@@ -23,9 +23,9 @@ Section bcred.
   Context `{OCM : OrderedCM.t A leR addO}.
   Canonical Structure bcredO := leibnizO bcred.
 
-  Local Infix "≤" := OrderedCM.le (at level 70).
+  Local Infix "≤" := leR (at level 70).
   Local Notation "0" := OrderedCM.unit.
-  Local Infix "⊕" := OrderedCM.add (at level 70).
+  Local Infix "⊕" := addO (at level 70).
   Local Infix "≃" := OrderedCM.eq (at level 70).
   Local Infix "⩓" := OrderedCM.meet (at level 70).
   Local Infix "⩔" := OrderedCM.join (at level 70).
@@ -179,8 +179,7 @@ Section bcred.
       rewrite bcred_valid in H. simpl in H. destruct H as (y&[Ha Hb]&(y0&y1&Hc&Hd&He)). 
       exists (credit_bound x). split.
       + esplit. split; [eauto|]. etransitivity; [|eauto]. etransitivity; [|eauto].
-        etransitivity; [eapply OrderedCM.add_left_le_proper; eauto|].
-        eapply @OrderedCM.add_right_le_proper; eauto.
+        eapply OrderedCM.add_le_proper; eauto.
       + rewrite bcred_op left_id_L. rewrite bcred_valid. simpl. exists x. split; [split; first done|done].
         eapply partition.closed; [|eauto]. etransitivity; [|eauto]. etransitivity; [eauto|].
         apply OrderedCM.add_base_right_le.

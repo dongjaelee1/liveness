@@ -25,9 +25,9 @@ Section bank.
   Context `{OCM : OrderedCM.t A leR addO}.
   Canonical Structure bankO := leibnizO bank.
 
-  Local Infix "≤" := OrderedCM.le (at level 70).
+  Local Infix "≤" := leR (at level 70).
   Local Notation "0" := OrderedCM.unit.
-  Local Infix "⊕" := OrderedCM.add (at level 70).
+  Local Infix "⊕" := addO (at level 70).
   Local Infix "≃" := OrderedCM.eq (at level 70).
   Local Infix "⩓" := OrderedCM.meet (at level 70).
   Local Infix "⩔" := OrderedCM.join (at level 70).
@@ -188,7 +188,7 @@ Section bank.
         etransitivity; [|eauto]. by apply quotient.add_right_le_proper.
     - rewrite right_id_L. auto using bank_valid_cash.
   Qed.
-  Lemma cash_update a0 a1 (LE : OrderedCM.le a0 a1) : cash a1 ~~> cash a0.
+  Lemma cash_update a0 a1 (LE : a0 ≤ a1) : cash a1 ~~> cash a0.
   Proof. apply bank_cash_update. by rewrite quotient.from_monoid_le. Qed.
 
   Lemma bank_debt_update a0 a1 s0 s1 q (LE1 : a0 /≤ a1) (LE2 : s0 /≤ s1) : BankDebt a0 s1 q ~~> BankDebt a1 s0 q.
@@ -206,7 +206,7 @@ Section bank.
       apply bank_valid_debt. split; [|auto].
       etransitivity; [eauto|]. etransitivity; [eauto|]. auto.
   Qed.
-  Lemma debt_update a0 a1 q (LE : OrderedCM.le a0 a1) : debt a0 q ~~> debt a1 q.
+  Lemma debt_update a0 a1 q (LE : a0 ≤ a1) : debt a0 q ~~> debt a1 q.
   Proof. apply bank_debt_update; [by rewrite quotient.from_monoid_le | reflexivity]. Qed.
 
   Lemma bank_debt_owe a0 a1 s : BankDebt a0 s 1 ~~> BankDebt (a0 /⊕ a1) s 1 ⋅ BankCash a1.

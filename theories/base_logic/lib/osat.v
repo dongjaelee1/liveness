@@ -1,89 +1,107 @@
-From iris.algebra Require Import gmap_view gset mono_nat.
+From iris.algebra Require Import gmap_view gset mono_nat excl_auth.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liveness Require Import orderedCM bcred.
+From liveness Require Import wfOrderedCM bcred.
 
-Inductive obl_type `{OrderedCM.t A leR addO} : Type :=
+Inductive obl_type `{WFOrderedCM.t A leR addO ltR} : Type :=
 | obl_init (a : A) | obl_live (a : A) | obl_done.
 
-Definition obl_type_lt `{OrderedCM.t A leR addO} (l1 l2 : obl_type) : Prop :=
+Definition obl_type_lt `{WFOrderedCM.t A leR addO ltR} (l1 l2 : obl_type) : Prop :=
   match l1, l2 with
   | obl_init a1, obl_init a2 => a1 = a2
-  | obl_live a1, obl_live a2 => OrderedCM.le a1 a2
+  | obl_live a1, obl_live a2 => WFOrderedCM.lt a1 a2
   | obl_done, obl_done => True
   | _, _ => False
+  end.
+
+Definition obl_type_lt_prod `{WFOrderedCM.t A leR addO ltR} {X : Type} (lx1 lx2 : prod obl_type X) : Prop :=
+  match lx1, lx2 with
+  | (l1, _), (l2, _) => obl_type_lt l1 l2
   end.
 
 (** All definitions in this file are internal to [fancy_updates] with the
 exception of what's in the [osatGS] module. The module [osatGS] is thus exported in
 [fancy_updates], where [osat] is only imported. *)
 Module osatGS.
-  Class osatGpreS `{SI : indexT} `{OrderedCM.t A leR addO} (Σ : gFunctors) : Set :=
+  Class osatGpreS `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     OsatGpreS {
-        osatGpreS_goal :
-        inG Σ (gmap_viewR positive (prodR (prodR (prodR (agreeR $ laterO (iPropO Σ)) bcredUR) mono_natUR) mono_natUR));
-        osatGpreS_dom : inG Σ (gset_disjR positive);
+        osatGpreS_obl :
+        inG Σ (gmap_viewR positive
+                 (prodR (prodR (prodR (agreeR $ laterO (iPropO Σ)) bcredUR) mono_natUR) mono_natUR));
+        osatGpreS_domain : inG Σ (excl_authUR (gset positive));
       }.
 
-  Class osatGS `{SI : indexT} `{OrderedCM.t A leR addO} (Σ : gFunctors) : Set :=
+  Class osatGS `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     OsatG {
         osat_inG : osatGpreS Σ;
         obligation_name : gname;
+        domain_name : gname;
       }.
 
-  Definition osatΣ `{SI : indexT} `{OrderedCM.t A leR addO} : gFunctors :=
+  Definition osatΣ `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} : gFunctors :=
     #[GFunctor (gmap_viewTRF positive (prodTRF (prodTRF (prodTRF (agreeTRF $ laterTF idTF) bcredUR) mono_natUR) mono_natUR));
-      GFunctor (gset_disjR positive)].
+      GFunctor (excl_authTRF (gsetO positive))].
 
-  Global Instance subG_osatΣ `{SI : indexT} `{OrderedCM.t A leR addO} {Σ} : subG osatΣ Σ → osatGpreS Σ.
+  Global Instance subG_osatΣ `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} {Σ} : subG osatΣ Σ → osatGpreS Σ.
   Proof. solve_inG. Qed.
 End osatGS.
 Import osatGS.
 
-TODO
-
 (* Make the instances local to this file. We cannot use #[local] in the code
 above, as that would make the instances local to the module. *)
-Local Existing Instances wsat_inG wsatGpreS_inv wsatGpreS_enabled wsatGpreS_disabled.
+Local Existing Instances osat_inG osatGpreS_obl osatGpreS_domain.
 
-Definition invariant_unfold `{SI : indexT} {Σ} (P : iProp Σ) : later (iProp Σ) :=
+Definition obl_goal_unfold `{SI : indexT} {Σ} (P : iProp Σ) : later (iProp Σ) :=
   Next P.
-Definition ownI `{SI : indexT} `{!wsatGS Σ} (i : positive) (P : iProp Σ) : iProp Σ :=
-  own invariant_name
-    (gmap_view_frag i DfracDiscarded (to_agree $ invariant_unfold P)).
-Global Typeclasses Opaque ownI.
-Global Instance: Params (@invariant_unfold) 2 := {}.
-Global Instance: Params (@ownI) 4 := {}.
+Definition oblG `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (P : iProp Σ) : iProp Σ :=
+  own obligation_name
+    (gmap_view_frag i DfracDiscarded (to_agree $ obl_goal_unfold P, ε, ε, ε)).
+Global Typeclasses Opaque oblG.
+Global Instance: Params (@obl_goal_unfold) 2 := {}.
+Global Instance: Params (@oblG) 8 := {}.
 
-Definition ownE `{SI : indexT} `{!wsatGS Σ} (E : coPset) : iProp Σ :=
-  own enabled_name (CoPset E).
-Global Typeclasses Opaque ownE.
-Global Instance: Params (@ownE) 4 := {}.
+Definition oblD_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (D : gset positive) : iProp Σ :=
+  own domain_name (●E D).
+Global Typeclasses Opaque oblD_auth.
+Global Instance: Params (@oblD_auth) 8 := {}.
 
-Definition ownD `{SI : indexT} `{!wsatGS Σ} (E : gset positive) : iProp Σ :=
-  own disabled_name (GSet E).
-Global Typeclasses Opaque ownD.
-Global Instance: Params (@ownD) 4 := {}.
+Definition oblD `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (D : gset positive) : iProp Σ :=
+  own domain_name (◯E D).
+Global Typeclasses Opaque oblD.
+Global Instance: Params (@oblD) 8 := {}.
 
-Definition wsat `{SI : indexT} `{!wsatGS Σ} : iProp Σ :=
+TODO
+
+Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ}
+  (Obls : gmap positive (prod obl_type (iProp Σ))) : iProp Σ :=
+  locked
+    (own obligation_name
+       (gmap_view_auth (DfracOwn 1)
+          ((λ x, (x, ε, ε, ε)) <$> (to_agree <$> (obl_goal_unfold <$> (snd <$> Obls))))) ∗
+     [∗ map] i ↦ oQ ∈ Obls,
+       match oQ with
+       | (o, Q) => ▷ Q
+       end)%I.
+
+Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} : iProp Σ :=
   locked (∃ I : gmap positive (iProp Σ),
     own invariant_name
-      (gmap_view_auth (DfracOwn 1) (to_agree <$> (invariant_unfold <$> I))) ∗
+      (gmap_view_auth (DfracOwn 1) (to_agree <$> (obl_goal_unfold <$> I))) ∗
     [∗ map] i ↦ Q ∈ I, ▷ Q ∗ ownD {[i]} ∨ ownE {[i]})%I.
 
-Section wsat.
-Context `{SI : indexT} `{!wsatGS Σ}.
+Section osat.
+Context `{SI : indexT} `{!osatGS Σ}.
 Implicit Types P : iProp Σ.
 
 (* Invariants *)
-Local Instance invariant_unfold_contractive : Contractive (@invariant_unfold SI Σ).
+Local Instance obl_goal_unfold_contractive : Contractive (@obl_goal_unfold SI Σ).
 Proof. solve_contractive. Qed.
-Global Instance ownI_contractive i : Contractive (@ownI SI Σ _ i).
+Global Instance oblG_contractive i : Contractive (@oblG SI Σ _ i).
 Proof. solve_contractive. Qed.
-Global Instance ownI_persistent i P : Persistent (ownI i P).
-Proof. rewrite /ownI. apply _. Qed.
+Global Instance oblG_persistent i P : Persistent (oblG i P).
+Proof. rewrite /oblG. apply _. Qed.
 
 Lemma ownE_empty : ⊢ |==> ownE ∅.
 Proof.
@@ -122,8 +140,8 @@ Lemma ownD_singleton_twice i : ownD {[i]} ∗ ownD {[i]} ⊢ False.
 Proof. rewrite ownD_disjoint. iIntros (?); set_solver. Qed.
 
 Lemma invariant_lookup (I : gmap positive (iProp Σ)) i P :
-  own invariant_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (invariant_unfold <$> I))) ∗
-  own invariant_name (gmap_view_frag i DfracDiscarded (to_agree $ invariant_unfold P)) ⊢
+  own invariant_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (obl_goal_unfold <$> I))) ∗
+  own invariant_name (gmap_view_frag i DfracDiscarded (to_agree $ obl_goal_unfold P)) ⊢
   ∃ Q, ⌜I !! i = Some Q⌝ ∗ ▷ (Q ≡ P).
 Proof.
   rewrite -own_op own_valid gmap_view_both_validI_total.
@@ -134,9 +152,9 @@ Proof.
   rewrite to_agree_includedI internal_eq_sym -later_equivI. done.
 Qed.
 
-Lemma ownI_open i P : wsat ∗ ownI i P ∗ ownE {[i]} ⊢ wsat ∗ ▷ P ∗ ownD {[i]}.
+Lemma oblG_open i P : osat ∗ oblG i P ∗ ownE {[i]} ⊢ osat ∗ ▷ P ∗ ownD {[i]}.
 Proof.
-  rewrite /ownI /wsat -!lock.
+  rewrite /oblG /osat -!lock.
   iIntros "(Hw & Hi & HiE)". iDestruct "Hw" as (I) "[Hw HI]".
   iDestruct (invariant_lookup I i P with "[$]") as (Q ?) "#HPQ".
   iDestruct (big_sepM_delete _ _ i with "HI") as "[[[HQ $]|HiE'] HI]"; eauto.
@@ -145,9 +163,9 @@ Proof.
     iFrame "HI"; eauto.
   - iDestruct (ownE_singleton_twice with "[$HiE $HiE']") as %[].
 Qed.
-Lemma ownI_close i P : wsat ∗ ownI i P ∗ ▷ P ∗ ownD {[i]} ⊢ wsat ∗ ownE {[i]}.
+Lemma oblG_close i P : osat ∗ oblG i P ∗ ▷ P ∗ ownD {[i]} ⊢ osat ∗ ownE {[i]}.
 Proof.
-  rewrite /ownI /wsat -!lock.
+  rewrite /oblG /osat -!lock.
   iIntros "(Hw & Hi & HP & HiD)". iDestruct "Hw" as (I) "[Hw HI]".
   iDestruct (invariant_lookup with "[$]") as (Q ?) "#HPQ".
   iDestruct (big_sepM_delete _ _ i with "HI") as "[[[HQ ?]|$] HI]"; eauto.
@@ -156,11 +174,11 @@ Proof.
     iFrame "HI". iLeft. iFrame "HiD". by iNext; iRewrite "HPQ".
 Qed.
 
-Lemma ownI_alloc φ P :
+Lemma oblG_alloc φ P :
   (∀ E : gset positive, ∃ i, i ∉ E ∧ φ i) →
-  wsat ∗ ▷ P ==∗ ∃ i, ⌜φ i⌝ ∗ wsat ∗ ownI i P.
+  osat ∗ ▷ P ==∗ ∃ i, ⌜φ i⌝ ∗ osat ∗ oblG i P.
 Proof.
-  iIntros (Hfresh) "[Hw HP]". rewrite /wsat -!lock.
+  iIntros (Hfresh) "[Hw HP]". rewrite /osat -!lock.
   iDestruct "Hw" as (I) "[Hw HI]".
   iMod (own_unit (gset_disjUR positive) disabled_name) as "HE".
   iMod (own_updateP with "[$]") as "HE".
@@ -171,18 +189,18 @@ Proof.
   iMod (own_update with "Hw") as "[Hw HiP]".
   { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree _)); [|done..].
     by rewrite /= !lookup_fmap HIi. }
-  iModIntro; iExists i;  iSplit; [done|]. rewrite /ownI; iFrame "HiP".
+  iModIntro; iExists i;  iSplit; [done|]. rewrite /oblG; iFrame "HiP".
   iExists (<[i:=P]>I); iSplitL "Hw".
   { by rewrite !fmap_insert. }
   iApply (big_sepM_insert _ I); first done.
   iFrame "HI". iLeft. by rewrite /ownD; iFrame.
 Qed.
 
-Lemma ownI_alloc_open φ P :
+Lemma oblG_alloc_open φ P :
   (∀ E : gset positive, ∃ i, i ∉ E ∧ φ i) →
-  wsat ==∗ ∃ i, ⌜φ i⌝ ∗ (ownE {[i]} -∗ wsat) ∗ ownI i P ∗ ownD {[i]}.
+  osat ==∗ ∃ i, ⌜φ i⌝ ∗ (ownE {[i]} -∗ osat) ∗ oblG i P ∗ ownD {[i]}.
 Proof.
-  iIntros (Hfresh) "Hw". rewrite /wsat -!lock. iDestruct "Hw" as (I) "[Hw HI]".
+  iIntros (Hfresh) "Hw". rewrite /osat -!lock. iDestruct "Hw" as (I) "[Hw HI]".
   iMod (own_unit (gset_disjUR positive) disabled_name) as "HD".
   iMod (own_updateP with "[$]") as "HD".
   { apply (gset_disj_alloc_empty_updateP_strong' (λ i, I !! i = None ∧ φ i)).
@@ -192,24 +210,24 @@ Proof.
   iMod (own_update with "Hw") as "[Hw HiP]".
   { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree _)); [|done..].
     by rewrite /= !lookup_fmap HIi. }
-  iModIntro; iExists i;  iSplit; [done|]. rewrite /ownI; iFrame "HiP".
+  iModIntro; iExists i;  iSplit; [done|]. rewrite /oblG; iFrame "HiP".
   rewrite -/(ownD _). iFrame "HD".
   iIntros "HE". iExists (<[i:=P]>I); iSplitL "Hw".
   { by rewrite !fmap_insert. }
   iApply (big_sepM_insert _ I); first done.
   iFrame "HI". by iRight.
 Qed.
-End wsat.
+End osat.
 
 (* Allocation of an initial world *)
-Lemma wsat_alloc `{SI : indexT} `{!wsatGpreS Σ} : ⊢ |==> ∃ _ : wsatGS Σ, wsat ∗ ownE ⊤.
+Lemma osat_alloc `{SI : indexT} `{!osatGpreS Σ} : ⊢ |==> ∃ _ : osatGS Σ, osat ∗ ownE ⊤.
 Proof.
   iIntros.
   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅)) as (γI) "HI";
     first by apply gmap_view_auth_valid.
   iMod (own_alloc (CoPset ⊤)) as (γE) "HE"; first done.
   iMod (own_alloc (GSet ∅)) as (γD) "HD"; first done.
-  iModIntro; iExists (WsatG SI _ _ γI γE γD).
-  rewrite /wsat /ownE -lock; iFrame.
+  iModIntro; iExists (OsatG SI _ _ γI γE γD).
+  rewrite /osat /ownE -lock; iFrame.
   iExists ∅. rewrite fmap_empty big_opM_empty. by iFrame.
 Qed.

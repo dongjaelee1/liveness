@@ -6,39 +6,46 @@ Require Import Program.
 (** Reference: "Module OrderedCM" in Lilo and FOS. *)
 Module OrderedCM.
   Class t {car : Type} (leR : car -> car -> Prop) (addO : car -> car -> car) := {
-      le := leR;
-      add := addO;
       unit : car;
-      #[global] le_PreOrder :: PreOrder le;
-      #[global] le_total :: Total le;
-      #[global] add_assoc_le :: Assoc le add;
-      #[global] add_comm_le :: Comm le add;
-      #[global] add_unit_left_le :: LeftId le unit add;
-      add_base_left_le : forall a0 a1, le a0 (add a0 a1);
-      #[global] add_left_le_proper :: forall a, Proper (le ==> le) (add a);
+      #[global] le_PreOrder :: PreOrder leR;
+      #[global] le_total :: Total leR;
+      #[global] add_assoc_le :: Assoc leR addO;
+      #[global] add_comm_le :: Comm leR addO;
+      #[global] add_unit_left_le :: LeftId leR unit addO;
+      add_base_left_le : forall a0 a1, leR a0 (addO a0 a1);
+      #[global] add_left_le_proper :: forall a, Proper (leR ==> leR) (addO a);
     }.
+
+  Definition eq `{t car leR addO} (a0 a1 : car) : Prop := leR a0 a1 /\ leR a1 a0.
+
+  Definition join `{t car leR addO} (a0 a1: car) : car :=
+    if (excluded_middle_informative (leR a0 a1)) then a1 else a0.
+
+  Definition meet `{t car leR addO} (a0 a1: car): car :=
+    if (excluded_middle_informative (leR a0 a1)) then a0 else a1.
 
   Section properties.
     Context `{t car leR addO}.
 
-    Definition eq (a0 a1 : car) : Prop := le a0 a1 /\ le a1 a0.
+    Local Notation le := leR.
+    Local Notation add := addO.
 
     Global Program Instance eq_Equivalence : Equivalence eq.
     Next Obligation.
-    Proof using.
+    Proof using Type*.
       unfold eq. intros x. split; reflexivity.
     Qed.
     Next Obligation.
-    Proof using.
+    Proof using Type*.
       unfold eq. intros x y [H1 H2]. split; auto.
     Qed.
     Next Obligation.
-    Proof using.
+    Proof using Type*.
       unfold eq. intros x y z [Ha1 Ha2] [Hb1 Hb2]. split; etransitivity; eauto.
     Qed.
 
     Global Instance add_assoc_eq : Assoc eq add.
-    Proof using.
+    Proof using Type*.
       repeat intro. split.
       { eapply add_assoc_le. }
       { etransitivity; [eapply add_comm_le |].
@@ -50,85 +57,94 @@ Module OrderedCM.
     Qed.
 
     Global Instance add_comm_eq : Comm eq add.
-    Proof using.
+    Proof using Type*.
       repeat intro. split; eapply add_comm_le.
     Qed.
 
     Global Instance add_unit_right_le : RightId le unit add.
-    Proof using.
+    Proof using Type*.
       intros a. etransitivity.
       { eapply add_comm_le. }
       { eapply add_unit_left_le. }
     Qed.
 
     Lemma add_base_right_le a0 a1 : le a1 (add a0 a1).
-    Proof using.
+    Proof using Type*.
       etransitivity.
       { eapply add_base_left_le. }
       { eapply add_comm_le. }
     Qed.
 
     Global Instance add_unit_left_eq : LeftId eq unit add.
-    Proof using.
+    Proof using Type*.
       intros a. split.
       { apply add_unit_left_le. }
       { apply add_base_right_le. }
     Qed.
 
     Global Instance add_unit_right_eq : RightId eq unit add.
-    Proof using.
+    Proof using Type*.
       intros a. etransitivity.
       { eapply add_comm_eq. }
       { eapply add_unit_left_eq. }
     Qed.
 
     Global Instance add_right_le_proper : forall a, Proper (le ==> le) (flip add a).
-    Proof using.
-      repeat intro. etransitivity.
+    Proof using Type*.
+      repeat intro. simpl. etransitivity.
       { eapply add_comm_le. }
       etransitivity.
       { eapply add_left_le_proper; eauto. }
       eapply add_comm_le.
     Qed.
 
+    Global Instance add_le_proper : Proper (le ==> le ==> le) add.
+    Proof using Type*.
+      repeat intro. etransitivity.
+      { eapply add_left_le_proper. eauto. }
+      eapply add_right_le_proper. auto.
+    Qed.
+
     Lemma unit_le a : le unit a.
-    Proof using.
+    Proof using Type*.
       etransitivity.
       { eapply add_base_right_le. }
       { eapply add_unit_right_le. }
     Qed.
 
     Global Instance add_left_eq_proper : forall a, Proper (eq ==> eq) (add a).
-    Proof using.
+    Proof using Type*.
       intros a b c [H1 H2]. split; eapply add_left_le_proper; eauto.
     Qed.
 
     Global Instance add_right_eq_proper : forall a, Proper (eq ==> eq) (flip add a).
-    Proof using.
+    Proof using Type*.
       intros a b c [H1 H2]. split; eapply add_right_le_proper; eauto.
     Qed.
 
-    Definition join (a0 a1: car) : car :=
-      if (excluded_middle_informative (le a0 a1)) then a1 else a0.
+    Global Instance add_eq_proper : Proper (eq ==> eq ==> eq) add.
+    Proof using Type*.
+      intros a b [H1 H2] c d [H3 H4]. split; eapply add_le_proper; eauto.
+    Qed.
 
     Lemma join_left_le a0 a1 : le a0 (join a0 a1).
-    Proof using.
+    Proof using Type*.
       unfold join. destruct (excluded_middle_informative); auto. reflexivity.
     Qed.
 
     Lemma join_right_le a0 a1 : le a1 (join a0 a1).
-    Proof using.
+    Proof using Type*.
       unfold join. destruct (excluded_middle_informative). reflexivity.
-      destruct (le_total a0 a1); auto. congruence.
+      destruct (le_total a0 a1); auto. contradiction.
     Qed.
 
     Lemma join_supremum a0 a1 a (LE0: le a0 a) (LE1: le a1 a) : le (join a0 a1) a.
-    Proof using.
+    Proof using Type*.
       unfold join. destruct (excluded_middle_informative); auto.
     Qed.
 
     Global Instance join_assoc_le : Assoc le join.
-    Proof using.
+    Proof using Type*.
       repeat intro. eapply join_supremum.
       { etransitivity; eapply join_left_le. }
       eapply join_supremum.
@@ -140,28 +156,28 @@ Module OrderedCM.
     Qed.
 
     Global Instance join_comm_le : Comm le join.
-    Proof using.
+    Proof using Type*.
       repeat intro. eapply join_supremum.
       { eapply join_right_le. }
       { eapply join_left_le. }
     Qed.
 
     Global Instance join_unit_left_le : LeftId le unit join.
-    Proof using.
+    Proof using Type*.
       repeat intro. eapply join_supremum.
       { eapply unit_le. }
       { reflexivity. }
     Qed.
 
     Global Instance join_left_le_proper : forall a, Proper (le ==> le) (join a).
-    Proof using.
+    Proof using Type*.
       repeat intro. eapply join_supremum.
       { eapply join_left_le. }
       { etransitivity; eauto. eapply join_right_le. }
     Qed.
 
     Global Instance join_assoc_eq : Assoc eq join.
-    Proof using.
+    Proof using Type*.
       repeat intro. split.
       { eapply join_assoc_le. }
       { etransitivity; [eapply join_comm_le |].
@@ -173,33 +189,33 @@ Module OrderedCM.
     Qed.
 
     Global Instance join_comm_eq : Comm eq join.
-    Proof using.
+    Proof using Type*.
       repeat intro. split; eapply join_comm_le.
     Qed.
 
     Global Instance join_unit_right_le : RightId le unit join.
-    Proof using.
+    Proof using Type*.
       repeat intro. etransitivity.
       { eapply join_comm_le. }
       { eapply join_unit_left_le. }
     Qed.
 
     Global Instance join_unit_left_eq : LeftId eq unit join.
-    Proof using.
+    Proof using Type*.
       repeat intro. split.
       { apply join_unit_left_le. }
       { apply join_right_le. }
     Qed.
 
     Global Instance join_unit_right_eq : RightId eq unit join.
-    Proof using.
+    Proof using Type*.
       repeat intro. etransitivity.
       { eapply join_comm_eq. }
       { eapply join_unit_left_eq. }
     Qed.
 
     Global Instance join_right_le_proper : forall a, Proper (le ==> le) (flip join a).
-    Proof using.
+    Proof using Type*.
       repeat intro. etransitivity.
       { eapply join_comm_le. }
       etransitivity.
@@ -207,14 +223,25 @@ Module OrderedCM.
       { eapply join_comm_le. }
     Qed.
 
+    Global Instance join_le_proper : Proper (le ==> le ==> le) join.
+    Proof using Type*.
+      repeat intro. etransitivity; [eapply join_left_le_proper; eauto |].
+      eapply join_right_le_proper; eauto.
+    Qed.
+
     Global Instance join_left_eq_proper : forall a, Proper (eq ==> eq) (join a).
-    Proof using.
+    Proof using Type*.
       intros x y z [H1 H2]. split; eapply join_left_le_proper; eauto.
     Qed.
 
     Global Instance join_right_eq_proper : forall a, Proper (eq ==> eq) (flip join a).
-    Proof using.
+    Proof using Type*.
       intros x y z [H1 H2]. split; eapply join_right_le_proper; eauto.
+    Qed.
+
+    Global Instance join_eq_proper : Proper (eq ==> eq ==> eq) join.
+    Proof using Type*.
+      intros x y [H1 H2] a b [H3 H4]. split; eapply join_le_proper; eauto.
     Qed.
 
     Global Instance join_idemp_le : IdemP le join.
@@ -222,29 +249,26 @@ Module OrderedCM.
     Global Instance join_idemp_eq : IdemP eq join.
     Proof. repeat intro. split; [apply join_idemp_le | apply join_left_le]. Qed.
 
-    Definition meet (a0 a1: car): car :=
-      if (excluded_middle_informative (le a0 a1)) then a0 else a1.
-
     Global Instance meet_left_le : forall a, LeftAbsorb le a meet.
-    Proof using.
+    Proof using Type*.
       repeat intro. unfold meet. destruct (excluded_middle_informative (le a x)).
       { reflexivity. }
-      { destruct (le_total a x); auto. congruence. }
+      { destruct (le_total a x); auto. contradiction. }
     Qed.
 
     Global Instance meet_right_le : forall a, RightAbsorb le a meet.
-    Proof using.
+    Proof using Type*.
       repeat intro. unfold meet. destruct (excluded_middle_informative (le x a)); auto.
       reflexivity.
     Qed.
 
     Lemma meet_infimum a0 a1 a (LE0: le a a0) (LE1: le a a1) : le a (meet a0 a1).
-    Proof using.
+    Proof using Type*.
       unfold meet. destruct (excluded_middle_informative (le a0 a1)); auto.
     Qed.
 
     Global Instance meet_assoc_le : Assoc le meet.
-    Proof using.
+    Proof using Type*.
       repeat intro. eapply meet_infimum.
       { eapply meet_infimum.
         { eapply meet_left_le. }
@@ -256,21 +280,21 @@ Module OrderedCM.
     Qed.
 
     Global Instance meet_comm_le : Comm le meet.
-    Proof using.
+    Proof using Type*.
       repeat intro. eapply meet_infimum.
       { eapply meet_right_le. }
       { eapply meet_left_le. }
     Qed.
 
     Global Instance meet_left_le_proper : forall a, Proper (le ==> le) (meet a).
-    Proof using.
+    Proof using Type*.
       repeat intro. eapply meet_infimum.
       { eapply meet_left_le. }
       { etransitivity; eauto. eapply meet_right_le. }
     Qed.
 
     Global Instance meet_right_le_proper : forall a, Proper (le ==> le) (flip meet a).
-    Proof using.
+    Proof using Type*.
       repeat intro. etransitivity.
       { eapply meet_comm_le. }
       etransitivity.
@@ -278,8 +302,14 @@ Module OrderedCM.
       { eapply meet_comm_le. }
     Qed.
 
+    Global Instance meet_le_proper : Proper (le ==> le ==> le) meet.
+    Proof using Type*.
+      repeat intro. etransitivity; [eapply meet_left_le_proper; eauto |].
+      eapply meet_right_le_proper; eauto.
+    Qed.
+
     Global Instance meet_assoc_eq : Assoc eq meet.
-    Proof using.
+    Proof using Type*.
       repeat intro. split.
       { eapply meet_assoc_le. }
       { etransitivity; [eapply meet_comm_le |].
@@ -291,32 +321,37 @@ Module OrderedCM.
     Qed.
 
     Global Instance meet_comm_eq : Comm eq meet.
-    Proof using.
+    Proof using Type*.
       repeat intro. split; eapply meet_comm_le.
     Qed.
 
     Global Instance meet_unit_left_eq : LeftAbsorb eq unit meet.
-    Proof using.
+    Proof using Type*.
       repeat intro. split.
       { apply meet_left_le. }
       { apply unit_le. }
     Qed.
 
     Global Instance meet_unit_right_eq : RightAbsorb eq unit meet.
-    Proof using.
+    Proof using Type*.
       repeat intro. split.
       { apply meet_right_le. }
       { apply unit_le. }
     Qed.
 
     Global Instance meet_left_eq_proper : forall a, Proper (eq ==> eq) (meet a).
-    Proof using.
+    Proof using Type*.
       intros a b c [H1 H2]. split; eapply meet_left_le_proper; eauto.
     Qed.
 
     Global Instance meet_right_eq_proper : forall a, Proper (eq ==> eq) (flip meet a).
-    Proof using.
+    Proof using Type*.
       intros a b c [H1 H2]. split; eapply meet_right_le_proper; eauto.
+    Qed.
+
+    Global Instance meet_eq_proper : Proper (eq ==> eq ==> eq) meet.
+    Proof using Type*.
+      intros a b [H1 H2] c d [H3 H4]. split; eapply meet_le_proper; eauto.
     Qed.
 
     Global Instance meet_idemp_le : IdemP le meet.
@@ -326,35 +361,30 @@ Module OrderedCM.
 
   End properties.
 
-  Global Program Instance flip_add `{t car leR addO} : t leR (flip addO) :=
-    Build_t _ leR (flip addO) unit le_PreOrder le_total _ _ _ _ _.
-  Next Obligation.
-    destruct H. subst le0 add0.
-    intros a b c. simpl.
-    etransitivity; [rewrite add_comm_le0|].
-    { eapply add_left_le_proper0. apply add_comm_le0. }
-    etransitivity; [eapply add_assoc_le0|].
-    etransitivity; [rewrite add_comm_le0|].
-    { eapply add_left_le_proper0. apply add_comm_le0. }
-    reflexivity.
-  Qed.
-  Next Obligation.
-    destruct H. subst le0 add0.
-    intros a b. simpl. apply add_comm_le0.
-  Qed.
-  Next Obligation.
-    destruct H. subst le0 add0.
-    intros a. simpl. etransitivity; [eapply add_comm_le0|]. apply add_unit_left_le0.
-  Qed.
-  Next Obligation.
-    destruct H. subst le0 add0.
-    etransitivity; [|eapply add_comm_le0]. apply add_base_left_le0.
-  Qed.
-  Next Obligation.
-    destruct H. subst le0 add0.
-    intros b c H. simpl. etransitivity; [eapply add_comm_le0|]. etransitivity; [|eapply add_comm_le0].
-    apply add_left_le_proper0; auto.
-  Qed.
+  (* Global Program Instance flip_add `{t car leR addO} : t leR (flip addO) := *)
+  (*   Build_t _ leR (flip addO) unit le_PreOrder le_total _ _ _ _ _. *)
+  (* Next Obligation. *)
+  (*   destruct H. *)
+  (*   intros a b c. simpl. *)
+  (*   etransitivity; [rewrite add_comm_le0|]. *)
+  (*   { eapply add_left_le_proper0. apply add_comm_le0. } *)
+  (*   etransitivity; [eapply add_assoc_le0|]. *)
+  (*   etransitivity; [rewrite add_comm_le0|]. *)
+  (*   { eapply add_left_le_proper0. apply add_comm_le0. } *)
+  (*   reflexivity. *)
+  (* Qed. *)
+  (* Next Obligation. *)
+  (*   destruct H. *)
+  (*   intros a b. simpl. apply add_comm_le0. *)
+  (* Qed. *)
+  (* Next Obligation. *)
+  (*   destruct H. *)
+  (*   intros a. simpl. etransitivity; [eapply add_comm_le0|]. apply add_unit_left_le0. *)
+  (* Qed. *)
+  (* Next Obligation. *)
+  (*   destruct H. *)
+  (*   etransitivity; [|eapply add_comm_le0]. apply add_base_left_le0. *)
+  (* Qed. *)
 
 End OrderedCM.
 
@@ -364,11 +394,11 @@ Module quotient.
 
   Record t {A : Type} (leR : A -> A -> Prop) (addO : A -> A -> A) `{OrderedCM.t A leR addO} := {
       collection :> A -> Prop;
-      generated : exists a0, forall a1, collection a1 <-> OrderedCM.le a0 a1;
+      generated : exists a0, forall a1, collection a1 <-> leR a0 a1;
     }.
 
   Global Program Definition from_monoid `{OrderedCM.t A leR addO} (a : A) : t leR addO :=
-    Build_t _ _ _ _ (OrderedCM.le a) _.
+    Build_t _ _ _ _ (leR a) _.
   Next Obligation.
     intros. exists a. intros. auto.
   Qed.
@@ -376,12 +406,9 @@ Module quotient.
   Definition le `{OrderedCM.t A leR addO} (s0 s1 : t leR addO) : Prop :=
     forall a, s1 a -> s0 a.
 
-  Global Program Instance le_PreOrder `{OrderedCM.t A leR addO} : PreOrder le.
-  Next Obligation.
-    repeat intro. auto.
-  Qed.
-  Next Obligation.
-    repeat intro. eauto.
+  Global Instance le_PreOrder `{OrderedCM.t A leR addO} : PreOrder le.
+  Proof.
+    split; repeat intro; eauto.
   Qed.
 
   Global Instance le_antisymm `{OrderedCM.t A leR addO} : AntiSymm (=) le.
@@ -407,13 +434,11 @@ Module quotient.
   Qed.
 
   Lemma from_monoid_iff `{OrderedCM.t A leR addO} a0 a1 :
-    from_monoid a0 a1 <-> OrderedCM.le a0 a1.
-  Proof.
-    simpl. auto.
-  Qed.
+    from_monoid a0 a1 <-> leR a0 a1.
+  Proof. simpl. auto. Qed.
 
   Lemma from_monoid_le `{OrderedCM.t A leR addO} a0 a1 :
-    le (from_monoid a0) (from_monoid a1) <-> OrderedCM.le a0 a1.
+    le (from_monoid a0) (from_monoid a1) <-> leR a0 a1.
   Proof.
     split.
     { repeat intro. rewrite <- from_monoid_iff. simpl.
@@ -439,17 +464,14 @@ Module quotient.
   Qed.
 
   Global Program Definition add `{OrderedCM.t A leR addO} (s0 s1 : t leR addO) : t leR addO :=
-    Build_t _ _ _ _ (fun a => exists a0 a1 (IN0: s0 a0) (IN1: s1 a1),
-                         OrderedCM.le (OrderedCM.add a0 a1) a) _.
+    Build_t _ _ _ _ (fun a => exists a0 a1 (IN0: s0 a0) (IN1: s1 a1), leR (addO a0 a1) a) _.
   Next Obligation.
     destruct (from_monoid_exist s0) as [a H0].
     destruct (from_monoid_exist s1) as [a0 H1].
-    subst. exists (OrderedCM.add a a0). intros. split.
+    subst. exists (addO a a0). intros. split.
     { intros [a2 [a3 [H1 [H2 H3]]]]. etransitivity.
-      { eapply OrderedCM.add_right_le_proper. erewrite <- from_monoid_iff. eauto. }
-      etransitivity.
-      { eapply OrderedCM.add_left_le_proper. erewrite <- from_monoid_iff. eauto. }
-      eauto.
+      { eapply OrderedCM.add_le_proper; erewrite <- from_monoid_iff; eauto. }
+      auto.
     }
     intros. repeat esplit.
     { erewrite from_monoid_iff. reflexivity. }
@@ -490,14 +512,12 @@ Module quotient.
   Qed.
 
   Lemma from_monoid_add `{OrderedCM.t A leR addO} a0 a1 :
-    add (from_monoid a0) (from_monoid a1) = from_monoid (OrderedCM.add a0 a1).
+    add (from_monoid a0) (from_monoid a1) = from_monoid (addO a0 a1).
   Proof.
     eapply ext. intros. split.
     { intros. simpl in *. destruct H0 as [a2 [a3 [H1 [H2 H3]]]]. etransitivity.
-      { eapply OrderedCM.add_right_le_proper. eauto. }
-      etransitivity.
-      { eapply OrderedCM.add_left_le_proper. eauto. }
-      { eauto. }
+      { eapply OrderedCM.add_le_proper; eauto. }
+      auto.
     }
     { intros. simpl in *. repeat esplit.
       { reflexivity. }
@@ -506,7 +526,7 @@ Module quotient.
     }
   Qed.
 
-  Lemma from_monoid_join_right `{OrderedCM.t A leR addO} a0 a1 (LE: OrderedCM.le a0 a1) :
+  Lemma from_monoid_join_right `{OrderedCM.t A leR addO} a0 a1 (LE: leR a0 a1) :
     join (from_monoid a0) (from_monoid a1) = from_monoid a1.
   Proof.
     eapply ext. intros. split.
@@ -514,7 +534,7 @@ Module quotient.
     { intros. simpl in *. split; auto. etransitivity; eauto. }
   Qed.
 
-  Lemma from_monoid_join_left `{OrderedCM.t A leR addO} a0 a1 (LE: OrderedCM.le a1 a0) :
+  Lemma from_monoid_join_left `{OrderedCM.t A leR addO} a0 a1 (LE : leR a1 a0) :
     join (from_monoid a0) (from_monoid a1) = from_monoid a0.
   Proof.
     eapply ext. intros. split.
@@ -522,7 +542,7 @@ Module quotient.
     { intros. simpl in *. split; auto. etransitivity; eauto. }
   Qed.
 
-  Lemma from_monoid_meet_left `{OrderedCM.t A leR addO} a0 a1 (LE: OrderedCM.le a0 a1) :
+  Lemma from_monoid_meet_left `{OrderedCM.t A leR addO} a0 a1 (LE : leR a0 a1) :
     meet (from_monoid a0) (from_monoid a1) = from_monoid a0.
   Proof.
     eapply ext. intros. split.
@@ -530,7 +550,7 @@ Module quotient.
     { intros. simpl in *. left. auto. }
   Qed.
 
-  Lemma from_monoid_meet_right `{OrderedCM.t A leR addO} a0 a1 (LE: OrderedCM.le a1 a0) :
+  Lemma from_monoid_meet_right `{OrderedCM.t A leR addO} a0 a1 (LE : leR a1 a0) :
     meet (from_monoid a0) (from_monoid a1) = from_monoid a1.
   Proof.
     eapply ext. intros. split.
@@ -693,88 +713,100 @@ Module quotient.
   Global Instance meet_right_le `{OrderedCM.t A leR addO} : forall a, RightAbsorb le a meet.
   Proof. repeat intro. simpl. auto. Qed.
 
+  Global Instance add_le_proper `{OrderedCM.t A leR addO} : Proper (le ==> le ==> le) add.
+  Proof.
+    intros a b LE c d LE0.
+    destruct (from_monoid_exist a); destruct (from_monoid_exist b);
+      destruct (from_monoid_exist c); destruct (from_monoid_exist d); subst.
+    rewrite !from_monoid_add. rewrite from_monoid_le.
+    apply OrderedCM.add_le_proper; apply from_monoid_le; auto.
+  Qed.
+  Global Instance add_eq_proper `{OrderedCM.t A leR addO} : Proper (eq ==> eq ==> eq) add.
+  Proof.
+    intros a b LE c d LE0.
+    destruct (from_monoid_exist a); destruct (from_monoid_exist b);
+      destruct (from_monoid_exist c); destruct (from_monoid_exist d); subst.
+    rewrite !from_monoid_add. rewrite from_monoid_eq.
+    apply OrderedCM.add_eq_proper; apply from_monoid_eq; auto.
+  Qed.
   Global Instance add_left_le_proper `{OrderedCM.t A leR addO} : forall a, Proper (le ==> le) (add a).
-  Proof.
-    intros a x y H0. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_add. rewrite from_monoid_le. apply OrderedCM.add_left_le_proper. apply from_monoid_le; auto.
-  Qed.
+  Proof. intros a x y H0. apply add_le_proper; [reflexivity | auto]. Qed.
   Global Instance add_left_eq_proper `{OrderedCM.t A leR addO} : forall a, Proper (eq ==> eq) (add a).
-  Proof.
-    intros a x y H0. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_add. rewrite from_monoid_eq. apply OrderedCM.add_left_eq_proper. apply from_monoid_eq; auto.
-  Qed.
+  Proof. intros a x y H0. apply add_eq_proper; [reflexivity | auto]. Qed.
   Global Instance add_right_le_proper `{OrderedCM.t A leR addO} : forall a, Proper (le ==> le) (flip add a).
-  Proof.
-    intros a x y H0. simpl. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_add. rewrite from_monoid_le. eapply @OrderedCM.add_right_le_proper. apply from_monoid_le; auto.
-  Qed.
+  Proof. intros a x y H0. apply add_le_proper; [auto | reflexivity]. Qed.
   Global Instance add_right_eq_proper `{OrderedCM.t A leR addO} : forall a, Proper (eq ==> eq) (flip add a).
-  Proof.
-    intros a x y H0. simpl. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_add. rewrite from_monoid_eq. apply @OrderedCM.add_right_eq_proper. apply from_monoid_eq; auto.
-  Qed.
+  Proof. intros a x y H0. apply add_eq_proper; [auto | reflexivity]. Qed.
 
-  Global Instance join_left_le_proper `{OrderedCM.t A leR addO} : forall a, Proper (le ==> le) (join a).
+  Global Instance join_le_proper `{OrderedCM.t A leR addO} : Proper (le ==> le ==> le) join.
   Proof.
-    intros a x y H0. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_join. rewrite from_monoid_le. apply OrderedCM.join_left_le_proper. apply from_monoid_le; auto.
+    intros a b LE c d LE0.
+    destruct (from_monoid_exist a); destruct (from_monoid_exist b);
+      destruct (from_monoid_exist c); destruct (from_monoid_exist d); subst.
+    rewrite !from_monoid_join. rewrite from_monoid_le.
+    apply OrderedCM.join_le_proper; apply from_monoid_le; auto.
   Qed.
-  Global Instance join_left_eq_proper `{OrderedCM.t A leR addO} : forall a, Proper (eq ==> eq) (join a).
+  Global Instance join_eq_proper `{OrderedCM.t A leR addO} : Proper (eq ==> eq ==> eq) join.
   Proof.
-    intros a x y H0. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_join. rewrite from_monoid_eq. apply OrderedCM.join_left_eq_proper. apply from_monoid_eq; auto.
+    intros a b LE c d LE0.
+    destruct (from_monoid_exist a); destruct (from_monoid_exist b);
+      destruct (from_monoid_exist c); destruct (from_monoid_exist d); subst.
+    rewrite !from_monoid_join. rewrite from_monoid_eq.
+    apply OrderedCM.join_eq_proper; apply from_monoid_eq; auto.
   Qed.
-  Global Instance join_right_le_proper `{OrderedCM.t A leR addO} : forall a, Proper (le ==> le) (flip join a).
-  Proof.
-    intros a x y H0. simpl. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_join. rewrite from_monoid_le. apply OrderedCM.join_right_le_proper. apply from_monoid_le; auto.
-  Qed.
-  Global Instance join_right_eq_proper `{OrderedCM.t A leR addO} : forall a, Proper (eq ==> eq) (flip join a).
-  Proof.
-    intros a x y H0. simpl. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_join. rewrite from_monoid_eq. apply OrderedCM.join_right_eq_proper. apply from_monoid_eq; auto.
-  Qed.
+  Global Instance join_left_le_proper `{OrderedCM.t A leR joinO} : forall a, Proper (le ==> le) (join a).
+  Proof. intros a x y H0. apply join_le_proper; [reflexivity | auto]. Qed.
+  Global Instance join_left_eq_proper `{OrderedCM.t A leR joinO} : forall a, Proper (eq ==> eq) (join a).
+  Proof. intros a x y H0. apply join_eq_proper; [reflexivity | auto]. Qed.
+  Global Instance join_right_le_proper `{OrderedCM.t A leR joinO} : forall a, Proper (le ==> le) (flip join a).
+  Proof. intros a x y H0. apply join_le_proper; [auto | reflexivity]. Qed.
+  Global Instance join_right_eq_proper `{OrderedCM.t A leR joinO} : forall a, Proper (eq ==> eq) (flip join a).
+  Proof. intros a x y H0. apply join_eq_proper; [auto | reflexivity]. Qed.
 
-  Global Instance meet_left_le_proper `{OrderedCM.t A leR addO} : forall a, Proper (le ==> le) (meet a).
+  Global Instance meet_le_proper `{OrderedCM.t A leR addO} : Proper (le ==> le ==> le) meet.
   Proof.
-    intros a x y H0. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_meet. rewrite from_monoid_le. apply OrderedCM.meet_left_le_proper. apply from_monoid_le; auto.
+    intros a b LE c d LE0.
+    destruct (from_monoid_exist a); destruct (from_monoid_exist b);
+      destruct (from_monoid_exist c); destruct (from_monoid_exist d); subst.
+    rewrite !from_monoid_meet. rewrite from_monoid_le.
+    apply OrderedCM.meet_le_proper; apply from_monoid_le; auto.
   Qed.
-  Global Instance meet_left_eq_proper `{OrderedCM.t A leR addO} : forall a, Proper (eq ==> eq) (meet a).
+  Global Instance meet_eq_proper `{OrderedCM.t A leR addO} : Proper (eq ==> eq ==> eq) meet.
   Proof.
-    intros a x y H0. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_meet. rewrite from_monoid_eq. apply OrderedCM.meet_left_eq_proper. apply from_monoid_eq; auto.
+    intros a b LE c d LE0.
+    destruct (from_monoid_exist a); destruct (from_monoid_exist b);
+      destruct (from_monoid_exist c); destruct (from_monoid_exist d); subst.
+    rewrite !from_monoid_meet. rewrite from_monoid_eq.
+    apply OrderedCM.meet_eq_proper; apply from_monoid_eq; auto.
   Qed.
-  Global Instance meet_right_le_proper `{OrderedCM.t A leR addO} : forall a, Proper (le ==> le) (flip meet a).
-  Proof.
-    intros a x y H0. simpl. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_meet. rewrite from_monoid_le. apply OrderedCM.meet_right_le_proper. apply from_monoid_le; auto.
-  Qed.
-  Global Instance meet_right_eq_proper `{OrderedCM.t A leR addO} : forall a, Proper (eq ==> eq) (flip meet a).
-  Proof.
-    intros a x y H0. simpl. destruct (from_monoid_exist a); destruct (from_monoid_exist x); destruct (from_monoid_exist y); subst.
-    rewrite !from_monoid_meet. rewrite from_monoid_eq. apply OrderedCM.meet_right_eq_proper. apply from_monoid_eq; auto.
-  Qed.
+  Global Instance meet_left_le_proper `{OrderedCM.t A leR meetO} : forall a, Proper (le ==> le) (meet a).
+  Proof. intros a x y H0. apply meet_le_proper; [reflexivity | auto]. Qed.
+  Global Instance meet_left_eq_proper `{OrderedCM.t A leR meetO} : forall a, Proper (eq ==> eq) (meet a).
+  Proof. intros a x y H0. apply meet_eq_proper; [reflexivity | auto]. Qed.
+  Global Instance meet_right_le_proper `{OrderedCM.t A leR meetO} : forall a, Proper (le ==> le) (flip meet a).
+  Proof. intros a x y H0. apply meet_le_proper; [auto | reflexivity]. Qed.
+  Global Instance meet_right_eq_proper `{OrderedCM.t A leR meetO} : forall a, Proper (eq ==> eq) (flip meet a).
+  Proof. intros a x y H0. apply meet_eq_proper; [auto | reflexivity]. Qed.
 
   Lemma join_supremum `{OrderedCM.t A leR addO} a0 a1 a (LE0: le a0 a) (LE1: le a1 a) : le (join a0 a1) a.
-  Proof using.
+  Proof using Type*.
     destruct (from_monoid_exist a); destruct (from_monoid_exist a0); destruct (from_monoid_exist a1); subst.    
     rewrite from_monoid_join, !from_monoid_le in *. apply OrderedCM.join_supremum; auto.
   Qed.
 
   Lemma meet_infimum `{OrderedCM.t A leR addO} a0 a1 a (LE0: le a a0) (LE1: le a a1) : le a (meet a0 a1).
-  Proof using.
+  Proof using Type*.
     destruct (from_monoid_exist a); destruct (from_monoid_exist a0); destruct (from_monoid_exist a1); subst.    
     rewrite from_monoid_meet, !from_monoid_le in *. apply OrderedCM.meet_infimum; auto.
   Qed.
 
   Lemma join_left_le `{OrderedCM.t A leR addO} a0 a1 : le a0 (join a0 a1).
-  Proof using.
+  Proof using Type*.
     destruct (from_monoid_exist a0); destruct (from_monoid_exist a1); subst.
     rewrite from_monoid_join, from_monoid_le. apply OrderedCM.join_left_le.
   Qed.
   Lemma join_right_le `{OrderedCM.t A leR addO} a0 a1 : le a1 (join a0 a1).
-  Proof using.
+  Proof using Type*.
     destruct (from_monoid_exist a0); destruct (from_monoid_exist a1); subst.
     rewrite from_monoid_join, from_monoid_le. apply OrderedCM.join_right_le.
   Qed.
@@ -797,7 +829,7 @@ Module partition.
 
   Record t {A : Type} (leR : A -> A -> Prop) (addO : A -> A -> A) `{OrderedCM.t A leR addO} := {
       collection :> A -> Prop;
-      closed: forall a0 a1 (LE: OrderedCM.le a0 a1),
+      closed: forall a0 a1 (LE : leR a0 a1),
         collection a1 -> collection a0;
     }.
 
@@ -816,11 +848,11 @@ Module partition.
     Build_t _ _ _ _ (fun _ => True) _.
 
   Program Definition from_monoid `{OrderedCM.t A leR addO} (a : A): t leR addO :=
-    Build_t _ _ _ _ (fun a' => OrderedCM.le a' a) _.
+    Build_t _ _ _ _ (fun a' => leR a' a) _.
   Next Obligation. etransitivity; eauto. Qed.
 
   Lemma from_monoid_iff `{OrderedCM.t A leR addO} a0 a1 :
-    from_monoid a0 a1 <-> OrderedCM.le a1 a0.
+    from_monoid a0 a1 <-> leR a1 a0.
   Proof.
     simpl. auto.
   Qed.
@@ -841,7 +873,7 @@ Module partition.
     }
   Qed.
 
-  Lemma from_monoid_meet_left `{OrderedCM.t A leR addO} a0 a1 (LE: OrderedCM.le a0 a1) :
+  Lemma from_monoid_meet_left `{OrderedCM.t A leR addO} a0 a1 (LE : leR a0 a1) :
     meet (from_monoid a0) (from_monoid a1) = from_monoid a0.
   Proof.
     eapply ext. intros. split.
@@ -849,7 +881,7 @@ Module partition.
     { intros. simpl in *. split; [auto|]. etransitivity; eauto. }
   Qed.
 
-  Lemma from_monoid_meet_right `{OrderedCM.t A leR addO} a0 a1 (LE: OrderedCM.le a1 a0) :
+  Lemma from_monoid_meet_right `{OrderedCM.t A leR addO} a0 a1 (LE : leR a1 a0) :
     meet (from_monoid a0) (from_monoid a1) = from_monoid a1.
   Proof.
     eapply ext. intros. split.
@@ -902,6 +934,8 @@ Module partition.
   Proof. intros a x y H0. subst. auto. Qed.
   Global Instance meet_right_eq_proper `{OrderedCM.t A leR addO} : forall a, Proper (eq ==> eq) (flip meet a).
   Proof. intros a x y H0. subst. auto. Qed.
+  Global Instance meet_eq_proper `{OrderedCM.t A leR addO} : Proper (eq ==> eq ==> eq) meet.
+  Proof. intros a b H0 c d H1. subst; auto. Qed.
 
   Global Instance meet_idemp_eq `{OrderedCM.t A leR addO} : IdemP (=) meet.
   Proof. intro x. apply ext. simpl. split; [intros [H0 _]; auto | auto]. Qed.
