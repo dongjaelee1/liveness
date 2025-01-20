@@ -1,5 +1,6 @@
 From stdpp Require Import base.
 From liveness Require Export orderedCM.
+Require Import Lia Program.
 
 Module WFOrderedCM.
   Class t {A : Type} (leR : A -> A -> Prop) (addO : A -> A -> A) (ltR : A -> A -> Prop) := {
@@ -12,7 +13,7 @@ Module WFOrderedCM.
     Context `{t A leR addO ltR}.
 
     Lemma lt_le_add_r : forall a b c, (ltR OrderedCM.unit a) -> (leR (addO a b) c) -> (ltR b c).
-    Proof using.
+    Proof using Type*.
       intros a b c LT LE. assert (leR (addO b a) c).
       { etransitivity. eapply OrderedCM.add_comm_le. auto. }
       eapply lt_le_add_l; eauto.
@@ -35,3 +36,7 @@ Module WFOrderedCM.
 
   End properties.
 End WFOrderedCM.
+
+Global Program Instance nat_WFOrderedCM: WFOrderedCM.t le Nat.add lt :=
+  WFOrderedCM.Build_t nat le Nat.add lt _ _ _.
+Next Obligation. lia. Qed.

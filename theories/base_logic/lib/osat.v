@@ -11,7 +11,7 @@ Inductive obl_type `{WFOrderedCM.t A leR addO ltR} : Type :=
 Definition obl_type_lt `{WFOrderedCM.t A leR addO ltR} (l1 l2 : obl_type) : Prop :=
   match l1, l2 with
   | obl_init a1, obl_init a2 => a1 = a2
-  | obl_live a1, obl_live a2 => WFOrderedCM.lt a1 a2
+  | obl_live a1, obl_live a2 => ltR a1 a2
   | obl_done, obl_done => True
   | _, _ => False
   end.
@@ -25,27 +25,50 @@ Definition obl_type_lt_prod `{WFOrderedCM.t A leR addO ltR} {X : Type} (lx1 lx2 
 exception of what's in the [osatGS] module. The module [osatGS] is thus exported in
 [fancy_updates], where [osat] is only imported. *)
 Module osatGS.
-  Class osatGpreS `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
+  Class osatGpreS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     OsatGpreS {
         osatGpreS_obl :
         inG Σ (gmap_viewR positive
-                 (prodR (prodR (prodR (agreeR $ laterO (iPropO Σ)) bcredUR) mono_natUR) mono_natUR));
+                 (prodUR (prodUR (prodUR (optionUR (agreeR $ laterO (iPropO Σ))) bcredUR) mono_natUR) mono_natUR));
         osatGpreS_domain : inG Σ (excl_authUR (gset positive));
       }.
 
-  Class osatGS `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
+  Class osatGS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     OsatG {
         osat_inG : osatGpreS Σ;
         obligation_name : gname;
         domain_name : gname;
       }.
 
-  Definition osatΣ `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} : gFunctors :=
-    #[GFunctor (gmap_viewTRF positive (prodTRF (prodTRF (prodTRF (agreeTRF $ laterTF idTF) bcredUR) mono_natUR) mono_natUR));
+  Definition osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} : gFunctors :=
+    #[GFunctor (gmap_viewTRF positive (prodTRF (prodTRF (prodTRF (optionTRF $ agreeTRF $ laterTF idTF) bcredUR) mono_natUR) mono_natUR));
       GFunctor (excl_authTRF (gsetO positive))].
 
-  Global Instance subG_osatΣ `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} {Σ} : subG osatΣ Σ → osatGpreS Σ.
-  Proof. solve_inG. Qed.
+  Global Instance subG_osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Σ} : subG osatΣ Σ → (osatGpreS Σ).
+  Proof.
+    (* FIXME : solve_inG fails with an error:
+Error: Cannot infer this placeholder of type
+"inG Σ
+   (gmap_viewR positive
+      (prodR (prodR (prodR (agreeR (laterO (iPropO Σ))) bcredUR) mono_natUR) mono_natUR))" (no type
+class instance found) in
+environment:
+SI : indexT
+A : Type
+leR : A → A → Prop
+addO : A → A → A
+ltR : A → A → Prop
+WF : WFOrderedCM.t leR addO ltR
+Σ : gFunctors
+H : subG osatΣ Σ
+     *)
+    intros. unfold osatΣ in H.
+    repeat match goal with
+           | H:subG (gFunctors.app _ _) _ |- _ => apply subG_inv in H; destruct H
+           end.
+    apply subG_inG in s. apply subG_inG in s0. simpl in *. split; assumption.
+  Qed.
+
 End osatGS.
 Import osatGS.
 
@@ -57,20 +80,68 @@ Definition obl_goal_unfold `{SI : indexT} {Σ} (P : iProp Σ) : later (iProp Σ)
   Next P.
 Definition oblG `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (P : iProp Σ) : iProp Σ :=
   own obligation_name
-    (gmap_view_frag i DfracDiscarded (to_agree $ obl_goal_unfold P, ε, ε, ε)).
+    (gmap_view_frag i DfracDiscarded (Some $ to_agree $ obl_goal_unfold P, ε, ε, ε)).
 Global Typeclasses Opaque oblG.
 Global Instance: Params (@obl_goal_unfold) 2 := {}.
-Global Instance: Params (@oblG) 8 := {}.
+Global Instance: Params (@oblG) 9 := {}.
+
+Definition oblG_idle `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (q : Qp) : iProp Σ :=
+  own obligation_name
+    (gmap_view_frag i DfracDiscarded (ε, ε, ●MN{#(q/2)} 0, ε)).
+Global Typeclasses Opaque oblG_idle.
+Global Instance: Params (@oblG_idle) 9 := {}.
+
+Definition oblG_active_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+  own obligation_name
+    (gmap_view_frag i DfracDiscarded (ε, ε, ●MN 1, ε)).
+Global Typeclasses Opaque oblG_active_auth.
+Global Instance: Params (@oblG_active_auth) 9 := {}.
+
+Definition oblG_active `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+  own obligation_name
+    (gmap_view_frag i DfracDiscarded (ε, ε, ◯MN 1, ε)).
+Global Typeclasses Opaque oblG_active.
+Global Instance: Params (@oblG_active) 9 := {}.
+
+Definition oblG_live `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+  own obligation_name
+    (gmap_view_frag i DfracDiscarded (ε, ε, ε, ●MN{#(1/2)} 0)).
+Global Typeclasses Opaque oblG_live.
+Global Instance: Params (@oblG_live) 9 := {}.
+
+Definition oblG_done_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+  own obligation_name
+    (gmap_view_frag i DfracDiscarded (ε, ε, ε, ●MN 1)).
+Global Typeclasses Opaque oblG_done_auth.
+Global Instance: Params (@oblG_done_auth) 9 := {}.
+
+Definition oblG_done `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+  own obligation_name
+    (gmap_view_frag i DfracDiscarded (ε, ε, ε, ◯MN 1)).
+Global Typeclasses Opaque oblG_done.
+Global Instance: Params (@oblG_done) 9 := {}.
+
+TODO
+
+(* Lemma test `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} i : Persistent (oblG_done i). *)
+(* Proof. apply own_core_persistent. typeclasses eauto. Qed. *)
+(* Lemma test0 `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} i : Persistent (oblG_active i). *)
+(* Proof. apply own_core_persistent. typeclasses eauto. Qed. *)
+(* Lemma test1 `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} i P : Persistent (oblG i P). *)
+(* Proof. apply own_core_persistent. typeclasses eauto. Qed. *)
+
 
 Definition oblD_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (D : gset positive) : iProp Σ :=
   own domain_name (●E D).
 Global Typeclasses Opaque oblD_auth.
-Global Instance: Params (@oblD_auth) 8 := {}.
+Global Instance: Params (@oblD_auth) 9 := {}.
 
 Definition oblD `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (D : gset positive) : iProp Σ :=
   own domain_name (◯E D).
 Global Typeclasses Opaque oblD.
-Global Instance: Params (@oblD) 8 := {}.
+Global Instance: Params (@oblD) 9 := {}.
+
+
 
 TODO
 

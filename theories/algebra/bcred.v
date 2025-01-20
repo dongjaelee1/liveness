@@ -2,20 +2,20 @@ From stdpp Require Import base.
 From iris.algebra Require Export cmra.
 From iris.algebra Require Import proofmode_classes updates.
 From iris.prelude Require Import options.
-From liveness Require Import orderedCM.
+From liveness Require Import wfOrderedCM.
 
 (** Bounded credit. *)
 (** Reference: "Module CounterRA" in Lilo and FOS. *)
 Variant bcred `{OrderedCM.t A leR addO} : Type :=
   BCred : partition.t leR addO → quotient.t leR addO → bcred.
 
-Definition credit_bound `{OrderedCM.t A leR addO} (a : A) : @bcred A leR addO _ :=
+Definition credit_bound `{OrderedCM.t A leR addO} (a : A) : bcred :=
   BCred (partition.from_monoid a) quotient.unit.
 
-Definition credit `{OrderedCM.t A leR addO} (a : A) : @bcred A leR addO _ :=
+Definition credit `{OrderedCM.t A leR addO} (a : A) : bcred :=
   BCred partition.top (quotient.from_monoid a).
 
-Definition bcred_unit `{OrderedCM.t A leR addO} : @bcred A leR addO _ :=
+Definition bcred_unit `{OrderedCM.t A leR addO} : bcred :=
   BCred partition.top quotient.unit.
 
 Section bcred.

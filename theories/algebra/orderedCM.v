@@ -1,6 +1,6 @@
 From stdpp Require Import base.
 From liveness Require Import axioms.
-Require Import Program.
+Require Import Lia Program.
 
 (** The less-than-or-equal-to-based Ordered Commutative Monoid class. *)
 (** Reference: "Module OrderedCM" in Lilo and FOS. *)
@@ -245,9 +245,9 @@ Module OrderedCM.
     Qed.
 
     Global Instance join_idemp_le : IdemP le join.
-    Proof. repeat intro. apply join_supremum; reflexivity. Qed.
+    Proof using. repeat intro. apply join_supremum; reflexivity. Qed.
     Global Instance join_idemp_eq : IdemP eq join.
-    Proof. repeat intro. split; [apply join_idemp_le | apply join_left_le]. Qed.
+    Proof using. repeat intro. split; [apply join_idemp_le | apply join_left_le]. Qed.
 
     Global Instance meet_left_le : forall a, LeftAbsorb le a meet.
     Proof using Type*.
@@ -355,9 +355,9 @@ Module OrderedCM.
     Qed.
 
     Global Instance meet_idemp_le : IdemP le meet.
-    Proof. repeat intro. apply meet_left_le. Qed.
+    Proof using. repeat intro. apply meet_left_le. Qed.
     Global Instance meet_idemp_eq : IdemP eq meet.
-    Proof. repeat intro. split; [apply meet_idemp_le | apply meet_infimum; reflexivity]. Qed.
+    Proof using. repeat intro. split; [apply meet_idemp_le | apply meet_infimum; reflexivity]. Qed.
 
   End properties.
 
@@ -387,6 +387,23 @@ Module OrderedCM.
   (* Qed. *)
 
 End OrderedCM.
+
+Global Program Instance nat_OrderedCM: OrderedCM.t le Nat.add :=
+  OrderedCM.Build_t nat le Nat.add 0 _ _ _ _ _ _ _.
+Next Obligation. repeat intro. lia. Qed.
+Next Obligation. repeat intro. lia. Qed.
+Next Obligation. repeat intro. lia. Qed.
+Next Obligation. repeat intro. lia. Qed.
+Next Obligation. repeat intro. lia. Qed.
+Next Obligation. repeat intro. lia. Qed.
+
+Lemma nat_OrderedCM_eq (a0 a1: nat):
+  OrderedCM.eq a0 a1 <-> a0 = a1.
+Proof.
+  split.
+  { intro H. red in H. lia. }
+  { intro. subst. reflexivity. }
+Qed.
 
 (** Quotient structure with respect to OrderedCM. *)
 (** Reference: "Module Fuel" in Lilo and FOS. *)
