@@ -1,6 +1,6 @@
 From stdpp Require Import base.
 From liveness Require Import axioms.
-Require Import Lia Program.
+Require Import Program.
 
 (** The less-than-or-equal-to-based Ordered Commutative Monoid class. *)
 (** Reference: "Module OrderedCM" in Lilo and FOS. *)
@@ -387,23 +387,6 @@ Module OrderedCM.
   (* Qed. *)
 
 End OrderedCM.
-
-Global Program Instance nat_OrderedCM: OrderedCM.t le Nat.add :=
-  OrderedCM.Build_t nat le Nat.add 0 _ _ _ _ _ _ _.
-Next Obligation. repeat intro. lia. Qed.
-Next Obligation. repeat intro. lia. Qed.
-Next Obligation. repeat intro. lia. Qed.
-Next Obligation. repeat intro. lia. Qed.
-Next Obligation. repeat intro. lia. Qed.
-Next Obligation. repeat intro. lia. Qed.
-
-Lemma nat_OrderedCM_eq (a0 a1: nat):
-  OrderedCM.eq a0 a1 <-> a0 = a1.
-Proof.
-  split.
-  { intro H. red in H. lia. }
-  { intro. subst. reflexivity. }
-Qed.
 
 (** Quotient structure with respect to OrderedCM. *)
 (** Reference: "Module Fuel" in Lilo and FOS. *)

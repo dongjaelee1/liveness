@@ -16,6 +16,7 @@ theories/prelude/axioms.v
 theories/algebra/orderedCM.v
 theories/algebra/wfOrderedCM.v
 theories/algebra/ordinal_WFOrderedCM.v
+theories/algebra/nat_WFOrderedCM.v
 theories/algebra/bank.v
 theories/algebra/bcred.v
 

@@ -1,6 +1,5 @@
 From stdpp Require Import base.
 From liveness Require Export orderedCM.
-Require Import Lia Program.
 
 Module WFOrderedCM.
   Class t {A : Type} (leR : A -> A -> Prop) (addO : A -> A -> A) (ltR : A -> A -> Prop) := {
@@ -36,7 +35,3 @@ Module WFOrderedCM.
 
   End properties.
 End WFOrderedCM.
-
-Global Program Instance nat_WFOrderedCM: WFOrderedCM.t le Nat.add lt :=
-  WFOrderedCM.Build_t nat le Nat.add lt _ _ _.
-Next Obligation. lia. Qed.
