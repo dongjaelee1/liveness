@@ -29,6 +29,10 @@ Next Obligation.
   apply Ord.lt_well_founded.
 Qed.
 Next Obligation.
-  intros a b c LT LE. simpl in *. eapply Ord.lt_le_lt; [|eauto].
-  apply Hessenberg.add_lt_l. auto.
+  intros a c. split; simpl; intros.
+  { destruct H as (b&LT&LE). eapply Ord.lt_le_lt; [|eauto]. apply Hessenberg.add_lt_l. auto. }
+  { exists Ord.one. split; [apply Ord.S_lt |].
+    unfold Ord.one. rewrite Hessenberg.add_S_r. apply Ord.S_supremum.
+    rewrite Hessenberg.add_O_r. auto.
+  }
 Qed.

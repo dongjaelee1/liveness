@@ -21,4 +21,4 @@ Qed.
 
 Global Program Instance nat_WFOrderedCM: WFOrderedCM.t le Nat.add lt :=
   WFOrderedCM.Build_t nat le Nat.add lt _ _ _.
-Next Obligation. lia. Qed.
+Next Obligation. split; intros; [destruct H | exists 1]; lia. Qed.
