@@ -27,7 +27,7 @@ Module osatGS.
     OsatGpreS {
         osatGpreS_goal : inG Σ (gmap_viewR positive (agreeR $ laterO (iPropO Σ)));
         osatGpreS_state : inG Σ (gmapUR positive (prodUR (prodUR bcredUR mono_natUR) mono_natUR));
-        osatGpreS_domain : inG Σ (prodUR (excl_authUR (gsetO positive)) (authUR (gsetUR positive)));
+        osatGpreS_domain : inG Σ (authUR (gsetUR positive));
       }.
 
   Class osatGS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
@@ -41,7 +41,7 @@ Module osatGS.
   Definition osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} : gFunctors :=
     #[GFunctor (gmap_viewTRF positive (agreeTRF $ laterTF idTF));
       GFunctor (gmapTRF positive (prodTRF (prodTRF bcredUR mono_natUR) mono_natUR));
-      GFunctor (prodTRF (excl_authTRF (gsetO positive)) (authTRF (gsetUR positive)))].
+      GFunctor (authTRF (gsetUR positive))].
 
   Global Instance subG_osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Σ} : subG osatΣ Σ → (osatGpreS Σ).
   Proof.
@@ -99,8 +99,8 @@ Definition oblS_active `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS 
 Global Typeclasses Opaque oblS_active.
 Global Instance: Params (@oblS_active) 9 := {}.
 
-Definition oblS_live `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
-  own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ●MN{#(1/2)} 0) ]} : gmap _ _).
+Definition oblS_live `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (q : Qp) : iProp Σ :=
+  own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ●MN{#(q/2)} 0) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_live.
 Global Instance: Params (@oblS_live) 9 := {}.
 
@@ -125,17 +125,12 @@ Global Typeclasses Opaque oblS_bound.
 Global Instance: Params (@oblS_bound) 9 := {}.
 
 Definition oblD_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (D : gset positive) : iProp Σ :=
-  own domain_name (●E D, ●D).
+  own domain_name (●D).
 Global Typeclasses Opaque oblD_auth.
 Global Instance: Params (@oblD_auth) 9 := {}.
 
-Definition oblD_dom `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (D : gset positive) : iProp Σ :=
-  own domain_name (◯E D, ε).
-Global Typeclasses Opaque oblD_dom.
-Global Instance: Params (@oblD_dom) 9 := {}.
-
 Definition oblD_elem `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
-  own domain_name (ε, ◯{[i]}).
+  own domain_name (◯{[i]}).
 Global Typeclasses Opaque oblD_elem.
 Global Instance: Params (@oblD_elem) 9 := {}.
 
@@ -148,9 +143,9 @@ Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ}
         ([∗ map] i ↦ oQ ∈ Obls,
            match oQ with
            | (obl_init a, _) =>
-               (∃ a', ⌜leR a a'⌝ ∗ oblS_credit i a' ∗ oblS_idle i 1%Qp ∗ oblS_live i)
+               (∃ a', ⌜leR a a'⌝ ∗ oblS_credit i a' ∗ oblS_idle i 1%Qp ∗ oblS_live i 1)
            | (obl_live a, _) =>
-               (∃ a', ⌜leR a a'⌝ ∗ oblS_credit i a' ∗ oblS_active_auth i ∗ oblS_live i)
+               (∃ a', ⌜leR a a'⌝ ∗ oblS_credit i a' ∗ oblS_active_auth i ∗ oblS_live i 1)
            | (obl_done, Q) =>
                (▷ Q ∗ oblS_active_auth i ∗ oblS_done_auth i)
            end) ∗
@@ -204,8 +199,8 @@ Section osat.
     apply prod_included. split; [done | apply mono_nat_included].
   Qed.
 
-  Lemma oblS_live_done i :
-    oblS_live i ∗ oblS_done i ⊢ False.
+  Lemma oblS_live_done i q :
+    oblS_live i q ∗ oblS_done i ⊢ False.
   Proof.
     rewrite /oblS_live /oblS_done. iIntros "[Hl Hd]".
     iCombine "Hl Hd" as "V". iPoseProof (own_valid with "V") as "%V".
@@ -249,32 +244,67 @@ Section osat.
     intros LE. iIntros "H". iApply oblS_credit_split. iApply oblS_credit_mon; done.
   Qed.
 
+  Lemma oblS_bound_mon i a0 a1 :
+    a0 /≤ a1 →
+    oblS_bound i a0 ⊢ |==> oblS_bound i a1.
+  Proof.
+    intros LE. rewrite /oblS_bound. apply own_update.
+    apply singleton_update.
+    apply prod_update; [simpl | reflexivity]. apply prod_update; [simpl | reflexivity].
+    by apply cmra_update_included, credit_bound_included.
+  Qed.
+
+  Lemma oblS_credit_spend i a0 a1 :
+    oblS_bound i a0 ∗ oblS_credit i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ oblS_bound i a2.
+  Proof.
+    rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)".
+    { rewrite singleton_op -!pair_op !left_id.
+      eapply (singleton_updateP
+                (λ k, ∃ a2, (k = (credit_bound a2, ε, ε)) ∧ (a1 /+ a2 /≤ a0))
+                (λ k, ∃ a2, (k = {[i := (credit_bound a2, ε, ε)]}) ∧ (a1 /+ a2 /≤ a0))
+             ).
+      { eapply (prod_updateP (λ k, ∃ a2, (k = (credit_bound a2, ε)) ∧ (a1 /+ a2 /≤ a0)) (eq ε)).
+        { eapply (prod_updateP (λ k, ∃ a2, (k = credit_bound a2) ∧ (a1 /+ a2 /≤ a0)) (eq ε)).
+          { eapply credit_spend. }
+          { eapply cmra_update_updateP. reflexivity. }
+          { intros. destruct H as (a2&A0&A1). exists a2. by subst. }
+        }
+        { eapply cmra_update_updateP. reflexivity. }
+        { intros. destruct H as (a2&A0&A1). exists a2. by subst. }
+      }
+      { intros. destruct H as (a2&A0&A1). exists a2. by subst. }
+    }
+    iSimpl. iDestruct "H" as "((%a2 & %EQ & %LE) & H)".
+    iExists a2. subst. iModIntro. iSplit; done.
+  Qed.
+
+  Lemma oblS_credit_induction i a P :
+    oblS_bound i a ∗ □(∃ c, ⌜/0 /< c⌝ ∧ ((oblS_credit i c ==∗ P) ==∗ P)) ⊢ |==> P.
+  Proof.
+    iIntros "[#Hb (%c & %LTc & #HI)]".
+    iStopProof. pattern a. revert a. apply (well_founded_induction WFOrderedCM.lt_wf).
+    intros a IND. iIntros "[#Hb #HI]".
+    iApply "HI". iIntros "Hc".
+    iMod (oblS_credit_spend with "[Hb Hc]") as "(%a' & %LE & #Hb')"; [iFrame; done |].
+    iClear "Hb". iApply (IND a'); [| iModIntro; iSplit; done].
+    apply WFOrderedCM.lt_exists_l. exists c. split; [auto | by rewrite OrderedCM.add_comm_le ].
+  Qed.
+
   Lemma oblD_auth_elem i D :
     oblD_auth D ∗ oblD_elem i ⊢ ⌜i ∈ D⌝.
   Proof.
     rewrite /oblD_auth /oblD_elem -own_op own_valid.
-    iIntros "%V". iPureIntro. rewrite -pair_op pair_valid in V. destruct V as [_ V].
+    iIntros "%V". iPureIntro.
     apply auth_both_valid_discrete in V. destruct V as [V _].
     apply gset_included in V. set_solver.
   Qed.
 
-  Lemma oblD_auth_dom_eq D0 D1 :
-    oblD_auth D0 ∗ oblD_dom D1 ⊢ ⌜D0 ≡ D1⌝.
+  Lemma oblD_auth_dom_update D i :
+    oblD_auth D ⊢ |==> oblD_auth ({[i]} ∪ D) ∗ oblD_elem i.
   Proof.
-    rewrite /oblD_auth /oblD_dom -own_op own_valid.
-    iIntros "%V". iPureIntro. rewrite -pair_op pair_valid in V. destruct V as [V _].
-    apply excl_auth_agree in V. auto.
-  Qed.
-
-  Lemma oblD_auth_dom_update D0 D1 i :
-    oblD_auth D0 ∗ oblD_dom D1 ⊢ |==> oblD_auth ({[i]} ∪ D0) ∗ oblD_dom ({[i]} ∪ D1) ∗ oblD_elem i.
-  Proof.
-    iIntros "H". iPoseProof (oblD_auth_dom_eq with "H") as "%EQ". iStopProof.
-    rewrite /oblD_auth /oblD_dom /oblD_elem -!own_op. apply own_update.
-    apply prod_update; simpl.
-    - rewrite right_id. rewrite EQ. apply excl_auth_update.
-    - rewrite left_id right_id. apply auth_update_alloc, local_update_unital_discrete.
-      intros. split; [done|]. rewrite H0. set_solver.
+    rewrite /oblD_auth /oblD_elem -!own_op. apply own_update.
+    apply auth_update_alloc, local_update_unital_discrete.
+     intros. split; [done|]. rewrite H0. set_solver.
   Qed.
 
   Lemma osat_oblD_elem i O :
@@ -285,11 +315,57 @@ Section osat.
     iApply (oblD_auth_elem with "[HoD]"). iFrame. done.
   Qed.
 
-  Lemma osat_progress_lookup O i o1 o2 :
+  Lemma osat_alloc O a P :
+    osat O
+    ⊢ |==> ∃ i, osat (<[i:=obl_init a]>O) ∗ ⌜O !! i = None⌝ ∗
+                oblG_goal i P ∗ oblS_idle i 1%Qp ∗ oblS_live i 1 ∗ oblS_bound i a ∗ oblD_elem i.
+  Proof.
+    rewrite /osat -!lock.
+    iIntros "Ho". iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom & Hod)".
+    iMod (@own_unit _ _ _ osatGpreS_state state_name) as "HU".
+    iMod ((@own_updateP _ _ _ osatGpreS_state _ state_name) with "HU") as "H".
+    { apply (alloc_updateP_cofinite' ∅ ((credit_bound a ⋅ credit a : bcred (H:=WFOrderedCM.orderedCM)), ●MN 0, ●MN 0) (dom O)).
+      rewrite pair_valid. split; [| apply mono_nat_auth_valid].
+      rewrite pair_valid. split; [| apply mono_nat_auth_valid].
+      apply credit_bound_credit_valid_eq.
+    }
+    iSimpl. iDestruct "H" as (a' (i & NIN & Ha' & _)) "H". rewrite insert_empty in Ha'. subst a'.
+    iAssert (oblS_bound i a ∗ oblS_credit i a ∗ oblS_idle i 1 ∗ oblS_idle i 1 ∗ oblS_live i 1 ∗ oblS_live i 1)%I
+      with "[H]" as "(Sb & Sc & Si1 & Si2 & Sl1 & Sl2)".
+    { rewrite /oblS_bound /oblS_credit /oblS_idle /oblS_live -!own_op !singleton_op -!pair_op. iSimpl.
+      iApply own_mono; [|done].
+      apply singleton_included, option_included. right. do 2 eexists. do 2 split; [eauto|].
+      left. rewrite !left_id !right_id. rewrite -!mono_nat_auth_dfrac_op dfrac_op_own Qp.half_half.
+      done.
+    }
+    iMod (own_update with "Hoa") as "Hoa".
+    { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree $ goal_unfold P)); [| done | done].
+      rewrite !lookup_fmap. rewrite not_elem_of_dom_1; [done |].
+      set_solver.
+    }
+    iDestruct "Hoa" as "[Hoa #Hg]".
+    iMod ((oblD_auth_dom_update _ i) with "Hod") as "(Hod & He)".
+    iModIntro. iExists i. iFrame. rewrite -!lock. iSplitL.
+    { iClear "Hg". iExists (<[i:=(obl_init a, P)]>Obls). iSplit.
+      { iPureIntro. subst O. by rewrite fmap_insert. }
+      iSplitL "Hoa".
+      { iEval (rewrite !fmap_insert). iFrame. }
+      iSplitR "Hod".
+      { iApply big_sepM_insert.
+        { subst O. apply not_elem_of_dom_1. set_solver. }
+        iFrame. done.
+      }
+      { by rewrite dom_insert_L. }
+    }
+    iSplit; [|done]. iPureIntro.
+    subst O. apply not_elem_of_dom_1. set_solver.
+  Qed.
+
+  Lemma osat_progress_one O i q o1 o2 :
     (O !! i = Some o1) →
     (obl_type_lt o2 o1) →
-    osat O ∗ oblS_active i ∗ oblS_live i
-    ⊢ |==> osat (<[i:=o2]> O) ∗ oblS_live i ∗ ∃ a, oblS_credit i a ∗ ⌜/0 /< a⌝.
+    osat O ∗ oblS_active i ∗ oblS_live i q
+    ⊢ |==> osat (<[i:=o2]> O) ∗ oblS_live i q ∗ ∃ a, oblS_credit i a ∗ ⌜/0 /< a⌝.
   Proof.
     intros LU LT. rewrite /osat -!lock.
     iIntros "(Ho & #Ha & Hl)". iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom & HoD)".
@@ -327,53 +403,9 @@ Section osat.
       iPoseProof (oblS_done_auth_done with "DONE") as "#D". done.
   Qed.
 
-  Lemma osat_alloc O D a P :
-    osat O ∗ oblD_dom D
-    ⊢ |==> ∃ i, osat (<[i:=obl_init a]>O) ∗ oblD_dom ({[i]} ∪ D) ∗ ⌜O !! i = None ∧ i ∉ D⌝ ∗
-                oblG_goal i P ∗ oblS_idle i 1%Qp ∗ oblS_live i ∗ oblS_bound i a ∗ oblD_elem i.
-  Proof.
-    rewrite /osat -!lock.
-    iIntros "(Ho & Hd)". iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom & Hod)".
-    iPoseProof (oblD_auth_dom_eq with "[Hod Hd]") as "%DOM"; [iFrame |].
-    iMod (@own_unit _ _ _ osatGpreS_state state_name) as "HU".
-    iMod ((@own_updateP _ _ _ osatGpreS_state _ state_name) with "HU") as "H".
-    { apply (alloc_updateP_cofinite' ∅ ((credit_bound a ⋅ credit a : bcred (H:=WFOrderedCM.orderedCM)), ●MN 0, ●MN 0) D).
-      rewrite pair_valid. split; [| apply mono_nat_auth_valid].
-      rewrite pair_valid. split; [| apply mono_nat_auth_valid]. apply credit_bound_credit_valid_eq.
-    }
-    iSimpl. iDestruct "H" as (a' (i & NIN & Ha' & _)) "H". rewrite insert_empty in Ha'. subst a'.
-    iAssert (oblS_bound i a ∗ oblS_credit i a ∗ oblS_idle i 1 ∗ oblS_idle i 1 ∗ oblS_live i ∗ oblS_live i)%I
-      with "[H]" as "(Sb & Sc & Si1 & Si2 & Sl1 & Sl2)".
-    { rewrite /oblS_bound /oblS_credit /oblS_idle /oblS_live -!own_op !singleton_op -!pair_op. iSimpl.
-      iApply own_mono; [|done].
-      apply singleton_included, option_included. right. do 2 eexists. do 2 split; [eauto|].
-      left. rewrite !left_id !right_id. rewrite -!mono_nat_auth_dfrac_op dfrac_op_own Qp.half_half.
-      done.
-    }
-    iMod (own_update with "Hoa") as "Hoa".
-    { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree $ goal_unfold P)); [| done | done].
-      rewrite !lookup_fmap. rewrite not_elem_of_dom_1; [done |].
-      set_solver.
-    }
-    iDestruct "Hoa" as "[Hoa #Hg]".
-    iMod ((oblD_auth_dom_update _ _ i) with "[Hod Hd]") as "(Hod & Hd & He)"; [iFrame|].
-    iModIntro. iExists i. iFrame. rewrite -!lock. iSplitL.
-    { iClear "Hg". iExists (<[i:=(obl_init a, P)]>Obls). iSplit.
-      { iPureIntro. subst O. by rewrite fmap_insert. }
-      iSplitL "Hoa".
-      { iEval (rewrite !fmap_insert). iFrame. }
-      iSplitR "Hod".
-      { iApply big_sepM_insert.
-        { subst O. apply not_elem_of_dom_1. set_solver. }
-        iFrame. done.
-      }
-      { by rewrite dom_insert_L. }
-    }
-    iSplit; [|done]. iPureIntro. split; [|auto].
-    subst O. apply not_elem_of_dom_1. set_solver.
-  Qed.
-
   TODO
+
+    osat_induction?
 
 Lemma ownE_empty : ⊢ |==> ownE ∅.
 Proof.
