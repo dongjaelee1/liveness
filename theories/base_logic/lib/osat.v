@@ -1,4 +1,4 @@
-From iris.algebra Require Import gmap_view gmap gset mono_nat excl_auth.
+From iris.algebra Require Import gmap_view gmap gset mono_nat excl_auth mra.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -6,12 +6,13 @@ From transfinite.base_logic.lib Require Export own.
 From liveness Require Import wfOrderedCM bcred.
 
 Inductive obl_type `{WFOrderedCM.t A leR addO ltR} : Type :=
-| obl_init (a : A) | obl_live (a : A) | obl_done.
+| obl_init (a : A) | obl_live (a : A) | obl_wait (a : A) | obl_done.
 
 Definition obl_type_lt `{WFOrderedCM.t A leR addO ltR} (l1 l2 : obl_type) : Prop :=
   match l1, l2 with
   | obl_init a1, obl_init a2 => a1 = a2
   | obl_live a1, obl_live a2 => ltR a1 a2
+  | obl_wait a1, obl_wait a2 => a1 = a2
   | obl_done, obl_done => True
   | _, _ => False
   end.
@@ -19,9 +20,9 @@ Definition obl_type_lt `{WFOrderedCM.t A leR addO ltR} (l1 l2 : obl_type) : Prop
 Definition obl_type_lt_gmap `{WFOrderedCM.t A leR addO ltR} (ls1 ls2 : gmap positive obl_type) : Prop :=
   map_Forall2 (λ _ l1 l2, obl_type_lt l1 l2) ls1 ls2.
 
-(** All definitions in this file are internal to [fancy_updates] with the
-exception of what's in the [osatGS] module. The module [osatGS] is thus exported in
-[fancy_updates], where [osat] is only imported. *)
+(* All definitions in this file are internal to [fancy_updates] with the
+   exception of what's in the [osatGS] module. The module [osatGS] is thus exported in
+   [fancy_updates], where [osat] is only imported. *)
 Module osatGS.
   Class osatGpreS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     OsatGpreS {
@@ -59,8 +60,8 @@ Module osatGS.
 End osatGS.
 Import osatGS.
 
-(* Make the instances local to this file. We cannot use #[local] in the code
-above, as that would make the instances local to the module. *)
+(* Make the instances local to this file. We cannot use #[local] in the code *)
+(* above, as that would make the instances local to the module. *)
 Local Existing Instances osat_inG osatGpreS_goal osatGpreS_state.
 
 Definition goal_unfold `{SI : indexT} {Σ} (P : iProp Σ) : later (iProp Σ) :=
