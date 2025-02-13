@@ -21,6 +21,14 @@ Proof.
   - constructor 2. simpl. intros. apply IHn. lia.
 Qed.
 
+Lemma nat_gt_ex_always_not_zero : forall (n : nat), n > 0 -> ex_always_not (flip gt) n (fun x => x = 0).
+Proof.
+  cofix IH; intros. eapply (ex_always_not_do_step _ _ _ (S n)).
+  - lia.
+  - simpl. lia.
+  - eauto.
+Qed.
+
 Section classical_proofs.
 
   (* From transfinite Iris. *)
