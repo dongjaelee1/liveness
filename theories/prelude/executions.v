@@ -29,6 +29,16 @@ Proof.
   - eauto.
 Qed.
 
+Section proofs.
+
+  Lemma ex_always_not_ex_loop {A} (R : relation A) x P :
+    ex_always_not R x P -> ex_loop R x.
+  Proof.
+    revert x. cofix IH; intros x Hex. destruct Hex. econstructor; eauto.
+  Qed.
+
+End proofs.
+
 Section classical_proofs.
 
   (* From transfinite Iris. *)
