@@ -1,0 +1,48 @@
+From stdpp Require Import base relations.
+From liveness Require Import axioms.
+
+Section definitions.
+  Context `(R : relation A).
+
+  Inductive all_eventually (x : A) (P : A -> Prop) : Prop :=
+  | all_eventually_done : (P x) -> all_eventually x P
+  | all_eventually_do_step : (forall y, R x y -> all_eventually y P) -> all_eventually x P.
+
+  CoInductive ex_always_not (x : A) (P : A -> Prop) : Prop :=
+  | ex_always_not_do_step y : (¬ P x) -> R x y -> ex_always_not y P -> ex_always_not x P.
+
+End definitions.
+
+Lemma nat_lt_all_eventually_zero : forall (n : nat), all_eventually (flip lt) n (fun x => x = 0).
+Proof.
+  intros n. assert (forall m, m <= n -> all_eventually (flip lt) m (fun x => x = 0)); [|eauto].
+  induction n; simpl; intros.
+  - constructor 1. lia.
+  - constructor 2. simpl. intros. apply IHn. lia.
+Qed.
+
+Section classical_proofs.
+
+  (* From transfinite Iris. *)
+  Lemma sn_not_ex_loop {A} (R : relation A) x :
+    ¬ex_loop R x → sn R x.
+  Proof.
+    intros Hex. destruct (classic (sn R x)) as [|Hsn]; [done|].
+    destruct Hex. revert x Hsn. cofix IH; intros x Hsn.
+    destruct (classic (∃ y, R x y ∧ ¬sn R y)) as [(y&?&?)|Hnot].
+    - exists y. all: auto.
+    - destruct Hsn. constructor. intros y Hxy.
+      destruct (classic (sn R y)). auto. naive_solver.
+  Qed.
+
+  Lemma not_all_eventually_ex_always_not {A} (R : relation A) x (P : A -> Prop) :
+    ¬ all_eventually R x P -> ex_always_not R x P.
+  Proof.
+    intros Hsn. revert x Hsn. cofix IH; intros x Hsn.
+    destruct (classic (exists y, R x y /\ ¬ all_eventually R y P)) as [(y&?&?)|Hnot].
+    - exists y. all: auto. intro HP. destruct Hsn. constructor 1. auto.
+    - destruct Hsn. constructor 2. intros y Hxy.
+      destruct (classic (all_eventually R y P)). auto. naive_solver.
+  Qed.
+
+End classical_proofs.
