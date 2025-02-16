@@ -1,57 +1,79 @@
-From iris.algebra Require Export ofe finite_stepindex.
+From stdpp Require Import gmap.
+From iris.algebra Require Export ofe.
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 
+Definition thread_id := positive.
+Canonical Structure thread_idO `{SI : indexT} := leibnizO thread_id.
+
+Notation thread_ids := (gset thread_id).
+
 Section language_mixin.
-  Context {expr val state observation : Type}.
+  Context {expr val state observation fuel : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
+  Context (fuelR : fuel → fuel → Prop).
   (** We annotate the reduction relation with observations [κ], which we will
      use in the definition of weakest preconditions to predict future
      observations and assert correctness of the predictions. *)
-  Context (prim_step : expr → state → list observation → expr → state → list expr → Prop).
+  (** thread_ids is a state that tracks occupied thread_ids,
+     and gmap thread_id expr are forked threads. *)
+  Context (prim_step : expr → state → thread_ids → list observation →
+                       expr → state → thread_ids → gmap thread_id expr → Prop).
 
   Record LanguageMixin := {
     mixin_to_of_val v : to_val (of_val v) = Some v;
     mixin_of_to_val e v : to_val e = Some v → of_val v = e;
-    mixin_val_stuck e σ κ e' σ' efs : prim_step e σ κ e' σ' efs → to_val e = None
+    mixin_val_stuck e σ τ κ e' σ' τ' efs : prim_step e σ τ κ e' σ' τ' efs → to_val e = None;
+    mixin_fuelR_wf : well_founded fuelR;
+    mixin_fork_thread_ids e σ τ κ e' σ' τ' efs :
+      prim_step e σ τ κ e' σ' τ' efs → (τ' ≡ τ ∪ (dom efs))
   }.
 End language_mixin.
 
-Structure language := Language {
-  expr : Type;
-  val : Type;
-  state : Type;
-  observation : Type;
-  of_val : val → expr;
-  to_val : expr → option val;
-  prim_step : expr → state → list observation → expr → state → list expr → Prop;
-  language_mixin : LanguageMixin of_val to_val prim_step
-}.
+Structure language :=
+  Language {
+      expr : Type;
+      val : Type;
+      state : Type;
+      observation : Type;
+      fuel : Type;
+      of_val : val → expr;
+      to_val : expr → option val;
+      fuelR : fuel → fuel → Prop;
+      prim_step : expr → state → thread_ids → list observation →
+                  expr → state → thread_ids → gmap thread_id expr → Prop;
+      language_mixin : LanguageMixin of_val to_val fuelR prim_step
+    }.
 
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments Language {_ _ _ _ _ _ _} _.
+Global Arguments Language {_ _ _ _ _ _ _ _ _} _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
-Global Arguments prim_step {_} _ _ _ _ _ _.
+Global Arguments fuelR {_} _ _.
+Global Arguments prim_step {_} _ _ _ _ _ _ _ _.
 
-Canonical Structure stateO Λ := leibnizO (state Λ).
-Canonical Structure valO Λ := leibnizO (val Λ).
-Canonical Structure exprO Λ := leibnizO (expr Λ).
+Canonical Structure fuelO `{SI : indexT} Λ := leibnizO (fuel Λ).
+Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
+Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
+Canonical Structure exprO `{SI : indexT} Λ := leibnizO (expr Λ).
 
-Definition cfg (Λ : language) := (list (expr Λ) * state Λ)%type.
+(** Thread pool with fuels to model scheduler fairness.
+    If a thread is done (is a val), fuel = None. *)
+Definition cfg (Λ : language) :=
+  (gmap thread_id (expr Λ) * gmap thread_id (option (fuel Λ)) * state Λ)%type.
 
 Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
   fill_not_val e :
     to_val e = None → to_val (K e) = None;
-  fill_step e1 σ1 κ e2 σ2 efs :
-    prim_step e1 σ1 κ e2 σ2 efs →
-    prim_step (K e1) σ1 κ (K e2) σ2 efs;
-  fill_step_inv e1' σ1 κ e2 σ2 efs :
-    to_val e1' = None → prim_step (K e1') σ1 κ e2 σ2 efs →
-    ∃ e2', e2 = K e2' ∧ prim_step e1' σ1 κ e2' σ2 efs
+  fill_step e1 σ1 τ1 κ e2 σ2 τ2 efs :
+    prim_step e1 σ1 τ1 κ e2 σ2 τ2 efs →
+    prim_step (K e1) σ1 τ1 κ (K e2) σ2 τ2 efs;
+  fill_step_inv e1' σ1 τ1 κ e2 σ2 τ2 efs :
+    to_val e1' = None → prim_step (K e1') σ1 τ1 κ e2 σ2 τ2 efs →
+    ∃ e2', e2 = K e2' ∧ prim_step e1' σ1 τ1 κ e2' σ2 τ2 efs
 }.
 
 Global Instance language_ctx_id Λ : LanguageCtx (@id (expr Λ)).
@@ -71,20 +93,24 @@ Section language.
   Proof. apply language_mixin. Qed.
   Lemma of_to_val e v : to_val e = Some v → of_val v = e.
   Proof. apply language_mixin. Qed.
-  Lemma val_stuck e σ κ e' σ' efs : prim_step e σ κ e' σ' efs → to_val e = None.
+  Lemma val_stuck e σ τ κ e' σ' τ' efs : prim_step e σ τ κ e' σ' τ' efs → to_val e = None.
+  Proof. apply language_mixin. Qed.
+  Lemma fuelR_wf : well_founded (@fuelR Λ).
+  Proof. apply language_mixin. Qed.
+  Lemma fork_thread_ids e σ τ κ e' σ' τ' efs : prim_step e σ τ κ e' σ' τ' efs → (τ' ≡ τ ∪ (dom efs)).
   Proof. apply language_mixin. Qed.
 
-  Definition reducible (e : expr Λ) (σ : state Λ) :=
-    ∃ κ e' σ' efs, prim_step e σ κ e' σ' efs.
+  Definition reducible (e : expr Λ) (σ : state Λ) τ :=
+    ∃ κ e' σ' τ' efs, prim_step e σ τ κ e' σ' τ' efs.
   (* Total WP only permits reductions without observations *)
-  Definition reducible_no_obs (e : expr Λ) (σ : state Λ) :=
-    ∃ e' σ' efs, prim_step e σ [] e' σ' efs.
-  Definition irreducible (e : expr Λ) (σ : state Λ) :=
-    ∀ κ e' σ' efs, ¬prim_step e σ κ e' σ' efs.
-  Definition stuck (e : expr Λ) (σ : state Λ) :=
-    to_val e = None ∧ irreducible e σ.
-  Definition not_stuck (e : expr Λ) (σ : state Λ) :=
-    is_Some (to_val e) ∨ reducible e σ.
+  Definition reducible_no_obs (e : expr Λ) (σ : state Λ) τ :=
+    ∃ e' σ' τ' efs, prim_step e σ τ [] e' σ' τ' efs.
+  Definition irreducible (e : expr Λ) (σ : state Λ) τ :=
+    ∀ κ e' σ' τ' efs, ¬prim_step e σ τ κ e' σ' τ' efs.
+  Definition stuck (e : expr Λ) (σ : state Λ) τ :=
+    to_val e = None ∧ irreducible e σ τ.
+  Definition not_stuck (e : expr Λ) (σ : state Λ) τ :=
+    is_Some (to_val e) ∨ reducible e σ τ.
 
   (* [Atomic WeaklyAtomic]: This (weak) form of atomicity is enough to open
      invariants when WP ensures safety, i.e., programs never can get stuck.  We
@@ -98,12 +124,43 @@ Section language.
      in case `e` reduces to a stuck non-value, there is no proof that the
      invariants have been established again. *)
   Class Atomic (a : atomicity) (e : expr Λ) : Prop :=
-    atomic σ e' κ σ' efs :
-      prim_step e σ κ e' σ' efs →
-      if a is WeaklyAtomic then irreducible e' σ' else is_Some (to_val e').
+    atomic σ τ e' κ σ' τ' efs :
+      prim_step e σ τ κ e' σ' τ' efs →
+      if a is WeaklyAtomic then irreducible e' σ' τ' else is_Some (to_val e').
 
+  Definition thread_pool_inv (ths : gmap thread_id (expr Λ)) (ϕ : gmap thread_id (option (fuel Λ))) : Prop :=
+    map_Forall2 (λ _ e f, (is_Some (to_val e) ∧ f = None) ∨ (to_val e = None ∧ is_Some f)) ths ϕ.
+
+  Definition fair_update_fuels (S : thread_ids) (ϕ1 ϕ2 : gmap thread_id (option (fuel Λ))) : Prop :=
+    map_Forall2 (λ i u1 u2,
+                   match u1, u2 with
+                   | None, None => True
+                   | Some f1, Some f2 => if decide (i ∈ S) then True else (fuelR f2 f1)
+                   | _, _ => False
+                   end) ϕ1 ϕ2.
+
+  (** An atomic thread step under scheduler fairness governed by fuel. *)
   Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-    | step_atomic e1 σ1 e2 σ2 efs t1 t2 :
+  | step_atomic e1 σ1 τ1 e2 σ2 τ2 efs ths ϕ i :
+    ρ1 = (ths, ϕ, σ1) →
+    dom ths ≡ dom ϕ →
+    ths !! i = e1 →
+    ∀ (ϕ' : gmap thread_id (fuel Λ)),
+    (update_fuels (ϕ {[i]} ϕ') →
+    ρ2 = (<[i:=e2]>ths ∪ efs, ϕ' + efs?, σ2) →
+
+    TODO
+    
+    ρ2 = (
+
+    
+       ρ1 = (t1 ++ e1 :: t2, σ1) →
+       ρ2 = (t1 ++ e2 :: t2 ++ efs, σ2) →
+       prim_step e1 σ1 κ e2 σ2 efs →
+       step ρ1 κ ρ2.
+  Local Hint Constructors step : core.
+  Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
+    | step_atomic e1 σ1 τ1 e2 σ2 τ2 efs ths1 ths2 :
        ρ1 = (t1 ++ e1 :: t2, σ1) →
        ρ2 = (t1 ++ e2 :: t2 ++ efs, σ2) →
        prim_step e1 σ1 κ e2 σ2 efs →
