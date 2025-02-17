@@ -19,15 +19,15 @@ Section language_mixin.
   (** thread_ids is a state that tracks occupied thread_ids,
      and gmap thread_id expr are forked threads. *)
   Context (prim_step : expr → state → thread_ids → list observation →
-                       expr → state → thread_ids → gmap thread_id expr → Prop).
+                       expr → state → gmap thread_id expr → Prop).
 
   Record LanguageMixin := {
     mixin_to_of_val v : to_val (of_val v) = Some v;
     mixin_of_to_val e v : to_val e = Some v → of_val v = e;
-    mixin_val_stuck e σ τ κ e' σ' τ' efs : prim_step e σ τ κ e' σ' τ' efs → to_val e = None;
+    mixin_val_stuck e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → to_val e = None;
     mixin_fuelR_wf : well_founded fuelR;
-    mixin_fork_thread_ids e σ τ κ e' σ' τ' efs :
-      prim_step e σ τ κ e' σ' τ' efs → (τ' ≡ τ ∪ (dom efs))
+    mixin_fork_thread_ids e σ τ κ e' σ' efs :
+      prim_step e σ τ κ e' σ' efs → (τ ## (dom efs))
   }.
 End language_mixin.
 
@@ -42,7 +42,7 @@ Structure language :=
       to_val : expr → option val;
       fuelR : fuel → fuel → Prop;
       prim_step : expr → state → thread_ids → list observation →
-                  expr → state → thread_ids → gmap thread_id expr → Prop;
+                  expr → state → gmap thread_id expr → Prop;
       language_mixin : LanguageMixin of_val to_val fuelR prim_step
     }.
 
@@ -53,7 +53,7 @@ Global Arguments Language {_ _ _ _ _ _ _ _ _} _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
 Global Arguments fuelR {_} _ _.
-Global Arguments prim_step {_} _ _ _ _ _ _ _ _.
+Global Arguments prim_step {_} _ _ _ _ _ _ _.
 
 Canonical Structure fuelO `{SI : indexT} Λ := leibnizO (fuel Λ).
 Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
@@ -68,12 +68,12 @@ Definition cfg (Λ : language) :=
 Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
   fill_not_val e :
     to_val e = None → to_val (K e) = None;
-  fill_step e1 σ1 τ1 κ e2 σ2 τ2 efs :
-    prim_step e1 σ1 τ1 κ e2 σ2 τ2 efs →
-    prim_step (K e1) σ1 τ1 κ (K e2) σ2 τ2 efs;
-  fill_step_inv e1' σ1 τ1 κ e2 σ2 τ2 efs :
-    to_val e1' = None → prim_step (K e1') σ1 τ1 κ e2 σ2 τ2 efs →
-    ∃ e2', e2 = K e2' ∧ prim_step e1' σ1 τ1 κ e2' σ2 τ2 efs
+  fill_step e1 σ1 τ1 κ e2 σ2 efs :
+    prim_step e1 σ1 τ1 κ e2 σ2 efs →
+    prim_step (K e1) σ1 τ1 κ (K e2) σ2 efs;
+  fill_step_inv e1' σ1 τ1 κ e2 σ2 efs :
+    to_val e1' = None → prim_step (K e1') σ1 τ1 κ e2 σ2 efs →
+    ∃ e2', e2 = K e2' ∧ prim_step e1' σ1 τ1 κ e2' σ2 efs
 }.
 
 Global Instance language_ctx_id Λ : LanguageCtx (@id (expr Λ)).
@@ -93,20 +93,20 @@ Section language.
   Proof. apply language_mixin. Qed.
   Lemma of_to_val e v : to_val e = Some v → of_val v = e.
   Proof. apply language_mixin. Qed.
-  Lemma val_stuck e σ τ κ e' σ' τ' efs : prim_step e σ τ κ e' σ' τ' efs → to_val e = None.
+  Lemma val_stuck e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → to_val e = None.
   Proof. apply language_mixin. Qed.
   Lemma fuelR_wf : well_founded (@fuelR Λ).
   Proof. apply language_mixin. Qed.
-  Lemma fork_thread_ids e σ τ κ e' σ' τ' efs : prim_step e σ τ κ e' σ' τ' efs → (τ' ≡ τ ∪ (dom efs)).
+  Lemma fork_thread_ids e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → (τ ## (dom efs)).
   Proof. apply language_mixin. Qed.
 
   Definition reducible (e : expr Λ) (σ : state Λ) τ :=
-    ∃ κ e' σ' τ' efs, prim_step e σ τ κ e' σ' τ' efs.
+    ∃ κ e' σ' efs, prim_step e σ τ κ e' σ' efs.
   (* Total WP only permits reductions without observations *)
   Definition reducible_no_obs (e : expr Λ) (σ : state Λ) τ :=
-    ∃ e' σ' τ' efs, prim_step e σ τ [] e' σ' τ' efs.
+    ∃ e' σ' efs, prim_step e σ τ [] e' σ' efs.
   Definition irreducible (e : expr Λ) (σ : state Λ) τ :=
-    ∀ κ e' σ' τ' efs, ¬prim_step e σ τ κ e' σ' τ' efs.
+    ∀ κ e' σ' efs, ¬prim_step e σ τ κ e' σ' efs.
   Definition stuck (e : expr Λ) (σ : state Λ) τ :=
     to_val e = None ∧ irreducible e σ τ.
   Definition not_stuck (e : expr Λ) (σ : state Λ) τ :=
@@ -124,14 +124,14 @@ Section language.
      in case `e` reduces to a stuck non-value, there is no proof that the
      invariants have been established again. *)
   Class Atomic (a : atomicity) (e : expr Λ) : Prop :=
-    atomic σ τ e' κ σ' τ' efs :
-      prim_step e σ τ κ e' σ' τ' efs →
-      if a is WeaklyAtomic then irreducible e' σ' τ' else is_Some (to_val e').
+    atomic σ τ e' κ σ' efs :
+      prim_step e σ τ κ e' σ' efs →
+      if a is WeaklyAtomic then irreducible e' σ' (τ ∪ (dom efs)) else is_Some (to_val e').
 
   Definition thread_pool_inv (ths : gmap thread_id (expr Λ)) (ϕ : gmap thread_id (option (fuel Λ))) : Prop :=
     map_Forall2 (λ _ e f, (is_Some (to_val e) ∧ f = None) ∨ (to_val e = None ∧ is_Some f)) ths ϕ.
 
-  Definition fair_update_fuels (S : thread_ids) (ϕ1 ϕ2 : gmap thread_id (option (fuel Λ))) : Prop :=
+  Definition fuels_fair_update (S : thread_ids) (ϕ1 ϕ2 : gmap thread_id (option (fuel Λ))) : Prop :=
     map_Forall2 (λ i u1 u2,
                    match u1, u2 with
                    | None, None => True
@@ -139,32 +139,27 @@ Section language.
                    | _, _ => False
                    end) ϕ1 ϕ2.
 
+  Definition fuels_thread_yield (i : thread_id) (e : expr Λ) (ϕ : gmap thread_id (option (fuel Λ))) : gmap thread_id (option (fuel Λ)) :=
+    match to_val e with
+    | Some v => <[i:=None]>ϕ
+    | None => ϕ
+    end.
+
+  Definition fuels_fair_add (efs : gmap thread_id (expr Λ)) (ϕ1 ϕ2 : gmap thread_id (option (fuel Λ))) : Prop :=
+    ∃ (ϕ' : gmap thread_id (option (fuel Λ))), (thread_pool_inv efs ϕ') ∧ (ϕ2 = ϕ1 ∪ ϕ').
+
   (** An atomic thread step under scheduler fairness governed by fuel. *)
   Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-  | step_atomic e1 σ1 τ1 e2 σ2 τ2 efs ths ϕ i :
-    ρ1 = (ths, ϕ, σ1) →
-    dom ths ≡ dom ϕ →
-    ths !! i = e1 →
-    ∀ (ϕ' : gmap thread_id (fuel Λ)),
-    (update_fuels (ϕ {[i]} ϕ') →
-    ρ2 = (<[i:=e2]>ths ∪ efs, ϕ' + efs?, σ2) →
-
-    TODO
-    
-    ρ2 = (
-
-    
-       ρ1 = (t1 ++ e1 :: t2, σ1) →
-       ρ2 = (t1 ++ e2 :: t2 ++ efs, σ2) →
-       prim_step e1 σ1 κ e2 σ2 efs →
-       step ρ1 κ ρ2.
-  Local Hint Constructors step : core.
-  Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-    | step_atomic e1 σ1 τ1 e2 σ2 τ2 efs ths1 ths2 :
-       ρ1 = (t1 ++ e1 :: t2, σ1) →
-       ρ2 = (t1 ++ e2 :: t2 ++ efs, σ2) →
-       prim_step e1 σ1 κ e2 σ2 efs →
-       step ρ1 κ ρ2.
+  | step_atomic e1 σ1 e2 σ2 ths i efs ϕ0 ϕ1 ϕ2 ϕ3 :
+    ρ1 = (ths, ϕ0, σ1) →
+    ths !! i = Some e1 →
+    (* fair scheduling. *)
+    fuels_fair_update {[i]} ϕ0 ϕ1 →
+    prim_step e1 σ1 (dom ths) κ e2 σ2 efs →
+    ϕ2 = fuels_thread_yield i e2 ϕ1 →
+    fuels_fair_add efs ϕ2 ϕ3 →
+    ρ2 = ((<[i:=e2]>ths) ∪ efs, ϕ3, σ2) →
+    step ρ1 κ ρ2.
   Local Hint Constructors step : core.
 
   Inductive nsteps : nat → cfg Λ → list (observation Λ) → cfg Λ → Prop :=
@@ -192,17 +187,17 @@ Section language.
   Lemma of_to_val_flip v e : of_val v = e → to_val e = Some v.
   Proof. intros <-. by rewrite to_of_val. Qed.
 
-  Lemma not_reducible e σ : ¬reducible e σ ↔ irreducible e σ.
+  Lemma not_reducible e σ τ : ¬reducible e σ τ ↔ irreducible e σ τ.
   Proof. unfold reducible, irreducible. naive_solver. Qed.
-  Lemma reducible_not_val e σ : reducible e σ → to_val e = None.
+  Lemma reducible_not_val e σ τ : reducible e σ τ → to_val e = None.
   Proof. intros (?&?&?&?&?); eauto using val_stuck. Qed.
-  Lemma reducible_no_obs_reducible e σ : reducible_no_obs e σ → reducible e σ.
+  Lemma reducible_no_obs_reducible e σ τ : reducible_no_obs e σ τ → reducible e σ τ.
   Proof. intros (?&?&?&?); eexists; eauto. Qed.
-  Lemma val_irreducible e σ : is_Some (to_val e) → irreducible e σ.
+  Lemma val_irreducible e σ τ : is_Some (to_val e) → irreducible e σ τ.
   Proof. intros [??] ???? ?%val_stuck. by destruct (to_val e). Qed.
   Global Instance of_val_inj : Inj (=) (=) (@of_val Λ).
   Proof. by intros v v' Hv; apply (inj Some); rewrite -!to_of_val Hv. Qed.
-  Lemma not_not_stuck e σ : ¬not_stuck e σ ↔ stuck e σ.
+  Lemma not_not_stuck e σ τ : ¬not_stuck e σ τ ↔ stuck e σ τ.
   Proof.
     rewrite /stuck /not_stuck -not_eq_None_Some -not_reducible.
     destruct (decide (to_val e = None)); naive_solver.
@@ -212,71 +207,136 @@ Section language.
     Atomic StronglyAtomic e → Atomic a e.
   Proof. unfold Atomic. destruct a; eauto using val_irreducible. Qed.
 
-  Lemma reducible_fill `{!@LanguageCtx Λ K} e σ :
-    reducible e σ → reducible (K e) σ.
+  Lemma reducible_fill `{!@LanguageCtx Λ K} e σ τ :
+    reducible e σ τ → reducible (K e) σ τ.
   Proof. unfold reducible in *. naive_solver eauto using fill_step. Qed.
-  Lemma reducible_fill_inv `{!@LanguageCtx Λ K} e σ :
-    to_val e = None → reducible (K e) σ → reducible e σ.
+  Lemma reducible_fill_inv `{!@LanguageCtx Λ K} e σ τ :
+    to_val e = None → reducible (K e) σ τ → reducible e σ τ.
   Proof.
     intros ? (e'&σ'&k&efs&Hstep); unfold reducible.
     apply fill_step_inv in Hstep as (e2' & _ & Hstep); eauto.
   Qed.
-  Lemma reducible_no_obs_fill `{!@LanguageCtx Λ K} e σ :
-    reducible_no_obs e σ → reducible_no_obs (K e) σ.
+  Lemma reducible_no_obs_fill `{!@LanguageCtx Λ K} e σ τ :
+    reducible_no_obs e σ τ → reducible_no_obs (K e) σ τ.
   Proof. unfold reducible_no_obs in *. naive_solver eauto using fill_step. Qed.
-  Lemma reducible_no_obs_fill_inv `{!@LanguageCtx Λ K} e σ :
-    to_val e = None → reducible_no_obs (K e) σ → reducible_no_obs e σ.
+  Lemma reducible_no_obs_fill_inv `{!@LanguageCtx Λ K} e σ τ :
+    to_val e = None → reducible_no_obs (K e) σ τ → reducible_no_obs e σ τ.
   Proof.
     intros ? (e'&σ'&efs&Hstep); unfold reducible_no_obs.
     apply fill_step_inv in Hstep as (e2' & _ & Hstep); eauto.
   Qed.
-  Lemma irreducible_fill `{!@LanguageCtx Λ K} e σ :
-    to_val e = None → irreducible e σ → irreducible (K e) σ.
+  Lemma irreducible_fill `{!@LanguageCtx Λ K} e σ τ :
+    to_val e = None → irreducible e σ τ → irreducible (K e) σ τ.
   Proof. rewrite -!not_reducible. naive_solver eauto using reducible_fill_inv. Qed.
-  Lemma irreducible_fill_inv `{!@LanguageCtx Λ K} e σ :
-    irreducible (K e) σ → irreducible e σ.
+  Lemma irreducible_fill_inv `{!@LanguageCtx Λ K} e σ τ :
+    irreducible (K e) σ τ → irreducible e σ τ.
   Proof. rewrite -!not_reducible. naive_solver eauto using reducible_fill. Qed.
 
-  Lemma not_stuck_fill_inv K `{!@LanguageCtx Λ K} e σ :
-    not_stuck (K e) σ → not_stuck e σ.
+  Lemma not_stuck_fill_inv K `{!@LanguageCtx Λ K} e σ τ :
+    not_stuck (K e) σ τ → not_stuck e σ τ.
   Proof.
     rewrite /not_stuck -!not_eq_None_Some. intros [?|?].
     - auto using fill_not_val.
     - destruct (decide (to_val e = None)); eauto using reducible_fill_inv.
   Qed.
 
-  Lemma stuck_fill `{!@LanguageCtx Λ K} e σ :
-    stuck e σ → stuck (K e) σ.
+  Lemma stuck_fill `{!@LanguageCtx Λ K} e σ τ :
+    stuck e σ τ → stuck (K e) σ τ.
   Proof. rewrite -!not_not_stuck. eauto using not_stuck_fill_inv. Qed.
 
-  Lemma step_Permutation (t1 t1' t2 : list (expr Λ)) κ σ1 σ2 :
-    t1 ≡ₚ t1' → step (t1,σ1) κ (t2,σ2) → ∃ t2', t2 ≡ₚ t2' ∧ step (t1',σ1) κ (t2',σ2).
+  (** Properties about step. *)
+  Lemma thread_pool_inv_dom ths ϕ :
+    thread_pool_inv ths ϕ → dom ths = dom ϕ.
+  Proof. by eapply map_Forall2_dom_L. Qed.
+
+  Lemma fuels_fair_update_dom S ϕ0 ϕ1 :
+    fuels_fair_update S ϕ0 ϕ1 → dom ϕ0 = dom ϕ1.
+  Proof. by eapply map_Forall2_dom_L. Qed.
+
+  Lemma fuels_fair_update_thread_pool_inv ths ϕ0 S ϕ1 :
+    thread_pool_inv ths ϕ0 →
+    fuels_fair_update S ϕ0 ϕ1 →
+    thread_pool_inv ths ϕ1.
   Proof.
-    intros Ht [e1 σ1' e2 σ2' efs tl tr ?? Hstep]; simplify_eq/=.
-    move: Ht; rewrite -Permutation_middle (symmetry_iff (≡ₚ)).
-    intros (tl'&tr'&->&Ht)%Permutation_cons_inv_r.
-    exists (tl' ++ e2 :: tr' ++ efs); split; [|by econstructor].
-    by rewrite -!Permutation_middle !assoc_L Ht.
+    revert ϕ0 ϕ1. pattern ths. revert ths. eapply map_ind; intros.
+    { apply map_Forall2_empty_inv_l in H; subst. apply map_Forall2_empty_inv_l in H0; subst.
+      apply map_Forall2_empty.
+    }
+    eapply map_Forall2_insert_inv_l in H1; [|done]. destruct H1 as (?&?&?&?&?&?). subst.
+    eapply map_Forall2_insert_inv_l in H2; [|done]. destruct H2 as (?&?&?&?&?&?). subst.
+    apply map_Forall2_insert; auto.
+    split; [| by eapply H0].
+    destruct x0, x2; simpl in H6; try done.
+    destruct H4.
+    - by destruct H1.
+    - right. by destruct H1.
   Qed.
 
-  Lemma step_insert i t2 σ2 e κ e' σ3 efs :
-    t2 !! i = Some e →
-    prim_step e σ2 κ e' σ3 efs →
-    step (t2, σ2) κ (<[i:=e']>t2 ++ efs, σ3).
+  Lemma fuels_thread_yield_thread_pool_inv ths e1 ϕ i e2 :
+    ths !! i = Some e1 →
+    to_val e1 = None →
+    thread_pool_inv ths ϕ →
+    thread_pool_inv (<[i:=e2]>ths) (fuels_thread_yield i e2 ϕ).
   Proof.
-    intros.
-    edestruct (elem_of_list_split_length t2) as (t21&t22&?&?);
-      first (by eauto using elem_of_list_lookup_2); simplify_eq.
-    econstructor; eauto.
-    by rewrite insert_app_r_alt // Nat.sub_diag /= -assoc_L.
+    intros Hs Hv Hi. rewrite <- (insert_delete ths i e1) in Hi; [|done].
+    apply map_Forall2_insert_inv_l in Hi; [|by eapply lookup_delete].
+    destruct Hi as (?&?&?&?&?&?). subst.
+    rewrite <- (insert_delete ths i e1); [|done]. rewrite (insert_insert (delete i ths)).
+    rewrite /fuels_thread_yield. destruct (to_val e2) eqn:He.
+    - rewrite insert_insert. apply map_Forall2_insert; try done.
+      + apply lookup_delete.
+      + split; [left; done | done].
+    - apply map_Forall2_insert; try done.
+      + apply lookup_delete.
+      + split; [right | done]. rewrite Hv in H1. destruct H1 as [(?&?) | (?&?)]; [| done].
+        by destruct H.
   Qed.
 
-  Lemma erased_step_Permutation (t1 t1' t2 : list (expr Λ)) σ1 σ2 :
-    t1 ≡ₚ t1' → erased_step (t1,σ1) (t2,σ2) → ∃ t2', t2 ≡ₚ t2' ∧ erased_step (t1',σ1) (t2',σ2).
+  Lemma disjoint_union_thread_pool_inv ths ϕ efs ϕ' :
+    (dom ths ## dom efs) →
+    thread_pool_inv ths ϕ →
+    thread_pool_inv efs ϕ' →
+    thread_pool_inv (ths ∪ efs) (ϕ ∪ ϕ').
   Proof.
-    intros Heq [? Hs]. pose proof (step_Permutation _ _ _ _ _ _ Heq Hs). firstorder.
-     (* FIXME: [naive_solver] should be able to handle this *)
+    revert ϕ. pattern ths. revert ths. eapply map_ind; intros.
+    { apply map_Forall2_empty_inv_l in H0; subst. rewrite !left_id_L. auto. }
+    eapply map_Forall2_insert_inv_l in H2; [|done]. destruct H2 as (?&?&?&?&?&?). subst.
+    assert (Hefs : efs !! i = None).
+    { apply map_disjoint_dom in H1. eapply map_disjoint_Some_l; [done | apply lookup_insert]. }
+    rewrite -!insert_union_l. apply map_Forall2_insert.
+    { rewrite lookup_union_l; auto. }
+    { rewrite lookup_union_l; [auto |]. apply not_elem_of_dom_1. apply not_elem_of_dom_2 in Hefs.
+      replace (dom ϕ') with (dom efs); [auto|].
+      by eapply map_Forall2_dom_L.
+    }
+    split; [done|].
+    apply H0; try done. set_solver.
   Qed.
+
+  Lemma fuels_fair_add_thread_pool_inv ths ϕ1 efs ϕ2 :
+    (dom ths ## dom efs) →
+    thread_pool_inv ths ϕ1 →
+    fuels_fair_add efs ϕ1 ϕ2 →
+    thread_pool_inv (ths ∪ efs) ϕ2.
+  Proof.
+    intros. destruct H1 as (ϕ'&?&?). subst. by apply disjoint_union_thread_pool_inv.
+  Qed.
+
+  Lemma step_thread_pool_inv ρ1 κ ρ2 :
+    thread_pool_inv ρ1.1.1 ρ1.1.2 →
+    step ρ1 κ ρ2 →
+    thread_pool_inv ρ2.1.1 ρ2.1.2.
+  Proof.
+    intros Hi Hs. inv Hs. simpl in *.
+    assert (Hd : dom ths ## dom efs).
+    { by eapply fork_thread_ids. }
+    eapply fuels_fair_add_thread_pool_inv; [| | done].
+    { rewrite dom_insert_lookup; done. }
+    eapply fuels_thread_yield_thread_pool_inv; [done | by eapply val_stuck |].
+    eapply fuels_fair_update_thread_pool_inv; done.
+  Qed.
+
+  TODO
 
   Record pure_step (e1 e2 : expr Λ) := {
     pure_step_safe σ1 : reducible_no_obs e1 σ1;
