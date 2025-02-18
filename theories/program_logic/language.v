@@ -158,7 +158,7 @@ Section language.
     prim_step e1 σ1 (dom ths) κ e2 σ2 efs →
     ϕ2 = fuels_thread_yield i e2 ϕ1 →
     fuels_fair_add efs ϕ2 ϕ3 →
-    ρ2 = ((<[i:=e2]>ths) ∪ efs, ϕ3, σ2) →
+    ρ2 = (<[i:=e2]>ths ∪ efs, ϕ3, σ2) →
     step ρ1 κ ρ2.
   Local Hint Constructors step : core.
 
@@ -336,15 +336,13 @@ Section language.
     eapply fuels_fair_update_thread_pool_inv; done.
   Qed.
 
-  TODO
-
   Record pure_step (e1 e2 : expr Λ) := {
-    pure_step_safe σ1 : reducible_no_obs e1 σ1;
-    pure_step_det σ1 κ e2' σ2 efs :
-      prim_step e1 σ1 κ e2' σ2 efs → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs = []
+    pure_step_safe σ1 τ : reducible_no_obs e1 σ1 τ;
+    pure_step_det σ1 κ τ e2' σ2 efs :
+      prim_step e1 σ1 τ κ e2' σ2 efs → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs = ∅
   }.
 
-  Notation pure_steps_tp := (Forall2 (rtc pure_step)).
+  Notation pure_steps_tp := (map_Forall2 (λ _, rtc pure_step)).
 
   (* TODO: Exclude the case of [n=0], either here, or in [wp_pure] to avoid it
   succeeding when it did not actually do anything. *)
@@ -357,10 +355,10 @@ Section language.
   Proof.
     intros [Hred Hstep]. split.
     - unfold reducible_no_obs in *. naive_solver eauto using fill_step.
-    - intros σ1 κ e2' σ2 efs Hpstep.
-      destruct (fill_step_inv e1 σ1 κ e2' σ2 efs) as (e2'' & -> & ?); [|exact Hpstep|].
-      + destruct (Hred σ1) as (? & ? & ? & ?); eauto using val_stuck.
-      + edestruct (Hstep σ1 κ e2'' σ2 efs) as (? & -> & -> & ->); auto.
+    - intros σ1 κ τ e2' σ2 efs Hpstep.
+      destruct (fill_step_inv e1 σ1 τ κ e2' σ2 efs) as (e2'' & -> & ?); [|exact Hpstep|].
+      + destruct (Hred σ1 τ) as (? & ? & ? & ?); eauto using val_stuck.
+      + edestruct (Hstep σ1 κ τ e2'' σ2 efs) as (? & -> & -> & ->); auto.
   Qed.
 
   Lemma pure_step_nsteps_ctx K `{!@LanguageCtx Λ K} n e1 e2 :
@@ -395,8 +393,8 @@ Section language.
     (∃ v, of_val v = e) → is_Some (to_val e).
   Proof. intros [v <-]. rewrite to_of_val. eauto. Qed.
 
-  Lemma prim_step_not_stuck e σ κ e' σ' efs :
-    prim_step e σ κ e' σ' efs → not_stuck e σ.
+  Lemma prim_step_not_stuck e σ τ κ e' σ' efs :
+    prim_step e σ τ κ e' σ' efs → not_stuck e σ τ.
   Proof. rewrite /not_stuck /reducible. eauto 10. Qed.
 
   Lemma rtc_pure_step_val `{!Inhabited (state Λ)} v e :
@@ -405,7 +403,7 @@ Section language.
     intros ?; rewrite <- to_of_val.
     f_equal; symmetry; eapply rtc_nf; first done.
     intros [e' [Hstep _]].
-    destruct (Hstep inhabitant) as (?&?&?&Hval%val_stuck).
+    destruct (Hstep inhabitant ∅) as (?&?&?&Hval%val_stuck).
     by rewrite to_of_val in Hval.
   Qed.
 
@@ -417,29 +415,25 @@ Section language.
    or, there is an [i] such that [i]th thread does not participate in the
    pure steps between [t1] and [t3] and [t2] corresponds to taking a step in
    the [i]th thread starting from [t1]. *)
-  Lemma erased_step_pure_step_tp t1 σ1 t2 σ2 t3 :
-    erased_step (t1, σ1) (t2, σ2) →
+  Lemma erased_step_pure_step_tp t1 ϕ1 σ1 t2 ϕ2 σ2 t3 :
+    erased_step (t1, ϕ1, σ1) (t2, ϕ2, σ2) →
     pure_steps_tp t1 t3 →
     (σ1 = σ2 ∧ pure_steps_tp t2 t3) ∨
     (∃ i e efs e' κ,
       t1 !! i = Some e ∧ t3 !! i = Some e ∧
-      t2 = <[i:=e']>t1 ++ efs ∧
-      prim_step e σ1 κ e' σ2 efs).
+      t2 = <[i:=e']>t1 ∪ efs ∧
+      prim_step e σ1 (dom t1) κ e' σ2 efs).
   Proof.
-    intros [κ [e σ e' σ' efs t11 t12 ?? Hstep]] Hps; simplify_eq/=.
-    apply Forall2_app_inv_l in Hps
-      as (t31&?&Hpsteps&(e''&t32&Hps&?&->)%Forall2_cons_inv_l&->).
-    destruct Hps as [e|e1 e2 e3 [_ Hprs]].
-    - right.
-      exists (length t11), e, efs, e', κ; split_and!; last done.
-      + by rewrite lookup_app_r // Nat.sub_diag.
-      + apply Forall2_length in Hpsteps.
-        by rewrite lookup_app_r Hpsteps // Nat.sub_diag.
-      + by rewrite insert_app_r_alt // Nat.sub_diag /= -assoc_L.
-    - edestruct Hprs as (?&?&?&?); first done; simplify_eq.
-      left; split; first done.
-      rewrite right_id_L.
-      eauto using Forall2_app.
+    intros [κ [e σ e' σ' ths i efs ϕ10 ϕ11 ϕ12 ϕ13 t11 Hi Hf0 Hstep Hf' Hf1 t12]] Hps; simplify_eq/=.
+    assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None).
+    { exists (delete i ths). split; [by rewrite insert_delete | by apply lookup_delete]. }
+    destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi.
+    apply map_Forall2_insert_inv_l in Hps as (e'' & t31 & -> & Ht31 & Hsteps & Hps); [| done].
+    destruct Hsteps as [e|e1 e2 e3 Hpstep Hprs].
+    - right. exists i, e, efs, e', κ. split_and!. 1,2: by apply lookup_insert. all: done.
+    - edestruct Hpstep as (?&?&?&?); first done. destruct H1. simplify_eq.
+      left. split; first done. rewrite insert_insert right_id_L.
+      by eapply map_Forall2_insert.
   Qed.
 
 End language.
@@ -448,4 +442,4 @@ Global Hint Mode PureExec + - - ! - : typeclass_instances.
 
 Global Arguments step_atomic {Λ ρ1 κ ρ2}.
 
-Notation pure_steps_tp := (Forall2 (rtc pure_step)).
+Notation pure_steps_tp := (map_Forall2 (λ _, rtc pure_step)).

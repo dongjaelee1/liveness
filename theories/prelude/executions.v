@@ -11,8 +11,10 @@ Section definitions.
     (exists x', R x x') -> (forall y, R x y -> all_eventually y P) -> all_eventually x P.
 
   CoInductive ex_always_not (x : A) (P : A -> Prop) : Prop :=
-  | ex_always_not_done : (forall x', ¬ R x x') -> (¬ P x) -> ex_always_not x P
-  | ex_always_not_do_step y : (¬ P x) -> R x y -> ex_always_not y P -> ex_always_not x P.
+  | ex_always_not_done :
+    (forall x', ¬ R x x') -> (¬ P x) -> ex_always_not x P
+  | ex_always_not_do_step y :
+    (¬ P x) -> R x y -> ex_always_not y P -> ex_always_not x P.
 
 End definitions.
 
