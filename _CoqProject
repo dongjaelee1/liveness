@@ -12,6 +12,7 @@
 -arg -w -arg -ambiguous-paths
 
 theories/prelude/axioms.v
+theories/prelude/wf_structs.v
 
 theories/algebra/orderedCM.v
 theories/algebra/wfOrderedCM.v
@@ -19,6 +20,8 @@ theories/algebra/ordinal_WFOrderedCM.v
 theories/algebra/nat_WFOrderedCM.v
 theories/algebra/bank.v
 theories/algebra/bcred.v
+
+theories/base_logic/upred_measure.v
 
 theories/base_logic/lib/osat.v
 
