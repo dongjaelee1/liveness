@@ -106,3 +106,19 @@ Section measure.
   Qed.
 
 End measure.
+
+Section logic.
+  Context `{SI: indexT} {PROP : bi} {A : Type}.
+
+  Infix "<ₒ" := (ord_tree_lt) (at level 60).
+  Notation ot := (ord_tree (index * A)%type).
+
+  Lemma mono_match_measure (P : ot → PROP) o1 :
+    (∀ o o', ⌜o <ₒ o'⌝ -∗ P o -∗ P o') ⊢ (∃ o0, P o0 ∧ ⌜o0 <ₒ o1⌝) -∗ P o1.
+  Proof.
+    iIntros "Hm (%o0&He&%Ho)". iApply "Hm".
+    - iPureIntro. eauto.
+    - iFrame.
+  Qed.
+
+End logic.
