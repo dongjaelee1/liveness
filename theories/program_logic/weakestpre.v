@@ -1,23 +1,24 @@
 From iris.proofmode Require Import base proofmode classes.
-From iris.base_logic.lib Require Export fancy_updates.
-From iris.program_logic Require Export language.
+From transfinite.base_logic.lib Require Export fancy_updates.
+From liveness Require Export language.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 Import uPred.
 
-Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
+Class irisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
   #[global] iris_invGS :: invGS_gen hlc Σ;
 
   (** The state interpretation is an invariant that should hold in
   between each step of reduction. Here [Λstate] is the global state,
   the first [nat] is the number of steps already performed by the
   program, [list (observation Λ)] are the remaining observations, and the
-  last [nat] is the number of forked-off threads (not the total number
-  of threads, which is one higher because there is always a main
-  thread). *)
-  state_interp : state Λ → nat → list (observation Λ) → nat → iProp Σ;
+  last thread_ids is the set of allocated thread identifiers. *)
+  state_interp : state Λ → nat → list (observation Λ) → thread_ids → iProp Σ;
+
+  (** Liveness obligation interpretation. *)
+  obl_interp : 
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -42,11 +43,11 @@ Class irisGS_gen (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
   of the definition [state_interp_mono] does not significantly
   complicate the formalization in Iris, we prefer simplifying the
   client. *)
-  state_interp_mono σ ns κs nt:
-    state_interp σ ns κs nt ⊢ |={∅}=> state_interp σ (S ns) κs nt
+  state_interp_mono σ ns κs τ:
+    state_interp σ ns κs τ ⊢ |={∅}=> state_interp σ (S ns) κs τ
 }.
 Global Opaque iris_invGS.
-Global Arguments IrisG {hlc Λ Σ}.
+Global Arguments IrisG {SI hlc Λ Σ}.
 
 Notation irisGS := (irisGS_gen HasLc).
 
@@ -63,11 +64,11 @@ Notation irisGS := (irisGS_gen HasLc).
     can only be used by exactly one client.
   - The step-taking update can even be used by clients that opt out of
     later credits, e.g. because they use [BiFUpdPlainly]. *)
-Definition wp_pre `{!irisGS_gen hlc Λ Σ} (s : stuckness)
+Definition wp_pre `{SI : indexT} `{!irisGS_gen hlc Λ Σ} (s : stuckness)
     (wp : coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
     coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ := λ E e1 Φ,
   match to_val e1 with
-  | Some v => |={E}=> Φ v
+  | Some v => ∀ σ ns κs τ  |={E}=> Φ v
   | None => ∀ σ1 ns κ κs nt,
      state_interp σ1 ns (κ ++ κs) nt ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
