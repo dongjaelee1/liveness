@@ -9,7 +9,7 @@ Set Implicit Arguments.
 Lemma well_founded_irrefl A (R : A -> A -> Prop) (WF : well_founded R) : forall x, ~ R x x.
 Proof. intros x HR. specialize (WF x). induction WF; eauto. Qed.
 
-Inductive ord_tree (A : Type): Type :=
+Inductive ord_tree (A : Type) : Type :=
 | ord_tree_base
 | ord_tree_cons (childs : A -> ord_tree A)
 .
