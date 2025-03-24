@@ -36,3 +36,34 @@ Next Obligation.
     rewrite Hessenberg.add_O_r. auto.
   }
 Qed.
+
+Section ord_facts.
+
+  Lemma ord_lt_one (o0 o1 : Ord.t) :
+    (o0 < o1)%ord -> ((o0 ⊕ (Ord.S Ord.O)) <= o1)%ord.
+  Proof.
+    intros H. apply WFOrderedCM.lt_exists_left in H. destruct H as (b&H0&H1).
+    etransitivity; [|eauto]. apply Hessenberg.le_add_r.
+    apply Ord.S_supremum. auto.
+  Qed.
+
+End ord_facts.
+
+Section ord_from_wf_facts.
+
+  Context {A : Type} {R : A -> A -> Prop}.
+  Variable WF : well_founded R.
+
+  Lemma ord_from_wf_lt_one (a0 a1 : A) :
+    R a0 a1 -> ((Ord.from_wf WF a0 ⊕ (Ord.S Ord.O)) <= Ord.from_wf WF a1)%ord.
+  Proof using.
+    intros HR. apply ord_lt_one. apply Ord.lt_from_wf. auto.
+  Qed.
+
+  Lemma ord_from_wf_set_one (a : A) :
+    ((Ord.from_wf WF a ⊕ (Ord.S Ord.O)) <= Ord.from_wf_set WF)%ord.
+  Proof using.
+    apply ord_lt_one. apply Ord.from_wf_set_upperbound.
+  Qed.
+
+End ord_from_wf_facts.
