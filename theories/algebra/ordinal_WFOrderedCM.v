@@ -2,6 +2,8 @@ From stdpp Require Import base.
 From liveness Require Export wfOrderedCM.
 From Ordinal Require Import Ordinal Hessenberg ClassicalOrdinal.
 
+Notation "'ω'" := Ord.omega.
+
 Global Program Instance ord_OrderedCM : OrderedCM.t Ord.le Hessenberg.add :=
   OrderedCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.
 Next Obligation.
@@ -47,6 +49,12 @@ Section ord_facts.
     apply Ord.S_supremum. auto.
   Qed.
 
+  Lemma Jacobsthal_expn_omega (o : Ord.t) :
+    (Ord.S Ord.O < o)%ord -> forall (n : nat), ((o ↑ n) < (o ↑ Ord.omega))%ord.
+  Proof.
+    intros. apply Jacobsthal.lt_expn_r; [auto|apply Ord.omega_upperbound].
+  Qed.
+
 End ord_facts.
 
 Section ord_from_wf_facts.
@@ -67,3 +75,60 @@ Section ord_from_wf_facts.
   Qed.
 
 End ord_from_wf_facts.
+
+Class enum_from_nat (A : Type) := enum_f : nat -> A.
+Notation "'en[' n ']'" := (enum_f n) (format "en[ n ]").
+
+Class Enum {A : Type} (R : A -> A -> Prop) (f : enum_from_nat A) := {
+    enum_wf : well_founded R;
+    enum_f_proper : Proper (lt ==> R) enum_f;
+  }.
+
+Definition ord_from_enum `{E : Enum A R} (a : A) : Ord.t := Ord.from_wf enum_wf a.
+Definition ord_from_enum_set `{E : Enum A R} : Ord.t := Ord.from_wf_set enum_wf.
+
+Notation "'oe[' a ']'" := (ord_from_enum a) (format "oe[ a ]").
+Notation "'oen[' n ']'" := (ord_from_enum en[n]) (format "oen[ n ]").
+Notation "'oE'" := ord_from_enum_set.
+
+Section ord_from_enum_facts.
+
+  Context `{@Enum A R f}.
+
+  Lemma ord_from_enum_lt (a0 a1 : A) :
+    R a0 a1 -> (oe[a0] < oe[a1])%ord.
+  Proof using.
+    apply Ord.lt_from_wf.
+  Qed.
+
+  Lemma ord_from_enum_lt_nat (n0 n1 : nat) :
+    n0 < n1 -> (oen[n0] < oen[n1])%ord.
+  Proof using.
+    intros. apply Ord.lt_from_wf. apply enum_f_proper. auto.
+  Qed.
+
+  Lemma ord_from_enum_set_omega :
+    (ω <= oE)%ord.
+  Proof using.
+    rewrite Ord.omega_from_peano_lt_set. eapply WfRel.from_wf_set_inj. apply enum_f_proper.
+  Qed.
+
+  Lemma ord_from_enum_set_nat :
+    forall (n : nat), (n < oE)%ord.
+  Proof using.
+    intros. eapply Ord.lt_le_lt; [apply Ord.omega_upperbound | apply ord_from_enum_set_omega].
+  Qed.
+
+  Lemma ord_from_enum_set_zero :
+    (Ord.O < oE)%ord.
+  Proof using.
+    rewrite <- Ord.from_nat_O. apply ord_from_enum_set_nat.
+  Qed.
+
+  Lemma ord_from_enum_set_one :
+    (Ord.S Ord.O < oE)%ord.
+  Proof using.
+    rewrite <- Ord.from_nat_O, <- Ord.from_nat_S . apply ord_from_enum_set_nat.
+  Qed.
+
+End ord_from_enum_facts.
