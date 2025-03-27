@@ -293,7 +293,7 @@ Section osat.
     iApply "HI". iIntros "Hc".
     iMod (oblS_credit_spend with "[Hb Hc]") as "(%a' & %LE & #Hb')"; [iFrame; done |].
     iClear "Hb". iApply (IND a'); [| iModIntro; iSplit; done].
-    apply WFOrderedCM.lt_exists_l. exists c. split; [auto | by rewrite OrderedCM.add_comm_le ].
+    apply WFOrderedCM.lt_exists_left. exists c. split; [auto | by rewrite OrderedCM.add_comm_le ].
   Qed.
 
   Lemma oblG_goal_lookup (Obls : gmap positive (obl_type * iProp Σ)) i P :
@@ -382,7 +382,7 @@ Section osat.
     - iExFalso. subst. iDestruct "LU" as "(% & _ & _ & IDLE & _)".
       iPoseProof (oblS_idle_active_false with "[IDLE Ha]") as "%F"; [iFrame; done | done].
     - iDestruct "LU" as "(%a' & %LE & CRED & ACTa & LIVE)".
-      apply WFOrderedCM.lt_exists_l in LT. destruct LT as (b&LTb&LEb).
+      apply WFOrderedCM.lt_exists_left in LT. destruct LT as (b&LTb&LEb).
       iMod (oblS_credit_mon_split with "CRED") as "[CRED CRED']".
       { etrans; [|eauto]. eauto. }
       iPoseProof ((big_sepM_insert _ (delete i Obls) i (obl_live a0, Q))  with "[Hom ACTa LIVE CRED]") as "Hom".
@@ -431,14 +431,26 @@ Section osat.
 
   Lemma osat_is_done O i P :
     osat O ∗ oblS_done i ∗ oblG_goal i P
-    ⊢ |==> (▷ P -∗ osat O) ∗ ▷ P.
+    ⊢ (▷ P) ∗ (▷ P -∗ osat O).
   Proof.
-
+    iIntros "(Ho & #Hd & #Hg)".
+    rewrite /osat -!lock. iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom)".
+    iDestruct (oblG_goal_lookup Obls i P with "[Hoa]") as (o Q IN) "#HPQ"; [iFrame; done|].
+    iDestruct (big_sepM_delete _ _ i _ IN with "Hom") as "[Hc Hom]".
+    destruct o.
+    { iExFalso. iDestruct "Hc" as "(%&_&_&_&Hl)". iDestruct (oblS_live_done_false with "[$]") as "F". done. }
+    { iExFalso. iDestruct "Hc" as "(%&_&_&_&Hl)". iDestruct (oblS_live_done_false with "[$]") as "F". done. }
+    { iDestruct "Hc" as "(HQ&Haa&Hda)". iSplitL "HQ".
+      { iNext. iRewrite "HPQ" in "HQ". done. }
+      { iIntros "HP". iExists Obls. iSplit; [iPureIntro; done |].
+        iFrame. iApply (big_sepM_delete _ _ i); [eauto |].
+        iFrame. iNext. iRewrite "HPQ". done.
+      }
+    }
+  Qed.
 
     TODO
 
-  Admitted.
-  
 
 
 
