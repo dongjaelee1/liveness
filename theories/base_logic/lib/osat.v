@@ -321,7 +321,7 @@ Section osat.
     iPureIntro. subst O. apply elem_of_dom_2 in H. set_solver.
   Qed.
 
-  Lemma osat_alloc O a P :
+  Lemma obl_alloc O a P :
     osat O
     ⊢ |==> ∃ i, osat (<[i:=obl_init a]>O) ∗ ⌜O !! i = None⌝ ∗
                 oblG_goal i P ∗ oblS_idle i 1%Qp ∗ oblS_live i 1 ∗ oblS_bound i a.
@@ -429,7 +429,7 @@ Section osat.
     }
   Qed.
 
-  Lemma osat_is_done O i P :
+  Lemma osat_done_open O i P :
     osat O ∗ oblS_done i ∗ oblG_goal i P
     ⊢ (▷ P) ∗ (▷ P -∗ osat O).
   Proof.
@@ -449,162 +449,26 @@ Section osat.
     }
   Qed.
 
-    TODO
+  Lemma osat_done_open_pers O i P :
+    Persistent P →
+    osat O ∗ oblS_done i ∗ oblG_goal i P
+    ⊢ osat O ∗ ▷ P.
+  Proof.
+    iIntros (PP) "H". iPoseProof (osat_done_open with "H") as "[#HP Ho]".
+    iSplitL; [|done]. iApply "Ho". done.
+  Qed.
 
-
-
-
-Lemma oblG_open i P : osat ∗ oblG i P ∗ ownE {[i]} ⊢ osat ∗ ▷ P ∗ ownD {[i]}.
-Proof.
-  rewrite /oblG /osat -!lock.
-  iIntros "(Hw & Hi & HiE)". iDestruct "Hw" as (I) "[Hw HI]".
-  iDestruct (invariant_lookup I i P with "[$]") as (Q ?) "#HPQ".
-  iDestruct (big_sepM_delete _ _ i with "HI") as "[[[HQ $]|HiE'] HI]"; eauto.
-  - iSplitR "HQ"; last by iNext; iRewrite -"HPQ".
-    iExists I. iFrame "Hw". iApply (big_sepM_delete _ _ i); eauto.
-    iFrame "HI"; eauto.
-  - iDestruct (ownE_singleton_twice with "[$HiE $HiE']") as %[].
-Qed.
-Lemma oblG_close i P : osat ∗ oblG i P ∗ ▷ P ∗ ownD {[i]} ⊢ osat ∗ ownE {[i]}.
-Proof.
-  rewrite /oblG /osat -!lock.
-  iIntros "(Hw & Hi & HP & HiD)". iDestruct "Hw" as (I) "[Hw HI]".
-  iDestruct (invariant_lookup with "[$]") as (Q ?) "#HPQ".
-  iDestruct (big_sepM_delete _ _ i with "HI") as "[[[HQ ?]|$] HI]"; eauto.
-  - iDestruct (ownD_singleton_twice with "[$]") as %[].
-  - iExists I. iFrame "Hw". iApply (big_sepM_delete _ _ i); eauto.
-    iFrame "HI". iLeft. iFrame "HiD". by iNext; iRewrite "HPQ".
-Qed.
-
-  TODO
-
-    osat_induction?
-
-Lemma ownE_empty : ⊢ |==> ownE ∅.
-Proof.
-  rewrite /bi_emp_valid.
-  by rewrite (own_unit (coPset_disjUR) enabled_name).
-Qed.
-Lemma ownE_op E1 E2 : E1 ## E2 → ownE (E1 ∪ E2) ⊣⊢ ownE E1 ∗ ownE E2.
-Proof. intros. by rewrite /ownE -own_op coPset_disj_union. Qed.
-Lemma ownE_disjoint E1 E2 : ownE E1 ∗ ownE E2 ⊢ ⌜E1 ## E2⌝.
-Proof. rewrite /ownE -own_op own_valid. by iIntros (?%coPset_disj_valid_op). Qed.
-Lemma ownE_op' E1 E2 : ⌜E1 ## E2⌝ ∧ ownE (E1 ∪ E2) ⊣⊢ ownE E1 ∗ ownE E2.
-Proof.
-  iSplit; [iIntros "[% ?]"; by iApply ownE_op|].
-  iIntros "HE". iDestruct (ownE_disjoint with "HE") as %?.
-  iSplit; first done. iApply ownE_op; by try iFrame.
-Qed.
-Lemma ownE_singleton_twice i : ownE {[i]} ∗ ownE {[i]} ⊢ False.
-Proof. rewrite ownE_disjoint. iIntros (?); set_solver. Qed.
-
-Lemma ownD_empty : ⊢ |==> ownD ∅.
-Proof.
-  rewrite /bi_emp_valid.
-  by rewrite (own_unit (gset_disjUR positive) disabled_name).
-Qed.
-Lemma ownD_op E1 E2 : E1 ## E2 → ownD (E1 ∪ E2) ⊣⊢ ownD E1 ∗ ownD E2.
-Proof. intros. by rewrite /ownD -own_op gset_disj_union. Qed.
-Lemma ownD_disjoint E1 E2 : ownD E1 ∗ ownD E2 ⊢ ⌜E1 ## E2⌝.
-Proof. rewrite /ownD -own_op own_valid. by iIntros (?%gset_disj_valid_op). Qed.
-Lemma ownD_op' E1 E2 : ⌜E1 ## E2⌝ ∧ ownD (E1 ∪ E2) ⊣⊢ ownD E1 ∗ ownD E2.
-Proof.
-  iSplit; [iIntros "[% ?]"; by iApply ownD_op|].
-  iIntros "HE". iDestruct (ownD_disjoint with "HE") as %?.
-  iSplit; first done. iApply ownD_op; by try iFrame.
-Qed.
-Lemma ownD_singleton_twice i : ownD {[i]} ∗ ownD {[i]} ⊢ False.
-Proof. rewrite ownD_disjoint. iIntros (?); set_solver. Qed.
-
-Lemma invariant_lookup (I : gmap positive (iProp Σ)) i P :
-  own invariant_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (obl_goal_unfold <$> I))) ∗
-  own invariant_name (gmap_view_frag i DfracDiscarded (to_agree $ obl_goal_unfold P)) ⊢
-  ∃ Q, ⌜I !! i = Some Q⌝ ∗ ▷ (Q ≡ P).
-Proof.
-  rewrite -own_op own_valid gmap_view_both_validI_total.
-  iIntros "[%Q' (_& _ & HQ' & Hval & Hincl)]". rewrite !lookup_fmap.
-  case: (I !! i)=> [Q|] /=; last first.
-  { iDestruct "HQ'" as %?. done. }
-  iDestruct "HQ'" as %[= <-]. iExists Q; iSplit; first done.
-  rewrite to_agree_includedI internal_eq_sym -later_equivI. done.
-Qed.
-
-Lemma oblG_open i P : osat ∗ oblG i P ∗ ownE {[i]} ⊢ osat ∗ ▷ P ∗ ownD {[i]}.
-Proof.
-  rewrite /oblG /osat -!lock.
-  iIntros "(Hw & Hi & HiE)". iDestruct "Hw" as (I) "[Hw HI]".
-  iDestruct (invariant_lookup I i P with "[$]") as (Q ?) "#HPQ".
-  iDestruct (big_sepM_delete _ _ i with "HI") as "[[[HQ $]|HiE'] HI]"; eauto.
-  - iSplitR "HQ"; last by iNext; iRewrite -"HPQ".
-    iExists I. iFrame "Hw". iApply (big_sepM_delete _ _ i); eauto.
-    iFrame "HI"; eauto.
-  - iDestruct (ownE_singleton_twice with "[$HiE $HiE']") as %[].
-Qed.
-Lemma oblG_close i P : osat ∗ oblG i P ∗ ▷ P ∗ ownD {[i]} ⊢ osat ∗ ownE {[i]}.
-Proof.
-  rewrite /oblG /osat -!lock.
-  iIntros "(Hw & Hi & HP & HiD)". iDestruct "Hw" as (I) "[Hw HI]".
-  iDestruct (invariant_lookup with "[$]") as (Q ?) "#HPQ".
-  iDestruct (big_sepM_delete _ _ i with "HI") as "[[[HQ ?]|$] HI]"; eauto.
-  - iDestruct (ownD_singleton_twice with "[$]") as %[].
-  - iExists I. iFrame "Hw". iApply (big_sepM_delete _ _ i); eauto.
-    iFrame "HI". iLeft. iFrame "HiD". by iNext; iRewrite "HPQ".
-Qed.
-
-Lemma oblG_alloc φ P :
-  (∀ E : gset positive, ∃ i, i ∉ E ∧ φ i) →
-  osat ∗ ▷ P ==∗ ∃ i, ⌜φ i⌝ ∗ osat ∗ oblG i P.
-Proof.
-  iIntros (Hfresh) "[Hw HP]". rewrite /osat -!lock.
-  iDestruct "Hw" as (I) "[Hw HI]".
-  iMod (own_unit (gset_disjUR positive) disabled_name) as "HE".
-  iMod (own_updateP with "[$]") as "HE".
-  { apply (gset_disj_alloc_empty_updateP_strong' (λ i, I !! i = None ∧ φ i)).
-    intros E. destruct (Hfresh (E ∪ dom I))
-      as (i & [? HIi%not_elem_of_dom]%not_elem_of_union & ?); eauto. }
-  iDestruct "HE" as (X) "[Hi HE]"; iDestruct "Hi" as %(i & -> & HIi & ?).
-  iMod (own_update with "Hw") as "[Hw HiP]".
-  { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree _)); [|done..].
-    by rewrite /= !lookup_fmap HIi. }
-  iModIntro; iExists i;  iSplit; [done|]. rewrite /oblG; iFrame "HiP".
-  iExists (<[i:=P]>I); iSplitL "Hw".
-  { by rewrite !fmap_insert. }
-  iApply (big_sepM_insert _ I); first done.
-  iFrame "HI". iLeft. by rewrite /ownD; iFrame.
-Qed.
-
-Lemma oblG_alloc_open φ P :
-  (∀ E : gset positive, ∃ i, i ∉ E ∧ φ i) →
-  osat ==∗ ∃ i, ⌜φ i⌝ ∗ (ownE {[i]} -∗ osat) ∗ oblG i P ∗ ownD {[i]}.
-Proof.
-  iIntros (Hfresh) "Hw". rewrite /osat -!lock. iDestruct "Hw" as (I) "[Hw HI]".
-  iMod (own_unit (gset_disjUR positive) disabled_name) as "HD".
-  iMod (own_updateP with "[$]") as "HD".
-  { apply (gset_disj_alloc_empty_updateP_strong' (λ i, I !! i = None ∧ φ i)).
-    intros E. destruct (Hfresh (E ∪ dom I))
-      as (i & [? HIi%not_elem_of_dom]%not_elem_of_union & ?); eauto. }
-  iDestruct "HD" as (X) "[Hi HD]"; iDestruct "Hi" as %(i & -> & HIi & ?).
-  iMod (own_update with "Hw") as "[Hw HiP]".
-  { eapply (gmap_view_alloc _ i DfracDiscarded (to_agree _)); [|done..].
-    by rewrite /= !lookup_fmap HIi. }
-  iModIntro; iExists i;  iSplit; [done|]. rewrite /oblG; iFrame "HiP".
-  rewrite -/(ownD _). iFrame "HD".
-  iIntros "HE". iExists (<[i:=P]>I); iSplitL "Hw".
-  { by rewrite !fmap_insert. }
-  iApply (big_sepM_insert _ I); first done.
-  iFrame "HI". by iRight.
-Qed.
 End osat.
 
-(* Allocation of an initial world *)
-Lemma osat_alloc `{SI : indexT} `{!osatGpreS Σ} : ⊢ |==> ∃ _ : osatGS Σ, osat ∗ ownE ⊤.
+(* Allocation of an initial obligation protocol. *)
+Lemma osat_alloc `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osatGpreS Σ} : ⊢ |==> ∃ _ : osatGS Σ, osat ∅.
 Proof.
   iIntros.
-  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅)) as (γI) "HI";
+  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅)) as (γG) "HG";
     first by apply gmap_view_auth_valid.
-  iMod (own_alloc (CoPset ⊤)) as (γE) "HE"; first done.
-  iMod (own_alloc (GSet ∅)) as (γD) "HD"; first done.
-  iModIntro; iExists (OsatG SI _ _ γI γE γD).
-  rewrite /osat /ownE -lock; iFrame.
-  iExists ∅. rewrite fmap_empty big_opM_empty. by iFrame.
+  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅)) as (γS) "HS";
+    first by apply gmap_view_auth_valid.
+  iModIntro; iExists (OsatG SI _ _ _ _ WF _ _ γG γS).
+  rewrite /osat -lock.
+  iExists ∅. rewrite !fmap_empty big_opM_empty. by iFrame.
 Qed.
