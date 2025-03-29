@@ -6,8 +6,10 @@ From liveness Require Export language.
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 Import uPred.
+From liveness Require Import osat.
+Export osatGS.
 
-Class irisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
+Class irisGS_gen `{SI : indexT} `{WFO : WFOrderedCM.t A leR addO ltR} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
   #[global] iris_invGS :: invGS_gen hlc Σ;
 
   (** The state interpretation is an invariant that should hold in
@@ -17,8 +19,11 @@ Class irisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) 
   last thread_ids is the set of allocated thread identifiers. *)
   state_interp : state Λ → nat → list (observation Λ) → thread_ids → iProp Σ;
 
+  (** Scheduler fairness interpretation. *)
+  sched_interp : sched_fuels Λ → iProp Σ;
+
   (** Liveness obligation interpretation. *)
-  obl_interp : 
+  obl_interp : obl_types → sched_fuels Λ → iProp Σ;
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -47,9 +52,11 @@ Class irisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) 
     state_interp σ ns κs τ ⊢ |={∅}=> state_interp σ (S ns) κs τ
 }.
 Global Opaque iris_invGS.
-Global Arguments IrisG {SI hlc Λ Σ}.
+Global Arguments IrisG {SI A leR addO ltR WFO hlc Λ Σ}.
 
 Notation irisGS := (irisGS_gen HasLc).
+
+TODO
 
 (** The predicate we take the fixpoint of in order to define the WP. *)
 (** In the step case, we both provide [S (num_laters_per_step ns)]

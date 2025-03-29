@@ -60,10 +60,14 @@ Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
 Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
 Canonical Structure exprO `{SI : indexT} Λ := leibnizO (expr Λ).
 
+Notation sched_fuels := (λ Λ, gmap thread_id (option (fuel Λ))).
+Notation thread_pool := (λ Λ, gmap thread_id (expr Λ)).
+
 (** Thread pool with fuels to model scheduler fairness.
     If a thread is done (is a val), fuel = None. *)
 Definition cfg (Λ : language) :=
-  (gmap thread_id (expr Λ) * gmap thread_id (option (fuel Λ)) * state Λ)%type.
+  (thread_pool Λ * sched_fuels Λ * state Λ)%type.
+  (* (gmap thread_id (expr Λ) * gmap thread_id (option (fuel Λ)) * state Λ)%type. *)
 
 Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
   fill_not_val e :
@@ -128,10 +132,10 @@ Section language.
       prim_step e σ τ κ e' σ' efs →
       if a is WeaklyAtomic then irreducible e' σ' (τ ∪ (dom efs)) else is_Some (to_val e').
 
-  Definition thread_pool_inv (ths : gmap thread_id (expr Λ)) (ϕ : gmap thread_id (option (fuel Λ))) : Prop :=
+  Definition thread_pool_inv (ths : thread_pool Λ) (ϕ : sched_fuels Λ) : Prop :=
     map_Forall2 (λ _ e f, (is_Some (to_val e) ∧ f = None) ∨ (to_val e = None ∧ is_Some f)) ths ϕ.
 
-  Definition fuels_fair_update (S : thread_ids) (ϕ1 ϕ2 : gmap thread_id (option (fuel Λ))) : Prop :=
+  Definition fuels_fair_update (S : thread_ids) (ϕ1 ϕ2 : sched_fuels Λ) : Prop :=
     map_Forall2 (λ i u1 u2,
                    match u1, u2 with
                    | None, None => True
@@ -139,14 +143,14 @@ Section language.
                    | _, _ => False
                    end) ϕ1 ϕ2.
 
-  Definition fuels_thread_yield (i : thread_id) (e : expr Λ) (ϕ : gmap thread_id (option (fuel Λ))) : gmap thread_id (option (fuel Λ)) :=
+  Definition fuels_thread_yield (i : thread_id) (e : expr Λ) (ϕ : sched_fuels Λ) : sched_fuels Λ :=
     match to_val e with
     | Some v => <[i:=None]>ϕ
     | None => ϕ
     end.
 
-  Definition fuels_fair_add (efs : gmap thread_id (expr Λ)) (ϕ1 ϕ2 : gmap thread_id (option (fuel Λ))) : Prop :=
-    ∃ (ϕ' : gmap thread_id (option (fuel Λ))), (thread_pool_inv efs ϕ') ∧ (ϕ2 = ϕ1 ∪ ϕ').
+  Definition fuels_fair_add (efs : thread_pool Λ) (ϕ1 ϕ2 : sched_fuels Λ) : Prop :=
+    ∃ (ϕ' : sched_fuels Λ), (thread_pool_inv efs ϕ') ∧ (ϕ2 = ϕ1 ∪ ϕ').
 
   (** An atomic thread step under scheduler fairness governed by fuel. *)
   Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=

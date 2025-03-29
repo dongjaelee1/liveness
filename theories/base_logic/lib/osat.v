@@ -3,7 +3,7 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liveness Require Import wfOrderedCM bcred.
+From liveness Require Export wfOrderedCM bcred.
 
 Inductive obl_type `{WFOrderedCM.t A leR addO ltR} : Type :=
 | obl_init (a : A) | obl_live (a : A) | obl_done.
@@ -25,14 +25,20 @@ Definition obl_type_transition `{WFOrderedCM.t A leR addO ltR} (l1 l2 : obl_type
 Definition obl_type_lt_gmap (K : Type) {EqDecision : EqDecision K} {Cnt : Countable K} `{WFOrderedCM.t A leR addO ltR} (ls1 ls2 : gmap K obl_type) : Prop :=
   map_Forall2 (λ _ l1 l2, obl_type_lt l1 l2) ls1 ls2.
 
+Definition obl_id := positive.
+Canonical Structure obl_idO `{SI : indexT} := leibnizO obl_id.
+
+Notation obl_ids := (gset obl_id).
+Notation obl_types := (gmap obl_id obl_type).
+
 (* All definitions in this file are internal to [fancy_updates] with the
    exception of what's in the [osatGS] module. The module [osatGS] is thus exported in
    [fancy_updates], where [osat] is only imported. *)
 Module osatGS.
   Class osatGpreS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     OsatGpreS {
-        osatGpreS_goal : inG Σ (gmap_viewR positive (agreeR $ laterO (iPropO Σ)));
-        osatGpreS_state : inG Σ (gmapUR positive (prodUR (prodUR bcredUR mono_natUR) mono_natUR));
+        osatGpreS_goal : inG Σ (gmap_viewR obl_id (agreeR $ laterO (iPropO Σ)));
+        osatGpreS_state : inG Σ (gmapUR obl_id (prodUR (prodUR bcredUR mono_natUR) mono_natUR));
       }.
 
   Class osatGS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
@@ -43,8 +49,8 @@ Module osatGS.
       }.
 
   Definition osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} : gFunctors :=
-    #[GFunctor (gmap_viewTRF positive (agreeTRF $ laterTF idTF));
-      GFunctor (gmapTRF positive (prodTRF (prodTRF bcredUR mono_natUR) mono_natUR))
+    #[GFunctor (gmap_viewTRF obl_id (agreeTRF $ laterTF idTF));
+      GFunctor (gmapTRF obl_id (prodTRF (prodTRF bcredUR mono_natUR) mono_natUR))
       ].
 
   Global Instance subG_osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Σ} : subG osatΣ Σ → (osatGpreS Σ).
@@ -71,61 +77,60 @@ Local Existing Instances osat_inG osatGpreS_goal osatGpreS_state.
 
 Definition goal_unfold `{SI : indexT} {Σ} (P : iProp Σ) : later (iProp Σ) :=
   Next P.
-Definition oblG_goal `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (P : iProp Σ) : iProp Σ :=
+Definition oblG_goal `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) (P : iProp Σ) : iProp Σ :=
   own goal_name
     (gmap_view_frag i DfracDiscarded (to_agree $ goal_unfold P)).
 Global Typeclasses Opaque oblG_goal.
 Global Instance: Params (@goal_unfold) 2 := {}.
 Global Instance: Params (@oblG_goal) 9 := {}.
-(* TODO: what is the correct arity for Params? *)
 
-Definition oblG_elem `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+Definition oblG_elem `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
   ∃ (P : iProp Σ), oblG_goal i P.
 Global Typeclasses Opaque oblG_elem.
 Global Instance: Params (@oblG_elem) 9 := {}.
 
-Definition oblS_idle `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (q : Qp) : iProp Σ :=
+Definition oblS_idle `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) (q : Qp) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ●MN{#(q/2)} 0, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_idle.
 Global Instance: Params (@oblS_idle) 9 := {}.
 
-Definition oblS_active_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+Definition oblS_active_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ●MN 1, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_active_auth.
 Global Instance: Params (@oblS_active_auth) 9 := {}.
 
-Definition oblS_active `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+Definition oblS_active `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ◯MN 1, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_active.
 Global Instance: Params (@oblS_active) 9 := {}.
 
-Definition oblS_live `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (q : Qp) : iProp Σ :=
+Definition oblS_live `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) (q : Qp) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ●MN{#(q/2)} 0) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_live.
 Global Instance: Params (@oblS_live) 9 := {}.
 
-Definition oblS_done_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+Definition oblS_done_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ●MN 1) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_done_auth.
 Global Instance: Params (@oblS_done_auth) 9 := {}.
 
-Definition oblS_done `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) : iProp Σ :=
+Definition oblS_done `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ◯MN 1) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_done.
 Global Instance: Params (@oblS_done) 9 := {}.
 
-Definition oblS_credit `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (a : A) : iProp Σ :=
+Definition oblS_credit `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) (a : A) : iProp Σ :=
   own state_name ({[ i := (credit a : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_credit.
 Global Instance: Params (@oblS_credit) 9 := {}.
 
-Definition oblS_bound `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : positive) (a : A) : iProp Σ :=
+Definition oblS_bound `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} (i : obl_id) (a : A) : iProp Σ :=
   own state_name ({[ i := (credit_bound a : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_bound.
 Global Instance: Params (@oblS_bound) 9 := {}.
 
 Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ}
-  (O : gmap positive obl_type) : iProp Σ :=
+  (O : obl_types) : iProp Σ :=
   locked
     (∃ (Obls : gmap positive (obl_type * (iProp Σ))%type),
         (⌜O = fst <$> Obls⌝) ∗
