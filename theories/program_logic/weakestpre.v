@@ -9,8 +9,15 @@ Import uPred.
 From liveness Require Import osat.
 Export osatGS.
 
-Class irisGS_gen `{SI : indexT} `{WFO : WFOrderedCM.t A leR addO ltR} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := IrisG {
-  #[global] iris_invGS :: invGS_gen hlc Σ;
+Class lirisGS_gen `{SI : indexT} `{WFO : WFOrderedCM.t A leR addO ltR} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {
+  #[global] liris_invGS :: invGS_gen hlc Σ;
+  #[global] liris_oblGS :: osatGS Σ;
+
+  (** Scheduler fairness interpretation. *)
+  sched_interp : sched_fuels Λ → iProp Σ;
+
+  (** Connecting liveness obligations and scheduler fairness. *)
+  obl_interp : obl_types → sched_fuels Λ → iProp Σ;
 
   (** The state interpretation is an invariant that should hold in
   between each step of reduction. Here [Λstate] is the global state,
@@ -18,12 +25,6 @@ Class irisGS_gen `{SI : indexT} `{WFO : WFOrderedCM.t A leR addO ltR} (hlc : has
   program, [list (observation Λ)] are the remaining observations, and the
   last thread_ids is the set of allocated thread identifiers. *)
   state_interp : state Λ → nat → list (observation Λ) → thread_ids → iProp Σ;
-
-  (** Scheduler fairness interpretation. *)
-  sched_interp : sched_fuels Λ → iProp Σ;
-
-  (** Liveness obligation interpretation. *)
-  obl_interp : obl_types → sched_fuels Λ → iProp Σ;
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to

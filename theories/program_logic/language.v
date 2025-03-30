@@ -2,6 +2,7 @@ From stdpp Require Import gmap.
 From iris.algebra Require Export ofe.
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
+From liveness Require Export wfOrderedCM.
 
 Definition thread_id := positive.
 Canonical Structure thread_idO `{SI : indexT} := leibnizO thread_id.
@@ -12,7 +13,8 @@ Section language_mixin.
   Context {expr val state observation fuel : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
-  Context (fuelR : fuel → fuel → Prop).
+  Context (fuel_leR fuelR : fuel → fuel → Prop).
+  Context (fuel_addO : fuel → fuel → fuel).
   (** We annotate the reduction relation with observations [κ], which we will
      use in the definition of weakest preconditions to predict future
      observations and assert correctness of the predictions. *)
@@ -25,7 +27,7 @@ Section language_mixin.
     mixin_to_of_val v : to_val (of_val v) = Some v;
     mixin_of_to_val e v : to_val e = Some v → of_val v = e;
     mixin_val_stuck e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → to_val e = None;
-    mixin_fuelR_wf : well_founded fuelR;
+    mixin_fuel_wf :: @WFOrderedCM.t _ fuel_leR fuel_addO fuelR;
     mixin_fork_thread_ids e σ τ κ e' σ' efs :
       prim_step e σ τ κ e' σ' efs → (τ ## (dom efs))
   }.
@@ -40,19 +42,23 @@ Structure language :=
       fuel : Type;
       of_val : val → expr;
       to_val : expr → option val;
+      fuel_leR : fuel → fuel → Prop;
       fuelR : fuel → fuel → Prop;
+      fuel_addO : fuel → fuel → fuel;
       prim_step : expr → state → thread_ids → list observation →
                   expr → state → gmap thread_id expr → Prop;
-      language_mixin : LanguageMixin of_val to_val fuelR prim_step
+      language_mixin : LanguageMixin of_val to_val fuel_leR fuelR fuel_addO prim_step
     }.
 
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments Language {_ _ _ _ _ _ _ _ _} _.
+Global Arguments Language {_ _ _ _ _ _ _ _ _ _ _} _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
+Global Arguments fuel_leR {_} _ _.
 Global Arguments fuelR {_} _ _.
+Global Arguments fuel_addO {_} _ _.
 Global Arguments prim_step {_} _ _ _ _ _ _ _.
 
 Canonical Structure fuelO `{SI : indexT} Λ := leibnizO (fuel Λ).
@@ -60,14 +66,13 @@ Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
 Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
 Canonical Structure exprO `{SI : indexT} Λ := leibnizO (expr Λ).
 
-Notation sched_fuels := (λ Λ, gmap thread_id (option (fuel Λ))).
-Notation thread_pool := (λ Λ, gmap thread_id (expr Λ)).
+Notation "'sched_fuels' Λ" := (gmap thread_id (option (fuel Λ))) (at level 1).
+Notation "'thread_pool' Λ" := (gmap thread_id (expr Λ)) (at level 1).
 
 (** Thread pool with fuels to model scheduler fairness.
     If a thread is done (is a val), fuel = None. *)
 Definition cfg (Λ : language) :=
   (thread_pool Λ * sched_fuels Λ * state Λ)%type.
-  (* (gmap thread_id (expr Λ) * gmap thread_id (option (fuel Λ)) * state Λ)%type. *)
 
 Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
   fill_not_val e :
@@ -99,7 +104,7 @@ Section language.
   Proof. apply language_mixin. Qed.
   Lemma val_stuck e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → to_val e = None.
   Proof. apply language_mixin. Qed.
-  Lemma fuelR_wf : well_founded (@fuelR Λ).
+  Lemma fuel_wf : WFOrderedCM.t (@fuel_leR Λ) (@fuel_addO Λ) (@fuelR Λ).
   Proof. apply language_mixin. Qed.
   Lemma fork_thread_ids e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → (τ ## (dom efs)).
   Proof. apply language_mixin. Qed.
@@ -149,7 +154,7 @@ Section language.
     | None => ϕ
     end.
 
-  Definition fuels_fair_add (efs : thread_pool Λ) (ϕ1 ϕ2 : sched_fuels Λ) : Prop :=
+  Definition fuels_fair_fork (efs : thread_pool Λ) (ϕ1 ϕ2 : sched_fuels Λ) : Prop :=
     ∃ (ϕ' : sched_fuels Λ), (thread_pool_inv efs ϕ') ∧ (ϕ2 = ϕ1 ∪ ϕ').
 
   (** An atomic thread step under scheduler fairness governed by fuel. *)
@@ -161,7 +166,7 @@ Section language.
     fuels_fair_update {[i]} ϕ0 ϕ1 →
     prim_step e1 σ1 (dom ths) κ e2 σ2 efs →
     ϕ2 = fuels_thread_yield i e2 ϕ1 →
-    fuels_fair_add efs ϕ2 ϕ3 →
+    fuels_fair_fork efs ϕ2 ϕ3 →
     ρ2 = (<[i:=e2]>ths ∪ efs, ϕ3, σ2) →
     step ρ1 κ ρ2.
   Local Hint Constructors step : core.
@@ -317,10 +322,10 @@ Section language.
     apply H0; try done. set_solver.
   Qed.
 
-  Lemma fuels_fair_add_thread_pool_inv ths ϕ1 efs ϕ2 :
+  Lemma fuels_fair_fork_thread_pool_inv ths ϕ1 efs ϕ2 :
     (dom ths ## dom efs) →
     thread_pool_inv ths ϕ1 →
-    fuels_fair_add efs ϕ1 ϕ2 →
+    fuels_fair_fork efs ϕ1 ϕ2 →
     thread_pool_inv (ths ∪ efs) ϕ2.
   Proof.
     intros. destruct H1 as (ϕ'&?&?). subst. by apply disjoint_union_thread_pool_inv.
@@ -334,7 +339,7 @@ Section language.
     intros Hi Hs. inv Hs. simpl in *.
     assert (Hd : dom ths ## dom efs).
     { by eapply fork_thread_ids. }
-    eapply fuels_fair_add_thread_pool_inv; [| | done].
+    eapply fuels_fair_fork_thread_pool_inv; [| | done].
     { rewrite dom_insert_lookup; done. }
     eapply fuels_thread_yield_thread_pool_inv; [done | by eapply val_stuck |].
     eapply fuels_fair_update_thread_pool_inv; done.
