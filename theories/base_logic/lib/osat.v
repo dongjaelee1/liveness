@@ -5,33 +5,61 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liveness Require Export wfOrderedCM bcred.
 
-Inductive obl_type `{WFOrderedCM.t A leR addO ltR} : Type :=
-| obl_init (a : A) | obl_live (a : A) | obl_done.
+(* TODO : Move to somewhere else *)
+Lemma sn_tc {X} (R : X → X → Prop) (x : X): sn R x ↔ sn (tc R) x.
+Proof.
+  split.
+  - induction 1 as [x _ IH]; constructor; simpl; intros y Hy; revert IH; simpl.
+    destruct Hy as [x y Honce|x y z Honce Hsteps]; intros IH; eauto.
+    destruct (IH _ Honce) as [Hy]; eauto.
+  - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
+Qed.
 
-Definition obl_type_lt `{WFOrderedCM.t A leR addO ltR} (l1 l2 : obl_type) : Prop :=
-  match l1, l2 with
-  | obl_init a1, obl_init a2 => a1 = a2
-  | obl_live a1, obl_live a2 => ltR a1 a2
-  | obl_done, obl_done => True
-  | _, _ => False
-  end.
+Class obl_program_state (St : Type) := obl_ps (s : St) : Type.
 
-Definition obl_type_transition `{WFOrderedCM.t A leR addO ltR} (l1 l2 : obl_type) : Prop :=
-  match l1, l2 with
-  | obl_init _, obl_live _ | obl_live _, obl_done => True
-  | _, _ => False
-  end.
+Inductive obl_state `{WFOrderedCM.t A leR addO ltR} `{obl_program_state St} : Type :=
+| obl_init (a : A) | obl_live (a : A) | obl_done (P : St → Prop).
 
-Definition obl_type_lt_gmap (K : Type) {EqDecision : EqDecision K} {Cnt : Countable K} `{WFOrderedCM.t A leR addO ltR} (ls1 ls2 : gmap K obl_type) : Prop :=
-  map_Forall2 (λ _ l1 l2, obl_type_lt l1 l2) ls1 ls2.
+Definition obl_state_step `{WFOrderedCM.t A leR addO ltR} `{obl_program_state St} (s : St) : relation obl_state :=
+  λ o1 o2,
+    match o1, o2 with
+    | obl_init a1, obl_init a2 => a1 = a2
+    | obl_live a1, obl_live a2 => ltR a1 a2
+    | obl_done P1, obl_done P2 => (∀ s, P1 s ↔ P2 s)
+    | obl_init a1, obl_live a2 => a1 = a2
+    | obl_live a, obl_done P => P s
+    | _, _ => False
+    end.
 
 Definition obl_id := positive.
 Canonical Structure obl_idO `{SI : indexT} := leibnizO obl_id.
 
 Notation obl_ids := (gset obl_id).
-Notation obl_types := (gmap obl_id obl_type).
+Notation obl_states := (gmap obl_id obl_state).
 
-(* All definitions in this file are internal to [fancy_updates] with the
+Definition obl_states_step' `{WFOrderedCM.t A leR addO ltR} `{obl_program_state St} (s : St) (K : obl_ids) : relation obl_states :=
+  λ os1 os2, map_Forall2 (λ k o1 o2, k ∈ K → obl_state_step s o1 o2) os1 os2.
+
+Variant obl_states_step `{WFOrderedCM.t A leR addO ltR} `{obl_program_state St} (s : St) (K : obl_ids) : relation obl_states :=
+  | obl_states_step_alloc os1 os2 i a :
+    os1 !! i = None →
+    os2 = <[i:=obl_init a]> os1 →
+    obl_states_step s K os1 os2
+  | obl_states_step_step os1 os2 :
+    obl_states_step' s K os1 os2 →
+    obl_states_step s K os1 os2.
+
+Notation "'[[' a ↪ b ':' s ',' K ']]'" := (obl_states_step s K a b) (at level 60, format "[[ a  ↪  b  :  s ,  K ]]").
+(* We use the transitive closure.
+   It's normalization is equivalent to normalization of source_rel. *)
+Notation "'[[' a ↪⁺ b ':' s ',' K ']]'" := ((tc (obl_states_step s K)) a b) (at level 60, format "[[ a  ↪⁺  b  :  s ,  K ]]").
+Notation "'[[' a ↪⋆ b ':' s ',' K ']]'" := ((rtc (obl_states_step s K)) a b) (at level 60, format "[[ a  ↪⋆  b  :  s ,  K ]]").
+
+(* Global Instance obl_ps_nat : obl_program_state := prod nat nat. *)
+(* Print Instances obl_program_state. *)
+(* Definition obl_state_test `{WFOrderedCM.t A leR addO ltR} o1 o2 (s : prod nat nat) := obl_state_step o1 o2 s. *)
+
+(* All following definitions in this file are internal to [fancy_updates] with the
    exception of what's in the [osatGS] module. The module [osatGS] is thus exported in
    [fancy_updates], where [osat] is only imported. *)
 Module osatGS.
@@ -129,25 +157,25 @@ Definition oblS_bound `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osa
 Global Typeclasses Opaque oblS_bound.
 Global Instance: Params (@oblS_bound) 9 := {}.
 
-Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ}
-  (O : obl_types) : iProp Σ :=
+Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} `{obl_program_state St}
+  (O : obl_states) : iProp Σ :=
   locked
-    (∃ (Obls : gmap positive (obl_type * (iProp Σ))%type),
+    (∃ (Obls : gmap positive (obl_state * (iProp Σ))%type),
         (⌜O = fst <$> Obls⌝) ∗
         (own goal_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (goal_unfold <$> (snd <$> Obls))))) ∗
         ([∗ map] i ↦ oQ ∈ Obls,
            match oQ with
            | (obl_init a, _) =>
-               (∃ a', ⌜leR a a'⌝ ∗ oblS_credit i a' ∗ oblS_idle i 1%Qp ∗ oblS_live i 1)
+               (∃ a', ⌜leR a' a⌝ ∗ oblS_bound i a' ∗ oblS_idle i 1%Qp ∗ oblS_live i 1)
            | (obl_live a, _) =>
-               (∃ a', ⌜leR a a'⌝ ∗ oblS_credit i a' ∗ oblS_active_auth i ∗ oblS_live i 1)
-           | (obl_done, Q) =>
+               (∃ a', ⌜leR a' a⌝ ∗ oblS_bound i a' ∗ oblS_active_auth i ∗ oblS_live i 1)
+           | (obl_done _, Q) =>
                (▷ Q ∗ oblS_active_auth i ∗ oblS_done_auth i)
            end)
     )%I.
 
 Section osat.
-  Context `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osatGS Σ}.
+  Context `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osatGS Σ} `{OPS : obl_program_state St}.
   Implicit Types P : iProp Σ.
 
   Local Instance goal_unfold_contractive : Contractive (@goal_unfold SI Σ).
@@ -301,7 +329,7 @@ Section osat.
     apply WFOrderedCM.lt_exists_left. exists c. split; [auto | by rewrite OrderedCM.add_comm_le ].
   Qed.
 
-  Lemma oblG_goal_lookup (Obls : gmap positive (obl_type * iProp Σ)) i P :
+  Lemma oblG_goal_lookup (Obls : gmap positive (obl_state * iProp Σ)) i P :
     own goal_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (goal_unfold <$> (snd <$> Obls)))) ∗
     own goal_name (gmap_view_frag i DfracDiscarded (to_agree $ goal_unfold P)) ⊢
     ∃ o Q, ⌜Obls !! i = Some (o, Q)⌝ ∗ ▷ (Q ≡ P).
@@ -328,8 +356,8 @@ Section osat.
 
   Lemma obl_alloc O a P :
     osat O
-    ⊢ |==> ∃ i, osat (<[i:=obl_init a]>O) ∗ ⌜O !! i = None⌝ ∗
-                oblG_goal i P ∗ oblS_idle i 1%Qp ∗ oblS_live i 1 ∗ oblS_bound i a.
+    ⊢ |==> ∃ i, ⌜O !! i = None⌝ ∗ osat (<[i:=obl_init a]>O) ∗
+                oblG_goal i P ∗ oblS_idle i 1%Qp ∗ oblS_live i 1 ∗ oblS_credit i a.
   Proof.
     rewrite /osat -!lock.
     iIntros "Ho". iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom)".
@@ -355,7 +383,9 @@ Section osat.
       set_solver.
     }
     iDestruct "Hoa" as "[Hoa #Hg]".
-    iModIntro. iExists i. iFrame. rewrite -!lock. iSplitL.
+    iModIntro. iExists i. iFrame. rewrite -!lock. iSplitR.
+    { iPureIntro. subst O. apply not_elem_of_dom_1. set_solver. }
+    iSplit; [|done].
     { iClear "Hg". iExists (<[i:=(obl_init a, P)]>Obls). iSplit.
       { iPureIntro. subst O. by rewrite fmap_insert. }
       iSplitL "Hoa".
@@ -365,13 +395,13 @@ Section osat.
         iFrame. done.
       }
     }
-    iSplit; [|done]. iPureIntro.
-    subst O. apply not_elem_of_dom_1. set_solver.
   Qed.
+
+  TODO
 
   Lemma osat_progress_one O i q o1 o2 :
     (O !! i = Some o1) →
-    (obl_type_lt o2 o1) →
+    (obl_state_lt o2 o1) →
     osat O ∗ oblS_active i ∗ oblS_live i q
     ⊢ |==> osat (<[i:=o2]> O) ∗ oblS_live i q ∗ ∃ a, oblS_credit i a ∗ ⌜/0 /< a⌝.
   Proof.
