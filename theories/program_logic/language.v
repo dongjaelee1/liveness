@@ -66,8 +66,8 @@ Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
 Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
 Canonical Structure exprO `{SI : indexT} Λ := leibnizO (expr Λ).
 
-Notation "'sched_fuels' Λ" := (gmap thread_id (option (fuel Λ))) (at level 1).
-Notation "'thread_pool' Λ" := (gmap thread_id (expr Λ)) (at level 1).
+Notation sched_fuels Λ := (gmap thread_id (option (fuel Λ))).
+Notation thread_pool Λ := (gmap thread_id (expr Λ)).
 
 (** Thread pool with fuels to model scheduler fairness.
     If a thread is done (is a val), fuel = None. *)

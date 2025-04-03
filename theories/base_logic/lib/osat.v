@@ -3,7 +3,8 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liveness Require Export wfOrderedCM bcred.
+From liveness Require Export wfOrderedCM.
+From liveness Require Import bcred.
 
 (* FIXME : Move to somewhere else *)
 Lemma sn_tc {X} (R : X → X → Prop) (x : X): sn R x ↔ sn (tc R) x.
@@ -210,6 +211,7 @@ Section osat.
   Global Instance oblS_bound_persistent i (a : A) : Persistent (oblS_bound i a).
   Proof. rewrite /oblS_bound. apply _. Qed.
 
+  Local Infix "/=" := OrderedCM.eq (at level 70).
   Local Infix "/≤" := leR (at level 70).
   Local Infix "/+" := addO (at level 70).
   Local Infix "/<" := ltR (at level 70).
@@ -271,6 +273,13 @@ Section osat.
     rewrite singleton_op -!pair_op !left_id. apply singleton_update, prod_update; [done|].
     simpl. rewrite -mono_nat_auth_dfrac_op.
     rewrite dfrac_op_own Qp.half_half. apply mono_nat_update. auto.
+  Qed.
+
+  Lemma oblS_credit_eq i a0 a1 :
+    a0 /= a1 →
+    oblS_credit i a0 = oblS_credit i a1.
+  Proof.
+    intros EQ. rewrite /oblS_credit. by erewrite credit_eq.
   Qed.
 
   Lemma oblS_credit_mon i a0 a1 :
