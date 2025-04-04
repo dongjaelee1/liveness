@@ -81,7 +81,6 @@ Module osatGS.
   Class osatGpreS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} (Σ : gFunctors) : Set :=
     OsatGpreS {
         osatGpreS_goal : inG Σ (gmap_viewR obl_id (prodR (agreeR $ obl_ps_propO) (agreeR $ (laterO (iPropO Σ)))));
-        (* osatGpreS_goal : inG Σ (gmap_viewR obl_id (agreeR $ laterO (iPropO Σ))); *)
         osatGpreS_state : inG Σ (gmapUR obl_id (prodUR (prodUR bcredUR mono_natUR) mono_natUR));
       }.
 
