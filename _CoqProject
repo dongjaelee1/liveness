@@ -20,10 +20,12 @@ theories/algebra/ordinal_WFOrderedCM.v
 theories/algebra/nat_WFOrderedCM.v
 theories/algebra/bank.v
 theories/algebra/bcred.v
+theories/algebra/obligation.v
 
 theories/base_logic/upred_measure.v
 
 theories/base_logic/lib/osat.v
 
 theories/program_logic/language.v
+theories/program_logic/sched_fair_interp.v
 theories/program_logic/weakestpre.v

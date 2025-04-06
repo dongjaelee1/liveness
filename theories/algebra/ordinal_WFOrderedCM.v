@@ -1,8 +1,8 @@
 From stdpp Require Import base.
 From liveness Require Export wfOrderedCM.
-From Ordinal Require Import Ordinal Hessenberg ClassicalHessenberg.
+From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
 
-Notation "'ω'" := Ord.omega.
+Global Notation "'ω'" := Ord.omega.
 
 Global Program Instance ord_OrderedCM : OrderedCM.t Ord.le Hessenberg.add :=
   OrderedCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.
@@ -40,6 +40,11 @@ Next Obligation.
 Qed.
 
 Section ord_facts.
+
+  Lemma omega_lt_one : (Ord.S Ord.O < ω)%ord.
+  Proof.
+    rewrite <- Ord.from_nat_O. rewrite <- Ord.from_nat_S. apply Ord.omega_upperbound.
+  Qed.
 
   Lemma ord_lt_one (o0 o1 : Ord.t) :
     (o0 < o1)%ord -> ((o0 ⊕ (Ord.S Ord.O)) <= o1)%ord.
@@ -105,7 +110,84 @@ Section Jacobsthal_expn_nat_facts.
 
 End Jacobsthal_expn_nat_facts.
 
-(** Embedding enumeration into ordinal. *)
+(** Layer structure. *)
+Fixpoint layer (i : nat) : Ord.t :=
+  match i with
+  | O => (ω ↑ ω)%ord
+  | S j => ((layer j) ↑ ω)%ord
+  end.
+
+Notation "'ℓ[' i ']'" := (layer i) (format "ℓ[ i ]").
+
+Section layer_facts.
+
+  Import Jacobsthal.
+
+  Lemma layer_unfold_zero : ℓ[0] = (ω ↑ ω)%ord.
+  Proof using. reflexivity. Qed.
+
+  Lemma layer_unfold_S :
+    forall i, layer (S i) = ((layer i) ↑ ω)%ord.
+  Proof using. auto. Qed.
+
+  Lemma layer_lt_zero :
+    forall i, (Ord.O < ℓ[i])%ord.
+  Proof using.
+    destruct i.
+    - unfold layer. apply Jacobsthal.expn_pos.
+    - rewrite layer_unfold_S. apply Jacobsthal.expn_pos.
+  Qed.
+
+  Lemma layer_lt_one :
+    forall i, (Ord.S Ord.O < ℓ[i])%ord.
+  Proof using.
+    assert (Ord.S Ord.O < ω)%ord by apply omega_lt_one.
+    induction i.
+    - unfold layer. pose proof H.
+      rewrite <- (@expn_1_r ω) in H; [|rewrite <- Ord.from_nat_O; apply Ord.omega_upperbound ].
+      etransitivity; [eapply H|]. eapply lt_expn_r; auto.
+    - etransitivity; [eauto|]. rewrite <- (@expn_1_r ℓ[i]); [| apply layer_lt_zero].
+      rewrite layer_unfold_S. apply lt_expn_r; auto.
+  Qed.
+
+  Lemma layer_lt_S :
+    forall i, (ℓ[i] < ℓ[S i])%ord.
+  Proof.
+    intros. rewrite <- (@expn_1_r ℓ[i]); [|apply layer_lt_zero].
+    rewrite layer_unfold_S. apply lt_expn_r; [apply layer_lt_one | apply omega_lt_one].
+  Qed.
+
+  Lemma layer_le_layer_zero :
+    forall i, (ℓ[0] <= ℓ[i])%ord.
+  Proof using.
+    induction i; [reflexivity|].
+    etransitivity; [eauto|]. apply Ord.lt_le, layer_lt_S.
+  Qed.
+
+  Lemma layer_le_proper :
+    Proper (le ==> Ord.le) layer.
+  Proof using.
+    intros i j LE. induction LE.
+    - reflexivity.
+    - etransitivity; [eauto|]. apply Ord.lt_le. apply layer_lt_S.
+  Qed.
+
+  Lemma layer_lt_proper :
+    Proper (lt ==> Ord.lt) layer.
+  Proof using.
+    intros i j LT. unfold lt in LT. eapply (Ord.lt_le_lt (o1 := ℓ[S i])).
+    - apply layer_lt_S.
+    - apply layer_le_proper. auto.
+  Qed.
+
+End layer_facts.
+
+(* Rank structure. *)
+Definition rank (o : Ord.t) (i : nat) : Ord.t := (o ↑ i)%ord.
+
+(* TODO: prove facts about rank. *)
+
+(** Embedding enumeration into ordinal. Deprecated for now. *)
 Class enum_from_nat (A : Type) := enum_f : nat -> A.
 Notation "'en[' n ']'" := (enum_f n) (format "en[ n ]").
 
@@ -166,76 +248,3 @@ Section ord_from_enum_facts.
   Qed.
 
 End ord_from_enum_facts.
-
-Fixpoint layer `{E : Enum A R} (i : nat) : Ord.t :=
-  match i with
-  | O => oE
-  | S j => ((layer j) ↑ ω)%ord
-  end.
-
-Notation "'ℓ[' i ']'" := (layer i) (format "ℓ[ i ]").
-
-Section layer_facts.
-
-  Context `{@Enum A R f}.
-
-  Lemma layer_unfold_zero : ℓ[0] = oE.
-  Proof using. reflexivity. Qed.
-
-  Lemma layer_unfold_S :
-    forall (i : nat), layer (S i) = ((layer i) ↑ ω)%ord.
-  Proof using. auto. Qed.
-
-  Lemma layer_zero :
-    forall (i : nat), (Ord.O < ℓ[i])%ord.
-  Proof using.
-    destruct i.
-    - unfold layer. apply ord_from_enum_set_zero.
-    - rewrite layer_unfold_S. apply Jacobsthal.expn_pos.
-  Qed.
-
-  Lemma layer_ord_from_enum_set :
-    forall (i : nat), (oE <= ℓ[i])%ord.
-  Proof using.
-    induction i.
-    - unfold layer. reflexivity.
-    - rewrite layer_unfold_S. etransitivity; [eauto |].
-      rewrite <- (Jacobsthal.expn_1_r (layer_zero i)) at 1. apply Jacobsthal.le_expn_r.
-      rewrite <- Ord.from_nat_O, <- Ord.from_nat_S . apply Ord.lt_le, Ord.omega_upperbound.
-  Qed.
-
-  Lemma layer_one :
-    forall (i : nat), (Ord.S Ord.O < ℓ[i])%ord.
-  Proof using.
-    intros. eapply Ord.lt_le_lt; [apply ord_from_enum_set_one | apply layer_ord_from_enum_set].
-  Qed.
-
-  Lemma layer_nat :
-    forall (n i : nat), (n < ℓ[i])%ord.
-  Proof using.
-    intros. eapply Ord.lt_le_lt; [apply ord_from_enum_set_nat | apply layer_ord_from_enum_set].
-  Qed.
-
-  Lemma layer_le_proper :
-    Proper (le ==> Ord.le) layer.
-  Proof using.
-    intros i j LE. induction LE.
-    - reflexivity.
-    - etransitivity; [eauto|]. 
-      rewrite <- (Jacobsthal.expn_1_r (layer_zero m)) at 1.
-      rewrite layer_unfold_S. apply Jacobsthal.le_expn_r.
-      rewrite <- Ord.from_nat_O, <- Ord.from_nat_S . apply Ord.lt_le, Ord.omega_upperbound.
-  Qed.
-
-  Lemma layer_lt_proper :
-    Proper (lt ==> Ord.lt) layer.
-  Proof using.
-    intros i j LT. unfold lt in LT. eapply (Ord.lt_le_lt (o1 := ℓ[S i])).
-    - rewrite layer_unfold_S. 
-      rewrite <- (Jacobsthal.expn_1_r (layer_zero i)) at 1.
-      apply Jacobsthal.lt_expn_r; [apply layer_one |].
-      rewrite <- Ord.from_nat_O, <- Ord.from_nat_S . apply Ord.omega_upperbound.
-    - apply layer_le_proper. auto.
-  Qed.
-
-End layer_facts.
