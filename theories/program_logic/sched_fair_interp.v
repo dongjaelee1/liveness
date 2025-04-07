@@ -1,4 +1,4 @@
-From iris.algebra Require Import reservation_map mono_nat.
+From iris.algebra Require Import functions reservation_map mono_nat.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -6,10 +6,10 @@ From transfinite.base_logic.lib Require Export own.
 From liveness Require Import bank language.
 
 Module schedfairGS.
-  (* We assume thread_id = positive. To generalize, we need a general version of reservation_map. *)
+
   Class schedfairGpreS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     SchedfairGpreS {
-        schedfairGpreS_state : inG Σ (reservation_mapUR (prodUR bankUR mono_natUR));
+        schedfairGpreS_state : inG Σ (discrete_funUR (λ (k : thread_id), (prodUR bankUR mono_natUR)));
       }.
 
   Class schedfairGS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
@@ -18,9 +18,9 @@ Module schedfairGS.
         state_name : gname;
       }.
 
-  (* Do we need reservation_map version of gmapTRF? Why do we even need Functor? *)
+  (* Do we need discrete_fun version of gmapTRF? Why do we even need Functor? *)
   Definition schedfairΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} : gFunctors :=
-    #[GFunctor (reservation_mapUR (prodUR bankUR mono_natUR))
+    #[GFunctor (discrete_funUR (λ (k : thread_id), prodUR bankUR mono_natUR))
       ].
 
   Global Instance subG_schedfairΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Σ} : subG schedfairΣ Σ → (schedfairGpreS Σ).
@@ -36,34 +36,34 @@ Import schedfairGS.
 Local Existing Instances schedfair_inG schedfairGpreS_state.
 
 Definition sfS_exec `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (q : Qp) : iProp Σ :=
-  own state_name (reservation_map_data i (ε, ●MN{#q} 0)).
+  own state_name (discrete_fun_singleton i (ε, ●MN{#q} 0)).
 Global Typeclasses Opaque sfS_exec.
 Global Instance: Params (@sfS_exec) 9 := {}.
 
 Definition sfS_term_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) : iProp Σ :=
-  own state_name (reservation_map_data i (ε, ●MN 1)).
+  own state_name (discrete_fun_singleton i (ε, ●MN 1)).
 Global Typeclasses Opaque sfS_term_auth.
 Global Instance: Params (@sfS_term_auth) 9 := {}.
 
 Definition sfS_term `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) : iProp Σ :=
-  own state_name (reservation_map_data i (ε, ◯MN 1)).
+  own state_name (discrete_fun_singleton i (ε, ◯MN 1)).
 Global Typeclasses Opaque sfS_term.
 Global Instance: Params (@sfS_term) 9 := {}.
 
 Definition sfS_fuel_bound `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (a : A) (q : Qp) : iProp Σ :=
-  own state_name (reservation_map_data i (debt a q, ε)).
+  own state_name (discrete_fun_singleton i (debt a q, ε)).
 Global Typeclasses Opaque sfS_fuel_bound.
 Global Instance: Params (@sfS_fuel_bound) 9 := {}.
 
 Definition sfS_fuel_credit `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (a : A) : iProp Σ :=
-  own state_name (reservation_map_data i (cash a, ε)).
+  own state_name (discrete_fun_singleton i (cash a, ε)).
 Global Typeclasses Opaque sfS_fuel_credit.
 Global Instance: Params (@sfS_fuel_credit) 9 := {}.
 
 Definition schedfairI `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ}
   (ϕ : gmap thread_id (option A)) : iProp Σ :=
   locked
-    (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom ϕ))) ∗
+    (∃ a, own state_name ((λ k, if (decide (k ∈ dom ϕ)) then ε else (debt a 1, ●MN 0)) : discrete_fun _) ∗
      [∗ map] i ↦ oF ∈ ϕ,
        match oF with
        | Some f =>
@@ -90,9 +90,9 @@ Section sfi.
     sfS_exec i q ∗ sfS_term i ⊢ False.
   Proof.
     rewrite /sfS_exec /sfS_term. iIntros "[Hi Ha]".
-    iCombine "Hi Ha" as "V". iPoseProof (own_valid with "V") as "%V".
-    iPureIntro.
-    apply reservation_map_data_valid in V. rewrite pair_valid in V. destruct V as [_ V].
+    iCombine "Hi Ha" as "V". rewrite discrete_fun_singleton_op.
+    iPoseProof (own_valid with "V") as "%V". iPureIntro.
+    apply discrete_fun_singleton_valid in V. rewrite pair_valid in V. destruct V as [_ V].
     apply mono_nat_both_dfrac_valid in V. destruct V. lia.
   Qed.
 
@@ -100,15 +100,17 @@ Section sfi.
     sfS_term_auth i ⊢ sfS_term i.
   Proof.
     rewrite /sfS_term_auth /sfS_term. apply own_mono.
-    apply reservation_map_data_mono, prod_included.
-    simpl. split; [done | apply mono_nat_included].
+    exists (discrete_fun_singleton i (ε, ●MN 1)).
+    rewrite comm discrete_fun_singleton_op -pair_op. apply discrete_fun_singleton_proper, pair_proper.
+    - by rewrite left_id.
+    - apply mono_nat_auth_lb_op.
   Qed.
 
   Lemma sfS_exec_to_term i :
     sfS_exec i 1 ⊢ |==> sfS_term_auth i.
   Proof.
     rewrite /sfS_exec /sfS_term_auth. apply own_update.
-    apply reservation_map_update, prod_update; [done|].
+    apply discrete_fun_singleton_update, prod_update; [done|].
     simpl. apply mono_nat_update. auto.
   Qed.
 
@@ -124,17 +126,14 @@ Section sfi.
     sfS_fuel_credit i a1 ⊢ |==> sfS_fuel_credit i a0.
   Proof.
     intros LE. rewrite /sfS_fuel_credit. apply own_update.
-    apply reservation_map_update.
+    apply discrete_fun_singleton_update.
     apply prod_update; [by apply cash_update | reflexivity].
   Qed.
 
   Lemma sfS_fuel_credit_add i a0 a1 :
     sfS_fuel_credit i (a0 /+ a1) ⊣⊢ sfS_fuel_credit i a0 ∗ sfS_fuel_credit i a1.
   Proof.
-    rewrite /sfS_fuel_credit. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
-    - iEval (rewrite -cash_add) in "H". iApply own_op.
-      iApply own_mono; [| iFrame]. rewrite -reservation_map_data_op. done.
-    - iCombine "H1 H2" as "H". iEval (rewrite -cash_add). iFrame.
+    rewrite /sfS_fuel_credit -own_op discrete_fun_singleton_op -pair_op cash_add. f_equal.
   Qed.
 
   Lemma sfS_fuel_credit_mon_add i a0 a1 a2 :
@@ -156,36 +155,28 @@ Section sfi.
     sfS_fuel_bound i a0 q ⊢ |==> sfS_fuel_bound i a1 q.
   Proof.
     intros LE. rewrite /sfS_fuel_bound. apply own_update.
-    apply reservation_map_update.
+    apply discrete_fun_singleton_update.
     apply prod_update; [by apply debt_update | reflexivity].
   Qed.
 
   Lemma sfS_fuel_bound_add i a0 a1 q0 q1 :
     sfS_fuel_bound i (a0 /∧ a1) (q0 + q1) ⊣⊢ sfS_fuel_bound i a0 q0 ∗ sfS_fuel_bound i a1 q1.
   Proof.
-    rewrite /sfS_fuel_bound. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
-    - iEval (rewrite -debt_add) in "H". iApply own_op.
-      iApply own_mono; [| iFrame]. rewrite -reservation_map_data_op. done.
-    - iCombine "H1 H2" as "H". iEval (rewrite -debt_add). iFrame.
+    rewrite /sfS_fuel_bound -own_op discrete_fun_singleton_op -pair_op debt_add. f_equal.
   Qed.
 
   Lemma sfS_fuel_pay i a0 a1 q :
     sfS_fuel_bound i a0 q ∗ sfS_fuel_credit i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ sfS_fuel_bound i a2 q.
   Proof.
     rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)".
-    { rewrite -reservation_map_data_op -!pair_op !left_id.
-      eapply (reservation_map_updateP
-                (λ k, ∃ a2, (k = (debt a2 q, ε)) ∧ (a1 /+ a2 /≤ a0))
-                (λ k, ∃ a2, (k = {[i := (debt a2 q, ε)]}) ∧ (a1 /+ a2 /≤ a0))
-             ).
-      { eapply (prod_updateP (λ k, ∃ a2, (k = (debt a2 q)) ∧ (a1 /+ a2 /≤ a0)) (eq ε)).
-        { eapply debt_pay. }
-        { eapply cmra_update_updateP. reflexivity. }
-        { intros. destruct H as (a2&A0&A1). exists a2. by subst. }
-      }
+    { rewrite discrete_fun_singleton_op -!pair_op.
+      eapply (discrete_fun_singleton_updateP' i (λ k, ∃ a2, (k = (debt a2 q, ε)) ∧ (a1 /+ a2 /≤ a0))).
+      eapply (prod_updateP (λ k, ∃ a2, (k = (debt a2 q)) ∧ (a1 /+ a2 /≤ a0)) (eq ε)).
+      { eapply debt_pay. }
+      { eapply cmra_update_updateP. reflexivity. }
       { intros. destruct H as (a2&A0&A1). exists a2. by subst. }
     }
-    iSimpl. iDestruct "H" as "((%a2 & %EQ & %LE) & H)".
+    iSimpl. iDestruct "H" as "((% & % & %a2 & %EQ & %LE) & H)".
     iExists a2. subst. iModIntro. iSplit; done.
   Qed.
 
@@ -193,8 +184,8 @@ Section sfi.
     sfS_fuel_bound i a0 1 ⊢ |==> sfS_fuel_bound i (a0 /+ a1) 1 ∗ sfS_fuel_credit i a1.
   Proof.
     rewrite -own_op. iIntros "H". iMod (own_update with "H") as "H".
-    { eapply (reservation_map_update i _ (debt (a0 /+ a1) 1 ⋅ cash a1, ε)), prod_update; [apply debt_owe | reflexivity]. }
-    iModIntro. by rewrite -reservation_map_data_op.
+    { eapply (discrete_fun_singleton_update i _ (debt (a0 /+ a1) 1 ⋅ cash a1, ε)), prod_update; [apply debt_owe | reflexivity]. }
+    iModIntro. by rewrite discrete_fun_singleton_op.
   Qed.
 
   Lemma schedfairI_thread_is_exec ϕ i oF q :
@@ -202,49 +193,58 @@ Section sfi.
     schedfairI ϕ ∗ sfS_exec i q
     ⊢ ∃ f, ⌜oF = Some f⌝.
   Proof.
-    rewrite /schedfairI -!lock. iIntros (LU) "([Htk Hs] & He)".
+    rewrite /schedfairI -!lock. iIntros (LU) "((% & Htk & Hs) & He)".
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eapply LU |].
     destruct oF.
-    - by iExists a.
+    - by iExists a0.
     - iExFalso. iDestruct "LU" as "(%&_&Hta)". iPoseProof (sfS_term_auth_term with "Hta") as "#Ht".
       iDestruct (sfS_exec_term_false with "[He]") as "%F"; [by iFrame | done].
+  Qed.
+
+  Lemma schedfairI_reserved_fork (S : gset _) (i : thread_id) a :
+    (i ∉ S) →
+    own state_name ((λ k : thread_id, if decide (k ∈ S) then ε else (debt a 1, ●MN 0)) : discrete_fun _)
+    ⊢ (own state_name ((λ k : thread_id, if decide (k ∈ {[i]} ∪ S) then ε else (debt a 1, ●MN 0)) : discrete_fun _) ∗
+       own state_name (discrete_fun_singleton i (debt a 1, ●MN 0))).
+  Proof.
+    iIntros (LU) "Htk".
+    assert (FORK : ((λ k : thread_id, if decide (k ∈ S) then ε else (debt a 1, ●MN 0)) : discrete_fun _)
+                     ≡
+                     (((λ k : thread_id, if decide (k ∈ {[i]} ∪ S) then ε else (debt a 1, ●MN 0)) : discrete_fun _)
+                      ⋅ discrete_fun_singleton i (debt a 1, ●MN 0))).
+    { intros x. rewrite discrete_fun_lookup_op. destruct (decide (x ∈ S)).
+      - destruct (decide (x ∈ {[i]} ∪ S)).
+        + rewrite discrete_fun_lookup_singleton_ne; [by rewrite left_id | set_solver].
+        + exfalso. set_solver.
+      - destruct (decide (x = i)).
+        + subst. destruct (decide (i ∈ {[i]} ∪ S)); [|exfalso; set_solver].
+          by rewrite discrete_fun_lookup_singleton left_id.
+        + destruct (decide (x ∈ {[i]} ∪ S)); [exfalso; set_solver |].
+          rewrite discrete_fun_lookup_singleton_ne; [by rewrite right_id | done].
+    }
+    rewrite FORK own_op. iDestruct "Htk" as "[Htk Hi]". iFrame.
   Qed.
 
   Lemma schedfairI_fork ϕ i f :
     (ϕ !! i = None) →
     schedfairI ϕ
     ⊢ |==> schedfairI (<[i:=Some f]>ϕ) ∗
-           sfS_exec i (1/2) ∗ sfS_fuel_bound i f 1.
+           sfS_exec i (1/2) ∗ ∃ fb, (* ⌜f /≤ fb⌝ ∗ *) sfS_fuel_bound i fb 1.
   Proof.
-    rewrite /schedfairI -!lock. iIntros (LU) "[Htk Hs]".
+    rewrite /schedfairI -!lock. iIntros (LU) "(% & Htk & Hs)".
     pose proof LU as LU'. apply not_elem_of_dom in LU.
-    assert (Fresh : {[ i ]} ⊆ (⊤ ∖ gset_to_coPset (dom ϕ))).
-    { apply elem_of_subseteq_singleton. apply elem_of_difference. split; [set_solver|].
-      intros F. apply elem_of_gset_to_coPset in F. done.
-    }
-    rewrite (reservation_map_token_difference _ _ Fresh). iDestruct "Htk" as "[Htki Htk]".
-    assert (New : (⊤ ∖ gset_to_coPset (dom ϕ) ∖ {[i]}) = (⊤ ∖ gset_to_coPset ({[i]} ∪ dom ϕ))).
-    { rewrite difference_difference_l_L. f_equal. rewrite -leibniz_equiv_iff.
-      intros x. split; intros IN.
-      - apply elem_of_gset_to_coPset. apply elem_of_union in IN. destruct IN.
-        + apply elem_of_gset_to_coPset in H. set_solver.
-        + set_solver.
-      - apply elem_of_union. apply elem_of_gset_to_coPset in IN. apply elem_of_union in IN. destruct IN.
-        + set_solver.
-        + left. apply elem_of_gset_to_coPset. done.
-    }
-    iMod (own_update with "Htki") as "Hi".
-    { apply (reservation_map_alloc _ i (debt /0 1, ●MN 0)); [set_solver|].
-      rewrite pair_valid. split; [by apply bank_valid_debt | apply mono_nat_auth_valid].
-    }
-    iAssert (sfS_fuel_bound i /0 1 ∗ sfS_exec i (1/2) ∗ sfS_exec i (1/2))%I with "[Hi]" as "(Hfb&He1&He2)".
-    { rewrite /sfS_fuel_bound /sfS_exec. do 2 rewrite -own_op. rewrite -!reservation_map_data_op.
-      rewrite -!pair_op. simpl. rewrite -mono_nat_auth_dfrac_op dfrac_op_own Qp.div_2.
+    iDestruct (schedfairI_reserved_fork _ _ _ LU with "Htk") as "[Htk Hi]".
+    iAssert (sfS_fuel_bound i a 1 ∗ sfS_exec i (1/2) ∗ sfS_exec i (1/2))%I with "[Hi]" as "(Hfb&He1&He2)".
+    { rewrite /sfS_fuel_bound /sfS_exec. do 2 rewrite -own_op. rewrite !discrete_fun_singleton_op.
+      rewrite -!pair_op. simpl. iApply own_mono; [|done]. exists ε. rewrite right_id.
+      apply discrete_fun_singleton_proper. rewrite -mono_nat_auth_dfrac_op dfrac_op_own Qp.div_2.
       by rewrite !left_id !right_id_L.
     }
-    iMod (sfS_fuel_owe i _ f with "Hfb") as "[Hfb Hfc]". rewrite (sfS_fuel_bound_eq _ _ f); [| by rewrite left_id].
-    iModIntro. iFrame. iSplitL "Htk".
-    - rewrite New dom_insert_L. done.
+    iMod (sfS_fuel_owe i _ f with "Hfb") as "[Hfb Hfc]".
+    iModIntro. iFrame.
+    (* iSplit; [|iPureIntro; apply OrderedCM.add_base_right_le]. *)
+    iExists a. iSplitL "Htk".
+    - rewrite dom_insert_L. done.
     - iApply big_sepM_insert; [auto|]. iFrame. done.
   Qed.
 
@@ -254,7 +254,7 @@ Section sfi.
     schedfairI ϕ
     ⊢ |==> schedfairI (<[i:=Some f']>ϕ) ∗ ∃ c, ⌜/0 /< c⌝ ∗ sfS_fuel_credit i c.
   Proof.
-    rewrite /schedfairI -!lock. iIntros (LU Hf) "[Htk Hs]".
+    rewrite /schedfairI -!lock. iIntros (LU Hf) "(%&Htk&Hs)".
     rewrite (dom_insert_lookup_L ϕ i (Some f')); [iFrame | done].
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
     iDestruct "LU" as "(%&%&Hfc&He)".
@@ -268,12 +268,30 @@ Section sfi.
     iModIntro. rewrite insert_delete_insert. iFrame. done.
   Qed.
 
+  Lemma schedfairI_credit_one_reserved ϕ c :
+    schedfairI ϕ
+    ⊢ |==> schedfairI ϕ ∗
+           (own state_name ((λ k : thread_id, if decide (k ∈ dom ϕ) then ε else (cash c, ε)) : discrete_fun _)).
+  Proof.
+    rewrite /schedfairI -!lock. iIntros "(%&Htk&Hs)".
+    iMod (own_update with "Htk") as "Htk".
+    { apply (discrete_fun_update _ (λ k, if decide (k ∈ dom ϕ) then ε else (debt (a /+ c) 1 ⋅ cash c, ●MN 0))).
+      intros. destruct (decide (a0 ∈ dom ϕ)); [done|]. apply prod_update; [apply debt_owe|done].
+    }
+    assert (ADD : ((λ k : thread_id, if decide (k ∈ dom ϕ) then ε else (debt (a /+ c) 1 ⋅ cash c, ●MN 0)) : discrete_fun _)
+                    ≡
+                    (((λ k : thread_id, if decide (k ∈ dom ϕ) then ε else (debt (a /+ c) 1, ●MN 0)) : discrete_fun _)
+                     ⋅ ((λ k : thread_id, if decide (k ∈ dom ϕ) then ε else (cash c, ε)) : discrete_fun _))).
+    { intros x. rewrite discrete_fun_lookup_op. destruct (decide (x ∈ dom ϕ)); [by rewrite left_id | by rewrite -pair_op]. }
+    rewrite ADD. clear ADD. iDestruct "Htk" as "[Htk Hc]". iModIntro. iFrame.
+  Qed.
+
   Lemma schedfairI_reset_one ϕ i f f0 f' :
     (ϕ !! i = Some (Some f)) →
     schedfairI ϕ ∗ sfS_fuel_bound i f0 1
     ⊢ |==> schedfairI (<[i:=Some f']>ϕ) ∗ sfS_fuel_bound i (f0 /+ f') 1.
   Proof.
-    rewrite /schedfairI -!lock. iIntros (LU) "[[Htk Hs] Hfb]".
+    rewrite /schedfairI -!lock. iIntros (LU) "[(%&Htk&Hs) Hfb]".
     rewrite dom_insert_lookup_L; [iFrame|done].
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
     iDestruct "LU" as "(%&%&_&He)".
@@ -290,18 +308,20 @@ Section sfi.
     ⊢ |==> schedfairI (<[i:=None]>ϕ) ∗ sfS_term i.
   Proof.
     iIntros (LU) "(Hs&He&Hfb)". iDestruct (schedfairI_thread_is_exec _ _ _ _ LU with "[Hs He]") as "[% %]"; [iFrame|subst].
-    rewrite /schedfairI -!lock. iDestruct "Hs" as "[Htk Hs]".
+    rewrite /schedfairI -!lock. iDestruct "Hs" as "(%&Htk&Hs)".
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
     iDestruct "LU" as "(%&%&Hfc&He2)".
     iMod (sfS_exec_to_term with "[He He2]") as "Hta".
     { rewrite /sfS_exec. iPoseProof (own_op with "[He He2]") as "He"; [iFrame|].
-      by rewrite -reservation_map_data_op -pair_op -mono_nat_auth_dfrac_op dfrac_op_own Qp.div_2 left_id.
+      iApply own_mono; [|done]. exists ε. rewrite right_id.
+      rewrite discrete_fun_singleton_op -pair_op. apply discrete_fun_singleton_proper.
+      rewrite -mono_nat_auth_dfrac_op dfrac_op_own Qp.div_2. by rewrite !left_id.
     }
     iPoseProof (sfS_term_auth_term with "Hta") as "#Hterm".
     iPoseProof (big_sepM_insert _ (delete i ϕ) i None with "[Hs Hta Hfb]") as "Hs".
     { apply lookup_delete. }
     { iFrame. iExists f. iFrame. }
-    iModIntro. rewrite insert_delete_insert. iFrame. iSplit; [by rewrite dom_insert_lookup_L | done].
+    iModIntro. rewrite insert_delete_insert. iFrame. iSplit; [iExists _; by rewrite dom_insert_lookup_L | done].
   Qed.
 
 End sfi.
@@ -310,13 +330,12 @@ End sfi.
 Lemma schedfairI_alloc `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!schedfairGpreS Σ} : ⊢ |==> ∃ _ : schedfairGS Σ, schedfairI ∅.
 Proof.
   iIntros.
-  iMod (own_alloc (reservation_map_token ⊤)) as (γS) "HS";
-    first by apply reservation_map_token_valid.
+  iMod (own_alloc ((λ k, if (decide (k ∈ dom (∅ : gmap thread_id (option A)))) then ε else (debt OrderedCM.unit 1, ●MN 0)) : discrete_fun _)) as (γS) "HS".
+  { intros x. destruct (decide (x ∈ dom ∅)).
+    - apply ucmra_unit_valid.
+    - apply pair_valid. split; [by apply bank_valid_debt | apply mono_nat_auth_valid].
+  }
   iModIntro; iExists (SchedfairG SI _ _ _ _ WF _ _ γS).
   rewrite /schedfairI -lock.
-  rewrite big_opM_empty. replace (⊤ ∖ gset_to_coPset (dom ∅)) with (⊤ : coPset); [by iFrame|].
-  rewrite -leibniz_equiv_iff. intros x. split; intros IN.
-  - apply elem_of_difference. split; [set_solver|].
-    intros F. apply elem_of_gset_to_coPset in F. set_solver.
-  - set_solver.
+  iExists OrderedCM.unit. rewrite big_opM_empty. by iFrame.
 Qed.
