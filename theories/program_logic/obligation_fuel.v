@@ -3,8 +3,8 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liveness Require Export obligation ordinal_WFOrderedCM.
-From liveness Require Import bcred.
+From liveness Require Export obligation.
+From liveness Require Import ordinal_WFOrderedCM bcred.
 
 Module ofuelGS.
   Class ofuelGpreS `{SI : indexT} (Σ : gFunctors) : Set :=

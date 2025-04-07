@@ -28,4 +28,5 @@ theories/base_logic/lib/osat.v
 
 theories/program_logic/language.v
 theories/program_logic/sched_fair_interp.v
+theories/program_logic/obligation_fuel.v
 theories/program_logic/weakestpre.v
