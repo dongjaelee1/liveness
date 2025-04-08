@@ -1,17 +1,20 @@
-From iris.algebra Require Import gmap_view gmap gset reservation_map.
+From iris.algebra Require Import gmap_view mono_list gmap gset.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liveness Require Import language.
-From liveness Require Export sched_fair_interp obligation_fuel.
+From liveness Require Export osat sched_fair_interp obligation_fuel.
 From Ordinal Require Import Ordinal.
 
 (** Connects scheduler fairness with obligations to enable liveness induction. *)
 Module schedoblGS.
   Class schedoblGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     SchedoblGpreS {
-        schedoblGpreS_state : inG Σ (gmap_viewR thread_id (gset obl_id));
+        schedoblGpreS_state : inG Σ (gmap_viewR thread_id (mono_listUR obl_id));
+        schedoblGpreS_live : inG Σ (gmap_viewR thread_id (agreeR (list obl_id)));
+        (* schedoblGpreS_state : inG Σ (gmap_viewR thread_id (gmap_viewR obl_id unitUR)); *)
+        (* schedoblGpreS_live : inG Σ (gmap_viewR thread_id (gsetUR obl_id)); *)
         (* schedoblGpreS_state : inG Σ (gmap_viewR thread_id (gset_disjUR obl_id)); *)
       }.
 
@@ -19,12 +22,14 @@ Module schedoblGS.
     SchedoblG {
         schedobl_inG : schedoblGpreS Σ;
         state_name : gname;
+        live_name : gname;
       }.
 
   Definition schedoblΣ `{SI : indexT} : gFunctors :=
-    (* #[GFunctor (gmap_viewTRF thread_id (gset_disjUR obl_id)) *)
-    #[GFunctor (gmap_viewTRF thread_id (gsetUR obl_id))
+    #[GFunctor (gmap_viewTRF thread_id (mono_listUR obl_id));
+      GFunctor (gmap_viewTRF thread_id (agreeTRF (listO obl_id)))
       ].
+  (* #[GFunctor (gmap_viewTRF thread_id (gset_disjUR obl_id)) *)
 
   Global Instance subG_schedoblΣ `{SI : indexT} {Σ} : subG schedoblΣ Σ → (schedoblGpreS Σ).
   Proof.
@@ -36,30 +41,42 @@ Import schedoblGS.
 
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
-Local Existing Instances schedobl_inG schedoblGpreS_state.
+Local Existing Instances schedobl_inG schedoblGpreS_state schedoblGpreS_live.
+Local Existing Instances osatGS.osat_inG osatGS.osatGpreS_goal osatGS.osatGpreS_state.
 Local Existing Instances schedfairGS.schedfair_inG schedfairGS.schedfairGpreS_state.
 Local Existing Instances ofuelGS.ofuel_inG ofuelGS.ofuelGpreS_state.
 
+Definition soS_snapshot `{SI : indexT} `{!schedoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
+  own state_name (gmap_view_frag i DfracDiscarded (◯ML l)).
+Global Typeclasses Opaque soS_snapshot.
+Global Instance: Params (@soS_snapshot) 4 := {}.
+
+Definition soL_live `{SI : indexT} `{!schedoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
+  own live_name (gmap_view_frag i (DfracOwn 1) (to_agree l)).
+Global Typeclasses Opaque soL_live.
+Global Instance: Params (@soL_live) 4 := {}.
+
 (* thread fork cases: sched fuel for new threads? *)
-Definition sfofI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} {Σ}
-  `{!schedoblGS Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ} `{@ofuelGS.ofuelGS SI Σ}
-  (ϕ : gmap thread_id (option A)) : iProp Σ :=
+Definition soI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} {Σ}
+  `{!schedoblGS Σ} `{@osatGS.osatGS SI Ord.t _ _ _ _ _ Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ} `{@ofuelGS.ofuelGS SI Σ}
+  (ϕ : gmap thread_id (option A)) (O : obl_states) : iProp Σ :=
   locked
-    (∃ (Ψ : gmap thread_id (gset obl_id)),
-        (⌜dom Ψ ≡ dom ϕ⌝) ∗
-        (own state_name (gmap_view_auth (DfracOwn 1) Ψ)) ∗
+    (∃ (Ψ γ : gmap thread_id (list obl_id)),
+        (⌜dom ϕ ≡ dom Ψ⌝) ∗
+        (⌜map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ⌝) ∗
+        (own state_name (gmap_view_auth (DfracOwn 1) ((mono_list_auth (DfracOwn 1)) <$> Ψ))) ∗
+        (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
         ([∗ map] i ↦ oF ∈ ϕ,
            match oF with
            | Some _ =>
                (sfS_exec i (1/2) ∗
                 ∃ (f : A), sfS_fuel_bound i f 1 ∗
-                           ∃ K, ⌜Ψ !! i = Some K⌝ ∗
-                                ([∗ set] k ∈ K,
-                                   ∃ o, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= o)%ord⌝ ∗
-                                        ofuelS_fuel k o)
-               )
+                           (∃ L S, ⌜γ !! i = Some L⌝ ∗ ⌜Ψ !! i = Some S⌝ ∗
+                                   ([∗ list] k ∈ L, ∃ o, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= o)%ord⌝ ∗ ofuelS_fuel k o) ∗
+                                   ([∗ list] k ∈ S, ⌜k ∈ L⌝ ∨ oblS_done k)
+                           ))
            | None =>
-               ((* return frag *) sfS_term i)
+               (sfS_term i ∗ soL_live i [])
            end
         )
     )%I.
