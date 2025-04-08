@@ -6,18 +6,20 @@ From liveness Require Export language.
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 Import uPred.
-From liveness Require Import osat.
-Export osatGS.
+From liveness Require Import ordinal_WFOrderedCM thread_obligation.
 
-Class lirisGS_gen `{SI : indexT} `{WFO : WFOrderedCM.t A leR addO ltR} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {
+Global Instance language_obl_ps (Λ : language) : obl_ps := { Π := (expr Λ * state Λ)%type }.
+
+Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {
+  (** Invariants. *)
   #[global] liris_invGS :: invGS_gen hlc Σ;
-  #[global] liris_oblGS :: osatGS Σ;
-
+  (** Liveness obligation interpretation. *)
+  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_WFOrderedCM) (H:=language_obl_ps Λ) Σ;
   (** Scheduler fairness interpretation. *)
-  sched_interp : sched_fuels Λ → iProp Σ;
-
+  #[global] liris_schedfairGS :: schedfairGS.schedfairGS (WF:=@fuel_wf Λ) Σ;
   (** Connecting liveness obligations and scheduler fairness. *)
-  obl_interp : obl_types → sched_fuels Λ → iProp Σ;
+  #[global] liris_oblfuelGS :: ofuelGS.ofuelGS Σ;
+  #[global] liris_threadoblGS :: threadoblGS.threadoblGS Σ;
 
   (** The state interpretation is an invariant that should hold in
   between each step of reduction. Here [Λstate] is the global state,
@@ -52,12 +54,11 @@ Class lirisGS_gen `{SI : indexT} `{WFO : WFOrderedCM.t A leR addO ltR} (hlc : ha
   state_interp_mono σ ns κs τ:
     state_interp σ ns κs τ ⊢ |={∅}=> state_interp σ (S ns) κs τ
 }.
-Global Opaque iris_invGS.
-Global Arguments IrisG {SI A leR addO ltR WFO hlc Λ Σ}.
+Global Opaque liris_invGS liris_osatGS liris_schedfairGS liris_oblfuelGS liris_threadoblGS.
+Global Arguments LirisG {SI hlc Λ Σ}.
 
-Notation irisGS := (irisGS_gen HasLc).
-
-TODO
+Notation lirisGS := (lirisGS_gen HasLc).
+Notation "'⫪' Λ" := (Ord.from_wf_set (@WFOrderedCM.lt_wf _ _ _ _ (@fuel_wf Λ))) (at level 70).
 
 (** The predicate we take the fixpoint of in order to define the WP. *)
 (** In the step case, we both provide [S (num_laters_per_step ns)]
@@ -72,11 +73,22 @@ TODO
     can only be used by exactly one client.
   - The step-taking update can even be used by clients that opt out of
     later credits, e.g. because they use [BiFUpdPlainly]. *)
-Definition wp_pre `{SI : indexT} `{!irisGS_gen hlc Λ Σ} (s : stuckness)
-    (wp : coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
-    coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ := λ E e1 Φ,
-  match to_val e1 with
-  | Some v => ∀ σ ns κs τ  |={E}=> Φ v
+Definition wp_pre `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness)
+  (wp : coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
+  coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=
+  λ E e1 Φ,
+    match to_val e1 with
+    | Some v =>
+        (∀ σ ns κs τ ϕ Ω, schedfairI (H:=@fuel_wf Λ) ϕ ∗ osat Ω ∗ ofuelI (⫪ Λ) Ω ∗ toI (WF:=@fuel_wf Λ) (H:=language_obl_ps Λ) ∗ state_interp σ ns κs τ ={E}=∗ Φ v)
+    | None =>
+        ⌜ True ⌝
+    end%I.
+
+Set Printing All.
+
+TODO : fix GS defs to make osat etc. to infer WF and stuff.
+
+        
   | None => ∀ σ1 ns κ κs nt,
      state_interp σ1 ns (κ ++ κs) nt ={E,∅}=∗
        ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
