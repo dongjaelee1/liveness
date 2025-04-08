@@ -47,16 +47,16 @@ Notation obl_ids := (gset obl_id).
 Notation obl_states := (gmap obl_id obl_state).
 
 Definition obl_states_step' `{WFOrderedCM.t A leR addO ltR} `{obl_ps} (s : Π) (K : obl_ids) : relation obl_states :=
-  λ os1 os2, map_Forall2 (λ k o1 o2, k ∈ K → obl_state_step s o1 o2) os1 os2.
+  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, k ∈ K → obl_state_step s o1 o2) Ω1 Ω2.
 
 Variant obl_states_step `{WFOrderedCM.t A leR addO ltR} `{obl_ps} (s : Π) (K : obl_ids) : relation obl_states :=
-  | obl_states_step_alloc os1 os2 i a :
-    os1 !! i = None →
-    os2 = <[i:=obl_init a]> os1 →
-    obl_states_step s K os1 os2
-  | obl_states_step_step os1 os2 :
-    obl_states_step' s K os1 os2 →
-    obl_states_step s K os1 os2.
+  | obl_states_step_alloc Ω1 Ω2 i a :
+    Ω1 !! i = None →
+    Ω2 = <[i:=obl_init a]> Ω1 →
+    obl_states_step s K Ω1 Ω2
+  | obl_states_step_step Ω1 Ω2 :
+    obl_states_step' s K Ω1 Ω2 →
+    obl_states_step s K Ω1 Ω2.
 
 Notation "'[[' a ↪ b ':' s ',' K ']]'" := (obl_states_step s K a b) (at level 60, format "[[ a  ↪  b  :  s ,  K ]]").
 (* We use the transitive closure.

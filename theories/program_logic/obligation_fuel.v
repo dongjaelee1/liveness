@@ -45,10 +45,10 @@ Global Typeclasses Opaque ofuelS_bound.
 Global Instance: Params (@ofuelS_bound) 4 := {}.
 
 Definition ofuelI `{SI : indexT} `{obl_ps} `{!ofuelGS Σ}
-  (c : Ord.t) (O : obl_states) : iProp Σ :=
+  (c : Ord.t) (Ω : obl_states) : iProp Σ :=
   locked
-    (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom O))) ∗
-     [∗ map] i ↦ o ∈ O,
+    (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ω))) ∗
+     [∗ map] i ↦ o ∈ Ω,
        match o with
        | obl_init a =>
            (∃ a', ⌜ (a <= a')%ord ⌝ ∗ ofuelS_fuel i (c × a')%ord)
@@ -130,19 +130,19 @@ Section ofuel.
     apply WFOrderedCM.lt_exists_left. exists c. split; [auto | by rewrite OrderedCM.add_comm_le ].
   Qed.
 
-  Lemma ofuelI_alloc c O a i :
-    (O !! i = None) →
-    ofuelI c O
-    ⊢ |==> ofuelI c (<[i:=obl_init a]>O) ∗ ofuelS_bound i (c × a)%ord.
+  Lemma ofuelI_alloc c Ω a i :
+    (Ω !! i = None) →
+    ofuelI c Ω
+    ⊢ |==> ofuelI c (<[i:=obl_init a]>Ω) ∗ ofuelS_bound i (c × a)%ord.
   Proof.
     rewrite /ofuelI -!lock. iIntros (LU) "[Htk Hs]".
     pose proof LU as LU'. apply not_elem_of_dom in LU.
-    assert (Fresh : {[ i ]} ⊆ (⊤ ∖ gset_to_coPset (dom O))).
+    assert (Fresh : {[ i ]} ⊆ (⊤ ∖ gset_to_coPset (dom Ω))).
     { apply elem_of_subseteq_singleton. apply elem_of_difference. split; [set_solver|].
       intros F. apply elem_of_gset_to_coPset in F. done.
     }
     rewrite (reservation_map_token_difference _ _ Fresh). iDestruct "Htk" as "[Htki Htk]".
-    assert (New : (⊤ ∖ gset_to_coPset (dom O) ∖ {[i]}) = (⊤ ∖ gset_to_coPset ({[i]} ∪ dom O))).
+    assert (New : (⊤ ∖ gset_to_coPset (dom Ω) ∖ {[i]}) = (⊤ ∖ gset_to_coPset ({[i]} ∪ dom Ω))).
     { rewrite difference_difference_l_L. f_equal. rewrite -leibniz_equiv_iff.
       intros x. split; intros IN.
       - apply elem_of_gset_to_coPset. apply elem_of_union in IN. destruct IN.
@@ -163,14 +163,14 @@ Section ofuel.
     - iApply big_sepM_insert; [auto|]. iFrame. done.
   Qed.
 
-  Lemma ofuelI_progress_one c O i o1 o2 :
-    (O !! i = Some (obl_live o1)) →
+  Lemma ofuelI_progress_one c Ω i o1 o2 :
+    (Ω !! i = Some (obl_live o1)) →
     (o2 < o1)%ord →
-    ofuelI c O
-    ⊢ |==> ofuelI c (<[i:=obl_live o2]>O) ∗ ofuelS_fuel i c.
+    ofuelI c Ω
+    ⊢ |==> ofuelI c (<[i:=obl_live o2]>Ω) ∗ ofuelS_fuel i c.
   Proof.
     intros LU LT. rewrite /ofuelI -!lock. iIntros "(Htk & Hs)".
-    rewrite (dom_insert_lookup_L O i (obl_live o2)); [iFrame | done].
+    rewrite (dom_insert_lookup_L Ω i (obl_live o2)); [iFrame | done].
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
     iDestruct "LU" as "(%&%&Hf)".
     apply ord_lt_one in LT.
@@ -179,21 +179,21 @@ Section ofuel.
       eapply Jacobsthal.le_mult_r. etrans; [|eauto].
       by rewrite Hessenberg.add_S_r Hessenberg.add_O_r in LT.
     }
-    iFrame. iPoseProof (big_sepM_insert _ (delete i O) i (obl_live o2) with "[Hs Hf]") as "Hs".
+    iFrame. iPoseProof (big_sepM_insert _ (delete i Ω) i (obl_live o2) with "[Hs Hf]") as "Hs".
     { apply lookup_delete. }
     { iFrame. iExists o2. by iFrame. }
     iModIntro. rewrite insert_delete_insert. iFrame.
   Qed.
 
-  Lemma ofuelI_done_one c O i o P :
-    (O !! i = Some o) →
-    ofuelI c O
-    ⊢ |==> ofuelI c (<[i:=obl_done P]>O).
+  Lemma ofuelI_done_one c Ω i o P :
+    (Ω !! i = Some o) →
+    ofuelI c Ω
+    ⊢ |==> ofuelI c (<[i:=obl_done P]>Ω).
   Proof.
     intros LU. rewrite /ofuelI -!lock. iIntros "(Htk & Hs)".
-    rewrite (dom_insert_lookup_L O i (obl_done P)); [iFrame | done].
+    rewrite (dom_insert_lookup_L Ω i (obl_done P)); [iFrame | done].
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
-    iPoseProof (big_sepM_insert _ (delete i O) i (obl_done P) with "[Hs]") as "Hs".
+    iPoseProof (big_sepM_insert _ (delete i Ω) i (obl_done P) with "[Hs]") as "Hs".
     { apply lookup_delete. }
     { iFrame. }
     iModIntro. rewrite insert_delete_insert. iFrame.
