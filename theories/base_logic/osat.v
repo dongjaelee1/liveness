@@ -10,25 +10,25 @@ From liveness Require Import bcred.
    exception of what's in the [osatGS] module. The module [osatGS] is thus exported in
    [fancy_updates], where [osat] is only imported. *)
 Module osatGS.
-  Class osatGpreS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} (Σ : gFunctors) : Set :=
+  Class osatGpreS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Π : Type) (Σ : gFunctors) : Set :=
     OsatGpreS {
-        osatGpreS_goal : inG Σ (gmap_viewR obl_id (prodR (agreeR $ obl_ps_propO) (agreeR $ (laterO (iPropO Σ)))));
+        osatGpreS_goal : inG Σ (gmap_viewR obl_id (prodR (agreeR $ ps_propO Π) (agreeR $ (laterO (iPropO Σ)))));
         osatGpreS_state : inG Σ (gmapUR obl_id (prodUR (prodUR bcredUR mono_natUR) mono_natUR));
       }.
 
-  Class osatGS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} (Σ : gFunctors) : Set :=
+  Class osatGS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Π : Type) (Σ : gFunctors) : Set :=
     OsatG {
-        osat_inG : osatGpreS Σ;
+        osat_inG : osatGpreS Π Σ;
         goal_name : gname;
         state_name : gname;
       }.
 
-  Definition osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} : gFunctors :=
-    #[GFunctor (gmap_viewTRF obl_id (prodTRF (agreeTRF obl_ps_propO) (agreeTRF $ (laterTF idTF))));
+  Definition osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} Π : gFunctors :=
+    #[GFunctor (gmap_viewTRF obl_id (prodTRF (agreeTRF $ ps_propO Π) (agreeTRF $ (laterTF idTF))));
       GFunctor (gmapTRF obl_id (prodTRF (prodTRF bcredUR mono_natUR) mono_natUR))
       ].
 
-  Global Instance subG_osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} {Σ} : subG osatΣ Σ → (osatGpreS Σ).
+  Global Instance subG_osatΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Π} {Σ} : subG (osatΣ Π) Σ → (osatGpreS Π Σ).
   Proof.
     (* FIXME : solve_inG fails because it lacks support for subG (5 < args). *)
     intros;
@@ -52,62 +52,62 @@ Local Existing Instances osat_inG osatGpreS_goal osatGpreS_state.
 
 Definition goal_unfold `{SI : indexT} {Σ} (R : iProp Σ) : later (iProp Σ) :=
   Next R.
-Definition oblG_goal `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) (P : obl_ps_prop) (R : iProp Σ) : iProp Σ :=
+Definition oblG_goal `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) (P : ps_prop Π) (R : iProp Σ) : iProp Σ :=
   own goal_name
     (gmap_view_frag i DfracDiscarded (to_agree $ P, to_agree $ goal_unfold R)).
 Global Typeclasses Opaque oblG_goal.
 Global Instance: Params (@goal_unfold) 2 := {}.
 Global Instance: Params (@oblG_goal) 10 := {}.
 
-Definition oblG_elem `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
+Definition oblG_elem `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) : iProp Σ :=
   ∃ P R, oblG_goal i P R.
 Global Typeclasses Opaque oblG_elem.
 Global Instance: Params (@oblG_elem) 10 := {}.
 
-Definition oblS_idle `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) (q : Qp) : iProp Σ :=
+Definition oblS_idle `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) (q : Qp) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ●MN{#(q/2)} 0, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_idle.
 Global Instance: Params (@oblS_idle) 10 := {}.
 
-Definition oblS_active_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
+Definition oblS_active_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ●MN 1, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_active_auth.
 Global Instance: Params (@oblS_active_auth) 10 := {}.
 
-Definition oblS_active `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
+Definition oblS_active `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ◯MN 1, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_active.
 Global Instance: Params (@oblS_active) 10 := {}.
 
-Definition oblS_live `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) (q : Qp) : iProp Σ :=
+Definition oblS_live `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) (q : Qp) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ●MN{#(q/2)} 0) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_live.
 Global Instance: Params (@oblS_live) 10 := {}.
 
-Definition oblS_done_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
+Definition oblS_done_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ●MN 1) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_done_auth.
 Global Instance: Params (@oblS_done_auth) 10 := {}.
 
-Definition oblS_done `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) : iProp Σ :=
+Definition oblS_done `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) : iProp Σ :=
   own state_name ({[ i := (ε : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ◯MN 1) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_done.
 Global Instance: Params (@oblS_done) 10 := {}.
 
-Definition oblS_credit `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) (a : A) : iProp Σ :=
+Definition oblS_credit `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) (a : A) : iProp Σ :=
   own state_name ({[ i := (credit a : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_credit.
 Global Instance: Params (@oblS_credit) 10 := {}.
 
-Definition oblS_bound `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ} (i : obl_id) (a : A) : iProp Σ :=
+Definition oblS_bound `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ} (i : obl_id) (a : A) : iProp Σ :=
   own state_name ({[ i := (credit_bound a : (@bcredUR _ _ _ _ WFOrderedCM.orderedCM), ε, ε) ]} : gmap _ _).
 Global Typeclasses Opaque oblS_bound.
 Global Instance: Params (@oblS_bound) 10 := {}.
 
-Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGS Σ}
+Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ}
   (Ω : obl_states) : iProp Σ :=
   locked
-    (∃ (Obls : gmap positive (obl_state * (obl_ps_prop * iProp Σ))%type),
+    (∃ (Obls : gmap positive (obl_state * (ps_prop Π * iProp Σ))%type),
         (⌜Ω = fst <$> Obls⌝) ∗
         (own goal_name
            (gmap_view_auth (DfracOwn 1)
@@ -124,11 +124,11 @@ Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osat
     )%I.
 
 Section osat.
-  Context `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{OPS : obl_ps} `{!osatGS Σ}.
+  Context `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ}.
 
   Local Instance goal_unfold_contractive : Contractive (@goal_unfold SI Σ).
   Proof. solve_contractive. Qed.
-  Global Instance oblG_goal_contractive i P : Contractive (@oblG_goal SI _ _ _ _ WF OPS Σ _ i P).
+  Global Instance oblG_goal_contractive i P : Contractive (@oblG_goal SI _ _ _ _ WF Π Σ _ i P).
   Proof. solve_contractive. Qed.
   Global Instance oblG_goal_persistent i P R : Persistent (oblG_goal i P R).
   Proof. rewrite /oblG_goal. apply _. Qed.
@@ -285,7 +285,7 @@ Section osat.
     apply WFOrderedCM.lt_exists_left. exists c. split; [auto | by rewrite OrderedCM.add_comm_le ].
   Qed.
 
-  Lemma oblG_goal_lookup (Obls : gmap positive (obl_state * (obl_ps_prop * iProp Σ))) i P R :
+  Lemma oblG_goal_lookup (Obls : gmap positive (obl_state (Π:=Π) * (ps_prop Π * iProp Σ))) i P R :
     own goal_name
       (gmap_view_auth (DfracOwn 1)
          ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> (snd <$> Obls))) ∗
@@ -516,7 +516,7 @@ Section osat.
 End osat.
 
 (* Allocation of an initial obligation protocol. *)
-Lemma osat_alloc `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} `{!osatGpreS Σ} : ⊢ |==> ∃ _ : osatGS Σ, osat ∅.
+Lemma osat_alloc `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!osatGpreS Π Σ} : ⊢ |==> ∃ _ : osatGS Π Σ, osat ∅.
 Proof.
   iIntros.
   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅)) as (γG) "HG";

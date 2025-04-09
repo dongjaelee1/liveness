@@ -8,13 +8,13 @@ From iris.prelude Require Import options.
 Import uPred.
 From liveness Require Import ordinal_WFOrderedCM thread_obligation.
 
-Global Instance language_obl_ps (Λ : language) : obl_ps := { Π := (expr Λ * state Λ)%type }.
+Notation Π Λ := (state Λ).
 
 Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {
   (** Invariants. *)
   #[global] liris_invGS :: invGS_gen hlc Σ;
   (** Liveness obligation interpretation. *)
-  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_WFOrderedCM) (H:=language_obl_ps Λ) Σ;
+  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_WFOrderedCM) (Π Λ) Σ;
   (** Scheduler fairness interpretation. *)
   #[global] liris_schedfairGS :: schedfairGS.schedfairGS (WF:=@fuel_wf Λ) Σ;
   (** Connecting liveness obligations and scheduler fairness. *)
@@ -58,7 +58,8 @@ Global Opaque liris_invGS liris_osatGS liris_schedfairGS liris_oblfuelGS liris_t
 Global Arguments LirisG {SI hlc Λ Σ}.
 
 Notation lirisGS := (lirisGS_gen HasLc).
-Notation "'⫪' Λ" := (Ord.from_wf_set (@WFOrderedCM.lt_wf _ _ _ _ (@fuel_wf Λ))) (at level 70).
+Notation "'⌈' Λ '⌉'" := (Ord.from_wf_set (@WFOrderedCM.lt_wf _ _ _ _ (@fuel_wf Λ))).
+Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (Π:=Π Λ)).
 
 (** The predicate we take the fixpoint of in order to define the WP. *)
 (** In the step case, we both provide [S (num_laters_per_step ns)]
@@ -73,6 +74,37 @@ Notation "'⫪' Λ" := (Ord.from_wf_set (@WFOrderedCM.lt_wf _ _ _ _ (@fuel_wf Λ
     can only be used by exactly one client.
   - The step-taking update can even be used by clients that opt out of
     later credits, e.g. because they use [BiFUpdPlainly]. *)
+
+Definition wp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (E : coPset) (i : thread_id) (e1 : expr Λ)
+  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
+  (∀ ϕ0 ϕ1, (schedfairI (H:=@fuel_wf Λ) ϕ0 ∗ (⌜fuels_fair_update {[i]} ϕ0 ϕ1⌝)) -∗ ∀ Ω γ τ,
+     (osat Ω ∗ ofuelI ⌈Λ⌉ Ω ∗ toIL Λ τ γ) -∗ ∀ σ1 ns κ κs,
+     state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
+     (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
+     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝ -∗
+                  (* £ (S O) ={∅}▷=∗ |={∅,E}=> *)
+                  £ (S (num_laters_per_step ns))
+                  ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
+     ∃ Ω', (⌜∃ os, γ !! i = Some os ∧ obl_states_step_list σ2 os Ω Ω'⌝) ∗
+           ∃ γ', (osat Ω' ∗ ofuelI ⌈Λ⌉ Ω' ∗ toIL Λ τ γ') ∗
+                 state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
+                 ν e2 efs
+  )%I.
+
+TODO
+
+
+Inductive step (Λ : language) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
+    step_atomic : ∀ (e1 : expr Λ) (σ1 : state Λ) (e2 : expr Λ) (σ2 : state Λ) (ths : thread_pool Λ) (i : thread_id) 
+                    (efs : thread_pool Λ) (ϕ0 ϕ1 ϕ2 ϕ3 : sched_fuels Λ),
+                    ρ1 = (ths, ϕ0, σ1)
+                    → ths !! i = Some e1
+                      → fuels_fair_update {[i]} ϕ0 ϕ1
+                        → prim_step e1 σ1 (dom ths) κ e2 σ2 efs
+                          → ϕ2 = fuels_thread_yield i e2 ϕ1
+                            → fuels_fair_fork efs ϕ2 ϕ3 → ρ2 = (<[i:=e2]> ths ∪ efs, ϕ3, σ2) → step ρ1 κ ρ2.
+
+
 Definition wp_pre `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness)
   (wp : coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
   coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=

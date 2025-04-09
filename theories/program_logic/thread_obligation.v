@@ -14,9 +14,6 @@ Module threadoblGS.
     ThreadoblGpreS {
         threadoblGpreS_state : inG Σ (gmap_viewR thread_id (mono_listUR obl_id));
         threadoblGpreS_live : inG Σ (gmap_viewR thread_id (agreeR (list obl_id)));
-        (* threadoblGpreS_state : inG Σ (gmap_viewR thread_id (gmap_viewR obl_id unitUR)); *)
-        (* threadoblGpreS_live : inG Σ (gmap_viewR thread_id (gsetUR obl_id)); *)
-        (* threadoblGpreS_state : inG Σ (gmap_viewR thread_id (gset_disjUR obl_id)); *)
       }.
 
   Class threadoblGS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -30,7 +27,6 @@ Module threadoblGS.
     #[GFunctor (gmap_viewTRF thread_id (mono_listUR obl_id));
       GFunctor (gmap_viewTRF thread_id (agreeTRF (listO obl_id)))
       ].
-  (* #[GFunctor (gmap_viewTRF thread_id (gset_disjUR obl_id)) *)
 
   Global Instance subG_threadoblΣ `{SI : indexT} {Σ} : subG threadoblΣ Σ → (threadoblGpreS Σ).
   Proof.
@@ -58,20 +54,22 @@ Global Typeclasses Opaque toL_thread.
 Global Instance: Params (@toL_thread) 4 := {}.
 
 (* thread fork cases: sched fuel for new threads? *)
-Definition toI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{obl_ps} {Σ}
-  `{@osatGS.osatGS SI Ord.t _ _ _ _ _ Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ} `{@ofuelGS.ofuelGS SI Σ} `{!threadoblGS Σ}
+Definition toI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Π} {Σ}
+  `{@osatGS.osatGS SI Ord.t _ _ _ _ Π Σ} `{@schedfairGS.schedfairGS SI A _ _ _ WF Σ} `{@ofuelGS.ofuelGS SI Σ} `{!threadoblGS Σ}
+  (τ : thread_ids) (γ : gmap thread_id (list obl_id))
   : iProp Σ :=
   locked
-    (∃ (Ψ γ : gmap thread_id (list obl_id)),
-        (⌜map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ⌝) ∗
-        (own state_name (gmap_view_auth (DfracOwn 1) ((mono_list_auth (DfracOwn 1)) <$> Ψ))) ∗
-        (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
-        ([∗ map] i ↦ W ∈ Ψ,
-           (sfS_exec i (1/2) ∗
-            ∃ (f : A), sfS_fuel_bound i f 1 ∗
-                       (∃ L, ⌜γ !! i = Some L⌝ ∗
-                             ([∗ list] k ∈ L, oblS_live k 1 ∗ ∃ a, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= a)%ord⌝ ∗ ofuelS_fuel k a) ∗
-                             ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k)
-           ))
-           ∨
-             (sfS_term i ∗ toL_thread i [] ∗ [∗ list] k ∈ W, oblS_done k)))%I.
+    ((⌜dom γ ≡ τ⌝) ∗
+     ∃ (Ψ : gmap thread_id (list obl_id)),
+       (⌜map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ⌝) ∗
+       (own state_name (gmap_view_auth (DfracOwn 1) ((mono_list_auth (DfracOwn 1)) <$> Ψ))) ∗
+       (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
+       ([∗ map] i ↦ W ∈ Ψ,
+          (sfS_exec i (1/2) ∗
+           ∃ (f : A), sfS_fuel_bound i f 1 ∗
+                      (∃ L, ⌜γ !! i = Some L⌝ ∗
+                            ([∗ list] k ∈ L, oblS_live k 1 ∗ ∃ a, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= a)%ord⌝ ∗ ofuelS_fuel k a) ∗
+                            ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k)
+          ))
+          ∨
+            (sfS_term i ∗ toL_thread i [] ∗ [∗ list] k ∈ W, oblS_done k)))%I.

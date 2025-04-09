@@ -44,8 +44,8 @@ Definition ofuelS_bound `{SI : indexT} `{!ofuelGS Σ} (i : obl_id) (a : Ord.t) :
 Global Typeclasses Opaque ofuelS_bound.
 Global Instance: Params (@ofuelS_bound) 4 := {}.
 
-Definition ofuelI `{SI : indexT} `{obl_ps} `{!ofuelGS Σ}
-  (c : Ord.t) (Ω : obl_states) : iProp Σ :=
+Definition ofuelI `{SI : indexT} {Π : Type} `{!ofuelGS Σ}
+  (c : Ord.t) (Ω : obl_states' Π) : iProp Σ :=
   locked
     (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ω))) ∗
      [∗ map] i ↦ o ∈ Ω,
@@ -60,7 +60,7 @@ Definition ofuelI `{SI : indexT} `{obl_ps} `{!ofuelGS Σ}
     )%I.
 
 Section ofuel.
-  Context `{SI : indexT} `{OPS : obl_ps} `{!ofuelGS Σ}.
+  Context `{SI : indexT} {Π : Type} `{!ofuelGS Σ}.
 
   Global Instance ofuelS_bound_persistent i a : Persistent (ofuelS_bound i a).
   Proof. rewrite /ofuelS_bound. apply _. Qed.
@@ -130,7 +130,7 @@ Section ofuel.
     apply WFOrderedCM.lt_exists_left. exists c. split; [auto | by rewrite OrderedCM.add_comm_le ].
   Qed.
 
-  Lemma ofuelI_alloc c Ω a i :
+  Lemma ofuelI_alloc c (Ω : obl_states' Π) a i :
     (Ω !! i = None) →
     ofuelI c Ω
     ⊢ |==> ofuelI c (<[i:=obl_init a]>Ω) ∗ ofuelS_bound i (c × a)%ord.
@@ -163,7 +163,7 @@ Section ofuel.
     - iApply big_sepM_insert; [auto|]. iFrame. done.
   Qed.
 
-  Lemma ofuelI_progress_one c Ω i o1 o2 :
+  Lemma ofuelI_progress_one c (Ω : obl_states' Π) i o1 o2 :
     (Ω !! i = Some (obl_live o1)) →
     (o2 < o1)%ord →
     ofuelI c Ω
@@ -185,7 +185,7 @@ Section ofuel.
     iModIntro. rewrite insert_delete_insert. iFrame.
   Qed.
 
-  Lemma ofuelI_done_one c Ω i o P :
+  Lemma ofuelI_done_one c (Ω : obl_states' Π) i o P :
     (Ω !! i = Some o) →
     ofuelI c Ω
     ⊢ |==> ofuelI c (<[i:=obl_done P]>Ω).
@@ -202,7 +202,7 @@ Section ofuel.
 End ofuel.
 
 (* Allocation of an initial obligation fuel variant. *)
-Lemma ofuel_alloc `{SI : indexT} `{obl_ps} `{!ofuelGpreS Σ} c : ⊢ |==> ∃ _ : ofuelGS Σ, ofuelI c ∅.
+Lemma ofuel_alloc `{SI : indexT} {Π : Type} `{!ofuelGpreS Σ} c : ⊢ |==> ∃ _ : ofuelGS Σ, ofuelI (Π:=Π) c ∅.
 Proof.
   iIntros.
   iMod (own_alloc (reservation_map_token ⊤)) as (γS) "HS";
