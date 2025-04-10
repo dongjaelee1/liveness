@@ -188,17 +188,49 @@ Section sfi.
     iModIntro. by rewrite discrete_fun_singleton_op.
   Qed.
 
-  Lemma schedfairI_thread_is_exec ϕ i oF q :
-    (ϕ !! i = Some oF) →
+  Lemma schedfairI_thread_is_exec ϕ i q :
     schedfairI ϕ ∗ sfS_exec i q
-    ⊢ ∃ f, ⌜oF = Some f⌝.
+    ⊢ ∃ f, ⌜ϕ !! i = Some (Some f)⌝.
   Proof.
-    rewrite /schedfairI -!lock. iIntros (LU) "((% & Htk & Hs) & He)".
+    rewrite /schedfairI -!lock. iIntros "((% & Htk & Hs) & He)".
+    iAssert (∃ oF, ⌜ϕ !! i = Some oF⌝)%I with "[Htk He]" as "[% %LU]".
+    { destruct (decide (i ∈ dom ϕ)).
+      { apply elem_of_dom in e. destruct e. iExists x. done. }
+      { iExFalso. rewrite /sfS_exec. iCombine "Htk He" as "H". iPoseProof (own_valid with "H") as "V".
+        rewrite /discrete_fun_singleton /discrete_fun_insert.
+        iPoseProof (discrete_fun_validI with "V") as "%V". iPureIntro.
+        specialize (V i). rewrite discrete_fun_lookup_op in V. destruct (decide (i ∈ dom ϕ)); [done|].
+        destruct (decide (i = i)); [|done]. rewrite rew_const -pair_op pair_valid in V. destruct V as [_ V].
+        apply mono_nat_auth_dfrac_op_valid in V. destruct V as [V _]. apply dfrac_valid_own_l in V. done.
+      }
+    }
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eapply LU |].
     destruct oF.
     - by iExists a0.
     - iExFalso. iDestruct "LU" as "(%&_&Hta)". iPoseProof (sfS_term_auth_term with "Hta") as "#Ht".
       iDestruct (sfS_exec_term_false with "[He]") as "%F"; [by iFrame | done].
+  Qed.
+
+  Lemma schedfairI_thread_is_term ϕ i :
+    schedfairI ϕ ∗ sfS_term i
+    ⊢ ⌜ϕ !! i = Some None⌝.
+  Proof.
+    rewrite /schedfairI -!lock. iIntros "((% & Htk & Hs) & Ht)".
+    iAssert (∃ oF, ⌜ϕ !! i = Some oF⌝)%I with "[Htk Ht]" as "[% %LU]".
+    { destruct (decide (i ∈ dom ϕ)).
+      { apply elem_of_dom in e. destruct e. iExists x. done. }
+      { iExFalso. rewrite /sfS_term. iCombine "Htk Ht" as "H". iPoseProof (own_valid with "H") as "V".
+        rewrite /discrete_fun_singleton /discrete_fun_insert.
+        iPoseProof (discrete_fun_validI with "V") as "%V". iPureIntro.
+        specialize (V i). rewrite discrete_fun_lookup_op in V. destruct (decide (i ∈ dom ϕ)); [done|].
+        destruct (decide (i = i)); [|done]. rewrite rew_const -pair_op pair_valid in V. destruct V as [_ V].
+        apply mono_nat_both_valid in V. lia.
+      }
+    }
+    iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eapply LU |].
+    destruct oF.
+    - iExFalso. iDestruct "LU" as "(%&_&_&He)". iPoseProof (sfS_exec_term_false with "[He Ht]") as "%F"; [iFrame|done].
+    - done.
   Qed.
 
   Lemma schedfairI_reserved_fork (S : gset _) (i : thread_id) a :
@@ -307,7 +339,7 @@ Section sfi.
     schedfairI ϕ ∗ sfS_exec i (1/2) ∗ sfS_fuel_bound i f 1
     ⊢ |==> schedfairI (<[i:=None]>ϕ) ∗ sfS_term i.
   Proof.
-    iIntros (LU) "(Hs&He&Hfb)". iDestruct (schedfairI_thread_is_exec _ _ _ _ LU with "[Hs He]") as "[% %]"; [iFrame|subst].
+    iIntros (LU) "(Hs&He&Hfb)". iDestruct (schedfairI_thread_is_exec with "[Hs He]") as "[% %]"; [iFrame|subst].
     rewrite /schedfairI -!lock. iDestruct "Hs" as "(%&Htk&Hs)".
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
     iDestruct "LU" as "(%&%&Hfc&He2)".

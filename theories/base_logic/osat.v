@@ -119,7 +119,7 @@ Definition osat `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!osatGS Π Σ}
            | (obl_live a, _) =>
                (∃ a', ⌜leR a' a⌝ ∗ oblS_bound i a' ∗ oblS_active_auth i ∗ oblS_live i 1)
            | (obl_done P1, (P2, R)) =>
-               (⌜P1 = P2⌝ ∗ ▷ R ∗ oblS_active_auth i ∗ oblS_done_auth i)
+               (⌜P1 ≡ P2⌝ ∗ ▷ R ∗ oblS_active_auth i ∗ oblS_done_auth i)
            end)
     )%I.
 
@@ -364,7 +364,7 @@ Section osat.
 
   Lemma osat_obl_is_done Ω i P R :
     osat Ω ∗ oblG_goal i P R ∗ oblS_done i
-    ⊢ ⌜Ω !! i = Some (obl_done P)⌝.
+    ⊢ ∃ P', ⌜Ω !! i = Some (obl_done P') ∧ P' ≡ P⌝.
   Proof.
     iIntros "(Ho & #He & #Hd)".
     iPoseProof (osat_oblG_elem with "[Ho]") as "%Hin"; [rewrite /oblG_elem; iFrame; eauto |].
@@ -383,7 +383,7 @@ Section osat.
       iPoseProof (oblS_live_done_false with "[LIVE Hd]") as "%F"; [iFrame; done | done].
     - iPoseProof (oblG_goal_lookup with "[Hoa]") as "(%&%&%&%&%&_)"; [iFrame; done |].
       destruct Q. iDestruct "LU" as "[% _]". iPureIntro. subst.
-      rewrite LU2 in H. inv H. rewrite LU. auto.
+      rewrite LU2 in H. inv H. rewrite LU. exists P0. done.
   Qed.
 
   Lemma obl_alloc Ω a P R :
@@ -494,9 +494,10 @@ Section osat.
     rewrite /osat -!lock. iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom)".
     iDestruct (oblG_goal_lookup Obls i P with "[Hoa]") as (o P' R' IN HP') "#HPQ"; [iFrame; done|].
     iDestruct (big_sepM_delete _ _ i _ IN with "Hom") as "[Hc Hom]".
-    subst. assert (o = obl_done P).
-    { rewrite lookup_fmap IN in Hdone. by inv Hdone. }
-    subst. iDestruct "Hc" as "(HP&HQ&Haa&Hda)". iSplitL "HQ".
+    subst. assert (∃ P', o = obl_done P' ∧ P' ≡ P).
+    { rewrite lookup_fmap IN in Hdone. destruct Hdone as (?&?&?). inv H. exists x. done. }
+    destruct H as (P'&?&?). subst.
+    iDestruct "Hc" as "(HP&HQ&Haa&Hda)". iSplitL "HQ".
     { iNext. by iRewrite "HPQ" in "HQ". }
     { iIntros "HR". iExists Obls. iSplit; [iPureIntro; done |].
       iFrame. iApply (big_sepM_delete _ _ i); [eauto |].

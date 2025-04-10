@@ -80,4 +80,4 @@ Notation "'{{' a ↪ b '|' s '}}'" := (obl_states_step s a b) (at level 60, form
 (* We use the transitive closure.
    It's normalization is equivalent to normalization of source_rel. *)
 Notation "'{{' a ↪⁺ b '|' s '}}'" := ((tc (obl_states_step s)) a b) (at level 60, format "{{ a  ↪⁺  b  |  s }}").
-Notation "'{{' a ↪⋆ b '|' s '}}'" := ((rtc (obl_states_step_list s)) a b) (at level 60, format "{{ a  ↪⋆  b  |  s }}").
+Notation "'{{' a ↪⋆ b '|' s '}}'" := ((rtc (obl_states_step s)) a b) (at level 60, format "{{ a  ↪⋆  b  |  s }}").

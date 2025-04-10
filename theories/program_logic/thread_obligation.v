@@ -56,11 +56,10 @@ Global Instance: Params (@toL_thread) 4 := {}.
 (* thread fork cases: sched fuel for new threads? *)
 Definition toI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Π} {Σ}
   `{@osatGS.osatGS SI Ord.t _ _ _ _ Π Σ} `{@schedfairGS.schedfairGS SI A _ _ _ WF Σ} `{@ofuelGS.ofuelGS SI Σ} `{!threadoblGS Σ}
-  (τ : thread_ids) (γ : gmap thread_id (list obl_id))
+  (γ : gmap thread_id (list obl_id))
   : iProp Σ :=
   locked
-    ((⌜dom γ ≡ τ⌝) ∗
-     ∃ (Ψ : gmap thread_id (list obl_id)),
+    (∃ (Ψ : gmap thread_id (list obl_id)),
        (⌜map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ⌝) ∗
        (own state_name (gmap_view_auth (DfracOwn 1) ((mono_list_auth (DfracOwn 1)) <$> Ψ))) ∗
        (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
