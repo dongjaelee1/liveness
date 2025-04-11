@@ -3,9 +3,8 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liveness Require Import language.
-From liveness Require Export osat sched_fair_interp obligation_fuel.
-From Ordinal Require Import Ordinal.
+From liveness Require Export osat sched_fair_interp.
+From liveness Require Import language ordinal_WFOrderedCM.
 
 (** Enable thread local management of obligations.
     Also connects scheduler fairness with obligations to enable liveness induction. *)
@@ -41,7 +40,7 @@ Import threadoblGS.
 Local Existing Instances threadobl_inG threadoblGpreS_state threadoblGpreS_live.
 Local Existing Instances osatGS.osat_inG osatGS.osatGpreS_goal osatGS.osatGpreS_state.
 Local Existing Instances schedfairGS.schedfair_inG schedfairGS.schedfairGpreS_state.
-Local Existing Instances ofuelGS.ofuel_inG ofuelGS.ofuelGpreS_state.
+(* Local Existing Instances ofuelGS.ofuel_inG ofuelGS.ofuelGpreS_state. *)
 
 Definition toS_snapshot `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
   own state_name (gmap_view_frag i DfracDiscarded (◯ML l)).
@@ -55,7 +54,9 @@ Global Instance: Params (@toL_thread) 4 := {}.
 
 (* thread fork cases: sched fuel for new threads? *)
 Definition toI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Π} {Σ}
-  `{@osatGS.osatGS SI Ord.t _ _ _ _ Π Σ} `{@schedfairGS.schedfairGS SI A _ _ _ WF Σ} `{@ofuelGS.ofuelGS SI Σ} `{!threadoblGS Σ}
+  `{@osatGS.osatGS SI Ord.t _ _ _ _ Π Σ} `{@schedfairGS.schedfairGS SI A _ _ _ WF Σ}
+  (* `{@ofuelGS.ofuelGS SI Σ} *)
+  `{!threadoblGS Σ}
   (γ : gmap thread_id (list obl_id))
   : iProp Σ :=
   locked
@@ -67,8 +68,8 @@ Definition toI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Π} {Σ}
           (sfS_exec i (1/2) ∗
            ∃ (f : A), sfS_fuel_bound i f 1 ∗
                       (∃ L, ⌜γ !! i = Some L⌝ ∗
-                            ([∗ list] k ∈ L, oblS_live k 1 ∗ ∃ a, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= a)%ord⌝ ∗ ofuelS_fuel k a) ∗
-                            ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k)
+                            ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
+                            ([∗ list] k ∈ L, oblS_live k 1 ∗ ∃ a, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= a)%ord⌝ ∗ oblS_credit k a)
           ))
           ∨
             (sfS_term i ∗ toL_thread i [] ∗ [∗ list] k ∈ W, oblS_done k)))%I.

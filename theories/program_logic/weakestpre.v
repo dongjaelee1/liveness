@@ -18,7 +18,7 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
   (** Scheduler fairness interpretation. *)
   #[global] liris_schedfairGS :: schedfairGS.schedfairGS (WF:=@fuel_wf Λ) Σ;
   (** Connecting liveness obligations and scheduler fairness. *)
-  #[global] liris_oblfuelGS :: ofuelGS.ofuelGS Σ;
+  (* #[global] liris_oblfuelGS :: ofuelGS.ofuelGS Σ; *)
   #[global] liris_threadoblGS :: threadoblGS.threadoblGS Σ;
 
   (** The state interpretation is an invariant that should hold in
@@ -54,7 +54,7 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
   state_interp_mono σ ns κs τ:
     state_interp σ ns κs τ ⊢ |={∅}=> state_interp σ (S ns) κs τ
 }.
-Global Opaque liris_invGS liris_osatGS liris_schedfairGS liris_oblfuelGS liris_threadoblGS.
+Global Opaque liris_invGS liris_osatGS liris_schedfairGS liris_threadoblGS.
 Global Arguments LirisG {SI hlc Λ Σ}.
 
 Notation lirisGS := (lirisGS_gen HasLc).
@@ -80,7 +80,7 @@ Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (Π:=Π Λ)).
 Definition wp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ ϕ0 ϕ1, (schedfairIL Λ ϕ0 ∗ ⌜fuels_fair_update {[i]} ϕ0 ϕ1⌝) -∗
-            ∀ Ω γ, (osat Ω ∗ ofuelI ⌈Λ⌉ Ω ∗ toIL Λ γ) -∗
+            ∀ Ω γ, (osat Ω ∗ toIL Λ γ) -∗
                    ∀ σ1 ns κ κs τ, state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
                                    (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
                                    ∀ e2 σ2 efs, ⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝ -∗
@@ -89,7 +89,7 @@ Definition wp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i :
      ∀ ϕ2 ϕ3, (⌜ϕ2 = fuels_thread_yield i e2 ϕ1 ∧ fuels_fair_fork efs ϕ2 ϕ3⌝) -∗
               (schedfairIL Λ ϕ3) ∗
               ∃ Ω', (⌜∃ os, γ !! i = Some os ∧ [[Ω ↪ Ω' | os, σ2 ]]⌝) ∗
-                    ∃ γ', (osat Ω' ∗ ofuelI ⌈Λ⌉ Ω' ∗ toIL Λ γ') ∗
+                    ∃ γ', (osat Ω' ∗ toIL Λ γ') ∗
                           state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
                           ν e2 efs
   )%I.
@@ -98,11 +98,11 @@ Definition wp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i :
 Definition ghost_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (E : coPset)
   (ν : iPropO Σ) : iPropO Σ :=
   (∀ ϕ, schedfairIL Λ ϕ -∗
-        ∀ Ω γ, (osat Ω ∗ ofuelI ⌈Λ⌉ Ω ∗ toIL Λ γ) -∗
+        ∀ Ω γ, (osat Ω ∗ toIL Λ γ) -∗
                ∀ σ ns κs τ, state_interp σ ns κs τ ={E}=∗
                             (schedfairIL Λ ϕ) ∗
                             ∃ Ω', (⌜{{Ω ↪⋆ Ω' | σ }}⌝) ∗
-                                  ∃ γ', (osat Ω' ∗ ofuelI ⌈Λ⌉ Ω' ∗ toIL Λ γ') ∗
+                                  ∃ γ', (osat Ω' ∗ toIL Λ γ') ∗
                                         state_interp σ ns κs τ ∗
                                         ν
   )%I.
