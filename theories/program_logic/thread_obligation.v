@@ -61,15 +61,18 @@ Definition toI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Π} {Σ}
   : iProp Σ :=
   locked
     (∃ (Ψ : gmap thread_id (list obl_id)),
-       (⌜map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ⌝) ∗
-       (own state_name (gmap_view_auth (DfracOwn 1) ((mono_list_auth (DfracOwn 1)) <$> Ψ))) ∗
-       (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
-       ([∗ map] i ↦ W ∈ Ψ,
-          (sfS_exec i (1/2) ∗
-           ∃ (f : A), sfS_fuel_bound i f 1 ∗
-                      (∃ L, ⌜γ !! i = Some L⌝ ∗
-                            ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
-                            ([∗ list] k ∈ L, oblS_live k 1 ∗ ∃ a, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= a)%ord⌝ ∗ oblS_credit k a)
-          ))
-          ∨
-            (sfS_term i ∗ toL_thread i [] ∗ [∗ list] k ∈ W, oblS_done k)))%I.
+        (⌜map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ⌝) ∗
+        (own state_name (gmap_view_auth (DfracOwn 1) ((mono_list_auth (DfracOwn 1)) <$> Ψ))) ∗
+        (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
+        ([∗ map] i ↦ W ∈ Ψ,
+           (sfS_exec i (1/2) ∗
+            ∃ (f : A), sfS_fuel_bound i f 1 ∗
+                       (∃ L, ⌜γ !! i = Some L⌝ ∗
+                             ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
+                             ([∗ list] k ∈ L, oblS_live k (1/2) ∗
+                                              ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOrderedCM.lt_wf))) ∨
+                                                 (oblS_active k ∗
+                                                  ∃ a, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= a)%ord⌝ ∗ oblS_credit k a)))
+           ))
+           ∨
+             (sfS_term i ∗ toL_thread i [] ∗ [∗ list] k ∈ W, oblS_done k)))%I.
