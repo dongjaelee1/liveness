@@ -9,7 +9,7 @@ From iris.prelude Require Import options.
 Import uPred.
 From liveness Require Import ordinal_WFOrderedCM thread_obligation.
 
-Notation Π Λ := (prod (thread_pool Λ) (state Λ)).
+Notation Π Λ := (state Λ).
 
 Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {
   (** Invariants. *)
@@ -80,59 +80,54 @@ Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (Π:=Π Λ)).
 (* Ω must make strict progress *)
 Definition wp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
-  (∀ (ths : thread_pool Λ),
-     ⌜ths !! i = Some e1⌝ -∗
-     ∀ ϕ0 ϕ1, (schedfairIL Λ ϕ0 ∗ ⌜fuels_fair_update {[i]} ϕ0 ϕ1⌝) -∗
-              ∀ Ω γ, (osat Ω ∗ toIL Λ γ) -∗
-                     ∀ σ1 ns κ κs τ, state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
-                                     (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
-                                     ∀ e2 σ2 efs, ⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝ -∗
-                                                  £ (S (num_laters_per_step ns))
-                                                  ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
+  (∀ ϕ0 ϕ1, (schedfairIL Λ ϕ0 ∗ ⌜fuels_fair_update {[i]} ϕ0 ϕ1⌝) -∗
+            ∀ Ω γ, (osat Ω ∗ toIL Λ γ) -∗
+                   ∀ σ1 ns κ κs τ, state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
+                                   (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
+                                   ∀ e2 σ2 efs, ⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝ -∗
+                                                £ (S (num_laters_per_step ns))
+                                                ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
      ∀ ϕ2 ϕ3, (⌜ϕ2 = fuels_thread_yield i e2 ϕ1 ∧ fuels_fair_fork efs ϕ2 ϕ3⌝) -∗
               (schedfairIL Λ ϕ3) ∗
-              ∃ Ω', (⌜∃ os, γ !! i = Some os ∧ [[Ω ↪⁺ Ω' | os, (<[i := e2]>ths, σ2) ]]⌝) ∗
+              ∃ Ω', (⌜∃ os, γ !! i = Some os ∧ (Ω ↪ₗ⁺ Ω' @ os; σ2)⌝) ∗
                     ∃ γ', (osat Ω' ∗ toIL Λ γ') ∗
                           state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
                           ν e2 efs
   )%I.
 
 (* Ω can allocate, progress, or fulfills obligations. Note this has no later modality. *)
-Definition ghost_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (i : thread_id) (E : coPset) (e : expr Λ)
+Definition ghost_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (E : coPset)
   (ν : iPropO Σ) : iPropO Σ :=
-  (∀ (ths : thread_pool Λ),
-     ⌜ths !! i = Some e⌝ -∗
-     ∀ ϕ, schedfairIL Λ ϕ -∗
-          ∀ Ω γ, (osat Ω ∗ toIL Λ γ) -∗
-                 ∀ σ ns κs τ, state_interp σ ns κs τ ={E}=∗
-                              (schedfairIL Λ ϕ) ∗
-                              ∃ Ω', (⌜{{Ω ↪⋆ Ω' | (ths, σ) }}⌝) ∗
-                                    ∃ γ', (osat Ω' ∗ toIL Λ γ') ∗
-                                          state_interp σ ns κs τ ∗
-                                          ν
+  (∀ ϕ, schedfairIL Λ ϕ -∗
+        ∀ Ω γ, (osat Ω ∗ toIL Λ γ) -∗
+               ∀ σ ns κs τ, state_interp σ ns κs τ ={E}=∗
+                            (schedfairIL Λ ϕ) ∗
+                            ∃ Ω', (⌜(Ω ↪ₛ⋆ Ω' @ σ)⌝) ∗
+                                  ∃ γ', (osat Ω' ∗ toIL Λ γ') ∗
+                                        state_interp σ ns κs τ ∗
+                                        ν
   )%I.
 
 (* pre-definition of wp of which we take a least fixpoint *)
 Definition wp_pre `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness)
   (wp : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
   thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=
-  λ i E e1 Q,
+  λ i E e1 Φ,
     ((match to_val e1 with
-      | Some v => |={E}=> Q v
-      | None => wp_step s i E e1 (λ e2 efs, (wp i E e2 Q) ∗ [∗ map] j ↦ ef ∈ efs, wp j ⊤ ef fork_post)
+      | Some v => |={E}=> Φ v
+      | None => wp_step s i E e1 (λ e2 efs, (wp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, wp j ⊤ ef fork_post)
       end)
-     ∨ (ghost_step i E e1 (wp i E e1 Q))
+     ∨ (ghost_step E (wp i E e1 Φ))
     )%I.
 
 Lemma wp_pre_mono `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} s
   (wp1 wp2 : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
-  ⊢ ((□ ∀ i E e Q, wp1 i E e Q -∗ wp2 i E e Q) →
-     ∀ i E e Q, wp_pre s wp1 i E e Q -∗ wp_pre s wp2 i E e Q)%I.
+  ⊢ ((□ ∀ i E e Φ, wp1 i E e Φ -∗ wp2 i E e Φ) →
+     ∀ i E e Φ, wp_pre s wp1 i E e Φ -∗ wp_pre s wp2 i E e Φ)%I.
 Proof.
   iIntros "#Hmono"; iIntros (i E e1 Φ) "Hwp". rewrite /wp_pre /wp_step /ghost_step.
   iDestruct "Hwp" as "[Hwp | Hwp]".
   - iLeft. destruct (to_val e1) as [v|]; first done.
-    iIntros (ths) "H". iSpecialize ("Hwp" $! ths with "H").
     iIntros (ϕ0 ϕ1) "H". iSpecialize ("Hwp" $! ϕ0 ϕ1 with "H").
     iIntros (Ω γ) "H". iSpecialize ("Hwp" $! Ω γ with "H").
     iIntros (σ1 ns κ κs τ) "H". iSpecialize ("Hwp" $! σ1 ns κ κs τ with "H").
@@ -144,7 +139,6 @@ Proof.
     iFrame.  iSplitL "H4"; first by iApply "Hmono".
     iApply (@big_sepM_impl with "H5"); iIntros "!#" (k e _) "Hwp". by iApply "Hmono".
   - iRight.
-    iIntros (ths) "H". iSpecialize ("Hwp" $! ths with "H").
     iIntros (ϕ) "H". iSpecialize ("Hwp" $! ϕ with "H").
     iIntros (Ω γ) "H". iSpecialize ("Hwp" $! Ω γ with "H").
     iIntros (σ ns κs τ) "H". iSpecialize ("Hwp" $! σ ns κs τ with "H").
@@ -162,97 +156,42 @@ Local Instance wp_pre_mono' `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} s :
   BiMonoPred (wp_pre' s).
 Proof.
   constructor.
-  - iIntros (wp1 wp2 NE1 NE2) "#H". iIntros ((((i&E)&e)&Q)). iRevert (i E e Q).
-    iApply wp_pre_mono. iIntros "!#" (i E e Q). iApply ("H" $! (i,E,e,Q)).
-  - intros wp Hwp n (((i1&E1)&e1)&Q1) (((i2&E2)&e2)&Q2)
+  - iIntros (wp1 wp2 NE1 NE2) "#H". iIntros ((((i&E)&e)&Φ)). iRevert (i E e Φ).
+    iApply wp_pre_mono. iIntros "!#" (i E e Φ). iApply ("H" $! (i,E,e,Φ)).
+  - intros wp Hwp n (((i1&E1)&e1)&Φ1) (((i2&E2)&e2)&Φ2)
       (((?%leibniz_equiv & ?%leibniz_equiv) & ?%leibniz_equiv) & ?); simplify_eq/=.
-    rewrite /curry4 /wp_pre /wp_step /ghost_step. do 30 (f_equiv || done).
-    + do 6 (f_equiv || done). remember (S (num_laters_per_step a5)) as x. clear Heqx. induction x.
+    rewrite /curry4 /wp_pre /wp_step /ghost_step. do 27 (f_equiv || done).
+    + do 6 (f_equiv || done). remember (S (num_laters_per_step a4)) as x. clear Heqx. induction x.
       * simpl. do 16 (f_equiv || done). by apply pair_ne.
       * simpl. do 3 f_equiv. apply IHx.
     + f_equiv. by apply pair_ne.
 Qed.
 
 (* take the least fixpoint of the above definition *)
-Definition wp_def `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness)
-  (i : thread_id) (E : coPset) (e : expr Λ) (Q : val Λ → iProp Σ) : iProp Σ
-  := bi_least_fixpoint (wp_pre' s) (i,E,e,Q).
-Definition wp_aux `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} : seal (@wp_def SI _ Λ Σ _). by eexists. Qed.
-Instance wp' `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} : Wp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id := wp_aux.(unseal).
-Definition wp_eq `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} : wp = @wp_def SI _ Λ Σ _ := wp_aux.(seal_eq).
-
-TODO
-
-Inductive step (Λ : language) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-    step_atomic : ∀ (e1 : expr Λ) (σ1 : state Λ) (e2 : expr Λ) (σ2 : state Λ) (ths : thread_pool Λ) (i : thread_id) 
-                    (efs : thread_pool Λ) (ϕ0 ϕ1 ϕ2 ϕ3 : sched_fuels Λ),
-                    ρ1 = (ths, ϕ0, σ1)
-                    → ths !! i = Some e1
-                      → fuels_fair_update {[i]} ϕ0 ϕ1
-                        → prim_step e1 σ1 (dom ths) κ e2 σ2 efs
-                          → ϕ2 = fuels_thread_yield i e2 ϕ1
-                            → fuels_fair_fork efs ϕ2 ϕ3 → ρ2 = (<[i:=e2]> ths ∪ efs, ϕ3, σ2) → step ρ1 κ ρ2.
-
-
-Definition wp_pre `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness)
-  (wp : coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
-  coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=
-  λ E e1 Φ,
-    match to_val e1 with
-    | Some v =>
-        (∀ σ ns κs τ ϕ Ω, schedfairI (H:=@fuel_wf Λ) ϕ ∗ osat Ω ∗ ofuelI (⫪ Λ) Ω ∗ toI (WF:=@fuel_wf Λ) (H:=language_obl_ps Λ) ∗ state_interp σ ns κs τ ={E}=∗ Φ v)
-    | None =>
-        ⌜ True ⌝
-    end%I.
-
-Set Printing All.
-
-TODO : fix GS defs to make osat etc. to infer WF and stuff.
-
-        
-  | None => ∀ σ1 ns κ κs nt,
-     state_interp σ1 ns (κ ++ κs) nt ={E,∅}=∗
-       ⌜if s is NotStuck then reducible e1 σ1 else True⌝ ∗
-       ∀ e2 σ2 efs, ⌜prim_step e1 σ1 κ e2 σ2 efs⌝ -∗
-         £ (S (num_laters_per_step ns))
-         ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-         state_interp σ2 (S ns) κs (length efs + nt) ∗
-         wp E e2 Φ ∗
-         [∗ list] i ↦ ef ∈ efs, wp ⊤ ef fork_post
-  end%I.
-
-Local Instance wp_pre_contractive `{!irisGS_gen hlc Λ Σ} s : Contractive (wp_pre s).
-Proof.
-  rewrite /wp_pre /= => n wp wp' Hwp E e1 Φ.
-  do 25 (f_contractive || f_equiv).
-  (* FIXME : simplify this proof once we have a good definition and a
-     proper instance for step_fupdN. *)
-  induction num_laters_per_step as [|k IH]; simpl.
-  - repeat (f_contractive || f_equiv); apply Hwp.
-  - by rewrite -IH.
-Qed.
-
-Local Definition wp_def `{!irisGS_gen hlc Λ Σ} : Wp (iProp Σ) (expr Λ) (val Λ) stuckness :=
-  λ s : stuckness, fixpoint (wp_pre s).
-Local Definition wp_aux : seal (@wp_def). Proof. by eexists. Qed.
+Local Definition wp_def `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} : Wp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
+  λ s i E e Φ, (bi_least_fixpoint (wp_pre' s)) (i,E,e,Φ).
+Local Definition wp_aux : seal (@wp_def). by eexists. Qed.
 Definition wp' := wp_aux.(unseal).
-Global Arguments wp' {hlc Λ Σ _}.
+Global Arguments wp' {SI hlc Λ Σ _}.
 Global Existing Instance wp'.
-Local Lemma wp_unseal `{!irisGS_gen hlc Λ Σ} : wp = @wp_def hlc Λ Σ _.
+Local Lemma wp_unseal `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} : wp = @wp_def SI hlc Λ Σ _.
 Proof. rewrite -wp_aux.(seal_eq) //. Qed.
 
 Section wp.
-Context `{!irisGS_gen hlc Λ Σ}.
+Context `{SI : indexT} `{!lirisGS_gen hlc Λ Σ}.
 Implicit Types s : stuckness.
+Implicit Types i : thread_id.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
 Implicit Types v : val Λ.
 Implicit Types e : expr Λ.
 
 (* Weakest pre *)
-Lemma wp_unfold s E e Φ :
-  WP e @ s; E {{ Φ }} ⊣⊢ wp_pre s (wp (PROP:=iProp Σ) s) E e Φ.
+Lemma wp_unfold s i E e Φ :
+  lWP e @ s; i; E {{ Φ }} ⊣⊢ wp_pre s (wp (PROP:=iProp Σ) s) i E e Φ.
 Proof. rewrite wp_unseal. apply (fixpoint_unfold (wp_pre s)). Qed.
+
+TODO
 
 Global Instance wp_ne s E e n :
   Proper (pointwise_relation _ (dist n) ==> dist n) (wp (PROP:=iProp Σ) s E e).

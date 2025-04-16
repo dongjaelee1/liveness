@@ -137,37 +137,37 @@ Section language.
       prim_step e σ τ κ e' σ' efs →
       if a is WeaklyAtomic then irreducible e' σ' (τ ∪ (dom efs)) else is_Some (to_val e').
 
-  Definition thread_pool_inv (ths : thread_pool Λ) (ϕ : sched_fuels Λ) : Prop :=
-    map_Forall2 (λ _ e f, (is_Some (to_val e) ∧ f = None) ∨ (to_val e = None ∧ is_Some f)) ths ϕ.
+  Definition thread_pool_inv (ths : thread_pool Λ) (δ : sched_fuels Λ) : Prop :=
+    map_Forall2 (λ _ e f, (is_Some (to_val e) ∧ f = None) ∨ (to_val e = None ∧ is_Some f)) ths δ.
 
-  Definition fuels_fair_update (S : thread_ids) (ϕ1 ϕ2 : sched_fuels Λ) : Prop :=
+  Definition fuels_fair_update (S : thread_ids) (δ1 δ2 : sched_fuels Λ) : Prop :=
     map_Forall2 (λ i u1 u2,
                    match u1, u2 with
                    | None, None => True
                    | Some f1, Some f2 => if decide (i ∈ S) then True else (fuelR f2 f1)
                    | _, _ => False
-                   end) ϕ1 ϕ2.
+                   end) δ1 δ2.
 
-  Definition fuels_thread_yield (i : thread_id) (e : expr Λ) (ϕ : sched_fuels Λ) : sched_fuels Λ :=
+  Definition fuels_thread_yield (i : thread_id) (e : expr Λ) (δ : sched_fuels Λ) : sched_fuels Λ :=
     match to_val e with
-    | Some v => <[i:=None]>ϕ
-    | None => ϕ
+    | Some v => <[i:=None]>δ
+    | None => δ
     end.
 
-  Definition fuels_fair_fork (efs : thread_pool Λ) (ϕ1 ϕ2 : sched_fuels Λ) : Prop :=
-    ∃ (ϕ' : sched_fuels Λ), (thread_pool_inv efs ϕ') ∧ (ϕ2 = ϕ1 ∪ ϕ').
+  Definition fuels_fair_fork (efs : thread_pool Λ) (δ1 δ2 : sched_fuels Λ) : Prop :=
+    ∃ (δ' : sched_fuels Λ), (thread_pool_inv efs δ') ∧ (δ2 = δ1 ∪ δ').
 
   (** An atomic thread step under scheduler fairness governed by fuel. *)
   Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-  | step_atomic e1 σ1 e2 σ2 ths i efs ϕ0 ϕ1 ϕ2 ϕ3 :
-    ρ1 = (ths, ϕ0, σ1) →
+  | step_atomic e1 σ1 e2 σ2 ths i efs δ0 δ1 δ2 δ3 :
+    ρ1 = (ths, δ0, σ1) →
     ths !! i = Some e1 →
     (* fair scheduling. *)
-    fuels_fair_update {[i]} ϕ0 ϕ1 →
+    fuels_fair_update {[i]} δ0 δ1 →
     prim_step e1 σ1 (dom ths) κ e2 σ2 efs →
-    ϕ2 = fuels_thread_yield i e2 ϕ1 →
-    fuels_fair_fork efs ϕ2 ϕ3 →
-    ρ2 = (<[i:=e2]>ths ∪ efs, ϕ3, σ2) →
+    δ2 = fuels_thread_yield i e2 δ1 →
+    fuels_fair_fork efs δ2 δ3 →
+    ρ2 = (<[i:=e2]>ths ∪ efs, δ3, σ2) →
     step ρ1 κ ρ2.
   Local Hint Constructors step : core.
 
@@ -254,20 +254,20 @@ Section language.
   Proof. rewrite -!not_not_stuck. eauto using not_stuck_fill_inv. Qed.
 
   (** Properties about step. *)
-  Lemma thread_pool_inv_dom ths ϕ :
-    thread_pool_inv ths ϕ → dom ths = dom ϕ.
+  Lemma thread_pool_inv_dom ths δ :
+    thread_pool_inv ths δ → dom ths = dom δ.
   Proof. by eapply map_Forall2_dom_L. Qed.
 
-  Lemma fuels_fair_update_dom S ϕ0 ϕ1 :
-    fuels_fair_update S ϕ0 ϕ1 → dom ϕ0 = dom ϕ1.
+  Lemma fuels_fair_update_dom S δ0 δ1 :
+    fuels_fair_update S δ0 δ1 → dom δ0 = dom δ1.
   Proof. by eapply map_Forall2_dom_L. Qed.
 
-  Lemma fuels_fair_update_thread_pool_inv ths ϕ0 S ϕ1 :
-    thread_pool_inv ths ϕ0 →
-    fuels_fair_update S ϕ0 ϕ1 →
-    thread_pool_inv ths ϕ1.
+  Lemma fuels_fair_update_thread_pool_inv ths δ0 S δ1 :
+    thread_pool_inv ths δ0 →
+    fuels_fair_update S δ0 δ1 →
+    thread_pool_inv ths δ1.
   Proof.
-    revert ϕ0 ϕ1. pattern ths. revert ths. eapply map_ind; intros.
+    revert δ0 δ1. pattern ths. revert ths. eapply map_ind; intros.
     { apply map_Forall2_empty_inv_l in H; subst. apply map_Forall2_empty_inv_l in H0; subst.
       apply map_Forall2_empty.
     }
@@ -281,11 +281,11 @@ Section language.
     - right. by destruct H1.
   Qed.
 
-  Lemma fuels_thread_yield_thread_pool_inv ths e1 ϕ i e2 :
+  Lemma fuels_thread_yield_thread_pool_inv ths e1 δ i e2 :
     ths !! i = Some e1 →
     to_val e1 = None →
-    thread_pool_inv ths ϕ →
-    thread_pool_inv (<[i:=e2]>ths) (fuels_thread_yield i e2 ϕ).
+    thread_pool_inv ths δ →
+    thread_pool_inv (<[i:=e2]>ths) (fuels_thread_yield i e2 δ).
   Proof.
     intros Hs Hv Hi. rewrite <- (insert_delete ths i e1) in Hi; [|done].
     apply map_Forall2_insert_inv_l in Hi; [|by eapply lookup_delete].
@@ -301,13 +301,13 @@ Section language.
         by destruct H.
   Qed.
 
-  Lemma disjoint_union_thread_pool_inv ths ϕ efs ϕ' :
+  Lemma disjoint_union_thread_pool_inv ths δ efs δ' :
     (dom ths ## dom efs) →
-    thread_pool_inv ths ϕ →
-    thread_pool_inv efs ϕ' →
-    thread_pool_inv (ths ∪ efs) (ϕ ∪ ϕ').
+    thread_pool_inv ths δ →
+    thread_pool_inv efs δ' →
+    thread_pool_inv (ths ∪ efs) (δ ∪ δ').
   Proof.
-    revert ϕ. pattern ths. revert ths. eapply map_ind; intros.
+    revert δ. pattern ths. revert ths. eapply map_ind; intros.
     { apply map_Forall2_empty_inv_l in H0; subst. rewrite !left_id_L. auto. }
     eapply map_Forall2_insert_inv_l in H2; [|done]. destruct H2 as (?&?&?&?&?&?). subst.
     assert (Hefs : efs !! i = None).
@@ -315,20 +315,20 @@ Section language.
     rewrite -!insert_union_l. apply map_Forall2_insert.
     { rewrite lookup_union_l; auto. }
     { rewrite lookup_union_l; [auto |]. apply not_elem_of_dom_1. apply not_elem_of_dom_2 in Hefs.
-      replace (dom ϕ') with (dom efs); [auto|].
+      replace (dom δ') with (dom efs); [auto|].
       by eapply map_Forall2_dom_L.
     }
     split; [done|].
     apply H0; try done. set_solver.
   Qed.
 
-  Lemma fuels_fair_fork_thread_pool_inv ths ϕ1 efs ϕ2 :
+  Lemma fuels_fair_fork_thread_pool_inv ths δ1 efs δ2 :
     (dom ths ## dom efs) →
-    thread_pool_inv ths ϕ1 →
-    fuels_fair_fork efs ϕ1 ϕ2 →
-    thread_pool_inv (ths ∪ efs) ϕ2.
+    thread_pool_inv ths δ1 →
+    fuels_fair_fork efs δ1 δ2 →
+    thread_pool_inv (ths ∪ efs) δ2.
   Proof.
-    intros. destruct H1 as (ϕ'&?&?). subst. by apply disjoint_union_thread_pool_inv.
+    intros. destruct H1 as (δ'&?&?). subst. by apply disjoint_union_thread_pool_inv.
   Qed.
 
   Lemma step_thread_pool_inv ρ1 κ ρ2 :
@@ -355,8 +355,8 @@ Section language.
 
   (* TODO: Exclude the case of [n=0], either here, or in [wp_pure] to avoid it
   succeeding when it did not actually do anything. *)
-  Class PureExec (φ : Prop) (n : nat) (e1 e2 : expr Λ) :=
-    pure_exec : φ → relations.nsteps pure_step n e1 e2.
+  Class PureExec (δ : Prop) (n : nat) (e1 e2 : expr Λ) :=
+    pure_exec : δ → relations.nsteps pure_step n e1 e2.
 
   Lemma pure_step_ctx K `{!@LanguageCtx Λ K} e1 e2 :
     pure_step e1 e2 →
@@ -380,9 +380,9 @@ Section language.
   Proof. eauto using rtc_congruence, pure_step_ctx. Qed.
 
   (* We do not make this an instance because it is awfully general. *)
-  Lemma pure_exec_ctx K `{!@LanguageCtx Λ K} φ n e1 e2 :
-    PureExec φ n e1 e2 →
-    PureExec φ n (K e1) (K e2).
+  Lemma pure_exec_ctx K `{!@LanguageCtx Λ K} δ n e1 e2 :
+    PureExec δ n e1 e2 →
+    PureExec δ n (K e1) (K e2).
   Proof. rewrite /PureExec; eauto using pure_step_nsteps_ctx. Qed.
 
   (* This is a family of frequent assumptions for PureExec *)
@@ -424,8 +424,8 @@ Section language.
    or, there is an [i] such that [i]th thread does not participate in the
    pure steps between [t1] and [t3] and [t2] corresponds to taking a step in
    the [i]th thread starting from [t1]. *)
-  Lemma erased_step_pure_step_tp t1 ϕ1 σ1 t2 ϕ2 σ2 t3 :
-    erased_step (t1, ϕ1, σ1) (t2, ϕ2, σ2) →
+  Lemma erased_step_pure_step_tp t1 δ1 σ1 t2 δ2 σ2 t3 :
+    erased_step (t1, δ1, σ1) (t2, δ2, σ2) →
     pure_steps_tp t1 t3 →
     (σ1 = σ2 ∧ pure_steps_tp t2 t3) ∨
     (∃ i e efs e' κ,
@@ -433,7 +433,7 @@ Section language.
       t2 = <[i:=e']>t1 ∪ efs ∧
       prim_step e σ1 (dom t1) κ e' σ2 efs).
   Proof.
-    intros [κ [e σ e' σ' ths i efs ϕ10 ϕ11 ϕ12 ϕ13 t11 Hi Hf0 Hstep Hf' Hf1 t12]] Hps; simplify_eq/=.
+    intros [κ [e σ e' σ' ths i efs δ10 δ11 δ12 δ13 t11 Hi Hf0 Hstep Hf' Hf1 t12]] Hps; simplify_eq/=.
     assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None).
     { exists (delete i ths). split; [by rewrite insert_delete | by apply lookup_delete]. }
     destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi.

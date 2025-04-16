@@ -47,25 +47,25 @@ Notation obl_states' Π := (gmap obl_id (obl_state (Π:=Π))).
 Definition obl_states_step_one `{WFOrderedCM.t A leR addO ltR} {Π} (s : Π) (x : obl_id) : relation obl_states :=
   λ Ω1 Ω2, map_Forall2 (λ k o1 o2, if (decide (k = x)) then obl_state_step s o1 o2 else o1 = o2) Ω1 Ω2.
 
-Notation "'<<' a ↪ b '|' x ',' s '>>'" := (obl_states_step_one s x a b) (at level 60, format "<< a  ↪  b  |  x ,  s >>").
+Notation "a ↪ b @ x ; s" := (obl_states_step_one s x a b) (at level 20, format "a  ↪  b  @  x ;  s ").
 (* We use the transitive closure.
    It's normalization is equivalent to normalization of source_rel. *)
-Notation "'<<' a ↪⁺ b '|' x ',' s '>>'" := ((tc (obl_states_step_one s x)) a b) (at level 60, format "<< a  ↪⁺  b  |  x ,  s >>").
-Notation "'<<' a ↪⋆ b '|' x ',' s '>>'" := ((rtc (obl_states_step_one s x)) a b) (at level 60, format "<< a  ↪⋆  b  |  x ,  s >>").
+Notation "a ↪⁺ b @ x ; s" := ((tc (obl_states_step_one s x)) a b) (at level 20, format "a  ↪⁺  b  @  x ;  s").
+Notation "a ↪⋆ b @ x ; s" := ((rtc (obl_states_step_one s x)) a b) (at level 20, format "a  ↪⋆  b  @  x ;  s").
 
 Inductive obl_states_step_list `{WFOrderedCM.t A leR addO ltR} {Π} (s : Π) : list obl_id → relation obl_states :=
 | obl_states_step_list_nil Ω :
   obl_states_step_list s [] Ω Ω
 | obl_states_step_list_cons hd tl Ω1 Ω2 Ω3 :
-  <<Ω1 ↪ Ω2 | hd, s>> →
+  Ω1 ↪ Ω2 @ hd; s →
   obl_states_step_list s tl Ω2 Ω3 →
   obl_states_step_list s (hd :: tl) Ω1 Ω3.
 
-Notation "'[[' a ↪ b '|' K ',' s ']]'" := (obl_states_step_list s K a b) (at level 60, format "[[ a  ↪  b  |  K ,  s ]]").
+Notation "a ↪ₗ b @ K ; s" := (obl_states_step_list s K a b) (at level 20, format "a  ↪ₗ  b  @  K ;  s").
 (* We use the transitive closure.
    It's normalization is equivalent to normalization of source_rel. *)
-Notation "'[[' a ↪⁺ b '|' K ',' s ']]'" := ((tc (obl_states_step_list s K)) a b) (at level 60, format "[[ a  ↪⁺  b  |  K ,  s ]]").
-Notation "'[[' a ↪⋆ b '|' K ',' s ']]'" := ((rtc (obl_states_step_list s K)) a b) (at level 60, format "[[ a  ↪⋆  b  |  K ,  s ]]").
+Notation "a ↪ₗ⁺ b @ K ; s" := ((tc (obl_states_step_list s K)) a b) (at level 20, format "a  ↪ₗ⁺  b  @  K ;  s").
+Notation "a ↪ₗ⋆ b @ K ; s" := ((rtc (obl_states_step_list s K)) a b) (at level 20, format "a  ↪ₗ⋆  b  @  K ;  s").
 
 Variant obl_states_step `{WFOrderedCM.t A leR addO ltR} {Π} (s : Π) : relation obl_states :=
   | obl_states_step_alloc Ω1 Ω2 i a :
@@ -73,11 +73,11 @@ Variant obl_states_step `{WFOrderedCM.t A leR addO ltR} {Π} (s : Π) : relation
     Ω2 = <[i:=obl_init a]> Ω1 →
     obl_states_step s Ω1 Ω2
   | obl_states_step_progress os Ω1 Ω2 :
-    [[Ω1 ↪ Ω2 | os, s]] →
+    Ω1 ↪ₗ Ω2 @ os; s →
     obl_states_step s Ω1 Ω2.
 
-Notation "'{{' a ↪ b '|' s '}}'" := (obl_states_step s a b) (at level 60, format "{{ a  ↪  b  |  s }}").
+Notation "a ↪ₛ b @ s" := (obl_states_step s a b) (at level 20, format "a  ↪ₛ  b  @  s").
 (* We use the transitive closure.
    It's normalization is equivalent to normalization of source_rel. *)
-Notation "'{{' a ↪⁺ b '|' s '}}'" := ((tc (obl_states_step s)) a b) (at level 60, format "{{ a  ↪⁺  b  |  s }}").
-Notation "'{{' a ↪⋆ b '|' s '}}'" := ((rtc (obl_states_step s)) a b) (at level 60, format "{{ a  ↪⋆  b  |  s }}").
+Notation "a ↪ₛ⁺ b @ s" := ((tc (obl_states_step s)) a b) (at level 20, format "a  ↪ₛ⁺  b  @  s").
+Notation "a ↪ₛ⋆ b @ s" := ((rtc (obl_states_step s)) a b) (at level 20, format "a  ↪ₛ⋆  b  @  s").

@@ -61,10 +61,10 @@ Global Typeclasses Opaque sfS_fuel_credit.
 Global Instance: Params (@sfS_fuel_credit) 9 := {}.
 
 Definition schedfairI `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ}
-  (ϕ : gmap thread_id (option A)) : iProp Σ :=
+  (δ : gmap thread_id (option A)) : iProp Σ :=
   locked
-    (∃ a, own state_name ((λ k, if (decide (k ∈ dom ϕ)) then ε else (debt a 1, ●MN 0)) : discrete_fun _) ∗
-     [∗ map] i ↦ oF ∈ ϕ,
+    (∃ a, own state_name ((λ k, if (decide (k ∈ dom δ)) then ε else (debt a 1, ●MN 0)) : discrete_fun _) ∗
+     [∗ map] i ↦ oF ∈ δ,
        match oF with
        | Some f =>
            (∃ f', ⌜leR f f'⌝ ∗ sfS_fuel_credit i f' ∗ sfS_exec i (1/2)%Qp)
@@ -188,18 +188,18 @@ Section sfi.
     iModIntro. by rewrite discrete_fun_singleton_op.
   Qed.
 
-  Lemma schedfairI_thread_is_exec ϕ i q :
-    schedfairI ϕ ∗ sfS_exec i q
-    ⊢ ∃ f, ⌜ϕ !! i = Some (Some f)⌝.
+  Lemma schedfairI_thread_is_exec δ i q :
+    schedfairI δ ∗ sfS_exec i q
+    ⊢ ∃ f, ⌜δ !! i = Some (Some f)⌝.
   Proof.
     rewrite /schedfairI -!lock. iIntros "((% & Htk & Hs) & He)".
-    iAssert (∃ oF, ⌜ϕ !! i = Some oF⌝)%I with "[Htk He]" as "[% %LU]".
-    { destruct (decide (i ∈ dom ϕ)).
+    iAssert (∃ oF, ⌜δ !! i = Some oF⌝)%I with "[Htk He]" as "[% %LU]".
+    { destruct (decide (i ∈ dom δ)).
       { apply elem_of_dom in e. destruct e. iExists x. done. }
       { iExFalso. rewrite /sfS_exec. iCombine "Htk He" as "H". iPoseProof (own_valid with "H") as "V".
         rewrite /discrete_fun_singleton /discrete_fun_insert.
         iPoseProof (discrete_fun_validI with "V") as "%V". iPureIntro.
-        specialize (V i). rewrite discrete_fun_lookup_op in V. destruct (decide (i ∈ dom ϕ)); [done|].
+        specialize (V i). rewrite discrete_fun_lookup_op in V. destruct (decide (i ∈ dom δ)); [done|].
         destruct (decide (i = i)); [|done]. rewrite rew_const -pair_op pair_valid in V. destruct V as [_ V].
         apply mono_nat_auth_dfrac_op_valid in V. destruct V as [V _]. apply dfrac_valid_own_l in V. done.
       }
@@ -211,18 +211,18 @@ Section sfi.
       iDestruct (sfS_exec_term_false with "[He]") as "%F"; [by iFrame | done].
   Qed.
 
-  Lemma schedfairI_thread_is_term ϕ i :
-    schedfairI ϕ ∗ sfS_term i
-    ⊢ ⌜ϕ !! i = Some None⌝.
+  Lemma schedfairI_thread_is_term δ i :
+    schedfairI δ ∗ sfS_term i
+    ⊢ ⌜δ !! i = Some None⌝.
   Proof.
     rewrite /schedfairI -!lock. iIntros "((% & Htk & Hs) & Ht)".
-    iAssert (∃ oF, ⌜ϕ !! i = Some oF⌝)%I with "[Htk Ht]" as "[% %LU]".
-    { destruct (decide (i ∈ dom ϕ)).
+    iAssert (∃ oF, ⌜δ !! i = Some oF⌝)%I with "[Htk Ht]" as "[% %LU]".
+    { destruct (decide (i ∈ dom δ)).
       { apply elem_of_dom in e. destruct e. iExists x. done. }
       { iExFalso. rewrite /sfS_term. iCombine "Htk Ht" as "H". iPoseProof (own_valid with "H") as "V".
         rewrite /discrete_fun_singleton /discrete_fun_insert.
         iPoseProof (discrete_fun_validI with "V") as "%V". iPureIntro.
-        specialize (V i). rewrite discrete_fun_lookup_op in V. destruct (decide (i ∈ dom ϕ)); [done|].
+        specialize (V i). rewrite discrete_fun_lookup_op in V. destruct (decide (i ∈ dom δ)); [done|].
         destruct (decide (i = i)); [|done]. rewrite rew_const -pair_op pair_valid in V. destruct V as [_ V].
         apply mono_nat_both_valid in V. lia.
       }
@@ -257,10 +257,10 @@ Section sfi.
     rewrite FORK own_op. iDestruct "Htk" as "[Htk Hi]". iFrame.
   Qed.
 
-  Lemma schedfairI_fork ϕ i f :
-    (ϕ !! i = None) →
-    schedfairI ϕ
-    ⊢ |==> schedfairI (<[i:=Some f]>ϕ) ∗
+  Lemma schedfairI_fork δ i f :
+    (δ !! i = None) →
+    schedfairI δ
+    ⊢ |==> schedfairI (<[i:=Some f]>δ) ∗
            sfS_exec i (1/2) ∗ ∃ fb, (* ⌜f /≤ fb⌝ ∗ *) sfS_fuel_bound i fb 1.
   Proof.
     rewrite /schedfairI -!lock. iIntros (LU) "(% & Htk & Hs)".
@@ -280,64 +280,64 @@ Section sfi.
     - iApply big_sepM_insert; [auto|]. iFrame. done.
   Qed.
 
-  Lemma schedfairI_decr_one ϕ i f f' :
-    (ϕ !! i = Some (Some f)) →
+  Lemma schedfairI_decr_one δ i f f' :
+    (δ !! i = Some (Some f)) →
     (f' /< f) →
-    schedfairI ϕ
-    ⊢ |==> schedfairI (<[i:=Some f']>ϕ) ∗ ∃ c, ⌜/0 /< c⌝ ∗ sfS_fuel_credit i c.
+    schedfairI δ
+    ⊢ |==> schedfairI (<[i:=Some f']>δ) ∗ ∃ c, ⌜/0 /< c⌝ ∗ sfS_fuel_credit i c.
   Proof.
     rewrite /schedfairI -!lock. iIntros (LU Hf) "(%&Htk&Hs)".
-    rewrite (dom_insert_lookup_L ϕ i (Some f')); [iFrame | done].
+    rewrite (dom_insert_lookup_L δ i (Some f')); [iFrame | done].
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
     iDestruct "LU" as "(%&%&Hfc&He)".
     assert (∃ f1, (/0 /< f1) ∧ (f' /+ f1) /≤ f'0).
     { apply WFOrderedCM.lt_exists_left in Hf. destruct Hf as (?&?&?). exists x. split; [auto | etransitivity; eauto]. }
     destruct H0 as (f1&Hpos&Hf1). 
     iMod (sfS_fuel_credit_mon_add _ _ _ _ Hf1 with "Hfc") as "[Hfc1 Hfc2]".
-    iPoseProof (big_sepM_insert _ (delete i ϕ) i (Some f') with "[Hs He Hfc1]") as "Hs".
+    iPoseProof (big_sepM_insert _ (delete i δ) i (Some f') with "[Hs He Hfc1]") as "Hs".
     { apply lookup_delete. }
     { iFrame. iExists f'. iFrame. done. }
     iModIntro. rewrite insert_delete_insert. iFrame. done.
   Qed.
 
-  Lemma schedfairI_credit_one_reserved ϕ c :
-    schedfairI ϕ
-    ⊢ |==> schedfairI ϕ ∗
-           (own state_name ((λ k : thread_id, if decide (k ∈ dom ϕ) then ε else (cash c, ε)) : discrete_fun _)).
+  Lemma schedfairI_credit_one_reserved δ c :
+    schedfairI δ
+    ⊢ |==> schedfairI δ ∗
+           (own state_name ((λ k : thread_id, if decide (k ∈ dom δ) then ε else (cash c, ε)) : discrete_fun _)).
   Proof.
     rewrite /schedfairI -!lock. iIntros "(%&Htk&Hs)".
     iMod (own_update with "Htk") as "Htk".
-    { apply (discrete_fun_update _ (λ k, if decide (k ∈ dom ϕ) then ε else (debt (a /+ c) 1 ⋅ cash c, ●MN 0))).
-      intros. destruct (decide (a0 ∈ dom ϕ)); [done|]. apply prod_update; [apply debt_owe|done].
+    { apply (discrete_fun_update _ (λ k, if decide (k ∈ dom δ) then ε else (debt (a /+ c) 1 ⋅ cash c, ●MN 0))).
+      intros. destruct (decide (a0 ∈ dom δ)); [done|]. apply prod_update; [apply debt_owe|done].
     }
-    assert (ADD : ((λ k : thread_id, if decide (k ∈ dom ϕ) then ε else (debt (a /+ c) 1 ⋅ cash c, ●MN 0)) : discrete_fun _)
+    assert (ADD : ((λ k : thread_id, if decide (k ∈ dom δ) then ε else (debt (a /+ c) 1 ⋅ cash c, ●MN 0)) : discrete_fun _)
                     ≡
-                    (((λ k : thread_id, if decide (k ∈ dom ϕ) then ε else (debt (a /+ c) 1, ●MN 0)) : discrete_fun _)
-                     ⋅ ((λ k : thread_id, if decide (k ∈ dom ϕ) then ε else (cash c, ε)) : discrete_fun _))).
-    { intros x. rewrite discrete_fun_lookup_op. destruct (decide (x ∈ dom ϕ)); [by rewrite left_id | by rewrite -pair_op]. }
+                    (((λ k : thread_id, if decide (k ∈ dom δ) then ε else (debt (a /+ c) 1, ●MN 0)) : discrete_fun _)
+                     ⋅ ((λ k : thread_id, if decide (k ∈ dom δ) then ε else (cash c, ε)) : discrete_fun _))).
+    { intros x. rewrite discrete_fun_lookup_op. destruct (decide (x ∈ dom δ)); [by rewrite left_id | by rewrite -pair_op]. }
     rewrite ADD. clear ADD. iDestruct "Htk" as "[Htk Hc]". iModIntro. iFrame.
   Qed.
 
-  Lemma schedfairI_reset_one ϕ i f f0 f' :
-    (ϕ !! i = Some (Some f)) →
-    schedfairI ϕ ∗ sfS_fuel_bound i f0 1
-    ⊢ |==> schedfairI (<[i:=Some f']>ϕ) ∗ sfS_fuel_bound i (f0 /+ f') 1.
+  Lemma schedfairI_reset_one δ i f f0 f' :
+    (δ !! i = Some (Some f)) →
+    schedfairI δ ∗ sfS_fuel_bound i f0 1
+    ⊢ |==> schedfairI (<[i:=Some f']>δ) ∗ sfS_fuel_bound i (f0 /+ f') 1.
   Proof.
     rewrite /schedfairI -!lock. iIntros (LU) "[(%&Htk&Hs) Hfb]".
     rewrite dom_insert_lookup_L; [iFrame|done].
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
     iDestruct "LU" as "(%&%&_&He)".
     iMod (sfS_fuel_owe i _ f' with "Hfb") as "[Hfb Hfc]". iFrame.
-    iPoseProof (big_sepM_insert _ (delete i ϕ) i (Some f') with "[Hs He Hfc]") as "Hs".
+    iPoseProof (big_sepM_insert _ (delete i δ) i (Some f') with "[Hs He Hfc]") as "Hs".
     { apply lookup_delete. }
     { iFrame. iExists f'. iFrame. done. }
     iModIntro. rewrite insert_delete_insert. iFrame.
   Qed.
 
-  Lemma schedfairI_term_one ϕ i oF f :
-    (ϕ !! i = Some oF) →
-    schedfairI ϕ ∗ sfS_exec i (1/2) ∗ sfS_fuel_bound i f 1
-    ⊢ |==> schedfairI (<[i:=None]>ϕ) ∗ sfS_term i.
+  Lemma schedfairI_term_one δ i oF f :
+    (δ !! i = Some oF) →
+    schedfairI δ ∗ sfS_exec i (1/2) ∗ sfS_fuel_bound i f 1
+    ⊢ |==> schedfairI (<[i:=None]>δ) ∗ sfS_term i.
   Proof.
     iIntros (LU) "(Hs&He&Hfb)". iDestruct (schedfairI_thread_is_exec with "[Hs He]") as "[% %]"; [iFrame|subst].
     rewrite /schedfairI -!lock. iDestruct "Hs" as "(%&Htk&Hs)".
@@ -350,7 +350,7 @@ Section sfi.
       rewrite -mono_nat_auth_dfrac_op dfrac_op_own Qp.div_2. by rewrite !left_id.
     }
     iPoseProof (sfS_term_auth_term with "Hta") as "#Hterm".
-    iPoseProof (big_sepM_insert _ (delete i ϕ) i None with "[Hs Hta Hfb]") as "Hs".
+    iPoseProof (big_sepM_insert _ (delete i δ) i None with "[Hs Hta Hfb]") as "Hs".
     { apply lookup_delete. }
     { iFrame. iExists f. iFrame. }
     iModIntro. rewrite insert_delete_insert. iFrame. iSplit; [iExists _; by rewrite dom_insert_lookup_L | done].
