@@ -14,6 +14,8 @@
 theories/prelude/axioms.v
 theories/prelude/wf_structs.v
 
+theories/bi/weakestpre.v
+
 theories/algebra/orderedCM.v
 theories/algebra/wfOrderedCM.v
 theories/algebra/ordinal_WFOrderedCM.v
