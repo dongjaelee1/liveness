@@ -3,7 +3,7 @@ From transfinite.base_logic.lib Require Export fancy_updates.
 From liveness Require Export language.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
-From iris.bi Require Export weakestpre.
+From iris.bi Require Export fixpoint weakestpre.
 From iris.prelude Require Import options.
 Import uPred.
 From liveness Require Import ordinal_WFOrderedCM thread_obligation.
@@ -118,6 +118,65 @@ Definition wp_pre `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness)
       end)
      ∨ (ghost_step E (wp i E e1 Q))
     )%I.
+
+Lemma wp_pre_mono `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} s
+  (wp1 wp2 : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
+  ⊢ ((□ ∀ i E e Q, wp1 i E e Q -∗ wp2 i E e Q) →
+     ∀ i E e Q, wp_pre s wp1 i E e Q -∗ wp_pre s wp2 i E e Q)%I.
+Proof.
+  iIntros "#Hmono"; iIntros (i E e1 Φ) "Hwp". rewrite /wp_pre /wp_step /ghost_step.
+  iDestruct "Hwp" as "[Hwp | Hwp]".
+  - iLeft. destruct (to_val e1) as [v|]; first done.
+    iIntros (ϕ0 ϕ1) "H". iSpecialize ("Hwp" $! ϕ0 ϕ1 with "H").
+    iIntros (Ω γ) "H". iSpecialize ("Hwp" $! Ω γ with "H").
+    iIntros (σ1 ns κ κs τ) "H". iSpecialize ("Hwp" $! σ1 ns κ κs τ with "H").
+    iMod "Hwp" as "(H&Hwp)". iModIntro. iFrame.
+    iIntros (e2 σ2 efs) "H". iSpecialize ("Hwp" $! e2 σ2 efs with "H").
+    iIntros "H". iSpecialize ("Hwp" with "H").
+    iApply (step_fupdN_wand with "Hwp"). iIntros ">Hwp". iModIntro.
+    iIntros (ϕ2 ϕ3) "H". iSpecialize ("Hwp" $! ϕ2 ϕ3 with "H"). iDestruct "Hwp" as "(H0&%&H1&%&H2&H3&H4&H5)".
+    iFrame.  iSplitL "H4"; first by iApply "Hmono".
+    iApply (@big_sepM_impl with "H5"); iIntros "!#" (k e _) "Hwp". by iApply "Hmono".
+  - iRight.
+    iIntros (ϕ) "H". iSpecialize ("Hwp" $! ϕ with "H").
+    iIntros (Ω γ) "H". iSpecialize ("Hwp" $! Ω γ with "H").
+    iIntros (σ ns κs τ) "H". iSpecialize ("Hwp" $! σ ns κs τ with "H").
+    iMod "Hwp" as "(H&Hwp)". iModIntro. iFrame.
+    iDestruct "Hwp" as "(%&H0&%&H1&H2&H3)". iFrame. by iApply "Hmono".
+Qed.
+
+(* Uncurry [wp_pre] and equip its type with an OFE structure *)
+Definition wp_pre' `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) :
+  (prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ) →
+  (prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ)
+  := uncurry4 ∘ wp_pre s ∘ curry4.
+
+Local Instance wp_pre_mono' `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} s :
+  BiMonoPred (wp_pre' s).
+Proof.
+  constructor.
+  - iIntros (wp1 wp2 NE1 NE2) "#H". iIntros ((((i&E)&e)&Q)). iRevert (i E e Q).
+    iApply wp_pre_mono. iIntros "!#" (i E e Q). iApply ("H" $! (i,E,e,Q)).
+  - intros wp Hwp n (((i1&E1)&e1)&Q1) (((i2&E2)&e2)&Q2)
+      (((?%leibniz_equiv & ?%leibniz_equiv) & ?%leibniz_equiv) & ?); simplify_eq/=.
+    rewrite /curry4 /wp_pre /wp_step /ghost_step. do 27 (f_equiv || done).
+    + do 6 (f_equiv || done). remember (S (num_laters_per_step a4)) as x. clear Heqx. induction x.
+      * simpl. do 16 (f_equiv || done). by apply pair_ne.
+      * simpl. do 3 f_equiv. apply IHx.
+    + f_equiv. by apply pair_ne.
+Qed.
+
+(* take the least fixpoint of the above definition *)
+Definition wp_def `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness)
+  (i : thread_id) (E : coPset) (e : expr Λ) (Q : val Λ → iProp Σ) : iProp Σ
+  := bi_least_fixpoint (wp_pre' s) (i,E,e,Q).
+Definition wp_aux`{SI : indexT} `{!lirisGS_gen hlc Λ Σ} : seal (@wp_def SI _ Λ Σ _). by eexists. Qed.
+
+TODO
+Instance wp' {SI} {Σ: gFunctors SI} {A Λ} `{!source Σ A} `{!ref_irisG Λ Σ} : Rwp Λ (iProp Σ) stuckness := rwp_aux.(unseal).
+Definition rwp_eq {SI} {Σ: gFunctors SI} {A Λ} `{!source Σ A} `{!ref_irisG Λ Σ} : rwp = @rwp_def SI Σ A Λ _ _ := rwp_aux.(seal_eq).
+
+
 
 TODO
 
