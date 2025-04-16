@@ -12,7 +12,7 @@ Proof.
 Qed.
 
 
-Notation ps_prop Π := (Π → Prop).
+Definition ps_prop (Π : Type) := (Π → Prop).
 
 Global Instance ps_prop_iff (Π : Type) : Equiv (ps_prop Π) :=
   λ P1 P2, ∀ (s : Π), (P1 s) ↔ (P2 s).
