@@ -187,43 +187,68 @@ Implicit Types v : val Λ.
 Implicit Types e : expr Λ.
 
 (* Weakest pre *)
+Lemma wp_pre_wp_pre' s _wp i E e Φ :
+  wp_pre s _wp i E e Φ = wp_pre' s (λ '(i,E,e,Φ), _wp i E e Φ) (i,E,e,Φ).
+Proof. rewrite /wp_pre' /curry /uncurry4. simpl. rewrite /curry4. f_equal. Qed.
 Lemma wp_unfold s i E e Φ :
   lWP e @ s; i; E {{ Φ }} ⊣⊢ wp_pre s (wp (PROP:=iProp Σ) s) i E e Φ.
-Proof. rewrite wp_unseal. apply (fixpoint_unfold (wp_pre s)). Qed.
+Proof. rewrite wp_unseal. rewrite wp_pre_wp_pre' /wp_def. rewrite (least_fixpoint_unfold (wp_pre' s)). done. Qed.
 
-TODO
-
-Global Instance wp_ne s E e n :
-  Proper (pointwise_relation _ (dist n) ==> dist n) (wp (PROP:=iProp Σ) s E e).
+Lemma wp_strong_ind s Ψ :
+  (∀ n i E e, Proper (pointwise_relation _ (dist n) ==> dist n) (Ψ i E e))
+  → ⊢ (□ (∀ i e E Φ, wp_pre s (λ i E e Φ, Ψ i E e Φ ∧ lWP e @ s; i; E {{ Φ }}) i E e Φ -∗ Ψ i E e Φ)
+       → ∀ i e E Φ, lWP e @ s; i; E {{ Φ }} -∗ Ψ i E e Φ)%I.
 Proof.
-  revert e. induction (lt_wf n) as [n _ IH]=> e Φ Ψ HΦ.
-  rewrite !wp_unfold /wp_pre /=.
-  (* FIXME: figure out a way to properly automate this proof *)
-  (* FIXME: reflexivity, as being called many times by f_equiv and f_contractive
-  is very slow here *)
-  do 25 (f_contractive || f_equiv).
-  (* FIXME : simplify this proof once we have a good definition and a
-     proper instance for step_fupdN. *)
-  induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
-  rewrite IH; [done| simpl in *; lia|]. intros v.
-  eapply dist_le; first apply HΦ. simpl in *; lia.
+  iIntros (HΨ). iIntros "#IH" (i e E Φ) "H". rewrite wp_unseal.
+  set (Ψ' := uncurry4 Ψ :
+         prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ).
+  assert (NonExpansive Ψ').
+  { intros n [[[i1 E1] e1] Φ1] [[[i2 E2] e2] Φ2]
+      [[[?%leibniz_equiv ?%leibniz_equiv] ?%leibniz_equiv] ?]; simplify_eq/=. by apply HΨ. }
+  iApply (least_fixpoint_ind _ Ψ' with "[] H").
+  iIntros "!#" ([[[??] ?] ?]) "H". by iApply "IH".
 Qed.
-Global Instance wp_proper s E e :
-  Proper (pointwise_relation _ (≡) ==> (≡)) (wp (PROP:=iProp Σ) s E e).
+
+Lemma wp_ind s Ψ :
+  (∀ n i E e, Proper (pointwise_relation _ (dist n) ==> dist n) (Ψ i E e))
+  → ⊢ (□ (∀ i e E Φ, wp_pre s (λ i E e Φ, Ψ i E e Φ) i E e Φ -∗ Ψ i E e Φ)
+       → ∀ i e E Φ, lWP e @ s; i; E {{ Φ }} -∗ Ψ i E e Φ)%I.
+Proof.
+  iIntros (HΨ) "#H". iApply wp_strong_ind. iIntros "!>" (i e E Φ) "Hrwp".
+  iApply "H". iApply (wp_pre_mono with "[] Hrwp"). clear.
+  iIntros "!>" (i E e Φ) "[$ _]".
+Qed.
+
+Global Instance wp_ne s i E e n :
+  Proper (pointwise_relation _ (dist n) ==> dist n) (wp (PROP:=iProp Σ) s i E e).
+Proof.
+  intros Φ1 Φ2 HΦ. rewrite !wp_unseal. by apply (least_fixpoint_ne _), pair_ne, HΦ.
+Qed.
+Global Instance wp_proper s i E e :
+  Proper (pointwise_relation _ (≡) ==> (≡)) (wp (PROP:=iProp Σ) s i E e).
 Proof.
   by intros Φ Φ' ?; apply equiv_dist=>n; apply wp_ne=>v; apply equiv_dist.
 Qed.
-Global Instance wp_contractive s E e n :
-  TCEq (to_val e) None →
-  Proper (pointwise_relation _ (dist_later n) ==> dist n) (wp (PROP:=iProp Σ) s E e).
-Proof.
-  intros He Φ Ψ HΦ. rewrite !wp_unfold /wp_pre He /=.
-  do 24 (f_contractive || f_equiv).
-  (* FIXME : simplify this proof once we have a good definition and a
-     proper instance for step_fupdN. *)
-  induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk.
-  by do 4 f_equiv.
-Qed.
+
+Lemma wp_value' s i E Φ v : Φ v ⊢ lWP of_val v @ s; i; E {{ Φ }}.
+Proof. iIntros "HΦ". rewrite wp_unfold /wp_pre to_of_val. iLeft. done. Qed.
+
+TODO
+
+(* FIXME : ghost_step part is not contractive? *)
+(* Global Instance wp_contractive s i E e n : *)
+(*   TCEq (to_val e) None → *)
+(*   Proper (pointwise_relation _ (dist_later n) ==> dist n) (wp (PROP:=iProp Σ) s i E e). *)
+(* Proof. *)
+(*   intros He Φ Ψ HΦ. rewrite !wp_unfold /wp_pre /wp_step /ghost_step He /=. *)
+(*   do 28 (f_contractive || f_equiv). *)
+(*   - do 7 (f_contractive || f_equiv). *)
+(*     (* FIXME : simplify this proof once we have a good definition and a *)
+(*      proper instance for step_fupdN. *) *)
+(*     induction num_laters_per_step as [|k IHk]; simpl; last by rewrite IHk. *)
+(*     by do 16 f_equiv. *)
+(*   - *)
+(* Qed. *)
 
 Lemma wp_value_fupd' s E Φ v : WP of_val v @ s; E {{ Φ }} ⊣⊢ |={E}=> Φ v.
 Proof. rewrite wp_unfold /wp_pre to_of_val. auto. Qed.
