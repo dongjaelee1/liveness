@@ -39,6 +39,9 @@ Next Obligation.
   }
 Qed.
 
+Global Program Instance ord_wfocm_pack : WFOCM.pack Ord.t :=
+  WFOCM.Build_pack _ _ _ _ ord_wfocm.
+
 Section ord_facts.
 
   Import Hessenberg Jacobsthal.

@@ -15,7 +15,7 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
   (** Invariants. *)
   #[global] liris_invGS :: invGS_gen hlc Σ;
   (** Liveness obligation interpretation. *)
-  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm) (Π Λ) Σ;
+  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (Π Λ) Σ;
   (** Scheduler fairness interpretation. *)
   #[global] liris_schedfairGS :: schedfairGS.schedfairGS (WF:=@fuel_wf Λ) Σ;
   (** Connecting liveness obligations and scheduler fairness. *)
@@ -61,7 +61,7 @@ Global Arguments LirisG {SI hlc Λ Σ}.
 Notation lirisGS := (lirisGS_gen HasLc).
 Notation "'⌈' Λ '⌉'" := (Ord.from_wf_set (@WFOCM.lt_wf _ _ _ _ (@fuel_wf Λ))).
 Notation schedfairIL Λ := (schedfairI (H:=@fuel_wf Λ)).
-Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (Π:=Π Λ)).
+Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=Π Λ)).
 
 (** The predicate we take the fixpoint of in order to define the LWP. *)
 (** In the step case, we both provide [S (num_laters_per_step ns)]

@@ -53,9 +53,8 @@ Global Typeclasses Opaque toL_thread.
 Global Instance: Params (@toL_thread) 4 := {}.
 
 (* thread fork cases: sched fuel for new threads? *)
-Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {Π} {Σ}
-  `{@osatGS.osatGS SI Ord.t _ _ _ _ Π Σ} `{@schedfairGS.schedfairGS SI A _ _ _ WF Σ}
-  (* `{@ofuelGS.ofuelGS SI Σ} *)
+Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
+  `{@osatGS.osatGS SI Ord.t _ ps Σ} `{@schedfairGS.schedfairGS SI A _ _ _ WF Σ}
   `{!threadoblGS Σ}
   (γ : gmap thread_id (list obl_id))
   : iProp Σ :=

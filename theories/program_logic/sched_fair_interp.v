@@ -300,7 +300,7 @@ Section sfi.
     iModIntro. rewrite insert_delete_insert. iFrame. done.
   Qed.
 
-  Lemma schedfairI_credit_one_reserved δ c :
+  Lemma schedfairI_credit_of_reserved δ c :
     schedfairI δ
     ⊢ |==> schedfairI δ ∗
            (own state_name ((λ k : thread_id, if decide (k ∈ dom δ) then ε else (cash c, ε)) : discrete_fun _)).
