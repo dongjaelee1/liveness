@@ -7,23 +7,23 @@ From liveness Require Import bank language.
 
 Module schedfairGS.
 
-  Class schedfairGpreS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
+  Class schedfairGpreS `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     SchedfairGpreS {
         schedfairGpreS_state : inG Σ (discrete_funUR (λ (k : thread_id), (prodUR bankUR mono_natUR)));
       }.
 
-  Class schedfairGS `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
+  Class schedfairGS `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
     SchedfairG {
         schedfair_inG : schedfairGpreS Σ;
         state_name : gname;
       }.
 
   (* Do we need discrete_fun version of gmapTRF? Why do we even need Functor? *)
-  Definition schedfairΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} : gFunctors :=
+  Definition schedfairΣ `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} : gFunctors :=
     #[GFunctor (discrete_funUR (λ (k : thread_id), prodUR bankUR mono_natUR))
       ].
 
-  Global Instance subG_schedfairΣ `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Σ} : subG schedfairΣ Σ → (schedfairGpreS Σ).
+  Global Instance subG_schedfairΣ `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {Σ} : subG schedfairΣ Σ → (schedfairGpreS Σ).
   Proof.
     solve_inG.
   Qed.
@@ -35,32 +35,32 @@ Import schedfairGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances schedfair_inG schedfairGpreS_state.
 
-Definition sfS_exec `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (q : Qp) : iProp Σ :=
+Definition sfS_exec `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (q : Qp) : iProp Σ :=
   own state_name (discrete_fun_singleton i (ε, ●MN{#q} 0)).
 Global Typeclasses Opaque sfS_exec.
 Global Instance: Params (@sfS_exec) 9 := {}.
 
-Definition sfS_term_auth `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) : iProp Σ :=
+Definition sfS_term_auth `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) : iProp Σ :=
   own state_name (discrete_fun_singleton i (ε, ●MN 1)).
 Global Typeclasses Opaque sfS_term_auth.
 Global Instance: Params (@sfS_term_auth) 9 := {}.
 
-Definition sfS_term `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) : iProp Σ :=
+Definition sfS_term `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) : iProp Σ :=
   own state_name (discrete_fun_singleton i (ε, ◯MN 1)).
 Global Typeclasses Opaque sfS_term.
 Global Instance: Params (@sfS_term) 9 := {}.
 
-Definition sfS_fuel_bound `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (a : A) (q : Qp) : iProp Σ :=
+Definition sfS_fuel_bound `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (a : A) (q : Qp) : iProp Σ :=
   own state_name (discrete_fun_singleton i (debt a q, ε)).
 Global Typeclasses Opaque sfS_fuel_bound.
 Global Instance: Params (@sfS_fuel_bound) 9 := {}.
 
-Definition sfS_fuel_credit `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (a : A) : iProp Σ :=
+Definition sfS_fuel_credit `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ} (i : thread_id) (a : A) : iProp Σ :=
   own state_name (discrete_fun_singleton i (cash a, ε)).
 Global Typeclasses Opaque sfS_fuel_credit.
 Global Instance: Params (@sfS_fuel_credit) 9 := {}.
 
-Definition schedfairI `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ}
+Definition schedfairI `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ}
   (δ : gmap thread_id (option A)) : iProp Σ :=
   locked
     (∃ a, own state_name ((λ k, if (decide (k ∈ dom δ)) then ε else (debt a 1, ●MN 0)) : discrete_fun _) ∗
@@ -74,17 +74,17 @@ Definition schedfairI `{SI : indexT} `{WFOrderedCM.t A leR addO ltR} `{!schedfai
     )%I.
 
 Section sfi.
-  Context `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!schedfairGS Σ}.
+  Context `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} `{!schedfairGS Σ}.
 
   Global Instance sfS_term_persistent i : Persistent (sfS_term i).
   Proof. rewrite /sfS_term. apply _. Qed.
 
-  Local Infix "/=" := OrderedCM.eq (at level 70).
+  Local Infix "/=" := OCM.eq (at level 70).
   Local Infix "/≤" := leR (at level 70).
   Local Infix "/+" := addO (at level 70).
   Local Infix "/<" := ltR (at level 70).
-  Local Infix "/∧" := OrderedCM.meet (at level 70).
-  Local Notation "/0" := OrderedCM.unit.
+  Local Infix "/∧" := OCM.meet (at level 70).
+  Local Notation "/0" := OCM.unit.
 
   Lemma sfS_exec_term_false i q :
     sfS_exec i q ∗ sfS_term i ⊢ False.
@@ -274,7 +274,7 @@ Section sfi.
     }
     iMod (sfS_fuel_owe i _ f with "Hfb") as "[Hfb Hfc]".
     iModIntro. iFrame.
-    (* iSplit; [|iPureIntro; apply OrderedCM.add_base_right_le]. *)
+    (* iSplit; [|iPureIntro; apply OCM.add_base_right_le]. *)
     iExists a. iSplitL "Htk".
     - rewrite dom_insert_L. done.
     - iApply big_sepM_insert; [auto|]. iFrame. done.
@@ -291,7 +291,7 @@ Section sfi.
     iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
     iDestruct "LU" as "(%&%&Hfc&He)".
     assert (∃ f1, (/0 /< f1) ∧ (f' /+ f1) /≤ f'0).
-    { apply WFOrderedCM.lt_exists_left in Hf. destruct Hf as (?&?&?). exists x. split; [auto | etransitivity; eauto]. }
+    { apply WFOCM.lt_exists_left in Hf. destruct Hf as (?&?&?). exists x. split; [auto | etransitivity; eauto]. }
     destruct H0 as (f1&Hpos&Hf1). 
     iMod (sfS_fuel_credit_mon_add _ _ _ _ Hf1 with "Hfc") as "[Hfc1 Hfc2]".
     iPoseProof (big_sepM_insert _ (delete i δ) i (Some f') with "[Hs He Hfc1]") as "Hs".
@@ -359,15 +359,15 @@ Section sfi.
 End sfi.
 
 (* Allocation of an initial obligation protocol. *)
-Lemma schedfairI_alloc `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} `{!schedfairGpreS Σ} : ⊢ |==> ∃ _ : schedfairGS Σ, schedfairI ∅.
+Lemma schedfairI_alloc `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} `{!schedfairGpreS Σ} : ⊢ |==> ∃ _ : schedfairGS Σ, schedfairI ∅.
 Proof.
   iIntros.
-  iMod (own_alloc ((λ k, if (decide (k ∈ dom (∅ : gmap thread_id (option A)))) then ε else (debt OrderedCM.unit 1, ●MN 0)) : discrete_fun _)) as (γS) "HS".
+  iMod (own_alloc ((λ k, if (decide (k ∈ dom (∅ : gmap thread_id (option A)))) then ε else (debt OCM.unit 1, ●MN 0)) : discrete_fun _)) as (γS) "HS".
   { intros x. destruct (decide (x ∈ dom ∅)).
     - apply ucmra_unit_valid.
     - apply pair_valid. split; [by apply bank_valid_debt | apply mono_nat_auth_valid].
   }
   iModIntro; iExists (SchedfairG SI _ _ _ _ WF _ _ γS).
   rewrite /schedfairI -lock.
-  iExists OrderedCM.unit. rewrite big_opM_empty. by iFrame.
+  iExists OCM.unit. rewrite big_opM_empty. by iFrame.
 Qed.

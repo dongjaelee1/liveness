@@ -2,35 +2,35 @@ From stdpp Require Import base.
 From iris.algebra Require Export cmra.
 From iris.algebra Require Import proofmode_classes updates.
 From iris.prelude Require Import options.
-From liveness Require Import orderedCM.
+From liveness Require Import ocm.
 
 (** Reference: "Module Fuel" in Lilo and FOS. *)
 
-Variant bank `{OrderedCM.t A leR addO} : Type :=
+Variant bank `{OCM.t A leR addO} : Type :=
   | BankCash (s : quotient.t leR addO) (* sub *)
   | BankDebt (e : quotient.t leR addO) (s : quotient.t leR addO) (q : Qp) (* entire, sub, q *)
 .
 
-Definition debt `{OrderedCM.t A leR addO} (a : A) (q : Qp) : @bank A leR addO _ :=
-  BankDebt (quotient.from_monoid a) (quotient.from_monoid OrderedCM.unit) q.
+Definition debt `{OCM.t A leR addO} (a : A) (q : Qp) : @bank A leR addO _ :=
+  BankDebt (quotient.from_monoid a) (quotient.from_monoid OCM.unit) q.
 
-Definition cash `{OrderedCM.t A leR addO} (a : A) : @bank A leR addO _ :=
+Definition cash `{OCM.t A leR addO} (a : A) : @bank A leR addO _ :=
   BankCash (quotient.from_monoid a).
 
-Definition bank_unit `{OrderedCM.t A leR addO} : @bank A leR addO _ :=
-  cash OrderedCM.unit.
+Definition bank_unit `{OCM.t A leR addO} : @bank A leR addO _ :=
+  cash OCM.unit.
 
 Section bank.
   Context `{SI : indexT}.
-  Context `{OCM : OrderedCM.t A leR addO}.
+  Context `{OCM : OCM.t A leR addO}.
   Canonical Structure bankO := leibnizO bank.
 
   Local Infix "≤" := leR (at level 70).
-  Local Notation "0" := OrderedCM.unit.
+  Local Notation "0" := OCM.unit.
   Local Infix "⊕" := addO (at level 70).
-  Local Infix "≃" := OrderedCM.eq (at level 70).
-  Local Infix "⩓" := OrderedCM.meet (at level 70).
-  Local Infix "⩔" := OrderedCM.join (at level 70).
+  Local Infix "≃" := OCM.eq (at level 70).
+  Local Infix "⩓" := OCM.meet (at level 70).
+  Local Infix "⩔" := OCM.join (at level 70).
 
   Local Infix "/≤" := quotient.le (at level 70).
   Local Infix "/⊕" := quotient.add (at level 70).
@@ -147,15 +147,15 @@ Section bank.
     - rewrite /valid /bank_valid_instance. intros x y V. destruct x, y; simpl; auto.
       + rewrite bank_op_debt_cash in V. destruct V as [H1 H2]. split; [|auto].
         etransitivity; [|eauto]. destruct (quotient.from_monoid_exist s); destruct (quotient.from_monoid_exist s0); subst.
-        rewrite quotient.from_monoid_add. apply quotient.from_monoid_le. apply OrderedCM.add_base_left_le.
+        rewrite quotient.from_monoid_add. apply quotient.from_monoid_le. apply OCM.add_base_left_le.
       + rewrite bank_op_debt in V. destruct V as [H1 H2]. split.
         * destruct (quotient.from_monoid_exist s); destruct (quotient.from_monoid_exist s0);
             destruct (quotient.from_monoid_exist e); destruct (quotient.from_monoid_exist e0); subst.
           rewrite quotient.from_monoid_add quotient.from_monoid_meet in H1.
           apply quotient.from_monoid_le. rewrite quotient.from_monoid_le in H1.
-          etransitivity; [eapply OrderedCM.add_base_left_le|].
+          etransitivity; [eapply OCM.add_base_left_le|].
           etransitivity; [eapply H1|].
-          eapply OrderedCM.meet_left_le.
+          eapply OCM.meet_left_le.
         * etransitivity; [|eauto]. eapply Qp.le_add_l.
   Qed.
   Canonical Structure bankR := discreteR bank bank_ra_mixin.

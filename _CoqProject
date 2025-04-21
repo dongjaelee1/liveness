@@ -16,19 +16,19 @@ theories/prelude/wf_structs.v
 
 theories/bi/weakestpre.v
 
-theories/algebra/orderedCM.v
-theories/algebra/wfOrderedCM.v
-theories/algebra/ordinal_WFOrderedCM.v
-theories/algebra/nat_WFOrderedCM.v
+theories/algebra/ocm.v
+theories/algebra/wfocm.v
+theories/algebra/ordinal_wfocm.v
+theories/algebra/nat_wfocm.v
 theories/algebra/bank.v
 theories/algebra/bcred.v
 theories/algebra/obligation.v
 
 theories/base_logic/osat.v
-theories/base_logic/upred_measure.v
+#theories/base_logic/upred_measure.v
 
 theories/program_logic/language.v
 theories/program_logic/sched_fair_interp.v
-theories/program_logic/obligation_fuel.v
 theories/program_logic/thread_obligation.v
 theories/program_logic/weakestpre.v
+#theories/program_logic/obligation_fuel.v

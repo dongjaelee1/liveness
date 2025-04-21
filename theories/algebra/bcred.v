@@ -2,33 +2,33 @@ From stdpp Require Import base.
 From iris.algebra Require Export cmra.
 From iris.algebra Require Import proofmode_classes updates.
 From iris.prelude Require Import options.
-From liveness Require Import orderedCM.
+From liveness Require Import ocm.
 
 (** Bounded credit. *)
 (** Reference: "Module CounterRA" in Lilo and FOS. *)
-Variant bcred `{OrderedCM.t A leR addO} : Type :=
+Variant bcred `{OCM.t A leR addO} : Type :=
   BCred : partition.t leR addO → quotient.t leR addO → bcred.
 
-Definition credit_bound `{OrderedCM.t A leR addO} (a : A) : bcred :=
+Definition credit_bound `{OCM.t A leR addO} (a : A) : bcred :=
   BCred (partition.from_monoid a) quotient.unit.
 
-Definition credit `{OrderedCM.t A leR addO} (a : A) : bcred :=
+Definition credit `{OCM.t A leR addO} (a : A) : bcred :=
   BCred partition.top (quotient.from_monoid a).
 
-Definition bcred_unit `{OrderedCM.t A leR addO} : bcred :=
+Definition bcred_unit `{OCM.t A leR addO} : bcred :=
   BCred partition.top quotient.unit.
 
 Section bcred.
   Context `{SI : indexT}.
-  Context `{OCM : OrderedCM.t A leR addO}.
+  Context `{OCM : OCM.t A leR addO}.
   Canonical Structure bcredO := leibnizO bcred.
 
   Local Infix "≤" := leR (at level 70).
-  Local Notation "0" := OrderedCM.unit.
+  Local Notation "0" := OCM.unit.
   Local Infix "⊕" := addO (at level 70).
-  Local Infix "≃" := OrderedCM.eq (at level 70).
-  Local Infix "⩓" := OrderedCM.meet (at level 70).
-  Local Infix "⩔" := OrderedCM.join (at level 70).
+  Local Infix "≃" := OCM.eq (at level 70).
+  Local Infix "⩓" := OCM.meet (at level 70).
+  Local Infix "⩔" := OCM.join (at level 70).
 
   Local Infix "/≤" := quotient.le (at level 70).
   Local Infix "/⊕" := quotient.add (at level 70).
@@ -96,7 +96,7 @@ Section bcred.
       rewrite bcred_op in V. destruct V as (a&Hp&Hq). simpl in *.
       destruct Hp. destruct Hq as (q0&q1&Ha0&Ha1&LE). exists a; split; [auto|].
       destruct t0; simpl in *. destruct generated. apply H1 in Ha0. apply H1.
-      etransitivity; [eauto|]. etransitivity; [|eauto]. apply OrderedCM.add_base_left_le.
+      etransitivity; [eauto|]. etransitivity; [|eauto]. apply OCM.add_base_left_le.
   Qed.
   Canonical Structure bcredR := discreteR bcred bcred_ra_mixin.
 
@@ -120,17 +120,17 @@ Section bcred.
   Proof using SI. destruct mb; simpl; auto. by rewrite right_id_L. Qed.
 
   Lemma credit_bound_valid a : ✓ (credit_bound a).
-  Proof. rewrite bcred_valid. simpl. exists a. split; [reflexivity | apply OrderedCM.unit_le]. Qed.
+  Proof. rewrite bcred_valid. simpl. exists a. split; [reflexivity | apply OCM.unit_le]. Qed.
   Lemma credit_valid a : ✓ (credit a).
   Proof. rewrite bcred_valid. simpl. exists a. done. Qed.
   Lemma credit_bound_credit_valid a b : ✓ (credit_bound a ⋅ credit b) ↔ (∃ c, c ≤ a ∧ b ≤ c).
   Proof using.
     rewrite bcred_valid. simpl. split; [intros (a0&[LE0 _]&a1&a2&_&LEb&LE1) | intros (c&LE0&LE1)].
     - exists a0. split; [auto|]. etransitivity; [|eauto]. etransitivity; [eauto|].
-      apply OrderedCM.add_base_right_le.
+      apply OCM.add_base_right_le.
     - exists b. split.
       + split; [|auto]. etransitivity; eauto.
-      + exists 0, b. esplit; [done|]. esplit; [done|]. apply OrderedCM.add_unit_left_le.
+      + exists 0, b. esplit; [done|]. esplit; [done|]. apply OCM.add_unit_left_le.
   Qed.
   Lemma credit_bound_credit_valid_eq a : ✓ (credit_bound a ⋅ credit a).
   Proof. apply credit_bound_credit_valid. by exists a. Qed.
@@ -156,7 +156,7 @@ Section bcred.
     - rewrite right_id_L. apply credit_valid.
   Qed.
 
-  Lemma credit_eq a0 a1 (EQ : OrderedCM.eq a0 a1) : credit a0 = credit a1.
+  Lemma credit_eq a0 a1 (EQ : OCM.eq a0 a1) : credit a0 = credit a1.
   Proof. rewrite /credit. f_equal. by apply quotient.from_monoid_eq. Qed.
 
   Lemma credit_split a0 a1 : credit (a0 ⊕ a1) = credit a0 ⋅ credit a1.
@@ -179,13 +179,13 @@ Section bcred.
       rewrite bcred_valid in H. simpl in H. destruct H as (y&[Ha Hb]&(y0&y1&Hc&Hd&He)). 
       exists (credit_bound x). split.
       + esplit. split; [eauto|]. etransitivity; [|eauto]. etransitivity; [|eauto].
-        eapply OrderedCM.add_le_proper; eauto.
+        eapply OCM.add_le_proper; eauto.
       + rewrite bcred_op left_id_L. rewrite bcred_valid. simpl. exists x. split; [split; first done|done].
         eapply partition.closed; [|eauto]. etransitivity; [|eauto]. etransitivity; [eauto|].
-        apply OrderedCM.add_base_right_le.
+        apply OCM.add_base_right_le.
     - rewrite right_id_L in H. apply credit_bound_credit_valid in H. destruct H as (c&LE0&LE1).
       exists (credit_bound 0). split.
-      + exists 0. split; [eauto|]. etransitivity; [by apply OrderedCM.add_unit_right_le|].
+      + exists 0. split; [eauto|]. etransitivity; [by apply OCM.add_unit_right_le|].
         etransitivity; first eauto. auto.
       + apply credit_bound_valid.
   Qed.

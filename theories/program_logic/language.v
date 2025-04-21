@@ -2,7 +2,7 @@ From stdpp Require Import gmap.
 From iris.algebra Require Export ofe.
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
-From liveness Require Export wfOrderedCM.
+From liveness Require Export wfocm.
 
 Definition thread_id := positive.
 Canonical Structure thread_idO `{SI : indexT} := leibnizO thread_id.
@@ -27,7 +27,7 @@ Section language_mixin.
     mixin_to_of_val v : to_val (of_val v) = Some v;
     mixin_of_to_val e v : to_val e = Some v → of_val v = e;
     mixin_val_stuck e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → to_val e = None;
-    mixin_fuel_wf :: @WFOrderedCM.t _ fuel_leR fuel_addO fuelR;
+    mixin_fuel_wf :: @WFOCM.t _ fuel_leR fuel_addO fuelR;
     mixin_fork_thread_ids e σ τ κ e' σ' efs :
       prim_step e σ τ κ e' σ' efs → (τ ## (dom efs))
   }.
@@ -104,7 +104,7 @@ Section language.
   Proof. apply language_mixin. Qed.
   Lemma val_stuck e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → to_val e = None.
   Proof. apply language_mixin. Qed.
-  Lemma fuel_wf : WFOrderedCM.t (@fuel_leR Λ) (@fuel_addO Λ) (@fuelR Λ).
+  Lemma fuel_wf : WFOCM.t (@fuel_leR Λ) (@fuel_addO Λ) (@fuelR Λ).
   Proof. apply language_mixin. Qed.
   Lemma fork_thread_ids e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → (τ ## (dom efs)).
   Proof. apply language_mixin. Qed.

@@ -1,24 +1,24 @@
 From stdpp Require Import base.
-From liveness Require Export orderedCM.
+From liveness Require Export ocm.
 
-Module WFOrderedCM.
+Module WFOCM.
   Class t {A : Type} (leR : A -> A -> Prop) (addO : A -> A -> A) (ltR : A -> A -> Prop) := {
-      #[global] orderedCM :: OrderedCM.t leR addO;
+      #[global] ocm :: OCM.t leR addO;
       lt_wf : well_founded ltR;
-      lt_exists_left : forall a c, (exists b, (ltR OrderedCM.unit b) /\ (leR (addO a b) c)) <-> (ltR a c);
+      lt_exists_left : forall a c, (exists b, (ltR OCM.unit b) /\ (leR (addO a b) c)) <-> (ltR a c);
     }.
 
   Section properties.
     Context `{t A leR addO ltR}.
 
-    Lemma lt_exists_right : forall a c, (exists b, (ltR OrderedCM.unit b) /\ (leR (addO b a) c)) <-> (ltR a c).
+    Lemma lt_exists_right : forall a c, (exists b, (ltR OCM.unit b) /\ (leR (addO b a) c)) <-> (ltR a c).
     Proof using Type*.
       intros a c. split; intros.
       { destruct H0 as (b&LT&LE). apply lt_exists_left. exists b.
-        split; [auto|]. etransitivity. eapply OrderedCM.add_comm_le. auto.
+        split; [auto|]. etransitivity. eapply OCM.add_comm_le. auto.
       }
       { apply lt_exists_left in H0. destruct H0 as (b&LT&LE). exists b.
-        split; [auto|]. etransitivity. eapply OrderedCM.add_comm_le. auto.
+        split; [auto|]. etransitivity. eapply OCM.add_comm_le. auto.
       }
     Qed.
 
@@ -38,4 +38,12 @@ Module WFOrderedCM.
     Qed.
 
   End properties.
-End WFOrderedCM.
+
+  Class pack (A : Type) := {
+      leR : A -> A -> Prop;
+      addO : A -> A -> A;
+      ltR : A -> A -> Prop;
+      #[global] wfocm :: @t A leR addO ltR;
+    }.
+
+End WFOCM.

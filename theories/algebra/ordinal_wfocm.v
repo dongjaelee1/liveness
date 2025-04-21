@@ -1,11 +1,11 @@
 From stdpp Require Import base.
-From liveness Require Export wfOrderedCM.
+From liveness Require Export wfocm.
 From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
 
 Global Notation "'ω'" := Ord.omega.
 
-Global Program Instance ord_OrderedCM : OrderedCM.t Ord.le Hessenberg.add :=
-  OrderedCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.
+Global Program Instance ord_OCM : OCM.t Ord.le Hessenberg.add :=
+  OCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.
 Next Obligation.
   repeat intro. eapply ClassicOrd.total_le.
 Qed.
@@ -22,11 +22,11 @@ Next Obligation.
   eapply Hessenberg.add_base_l.
 Qed.
 
-Lemma ord_OrderedCM_eq (a0 a1 : Ord.t) : OrderedCM.eq a0 a1 <-> Ord.eq a0 a1.
+Lemma ord_OCM_eq (a0 a1 : Ord.t) : OCM.eq a0 a1 <-> Ord.eq a0 a1.
 Proof. auto. Qed.
 
-Global Program Instance ord_WFOrderedCM : WFOrderedCM.t Ord.le Hessenberg.add Ord.lt :=
-  WFOrderedCM.Build_t _ _ _ _ _ _ _.
+Global Program Instance ord_wfocm : WFOCM.t Ord.le Hessenberg.add Ord.lt :=
+  WFOCM.Build_t _ _ _ _ _ _ _.
 Next Obligation.
   apply Ord.lt_well_founded.
 Qed.
@@ -51,7 +51,7 @@ Section ord_facts.
   Lemma ord_lt_one (o0 o1 : Ord.t) :
     (o0 < o1)%ord -> ((o0 ⊕ (Ord.S Ord.O)) <= o1)%ord.
   Proof.
-    intros H. apply WFOrderedCM.lt_exists_left in H. destruct H as (b&H0&H1).
+    intros H. apply WFOCM.lt_exists_left in H. destruct H as (b&H0&H1).
     etransitivity; [|eauto]. apply Hessenberg.le_add_r.
     apply Ord.S_supremum. auto.
   Qed.
@@ -143,29 +143,31 @@ End Jacobsthal_expn_nat_facts.
 (** Layer structure. (Ord.S u) is the "unit" of the construction. *)
 Fixpoint layer (u : Ord.t) (i : nat) : Ord.t :=
   match i with
-  | O => (((Ord.S u) × ω) ↑ ω)%ord
-  | S j => ((layer u j) ↑ ω)%ord
+  | O => ((((Ord.S u) × ω) ↑ ω) ⊕ u)%ord
+  | S j => (((layer u j) ↑ ω) ⊕ u)%ord
   end.
 
 Notation "'ℓ[' u '](' i ')'" := (layer u i) (format "ℓ[ u ]( i )").
 
 Section layer_facts.
 
-  Import Jacobsthal.
+  Import Hessenberg Jacobsthal.
 
-  Lemma layer_unfold_zero u : ℓ[u](0) = (((Ord.S u) × ω) ↑ ω)%ord.
+  Lemma layer_unfold_zero u : ℓ[u](0) = ((((Ord.S u) × ω) ↑ ω) ⊕ u)%ord.
   Proof using. reflexivity. Qed.
 
   Lemma layer_unfold_S u :
-    forall i, ℓ[u](S i) = (ℓ[u](i) ↑ ω)%ord.
+    forall i, ℓ[u](S i) = ((ℓ[u](i) ↑ ω) ⊕ u)%ord.
   Proof using. auto. Qed.
+
+  Ltac lt_remove_add_r := eapply Ord.lt_le_lt; [|apply add_base_l].
 
   Lemma layer_lt_zero u :
     forall i, (Ord.O < ℓ[u](i))%ord.
   Proof using.
     destruct i.
-    - unfold layer. apply Jacobsthal.expn_pos.
-    - rewrite layer_unfold_S. apply Jacobsthal.expn_pos.
+    - unfold layer. lt_remove_add_r. apply Jacobsthal.expn_pos.
+    - rewrite layer_unfold_S. lt_remove_add_r. apply Jacobsthal.expn_pos.
   Qed.
 
   Lemma layer_lt_one u :
@@ -177,15 +179,15 @@ Section layer_facts.
     - unfold layer. pose proof H.
       rewrite <- (@expn_1_r (Ord.S u × ω)%ord) in H.
       2:{ etransitivity; [|eapply H]. apply Ord.S_lt. }
-      etransitivity; [eapply H|]. eapply lt_expn_r; auto.
+      lt_remove_add_r. etransitivity; [eapply H|]. eapply lt_expn_r; auto.
     - etransitivity; [eauto|]. rewrite <- (@expn_1_r ℓ[u](i)); [| apply layer_lt_zero].
-      rewrite layer_unfold_S. apply lt_expn_r; auto.
+      rewrite layer_unfold_S. lt_remove_add_r. apply lt_expn_r; auto.
   Qed.
 
   Lemma layer_lt_S_nat u :
     forall (n i : nat), ((ℓ[u](i) ↑ n) < ℓ[u](S i))%ord.
   Proof.
-    intros. rewrite layer_unfold_S. apply lt_expn_r; [apply layer_lt_one | apply Ord.omega_upperbound].
+    intros. rewrite layer_unfold_S. lt_remove_add_r. apply lt_expn_r; [apply layer_lt_one | apply Ord.omega_upperbound].
   Qed.
 
   Lemma layer_lt_S u :
@@ -223,7 +225,7 @@ Section layer_facts.
     forall (n i : nat), ((((Ord.S u) × ω) ↑ n) < ℓ[u](i))%ord.
   Proof.
     intros n. induction i.
-    - rewrite layer_unfold_zero. apply lt_expn_r.
+    - rewrite layer_unfold_zero. lt_remove_add_r. apply lt_expn_r.
       + apply unit_mult_omega_lt_one.
       + apply Ord.omega_upperbound.
     - etransitivity; [eauto|]. apply layer_lt_S.
@@ -250,7 +252,7 @@ Section layer_facts.
   Proof.
     intros. etransitivity. instantiate (1:=(ℓ[u](i) ↑ (S n))%ord).
     - apply layer_expn_lt_S_gen.
-    - rewrite layer_unfold_S. apply lt_expn_r; [apply layer_lt_one | apply Ord.omega_upperbound].
+    - rewrite layer_unfold_S. lt_remove_add_r. apply lt_expn_r; [apply layer_lt_one | apply Ord.omega_upperbound].
   Qed.
 
 End layer_facts.

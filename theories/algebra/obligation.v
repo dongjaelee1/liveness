@@ -1,5 +1,15 @@
 From iris.proofmode Require Import proofmode.
-From liveness Require Export wfOrderedCM.
+
+Definition prop_of (T : Type) := (T → Prop).
+
+Global Instance prop_of_iff (T : Type) : Equiv (prop_of T) :=
+  λ P1 P2, ∀ (s : T), (P1 s) ↔ (P2 s).
+
+Global Instance prop_of_iff_equivalence T : Equivalence (@equiv _ (prop_of_iff T)).
+Proof. firstorder. Qed.
+
+Canonical Structure prop_ofO `{SI : indexT} (T : Type) := leibnizO (prop_of T).
+
 
 (* FIXME : Move to somewhere else *)
 Lemma sn_tc {X} (R : X → X → Prop) (x : X): sn R x ↔ sn (tc R) x.
@@ -11,26 +21,19 @@ Proof.
   - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
 Qed.
 
+Class obl_class (obl_ps : Type) (obl_count : Type) := {
+    obl_count_ltR : obl_count → obl_count → Prop;
+    obl_count_ltR_wf : well_founded obl_count_ltR;
+  }.
 
-Definition ps_prop (Π : Type) := (Π → Prop).
+Inductive obl_state `{Δ : obl_class} : Type :=
+| obl_init (a : obl_count) | obl_live (a : obl_count) | obl_done (P : prop_of obl_ps).
 
-Global Instance ps_prop_iff (Π : Type) : Equiv (ps_prop Π) :=
-  λ P1 P2, ∀ (s : Π), (P1 s) ↔ (P2 s).
-
-Global Instance ps_prop_iff_equivalence Π : Equivalence (@equiv _ (ps_prop_iff Π)).
-Proof. firstorder. Qed.
-
-Canonical Structure ps_propO `{SI : indexT} Π := leibnizO (ps_prop Π).
-
-
-Inductive obl_state `{WFOrderedCM.t A leR addO ltR} {Π : Type} : Type :=
-| obl_init (a : A) | obl_live (a : A) | obl_done (P : ps_prop Π).
-
-Definition obl_state_step `{WFOrderedCM.t A leR addO ltR} {Π} (s : Π) : relation obl_state :=
+Definition obl_state_step `{Δ : obl_class} (s : obl_ps) : relation obl_state :=
   λ o1 o2,
     match o1, o2 with
     | obl_init a1, obl_init a2 => a1 = a2
-    | obl_live a1, obl_live a2 => ltR a2 a1
+    | obl_live a1, obl_live a2 => obl_count_ltR a2 a1
     | obl_done P1, obl_done P2 => P1 ≡ P2
     | obl_init a1, obl_live a2 => a1 = a2
     | obl_live a, obl_done P => P s
@@ -42,39 +45,29 @@ Canonical Structure obl_idO `{SI : indexT} := leibnizO obl_id.
 
 Notation obl_ids := (gset obl_id).
 Notation obl_states := (gmap obl_id obl_state).
-Notation obl_states' Π := (gmap obl_id (obl_state (Π:=Π))).
+Notation obl_states' Δ := (gmap obl_id (obl_state (Δ:=Δ))).
 
-Definition obl_states_step_one `{WFOrderedCM.t A leR addO ltR} {Π} (s : Π) (x : obl_id) : relation obl_states :=
-  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, if (decide (k = x)) then obl_state_step s o1 o2 else o1 = o2) Ω1 Ω2.
+Definition obl_states_progress `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
+  λ Ω1 Ω2, map_Forall2 (λ _ o1 o2, obl_state_step s o1 o2) Ω1 Ω2.
 
-Notation "a ↪ b @ x ; s" := (obl_states_step_one s x a b) (at level 20, format "a  ↪  b  @  x ;  s ").
-(* We use the transitive closure.
-   It's normalization is equivalent to normalization of source_rel. *)
-Notation "a ↪⁺ b @ x ; s" := ((tc (obl_states_step_one s x)) a b) (at level 20, format "a  ↪⁺  b  @  x ;  s").
-Notation "a ↪⋆ b @ x ; s" := ((rtc (obl_states_step_one s x)) a b) (at level 20, format "a  ↪⋆  b  @  x ;  s").
+Notation "a ↪ₚ b @ s" := (obl_states_progress s a b) (at level 20, format "a  ↪ₚ  b  @  s ").
+(* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
+Notation "a ↪ₚ⁺ b @ s" := ((tc (obl_states_progress s)) a b) (at level 20, format "a  ↪ₚ⁺  b  @  s").
+Notation "a ↪ₚ⋆ b @ s" := ((rtc (obl_states_progress s)) a b) (at level 20, format "a  ↪ₚ⋆  b  @  s").
 
-Inductive obl_states_step_list `{WFOrderedCM.t A leR addO ltR} {Π} (s : Π) : list obl_id → relation obl_states :=
-| obl_states_step_list_nil Ω :
-  obl_states_step_list s [] Ω Ω
-| obl_states_step_list_cons hd tl Ω1 Ω2 Ω3 :
-  Ω1 ↪ Ω2 @ hd; s →
-  obl_states_step_list s tl Ω2 Ω3 →
-  obl_states_step_list s (hd :: tl) Ω1 Ω3.
+Definition obl_states_alloc `{Δ : obl_class} : relation obl_states :=
+  λ Ω1 Ω2, ∃ i a, Ω1 !! i = None ∧ Ω2 = <[i:=obl_init a]> Ω1.
 
-Notation "a ↪ₗ b @ K ; s" := (obl_states_step_list s K a b) (at level 20, format "a  ↪ₗ  b  @  K ;  s").
-(* We use the transitive closure.
-   It's normalization is equivalent to normalization of source_rel. *)
-Notation "a ↪ₗ⁺ b @ K ; s" := ((tc (obl_states_step_list s K)) a b) (at level 20, format "a  ↪ₗ⁺  b  @  K ;  s").
-Notation "a ↪ₗ⋆ b @ K ; s" := ((rtc (obl_states_step_list s K)) a b) (at level 20, format "a  ↪ₗ⋆  b  @  K ;  s").
+Infix "↪ₐ" := (obl_states_alloc) (at level 20).
+(* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
+Infix "↪ₐ⁺" := (tc obl_states_alloc) (at level 20).
+Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 
-Variant obl_states_step `{WFOrderedCM.t A leR addO ltR} {Π} (s : Π) : relation obl_states :=
-  | obl_states_step_alloc Ω1 Ω2 i a :
-    Ω1 !! i = None →
-    Ω2 = <[i:=obl_init a]> Ω1 →
-    obl_states_step s Ω1 Ω2
-  | obl_states_step_progress os Ω1 Ω2 :
-    Ω1 ↪ₗ Ω2 @ os; s →
-    obl_states_step s Ω1 Ω2.
+Variant obl_states_step `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
+  | obl_states_step_alloc Ω1 Ω2 :
+    Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2
+  | obl_states_step_progress Ω1 Ω2 :
+    Ω1 ↪ₚ Ω2 @ s → obl_states_step s Ω1 Ω2.
 
 Notation "a ↪ₛ b @ s" := (obl_states_step s a b) (at level 20, format "a  ↪ₛ  b  @  s").
 (* We use the transitive closure.

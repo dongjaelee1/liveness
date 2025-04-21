@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liveness Require Export obligation.
-From liveness Require Import ordinal_WFOrderedCM bcred.
+From liveness Require Import ordinal_wfocm bcred.
 
 Module ofuelGS.
   Class ofuelGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -122,12 +122,12 @@ Section ofuel.
     ofuelS_bound i a ∗ □(∃ c, ⌜/0 /< c⌝ ∧ ((ofuelS_fuel i c ==∗ P) ==∗ P)) ⊢ |==> P.
   Proof.
     iIntros "[#Hb (%c & %LTc & #HI)]".
-    iStopProof. pattern a. revert a. apply (well_founded_induction WFOrderedCM.lt_wf).
+    iStopProof. pattern a. revert a. apply (well_founded_induction WFOCM.lt_wf).
     intros a IND. iIntros "[#Hb #HI]".
     iApply "HI". iIntros "Hc".
     iMod (ofuelS_fuel_spend with "[Hb Hc]") as "(%a' & %LE & #Hb')"; [iFrame; done |].
     iClear "Hb". iApply (IND a'); [| iModIntro; iSplit; done].
-    apply WFOrderedCM.lt_exists_left. exists c. split; [auto | by rewrite OrderedCM.add_comm_le ].
+    apply WFOCM.lt_exists_left. exists c. split; [auto | by rewrite OCM.add_comm_le ].
   Qed.
 
   Lemma ofuelI_alloc c (Ω : obl_states' Π) a i :

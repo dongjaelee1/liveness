@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liveness Require Export osat sched_fair_interp.
-From liveness Require Import language ordinal_WFOrderedCM.
+From liveness Require Import language ordinal_wfocm.
 
 (** Enable thread local management of obligations.
     Also connects scheduler fairness with obligations to enable liveness induction. *)
@@ -53,7 +53,7 @@ Global Typeclasses Opaque toL_thread.
 Global Instance: Params (@toL_thread) 4 := {}.
 
 (* thread fork cases: sched fuel for new threads? *)
-Definition toI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Π} {Σ}
+Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {Π} {Σ}
   `{@osatGS.osatGS SI Ord.t _ _ _ _ Π Σ} `{@schedfairGS.schedfairGS SI A _ _ _ WF Σ}
   (* `{@ofuelGS.ofuelGS SI Σ} *)
   `{!threadoblGS Σ}
@@ -69,10 +69,10 @@ Definition toI `{SI : indexT} `{WF : WFOrderedCM.t A leR addO ltR} {Π} {Σ}
             ∃ (f : A), sfS_fuel_bound i f 1 ∗
                        (∃ L, ⌜γ !! i = Some L⌝ ∗
                              ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
-                             ([∗ list] k ∈ L, oblS_live k (1/2) ∗
-                                              ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOrderedCM.lt_wf))) ∨
+                             ([∗ list] k ∈ L, oblS_live k (1/2/2) ∗
+                                              ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf))) ∨
                                                  (oblS_active k ∗
-                                                  ∃ a, ⌜(Ord.from_wf (WFOrderedCM.lt_wf) f <= a)%ord⌝ ∗ oblS_credit k a)))
+                                                  ∃ a, ⌜(Ord.from_wf (WFOCM.lt_wf) f <= a)%ord⌝ ∗ oblS_credit k a)))
            ))
            ∨
              (sfS_term i ∗ toL_thread i [] ∗ [∗ list] k ∈ W, oblS_done k)))%I.
