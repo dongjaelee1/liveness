@@ -464,30 +464,33 @@ Qed.
     that we can use to prove [P] in the postcondition, and we have to update
     the state interpretation from [state_interp _ (S m) _ _] to
     [state_interp _ (S ns) _ _] again. *)
-Lemma lwp_credit_access s E e Φ P :
+Lemma lwp_credit_access s i E e Φ P :
   TCEq (to_val e) None →
   (∀ m k, num_laters_per_step m + num_laters_per_step k ≤ num_laters_per_step (m + k)) →
-  (∀ σ1 ns κs nt, state_interp σ1 ns κs nt ={E}=∗
-    ∃ k m, state_interp σ1 m κs nt ∗ ⌜ns = (m + k)%nat⌝ ∗
-    (∀ nt σ2 κs, £ (num_laters_per_step k) -∗ state_interp σ2 (S m) κs nt ={E}=∗
-      state_interp σ2 (S ns) κs nt ∗ P)) -∗
-  LWP e @ s; E {{ v, P ={E}=∗ Φ v }} -∗
-  LWP e @ s; E {{ Φ }}.
+  (∀ σ1 ns κs τ, state_interp σ1 ns κs τ ={E}=∗
+                 ∃ k m, state_interp σ1 m κs τ ∗ ⌜ns = (m + k)%nat⌝ ∗
+                        (∀ τ σ2 κs, £ (num_laters_per_step k) -∗ state_interp σ2 (S m) κs τ ={E}=∗
+                                    state_interp σ2 (S ns) κs τ ∗ P)) -∗
+  lWP e @ s; i; E {{ v, P ={E}=∗ Φ v }} -∗
+                lWP e @ s; i; E {{ Φ }}.
 Proof.
   rewrite !lwp_unfold /lwp_pre /=. iIntros (-> Htri) "Hupd Hwp".
-  iIntros (σ1 ns κ κs nt) "Hσ1".
+  iIntros (????????) "(H0 & H1 & H2 & H3 & Hσ1)".
   iMod ("Hupd" with "Hσ1") as (k m) "(Hσ1 & -> & Hpost)".
-  iMod ("Hwp" with "Hσ1") as "[$ Hwp]". iModIntro.
-  iIntros (e2 σ2 efs Hstep) "Hc".
+  iCombine "H0 H1 H2 H3 Hσ1" as "H".
+  iMod ("Hwp" with "H") as "[$ Hwp]". iModIntro.
+  iDestruct "Hwp" as "(%&%&Hwp)". iExists _. iSplit; first done.
+  iIntros (e2 σ2 efs Hstep ????) "Hc".
   iDestruct "Hc" as "[Hone Hc]".
   iPoseProof (lc_weaken with "Hc") as "Hc"; first apply Htri.
   iDestruct "Hc" as "[Hm Hk]".
   iCombine "Hone Hm" as "Hm".
-  iApply (step_fupd_wand with "(Hwp [//] Hm)"). iIntros "Hwp".
+  iApply (step_fupd_wand with "(Hwp [//] [//] Hm)"). iIntros "Hwp".
   iApply (step_fupdN_le (num_laters_per_step m)); [ | done | ].
   { etrans; last apply Htri. lia. }
-  iApply (step_fupdN_wand with "Hwp"). iIntros ">(SI & Hwp & $)".
-  iMod ("Hpost" with "Hk SI") as "[$ HP]". iModIntro.
+  iApply (step_fupdN_wand with "Hwp"). iIntros ">(%&%&%&%& (H0 & H1 & H2 & H3 & Hσ1) & Hwp & $)".
+  iMod ("Hpost" with "Hk Hσ1") as "[$ HP]". iFrame. iModIntro.
+  iExists _. iSplit; first done.
   iApply (lwp_strong_mono with "Hwp"); [by auto..|].
   iIntros (v) "HΦ". iApply ("HΦ" with "HP").
 Qed.
@@ -500,48 +503,54 @@ Qed.
 
    See the statement of [lwp_step_fupdN] below to understand the use of
    ordinary conjunction here. *)
-Lemma lwp_step_fupdN_strong n s E1 E2 e P Φ :
+Lemma lwp_step_fupdN_strong n s i E1 E2 e P Φ :
   TCEq (to_val e) None → E2 ⊆ E1 →
-  (∀ σ ns κs nt, state_interp σ ns κs nt
-       ={E1,∅}=∗ ⌜n ≤ S (num_laters_per_step ns)⌝) ∧
+  (∀ σ ns κs τ, state_interp σ ns κs τ
+                ={E1,∅}=∗ ⌜n ≤ S (num_laters_per_step ns)⌝) ∧
   ((|={E1,E2}=> |={∅}▷=>^n |={E2,E1}=> P) ∗
-    LWP e @ s; E2 {{ v, P ={E1}=∗ Φ v }}) -∗
-  LWP e @ s; E1 {{ Φ }}.
+   lWP e @ s; i; E2 {{ v, P ={E1}=∗ Φ v }}) -∗
+  lWP e @ s; i; E1 {{ Φ }}.
 Proof.
   destruct n as [|n].
   { iIntros (_ ?) "/= [_ [HP Hwp]]".
     iApply (lwp_strong_mono with "Hwp"); [done..|].
     iIntros (v) "H". iApply ("H" with "[>HP]"). by do 2 iMod "HP". }
   rewrite !lwp_unfold /lwp_pre /=. iIntros (-> ?) "H".
-  iIntros (σ1 ns κ κs nt) "Hσ".
+  iIntros (????????) "(H0 & H1 & H2 & H3 & Hσ)".
   destruct (decide (n ≤ num_laters_per_step ns)) as [Hn|Hn]; first last.
   { iDestruct "H" as "[Hn _]". iMod ("Hn" with "Hσ") as %?. lia. }
   iDestruct "H" as "[_ [>HP Hwp]]". iMod ("Hwp" with "[$]") as "[$ H]". iMod "HP".
-  iIntros "!>" (e2 σ2 efs Hstep) "Hcred". iMod ("H" $! e2 σ2 efs with "[% //] Hcred") as "H".
+  iDestruct "H" as "(%&%&H)". iModIntro. iExists _. iSplit; first done.
+  iIntros (e2 σ2 efs Hstep ????) "Hcred". iMod ("H" $! e2 σ2 efs with "[% //] [//] Hcred") as "H".
   iIntros "!>!>". iMod "H". iMod "HP". iModIntro.
   revert n Hn. generalize (num_laters_per_step ns)=>n0 n Hn.
   iInduction n as [|n IH] forall (n0 Hn).
-  - iApply (step_fupdN_wand with "H"). iIntros ">($ & Hwp & $)". iMod "HP".
-    iModIntro. iApply (lwp_strong_mono with "Hwp"); [done|set_solver|].
+  - iApply (step_fupdN_wand with "H").
+    iIntros ">(%&%&%&%& (H0 & H1 & H2 & H3 & Hσ1) & Hwp & $)". iMod "HP".
+    iModIntro. iFrame. iExists _. iSplit; first done.
+    iApply (lwp_strong_mono with "Hwp"); [done|set_solver|].
     iIntros (v) "HΦ". iApply ("HΦ" with "HP").
   - destruct n0 as [|n0]; [lia|]=>/=. iMod "HP". iMod "H". iIntros "!> !>".
     iMod "HP". iMod "H". iModIntro. iApply ("IH" with "[] HP H").
     auto with lia.
 Qed.
 
-Lemma lwp_bind K `{!LanguageCtx K} s E e Φ :
-  LWP e @ s; E {{ v, LWP K (of_val v) @ s; E {{ Φ }} }} ⊢ LWP K e @ s; E {{ Φ }}.
+Lemma lwp_bind K `{!LanguageCtx K} s i E e Φ :
+  lWP e @ s; i; E {{ v, lWP K (of_val v) @ s; i; E {{ Φ }} }} ⊢ lWP K e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iLöb as "IH" forall (E e Φ). rewrite lwp_unfold /lwp_pre.
   destruct (to_val e) as [v|] eqn:He.
-  { apply of_to_val in He as <-. by iApply fupd_lwp. }
+  { apply of_to_val in He as <-. by iApply ghost_step_intro. }
   rewrite lwp_unfold /lwp_pre fill_not_val /=; [|done].
-  iIntros (σ1 step κ κs n) "Hσ". iMod ("H" with "[$]") as "[% H]".
+  iIntros (??? σ1 step κ κs τ) "(H0 & H1 & H2 & H3 & Hσ)". iMod ("H" with "[$]") as "(%&%&%&H)".
   iModIntro; iSplit.
   { destruct s; eauto using reducible_fill. }
-  iIntros (e2 σ2 efs Hstep) "Hcred".
-  destruct (fill_step_inv e σ1 κ e2 σ2 efs) as (e2'&->&?); auto.
-  iMod ("H" $! e2' σ2 efs with "[//] Hcred") as "H". iIntros "!>!>".
+  iExists _. iSplit; first done. iIntros (e2 σ2 efs Hstep ????) "Hcred".
+  destruct (fill_step_inv e σ1 τ κ e2 σ2 efs) as (e2'&->&?); auto.
+  TODO
+  H1 : fuels_fair_update {[i]} δ0 δ1 ∧ δ2 = fuels_thread_yield i (K e2') δ1 ∧ fuels_fair_fork efs δ2 δ3
+            ⌜fuels_fair_update {[i]} δ0 δ4 ∧ δ5 = fuels_thread_yield i e2 δ4 ∧ fuels_fair_fork efs0 δ5 δ6⌝ -∗
+  iMod ("H" $! e2' σ2 efs with "[//] [//] Hcred") as "H". iIntros "!>!>".
   iMod "H". iModIntro. iApply (step_fupdN_wand with "H"). iIntros "H".
   iMod "H" as "($ & H & $)". iModIntro. by iApply "IH".
 Qed.

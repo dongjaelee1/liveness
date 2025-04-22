@@ -445,6 +445,11 @@ Section language.
       by eapply map_Forall2_insert.
   Qed.
 
+  (** Properties about fuels. *)
+  Lemma fuels_thread_yield_fill `{!@LanguageCtx Λ K} i e δ :
+    fuels_thread_yield i e δ = fuels_thread_yield i (K e) δ.
+  Proof.
+
 End language.
 
 Global Hint Mode PureExec + - - ! - : typeclass_instances.
