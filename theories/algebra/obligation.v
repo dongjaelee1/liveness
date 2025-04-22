@@ -47,13 +47,21 @@ Notation obl_ids := (gset obl_id).
 Notation obl_states := (gmap obl_id obl_state).
 Notation obl_states' Δ := (gmap obl_id (obl_state (Δ:=Δ))).
 
+Definition obl_states_step_one `{Δ : obl_class} (s : obl_ps) (x : obl_id) : relation obl_states :=
+  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, if decide (k = x) then obl_state_step s o1 o2 else o1 = o2) Ω1 Ω2.
+
+Notation "a ↪ₒ b @ s , x" := (obl_states_step_one s x a b) (at level 20, format "a  ↪ₒ  b  @  s ,  x ").
+(* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
+Notation "a ↪ₒ⁺ b @ s , x" := (tc (obl_states_step_one s x) a b) (at level 20, format "a  ↪ₒ⁺  b  @  s ,  x ").
+Notation "a ↪ₒ⋆ b @ s , x" := (rtc (obl_states_step_one s x) a b) (at level 20, format "a  ↪ₒ⋆  b  @  s ,  x ").
+
 Definition obl_states_progress `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
   λ Ω1 Ω2, map_Forall2 (λ _ o1 o2, obl_state_step s o1 o2) Ω1 Ω2.
 
 Notation "a ↪ₚ b @ s" := (obl_states_progress s a b) (at level 20, format "a  ↪ₚ  b  @  s ").
 (* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
-Notation "a ↪ₚ⁺ b @ s" := ((tc (obl_states_progress s)) a b) (at level 20, format "a  ↪ₚ⁺  b  @  s").
-Notation "a ↪ₚ⋆ b @ s" := ((rtc (obl_states_progress s)) a b) (at level 20, format "a  ↪ₚ⋆  b  @  s").
+Notation "a ↪ₚ⁺ b @ s" := (tc (obl_states_progress s) a b) (at level 20, format "a  ↪ₚ⁺  b  @  s").
+Notation "a ↪ₚ⋆ b @ s" := (rtc (obl_states_progress s) a b) (at level 20, format "a  ↪ₚ⋆  b  @  s").
 
 Definition obl_states_alloc `{Δ : obl_class} : relation obl_states :=
   λ Ω1 Ω2, ∃ i a, Ω1 !! i = None ∧ Ω2 = <[i:=obl_init a]> Ω1.
@@ -64,6 +72,8 @@ Infix "↪ₐ⁺" := (tc obl_states_alloc) (at level 20).
 Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 
 Variant obl_states_step `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
+  | obl_states_step_step_one x Ω1 Ω2 :
+    Ω1 ↪ₒ Ω2 @ s, x → obl_states_step s Ω1 Ω2
   | obl_states_step_alloc Ω1 Ω2 :
     Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2
   | obl_states_step_progress Ω1 Ω2 :
