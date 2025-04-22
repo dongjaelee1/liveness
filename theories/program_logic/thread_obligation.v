@@ -75,3 +75,10 @@ Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
            ))
            ∨
              (sfS_term i ∗ toL_thread i [] ∗ [∗ list] k ∈ W, oblS_done k)))%I.
+
+Definition oftI `{SI : indexT} {T : Type} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class obl_ps (T * A)%type} {Σ}
+  (Ω : obl_states) (δ : gmap thread_id (option A)) (γ : gmap thread_id (list obl_id)) : iProp Σ :=
+  ([∗ map] oF; L ∈ δ; γ, match oF with
+                         | Some f => [∗ list] k ∈ L, ⌜∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2⌝
+                         | None => True
+                         end)%I.

@@ -58,10 +58,15 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
 Global Opaque liris_invGS liris_osatGS liris_schedfairGS liris_threadoblGS.
 Global Arguments LirisG {SI hlc Λ Σ}.
 
+Global Instance wp_obl_class {Λ : language} : obl_class (Π Λ) (prod Ord.t (fuel Λ)) :=
+  osat_obl_class_def ord_wfocm_pack (WFOCM.lt_wf (t:=@fuel_wf Λ)) (Π Λ).
+
 Notation lirisGS := (lirisGS_gen HasLc).
 Notation "'⌈' Λ '⌉'" := (Ord.from_wf_set (@WFOCM.lt_wf _ _ _ _ (@fuel_wf Λ))).
 Notation schedfairIL Λ := (schedfairI (H:=@fuel_wf Λ)).
 Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=Π Λ)).
+Notation oftIL Λ := (oftI (WF:=@fuel_wf Λ) (obl_ps:=Π Λ)).
+Notation obl_statesL Λ := (obl_states' (@wp_obl_class Λ)).
 
 (** The predicate we take the fixpoint of in order to define the LWP. *)
 (** In the step case, we both provide [S (num_laters_per_step ns)]
@@ -80,15 +85,15 @@ Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=Π Λ)).
 (* Ω must make strict progress *)
 Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
-  (∀ ϕ0 Ω0 γ σ1 ns κ κs τ, (schedfairIL Λ ϕ0 ∗ osat Ω0 ∗ toIL Λ γ ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
-                           (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
-                           ∃ Ω1, (⌜(Ω0 ↪ₛ⋆ Ω1 @ σ1)⌝) ∗
-                                 ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                                              ∀ ϕ1 ϕ2 ϕ3, (⌜fuels_fair_update {[i]} ϕ0 ϕ1 ∧ ϕ2 = fuels_thread_yield i e2 ϕ1 ∧ fuels_fair_fork efs ϕ2 ϕ3⌝) -∗
-                                                          £ (S (num_laters_per_step ns))
-                                                          ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-     ∃ Ω2 Ω3, (⌜(∃ os, γ !! i = Some os ∧ (Ω1 ↪ₗ⁺ Ω2 @ os; σ2)) ∧ (Ω2 ↪ₛ⋆ Ω3 @ σ2)⌝) ∗
-              ∃ γ', (schedfairIL Λ ϕ3 ∗ osat Ω3 ∗ toIL Λ γ' ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
+  (∀ δ0 (Ω0 : obl_statesL Λ) γ1 σ1 ns κ κs τ,
+     (schedfairIL Λ δ0 ∗ osat Ω0 ∗ toIL Λ γ1 ∗ oftIL Λ Ω0 δ0 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
+     (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
+     ∃ Ω1, (⌜(Ω0 ↪ₛ⋆ Ω1 @ σ1)⌝) ∗
+           ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
+                        ∀ δ1 δ2 δ3, (⌜fuels_fair_update {[i]} δ0 δ1 ∧ δ2 = fuels_thread_yield i e2 δ1 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
+                                    £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
+     ∃ Ω2 Ω3, (⌜(Ω1 ↪ₚ⁺ Ω2 @ σ2) ∧ (Ω2 ↪ₛ⋆ Ω3 @ σ2)⌝) ∗
+              ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω3 ∗ toIL Λ γ2 ∗ oftIL Λ Ω3 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
                     ν e2 efs
   )%I.
 
@@ -133,15 +138,15 @@ Section lwp_step.
 
 End lwp_step.
 
-
 (** Modality for updating obligation state. *)
 (* Ω can allocate, progress, or fulfills obligations. Note this has no later modality. *)
 Definition ghost_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (E : coPset)
   (ν : iPropO Σ) : iPropO Σ :=
-  (∀ ϕ Ω γ σ ns κs τ, (schedfairIL Λ ϕ ∗ osat Ω ∗ toIL Λ γ ∗ state_interp σ ns κs τ) ={E}=∗
-                      ∃ Ω', (⌜(Ω ↪ₛ⋆ Ω' @ σ)⌝) ∗
-                            ∃ γ', (schedfairIL Λ ϕ ∗ osat Ω' ∗ toIL Λ γ' ∗ state_interp σ ns κs τ) ∗
-                                  ν
+  (∀ δ (Ω : obl_statesL Λ) γ σ ns κs τ,
+     (schedfairIL Λ δ ∗ osat Ω ∗ toIL Λ γ ∗ oftIL Λ Ω δ γ ∗ state_interp σ ns κs τ) ={E}=∗
+     ∃ Ω', (⌜(Ω ↪ₛ⋆ Ω' @ σ)⌝) ∗
+           ∃ γ', (schedfairIL Λ δ ∗ osat Ω' ∗ toIL Λ γ' ∗ oftIL Λ Ω' δ γ' ∗ state_interp σ ns κs τ) ∗
+                 ν
   )%I.
 
 Section ghost_step.
@@ -221,7 +226,6 @@ Section ghost_step.
   Qed.
 
 End ghost_step.
-
 
 (* pre-definition of lwp of which we take a least fixpoint *)
 Definition lwp_pre `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness)
@@ -344,16 +348,13 @@ Proof.
   by do 11 f_equiv.
 Qed.
 
-TODO
-
 Lemma ghost_step_intro s i E e Φ :
   ghost_step E (lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "Hg". rewrite !lwp_unfold /lwp_pre /lwp_step.
   destruct (to_val e) as [v|] eqn:?.
   { by iApply ghost_step_idemp. }
-  iIntros (????????) "H". rewrite /ghost_step.
-  iSpecialize ("Hg" with "[$]"). iMod "Hg".
+  iIntros (????????) "H". rewrite /ghost_step. iSpecialize ("Hg" with "[$]"). iMod "Hg".
   iDestruct "Hg" as "(%&%&%&H&Hg)". iSpecialize ("Hg" with "[$]").
   iMod "Hg". iModIntro. iDestruct "Hg" as "(H&%&%&Hg)". iSplitL "H"; first done.
   iExists Ω1. iSplitR.
@@ -375,17 +376,15 @@ Proof.
   iIntros (?) "H". iRevert (i e E Φ) "H".
   iApply lwp_ind_strong. iModIntro. iIntros (i e E Φ) "IH".
   rewrite !lwp_unfold /lwp_pre /=. destruct (to_val e) as [v|] eqn:?; first done.
-  iIntros (??) "H". iSpecialize ("IH" with "[$]").
-  iIntros (??) "H". iSpecialize ("IH" with "[$]").
-  iIntros (?????) "H". iSpecialize ("IH" with "[$]"). iMod "IH" as "(%&%&%&IH)".
+  iIntros (????????) "H". iSpecialize ("IH" with "[$]").
+  iMod "IH" as "(%&%&%&IH)".
   iModIntro. iSplit; [by destruct s1, s2|clear H0]. iExists _. iSplitR; first done.
-  iIntros (???????) "Hcred".
+  iIntros (????????) "Hcred".
   iMod ("IH" with "[//] [//] Hcred") as "IH". iIntros "!> !>".  iMod "IH". iModIntro.
   iApply (step_fupdN_wand with "[IH]"); first by iApply "IH".
-  iIntros ">IH". iModIntro.
-  iDestruct "IH" as "(H0&%&%&H1&H2&H3&[H4 _]&H5)".
-  iFrame. iApply (big_sepM_impl with "H5"). iIntros "!>" (k ef _).
-  iIntros "[H _]". done.
+  iIntros ">IH". iModIntro. iDestruct "IH" as "(%&%&%&%&H0&[H1 _]&Hefs)".
+  iFrame. iExists _. iSplitR; first done.
+  iApply (big_sepM_impl with "Hefs"). iIntros "!>" (k ef _). iIntros "[H _]". done.
 Qed.
 
 Lemma lwp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
@@ -399,20 +398,17 @@ Proof.
   rewrite !lwp_unfold /lwp_pre /=.
   destruct (to_val e) as [v|] eqn:?.
   { iApply (ghost_step_strong_mono with "IH"); done. }
-  iIntros (??) "H". iSpecialize ("IH" with "[$]").
-  iIntros (??) "H". iSpecialize ("IH" with "[$]").
-  iIntros (?????) "H". iSpecialize ("IH" with "[$]").
+  iIntros (????????) "H". iSpecialize ("IH" with "[$]").
   iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
   iMod "IH" as "(%&%&%&IH)".
   iModIntro. iSplit; [by destruct s1, s2|clear H0]. iExists _. iSplitR; first done.
-  iIntros (???????) "Hcred".
+  iIntros (????????) "Hcred".
   iMod ("IH" with "[//] [//] Hcred") as "IH". iIntros "!> !>".  iMod "IH". iModIntro.
   iApply (step_fupdN_wand with "[IH]"); first by iApply "IH".
-  iIntros ">IH". iMod "Hclose" as "_". iModIntro.
-  iDestruct "IH" as "(H0&%&%&H1&H2&H3&[H4 _]&H5)".
-  iFrame. iSplitR "H5".
-  + by iApply "H4".
-  + iApply (big_sepM_impl with "H5"); iIntros "!>" (k ef _).
+  iIntros ">IH". iMod "Hclose" as "_". iModIntro. iDestruct "IH" as "(%&%&%&%&H0&[H1 _]&Hefs)".
+  iFrame. iExists _. iSplit; first done. iSplitR "Hefs".
+  + by iApply "H1".
+  + iApply (big_sepM_impl with "Hefs"); iIntros "!>" (k ef _).
     iIntros "[_ H]". by iApply (lwp_stuckness_mono with "H").
 Qed.
 
@@ -420,8 +416,8 @@ Lemma fupd_lwp s i E e Φ : (|={E}=> lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i;
 Proof.
   rewrite lwp_unfold /lwp_pre. iIntros "H". destruct (to_val e) as [v|] eqn:?.
   { by iMod "H". }
-  rewrite /lwp_step. iIntros "%% H0 %% H1 %%%%% H2". iMod "H".
-  iSpecialize ("H" with "[$] [$] [$]"). done.
+  rewrite /lwp_step. iIntros (????????) "Hp". iMod "H".
+  iSpecialize ("H" with "[$]"). done.
 Qed.
 Lemma lwp_fupd s i E e Φ : lWP e @ s; i; E {{ v, |={E}=> Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
 Proof. iIntros "H". iApply (lwp_strong_mono s s i E with "H"); auto. Qed.
@@ -433,98 +429,24 @@ Proof.
   destruct (to_val e) as [v|] eqn:He.
   { by iApply ghost_step_atomic. }
   rewrite /lwp_step.
-  iIntros "%% H0 %% H1 %%%%% H2". iMod "H". iMod ("H" with "[$] [$] [$]") as "(%&%&%&H)".
+  iIntros (????????) "Hp". iMod "H".  iMod ("H" with "[$]") as "(%&%&%&H)".
   iModIntro. iSplitR; first done. iExists _. iSplitR; first done.
-  iIntros (???????) "Hcred". iApply (step_fupdN_wand with "(H [//] [//] Hcred)").
-  iIntros ">(H0 & %&%&% & H1 & Hσ & H & Hefs)".
-
-  TODO
-
-  destruct s.
+  iIntros (????????) "Hcred". iApply (step_fupdN_wand with "(H [//] [//] Hcred)").
+  iIntros ">(%&%&%&%&H0&H&Hefs)". destruct s.
   - rewrite !lwp_unfold /lwp_pre. destruct (to_val e2) as [v2|] eqn:He2.
-    + iSpecialize ("H" with "[$] [$] [$]"). iMod "H".
-      iDestruct "H" as "(H0&%&%&%&H1&H2&H3)". iMod "H3". iFrame.
-      iModIntro. iSplit.
-      * iPureIntro. destruct H3 as (?&?&?). eexists. split; eauto.
-      2:{ rewrite lwp_unfold /lwp_pre. rewrite He2. by iApply ghost_step_elim. }
-
-      iDestruct "H" as ">> $". by iFrame.
-    + iMod ("H" $! _ _ [] with "[$]") as "[H _]". iDestruct "H" as %(? & ? & ? & ? & ?).
-      by edestruct (atomic _ _ _ _ _ Hstep).
-  - destruct (atomic _ _ _ _ _ Hstep) as [v <-%of_to_val].
-    rewrite wp_value_fupd'. iMod "H" as ">H".
-    iModIntro. iFrame "Hσ Hefs". by iApply wp_value_fupd'.
-Qed.
-
-
-  iIntros ">H".
-
-  TODO
-
-  iIntros (?).
-  iIntros "(Hσ & H & Hefs)". destruct s.
-
-
-  iIntros "%".
-
-  iIntros (??) "H". iSpecialize ("IH" with "[$]").
-  iIntros (Ω γ) "H". iSpecialize ("IH" with "[$]").
-  iIntros (σ ns κs τ) "H". iSpecialize ("IH" with "[$]").
-  iMod "IH". iMod "IH". iDestruct "IH" as "(H0&%&H1&%&H2&H3&H4)". 
-
-  iFrame. by iFrame.
-
-
-  iApply (ghost_step_atomic E1 E2). 
-
-  iApply (fupd_mask
-
-  iModIntro. iMod "Hwp". iModIntro.
-  iApply (ghost_step_mono with  "[] Hwp"). iModIntro. iIntros "Hwp".
-  destruct (to_val e) as [v|] eqn:He.
-  { by iDestruct "Hwp" as ">>H". }
-
-  
-  iIntros (ϕ) "H". iSpecialize ("IH" with "[$]").
-  iIntros (Ω γ) "H". iSpecialize ("IH" with "[$]").
-  iIntros (σ ns κs τ) "H". iSpecialize ("IH" with "[$]").
-  iModIntro. 
-
-  iMod (fupd_mask_subseteq E1) as "close"; first done. iMod "IH" as "[H IH]". iFrame.
-  iMod "close" as "_". iDestruct "IH" as "(%&H0&%&H1&H2&H3)". iFrame. by iApply "Hu".
-
-  iMod "H". iMod "H". iDestruct "H" as "[H | H]".
-  - iLeft. destruct (to_val e) as [v|] eqn:He.
-    { by iDestruct "H" as ">>H". }
-
-    iMod (fupd_intro E1 with "H") as "H".
-    iApply fupd_mask_intro.
-    iModIntro.
-    
-    iIntros (ϕ0 ϕ1) "H". iSpecialize ("Hwp" $! ϕ0 ϕ1 with "H").
-    iIntros (Ω γ) "H". iSpecialize ("Hwp" $! Ω γ with "H").
-    iIntros (σ1 ns κ κs τ) "H". iSpecialize ("Hwp" $! σ1 ns κ κs τ with "H").
-    iMod "Hwp" as "(H&Hwp)". iModIntro. iFrame.
-    iIntros (e2 σ2 efs) "H". iSpecialize ("Hwp" $! e2 σ2 efs with "H").
-    iIntros "H". iSpecialize ("Hwp" with "H").
-    iApply (step_fupdN_wand with "Hwp"). iIntros ">Hwp". iModIntro.
-    iIntros (ϕ2 ϕ3) "H". iSpecialize ("Hwp" $! ϕ2 ϕ3 with "H"). iDestruct "Hwp" as "(H0&%&H1&%&H2&H3&H4)".
-    iFrame. by iApply "Hmono".
-    
-
-
-
-    iIntros (σ1 ns κ κs nt) "Hσ". iMod "H". iMod ("H" $! σ1 with "Hσ") as "[$ H]".
-    iModIntro. iIntros (e2 σ2 efs Hstep) "Hcred".
-    iApply (step_fupdN_wand with "(H [//] Hcred)").
-    iIntros ">(Hσ & H & Hefs)". destruct s.
-  - rewrite !lwp_unfold /lwp_pre. destruct (to_val e2) as [v2|] eqn:He2.
-    + iDestruct "H" as ">> $". by iFrame.
-    + iMod ("H" $! _ _ [] with "[$]") as "[H _]". iDestruct "H" as %(? & ? & ? & ? & ?).
-      by edestruct (atomic _ _ _ _ _ Hstep).
-  - destruct (atomic _ _ _ _ _ Hstep) as [v <-%of_to_val].
-    rewrite lwp_value_fupd'. iMod "H" as ">H".
-    iModIntro. iFrame "Hσ Hefs". by iApply lwp_value_fupd'.
+    + iSpecialize ("H" with "[$]"). iMod "H".
+      iDestruct "H" as "(%&%&%&H0&H)". iMod "H". iFrame.
+      iModIntro. iExists Ω2. iSplit.
+      * iPureIntro. destruct H3. split; first auto. etransitivity; eauto.
+      * rewrite lwp_unfold /lwp_pre. rewrite He2. by iApply ghost_step_elim.
+    + iMod ("H" $! _ _ _ _ _ [] _ _ with "[$]") as "[H H']".
+      iDestruct "H" as %(? & ? & ? & ? & ?). by edestruct (atomic _ _ _ _ _ _ H1).
+  - destruct (atomic _ _ _ _ _ _ H1) as [v <-%of_to_val].
+    rewrite lwp_value_fupd'. iMod ("H" with "[$]") as "H".
+    iDestruct "H" as "(%&%&%&H0&>H)". iModIntro. iFrame.
+    iExists Ω2. iSplit.
+    { iPureIntro. destruct H3. split; first auto. etransitivity; eauto. }
+    iApply lwp_value_fupd'. by iApply ghost_step_elim.
 Qed.
 
 (** This lemma gives us access to the later credits that are generated in each step,
