@@ -535,6 +535,8 @@ Proof.
     auto with lia.
 Qed.
 
+TODO
+
 Lemma lwp_bind K `{!LanguageCtx K} s i E e Φ :
   lWP e @ s; i; E {{ v, lWP K (of_val v) @ s; i; E {{ Φ }} }} ⊢ lWP K e @ s; i; E {{ Φ }}.
 Proof.
