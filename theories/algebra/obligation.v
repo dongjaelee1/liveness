@@ -72,10 +72,10 @@ Infix "↪ₐ⁺" := (tc obl_states_alloc) (at level 20).
 Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 
 Variant obl_states_step `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
-  | obl_states_step_step_one x Ω1 Ω2 :
-    Ω1 ↪ₒ Ω2 @ s, x → obl_states_step s Ω1 Ω2
   | obl_states_step_alloc Ω1 Ω2 :
     Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2
+  | obl_states_step_step_one x Ω1 Ω2 :
+    Ω1 ↪ₒ Ω2 @ s, x → obl_states_step s Ω1 Ω2
   | obl_states_step_progress Ω1 Ω2 :
     Ω1 ↪ₚ Ω2 @ s → obl_states_step s Ω1 Ω2.
 

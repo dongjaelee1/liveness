@@ -1,4 +1,4 @@
-From iris.algebra Require Import gmap_view mono_list gmap gset.
+From iris.algebra Require Import gmap_view mono_list mono_nat gmap gset.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -40,21 +40,27 @@ Import threadoblGS.
 Local Existing Instances threadobl_inG threadoblGpreS_state threadoblGpreS_live.
 Local Existing Instances osatGS.osat_inG osatGS.osatGpreS_goal osatGS.osatGpreS_state.
 Local Existing Instances schedfairGS.schedfair_inG schedfairGS.schedfairGpreS_state.
-(* Local Existing Instances ofuelGS.ofuel_inG ofuelGS.ofuelGpreS_state. *)
 
 Definition toS_snapshot `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
   own state_name (gmap_view_frag i DfracDiscarded (◯ML l)).
 Global Typeclasses Opaque toS_snapshot.
 Global Instance: Params (@toS_snapshot) 4 := {}.
 
+(* thread i is currently executing, with live obligations l. *)
 Definition toL_thread `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
   own live_name (gmap_view_frag i (DfracOwn 1) (to_agree l)).
 Global Typeclasses Opaque toL_thread.
 Global Instance: Params (@toL_thread) 4 := {}.
 
+(* thread i terminated, with no live obligation []. *)
+Definition toL_term `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) : iProp Σ :=
+  own live_name (gmap_view_frag i DfracDiscarded (to_agree [])).
+Global Typeclasses Opaque toL_term.
+Global Instance: Params (@toL_term) 4 := {}.
+
 (* thread fork cases: sched fuel for new threads? *)
 Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
-  `{@osatGS.osatGS SI Ord.t _ ps Σ} `{@schedfairGS.schedfairGS SI A _ _ _ WF Σ}
+  `{@osatGS.osatGS SI Ord.t _ ps Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ}
   `{!threadoblGS Σ}
   (γ : gmap thread_id (list obl_id))
   : iProp Σ :=
@@ -64,21 +70,19 @@ Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
         (own state_name (gmap_view_auth (DfracOwn 1) ((mono_list_auth (DfracOwn 1)) <$> Ψ))) ∗
         (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
         ([∗ map] i ↦ W ∈ Ψ,
-           (sfS_exec i (1/2) ∗
-            ∃ (f : A), sfS_fuel_bound i f 1 ∗
-                       (∃ L, ⌜γ !! i = Some L⌝ ∗
-                             ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
-                             ([∗ list] k ∈ L, oblS_live k (1/2/2) ∗
-                                              ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf))) ∨
-                                                 (oblS_active k ∗
-                                                  ∃ a, ⌜(Ord.from_wf (WFOCM.lt_wf) f <= a)%ord⌝ ∗ oblS_credit k a)))
-           ))
-           ∨
-             (sfS_term i ∗ toL_thread i [] ∗ [∗ list] k ∈ W, oblS_done k)))%I.
+           ∃ (f : A), sfS_fuel_bound i f 1 ∗
+                      (∃ L, ⌜γ !! i = Some L⌝ ∗
+                            ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
+                            ([∗ list] k ∈ L,
+                               oblS_live k (1/2/2) ∗
+                               ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf)))
+                                ∨ (oblS_active k ∗ ∃ a, ⌜(Ord.from_wf (WFOCM.lt_wf) f <= a)%ord⌝ ∗ oblS_credit k a)))
+                      )
+        (* ∨ *)
+        (* (toL_term i ∗ [∗ list] k ∈ W, oblS_done k) *)
+        )
+    )%I.
 
 Definition oftI `{SI : indexT} {T : Type} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class obl_ps (T * A)%type} {Σ}
-  (Ω : obl_states) (δ : gmap thread_id (option A)) (γ : gmap thread_id (list obl_id)) : iProp Σ :=
-  ([∗ map] oF; L ∈ δ; γ, match oF with
-                         | Some f => [∗ list] k ∈ L, ⌜∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2⌝
-                         | None => True
-                         end)%I.
+  (Ω : obl_states) (δ : gmap thread_id A) (γ : gmap thread_id (list obl_id)) : iProp Σ :=
+  ([∗ map] f; L ∈ δ; γ, [∗ list] k ∈ L, ⌜∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2⌝)%I.
