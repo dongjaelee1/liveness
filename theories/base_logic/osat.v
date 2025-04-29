@@ -321,6 +321,8 @@ Section osat.
   Lemma oblG_elem_unfold i : oblG_elem i ⊢ ∃ P R, oblG_goal i P R.
   Proof. done. Qed.
 
+  (* osat lemmas. *)
+
   Implicit Types Ω : obl_states' occ.
 
   Lemma osat_oblG_elem i Ω :

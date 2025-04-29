@@ -1,4 +1,4 @@
-From iris.algebra Require Import gmap_view mono_list mono_nat gmap gset.
+From iris.algebra Require Import gmap_view reservation_map mono_list mono_nat.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -11,7 +11,8 @@ From liveness Require Import language ordinal_wfocm.
 Module threadoblGS.
   Class threadoblGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     ThreadoblGpreS {
-        threadoblGpreS_state : inG Σ (gmap_viewR thread_id (mono_listUR obl_id));
+        threadoblGpreS_state : inG Σ (reservation_mapUR (mono_listUR obl_id));
+        (* threadoblGpreS_state : inG Σ (gmap_viewR thread_id (mono_listUR obl_id)); *)
         threadoblGpreS_live : inG Σ (gmap_viewR thread_id (agreeR (list obl_id)));
       }.
 
@@ -23,7 +24,8 @@ Module threadoblGS.
       }.
 
   Definition threadoblΣ `{SI : indexT} : gFunctors :=
-    #[GFunctor (gmap_viewTRF thread_id (mono_listUR obl_id));
+    #[GFunctor (reservation_mapUR (mono_listUR obl_id));
+      (* GFunctor (gmap_viewTRF thread_id (mono_listUR obl_id)); *)
       GFunctor (gmap_viewTRF thread_id (agreeTRF (listO obl_id)))
       ].
 
@@ -41,10 +43,22 @@ Local Existing Instances threadobl_inG threadoblGpreS_state threadoblGpreS_live.
 Local Existing Instances osatGS.osat_inG osatGS.osatGpreS_goal osatGS.osatGpreS_state.
 Local Existing Instances schedfairGS.schedfair_inG schedfairGS.schedfairGpreS_state.
 
+(* list l logs every obligation ever allocated to thread i *)
+Definition toS_thread `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
+  own state_name (reservation_map_data i (●ML l)).
+Global Typeclasses Opaque toS_thread.
+Global Instance: Params (@toS_thread) 4 := {}.
+
+(* list l is a snapshot of the log of obligations ever allocated to thread i *)
 Definition toS_snapshot `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
-  own state_name (gmap_view_frag i DfracDiscarded (◯ML l)).
+  own state_name (reservation_map_data i (◯ML l)).
 Global Typeclasses Opaque toS_snapshot.
 Global Instance: Params (@toS_snapshot) 4 := {}.
+
+Definition toS_assigned `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (κ : obl_id) : iProp Σ :=
+  (∃ l, ⌜ κ ∈ l ⌝ ∗ toS_snapshot i l)%I.
+Global Typeclasses Opaque toS_assigned.
+Global Instance: Params (@toS_assigned) 4 := {}.
 
 (* thread i is currently executing, with live obligations l. *)
 Definition toL_thread `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
@@ -66,23 +80,23 @@ Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
   : iProp Σ :=
   locked
     (∃ (Ψ : gmap thread_id (list obl_id)),
-        (⌜map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ⌝) ∗
-        (own state_name (gmap_view_auth (DfracOwn 1) ((mono_list_auth (DfracOwn 1)) <$> Ψ))) ∗
+        (⌜ map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ ⌝) ∗
+        (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ)))) ∗
         (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
         ([∗ map] i ↦ W ∈ Ψ,
+           toS_thread i W ∗
            ∃ (f : A), sfS_fuel_bound i f 1 ∗
-                      (∃ L, ⌜γ !! i = Some L⌝ ∗
+                      (∃ L, ⌜ γ !! i = Some L ⌝ ∗
                             ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
                             ([∗ list] k ∈ L,
                                oblS_live k (1/2/2) ∗
                                ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf)))
-                                ∨ (oblS_active k ∗ ∃ a, ⌜(Ord.from_wf (WFOCM.lt_wf) f <= a)%ord⌝ ∗ oblS_credit k a)))
+                                ∨ (oblS_active k ∗ ∃ a, ⌜ (Ord.from_wf (WFOCM.lt_wf) f <= a)%ord ⌝ ∗ oblS_credit k a)))
                       )
-        (* ∨ *)
-        (* (toL_term i ∗ [∗ list] k ∈ W, oblS_done k) *)
         )
     )%I.
 
-Definition oftI `{SI : indexT} {T : Type} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class obl_ps (T * A)%type} {Σ}
+Definition oftI `{SI : indexT} {T : Type} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class obl_ps (T * A)%type} `{!threadoblGS Σ}
   (Ω : obl_states) (δ : gmap thread_id A) (γ : gmap thread_id (list obl_id)) : iProp Σ :=
-  ([∗ map] f; L ∈ δ; γ, [∗ list] k ∈ L, ⌜∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2⌝)%I.
+  (([∗ set] κ ∈ dom Ω, ∃ i, toS_assigned i κ) ∗
+   ([∗ map] f; L ∈ δ; γ, [∗ list] k ∈ L, ⌜ ∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2 ⌝))%I.
