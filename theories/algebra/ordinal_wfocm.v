@@ -148,14 +148,14 @@ End Jacobsthal_expn_nat_facts.
 (* A inperative-like pseudocode has the following "size":
 one 'line' (Ord.S u), one 'block' = line × ω, one 'loop' = block × ω <= (line × ω) ↑ 2,
 and this is recursively nested: size(pseudocode) <= (line × ω) ↑ ω.
-We also multiply an omega (× ω) to get nondeterministic number of  (line × ω) ↑ ω tokens,
-which is useful when we want to 'delay' the credit submission.
+We also multiply (ω ↑ ω) to get code-size nondeterministic number of  (line × ω) ↑ ω tokens,
+which allow us to write an "obligation structure code".
 Finally, (⊕ u) is to initialize the layer-scheduler fairness connection.
  *)
 Fixpoint layer (u : Ord.t) (i : nat) : Ord.t :=
   match i with
-  | O => (((((Ord.S u) × ω) ↑ ω) × ω) ⊕ u)%ord
-  | S j => ((((layer u j) ↑ ω) × ω) ⊕ u)%ord
+  | O => (((((Ord.S u) × ω) ↑ ω) × (ω ↑ ω)) ⊕ u)%ord
+  | S j => ((((layer u j) ↑ ω) × (ω ↑ ω)) ⊕ u)%ord
   end.
 
 Notation "'ℓ[' u '](' i ')'" := (layer u i) (format "ℓ[ u ]( i )").
@@ -164,11 +164,11 @@ Section layer_facts.
 
   Import Hessenberg Jacobsthal.
 
-  Lemma layer_unfold_zero u : ℓ[u](0) = (((((Ord.S u) × ω) ↑ ω) × ω) ⊕ u)%ord.
+  Lemma layer_unfold_zero u : ℓ[u](0) = (((((Ord.S u) × ω) ↑ ω) × (ω ↑ ω)) ⊕ u)%ord.
   Proof using. reflexivity. Qed.
 
   Lemma layer_unfold_S u :
-    forall i, ℓ[u](S i) = (((ℓ[u](i) ↑ ω) × ω) ⊕ u)%ord.
+    forall i, ℓ[u](S i) = (((ℓ[u](i) ↑ ω) × (ω ↑ ω)) ⊕ u)%ord.
   Proof using. auto. Qed.
 
   Lemma mult_base_l (o0 o1 : Ord.t) : (Ord.O < o1)%ord -> (o0 <= (o0 × o1))%ord.
@@ -182,7 +182,7 @@ Section layer_facts.
   Proof. etransitivity; [|eapply omega_lt_one]. apply Ord.S_lt. Qed.
 
   Ltac lt_remove_add_r := eapply Ord.lt_le_lt; [|apply add_base_l].
-  Ltac lt_remove_mult_r := eapply Ord.lt_le_lt; [|apply mult_base_l; apply omega_lt_zero].
+  Ltac lt_remove_mult_r := eapply Ord.lt_le_lt; [|apply mult_base_l; apply expn_pos].
   Ltac lt_remove_r := lt_remove_add_r; lt_remove_mult_r.
 
   Lemma layer_lt_zero u :
@@ -210,7 +210,9 @@ Section layer_facts.
   Lemma layer_lt_S_nats u :
     forall (n i : nat), (((ℓ[u](i) ↑ ω) × n) < ℓ[u](S i))%ord.
   Proof.
-    intros. rewrite layer_unfold_S. lt_remove_add_r. apply lt_mult_r; [apply Ord.omega_upperbound | apply expn_pos].
+    intros. rewrite layer_unfold_S. lt_remove_add_r. apply lt_mult_r; [| apply expn_pos].
+    etransitivity; [|eapply lt_expn_r]. 2,3: apply omega_lt_one.
+    rewrite expn_1_r; [apply Ord.omega_upperbound | apply omega_lt_zero].
   Qed.
 
   Lemma layer_lt_S_nat u :
