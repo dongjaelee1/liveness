@@ -5,6 +5,55 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liveness Require Import bank language.
 
+Section gmap.
+  Context {K : Type} {EqDecision0 : EqDecision K} {Countable0 : Countable K}.
+
+  Lemma map_Forall2_map_Forall {A B : Type} (R : K → A → B → Prop) (m1 : gmap K A) (m2 : gmap K B) :
+    map_Forall2 R m1 m2 → dom m1 ≡ dom m2 ∧ map_Forall (λ k a, ∃ b, m2 !! k = Some b ∧ R k a b) m1.
+  Proof.
+    intros Hmf. pose proof (map_Forall2_dom _ _ _ Hmf) as Hd. split; [auto|].
+    intros k. specialize (Hmf k). intros. assert (is_Some (m2 !! k)).
+    { destruct (m2 !! k) eqn:Hm2; [eauto|]. exfalso. apply elem_of_dom_2 in H. apply not_elem_of_dom in Hm2. set_solver. }
+    destruct H0. eexists; esplit; [eauto|]. rewrite H H0 in Hmf. by inv Hmf.
+  Qed.
+
+  Lemma map_Forall_map_Forall_2 {A B : Type} (R : K → A → B → Prop) (m1 : gmap K A) (m2 : gmap K B) :
+    (dom m1 ≡ dom m2 ∧ map_Forall (λ k a, ∃ b, m2 !! k = Some b ∧ R k a b) m1) → map_Forall2 R m1 m2.
+  Proof.
+    intros [Hd Hmf]. intros k. destruct (m1 !! k) eqn:Hm1.
+    - specialize (Hmf k a Hm1). simpl in Hmf. destruct Hmf as (?&?&?). rewrite H. by econstructor.
+    - assert (m2 !! k = None).
+      { destruct (m2 !! k) eqn:Hm2; [|auto]. exfalso. apply elem_of_dom_2 in Hm2. apply not_elem_of_dom in Hm1. set_solver. }
+      rewrite H. econstructor.
+  Qed.
+
+  Lemma map_Forall2_lookup_l {A B : Type} (R : K → A → B → Prop) (m1 : gmap K A) (m2 : gmap K B) :
+    map_Forall2 R m1 m2 → ∀ i a, m1 !! i = Some a → ∃ b, m2 !! i = Some b ∧ R i a b.
+  Proof.
+    intros. specialize (H i). rewrite H0 in H. inv H. eauto.
+  Qed.
+
+  Lemma map_Forall2_lookup_r {A B : Type} (R : K → A → B → Prop) (m1 : gmap K A) (m2 : gmap K B) :
+    map_Forall2 R m1 m2 → ∀ i b, m2 !! i = Some b → ∃ a, m1 !! i = Some a ∧ R i a b.
+  Proof.
+    intros. specialize (H i). rewrite H0 in H. inv H. eauto.
+  Qed.
+
+  Lemma map_Forall2_ind {A B : Type} (R : K → A → B → Prop) (Q : gmap K A → gmap K B → Prop) :
+    Q ∅ ∅ →
+    (∀ m1 m2 (i : K) (x : A) (y : B),
+       m1 !! i = None → m2 !! i = None → R i x y → map_Forall2 R m1 m2 → Q m1 m2 → Q (<[i:=x]>m1) (<[i:=y]>m2)) →
+    ∀ m1 m2, map_Forall2 R m1 m2 → Q m1 m2.
+  Proof.
+    intros Hempty Hind. apply (map_ind (K:=K) (A:=A) (λ m1, ∀ (m2 : gmap K B), map_Forall2 R m1 m2 → Q m1 m2)).
+    - intros. apply map_Forall2_empty_inv_l in H. by subst.
+    - intros i a m1 Him1 IH m2 Hmf2. apply map_Forall2_insert_inv_l in Hmf2; [|auto].
+      destruct Hmf2 as (b&m2'&Hm2'&Him2&HR&Hmf2). specialize (Hind _ _ _ _ _ Him1 Him2 HR Hmf2 (IH _ Hmf2)).
+      rewrite Hm2'. auto.
+  Qed.
+
+End gmap.
+
 Module schedfairGS.
 
   Class schedfairGpreS `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} (Σ : gFunctors) : Set :=
@@ -44,6 +93,11 @@ Definition sfS_fuel_credit `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfair
   own state_name (discrete_fun_singleton i (cash a)).
 Global Typeclasses Opaque sfS_fuel_credit.
 Global Instance: Params (@sfS_fuel_credit) 9 := {}.
+
+Definition sfS_fuel_credit_forall `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ} (a : A) : iProp Σ :=
+  (∀ i, sfS_fuel_credit i a)%I.
+Global Typeclasses Opaque sfS_fuel_credit_forall.
+Global Instance: Params (@sfS_fuel_credit_forall) 8 := {}.
 
 Definition schedfairI `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ}
   (δ : gmap thread_id A) : iProp Σ :=
@@ -209,6 +263,43 @@ Section sfi.
     iModIntro. rewrite insert_delete_insert. iFrame. done.
   Qed.
 
+  Lemma schedfairI_decr_set δ1 δ2 :
+    map_Forall2 (λ _ f1 f2, (f2 /< f1)) δ1 δ2 →
+    schedfairI δ1
+    ⊢ |==> schedfairI δ2 ∗ [∗ set] i ∈ dom δ1, ∃ c, ⌜/0 /< c⌝ ∗ sfS_fuel_credit i c.
+  Proof.
+    rewrite /schedfairI -!lock. iIntros (Hmf2) "(%&Ho&HM)".
+    pose proof (map_Forall2_dom_L _ _ _ Hmf2) as Hd. rewrite <- Hd. iFrame.
+    rewrite Hd -big_opM_dom -big_sepM_sep. iApply big_sepM_bupd.
+    iPoseProof (big_sepM_impl_strong _ _ δ1 δ2 with "HM []") as "[HM _]"; [|iApply "HM"].
+    iModIntro. clear a. iIntros (k f2) "Hc %Hd2". pose proof (map_Forall2_lookup_r _ _ _ Hmf2 _ _ Hd2).
+    destruct H as (f1&Hd1&Hf). rewrite Hd1. iDestruct "Hc" as "(%&%&Hc)".
+    assert (∃ f0, (/0 /< f0) ∧ (f2 /+ f0) /≤ f').
+    { apply WFOCM.lt_exists_left in Hf. destruct Hf as (?&?&?). exists x. split; [auto | etransitivity; done]. }
+    destruct H0 as (f0&Hpos&Hf0). 
+    iMod (sfS_fuel_credit_mon_add _ _ _ _ Hf0 with "Hc") as "[Hc1 Hc2]".
+    iModIntro. iSplitL "Hc1".
+    - iExists f2. by iFrame.
+    - iExists f0. by iFrame.
+  Qed.
+
+  Lemma schedfairI_reset_one δ i f f0 f' c :
+    (δ !! i = Some f) →
+    schedfairI δ ∗ sfS_fuel_bound i f0 1
+    ⊢ |==> schedfairI (<[i:=f']>δ) ∗ sfS_fuel_bound i (f0 /+ (f' /+ c)) 1 ∗ sfS_fuel_credit i c.
+  Proof.
+    rewrite /schedfairI -!lock. iIntros (LU) "[(%&Htk&Hs) Hfb]".
+    rewrite dom_insert_lookup_L; [iFrame|done].
+    iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
+    iDestruct "LU" as "(%&%&_)".
+    iMod (sfS_fuel_owe i _ (f' /+ c) with "Hfb") as "[Hfb Hfc]".
+    iPoseProof (sfS_fuel_credit_add with "Hfc") as "[Hf Hc]". iFrame.
+    iPoseProof (big_sepM_insert _ (delete i δ) i f' with "[Hs Hf]") as "Hs".
+    { apply lookup_delete. }
+    { iFrame. iExists f'. iFrame. done. }
+    iModIntro. rewrite insert_delete_insert. iFrame.
+  Qed.
+
   Lemma schedfairI_credit_of_reserved δ c :
     schedfairI δ
     ⊢ |==> schedfairI δ ∗
@@ -227,20 +318,57 @@ Section sfi.
     rewrite ADD. clear ADD. iDestruct "Htk" as "[Htk Hc]". iModIntro. iFrame.
   Qed.
 
-  Lemma schedfairI_reset_one δ i f f0 f' :
-    (δ !! i = Some f) →
-    schedfairI δ ∗ sfS_fuel_bound i f0 1
-    ⊢ |==> schedfairI (<[i:=f']>δ) ∗ sfS_fuel_bound i (f0 /+ f') 1.
+  Lemma schedfairI_credit_from_all δ1 δ2 S c :
+    map_Forall2 (λ i f1 f2, if decide (i ∈ S) then True else (f2 /< f1)) δ1 δ2 →
+    schedfairI δ1 ∗ ([∗ set] i ∈ dom δ1, if decide (i ∈ S) then ∃ f, sfS_fuel_bound i f 1 else True)
+    ⊢ |==> schedfairI δ2 ∗ ([∗ set] i ∈ dom δ2, if decide (i ∈ S) then ∃ f, sfS_fuel_bound i f 1 else True) ∗
+           (own state_name ((λ k : thread_id, if decide (k ∈ dom δ1) then ε else (cash c)) : discrete_fun _)) ∗
+           ([∗ set] i ∈ dom δ1, if decide (i ∈ S) then sfS_fuel_credit i c else ∃ c, ⌜ /0 /< c ⌝ ∗ sfS_fuel_credit i c).
   Proof.
-    rewrite /schedfairI -!lock. iIntros (LU) "[(%&Htk&Hs) Hfb]".
-    rewrite dom_insert_lookup_L; [iFrame|done].
-    iPoseProof (big_sepM_delete with "Hs") as "[LU Hs]"; [eauto |].
-    iDestruct "LU" as "(%&%&_)".
-    iMod (sfS_fuel_owe i _ f' with "Hfb") as "[Hfb Hfc]". iFrame.
-    iPoseProof (big_sepM_insert _ (delete i δ) i f' with "[Hs Hfc]") as "Hs".
-    { apply lookup_delete. }
-    { iFrame. iExists f'. iFrame. done. }
-    iModIntro. rewrite insert_delete_insert. iFrame.
+    iIntros (Hmf2) "[Hsi HS]". iMod (schedfairI_credit_of_reserved with "Hsi") as "[Hsi Hcr]". iFrame "Hcr".
+    rewrite /schedfairI -!lock. iDestruct "Hsi" as "(%&Ho&HM)".
+    pose proof (map_Forall2_dom_L _ _ _ Hmf2) as Hd. rewrite <- Hd. iFrame "Ho".
+    iPoseProof (big_opM_dom with "HS") as "HS". iCombine "HM HS" as "H".
+    rewrite -big_sepS_sep Hd -!big_opM_dom -!big_sepM_sep. iApply big_sepM_bupd.
+    iPoseProof (big_sepM_impl_strong _ _ δ1 δ2 with "H []") as "[H _]"; [|iApply "H"].
+    iModIntro. clear a. iIntros (k f2) "Hc %Hd2". pose proof (map_Forall2_lookup_r _ _ _ Hmf2 _ _ Hd2).
+    destruct H as (f1&Hd1&Hf). rewrite Hd1. iDestruct "Hc" as "[(%&%&Hc) Hs]".
+    destruct (decide (k ∈ S)).
+    - iDestruct "Hs" as "[% Hfb]". iMod (sfS_fuel_owe k _ (f2 /+ c) with "Hfb") as "[Hfb Hfc]".
+      iClear "Hc". iPoseProof (sfS_fuel_credit_add with "Hfc") as "[Hf Hc]".
+      iModIntro. iSplitL "Hf"; [|iFrame]. iExists f2. by iFrame.
+    - iClear "Hs". assert (∃ f0, (/0 /< f0) ∧ (f2 /+ f0) /≤ f').
+      { apply WFOCM.lt_exists_left in Hf. destruct Hf as (?&?&?). exists x. split; [auto | etransitivity; done]. }
+      destruct H0 as (f0&Hpos&Hf0). 
+      iMod (sfS_fuel_credit_mon_add _ _ _ _ Hf0 with "Hc") as "[Hc1 Hc2]".
+      iModIntro. iSplitL "Hc1".
+      + iExists f2. by iFrame.
+      + iSplit; first done. iExists f0. by iFrame.
+  Qed.
+
+  Lemma sfS_fuel_credit_forall_exists (δ : gmap thread_id A) S c :
+    (/0 /< c) →
+    (own state_name ((λ k : thread_id, if decide (k ∈ dom δ) then ε else (cash c)) : discrete_fun _)) ∗
+    ([∗ set] i ∈ dom δ, if decide (i ∈ S) then sfS_fuel_credit i c else ∃ c, ⌜/0 /< c⌝ ∗ sfS_fuel_credit i c)
+    ⊢ ∀ i, ∃ c, ⌜ /0 /< c ⌝ ∗ sfS_fuel_credit i c.
+  Proof.
+    iIntros (LT) "(H1 & H2) %i". destruct (decide (i ∈ dom δ)).
+    - iPoseProof (big_sepS_elem_of_acc _ _ _ e with "H2") as "[Hc H2]". destruct (decide (i ∈ S)).
+      + iExists c. by iFrame.
+      + done.
+    - iExists c. iSplit; first done. iClear "H2". rewrite /sfS_fuel_credit. iStopProof. apply own_mono.
+      assert (((λ k : thread_id, if decide (k ∈ dom δ) then ε else cash c) : discrete_fun _)
+                ≡
+                discrete_fun_singleton i (cash c)
+              ⋅ ((λ k : thread_id, if decide (k ∈ dom δ) then ε else if decide (k = i) then ε else cash c) : discrete_fun _)).
+      { rewrite /discrete_fun_singleton /discrete_fun_insert.
+        intros k. rewrite discrete_fun_lookup_op. destruct (decide (k ∈ dom δ)).
+        - destruct (decide (i = k)); [subst; set_solver|]. rewrite right_id. done.
+        - destruct (decide (i = k)).
+          + subst. simpl. destruct (decide (k = k)); [|done]. by rewrite right_id.
+          + destruct (decide (k = i)); [done|]. by rewrite left_id.
+      }
+      rewrite H. apply cmra_included_l.
   Qed.
 
 End sfi.

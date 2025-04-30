@@ -41,8 +41,6 @@ Local Existing Instances threadobl_inG threadoblGpreS_state threadoblGpreS_live.
 Local Existing Instances osatGS.osat_inG osatGS.osatGpreS_goal osatGS.osatGpreS_state.
 Local Existing Instances schedfairGS.schedfair_inG schedfairGS.schedfairGpreS_state.
 
-Print Instances Equiv.
-
 (* list l logs every obligation ever allocated to thread i *)
 Definition toS_thread `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
   (∃ l', ⌜ l ≡ₚ l' ⌝ ∗ own state_name (reservation_map_data i (●ML l')))%I.
