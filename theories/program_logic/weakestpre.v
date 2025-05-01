@@ -7,7 +7,8 @@ From iris.bi Require Export fixpoint.
 From liveness.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 Import uPred.
-From liveness Require Import ordinal_wfocm thread_obligation.
+From liveness Require Export thread_obligation.
+From liveness Require Import ordinal_wfocm.
 
 Notation Π Λ := (state Λ).
 
