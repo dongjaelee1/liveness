@@ -447,6 +447,29 @@ Section osat.
     }
   Qed.
 
+  Lemma osat_step_one_obl_init_live Ω i :
+    osat Ω ∗ oblG_elem i ∗ oblS_idle i (1/2)
+    ⊢ |==> ∃ a, osat (<[i:=obl_live a]>Ω) ∗ oblS_active i.
+  Proof.
+    iIntros "(Ho&He&Hi)". iPoseProof (osat_obl_is_init with "[Ho He Hi]") as "(%a & %LU)"; first iFrame.
+    destruct a as [a b]. rewrite /osat -!lock. iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom)".
+    assert (LU2 : exists Q, Obls !! i = Some (obl_init (a, b), Q)).
+    { subst. apply lookup_fmap_Some in LU. destruct LU as ((t&Q)&EQ&LU). simpl in *. subst t. eauto. }
+    destruct LU2 as (Q&LU2). iPoseProof (big_sepM_delete with "Hom") as "[LU Hom]"; [eapply LU2 |].
+    iDestruct "LU" as "(%a' & %LE & BND & IDLE & LIVE)".
+    iMod (oblS_idle_to_active with "[Hi IDLE]") as "Ha".
+    { iApply oblS_idle_div_2. iFrame. }
+    iPoseProof (oblS_active_auth_active with "Ha") as "#Haa".
+    iPoseProof ((big_sepM_insert _ (delete i Obls) i (obl_live (a, b), Q))  with "[Hom Ha LIVE BND]") as "Hom".
+    { apply lookup_delete. }
+    { iFrame. iExists a'. iFrame. done. }
+    iModIntro. iExists (a, b). rewrite -lock. iFrame. iSplit; [|done]. iSplit.
+    - iPureIntro. rewrite insert_delete_insert fmap_insert. simpl. by rewrite <- HO.
+    - assert (snd <$> Obls = (snd <$> <[i:=(obl_live (a, b), Q)]> (delete i Obls))).
+      { rewrite fmap_insert fmap_delete. simpl. symmetry. apply insert_delete. rewrite lookup_fmap. by rewrite LU2. }
+      by rewrite H.
+  Qed.
+
   Lemma osat_step_one_obl_live_live Ω i a b b' c :
     (Ω !! i = Some (obl_live (a, b))) →
     (/0 /< c) →
@@ -456,9 +479,7 @@ Section osat.
     intros LU Hc. iIntros "(Ho & CR)".
     rewrite /osat -!lock. iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom)".
     assert (LU2 : exists Q, Obls !! i = Some (obl_live (a, b), Q)).
-    { subst. apply lookup_fmap_Some in LU. destruct LU as ((t&Q)&EQ&LU).
-      simpl in *. subst t. eauto.
-    }
+    { subst. apply lookup_fmap_Some in LU. destruct LU as ((t&Q)&EQ&LU). simpl in *. subst t. eauto. }
     destruct LU2 as (Q&LU2).
     iPoseProof (big_sepM_delete with "Hom") as "[LU Hom]"; [eapply LU2 |].
     iDestruct "LU" as "(%a' & %LE & BND & ACTa & LIVE)".
@@ -505,6 +526,118 @@ Section osat.
     iFrame. iSplitL "R".
     { iSplit; [done|]. iNext. by iRewrite "HPQ". }
     rewrite delete_insert_delete. iFrame.
+  Qed.
+
+  Lemma osat_progress Ω (L : list obl_id) (F : obl_id → B) :
+    osat Ω ∗ ([∗ map] i ↦ o ∈ Ω, match o with
+                                 | obl_live (a, b) =>
+                                     (if decide (i ∈ L) then (∃ c, ⌜ /0 /< c ⌝ ∧ oblS_credit i c) else (⌜ ∃ b', RB b' b ⌝))
+                                 | _ => True
+                                 end)
+    ⊢ |==> ∃ Ω', osat Ω' ∗ (∀ s, ⌜ obl_states_progress s Ω Ω' ⌝) ∗
+                 (⌜ map_Forall (λ i o, match o with | obl_live (a, b) => (if decide (i ∈ L) then b = (F i) else True) | _ => True end) Ω' ⌝).
+  Proof.
+    rewrite /osat -!lock. iIntros "[(%Obls & %HO & Hoa & Hom) HM]".
+    iEval (rewrite HO) in "HM". iPoseProof (big_sepM_fmap fst _ Obls with "HM") as "HM".
+    iCombine "Hom HM" as "HM". iPoseProof (big_sepM_sep with "HM") as "HM".
+    iAssert (|==> [∗ map] k↦x ∈ Obls,
+               (let (y, y0) := (x : obl_state * (prop_of ps * iProp Σ)) in
+                match y with
+                | obl_init (a, _) =>
+                    (∃ a' : A, ⌜a' /≤ a⌝ ∗ oblS_bound k a' ∗ oblS_idle k (1 / 2) ∗ oblS_live k (1 / 2))
+                | obl_live (a, b) =>
+                    (if decide (k ∈ L)
+                     then (∃ a0, ⌜ a0 /< a ⌝ ∗ ∃ a' : A, ⌜a' /≤ a0⌝ ∗ oblS_bound k a' ∗ oblS_active_auth k ∗ oblS_live k (1 / 2))
+                     else ((∃ a' : A, ⌜a' /≤ a⌝ ∗ oblS_bound k a' ∗ oblS_active_auth k ∗ oblS_live k (1 / 2)) ∗ ⌜ ∃ b', RB b' b ⌝))
+                | obl_done P1 => (let (P2, R) := y0 in ⌜P1 ≡ P2⌝ ∗ ▷ R ∗ oblS_active_auth k ∗ oblS_done_auth k)
+                end))%I with "[HM]" as ">HM".
+    { iApply big_sepM_bupd. iApply (big_sepM_impl with "HM"). iIntros "!>" (?? ?) "[H1 H2]".
+      destruct x as (o&p&P). simpl. destruct o; [done | | done].
+      destruct a as (a&b). iDestruct "H1" as "(%&%&Hb&Haa&Hl)". destruct (decide (k ∈ L)).
+      - iDestruct "H2" as "(%&%&Hc)".
+        iMod (oblS_credit_spend with "[Hb Hc]") as "(%&%&Hb)"; first iFrame.
+        iModIntro. iFrame. iExists a2. iSplit; [|done]. iPureIntro.
+        apply WFOCM.lt_exists_right. exists c. split; [auto|]. by etransitivity.
+      - iDestruct "H2" as %[b' Hb']. iModIntro. iFrame. iPureIntro. split; first done. by exists b'.
+    }
+    iAssert (|==> ∃ Obls', ([∗ map] k ↦ x ∈ (Obls' : gmap positive (obl_state * (prop_of ps * iProp Σ))),
+                              let (y, y0) := (x : obl_state * (prop_of ps * iProp Σ)) in
+                              match y with
+                              | obl_init (a, _) =>
+                                  (∃ a' : A, ⌜a' /≤ a⌝ ∗ oblS_bound k a' ∗ oblS_idle k (1 / 2) ∗ oblS_live k (1 / 2))
+                              | obl_live (a, _) =>
+                                  (∃ a' : A, ⌜a' /≤ a⌝ ∗ oblS_bound k a' ∗ oblS_active_auth k ∗ oblS_live k (1 / 2))
+                              | obl_done P1 => (let (P2, R) := y0 in ⌜P1 ≡ P2⌝ ∗ ▷ R ∗ oblS_active_auth k ∗ oblS_done_auth k)
+                              end) ∗
+                           (⌜ snd <$> Obls = snd <$> Obls' ⌝) ∗
+                           (⌜ ∀ s : ps, (fst <$> Obls) ↪ₚ (fst <$> Obls') @ s ⌝) ∗
+                           (⌜ map_Forall (λ i o, match o with | obl_live (a, b) => (if decide (i ∈ L) then b = (F i) else True) | _ => True end) (fst <$> Obls') ⌝)
+            )%I with "[HM]" as ">HM".
+    { clear Ω HO. iStopProof. pattern Obls. revert Obls. apply map_ind.
+      { iIntros "_". iExists ∅. rewrite big_sepM_empty. iPureIntro. split; first auto. split; first done.
+        rewrite !fmap_empty. split; [|done]. intros. apply map_Forall2_empty.
+      }
+      intros i (o&P&Q) Obls Hlu IH. iIntros "H". iDestruct (big_sepM_insert _ _ _ _ Hlu with "H") as "[H HM]".
+      iDestruct (IH with "HM") as ">(%&HM&%Hd&%Hp&%Hf)". clear IH.
+      assert (Hdom : dom Obls = dom Obls').
+      { rewrite <- (dom_fmap_L snd Obls), <- (dom_fmap_L snd Obls'). by rewrite Hd. }
+      assert (Hlu2 : Obls' !! i = None).
+      { apply not_elem_of_dom. apply not_elem_of_dom in Hlu. set_solver. }
+      destruct o.
+      - iModIntro. iExists (<[i:=(obl_init a, (P, Q))]>Obls'). iSplitL.
+        + iApply big_sepM_insert; first done. iFrame.
+        + iPureIntro. repeat split.
+          * rewrite !fmap_insert. rewrite Hd. done.
+          * intros. specialize (Hp s). rewrite !fmap_insert. apply map_Forall2_insert.
+            { by rewrite lookup_fmap Hlu. }
+            { by rewrite lookup_fmap Hlu2. }
+            simpl. split; auto.
+          * rewrite fmap_insert. apply map_Forall_insert.
+            { by rewrite lookup_fmap Hlu2. }
+            split; auto. done.
+      - destruct a as [a b]. case_decide.
+        (* destruct (@decide (@elem_of obl_id (list obl_id) (@elem_of_list obl_id) i L)). *)
+        { iDestruct "H" as "(%&%&%&%&Hb&Hi&Hl)". iMod (oblS_bound_mon _ _ _ H1 with "Hb") as "Hb".
+          iModIntro. iExists (<[i:=(obl_live (a0, F i), (P, Q))]>Obls'). iSplitL.
+          - iApply big_sepM_insert; first done. by iFrame.
+          - iPureIntro. repeat split.
+            + rewrite !fmap_insert. by rewrite Hd.
+            + intros. rewrite !fmap_insert. simpl. specialize (Hp s). apply map_Forall2_insert.
+              { by rewrite lookup_fmap Hlu. }
+              { by rewrite lookup_fmap Hlu2. }
+              simpl; split; auto. by econstructor 1.
+            + rewrite fmap_insert. apply map_Forall_insert.
+              { by rewrite lookup_fmap Hlu2. }
+              split; auto. simpl. case_decide; auto.
+        }
+        { iDestruct "H" as "((%&%&Hb&Ha&Hl)&%)". destruct H1 as [b1 Hb1].
+          iModIntro. iExists (<[i:=(obl_live (a, b1), (P, Q))]>Obls'). iSplitL.
+          - iApply big_sepM_insert; first done. by iFrame.
+          - iPureIntro. repeat split.
+            + rewrite !fmap_insert. by rewrite Hd.
+            + intros. rewrite !fmap_insert. simpl. specialize (Hp s). apply map_Forall2_insert.
+              { by rewrite lookup_fmap Hlu. }
+              { by rewrite lookup_fmap Hlu2. }
+              simpl; split; auto. econstructor 2; auto.
+            + rewrite fmap_insert. apply map_Forall_insert.
+              { by rewrite lookup_fmap Hlu2. }
+              split; auto. simpl. case_decide; done.
+        }
+      - iModIntro. iExists (<[i:=(obl_done P0, (P, Q))]>Obls'). iSplitL.
+        + iApply big_sepM_insert; first done. iFrame.
+        + iPureIntro. repeat split.
+          * rewrite !fmap_insert. rewrite Hd. done.
+          * intros. specialize (Hp s). rewrite !fmap_insert. apply map_Forall2_insert.
+            { by rewrite lookup_fmap Hlu. }
+            { by rewrite lookup_fmap Hlu2. }
+            simpl. split; auto.
+          * rewrite fmap_insert. apply map_Forall_insert.
+            { by rewrite lookup_fmap Hlu2. }
+            split; auto. done.
+    }
+    iDestruct "HM" as "(%&HM&%&%&%)". iModIntro. iExists (fst <$> Obls'). rewrite -lock. iSplitL.
+    - iExists Obls'. iSplit; first done. rewrite <-H. iFrame.
+    - iPureIntro. split; simpl; auto. intros. subst Ω. done.
   Qed.
 
   Lemma osat_done_open Ω i P R :
