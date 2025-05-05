@@ -94,8 +94,8 @@ Definition sfS_fuel_credit `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfair
 Global Typeclasses Opaque sfS_fuel_credit.
 Global Instance: Params (@sfS_fuel_credit) 9 := {}.
 
-Definition sfS_fuel_credit_forall `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ} (a : A) : iProp Σ :=
-  (∀ i, sfS_fuel_credit i a)%I.
+Definition sfS_fuel_credit_forall `{SI : indexT} `{WFOCM.t A leR addO ltR} `{!schedfairGS Σ} : iProp Σ :=
+  (∀ i, ∃ c, ⌜ ltR OCM.unit c ⌝ ∗ sfS_fuel_credit i c)%I.
 Global Typeclasses Opaque sfS_fuel_credit_forall.
 Global Instance: Params (@sfS_fuel_credit_forall) 8 := {}.
 
@@ -346,13 +346,13 @@ Section sfi.
       + iSplit; first done. iExists f0. by iFrame.
   Qed.
 
-  Lemma sfS_fuel_credit_forall_exists (δ : gmap thread_id A) S c :
+  Lemma sfS_fuel_credit_forall_get (δ : gmap thread_id A) S c :
     (/0 /< c) →
     (own state_name ((λ k : thread_id, if decide (k ∈ dom δ) then ε else (cash c)) : discrete_fun _)) ∗
     ([∗ set] i ∈ dom δ, if decide (i ∈ S) then sfS_fuel_credit i c else ∃ c, ⌜/0 /< c⌝ ∗ sfS_fuel_credit i c)
-    ⊢ ∀ i, ∃ c, ⌜ /0 /< c ⌝ ∗ sfS_fuel_credit i c.
+    ⊢ sfS_fuel_credit_forall.
   Proof.
-    iIntros (LT) "(H1 & H2) %i". destruct (decide (i ∈ dom δ)).
+    rewrite /sfS_fuel_credit_forall. iIntros (LT) "(H1 & H2) %i". destruct (decide (i ∈ dom δ)).
     - iPoseProof (big_sepS_elem_of_acc _ _ _ e with "H2") as "[Hc H2]". destruct (decide (i ∈ S)).
       + iExists c. by iFrame.
       + done.
@@ -369,6 +369,14 @@ Section sfi.
           + destruct (decide (k = i)); [done|]. by rewrite left_id.
       }
       rewrite H. apply cmra_included_l.
+  Qed.
+
+  Lemma sfS_fuel_pay_forall i a0 q :
+    sfS_fuel_bound i a0 q ∗ sfS_fuel_credit_forall ⊢ |==> ∃ a1, ⌜ a1 /< a0 ⌝ ∗ sfS_fuel_bound i a1 q.
+  Proof.
+    iIntros "[Hb Hcf]". rewrite /sfS_fuel_credit_forall. iSpecialize ("Hcf" $! i).
+    iDestruct "Hcf" as "(%&%&Hc)". iMod (sfS_fuel_pay with "[Hb Hc]") as "(%&%&Hb)"; first iFrame.
+    iFrame. iPureIntro. apply WFOCM.lt_exists_right. exists c. done.
   Qed.
 
 End sfi.

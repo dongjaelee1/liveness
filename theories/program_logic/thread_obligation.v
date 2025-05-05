@@ -235,6 +235,16 @@ Section thread_obligation.
     iFrame. iPureIntro. done.
   Qed.
 
+  Lemma toL_obligation_free γ i κ l :
+    own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i (κ :: l)
+    ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=l]>γ)) ∗ toL_thread i l.
+  Proof.
+    rewrite /toL_thread. iIntros "[H (%&%&Ht)]". iCombine "H Ht" as "H".
+    iMod (own_update _ _ (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=l]>γ) ⋅ gmap_view_frag i (DfracOwn 1) (to_agree l)) with "H") as "[H Ht]".
+    { rewrite fmap_insert. apply gmap_view_replace. done. }
+    iFrame. iPureIntro. done.
+  Qed.
+
   Lemma toI_thread_alloc γ i f :
     γ !! i = None →
     toI γ ∗ sfS_fuel_bound i f 1
@@ -298,6 +308,68 @@ Section thread_obligation.
       + exfalso. rewrite lookup_delete in H4. done.
       + rewrite lookup_insert_ne; done.
   Qed.
+
+  Lemma toI_obligation_fulfill γ i κ l :
+    toI γ ∗ toL_thread i (κ :: l) ∗ oblS_live κ (1/2/2)
+    ⊢ |==> oblS_live κ (1/2) ∗ (oblS_done κ -∗ toI (<[i:=l]>γ) ∗ toL_thread i l).
+  Proof.
+    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Ht & Hl)".
+    iPoseProof (toL_thread_elem_of with "[Hol Ht]") as "%"; first iFrame. destruct H3 as (l'&LUγ&Perml).
+    pose proof (map_Forall2_lookup_l _ _ _ H2 _ _ LUγ) as Hlu. destruct Hlu as (W&LUΨ&Hsub).
+    iPoseProof (big_sepM_delete _ _ _ _ LUΨ with "HM") as "[HP HM]".
+    iDestruct "HP" as "(Hp1 & % & Hp2 & % & % & Hp3 & Hpl)".
+    rewrite LUγ in H3. inv H3.
+    rewrite (big_opL_permutation _ _ _ Perml). iPoseProof (big_sepL_cons with "Hpl") as "[[HL1 _] Hpl]".
+    iCombine "Hl HL1" as "Hl". iPoseProof (oblS_live_div_2 with "Hl") as "Hl". iFrame "Hl".
+    iMod (toL_obligation_free with "[Hol Ht]") as "[Hol Ht]"; first iFrame.
+    iIntros "!> #Hd". iFrame "Ht". iExists Ψ. iSplit.
+    { iPureIntro. intros j. destruct (decide (i = j)).
+      - subst. rewrite lookup_insert LUΨ. econstructor. etransitivity; [|eapply Hsub]. rewrite Perml. set_solver.
+      - rewrite lookup_insert_ne; done.
+    }
+    iFrame "Hos Hol". iApply (big_sepM_delete _ _ _ _ LUΨ). iSplitR "HM".
+    - iFrame. iSplit; first by rewrite lookup_insert. iApply (big_sepL_impl with "Hp3").
+      iModIntro. iIntros (k x ?) "[% | H]"; [|iRight; done]. destruct (decide (x = κ)).
+      + subst. by iRight.
+      + iLeft; iPureIntro. rewrite Perml in H4. set_solver.
+    - iApply (big_sepM_impl with "HM"). iModIntro. iIntros (k x ?) "(H1&%&H2&%&%&H3&H4)". iFrame.
+      iPureIntro. rewrite lookup_insert_ne; first done. intros eq. subst. rewrite lookup_delete in H3. done.
+  Qed.
+
+  TODO
+
+  Lemma toI_obligation_progress γ i l :
+    toI γ ∗ toL_thread i l ∗
+    ⊢ |==> toI γ ∗ toL_thread i l ∗  .
+  Proof.
+
+    Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
+  `{@osatGS.osatGS SI Ord.t _ ps Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ} `{!threadoblGS Σ}
+  (γ : gmap thread_id (list obl_id))
+  : iProp Σ :=
+  locked
+    (∃ (Ψ : gmap thread_id (list obl_id)),
+        (⌜ map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ ⌝) ∗
+        (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ)))) ∗
+        (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
+        ([∗ map] i ↦ W ∈ Ψ,
+           toS_thread i W ∗
+           ∃ (f : A), sfS_fuel_bound i f 1 ∗
+                      (∃ L, ⌜ γ !! i = Some L ⌝ ∗
+                            ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
+                            ([∗ list] k ∈ L,
+                               oblS_live k (1/2/2) ∗
+                               ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf)))
+                                ∨ (oblS_active k ∗ ∃ a, ⌜ (Ord.from_wf (WFOCM.lt_wf) f <= a)%ord ⌝ ∗ oblS_credit k a)))
+                      )
+        )
+    )%I.
+
+
+  Definition oftI `{SI : indexT} {T : Type} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class obl_ps (T * A)%type} `{!threadoblGS Σ}
+  (Ω : obl_states) (δ : gmap thread_id A) (γ : gmap thread_id (list obl_id)) : iProp Σ :=
+  (([∗ set] κ ∈ dom Ω, ∃ i, toS_assigned i κ) ∗
+   ([∗ map] f; L ∈ δ; γ, [∗ list] k ∈ L, ⌜ ∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2 ⌝))%I.
 
 End thread_obligation.
 
