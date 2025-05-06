@@ -54,8 +54,8 @@ Global Typeclasses Opaque toS_assigned.
 Global Instance: Params (@toS_assigned) 4 := {}.
 
 (* thread i is currently executing, with live obligations l. *)
-Definition toL_thread `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) (l : list obl_id) : iProp Σ :=
-  (∃ l', ⌜ l ≡ₚ l' ⌝ ∗ own live_name (gmap_view_frag i (DfracOwn 1) (to_agree l')))%I.
+Definition toL_thread `{SI : indexT} `{!threadoblGS Σ} (i : thread_id) q (l : list obl_id) : iProp Σ :=
+  (∃ l', ⌜ l ≡ₚ l' ⌝ ∗ own live_name (gmap_view_frag i (DfracOwn q) (to_agree l')))%I.
 Global Typeclasses Opaque toL_thread.
 Global Instance: Params (@toL_thread) 4 := {}.
 
@@ -177,24 +177,24 @@ Section thread_obligation.
     iFrame. iModIntro. iSplit; [|done]. iPureIntro. rewrite H2. apply Permutation_cons_append.
   Qed.
 
-  Lemma toL_thread_term i :
-    toL_thread i [] ⊢ |==> toL_term i.
+  Lemma toL_thread_term i q :
+    toL_thread i q [] ⊢ |==> toL_term i.
   Proof.
     rewrite /toL_thread /toL_term. iIntros "(%&%&H)". apply Permutation_nil in H2. subst.
     iApply (own_update with "H"). apply gmap_view_frag_persist.
   Qed.
 
-  Lemma toL_thread_perm i l l' :
+  Lemma toL_thread_perm i q l l' :
     Permutation l l' →
-    toL_thread i l ⊣⊢ toL_thread i l'.
+    toL_thread i q l ⊣⊢ toL_thread i q l'.
   Proof.
     rewrite /toL_thread. iIntros (Hp). iSplit; iIntros "(%&%&H)".
     - iExists l'0. iFrame. iPureIntro. etransitivity; done.
     - iExists l'0. iFrame. iPureIntro. etransitivity; done.
   Qed.
 
-  Lemma toL_thread_elem_of γ i l :
-    own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i l
+  Lemma toL_thread_elem_of γ i q l :
+    own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i q l
     ⊢ ∃ l', ⌜ γ !! i = Some l' ⌝ ∧ ⌜ l' ≡ₚ l ⌝.
   Proof.
     rewrite /toL_thread. iIntros "(H&%&%&Ht)". iCombine "H Ht" as "H".
@@ -217,7 +217,7 @@ Section thread_obligation.
   Lemma toL_thread_alloc γ i l :
     γ !! i = None →
     own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))
-    ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=l]>γ)) ∗ toL_thread i l.
+    ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=l]>γ)) ∗ toL_thread i 1 l.
   Proof.
     iIntros (LU) "H". iMod (own_update with "H") as "[H Ht]".
     { apply (gmap_view_alloc _ i (DfracOwn 1) (to_agree l)); [| done | done]. by rewrite lookup_fmap LU. }
@@ -226,8 +226,8 @@ Section thread_obligation.
   Qed.
 
   Lemma toL_obligation_alloc γ i l κ :
-    own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i l
-    ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=κ :: l]>γ)) ∗ toL_thread i (κ :: l).
+    own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i 1 l
+    ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=κ :: l]>γ)) ∗ toL_thread i 1 (κ :: l).
   Proof.
     rewrite /toL_thread. iIntros "[H (%&%&Ht)]". iCombine "H Ht" as "H".
     iMod (own_update _ _ (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=κ :: l]>γ) ⋅ gmap_view_frag i (DfracOwn 1) (to_agree (κ :: l))) with "H") as "[H Ht]".
@@ -236,8 +236,8 @@ Section thread_obligation.
   Qed.
 
   Lemma toL_obligation_free γ i κ l :
-    own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i (κ :: l)
-    ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=l]>γ)) ∗ toL_thread i l.
+    own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i 1 (κ :: l)
+    ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=l]>γ)) ∗ toL_thread i 1 l.
   Proof.
     rewrite /toL_thread. iIntros "[H (%&%&Ht)]". iCombine "H Ht" as "H".
     iMod (own_update _ _ (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=l]>γ) ⋅ gmap_view_frag i (DfracOwn 1) (to_agree l)) with "H") as "[H Ht]".
@@ -248,7 +248,7 @@ Section thread_obligation.
   Lemma toI_thread_alloc γ i f :
     γ !! i = None →
     toI γ ∗ sfS_fuel_bound i f 1
-    ⊢ |==> toI (<[i:=[]]>γ) ∗ toL_thread i [].
+    ⊢ |==> toI (<[i:=[]]>γ) ∗ toL_thread i 1 [].
   Proof.
     iIntros (LU) "[HI Hf]". pose proof (not_elem_of_dom_2 _ _ LU) as Hn.
     rewrite /toI -!lock. iDestruct "HI" as "(%&%&Hos&Hol&HM)".
@@ -275,8 +275,8 @@ Section thread_obligation.
   Qed.
 
   Lemma toI_obligation_alloc γ i l κ :
-    toI γ ∗ toL_thread i l ∗ oblS_live κ (1/2/2) ∗ oblS_idle κ (1/2/2) ∗ oblS_credit κ (Ord.from_wf_set (WFOCM.lt_wf))
-    ⊢ |==> toI (<[i:=κ :: l]>γ) ∗ toL_thread i (κ :: l) ∗ toS_assigned i κ.
+    toI γ ∗ toL_thread i 1 l ∗ oblS_live κ (1/2/2) ∗ oblS_idle κ (1/2/2) ∗ oblS_credit κ (Ord.from_wf_set (WFOCM.lt_wf))
+    ⊢ |==> toI (<[i:=κ :: l]>γ) ∗ toL_thread i 1 (κ :: l) ∗ toS_assigned i κ.
   Proof.
     rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & (Htl&Hsl&Hsi&Hsc))".
     iPoseProof (toL_thread_elem_of with "[Hol Htl]") as "%"; first iFrame.
@@ -310,8 +310,8 @@ Section thread_obligation.
   Qed.
 
   Lemma toI_obligation_fulfill γ i κ l :
-    toI γ ∗ toL_thread i (κ :: l) ∗ oblS_live κ (1/2/2)
-    ⊢ |==> oblS_live κ (1/2) ∗ (oblS_done κ -∗ toI (<[i:=l]>γ) ∗ toL_thread i l).
+    toI γ ∗ toL_thread i 1 (κ :: l) ∗ oblS_live κ (1/2/2)
+    ⊢ |==> oblS_live κ (1/2) ∗ (oblS_done κ -∗ toI (<[i:=l]>γ) ∗ toL_thread i 1 l).
   Proof.
     rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Ht & Hl)".
     iPoseProof (toL_thread_elem_of with "[Hol Ht]") as "%"; first iFrame. destruct H3 as (l'&LUγ&Perml).
@@ -339,8 +339,8 @@ Section thread_obligation.
   TODO
 
   Lemma toI_obligation_progress γ i l :
-    toI γ ∗ toL_thread i l ∗
-    ⊢ |==> toI γ ∗ toL_thread i l ∗  .
+    toI γ ∗ toL_thread i l ∗ [∗ list] k ∈ l, (oblS_idle k 
+    ⊢ |==> (∃ f, sfS_fuel_bound i f 1) ∗ (∀ f, sfS_fule_bound i f 1 -∗ (toI γ ∗ toL_thread i l)).
   Proof.
 
     Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
