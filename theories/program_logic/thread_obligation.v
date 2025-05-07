@@ -126,6 +126,15 @@ Section thread_obligation.
     - iApply (own_mono with "H"). apply reservation_map_data_mono. by rewrite mono_list_auth_lb_op.
   Qed.
 
+  Lemma toS_thread_assigned_inv i l κ :
+    toS_thread i l ∗ toS_assigned i κ ⊢ ⌜ κ ∈ l ⌝.
+  Proof.
+    rewrite /toS_thread /toS_assigned. iIntros "[(%&%&H) (%&%&H2)]".
+    iCombine "H H2" as "H". iPoseProof (own_valid with "H") as "%". iPureIntro.
+    apply reservation_map_data_valid in H4. apply mono_list_both_valid_L in H4.
+    rewrite H2. eauto using elem_of_prefix.
+  Qed.
+
   Lemma toS_thread_elem_of D i l :
     own state_name (reservation_map_token (⊤ ∖ D)) ∗ toS_thread i l
     ⊢ ⌜ i ∈ D ⌝.
@@ -336,12 +345,56 @@ Section thread_obligation.
       iPureIntro. rewrite lookup_insert_ne; first done. intros eq. subst. rewrite lookup_delete in H3. done.
   Qed.
 
-  TODO
-
-  Lemma toI_obligation_progress γ i l :
-    toI γ ∗ toL_thread i l ∗ [∗ list] k ∈ l, (oblS_idle k 
-    ⊢ |==> (∃ f, sfS_fuel_bound i f 1) ∗ (∀ f, sfS_fule_bound i f 1 -∗ (toI γ ∗ toL_thread i l)).
+  Lemma toI_obligation_reset_fuel γ i q l :
+    toI γ ∗ toL_thread i q l ∗ ([∗ list] k ∈ l, (oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf))))
+    ⊢ (∃ f, sfS_fuel_bound i f 1) ∗ (∀ f, sfS_fuel_bound i f 1 -∗ (toI γ ∗ toL_thread i q l)).
   Proof.
+    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Ht & HL)".
+    iPoseProof (toL_thread_elem_of with "[Hol Ht]") as "(%&%LUγ&%Perml)"; first iFrame.
+    pose proof (map_Forall2_lookup_l _ _ _ H2 _ _ LUγ) as Hlu. destruct Hlu as (W&LUΨ&Hsub).
+    iPoseProof (big_sepM_delete _ _ _ _ LUΨ with "HM") as "[HP HM]".
+    iDestruct "HP" as "(Hp1 & % & Hp2 & % & % & Hp3 & Hpl)".
+    rewrite LUγ in H3. inv H3. iSplitL "Hp2"; first iFrame. iIntros (?) "Hp2".
+    iFrame "Ht". iExists Ψ. iSplit; first done. iFrame "Hos Hol".
+    iApply (big_sepM_delete _ _ _ _ LUΨ). iFrame "HM". iFrame. iSplit; first done.
+    rewrite <-(big_opL_permutation _ _ _ Perml). iCombine "HL Hpl" as "Hl". iPoseProof (big_sepL_sep with "Hl") as "Hl".
+    iApply (big_sepL_impl with "Hl"). iModIntro. iIntros (j k LUk) "(Hc&Hl&[(Hi & _) | (Ha & _)])".
+    - iFrame. iLeft. iFrame.
+    - iFrame. iRight. iFrame. iPureIntro. apply Ord.lt_le, Ord.from_wf_set_upperbound.
+  Qed.
+
+  Lemma toI_assigned_progress γ i (K : gset obl_id) :
+    toI γ ∗ sfS_fuel_credit_forall ∗ ([∗ set] k ∈ K, toS_assigned i k) ∗ ([∗ set] k ∈ K, oblS_active k)
+    ⊢ |==> toI γ ∗ ([∗ set] k ∈ K, (∃ c, ⌜ /0 /< c ⌝ ∗ oblS_credit k c) ∨ oblS_done k).
+  Proof.
+    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Hcf & #HK & #HKa)".
+    destruct (decide (K = ∅)).
+    { subst. iFrame. iModIntro. iSplit; first done. rewrite !big_sepS_empty. done. }
+    iAssert (∃ W, ⌜ Ψ !! i = Some W ⌝ ∧ [∗ set] k ∈ K, ⌜ k ∈ W ⌝)%I as "(%&%LUΨ&#HKin)".
+    { assert (K ≢ ∅) by set_solver. apply size_non_empty_iff in H3. assert (0 < size K) by lia.
+      apply size_pos_elem_of in H4. destruct H4 as [k Hk].
+      iPoseProof (big_sepS_delete _ _ _ Hk with "HK") as "[Hk _]".
+      iPoseProof (toS_assigned_elem_of _ _ _ with "[Hos Hk]") as "%Hkp"; first by iFrame.
+      apply elem_of_gset_to_coPset, elem_of_dom in Hkp. destruct Hkp. iExists x. iSplit; first done.
+      iApply big_sepS_forall. iIntros (??). iPoseProof (big_sepS_delete _ _ _ H5 with "HK") as "[Hx _]".
+      iPoseProof (big_sepM_delete _ _ _ _ H4 with "HM") as "[[Hxx _] HM]".
+      iApply (toS_thread_assigned_inv with "[Hxx Hx]"); by iFrame.
+    }
+    iAssert (|==> 
+    (∃ Ψ0 : gmap thread_id (list obl_id), ⌜map_Forall2 (λ (_ : thread_id) (l1 l2 : list obl_id), l1 ⊆ l2) γ Ψ0⌝ ∗
+       own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ0))) ∗
+       own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗
+       ([∗ map] i0↦W0 ∈ Ψ0, toS_thread i0 W0 ∗
+        ∃ f : A, sfS_fuel_bound i0 f 1 ∗
+          ∃ L : list obl_id, ⌜γ !! i0 = Some L⌝ ∗ ([∗ list] k ∈ W0, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
+            ([∗ list] k ∈ L, oblS_live k (1 / 2 / 2) ∗
+             (oblS_idle k (1 / 2 / 2) ∗ oblS_credit k (Ord.from_wf_set WFOCM.lt_wf) ∨ oblS_active k ∗
+              ∃ a : Ord.t, ⌜(Ord.from_wf WFOCM.lt_wf f <= a)%ord⌝ ∗ oblS_credit k a)))) ∗
+    ([∗ list] k ∈ W, (∃ c : Ord.t, ⌜/0 /< c⌝ ∗ oblS_credit k c) ∨ oblS_done k))%I with "[-]" as "H".
+    {
+
+      TODO
+
 
     Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
   `{@osatGS.osatGS SI Ord.t _ ps Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ} `{!threadoblGS Σ}
