@@ -143,6 +143,27 @@ Section Jacobsthal_expn_nat_facts.
 
 End Jacobsthal_expn_nat_facts.
 
+(** WFOCM respects some ordinal operations when embedded. *)
+Class OrdFromWFOCM `(wfocm : WFOCM.t A leR addO ltR) := {
+    ord_from_wfocm_hess_add :
+    forall (a1 a2 : A), (Ord.from_wf WFOCM.lt_wf (addO a1 a2) == ((Ord.from_wf WFOCM.lt_wf a1) ⊕ (Ord.from_wf WFOCM.lt_wf a2)))%ord;
+    ord_from_wfocm_le :
+    forall (a1 a2 : A), leR a1 a2 -> (Ord.from_wf WFOCM.lt_wf a1 <= Ord.from_wf WFOCM.lt_wf a2)%ord;
+  }.
+
+Section ord_from_wfocm.
+  Context `{wfocm : WFOCM.t A leR addO ltR} {OFW : OrdFromWFOCM wfocm}.
+
+  Lemma ord_from_wfocm_unit_lt (a : A) :
+    (ltR OCM.unit a) -> (Ord.O < Ord.from_wf WFOCM.lt_wf a)%ord.
+  Proof using.
+    intros. apply (Ord.lt_from_wf WFOCM.lt_wf) in H. apply ord_lt_one in H.
+    eapply Ord.lt_le_lt; [| eauto]. rewrite Hessenberg.add_comm, <- ord_S_add.
+    apply Ord.S_pos.
+  Qed.
+
+End ord_from_wfocm.
+
 (** Layer structure. (Ord.S u) is the "unit" of the construction. *)
 (* u is instantiated to the upperbound ordinal of the set of scheduler fairness fuel. *)
 (* A inperative-like pseudocode has the following "size":

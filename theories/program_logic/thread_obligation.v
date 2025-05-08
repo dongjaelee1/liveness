@@ -72,18 +72,17 @@ Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
   : iProp Σ :=
   locked
     (∃ (Ψ : gmap thread_id (list obl_id)),
-        (⌜ map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ ⌝) ∗
+        (⌜ map_Forall2 (λ _ l1 l2, l1 ⊆+ l2) γ Ψ ⌝) ∗
         (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ)))) ∗
         (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
         ([∗ map] i ↦ W ∈ Ψ,
            toS_thread i W ∗
            ∃ (f : A), sfS_fuel_bound i f 1 ∗
                       (∃ L, ⌜ γ !! i = Some L ⌝ ∗
-                            ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
+                            ([∗ list] k ∈ W, ⌜ k ∈ L ⌝ ∨ oblS_done k) ∗
                             ([∗ list] k ∈ L,
                                oblS_live k (1/2/2) ∗
-                               ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf)))
-                                ∨ (oblS_active k ∗ ∃ a, ⌜ (Ord.from_wf (WFOCM.lt_wf) f <= a)%ord ⌝ ∗ oblS_credit k a)))
+                               (oblS_active k ∗ ∃ a, ⌜ (Ord.from_wf (WFOCM.lt_wf) f <= a)%ord ⌝ ∗ oblS_credit k a))
                       )
         )
     )%I.
@@ -91,7 +90,7 @@ Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
 Definition oftI `{SI : indexT} {T : Type} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class obl_ps (T * A)%type} `{!threadoblGS Σ}
   (Ω : obl_states) (δ : gmap thread_id A) (γ : gmap thread_id (list obl_id)) : iProp Σ :=
   (([∗ set] κ ∈ dom Ω, ∃ i, toS_assigned i κ) ∗
-   ([∗ map] f; L ∈ δ; γ, [∗ list] k ∈ L, ⌜ ∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2 ⌝))%I.
+   ([∗ map] f; L ∈ δ; γ, [∗ list] κ ∈ L, ⌜ ∃ c, Ω !! κ = Some (obl_live c) ∧ leR f c.2 ⌝))%I.
 
 Section thread_obligation.
   Context `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class ps (Ord.t * A)%type}.
@@ -284,7 +283,7 @@ Section thread_obligation.
   Qed.
 
   Lemma toI_obligation_alloc γ i l κ :
-    toI γ ∗ toL_thread i 1 l ∗ oblS_live κ (1/2/2) ∗ oblS_idle κ (1/2/2) ∗ oblS_credit κ (Ord.from_wf_set (WFOCM.lt_wf))
+    toI γ ∗ toL_thread i 1 l ∗ oblS_live κ (1/2/2) ∗ oblS_active κ ∗ oblS_credit κ (Ord.from_wf_set (WFOCM.lt_wf))
     ⊢ |==> toI (<[i:=κ :: l]>γ) ∗ toL_thread i 1 (κ :: l) ∗ toS_assigned i κ.
   Proof.
     rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & (Htl&Hsl&Hsi&Hsc))".
@@ -300,18 +299,24 @@ Section thread_obligation.
     iExists (<[i:=κ :: W]>Ψ). replace (dom (<[i:=κ :: W]> Ψ)) with (dom Ψ).
     2:{ rewrite dom_insert_lookup_L; done. }
     iFrame. iSplit.
-    { iPureIntro. apply map_Forall2_insert_2; [|done]. apply list_subseteq_skip.
-      specialize (H2 i). rewrite LU2 LU in H2. inv H2.
-      rewrite list_subseteq_Permutation; [apply H6 | done | done].
+    { iPureIntro. apply map_Forall2_insert_2; [|done]. specialize (H2 i).
+      rewrite LU2 LU in H2. inv H2. rewrite HP in H6. by econstructor.
     }
     iApply (big_sepM_delete _ _ i (κ :: W)); [apply lookup_insert|]. rewrite H3 in LU. inv LU.
     iSplitR "HM".
-    - iSplitL "Hm1"; [done|]. iExists f. iSplitL "Hm2"; [done|]. iExists (κ :: l).
-      iSplit; [iPureIntro; apply lookup_insert|]. iFrame. iSplitL "Hm3".
+    - iFrame "Hm1 Hm2". iExists (κ :: l).
+      iSplit; [iPureIntro; apply lookup_insert|].
+      iAssert (∀ k, ⌜ k ∈ W → k ∉ l' → k ≠ κ ⌝)%I as "%NIN".
+      { iIntros (k INW NINl'). destruct (elem_of_list_lookup_1 _ _ INW) as [n LUW].
+        iPoseProof (big_sepL_delete _ _ _ _ LUW with "Hm3") as "[[%IN | NIN] Hm3]"; first done.
+        destruct (decide (k = κ)); [subst | done]. iPoseProof (oblS_live_done_false with "[$]") as "%F"; done.
+      }
+      iFrame. iSplitL "Hm3".
       + rewrite big_opL_cons. iSplit; [iLeft; iPureIntro; set_solver|].
-        iApply (big_sepL_impl with "Hm3"). iModIntro. iIntros (???) "[% | ?]"; [|iFrame].
-        iLeft. iPureIntro. rewrite -HP. set_solver.
+        iApply (big_sepL_impl with "Hm3"). iModIntro. iIntros (???) "[% | H]"; [|iFrame].
+        * iLeft. iPureIntro. rewrite -HP. set_solver.
       + rewrite big_opL_permutation'; [|eauto]. iFrame.
+        iPureIntro. apply Ord.lt_le, Ord.from_wf_set_upperbound.
     - rewrite delete_insert_delete. iApply (big_sepM_impl with "HM"). iModIntro. iIntros (???) "[Hts (%&H1&%&%&H2&H3)]".
       iFrame. iPureIntro. destruct (decide (i = k)); subst.
       + exfalso. rewrite lookup_delete in H4. done.
@@ -319,28 +324,34 @@ Section thread_obligation.
   Qed.
 
   Lemma toI_obligation_fulfill γ i κ l :
-    toI γ ∗ toL_thread i 1 (κ :: l) ∗ oblS_live κ (1/2/2)
-    ⊢ |==> oblS_live κ (1/2) ∗ (oblS_done κ -∗ toI (<[i:=l]>γ) ∗ toL_thread i 1 l).
+    toI γ ∗ toL_thread i 1 (κ :: l)
+    ⊢ |==> oblS_live κ (1/2/2) ∗ (oblS_done κ -∗ toI (<[i:=l]>γ) ∗ toL_thread i 1 l).
   Proof.
-    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Ht & Hl)".
+    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Ht)".
     iPoseProof (toL_thread_elem_of with "[Hol Ht]") as "%"; first iFrame. destruct H3 as (l'&LUγ&Perml).
     pose proof (map_Forall2_lookup_l _ _ _ H2 _ _ LUγ) as Hlu. destruct Hlu as (W&LUΨ&Hsub).
     iPoseProof (big_sepM_delete _ _ _ _ LUΨ with "HM") as "[HP HM]".
     iDestruct "HP" as "(Hp1 & % & Hp2 & % & % & Hp3 & Hpl)".
     rewrite LUγ in H3. inv H3.
-    rewrite (big_opL_permutation _ _ _ Perml). iPoseProof (big_sepL_cons with "Hpl") as "[[HL1 _] Hpl]".
-    iCombine "Hl HL1" as "Hl". iPoseProof (oblS_live_div_2 with "Hl") as "Hl". iFrame "Hl".
+    rewrite (big_opL_permutation _ _ _ Perml). iPoseProof (big_sepL_cons with "Hpl") as "[[HL1 _] Hpl]". iFrame "HL1".
     iMod (toL_obligation_free with "[Hol Ht]") as "[Hol Ht]"; first iFrame.
-    iIntros "!> #Hd". iFrame "Ht". iExists Ψ. iSplit.
+    iIntros "!> #Hd". iAssert (⌜ κ ∉ l ⌝)%I as "%NIN".
+    { destruct (decide (κ ∈ l)); [|done]. destruct (elem_of_list_lookup_1 _ _ e) as [n LUW].
+      iPoseProof (big_sepL_delete _ _ _ _ LUW with "Hpl") as "[[Hlive _] Hpl]".
+      iPoseProof (oblS_live_done_false with "[Hlive Hd]") as "%F"; [by iFrame | done].
+    }
+    iFrame "Ht". iExists Ψ. iSplit.
     { iPureIntro. intros j. destruct (decide (i = j)).
-      - subst. rewrite lookup_insert LUΨ. econstructor. etransitivity; [|eapply Hsub]. rewrite Perml. set_solver.
+      - subst. rewrite lookup_insert LUΨ. econstructor. etransitivity; [|eapply Hsub]. rewrite Perml. by econstructor.
       - rewrite lookup_insert_ne; done.
     }
     iFrame "Hos Hol". iApply (big_sepM_delete _ _ _ _ LUΨ). iSplitR "HM".
     - iFrame. iSplit; first by rewrite lookup_insert. iApply (big_sepL_impl with "Hp3").
-      iModIntro. iIntros (k x ?) "[% | H]"; [|iRight; done]. destruct (decide (x = κ)).
-      + subst. by iRight.
-      + iLeft; iPureIntro. rewrite Perml in H4. set_solver.
+      iModIntro. iIntros (k x ?) "[% | H]".
+      + destruct (decide (x = κ)).
+        * subst. iRight. done.
+        * iLeft; iPureIntro. rewrite Perml in H4. set_solver.
+      + by iRight.
     - iApply (big_sepM_impl with "HM"). iModIntro. iIntros (k x ?) "(H1&%&H2&%&%&H3&H4)". iFrame.
       iPureIntro. rewrite lookup_insert_ne; first done. intros eq. subst. rewrite lookup_delete in H3. done.
   Qed.
@@ -358,40 +369,98 @@ Section thread_obligation.
     iFrame "Ht". iExists Ψ. iSplit; first done. iFrame "Hos Hol".
     iApply (big_sepM_delete _ _ _ _ LUΨ). iFrame "HM". iFrame. iSplit; first done.
     rewrite <-(big_opL_permutation _ _ _ Perml). iCombine "HL Hpl" as "Hl". iPoseProof (big_sepL_sep with "Hl") as "Hl".
-    iApply (big_sepL_impl with "Hl"). iModIntro. iIntros (j k LUk) "(Hc&Hl&[(Hi & _) | (Ha & _)])".
-    - iFrame. iLeft. iFrame.
-    - iFrame. iRight. iFrame. iPureIntro. apply Ord.lt_le, Ord.from_wf_set_upperbound.
+    iApply (big_sepL_impl with "Hl"). iModIntro. iIntros (j k LUk) "(Hc&Hl&(Ha & _))".
+    iFrame. iPureIntro. apply Ord.lt_le, Ord.from_wf_set_upperbound.
   Qed.
 
-  Lemma toI_assigned_progress γ i (K : gset obl_id) :
-    toI γ ∗ sfS_fuel_credit_forall ∗ ([∗ set] k ∈ K, toS_assigned i k) ∗ ([∗ set] k ∈ K, oblS_active k)
+  Lemma toS_assigned_obligations_elem_of i K Ψ :
+    K ≠ ∅ →
+    (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ)))) ∗ 
+    ([∗ map] j ↦ W ∈ Ψ, toS_thread j W) ∗
+    ([∗ set] k ∈ K, toS_assigned i k)
+    ⊢ ∃ W : list obl_id, ⌜Ψ !! i = Some W⌝ ∧ ([∗ set] k ∈ K, ⌜k ∈ W⌝).
+  Proof.
+    iIntros (KE) "(Hos&Hts&#HK)".
+    assert (K ≢ ∅) by set_solver. apply size_non_empty_iff in H2. assert (0 < size K) by lia.
+    apply size_pos_elem_of in H3. destruct H3 as [k Hk].
+    iPoseProof (big_sepS_delete _ _ _ Hk with "HK") as "[Hk _]".
+    iPoseProof (toS_assigned_elem_of _ _ _ with "[Hos Hk]") as "%Hkp"; first by iFrame.
+    apply elem_of_gset_to_coPset, elem_of_dom in Hkp. destruct Hkp. iExists x. iSplit; first done.
+    iApply big_sepS_forall. iIntros (??). iPoseProof (big_sepS_delete _ _ _ H4 with "HK") as "[Hx _]".
+    iPoseProof (big_sepM_delete _ _ _ _ H3 with "Hts") as "[Ht Hts]".
+    iApply (toS_thread_assigned_inv with "[Ht Hx]"); by iFrame.
+  Qed.
+
+  Lemma toI_assigned_progress {OFW : OrdFromWFOCM WF} γ i (K : gset obl_id) :
+    toI γ ∗ sfS_fuel_credit_forall ∗ ([∗ set] k ∈ K, toS_assigned i k)
     ⊢ |==> toI γ ∗ ([∗ set] k ∈ K, (∃ c, ⌜ /0 /< c ⌝ ∗ oblS_credit k c) ∨ oblS_done k).
   Proof.
-    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Hcf & #HK & #HKa)".
+    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Hcf & #HK)".
     destruct (decide (K = ∅)).
     { subst. iFrame. iModIntro. iSplit; first done. rewrite !big_sepS_empty. done. }
-    iAssert (∃ W, ⌜ Ψ !! i = Some W ⌝ ∧ [∗ set] k ∈ K, ⌜ k ∈ W ⌝)%I as "(%&%LUΨ&#HKin)".
-    { assert (K ≢ ∅) by set_solver. apply size_non_empty_iff in H3. assert (0 < size K) by lia.
-      apply size_pos_elem_of in H4. destruct H4 as [k Hk].
-      iPoseProof (big_sepS_delete _ _ _ Hk with "HK") as "[Hk _]".
-      iPoseProof (toS_assigned_elem_of _ _ _ with "[Hos Hk]") as "%Hkp"; first by iFrame.
-      apply elem_of_gset_to_coPset, elem_of_dom in Hkp. destruct Hkp. iExists x. iSplit; first done.
-      iApply big_sepS_forall. iIntros (??). iPoseProof (big_sepS_delete _ _ _ H5 with "HK") as "[Hx _]".
-      iPoseProof (big_sepM_delete _ _ _ _ H4 with "HM") as "[[Hxx _] HM]".
-      iApply (toS_thread_assigned_inv with "[Hxx Hx]"); by iFrame.
+    iPoseProof (toS_assigned_obligations_elem_of i K Ψ n with "[Hos HM]") as "(%&%LUΨ&#HKin)".
+    { iFrame. iSplitL; [| done]. iApply (big_sepM_impl with "HM"). iModIntro. by iIntros (???) "[H _]". }
+    iPoseProof (big_sepM_delete _ _ _ _ LUΨ with "HM") as "[(Hm1&%&Hm2&%&%&#Hm3&Hm4) HM]".
+    iAssert (
+        (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ)))) ∗
+        (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
+        ([∗ map] k↦y ∈ delete i Ψ,
+           toS_thread k y ∗
+           ∃ f0, sfS_fuel_bound k f0 1 ∗
+                 ∃ L0, ⌜γ !! k = Some L0⌝ ∗
+                       ([∗ list] k0 ∈ y, ⌜k0 ∈ L0⌝ ∨ oblS_done k0) ∗
+                       ([∗ list] k0 ∈ L0, oblS_live k0 (1 / 2 / 2) ∗
+                                          oblS_active k0 ∗ ∃ a : Ord.t,
+                                              ⌜(Ord.from_wf WFOCM.lt_wf f0 <= a)%ord⌝ ∗ oblS_credit k0 a)) ∗
+        |==> (toS_thread i W ∗
+              ∃ f', sfS_fuel_bound i f' 1 ∗
+                    ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
+                    ([∗ list] k ∈ L, oblS_live k (1 / 2 / 2) ∗ oblS_active k ∗
+                                     ∃ a : Ord.t, ⌜(Ord.from_wf WFOCM.lt_wf f' <= a)%ord⌝ ∗ oblS_credit k a) ∗
+                    ([∗ set] k ∈ K, (∃ c : Ord.t, ⌜/0 /< c⌝ ∗ oblS_credit k c) ∨ oblS_done k)
+      ))%I with "[-]" as "(H1&H2&H3&>(Ht&%&Hs&HW&HL&HR))".
+    2:{ iModIntro. iFrame "H1 H2 HR". iSplit; first done. iApply (big_sepM_delete _ _ _ _ LUΨ with "[-]"). by iFrame. }
+    iFrame "Hos Hol HM Hm1". iMod (sfS_fuel_pay_forall with "[Hcf Hm2]") as "(%f'&%Hltf&Hcf)"; first iFrame.
+    iFrame "Hcf". iFrame "Hm3". iAssert ([∗ set] k ∈ K, ⌜k ∈ L⌝ ∨ oblS_done k)%I as "#HK2".
+    { iApply big_sepS_forall. iIntros (x INx). iDestruct "HKin" as "%HKin".
+      assert (LUW : ∃ z, W !! z = Some x).
+      { apply elem_of_list_lookup_1. set_solver. }
+      destruct LUW as [z LUW]. iPoseProof (big_sepL_delete _ _ _ _ LUW with "Hm3") as "[Hx _]". done.
     }
-    iAssert (|==> 
-    (∃ Ψ0 : gmap thread_id (list obl_id), ⌜map_Forall2 (λ (_ : thread_id) (l1 l2 : list obl_id), l1 ⊆ l2) γ Ψ0⌝ ∗
-       own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ0))) ∗
-       own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗
-       ([∗ map] i0↦W0 ∈ Ψ0, toS_thread i0 W0 ∗
-        ∃ f : A, sfS_fuel_bound i0 f 1 ∗
-          ∃ L : list obl_id, ⌜γ !! i0 = Some L⌝ ∗ ([∗ list] k ∈ W0, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
-            ([∗ list] k ∈ L, oblS_live k (1 / 2 / 2) ∗
-             (oblS_idle k (1 / 2 / 2) ∗ oblS_credit k (Ord.from_wf_set WFOCM.lt_wf) ∨ oblS_active k ∗
-              ∃ a : Ord.t, ⌜(Ord.from_wf WFOCM.lt_wf f <= a)%ord⌝ ∗ oblS_credit k a)))) ∗
-    ([∗ list] k ∈ W, (∃ c : Ord.t, ⌜/0 /< c⌝ ∗ oblS_credit k c) ∨ oblS_done k))%I with "[-]" as "H".
-    {
+    iAssert (|==> [∗ list] k ∈ L, (oblS_live k (1 / 2 / 2) ∗ oblS_active k ∗ ∃ a : Ord.t, ⌜(Ord.from_wf WFOCM.lt_wf f' <= a)%ord⌝ ∗ oblS_credit k a) ∗
+                             (∃ c : Ord.t, ⌜/0 /< c⌝ ∗ oblS_credit k c))%I with "[Hm4]" as ">Hm4".
+    { rewrite -big_sepL_bupd. iApply (big_sepL_impl with "Hm4").
+      iModIntro. iIntros (???) "(Hl & Ha & % & % & Hc)".
+      apply WFOCM.lt_exists_left in Hltf. destruct Hltf as (c&LTc&LEc).
+      assert ((Ord.from_wf WFOCM.lt_wf f' ⊕ Ord.from_wf WFOCM.lt_wf c) <= a)%ord.
+      { etransitivity; [|eauto]. rewrite <-ord_from_wfocm_hess_add. by apply ord_from_wfocm_le. }
+      iMod (oblS_credit_mon_split x with "Hc") as "[Hf Hc]"; first by eapply H6.
+      iModIntro. iSplitR "Hc"; first by iFrame. iFrame. iPureIntro. by apply ord_from_wfocm_unit_lt.
+    }
+    iPoseProof (big_sepL_sep with "Hm4") as "[Hm41 Hm42]". iFrame "Hm41". iModIntro.
+    iClear "HK HKin Hm3". iStopProof. clear n H3. revert L. pattern K. revert K. apply set_ind.
+    { solve_proper. }
+    { iIntros. done. }
+    iIntros (k K NIN IH) "% [#HK HL]". destruct (decide (k ∈ K)).
+    { assert ({[k]} ∪ K = K) by set_solver. rewrite !H3. by iApply (IH L). }
+    rewrite !(big_sepS_union _ {[k]} K); [|set_solver|set_solver].
+    rewrite !big_sepS_singleton. iDestruct "HK" as "[[%Lk | #Hd] HK]".
+    - destruct (elem_of_list_lookup_1 _ _ Lk) as [v LUL]. pose proof (delete_Permutation _ _ _ LUL).
+      iPoseProof (big_opL_permutation with "HL") as "HL".
+      { symmetry. apply H3. }
+      rewrite big_sepL_cons. iDestruct "HL" as "[Hl HL]".
+      iSplitL "Hl"; first by iLeft. iApply (IH (delete v L)). iSplitR.
+      + iModIntro. iApply (big_sepS_impl with "HK"). iModIntro. iIntros (x INx) "[%INxL | Hd]"; [|by iRight].
+        iLeft. iPureIntro. destruct (decide (x = k)); first set_solver.
+        destruct (elem_of_list_lookup_1 _ _ INxL) as [u LUx]. destruct (decide (u = v)).
+        { subst. rewrite LUL in LUx. inv LUx. }
+        destruct (decide (u < v)).
+        { eapply (elem_of_list_lookup_2 _ u).  rewrite lookup_delete_lt; done. }
+        { destruct u; first lia. eapply (elem_of_list_lookup_2). rewrite lookup_delete_ge; first done. lia. }
+      + done.
+    - iSplitR; [by iRight|].
+      iApply (IH L). by iFrame.
+  Qed.
 
       TODO
 
