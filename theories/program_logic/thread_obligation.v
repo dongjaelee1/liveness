@@ -92,7 +92,7 @@ Definition oftI `{SI : indexT} {T : Type} `{WF : WFOCM.t A leR addO ltR} `{OC : 
   (([∗ set] κ ∈ dom Ω, ∃ i, toS_assigned i κ) ∗
    ([∗ map] f; L ∈ δ; γ, [∗ list] κ ∈ L, ⌜ ∃ c, Ω !! κ = Some (obl_live c) ∧ leR f c.2 ⌝))%I.
 
-Section thread_obligation.
+Section thread_obl.
   Context `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class ps (Ord.t * A)%type}.
   Context {Σ} `{@osatGS.osatGS SI _ ord_wfocm_pack ps Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ} `{!@threadoblGS SI Σ}.
 
@@ -100,6 +100,8 @@ Section thread_obligation.
   Proof. rewrite /toS_assigned. apply _. Qed.
   Global Instance toL_term_persistent i : Persistent (toL_term i).
   Proof. rewrite /toL_term. apply _. Qed.
+  Global Instance oftI_persistent Ω δ γ : Persistent (oftI Ω δ γ).
+  Proof. rewrite /oftI. apply _. Qed.
 
   Local Infix "/=" := OCM.eq (at level 70).
   Local Infix "/≤" := WFOCM.leR (at level 70).
@@ -174,7 +176,9 @@ Section thread_obligation.
     iModIntro. rewrite /toS_thread. iFrame. iSplit; [|done]. by rewrite New.
   Qed.
 
-  Lemma toS_obligation_alloc i l κ :
+  (* Print Table Search Blacklist. *)
+  (* Shows that _obl_ is blacklisted, and as a result. any lemma that contains _obl_ doesn't show up in Search.  *)
+  Lemma toS_obl_alloc i l κ :
     toS_thread i l ⊢ |==> toS_thread i (κ :: l) ∗ toS_assigned i κ.
   Proof.
     rewrite /toS_thread. iIntros "(%&%&H)". iMod (own_update _ _ (reservation_map_data i (●ML (l' ++ [κ]))) with "H") as "H".
@@ -233,7 +237,7 @@ Section thread_obligation.
     by rewrite fmap_insert.
   Qed.
 
-  Lemma toL_obligation_alloc γ i l κ :
+  Lemma toL_obl_alloc γ i l κ :
     own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i 1 l
     ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=κ :: l]>γ)) ∗ toL_thread i 1 (κ :: l).
   Proof.
@@ -243,7 +247,7 @@ Section thread_obligation.
     iFrame. iPureIntro. done.
   Qed.
 
-  Lemma toL_obligation_free γ i κ l :
+  Lemma toL_obl_free γ i κ l :
     own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i 1 (κ :: l)
     ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=l]>γ)) ∗ toL_thread i 1 l.
   Proof.
@@ -282,19 +286,19 @@ Section thread_obligation.
     - by rewrite lookup_insert_ne.
   Qed.
 
-  Lemma toI_obligation_alloc γ i l κ :
+  Lemma toI_obl_alloc γ i l κ :
     toI γ ∗ toL_thread i 1 l ∗ oblS_live κ (1/2/2) ∗ oblS_active κ ∗ oblS_credit κ (Ord.from_wf_set (WFOCM.lt_wf))
     ⊢ |==> toI (<[i:=κ :: l]>γ) ∗ toL_thread i 1 (κ :: l) ∗ toS_assigned i κ.
   Proof.
     rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & (Htl&Hsl&Hsi&Hsc))".
     iPoseProof (toL_thread_elem_of with "[Hol Htl]") as "%"; first iFrame.
     destruct H3 as (l'&LU&HP).
-    iMod (toL_obligation_alloc _ _ _ κ with "[Hol Htl]") as "(Hol&Htl)"; first iFrame.
+    iMod (toL_obl_alloc _ _ _ κ with "[Hol Htl]") as "(Hol&Htl)"; first iFrame.
     assert (∃ W, Ψ !! i = Some W).
     { apply map_Forall2_dom in H2. apply elem_of_dom. rewrite -H2. apply elem_of_dom. done. }
     destruct H3 as (W&LU2). iPoseProof (big_sepM_delete with "HM") as "[H HM]"; first done.
     iDestruct "H" as "(Hm1&%&Hm2&%&%&Hm3&Mm4)".
-    iMod (toS_obligation_alloc _ _ κ with "Hm1") as "[Hm1 Hsa]".
+    iMod (toS_obl_alloc _ _ κ with "Hm1") as "[Hm1 Hsa]".
     iModIntro. iSplitR "Htl Hsa"; [|iFrame].
     iExists (<[i:=κ :: W]>Ψ). replace (dom (<[i:=κ :: W]> Ψ)) with (dom Ψ).
     2:{ rewrite dom_insert_lookup_L; done. }
@@ -323,7 +327,7 @@ Section thread_obligation.
       + rewrite lookup_insert_ne; done.
   Qed.
 
-  Lemma toI_obligation_fulfill γ i κ l :
+  Lemma toI_obl_fulfill γ i κ l :
     toI γ ∗ toL_thread i 1 (κ :: l)
     ⊢ |==> oblS_live κ (1/2/2) ∗ (oblS_done κ -∗ toI (<[i:=l]>γ) ∗ toL_thread i 1 l).
   Proof.
@@ -334,7 +338,7 @@ Section thread_obligation.
     iDestruct "HP" as "(Hp1 & % & Hp2 & % & % & Hp3 & Hpl)".
     rewrite LUγ in H3. inv H3.
     rewrite (big_opL_permutation _ _ _ Perml). iPoseProof (big_sepL_cons with "Hpl") as "[[HL1 _] Hpl]". iFrame "HL1".
-    iMod (toL_obligation_free with "[Hol Ht]") as "[Hol Ht]"; first iFrame.
+    iMod (toL_obl_free with "[Hol Ht]") as "[Hol Ht]"; first iFrame.
     iIntros "!> #Hd". iAssert (⌜ κ ∉ l ⌝)%I as "%NIN".
     { destruct (decide (κ ∈ l)); [|done]. destruct (elem_of_list_lookup_1 _ _ e) as [n LUW].
       iPoseProof (big_sepL_delete _ _ _ _ LUW with "Hpl") as "[[Hlive _] Hpl]".
@@ -356,7 +360,7 @@ Section thread_obligation.
       iPureIntro. rewrite lookup_insert_ne; first done. intros eq. subst. rewrite lookup_delete in H3. done.
   Qed.
 
-  Lemma toI_obligation_reset_fuel γ i q l :
+  Lemma toI_obl_reset_fuel γ i q l :
     toI γ ∗ toL_thread i q l ∗ ([∗ list] k ∈ l, (oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf))))
     ⊢ (∃ f, sfS_fuel_bound i f 1) ∗ (∀ f, sfS_fuel_bound i f 1 -∗ (toI γ ∗ toL_thread i q l)).
   Proof.
@@ -373,7 +377,7 @@ Section thread_obligation.
     iFrame. iPureIntro. apply Ord.lt_le, Ord.from_wf_set_upperbound.
   Qed.
 
-  Lemma toS_assigned_obligations_elem_of i K Ψ :
+  Lemma toS_assigned_obls_elem_of i K Ψ :
     K ≠ ∅ →
     (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ)))) ∗ 
     ([∗ map] j ↦ W ∈ Ψ, toS_thread j W) ∗
@@ -391,14 +395,14 @@ Section thread_obligation.
     iApply (toS_thread_assigned_inv with "[Ht Hx]"); by iFrame.
   Qed.
 
-  Lemma toI_assigned_progress {OFW : OrdFromWFOCM WF} γ i (K : gset obl_id) :
+  Lemma toI_obl_progress {OFW : OrdFromWFOCM WF} γ i (K : gset obl_id) :
     toI γ ∗ sfS_fuel_credit_forall ∗ ([∗ set] k ∈ K, toS_assigned i k)
     ⊢ |==> toI γ ∗ ([∗ set] k ∈ K, (∃ c, ⌜ /0 /< c ⌝ ∗ oblS_credit k c) ∨ oblS_done k).
   Proof.
     rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & Hcf & #HK)".
     destruct (decide (K = ∅)).
     { subst. iFrame. iModIntro. iSplit; first done. rewrite !big_sepS_empty. done. }
-    iPoseProof (toS_assigned_obligations_elem_of i K Ψ n with "[Hos HM]") as "(%&%LUΨ&#HKin)".
+    iPoseProof (toS_assigned_obls_elem_of i K Ψ n with "[Hos HM]") as "(%&%LUΨ&#HKin)".
     { iFrame. iSplitL; [| done]. iApply (big_sepM_impl with "HM"). iModIntro. by iIntros (???) "[H _]". }
     iPoseProof (big_sepM_delete _ _ _ _ LUΨ with "HM") as "[(Hm1&%&Hm2&%&%&#Hm3&Hm4) HM]".
     iAssert (
@@ -462,30 +466,45 @@ Section thread_obligation.
       iApply (IH L). by iFrame.
   Qed.
 
+  Lemma toI_assigned_obls γ (D : obl_ids) :
+    toI γ ∗ ([∗ set] κ ∈ D, ∃ i, toS_assigned i κ)
+    ⊢ toI γ ∗ ∃ D1 D2, ⌜ D = D1 ∪ D2 ∧ D1 ## D2 ⌝ ∗
+                       ([∗ set] κ ∈ D1, oblS_done κ) ∗
+                       ([∗ set] κ ∈ D2, ⌜ ∃ i L, γ !! i = Some L ∧ κ ∈ L ⌝).
+  Proof.
+    (* set_ind? *)
+  Abort.
+
+  (* Lemma osat_toI_live_obls Ω γ (D : obl_ids) : *)
+  (*   osat (WFB:=WFOCM.lt_wf (t:=WF)) Ω ∗ toI γ ∗ ([∗ set] κ ∈ D, ⌜ ∃ i L, γ !! i = Some L ∧ κ ∈ L ⌝) *)
+  (*   ⊢ osat Ω ∗ toI γ ∗ ([∗ set] κ ∈ D, ⌜ ∃ c, Ω !! κ = Some (obl_live c) ⌝). *)
+  (* Proof. *)
+  (* Abort. *)
+  oftI_thread_alloc
+  oftI_obl_alloc
+  oftI_obl_fulfill
+
+  Lemma oftI_schedule
+    map_Forall2 (λ i f1 f2, if decide (i ∈ S) then True else (f2 /< f1)) δ1 δ2 →
+        ([∗ set] κ ∈ D, ⌜ ∃ i L, γ !! i = Some L ∧ κ ∈ L ⌝).
+        (* ([∗ set] κ ∈ D, ⌜ ∃ c, Ω !! κ = Some (obl_live c) ⌝). *)
+   ([∗ map] f; L ∈ δ; γ, [∗ list] k ∈ L, ⌜ ∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2 ⌝)
+    ⊢ ([∗ map] i ↦ o ∈ Ω, match o with
+                                 | obl_live (a, b) =>
+                                     (if decide (i ∈ L) then True else (⌜ ∃ b', RB b' b ⌝))
+                                 | _ => True
+                                 end)
+
+
       TODO
-
-
-    Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
-  `{@osatGS.osatGS SI Ord.t _ ps Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ} `{!threadoblGS Σ}
-  (γ : gmap thread_id (list obl_id))
-  : iProp Σ :=
-  locked
-    (∃ (Ψ : gmap thread_id (list obl_id)),
-        (⌜ map_Forall2 (λ _ l1 l2, l1 ⊆ l2) γ Ψ ⌝) ∗
-        (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset (dom Ψ)))) ∗
-        (own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ))) ∗
-        ([∗ map] i ↦ W ∈ Ψ,
-           toS_thread i W ∗
-           ∃ (f : A), sfS_fuel_bound i f 1 ∗
-                      (∃ L, ⌜ γ !! i = Some L ⌝ ∗
-                            ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
-                            ([∗ list] k ∈ L,
-                               oblS_live k (1/2/2) ∗
-                               ((oblS_idle k (1/2/2) ∗ oblS_credit k (Ord.from_wf_set (WFOCM.lt_wf)))
-                                ∨ (oblS_active k ∗ ∃ a, ⌜ (Ord.from_wf (WFOCM.lt_wf) f <= a)%ord ⌝ ∗ oblS_credit k a)))
-                      )
-        )
-    )%I.
+  Lemma osat_progress Ω (L : list obl_id) (F : obl_id → B) :
+    osat Ω ∗ ([∗ map] i ↦ o ∈ Ω, match o with
+                                 | obl_live (a, b) =>
+                                     (if decide (i ∈ L) then (∃ c, ⌜ /0 /< c ⌝ ∧ oblS_credit i c) else (⌜ ∃ b', RB b' b ⌝))
+                                 | _ => True
+                                 end)
+    ⊢ |==> ∃ Ω', osat Ω' ∗ (∀ s, ⌜ obl_states_progress s Ω Ω' ⌝) ∗
+                 (⌜ map_Forall (λ i o, match o with | obl_live (a, b) => (if decide (i ∈ L) then b = (F i) else True) | _ => True end) Ω' ⌝).
 
 
   Definition oftI `{SI : indexT} {T : Type} `{WF : WFOCM.t A leR addO ltR} `{OC : obl_class obl_ps (T * A)%type} `{!threadoblGS Σ}
@@ -493,7 +512,7 @@ Section thread_obligation.
   (([∗ set] κ ∈ dom Ω, ∃ i, toS_assigned i κ) ∗
    ([∗ map] f; L ∈ δ; γ, [∗ list] k ∈ L, ⌜ ∃ c, Ω !! k = Some (obl_live c) ∧ leR f c.2 ⌝))%I.
 
-End thread_obligation.
+End thread_obl.
 
 (* Allocation of an initial thread obligation protocol. *)
 Lemma toI_alloc `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ} `{@osatGS.osatGS SI Ord.t _ ps Σ} `{@schedfairGS.schedfairGS SI _ _ _ _ WF Σ} `{!threadoblGS Σ} : ⊢ |==> ∃ _ : threadoblGS Σ, toI ∅.
