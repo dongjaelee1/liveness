@@ -597,7 +597,8 @@ Section thread_obl.
     set_Forall (λ κ, ∃ i L, γ !! i = Some L ∧ κ ∈ L) D2 →
     map_Forall (λ κ o, match o with
                        | obl_live (a, b) =>
-                           (∃ i L, (γ !! i = Some L) ∧ κ ∈ L ∧ if (decide (i ∈ S)) then True else ∃ b', b' /< b)
+                           (∃ i L, (γ !! i = Some L) ∧ κ ∈ L ∧
+                                   if (decide (i ∈ S)) then True else ∃ b', b' /< b ∧ ∃ f, δ2 !! i = Some f ∧ f /≤ b)
                        | _ => True
                        end) Ω.
   Proof using Type*.
@@ -615,9 +616,27 @@ Section thread_obl.
       2:{ apply not_elem_of_dom. apply elem_of_dom_2 in LU. set_solver. }
       rewrite LU in LUm2. inv LUm2. exists i, L. split; first auto. split; first auto.
       specialize (SF i). rewrite H3 in SF. inv SF. 
-      case_decide; first eauto. exists y. apply WFOCM.lt_exists_left. apply WFOCM.lt_exists_left in H6.
-      destruct H6 as (z&?&?). exists z. split; first auto. etransitivity; first apply H7. apply LE.
+      case_decide; first eauto. exists y. apply WFOCM.lt_exists_left in H6. destruct H6 as (z&?&?). split.
+      + apply WFOCM.lt_exists_left. exists z. split; first auto. etransitivity; first apply H7. apply LE.
+      + exists y. split; first auto. etransitivity; [|eauto]. etransitivity; [|eauto]. apply OCM.add_base_left_le.
   Qed.
+
+  Lemma oftI_schedule_2 (Ω1 Ω2 : obl_states' OC) (δ1 δ2 : gmap thread_id A) (γ : gmap thread_id (list obl_id)) (S : thread_ids) s :
+    map_Forall2 (λ i f1 f2, if decide (i ∈ S) then True else (f2 /< f1)) δ1 δ2 →
+    (Ω1 ↪ₚ Ω2 @ s) →
+    (map_Forall (λ κ o, match o with
+                        | obl_live (a, b) =>
+                            (∃ i L, (γ !! i = Some L) ∧ κ ∈ L ∧ (∃ f, δ2 !! i = Some f ∧ f /≤ b))
+                        | _ => True end) Ω2) →
+    oftI Ω1 δ1 γ ⊢ oftI Ω2 δ2 γ.
+  Proof.
+    rewrite /oftI. iIntros (SF HP MF) "(#HΩ&#H)".
+
+
+    TODO
+
+    rewrite dom_insert_L. rewrite subseteq_union_1_L.
+    
 
 
       TODO

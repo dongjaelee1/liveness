@@ -528,14 +528,17 @@ Section osat.
     rewrite delete_insert_delete. iFrame.
   Qed.
 
-  Lemma osat_progress Ω (L : list obl_id) (F : obl_id → B) :
+  Lemma osat_progress Ω (L : list obl_id) (F : obl_id → B → Prop) (R : obl_id → B → Prop) :
     osat Ω ∗ ([∗ map] i ↦ o ∈ Ω, match o with
                                  | obl_live (a, b) =>
-                                     (if decide (i ∈ L) then (∃ c, ⌜ /0 /< c ⌝ ∧ oblS_credit i c) else (⌜ ∃ b', RB b' b ⌝))
+                                     (if decide (i ∈ L)
+                                      then (∃ c, ⌜ /0 /< c ⌝ ∧ oblS_credit i c ∧ ⌜ ∃ b', F i b' ⌝)
+                                      else (⌜ ∃ b', RB b' b ∧ R i b' ⌝))
                                  | _ => True
                                  end)
     ⊢ |==> ∃ Ω', osat Ω' ∗ (∀ s, ⌜ obl_states_progress s Ω Ω' ⌝) ∗
-                 (⌜ map_Forall (λ i o, match o with | obl_live (a, b) => (if decide (i ∈ L) then b = (F i) else True) | _ => True end) Ω' ⌝).
+                 (⌜ map_Forall (λ i o, match o with
+                                       | obl_live (a, b) => (if decide (i ∈ L) then F i b else R i b) | _ => True end) Ω' ⌝).
   Proof.
     rewrite /osat -!lock. iIntros "[(%Obls & %HO & Hoa & Hom) HM]".
     iEval (rewrite HO) in "HM". iPoseProof (big_sepM_fmap fst _ Obls with "HM") as "HM".
@@ -547,18 +550,18 @@ Section osat.
                     (∃ a' : A, ⌜a' /≤ a⌝ ∗ oblS_bound k a' ∗ oblS_idle k (1 / 2) ∗ oblS_live k (1 / 2))
                 | obl_live (a, b) =>
                     (if decide (k ∈ L)
-                     then (∃ a0, ⌜ a0 /< a ⌝ ∗ ∃ a' : A, ⌜a' /≤ a0⌝ ∗ oblS_bound k a' ∗ oblS_active_auth k ∗ oblS_live k (1 / 2))
-                     else ((∃ a' : A, ⌜a' /≤ a⌝ ∗ oblS_bound k a' ∗ oblS_active_auth k ∗ oblS_live k (1 / 2)) ∗ ⌜ ∃ b', RB b' b ⌝))
+                     then (∃ a0, ⌜ a0 /< a ⌝ ∗ ∃ a' : A, ⌜a' /≤ a0⌝ ∗ oblS_bound k a' ∗ oblS_active_auth k ∗ oblS_live k (1 / 2) ∧ ⌜ ∃ b', F k b' ⌝)
+                     else ((∃ a' : A, ⌜a' /≤ a⌝ ∗ oblS_bound k a' ∗ oblS_active_auth k ∗ oblS_live k (1 / 2)) ∗ ⌜ ∃ b', RB b' b ∧ R k b' ⌝))
                 | obl_done P1 => (let (P2, R) := y0 in ⌜P1 ≡ P2⌝ ∗ ▷ R ∗ oblS_active_auth k ∗ oblS_done_auth k)
                 end))%I with "[HM]" as ">HM".
     { iApply big_sepM_bupd. iApply (big_sepM_impl with "HM"). iIntros "!>" (?? ?) "[H1 H2]".
       destruct x as (o&p&P). simpl. destruct o; [done | | done].
       destruct a as (a&b). iDestruct "H1" as "(%&%&Hb&Haa&Hl)". destruct (decide (k ∈ L)).
-      - iDestruct "H2" as "(%&%&Hc)".
+      - iDestruct "H2" as "(%&%&Hc&HF)".
         iMod (oblS_credit_spend with "[Hb Hc]") as "(%&%&Hb)"; first iFrame.
         iModIntro. iFrame. iExists a2. iSplit; [|done]. iPureIntro.
         apply WFOCM.lt_exists_right. exists c. split; [auto|]. by etransitivity.
-      - iDestruct "H2" as %[b' Hb']. iModIntro. iFrame. iPureIntro. split; first done. by exists b'.
+      - iDestruct "H2" as %[b' Hb']. iModIntro. iFrame. iPureIntro. split; first done. eauto.
     }
     iAssert (|==> ∃ Obls', ([∗ map] k ↦ x ∈ (Obls' : gmap positive (obl_state * (prop_of ps * iProp Σ))),
                               let (y, y0) := (x : obl_state * (prop_of ps * iProp Σ)) in
@@ -571,7 +574,7 @@ Section osat.
                               end) ∗
                            (⌜ snd <$> Obls = snd <$> Obls' ⌝) ∗
                            (⌜ ∀ s : ps, (fst <$> Obls) ↪ₚ (fst <$> Obls') @ s ⌝) ∗
-                           (⌜ map_Forall (λ i o, match o with | obl_live (a, b) => (if decide (i ∈ L) then b = (F i) else True) | _ => True end) (fst <$> Obls') ⌝)
+                           (⌜ map_Forall (λ i o, match o with | obl_live (a, b) => (if decide (i ∈ L) then F i b else R i b) | _ => True end) (fst <$> Obls') ⌝)
             )%I with "[HM]" as ">HM".
     { clear Ω HO. iStopProof. pattern Obls. revert Obls. apply map_ind.
       { iIntros "_". iExists ∅. rewrite big_sepM_empty. iPureIntro. split; first auto. split; first done.
@@ -597,8 +600,9 @@ Section osat.
             split; auto. done.
       - destruct a as [a b]. case_decide.
         (* destruct (@decide (@elem_of obl_id (list obl_id) (@elem_of_list obl_id) i L)). *)
-        { iDestruct "H" as "(%&%&%&%&Hb&Hi&Hl)". iMod (oblS_bound_mon _ _ _ H1 with "Hb") as "Hb".
-          iModIntro. iExists (<[i:=(obl_live (a0, F i), (P, Q))]>Obls'). iSplitL.
+        { iDestruct "H" as "(%&%&%&%&Hb&Hi&Hl&%)". destruct H2.
+          iMod (oblS_bound_mon _ _ _ H1 with "Hb") as "Hb".
+          iModIntro. iExists (<[i:=(obl_live (a0, x), (P, Q))]>Obls'). iSplitL.
           - iApply big_sepM_insert; first done. by iFrame.
           - iPureIntro. repeat split.
             + rewrite !fmap_insert. by rewrite Hd.
@@ -608,7 +612,7 @@ Section osat.
               simpl; split; auto. by econstructor 1.
             + rewrite fmap_insert. apply map_Forall_insert.
               { by rewrite lookup_fmap Hlu2. }
-              split; auto. simpl. case_decide; auto.
+              split; auto. simpl. case_decide; auto. set_solver.
         }
         { iDestruct "H" as "((%&%&Hb&Ha&Hl)&%)". destruct H1 as [b1 Hb1].
           iModIntro. iExists (<[i:=(obl_live (a, b1), (P, Q))]>Obls'). iSplitL.
@@ -618,10 +622,10 @@ Section osat.
             + intros. rewrite !fmap_insert. simpl. specialize (Hp s). apply map_Forall2_insert.
               { by rewrite lookup_fmap Hlu. }
               { by rewrite lookup_fmap Hlu2. }
-              simpl; split; auto. econstructor 2; auto.
+              simpl; split; auto. destruct Hb1. econstructor 2; auto.
             + rewrite fmap_insert. apply map_Forall_insert.
               { by rewrite lookup_fmap Hlu2. }
-              split; auto. simpl. case_decide; done.
+              split; auto. simpl. destruct Hb1. case_decide; done.
         }
       - iModIntro. iExists (<[i:=(obl_done P0, (P, Q))]>Obls'). iSplitL.
         + iApply big_sepM_insert; first done. iFrame.
