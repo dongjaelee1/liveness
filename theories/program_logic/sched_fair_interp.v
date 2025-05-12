@@ -203,7 +203,7 @@ Section sfi.
     done.
   Qed.
 
-  Lemma schedfairI_reserved_thread_alloc (S : gset _) (i : thread_id) a :
+  Lemma schedfairI_reserved_alloc_thread (S : gset _) (i : thread_id) a :
     (i ∉ S) →
     own state_name ((λ k : thread_id, if decide (k ∈ S) then ε else (debt a 1)) : discrete_fun _)
     ⊢ (own state_name ((λ k : thread_id, if decide (k ∈ {[i]} ∪ S) then ε else (debt a 1)) : discrete_fun _) ∗
@@ -227,14 +227,14 @@ Section sfi.
     rewrite FORK own_op. iDestruct "Htk" as "[Htk Hi]". iFrame.
   Qed.
 
-  Lemma schedfairI_thread_alloc δ i f :
+  Lemma schedfairI_alloc_thread δ i f :
     (δ !! i = None) →
     schedfairI δ
     ⊢ |==> schedfairI (<[i:=f]>δ) ∗ ∃ fb, sfS_fuel_bound i fb 1.
   Proof.
     rewrite /schedfairI -!lock. iIntros (LU) "(% & Htk & Hs)".
     pose proof LU as LU'. apply not_elem_of_dom in LU.
-    iDestruct (schedfairI_reserved_thread_alloc _ _ _ LU with "Htk") as "[Htk Hfb]".
+    iDestruct (schedfairI_reserved_alloc_thread _ _ _ LU with "Htk") as "[Htk Hfb]".
     iMod (sfS_fuel_owe i _ f with "Hfb") as "[Hfb Hfc]".
     iModIntro. iFrame.
     (* iSplit; [|iPureIntro; apply OCM.add_base_right_le]. *)

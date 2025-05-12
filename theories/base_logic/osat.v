@@ -405,7 +405,7 @@ Section osat.
       rewrite LU2 in H. inv H. rewrite LU. exists P0. done.
   Qed.
 
-  Lemma obl_alloc Ω a b P R :
+  Lemma osat_alloc_obl Ω a b P R :
     osat Ω
     ⊢ |==> ∃ i, ⌜Ω !! i = None⌝ ∗ osat (<[i:=obl_init (a, b)]>Ω) ∗
                 oblG_goal i P R ∗ oblS_idle i (1/2) ∗ oblS_live i (1/2) ∗ oblS_credit i a.
