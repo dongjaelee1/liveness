@@ -630,7 +630,7 @@ Section thread_obl.
                         | _ => True end) Ω2) →
     oftI Ω1 δ1 γ ⊢ oftI Ω2 δ2 γ.
   Proof.
-    rewrite /oftI. iIntros (SF HP MF) "(#HΩ&#H)".
+    rewrite /oftI. iIntros (SF HP MF) "(#HΩ&#H)". pose proof (obl_states_progress
 
 
     TODO

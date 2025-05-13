@@ -84,3 +84,42 @@ Notation "a ↪ₛ b @ s" := (obl_states_step s a b) (at level 20, format "a  �
    It's normalization is equivalent to normalization of source_rel. *)
 Notation "a ↪ₛ⁺ b @ s" := ((tc (obl_states_step s)) a b) (at level 20, format "a  ↪ₛ⁺  b  @  s").
 Notation "a ↪ₛ⋆ b @ s" := ((rtc (obl_states_step s)) a b) (at level 20, format "a  ↪ₛ⋆  b  @  s").
+
+Section obl_states.
+  Context `{Δ : obl_class}.
+
+  Lemma obl_states_step_one_dom Ω1 Ω2 s x : Ω1 ↪ₒ Ω2 @ s, x → dom Ω1 = dom Ω2.
+  Proof using. intros H. eapply map_Forall2_dom_L; eauto. Qed.
+
+  Lemma obl_states_step_one_tc_dom Ω1 Ω2 s x : Ω1 ↪ₒ⁺ Ω2 @ s, x → dom Ω1 = dom Ω2.
+  Proof using.
+    intros H. induction H.
+    - eapply obl_states_step_one_dom; eauto.
+    - rewrite <- IHtc. eapply obl_states_step_one_dom; eauto.
+  Qed.
+
+  Lemma obl_states_step_one_rtc_dom Ω1 Ω2 s x : Ω1 ↪ₒ⋆ Ω2 @ s, x → dom Ω1 = dom Ω2.
+  Proof using.
+    intros H. induction H.
+    - auto.
+    - rewrite <- IHrtc. eapply obl_states_step_one_dom; eauto.
+  Qed.
+
+  Lemma obl_states_progress_dom Ω1 Ω2 s : Ω1 ↪ₚ Ω2 @ s → dom Ω1 = dom Ω2.
+  Proof using. intros H. eapply map_Forall2_dom_L; eauto. Qed.
+
+  Lemma obl_states_progress_tc_dom Ω1 Ω2 s : Ω1 ↪ₚ⁺ Ω2 @ s → dom Ω1 = dom Ω2.
+  Proof using.
+    intros H. induction H.
+    - eapply obl_states_progress_dom; eauto.
+    - rewrite <- IHtc. eapply obl_states_progress_dom; eauto.
+  Qed.
+
+  Lemma obl_states_progress_rtc_dom Ω1 Ω2 s : Ω1 ↪ₚ⋆ Ω2 @ s → dom Ω1 = dom Ω2.
+  Proof using.
+    intros H. induction H.
+    - auto.
+    - rewrite <- IHrtc. eapply obl_states_progress_dom; eauto.
+  Qed.
+
+End obl_states.
