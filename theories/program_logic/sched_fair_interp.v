@@ -203,7 +203,7 @@ Section sfi.
     done.
   Qed.
 
-  Lemma schedfairI_reserved_alloc_thread (S : gset _) (i : thread_id) a :
+  Lemma schedfairI_reserved_alloc_thread (S : thread_ids) (i : thread_id) a :
     (i ∉ S) →
     own state_name ((λ k : thread_id, if decide (k ∈ S) then ε else (debt a 1)) : discrete_fun _)
     ⊢ (own state_name ((λ k : thread_id, if decide (k ∈ {[i]} ∪ S) then ε else (debt a 1)) : discrete_fun _) ∗
@@ -318,7 +318,7 @@ Section sfi.
     rewrite ADD. clear ADD. iDestruct "Htk" as "[Htk Hc]". iModIntro. iFrame.
   Qed.
 
-  Lemma schedfairI_credit_from_all δ1 δ2 S c :
+  Lemma schedfairI_credit_from_all δ1 δ2 (S : thread_ids) c :
     map_Forall2 (λ i f1 f2, if decide (i ∈ S) then True else (f2 /< f1)) δ1 δ2 →
     schedfairI δ1 ∗ ([∗ set] i ∈ dom δ1, if decide (i ∈ S) then ∃ f, sfS_fuel_bound i f 1 else True)
     ⊢ |==> schedfairI δ2 ∗ ([∗ set] i ∈ dom δ2, if decide (i ∈ S) then ∃ f, sfS_fuel_bound i f 1 else True) ∗
@@ -346,7 +346,7 @@ Section sfi.
       + iSplit; first done. iExists f0. by iFrame.
   Qed.
 
-  Lemma sfS_fuel_credit_forall_get (δ : gmap thread_id A) S c :
+  Lemma sfS_fuel_credit_forall_get (δ : gmap thread_id A) (S : thread_ids) c :
     (/0 /< c) →
     (own state_name ((λ k : thread_id, if decide (k ∈ dom δ) then ε else (cash c)) : discrete_fun _)) ∗
     ([∗ set] i ∈ dom δ, if decide (i ∈ S) then sfS_fuel_credit i c else ∃ c, ⌜/0 /< c⌝ ∗ sfS_fuel_credit i c)

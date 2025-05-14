@@ -3,7 +3,10 @@ semantics to the program logic. *)
 
 From iris.proofmode Require Import proofmode.
 From liveness.program_logic Require Export weakestpre.
+From liveness Require Import ordinal_wfocm.
 From iris.prelude Require Import options.
+
+Notation sfS_fuel_credit_forallL Λ := (sfS_fuel_credit_forall (H:=@fuel_wf Λ)).
 
 Section lifting.
 Context `{SI : indexT} `{!lirisGS_gen hlc Λ Σ}.
@@ -15,6 +18,118 @@ Implicit Types σ : state Λ.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
 
+Section liveness.
+
+  (* For lwp_step, enable progress and fork. *)
+  Lemma lwp_step_progress s i E e1 ν :
+    (∀ σ1 ns κ κs τ,
+       state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
+       ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
+              (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
+              ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
+                           toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗
+                           £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
+       state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗ ν e2 efs)
+    ⊢ lwp_step s i E e1 ν.
+  Proof.
+    rewrite /lwp_step. iIntros "H % % % % % % % % I". iDestruct "I" as "(Id1&IO1&Ig1&#Ioft1&Is1)".
+    iMod ("H" with "Is1") as "(%&%&Ht&Hcs&Hstuck&H)".
+    iPoseProof (oblS_credit_eq_list with "Hcs") as "Hcs".
+    { rewrite ord_S_add. reflexivity. }
+    iPoseProof (oblS_credit_split_list with "Hcs") as "[Hcs0 Hcs]".
+    iModIntro. iSplitL "Hstuck"; first done.
+    iExists Ω1. iSplit; first done. iIntros (??? Hstep ?? Hsf) "Hlc".
+    destruct Hsf as [Hffu Hfff].
+    iPoseProof (toI_toL_thread_lookup with "[Ig1 Ht]") as "%LUg"; first iFrame. destruct LUg as (L'&LUg&PermL).
+    symmetry in PermL. iPoseProof (toL_thread_perm _ _ _ _ PermL with "Ht") as "Ht". rewrite !(big_opL_permutation _ _ _ PermL).
+    iPoseProof "Ioft1" as "Ioft1'". iDestruct "Ioft1'" as "[IoftO IoftM]".
+    iPoseProof (big_sepM2_lookup_iff with "IoftM") as "%A".
+    specialize (A i). destruct A. destruct H0 as [f LUd1]; first eauto. clear H.
+    iPoseProof (toI_obl_reset_fuel with "[Ig1 Ht Hcs]") as "[[% Hfb] Ig]"; first iFrame.
+    destruct (WFOCM.exists_pos (t:=@fuel_wf Λ)) as [c LTc].
+    simpl.
+    iMod (schedfairI_credit_from_all _ _ _ c Hffu with "[Id1 Hfb]") as "(Id2&Hfb&Hc)".
+    { iFrame. apply elem_of_dom_2 in LUd1. iApply (big_sepS_delete _ _ _ LUd1 with "[Hfb]"). iSplitL.
+      - case_decide; [iFrame|done].
+      - iApply big_sepS_intro. iModIntro. iIntros. case_decide; [set_solver|done].
+    }
+    iPoseProof (sfS_fuel_credit_forall_get with "Hc") as "Hc"; first done.
+    assert (∃ f2, δ2 !! i = Some f2).
+    { pose proof (map_Forall2_lookup_l _ _ _ Hffu _ _ LUd1). destruct H as (?&?&?). eauto. }
+    destruct H as [f2 LUd2]. iAssert (∃ f1, sfS_fuel_bound i f1 1)%I with "[Hfb]" as "Hfb".
+    { apply elem_of_dom_2 in LUd2. iPoseProof (big_sepS_delete _ _ _ LUd2 with "Hfb") as "[H _]".
+      case_decide; first iFrame. exfalso. set_solver.
+    }
+    iDestruct "Hfb" as "[% Hfb]". iDestruct ("Ig" with "Hfb") as "[Ig1 Ht]".
+    iPoseProof (toL_thread_perm _ _ _ _ PermL with "Ht") as "Ht".
+    iDestruct ("H" with "[//] Ht Hc Hlc") as "H". iApply (step_fupdN_wand with "H"). iNext. iIntros ">[Is2 H]".
+    clear L PermL. rename L' into L.
+    iPoseProof (toI_assigned_obls_split_dom _ (dom Ω1) with "[Ig1]") as "(%&%&%HDD&#HD1&#HD2)"; first by iFrame.
+    destruct HDD as [HOD HDD].
+    set (FR:=λ (α : obl_id) (f : fuel Λ), ∃ (i' : thread_id) (L' : list obl_id),
+            γ1 !! i' = Some L' ∧ α ∈ L' ∧ ∃ f', δ2 !! i = Some f' ∧ (fuel_leR f' f)).
+    iMod (osat_progress _ L FR FR with "[IO1 Hcs0]") as "(%Ω2&IO2&%HOP&%HMF)".
+    { iPoseProof (osat_obl_is_done_weak_set _ D1 with "[IO1]") as "%HD1"; first by iFrame.
+      iFrame "IO1". iPoseProof (big_sepM2_forall with "IoftM") as "%M". destruct M as [M1 M2].
+      iPoseProof "HD2" as "%HD2".
+      assert (mp : ∀ (P Q : Type), P → (P → Q) → Q) by intuition. eapply mp; [eapply oftI_schedule_1|]; eauto.
+      { intros. apply elem_of_list_lookup_1 in H1. destruct H1. eapply M2; eauto. }
+      intros MF.
+
+      TODO
+
+
+oftI_schedule_1
+     : ∀ (Ω : obl_states' ?OC) (γ : gmap thread_id (list obl_id)) (δ4 δ5 : gmap thread_id ?A) (S : thread_ids) (D3 D4 : obl_ids),
+         map_Forall2 (λ i0 (f3 f4 : ?A), if decide (i0 ∈ S) then True else ?ltR f4 f3) δ4 δ5
+         → (∀ i0, is_Some (δ4 !! i0) ↔ is_Some (γ !! i0))
+           → (∀ i0 (f3 : ?A) (L0 : list obl_id),
+                δ4 !! i0 = Some f3
+                → γ !! i0 = Some L0 → ∀ κ0 : obl_id, κ0 ∈ L0 → ∃ c0 : Ord.t * ?A, Ω !! κ0 = Some (obl_live c0) ∧ ?leR f3 c0.2)
+             → dom Ω = D3 ∪ D4
+               → D3 ## D4
+                 → set_Forall (λ κ0 : obl_id, ∃ P : prop_of ?ps, Ω !! κ0 = Some (obl_done P)) D3
+                   → set_Forall (λ κ : obl_id, ∃ i (L : list obl_id), γ !! i = Some L ∧ κ ∈ L) D4
+                     → map_Forall
+                         (λ (κ0 : obl_id) (o : obl_state),
+                            match o with
+                            | obl_live (_, b) =>
+                                ∃ i0 (L0 : list obl_id),
+                                  γ !! i0 = Some L0
+                                  ∧ κ0 ∈ L0
+                                    ∧ (if decide (i0 ∈ S)
+                                       then True
+                                       else ∃ b' : ?A, ?ltR b' b ∧ ∃ f3 : ?A, δ5 !! i0 = Some f3 ∧ ?leR f3 b)
+                            | _ => True
+                            end) Ω
+oftI_schedule_2:
+  
+(* Ω must make strict progress *)
+Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
+  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
+  (∀ δ1 (Ω1 : obl_statesL Λ) γ1 σ1 ns κ κs τ,
+     (schedfairIL Λ δ1 ∗ osat Ω1 ∗ toIL Λ γ1 ∗ oftIL Λ Ω1 δ1 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
+     (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
+     ∃ Ω2, (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗
+           ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
+                        ∀ δ2 δ3, (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
+                                    £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
+     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
+              ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
+                    ν e2 efs
+  )%I.
+(* Ω can allocate, progress, or fulfills obligations. Note this has no later modality. *)
+Definition ghost_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (E : coPset)
+  (ν : iPropO Σ) : iPropO Σ :=
+  (∀ δ (Ω : obl_statesL Λ) γ σ ns κs τ,
+     (schedfairIL Λ δ ∗ osat Ω ∗ toIL Λ γ ∗ oftIL Λ Ω δ γ ∗ state_interp σ ns κs τ) ={E}=∗
+     ∃ Ω', (⌜(Ω ↪ₛ⋆ Ω' @ σ)⌝) ∗
+           ∃ γ', (schedfairIL Λ δ ∗ osat Ω' ∗ toIL Λ γ' ∗ oftIL Λ Ω' δ γ' ∗ state_interp σ ns κs τ) ∗
+                 ν
+  )%I.
+
+End liveness.
+
 Local Hint Resolve reducible_no_obs_reducible : core.
 
 Lemma lwp_lift_step_fupdN s i E Φ e1 :
@@ -25,7 +140,7 @@ Lemma lwp_lift_step_fupdN s i E Φ e1 :
        (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗ ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗ ∀ δ2 δ3,
      (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
      £ (S $ num_laters_per_step ns) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3 @ σ2) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
+     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
               ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
                     lWP e2 @ s; i; E {{ Φ }} ∗
                                    [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
@@ -40,7 +155,7 @@ Lemma lwp_lift_step_fupd s i E Φ e1 :
        (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗ ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗ ∀ δ2 δ3,
      (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
      £ 1 ={∅}=∗ ▷ |={∅,E}=>
-     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3 @ σ2) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
+     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
               ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
                     lWP e2 @ s; i; E {{ Φ }} ∗
                                    [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
@@ -77,7 +192,7 @@ Lemma lwp_lift_step s i E Φ e1 :
        (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗ ▷ ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗ ∀ δ2 δ3,
      (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
      £ 1 ={∅,E}=∗
-     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3 @ σ2) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
+     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
               ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
                     lWP e2 @ s; i; E {{ Φ }} ∗
                                    [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})

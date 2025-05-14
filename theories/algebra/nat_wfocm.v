@@ -20,8 +20,9 @@ Proof.
 Qed.
 
 Global Program Instance nat_wfocm: WFOCM.t le Nat.add lt :=
-  WFOCM.Build_t nat le Nat.add lt _ _ _.
+  WFOCM.Build_t nat le Nat.add lt _ _ _ _.
 Next Obligation. split; intros; [destruct H | exists 1]; lia. Qed.
+Next Obligation. exists 1. auto. Qed.
 
 Global Program Instance nat_wfocm_pack : WFOCM.pack nat :=
   WFOCM.Build_pack _ _ _ _ nat_wfocm.

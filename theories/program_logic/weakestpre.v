@@ -92,7 +92,7 @@ Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i 
            ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
                         ∀ δ2 δ3, (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
                                     £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3 @ σ2) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
+     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
               ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
                     ν e2 efs
   )%I.

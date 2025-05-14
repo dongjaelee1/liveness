@@ -26,7 +26,7 @@ Lemma ord_OCM_eq (a0 a1 : Ord.t) : OCM.eq a0 a1 <-> Ord.eq a0 a1.
 Proof. auto. Qed.
 
 Global Program Instance ord_wfocm : WFOCM.t Ord.le Hessenberg.add Ord.lt :=
-  WFOCM.Build_t _ _ _ _ _ _ _.
+  WFOCM.Build_t _ _ _ _ _ _ _ _.
 Next Obligation.
   apply Ord.lt_well_founded.
 Qed.
@@ -37,6 +37,9 @@ Next Obligation.
     unfold Ord.one. rewrite Hessenberg.add_S_r. apply Ord.S_supremum.
     rewrite Hessenberg.add_O_r. auto.
   }
+Qed.
+Next Obligation.
+  exists (Ord.S Ord.O). apply Ord.S_pos.
 Qed.
 
 Global Program Instance ord_wfocm_pack : WFOCM.pack Ord.t :=

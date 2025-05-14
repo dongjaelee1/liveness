@@ -79,7 +79,7 @@ Definition toI `{SI : indexT} `{WF : WFOCM.t A leR addO ltR} {ps} {Σ}
            toS_thread i W ∗
            ∃ (f : A), sfS_fuel_bound i f 1 ∗
                       (∃ L, ⌜ γ !! i = Some L ⌝ ∗
-                            ([∗ list] k ∈ W, ⌜ k ∈ L ⌝ ∨ oblS_done k) ∗
+                            ([∗ list] k ∈ W, (⌜ k ∈ L ⌝ ∨ oblS_done k) ∗ oblG_elem k) ∗
                             ([∗ list] k ∈ L,
                                oblS_live k (1/2 + 1/2/2)%Qp ∗
                                (oblS_active k ∗ ∃ a, ⌜ (Ord.from_wf (WFOCM.lt_wf) f <= a)%ord ⌝ ∗ oblS_credit k a))
@@ -287,10 +287,11 @@ Section thread_obl.
   Qed.
 
   Lemma toI_alloc_obl γ i l κ :
-    toI γ ∗ toL_thread i 1 l ∗ oblS_live κ (1/2 + 1/2/2)%Qp ∗ oblS_active κ ∗ oblS_credit κ (Ord.from_wf_set (WFOCM.lt_wf))
+    toI γ ∗ toL_thread i 1 l ∗
+    oblG_elem κ ∗ oblS_live κ (1/2 + 1/2/2)%Qp ∗ oblS_active κ ∗ oblS_credit κ (Ord.from_wf_set (WFOCM.lt_wf))
     ⊢ |==> toI (<[i:=κ :: l]>γ) ∗ toL_thread i 1 (κ :: l) ∗ toS_assigned i κ.
   Proof.
-    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & (Htl&Hsl&Hsi&Hsc))".
+    rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & (Htl&Hge&Hsl&Hsi&Hsc))".
     iPoseProof (toL_thread_lookup with "[Hol Htl]") as "%"; first iFrame.
     destruct H3 as (l'&LU&HP).
     iMod (toL_alloc_obl _ _ _ κ with "[Hol Htl]") as "(Hol&Htl)"; first iFrame.
@@ -312,13 +313,13 @@ Section thread_obl.
       iSplit; [iPureIntro; apply lookup_insert|].
       iAssert (∀ k, ⌜ k ∈ W → k ∉ l' → k ≠ κ ⌝)%I as "%NIN".
       { iIntros (k INW NINl'). destruct (elem_of_list_lookup_1 _ _ INW) as [n LUW].
-        iPoseProof (big_sepL_delete _ _ _ _ LUW with "Hm3") as "[[%IN | NIN] Hm3]"; first done.
+        iPoseProof (big_sepL_delete _ _ _ _ LUW with "Hm3") as "[[[%IN | NIN] Hge'] Hm3]"; first done.
         destruct (decide (k = κ)); [subst | done]. iPoseProof (oblS_live_done_false with "[$]") as "%F"; done.
       }
-      iFrame. iSplitL "Hm3".
-      + rewrite big_opL_cons. iSplit; [iLeft; iPureIntro; set_solver|].
-        iApply (big_sepL_impl with "Hm3"). iModIntro. iIntros (???) "[% | H]"; [|iFrame].
-        * iLeft. iPureIntro. rewrite -HP. set_solver.
+      iSplitL "Hge Hm3".
+      + rewrite big_opL_cons. iFrame "Hge". iSplit; [iLeft; iPureIntro; set_solver|].
+        iApply (big_sepL_impl with "Hm3"). iModIntro. iIntros (???) "[[% | H] He]"; [|iFrame].
+        iFrame "He". iLeft. iPureIntro. rewrite -HP. set_solver.
       + rewrite big_opL_permutation'; [|eauto]. iFrame.
         iPureIntro. apply Ord.lt_le, Ord.from_wf_set_upperbound.
     - rewrite delete_insert_delete. iApply (big_sepM_impl with "HM"). iModIntro. iIntros (???) "[Hts (%&H1&%&%&H2&H3)]".
@@ -351,11 +352,11 @@ Section thread_obl.
     }
     iFrame "Hos Hol". iApply (big_sepM_delete _ _ _ _ LUΨ). iSplitR "HM".
     - iFrame. iSplit; first by rewrite lookup_insert. iApply (big_sepL_impl with "Hp3").
-      iModIntro. iIntros (k x ?) "[% | H]".
-      + destruct (decide (x = κ)).
+      iModIntro. iIntros (k x ?) "[[% | H] He]".
+      + iFrame. destruct (decide (x = κ)).
         * subst. iRight. done.
         * iLeft; iPureIntro. rewrite Perml in H4. set_solver.
-      + by iRight.
+      + iFrame.
     - iApply (big_sepM_impl with "HM"). iModIntro. iIntros (k x ?) "(H1&%&H2&%&%&H3&H4)". iFrame.
       iPureIntro. rewrite lookup_insert_ne; first done. intros eq. subst. rewrite lookup_delete in H3. done.
   Qed.
@@ -424,13 +425,13 @@ Section thread_obl.
            toS_thread k y ∗
            ∃ f0, sfS_fuel_bound k f0 1 ∗
                  ∃ L0, ⌜γ !! k = Some L0⌝ ∗
-                       ([∗ list] k0 ∈ y, ⌜k0 ∈ L0⌝ ∨ oblS_done k0) ∗
+                       ([∗ list] k0 ∈ y, (⌜k0 ∈ L0⌝ ∨ oblS_done k0) ∗ oblG_elem k0) ∗
                        ([∗ list] k0 ∈ L0, oblS_live k0 (1/2 + 1 / 2 / 2) ∗
                                           oblS_active k0 ∗ ∃ a : Ord.t,
                                               ⌜(Ord.from_wf WFOCM.lt_wf f0 <= a)%ord⌝ ∗ oblS_credit k0 a)) ∗
         |==> (toS_thread i W ∗
               ∃ f', sfS_fuel_bound i f' 1 ∗
-                    ([∗ list] k ∈ W, ⌜k ∈ L⌝ ∨ oblS_done k) ∗
+                    ([∗ list] k ∈ W, (⌜k ∈ L⌝ ∨ oblS_done k) ∗ oblG_elem k) ∗
                     ([∗ list] k ∈ L, oblS_live k (1/2 + 1 / 2 / 2) ∗ oblS_active k ∗
                                      ∃ a : Ord.t, ⌜(Ord.from_wf WFOCM.lt_wf f' <= a)%ord⌝ ∗ oblS_credit k a) ∗
                     ([∗ set] k ∈ K, (∃ c : Ord.t, ⌜ (Ord.O < c)%ord ⌝ ∗ oblS_credit k c) ∨ oblS_done k)
@@ -441,7 +442,7 @@ Section thread_obl.
     { iApply big_sepS_forall. iIntros (x INx). iDestruct "HKin" as "%HKin".
       assert (LUW : ∃ z, W !! z = Some x).
       { apply elem_of_list_lookup_1. set_solver. }
-      destruct LUW as [z LUW]. iPoseProof (big_sepL_delete _ _ _ _ LUW with "Hm3") as "[Hx _]". done.
+      destruct LUW as [z LUW]. iPoseProof (big_sepL_delete _ _ _ _ LUW with "Hm3") as "[[Hx _] _]". done.
     }
     iAssert (|==> [∗ list] k ∈ L, (oblS_live k (1/2 + 1 / 2 / 2) ∗ oblS_active k ∗ ∃ a : Ord.t, ⌜(Ord.from_wf WFOCM.lt_wf f' <= a)%ord⌝ ∗ oblS_credit k a) ∗
                              (∃ c : Ord.t, ⌜ (Ord.O < c)%ord ⌝ ∗ oblS_credit k c))%I with "[Hm4]" as ">Hm4".
@@ -480,7 +481,7 @@ Section thread_obl.
 
   Lemma toI_assigned_obl_cases γ i κ :
     toI γ ∗ toS_assigned i κ
-    ⊢ oblS_done κ ∨ ⌜ ∃ L, γ !! i = Some L ∧ κ ∈ L ⌝.
+    ⊢ (oblS_done κ ∗ oblG_elem κ) ∨ ⌜ ∃ L, γ !! i = Some L ∧ κ ∈ L ⌝.
   Proof.
     rewrite /toI -!lock. iIntros "((%&%&Hos&Hol&HM) & #Hκ)".
     iPoseProof (toS_assigned_obls_elem_of i {[ κ ]} Ψ with "[Hos HM]") as "(%&%&%)".
@@ -491,15 +492,15 @@ Section thread_obl.
     }
     apply set_Forall_singleton in H4. iPoseProof (big_sepM_delete _ _ _ _ H3 with "HM") as "[Hm _]".
     iDestruct "Hm" as "(_&%&_&%&%&H1&H2)". apply elem_of_list_lookup_1 in H4. destruct H4.
-    iPoseProof (big_sepL_delete _ _ _ _ H4 with "H1") as "[[% | #Hd] _]".
+    iPoseProof (big_sepL_delete _ _ _ _ H4 with "H1") as "[[[% | #Hd] He] _]".
     - iRight; iPureIntro. exists L. done.
-    - by iLeft.
+    - iLeft. by iFrame.
   Qed.
 
   Lemma toI_assigned_obls_split_dom γ (D : obl_ids) :
     toI γ ∗ ([∗ set] κ ∈ D, ∃ i, toS_assigned i κ)
     ⊢ ∃ D1 D2, ⌜ D = D1 ∪ D2 ∧ D1 ## D2 ⌝ ∗
-               ([∗ set] κ ∈ D1, oblS_done κ) ∗
+               ([∗ set] κ ∈ D1, oblS_done κ ∗ oblG_elem κ) ∗
                ([∗ set] κ ∈ D2, ⌜ ∃ i L, γ !! i = Some L ∧ κ ∈ L ⌝).
   Proof.
     pattern D. revert D. apply set_ind.

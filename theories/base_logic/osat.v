@@ -261,6 +261,13 @@ Section osat.
     intros EQ. rewrite /oblS_credit. by erewrite credit_eq.
   Qed.
 
+  Lemma oblS_credit_eq_list L a0 a1 :
+    a0 /= a1 →
+    ([∗ list] i ∈ L, oblS_credit i a0)%I ≡ ([∗ list] i ∈ L, oblS_credit i a1)%I.
+  Proof.
+    intros. apply big_opL_proper. intros. erewrite oblS_credit_eq; eauto.
+  Qed.
+
   Lemma oblS_credit_mon i a0 a1 :
     a0 /≤ a1 →
     oblS_credit i a1 ⊢ |==> oblS_credit i a0.
@@ -280,11 +287,27 @@ Section osat.
     - iCombine "H1 H2" as "H". iEval (rewrite credit_split). iFrame.
   Qed.
 
+  Lemma oblS_credit_split_list L a0 a1 :
+    ([∗ list] i ∈ L, oblS_credit i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, oblS_credit i a0) ∗ ([∗ list] i ∈ L, oblS_credit i a1).
+  Proof.
+    rewrite -big_sepL_sep. iSplit; iIntros "H".
+    - iApply (big_sepL_impl with "H"). iModIntro. iIntros. by iApply oblS_credit_split.
+    - iApply (big_sepL_impl with "H"). iModIntro. iIntros. by iApply oblS_credit_split.
+  Qed.
+
   Lemma oblS_credit_mon_split i a0 a1 a2 :
     a0 /+ a1 /≤ a2 →
     oblS_credit i a2 ⊢ |==> oblS_credit i a0 ∗ oblS_credit i a1.
   Proof.
     intros LE. iIntros "H". iApply oblS_credit_split. iApply oblS_credit_mon; done.
+  Qed.
+
+  Lemma oblS_credit_mon_split_list L a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    ([∗ list] i ∈ L, oblS_credit i a2) ⊢ |==> ([∗ list] i ∈ L, oblS_credit i a0) ∗ ([∗ list] i ∈ L, oblS_credit i a1).
+  Proof.
+    iIntros (LE) "H". rewrite -big_sepL_sep -big_sepL_bupd. iApply (big_sepL_impl with "H").
+    iModIntro. iIntros. by iApply oblS_credit_mon_split.
   Qed.
 
   Lemma oblS_bound_mon i a0 a1 :
@@ -436,6 +459,28 @@ Section osat.
     - iPoseProof (oblG_goal_lookup with "[Hoa]") as "(%&%&%&%&%&_)"; [iFrame; done |].
       destruct Q. iDestruct "LU" as "[% _]". iPureIntro. subst.
       rewrite LU2 in H. inv H. rewrite LU. exists P0. done.
+  Qed.
+
+  Lemma osat_obl_is_done_weak Ω i :
+    osat Ω ∗ oblG_elem i ∗ oblS_done i
+    ⊢ ∃ P, ⌜Ω !! i = Some (obl_done P)⌝.
+  Proof.
+    rewrite /oblG_elem. iIntros "(Ho & #He & #Hd)". iDestruct "He" as "(%&%&#He)".
+    iPoseProof (osat_obl_is_done with "[$]") as "(%&%)". destruct H. by iExists P'.
+  Qed.
+
+  Lemma osat_obl_is_done_weak_set Ω D :
+    osat Ω ∗ ([∗ set] i ∈ D, oblS_done i ∗ oblG_elem i)
+    ⊢ [∗ set] i ∈ D, ⌜ ∃ P, Ω !! i = Some (obl_done P) ⌝.
+  Proof.
+    revert Ω. pattern D. revert D. apply set_ind.
+    { solve_proper. }
+    { iIntros (Ω) "[HO Hs]". rewrite big_opS_empty. done. }
+    iIntros (i D NIN IH Ω) "[HO Hs]". rewrite !big_sepS_union; [|set_solver|set_solver].
+    rewrite !big_sepS_singleton. iDestruct "Hs" as "[[Hi1 Hi2] Hs]".
+    iPoseProof (osat_obl_is_done_weak with "[HO Hi1 Hi2]") as "[% %]"; first iFrame. iSplitR.
+    - iPureIntro. exists P. done.
+    - iApply IH. iFrame.
   Qed.
 
   Lemma osat_alloc_obl Ω a b P R :

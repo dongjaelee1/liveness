@@ -6,6 +6,7 @@ Module WFOCM.
       #[global] ocm :: OCM.t leR addO;
       lt_wf : well_founded ltR;
       lt_exists_left : forall a c, (exists b, (ltR OCM.unit b) /\ (leR (addO a b) c)) <-> (ltR a c);
+      exists_pos : exists a, ltR OCM.unit a;
     }.
 
   Section properties.
