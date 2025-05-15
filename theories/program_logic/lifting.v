@@ -73,8 +73,153 @@ Section liveness.
       iFrame "IO1". iPoseProof (big_sepM2_forall with "IoftM") as "%M". destruct M as [M1 M2].
       iPoseProof "HD2" as "%HD2".
       assert (mp : ∀ (P Q : Type), P → (P → Q) → Q) by intuition. eapply mp; [eapply oftI_schedule_1|]; eauto.
-      { intros. apply elem_of_list_lookup_1 in H1. destruct H1. eapply M2; eauto. }
-      intros MF.
+      { intros. apply elem_of_list_lookup_1 in H1. destruct H1. eapply M2; eauto. Unshelve. all: try apply _. }
+      intros MF. pose proof (dom_union_inv_L _ _ _ HDD HOD). destruct H as (m1&m2&HOm&Hmm&Hm1&Hm2).
+      subst. rewrite big_sepM_union; [|auto]. iSplitR.
+      - iApply (big_sepM_impl (λ _ _, emp)%I); first done.
+        iModIntro. iIntros (k o LUk) "_". assert (k ∈ dom m1) by (eapply elem_of_dom_2; eauto).
+        specialize (HD1 _ H). destruct HD1. rewrite lookup_union_l in H0.
+        2:{ apply not_elem_of_dom. set_solver. }
+        rewrite LUk in H0. inv H0. auto.
+      - iAssert (
+  ([∗ map] k↦y ∈ m2, match y with
+                    | obl_live (_, b) =>
+                        if decide (k ∈ L)
+                        then ∃ c0 : Ord.t, ⌜WFOCM.ltR OCM.unit c0⌝ ∧ oblS_credit k c0 ∧ ⌜∃ b' : fuel Λ, FR k b'⌝
+                        else True
+                    | _ => True
+                    end) ∗
+  ([∗ map] k↦y ∈ m2, match y with
+                    | obl_live (_, b) =>
+                        if decide (k ∈ L)
+                        then True
+                        else ⌜∃ b' : fuel Λ, fuelR b' b ∧ FR k b'⌝
+                    | _ => True
+                     end))%I with "[-]" as "H".
+        2:{ rewrite -big_sepM_sep. iApply (big_sepM_impl with "H"). iModIntro. iIntros (k o LUk) "[H1 H2]".
+            destruct o; try auto. destruct a. destruct (decide (k ∈ L)); iFrame.
+        }
+        iSplitL.
+        + iAssert (
+  ([∗ map] k↦y ∈ m2, match y with
+                    | obl_live (_, _) =>
+                        if decide (k ∈ L)
+                        then ∃ c0 : Ord.t, ⌜WFOCM.ltR OCM.unit c0⌝ ∧ oblS_credit k c0
+                        else True
+                    | _ => True
+                    end) ∗
+  ([∗ map] k↦y ∈ m2, match y with
+                    | obl_live (_, _) =>
+                        if decide (k ∈ L)
+                        then ⌜∃ b' : fuel Λ, FR k b'⌝
+                        else True
+                    | _ => True
+                     end))%I with "[-]" as "H".
+          2:{ rewrite -big_sepM_sep. iApply (big_sepM_impl with "H"). iModIntro. iIntros (k o LUk) "[H1 H2]".
+              destruct o; try auto. destruct a. destruct (decide (k ∈ L)); iFrame.
+          }
+          iSplitL.
+          * iClear (HOD HDD HD1 M2 MF HD2 Hmm LUg) "#". iStopProof. revert m2. induction L.
+            { iIntros. iApply (big_sepM_impl (λ _ _, True)%I); first done. iModIntro. iIntros.
+              destruct x; try auto. destruct a. destruct (decide (k ∈ [])); [set_solver|auto].
+            }
+            iIntros (m2) "Hc". iPoseProof (big_sepL_cons with "Hc") as "[C Hc]".
+            iAssert (
+  ([∗ map] k↦y ∈ m2, match y with
+                    | obl_live (_, _) =>
+                        if decide (k = a)
+                        then ∃ c0 : Ord.t, ⌜WFOCM.ltR OCM.unit c0⌝ ∧ oblS_credit k c0
+                        else True
+                    | _ => True
+                    end) ∗
+  ([∗ map] k↦y ∈ m2, match y with
+                    | obl_live (_, _) =>
+                        if decide (k ∈ L)
+                        then ∃ c0 : Ord.t, ⌜WFOCM.ltR OCM.unit c0⌝ ∧ oblS_credit k c0
+                        else True
+                    | _ => True
+                     end))%I with "[-]" as "H".
+            2:{ rewrite -big_sepM_sep. iApply (big_sepM_impl with "H"). iModIntro.
+                iIntros (k o LU) "[H1 H2]". destruct (decide (k ∈ a :: L)).
+                - apply elem_of_cons in e. destruct e.
+                  + subst. destruct o; auto. destruct a0. rewrite decide_True; done.
+                  + destruct o; auto. destruct a0. iClear "H1". rewrite decide_True; done.
+                - destruct o; auto. destruct a0. auto.
+            }
+            iSplitL "C".
+            { destruct (m2 !! a) eqn:LU.
+              - iApply (big_sepM_delete _ _ _ _ LU with "[C]"). iSplitL.
+                + destruct o; auto. destruct a0. rewrite decide_True; [|auto].
+                  iFrame. iPureIntro. apply Ord.S_pos.
+                + iApply (big_sepM_impl (λ _ _, True)%I); first done.
+                  iModIntro. iIntros (k x LU2) "_". destruct x; auto. destruct a0.
+                  destruct (decide (k = a)); auto. subst. rewrite lookup_delete in LU2. inv LU2.
+              - iApply (big_sepM_impl (λ _ _, True)%I); first done.
+                iModIntro. iIntros (k x LU2) "_". destruct x; auto. destruct a0.
+                destruct (decide (k = a)); auto. subst. rewrite LU in LU2. inv LU2.
+            }
+            iApply (IHL with "Hc").
+          * iApply big_sepM_forall; first apply _.
+            iIntros (k o LU). destruct o; auto. destruct a. destruct (decide (k ∈ L)); auto.
+            iPureIntro. subst FR. simpl.
+            specialize (Hffu i). rewrite LUd1 in Hffu. inv Hffu. symmetry in H0.
+            exists y, i, L. repeat split; eauto. exists y. split; auto.
+            eapply (@PreOrder_Reflexive _ _ (OCM.le_PreOrder (t:=(@fuel_wf Λ).(WFOCM.ocm)))).
+        + 
+          TODO
+
+
+
+            iClear (HOD HDD HD1 M2 MF HD2 Hmm LUg) "#". iStopProof. revert L. pattern m2. revert m2. apply map_ind.
+            { iIntros. by rewrite big_sepM_empty. }
+            iIntros (k o m LUk IH L) "HL". iApply big_sepM_insert; first auto.
+            destruct (decide (k ∈ L)).
+            -- destruct (elem_of_list_lookup_1 _ _ e). iPoseProof (big_sepL_delete _ _ _ _ H with "HL") as "[H HL]".
+               iSplitL "H".
+               { destruct o; try auto. destruct a. iFrame. iPureIntro. apply Ord.S_pos. }
+               iPoseProof (IH (delete x L) with "[HL]") as "H".
+               { clear e. iStopProof. revert x H. pattern L. induction L.
+                 { iIntros. simpl. done. }
+                 iIntros (j LUL) "H". destruct j.
+                 { inv LUL. simpl. iDestruct "H" as "[_ H]". iFrame. }
+                 simpl in LUL. simpl. iDestruct "H" as "[H Hc]". iFrame. iApply IHL; auto.
+                 iApply (big_sepL_impl with "Hc"). iModIntro. iIntros. destruct (decide (k0 = j)).
+                 { subst. case_decide; try done. }
+                 { case_decide; try done. inv H0. }
+               }
+
+
+               iApply (big_sepM_impl with "H"). iModIntro. iIntros. destruct x0; auto. destruct a.
+               case_decide.
+               { case_decide; by iFrame. }
+               { case_decide.
+                 - 
+
+                   exfalso. 
+                 [set_solver|].
+
+                 [|exfalso; set_solver].
+
+                 case_decide.
+                 { inv H0. 
+                 rewrite big_sepL_cons
+lookup_delete_lt: ∀ {A : Type} (l : list A) (i j : nat), j < i → delete i l !! j = l !! j
+lookup_delete_ge: ∀ {A : Type} (l : list A) (i j : nat), i ≤ j → delete i l !! j = l !! S j
+
+                 iPoseProof (big_sepL_submseteq _ (delete x L) L with "HL") as "HL".
+
+big_sepL_submseteq:
+  ∀ {SI : indexT} {PROP : bi} {A : Type} (Φ : A → PROP),
+    (∀ x : A, Affine (Φ x)) → ∀ l1 l2 : list A, l1 ⊆+ l2 → ([∗ list] y ∈ l2, Φ y) ⊢ [∗ list] y ∈ l1, Φ y
+submseteq_delete: ∀ {A : Type} (l : list A) (i : nat), delete i l ⊆+ l
+                 pose proof (delete_Permutation _ _ _ H). rewrite (big_opL_permutation _ _ _ H0).
+delete_Permutation: ∀ {A : Type} (l : list A) (i : nat) (x : A), l !! i = Some x → l ≡ₚ x :: delete i l
+              
+        
+big_sepL_delete:
+  ∀ {SI : indexT} {PROP : bi} {A : Type} (Φ : nat → A → PROP) (l : list A) (i : nat) (x : A),
+    l !! i = Some x → ([∗ list] k↦y ∈ l, Φ k y) ⊣⊢ Φ i x ∗ ([∗ list] k↦y ∈ l, if decide (k = i) then emp else Φ k y)
+      
 
       TODO
 
