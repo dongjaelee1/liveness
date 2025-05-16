@@ -351,6 +351,16 @@ Section language.
     by eapply insert_thread_pool_inv.
   Qed.
 
+  Lemma thread_ids_preserve δ1 δ2 δ3 S efs :
+    dom δ1 ## dom efs →
+    fuels_fair_update S δ1 δ2 →
+    fuels_fair_fork efs δ2 δ3 →
+    dom δ1 ∪ dom efs = dom δ3.
+  Proof.
+    intros. apply fuels_fair_update_dom in H0. destruct H1 as (δ'&TI&Hu).
+    apply thread_pool_inv_dom in TI. subst. rewrite dom_union_L -H0 TI. done.
+  Qed.
+
   Record pure_step (e1 e2 : expr Λ) := {
     pure_step_safe σ1 τ : reducible_no_obs e1 σ1 τ;
     pure_step_det σ1 κ τ e2' σ2 efs :

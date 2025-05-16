@@ -29,10 +29,10 @@ Section liveness.
               ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
                            toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗
                            £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-       state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗ ν e2 efs)
+       state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗ (([∗ set] i ∈ dom efs, toL_thread i 1 []) -∗ ν e2 efs))
     ⊢ lwp_step s i E e1 ν.
   Proof.
-    rewrite /lwp_step. iIntros "H % % % % % % % % I". iDestruct "I" as "(Id1&IO1&Ig1&#Ioft1&Is1)".
+    rewrite /lwp_step. iIntros "H % % % % % % % % I". iDestruct "I" as "(%Idom&Id1&IO1&Ig1&#Ioft1&Is1)".
     iMod ("H" with "Is1") as "(%&%&Ht&Hcs&Hstuck&H)".
     iPoseProof (oblS_credit_eq_list with "Hcs") as "Hcs".
     { rewrite ord_S_add. reflexivity. }
@@ -174,56 +174,36 @@ Section liveness.
             exists f'. split; [auto|]. exists i', L'. repeat split; auto. exists f2'. split; auto.
     }
     destruct Hfff as (δ'&Hd1&Hd2). apply thread_pool_inv_dom in Hd1. pose proof (fork_thread_ids _ _ _ _ _ _ _ Hstep) as Hefs.
-    assert (Hd3 : dom δ1 ## dom δ').
-    { TODO
-    
-
-schedfairI_alloc_threads:
-  ∀ {SI : indexT} {A : Type} {leR : A → A → Prop} {addO : A → A → A} {ltR : A → A → Prop} {WF : WFOCM.t leR addO ltR} 
-    {Σ : gFunctors} {schedfairGS0 : schedfairGS.schedfairGS Σ} (δ1 δ2 δ' : gmap thread_id A),
-    δ2 = δ1 ∪ δ' → dom δ1 ## dom δ' → schedfairI δ1 ⊢ |==> schedfairI δ2 ∗ ([∗ set] i ∈ dom δ', ∃ fb : A, sfS_fuel_bound i fb 1)
-toI_alloc_threads:
-  ∀ {SI : indexT} {A : Type} {leR : A → A → Prop} {addO : A → A → A} {ltR : A → A → Prop} {WF : WFOCM.t leR addO ltR} 
-    {ps : Type} {Σ : gFunctors} {H : osatGS.osatGS ps Σ} {H0 : schedfairGS.schedfairGS Σ} {H1 : threadoblGS.threadoblGS Σ} 
-    (γ1 γ2 : gmap thread_id (list obl_id)) (δ : thread_ids),
-    γ2 = γ1 ∪ gset_to_gmap [] δ
-    → dom γ1 ## δ → toI γ1 ∗ ([∗ set] i ∈ δ, ∃ f : A, sfS_fuel_bound i f 1) ⊢ |==> toI γ2 ∗ ([∗ set] i ∈ δ, toL_thread i 1 [])
-oftI_alloc_threads:
-  ∀ {SI : indexT} {A : Type} {leR : A → A → Prop} {addO : A → A → A} {ltR : A → A → Prop} {WF : WFOCM.t leR addO ltR} 
-    {ps : Type} {OC : obl_class ps (Ord.t * A)} {Σ : gFunctors} {H1 : threadoblGS.threadoblGS Σ} (Ω : obl_states' OC) 
-    (δ1 δ2 : gmap thread_id A) (γ1 γ2 : gmap thread_id (list obl_id)) (δ : gmap thread_id A),
-    δ2 = δ1 ∪ δ → dom δ1 ## dom δ → γ2 = γ1 ∪ gset_to_gmap [] (dom δ) → oftI Ω δ1 γ1 ⊢ oftI Ω δ2 γ2
-
+    assert (Hd3 : dom δ2 ## dom δ').
+    { subst. rewrite -Hd1. apply fuels_fair_update_dom in Hffu. rewrite -Hffu. auto. }
+    iPoseProof (big_sepM2_dom with "IoftM") as "%Hg1".
+    assert (Hg2 : dom γ1 ## dom δ').
+    { rewrite -Hg1. subst. rewrite -Hd1. auto. }
+    pose proof (fuels_fair_update_dom _ _ _ Hffu) as Hddd.
+    iPoseProof (oftI_schedule_2 _ _ _ _ _ Hddd with "[Ig1 Ioft1]") as "#Ioft2".
+    { econstructor 2; first eapply HOP. reflexivity. }
+    { subst FR. simpl in HMF. eapply map_Forall_impl; first eauto. intros. destruct x; auto. destruct a.
+      case_decide; eauto.
+    }
+    { iFrame. iApply "Ioft1". }
+    iMod (schedfairI_alloc_threads _ _ _ Hd2 Hd3 with "Id2") as "[Id2 Hfbs]".
+    set (γ2 := γ1 ∪ (gset_to_gmap [] (dom δ'))).
+    iMod (toI_alloc_threads _ γ2 with "[Ig1 Hfbs]") as "[Ig2 Hts]".
+    1,2: eauto.
+    { iFrame. }
+    iPoseProof (oftI_alloc_threads _ _ δ3 _ γ2 δ' with "Ioft2") as "#Ioft3".
+    1,2,3: auto.
+    iModIntro. iExists Ω2, Ω2. iSplit.
+    { iPureIntro. split.
+      - by econstructor 1.
+      - reflexivity.
+    }
+    iExists γ2. iFrame. iSplitR; first done. iApply "H". rewrite Hd1. iFrame.
+  Qed.
 
     TODO
-            
 
 
-oftI_schedule_1
-     : ∀ (Ω : obl_states' ?OC) (γ : gmap thread_id (list obl_id)) (δ4 δ5 : gmap thread_id ?A) (S : thread_ids) (D3 D4 : obl_ids),
-         map_Forall2 (λ i0 (f3 f4 : ?A), if decide (i0 ∈ S) then True else ?ltR f4 f3) δ4 δ5
-         → (∀ i0, is_Some (δ4 !! i0) ↔ is_Some (γ !! i0))
-           → (∀ i0 (f3 : ?A) (L0 : list obl_id),
-                δ4 !! i0 = Some f3
-                → γ !! i0 = Some L0 → ∀ κ0 : obl_id, κ0 ∈ L0 → ∃ c0 : Ord.t * ?A, Ω !! κ0 = Some (obl_live c0) ∧ ?leR f3 c0.2)
-             → dom Ω = D3 ∪ D4
-               → D3 ## D4
-                 → set_Forall (λ κ0 : obl_id, ∃ P : prop_of ?ps, Ω !! κ0 = Some (obl_done P)) D3
-                   → set_Forall (λ κ : obl_id, ∃ i (L : list obl_id), γ !! i = Some L ∧ κ ∈ L) D4
-                     → map_Forall
-                         (λ (κ0 : obl_id) (o : obl_state),
-                            match o with
-                            | obl_live (_, b) =>
-                                ∃ i0 (L0 : list obl_id),
-                                  γ !! i0 = Some L0
-                                  ∧ κ0 ∈ L0
-                                    ∧ (if decide (i0 ∈ S)
-                                       then True
-                                       else ∃ b' : ?A, ?ltR b' b ∧ ∃ f3 : ?A, δ5 !! i0 = Some f3 ∧ ?leR f3 b)
-                            | _ => True
-                            end) Ω
-oftI_schedule_2:
-  
 (* Ω must make strict progress *)
 Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=

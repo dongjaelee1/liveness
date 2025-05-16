@@ -439,19 +439,20 @@ Proof.
   iMod "H".  iMod ("H" with "[$]") as "(%&%&%&H)".
   iModIntro. iSplitR; first done. iExists _. iSplitR; first done.
   iIntros (???????) "Hcred". iApply (step_fupdN_wand with "(H [//] [//] Hcred)").
-  iIntros ">(%&%&%&%&H0&H&Hefs)". destruct s.
+  iIntros ">(%&%&%&%&H0&H&Hefs)".
+  assert (TI2 : τ ∪ dom efs = dom δ3).
+  { subst. destruct H2. eapply thread_ids_preserve; eauto. eapply fork_thread_ids; eauto. }
+  destruct s.
   - rewrite !lwp_unfold /lwp_pre. destruct (to_val e2) as [v2|] eqn:He2.
-    + TODO assert (TI2 : τ ∪ dom efs = dom δ3).
-      { 
-      iSpecialize ("H" with "[H0]"). iMod "H".
-      iDestruct "H" as "(%&%&%&H0&H)". iMod "H". iFrame.
+    + iSpecialize ("H" with "[H0]"); first by iFrame.
+      iMod "H". iDestruct "H" as "(%&%&%&H0&H)". iMod "H". iFrame.
       iModIntro. iExists Ω3. iSplit.
       * iPureIntro. destruct H3. split; first auto. etransitivity; eauto.
       * rewrite lwp_unfold /lwp_pre. rewrite He2. by iApply ghost_step_intro.
-    + iMod ("H" $! _ _ _ _ _ [] _ _ with "[$]") as "[H H']".
+    + iMod ("H" $! _ _ _ _ _ [] _ _ with "[H0]") as "[H H']"; first by iFrame.
       iDestruct "H" as %(? & ? & ? & ? & ?). by edestruct (atomic _ _ _ _ _ _ H1).
   - destruct (atomic _ _ _ _ _ _ H1) as [v <-%of_to_val].
-    rewrite lwp_value_fupd'. iMod ("H" with "[$]") as "H".
+    rewrite lwp_value_fupd'. iMod ("H" with "[H0]") as "H"; first by iFrame.
     iDestruct "H" as "(%&%&%&H0&>H)". iModIntro. iFrame.
     iExists Ω3. iSplit.
     { iPureIntro. destruct H3. split; first auto. etransitivity; eauto. }
@@ -484,10 +485,10 @@ Lemma lwp_credit_access s i E e Φ P :
                 lWP e @ s; i; E {{ Φ }}.
 Proof.
   rewrite !lwp_unfold /lwp_pre /=. iIntros (-> Htri) "Hupd Hwp".
-  iIntros (????????) "(H0 & H1 & H2 & H3 & Hσ1)".
+  iIntros (????????) "(%Hd & H0 & H1 & H2 & H3 & Hσ1)".
   iMod ("Hupd" with "Hσ1") as (k m) "(Hσ1 & -> & Hpost)".
   iCombine "H0 H1 H2 H3 Hσ1" as "H".
-  iMod ("Hwp" with "H") as "[$ Hwp]". iModIntro.
+  iMod ("Hwp" with "[H]") as "[$ Hwp]"; first by iFrame. iModIntro.
   iDestruct "Hwp" as "(%&%&Hwp)". iExists _. iSplit; first done.
   iIntros (e2 σ2 efs Hstep ???) "Hc".
   iDestruct "Hc" as "[Hone Hc]".
@@ -525,10 +526,10 @@ Proof.
     iApply (lwp_strong_mono with "Hwp"); [done..|].
     iIntros (v) "H". iApply ("H" with "[>HP]"). by do 2 iMod "HP". }
   rewrite !lwp_unfold /lwp_pre /=. iIntros (-> ?) "H".
-  iIntros (????????) "(H0 & H1 & H2 & H3 & Hσ)".
+  iIntros (????????) "(%Hd & H0 & H1 & H2 & H3 & Hσ)".
   destruct (decide (n ≤ num_laters_per_step ns)) as [Hn|Hn]; first last.
   { iDestruct "H" as "[Hn _]". iMod ("Hn" with "Hσ") as %?. lia. }
-  iDestruct "H" as "[_ [>HP Hwp]]". iMod ("Hwp" with "[$]") as "[$ H]". iMod "HP".
+  iDestruct "H" as "[_ [>HP Hwp]]". iMod ("Hwp" with "[-HP]") as "[$ H]"; first by iFrame. iMod "HP".
   iDestruct "H" as "(%&%&H)". iModIntro. iExists _. iSplit; first done.
   iIntros (e2 σ2 efs Hstep ???) "Hcred". iMod ("H" $! e2 σ2 efs with "[% //] [//] Hcred") as "H".
   iIntros "!>!>". iMod "H". iMod "HP". iModIntro.
