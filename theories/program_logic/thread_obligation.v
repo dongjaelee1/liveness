@@ -207,7 +207,7 @@ Section thread_obl.
   Qed.
 
   (* Print Table Search Blacklist. *)
-  (* Shows that _obl_ is blacklisted, and as a result. any lemma that contains _obl_ doesn't show up in Search.  *)
+  (* Shows that _obligation_ is blacklisted, and as a result. any lemma that contains _obligation_ doesn't show up in Search.  *)
   Lemma toS_alloc_obl i l κ :
     toS_thread i l ⊢ |==> toS_thread i (κ :: l) ∗ toS_assigned i κ.
   Proof.
@@ -638,6 +638,21 @@ Section thread_obl.
       rewrite !Qp.div_2. reflexivity.
     }
     iPoseProof (oblS_live_valid with "HL") as "%F". by apply Qp.not_add_le_l in F.
+  Qed.
+
+  Lemma oftI_one_permutation Ω δ γ i l l' :
+    γ !! i = Some l → l ≡ₚ l' →
+    oftI Ω δ γ ⊢ oftI Ω δ (<[i:=l']>γ).
+  Proof.
+    rewrite /oftI. iIntros (LUγ Perm) "[#HΩ #H]". iSplit; first done.
+    iPoseProof (big_sepM2_forall with "H") as "#[%HM1 HM]".
+    iApply big_sepM2_forall. iSplit.
+    { iPureIntro. intros. rewrite HM1. rewrite lookup_insert_is_Some'.
+      split; intros; auto. destruct H2; auto. subst. by rewrite LUγ.
+    }
+    iIntros (j f l2 LUd LUg'). destruct (decide (i = j)).
+    - subst. rewrite lookup_insert in LUg'. inv LUg'. rewrite -big_opL_permutation; [|eauto]. iApply "HM"; eauto.
+    - rewrite lookup_insert_ne in LUg'; [|auto]. iApply "HM"; eauto.
   Qed.
 
   Lemma oftI_alloc_thread Ω δ γ i :

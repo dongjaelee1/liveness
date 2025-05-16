@@ -27,9 +27,9 @@ Section liveness.
        ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
               (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
               ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                           toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗
+                           toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] i ∈ dom efs, toL_thread i 1 []) -∗
                            £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-       state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗ (([∗ set] i ∈ dom efs, toL_thread i 1 []) -∗ ν e2 efs))
+       state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗ ν e2 efs)
     ⊢ lwp_step s i E e1 ν.
   Proof.
     rewrite /lwp_step. iIntros "H % % % % % % % % I". iDestruct "I" as "(%Idom&Id1&IO1&Ig1&#Ioft1&Is1)".
@@ -62,14 +62,15 @@ Section liveness.
     }
     iDestruct "Hfb" as "[% Hfb]". iDestruct ("Ig" with "Hfb") as "[Ig1 Ht]".
     iPoseProof (toL_thread_perm _ _ _ _ PermL with "Ht") as "Ht".
-    iDestruct ("H" with "[//] Ht Hc Hlc") as "H". iApply (step_fupdN_wand with "H"). iNext. iIntros ">[Is2 H]".
-    clear L PermL. rename L' into L.
+    rename L into L_orig, L' into L.
+
     iPoseProof (toI_assigned_obls_split_dom _ (dom Ω1) with "[Ig1]") as "(%&%&%HDD&#HD1&#HD2)"; first by iFrame.
     destruct HDD as [HOD HDD].
     set (FR:=λ (α : obl_id) (f : fuel Λ), ∃ (i' : thread_id) (L' : list obl_id),
             γ1 !! i' = Some L' ∧ α ∈ L' ∧ ∃ f', δ2 !! i' = Some f' ∧ (fuel_leR f' f)).
     iMod (osat_progress _ L FR FR with "[IO1 Hcs0]") as "(%Ω2&IO2&%HOP&%HMF)".
-    { iPoseProof (osat_obl_is_done_weak_set _ D1 with "[IO1]") as "%HD1"; first by iFrame.
+    { clear L_orig PermL.
+      iPoseProof (osat_obl_is_done_weak_set _ D1 with "[IO1]") as "%HD1"; first by iFrame.
       iFrame "IO1". iPoseProof (big_sepM2_forall with "IoftM") as "%M". destruct M as [M1 M2].
       iPoseProof "HD2" as "%HD2".
       assert (mp : ∀ (P Q : Type), P → (P → Q) → Q) by intuition. eapply mp; [eapply oftI_schedule_1|]; eauto.
@@ -193,16 +194,82 @@ Section liveness.
     { iFrame. }
     iPoseProof (oftI_alloc_threads _ _ δ3 _ γ2 δ' with "Ioft2") as "#Ioft3".
     1,2,3: auto.
+
+    rewrite -Hd1. iDestruct ("H" with "[//] Ht Hc Hts Hlc") as "H".
+    iApply (step_fupdN_wand with "H"). iNext. iIntros ">[Is2 H]".
     iModIntro. iExists Ω2, Ω2. iSplit.
     { iPureIntro. split.
       - by econstructor 1.
       - reflexivity.
     }
-    iExists γ2. iFrame. iSplitR; first done. iApply "H". rewrite Hd1. iFrame.
+    iExists γ2. by iFrame.
   Qed.
+
+  (* For ghost_step, enable allocating and fulfilling an obligation. *)
+  Lemma ghost_step_alloc_obl a T R E ν :
+    (∀ σ ns κs τ,
+       state_interp σ ns κs τ ={E,∅}=∗
+       ∃ i L, toL_thread i 1 L ∗
+              ∀ κ, toL_thread i 1 (κ :: L) -∗
+                   (oblG_goal κ T R ∗ oblS_active κ ∗ toS_assigned i κ ∗ oblS_credit κ a ∗ ∃ b, oblS_bound κ b) ={∅,E}=∗
+                   state_interp σ ns κs τ ∗ ν)
+    ⊢ ghost_step E ν.
+  Proof.
+    rewrite /ghost_step. iIntros "H % % % % % % % I". iDestruct "I" as "(%Idom&Id1&IO1&Ig1&#Ioft1&Is1)".
+    iDestruct ("H" with "Is1") as ">(%&%&Ht&H)".
+    iPoseProof (toI_toL_thread_lookup with "[Ig1 Ht]") as "(%&%LUg&%PermL)"; first iFrame.
+    iPoseProof "Ioft1" as "Ioft1'". iDestruct "Ioft1'" as "[IoftO IoftM]".
+    iPoseProof (big_sepM2_lookup_iff with "IoftM") as "%A".
+    specialize (A i). destruct A. destruct H0 as [f LUd]; first eauto. clear H.
+    iMod (osat_alloc_obl _ (a ⊕ ⌈Λ⌉)%ord f T R with "IO1") as "(%κ & %LUκ & IO2 & #Hog & Hoi & Hol & Hoc & #Hob)".
+    iPoseProof (oblS_credit_split with "Hoc") as "[Hoc1 Hoc2]".
+    iMod (osat_step_one_obl_init_live with "[IO2 Hoi]") as "[IO2 #Hoa]"; first apply lookup_insert.
+    { iFrame. rewrite /oblG_elem. eauto. }
+    rewrite insert_insert.
+    iMod (toI_alloc_obl with "[Ig1 Ht Hol Hoc2]") as "(Ig1 & Ht & #Hta)".
+    { iFrame. rewrite /oblG_elem. iSplit; eauto. }
+    iPoseProof (oftI_alloc_obl _ _ _ κ i f f _ (a ⊕ ⌈Λ⌉)%ord LUκ LUd _ LUg with "[]") as "#Ioft2"; first auto.
+    Unshelve.
+    2:{ eapply (@PreOrder_Reflexive _ _ (OCM.le_PreOrder (t:=(@fuel_wf Λ).(WFOCM.ocm)))). }
+    iMod ("H" with "Ht [Hoc1]") as "[Hs H]".
+    { iFrame. eauto. }
+    iModIntro. iExists (<[κ:=obl_live ((a ⊕ ⌈ Λ ⌉)%ord, f)]> Ω). iSplit.
+    { iPureIntro. econstructor 2.
+      - econstructor 1. exists κ. exists ((a ⊕ ⌈ Λ ⌉)%ord, f). split; [auto | reflexivity].
+      - econstructor 2; [|reflexivity]. eapply (obl_states_step_step_one _ κ).
+        apply map_Forall2_insert; auto. split.
+        + rewrite decide_True; done.
+        + intros j. destruct (decide (j = κ)).
+          * subst. rewrite !LUκ. econstructor.
+          * destruct (Ω !! j); done.
+    }
+    iExists (<[i:=κ :: L]> γ). iPoseProof (oftI_one_permutation _ _ _ i (κ :: l') (κ :: L) with "Ioft2") as "Ioft3".
+    { apply lookup_insert. }
+    { econstructor. auto. }
+    rewrite insert_insert. by iFrame.
+  Qed.
+
+  Lemma ghost_step_fulfill_obl a T R E ν :
+    (∀ σ ns κs τ,
+       state_interp σ ns κs τ ={E,∅}=∗
+       ∃ i L, toL_thread i 1 L ∗
+              ∀ κ, toL_thread i 1 (κ :: L) -∗
+                   (oblG_goal κ T R ∗ oblS_active κ ∗ toS_assigned i κ ∗ oblS_credit κ a ∗ ∃ b, oblS_bound κ b) ={∅,E}=∗
+                   state_interp σ ns κs τ ∗ ν)
+    ⊢ ghost_step E ν.
+  Proof.
+
 
     TODO
 
+oftI_alloc_obl:
+  ∀ {SI : indexT} {A : Type} {leR : A → A → Prop} {addO : A → A → A} {ltR : A → A → Prop} {WF : WFOCM.t leR addO ltR} 
+    {ps : Type} {OC : obl_class ps (Ord.t * A)} {Σ : gFunctors} {H1 : threadoblGS.threadoblGS Σ} (Ω : obl_states' OC) 
+    (δ : gmap thread_id A) (γ : gmap thread_id (list obl_id)) (κ : obl_id) i (f f' : A) (l : list obl_id) 
+    (a : Ord.t),
+    Ω !! κ = None
+    → δ !! i = Some f
+      → leR f f' → γ !! i = Some l → oftI Ω δ γ ∗ toS_assigned i κ ⊢ oftI (<[κ:=obl_live (a, f')]> Ω) δ (<[i:=κ :: l]> γ)
 
 (* Ω must make strict progress *)
 Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
