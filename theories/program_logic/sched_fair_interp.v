@@ -243,6 +243,27 @@ Section sfi.
     - iApply big_sepM_insert; [auto|]. iFrame. done.
   Qed.
 
+  Lemma schedfairI_alloc_threads δ1 δ2 δ' :
+    (δ2 = δ1 ∪ δ') → (dom δ1 ## dom δ') →
+    schedfairI δ1
+    ⊢ |==> schedfairI δ2 ∗ [∗ set] i ∈ dom δ', ∃ fb, sfS_fuel_bound i fb 1.
+  Proof.
+    revert δ1 δ2. pattern δ'. revert δ'. apply map_ind.
+    { iIntros. rewrite right_id in H. subst. iFrame. rewrite dom_empty_L. iModIntro. done. }
+    iIntros (i f δ LUd IH δ1 δ2 Hdu Hdd) "SF". iMod (IH δ1 (delete i δ2) with "SF") as "[SF Hbs]".
+    { subst. replace (δ1 ∪ <[i:=f]> δ) with (<[i:=f]>(δ1 ∪ δ)).
+      - rewrite delete_insert; auto. rewrite lookup_union_l; auto. apply not_elem_of_dom_1. set_solver.
+      - rewrite insert_union_r; auto. apply not_elem_of_dom_1. set_solver.
+    }
+    { set_solver. }
+    iMod (schedfairI_alloc_thread _ i f with "SF") as "[SF Hb]".
+    { apply lookup_delete. }
+    pose proof (not_elem_of_dom_2 _ _ LUd) as NINd.
+    rewrite dom_insert_L big_sepS_union; [|set_solver].
+    rewrite big_sepS_singleton. iFrame. rewrite insert_delete; first by iFrame.
+    subst. rewrite -insert_union_r; first by rewrite lookup_insert. apply not_elem_of_dom_1. set_solver.
+  Qed.
+
   Lemma schedfairI_decr_one δ i f f' :
     (δ !! i = Some f) →
     (f' /< f) →

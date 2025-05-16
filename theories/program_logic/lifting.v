@@ -67,7 +67,7 @@ Section liveness.
     iPoseProof (toI_assigned_obls_split_dom _ (dom Ω1) with "[Ig1]") as "(%&%&%HDD&#HD1&#HD2)"; first by iFrame.
     destruct HDD as [HOD HDD].
     set (FR:=λ (α : obl_id) (f : fuel Λ), ∃ (i' : thread_id) (L' : list obl_id),
-            γ1 !! i' = Some L' ∧ α ∈ L' ∧ ∃ f', δ2 !! i = Some f' ∧ (fuel_leR f' f)).
+            γ1 !! i' = Some L' ∧ α ∈ L' ∧ ∃ f', δ2 !! i' = Some f' ∧ (fuel_leR f' f)).
     iMod (osat_progress _ L FR FR with "[IO1 Hcs0]") as "(%Ω2&IO2&%HOP&%HMF)".
     { iPoseProof (osat_obl_is_done_weak_set _ D1 with "[IO1]") as "%HD1"; first by iFrame.
       iFrame "IO1". iPoseProof (big_sepM2_forall with "IoftM") as "%M". destruct M as [M1 M2].
@@ -165,63 +165,38 @@ Section liveness.
             specialize (Hffu i). rewrite LUd1 in Hffu. inv Hffu. symmetry in H0.
             exists y, i, L. repeat split; eauto. exists y. split; auto.
             eapply (@PreOrder_Reflexive _ _ (OCM.le_PreOrder (t:=(@fuel_wf Λ).(WFOCM.ocm)))).
-        + 
-          TODO
+        + iApply big_sepM_forall; first apply _. iIntros (k o LU). destruct o; auto. destruct a.
+          destruct (decide (k ∈ L)); auto. iPureIntro. subst FR.
+          pose proof (map_Forall_union_1_2 _ _ _ Hmm MF) as MF2. specialize (MF2 _ _ LU).
+          destruct MF2 as (i'&L'&LUg1'&INL'&MF2). destruct (decide (i' = i)).
+          * subst. rewrite LUg in LUg1'. inv LUg1'. done.
+          * rewrite decide_False in MF2; [|set_solver]. destruct MF2 as (f'&LTf'&f2'&LUd2'&LEf2).
+            exists f'. split; [auto|]. exists i', L'. repeat split; auto. exists f2'. split; auto.
+    }
+    destruct Hfff as (δ'&Hd1&Hd2). apply thread_pool_inv_dom in Hd1. pose proof (fork_thread_ids _ _ _ _ _ _ _ Hstep) as Hefs.
+    assert (Hd3 : dom δ1 ## dom δ').
+    { TODO
+    
+
+schedfairI_alloc_threads:
+  ∀ {SI : indexT} {A : Type} {leR : A → A → Prop} {addO : A → A → A} {ltR : A → A → Prop} {WF : WFOCM.t leR addO ltR} 
+    {Σ : gFunctors} {schedfairGS0 : schedfairGS.schedfairGS Σ} (δ1 δ2 δ' : gmap thread_id A),
+    δ2 = δ1 ∪ δ' → dom δ1 ## dom δ' → schedfairI δ1 ⊢ |==> schedfairI δ2 ∗ ([∗ set] i ∈ dom δ', ∃ fb : A, sfS_fuel_bound i fb 1)
+toI_alloc_threads:
+  ∀ {SI : indexT} {A : Type} {leR : A → A → Prop} {addO : A → A → A} {ltR : A → A → Prop} {WF : WFOCM.t leR addO ltR} 
+    {ps : Type} {Σ : gFunctors} {H : osatGS.osatGS ps Σ} {H0 : schedfairGS.schedfairGS Σ} {H1 : threadoblGS.threadoblGS Σ} 
+    (γ1 γ2 : gmap thread_id (list obl_id)) (δ : thread_ids),
+    γ2 = γ1 ∪ gset_to_gmap [] δ
+    → dom γ1 ## δ → toI γ1 ∗ ([∗ set] i ∈ δ, ∃ f : A, sfS_fuel_bound i f 1) ⊢ |==> toI γ2 ∗ ([∗ set] i ∈ δ, toL_thread i 1 [])
+oftI_alloc_threads:
+  ∀ {SI : indexT} {A : Type} {leR : A → A → Prop} {addO : A → A → A} {ltR : A → A → Prop} {WF : WFOCM.t leR addO ltR} 
+    {ps : Type} {OC : obl_class ps (Ord.t * A)} {Σ : gFunctors} {H1 : threadoblGS.threadoblGS Σ} (Ω : obl_states' OC) 
+    (δ1 δ2 : gmap thread_id A) (γ1 γ2 : gmap thread_id (list obl_id)) (δ : gmap thread_id A),
+    δ2 = δ1 ∪ δ → dom δ1 ## dom δ → γ2 = γ1 ∪ gset_to_gmap [] (dom δ) → oftI Ω δ1 γ1 ⊢ oftI Ω δ2 γ2
 
 
-
-            iClear (HOD HDD HD1 M2 MF HD2 Hmm LUg) "#". iStopProof. revert L. pattern m2. revert m2. apply map_ind.
-            { iIntros. by rewrite big_sepM_empty. }
-            iIntros (k o m LUk IH L) "HL". iApply big_sepM_insert; first auto.
-            destruct (decide (k ∈ L)).
-            -- destruct (elem_of_list_lookup_1 _ _ e). iPoseProof (big_sepL_delete _ _ _ _ H with "HL") as "[H HL]".
-               iSplitL "H".
-               { destruct o; try auto. destruct a. iFrame. iPureIntro. apply Ord.S_pos. }
-               iPoseProof (IH (delete x L) with "[HL]") as "H".
-               { clear e. iStopProof. revert x H. pattern L. induction L.
-                 { iIntros. simpl. done. }
-                 iIntros (j LUL) "H". destruct j.
-                 { inv LUL. simpl. iDestruct "H" as "[_ H]". iFrame. }
-                 simpl in LUL. simpl. iDestruct "H" as "[H Hc]". iFrame. iApply IHL; auto.
-                 iApply (big_sepL_impl with "Hc"). iModIntro. iIntros. destruct (decide (k0 = j)).
-                 { subst. case_decide; try done. }
-                 { case_decide; try done. inv H0. }
-               }
-
-
-               iApply (big_sepM_impl with "H"). iModIntro. iIntros. destruct x0; auto. destruct a.
-               case_decide.
-               { case_decide; by iFrame. }
-               { case_decide.
-                 - 
-
-                   exfalso. 
-                 [set_solver|].
-
-                 [|exfalso; set_solver].
-
-                 case_decide.
-                 { inv H0. 
-                 rewrite big_sepL_cons
-lookup_delete_lt: ∀ {A : Type} (l : list A) (i j : nat), j < i → delete i l !! j = l !! j
-lookup_delete_ge: ∀ {A : Type} (l : list A) (i j : nat), i ≤ j → delete i l !! j = l !! S j
-
-                 iPoseProof (big_sepL_submseteq _ (delete x L) L with "HL") as "HL".
-
-big_sepL_submseteq:
-  ∀ {SI : indexT} {PROP : bi} {A : Type} (Φ : A → PROP),
-    (∀ x : A, Affine (Φ x)) → ∀ l1 l2 : list A, l1 ⊆+ l2 → ([∗ list] y ∈ l2, Φ y) ⊢ [∗ list] y ∈ l1, Φ y
-submseteq_delete: ∀ {A : Type} (l : list A) (i : nat), delete i l ⊆+ l
-                 pose proof (delete_Permutation _ _ _ H). rewrite (big_opL_permutation _ _ _ H0).
-delete_Permutation: ∀ {A : Type} (l : list A) (i : nat) (x : A), l !! i = Some x → l ≡ₚ x :: delete i l
-              
-        
-big_sepL_delete:
-  ∀ {SI : indexT} {PROP : bi} {A : Type} (Φ : nat → A → PROP) (l : list A) (i : nat) (x : A),
-    l !! i = Some x → ([∗ list] k↦y ∈ l, Φ k y) ⊣⊢ Φ i x ∗ ([∗ list] k↦y ∈ l, if decide (k = i) then emp else Φ k y)
-      
-
-      TODO
+    TODO
+            
 
 
 oftI_schedule_1

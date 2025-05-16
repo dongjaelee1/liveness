@@ -86,12 +86,12 @@ Notation obl_statesL Λ := (obl_states' (@wp_obl_class Λ)).
 Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ δ1 (Ω1 : obl_statesL Λ) γ1 σ1 ns κ κs τ,
-     (schedfairIL Λ δ1 ∗ osat Ω1 ∗ toIL Λ γ1 ∗ oftIL Λ Ω1 δ1 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
+     (⌜ τ = dom δ1 ⌝ ∗ schedfairIL Λ δ1 ∗ osat Ω1 ∗ toIL Λ γ1 ∗ oftIL Λ Ω1 δ1 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
      (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
      ∃ Ω2, (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗
            ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
                         ∀ δ2 δ3, (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
-                                    £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
+                                 £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
      ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
               ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
                     ν e2 efs
@@ -143,7 +143,7 @@ End lwp_step.
 Definition ghost_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (E : coPset)
   (ν : iPropO Σ) : iPropO Σ :=
   (∀ δ (Ω : obl_statesL Λ) γ σ ns κs τ,
-     (schedfairIL Λ δ ∗ osat Ω ∗ toIL Λ γ ∗ oftIL Λ Ω δ γ ∗ state_interp σ ns κs τ) ={E}=∗
+     (⌜ τ = dom δ ⌝ ∗ schedfairIL Λ δ ∗ osat Ω ∗ toIL Λ γ ∗ oftIL Λ Ω δ γ ∗ state_interp σ ns κs τ) ={E}=∗
      ∃ Ω', (⌜(Ω ↪ₛ⋆ Ω' @ σ)⌝) ∗
            ∃ γ', (schedfairIL Λ δ ∗ osat Ω' ∗ toIL Λ γ' ∗ oftIL Λ Ω' δ γ' ∗ state_interp σ ns κs τ) ∗
                  ν
@@ -192,7 +192,7 @@ Section ghost_step.
     Ψ ⊢ ghost_step E Ψ.
   Proof.
     iIntros "Hlwp". rewrite /ghost_step.
-    iIntros "%%%%%%% H". iModIntro. by iFrame.
+    iIntros "%%%%%%% [_ H]". iModIntro. by iFrame.
   Qed.
 
   Lemma ghost_step_strong_mono `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} E1 E2 Ψ1 Ψ2 :
@@ -219,8 +219,10 @@ Section ghost_step.
     ghost_step E (ghost_step E Ψ) ⊢ ghost_step E Ψ.
   Proof.
     iIntros "Hg". rewrite /ghost_step.
-    iIntros (???????) "H". iSpecialize ("Hg" with "[$]"). iMod "Hg".
-    iDestruct "Hg" as "(%&%&%&H&Hg)". iSpecialize ("Hg" with "[$]").
+    iIntros (???????) "H". iAssert (⌜ τ = dom δ ⌝)%I as "%TI".
+    { iDestruct "H" as "[H _]". done. }
+    iSpecialize ("Hg" with "[$]"). iMod "Hg".
+    iDestruct "Hg" as "(%&%&%&H&Hg)". iSpecialize ("Hg" with "[-]"); first by iFrame.
     iDestruct "Hg" as ">(%&%&%&H&Hg)". iModIntro. iFrame.
     iPureIntro. by etransitivity.
   Qed.
@@ -355,8 +357,10 @@ Proof.
   iIntros "Hg". rewrite !lwp_unfold /lwp_pre /lwp_step.
   destruct (to_val e) as [v|] eqn:?.
   { by iApply ghost_step_idemp. }
-  iIntros (????????) "H". rewrite /ghost_step. iSpecialize ("Hg" with "[$]"). iMod "Hg".
-  iDestruct "Hg" as "(%&%&%&H&Hg)". iSpecialize ("Hg" with "[$]").
+  iIntros (????????) "H". iAssert (⌜τ = dom δ1⌝)%I as "%TI".
+  { iDestruct "H" as "[H _]". done. }
+  rewrite /ghost_step. iSpecialize ("Hg" with "[$]"). iMod "Hg".
+  iDestruct "Hg" as "(%&%&%&H&Hg)". iSpecialize ("Hg" with "[-]"); first by iFrame.
   iMod "Hg". iModIntro. iDestruct "Hg" as "(H&%&%&Hg)". iSplitL "H"; first done.
   iExists Ω2. iSplitR.
   { iPureIntro. etransitivity; eauto. }
@@ -430,12 +434,16 @@ Proof.
   destruct (to_val e) as [v|] eqn:He.
   { by iApply ghost_step_atomic. }
   rewrite /lwp_step.
-  iIntros (????????) "Hp". iMod "H".  iMod ("H" with "[$]") as "(%&%&%&H)".
+  iIntros (????????) "Hp". iAssert (⌜τ = dom δ1⌝)%I as "%TI".
+  { iDestruct "Hp" as "[Hp _]". done. }
+  iMod "H".  iMod ("H" with "[$]") as "(%&%&%&H)".
   iModIntro. iSplitR; first done. iExists _. iSplitR; first done.
   iIntros (???????) "Hcred". iApply (step_fupdN_wand with "(H [//] [//] Hcred)").
   iIntros ">(%&%&%&%&H0&H&Hefs)". destruct s.
   - rewrite !lwp_unfold /lwp_pre. destruct (to_val e2) as [v2|] eqn:He2.
-    + iSpecialize ("H" with "[$]"). iMod "H".
+    + TODO assert (TI2 : τ ∪ dom efs = dom δ3).
+      { 
+      iSpecialize ("H" with "[H0]"). iMod "H".
       iDestruct "H" as "(%&%&%&H0&H)". iMod "H". iFrame.
       iModIntro. iExists Ω3. iSplit.
       * iPureIntro. destruct H3. split; first auto. etransitivity; eauto.

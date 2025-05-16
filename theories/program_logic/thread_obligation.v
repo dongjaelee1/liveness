@@ -176,6 +176,36 @@ Section thread_obl.
     iModIntro. rewrite /toS_thread. iFrame. iSplit; [|done]. by rewrite New.
   Qed.
 
+  Lemma toS_alloc_threads D (δ : thread_ids) l :
+    (gset_to_coPset δ) ## D →
+    own state_name (reservation_map_token (⊤ ∖ D))
+    ⊢ |==> own state_name (reservation_map_token (⊤ ∖ ((gset_to_coPset δ) ∪ D))) ∗ [∗ set] i ∈ δ, toS_thread i l.
+  Proof.
+    revert D l. pattern δ. revert δ. apply set_ind.
+    { solve_proper. }
+    { iIntros. replace (gset_to_coPset ∅ ∪ D) with D; first (iFrame; by iModIntro).
+      apply leibniz_equiv. intros x. rewrite elem_of_union. split; intro; auto. destruct H3; auto.
+      apply elem_of_gset_to_coPset in H3. set_solver.
+    }
+    iIntros (i δ NINd IH D l Hdd) "H".
+    assert (Hsub1 : gset_to_coPset δ ⊆ (gset_to_coPset ({[i]} ∪ δ))).
+    { intros x IN. apply elem_of_gset_to_coPset in IN. apply elem_of_gset_to_coPset. set_solver. }
+    assert (Hsub2 : gset_to_coPset {[i]} ⊆ (gset_to_coPset ({[i]} ∪ δ))).
+    { intros x IN. apply elem_of_gset_to_coPset in IN. apply elem_of_gset_to_coPset. set_solver. }
+    iMod (IH _ l with "H") as "[H Hts]".
+    { set_solver. }
+    rewrite big_sepS_union; [|set_solver]. iFrame "Hts". rewrite big_sepS_singleton.
+    replace (gset_to_coPset ({[i]} ∪ δ) ∪ D) with ({[i]} ∪ (gset_to_coPset δ ∪ D)).
+    { iApply (toS_alloc_thread _ i with "H"). apply not_elem_of_union. split.
+      - intros x. apply NINd. by apply elem_of_gset_to_coPset.
+      - assert (gset_to_coPset {[i]} ## D); first set_solver.
+        rewrite elem_of_disjoint in H2. intros x. eapply H2; eauto. apply elem_of_gset_to_coPset. set_solver.
+    }
+    { rewrite union_assoc_L. f_equal. apply leibniz_equiv. intros x.
+      rewrite elem_of_union !elem_of_gset_to_coPset elem_of_union. split; intros C; destruct C; auto; try set_solver.
+    }
+  Qed.
+
   (* Print Table Search Blacklist. *)
   (* Shows that _obl_ is blacklisted, and as a result. any lemma that contains _obl_ doesn't show up in Search.  *)
   Lemma toS_alloc_obl i l κ :
@@ -237,6 +267,31 @@ Section thread_obl.
     by rewrite fmap_insert.
   Qed.
 
+  Lemma toL_alloc_threads γ1 γ2 (δ : thread_ids) l :
+    γ2 = γ1 ∪ (gset_to_gmap l δ) → dom γ1 ## δ →
+    own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ1))
+    ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ2)) ∗ [∗ set] i ∈ δ, toL_thread i 1 l.
+  Proof.
+    revert γ1 γ2 l. pattern δ. revert δ. apply set_ind.
+    { solve_proper. }
+    { iIntros. rewrite gset_to_gmap_empty right_id in H2. subst. iFrame. by iModIntro. }
+    iIntros (i δ NINd IH γ1 γ2 l Hgu Hgd) "H". iMod (IH γ1 (delete i γ2) l with "H") as "[H Hts]".
+    { subst. rewrite gset_to_gmap_union_singleton.
+      replace (γ1 ∪ <[i:=l]>(gset_to_gmap l δ)) with (<[i:=l]>(γ1 ∪ gset_to_gmap l δ)).
+      - rewrite delete_insert; auto. rewrite lookup_union_l; auto.
+        + apply not_elem_of_dom_1. set_solver.
+        + apply not_elem_of_dom_1. by rewrite dom_gset_to_gmap.
+      - rewrite insert_union_r; auto. apply not_elem_of_dom_1. set_solver.
+    }
+    { set_solver. }
+    iMod (toL_alloc_thread _ i l with "H") as "[H Ht]".
+    { apply lookup_delete. }
+    rewrite big_sepS_union; [|set_solver].
+    rewrite big_sepS_singleton. iFrame. rewrite insert_delete; first by iFrame.
+    subst. rewrite gset_to_gmap_union_singleton -insert_union_r; first by rewrite lookup_insert.
+    apply not_elem_of_dom_1. set_solver.
+  Qed.
+
   Lemma toL_alloc_obl γ i l κ :
     own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> γ)) ∗ toL_thread i 1 l
     ⊢ |==> own live_name (gmap_view_auth (DfracOwn 1) (to_agree <$> <[i:=κ :: l]>γ)) ∗ toL_thread i 1 (κ :: l).
@@ -284,6 +339,35 @@ Section thread_obl.
     destruct (decide (i = k)).
     - subst. iDestruct "H" as "(%&_&%&%&_)". exfalso. by rewrite LU in H5.
     - by rewrite lookup_insert_ne.
+  Qed.
+
+  Lemma toI_alloc_threads γ1 γ2 (δ : thread_ids) :
+    γ2 = γ1 ∪ (gset_to_gmap [] δ) → dom γ1 ## δ →
+    toI γ1 ∗ ([∗ set] i ∈ δ, ∃ f, sfS_fuel_bound i f 1)
+    ⊢ |==> toI γ2 ∗ [∗ set] i ∈ δ, toL_thread i 1 [].
+  Proof.
+    revert γ1 γ2. pattern δ. revert δ. apply set_ind.
+    { solve_proper. }
+    { iIntros (????) "[H1 H2]". rewrite gset_to_gmap_empty right_id in H2. subst. iFrame. by iModIntro. }
+    iIntros (i δ NINd IH γ1 γ2 Hgu Hgd) "[Hg Hfbs]".
+    rewrite !big_sepS_union; [|set_solver|set_solver].
+    rewrite !big_sepS_singleton. iDestruct "Hfbs" as "[Hfb Hfbs]".
+    iMod (IH γ1 (delete i γ2) with "[Hg Hfbs]") as "[Hg Hts]".
+    { subst. rewrite gset_to_gmap_union_singleton.
+      replace (γ1 ∪ <[i:=[]]>(gset_to_gmap [] δ)) with (<[i:=[]]>(γ1 ∪ gset_to_gmap [] δ)).
+      - rewrite delete_insert; auto. rewrite lookup_union_l; auto.
+        + apply not_elem_of_dom_1. set_solver.
+        + apply not_elem_of_dom_1. by rewrite dom_gset_to_gmap.
+      - rewrite insert_union_r; auto. apply not_elem_of_dom_1. set_solver.
+    }
+    { set_solver. }
+    { iFrame. }
+    iDestruct "Hfb" as "[%f Hfb]". iMod (toI_alloc_thread _ i f with "[Hg Hfb]") as "[Hg Ht]".
+    2:{ iFrame. }
+    { apply lookup_delete. }
+    iFrame. rewrite insert_delete; first by iFrame.
+    subst. rewrite gset_to_gmap_union_singleton -insert_union_r; first by rewrite lookup_insert.
+    apply not_elem_of_dom_1. set_solver.
   Qed.
 
   Lemma toI_alloc_obl γ i l κ :
@@ -564,6 +648,38 @@ Section thread_obl.
     iApply big_sepM2_insert_2; [|done]. by rewrite big_sepL_nil.
   Qed.
 
+  Lemma oftI_alloc_threads Ω δ1 δ2 γ1 γ2 δ :
+    δ2 = δ1 ∪ δ → dom δ1 ## dom δ →
+    γ2 = γ1 ∪ (gset_to_gmap [] (dom δ)) →
+    oftI Ω δ1 γ1 ⊢ oftI Ω δ2 γ2.
+  Proof.
+    revert δ1 δ2 γ1 γ2. pattern δ. revert δ. apply map_ind.
+    { iIntros (???????) "H". rewrite dom_empty_L gset_to_gmap_empty in H4. rewrite !right_id in H2 H4. by subst. }
+    iIntros (i f δ LUd IH δ1 δ2 γ1 γ2 Hdu Hdd Hgu) "H".
+    iAssert (⌜ dom γ1 ## dom (<[i:=f]> δ) ⌝)%I as "%Hgd".
+    { rewrite /oftI. iDestruct "H" as "[_ #H]". iPoseProof (big_sepM2_dom with "H") as "%Hd". iPureIntro. by rewrite -Hd. }
+    iPoseProof (IH _ (delete i δ2) _ (delete i γ2) with "H") as "H".
+    { subst. replace (δ1 ∪ <[i:=f]> δ) with (<[i:=f]>(δ1 ∪ δ)).
+      - rewrite delete_insert; auto. rewrite lookup_union_l; auto. apply not_elem_of_dom_1. set_solver.
+      - rewrite insert_union_r; auto. apply not_elem_of_dom_1. set_solver.
+    }
+    { set_solver. }
+    { subst. rewrite dom_insert_L gset_to_gmap_union_singleton.
+      replace (γ1 ∪ <[i:=[]]>(gset_to_gmap [] (dom δ))) with (<[i:=[]]>(γ1 ∪ gset_to_gmap [] (dom δ))).
+      - rewrite delete_insert; auto. rewrite lookup_union_l; auto.
+        + apply not_elem_of_dom_1. set_solver.
+        + apply not_elem_of_dom_1. rewrite dom_gset_to_gmap. by apply not_elem_of_dom_2.
+      - rewrite insert_union_r; auto. apply not_elem_of_dom_1. set_solver.
+    }
+    iPoseProof (oftI_alloc_thread _ _ _ i with "H") as "H".
+    { apply lookup_delete. }
+    { apply lookup_delete. }
+    iSpecialize ("H" $! f). rewrite ! insert_delete; first iFrame.
+    - subst. rewrite gset_to_gmap_dom. rewrite fmap_insert -insert_union_r; first by rewrite lookup_insert.
+      apply not_elem_of_dom_1. set_solver.
+    - subst. rewrite -insert_union_r; first by rewrite lookup_insert. apply not_elem_of_dom_1. set_solver.
+  Qed.
+
   Lemma oftI_alloc_obl Ω δ γ κ i f f' l a :
     Ω !! κ = None → δ !! i = Some f → (f /≤ f') → γ !! i = Some l →
     oftI Ω δ γ ∗ toS_assigned i κ
@@ -628,7 +744,7 @@ Section thread_obl.
     map_Forall (λ κ o, match o with
                        | obl_live (a, b) =>
                            (∃ i L, (γ !! i = Some L) ∧ κ ∈ L ∧
-                                   if (decide (i ∈ S)) then True else ∃ b', b' /< b ∧ ∃ f, δ2 !! i = Some f ∧ f /≤ b)
+                                   if (decide (i ∈ S)) then True else ∃ b', b' /< b ∧ ∃ f, δ2 !! i = Some f ∧ f /≤ b')
                        | _ => True
                        end) Ω.
   Proof using Type*.
@@ -648,7 +764,7 @@ Section thread_obl.
       specialize (SF i). rewrite H3 in SF. inv SF. 
       case_decide; first eauto. exists y. apply WFOCM.lt_exists_left in H6. destruct H6 as (z&?&?). split.
       + apply WFOCM.lt_exists_left. exists z. split; first auto. etransitivity; first apply H7. apply LE.
-      + exists y. split; first auto. etransitivity; [|eauto]. etransitivity; [|eauto]. apply OCM.add_base_left_le.
+      + exists y. split; auto. reflexivity.
   Qed.
 
   Lemma oftI_schedule_2 (Ω1 Ω2 : obl_states' OC) (δ1 δ2 : gmap thread_id A) (γ : gmap thread_id (list obl_id)) :
