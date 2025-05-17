@@ -210,8 +210,7 @@ Section liveness.
     (∀ σ ns κs τ,
        state_interp σ ns κs τ ={E,∅}=∗
        ∃ i L, toL_thread i 1 L ∗
-              ∀ κ, toL_thread i 1 (κ :: L) -∗
-                   (oblG_goal κ T R ∗ oblS_active κ ∗ toS_assigned i κ ∗ oblS_credit κ a ∗ ∃ b, oblS_bound κ b) ={∅,E}=∗
+              ∀ κ, (toL_thread i 1 (κ :: L) ∗ oblG_goal κ T R ∗ oblS_active κ ∗ toS_assigned i κ ∗ oblS_credit κ a ∗ ∃ b, oblS_bound κ b) ={∅,E}=∗
                    state_interp σ ns κs τ ∗ ν)
     ⊢ ghost_step E ν.
   Proof.
@@ -231,7 +230,7 @@ Section liveness.
     iPoseProof (oftI_alloc_obl _ _ _ κ i f f _ (a ⊕ ⌈Λ⌉)%ord LUκ LUd _ LUg with "[]") as "#Ioft2"; first auto.
     Unshelve.
     2:{ eapply (@PreOrder_Reflexive _ _ (OCM.le_PreOrder (t:=(@fuel_wf Λ).(WFOCM.ocm)))). }
-    iMod ("H" with "Ht [Hoc1]") as "[Hs H]".
+    iMod ("H" with "[Ht Hoc1]") as "[Hs H]".
     { iFrame. eauto. }
     iModIntro. iExists (<[κ:=obl_live ((a ⊕ ⌈ Λ ⌉)%ord, f)]> Ω). iSplit.
     { iPureIntro. econstructor 2.
@@ -249,51 +248,72 @@ Section liveness.
     rewrite insert_insert. by iFrame.
   Qed.
 
-  Lemma ghost_step_fulfill_obl a T R E ν :
+  Lemma ghost_step_fulfill_obl κ E ν :
     (∀ σ ns κs τ,
        state_interp σ ns κs τ ={E,∅}=∗
-       ∃ i L, toL_thread i 1 L ∗
-              ∀ κ, toL_thread i 1 (κ :: L) -∗
-                   (oblG_goal κ T R ∗ oblS_active κ ∗ toS_assigned i κ ∗ oblS_credit κ a ∗ ∃ b, oblS_bound κ b) ={∅,E}=∗
-                   state_interp σ ns κs τ ∗ ν)
+       ∃ i L T R, (toL_thread i 1 (κ :: L) ∗ oblG_goal κ T R ∗ oblS_active κ ∗ ⌜ T σ ⌝ ∗ ▷ R) ∗
+                  (toL_thread i 1 L ∗ oblS_done κ ={∅,E}=∗
+                   state_interp σ ns κs τ ∗ ν))
     ⊢ ghost_step E ν.
   Proof.
+    rewrite /ghost_step. iIntros "H % % % % % % % I". iDestruct "I" as "(%Idom&Id1&IO1&Ig1&#Ioft1&Is1)".
+    iDestruct ("H" with "Is1") as ">(%&%&%&%& (Ht&#Hog&#Hoa&%HT&HR) &H)".
+    iPoseProof (toI_toL_thread_lookup with "[Ig1 Ht]") as "(%&%LUg&%PermL)"; first iFrame.
+    iMod (toI_fulfill_obl with "[Ig1 Ht]") as "[Hol Htt]"; first iFrame.
+    iPoseProof (osat_obl_is_live with "[IO1 Hol]") as "[% %LUO]".
+    { iFrame. rewrite /oblG_elem. eauto. }
+    iMod (osat_step_one_obl_live_done with "[IO1 Hol HR]") as "[IO2 #Hod]"; first (iFrame; eauto).
+    iPoseProof ("Htt" with "Hod") as "[Ig2 Ht]".
+    iPoseProof (toI_oblS_done_notin with "[Ig2]") as "%NIN"; first by iFrame.
+    assert (IN : is_Some (Ω !! κ)) by eauto.
+    iPoseProof (oftI_fulfill_obl _ _ _ κ i _ _ T IN LUg PermL NIN with "Ioft1") as "Ioft2".
+    iMod ("H" with "[Ht]") as "[Hs H]"; first by iFrame.
+    iModIntro. iExists (<[κ:=obl_done T]> Ω). iSplit.
+    { iPureIntro. econstructor 2; [|reflexivity]. eapply (obl_states_step_step_one _ κ).
+      intros x. destruct (decide (x = κ)).
+      - subst. rewrite LUO lookup_insert. econstructor. simpl. auto.
+      - rewrite lookup_insert_ne; auto. destruct (Ω !! x); econstructor; auto.
+    }
+    iExists (<[i:=L]> γ). iFrame. auto.
+  Qed.
 
+  Lemma lwp_progress s i E e1 Φ :
+    to_val e1 = None →
+    (∀ σ1 ns κ κs τ,
+       state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
+       ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
+              (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
+              ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
+                           toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] i ∈ dom efs, toL_thread i 1 []) -∗
+                           £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
+       state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
+       lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros (He) "H". rewrite lwp_unfold /lwp_pre He. iApply lwp_step_progress. iFrame.
+  Qed.
 
-    TODO
+  Lemma lwp_alloc_obl a T R s i E e Φ :
+    (∀ σ ns κs τ,
+       state_interp σ ns κs τ ={E,∅}=∗
+       ∃ j L, toL_thread j 1 L ∗
+              ∀ κ, (toL_thread j 1 (κ :: L) ∗ oblG_goal κ T R ∗ oblS_active κ ∗ toS_assigned j κ ∗ oblS_credit κ a ∗ ∃ b, oblS_bound κ b) ={∅,E}=∗
+                   state_interp σ ns κs τ ∗ lWP e @ s; i; E {{ Φ }})
+    ⊢ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "H". iApply ghost_step_elim. iApply (ghost_step_alloc_obl a T R). iFrame.
+  Qed.
 
-oftI_alloc_obl:
-  ∀ {SI : indexT} {A : Type} {leR : A → A → Prop} {addO : A → A → A} {ltR : A → A → Prop} {WF : WFOCM.t leR addO ltR} 
-    {ps : Type} {OC : obl_class ps (Ord.t * A)} {Σ : gFunctors} {H1 : threadoblGS.threadoblGS Σ} (Ω : obl_states' OC) 
-    (δ : gmap thread_id A) (γ : gmap thread_id (list obl_id)) (κ : obl_id) i (f f' : A) (l : list obl_id) 
-    (a : Ord.t),
-    Ω !! κ = None
-    → δ !! i = Some f
-      → leR f f' → γ !! i = Some l → oftI Ω δ γ ∗ toS_assigned i κ ⊢ oftI (<[κ:=obl_live (a, f')]> Ω) δ (<[i:=κ :: l]> γ)
-
-(* Ω must make strict progress *)
-Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
-  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
-  (∀ δ1 (Ω1 : obl_statesL Λ) γ1 σ1 ns κ κs τ,
-     (schedfairIL Λ δ1 ∗ osat Ω1 ∗ toIL Λ γ1 ∗ oftIL Λ Ω1 δ1 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
-     (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
-     ∃ Ω2, (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗
-           ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                        ∀ δ2 δ3, (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
-                                    £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
-              ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
-                    ν e2 efs
-  )%I.
-(* Ω can allocate, progress, or fulfills obligations. Note this has no later modality. *)
-Definition ghost_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (E : coPset)
-  (ν : iPropO Σ) : iPropO Σ :=
-  (∀ δ (Ω : obl_statesL Λ) γ σ ns κs τ,
-     (schedfairIL Λ δ ∗ osat Ω ∗ toIL Λ γ ∗ oftIL Λ Ω δ γ ∗ state_interp σ ns κs τ) ={E}=∗
-     ∃ Ω', (⌜(Ω ↪ₛ⋆ Ω' @ σ)⌝) ∗
-           ∃ γ', (schedfairIL Λ δ ∗ osat Ω' ∗ toIL Λ γ' ∗ oftIL Λ Ω' δ γ' ∗ state_interp σ ns κs τ) ∗
-                 ν
-  )%I.
+  Lemma lwp_fulfill_obl κ s i E e Φ :
+    (∀ σ ns κs τ,
+       state_interp σ ns κs τ ={E,∅}=∗
+       ∃ j L T R, (toL_thread j 1 (κ :: L) ∗ oblG_goal κ T R ∗ oblS_active κ ∗ ⌜ T σ ⌝ ∗ ▷ R) ∗
+                  (toL_thread j 1 L ∗ oblS_done κ ={∅,E}=∗
+                   state_interp σ ns κs τ ∗ lWP e @ s; i; E {{ Φ }}))
+    ⊢ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "H". iApply ghost_step_elim. iApply (ghost_step_fulfill_obl κ). iFrame.
+  Qed.
 
 End liveness.
 
@@ -301,41 +321,41 @@ Local Hint Resolve reducible_no_obs_reducible : core.
 
 Lemma lwp_lift_step_fupdN s i E Φ e1 :
   to_val e1 = None →
-  (∀ δ1 (Ω1 : obl_statesL Λ) γ1 σ1 ns κ κs τ,
-     (schedfairIL Λ δ1 ∗ osat Ω1 ∗ toIL Λ γ1 ∗ oftIL Λ Ω1 δ1 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
-     ⌜if s is NotStuck then reducible e1 σ1 τ else True⌝ ∗ ∃ Ω2,
-       (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗ ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗ ∀ δ2 δ3,
-     (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
-     £ (S $ num_laters_per_step ns) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
-              ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
-                    lWP e2 @ s; i; E {{ Φ }} ∗
-                                   [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
+  (∀ σ1 ns κ κs τ,
+     state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
+     ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
+            (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
+            ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
+                         toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] i ∈ dom efs, toL_thread i 1 []) -∗
+                         £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
+     state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
+     lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
-Proof. by rewrite lwp_unfold /lwp_pre /lwp_step =>->. Qed.
+Proof. apply lwp_progress. Qed.
 
 Lemma lwp_lift_step_fupd s i E Φ e1 :
   to_val e1 = None →
-  (∀ δ1 (Ω1 : obl_statesL Λ) γ1 σ1 ns κ κs τ,
-     (schedfairIL Λ δ1 ∗ osat Ω1 ∗ toIL Λ γ1 ∗ oftIL Λ Ω1 δ1 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
-     ⌜if s is NotStuck then reducible e1 σ1 τ else True⌝ ∗ ∃ Ω2,
-       (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗ ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗ ∀ δ2 δ3,
-     (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
-     £ 1 ={∅}=∗ ▷ |={∅,E}=>
-     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
-              ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
-                    lWP e2 @ s; i; E {{ Φ }} ∗
-                                   [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
+  (∀ σ1 ns κ κs τ,
+     state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
+     ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
+            (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
+            ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
+                         toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] i ∈ dom efs, toL_thread i 1 []) -∗
+                         £ 1 ={∅}=∗ ▷ |={∅,E}=>
+     state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
+     lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (?) "Hlwp". rewrite -lwp_lift_step_fupdN; [|done].
-  iIntros (????????) "Hσ". iMod ("Hlwp" with "Hσ") as "($ & (% & % & Hlwp))".
-  iModIntro. iExists _. iSplit; first done. iIntros (??? ? ?? ?) "Hcred".
+  iIntros (?????) "Hσ". iMod ("Hlwp" with "Hσ") as "(% & % & Ht & Hcs & % & Hlwp)".
+  iModIntro. iExists _, _. iFrame "Ht Hcs". iSplit; first done. iIntros (??? ?) "Ht Hc Hts Hcred".
   iPoseProof (lc_weaken 1 with "Hcred") as "Hcred"; first lia.
   simpl. rewrite -step_fupdN_intro; [|done]. rewrite -bi.laterN_intro.
-  iMod ("Hlwp" with "[//] [//] Hcred") as "Hlwp".
+  iMod ("Hlwp" with "[//] Ht Hc Hts Hcred") as "Hlwp".
   iApply step_fupd_intro; done.
 Qed.
+
+TODO
 
 Lemma lwp_lift_stuck i E Φ e :
   to_val e = None →
