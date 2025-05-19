@@ -371,8 +371,8 @@ Section language.
 
   (* TODO: Exclude the case of [n=0], either here, or in [wp_pure] to avoid it
   succeeding when it did not actually do anything. *)
-  Class PureExec (δ : Prop) (n : nat) (e1 e2 : expr Λ) :=
-    pure_exec : δ → relations.nsteps pure_step n e1 e2.
+  Class PureExec (φ : Prop) (n : nat) (e1 e2 : expr Λ) :=
+    pure_exec : φ → relations.nsteps pure_step n e1 e2.
 
   Lemma pure_step_ctx K `{!@LanguageCtx Λ K} e1 e2 :
     pure_step e1 e2 →
@@ -396,9 +396,9 @@ Section language.
   Proof. eauto using rtc_congruence, pure_step_ctx. Qed.
 
   (* We do not make this an instance because it is awfully general. *)
-  Lemma pure_exec_ctx K `{!@LanguageCtx Λ K} δ n e1 e2 :
-    PureExec δ n e1 e2 →
-    PureExec δ n (K e1) (K e2).
+  Lemma pure_exec_ctx K `{!@LanguageCtx Λ K} φ n e1 e2 :
+    PureExec φ n e1 e2 →
+    PureExec φ n (K e1) (K e2).
   Proof. rewrite /PureExec; eauto using pure_step_nsteps_ctx. Qed.
 
   (* This is a family of frequent assumptions for PureExec *)
