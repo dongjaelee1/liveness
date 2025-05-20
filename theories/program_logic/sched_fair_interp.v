@@ -3,7 +3,7 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liveness Require Import bank language.
+From liris Require Import bank language.
 
 Section gmap.
   Context {K : Type} {EqDecision0 : EqDecision K} {Countable0 : Countable K}.

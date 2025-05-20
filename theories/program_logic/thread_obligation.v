@@ -3,8 +3,8 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liveness Require Export osat sched_fair_interp.
-From liveness Require Import language ordinal_wfocm.
+From liris Require Export osat sched_fair_interp.
+From liris Require Import language ordinal_wfocm.
 
 (** Enable thread local management of obligations.
     Also connects scheduler fairness with obligations to enable liveness induction. *)

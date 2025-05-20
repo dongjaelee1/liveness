@@ -1,5 +1,5 @@
 From stdpp Require Import base.
-From liveness Require Export ocm.
+From liris Require Export ocm.
 
 Module WFOCM.
   Class t {A : Type} (leR : A -> A -> Prop) (addO : A -> A -> A) (ltR : A -> A -> Prop) := {

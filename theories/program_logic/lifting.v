@@ -2,8 +2,8 @@
 semantics to the program logic. *)
 
 From iris.proofmode Require Import proofmode.
-From liveness.program_logic Require Export weakestpre.
-From liveness Require Import ordinal_wfocm.
+From liris.program_logic Require Export weakestpre.
+From liris Require Import ordinal_wfocm.
 From iris.prelude Require Import options.
 
 Notation sfS_fuel_credit_forallL Λ := (sfS_fuel_credit_forall (H:=@fuel_wf Λ)).

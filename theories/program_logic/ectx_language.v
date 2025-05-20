@@ -1,7 +1,7 @@
 (** An axiomatization of evaluation-context based languages, including a proof
     that this gives rise to a "language" in the Iris sense. *)
 From iris.prelude Require Export prelude.
-From liveness.program_logic Require Import language.
+From liris.program_logic Require Import language.
 From iris.prelude Require Import options.
 
 (** TAKE CARE: When you define an [ectxLanguage] canonical structure for your

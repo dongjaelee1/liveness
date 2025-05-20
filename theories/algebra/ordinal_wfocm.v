@@ -1,5 +1,5 @@
 From stdpp Require Import base.
-From liveness Require Export wfocm.
+From liris Require Export wfocm.
 From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
 
 Global Notation "'ω'" := Ord.omega.

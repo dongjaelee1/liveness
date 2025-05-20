@@ -2,7 +2,7 @@ From stdpp Require Import base.
 From iris.algebra Require Export cmra.
 From iris.algebra Require Import proofmode_classes updates.
 From iris.prelude Require Import options.
-From liveness Require Import ocm.
+From liris Require Import ocm.
 
 (** Reference: "Module Fuel" in Lilo and FOS. *)
 

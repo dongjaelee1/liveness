@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic Require Import upred.
-From liveness Require Import wf_structs.
+From liris Require Import wf_structs.
 
 Section measure.
   Context `{SI: indexT} {M : ucmra}.

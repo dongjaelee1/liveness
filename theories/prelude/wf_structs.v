@@ -1,4 +1,4 @@
-From liveness Require Import axioms.
+From liris Require Import axioms.
 From Coq Require Export Relations.Relation_Operators.
 From Coq Require Import RelationClasses Relations.Operators_Properties.
 

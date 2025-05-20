@@ -3,7 +3,7 @@
 1. Setup a new opam switch and switch to it:
   ```
   opam update
-  opam switch create liveness 5.2.1
+  opam switch create liris 5.2.1
   eval $(opam env)
   ```
 

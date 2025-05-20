@@ -1,5 +1,5 @@
 From stdpp Require Import base.
-From liveness Require Import axioms.
+From liris Require Import axioms.
 Require Import Program.
 
 (** The less-than-or-equal-to-based Ordered Commutative Monoid class. *)

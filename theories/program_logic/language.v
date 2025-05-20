@@ -2,7 +2,7 @@ From stdpp Require Export gmap.
 From iris.algebra Require Export ofe.
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
-From liveness Require Export wfocm.
+From liris Require Export wfocm.
 
 Definition thread_id := positive.
 Canonical Structure thread_idO `{SI : indexT} := leibnizO thread_id.

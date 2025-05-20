@@ -3,8 +3,8 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liveness Require Export obligation wfocm wf_structs.
-From liveness Require Import bcred.
+From liris Require Export obligation wfocm wf_structs.
+From liris Require Import bcred.
 
 Definition osat_obl_class_def `(WFA : WFOCM.pack A) `(WFB : @well_founded B RB) (ps : Type) : obl_class ps (prod A B) :=
   Build_obl_class ps (prod A B) _ (prod_lt_well_founded WFOCM.lt_wf WFB).

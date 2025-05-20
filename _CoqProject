@@ -1,4 +1,4 @@
--Q theories liveness
+-Q theories liris
 # We sometimes want to locally override notation (e.g. in proofmode/base.v, bi/embedding.v), and there
 # is no good way to do that with scopes.
 -arg -w -arg -notation-overridden
@@ -25,7 +25,7 @@ theories/algebra/bcred.v
 theories/algebra/obligation.v
 
 theories/base_logic/osat.v
-#theories/base_logic/upred_measure.v
+# theories/base_logic/upred_measure.v
 
 theories/program_logic/language.v
 theories/program_logic/sched_fair_interp.v
@@ -34,11 +34,11 @@ theories/program_logic/weakestpre.v
 theories/program_logic/lifting.v
 theories/program_logic/ectx_language.v
 theories/program_logic/ectxi_language.v
-#theories/program_logic/obligation_fuel.v
+# theories/program_logic/obligation_fuel.v
 
 
-# liris_heap_lang/locations.v
-# liris_heap_lang/lang.v
+liris_heap_lang/locations.v
+liris_heap_lang/lang.v
 # liris_heap_lang/class_instances.v
 # liris_heap_lang/pretty.v
 # liris_heap_lang/metatheory.v

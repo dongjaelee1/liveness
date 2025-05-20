@@ -1,7 +1,7 @@
 (** An axiomatization of languages based on evaluation context items, including
     a proof that these are instances of general ectx-based languages. *)
 From iris.prelude Require Export prelude.
-From liveness.program_logic Require Import language ectx_language.
+From liris.program_logic Require Import language ectx_language.
 From iris.prelude Require Import options.
 
 (** TAKE CARE: When you define an [ectxiLanguage] canonical structure for your

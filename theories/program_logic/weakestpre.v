@@ -1,14 +1,14 @@
 From iris.proofmode Require Import base proofmode classes.
 From transfinite.base_logic.lib Require Export fancy_updates.
-From liveness Require Export language.
+From liris Require Export language.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
 From iris.bi Require Export fixpoint.
-From liveness.bi Require Export weakestpre.
+From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 Import uPred.
-From liveness Require Export thread_obligation.
-From liveness Require Import ordinal_wfocm.
+From liris Require Export thread_obligation.
+From liris Require Import ordinal_wfocm.
 
 Notation Π Λ := (state Λ).
 

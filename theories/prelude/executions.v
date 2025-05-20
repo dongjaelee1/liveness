@@ -1,5 +1,5 @@
 From stdpp Require Import base relations.
-From liveness Require Import axioms.
+From liris Require Import axioms.
 
 Section definitions.
   Context `(R : relation A).

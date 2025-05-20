@@ -1,5 +1,5 @@
 From stdpp Require Import base.
-From liveness Require Export wfocm.
+From liris Require Export wfocm.
 Require Import Lia Program.
 
 Global Program Instance nat_OCM: OCM.t le Nat.add :=
