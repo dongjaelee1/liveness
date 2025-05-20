@@ -32,4 +32,39 @@ theories/program_logic/sched_fair_interp.v
 theories/program_logic/thread_obligation.v
 theories/program_logic/weakestpre.v
 theories/program_logic/lifting.v
+theories/program_logic/ectx_language.v
+theories/program_logic/ectxi_language.v
 #theories/program_logic/obligation_fuel.v
+
+
+# liris_heap_lang/locations.v
+# liris_heap_lang/lang.v
+# liris_heap_lang/class_instances.v
+# liris_heap_lang/pretty.v
+# liris_heap_lang/metatheory.v
+# liris_heap_lang/tactics.v
+# liris_heap_lang/primitive_laws.v
+# liris_heap_lang/derived_laws.v
+# liris_heap_lang/notation.v
+# liris_heap_lang/proofmode.v
+# liris_heap_lang/adequacy.v
+# liris_heap_lang/total_adequacy.v
+# liris_heap_lang/proph_erasure.v
+# liris_heap_lang/lib/spawn.v
+# liris_heap_lang/lib/par.v
+# liris_heap_lang/lib/assert.v
+# liris_heap_lang/lib/lock.v
+# liris_heap_lang/lib/rw_lock.v
+# liris_heap_lang/lib/spin_lock.v
+# liris_heap_lang/lib/ticket_lock.v
+# liris_heap_lang/lib/rw_spin_lock.v
+# liris_heap_lang/lib/nondet_bool.v
+# liris_heap_lang/lib/lazy_coin.v
+# liris_heap_lang/lib/clairvoyant_coin.v
+# liris_heap_lang/lib/counter.v
+# liris_heap_lang/lib/atomic_heap.v
+# liris_heap_lang/lib/increment.v
+# liris_heap_lang/lib/diverge.v
+# liris_heap_lang/lib/arith.v
+# liris_heap_lang/lib/array.v
+# liris_heap_lang/lib/logatom_lock.v

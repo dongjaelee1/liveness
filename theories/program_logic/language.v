@@ -1,4 +1,4 @@
-From stdpp Require Import gmap.
+From stdpp Require Export gmap.
 From iris.algebra Require Export ofe.
 From iris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
