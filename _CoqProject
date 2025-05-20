@@ -1,15 +1,19 @@
+# Search paths for all packages. They must all match the regex
+# `-Q $PACKAGE[/ ]` so that we can filter out the right ones for each package.
 -Q theories liris
-# We sometimes want to locally override notation (e.g. in proofmode/base.v, bi/embedding.v), and there
-# is no good way to do that with scopes.
+-Q liris_heap_lang liris.heap_lang
+
+# Custom flags (to be kept in sync with the dune file at the root of the repo).
+# We sometimes want to locally override notation, and there is no good way to do that with scopes.
 -arg -w -arg -notation-overridden
-# non-canonical projections (https://github.com/coq/coq/pull/10076) do not exist yet in 8.9.
+# Cannot use non-canonical projections as it causes massive unification failures
+# (https://github.com/coq/coq/issues/6294).
 -arg -w -arg -redundant-canonical-projection
-# change_no_check does not exist yet in 8.9.
--arg -w -arg -convert_concl_no_check
-# "Declare Scope" does not exist yet in 8.9.
--arg -w -arg -undeclared-scope
-# We have ambiguous paths and so far it is not even clear what they are (https://gitlab.mpi-sws.org/iris/iris/issues/240).
--arg -w -arg -ambiguous-paths
+# Warning seems incorrect, see https://gitlab.mpi-sws.org/iris/stdpp/-/issues/216
+-arg -w -arg -notation-incompatible-prefix
+# We can't do this migration yet until we require Coq 9.0
+-arg -w -arg -deprecated-from-Coq
+-arg -w -arg -deprecated-dirpath-Coq
 
 theories/prelude/axioms.v
 theories/prelude/wf_structs.v
