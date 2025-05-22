@@ -4,6 +4,7 @@ From iris.algebra Require Export ofe.
 From liris.program_logic Require Export language ectx_language ectxi_language.
 From liris.heap_lang Require Export locations.
 From iris.prelude Require Import options.
+From liris.algebra Require Import nat_wfocm.
 
 (** heap_lang.  A fairly simple language used for common Iris examples.
 
@@ -155,7 +156,7 @@ architectures). The tags have the following meaning:
 2: Payload is the data for a InjRV (LitV (LitInt _)).
 3: Payload is the data for a LitV (LitLoc _).
 4: Payload is the data for a InjLV (LitV (LitLoc _)).
-4: Payload is the data for a InjRV (LitV (LitLoc _)).
+5: Payload is the data for a InjRV (LitV (LitLoc _)).
 6: Payload is one of the following finitely many values, which 61 bits are more
    than enough to encode:
    LitV LitUnit, InjLV (LitV LitUnit), InjRV (LitV LitUnit),
@@ -399,15 +400,22 @@ Qed.
 Global Instance val_countable : Countable val.
 Proof. refine (inj_countable of_val to_val _); auto using to_of_val. Qed.
 
+Definition fuel : Type := nat.
+Definition fuel_leR : relation fuel := le.
+Definition fuelR : relation fuel := lt.
+Definition fuel_addO : fuel → fuel → fuel := Nat.add.
+
 Global Instance state_inhabited : Inhabited state :=
   populate {| heap := inhabitant; used_proph_id := inhabitant |}.
 Global Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
 Global Instance expr_inhabited : Inhabited expr := populate (Val inhabitant).
+Global Instance fuel_inhabited : Inhabited fuel := populate 0.
 
-Canonical Structure stateO := leibnizO state.
-Canonical Structure locO := leibnizO loc.
-Canonical Structure valO := leibnizO val.
-Canonical Structure exprO := leibnizO expr.
+Canonical Structure stateO `{SI : indexT} := leibnizO state.
+Canonical Structure locO `{SI : indexT} := leibnizO loc.
+Canonical Structure valO `{SI : indexT} := leibnizO val.
+Canonical Structure exprO `{SI : indexT} := leibnizO expr.
+Canonical Structure fuelO `{SI : indexT} := leibnizO fuel.
 
 (** Evaluation contexts *)
 (** Note that [ResolveLCtx] is not by itself an evaluation context item: we do
@@ -638,91 +646,92 @@ Proof.
   rewrite right_id insert_union_singleton_l. done.
 Qed.
 
-Inductive base_step : expr → state → list observation → expr → state → list expr → Prop :=
-  | RecS f x e σ :
-     base_step (Rec f x e) σ [] (Val $ RecV f x e) σ []
-  | PairS v1 v2 σ :
-     base_step (Pair (Val v1) (Val v2)) σ [] (Val $ PairV v1 v2) σ []
-  | InjLS v σ :
-     base_step (InjL $ Val v) σ [] (Val $ InjLV v) σ []
-  | InjRS v σ :
-     base_step (InjR $ Val v) σ [] (Val $ InjRV v) σ []
-  | BetaS f x e1 v2 e' σ :
+Inductive base_step : expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop :=
+  | RecS f x e σ τ :
+     base_step (Rec f x e) σ τ [] (Val $ RecV f x e) σ ∅
+  | PairS v1 v2 σ τ :
+     base_step (Pair (Val v1) (Val v2)) σ τ [] (Val $ PairV v1 v2) σ ∅
+  | InjLS v σ τ :
+     base_step (InjL $ Val v) σ τ [] (Val $ InjLV v) σ ∅
+  | InjRS v σ τ :
+     base_step (InjR $ Val v) σ τ [] (Val $ InjRV v) σ ∅
+  | BetaS f x e1 v2 e' σ τ :
      e' = subst' x v2 (subst' f (RecV f x e1) e1) →
-     base_step (App (Val $ RecV f x e1) (Val v2)) σ [] e' σ []
-  | UnOpS op v v' σ :
+     base_step (App (Val $ RecV f x e1) (Val v2)) σ τ [] e' σ ∅
+  | UnOpS op v v' σ τ :
      un_op_eval op v = Some v' →
-     base_step (UnOp op (Val v)) σ [] (Val v') σ []
-  | BinOpS op v1 v2 v' σ :
+     base_step (UnOp op (Val v)) σ τ [] (Val v') σ ∅
+  | BinOpS op v1 v2 v' σ τ :
      bin_op_eval op v1 v2 = Some v' →
-     base_step (BinOp op (Val v1) (Val v2)) σ [] (Val v') σ []
-  | IfTrueS e1 e2 σ :
-     base_step (If (Val $ LitV $ LitBool true) e1 e2) σ [] e1 σ []
-  | IfFalseS e1 e2 σ :
-     base_step (If (Val $ LitV $ LitBool false) e1 e2) σ [] e2 σ []
-  | FstS v1 v2 σ :
-     base_step (Fst (Val $ PairV v1 v2)) σ [] (Val v1) σ []
-  | SndS v1 v2 σ :
-     base_step (Snd (Val $ PairV v1 v2)) σ [] (Val v2) σ []
-  | CaseLS v e1 e2 σ :
-     base_step (Case (Val $ InjLV v) e1 e2) σ [] (App e1 (Val v)) σ []
-  | CaseRS v e1 e2 σ :
-     base_step (Case (Val $ InjRV v) e1 e2) σ [] (App e2 (Val v)) σ []
-  | AllocNS n v σ l :
+     base_step (BinOp op (Val v1) (Val v2)) σ τ [] (Val v') σ ∅
+  | IfTrueS e1 e2 σ τ :
+     base_step (If (Val $ LitV $ LitBool true) e1 e2) σ τ [] e1 σ ∅
+  | IfFalseS e1 e2 σ τ :
+     base_step (If (Val $ LitV $ LitBool false) e1 e2) σ τ [] e2 σ ∅
+  | FstS v1 v2 σ τ :
+     base_step (Fst (Val $ PairV v1 v2)) σ τ [] (Val v1) σ ∅
+  | SndS v1 v2 σ τ :
+     base_step (Snd (Val $ PairV v1 v2)) σ τ [] (Val v2) σ ∅
+  | CaseLS v e1 e2 σ τ :
+     base_step (Case (Val $ InjLV v) e1 e2) σ τ [] (App e1 (Val v)) σ ∅
+  | CaseRS v e1 e2 σ τ :
+     base_step (Case (Val $ InjRV v) e1 e2) σ τ [] (App e2 (Val v)) σ ∅
+  | AllocNS n v σ τ l :
      (0 < n)%Z →
      (∀ i, (0 ≤ i)%Z → (i < n)%Z → σ.(heap) !! (l +ₗ i) = None) →
-     base_step (AllocN (Val $ LitV $ LitInt n) (Val v)) σ
+     base_step (AllocN (Val $ LitV $ LitInt n) (Val v)) σ τ
                []
                (Val $ LitV $ LitLoc l) (state_init_heap l n v σ)
-               []
-  | FreeS l v σ :
+               ∅
+  | FreeS l v σ τ :
      σ.(heap) !! l = Some $ Some v →
-     base_step (Free (Val $ LitV $ LitLoc l)) σ
+     base_step (Free (Val $ LitV $ LitLoc l)) σ τ
                []
                (Val $ LitV LitUnit) (state_upd_heap <[l:=None]> σ)
-               []
-  | LoadS l v σ :
+               ∅
+  | LoadS l v σ τ :
      σ.(heap) !! l = Some $ Some v →
-     base_step (Load (Val $ LitV $ LitLoc l)) σ [] (of_val v) σ []
-  | StoreS l v w σ :
+     base_step (Load (Val $ LitV $ LitLoc l)) σ τ [] (of_val v) σ ∅
+  | StoreS l v w σ τ :
      σ.(heap) !! l = Some $ Some v →
-     base_step (Store (Val $ LitV $ LitLoc l) (Val w)) σ
+     base_step (Store (Val $ LitV $ LitLoc l) (Val w)) σ τ
                []
                (Val $ LitV LitUnit) (state_upd_heap <[l:=Some w]> σ)
-               []
-  | XchgS l v1 v2 σ :
+               ∅
+  | XchgS l v1 v2 σ τ :
      σ.(heap) !! l = Some $ Some v1 →
-     base_step (Xchg (Val $ LitV $ LitLoc l) (Val v2)) σ
+     base_step (Xchg (Val $ LitV $ LitLoc l) (Val v2)) σ τ
                []
                (Val v1) (state_upd_heap <[l:=Some v2]> σ)
-               []
+               ∅
 
-  | CmpXchgS l v1 v2 vl σ b :
+  | CmpXchgS l v1 v2 vl σ τ b :
      σ.(heap) !! l = Some $ Some vl →
      (* Crucially, this compares the same way as [EqOp]! *)
      vals_compare_safe vl v1 →
      b = bool_decide (vl = v1) →
-     base_step (CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2)) σ
+     base_step (CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2)) σ τ
                []
                (Val $ PairV vl (LitV $ LitBool b)) (if b then state_upd_heap <[l:=Some v2]> σ else σ)
-               []
-  | FaaS l i1 i2 σ :
+               ∅
+  | FaaS l i1 i2 σ τ :
      σ.(heap) !! l = Some $ Some (LitV (LitInt i1)) →
-     base_step (FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2)) σ
+     base_step (FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2)) σ τ
                []
                (Val $ LitV $ LitInt i1) (state_upd_heap <[l:=Some $ LitV (LitInt (i1 + i2))]>σ)
-               []
-  | ForkS e σ:
-     base_step (Fork e) σ [] (Val $ LitV LitUnit) σ [e]
-  | NewProphS σ p :
+               ∅
+  | ForkS e σ τ i :
+     i ∉ τ →
+     base_step (Fork e) σ τ [] (Val $ LitV LitUnit) σ {[i := e]}
+  | NewProphS σ τ p :
      p ∉ σ.(used_proph_id) →
-     base_step NewProph σ
+     base_step NewProph σ τ
                []
                (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ)
-               []
-  | ResolveS p v e σ w σ' κs ts :
-     base_step e σ κs (Val v) σ' ts →
-     base_step (Resolve e (Val $ LitV $ LitProphecy p) (Val w)) σ
+               ∅
+  | ResolveS p v e σ τ w σ' κs ts :
+     base_step e σ τ κs (Val v) σ' ts →
+     base_step (Resolve e (Val $ LitV $ LitProphecy p) (Val w)) σ τ
                (κs ++ [(p, (v, w))]) (Val v) σ' ts.
 
 (** Basic properties about the language *)
@@ -733,11 +742,11 @@ Lemma fill_item_val Ki e :
   is_Some (to_val (fill_item Ki e)) → is_Some (to_val e).
 Proof. intros [v ?]. induction Ki; simplify_option_eq; eauto. Qed.
 
-Lemma val_base_stuck e1 σ1 κ e2 σ2 efs : base_step e1 σ1 κ e2 σ2 efs → to_val e1 = None.
+Lemma val_base_stuck e1 σ1 τ κ e2 σ2 efs : base_step e1 σ1 τ κ e2 σ2 efs → to_val e1 = None.
 Proof. destruct 1; naive_solver. Qed.
 
-Lemma base_ctx_step_val Ki e σ1 κ e2 σ2 efs :
-  base_step (fill_item Ki e) σ1 κ e2 σ2 efs → is_Some (to_val e).
+Lemma base_ctx_step_val Ki e σ1 τ κ e2 σ2 efs :
+  base_step (fill_item Ki e) σ1 τ κ e2 σ2 efs → is_Some (to_val e).
 Proof. revert κ e2. induction Ki; inversion_clear 1; simplify_option_eq; eauto. Qed.
 
 Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
@@ -747,11 +756,11 @@ Proof.
   revert Ki1. induction Ki2; intros Ki1; induction Ki1; naive_solver eauto with f_equal.
 Qed.
 
-Lemma alloc_fresh v n σ :
+Lemma alloc_fresh v n σ τ :
   let l := Loc.fresh (dom σ.(heap)) in
   (0 < n)%Z →
-  base_step (AllocN ((Val $ LitV $ LitInt $ n)) (Val v)) σ []
-            (Val $ LitV $ LitLoc l) (state_init_heap l n v σ) [].
+  base_step (AllocN ((Val $ LitV $ LitInt $ n)) (Val v)) σ τ []
+            (Val $ LitV $ LitLoc l) (state_init_heap l n v σ) ∅.
 Proof.
   intros.
   apply AllocNS; first done.
@@ -759,15 +768,24 @@ Proof.
   by apply Loc.fresh_fresh.
 Qed.
 
-Lemma new_proph_id_fresh σ :
+Lemma new_proph_id_fresh σ τ :
   let p := fresh σ.(used_proph_id) in
-  base_step NewProph σ [] (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ) [].
+  base_step NewProph σ τ [] (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ) ∅.
 Proof. constructor. apply is_fresh. Qed.
 
-Lemma heap_lang_mixin : EctxiLanguageMixin of_val to_val fill_item base_step.
+Lemma new_thread_id_fresh e σ τ :
+  let i := fresh τ in
+  base_step (Fork e) σ τ [] (Val (LitV LitUnit)) σ {[i := e]}.
+Proof. constructor. apply is_fresh. Qed.
+
+Lemma fork_thread_ids_disjoint e1 σ1 τ κ e2 σ2 efs :
+  base_step e1 σ1 τ κ e2 σ2 efs → τ ## dom efs.
+Proof. intros H. induction H; try set_solver. Qed.
+
+Lemma heap_lang_mixin : EctxiLanguageMixin of_val to_val fuel_leR fuelR fuel_addO fill_item base_step.
 Proof.
   split; apply _ || eauto using to_of_val, of_to_val, val_base_stuck,
-    fill_item_val, fill_item_no_val_inj, base_ctx_step_val.
+    fill_item_val, fill_item_no_val_inj, base_ctx_step_val, fork_thread_ids_disjoint.
 Qed.
 End heap_lang.
 
@@ -796,8 +814,8 @@ Proof.
   by simplify_eq.
 Qed.
 
-Lemma prim_step_to_val_is_base_step e σ1 κs w σ2 efs :
-  prim_step e σ1 κs (Val w) σ2 efs → base_step e σ1 κs (Val w) σ2 efs.
+Lemma prim_step_to_val_is_base_step e σ1 τ κs w σ2 efs :
+  prim_step e σ1 τ κs (Val w) σ2 efs → base_step e σ1 τ κs (Val w) σ2 efs.
 Proof.
   intro H. destruct H as [K e1 e2 H1 H2].
   assert (to_val (fill K e2) = Some w) as H3; first by rewrite -H2.
@@ -806,13 +824,13 @@ Qed.
 
 (** If [e1] makes a base step to a value under some state [σ1] then any base
  step from [e1] under any other state [σ1'] must necessarily be to a value. *)
-Lemma base_step_to_val e1 σ1 κ e2 σ2 efs σ1' κ' e2' σ2' efs' :
-  base_step e1 σ1 κ e2 σ2 efs →
-  base_step e1 σ1' κ' e2' σ2' efs' → is_Some (to_val e2) → is_Some (to_val e2').
+Lemma base_step_to_val e1 σ1 τ κ e2 σ2 efs σ1' τ' κ' e2' σ2' efs' :
+  base_step e1 σ1 τ κ e2 σ2 efs →
+  base_step e1 σ1' τ' κ' e2' σ2' efs' → is_Some (to_val e2) → is_Some (to_val e2').
 Proof. destruct 1; inversion 1; naive_solver. Qed.
 
-Lemma irreducible_resolve e v1 v2 σ :
-  irreducible e σ → irreducible (Resolve e (Val v1) (Val v2)) σ.
+Lemma irreducible_resolve e v1 v2 σ τ :
+  irreducible e σ τ → irreducible (Resolve e (Val v1) (Val v2)) σ τ.
 Proof.
   intros H κs ? σ' efs [Ks e1' e2' Hfill -> step]. simpl in *.
   induction Ks as [|K Ks _] using rev_ind; simpl in Hfill.
