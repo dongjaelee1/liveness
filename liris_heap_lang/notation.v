@@ -1,5 +1,5 @@
-From iris.program_logic Require Import language.
-From iris.heap_lang Require Export lang.
+From liris.program_logic Require Import language.
+From liris.heap_lang Require Export lang.
 From iris.prelude Require Import options.
 
 (** Coercions to make programs easier to type. *)

@@ -1,6 +1,6 @@
-From iris.program_logic Require Export language.
-From iris.heap_lang Require Export lang.
-From iris.heap_lang Require Import tactics notation.
+From liris.program_logic Require Export language.
+From liris.heap_lang Require Export lang.
+From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 
 Global Instance into_val_val v : IntoVal (Val v) v.
