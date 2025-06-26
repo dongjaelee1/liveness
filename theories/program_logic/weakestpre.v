@@ -10,13 +10,11 @@ Import uPred.
 From liris Require Export thread_obligation.
 From liris Require Import ordinal_wfocm.
 
-Notation Π Λ := (state Λ).
-
 Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {
   (** Invariants. *)
   #[global] liris_invGS :: invGS_gen hlc Σ;
   (** Liveness obligation interpretation. *)
-  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (Π Λ) Σ;
+  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (state Λ) Σ;
   (** Scheduler fairness interpretation. *)
   #[global] liris_schedfairGS :: schedfairGS.schedfairGS (WF:=@fuel_wf Λ) Σ;
   (** Connecting liveness obligations and scheduler fairness. *)
@@ -58,14 +56,14 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
 Global Opaque liris_invGS liris_osatGS liris_schedfairGS liris_threadoblGS.
 Global Arguments LirisG {SI hlc Λ Σ}.
 
-Global Instance wp_obl_class {Λ : language} : obl_class (Π Λ) (prod Ord.t (fuel Λ)) :=
-  osat_obl_class_def ord_wfocm_pack (WFOCM.lt_wf (t:=@fuel_wf Λ)) (Π Λ).
+Global Instance wp_obl_class {Λ : language} : obl_class (state Λ) (prod Ord.t (fuel Λ)) :=
+  osat_obl_class_def ord_wfocm_pack (WFOCM.lt_wf (t:=@fuel_wf Λ)) (state Λ).
 
 Notation lirisGS := (lirisGS_gen HasLc).
 Notation "'⌈' Λ '⌉'" := (Ord.from_wf_set (@WFOCM.lt_wf _ _ _ _ (@fuel_wf Λ))).
 Notation schedfairIL Λ := (schedfairI (H:=@fuel_wf Λ)).
-Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=Π Λ)).
-Notation oftIL Λ := (oftI (WF:=@fuel_wf Λ) (obl_ps:=Π Λ)).
+Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=state Λ)).
+Notation oftIL Λ := (oftI (WF:=@fuel_wf Λ) (obl_ps:=state Λ)).
 Notation obl_statesL Λ := (obl_states' (@wp_obl_class Λ)).
 
 (** The predicate we take the fixpoint of in order to define the lWP. *)

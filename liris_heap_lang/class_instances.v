@@ -64,16 +64,16 @@ Section atomic.
   Global Instance resolve_atomic s e v1 v2 :
     Atomic s e → Atomic s (Resolve e (Val v1) (Val v2)).
   Proof.
-    rename e into e1. intros H σ1 e2 κ σ2 efs [Ks e1' e2' Hfill -> step].
+    rename e into e1. intros H σ1 τ e2 κ σ2 efs [Ks e1' e2' Hfill -> step].
     simpl in *. induction Ks as [|K Ks _] using rev_ind; simpl in Hfill.
-    - subst. inversion_clear step. by eapply (H σ1 (Val _) _ σ2 efs), base_prim_step.
+    - subst. inversion_clear step. by eapply (H σ1 τ (Val _) _ σ2 efs), base_prim_step.
     - rewrite fill_app. rewrite fill_app in Hfill.
       assert (∀ v, Val v = fill Ks e1' → False) as fill_absurd.
       { intros v Hv. assert (to_val (fill Ks e1') = Some v) as Htv by by rewrite -Hv.
         apply to_val_fill_some in Htv. destruct Htv as [-> ->]. inversion step. }
       destruct K; (inversion Hfill; clear Hfill; subst; try
         match goal with | H : Val ?v = fill Ks e1' |- _ => by apply fill_absurd in H end).
-      refine (_ (H σ1 (fill (Ks ++ [_]) e2') _ σ2 efs _)).
+      refine (_ (H σ1 τ (fill (Ks ++ [_]) e2') _ σ2 efs _)).
       + destruct s; intro Hs; simpl in *.
         * destruct Hs as [v Hs]. apply to_val_fill_some in Hs. by destruct Hs, Ks.
         * apply irreducible_resolve. by rewrite fill_app in Hs.

@@ -5,10 +5,10 @@ From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From iris.base_logic.lib Require Import mono_nat.
 From iris.base_logic.lib Require Export gen_heap proph_map gen_inv_heap.
-From iris.program_logic Require Export weakestpre total_weakestpre.
-From iris.program_logic Require Import ectx_lifting total_ectx_lifting.
-From iris.heap_lang Require Export class_instances.
-From iris.heap_lang Require Import tactics notation.
+From liris.program_logic Require Export weakestpre.
+From liris.program_logic Require Import ectx_lifting.
+From liris.heap_lang Require Export class_instances.
+From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 
 Class heapGS_gen hlc Σ := HeapGS {
