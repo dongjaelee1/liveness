@@ -357,12 +357,12 @@ Qed.
 
 Lemma lwp_lift_stuck i E Φ e :
   to_val e = None →
-  (∀ δ1 (Ω1 : obl_statesL Λ) γ1 σ1 ns κ κs τ,
-     (⌜ τ = dom δ1 ⌝ ∗ schedfairIL Λ δ1 ∗ osat Ω1 ∗ toIL Λ γ1 ∗ oftIL Λ Ω1 δ1 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
-     ⌜ stuck e σ1 τ ⌝)
+  (∀ δ (Ω : obl_statesL Λ) γ σ ns κs τ,
+     (⌜ τ = dom δ ⌝ ∗ schedfairIL Λ δ ∗ osat Ω ∗ toIL Λ γ ∗ oftIL Λ Ω δ γ ∗ state_interp σ ns κs τ) ={E,∅}=∗
+     ⌜ stuck e σ τ ⌝)
   ⊢ lWP e @ i; E ?{{ Φ }}.
 Proof.
-  rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (??? σ1 ns κ κs nt) "Hσ".
+  rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (??? σ ns κ κs nt) "Hσ".
   iMod ("H" with "Hσ") as %[? Hirr]. iModIntro. iSplit; first done.
   iExists Ω1. iSplit; first done.
   iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
@@ -417,7 +417,7 @@ Proof.
   iIntros (Hstuck) "_". iApply lwp_lift_stuck.
   - destruct(to_val e) as [v|] eqn:He; last done.
     rewrite -He. by case (Hstuck inhabitant ∅).
-  - iIntros (????????) "_". iApply fupd_mask_intro; auto with set_solver.
+  - iIntros (???????) "_". iApply fupd_mask_intro; auto with set_solver.
 Qed.
 
 (* To fetch toL_thread from the invariant, atomic step needs to update mask. *)
