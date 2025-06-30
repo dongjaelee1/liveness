@@ -3,16 +3,20 @@ the Iris lifting lemmas. *)
 
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
-From iris.base_logic.lib Require Import mono_nat.
-From iris.base_logic.lib Require Export gen_heap proph_map gen_inv_heap.
+From transfinite.base_logic.lib Require Import mono_nat.
+From transfinite.base_logic.lib Require Export gen_heap proph_map gen_inv_heap.
+From liris.algebra Require Import ordinal_wfocm.
 From liris.program_logic Require Export weakestpre.
 From liris.program_logic Require Import ectx_lifting.
 From liris.heap_lang Require Export class_instances.
 From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 
-Class heapGS_gen hlc Σ := HeapGS {
+Class heapGS_gen `{SI : indexT} hlc Σ := HeapGS {
   heapGS_invGS : invGS_gen hlc Σ;
+  heapGS_osatGS : osatGS.osatGS (WF:=ord_wfocm_pack) (language.state heap_lang) Σ;
+  heapGS_schedfairGS : schedfairGS.schedfairGS (WF:=@fuel_wf heap_lang) Σ;
+  heapGS_threadoblGS : threadoblGS.threadoblGS Σ;
   #[global] heapGS_gen_heapGS :: gen_heapGS loc (option val) Σ;
   #[global] heapGS_inv_heapGS :: inv_heapGS loc (option val) Σ;
   #[global] heapGS_proph_mapGS :: proph_mapGS proph_id (val * val) Σ;
@@ -24,7 +28,7 @@ Local Existing Instance heapGS_step_cnt.
 Notation heapGS := (heapGS_gen HasLc).
 
 Section steps.
-  Context `{!heapGS_gen hlc Σ}.
+  Context `{SI : indexT} `{!heapGS_gen hlc Σ}.
 
   Local Definition steps_auth (n : nat) : iProp Σ :=
     mono_nat_auth_own heapGS_step_name 1 n.
@@ -64,8 +68,11 @@ Section steps.
 
 End steps.
 
-Global Program Instance heapGS_irisGS `{!heapGS_gen hlc Σ} : irisGS_gen hlc heap_lang Σ := {
-  iris_invGS := heapGS_invGS;
+Global Program Instance heapGS_lirisGS `{SI : indexT} `{!heapGS_gen hlc Σ} : lirisGS_gen hlc heap_lang Σ := {
+  liris_invGS := heapGS_invGS;
+  liris_osatGS := heapGS_osatGS;
+  liris_schedfairGS := heapGS_schedfairGS;
+  liris_threadoblGS := heapGS_threadoblGS;
   state_interp σ step_cnt κs _ :=
     (gen_heap_interp σ.(heap) ∗ proph_map_interp κs σ.(used_proph_id) ∗
      steps_auth step_cnt)%I;
@@ -73,7 +80,7 @@ Global Program Instance heapGS_irisGS `{!heapGS_gen hlc Σ} : irisGS_gen hlc hea
   num_laters_per_step n := n;
 }.
 Next Obligation.
-  iIntros (??? σ ns κs nt)  "/= ($ & $ & H)".
+  iIntros (???? σ ns κs τ)  "/= ($ & $ & H)".
   by iMod (steps_auth_update_S with "H") as "$".
 Qed.
 
@@ -81,14 +88,14 @@ Qed.
 [Some]. We also seal the definition to avoid confusion between the version from
 [gen_heap], and our version with [Some]. That also helps for scopes and
 coercions. *)
-Local Definition pointsto_def `{heapGS_gen hlc Σ}
+Local Definition pointsto_def `{SI : indexT} `{@heapGS_gen SI hlc Σ}
     (l : loc) (dq : dfrac) (v : val) : iProp Σ :=
   pointsto l dq (Some v).
 Local Definition pointsto_aux : seal (@pointsto_def). Proof. by eexists. Qed.
 Definition pointsto := pointsto_aux.(unseal).
 Local Definition pointsto_unseal :
   @pointsto = @pointsto_def := pointsto_aux.(seal_eq).
-Global Arguments pointsto {hlc Σ _}.
+Global Arguments pointsto {SI hlc Σ _}.
 
 Notation "l ↦ dq v" := (pointsto l dq v)
   (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
@@ -97,15 +104,15 @@ Notation "l ↦ dq v" := (pointsto l dq v)
 make setoid rewriting in the predicate [I] work we need actual definitions
 here. *)
 Section definitions.
-  Context `{!heapGS_gen hlc Σ}.
+  Context `{SI : indexT} `{!heapGS_gen hlc Σ}.
   Definition inv_pointsto_own (l : loc) (v : val) (I : val → Prop) : iProp Σ :=
     inv_pointsto_own l (Some v) (from_option I False).
   Definition inv_pointsto (l : loc) (I : val → Prop) : iProp Σ :=
     inv_pointsto l (from_option I False).
 End definitions.
 
-Global Instance: Params (@inv_pointsto_own) 4 := {}.
-Global Instance: Params (@inv_pointsto) 3 := {}.
+Global Instance: Params (@inv_pointsto_own) 5 := {}.
+Global Instance: Params (@inv_pointsto) 4 := {}.
 
 Notation inv_heap_inv := (inv_heap_inv loc (option val)).
 Notation "l '↦_' I □" := (inv_pointsto l I%stdpp%type)
@@ -114,7 +121,7 @@ Notation "l ↦_ I v" := (inv_pointsto_own l v I%stdpp%type)
   (at level 20, I at level 9, format "l  ↦_ I  v") : bi_scope.
 
 Section lifting.
-Context `{!heapGS_gen hlc Σ}.
+Context `{SI : indexT} `{!heapGS_gen hlc Σ}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ Ψ : val → iProp Σ.
 Implicit Types efs : list expr.
@@ -122,78 +129,78 @@ Implicit Types σ : state.
 Implicit Types v : val.
 Implicit Types l : loc.
 
-Lemma wp_lb_update s n E e Φ :
+Lemma lwp_lb_update s i n E e Φ :
   TCEq (to_val e) None →
   steps_lb n -∗
-  WP e @ s; E {{ v, steps_lb (S n) -∗ Φ v }} -∗
-  WP e @ s; E {{ Φ }}.
+  lWP e @ s; i; E {{ v, steps_lb (S n) -∗ Φ v }} -∗
+  lWP e @ s; i; E {{ Φ }}.
 Proof.
-  (** TODO: We should try to use a generic lifting lemma (and avoid [wp_unfold])
-  here, since this breaks the WP abstraction. *)
-  rewrite !wp_unfold /wp_pre /=. iIntros (->) "Hlb Hwp".
-  iIntros (σ1 ns κ κs m) "(Hσ & Hκ & Hsteps)".
+  (** TODO: We should try to use a generic lifting lemma (and avoid [lwp_unfold])
+  here, since this breaks the lWP abstraction. *)
+  rewrite !lwp_unfold /lwp_pre /=. iIntros (->) "Hlb Hlwp".
+  iIntros (δ1 Ω1 γ1 σ1 ns κ κs m) "(Hτ & Hsf & Hos & Hto & Hoft & Hσ & Hκ & Hsteps)".
   iDestruct (steps_lb_valid with "Hsteps Hlb") as %?.
-  iMod ("Hwp" $! σ1 ns κ κs m with "[$Hσ $Hκ $Hsteps]") as "[%Hs Hwp]".
-  iModIntro. iSplit; [done|].
-  iIntros (e2 σ2 efs Hstep) "Hcred".
-  iMod ("Hwp" with "[//] Hcred") as "Hwp".
-  iIntros "!> !>". iMod "Hwp" as "Hwp". iIntros "!>".
-  iApply (step_fupdN_wand with "Hwp").
-  iIntros "Hwp". iMod "Hwp" as "(($ & $ & Hsteps)& Hwp & $)".
+  iMod ("Hlwp" $! δ1 Ω1 γ1 σ1 ns κ κs m with "[$Hτ $Hsf $Hos $Hto $Hoft $Hσ $Hκ $Hsteps]") as "[%Hs Hlwp]".
+  iModIntro. iSplit; [done|]. iDestruct "Hlwp" as "(%&%&Hlwp)". iExists _. iSplit; [done|].
+  iIntros (e2 σ2 efs Hstep) "% % % Hcred".
+  iDestruct ("Hlwp" with "[//] [//] Hcred") as "Hlwp".
+  iMod "Hlwp" as "Hlwp". iModIntro. iNext. iMod "Hlwp" as "Hlwp". iIntros "!>".
+  iApply (step_fupdN_wand with "Hlwp").
+  iIntros "Hlwp". iMod "Hlwp" as "(% & % & % & % & ($ & $ & $ & $ & $ & $ & Hsteps)& Hlwp & $)".
   iDestruct (steps_lb_get with "Hsteps") as "#HlbS".
   iDestruct (steps_lb_le _ (S n) with "HlbS") as "#HlbS'"; [lia|].
-  iModIntro. iFrame "Hsteps".
-  iApply (wp_wand with "Hwp"). iIntros (v) "HΦ". by iApply "HΦ".
+  iModIntro. iExists _. iSplit; [done|]. iFrame "Hsteps".
+  iApply (lwp_wand with "Hlwp"). iIntros (v) "HΦ". by iApply "HΦ".
 Qed.
 
-(** A stronger version of [twp_wp_step] to turn a TWP into a WP. Provided
-[steps_lb n], this version gives us [S n] laters ([twp_wp_step] gives just one)
-and [S n] later credits ([twp_wp_step] gives none). *)
-Lemma twp_wp_step_lc s n E e P Φ :
-  TCEq (to_val e) None →
-  steps_lb n -∗
-  ▷^(S n) P -∗
-  WP e @ s; E [{ v, P -∗ £ (S n) ={E}=∗ Φ v }] -∗
-  WP e @ s; E {{ Φ }}.
-Proof.
-  iIntros (?) "#Hlb HP Hwp".
-  iApply (twp_wp_fupdN_strong (S n) _ _ _ _ (P ∗ £ (S n))); [done|]. iSplit.
-  - iIntros (σ ns κ m) "(Hσ & Hκ & Hsteps)".
-    iDestruct (steps_lb_valid with "[$] [$]") as %?.
-    iApply fupd_mask_intro_discard; [set_solver|].
-    iPureIntro. rewrite /num_laters_per_step /=. lia.
-  - iSplitL "HP".
-    + iIntros "!> ?". iApply step_fupdN_intro; [done|].
-      iIntros "!> !>". by iFrame.
-    + iApply (twp_wand with "Hwp").
-      iIntros (v) "H [??]". by iApply ("H" with "[$]").
-Qed.
+(* (** A stronger version of [tlwp_lwp_step] to turn a TlWP into a lWP. Provided *)
+(* [steps_lb n], this version gives us [S n] laters ([tlwp_lwp_step] gives just one) *)
+(* and [S n] later credits ([tlwp_lwp_step] gives i none). *) *)
+(* Lemma tlwp_lwp_step_lc s i n E e P Φ : *)
+(*   TCEq (to_val e) None → *)
+(*   steps_lb n -∗ *)
+(*   ▷^(S n) P -∗ *)
+(*   lWP e @ s; i; E [{ v, P -∗ £ (S n) ={E}=∗ Φ v }] -∗ *)
+(*   lWP e @ s; i; E {{ Φ }}. *)
+(* Proof. *)
+(*   iIntros (?) "#Hlb HP Hlwp". *)
+(*   iApply (tlwp_lwp_fupdN_strong (S n) _ _ _ _ (P ∗ £ (S n))); [done|]. iSplit. *)
+(*   - iIntros (σ ns κ m) "(Hσ & Hκ & Hsteps)". *)
+(*     iDestruct (steps_lb_valid with "[$] [$]") as %?. *)
+(*     iApply fupd_mask_intro_discard; [set_solver|]. *)
+(*     iPureIntro. rewrite /num_laters_per_step /=. lia. *)
+(*   - iSplitL "HP". *)
+(*     + iIntros "!> ?". iApply step_fupdN_intro; [done|]. *)
+(*       iIntros "!> !>". by iFrame. *)
+(*     + iApply (tlwp_wand with "Hlwp"). *)
+(*       iIntros (v) "H [??]". by iApply ("H" with "[$]"). *)
+(* Qed. *)
 
-(** A version of [twp_wp_step_lc] that provides only a single later modality
-(but still [S n] later credits). This version is tailored to lift total Texan
-triples to a partial Texan triples with later credits, see e.g., [wp_alloc_lc]
-below. *)
-Lemma twp_wp_step_lc_texan s n E e P Φ :
-  TCEq (to_val e) None →
-  steps_lb n -∗
-  ▷ P -∗
-  WP e @ s; E [{ v, P -∗ £ (S n) ={E}=∗ Φ v }] -∗
-  WP e @ s; E {{ Φ }}.
-Proof.
-  iIntros (?) "#Hlb HP Hwp".
-  iApply (twp_wp_step_lc with "[$] [HP] Hwp"); auto.
-Qed.
+(* (** A version of [tlwp_lwp_step_lc] that provides only a single later modality *)
+(* (but still [S n] later credits). This version is tailored to lift total Texan *)
+(* triples to a partial Texan triples with later credits, see e.g., [lwp_alloc_lc] *)
+(* below. *) *)
+(* Lemma tlwp_lwp_step_lc_texan s i n E e P Φ : *)
+(*   TCEq (to_val e) None → *)
+(*   steps_lb n -∗ *)
+(*   ▷ P -∗ *)
+(*   lWP e @ s; i; E [{ v, P -∗ £ (S n) ={E}=∗ Φ v }] -∗ *)
+(*   lWP e @ s; i; E {{ Φ }}. *)
+(* Proof. *)
+(*   iIntros (?) "#Hlb HP Hlwp". *)
+(*   iApply (tlwp_lwp_step_lc with "[$] [HP] Hlwp"); auto. *)
+(* Qed. *)
 
-Lemma wp_step_fupdN_lb s n E1 E2 e P Φ :
+Lemma lwp_step_fupdN_lb s i n E1 E2 e P Φ :
   TCEq (to_val e) None →
   E2 ⊆ E1 →
   steps_lb n -∗
   (|={E1∖E2,∅}=> |={∅}▷=>^(S n) |={∅,E1∖E2}=> P) -∗
-  WP e @ s; E2 {{ v, P ={E1}=∗ Φ v }} -∗
-  WP e @ s; E1 {{ Φ }}.
+  lWP e @ s; i; E2 {{ v, P ={E1}=∗ Φ v }} -∗
+  lWP e @ s; i; E1 {{ Φ }}.
 Proof.
-  iIntros (He HE) "Hlb HP Hwp".
-  iApply wp_step_fupdN; [done|].
+  iIntros (He HE) "Hlb HP Hlwp".
+  iApply lwp_step_fupdN; [done|].
   iSplit; [|by iFrame].
   iIntros (σ ns κs nt) "(? & ? & Hsteps)".
   iDestruct (steps_lb_valid with "Hsteps Hlb") as %Hle.
@@ -201,36 +208,38 @@ Proof.
   iIntros "_". iPureIntro. rewrite /num_laters_per_step /=. lia.
 Qed.
 
-(** Recursive functions: we do not use this lemmas as it is easier to use Löb
-induction directly, but this demonstrates that we can state the expected
-reasoning principle for recursive functions, without any visible ▷. *)
-Lemma wp_rec_löb s E f x e Φ Ψ :
-  □ ( □ (∀ v, Ψ v -∗ WP (rec: f x := e)%V v @ s; E {{ Φ }}) -∗
-     ∀ v, Ψ v -∗ WP (subst' x v (subst' f (rec: f x := e) e)) @ s; E {{ Φ }}) -∗
-  ∀ v, Ψ v -∗ WP (rec: f x := e)%V v @ s; E {{ Φ }}.
-Proof.
-  iIntros "#Hrec". iLöb as "IH". iIntros (v) "HΨ".
-  iApply lifting.wp_pure_step_later; first done.
-  iIntros "!> _". iApply ("Hrec" with "[] HΨ"). iIntros "!>" (w) "HΨ".
-  iApply ("IH" with "HΨ").
-Qed.
+(* (** Recursive functions: we do not use this lemmas as it is easier to use Löb *)
+(* induction directly, but this demonstrates that we can state the expected *)
+(* reasoning principle for recursive functions, without any visible ▷. *) *)
+(* Lemma lwp_rec_löb s i E f x e Φ Ψ : *)
+(*   □ ( □ (∀ v, Ψ v -∗ lWP (rec: f x := e)%V v @ s; i; E {{ Φ }}) -∗ *)
+(*      ∀ v, Ψ v -∗ lWP (subst' x v (subst' f (rec: f x := e) e)) @ s; i; E {{ Φ }}) -∗ *)
+(*   ∀ v, Ψ v -∗ lWP (rec: f x := e)%V v @ s; i; E {{ Φ }}. *)
+(* Proof. *)
+(*   iIntros "#Hrec". iLöb as "IH". iIntros (v) "HΨ". *)
+(*   iApply lifting.lwp_pure_step_later; first done. *)
+(*   iIntros "!> _". iApply ("Hrec" with "[] HΨ"). iIntros "!>" (w) "HΨ". *)
+(*   iApply ("IH" with "HΨ"). *)
+(* Qed. *)
+
+TODO
 
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
-Lemma wp_fork s E e Φ :
-  ▷ WP e @ s; ⊤ {{ _, True }} -∗ ▷ Φ (LitV LitUnit) -∗ WP Fork e @ s; E {{ Φ }}.
+Lemma lwp_fork s i E e Φ :
+  ▷ lWP e @ s; i; ⊤ {{ _, True }} -∗ ▷ Φ (LitV LitUnit) -∗ lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
-  iIntros "He HΦ". iApply wp_lift_atomic_base_step; [done|].
-  iIntros (σ1 ns κ κs nt) "(?&?&Hsteps) !>"; iSplit; first by eauto with base_step.
+  iIntros "He HΦ". iApply lwp_lift_atomic_base_step; [done|].
+  iIntros (σ1 ns κ κs i nt) "(?&?&Hsteps) !>"; iSplit; first by eauto with base_step.
   iIntros "!>" (v2 σ2 efs Hstep) "_"; inv_base_step.
   iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
   by iFrame.
 Qed.
 
-Lemma twp_fork s E e Φ :
-  WP e @ s; ⊤ [{ _, True }] -∗ Φ (LitV LitUnit) -∗ WP Fork e @ s; E [{ Φ }].
+Lemma tlwp_fork s E e Φ :
+  lWP e @ s; i; ⊤ [{ _, True }] -∗ Φ (LitV LitUnit) -∗ lWP Fork e @ s; i; E [{ Φ }].
 Proof.
-  iIntros "He HΦ". iApply twp_lift_atomic_base_step; [done|].
-  iIntros (σ1 ns κs nt) "(?&?&Hsteps) !>"; iSplit; first by eauto with base_step.
+  iIntros "He HΦ". iApply tlwp_lift_atomic_base_step; [done|].
+  iIntros (σ1 ns κs i nt) "(?&?&Hsteps) !>"; iSplit; first by eauto with base_step.
   iIntros (κ v2 σ2 efs Hstep); inv_base_step.
   iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
   by iFrame.
@@ -388,14 +397,14 @@ Proof.
   iDestruct "Hvs" as "[$ Hvs]". by iApply "IH".
 Qed.
 
-Lemma twp_allocN_seq s E v n :
+Lemma tlwp_allocN_seq s E v n :
   (0 < n)%Z →
-  [[{ True }]] AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; E
+  [[{ True }]] AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   [[{ l, RET LitV (LitLoc l); [∗ list] i ∈ seq 0 (Z.to_nat n),
       (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }]].
 Proof.
-  iIntros (Hn Φ) "_ HΦ". iApply twp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κs nt) "(Hσ & Hκs & Hsteps) !>".
+  iIntros (Hn Φ) "_ HΦ". iApply tlwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κs i nt) "(Hσ & Hκs & Hsteps) !>".
   iSplit; first by destruct n; auto with lia base_step.
   iIntros (κ v2 σ2 efs Hstep); inv_base_step.
   iMod (gen_heap_alloc_big _ (heap_array _ (replicate (Z.to_nat n) v)) with "Hσ")
@@ -408,58 +417,58 @@ Proof.
   - by iApply heap_array_to_seq_pointsto.
   - iApply (heap_array_to_seq_meta with "Hm"). by rewrite length_replicate.
 Qed.
-Lemma wp_allocN_seq s E v n :
+Lemma lwp_allocN_seq s E v n :
   (0 < n)%Z →
-  {{{ True }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; E
+  {{{ True }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   {{{ l, RET LitV (LitLoc l); [∗ list] i ∈ seq 0 (Z.to_nat n),
       (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
-  iIntros (Hn Φ) "_ HΦ". iApply (twp_wp_step with "HΦ").
-  iApply twp_allocN_seq; [by auto..|]; iIntros (l) "H HΦ". by iApply "HΦ".
+  iIntros (Hn Φ) "_ HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply tlwp_allocN_seq; [by auto..|]; iIntros (l) "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_allocN_seq_lc s E v n n' :
+Lemma lwp_allocN_seq_lc s E v n n' :
   (0 < n)%Z →
-  {{{ steps_lb n' }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; E
+  {{{ steps_lb n' }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   {{{ l, RET LitV (LitLoc l); ([∗ list] i ∈ seq 0 (Z.to_nat n),
       (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤) ∗ £ (S n') }}}.
 Proof.
-  iIntros (Hn Φ) "#? HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply twp_allocN_seq; [by auto..|]; iIntros (l) "H HΦ ? !>".
+  iIntros (Hn Φ) "#? HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply tlwp_allocN_seq; [by auto..|]; iIntros (l) "H HΦ ? !>".
   iApply "HΦ"; iFrame.
 Qed.
 
-Lemma twp_alloc s E v :
+Lemma tlwp_alloc s E v :
   [[{ True }]]
-    Alloc (Val v) @ s; E
+    Alloc (Val v) @ s; i; E
   [[{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ }]].
 Proof.
-  iIntros (Φ) "_ HΦ". iApply twp_allocN_seq; [auto with lia..|].
+  iIntros (Φ) "_ HΦ". iApply tlwp_allocN_seq; [auto with lia..|].
   iIntros (l) "/= (? & _)". rewrite Loc.add_0. iApply "HΦ"; iFrame.
 Qed.
-Lemma wp_alloc s E v :
+Lemma lwp_alloc s E v :
   {{{ True }}}
-    Alloc (Val v) @ s; E
+    Alloc (Val v) @ s; i; E
   {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ }}}.
 Proof.
-  iIntros (Φ) "_ HΦ". iApply (twp_wp_step with "HΦ").
-  iApply twp_alloc; [by auto..|]; iIntros (l) "H HΦ". by iApply "HΦ".
+  iIntros (Φ) "_ HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply tlwp_alloc; [by auto..|]; iIntros (l) "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_alloc_lc s E v n :
+Lemma lwp_alloc_lc s E v n :
   {{{ steps_lb n }}}
-    Alloc (Val v) @ s; E
+    Alloc (Val v) @ s; i; E
   {{{ l, RET LitV (LitLoc l); l ↦ v ∗ meta_token l ⊤ ∗ £ (S n) }}}.
 Proof.
-  iIntros (Φ) "#? HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply twp_alloc; [by auto..|]; iIntros (l) "[??] HΦ ? !>".
+  iIntros (Φ) "#? HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply tlwp_alloc; [by auto..|]; iIntros (l) "[??] HΦ ? !>".
   iApply "HΦ"; iFrame.
 Qed.
 
-Lemma twp_free s E l v :
-  [[{ l ↦ v }]] Free (Val $ LitV $ LitLoc l) @ s; E
+Lemma tlwp_free s E l v :
+  [[{ l ↦ v }]] Free (Val $ LitV $ LitLoc l) @ s; i; E
   [[{ RET LitV LitUnit; True }]].
 Proof.
-  iIntros (Φ) "Hl HΦ". iApply twp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κs nt) "(Hσ & Hκs & Hsteps) !>".
+  iIntros (Φ) "Hl HΦ". iApply tlwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κs i nt) "(Hσ & Hκs & Hsteps) !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hσ Hl") as %?.
   iSplit; first by eauto with base_step.
   iIntros (κ v2 σ2 efs Hstep); inv_base_step.
@@ -467,26 +476,26 @@ Proof.
   iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
   iModIntro. iSplit; first done. iSplit; first done. iFrame. by iApply "HΦ".
 Qed.
-Lemma wp_free s E l v :
-  {{{ ▷ l ↦ v }}} Free (Val $ LitV (LitLoc l)) @ s; E
+Lemma lwp_free s E l v :
+  {{{ ▷ l ↦ v }}} Free (Val $ LitV (LitLoc l)) @ s; i; E
   {{{ RET LitV LitUnit; True }}}.
 Proof.
-  iIntros (Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_free with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
+  iIntros (Φ) ">H HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply (tlwp_free with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_free_lc s E l v n :
-  {{{ steps_lb n ∗ ▷ l ↦ v }}} Free (Val $ LitV (LitLoc l)) @ s; E
+Lemma lwp_free_lc s E l v n :
+  {{{ steps_lb n ∗ ▷ l ↦ v }}} Free (Val $ LitV (LitLoc l)) @ s; i; E
   {{{ RET LitV LitUnit; £ (S n) }}}.
 Proof.
-  iIntros (Φ) "[#? >H] HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply (twp_free with "H"); [by auto..|]; iIntros "H HΦ ? !>". by iApply "HΦ".
+  iIntros (Φ) "[#? >H] HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply (tlwp_free with "H"); [by auto..|]; iIntros "H HΦ ? !>". by iApply "HΦ".
 Qed.
 
-Lemma twp_load s E l dq v :
-  [[{ l ↦{dq} v }]] Load (Val $ LitV $ LitLoc l) @ s; E [[{ RET v; l ↦{dq} v }]].
+Lemma tlwp_load s E l dq v :
+  [[{ l ↦{dq} v }]] Load (Val $ LitV $ LitLoc l) @ s; i; E [[{ RET v; l ↦{dq} v }]].
 Proof.
-  iIntros (Φ) "Hl HΦ". iApply twp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κs nt) "(Hσ & Hκs & Hsteps) !>".
+  iIntros (Φ) "Hl HΦ". iApply tlwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κs i nt) "(Hσ & Hκs & Hsteps) !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hσ Hl") as %?.
   iSplit; first by eauto with base_step.
   iIntros (κ v2 σ2 efs Hstep); inv_base_step.
@@ -494,27 +503,27 @@ Proof.
   iModIntro. iSplit; [done|]. iSplit; [done|]. iFrame.
   by iApply "HΦ".
 Qed.
-Lemma wp_load s E l dq v :
-  {{{ ▷ l ↦{dq} v }}} Load (Val $ LitV $ LitLoc l) @ s; E {{{ RET v; l ↦{dq} v }}}.
+Lemma lwp_load s E l dq v :
+  {{{ ▷ l ↦{dq} v }}} Load (Val $ LitV $ LitLoc l) @ s; i; E {{{ RET v; l ↦{dq} v }}}.
 Proof.
-  iIntros (Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_load with "H"). iIntros "H HΦ". by iApply "HΦ".
+  iIntros (Φ) ">H HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply (tlwp_load with "H"). iIntros "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_load_lc s E l dq v n :
+Lemma lwp_load_lc s E l dq v n :
   {{{ steps_lb n ∗ ▷ l ↦{dq} v }}}
-    Load (Val $ LitV $ LitLoc l) @ s; E
+    Load (Val $ LitV $ LitLoc l) @ s; i; E
   {{{ RET v; l ↦{dq} v ∗ £ (S n) }}}.
 Proof.
-  iIntros (Φ) "[#? >H] HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply (twp_load with "H"). iIntros "H HΦ ? !>". iApply "HΦ"; iFrame.
+  iIntros (Φ) "[#? >H] HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply (tlwp_load with "H"). iIntros "H HΦ ? !>". iApply "HΦ"; iFrame.
 Qed.
 
-Lemma twp_store s E l v' v :
-  [[{ l ↦ v' }]] Store (Val $ LitV $ LitLoc l) (Val v) @ s; E
+Lemma tlwp_store s E l v' v :
+  [[{ l ↦ v' }]] Store (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
   [[{ RET LitV LitUnit; l ↦ v }]].
 Proof.
-  iIntros (Φ) "Hl HΦ". iApply twp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κs nt) "(Hσ & Hκs & Hsteps) !>".
+  iIntros (Φ) "Hl HΦ". iApply tlwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κs i nt) "(Hσ & Hκs & Hsteps) !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hσ Hl") as %?.
   iSplit; first by eauto with base_step.
   iIntros (κ v2 σ2 efs Hstep); inv_base_step.
@@ -522,28 +531,28 @@ Proof.
   iMod (gen_heap_update with "Hσ Hl") as "[$ Hl]".
   iModIntro. iSplit; first done. iSplit; first done. iFrame. by iApply "HΦ".
 Qed.
-Lemma wp_store s E l v' v :
-  {{{ ▷ l ↦ v' }}} Store (Val $ LitV (LitLoc l)) (Val v) @ s; E
+Lemma lwp_store s E l v' v :
+  {{{ ▷ l ↦ v' }}} Store (Val $ LitV (LitLoc l)) (Val v) @ s; i; E
   {{{ RET LitV LitUnit; l ↦ v }}}.
 Proof.
-  iIntros (Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_store with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
+  iIntros (Φ) ">H HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply (tlwp_store with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_store_lc s E l v' v n :
-  {{{ steps_lb n ∗ ▷ l ↦ v' }}} Store (Val $ LitV (LitLoc l)) (Val v) @ s; E
+Lemma lwp_store_lc s E l v' v n :
+  {{{ steps_lb n ∗ ▷ l ↦ v' }}} Store (Val $ LitV (LitLoc l)) (Val v) @ s; i; E
   {{{ RET LitV LitUnit; l ↦ v ∗ £ (S n) }}}.
 Proof.
-  iIntros (Φ) "[#? >H] HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply (twp_store with "H"); [by auto..|]; iIntros "H HΦ ? !>".
+  iIntros (Φ) "[#? >H] HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply (tlwp_store with "H"); [by auto..|]; iIntros "H HΦ ? !>".
   iApply "HΦ"; iFrame.
 Qed.
 
-Lemma twp_xchg s E l v' v :
-  [[{ l ↦ v' }]] Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; E
+Lemma tlwp_xchg s E l v' v :
+  [[{ l ↦ v' }]] Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
   [[{ RET v'; l ↦ v }]].
 Proof.
-  iIntros (Φ) "Hl HΦ". iApply twp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κs nt) "(Hσ & Hκs & Hsteps) !>".
+  iIntros (Φ) "Hl HΦ". iApply tlwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κs i nt) "(Hσ & Hκs & Hsteps) !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hσ Hl") as %?.
   iSplit; first by eauto with base_step.
   iIntros (κ v2 σ2 efs Hstep); inv_base_step.
@@ -551,29 +560,29 @@ Proof.
   iMod (gen_heap_update with "Hσ Hl") as "[$ Hl]".
   iModIntro. iSplit; first done. iSplit; first done. iFrame. by iApply "HΦ".
 Qed.
-Lemma wp_xchg s E l v' v :
-  {{{ ▷ l ↦ v' }}} Xchg (Val $ LitV (LitLoc l)) (Val v) @ s; E
+Lemma lwp_xchg s E l v' v :
+  {{{ ▷ l ↦ v' }}} Xchg (Val $ LitV (LitLoc l)) (Val v) @ s; i; E
   {{{ RET v'; l ↦ v }}}.
 Proof.
-  iIntros (Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_xchg with "H"); [by auto..|]. iIntros "H HΦ". by iApply "HΦ".
+  iIntros (Φ) ">H HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply (tlwp_xchg with "H"); [by auto..|]. iIntros "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_xchg_lc s E l v' v n :
-  {{{ steps_lb n ∗ ▷ l ↦ v' }}} Xchg (Val $ LitV (LitLoc l)) (Val v) @ s; E
+Lemma lwp_xchg_lc s E l v' v n :
+  {{{ steps_lb n ∗ ▷ l ↦ v' }}} Xchg (Val $ LitV (LitLoc l)) (Val v) @ s; i; E
   {{{ RET v'; l ↦ v ∗ £ (S n) }}}.
 Proof.
-  iIntros (Φ) "[#? >H] HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply (twp_xchg with "H"); [by auto..|]. iIntros "H HΦ ? !>".
+  iIntros (Φ) "[#? >H] HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply (tlwp_xchg with "H"); [by auto..|]. iIntros "H HΦ ? !>".
   iApply "HΦ"; iFrame.
 Qed.
 
-Lemma twp_cmpxchg_fail s E l dq v' v1 v2 :
+Lemma tlwp_cmpxchg_fail s E l dq v' v1 v2 :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  [[{ l ↦{dq} v' }]] CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; E
+  [[{ l ↦{dq} v' }]] CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
   [[{ RET PairV v' (LitV $ LitBool false); l ↦{dq} v' }]].
 Proof.
-  iIntros (?? Φ) "Hl HΦ". iApply twp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κs nt) "(Hσ & Hκs & Hsteps) !>".
+  iIntros (?? Φ) "Hl HΦ". iApply tlwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κs i nt) "(Hσ & Hκs & Hsteps) !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hσ Hl") as %?.
   iSplit; first by eauto with base_step.
   iIntros (κ v2' σ2 efs Hstep); inv_base_step.
@@ -581,32 +590,32 @@ Proof.
   iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
   iModIntro; iSplit; first done. iSplit; first done. iFrame. by iApply "HΦ".
 Qed.
-Lemma wp_cmpxchg_fail s E l dq v' v1 v2 :
+Lemma lwp_cmpxchg_fail s E l dq v' v1 v2 :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  {{{ ▷ l ↦{dq} v' }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; E
+  {{{ ▷ l ↦{dq} v' }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
   {{{ RET PairV v' (LitV $ LitBool false); l ↦{dq} v' }}}.
 Proof.
-  iIntros (?? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_cmpxchg_fail with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
+  iIntros (?? Φ) ">H HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply (tlwp_cmpxchg_fail with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_cmpxchg_fail_lc s E l dq v' v1 v2 n :
+Lemma lwp_cmpxchg_fail_lc s E l dq v' v1 v2 n :
   v' ≠ v1 → vals_compare_safe v' v1 →
   {{{ steps_lb n ∗ ▷ l ↦{dq} v' }}}
-    CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; E
+    CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
   {{{ RET PairV v' (LitV $ LitBool false); l ↦{dq} v' ∗ £ (S n) }}}.
 Proof.
-  iIntros (?? Φ) "[#? >H] HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply (twp_cmpxchg_fail with "H"); [by auto..|]; iIntros "H HΦ ? !>".
+  iIntros (?? Φ) "[#? >H] HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply (tlwp_cmpxchg_fail with "H"); [by auto..|]; iIntros "H HΦ ? !>".
   iApply "HΦ"; iFrame.
 Qed.
 
-Lemma twp_cmpxchg_suc s E l v1 v2 v' :
+Lemma tlwp_cmpxchg_suc s E l v1 v2 v' :
   v' = v1 → vals_compare_safe v' v1 →
-  [[{ l ↦ v' }]] CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; E
+  [[{ l ↦ v' }]] CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
   [[{ RET PairV v' (LitV $ LitBool true); l ↦ v2 }]].
 Proof.
-  iIntros (?? Φ) "Hl HΦ". iApply twp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κs nt) "(Hσ & Hκs & Hsteps) !>".
+  iIntros (?? Φ) "Hl HΦ". iApply tlwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κs i nt) "(Hσ & Hκs & Hsteps) !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hσ Hl") as %?.
   iSplit; first by eauto with base_step.
   iIntros (κ v2' σ2 efs Hstep); inv_base_step.
@@ -615,32 +624,32 @@ Proof.
   iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
   iModIntro. iSplit; first done. iSplit; first done. iFrame. by iApply "HΦ".
 Qed.
-Lemma wp_cmpxchg_suc s E l v1 v2 v' :
+Lemma lwp_cmpxchg_suc s E l v1 v2 v' :
   v' = v1 → vals_compare_safe v' v1 →
-  {{{ ▷ l ↦ v' }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; E
+  {{{ ▷ l ↦ v' }}} CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
   {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 }}}.
 Proof.
-  iIntros (?? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_cmpxchg_suc with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
+  iIntros (?? Φ) ">H HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply (tlwp_cmpxchg_suc with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_cmpxchg_suc_lc s E l v1 v2 v' n :
+Lemma lwp_cmpxchg_suc_lc s E l v1 v2 v' n :
   v' = v1 → vals_compare_safe v' v1 →
   {{{ steps_lb n ∗ ▷ l ↦ v' }}}
-    CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; E
+    CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
   {{{ RET PairV v' (LitV $ LitBool true); l ↦ v2 ∗ £ (S n) }}}.
 Proof.
-  iIntros (?? Φ) "[#? >H] HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply (twp_cmpxchg_suc with "H"); [by auto..|]; iIntros "H HΦ ? !>".
+  iIntros (?? Φ) "[#? >H] HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply (tlwp_cmpxchg_suc with "H"); [by auto..|]; iIntros "H HΦ ? !>".
   iApply "HΦ"; iFrame.
 Qed.
 
-Lemma twp_faa s E l i1 i2 :
+Lemma tlwp_faa s E l i1 i2 :
   [[{ l ↦ LitV (LitInt i1) }]]
-    FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; E
+    FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
   [[{ RET LitV (LitInt i1); l ↦ LitV (LitInt (i1 + i2)) }]].
 Proof.
-  iIntros (Φ) "Hl HΦ". iApply twp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κs nt) "(Hσ & Hκs & Hsteps) !>".
+  iIntros (Φ) "Hl HΦ". iApply tlwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κs i nt) "(Hσ & Hκs & Hsteps) !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hσ Hl") as %?.
   iSplit; first by eauto with base_step.
   iIntros (κ e2 σ2 efs Hstep); inv_base_step.
@@ -648,31 +657,31 @@ Proof.
   iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
   iModIntro. do 2 (iSplit; first done). iFrame. by iApply "HΦ".
 Qed.
-Lemma wp_faa s E l i1 i2 :
+Lemma lwp_faa s E l i1 i2 :
   {{{ ▷ l ↦ LitV (LitInt i1) }}}
-    FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; E
+    FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
   {{{ RET LitV (LitInt i1); l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
-  iIntros (Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_faa with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
+  iIntros (Φ) ">H HΦ". iApply (tlwp_lwp_step with "HΦ").
+  iApply (tlwp_faa with "H"); [by auto..|]; iIntros "H HΦ". by iApply "HΦ".
 Qed.
-Lemma wp_faa_lc s E l i1 i2 n :
+Lemma lwp_faa_lc s E l i1 i2 n :
   {{{ steps_lb n ∗ ▷ l ↦ LitV (LitInt i1) }}}
-    FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; E
+    FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
   {{{ RET LitV (LitInt i1); l ↦ LitV (LitInt (i1 + i2)) ∗ £ (S n) }}}.
 Proof.
-  iIntros (Φ) "[#? >H] HΦ". iApply (twp_wp_step_lc_texan with "[$] HΦ").
-  iApply (twp_faa with "H"); [by auto..|]; iIntros "H HΦ ? !>".
+  iIntros (Φ) "[#? >H] HΦ". iApply (tlwp_lwp_step_lc_texan with "[$] HΦ").
+  iApply (tlwp_faa with "H"); [by auto..|]; iIntros "H HΦ ? !>".
   iApply "HΦ"; iFrame.
 Qed.
 
-Lemma wp_new_proph s E :
+Lemma lwp_new_proph s E :
   {{{ True }}}
-    NewProph @ s; E
+    NewProph @ s; i; E
   {{{ pvs p, RET (LitV (LitProphecy p)); proph p pvs }}}.
 Proof.
-  iIntros (Φ) "_ HΦ". iApply wp_lift_atomic_base_step_no_fork; first done.
-  iIntros (σ1 ns κ κs nt) "(Hσ & HR & Hsteps) !>". iSplit; first by eauto with base_step.
+  iIntros (Φ) "_ HΦ". iApply lwp_lift_atomic_base_step_no_fork; first done.
+  iIntros (σ1 ns κ κs i nt) "(Hσ & HR & Hsteps) !>". iSplit; first by eauto with base_step.
   iIntros "!>" (v2 σ2 efs Hstep) "_". inv_base_step.
   rename select proph_id into p.
   iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
@@ -722,34 +731,34 @@ Proof.
       apply to_val_fill_some in Hfillvt as [-> ->]. inv_base_step.
 Qed.
 
-Lemma wp_resolve s E e Φ (p : proph_id) v (pvs : list (val * val)) :
+Lemma lwp_resolve s E e Φ (p : proph_id) v (pvs : list (val * val)) :
   Atomic StronglyAtomic e →
   to_val e = None →
   proph p pvs -∗
-  WP e @ s; E {{ r, ∀ pvs', ⌜pvs = (r, v)::pvs'⌝ -∗ proph p pvs' -∗ Φ r }} -∗
-  WP Resolve e (Val $ LitV $ LitProphecy p) (Val v) @ s; E {{ Φ }}.
+  lWP e @ s; i; E {{ r, ∀ pvs', ⌜pvs = (r, v)::pvs'⌝ -∗ proph p pvs' -∗ Φ r }} -∗
+  lWP Resolve e (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E {{ Φ }}.
 Proof.
-  (* TODO we should try to use a generic lifting lemma (and avoid [wp_unfold])
-     here, since this breaks the WP abstraction. *)
-  iIntros (A He) "Hp WPe". rewrite !wp_unfold /wp_pre /= He. simpl in *.
-  iIntros (σ1 ns κ κs nt) "(Hσ & Hκ & Hsteps)".
+  (* TODO we should try to use a generic lifting lemma (and avoid [lwp_unfold])
+     here, since this breaks the lWP abstraction. *)
+  iIntros (A He) "Hp lWPe". rewrite !lwp_unfold /lwp_pre /= He. simpl in *.
+  iIntros (σ1 ns κ κs i nt) "(Hσ & Hκ & Hsteps)".
   destruct κ as [|[p' [w' v']] κ' _] using rev_ind.
-  - iMod ("WPe" $! σ1 ns [] κs nt with "[$Hσ $Hκ $Hsteps]") as "[Hs WPe]".
+  - iMod ("lWPe" $! σ1 ns [] κs i nt with "[$Hσ $Hκ $Hsteps]") as "[Hs lWPe]".
     iModIntro. iSplit.
-    { iDestruct "Hs" as "%". iPureIntro. destruct s; [ by apply resolve_reducible | done]. }
+    { iDestruct "Hs" as "%". iPureIntro. destruct s; i; [ by apply resolve_reducible | done]. }
     iIntros (e2 σ2 efs step). exfalso. apply step_resolve in step; last done.
     inv_base_step. match goal with H: ?κs ++ [_] = [] |- _ => by destruct κs end.
   - rewrite -assoc.
-    iMod ("WPe" $! σ1 ns _ _ nt with "[$Hσ $Hκ $Hsteps]") as "[Hs WPe]". iModIntro. iSplit.
-    { iDestruct "Hs" as %?. iPureIntro. destruct s; [ by apply resolve_reducible | done]. }
+    iMod ("lWPe" $! σ1 ns _ _ nt with "[$Hσ $Hκ $Hsteps]") as "[Hs lWPe]". iModIntro. iSplit.
+    { iDestruct "Hs" as %?. iPureIntro. destruct s; i; [ by apply resolve_reducible | done]. }
     iIntros (e2 σ2 efs step) "Hcred". apply step_resolve in step; last done.
     inv_base_step; simplify_list_eq.
-    iMod ("WPe" $! (Val w') σ2 efs with "[%] Hcred") as "WPe".
+    iMod ("lWPe" $! (Val w') σ2 efs with "[%] Hcred") as "lWPe".
     { by eexists [] _ _. }
-    iModIntro. iNext. iMod "WPe" as "WPe". iModIntro.
-    iApply (step_fupdN_wand with "WPe"); iIntros "> [($ & Hκ & $) WPe]".
+    iModIntro. iNext. iMod "lWPe" as "lWPe". iModIntro.
+    iApply (step_fupdN_wand with "lWPe"); iIntros "> [($ & Hκ & $) lWPe]".
     iMod (proph_map_resolve_proph p' (w',v') κs with "[$Hκ $Hp]") as (vs' ->) "[$ HPost]".
-    iModIntro. rewrite !wp_unfold /wp_pre /=. iDestruct "WPe" as "[HΦ $]".
+    iModIntro. rewrite !lwp_unfold /lwp_pre /=. iDestruct "lWPe" as "[HΦ $]".
     iMod "HΦ". iModIntro. by iApply "HΦ".
 Qed.
 
