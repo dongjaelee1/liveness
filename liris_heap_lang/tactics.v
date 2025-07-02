@@ -72,11 +72,12 @@ Ltac inv_base_step :=
   end.
 
 Create HintDb base_step.
-Global Hint Extern 0 (base_reducible _ _ _ _) => eexists _, _, _, _; simpl : base_step.
-Global Hint Extern 0 (base_reducible_no_obs _ _ _ _) => eexists _, _, _; simpl : base_step.
+Global Hint Extern 0 (base_reducible _ _ _) => eexists _, _, _, _; simpl : base_step.
+Global Hint Extern 0 (base_reducible_no_obs _ _ _) => eexists _, _, _; simpl : base_step.
 
 (* [simpl apply] is too stupid, so we need extern hints here. *)
 Global Hint Extern 1 (base_step _ _ _ _ _ _ _) => econstructor : base_step.
 Global Hint Extern 0 (base_step (CmpXchg _ _ _) _ _ _ _ _ _) => eapply CmpXchgS : base_step.
 Global Hint Extern 0 (base_step (AllocN _ _) _ _ _ _ _ _) => apply alloc_fresh : base_step.
 Global Hint Extern 0 (base_step NewProph _ _ _ _ _ _) => apply new_proph_id_fresh : base_step.
+Global Hint Extern 0 (base_step (Fork _) _ _ _ _ _ _) => apply new_thread_id_fresh : base_step.

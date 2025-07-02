@@ -222,17 +222,27 @@ Qed.
 (*   iApply ("IH" with "HΨ"). *)
 (* Qed. *)
 
-TODO
-
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
 Lemma lwp_fork s i E e Φ :
-  ▷ lWP e @ s; i; ⊤ {{ _, True }} -∗ ▷ Φ (LitV LitUnit) -∗ lWP Fork e @ s; i; E {{ Φ }}.
+  (∀ σ ns κs τ, state_interp σ ns κs τ ={E,∅}=∗
+                ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈ heap_ectx_lang ⌉)) ∗
+                       (∀ j, ⌜ j ∉ τ ⌝ -∗
+                             toL_thread i q L -∗
+                             sfS_fuel_credit_forallL heap_ectx_lang -∗
+                             toL_thread j 1 [] -∗
+                             £ 1 ={∅,E}=∗
+                             |={E}▷=> (state_interp σ (S ns) κs (τ ∪ {[ j ]}) ∗
+                                      Φ (LitV LitUnit) ∗
+                                      lWP e @ s; j; ⊤ {{ lift_term j (λ _ : val, True) }}))) -∗
+  lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
-  iIntros "He HΦ". iApply lwp_lift_atomic_base_step; [done|].
-  iIntros (σ1 ns κ κs i nt) "(?&?&Hsteps) !>"; iSplit; first by eauto with base_step.
-  iIntros "!>" (v2 σ2 efs Hstep) "_"; inv_base_step.
-  iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
-  by iFrame.
+  iIntros "H". iApply lwp_lift_atomic_base_step; [done|].
+  iIntros (σ1 ns κ κs τ) "Hσ". iSpecialize ("H" $! σ1 ns (κ ++ κs) τ with "Hσ").
+  iMod "H" as "(%&%& $ & $ &H)". iModIntro. iSplit; first by eauto with base_step.
+  iIntros (v2 σ2 efs Hstep) "HL Hsf HLs Hcred"; inv_base_step.
+  iMod ("H" $! i0 H0 with "HL Hsf [HLs] Hcred") as "H".
+  { replace (dom {[i0 := e]}) with ({[i0]} : gset _) by set_solver. by rewrite big_sepS_singleton. }
+  iModIntro. by rewrite big_sepM_singleton.
 Qed.
 
 Lemma tlwp_fork s E e Φ :
