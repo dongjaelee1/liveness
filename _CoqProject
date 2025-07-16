@@ -26,10 +26,9 @@ theories/algebra/ordinal_wfocm.v
 theories/algebra/nat_wfocm.v
 theories/algebra/bank.v
 theories/algebra/bcred.v
-theories/algebra/obligation.v
 
 theories/base_logic/osat.v
-# theories/base_logic/upred_measure.v
+theories/base_logic/obligation.v
 
 theories/program_logic/language.v
 theories/program_logic/sched_fair_interp.v
