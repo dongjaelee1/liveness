@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liris Require Export obligation wfocm wf_structs.
-From liris Require Import bcred.
+From liris Require Import bank bcred.
 
 (* All following definitions in this file are internal to [fancy_updates] with the
    exception of what's in the [osatGS] module. The module [osatGS] is thus exported in
