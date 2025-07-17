@@ -11,24 +11,21 @@ Variant bcred `{OCM.t A leR addO} : Type :=
 
 Definition credit_bound `{OCM.t A leR addO} (a : A) : bcred :=
   BCred (partition.from_monoid a) quotient.unit.
-
 Definition credit `{OCM.t A leR addO} (a : A) : bcred :=
   BCred partition.top (quotient.from_monoid a).
-
 Definition bcred_unit `{OCM.t A leR addO} : bcred :=
   BCred partition.top quotient.unit.
 
 Section bcred.
   Context `{SI : indexT}.
   Context `{OCM : OCM.t A leR addO}.
+
   Canonical Structure bcredO := leibnizO bcred.
 
   Local Infix "≤" := leR (at level 70).
   Local Notation "0" := OCM.unit.
   Local Infix "⊕" := addO (at level 70).
   Local Infix "≃" := OCM.eq (at level 70).
-  Local Infix "⩓" := OCM.meet (at level 70).
-  Local Infix "⩔" := OCM.join (at level 70).
 
   Local Infix "/≤" := quotient.le (at level 70).
   Local Infix "/⊕" := quotient.add (at level 70).
