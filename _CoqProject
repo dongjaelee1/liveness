@@ -17,9 +17,11 @@
 
 theories/prelude/axioms.v
 theories/prelude/wf_structs.v
+theories/prelude/tree.v
 
 theories/bi/weakestpre.v
 
+theories/algebra/tree.v
 theories/algebra/ocm.v
 theories/algebra/wfocm.v
 theories/algebra/ordinal_wfocm.v
