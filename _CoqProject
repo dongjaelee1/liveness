@@ -1,6 +1,6 @@
 # Search paths for all packages. They must all match the regex
 # `-Q $PACKAGE[/ ]` so that we can filter out the right ones for each package.
--Q theories liris
+-Q liris liris
 -Q liris_heap_lang liris.heap_lang
 
 # Custom flags (to be kept in sync with the dune file at the root of the repo).
@@ -15,32 +15,32 @@
 -arg -w -arg -deprecated-from-Coq
 -arg -w -arg -deprecated-dirpath-Coq
 
-theories/prelude/axioms.v
-theories/prelude/wf_structs.v
-theories/prelude/tree.v
+liris/prelude/axioms.v
+liris/prelude/wf_structs.v
+liris/prelude/tree.v
 
-theories/bi/weakestpre.v
+liris/bi/weakestpre.v
 
-theories/algebra/tree.v
-theories/algebra/ocm.v
-theories/algebra/wfocm.v
-theories/algebra/ordinal_wfocm.v
-theories/algebra/nat_wfocm.v
-theories/algebra/bank.v
-theories/algebra/bcred.v
+liris/algebra/tree.v
+liris/algebra/ocm.v
+liris/algebra/wfocm.v
+liris/algebra/ordinal_wfocm.v
+liris/algebra/nat_wfocm.v
+liris/algebra/bank.v
+liris/algebra/bcred.v
 
-theories/base_logic/osat.v
-theories/base_logic/obligation.v
+liris/base_logic/osat.v
+liris/base_logic/obligation.v
 
 # FIXME
-# theories/program_logic/language.v
-# theories/program_logic/sched_fair_interp.v
-# theories/program_logic/thread_obligation.v
-# theories/program_logic/weakestpre.v
-# theories/program_logic/lifting.v
-# theories/program_logic/ectx_language.v
-# theories/program_logic/ectx_lifting.v
-# theories/program_logic/ectxi_language.v
+# liris/program_logic/language.v
+# liris/program_logic/sched_fair_interp.v
+# liris/program_logic/thread_obligation.v
+# liris/program_logic/weakestpre.v
+# liris/program_logic/lifting.v
+# liris/program_logic/ectx_language.v
+# liris/program_logic/ectx_lifting.v
+# liris/program_logic/ectxi_language.v
 
 # FIXME
 # liris_heap_lang/locations.v
