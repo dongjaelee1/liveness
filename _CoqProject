@@ -21,7 +21,6 @@ liris/prelude/tree.v
 
 liris/bi/weakestpre.v
 
-liris/algebra/tree.v
 liris/algebra/ocm.v
 liris/algebra/wfocm.v
 liris/algebra/ordinal_wfocm.v
@@ -29,8 +28,9 @@ liris/algebra/nat_wfocm.v
 liris/algebra/bank.v
 liris/algebra/bcred.v
 
-liris/base_logic/osat.v
+liris/base_logic/digraph.v
 liris/base_logic/obligation.v
+liris/base_logic/osat.v
 
 # FIXME
 # liris/program_logic/language.v
