@@ -27,6 +27,7 @@ liris/algebra/ordinal_wfocm.v
 liris/algebra/nat_wfocm.v
 liris/algebra/bank.v
 liris/algebra/bcred.v
+liris/algebra/auth_mra.v
 
 liris/base_logic/digraph.v
 liris/base_logic/obligation.v
