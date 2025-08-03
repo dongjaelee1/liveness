@@ -412,6 +412,8 @@ Section osat.
     iPureIntro. subst. apply elem_of_dom_2 in H0. set_solver.
   Qed.
 
+  (* TODO *)
+
   Lemma osat_obl_is_init Ω i q :
     osat Ω ∗ oblG_elem i ∗ oblS_idle i q
     ⊢ ∃ a, ⌜Ω !! i = Some (obl_init a)⌝.

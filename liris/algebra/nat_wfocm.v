@@ -1,6 +1,6 @@
 From stdpp Require Import base.
 From liris Require Export wfocm.
-Require Import Lia Program.
+From Stdlib Require Import Lia Program.
 
 Global Program Instance nat_OCM: OCM.t le Nat.add :=
   OCM.Build_t nat le Nat.add 0 _ _ _ _ _ _ _.

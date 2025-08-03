@@ -10,7 +10,9 @@ Definition vertex := positive.
    a flag (false means the vertex owns the iProp), and keys of its children.
    List of children can only monotonically grow.
  *)
-Definition digraph `{SI : indexT} (A : Type) {Σ : gFunctors} :=
+Definition digraph (A : Type) :=
+  gmap vertex (prod (prod A (list vertex)) bool).
+Definition digraph_aux `{SI : indexT} (A : Type) {Σ : gFunctors} :=
   gmap vertex (prod (prod (prod A (list vertex)) bool) (iProp Σ)).
 
 (** The ghost state for digraph *)
@@ -40,7 +42,9 @@ Module digraphGS.
 End digraphGS.
 Import digraphGS.
 
-(* User interface *)
+(** User interface *)
+(* Make the instances local to this file. We cannot use #[local] in the code *)
+(* above, as that would make the instances local to the module. *)
 Local Existing Instances digraphGS_inG digraphGpreS_prop digraphGpreS_state.
 
 Definition prop_unfold `{SI : indexT} {Σ} (P : iProp Σ) : later (iProp Σ) := Next P.
@@ -85,10 +89,10 @@ Definition digS_flag_auth `{SI : indexT} `{!digraphGS A R Σ} (i : vertex) (q : 
 Global Typeclasses Opaque digS_flag_auth.
 Global Instance: Params (@digS_flag_auth) 6 := {}.
 
-Definition dsat `{SI : indexT} `{!digraphGS A R Σ} (V : gset vertex) : iProp Σ :=
+Definition dsat `{SI : indexT} `{!digraphGS A R Σ} (Γ : digraph A) : iProp Σ :=
   locked
-    (∃ (DG : digraph A),
-        (⌜ V = dom DG ⌝) ∗
+    (∃ (DG : digraph_aux A),
+        (⌜ Γ = fst <$> DG ⌝) ∗
         (own prop_name (gmap_view_auth (DfracOwn 1) (to_agree <$> (prop_unfold <$> (snd <$> DG))))) ∗
         ([∗ map] i ↦ V ∈ DG,
            match V with

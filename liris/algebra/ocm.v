@@ -1,6 +1,6 @@
 From stdpp Require Import base.
 From liris Require Import axioms.
-Require Import Program.
+From Stdlib Require Import Program.
 
 (** The less-than-or-equal-to-based Ordered Commutative Monoid class. *)
 (** Reference: "Module OCM" in Lilo and FOS. *)
