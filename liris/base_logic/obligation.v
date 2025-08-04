@@ -21,35 +21,40 @@ Proof.
   - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
 Qed.
 
-Class obl_class (obl_ps : Type) (obl_count : Type) := {
+Class obl_class (obl_count obl_ps obl_owner : Type) := {
     obl_count_ltR : obl_count → obl_count → Prop;
     obl_count_ltR_wf : well_founded obl_count_ltR;
   }.
 
+Record obl_live_data `{Δ : obl_class} := {
+    obl_transfer : obl_count;
+    obl_owner : obl_owner;
+    obl_credit : obl_count;
+  }.
+
 Inductive obl_state `{Δ : obl_class} : Type :=
-| obl_live (l : obl_count) (a : obl_count) | obl_done (P : prop_of obl_ps).
+| obl_live (d : obl_live_data) | obl_done (P : prop_of obl_ps).
 
 (* Logical progress that can obtain a later. *)
 Definition obl_state_progress `{Δ : obl_class} : relation obl_state :=
   λ o1 o2,
     match o1, o2 with
-    | obl_live l1 a1, obl_live l2 a2 => (l1 = l2 ∧ obl_count_ltR a2 a1)
+    | obl_live d1, obl_live d2 =>
+        (obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_credit d2) (obl_credit d1))
     | obl_done P1, obl_done P2 => P1 ≡ P2
     | _, _ => False
     end.
 
-(* General transition relation of the liveness obligation state machine. *)
+(* General transition relation of a liveness obligation. *)
 Definition obl_state_step `{Δ : obl_class} (s : obl_ps) : relation obl_state :=
   λ o1 o2,
-    match o1, o2 with
-    | obl_live l1 a1, obl_live l2 a2 => (obl_count_ltR l2 l1) ∨ (l1 = l2 ∧ obl_count_ltR a2 a1)
-    | obl_live _ _, obl_done P => P s
-    | obl_done P1, obl_done P2 => P1 ≡ P2
-    | _, _ => False
-    end.
+    (match o1, o2 with
+     | obl_live d1, obl_live d2 => obl_count_ltR (obl_transfer d2) (obl_transfer d1)
+     | obl_live _, obl_done P => P s
+     | _, _ => False
+     end) ∨ obl_state_progress o1 o2.
 
 Definition obl_id := positive.
-Canonical Structure obl_idO `{SI : indexT} := leibnizO obl_id.
 
 Notation obl_ids := (gset obl_id).
 Notation obl_states := (gmap obl_id obl_state).
@@ -72,7 +77,7 @@ Notation "a ↪ₒ⁺ b @ s , x" := (tc (obl_states_step_one s x) a b) (at level
 Notation "a ↪ₒ⋆ b @ s , x" := (rtc (obl_states_step_one s x) a b) (at level 20, format "a  ↪ₒ⋆  b  @  s ,  x ").
 
 Definition obl_states_alloc `{Δ : obl_class} : relation obl_states :=
-  λ Ω1 Ω2, ∃ i l a, Ω1 !! i = None ∧ Ω2 = <[i:=obl_live l a]> Ω1.
+  λ Ω1 Ω2, ∃ i d, Ω1 !! i = None ∧ Ω2 = <[i:=obl_live d]> Ω1.
 
 Infix "↪ₐ" := (obl_states_alloc) (at level 20).
 (* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
@@ -147,14 +152,14 @@ Section obl_states.
   Qed.
 
   Lemma obl_states_progress_rtc_live Ω1 Ω2 i :
-    Ω1 ↪ₚ⋆ Ω2 → (∃ l a, Ω1 !! i = Some (obl_live l a)) ↔ (∃ m b, Ω2 !! i = Some (obl_live m b)).
+    Ω1 ↪ₚ⋆ Ω2 → (∃ d, Ω1 !! i = Some (obl_live d)) ↔ (∃ d', Ω2 !! i = Some (obl_live d')).
   Proof using.
     intros H. apply (obl_states_progress_rtc_lookup _ _ i) in H.
-    split; intros (l & a & LU); rewrite LU in H; inv H.
-    - clear LU H1 i. remember (obl_live l a) as z. revert a Heqz. induction H2; intros; subst; eauto.
+    split; intros (d & LU); rewrite LU in H; inv H.
+    - clear LU H1 i. remember (obl_live d) as z. revert d Heqz. induction H2; intros; subst; eauto.
       destruct y; simpl in H; try done. destruct H; subst. eapply IHrtc; eauto.
-    - clear LU H0 i. remember (obl_live l a) as z. revert a Heqz. induction H2; intros; subst; eauto.
-      specialize (IHrtc _ eq_refl). destruct IHrtc as (?&?&H0). inv H0. destruct x; simpl in H; try eauto; done.
+    - clear LU H0 i. remember (obl_live d) as z. revert d Heqz. induction H2; intros; subst; eauto.
+      specialize (IHrtc _ eq_refl). destruct IHrtc as (?&H0). inv H0. destruct x; simpl in H; try eauto; done.
   Qed.
 
   Lemma obl_states_progress_rtc_done_1 Ω1 Ω2 i :
