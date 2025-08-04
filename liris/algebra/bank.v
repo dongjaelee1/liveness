@@ -276,6 +276,10 @@ Section bank.
     - apply quotient.from_monoid_le. rewrite -EQ2. apply quotient.meet_right_le.
   Qed.
 
+  Lemma debt_split a q0 q1 :
+    debt a (q0 + q1)%Qp = debt a q0 ⋅ debt a q1.
+  Proof. rewrite /debt bank_op_debt left_id_L. by rewrite idemp. Qed.
+
   Lemma cash_eq a0 a1 (EQ : a0 ≃ a1) : cash a0 = cash a1.
   Proof. rewrite /cash. apply quotient.from_monoid_eq in EQ. rewrite EQ. auto. Qed.
 

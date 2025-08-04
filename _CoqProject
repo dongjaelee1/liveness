@@ -17,7 +17,7 @@
 
 liris/prelude/axioms.v
 liris/prelude/wf_structs.v
-liris/prelude/tree.v
+# liris/prelude/tree.v
 
 liris/bi/weakestpre.v
 
@@ -30,7 +30,7 @@ liris/algebra/bcred.v
 liris/algebra/auth_mra.v
 liris/algebra/tree.v
 
-liris/base_logic/digraph.v
+# liris/base_logic/digraph.v
 liris/base_logic/obligation.v
 liris/base_logic/osat.v
 
