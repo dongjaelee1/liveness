@@ -1,11 +1,11 @@
-From Stdlib Require ClassicalFacts.
-From Stdlib Require FunctionalExtensionality.
-Require Stdlib.Logic.Epsilon.
-Require Stdlib.Logic.Classical_Pred_Type.
-Require Import Stdlib.Logic.ProofIrrelevance.
-Require Import Stdlib.Logic.ClassicalEpsilon.
-Require Import Stdlib.Logic.IndefiniteDescription.
-Require Import Stdlib.Logic.PropExtensionality.
+From Coq Require ClassicalFacts.
+From Coq Require FunctionalExtensionality.
+From Coq Require Logic.Epsilon.
+From Coq Require Logic.Classical_Pred_Type.
+From Coq Require Import Logic.ProofIrrelevance.
+From Coq Require Import Logic.ClassicalEpsilon.
+From Coq Require Import Logic.IndefiniteDescription.
+From Coq Require Import Logic.PropExtensionality.
 
 Set Implicit Arguments.
 

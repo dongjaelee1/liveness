@@ -1,6 +1,6 @@
 From stdpp Require Import base.
 From liris Require Export wfocm.
-From Stdlib Require Import Lia Program.
+From Coq Require Import Lia Program.
 
 Global Program Instance nat_OCM: OCM.t le Nat.add :=
   OCM.Build_t nat le Nat.add 0 _ _ _ _ _ _ _.
@@ -15,7 +15,7 @@ Lemma nat_OCM_eq (a0 a1: nat):
   OCM.eq a0 a1 <-> a0 = a1.
 Proof.
   split.
-  { intro H. red in H. lia. }
+  { intro H. destruct H. lia. }
   { intro. subst. reflexivity. }
 Qed.
 

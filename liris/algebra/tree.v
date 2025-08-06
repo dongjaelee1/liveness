@@ -2,6 +2,7 @@ From iris.algebra Require Export gmap.
 From iris.prelude Require Import options.
 
 Notation tree K A := (gmap K (A * (list K))).
+Notation tree' K := (gmap K (option K)).
 
 Inductive tree_wf {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} {A : Type} : K → tree K A → Prop :=
 | tree_wf_leaf r t a : t = {[r := (a, [])]} → tree_wf r t
