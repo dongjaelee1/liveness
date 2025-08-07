@@ -38,6 +38,12 @@
 
 ## Acknowledgements
 
+Files in `cgraphs/` directory are modifications of files from https://github.com/julesjacobs/cgraphs.
+The paper is available at:
+* "Connectivity graphs: a method for proving deadlock freedom based on separation logic"
+  by Jules Jacobs, Stephanie Balzer, and Robbert Krebbers, POPL 2022.
+  See https://dl.acm.org/doi/abs/10.1145/3498662
+
 (Transfinite Iris) The mechanization of set-theoretic ordinals and the underlying ZF model construction 
 has been based on Coq code by Dominik Kirst and Gert Smolka, available at: 
 

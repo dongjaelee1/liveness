@@ -21,6 +21,12 @@ liris/prelude/wf_structs.v
 
 liris/bi/weakestpre.v
 
+liris/cgraphs/mapexcl.v
+liris/cgraphs/multiset.v
+liris/cgraphs/util.v
+liris/cgraphs/uforests.v
+liris/cgraphs/cgraph.v
+
 liris/algebra/ocm.v
 liris/algebra/wfocm.v
 liris/algebra/ordinal_wfocm.v
