@@ -39,6 +39,7 @@ liris/algebra/tree.v
 # liris/base_logic/digraph.v
 liris/base_logic/obligation.v
 liris/base_logic/osat.v
+liris/base_logic/otree.v
 
 # FIXME
 # liris/program_logic/language.v
