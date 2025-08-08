@@ -35,15 +35,15 @@ Import otreeGS.
 Local Existing Instances otree_inG otreeGpreS_state.
 
 (* States - children *)
-Definition otreeS_children `{SI : indexT} `{!otreeGS L Σ} (i : obl_id) (C : gmap obl_id L) : iProp Σ :=
+Definition otreeG_children `{SI : indexT} `{!otreeGS L Σ} (i : obl_id) (C : gmap obl_id L) : iProp Σ :=
   own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> C))).
-Global Typeclasses Opaque otreeS_children.
-Global Instance: Params (@otreeS_children) 5 := {}.
+Global Typeclasses Opaque otreeG_children.
+Global Instance: Params (@otreeG_children) 5 := {}.
 
-Definition otreeS_child `{SI : indexT} `{!otreeGS L Σ} (i : obl_id) (c : obl_id) (l : L) : iProp Σ :=
+Definition otreeG_child `{SI : indexT} `{!otreeGS L Σ} (i : obl_id) (c : obl_id) (l : L) : iProp Σ :=
   own state_name (reservation_map_data i (gmap_view_frag c (DfracOwn 1) (to_agree $ l))).
-Global Typeclasses Opaque otreeS_child.
-Global Instance: Params (@otreeS_child) 6 := {}.
+Global Typeclasses Opaque otreeG_child.
+Global Instance: Params (@otreeG_child) 6 := {}.
 
 (* Global invariant for the obligation forest state. *)
 Definition otree `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
@@ -51,10 +51,12 @@ Definition otree `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
   (D : gset obl_id) : iProp Σ :=
   locked
     (∃ (OTree : cgraph obl_id (leibnizO A)),
+        (⌜ dom OTree = D ⌝) ∗
         ([∗ map] i ↦ C ∈ OTree,
-           otreeS_children i C ∗
-           ∃ l, oblG_transfer_bound i l (1/2)%Qp ∗
-                ⌜ map_Forall (λ _ a, ∃ l', WFOCM.leR l l' ∧ a ≡ l') C ⌝)
+           otreeG_children i C ∗
+           ∃ l c, oblG_transfer_bound i l (1/2)%Qp ∗
+                  oblG_credit_supply i c (1/2)%Qp ∗
+                  ⌜ map_Forall (λ _ a, ∃ l', WFOCM.leR l l' ∧ a ≡ l') C ⌝)
     )%I.
 
 TODO

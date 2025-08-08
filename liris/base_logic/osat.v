@@ -125,16 +125,16 @@ Global Instance: Params (@oblG_credit_supply) 8 := {}.
 (* Global invariant for the obligation ghost state. *)
 Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_class A ps T} (Ω : obl_states) : iProp Σ :=
   locked
-    ((∃ (OblPs : gmap obl_id (prop_of ps * iProp Σ)),
-         (⌜ dom OblPs = dom Ω ⌝) ∗
+    ((∃ (OProp : gmap obl_id (prop_of ps * iProp Σ)),
+         (⌜ dom OProp = dom Ω ⌝) ∗
          own goal_name
            (gmap_view_auth (DfracOwn 1)
-              ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OblPs))) ∗
-     (∃ (OblMs : gmap obl_id meta),
-         (⌜ dom OblMs = dom Ω ⌝) ∗
+              ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OProp))) ∗
+     (∃ (OMeta : gmap obl_id meta),
+         (⌜ dom OMeta = dom Ω ⌝) ∗
          own meta_name
            (gmap_view_auth (DfracOwn 1)
-              (to_agree <$> OblMs))) ∗
+              (to_agree <$> OMeta))) ∗
      ([∗ map] i ↦ o ∈ Ω,
         match o with
         | obl_live d =>
@@ -175,16 +175,16 @@ Section osat.
 
   (* Goal rules *)
 
-  Lemma oblG_goal_lookup (OblPs : gmap positive (prop_of ps * iProp Σ)) i P R :
+  Lemma oblG_goal_lookup (OProp : gmap positive (prop_of ps * iProp Σ)) i P R :
     own goal_name
       (gmap_view_auth (DfracOwn 1)
-         ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OblPs)) ∗
+         ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OProp)) ∗
     oblG_goal i P R
-    ⊢ ∃ P' R', ⌜OblPs !! i = Some (P', R')⌝ ∗ ⌜P' = P⌝ ∗ ▷ (R' ≡ R).
+    ⊢ ∃ P' R', ⌜OProp !! i = Some (P', R')⌝ ∗ ⌜P' = P⌝ ∗ ▷ (R' ≡ R).
   Proof.
     rewrite /oblG_goal -own_op own_valid gmap_view_both_validI_total.
     iIntros "[%Q' (_& _ & HQ' & Hval & Hincl)]". rewrite !lookup_fmap.
-    case: (OblPs !! i)=> [Q|] /=; last first.
+    case: (OProp !! i)=> [Q|] /=; last first.
     { by iDestruct "HQ'" as %?. }
     destruct Q as (P'&R'). iDestruct "HQ'" as %[= <-]. iExists P', R'; iSplit; first done.
     rewrite prod_includedI !to_agree_includedI; simpl. iDestruct "Hincl" as "[H1 H2]".
@@ -198,16 +198,16 @@ Section osat.
 
   (* Metadata rules *)
 
-  Lemma oblG_meta_lookup (OblMs : gmap positive meta) i m :
+  Lemma oblG_meta_lookup (OMeta : gmap positive meta) i m :
     own meta_name
       (gmap_view_auth (DfracOwn 1)
-         (to_agree <$> OblMs)) ∗
+         (to_agree <$> OMeta)) ∗
     oblG_meta i m
-    ⊢ ⌜OblMs !! i = Some m⌝.
+    ⊢ ⌜OMeta !! i = Some m⌝.
   Proof.
     rewrite /oblG_meta -own_op own_valid gmap_view_both_validI_total.
     iIntros "[%Q' (_& _ & HQ' & Hval & Hincl)]". rewrite !lookup_fmap.
-    case: (OblMs !! i)=> [Q|] /=; last first.
+    case: (OMeta !! i)=> [Q|] /=; last first.
     { by iDestruct "HQ'" as %?. }
     iDestruct "HQ'" as %[= <-]. rewrite !to_agree_includedI; simpl.
     iPoseProof (discrete_eq with "Hincl") as "%HG".
