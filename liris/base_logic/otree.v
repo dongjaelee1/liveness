@@ -93,8 +93,8 @@ Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {X : ofe} {Σ}
     )%I.
 
 (* Global invariant for the obligation forest state. *)
-Definition otree `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
-  `{!@osatGS.osatGS _ _ WF ps T Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS (prodO (leibnizO A) (leibnizO A)) Σ}
+Definition otree `{SI : indexT} `{WF : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WF ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS (prodO (leibnizO A) (leibnizO A)) Σ}
   (D : gset obl_id) : iProp Σ :=
   locked
     (* Label = (thread_id, root, parent) *)
@@ -108,9 +108,11 @@ Definition otree `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
              (∃ l c, oblG_transfer_bound i l (1/2)%Qp ∗ oblG_credit_supply i c (1/2)%Qp ∗
                      (own edge_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) ((λ _, to_agree (l, c)) <$> C : gmap _ (agreeR (prodO (leibnizO A) (leibnizO A))))))) ∗
                      (* is a root or... *)
-                     (∃ τ, ⌜ in_labels OTree i ≡ ε ⌝ ∗ othreadG_owns τ i true (1/2)%Qp) ∨
+                     (∃ τ, ⌜ in_labels OTree i ≡ ε ⌝ ∗
+                           oblG_owner i τ (1/2/2)%Qp ∗ othreadG_owns τ i true (1/2)%Qp) ∨
                        (* is an internal node, and is suspended with enough transfer and credits *)
-                       (∃ τ γ π, ⌜ in_labels OTree i ≡ {[(τ, γ, π)]} ⌝ ∗ othreadG_owns τ i false (1/2)%Qp ∗
+                       (∃ τ γ π, ⌜ in_labels OTree i ≡ {[(τ, γ, π)]} ⌝ ∗
+                                 oblG_owner i τ (1/2)%Qp ∗ othreadG_owns τ i false (1/2)%Qp ∗
                                  (∃ u, otreeG_suspend i u τ π ∗ otreeG_wait i u (1/2)%Qp) ∗
                                  otreeG_xlabel π i (l, c) 1 ∗
                                  ∃ l' c', ⌜ WFOCM.leR l l' ∧ WFOCM.leR c c' ⌝ ∗ oblG_transfer i l' ∗ oblG_credit i c'
