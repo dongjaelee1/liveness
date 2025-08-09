@@ -7,6 +7,7 @@ From liris.base_logic Require Import osat.
 (** The ghost state for thread obligations *)
 Module othreadGS.
 
+  (* Assumes thread ids are positive *)
   Class othreadGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     OthreadGpreS {
         othreadGpreS_state : inG Σ (reservation_mapUR (gmap_viewR obl_id (agreeR (leibnizO bool))));
@@ -68,19 +69,20 @@ Global Typeclasses Opaque othreadG_term.
 Global Instance: Params (@othreadG_term) 4 := {}.
 
 (* Global invariant for the thread obligations state. *)
-Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps T} {Σ}
-  `{!@osatGS.osatGS _ _ WFA ps T Σ} `{!othreadGS Σ}
+Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS Σ}
   (TP : gset positive) : iProp Σ :=
   locked
     (∃ (OThread : gmap positive (gmap obl_id bool)),
         (⌜ dom OThread = TP ⌝) ∗
-        (own state_name (reservation_map_token (⊤ ∖ gset_to_coPset TP))) ∗
-        (own exec_name (reservation_map_token (⊤ ∖ gset_to_coPset TP))) ∗
+        (own state_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset TP))) ∗
+        (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))) ∗
         (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
         ([∗ map] i ↦ B ∈ OThread,
-           (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> B)))) ∗
            (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ ⌜ B = ∅ ⌝)) ∗
-           ([∗ map] k ↦ b ∈ B, oblG_live k (1/2)%Qp ∗ othreadG_owns i k b (1/2)%Qp)
+           (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> B)))) ∗
+           ([∗ map] k ↦ b ∈ B, oblG_live k (1/2)%Qp ∗
+                               (match b with | true => oblG_owner k i (1/2/2)%Qp | _ => emp end))
         )
     )%I.
 

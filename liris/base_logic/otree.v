@@ -1,29 +1,40 @@
-From iris.algebra Require Import agree gmap_view reservation_map.
+From iris.algebra Require Import agree gmap gmap_view reservation_map mono_nat.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From liris.cgraphs Require Import cgraph.
-From liris.base_logic Require Import osat.
+From liris.base_logic Require Import osat othread.
 
 (** The ghost state for liveness obligation forest *)
 Module otreeGS.
 
-  Class otreeGpreS `{SI : indexT} (L : ofe) (Σ : gFunctors) : Set :=
+  Class otreeGpreS `{SI : indexT} (X : ofe) (Σ : gFunctors) : Set :=
     OtreeGpreS {
-        otreeGpreS_state : inG Σ (reservation_mapUR (gmap_viewR obl_id (agreeR L)));
+        otreeGpreS_edge : inG Σ (reservation_mapUR (gmap_viewR obl_id unitUR));
+        (* For auxiliary data not in the label *)
+        otreeGpreS_xlabel : inG Σ (reservation_mapUR (gmap_viewR obl_id (agreeR X)));
+        (* Data for suspending an obligation: returning thread_id, blocking parent id *)
+        otreeGpreS_suspend : inG Σ (reservation_mapUR (gmap_viewR positive (agreeR (prodO positiveO obl_idO))));
+        otreeGpreS_wait : inG Σ (reservation_mapUR (gmapUR positive mono_natUR));
       }.
 
-  Class otreeGS `{SI : indexT} (L : ofe) (Σ : gFunctors) : Set :=
+  Class otreeGS `{SI : indexT} (X : ofe) (Σ : gFunctors) : Set :=
     OtreeG {
-        otree_inG : otreeGpreS L Σ;
-        state_name : gname;
+        otree_inG : otreeGpreS X Σ;
+        edge_name : gname;
+        xlabel_name : gname;
+        suspend_name : gname;
+        wait_name : gname;
       }.
 
-  Definition otreeΣ `{SI : indexT} (L : ofe) : gFunctors :=
-    #[GFunctor (reservation_mapUR (gmap_viewR obl_id (agreeR L)))
+  Definition otreeΣ `{SI : indexT} (X : ofe) : gFunctors :=
+    #[GFunctor (reservation_mapUR (gmap_viewR obl_id unitUR));
+      GFunctor (reservation_mapUR (gmap_viewR obl_id (agreeR X)));
+      GFunctor (reservation_mapUR (gmap_viewR positive (agreeR (prodO positiveO obl_idO))));
+      GFunctor (reservation_mapUR (gmapUR positive mono_natUR))
       ].
 
-  Global Instance subG_otreeΣ `{SI : indexT} {L : ofe} {Σ} : subG (otreeΣ L) Σ → (otreeGpreS L Σ).
+  Global Instance subG_otreeΣ `{SI : indexT} {X : ofe} {Σ} : subG (otreeΣ X) Σ → (otreeGpreS X Σ).
   Proof. solve_inG. Qed.
 
 End otreeGS.
@@ -32,62 +43,84 @@ Import otreeGS.
 (** User interface *)
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
-Local Existing Instances otree_inG otreeGpreS_state.
+Local Existing Instances otree_inG otreeGpreS_edge otreeGpreS_xlabel otreeGpreS_suspend otreeGpreS_wait.
 
-(* States - children *)
-Definition otreeG_children `{SI : indexT} `{!otreeGS L Σ} (i : obl_id) (C : gmap obl_id L) : iProp Σ :=
-  own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> C))).
-Global Typeclasses Opaque otreeG_children.
-Global Instance: Params (@otreeG_children) 5 := {}.
+(* Edge *)
+Definition otreeG_edge `{SI : indexT} `{!otreeGS X Σ} (i j : obl_id) (q : Qp) : iProp Σ :=
+  own edge_name (reservation_map_data i (gmap_view_frag j (DfracOwn q) ())).
+Global Typeclasses Opaque otreeG_edge.
+Global Instance: Params (@otreeG_edge) 6 := {}.
 
-Definition otreeG_child `{SI : indexT} `{!otreeGS L Σ} (i : obl_id) (c : obl_id) (l : L) : iProp Σ :=
-  own state_name (reservation_map_data i (gmap_view_frag c (DfracOwn 1) (to_agree $ l))).
-Global Typeclasses Opaque otreeG_child.
-Global Instance: Params (@otreeG_child) 6 := {}.
+(* Xlabel data *)
+Definition otreeG_xlabel `{SI : indexT} `{!otreeGS X Σ} (i j : obl_id) (x : X) (q : Qp) : iProp Σ :=
+  own xlabel_name (reservation_map_data i (gmap_view_frag j (DfracOwn q) (to_agree x))).
+Global Typeclasses Opaque otreeG_xlabel.
+Global Instance: Params (@otreeG_xlabel) 6 := {}.
+
+(* Suspend knowledge *)
+Definition otreeG_suspend `{SI : indexT} `{!otreeGS X Σ} (i : obl_id) (u : positive) (τ : positive) (π : obl_id) : iProp Σ :=
+  own suspend_name (reservation_map_data i (gmap_view_frag u DfracDiscarded (to_agree (τ, π)))).
+Global Typeclasses Opaque otreeG_suspend.
+Global Instance: Params (@otreeG_suspend) 6 := {}.
+
+(* Wait token *)
+Definition otreeG_wait `{SI : indexT} `{!otreeGS X Σ} (i : obl_id) (u : positive) (q : Qp) : iProp Σ :=
+  own wait_name (reservation_map_data i {[u := ●MN{#q} 0]}).
+Global Typeclasses Opaque otreeG_wait.
+Global Instance: Params (@otreeG_wait) 6 := {}.
+
+Definition otreeG_free `{SI : indexT} `{!otreeGS X Σ} (i : obl_id) (u : positive) : iProp Σ :=
+  own wait_name (reservation_map_data i {[u := ●MN 1]}).
+Global Typeclasses Opaque otreeG_free.
+Global Instance: Params (@otreeG_free) 6 := {}.
+
+(* Global invariant for suspending obligations and waiting. *)
+Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {X : ofe} {Σ}
+  `{!@osatGS.osatGS _ _ WF ps T Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS X Σ}
+  (D : gset obl_id) : iProp Σ :=
+  locked
+    (∃ (OSus : gmap obl_id (gmap positive (prod positive obl_id))),
+        (⌜ dom OSus = D ⌝) ∗
+        (own suspend_name (reservation_map_token (A:=gmap_viewR positive (agreeR (prodO positiveO obl_idO))) (⊤ ∖ gset_to_coPset D))) ∗
+        (own wait_name (reservation_map_token (A:=gmapUR positive mono_natUR) (⊤ ∖ gset_to_coPset D))) ∗
+        ([∗ map] i ↦ M ∈ OSus,
+           (own suspend_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> M)))) ∗
+           ([∗ map] u ↦ '(τ, π) ∈ M,
+              ((othreadG_owns τ i false (1/2)%Qp ∗ otreeG_edge π i 1) ∨
+                 (othreadG_owns τ i true (1/2)%Qp ∗ otreeG_wait i u (1/2)%Qp ∗ oblG_done π)) ∨
+                otreeG_free i u)
+        )
+    )%I.
 
 (* Global invariant for the obligation forest state. *)
 Definition otree `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
-  `{!@osatGS.osatGS _ _ WF ps T Σ} `{!otreeGS (leibnizO A) Σ}
+  `{!@osatGS.osatGS _ _ WF ps T Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS (prodO (leibnizO A) (leibnizO A)) Σ}
   (D : gset obl_id) : iProp Σ :=
   locked
-    (∃ (OTree : cgraph obl_id (leibnizO A)),
+    (* Label = (thread_id, root, parent) *)
+    (∃ (OTree : cgraph obl_id (prod (prod positive obl_id) obl_id)),
         (⌜ dom OTree = D ⌝) ∗
+        (own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset D))) ∗
+        (own xlabel_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (prodO (leibnizO A) (leibnizO A)))) (⊤ ∖ gset_to_coPset D))) ∗
         ([∗ map] i ↦ C ∈ OTree,
-           otreeG_children i C ∗
-           ∃ l c, oblG_transfer_bound i l (1/2)%Qp ∗
-                  oblG_credit_supply i c (1/2)%Qp ∗
-                  ⌜ map_Forall (λ _ a, ∃ l', WFOCM.leR l l' ∧ a ≡ l') C ⌝)
-    )%I.
-
-TODO
-
-(* Global invariant for the obligation ghost state. *)
-Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} `{!otreeGS ps T Σ} `{obl_class A ps T} (Ω : obl_states) : iProp Σ :=
-  locked
-    ((∃ (OblPs : gmap obl_id (prop_of ps * iProp Σ)),
-         (⌜ dom OblPs = dom Ω ⌝) ∗
-         own goal_name
-           (gmap_view_auth (DfracOwn 1)
-              ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OblPs))) ∗
-     (∃ (OblMs : gmap obl_id meta),
-         (⌜ dom OblMs = dom Ω ⌝) ∗
-         own meta_name
-           (gmap_view_auth (DfracOwn 1)
-              (to_agree <$> OblMs))) ∗
-     ([∗ map] i ↦ o ∈ Ω,
-        match o with
-        | obl_live d =>
-            oblG_live i (1/2)%Qp ∗
-            (∃ l', ⌜ WFOCM.leR l' (obl_transfer d) ⌝ ∗ oblG_transfer_bound i l' (1/2)%Qp) ∗
-            (oblG_owner i (obl_owner d) (1/2)%Qp) ∗
-            (∃ a', ⌜ WFOCM.leR a' (obl_credit d) ⌝ ∗ oblG_credit_supply i a' (1/2)%Qp)
-        | obl_done P1 =>
-            ∃ P2 R, oblG_goal i P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
-                    oblG_done_auth i ∗
-                    (∃ l, oblG_transfer_bound i l 1) ∗
-                    (∃ t, oblG_owner i t 1) ∗
-                    (∃ a, oblG_credit_supply i a 1)
-      end)
+           (own edge_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> C)))) ∗
+           ((* This obligation is live and... *)
+             (∃ l c, oblG_transfer_bound i l (1/2)%Qp ∗ oblG_credit_supply i c (1/2)%Qp ∗
+                     (own edge_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) ((λ _, to_agree (l, c)) <$> C : gmap _ (agreeR (prodO (leibnizO A) (leibnizO A))))))) ∗
+                     (* is a root or... *)
+                     (∃ τ, ⌜ in_labels OTree i ≡ ε ⌝ ∗ othreadG_owns τ i true (1/2)%Qp) ∨
+                       (* is an internal node, and is suspended with enough transfer and credits *)
+                       (∃ τ γ π, ⌜ in_labels OTree i ≡ {[(τ, γ, π)]} ⌝ ∗ othreadG_owns τ i false (1/2)%Qp ∗
+                                 (∃ u, otreeG_suspend i u τ π ∗ otreeG_wait i u (1/2)%Qp) ∗
+                                 otreeG_xlabel π i (l, c) 1 ∗
+                                 ∃ l' c', ⌜ WFOCM.leR l l' ∧ WFOCM.leR c c' ⌝ ∗ oblG_transfer i l' ∗ oblG_credit i c'
+                       )
+             ) ∨
+               (* Or this obligation is done *)
+               (oblG_done i ∗ ⌜ in_labels OTree i ≡ ε ∧ C = ∅ ⌝ ∗
+                (own edge_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (∅ : gmap _ (agreeR (prodO (leibnizO A) (leibnizO A)))))))
+               )
+        ))
     )%I.
 
 Section otree.
