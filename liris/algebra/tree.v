@@ -1,38 +1,30 @@
-From iris.algebra Require Export gmap.
-From iris.prelude Require Import options.
-
-Notation tree K A := (gmap K (A * (list K))).
-Notation tree' K := (gmap K (option K)).
-
-Inductive tree_wf {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} {A : Type} : K → tree K A → Prop :=
-| tree_wf_leaf r t a : t = {[r := (a, [])]} → tree_wf r t
-| tree_wf_node r t n a (cs : list (K * tree K A)) :
-  n = {[r := (a, fst <$> cs)]} →
-  t = n ∪ (⋃ (snd <$> cs)) →
-  map_disjoint_list (n :: (snd <$> cs)) →
-  (∀ k u, (k, u) ∈ cs → tree_wf k u) →
-  tree_wf r t.
+From iris.proofmode Require Import tactics.
+From stdpp Require Import fin_maps.
+From liris.cgraphs Require Export cgraph.
+From liris.cgraphs Require Import mapexcl.
 
 Section tree.
-  Context {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} {A : Type}.
+  Context {V : Type}.
+  Context `{Countable V}.
+  Context `{SI : indexT} {L : ofe}.
+  Implicit Type t : cgraph V L.
+  Implicit Type n : gmap V L.
+  Implicit Type v u : V.
+
+  Definition node t v : Prop := is_Some (t !! v).
+  Definition root t v : Prop := node t v ∧ in_labels t v ≡ ε.
+  Definition internal t v : Prop := node t v ∧ (∃ x, in_labels t v ≡ {[x]}).
+  Definition tree_wf t : Prop := cgraph_wf t ∧ (∀ v, node t v → (root t v ∨ internal t v)).
+
+  Inductive descendants t : V → (gset V) → Prop :=
+  | descendant_child v Δ (cds : gmap V (gset V)) :
+    node t v →
+    dom (out_edges t v) = dom cds →
+    Δ = map_fold (λ _ cd s, cd ∪ s) ∅ cds →
+    (∀ c cd, cds !! c = Some cd → descendants t c cd) →
+    descendants t v Δ.
+  Definition descendant t : relation V := λ v u, ∃ Δ, descendants t v Δ ∧ u ∈ Δ.
+
+  Definition parent t (v π : V) : Prop := v ∈ dom (out_edges t π).
 
 End tree.
-
-Notation forest K A := (gmap K (list (K * tree K A))).
-
-Definition forest_to_trees {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} {A : Type}
-  (f : forest K A) : list (K * tree K A) :=
-  map_fold (λ k t l, l ++ t) [] f.
-
-Definition forest_to_map {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} {A : Type}
-  (f : forest K A) : gmap K A :=
-  fst <$> ⋃ ((snd <$> (forest_to_trees f)) : list (tree K A)).
-
-Definition forest_wf_trees {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} {A : Type}
-  (f : forest K A) : Prop :=
-  map_disjoint_list ((snd <$> (forest_to_trees f)) : list (tree K A)).
-
-Section forest.
-  Context {K : Type} {EqDecision0 : EqDecision K} {H : Countable K} {A : Type}.
-
-End forest.

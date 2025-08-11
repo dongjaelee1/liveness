@@ -90,20 +90,8 @@ Section othread.
   Context `{SI : indexT} `{WFA : WFOCM.pack A}.
   Context {Σ} `{!@osatGS.osatGS _ _ WFA ps T Σ} `{!othreadGS Σ}.
 
-  (* Local Instance goal_unfold_contractive : Contractive (@goal_unfold SI Σ). *)
-  (* Proof. solve_contractive. Qed. *)
-  (* Global Instance oblG_goal_contractive i P : Contractive (@oblG_goal SI _ WFA ps T Σ _ i P). *)
-  (* Proof. solve_contractive. Qed. *)
-  (* Global Instance oblG_goal_persistent i P R : Persistent (oblG_goal i P R). *)
-  (* Proof. rewrite /oblG_goal. apply _. Qed. *)
-  (* Global Instance oblG_elem_persistent i : Persistent (oblG_elem i). *)
-  (* Proof. rewrite /oblG_elem. apply _. Qed. *)
-  (* Global Instance oblG_meta_persistent i m : Persistent (oblG_meta i m). *)
-  (* Proof. rewrite /oblG_meta. apply _. Qed. *)
-  (* Global Instance oblG_done_persistent i : Persistent (oblG_done i). *)
-  (* Proof. rewrite /oblG_done. apply _. Qed. *)
-
-  (* Goal rules *)
+  Global Instance othreadG_term_persistent i : Persistent (othreadG_term i).
+  Proof. rewrite /othreadG_term. apply _. Qed.
 
 End othread.
 

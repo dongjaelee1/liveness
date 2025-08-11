@@ -1,11 +1,9 @@
 (** Reference: https://github.com/julesjacobs/cgraphs *)
 From iris.proofmode Require Import tactics.
-Require Export liris.cgraphs.uforests.
-From liris.cgraphs Require Export util.
 From stdpp Require Export gmap.
-Require Export liris.cgraphs.multiset.
 From stdpp Require Import fin_maps.
-Require Import liris.cgraphs.mapexcl.
+From liris.cgraphs Require Export uforests util multiset.
+From liris.cgraphs Require Import mapexcl.
 
 
 Ltac sdec := repeat case_decide; simplify_eq.
