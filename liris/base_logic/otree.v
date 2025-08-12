@@ -14,6 +14,7 @@ Module otreeGS.
         (* Data for suspending an obligation: returning thread_id, blocking parent id *)
         otreeGpreS_suspend : inG Σ (reservation_mapUR (gmap_viewR positive (agreeR (prodO positiveO obl_idO))));
         otreeGpreS_wait : inG Σ (reservation_mapUR (gmapUR positive mono_natUR));
+        otreeGpreS_elem : inG Σ (gmap_viewR obl_id unitUR);
       }.
 
   Class otreeGS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -22,12 +23,14 @@ Module otreeGS.
         edge_name : gname;
         suspend_name : gname;
         wait_name : gname;
+        elem_name : gname;
       }.
 
   Definition otreeΣ `{SI : indexT} : gFunctors :=
     #[GFunctor (reservation_mapUR (gmap_viewR obl_id unitUR));
       GFunctor (reservation_mapUR (gmap_viewR positive (agreeR (prodO positiveO obl_idO))));
-      GFunctor (reservation_mapUR (gmapUR positive mono_natUR))
+      GFunctor (reservation_mapUR (gmapUR positive mono_natUR));
+      GFunctor (gmap_viewR positive unitUR)
       ].
 
   Global Instance subG_otreeΣ `{SI : indexT} {Σ} : subG (otreeΣ) Σ → (otreeGpreS Σ).
@@ -39,7 +42,8 @@ Import otreeGS.
 (** User interface *)
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
-Local Existing Instances otree_inG otreeGpreS_edge otreeGpreS_suspend otreeGpreS_wait.
+Local Existing Instances otree_inG
+  otreeGpreS_edge otreeGpreS_suspend otreeGpreS_wait otreeGpreS_elem.
 
 (* Edge *)
 Definition otreeG_edge `{SI : indexT} `{!otreeGS Σ} (i j : obl_id) (q : Qp) : iProp Σ :=
@@ -64,6 +68,12 @@ Definition otreeG_free `{SI : indexT} `{!otreeGS Σ} (i : obl_id) (u : positive)
 Global Typeclasses Opaque otreeG_free.
 Global Instance: Params (@otreeG_free) 6 := {}.
 
+(* Elem: keeps the fact that a key is inside a map *)
+Definition otreeG_elem `{SI : indexT} `{!otreeGS Σ} (i : obl_id) : iProp Σ :=
+  own elem_name (gmap_view_frag i DfracDiscarded ()).
+Global Typeclasses Opaque otreeG_elem.
+Global Instance: Params (@otreeG_elem) 4 := {}.
+
 (* Global invariant for suspending obligations and waiting. *)
 Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
   `{!@osatGS.osatGS _ _ WF ps T Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
@@ -73,6 +83,7 @@ Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
         (⌜ dom OSus = D ⌝) ∗
         (own suspend_name (reservation_map_token (A:=gmap_viewR positive (agreeR (prodO positiveO obl_idO))) (⊤ ∖ gset_to_coPset D))) ∗
         (own wait_name (reservation_map_token (A:=gmapUR positive mono_natUR) (⊤ ∖ gset_to_coPset D))) ∗
+        (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> OSus))) ∗
         ([∗ map] i ↦ M ∈ OSus,
            (own suspend_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> M)))) ∗
            ([∗ map] u ↦ '(τ, π) ∈ M,
@@ -117,6 +128,8 @@ Section otree.
 
   Global Instance otreeG_suspend_persistent i u τ π : Persistent (otreeG_suspend i u τ π).
   Proof. rewrite /otreeG_suspend. apply _. Qed.
+  Global Instance otreeG_elem_persistent i : Persistent (otreeG_elem i).
+  Proof. rewrite /otreeG_elem. apply _. Qed.
 
   Local Infix "/=" := OCM.eq (at level 70).
   Local Infix "/≤" := WFOCM.leR (at level 70).
