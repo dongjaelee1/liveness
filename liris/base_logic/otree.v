@@ -88,7 +88,7 @@ Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   (D : gset obl_id) : iProp Σ :=
   locked
     (∃ (OTree : cgraph obl_id unitO) (OOwner : gmap obl_id positive),
-        (⌜ dom OTree = D ∧ dom OOwner = dom OTree ⌝) ∗
+        (⌜ dom OTree = D ∧ dom OOwner = D ∧ cgraph_wf OTree ⌝) ∗
         (⌜ ∀ v u, descendant OTree v u → OOwner !! v = OOwner !! u ⌝) ∗
         (own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset D))) ∗
         ([∗ map] i ↦ C ∈ OTree,
@@ -101,7 +101,7 @@ Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
               (∃ τ, ⌜ root OTree i ∧ OOwner !! i = Some τ ⌝ ∗
                     oblG_owner i τ (1/2/2)%Qp ∗ othreadG_owns τ i true (1/2)%Qp) ∨
                 (* is an internal node, and is suspended *)
-                (∃ τ π, ⌜ internal OTree i ∧ OOwner !! i = Some τ ∧ parent OTree i π ⌝ ∗
+                (∃ τ π, ⌜ parent OTree i π ∧ OOwner !! i = Some τ ⌝ ∗
                         oblG_owner i τ (1/2)%Qp ∗ othreadG_owns τ i false (1/2)%Qp ∗
                         (∃ x, otreeG_suspend i x τ π ∗ otreeG_wait i x (1/2)%Qp))
              ) ∨
