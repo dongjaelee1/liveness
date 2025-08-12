@@ -29,7 +29,7 @@ Class obl_class (obl_count obl_ps obl_owner : Type) := {
 Record obl_live_data `{Δ : obl_class} := {
     obl_transfer : obl_count;
     obl_owner : obl_owner;
-    obl_credit : obl_count;
+    obl_progress : obl_count;
   }.
 
 Inductive obl_state `{Δ : obl_class} : Type :=
@@ -40,7 +40,7 @@ Definition obl_state_progress `{Δ : obl_class} : relation obl_state :=
   λ o1 o2,
     match o1, o2 with
     | obl_live d1, obl_live d2 =>
-        (obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_credit d2) (obl_credit d1))
+        (obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1))
     | obl_done P1, obl_done P2 => P1 ≡ P2
     | _, _ => False
     end.

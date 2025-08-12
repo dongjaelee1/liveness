@@ -19,7 +19,7 @@ Module osatGS.
         osatGpreS_transfer : inG Σ (reservation_mapUR bankUR);
         osatGpreS_tbound : inG Σ (reservation_mapUR (agreeR (leibnizO A)));
         osatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO T)));
-        osatGpreS_credit : inG Σ (reservation_mapUR bankUR);
+        osatGpreS_progress : inG Σ (reservation_mapUR bankUR);
       }.
 
   Class osatGS `{SI : indexT} `{WF : WFOCM.pack A} (ps T : Type) (Σ : gFunctors) : Set :=
@@ -30,7 +30,7 @@ Module osatGS.
         transfer_name : gname;
         tbound_name : gname;
         owner_name : gname;
-        credit_name : gname;
+        progress_name : gname;
       }.
 
   Definition osatΣ `{SI : indexT} `{WF : WFOCM.pack A} (ps T : Type) : gFunctors :=
@@ -52,7 +52,7 @@ Import osatGS.
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances osat_inG
-  osatGpreS_goal osatGpreS_status osatGpreS_transfer osatGpreS_tbound osatGpreS_owner osatGpreS_credit.
+  osatGpreS_goal osatGpreS_status osatGpreS_transfer osatGpreS_tbound osatGpreS_owner osatGpreS_progress.
 
 (* Goals *)
 Definition goal_unfold `{SI : indexT} {Σ} (R : iProp Σ) : later (iProp Σ) := Next R.
@@ -106,16 +106,16 @@ Definition oblG_owner `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl
 Global Typeclasses Opaque oblG_owner.
 Global Instance: Params (@oblG_owner) 8 := {}.
 
-(* Credit: manage credits for logical progress *)
-Definition oblG_credit `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) : iProp Σ :=
-  own credit_name (reservation_map_data i (cash a)).
-Global Typeclasses Opaque oblG_credit.
-Global Instance: Params (@oblG_credit) 8 := {}.
+(* Progress: manage credits for logical progress *)
+Definition oblG_progress `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) : iProp Σ :=
+  own progress_name (reservation_map_data i (cash a)).
+Global Typeclasses Opaque oblG_progress.
+Global Instance: Params (@oblG_progress) 8 := {}.
 
-Definition oblG_credit_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) (q : Qp) : iProp Σ :=
-  own credit_name (reservation_map_data i (debt a q)).
-Global Typeclasses Opaque oblG_credit_supply.
-Global Instance: Params (@oblG_credit_supply) 8 := {}.
+Definition oblG_progress_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) (q : Qp) : iProp Σ :=
+  own progress_name (reservation_map_data i (debt a q)).
+Global Typeclasses Opaque oblG_progress_supply.
+Global Instance: Params (@oblG_progress_supply) 8 := {}.
 
 (* Global invariant for the obligation ghost state. *)
 Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_class A ps T} (Ω : obl_states) : iProp Σ :=
@@ -129,7 +129,7 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_cl
      (own transfer_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own tbound_name (reservation_map_token (A:=agreeR (leibnizO A)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
-     (own credit_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (own progress_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      ([∗ map] i ↦ o ∈ Ω,
         match o with
         | obl_live d =>
@@ -137,13 +137,13 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_cl
             (∃ l', ⌜ WFOCM.leR l' (obl_transfer d) ⌝ ∗ oblG_transfer_supply i l' (1/2)%Qp) ∗
             (∃ m, ⌜ WFOCM.leR (obl_transfer d) m ⌝ ∗ oblG_transfer_bound i m) ∗
             (oblG_owner i (obl_owner d) (1/2)%Qp) ∗
-            (∃ a', ⌜ WFOCM.leR a' (obl_credit d) ⌝ ∗ oblG_credit_supply i a' (1/2)%Qp)
+            (∃ a', ⌜ WFOCM.leR a' (obl_progress d) ⌝ ∗ oblG_progress_supply i a' (1/2)%Qp)
         | obl_done P1 =>
             ∃ P2 R, oblG_goal i P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
                     oblG_done_auth i ∗
                     (∃ l, oblG_transfer_supply i l 1) ∗
                     (∃ t, oblG_owner i t 1) ∗
-                    (∃ a, oblG_credit_supply i a 1)
+                    (∃ a, oblG_progress_supply i a 1)
       end)
     )%I.
 
@@ -346,92 +346,92 @@ Section osat.
   (*   iExists a2. subst. iModIntro. iSplitR; done. *)
   (* Qed. *)
 
-  (* (* oblG_credit rules *) *)
+  (* (* oblG_progress rules *) *)
 
-  (* Lemma oblG_credit_eq i a0 a1 : *)
+  (* Lemma oblG_progress_eq i a0 a1 : *)
   (*   a0 /= a1 → *)
-  (*   oblG_credit i a0 = oblG_credit i a1. *)
-  (* Proof. intros EQ. rewrite /oblG_credit. by erewrite cash_eq. Qed. *)
+  (*   oblG_progress i a0 = oblG_progress i a1. *)
+  (* Proof. intros EQ. rewrite /oblG_progress. by erewrite cash_eq. Qed. *)
 
-  (* Lemma oblG_credit_eq_list L a0 a1 : *)
+  (* Lemma oblG_progress_eq_list L a0 a1 : *)
   (*   a0 /= a1 → *)
-  (*   ([∗ list] i ∈ L, oblG_credit i a0)%I ≡ ([∗ list] i ∈ L, oblG_credit i a1)%I. *)
-  (* Proof. intros. apply big_opL_proper. intros. erewrite oblG_credit_eq; eauto. Qed. *)
+  (*   ([∗ list] i ∈ L, oblG_progress i a0)%I ≡ ([∗ list] i ∈ L, oblG_progress i a1)%I. *)
+  (* Proof. intros. apply big_opL_proper. intros. erewrite oblG_progress_eq; eauto. Qed. *)
 
-  (* Lemma oblG_credit_mon i a0 a1 : *)
+  (* Lemma oblG_progress_mon i a0 a1 : *)
   (*   a0 /≤ a1 → *)
-  (*   oblG_credit i a1 ⊢ |==> oblG_credit i a0. *)
+  (*   oblG_progress i a1 ⊢ |==> oblG_progress i a0. *)
   (* Proof. *)
-  (*   intros LE. rewrite /oblG_credit. apply own_update. *)
+  (*   intros LE. rewrite /oblG_progress. apply own_update. *)
   (*   apply reservation_map_update. *)
   (*   apply prod_update; [simpl | reflexivity]. apply prod_update; [reflexivity | simpl]. *)
   (*   by apply cash_update. *)
   (* Qed. *)
 
-  (* Lemma oblG_credit_split i a0 a1 : *)
-  (*   oblG_credit i (a0 /+ a1) ⊣⊢ oblG_credit i a0 ∗ oblG_credit i a1. *)
+  (* Lemma oblG_progress_split i a0 a1 : *)
+  (*   oblG_progress i (a0 /+ a1) ⊣⊢ oblG_progress i a0 ∗ oblG_progress i a1. *)
   (* Proof. *)
-  (*   rewrite /oblG_credit. iSplit; [iIntros "H" | iIntros "[H1 H2]"]. *)
+  (*   rewrite /oblG_progress. iSplit; [iIntros "H" | iIntros "[H1 H2]"]. *)
   (*   - iEval (rewrite -cash_add) in "H". iApply own_op. *)
   (*     iApply own_mono; [| iFrame]. rewrite reservation_map_data_op -!pair_op !left_id_L. done. *)
   (*   - iEval (rewrite -cash_add). iPoseProof (own_op with "[H1 H2]") as "H"; first (iSplitL "H1"; iFrame). *)
   (*     iEval (rewrite reservation_map_data_op -!pair_op left_id_L) in "H". done. *)
   (* Qed. *)
 
-  (* Lemma oblG_credit_split_list L a0 a1 : *)
-  (*   ([∗ list] i ∈ L, oblG_credit i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, oblG_credit i a0) ∗ ([∗ list] i ∈ L, oblG_credit i a1). *)
+  (* Lemma oblG_progress_split_list L a0 a1 : *)
+  (*   ([∗ list] i ∈ L, oblG_progress i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, oblG_progress i a0) ∗ ([∗ list] i ∈ L, oblG_progress i a1). *)
   (* Proof. *)
   (*   rewrite -big_sepL_sep. iSplit; iIntros "H". *)
-  (*   - iApply (big_sepL_impl with "H"). iModIntro. iIntros. by iApply oblG_credit_split. *)
-  (*   - iApply (big_sepL_impl with "H"). iModIntro. iIntros. by iApply oblG_credit_split. *)
+  (*   - iApply (big_sepL_impl with "H"). iModIntro. iIntros. by iApply oblG_progress_split. *)
+  (*   - iApply (big_sepL_impl with "H"). iModIntro. iIntros. by iApply oblG_progress_split. *)
   (* Qed. *)
 
-  (* Lemma oblG_credit_mon_split i a0 a1 a2 : *)
+  (* Lemma oblG_progress_mon_split i a0 a1 a2 : *)
   (*   a0 /+ a1 /≤ a2 → *)
-  (*   oblG_credit i a2 ⊢ |==> oblG_credit i a0 ∗ oblG_credit i a1. *)
+  (*   oblG_progress i a2 ⊢ |==> oblG_progress i a0 ∗ oblG_progress i a1. *)
   (* Proof. *)
-  (*   intros LE. iIntros "H". iApply oblG_credit_split. iApply oblG_credit_mon; done. *)
+  (*   intros LE. iIntros "H". iApply oblG_progress_split. iApply oblG_progress_mon; done. *)
   (* Qed. *)
 
-  (* Lemma oblG_credit_mon_split_list L a0 a1 a2 : *)
+  (* Lemma oblG_progress_mon_split_list L a0 a1 a2 : *)
   (*   a0 /+ a1 /≤ a2 → *)
-  (*   ([∗ list] i ∈ L, oblG_credit i a2) ⊢ |==> ([∗ list] i ∈ L, oblG_credit i a0) ∗ ([∗ list] i ∈ L, oblG_credit i a1). *)
+  (*   ([∗ list] i ∈ L, oblG_progress i a2) ⊢ |==> ([∗ list] i ∈ L, oblG_progress i a0) ∗ ([∗ list] i ∈ L, oblG_progress i a1). *)
   (* Proof. *)
   (*   iIntros (LE) "H". rewrite -big_sepL_sep -big_sepL_bupd. iApply (big_sepL_impl with "H"). *)
-  (*   iModIntro. iIntros. by iApply oblG_credit_mon_split. *)
+  (*   iModIntro. iIntros. by iApply oblG_progress_mon_split. *)
   (* Qed. *)
 
-  (* Lemma oblG_credit_supply_add i a0 a1 q0 q1 : *)
-  (*   oblG_credit_supply i a0 q0 ∗ oblG_credit_supply i a1 q1 *)
-  (*   ⊢ ∃ b, oblG_credit_supply i b (q0 + q1) ∗ ⌜ b /≤ a0 ∧ b /≤ a1 ⌝. *)
+  (* Lemma oblG_progress_supply_add i a0 a1 q0 q1 : *)
+  (*   oblG_progress_supply i a0 q0 ∗ oblG_progress_supply i a1 q1 *)
+  (*   ⊢ ∃ b, oblG_progress_supply i b (q0 + q1) ∗ ⌜ b /≤ a0 ∧ b /≤ a1 ⌝. *)
   (* Proof. *)
-  (*   rewrite /oblG_credit_supply. iIntros "[H1 H2]". *)
+  (*   rewrite /oblG_progress_supply. iIntros "[H1 H2]". *)
   (*   iPoseProof (own_op with "[H1 H2]") as "H"; first (iSplitL "H1"; iFrame). *)
   (*   iEval (rewrite reservation_map_data_op -!pair_op left_id_L) in "H". *)
   (*   destruct (debt_add a0 a1 q0 q1) as (b&Heq&Hle0&Hle1). rewrite Heq. *)
   (*   iExists b. iSplitL; done. *)
   (* Qed. *)
 
-  (* Lemma oblG_credit_supply_split i a q0 q1 : *)
-  (*   oblG_credit_supply i a (q0 + q1) ⊢ oblG_credit_supply i a q0 ∗ oblG_credit_supply i a q1. *)
+  (* Lemma oblG_progress_supply_split i a q0 q1 : *)
+  (*   oblG_progress_supply i a (q0 + q1) ⊢ oblG_progress_supply i a q0 ∗ oblG_progress_supply i a q1. *)
   (* Proof. *)
-  (*   rewrite /oblG_credit_supply. iIntros "H". *)
+  (*   rewrite /oblG_progress_supply. iIntros "H". *)
   (*   iApply own_op. iEval (rewrite reservation_map_data_op -!pair_op left_id_L). *)
   (*   rewrite debt_split. done. *)
   (* Qed. *)
 
-  (* Lemma oblG_credit_supply_issue i a0 a1 : *)
-  (*   oblG_credit_supply i a0 1 ⊢ |==> oblG_credit_supply i (a0 /+ a1) 1 ∗ oblG_credit i a1. *)
+  (* Lemma oblG_progress_supply_issue i a0 a1 : *)
+  (*   oblG_progress_supply i a0 1 ⊢ |==> oblG_progress_supply i (a0 /+ a1) 1 ∗ oblG_progress i a1. *)
   (* Proof. *)
-  (*   rewrite /oblG_credit_supply -own_op. apply own_update. *)
+  (*   rewrite /oblG_progress_supply -own_op. apply own_update. *)
   (*   rewrite reservation_map_data_op. apply reservation_map_update. *)
   (*   apply prod_update; [simpl | reflexivity]. apply prod_update; simpl. *)
   (*   { by rewrite -pair_op left_id_L. } *)
   (*   apply debt_owe. *)
   (* Qed. *)
 
-  (* Lemma oblG_credit_pay i a0 a1 q : *)
-  (*   oblG_credit_supply i a0 q ∗ oblG_credit i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ oblG_credit_supply i a2 q. *)
+  (* Lemma oblG_progress_pay i a0 a1 q : *)
+  (*   oblG_progress_supply i a0 q ∗ oblG_progress i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ oblG_progress_supply i a2 q. *)
   (* Proof. *)
   (*   rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)". *)
   (*   { rewrite reservation_map_data_op -!pair_op. *)
@@ -571,10 +571,10 @@ Section osat.
   (*   iIntros "Ho". iDestruct "Ho" as (Obls) "(%HO & Hoa & Hom)". *)
   (*   iMod (@own_unit _ _ _ osatGpreS_state state_name) as "HU". *)
   (*   iMod ((@own_updateP _ _ _ osatGpreS_state _ state_name) with "HU") as "H". *)
-  (*   { apply (alloc_updateP_cofinite' ∅ ((credit_bound a ⋅ credit a : bcred (H:=WFOCM.ocm)), ●MN 0, ●MN 0) (dom Ω)). *)
+  (*   { apply (alloc_updateP_cofinite' ∅ ((progress_bound a ⋅ progress a : bcred (H:=WFOCM.ocm)), ●MN 0, ●MN 0) (dom Ω)). *)
   (*     rewrite pair_valid. split; [| apply mono_nat_auth_valid]. *)
   (*     rewrite pair_valid. split; [| apply mono_nat_auth_valid]. *)
-  (*     apply credit_bound_credit_valid_eq. *)
+  (*     apply progress_bound_progress_valid_eq. *)
   (*   } *)
   (*   iSimpl. iDestruct "H" as (a' (i & NIN & Ha' & _)) "H". rewrite insert_empty in Ha'. subst a'. *)
   (*   iAssert (oblG_transfer_supply i a ∗ oblG_transfer i a ∗ oblG_idle i (1/2 + 1/2/2)%Qp ∗ oblG_idle i (1/2/2)%Qp ∗ oblG_live i (1/2 + 1/2/2)%Qp ∗ oblG_live i (1/2/2)%Qp)%I *)

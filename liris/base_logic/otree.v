@@ -94,8 +94,9 @@ Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
         ([∗ map] i ↦ C ∈ OTree,
            (own edge_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) C))) ∗
            ((* This obligation is live with enough transfer and credits for chiledren and... *)
-             ((∃ l c, oblG_transfer_supply i l (1/2)%Qp ∗ oblG_credit_supply i c (1/2)%Qp ∗
-                      ([∗ set] j ∈ (dom C), ∃ l' c', ⌜ WFOCM.leR l l' ∧ WFOCM.leR c c' ⌝ ∗ oblG_transfer j l' ∗ oblG_credit j c')
+             ((∃ l c, oblG_transfer_supply i l (1/2)%Qp ∗ oblG_progress_supply i c (1/2)%Qp ∗
+                      ([∗ set] j ∈ (dom C),
+                         ∃ l' c', ⌜ WFOCM.leR l l' ∧ WFOCM.leR c c' ⌝ ∗ oblG_transfer j l' ∗ oblG_progress j c')
               ) ∗
               (* is a root or... *)
               (∃ τ, ⌜ root OTree i ∧ OOwner !! i = Some τ ⌝ ∗
@@ -106,7 +107,7 @@ Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
                         (∃ x, otreeG_suspend i x τ π ∗ otreeG_wait i x (1/2)%Qp))
              ) ∨
                (* Or this obligation is done *)
-               (oblG_done i ∗ ⌜ in_labels OTree i ≡ ε ∧ C = ∅ ⌝)
+               (oblG_done i ∗ ⌜ root OTree i ∧ C = ∅ ⌝)
         ))
     )%I.
 
