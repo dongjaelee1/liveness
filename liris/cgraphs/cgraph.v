@@ -404,6 +404,13 @@ Section cgraph.
     Definition insert_edge (g : cgraph V L) (v1 v2 : V) (l : L) :=
       <[ v1 := <[ v2 := l ]> $ out_edges g v1 ]> g.
 
+    Lemma insert_edge_dom g v1 v2 l :
+      is_Some (g !! v1) → dom (insert_edge g v1 v2 l) = dom g.
+    Proof using.
+      unfold insert_edge, out_edges. intros [? ?]. rewrite H0.
+      rewrite dom_insert_L. apply elem_of_dom_2 in H0. set_solver.
+    Qed.
+
     Lemma out_edges_insert_edge (g : cgraph V L) (v1 v2 v3 : V) (l : L) :
       out_edges (insert_edge g v1 v2 l) v3 =
         if decide (v1 = v3) then <[ v2 := l ]> $ out_edges g v3
@@ -546,6 +553,13 @@ Section cgraph.
   Section delete_edge.
     Definition delete_edge (g : cgraph V L) (v1 v2 : V) :=
       <[ v1 := delete v2 (out_edges g v1) ]> g.
+
+    Lemma delete_edge_dom g v1 v2 :
+      is_Some (g !! v1) → dom (delete_edge g v1 v2) = dom g.
+    Proof using.
+      unfold delete_edge, out_edges. intros [? ?]. rewrite H0.
+      rewrite dom_insert_L. apply elem_of_dom_2 in H0. set_solver.
+    Qed.
 
     Lemma out_edges_delete_edge (g : cgraph V L) (v1 v2 v3 : V) :
       out_edges (delete_edge g v1 v2) v3 =
@@ -897,6 +911,15 @@ Section cgraph.
       | None => g
       end.
 
+    Lemma move_edge_dom g v1 v2 v3 :
+      is_Some (g !! v1) → is_Some (g !! v2) → dom (move_edge g v1 v2 v3) = dom g.
+    Proof using.
+      unfold move_edge. intros. destruct (out_edges g v1 !! v3); auto.
+      rewrite insert_edge_dom; cycle 1.
+      { apply elem_of_dom. rewrite delete_edge_dom; auto. by apply elem_of_dom. }
+      by apply delete_edge_dom.
+    Qed.
+
     Lemma move_edge_out_edges g v1 v2 v3 v l :
       out_edges g v1 !! v3 = Some l ->
       out_edges (move_edge g v1 v2 v3) v =
@@ -1090,12 +1113,13 @@ Section cgraph.
       e1 ##ₘ e2 ->
       out_edges g v1 = e1 ∪ e2 ->
       ∃ g', cgraph_wf g' ∧
-        ¬ uconn g' v1 v2 ∧
-        (∀ v, out_edges g' v =
-          if decide (v = v1) then e1
-          else if decide (v = v2) then out_edges g v ∪ e2
-          else out_edges g v) ∧
-        (∀ v, in_labels g' v ≡ in_labels g v).
+            ¬ uconn g' v1 v2 ∧
+            (∀ v, out_edges g' v =
+                  if decide (v = v1) then e1
+                  else if decide (v = v2) then out_edges g v ∪ e2
+                       else out_edges g v) ∧
+            (∀ v, in_labels g' v ≡ in_labels g v) ∧
+            (is_Some (g !! v1) → is_Some (g !! v2) → dom g' = dom g).
     Proof using.
       revert g e1.
       induction e2 using map_ind; intros g e1;
@@ -1125,7 +1149,7 @@ Section cgraph.
              rewrite delete_insert_eq; eauto.
              rewrite !delete_id; eauto.
              solve_map_disjoint.
-        + destruct H1 as (H1 & H2 & H3 & H4).
+        + destruct H1 as (H1 & H2 & H3 & H4 & Hdom).
           exists x0. split_and!; eauto.
           -- intros v. rewrite H3.
              assert (out_edges g v1 !! i = Some x).
@@ -1148,6 +1172,10 @@ Section cgraph.
              ++ erewrite move_edge_out_edges; eauto.
                 repeat case_decide; simplify_eq. done.
           -- intros v. rewrite H4. rewrite move_edge_in_labels'; eauto.
+          -- intros. rewrite Hdom.
+             ++ rewrite move_edge_dom; auto.
+             ++ apply elem_of_dom. rewrite move_edge_dom; auto. by apply elem_of_dom.
+             ++ apply elem_of_dom. rewrite move_edge_dom; auto. by apply elem_of_dom.
     Qed.
 
     Lemma move_edges' g v1 v2 e1 e2 :
@@ -1156,14 +1184,15 @@ Section cgraph.
       e1 ##ₘ e2 ->
       out_edges g v1 = e1 ∪ e2 ->
       ∃ g', cgraph_wf g' ∧
-        ¬ uconn g' v1 v2 ∧
-        out_edges g' v1 = e1 ∧
-        out_edges g' v2 = out_edges g v2 ∪ e2 ∧
-        (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v = out_edges g v) ∧
-        (∀ v, in_labels g' v ≡ in_labels g v).
+            ¬ uconn g' v1 v2 ∧
+            out_edges g' v1 = e1 ∧
+            out_edges g' v2 = out_edges g v2 ∪ e2 ∧
+            (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v = out_edges g v) ∧
+            (∀ v, in_labels g' v ≡ in_labels g v) ∧
+            (is_Some (g !! v1) → is_Some (g !! v2) → dom g' = dom g).
     Proof using.
       intros.
-      edestruct move_edges as (?&?&?&?&?); eauto.
+      edestruct move_edges as (?&?&?&?&?&?); eauto.
       eexists. split_and!; eauto.
       - specialize (H6 v1). case_decide; simplify_eq; done.
       - specialize (H6 v2). repeat case_decide; simplify_eq; done.
@@ -1178,11 +1207,12 @@ Section cgraph.
       e1 ##ₘ e2 ->
       out_edges g v1 ∪ out_edges g v2 = e1 ∪ e2 ->
       ∃ g', cgraph_wf g' ∧
-        ¬ uconn g' v1 v2 ∧
-        out_edges g' v1 = e1 ∧
-        out_edges g' v2 = e2 ∧
-        (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v = out_edges g v) ∧
-        (∀ v, in_labels g' v ≡ in_labels g v).
+            ¬ uconn g' v1 v2 ∧
+            out_edges g' v1 = e1 ∧
+            out_edges g' v2 = e2 ∧
+            (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v = out_edges g v) ∧
+            (∀ v, in_labels g' v ≡ in_labels g v) ∧
+            (is_Some (g !! v1) → is_Some (g !! v2) → dom g' = dom g).
     Proof using.
       intros Hwf Hnuconn Hdisj Hsplit.
       assert (out_edges g v1 ##ₘ out_edges g v2) as Hdisj'.
@@ -1192,13 +1222,13 @@ Section cgraph.
             ? & ? & HH1 & HH2); eauto; subst.
 
       destruct (move_edges' g v1 v2 e11 e12)
-        as (g' & Hwf' & Hnuconn' & Hv1 & Hv2 & Hv & Hin); eauto.
+        as (g' & Hwf' & Hnuconn' & Hv1 & Hv2 & Hv & Hin & Hdom); eauto.
       rewrite <-H1 in Hv2.
       rewrite <-assoc_L in Hv2; last apply _.
       rewrite map_union_comm in Hv2; last solve_map_disjoint.
 
       destruct (move_edges' g' v2 v1 (e22 ∪ e12) e21)
-        as (g'' & Hwf'' & Hnuconn'' & Hv1' & Hv2' & Hv' & Hin'); eauto.
+        as (g'' & Hwf'' & Hnuconn'' & Hv1' & Hv2' & Hv' & Hin' & Hdom'); eauto.
       { intro. apply Hnuconn'. symmetry. done. }
       { solve_map_disjoint. }
 
@@ -1208,6 +1238,9 @@ Section cgraph.
       - rewrite Hv1'. rewrite map_union_comm; eauto.
       - intros. rewrite Hv'; eauto.
       - intros. rewrite Hin'. eauto.
+      - intros. specialize (Hdom H2 H3). rewrite Hdom'; auto.
+        + apply elem_of_dom. rewrite Hdom. by apply elem_of_dom.
+        + apply elem_of_dom. rewrite Hdom. by apply elem_of_dom.
     Qed.
   End exchange.
 
@@ -1222,11 +1255,12 @@ Section cgraph.
         out_edges g' v2 = e2 ∧
         (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v = out_edges g v) ∧
         in_labels g' v2 ≡ {[ l ]} ⋅ in_labels g v2 ∧
-        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v).
+        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v) ∧
+        (is_Some (g !! v1) → is_Some (g !! v2) → dom g' = dom g).
     Proof using.
       intros Hwf Hnuconn Hdisj Hsplit.
       destruct (exchange g v1 v2 e1 e2)
-        as (g' & Hwf' & Hnuconn' & Hout1 & Hout2 & Hrest & Hin); eauto.
+        as (g' & Hwf' & Hnuconn' & Hout1 & Hout2 & Hrest & Hin & Hdom); eauto.
       exists (insert_edge g' v1 v2 l).
       split_and!.
       - eapply insert_edge_wf; eauto.
@@ -1240,6 +1274,8 @@ Section cgraph.
       - intros. rewrite in_labels_insert_edge.
         + sdec. rewrite Hin. done.
         + intro. eapply Hnuconn'. eapply rtc_once. left. done.
+      - intros. specialize (Hdom H0 H1). rewrite insert_edge_dom; auto.
+        apply elem_of_dom. rewrite Hdom. by apply elem_of_dom.
     Qed.
   End exchange_alloc.
 
@@ -1256,11 +1292,12 @@ Section cgraph.
         out_edges g' v2 = e2 ∧
         (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v = out_edges g v) ∧
         (∀ x, in_labels g v2 ≡ {[ l ]} ⋅ x -> in_labels g' v2 ≡ x) ∧
-        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v).
+        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v) ∧
+        (is_Some (g !! v1) → is_Some (g !! v2) → dom g' = dom g).
     Proof using.
       intros Hwf H1 Hdisj Hsplit.
       destruct (exchange (delete_edge g v1 v2) v1 v2 e1 e2)
-        as (g' & Hwf' & Hnuconn' & Hout1 & Hout2 & Hrest & Hin).
+        as (g' & Hwf' & Hnuconn' & Hout1 & Hout2 & Hrest & Hin & Hdom).
       - eapply delete_edge_wf; eauto.
       - eapply delete_edge_uconn; eauto using some_edge_L.
       - eauto.
@@ -1272,6 +1309,10 @@ Section cgraph.
         + intros. rewrite Hin. rewrite in_labels_delete_edge_eq; last done; eauto.
         + intros. rewrite Hin.
           rewrite in_labels_delete_edge_neq; eauto.
+        + intros. rewrite Hdom.
+          -- rewrite delete_edge_dom; auto.
+          -- apply elem_of_dom. rewrite delete_edge_dom; auto. by apply elem_of_dom.
+          -- apply elem_of_dom. rewrite delete_edge_dom; auto. by apply elem_of_dom.
     Qed.
   End exchange_dealloc.
 
@@ -1286,11 +1327,12 @@ Section cgraph.
         out_edges g' v2 = e2 ∧
         (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v = out_edges g v) ∧
         (∀ x, in_labels g v2 ≡ {[ l ]} ⋅ x -> in_labels g' v2 ≡ {[ l' ]} ⋅ x) ∧
-        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v).
+        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v) ∧
+        (is_Some (g !! v1) → is_Some (g !! v2) → dom g' = dom g).
     Proof using.
       intros Hwf H1 Hdisj Hsplit.
       destruct (exchange_dealloc g v1 v2 e1 e2 l)
-        as (g' & Hwf' & Hnuconn' & Hout1 & Hout2 & Hrest & Hin2 & Hin); eauto.
+        as (g' & Hwf' & Hnuconn' & Hout1 & Hout2 & Hrest & Hin2 & Hin & Hdom); eauto.
       exists (insert_edge g' v1 v2 l').
       split_and!; eauto.
       - eapply insert_edge_wf; eauto.
@@ -1305,6 +1347,8 @@ Section cgraph.
       - intros. rewrite in_labels_insert_edge.
         + sdec. rewrite Hin; done.
         + intro. eapply Hnuconn'. eapply rtc_once. left. done.
+      - intros. specialize (Hdom H0 H2). rewrite insert_edge_dom; auto.
+        apply elem_of_dom. rewrite Hdom. by apply elem_of_dom.
     Qed.
   End exchange_relabel.
 
@@ -1320,18 +1364,20 @@ Section cgraph.
         out_edges g' v2 ≡ e2 ∧
         (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v ≡ out_edges g v) ∧
         in_labels g' v2 ≡ {[ l ]} ⋅ in_labels g v2 ∧
-        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v).
+        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v) ∧
+        (is_Some (g !! v1) → is_Some (g !! v2) → dom g' ≡ dom g).
     Proof using.
       intros Hwf Hnuconn Hdisj Hsplit.
       eapply map_union_equiv_eq in Hsplit as (y' & z' & Hsplit & Hy' & Hz').
       destruct (exchange_alloc g v1 v2 y' z' l)
-        as (?&?&?&?&?&?&?); eauto.
+        as (?&?&?&?&?&?&?&?); eauto.
       { rewrite Hy' Hz' //. }
       exists x.
       split_and!; eauto.
       - rewrite H1 Hy' //.
       - rewrite H2 Hz' //.
       - intros. rewrite H3 //.
+      - intros. rewrite H6; auto.
     Qed.
 
     Lemma exchange_dealloc_S g v1 v2 e1 e2 l :
@@ -1345,13 +1391,14 @@ Section cgraph.
         out_edges g' v2 ≡ e2 ∧
         (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v ≡ out_edges g v) ∧
         (∀ x, in_labels g v2 ≡ {[ l ]} ⋅ x -> in_labels g' v2 ≡ x) ∧
-        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v).
+        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v) ∧
+        (is_Some (g !! v1) → is_Some (g !! v2) → dom g' ≡ dom g).
     Proof using.
       intros Hwf Hout1 Hdisj Hsplit.
       eapply Some_equiv_eq in Hout1 as (y' & Hout1 & Hy').
       eapply map_union_equiv_eq in Hsplit as (y2' & z' & Hsplit & Hy2' & Hz').
       destruct (exchange_dealloc g v1 v2 y2' z' y')
-        as (?&?&?&?&?&?&?&?); eauto.
+        as (?&?&?&?&?&?&?&?&Hdom); eauto.
       { rewrite Hy2' Hz' //. }
       eexists x.
       split_and!; eauto.
@@ -1359,6 +1406,7 @@ Section cgraph.
       - rewrite H3 //.
       - intros. rewrite H4 //.
       - intros. rewrite <-Hy' in H7. rewrite H5; last done. done.
+      - intros. rewrite Hdom; auto.
     Qed.
 
     Lemma exchange_relabel_S g v1 v2 e1 e2 l l' :
@@ -1371,7 +1419,8 @@ Section cgraph.
         out_edges g' v2 ≡ e2 ∧
         (∀ v, v ≠ v1 -> v ≠ v2 -> out_edges g' v ≡ out_edges g v) ∧
         (∀ x, in_labels g v2 ≡ {[ l ]} ⋅ x -> in_labels g' v2 ≡ {[ l' ]} ⋅ x) ∧
-        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v).
+        (∀ v, v ≠ v2 -> in_labels g' v ≡ in_labels g v) ∧
+        (is_Some (g !! v1) → is_Some (g !! v2) → dom g' ≡ dom g).
     Proof using.
       intros Hwf H1 Hdisj Hsplit.
       assert (∃ l2, l ≡ l2 ∧ out_edges g v1 !! v2 = Some l2)
@@ -1391,13 +1440,14 @@ Section cgraph.
         rewrite Hz'. done.
       }
       destruct (exchange_relabel g v1 v2 e1' e2' l2 l')
-        as (g' & Hwf' & Hv1' & Hv2' & Hrest' & Hin2' & Hin'); eauto.
+        as (g' & Hwf' & Hv1' & Hv2' & Hrest' & Hin2' & Hin' & Hdom'); eauto.
       exists g'. split_and!; eauto.
       - rewrite Hv1'. rewrite He1. done.
       - rewrite Hv2'. done.
       - intros. rewrite Hrest'; eauto.
       - intros. rewrite Hin2'; first done.
         rewrite H0. rewrite Hl2. done.
+      - intros. by rewrite Hdom'.
     Qed.
   End setoids.
 

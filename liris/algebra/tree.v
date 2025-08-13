@@ -26,6 +26,10 @@ Section tree.
 
   (** Properties *)
 
+  Lemma parent_edge t v π :
+    parent t v π ↔ edge t π v.
+  Proof using. rewrite /parent /edge /children. apply elem_of_dom. Qed.
+
   Global Instance map_Exists_out_edges_Decision v : ∀ t, Decision (map_Exists (λ u _, v ∈ dom (out_edges t u)) t).
   Proof using. intros. eapply map_Exists_dec. intros. solve_decision. Qed.
 
