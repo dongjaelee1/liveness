@@ -54,27 +54,29 @@ Definition obl_state_step `{Δ : obl_class} (s : obl_ps) : relation obl_state :=
      | _, _ => False
      end) ∨ obl_state_progress o1 o2.
 
+(** To a map *)
+
 Definition obl_id := positive.
 
 Notation obl_ids := (gset obl_id).
 Notation obl_states := (gmap obl_id obl_state).
-Notation obl_states' Δ := (gmap obl_id (obl_state (Δ:=Δ))).
+(* Notation obl_states' Δ := (gmap obl_id (obl_state (Δ:=Δ))). *)
 
-Definition obl_states_progress `{Δ : obl_class} : relation obl_states :=
-  λ Ω1 Ω2, map_Forall2 (λ _ o1 o2, obl_state_progress o1 o2) Ω1 Ω2.
+Definition obl_states_progress `{Δ : obl_class} (C : obl_id → obl_state → Prop) : relation obl_states :=
+  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, (C k o1 → obl_state_progress o1 o2) ∧ ((¬ C k o1) → o1 = o2)) Ω1 Ω2.
 
-Infix "↪ₚ" := (obl_states_progress) (at level 20).
+Notation "A ↪ₚ B | C" := (obl_states_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
 (* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
-Infix "↪ₚ⁺" := (tc (obl_states_progress)) (at level 20).
-Infix "↪ₚ⋆" := (rtc (obl_states_progress)) (at level 20).
+Notation "A ↪ₚ⁺ B | C" := (tc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⁺  B  |  C").
+Notation "A ↪ₚ⋆ B | C" := (rtc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⋆  B  |  C").
 
-Definition obl_states_step_one `{Δ : obl_class} (s : obl_ps) (k : obl_id) : relation obl_states :=
-  λ Ω1 Ω2, map_Forall2 (λ v o1 o2, if decide (v = k) then obl_state_step s o1 o2 else o1 = o2) Ω1 Ω2.
+Definition obl_states_step `{Δ : obl_class} (s : obl_ps) (C : obl_id → obl_state → Prop) : relation obl_states :=
+  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, (C k o1 → obl_state_step s o1 o2) ∧ ((¬ C k o1) → o1 = o2)) Ω1 Ω2.
 
-Notation "a ↪ₒ b @ s , x" := (obl_states_step_one s x a b) (at level 20, format "a  ↪ₒ  b  @  s ,  x ").
+Notation "A ↪ₛ B @ s | C" := (obl_states_step s C A B) (at level 20, format "A  ↪ₛ  B  @  s  |  C").
 (* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
-Notation "a ↪ₒ⁺ b @ s , x" := (tc (obl_states_step_one s x) a b) (at level 20, format "a  ↪ₒ⁺  b  @  s ,  x ").
-Notation "a ↪ₒ⋆ b @ s , x" := (rtc (obl_states_step_one s x) a b) (at level 20, format "a  ↪ₒ⋆  b  @  s ,  x ").
+Notation "A ↪ₛ⁺ B @ s | C" := (tc (obl_states_step s C) A B) (at level 20, format "A  ↪ₛ⁺  B  @  s  |  C").
+Notation "A ↪ₛ⋆ B @ s | C" := (rtc (obl_states_step s C) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s  |  C").
 
 Definition obl_states_alloc `{Δ : obl_class} : relation obl_states :=
   λ Ω1 Ω2, ∃ k d, Ω1 !! k = None ∧ Ω2 = <[k:=obl_live d]> Ω1.
@@ -84,17 +86,17 @@ Infix "↪ₐ" := (obl_states_alloc) (at level 20).
 Infix "↪ₐ⁺" := (tc obl_states_alloc) (at level 20).
 Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 
-Variant obl_states_step `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
-  | obl_states_step_alloc Ω1 Ω2 :
-    Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2
-  | obl_states_step_step_one k Ω1 Ω2 :
-    Ω1 ↪ₒ Ω2 @ s, k → obl_states_step s Ω1 Ω2.
+Variant obl_states_transition `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
+  | obl_states_transition_alloc Ω1 Ω2 :
+    Ω1 ↪ₐ Ω2 → obl_states_transition s Ω1 Ω2
+  | obl_states_transition_step C Ω1 Ω2 :
+    Ω1 ↪ₛ Ω2 @ s | C → obl_states_transition s Ω1 Ω2.
 
-Notation "a ↪ₛ b @ s" := (obl_states_step s a b) (at level 20, format "a  ↪ₛ  b  @  s").
+Notation "A ↪ₜ B @ s" := (obl_states_transition s A B) (at level 20, format "A  ↪ₜ  B  @  s").
 (* We use the transitive closure.
    It's normalization is equivalent to normalization of source_rel. *)
-Notation "a ↪ₛ⁺ b @ s" := ((tc (obl_states_step s)) a b) (at level 20, format "a  ↪ₛ⁺  b  @  s").
-Notation "a ↪ₛ⋆ b @ s" := ((rtc (obl_states_step s)) a b) (at level 20, format "a  ↪ₛ⋆  b  @  s").
+Notation "A ↪ₜ⁺ B @ s" := ((tc (obl_states_transition s)) A B) (at level 20, format "A  ↪ₜ⁺  B  @  s").
+Notation "A ↪ₜ⋆ B @ s" := ((rtc (obl_states_transition s)) A B) (at level 20, format "A  ↪ₜ⋆  B  @  s").
 
 Section obl_states.
   Context `{Δ : obl_class}.

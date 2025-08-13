@@ -98,7 +98,7 @@ Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
   (D : gset obl_id) : iProp Σ :=
   locked
-    (∃ (OTree : cgraph obl_id unitO) (OOwner : gmap obl_id positive),
+    (∃ (OTree : cgraph obl_id unitO) (OOwner : gmap obl_id (option positive)),
         (⌜ dom OTree = D ∧ dom OOwner = D ∧ cgraph_wf OTree ⌝) ∗
         (⌜ ∀ π k, descendant OTree π k → OOwner !! π = OOwner !! k ⌝) ∗
         (own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset D))) ∗
@@ -110,17 +110,17 @@ Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
                          ∃ α' β', ⌜ WFOCM.leR α α' ∧ WFOCM.leR β β' ⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')
               ) ∗
               (* is a root or... *)
-              (∃ θ, ⌜ root OTree k ∧ OOwner !! k = Some θ ⌝ ∗
+              (∃ θ, ⌜ root OTree k ∧ OOwner !! k = Some (Some θ) ⌝ ∗
                     oblG_owner k θ (1/2/2)%Qp ∗
                     othreadG_owns θ k true (1/2)%Qp) ∨
                 (* is an internal node, and is suspended *)
-                (∃ τ π, ⌜ parent OTree k π ∧ OOwner !! k = Some τ ⌝ ∗
+                (∃ τ π, ⌜ parent OTree k π ∧ OOwner !! k = Some (Some τ) ⌝ ∗
                         oblG_owner k τ (1/2)%Qp ∗
                         ∃ θ, othreadG_owns θ k false (1/2)%Qp ∗
                              (∃ x, otreeG_suspend k x θ π ∗ otreeG_wait k x (1/2)%Qp))
              ) ∨
                (* Or this obligation is done *)
-               (oblG_done k ∗ ⌜ root OTree k ∧ C = ∅ ⌝)
+               (oblG_done k ∗ ⌜ root OTree k ∧ C = ∅ ∧ OOwner !! k = Some None ⌝)
         ))
     )%I.
 
