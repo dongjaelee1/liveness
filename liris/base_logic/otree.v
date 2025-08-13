@@ -46,31 +46,31 @@ Local Existing Instances otree_inG
   otreeGpreS_edge otreeGpreS_suspend otreeGpreS_wait otreeGpreS_elem.
 
 (* Edge *)
-Definition otreeG_edge `{SI : indexT} `{!otreeGS Σ} (i j : obl_id) (q : Qp) : iProp Σ :=
-  own edge_name (reservation_map_data i (gmap_view_frag j (DfracOwn q) ())).
+Definition otreeG_edge `{SI : indexT} `{!otreeGS Σ} (π k : obl_id) (q : Qp) : iProp Σ :=
+  own edge_name (reservation_map_data π (gmap_view_frag k (DfracOwn q) ())).
 Global Typeclasses Opaque otreeG_edge.
 Global Instance: Params (@otreeG_edge) 6 := {}.
 
 (* Suspend knowledge *)
-Definition otreeG_suspend `{SI : indexT} `{!otreeGS Σ} (i : obl_id) (u : positive) (τ : positive) (π : obl_id) : iProp Σ :=
-  own suspend_name (reservation_map_data i (gmap_view_frag u DfracDiscarded (to_agree (τ, π)))).
+Definition otreeG_suspend `{SI : indexT} `{!otreeGS Σ} (k : obl_id) (x : positive) (θ : positive) (π : obl_id) : iProp Σ :=
+  own suspend_name (reservation_map_data k (gmap_view_frag x DfracDiscarded (to_agree (θ, π)))).
 Global Typeclasses Opaque otreeG_suspend.
 Global Instance: Params (@otreeG_suspend) 6 := {}.
 
 (* Wait token *)
-Definition otreeG_wait `{SI : indexT} `{!otreeGS Σ} (i : obl_id) (u : positive) (q : Qp) : iProp Σ :=
-  own wait_name (reservation_map_data i {[u := ●MN{#q} 0]}).
+Definition otreeG_wait `{SI : indexT} `{!otreeGS Σ} (k : obl_id) (x : positive) (q : Qp) : iProp Σ :=
+  own wait_name (reservation_map_data k {[x := ●MN{#q} 0]}).
 Global Typeclasses Opaque otreeG_wait.
 Global Instance: Params (@otreeG_wait) 6 := {}.
 
-Definition otreeG_free `{SI : indexT} `{!otreeGS Σ} (i : obl_id) (u : positive) : iProp Σ :=
-  own wait_name (reservation_map_data i {[u := ●MN 1]}).
+Definition otreeG_free `{SI : indexT} `{!otreeGS Σ} (k : obl_id) (x : positive) : iProp Σ :=
+  own wait_name (reservation_map_data k {[x := ●MN 1]}).
 Global Typeclasses Opaque otreeG_free.
 Global Instance: Params (@otreeG_free) 6 := {}.
 
 (* Elem: keeps the fact that a key is inside a map *)
-Definition otreeG_elem `{SI : indexT} `{!otreeGS Σ} (i : obl_id) : iProp Σ :=
-  own elem_name (gmap_view_frag i DfracDiscarded ()).
+Definition otreeG_elem `{SI : indexT} `{!otreeGS Σ} (k : obl_id) : iProp Σ :=
+  own elem_name (gmap_view_frag k DfracDiscarded ()).
 Global Typeclasses Opaque otreeG_elem.
 Global Instance: Params (@otreeG_elem) 4 := {}.
 
@@ -84,12 +84,12 @@ Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
         (own suspend_name (reservation_map_token (A:=gmap_viewR positive (agreeR (prodO positiveO obl_idO))) (⊤ ∖ gset_to_coPset D))) ∗
         (own wait_name (reservation_map_token (A:=gmapUR positive mono_natUR) (⊤ ∖ gset_to_coPset D))) ∗
         (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> OSus))) ∗
-        ([∗ map] i ↦ M ∈ OSus,
-           (own suspend_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> M)))) ∗
-           ([∗ map] u ↦ '(τ, π) ∈ M,
-              ((othreadG_owns τ i false (1/2)%Qp ∗ otreeG_edge π i 1) ∨
-                 (othreadG_owns τ i true (1/2)%Qp ∗ otreeG_wait i u (1/2)%Qp ∗ oblG_done π)) ∨
-                otreeG_free i u)
+        ([∗ map] k ↦ M ∈ OSus,
+           (own suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> M)))) ∗
+           ([∗ map] x ↦ '(θ, π) ∈ M,
+              ((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) ∨
+                 (othreadG_owns θ k true (1/2)%Qp ∗ otreeG_wait k x (1/2)%Qp ∗ oblG_done π)) ∨
+                otreeG_free k x)
         )
     )%I.
 
@@ -100,25 +100,27 @@ Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   locked
     (∃ (OTree : cgraph obl_id unitO) (OOwner : gmap obl_id positive),
         (⌜ dom OTree = D ∧ dom OOwner = D ∧ cgraph_wf OTree ⌝) ∗
-        (⌜ ∀ v u, descendant OTree v u → OOwner !! v = OOwner !! u ⌝) ∗
+        (⌜ ∀ π k, descendant OTree π k → OOwner !! π = OOwner !! k ⌝) ∗
         (own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset D))) ∗
-        ([∗ map] i ↦ C ∈ OTree,
-           (own edge_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) C))) ∗
-           ((* This obligation is live with enough transfer and credits for chiledren and... *)
-             ((∃ l c, oblG_transfer_supply i l (1/2)%Qp ∗ oblG_progress_supply i c (1/2)%Qp ∗
-                      ([∗ set] j ∈ (dom C),
-                         ∃ l' c', ⌜ WFOCM.leR l l' ∧ WFOCM.leR c c' ⌝ ∗ oblG_transfer j l' ∗ oblG_progress j c')
+        ([∗ map] k ↦ C ∈ OTree,
+           (own edge_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) C))) ∗
+           ((* This obligation is live and has enough transfer and progress credits for chiledren and... *)
+             ((∃ α β, oblG_transfer_supply k α (1/2)%Qp ∗ oblG_progress_supply k β (1/2)%Qp ∗
+                      ([∗ set] c ∈ (dom C),
+                         ∃ α' β', ⌜ WFOCM.leR α α' ∧ WFOCM.leR β β' ⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')
               ) ∗
               (* is a root or... *)
-              (∃ τ, ⌜ root OTree i ∧ OOwner !! i = Some τ ⌝ ∗
-                    oblG_owner i τ (1/2/2)%Qp ∗ othreadG_owns τ i true (1/2)%Qp) ∨
+              (∃ θ, ⌜ root OTree k ∧ OOwner !! k = Some θ ⌝ ∗
+                    oblG_owner k θ (1/2/2)%Qp ∗
+                    othreadG_owns θ k true (1/2)%Qp) ∨
                 (* is an internal node, and is suspended *)
-                (∃ τ π, ⌜ parent OTree i π ∧ OOwner !! i = Some τ ⌝ ∗
-                        oblG_owner i τ (1/2)%Qp ∗ othreadG_owns τ i false (1/2)%Qp ∗
-                        (∃ x, otreeG_suspend i x τ π ∗ otreeG_wait i x (1/2)%Qp))
+                (∃ τ π, ⌜ parent OTree k π ∧ OOwner !! k = Some τ ⌝ ∗
+                        oblG_owner k τ (1/2)%Qp ∗
+                        ∃ θ, othreadG_owns θ k false (1/2)%Qp ∗
+                             (∃ x, otreeG_suspend k x θ π ∗ otreeG_wait k x (1/2)%Qp))
              ) ∨
                (* Or this obligation is done *)
-               (oblG_done i ∗ ⌜ root OTree i ∧ C = ∅ ⌝)
+               (oblG_done k ∗ ⌜ root OTree k ∧ C = ∅ ⌝)
         ))
     )%I.
 
@@ -126,9 +128,9 @@ Section otree.
   Context `{SI : indexT} `{WFA : WFOCM.pack A} `{obl_class A ps T}.
   Context {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}.
 
-  Global Instance otreeG_suspend_persistent i u τ π : Persistent (otreeG_suspend i u τ π).
+  Global Instance otreeG_suspend_persistent k x θ π : Persistent (otreeG_suspend k x θ π).
   Proof. rewrite /otreeG_suspend. apply _. Qed.
-  Global Instance otreeG_elem_persistent i : Persistent (otreeG_elem i).
+  Global Instance otreeG_elem_persistent k : Persistent (otreeG_elem k).
   Proof. rewrite /otreeG_elem. apply _. Qed.
 
   Local Infix "/=" := OCM.eq (at level 70).

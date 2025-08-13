@@ -68,8 +68,8 @@ Infix "↪ₚ" := (obl_states_progress) (at level 20).
 Infix "↪ₚ⁺" := (tc (obl_states_progress)) (at level 20).
 Infix "↪ₚ⋆" := (rtc (obl_states_progress)) (at level 20).
 
-Definition obl_states_step_one `{Δ : obl_class} (s : obl_ps) (i : obl_id) : relation obl_states :=
-  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, if decide (k = i) then obl_state_step s o1 o2 else o1 = o2) Ω1 Ω2.
+Definition obl_states_step_one `{Δ : obl_class} (s : obl_ps) (k : obl_id) : relation obl_states :=
+  λ Ω1 Ω2, map_Forall2 (λ v o1 o2, if decide (v = k) then obl_state_step s o1 o2 else o1 = o2) Ω1 Ω2.
 
 Notation "a ↪ₒ b @ s , x" := (obl_states_step_one s x a b) (at level 20, format "a  ↪ₒ  b  @  s ,  x ").
 (* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
@@ -77,7 +77,7 @@ Notation "a ↪ₒ⁺ b @ s , x" := (tc (obl_states_step_one s x) a b) (at level
 Notation "a ↪ₒ⋆ b @ s , x" := (rtc (obl_states_step_one s x) a b) (at level 20, format "a  ↪ₒ⋆  b  @  s ,  x ").
 
 Definition obl_states_alloc `{Δ : obl_class} : relation obl_states :=
-  λ Ω1 Ω2, ∃ i d, Ω1 !! i = None ∧ Ω2 = <[i:=obl_live d]> Ω1.
+  λ Ω1 Ω2, ∃ k d, Ω1 !! k = None ∧ Ω2 = <[k:=obl_live d]> Ω1.
 
 Infix "↪ₐ" := (obl_states_alloc) (at level 20).
 (* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
@@ -87,8 +87,8 @@ Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 Variant obl_states_step `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
   | obl_states_step_alloc Ω1 Ω2 :
     Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2
-  | obl_states_step_step_one i Ω1 Ω2 :
-    Ω1 ↪ₒ Ω2 @ s, i → obl_states_step s Ω1 Ω2.
+  | obl_states_step_step_one k Ω1 Ω2 :
+    Ω1 ↪ₒ Ω2 @ s, k → obl_states_step s Ω1 Ω2.
 
 Notation "a ↪ₛ b @ s" := (obl_states_step s a b) (at level 20, format "a  ↪ₛ  b  @  s").
 (* We use the transitive closure.
@@ -129,55 +129,55 @@ Section obl_states.
     - rewrite <- IHrtc. eapply obl_states_progress_dom; eauto.
   Qed.
 
-  Lemma obl_states_progress_lookup Ω1 Ω2 i :
-    Ω1 ↪ₚ Ω2 → option_Forall2 obl_state_progress (Ω1 !! i) (Ω2 !! i).
+  Lemma obl_states_progress_lookup Ω1 Ω2 k :
+    Ω1 ↪ₚ Ω2 → option_Forall2 obl_state_progress (Ω1 !! k) (Ω2 !! k).
   Proof using. done. Qed.
-  Lemma obl_states_progress_tc_lookup Ω1 Ω2 i :
-    Ω1 ↪ₚ⁺ Ω2 → option_Forall2 (tc obl_state_progress) (Ω1 !! i) (Ω2 !! i).
+  Lemma obl_states_progress_tc_lookup Ω1 Ω2 k :
+    Ω1 ↪ₚ⁺ Ω2 → option_Forall2 (tc obl_state_progress) (Ω1 !! k) (Ω2 !! k).
   Proof using.
     intros H. induction H.
-    - eapply (obl_states_progress_lookup _ _ i) in H. inv H; econstructor. by econstructor 1.
-    - apply (obl_states_progress_lookup _ _ i) in H. inv IHtc.
+    - eapply (obl_states_progress_lookup _ _ k) in H. inv H; econstructor. by econstructor 1.
+    - apply (obl_states_progress_lookup _ _ k) in H. inv IHtc.
       + rewrite <-H1 in H. inv H. econstructor. econstructor 2; eauto.
       + rewrite <-H2 in H. inv H. econstructor.
   Qed.
-  Lemma obl_states_progress_rtc_lookup Ω1 Ω2 i :
-    Ω1 ↪ₚ⋆ Ω2 → option_Forall2 (rtc obl_state_progress) (Ω1 !! i) (Ω2 !! i).
+  Lemma obl_states_progress_rtc_lookup Ω1 Ω2 k :
+    Ω1 ↪ₚ⋆ Ω2 → option_Forall2 (rtc obl_state_progress) (Ω1 !! k) (Ω2 !! k).
   Proof using.
     intros H. induction H.
-    - destruct (x !! i); done.
-    - apply (obl_states_progress_lookup _ _ i) in H. inv IHrtc.
+    - destruct (x !! k); done.
+    - apply (obl_states_progress_lookup _ _ k) in H. inv IHrtc.
       + rewrite <-H1 in H. inv H. econstructor. econstructor 2; eauto.
       + rewrite <-H2 in H. inv H. econstructor.
   Qed.
 
-  Lemma obl_states_progress_rtc_live Ω1 Ω2 i :
-    Ω1 ↪ₚ⋆ Ω2 → (∃ d, Ω1 !! i = Some (obl_live d)) ↔ (∃ d', Ω2 !! i = Some (obl_live d')).
+  Lemma obl_states_progress_rtc_live Ω1 Ω2 k :
+    Ω1 ↪ₚ⋆ Ω2 → (∃ d, Ω1 !! k = Some (obl_live d)) ↔ (∃ d', Ω2 !! k = Some (obl_live d')).
   Proof using.
-    intros H. apply (obl_states_progress_rtc_lookup _ _ i) in H.
+    intros H. apply (obl_states_progress_rtc_lookup _ _ k) in H.
     split; intros (d & LU); rewrite LU in H; inv H.
-    - clear LU H1 i. remember (obl_live d) as z. revert d Heqz. induction H2; intros; subst; eauto.
+    - clear LU H1 k. remember (obl_live d) as z. revert d Heqz. induction H2; intros; subst; eauto.
       destruct y; simpl in H; try done. destruct H; subst. eapply IHrtc; eauto.
-    - clear LU H0 i. remember (obl_live d) as z. revert d Heqz. induction H2; intros; subst; eauto.
+    - clear LU H0 k. remember (obl_live d) as z. revert d Heqz. induction H2; intros; subst; eauto.
       specialize (IHrtc _ eq_refl). destruct IHrtc as (?&H0). inv H0. destruct x; simpl in H; try eauto; done.
   Qed.
 
-  Lemma obl_states_progress_rtc_done_1 Ω1 Ω2 i :
-    Ω1 ↪ₚ⋆ Ω2 → ∀ P, Ω1 !! i = Some (obl_done P) → (∃ P', Ω2 !! i = Some (obl_done P') ∧ P ≡ P').
+  Lemma obl_states_progress_rtc_done_1 Ω1 Ω2 k :
+    Ω1 ↪ₚ⋆ Ω2 → ∀ P, Ω1 !! k = Some (obl_done P) → (∃ P', Ω2 !! k = Some (obl_done P') ∧ P ≡ P').
   Proof using.
-    intros H. apply (obl_states_progress_rtc_lookup _ _ i) in H.
+    intros H. apply (obl_states_progress_rtc_lookup _ _ k) in H.
     intros P LU; rewrite LU in H; inv H.
     clear LU H1. remember (obl_done P) as z. revert P Heqz. induction H2; intros; subst; eauto.
     destruct y; simpl in H; try done.
     specialize (IHrtc P0 eq_refl). destruct IHrtc as (P'&?&?). inv H0. exists P'. split; auto. etransitivity; eauto.
   Qed.
 
-  Lemma obl_states_progress_rtc_done_2 Ω1 Ω2 i :
-    Ω1 ↪ₚ⋆ Ω2 → ∀ P, Ω2 !! i = Some (obl_done P) → (∃ P', Ω1 !! i = Some (obl_done P') ∧ P ≡ P').
+  Lemma obl_states_progress_rtc_done_2 Ω1 Ω2 k :
+    Ω1 ↪ₚ⋆ Ω2 → ∀ P, Ω2 !! k = Some (obl_done P) → (∃ P', Ω1 !! k = Some (obl_done P') ∧ P ≡ P').
   Proof using.
-    intros H. apply (obl_states_progress_rtc_lookup _ _ i) in H.
+    intros H. apply (obl_states_progress_rtc_lookup _ _ k) in H.
     intros P LU; rewrite LU in H; inv H.
-    clear LU H0 i. remember (obl_done P) as z. revert P Heqz. induction H2; intros; subst; eauto.
+    clear LU H0 k. remember (obl_done P) as z. revert P Heqz. induction H2; intros; subst; eauto.
     specialize (IHrtc _ eq_refl). destruct IHrtc as (P'&?&?). inv H0. destruct x; simpl in H; try done.
     exists P0. split; auto. etransitivity; eauto.
   Qed.

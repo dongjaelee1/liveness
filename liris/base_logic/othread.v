@@ -45,8 +45,8 @@ Local Existing Instances othread_inG
   othreadGpreS_state othreadGpreS_thread othreadGpreS_exec othreadGpreS_elem.
 
 (* States: thread currently has this obl or not *)
-Definition othreadG_owns `{SI : indexT} `{!othreadGS Σ} (i : positive) (k : obl_id) (b : bool) (q : Qp) : iProp Σ :=
-  own state_name (reservation_map_data i (gmap_view_frag k (DfracOwn q) (to_agree $ b))).
+Definition othreadG_owns `{SI : indexT} `{!othreadGS Σ} (i : positive) (k : obl_id) (f : bool) (q : Qp) : iProp Σ :=
+  own state_name (reservation_map_data i (gmap_view_frag k (DfracOwn q) (to_agree $ f))).
 Global Typeclasses Opaque othreadG_owns.
 Global Instance: Params (@othreadG_owns) 5 := {}.
 
@@ -89,11 +89,11 @@ Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
         (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))) ∗
         (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
         (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> OThread))) ∗
-        ([∗ map] i ↦ B ∈ OThread,
-           (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ ⌜ B = ∅ ⌝)) ∗
-           (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> B)))) ∗
-           ([∗ map] k ↦ b ∈ B, oblG_live k (1/2)%Qp ∗
-                               (match b with | true => oblG_owner k i (1/2/2)%Qp | _ => emp end))
+        ([∗ map] i ↦ F ∈ OThread,
+           (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ ⌜ F = ∅ ⌝)) ∗
+           (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> F)))) ∗
+           ([∗ map] k ↦ f ∈ F, oblG_live k (1/2)%Qp ∗
+                               (match f with | true => oblG_owner k i (1/2/2)%Qp | _ => emp end))
         )
     )%I.
 

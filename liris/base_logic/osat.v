@@ -56,64 +56,64 @@ Local Existing Instances osat_inG
 
 (* Goals *)
 Definition goal_unfold `{SI : indexT} {Σ} (R : iProp Σ) : later (iProp Σ) := Next R.
-Definition oblG_goal `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (P : prop_of ps) (R : iProp Σ) : iProp Σ :=
-  own goal_name (gmap_view_frag i DfracDiscarded (to_agree $ P, to_agree $ goal_unfold R)).
+Definition oblG_goal `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (P : prop_of ps) (R : iProp Σ) : iProp Σ :=
+  own goal_name (gmap_view_frag k DfracDiscarded (to_agree $ P, to_agree $ goal_unfold R)).
 Global Typeclasses Opaque oblG_goal.
 Global Instance: Params (@goal_unfold) 2 := {}.
 Global Instance: Params (@oblG_goal) 8 := {}.
 
-Definition oblG_elem `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) : iProp Σ :=
-  ∃ P R, oblG_goal i P R.
+Definition oblG_elem `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) : iProp Σ :=
+  ∃ P R, oblG_goal k P R.
 Global Typeclasses Opaque oblG_elem.
 Global Instance: Params (@oblG_elem) 8 := {}.
 
 (* Status: live or done *)
-Definition oblG_live `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (q : Qp) : iProp Σ :=
-  own status_name (reservation_map_data i (●MN{#q} 0)).
+Definition oblG_live `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (q : Qp) : iProp Σ :=
+  own status_name (reservation_map_data k (●MN{#q} 0)).
 Global Typeclasses Opaque oblG_live.
 Global Instance: Params (@oblG_live) 8 := {}.
 
-Definition oblG_done_auth `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) : iProp Σ :=
-  own status_name (reservation_map_data i (●MN 1)).
+Definition oblG_done_auth `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) : iProp Σ :=
+  own status_name (reservation_map_data k (●MN 1)).
 Global Typeclasses Opaque oblG_done_auth.
 Global Instance: Params (@oblG_done_auth) 8 := {}.
 
-Definition oblG_done `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) : iProp Σ :=
-  own status_name (reservation_map_data i (◯MN 1)).
+Definition oblG_done `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) : iProp Σ :=
+  own status_name (reservation_map_data k (◯MN 1)).
 Global Typeclasses Opaque oblG_done.
 Global Instance: Params (@oblG_done) 8 := {}.
 
 (* Transfer: manage credits for transfer *)
-Definition oblG_transfer `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) : iProp Σ :=
-  own transfer_name (reservation_map_data i (cash a)).
+Definition oblG_transfer `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) : iProp Σ :=
+  own transfer_name (reservation_map_data k (cash α)).
 Global Typeclasses Opaque oblG_transfer.
 Global Instance: Params (@oblG_transfer) 8 := {}.
 
-Definition oblG_transfer_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) (q : Qp) : iProp Σ :=
-  own transfer_name (reservation_map_data i (debt a q)).
+Definition oblG_transfer_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) (q : Qp) : iProp Σ :=
+  own transfer_name (reservation_map_data k (debt α q)).
 Global Typeclasses Opaque oblG_transfer_supply.
 Global Instance: Params (@oblG_transfer_supply) 8 := {}.
 
 (* Fixed bound for transfer credits *)
-Definition oblG_transfer_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) : iProp Σ :=
-  own tbound_name (reservation_map_data i (to_agree $ a : agreeR (leibnizO _))).
+Definition oblG_transfer_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
+  own tbound_name (reservation_map_data k (to_agree $ ℵ : agreeR (leibnizO _))).
 Global Typeclasses Opaque oblG_transfer_bound.
 Global Instance: Params (@oblG_transfer_bound) 8 := {}.
 
 (* Owner: tracks the owner thread of this obligation *)
-Definition oblG_owner `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (t : T) (q : Qp) : iProp Σ :=
-  own owner_name (reservation_map_data i (to_frac_agree q (t : leibnizO T))).
+Definition oblG_owner `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (τ : T) (q : Qp) : iProp Σ :=
+  own owner_name (reservation_map_data k (to_frac_agree q (τ : leibnizO T))).
 Global Typeclasses Opaque oblG_owner.
 Global Instance: Params (@oblG_owner) 8 := {}.
 
 (* Progress: manage credits for logical progress *)
-Definition oblG_progress `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) : iProp Σ :=
-  own progress_name (reservation_map_data i (cash a)).
+Definition oblG_progress `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (β : A) : iProp Σ :=
+  own progress_name (reservation_map_data k (cash β)).
 Global Typeclasses Opaque oblG_progress.
 Global Instance: Params (@oblG_progress) 8 := {}.
 
-Definition oblG_progress_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (i : obl_id) (a : A) (q : Qp) : iProp Σ :=
-  own progress_name (reservation_map_data i (debt a q)).
+Definition oblG_progress_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (β : A) (q : Qp) : iProp Σ :=
+  own progress_name (reservation_map_data k (debt β q)).
 Global Typeclasses Opaque oblG_progress_supply.
 Global Instance: Params (@oblG_progress_supply) 8 := {}.
 
@@ -130,20 +130,20 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_cl
      (own tbound_name (reservation_map_token (A:=agreeR (leibnizO A)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own progress_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
-     ([∗ map] i ↦ o ∈ Ω,
+     ([∗ map] k ↦ o ∈ Ω,
         match o with
         | obl_live d =>
-            oblG_live i (1/2)%Qp ∗
-            (∃ l', ⌜ WFOCM.leR l' (obl_transfer d) ⌝ ∗ oblG_transfer_supply i l' (1/2)%Qp) ∗
-            (∃ m, ⌜ WFOCM.leR (obl_transfer d) m ⌝ ∗ oblG_transfer_bound i m) ∗
-            (oblG_owner i (obl_owner d) (1/2)%Qp) ∗
-            (∃ a', ⌜ WFOCM.leR a' (obl_progress d) ⌝ ∗ oblG_progress_supply i a' (1/2)%Qp)
+            oblG_live k (1/2)%Qp ∗
+            (∃ α, ⌜ WFOCM.leR α (obl_transfer d) ⌝ ∗ oblG_transfer_supply k α (1/2)%Qp) ∗
+            (∃ ℵ, ⌜ WFOCM.leR (obl_transfer d) ℵ ⌝ ∗ oblG_transfer_bound k ℵ) ∗
+            (oblG_owner k (obl_owner d) (1/2)%Qp) ∗
+            (∃ β, ⌜ WFOCM.leR β (obl_progress d) ⌝ ∗ oblG_progress_supply k β (1/2)%Qp)
         | obl_done P1 =>
-            ∃ P2 R, oblG_goal i P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
-                    oblG_done_auth i ∗
-                    (∃ l, oblG_transfer_supply i l 1) ∗
-                    (∃ t, oblG_owner i t 1) ∗
-                    (∃ a, oblG_progress_supply i a 1)
+            ∃ P2 R, oblG_goal k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
+                    oblG_done_auth k ∗
+                    (∃ l, oblG_transfer_supply k l 1) ∗
+                    (∃ t, oblG_owner k t 1) ∗
+                    (∃ a, oblG_progress_supply k a 1)
       end)
     )%I.
 
@@ -152,15 +152,15 @@ Section osat.
 
   Local Instance goal_unfold_contractive : Contractive (@goal_unfold SI Σ).
   Proof. solve_contractive. Qed.
-  Global Instance oblG_goal_contractive i P : Contractive (@oblG_goal SI _ WFA ps T Σ _ i P).
+  Global Instance oblG_goal_contractive k P : Contractive (@oblG_goal SI _ WFA ps T Σ _ k P).
   Proof. solve_contractive. Qed.
-  Global Instance oblG_goal_persistent i P R : Persistent (oblG_goal i P R).
+  Global Instance oblG_goal_persistent k P R : Persistent (oblG_goal k P R).
   Proof. rewrite /oblG_goal. apply _. Qed.
-  Global Instance oblG_elem_persistent i : Persistent (oblG_elem i).
+  Global Instance oblG_elem_persistent k : Persistent (oblG_elem k).
   Proof. rewrite /oblG_elem. apply _. Qed.
-  Global Instance oblG_done_persistent i : Persistent (oblG_done i).
+  Global Instance oblG_done_persistent k : Persistent (oblG_done k).
   Proof. rewrite /oblG_done. apply _. Qed.
-  Global Instance oblG_transfer_bound_persistent i m : Persistent (oblG_transfer_bound i m).
+  Global Instance oblG_transfer_bound_persistent k ℵ : Persistent (oblG_transfer_bound k ℵ).
   Proof. rewrite /oblG_transfer_bound. apply _. Qed.
 
   Local Infix "/=" := OCM.eq (at level 70).
@@ -171,16 +171,16 @@ Section osat.
 
   (* Goal rules *)
 
-  Lemma oblG_goal_lookup (OProp : gmap positive (prop_of ps * iProp Σ)) i P R :
+  Lemma oblG_goal_lookup (OProp : gmap positive (prop_of ps * iProp Σ)) k P R :
     own goal_name
       (gmap_view_auth (DfracOwn 1)
          ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OProp)) ∗
-    oblG_goal i P R
-    ⊢ ∃ P' R', ⌜OProp !! i = Some (P', R')⌝ ∗ ⌜P' = P⌝ ∗ ▷ (R' ≡ R).
+    oblG_goal k P R
+    ⊢ ∃ P' R', ⌜OProp !! k = Some (P', R')⌝ ∗ ⌜P' = P⌝ ∗ ▷ (R' ≡ R).
   Proof.
     rewrite /oblG_goal -own_op own_valid gmap_view_both_validI_total.
     iIntros "[%Q' (_& _ & HQ' & Hval & Hincl)]". rewrite !lookup_fmap.
-    case: (OProp !! i)=> [Q|] /=; last first.
+    case: (OProp !! k)=> [Q|] /=; last first.
     { by iDestruct "HQ'" as %?. }
     destruct Q as (P'&R'). iDestruct "HQ'" as %[= <-]. iExists P', R'; iSplit; first done.
     rewrite prod_includedI !to_agree_includedI; simpl. iDestruct "Hincl" as "[H1 H2]".
@@ -189,13 +189,13 @@ Section osat.
     - iPoseProof (internal_eq_sym with "H2") as "H2". done.
   Qed.
 
-  Lemma oblG_elem_unfold i : oblG_elem i ⊣⊢ ∃ P R, oblG_goal i P R.
+  Lemma oblG_elem_unfold k : oblG_elem k ⊣⊢ ∃ P R, oblG_goal k P R.
   Proof. done. Qed.
 
   (* Status rules *)
 
-  Lemma oblG_live_done_false i q :
-    oblG_live i q ∗ oblG_done i ⊢ False.
+  Lemma oblG_live_done_false k q :
+    oblG_live k q ∗ oblG_done k ⊢ False.
   Proof.
     rewrite /oblG_live /oblG_done. iIntros "[Hl Hd]".
     iCombine "Hl Hd" as "V". iPoseProof (own_valid with "V") as "%V".
@@ -203,37 +203,37 @@ Section osat.
     apply mono_nat_both_dfrac_valid in V. destruct V. lia.
   Qed.
 
-  Lemma oblG_done_auth_done i :
-    oblG_done_auth i ⊢ oblG_done i.
+  Lemma oblG_done_auth_done k :
+    oblG_done_auth k ⊢ oblG_done k.
   Proof.
     rewrite /oblG_done_auth /oblG_done.
     apply own_mono.
     apply reservation_map_data_mono. apply mono_nat_included.
   Qed.
 
-  Lemma oblG_live_to_done i :
-    oblG_live i 1 ⊢ |==> oblG_done_auth i.
+  Lemma oblG_live_to_done k :
+    oblG_live k 1 ⊢ |==> oblG_done_auth k.
   Proof.
     rewrite /oblG_live /oblG_done_auth.
     apply own_update.
     apply reservation_map_update. apply mono_nat_update. auto.
   Qed.
 
-  Lemma oblG_live_dfrac_op i q1 q2 q :
+  Lemma oblG_live_dfrac_op k q1 q2 q :
     q = (q1 + q2)%Qp →
-    oblG_live i q1 ∗ oblG_live i q2 ⊣⊢ oblG_live i q.
+    oblG_live k q1 ∗ oblG_live k q2 ⊣⊢ oblG_live k q.
   Proof.
     intros; subst. rewrite /oblG_live. iSplit; [iIntros "[H1 H2]" | iIntros "H"].
     - iCombine "H1 H2" as "H". done.
     - iDestruct "H" as "[H1 H2]". iFrame.
   Qed.
 
-  Lemma oblG_live_div_2 i q :
-    oblG_live i (q/2) ∗ oblG_live i (q/2) ⊣⊢ oblG_live i q.
+  Lemma oblG_live_div_2 k q :
+    oblG_live k (q/2) ∗ oblG_live k (q/2) ⊣⊢ oblG_live k q.
   Proof. rewrite oblG_live_dfrac_op; first done. by rewrite Qp.div_2. Qed.
 
-  Lemma oblG_live_valid i q :
-    oblG_live i q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
+  Lemma oblG_live_valid k q :
+    oblG_live k q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
   Proof.
     rewrite /oblG_live. iIntros "H".
     iPoseProof (own_valid with "H") as "%V".
