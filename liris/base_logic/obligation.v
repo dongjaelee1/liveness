@@ -21,38 +21,47 @@ Proof.
   - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
 Qed.
 
-Class obl_class (obl_count obl_ps obl_owner : Type) := {
-    obl_count_ltR : obl_count → obl_count → Prop;
-    obl_count_ltR_wf : well_founded obl_count_ltR;
+Class obl_class (obl_count obl_ps obl_ownerid : Type) := {
+    obl_count_ltR : relation obl_count;
+    obl_count_ltR_well_founded : well_founded obl_count_ltR;
+    #[global] obl_count_ltR_Transitive :: Transitive obl_count_ltR;
   }.
 
-Record obl_live_data `{Δ : obl_class} := {
+Record obl_live_data `{Ξ : obl_class} := {
     obl_transfer : obl_count;
-    obl_owner : obl_owner;
+    obl_owner : obl_ownerid;
     obl_progress : obl_count;
   }.
 
-Inductive obl_state `{Δ : obl_class} : Type :=
+Inductive obl_state `{Ξ : obl_class} : Type :=
 | obl_live (d : obl_live_data) | obl_done (P : prop_of obl_ps).
 
-(* Logical progress that can obtain a later. *)
-Definition obl_state_progress `{Δ : obl_class} : relation obl_state :=
+(* Transition to make logical progress that can obtain a later. *)
+Definition obl_state_progress `{Ξ : obl_class} : relation obl_state :=
   λ o1 o2,
     match o1, o2 with
     | obl_live d1, obl_live d2 =>
-        (obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1))
-    | obl_done P1, obl_done P2 => P1 ≡ P2
+        obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)
     | _, _ => False
     end.
 
-(* General transition relation of a liveness obligation. *)
-Definition obl_state_step `{Δ : obl_class} (s : obl_ps) : relation obl_state :=
+(* Transition to transfer a liveness obligation. *)
+Definition obl_state_transfer `{Ξ : obl_class} : relation obl_state :=
   λ o1 o2,
     (match o1, o2 with
-     | obl_live d1, obl_live d2 => obl_count_ltR (obl_transfer d2) (obl_transfer d1)
-     | obl_live _, obl_done P => P s
+     | obl_live d1, obl_live d2 =>
+         obl_count_ltR (obl_transfer d2) (obl_transfer d1)
      | _, _ => False
-     end) ∨ obl_state_progress o1 o2.
+     end).
+
+(* Transition to resolve a liveness obligation. *)
+Definition obl_state_resolve `{Ξ : obl_class} (s : obl_ps) : relation obl_state :=
+  λ o1 o2,
+    (match o1, o2 with
+     | obl_live _, obl_done P =>
+         P s
+     | _, _ => False
+     end).
 
 (** To a map *)
 
@@ -60,98 +69,216 @@ Definition obl_id := positive.
 
 Notation obl_ids := (gset obl_id).
 Notation obl_states := (gmap obl_id obl_state).
-(* Notation obl_states' Δ := (gmap obl_id (obl_state (Δ:=Δ))). *)
+(* Notation obl_states' Ξ := (gmap obl_id (obl_state (Ξ:=Ξ))). *)
 
-Definition obl_states_progress `{Δ : obl_class} (C : obl_id → obl_state → Prop) : relation obl_states :=
-  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, (C k o1 → obl_state_progress o1 o2) ∧ ((¬ C k o1) → o1 = o2)) Ω1 Ω2.
+Definition obl_cond `{Ξ : obl_class} := (obl_id → obl_state → Prop).
+(* This version:
+Definition obl_states_cond_rel `{Ξ : obl_class} (C : obl_cond) (R : relation obl_state) : relation obl_states :=
+seems to cause universe problem in proving a list related lemma (app_comm_cons).
+ *)
+Definition obl_states_cond_rel `{Ξ : obl_class} (C : obl_cond) (R : obl_state → obl_state → Prop) : relation obl_states :=
+  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, (C k o1 → R o1 o2) ∧ ((¬ C k o1) → o1 = o2)) Ω1 Ω2.
+
+Definition obl_states_progress `{Ξ : obl_class} (C : obl_cond) : relation obl_states :=
+  obl_states_cond_rel C obl_state_progress.
 
 Notation "A ↪ₚ B | C" := (obl_states_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
-(* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
 Notation "A ↪ₚ⁺ B | C" := (tc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⁺  B  |  C").
 Notation "A ↪ₚ⋆ B | C" := (rtc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⋆  B  |  C").
 
-Definition obl_states_step `{Δ : obl_class} (s : obl_ps) (C : obl_id → obl_state → Prop) : relation obl_states :=
-  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, (C k o1 → obl_state_step s o1 o2) ∧ ((¬ C k o1) → o1 = o2)) Ω1 Ω2.
+Definition obl_states_transfer `{Ξ : obl_class} (C : obl_cond) : relation obl_states :=
+  obl_states_cond_rel C obl_state_transfer.
 
-Notation "A ↪ₛ B @ s | C" := (obl_states_step s C A B) (at level 20, format "A  ↪ₛ  B  @  s  |  C").
-(* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
-Notation "A ↪ₛ⁺ B @ s | C" := (tc (obl_states_step s C) A B) (at level 20, format "A  ↪ₛ⁺  B  @  s  |  C").
-Notation "A ↪ₛ⋆ B @ s | C" := (rtc (obl_states_step s C) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s  |  C").
+Notation "A ↪ₜ B | C" := (obl_states_transfer C A B) (at level 20, format "A  ↪ₜ  B  |  C").
+Notation "A ↪ₜ⁺ B | C" := (tc (obl_states_transfer C) A B) (at level 20, format "A  ↪ₜ⁺  B  |  C").
+Notation "A ↪ₜ⋆ B | C" := (rtc (obl_states_transfer C) A B) (at level 20, format "A  ↪ₜ⋆  B  |  C").
 
-Definition obl_states_alloc `{Δ : obl_class} : relation obl_states :=
+Definition obl_states_resolve `{Ξ : obl_class} (s : obl_ps) (C : obl_cond) : relation obl_states :=
+  obl_states_cond_rel C (obl_state_resolve s).
+
+Notation "A ↪ᵣ B @ s | C" := (obl_states_resolve s C A B) (at level 20, format "A  ↪ᵣ  B  @  s  |  C").
+Notation "A ↪ᵣ⁺ B @ s | C" := (tc (obl_states_resolve s C) A B) (at level 20, format "A  ↪ᵣ⁺  B  @  s  |  C").
+Notation "A ↪ᵣ⋆ B @ s | C" := (rtc (obl_states_resolve s C) A B) (at level 20, format "A  ↪ᵣ⋆  B  @  s  |  C").
+
+Definition obl_states_alloc `{Ξ : obl_class} : relation obl_states :=
   λ Ω1 Ω2, ∃ k d, Ω1 !! k = None ∧ Ω2 = <[k:=obl_live d]> Ω1.
 
 Infix "↪ₐ" := (obl_states_alloc) (at level 20).
-(* We use the transitive closure. It's normalization is equivalent to normalization of source_rel. *)
 Infix "↪ₐ⁺" := (tc obl_states_alloc) (at level 20).
 Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 
-Variant obl_states_transition `{Δ : obl_class} (s : obl_ps) : relation obl_states :=
-  | obl_states_transition_alloc Ω1 Ω2 :
-    Ω1 ↪ₐ Ω2 → obl_states_transition s Ω1 Ω2
-  | obl_states_transition_step C Ω1 Ω2 :
-    Ω1 ↪ₛ Ω2 @ s | C → obl_states_transition s Ω1 Ω2.
+Variant obl_states_step `{Ξ : obl_class} (s : obl_ps) : relation obl_states :=
+  | obl_states_step_progress Ω1 Ω2 :
+    (∃ C, Ω1 ↪ₚ Ω2 | C) → obl_states_step s Ω1 Ω2
+  | obl_states_step_transfer Ω1 Ω2 :
+    (∃ C, Ω1 ↪ₜ Ω2 | C) → obl_states_step s Ω1 Ω2
+  | obl_states_step_resolve Ω1 Ω2 :
+    (∃ C, Ω1 ↪ᵣ Ω2 @ s | C) → obl_states_step s Ω1 Ω2
+  | obl_states_step_alloc Ω1 Ω2 :
+    Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2.
 
-Notation "A ↪ₜ B @ s" := (obl_states_transition s A B) (at level 20, format "A  ↪ₜ  B  @  s").
-(* We use the transitive closure.
-   It's normalization is equivalent to normalization of source_rel. *)
-Notation "A ↪ₜ⁺ B @ s" := ((tc (obl_states_transition s)) A B) (at level 20, format "A  ↪ₜ⁺  B  @  s").
-Notation "A ↪ₜ⋆ B @ s" := ((rtc (obl_states_transition s)) A B) (at level 20, format "A  ↪ₜ⋆  B  @  s").
+Notation "A ↪ₛ B @ s" := (obl_states_step s A B) (at level 20, format "A  ↪ₛ  B  @  s").
+Notation "A ↪ₛ⁺ B @ s" := (tc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⁺  B  @  s").
+Notation "A ↪ₛ⋆ B @ s" := (rtc (obl_states_resolve s) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s").
+
+(* This version:
+Inductive obl_states_cond_rel_seq `{Ξ : obl_class} : (list (obl_cond * (relation obl_state))) → relation obl_states :=
+seems to cause universe problem in proving a list related lemma (app_comm_cons).
+ *)
+Inductive obl_states_cond_rel_seq `{Ξ : obl_class} : (list (obl_cond * (obl_state → obl_state → Prop))) → relation obl_states :=
+| obl_states_cond_rel_seq_nil Ω :
+  obl_states_cond_rel_seq [] Ω Ω
+| obl_states_cond_rel_seq_cons C R tl Ω1 Ω2 Ω :
+  obl_states_cond_rel C R Ω1 Ω2 →
+  obl_states_cond_rel_seq tl Ω2 Ω →
+  obl_states_cond_rel_seq ((C, R) :: tl) Ω1 Ω.
 
 Section obl_states.
-  Context `{Δ : obl_class}.
+  Context `{Ξ : obl_class}.
 
-  Lemma obl_states_step_one_dom Ω1 Ω2 s x : Ω1 ↪ₒ Ω2 @ s, x → dom Ω1 = dom Ω2.
-  Proof using. intros H. eapply map_Forall2_dom_L; eauto. Qed.
-  Lemma obl_states_step_one_tc_dom Ω1 Ω2 s x : Ω1 ↪ₒ⁺ Ω2 @ s, x → dom Ω1 = dom Ω2.
+  (** Additional definitions *)
+  Definition obl_cond_owner (i : obl_ownerid) : obl_cond :=
+    λ _ o, match o with | obl_live d => (obl_owner d = i) | _ => False end.
+
+  Definition obl_cond_id_prop (Δ : obl_id → Prop) : obl_cond :=
+    λ k _, Δ k.
+
+  Definition obl_rel_preserves_cond (C : obl_cond) (R : relation obl_state) : Prop :=
+    ∀ k o0 o1, C k o0 → R o0 o1 → C k o1.
+
+  (** Properties *)
+  Global Instance obl_state_progress_Transitive : Transitive obl_state_progress.
+  Proof using.
+    intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
+    destruct H1 as (?&?&?). destruct H2 as (?&?&?). split_and !; try (etrans; eauto).
+  Qed.
+
+  Global Instance obl_state_transfer_Transitive : Transitive obl_state_transfer.
+  Proof using.
+    intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
+    etrans; eauto.
+  Qed.
+
+  Global Instance obl_state_resolve_Transitive s : Transitive (obl_state_resolve s).
+  Proof using.
+    intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
+  Qed.
+
+  Global Instance obl_states_cond_rel_Transitive C R :
+    obl_rel_preserves_cond C R →
+    Transitive R →
+    Transitive (obl_states_cond_rel C R).
+  Proof using.
+    intros HCR HRT x y z H1 H2. intros i. specialize (H1 i). specialize (H2 i).
+    destruct (x !! i) eqn:Hxi; inv H1.
+    - rewrite -H0 in H2. inv H2. destruct H3, H4. econstructor. split; intro HC.
+      + specialize (H HC). etrans; first eauto. apply H3. eapply HCR; eauto.
+      + specialize (H2 HC). subst. apply H4; auto.
+    - rewrite -H in H2. inv H2. econstructor.
+  Qed.
+
+  Lemma obl_state_progress_cond_owner i : obl_rel_preserves_cond (obl_cond_owner i) obl_state_progress.
+  Proof using.
+    intros k o0 o1 Hc Hr. destruct o0, o1; try done. simpl in *. destruct Hr. destruct H0. by rewrite <-H0.
+  Qed.
+
+  Lemma obl_state_transfer_cond_id_prop Δ : obl_rel_preserves_cond (obl_cond_id_prop Δ) obl_state_transfer.
+  Proof using.
+    intros k o0 o1 Hc Hr. destruct o0, o1; try done.
+  Qed.
+
+  Lemma obl_states_cond_rel_dom C R Ω1 Ω2 : obl_states_cond_rel C R Ω1 Ω2 → dom Ω1 = dom Ω2.
+  Proof using. intros. eapply map_Forall2_dom_L; eauto. Qed.
+  Lemma obl_states_cond_rel_tc_dom C R Ω1 Ω2 : tc (obl_states_cond_rel C R) Ω1 Ω2 → dom Ω1 = dom Ω2.
   Proof using.
     intros H. induction H.
-    - eapply obl_states_step_one_dom; eauto.
-    - rewrite <- IHtc. eapply obl_states_step_one_dom; eauto.
+    - eapply obl_states_cond_rel_dom; eauto.
+    - rewrite <- IHtc. eapply obl_states_cond_rel_dom; eauto.
   Qed.
-  Lemma obl_states_step_one_rtc_dom Ω1 Ω2 s x : Ω1 ↪ₒ⋆ Ω2 @ s, x → dom Ω1 = dom Ω2.
+  Lemma obl_states_cond_rel_rtc_dom C R Ω1 Ω2 : rtc (obl_states_cond_rel C R) Ω1 Ω2 → dom Ω1 = dom Ω2.
   Proof using.
     intros H. induction H.
     - auto.
-    - rewrite <- IHrtc. eapply obl_states_step_one_dom; eauto.
+    - rewrite <- IHrtc. eapply obl_states_cond_rel_dom; eauto.
   Qed.
 
-  Lemma obl_states_progress_dom Ω1 Ω2 : Ω1 ↪ₚ Ω2 → dom Ω1 = dom Ω2.
-  Proof using. intros H. eapply map_Forall2_dom_L; eauto. Qed.
-  Lemma obl_states_progress_tc_dom Ω1 Ω2 : Ω1 ↪ₚ⁺ Ω2 → dom Ω1 = dom Ω2.
-  Proof using.
-    intros H. induction H.
-    - eapply obl_states_progress_dom; eauto.
-    - rewrite <- IHtc. eapply obl_states_progress_dom; eauto.
-  Qed.
-  Lemma obl_states_progress_rtc_dom Ω1 Ω2 : Ω1 ↪ₚ⋆ Ω2 → dom Ω1 = dom Ω2.
-  Proof using.
-    intros H. induction H.
-    - auto.
-    - rewrite <- IHrtc. eapply obl_states_progress_dom; eauto.
-  Qed.
-
-  Lemma obl_states_progress_lookup Ω1 Ω2 k :
-    Ω1 ↪ₚ Ω2 → option_Forall2 obl_state_progress (Ω1 !! k) (Ω2 !! k).
+  Lemma obl_states_cond_rel_lookup C R Ω1 Ω2 :
+    obl_states_cond_rel C R Ω1 Ω2 →
+    ∀ k, option_Forall2 (λ o1 o2, ((C k o1) → R o1 o2) ∧ ((¬ C k o1) → o1 = o2)) (Ω1 !! k) (Ω2 !! k).
   Proof using. done. Qed.
-  Lemma obl_states_progress_tc_lookup Ω1 Ω2 k :
-    Ω1 ↪ₚ⁺ Ω2 → option_Forall2 (tc obl_state_progress) (Ω1 !! k) (Ω2 !! k).
+  Lemma obl_states_cond_rel_tc_lookup C R Ω1 Ω2 :
+    obl_rel_preserves_cond C R →
+    Transitive R →
+    tc (obl_states_cond_rel C R) Ω1 Ω2 →
+    ∀ k, option_Forall2 (λ o1 o2, ((C k o1) → tc R o1 o2) ∧ ((¬ C k o1) → o1 = o2)) (Ω1 !! k) (Ω2 !! k).
   Proof using.
-    intros H. induction H.
-    - eapply (obl_states_progress_lookup _ _ k) in H. inv H; econstructor. by econstructor 1.
-    - apply (obl_states_progress_lookup _ _ k) in H. inv IHtc.
-      + rewrite <-H1 in H. inv H. econstructor. econstructor 2; eauto.
-      + rewrite <-H2 in H. inv H. econstructor.
+    intros HCR HTR H. induction H; intros.
+    - pose proof (obl_states_cond_rel_lookup _ _ _ _ H k). inv H0; econstructor.
+      destruct H3. split; auto. intros. econstructor 1; auto.
+    - pose proof (obl_states_cond_rel_lookup _ _ _ _ H k). specialize (IHtc k). inv IHtc.
+      + destruct H4. rewrite <-H2 in H1. inv H1. destruct H8. econstructor. split; intros.
+        * specialize (H1 H8). specialize (HCR _ _ _ H8 H1). specialize (H4 HCR). econstructor 2; eauto.
+        * specialize (H7 H8). subst. auto.
+      + rewrite <-H3 in H1. inv H1. econstructor.
   Qed.
-  Lemma obl_states_progress_rtc_lookup Ω1 Ω2 k :
-    Ω1 ↪ₚ⋆ Ω2 → option_Forall2 (rtc obl_state_progress) (Ω1 !! k) (Ω2 !! k).
+  Lemma obl_states_cond_rel_rtc_lookup C R Ω1 Ω2 :
+    obl_rel_preserves_cond C R →
+    Transitive R →
+    rtc (obl_states_cond_rel C R) Ω1 Ω2 →
+    ∀ k, option_Forall2 (λ o1 o2, ((C k o1) → rtc R o1 o2) ∧ ((¬ C k o1) → o1 = o2)) (Ω1 !! k) (Ω2 !! k).
   Proof using.
-    intros H. induction H.
-    - destruct (x !! k); done.
-    - apply (obl_states_progress_lookup _ _ k) in H. inv IHrtc.
-      + rewrite <-H1 in H. inv H. econstructor. econstructor 2; eauto.
-      + rewrite <-H2 in H. inv H. econstructor.
+    intros HCR HTR H. induction H; intros.
+    - destruct (x !! k); econstructor. split; done.
+    - pose proof (obl_states_cond_rel_lookup _ _ _ _ H k). specialize (IHrtc k). inv IHrtc.
+      + destruct H4. rewrite <-H2 in H1. inv H1. destruct H8. econstructor. split; intros.
+        * specialize (H1 H8). specialize (HCR _ _ _ H8 H1). specialize (H4 HCR). econstructor 2; eauto.
+        * specialize (H7 H8). subst. auto.
+      + rewrite <-H3 in H1. inv H1. econstructor.
   Qed.
+
+  Global Instance obl_states_cond_rel_seq_Reflexive : Reflexive (obl_states_cond_rel_seq []).
+  Proof using. intros x. econstructor. Qed.
+
+  Lemma obl_states_cond_rel_seq_app cr1 cr2 Ω1 Ω2 :
+    (∃ Ω, obl_states_cond_rel_seq cr1 Ω1 Ω ∧ obl_states_cond_rel_seq cr2 Ω Ω2) ↔
+    obl_states_cond_rel_seq (cr1 ++ cr2) Ω1 Ω2.
+  Proof using.
+    split; intros.
+    - destruct H as (Ω&?&?). revert cr2 Ω2 H0. induction H; intros; first done.
+      rewrite <-app_comm_cons. econstructor; eauto.
+    - revert cr2 Ω1 Ω2 H. induction cr1; intros.
+      { exists Ω1. split; auto. econstructor. }
+      rewrite <-app_comm_cons in H. inv H. destruct (IHcr1 _ _ _ H5) as (?&?&?).
+      exists x. split; last auto. econstructor; eauto.
+  Qed.
+
+  Lemma obl_states_cond_rel_split_cond C C1 C2 R Ω1 Ω2 Ω3 :
+    (∀ k o, Decision (C1 k o)) →
+    (∀ k o, Decision (C2 k o)) →
+    Transitive R →
+    (∀ k o, C k o → (C1 k o ∨ C2 k o)) →
+    (∀ k o, (¬ C k o) → ((¬ C1 k o) ∧ (¬ C2 k o))) →
+    obl_rel_preserves_cond C2 R →
+    obl_states_cond_rel C1 R Ω1 Ω2 →
+    obl_states_cond_rel C2 R Ω2 Ω3 →
+    obl_states_cond_rel C R Ω1 Ω3.
+  Proof using.
+    intros HD1 HD2 HTR HS1 HS2 HCR2. intros. intros k. specialize (H k). specialize (H0 k).
+    inv H.
+    - destruct H3. rewrite <-H2 in H0. inv H0. destruct H6. econstructor. split; intros.
+      + destruct (HS1 _ _ H6).
+        * specialize (H H7). destruct (decide (C2 k y)); eauto. specialize (H4 n). by subst.
+        * destruct (decide (C1 k x)).
+          -- specialize (H c). etrans; first eauto. specialize (HCR2 _ _ _ H7 H). auto.
+          -- specialize (H3 n). subst. auto.
+      + destruct (HS2 _ _ H6). specialize (H3 H7). subst. specialize (H4 H8). subst. auto.
+    - rewrite -H3 in H0. inv H0. econstructor.
+  Qed.
+
+
+  TODO
+
+
 
   Lemma obl_states_progress_rtc_live Ω1 Ω2 k :
     Ω1 ↪ₚ⋆ Ω2 → (∃ d, Ω1 !! k = Some (obl_live d)) ↔ (∃ d', Ω2 !! k = Some (obl_live d')).
