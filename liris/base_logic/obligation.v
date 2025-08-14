@@ -25,6 +25,7 @@ Class obl_class (obl_count obl_ps obl_ownerid : Type) := {
     obl_count_ltR : relation obl_count;
     obl_count_ltR_well_founded : well_founded obl_count_ltR;
     #[global] obl_count_ltR_Transitive :: Transitive obl_count_ltR;
+    #[global] obl_ownerid_EqDecision :: EqDecision obl_ownerid;
   }.
 
 Record obl_live_data `{Ξ : obl_class} := {
@@ -182,10 +183,16 @@ Section obl_states.
     intros k o0 o1 Hc Hr. destruct o0, o1; try done. simpl in *. destruct Hr. destruct H0. by rewrite <-H0.
   Qed.
 
+  Global Instance obl_cond_owner_Decision i : ∀ k o, Decision (obl_cond_owner i k o).
+  Proof using. intros. unfold obl_cond_owner. destruct o; solve_decision. Qed.
+
   Lemma obl_state_transfer_cond_id_prop Δ : obl_rel_preserves_cond (obl_cond_id_prop Δ) obl_state_transfer.
   Proof using.
     intros k o0 o1 Hc Hr. destruct o0, o1; try done.
   Qed.
+
+  Global Instance obl_cond_id_prop_Decision Δ : (∀ k, Decision (Δ k)) → ∀ k o, Decision (obl_cond_id_prop Δ k o).
+  Proof using. intros. unfold obl_cond_id_prop. solve_decision. Qed.
 
   Lemma obl_states_cond_rel_dom C R Ω1 Ω2 : obl_states_cond_rel C R Ω1 Ω2 → dom Ω1 = dom Ω2.
   Proof using. intros. eapply map_Forall2_dom_L; eauto. Qed.
@@ -256,17 +263,21 @@ Section obl_states.
     (∀ k o, Decision (C1 k o)) →
     (∀ k o, Decision (C2 k o)) →
     Transitive R →
-    (∀ k o, C k o → (C1 k o ∨ C2 k o)) →
-    (∀ k o, (¬ C k o) → ((¬ C1 k o) ∧ (¬ C2 k o))) →
+    (∀ k o, C k o ↔ (C1 k o ∨ C2 k o)) →
     obl_rel_preserves_cond C2 R →
     obl_states_cond_rel C1 R Ω1 Ω2 →
     obl_states_cond_rel C2 R Ω2 Ω3 →
     obl_states_cond_rel C R Ω1 Ω3.
   Proof using.
-    intros HD1 HD2 HTR HS1 HS2 HCR2. intros. intros k. specialize (H k). specialize (H0 k).
+    intros HD1 HD2 HTR HS1 HCR2. assert (HS2: ∀ k o, (¬ C k o) → ((¬ C1 k o) ∧ (¬ C2 k o))).
+    { intros. destruct (HS1 k o). destruct (decide ((C1 k o ∨ C2 k o))).
+      - specialize (H1 o0). auto.
+      - firstorder.
+    }
+    intros. intros k. specialize (H k). specialize (H0 k).
     inv H.
     - destruct H3. rewrite <-H2 in H0. inv H0. destruct H6. econstructor. split; intros.
-      + destruct (HS1 _ _ H6).
+      + destruct (HS1 k x). clear H8 HS1. rename H7 into HS1. destruct (HS1 H6).
         * specialize (H H7). destruct (decide (C2 k y)); eauto. specialize (H4 n). by subst.
         * destruct (decide (C1 k x)).
           -- specialize (H c). etrans; first eauto. specialize (HCR2 _ _ _ H7 H). auto.
