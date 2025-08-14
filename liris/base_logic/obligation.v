@@ -153,16 +153,122 @@ Section obl_states.
     intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
     destruct H1 as (?&?&?). destruct H2 as (?&?&?). split_and !; try (etrans; eauto).
   Qed.
-
   Global Instance obl_state_transfer_Transitive : Transitive obl_state_transfer.
   Proof using.
     intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
     etrans; eauto.
   Qed.
-
   Global Instance obl_state_resolve_Transitive s : Transitive (obl_state_resolve s).
   Proof using.
     intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
+  Qed.
+
+  Lemma obl_state_progress_live o1 o2 :
+    obl_state_progress o1 o2 →
+    ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
+             (obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)).
+  Proof using.
+    intros. destruct o1, o2; try done. simpl in H. do 2 eexists. split_and; eauto.
+  Qed.
+  Lemma obl_state_progress_tc_live o1 o2 :
+    tc obl_state_progress o1 o2 →
+    ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
+             (obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)).
+  Proof using.
+    intros. induction H.
+    { apply (obl_state_progress_live x y); auto. }
+    apply obl_state_progress_live in H.
+    destruct H as (?&?&?&?&(?&?&?)). destruct IHtc as (?&?&?&?&(?&?&?)).
+    subst. inv H3. exists x0, x3. split_and !; auto.
+    all: etrans; eauto.
+  Qed.
+
+  Lemma obl_state_progress_preserves_live o1 o2 :
+    obl_state_progress o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Proof using.
+    intros. split; intros [? ?]; subst.
+    - destruct o2; try eauto; done.
+    - destruct o1; try eauto; done.
+  Qed.
+  Lemma obl_state_progress_tc_preserves_live o1 o2 :
+    tc obl_state_progress o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Proof using.
+    intros. split.
+    - induction H.
+      { apply (obl_state_progress_preserves_live x y); auto. }
+      intros [? ?]. subst. apply obl_state_progress_preserves_live in H. destruct H.
+      apply IHtc in H; eauto.
+    - induction H.
+      { apply (obl_state_progress_preserves_live x y); auto. }
+      intros [? ?]. subst. apply obl_state_progress_preserves_live in H. destruct H.
+      apply H1. eapply IHtc; eauto.
+  Qed.
+  Lemma obl_state_progress_rtc_preserves_live o1 o2 :
+    rtc obl_state_progress o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Proof using.
+    intros. split.
+    - induction H.
+      { eauto. }
+      intros [? ?]. subst. apply obl_state_progress_preserves_live in H. destruct H.
+      apply IHrtc in H; eauto.
+    - induction H.
+      { eauto. }
+      intros [? ?]. subst. apply obl_state_progress_preserves_live in H. destruct H.
+      apply H1. eapply IHrtc; eauto.
+  Qed.
+
+  Lemma obl_state_transfer_live o1 o2 :
+    obl_state_transfer o1 o2 →
+    ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
+             (obl_count_ltR (obl_transfer d2) (obl_transfer d1)).
+  Proof using.
+    intros. destruct o1, o2; try done. simpl in H. do 2 eexists. split_and; eauto.
+  Qed.
+  Lemma obl_state_transfer_tc_live o1 o2 :
+    tc obl_state_transfer o1 o2 →
+    ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
+             (obl_count_ltR (obl_transfer d2) (obl_transfer d1)).
+  Proof using.
+    intros. induction H.
+    { apply (obl_state_transfer_live x y); auto. }
+    apply obl_state_transfer_live in H.
+    destruct H as (?&?&?&?&?). destruct IHtc as (?&?&?&?&?).
+    subst. inv H3. exists x0, x3. split_and !; auto.
+    etrans; eauto.
+  Qed.
+
+  Lemma obl_state_transfer_preserves_live o1 o2 :
+    obl_state_transfer o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Proof using.
+    intros. split; intros [? ?]; subst.
+    - destruct o2; try eauto; done.
+    - destruct o1; try eauto; done.
+  Qed.
+  Lemma obl_state_transfer_tc_preserves_live o1 o2 :
+    tc obl_state_transfer o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Proof using.
+    intros. split.
+    - induction H.
+      { apply (obl_state_transfer_preserves_live x y); auto. }
+      intros [? ?]. subst. apply obl_state_transfer_preserves_live in H. destruct H.
+      apply IHtc in H; eauto.
+    - induction H.
+      { apply (obl_state_transfer_preserves_live x y); auto. }
+      intros [? ?]. subst. apply obl_state_transfer_preserves_live in H. destruct H.
+      apply H1. eapply IHtc; eauto.
+  Qed.
+  Lemma obl_state_transfer_rtc_preserves_live o1 o2 :
+    rtc obl_state_transfer o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Proof using.
+    intros. split.
+    - induction H.
+      { eauto. }
+      intros [? ?]. subst. apply obl_state_transfer_preserves_live in H. destruct H.
+      apply IHrtc in H; eauto.
+    - induction H.
+      { eauto. }
+      intros [? ?]. subst. apply obl_state_transfer_preserves_live in H. destruct H.
+      apply H1. eapply IHrtc; eauto.
   Qed.
 
   Global Instance obl_states_cond_rel_Transitive C R :
@@ -284,42 +390,6 @@ Section obl_states.
           -- specialize (H3 n). subst. auto.
       + destruct (HS2 _ _ H6). specialize (H3 H7). subst. specialize (H4 H8). subst. auto.
     - rewrite -H3 in H0. inv H0. econstructor.
-  Qed.
-
-
-  TODO
-
-
-
-  Lemma obl_states_progress_rtc_live Ω1 Ω2 k :
-    Ω1 ↪ₚ⋆ Ω2 → (∃ d, Ω1 !! k = Some (obl_live d)) ↔ (∃ d', Ω2 !! k = Some (obl_live d')).
-  Proof using.
-    intros H. apply (obl_states_progress_rtc_lookup _ _ k) in H.
-    split; intros (d & LU); rewrite LU in H; inv H.
-    - clear LU H1 k. remember (obl_live d) as z. revert d Heqz. induction H2; intros; subst; eauto.
-      destruct y; simpl in H; try done. destruct H; subst. eapply IHrtc; eauto.
-    - clear LU H0 k. remember (obl_live d) as z. revert d Heqz. induction H2; intros; subst; eauto.
-      specialize (IHrtc _ eq_refl). destruct IHrtc as (?&H0). inv H0. destruct x; simpl in H; try eauto; done.
-  Qed.
-
-  Lemma obl_states_progress_rtc_done_1 Ω1 Ω2 k :
-    Ω1 ↪ₚ⋆ Ω2 → ∀ P, Ω1 !! k = Some (obl_done P) → (∃ P', Ω2 !! k = Some (obl_done P') ∧ P ≡ P').
-  Proof using.
-    intros H. apply (obl_states_progress_rtc_lookup _ _ k) in H.
-    intros P LU; rewrite LU in H; inv H.
-    clear LU H1. remember (obl_done P) as z. revert P Heqz. induction H2; intros; subst; eauto.
-    destruct y; simpl in H; try done.
-    specialize (IHrtc P0 eq_refl). destruct IHrtc as (P'&?&?). inv H0. exists P'. split; auto. etransitivity; eauto.
-  Qed.
-
-  Lemma obl_states_progress_rtc_done_2 Ω1 Ω2 k :
-    Ω1 ↪ₚ⋆ Ω2 → ∀ P, Ω2 !! k = Some (obl_done P) → (∃ P', Ω1 !! k = Some (obl_done P') ∧ P ≡ P').
-  Proof using.
-    intros H. apply (obl_states_progress_rtc_lookup _ _ k) in H.
-    intros P LU; rewrite LU in H; inv H.
-    clear LU H0 k. remember (obl_done P) as z. revert P Heqz. induction H2; intros; subst; eauto.
-    specialize (IHrtc _ eq_refl). destruct IHrtc as (P'&?&?). inv H0. destruct x; simpl in H; try done.
-    exists P0. split; auto. etransitivity; eauto.
   Qed.
 
 End obl_states.
