@@ -89,7 +89,7 @@ Section bank.
   Qed.
   Lemma bank_valid_debt_cash_raw e s q c : ✓ (BankDebt e s q ⋅ BankCash c) ↔ (s /⊕ c /≤ e) ∧ (q ≤ 1)%Qp.
   Proof. rewrite bank_op_debt_cash. apply bank_valid_debt. Qed.
-  Lemma bank_valid_Debt_cash a q c : ✓ (debt a q ⋅ cash c) ↔ (c ≤ a) ∧ (q ≤ 1)%Qp.
+  Lemma bank_valid_debt_cash a q c : ✓ (debt a q ⋅ cash c) ↔ (c ≤ a) ∧ (q ≤ 1)%Qp.
   Proof. rewrite /debt /cash bank_valid_debt_cash_raw. by rewrite left_id_L quotient.from_monoid_le. Qed.
 
   Lemma bank_cash_included a b : BankCash a ≼ BankCash b ↔ ∃ c, b = (a /⊕ c).
