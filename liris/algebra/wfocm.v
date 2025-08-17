@@ -23,6 +23,31 @@ Module WFOCM.
       }
     Qed.
 
+    Lemma lt_le : forall a b, (ltR a b) -> (leR a b).
+    Proof using Type*.
+      intros. apply lt_exists_left in H0. destruct H0 as (?&?&?).
+      etransitivity; last eauto. apply OCM.add_base_left_le.
+    Qed.
+
+    Lemma lt_le_lt : forall a b c, (ltR a b) -> (leR b c) -> (ltR a c).
+    Proof using Type*.
+      intros. apply lt_exists_left in H0. destruct H0 as (?&?&?).
+      apply lt_exists_left. exists x. split; first auto.
+      etransitivity; eauto.
+    Qed.
+
+    Lemma le_lt_lt : forall a b c, (leR a b) -> (ltR b c) -> (ltR a c).
+    Proof using Type*.
+      intros. apply lt_exists_left in H1. destruct H1 as (?&?&?).
+      apply lt_exists_left. exists x. split; first auto.
+      etransitivity; eauto. apply OCM.add_le_proper; auto. reflexivity.
+    Qed.
+
+    Global Instance lt_Transitive : Transitive ltR.
+    Proof using Type*.
+      intros x y z H0 H1. eapply lt_le_lt; eauto. apply lt_le; auto.
+    Qed.
+
     Lemma induction_type : forall P : A -> Type, (forall x : A, (forall y : A, ltR y x -> P y) -> P x) -> forall a : A, P a.
     Proof using Type*.
       intros. apply (well_founded_induction_type lt_wf). auto.

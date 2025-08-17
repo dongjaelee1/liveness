@@ -21,8 +21,7 @@ Proof.
   - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
 Qed.
 
-Class obl_class (obl_count obl_ps obl_ownerid : Type) := {
-    obl_count_ltR : relation obl_count;
+Class obl_class (obl_count obl_ps obl_ownerid : Type) (obl_count_ltR : relation obl_count) := {
     obl_count_ltR_well_founded : well_founded obl_count_ltR;
     #[global] obl_count_ltR_Transitive :: Transitive obl_count_ltR;
     #[global] obl_ownerid_EqDecision :: EqDecision obl_ownerid;
@@ -36,6 +35,9 @@ Record obl_live_data `{Ξ : obl_class} := {
 
 Inductive obl_state `{Ξ : obl_class} : Type :=
 | obl_live (d : obl_live_data) | obl_done (P : prop_of obl_ps).
+
+Definition olive `{Ξ : obl_class} α τ β := obl_live (Build_obl_live_data _ _ _ _ _ α τ β).
+Definition odone `{Ξ : obl_class} P := obl_done P.
 
 (* Transition to make logical progress that can obtain a later. *)
 Definition obl_state_progress `{Ξ : obl_class} : relation obl_state :=
