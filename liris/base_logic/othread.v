@@ -10,8 +10,8 @@ Module othreadGS.
   (* Assumes thread ids are positive *)
   Class othreadGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     OthreadGpreS {
-        othreadGpreS_state : inG Σ (reservation_mapUR (gmap_viewR obl_id (agreeR (leibnizO bool))));
-        othreadGpreS_thread : inG Σ (gmap_viewR positive (gset_disjUR obl_id));
+        othreadGpreS_status : inG Σ (reservation_mapUR (gmap_viewR obl_id (agreeR (leibnizO bool))));
+        othreadGpreS_obls : inG Σ (gmap_viewR positive (gset_disjUR obl_id));
         othreadGpreS_exec : inG Σ (reservation_mapUR mono_natUR);
         othreadGpreS_elem : inG Σ (gmap_viewR positive unitUR);
       }.
@@ -19,8 +19,8 @@ Module othreadGS.
   Class othreadGS `{SI : indexT} (Σ : gFunctors) : Set :=
     OthreadG {
         othread_inG : othreadGpreS Σ;
-        state_name : gname;
-        thread_name : gname;
+        status_name : gname;
+        obls_name : gname;
         exec_name : gname;
         elem_name : gname;
       }.
@@ -42,17 +42,17 @@ Import othreadGS.
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances othread_inG
-  othreadGpreS_state othreadGpreS_thread othreadGpreS_exec othreadGpreS_elem.
+  othreadGpreS_status othreadGpreS_obls othreadGpreS_exec othreadGpreS_elem.
 
 (* States: thread currently has this obl or not *)
 Definition othreadG_owns `{SI : indexT} `{!othreadGS Σ} (i : positive) (k : obl_id) (f : bool) (q : Qp) : iProp Σ :=
-  own state_name (reservation_map_data i (gmap_view_frag k (DfracOwn q) (to_agree $ f))).
+  own status_name (reservation_map_data i (gmap_view_frag k (DfracOwn q) (to_agree $ f))).
 Global Typeclasses Opaque othreadG_owns.
 Global Instance: Params (@othreadG_owns) 5 := {}.
 
 (* Thread: live obligations that this thread knows, also fix to empty when thread terminates *)
 Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (Θ : gset obl_id) (q : Qp) : iProp Σ :=
-  own thread_name (gmap_view_frag i (DfracOwn q) (GSet Θ)).
+  own obls_name (gmap_view_frag i (DfracOwn q) (GSet Θ)).
 Global Typeclasses Opaque othreadG_obls.
 Global Instance: Params (@othreadG_obls) 4 := {}.
 
@@ -85,13 +85,13 @@ Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   locked
     (∃ (OThread : gmap positive (gmap obl_id bool)),
         (⌜ dom OThread = TP ⌝) ∗
-        (own state_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset TP))) ∗
+        (own status_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset TP))) ∗
         (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))) ∗
-        (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
+        (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
         (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> OThread))) ∗
         ([∗ map] i ↦ OObls ∈ OThread,
            (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ othreadG_obls i ∅ 1)) ∗
-           (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
+           (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
            ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2)%Qp ∗
                                     (match f with | true => oblG_owner k i (1/2/2)%Qp | _ => emp end))
         )
@@ -100,6 +100,7 @@ Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
 Section othread.
   Context `{SI : indexT} `{WFA : WFOCM.pack A}.
   Context {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS Σ}.
+  Context `{Ξ : obl_class A ps positive WFOCM.ltR}.
 
   Global Instance othreadG_term_persistent i : Persistent (othreadG_term i).
   Proof. rewrite /othreadG_term. apply _. Qed.
@@ -135,9 +136,9 @@ Section othread.
   (** State rules *)
   Lemma othreadG_state_alloc D i :
     i ∉ D →
-    (own state_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset D)))
-    ⊢ |==> (own state_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset ({[i]} ∪ D)))) ∗
-           (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (∅ : gmap obl_id bool))))).
+    (own status_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset D)))
+    ⊢ |==> (own status_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset ({[i]} ∪ D)))) ∗
+           (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (∅ : gmap obl_id bool))))).
   Proof.
     iIntros (Hi) "Htk".
     iPoseProof (reservation_map_token_alloc_singleton _ _ i (gmap_view_auth (DfracOwn 1) (to_agree <$> (∅ : gmap obl_id bool))) with "Htk") as "[Htk >H]"; auto.
@@ -147,8 +148,8 @@ Section othread.
 
   Lemma othreadG_owns_alloc i (OObls : gmap obl_id bool) k (f : bool) :
     OObls !! k = None →
-    (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls))))
-    ⊢ |==> (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (<[k := f]>OObls))))) ∗
+    (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls))))
+    ⊢ |==> (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (<[k := f]>OObls))))) ∗
            othreadG_owns i k f 1.
   Proof.
     iIntros (Hk) "H". 
@@ -161,17 +162,17 @@ Section othread.
     rewrite fmap_insert. done.
   Qed.
   Lemma othreadG_owns_delete i (OObls : gmap obl_id bool) k (f : bool) :
-    (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
+    (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
     othreadG_owns i k f 1
-    ⊢ |==> (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (delete k OObls))))).
+    ⊢ |==> (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (delete k OObls))))).
   Proof.
     rewrite -own_op -reservation_map_data_op. apply own_update, reservation_map_update.
     rewrite fmap_delete. apply gmap_view_delete.
   Qed.
   Lemma othreadG_owns_update i OObls k f1 f2 :
-    (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
+    (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
     othreadG_owns i k f1 1
-    ⊢ |==> (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (<[k:=f2]>OObls))))) ∗
+    ⊢ |==> (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (<[k:=f2]>OObls))))) ∗
            othreadG_owns i k f2 1.
   Proof.
     rewrite /othreadG_owns -!own_op -!reservation_map_data_op. apply own_update.
@@ -211,9 +212,9 @@ Section othread.
 
   Lemma othreadG_owns_update_2 i OObls k f1 f2 f q1 q2 :
     (q1 + q2 = 1)%Qp →
-    (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
+    (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
     othreadG_owns i k f1 q1 ∗ othreadG_owns i k f2 q2
-    ⊢ |==> (own state_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (<[k:=f]>OObls))))) ∗
+    ⊢ |==> (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> (<[k:=f]>OObls))))) ∗
            othreadG_owns i k f q1 ∗ othreadG_owns i k f q2.
   Proof.
     intros Hq. iIntros "[H Hq]". iPoseProof (othreadG_owns_valid_2 with "Hq") as "%". destruct H0 as [_ ?]. subst.
@@ -225,8 +226,8 @@ Section othread.
   (** Thread rules *)
   Lemma othreadG_obls_alloc (OThread : gmap positive (gmap obl_id bool)) i :
     OThread !! i = None →
-    (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread))))
-    ⊢ |==> (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> <[i:=∅]>OThread)))) ∗
+    (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread))))
+    ⊢ |==> (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> <[i:=∅]>OThread)))) ∗
            othreadG_obls i ∅ 1.
   Proof.
     iIntros (Hi) "H". 
@@ -239,7 +240,7 @@ Section othread.
   Qed.
 
   Lemma othreadG_obls_lookup (OThread : gmap positive (gmap obl_id bool)) i Θ :
-    (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
+    (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
     othreadG_obls i Θ 1
     ⊢ ⌜ (dom <$> OThread) !! i = Some Θ ⌝.
   Proof.
@@ -248,7 +249,7 @@ Section othread.
     apply leibniz_equiv, lookup_fmap_Some in H0. destruct H0 as (?&?&?). inv H0. done.
   Qed.
   Lemma othreadG_obls_lookup_frac (OThread : gmap positive (gmap obl_id bool)) i Θ q :
-    (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
+    (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
     othreadG_obls i Θ q
     ⊢ ∃ Θ', ⌜ (dom <$> OThread) !! i = Some Θ' ∧ Θ ⊆ Θ' ⌝.
   Proof.
@@ -259,9 +260,9 @@ Section othread.
   Qed.
 
   Lemma othreadG_obls_update (OThread : gmap positive (gmap obl_id bool)) i Θ M :
-    (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
+    (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
     othreadG_obls i Θ 1
-    ⊢ |==> (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> <[i:=M]>OThread)))) ∗
+    ⊢ |==> (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> <[i:=M]>OThread)))) ∗
            othreadG_obls i (dom M) 1.
   Proof.
     rewrite /othreadG_obls -!own_op. apply own_update.
@@ -270,9 +271,9 @@ Section othread.
   Lemma othreadG_obls_update_local (OThread : gmap positive (gmap obl_id bool)) i q M1 M2 X1 X2 :
     (OThread !! i = Some M1) →
     (GSet (dom M1), GSet X1) ~l~> (GSet (dom M2), GSet X2) →
-    (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
+    (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
     othreadG_obls i X1 q
-    ⊢ |==> (own thread_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> <[i:=M2]>OThread)))) ∗
+    ⊢ |==> (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> <[i:=M2]>OThread)))) ∗
            othreadG_obls i X2 q.
   Proof.
     intros Hlookup Hlu. rewrite /othreadG_obls -!own_op. apply own_update.
@@ -370,6 +371,89 @@ Section othread.
   Qed.
 
   (** othread rules *)
+  Lemma othread_elem i TP :
+    othread TP ∗ othreadG_elem i ⊢ ⌜i ∈ TP⌝.
+  Proof.
+    rewrite /othread -!lock. iIntros "(Hthread & He)".
+    iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
+    iPoseProof (othreadG_elem_elem with "[$]") as "%".
+    by rewrite -Hdom.
+  Qed.
+
+  Lemma othread_alloc_thread i TP :
+    i ∉ TP →
+    othread TP
+    ⊢ |==> othread ({[i]} ∪ TP) ∗ othreadG_elem i ∗ othreadG_obls i ∅ 1 ∗ othreadG_exec i (1/2)%Qp.
+  Proof.
+    iIntros (Hi) "Hthread".
+    rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
+    assert (Hlu : OThread !! i = None).
+    { apply not_elem_of_dom. rewrite Hdom. auto. }
+    iMod (othreadG_elem_alloc _ i ∅ with "HE") as "[HE He]"; first auto.
+    iMod (othreadG_state_alloc with "HS") as "[HS Hs]"; first done.
+    iMod (othreadG_obls_alloc _ i with "HO") as "[HO Ho]"; first auto.
+    iMod (othreadG_exec_alloc _ i with "HX") as "[HX Hx]"; first auto.
+    iDestruct (othreadG_exec_div_2 with "Hx") as "[Hx0 Hx]".
+    iModIntro. iFrame "He Ho Hx0". iExists (<[i:=∅]>OThread). iFrame "HE HS HO HX".
+    iSplitR.
+    { iPureIntro. rewrite dom_insert_L Hdom. done. }
+    iApply big_sepM_insert; first done.
+    iFrame. done.
+  Qed.
+
+  Lemma othread_alloc_obl Ω TP i Θ k :
+    osat Ω ∗ othread TP ∗ othreadG_elem i ∗ othreadG_obls i Θ 1 ∗ oblG_live k (1/2)%Qp
+    ⊢ |==> osat Ω ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Θ) 1 ∗ othreadG_owns i k false 1.
+  Proof.
+    iIntros "(Hsat & Hthread&He&Ho&Os)".
+    (* iPoseProof (othread_elem with "[Hthread He]") as "%"; first iFrame. *)
+    rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
+    (* assert (Hlu : ∃ m, OThread !! i = m). *)
+    (* { rewrite -Hdom in H0. apply elem_of_dom in H0. eauto. } *)
+    (* destruct Hlu as [m Hlu]. *)
+    iPoseProof (othreadG_obls_lookup with "[HO Ho]") as "%"; first iFrame.
+    assert (Hlu : ∃ m, dom m = Θ ∧ OThread !! i = Some m).
+    { rewrite lookup_fmap_Some in H0. eauto. }
+    destruct Hlu as (OObls&Hm&Hlu).
+
+    TODO
+    
+othreadG_owns_alloc:
+  ∀ (i : positive) (OObls : gmap obl_id bool) (k : obl_id) (f : bool),
+    OObls !! k = None
+    → own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))
+      ⊢ |==> own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> <[k:=f]> OObls))) ∗
+          othreadG_owns i k f 1
+    
+    iMod (othreadG_elem_alloc _ i ∅ with "HE") as "[HE He]"; first auto.
+    iMod (othreadG_state_alloc with "HS") as "[HS Hs]"; first done.
+    iMod (othreadG_obls_alloc _ i with "HO") as "[HO Ho]"; first auto.
+    iMod (othreadG_exec_alloc _ i with "HX") as "[HX Hx]"; first auto.
+    iDestruct (othreadG_exec_div_2 with "Hx") as "[Hx0 Hx]".
+    iModIntro. iFrame "He Ho Hx0". iExists (<[i:=∅]>OThread). iFrame "HE HS HO HX".
+    iSplitR.
+    { iPureIntro. rewrite dom_insert_L Hdom. done. }
+    iApply big_sepM_insert; first done.
+    iFrame. done.
+  Qed.
+
+Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS Σ}
+  (TP : gset positive) : iProp Σ :=
+  locked
+    (∃ (OThread : gmap positive (gmap obl_id bool)),
+        (⌜ dom OThread = TP ⌝) ∗
+        (own status_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset TP))) ∗
+        (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))) ∗
+        (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
+        (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> OThread))) ∗
+        ([∗ map] i ↦ OObls ∈ OThread,
+           (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ othreadG_obls i ∅ 1)) ∗
+           (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
+           ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2)%Qp ∗
+                                    (match f with | true => oblG_owner k i (1/2/2)%Qp | _ => emp end))
+        )
+    )%I.
 
 End othread.
 
