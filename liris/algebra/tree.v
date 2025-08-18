@@ -16,6 +16,8 @@ Section tree.
   Definition root t v : Prop := ∀ u, v ∉ children t u.
   Definition internal t v : Prop := (∃ π, parent t v π).
 
+  Definition tree_wf t : Prop := ∀ v π1 π2, parent t v π1 → parent t v π2 → π1 = π2.
+
   Inductive descendants t : V → gset V → Prop :=
   | descendants_child v Δ (cds : gmap V (gset V)) :
     dom cds = children t v →

@@ -263,7 +263,7 @@ Section osat.
     apply reservation_map_update. apply mono_nat_update. auto.
   Qed.
 
-  Lemma oblG_live_dfrac_op k q1 q2 q :
+  Lemma oblG_live_frac_op k q1 q2 q :
     q = (q1 + q2)%Qp →
     oblG_live k q1 ∗ oblG_live k q2 ⊣⊢ oblG_live k q.
   Proof.
@@ -273,7 +273,7 @@ Section osat.
   Qed.
   Lemma oblG_live_div_2 k q :
     oblG_live k (q/2) ∗ oblG_live k (q/2) ⊣⊢ oblG_live k q.
-  Proof. rewrite oblG_live_dfrac_op; first done. by rewrite Qp.div_2. Qed.
+  Proof. rewrite oblG_live_frac_op; first done. by rewrite Qp.div_2. Qed.
   Lemma oblG_live_valid k q :
     oblG_live k q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
   Proof.
@@ -651,7 +651,7 @@ Section osat.
     apply frac_agree_op_valid in Hv. iPureIntro. destruct Hv. done.
   Qed.
 
-  Lemma oblG_owner_dfrac_op k τ q0 q1 q :
+  Lemma oblG_owner_frac_op k τ q0 q1 q :
     q = (q0 + q1)%Qp →
     oblG_owner k τ q0 ∗ oblG_owner k τ q1 ⊣⊢ oblG_owner k τ q.
   Proof.
@@ -661,7 +661,7 @@ Section osat.
   Qed.
   Lemma oblG_owner_div_2 k τ q :
     oblG_owner k τ (q/2) ∗ oblG_owner k τ (q/2) ⊣⊢ oblG_owner k τ q.
-  Proof. rewrite oblG_owner_dfrac_op; first done. by rewrite Qp.div_2. Qed.
+  Proof. rewrite oblG_owner_frac_op; first done. by rewrite Qp.div_2. Qed.
   Lemma oblG_owner_valid k τ q :
     oblG_owner k τ q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
   Proof.
@@ -877,12 +877,12 @@ Section osat.
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     iDestruct "Hk" as "( Hs & (%&%Htle&Hts) & (%&%&Hb) & Ho & (%&%&Hps) )".
     iMod (oblG_live_to_done with "[Hs Hs0]") as "Hs".
-    { iApply oblG_live_dfrac_op; last iFrame. by rewrite Qp.div_2. }
+    { iApply oblG_live_frac_op; last iFrame. by rewrite Qp.div_2. }
     iPoseProof (oblG_done_auth_done with "Hs") as "#Hsd".
     iPoseProof (oblG_transfer_supply_add with "[Hts Hts0]") as "(%&Hts&_)"; first iFrame.
     iPoseProof (oblG_owner_agree with "[Ho Ho0]") as "%"; first iFrame.
     destruct H1. clear H2. subst x1.
-    iCombine "Ho Ho0" as "Ho". iPoseProof (oblG_owner_dfrac_op with "Ho") as "Ho".
+    iCombine "Ho Ho0" as "Ho". iPoseProof (oblG_owner_frac_op with "Ho") as "Ho".
     { by rewrite Qp.div_2. }
     iPoseProof (oblG_progress_supply_add with "[Hps Hps0]") as "(%&Hps&_)"; first iFrame.
     rewrite (Qp.div_2 1).
@@ -896,7 +896,7 @@ Section osat.
 
   Lemma osat_transfer_bound Ω k α ℵ :
     osat Ω ∗ oblG_elem k ∗ oblG_transfer_supply k α (1/2)%Qp ∗ oblG_transfer_bound k ℵ
-    ⊢ osat Ω ∗ ∃ α', oblG_transfer_supply k α' (1/2)%Qp ∗ ⌜ α' /≤ ℵ ⌝.
+    ⊢ osat Ω ∗ ∃ α', oblG_transfer_supply k α' (1/2)%Qp ∗ ⌜ α' /≤ α ∧ α' /≤ ℵ ⌝.
   Proof.
     iIntros "(Hsat & #He & Hts0 & #Hb0)".
     iPoseProof (osat_elem k with "[Hsat]") as "%Helem"; first iFrame; eauto.
@@ -913,8 +913,8 @@ Section osat.
       { iFrame "Hm". iFrame. iPureIntro. split_and !; eauto. destruct H1. etransitivity; eauto. }
       iFrame "HS HT HB HO HP".
       rewrite insert_delete_eq insert_id; last done. iFrame.
-      simpl; iPureIntro; split_and !; auto.
-      destruct H1. etransitivity; [eapply H2 | etransitivity; eauto].
+      destruct H1. simpl; iPureIntro; split_and !; auto.
+      etransitivity; [eapply H2 | etransitivity; eauto].
     - iExFalso.
       iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & (%&Hts) & (%&Ho) & (%&Hps))".
       iPoseProof (oblG_transfer_supply_add with "[Hts Hts0]") as "(%&Hts&_)"; first iFrame.
