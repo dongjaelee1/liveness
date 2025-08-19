@@ -640,67 +640,37 @@ Section othread.
     othread TP ∗ othreadG_elem i ∗ othreadG_term i
     ⊢ othreadG_obls i ∅ 1 ∗ (othreadG_obls i ∅ 1 -∗ othread TP).
   Proof.
-
-    iIntros "(Hthread & Hx & Ho)".
+    iIntros "(Hthread & He & Hx)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
-    iPoseProof (othreadG_obls_lookup with "[HO Ho]") as "%"; first iFrame.
-    assert (Hlui : OThread !! i = Some ∅).
-    { rewrite lookup_fmap_Some in H0. destruct H0 as (?&?&?). apply dom_empty_inv_L in H0. subst; eauto. }
+    iPoseProof (othreadG_elem_elem with "[$]") as "%Hini".
+    assert (Hlui : ∃ m, OThread !! i = Some m).
+    { rewrite elem_of_dom in Hini. eauto. }
+    destruct Hlui as (OObls&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
-    iDestruct "Hi" as "([Hix | [Hix _]] & His & Him)"; last first.
-    { iExFalso. iPoseProof (othreadG_term_auth_term with "[$]") as "Hxt".
-      iPoseProof (othreadG_exec_term_false with "[$]") as "%F". inversion F.
-    }
-    iMod (othreadG_exec_to_term with "[Hx Hix]") as "Hx".
-    { rewrite -(othreadG_exec_div_2 _ 1). iFrame. }
-    iPoseProof (othreadG_term_auth_term with "Hx") as "#Hxt".
-    iModIntro. iSplitL; last done.
+    iDestruct "Hi" as "([Hix | [Hix Ho]] & His & Him)".
+    { iExFalso. iPoseProof (othreadG_exec_term_false with "[$]") as "%F". inversion F. }
+    iFrame "Ho". iIntros "Ho".
     iExists OThread. iSplitR; first done. iFrame "HS HX HO HE".
     iApply (big_sepM_delete _ _ i _ Hlui). iFrame. iRight. iFrame.
   Qed.
 
-  TODO
-    
-Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
-  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS Σ}
-  (TP : gset positive) : iProp Σ :=
-  locked
-    (∃ (OThread : gmap positive (gmap obl_id bool)),
-        (⌜ dom OThread = TP ⌝) ∗
-        (own status_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset TP))) ∗
-        (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))) ∗
-        (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
-        (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> OThread))) ∗
-        ([∗ map] i ↦ OObls ∈ OThread,
-           (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ othreadG_obls i ∅ 1)) ∗
-           (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
-           ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2)%Qp ∗
-                                    (match f with | true => oblG_owner k i (1/2/2)%Qp | _ => emp end))
-        )
-    )%I.
-
 End othread.
 
-(* Allocation of an initial obligation protocol. *)
-(* Lemma othread_alloc `{SI : indexT} `{WFA : WFOCM.pack A} `{!othreadGpreS ps T Σ} `{obl_class A ps T} : *)
-(*   ⊢ |==> ∃ _ : othreadGS ps T Σ, othread ∅. *)
-(* Proof. *)
-(*   iIntros. *)
-(*   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR obl_id (prodR _ _))) as (γG) "HG"; *)
-(*     first by apply gmap_view_auth_valid. *)
-(*   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR obl_id (agreeR $ metaO))) as (γM) "HM"; *)
-(*     first by apply gmap_view_auth_valid. *)
-(*   iMod (own_alloc (ε : gmap positive mono_natUR)) as (γS) "HS"; *)
-(*     first done. *)
-(*   iMod (own_alloc (ε : gmap positive bankUR)) as (γT) "HT"; *)
-(*     first done. *)
-(*   iMod (own_alloc (ε : gmap positive (dfrac_agreeR (leibnizO T)))) as (γO) "HO"; *)
-(*     first done. *)
-(*   iMod (own_alloc (ε : gmap positive bankUR)) as (γC) "HC"; *)
-(*     first done. *)
-(*   iModIntro; iExists (OthreadG SI _ WFA _ _ _ _ γG γM γS γT γO γC). *)
-(*   rewrite /othread -lock. *)
-(*   iSplitL "HG"; first (iExists ∅; by iFrame). *)
-(*   iSplitL "HM"; first (iExists ∅; by iFrame). *)
-(*   by iFrame. *)
-(* Qed. *)
+(* Allocation of initial invariant. *)
+Lemma othread_alloc `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGpreS Σ} :
+  ⊢ |==> ∃ _ : othreadGS Σ, othread ∅.
+Proof.
+  iIntros.
+  iMod (own_alloc (reservation_map_token (A:=(gmap_viewR obl_id (agreeR (leibnizO bool)))) ⊤)) as (γS) "HS";
+    first by apply reservation_map_token_valid.
+  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive (gset_disjUR _))) as (γO) "HO";
+    first by apply gmap_view_auth_valid.
+  iMod (own_alloc (reservation_map_token (A:=mono_natUR) ⊤)) as (γX) "HX";
+    first by apply reservation_map_token_valid.
+  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive unitUR)) as (γE) "HE";
+    first by apply gmap_view_auth_valid.
+  iModIntro; iExists (OthreadG SI _ _ γS γO γX γE).
+  rewrite /othread -lock. iExists ∅. iSplitR; first done.
+  replace (⊤ ∖ gset_to_coPset ∅) with (⊤ : coPset); [iFrame; done|].
+  set_solver.
+Qed.
