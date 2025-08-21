@@ -677,6 +677,14 @@ Section osat.
     rewrite /oblG_owner -!own_op -!reservation_map_data_op.
     intros Heq. by apply own_update, reservation_map_update, frac_agree_update_2.
   Qed.
+  Lemma oblG_owner_update k τ0 τ1 :
+    oblG_owner k τ0 1 ⊢ |==> oblG_owner k τ1 1.
+  Proof.
+    iIntros "H". iPoseProof (oblG_owner_div_2 with "H") as "[H1 H2]".
+    iMod (oblG_owner_update_2 _ _ _ _ _ τ1 with "[H1 H2]") as "[H1 H2]"; [| iFrame |].
+    { by rewrite Qp.div_2. }
+    iCombine "H1 H2" as "H". by iPoseProof (oblG_owner_div_2 with "H") as "H".
+  Qed.
 
   Lemma oblG_owner_alloc D k τ :
     k ∉ D →
@@ -719,6 +727,13 @@ Section osat.
     - iExFalso. iDestruct "LU" as "(% & % & _ & _ & _ & DONE & _)".
       iPoseProof (oblG_live_done_false with "[Hl DONE]") as "%F"; [iFrame | done].
       iPoseProof (oblG_done_auth_done with "[$]") as "#D". done.
+  Qed.
+  Lemma osat_obl_is_live_olive Ω k q :
+    osat Ω ∗ oblG_elem k ∗ oblG_live k q
+    ⊢ ∃ α τ β, ⌜Ω !! k = Some (olive α τ β)⌝.
+  Proof.
+    iIntros "H". iPoseProof (osat_obl_is_live with "H") as "(%&%)".
+    iPureIntro. destruct d. eauto.
   Qed.
 
   Lemma osat_obl_is_done Ω k (P : prop_of ps) R :

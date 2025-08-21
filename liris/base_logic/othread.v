@@ -133,8 +133,8 @@ Section othread.
     iPoseProof "HQ'" as "%". iPureIntro. apply elem_of_dom_2 in H0. by rewrite dom_fmap_L in H0.
   Qed.
 
-  (** State rules *)
-  Lemma othreadG_state_alloc D i :
+  (** Status rules *)
+  Lemma othreadG_owns_alloc_map D i :
     i ∉ D →
     (own status_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset D)))
     ⊢ |==> (own status_name (reservation_map_token (A:=gmap_viewR obl_id (agreeR (leibnizO bool))) (⊤ ∖ gset_to_coPset ({[i]} ∪ D)))) ∗
@@ -403,7 +403,7 @@ Section othread.
     assert (Hlu : OThread !! i = None).
     { apply not_elem_of_dom. rewrite Hdom. auto. }
     iMod (othreadG_elem_alloc _ i ∅ with "HE") as "[HE He]"; first auto.
-    iMod (othreadG_state_alloc with "HS") as "[HS Hs]"; first done.
+    iMod (othreadG_owns_alloc_map with "HS") as "[HS Hs]"; first done.
     iMod (othreadG_obls_alloc _ i with "HO") as "[HO Ho]"; first auto.
     iMod (othreadG_exec_alloc _ i with "HX") as "[HX Hx]"; first auto.
     iDestruct (othreadG_exec_div_2 with "Hx") as "[Hx0 Hx]".
