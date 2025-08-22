@@ -13,7 +13,7 @@ Module otreeGS.
         otreeGpreS_edge : inG Σ (reservation_mapUR (gmap_viewR obl_id unitUR));
         (* Data for suspending an obligation: returning thread_id, blocking parent id *)
         otreeGpreS_suspend : inG Σ (reservation_mapUR (gmap_viewR positive (agreeR (prodO positiveO obl_idO))));
-        otreeGpreS_wait : inG Σ (reservation_mapUR (gmapUR positive mono_natUR));
+        otreeGpreS_wait : inG Σ (reservation_mapUR (reservation_mapUR mono_natUR));
         otreeGpreS_elem : inG Σ (gmap_viewR obl_id unitUR);
       }.
 
@@ -29,7 +29,7 @@ Module otreeGS.
   Definition otreeΣ `{SI : indexT} : gFunctors :=
     #[GFunctor (reservation_mapUR (gmap_viewR obl_id unitUR));
       GFunctor (reservation_mapUR (gmap_viewR positive (agreeR (prodO positiveO obl_idO))));
-      GFunctor (reservation_mapUR (gmapUR positive mono_natUR));
+      GFunctor (reservation_mapUR (reservation_mapUR mono_natUR));
       GFunctor (gmap_viewR positive unitUR)
       ].
 
@@ -49,24 +49,24 @@ Local Existing Instances otree_inG
 Definition otreeG_edge `{SI : indexT} `{!otreeGS Σ} (π k : obl_id) (q : Qp) : iProp Σ :=
   own edge_name (reservation_map_data π (gmap_view_frag k (DfracOwn q) ())).
 Global Typeclasses Opaque otreeG_edge.
-Global Instance: Params (@otreeG_edge) 6 := {}.
+Global Instance: Params (@otreeG_edge) 5 := {}.
 
 (* Suspend knowledge *)
 Definition otreeG_suspend `{SI : indexT} `{!otreeGS Σ} (k : obl_id) (x : positive) (θ : positive) (π : obl_id) : iProp Σ :=
   own suspend_name (reservation_map_data k (gmap_view_frag x DfracDiscarded (to_agree (θ, π)))).
 Global Typeclasses Opaque otreeG_suspend.
-Global Instance: Params (@otreeG_suspend) 6 := {}.
+Global Instance: Params (@otreeG_suspend) 7 := {}.
 
 (* Wait token *)
 Definition otreeG_wait `{SI : indexT} `{!otreeGS Σ} (k : obl_id) (x : positive) (q : Qp) : iProp Σ :=
-  own wait_name (reservation_map_data k {[x := ●MN{#q} 0]}).
+  own wait_name (reservation_map_data k (reservation_map_data x (●MN{#q} 0))).
 Global Typeclasses Opaque otreeG_wait.
-Global Instance: Params (@otreeG_wait) 6 := {}.
+Global Instance: Params (@otreeG_wait) 5 := {}.
 
 Definition otreeG_wait_null `{SI : indexT} `{!otreeGS Σ} (k : obl_id) (x : positive) : iProp Σ :=
-  own wait_name (reservation_map_data k {[x := ●MN 1]}).
+  own wait_name (reservation_map_data k (reservation_map_data x (●MN 1))).
 Global Typeclasses Opaque otreeG_wait_null.
-Global Instance: Params (@otreeG_wait_null) 6 := {}.
+Global Instance: Params (@otreeG_wait_null) 5 := {}.
 
 (* Elem: keeps the fact that a key is inside a map *)
 Definition otreeG_elem `{SI : indexT} `{!otreeGS Σ} (k : obl_id) : iProp Σ :=
@@ -82,11 +82,11 @@ Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
     (∃ (OSus : gmap obl_id (gmap positive (prod positive obl_id))),
         (⌜ dom OSus = D ⌝) ∗
         (own suspend_name (reservation_map_token (A:=gmap_viewR positive (agreeR (prodO positiveO obl_idO))) (⊤ ∖ gset_to_coPset D))) ∗
-        (own wait_name (reservation_map_token (A:=gmapUR positive mono_natUR) (⊤ ∖ gset_to_coPset D))) ∗
+        (own wait_name (reservation_map_token (A:=reservation_mapUR mono_natUR) (⊤ ∖ gset_to_coPset D))) ∗
         (own elem_name (gmap_view_auth (DfracOwn 1) (gset_to_gmap () D))) ∗
         ([∗ map] k ↦ KSus ∈ OSus,
            (own suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> KSus)))) ∗
-           (own wait_name (reservation_map_data k (∅ : gmap positive mono_natUR))) ∗
+           (own wait_name (reservation_map_data k (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom KSus))))) ∗
            ([∗ map] x ↦ '(θ, π) ∈ KSus,
               ((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) ∨
                  (othreadG_owns θ k true (1/2)%Qp ∗ otreeG_wait k x (1/2)%Qp ∗ oblG_done π)) ∨
@@ -222,44 +222,57 @@ Section otree.
   (** Wait rules *)
   Lemma otreeG_wait_alloc_map D k :
     k ∉ D →
-    (own wait_name (reservation_map_token (A:=gmapUR positive mono_natUR) (⊤ ∖ gset_to_coPset D)))
-    ⊢ |==> (own wait_name (reservation_map_token (A:=gmapUR positive mono_natUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
-           (own wait_name (reservation_map_data k (∅ : gmap positive mono_natUR))).
+    (own wait_name (reservation_map_token (A:=reservation_mapUR mono_natUR) (⊤ ∖ gset_to_coPset D)))
+    ⊢ |==> (own wait_name (reservation_map_token (A:=reservation_mapUR mono_natUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
+           (own wait_name (reservation_map_data k (reservation_map_token (A:=mono_natUR) ⊤))).
   Proof.
     iIntros (Hk) "Htk".
-    iPoseProof (reservation_map_token_alloc_singleton _ _ k (∅ : gmap positive mono_natUR) with "Htk") as "[Htk >H]"; auto.
-    done.
+    iPoseProof (reservation_map_token_alloc_singleton _ _ k (reservation_map_token ⊤ : reservation_mapUR mono_natUR) with "Htk") as "[Htk >H]"; auto.
+    { apply reservation_map_token_valid. }
+    by iFrame.
   Qed.
 
-  Lemma otreeG_wait_alloc k (M : gmap positive mono_natUR) :
-    own wait_name (reservation_map_data k M)
-    ⊢ |==> ∃ x, ⌜ M !! x = None ⌝ ∗ (own wait_name (reservation_map_data k M)) ∗
-                otreeG_wait k x 1.
+  Lemma otreeG_wait_alloc k X x :
+    x ∉ X →
+    own wait_name (reservation_map_data k (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset X)))
+    ⊢ |==> (own wait_name (reservation_map_data k (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset ({[x]} ∪ X))))) ∗
+           otreeG_wait k x 1.
   Proof.
-    iIntros "H".
-    iMod (own_updateP (λ r, ∃ i, M !! i = None ∧ (r = reservation_map_data k (<[i:=●MN 0]>M))) with "H") as "(%&%&H)".
-    { eapply reservation_map_updateP.
-      - eapply (alloc_updateP' _ (●MN 0)). apply mono_nat_auth_valid.
-      - simpl. intros. destruct H1 as (?&?&?). exists x. split; first auto. by subst.
+    iIntros (Hx) "H".
+    rewrite (reservation_map_token_difference (gset_to_coPset {[x]}) (⊤ ∖ gset_to_coPset X)); cycle 1.
+    { apply elem_of_subseteq. intros. rewrite elem_of_difference. split; first set_solver.
+      intro F. rewrite !elem_of_gset_to_coPset in H1 F. set_solver.
     }
-    destruct H1 as (?&?&?). subst.
-    rewrite (insert_singleton_op _ _ _ H1) reservation_map_data_op.
-    iDestruct "H" as "[H1 H2]". rewrite /otreeG_wait. iExists x. by iFrame.
+    rewrite reservation_map_data_op. iDestruct "H" as "[Htk H]".
+    assert (⊤ ∖ gset_to_coPset X ∖ gset_to_coPset {[x]} = ⊤ ∖ gset_to_coPset ({[x]} ∪ X)).
+    { apply leibniz_equiv. intros y. rewrite !elem_of_difference. split; intros.
+      - destruct H1 as ((_&?)&?). split; first set_solver. intros F. apply elem_of_gset_to_coPset, elem_of_union in F.
+        destruct F; [apply H2 | apply H1]; apply elem_of_gset_to_coPset; set_solver.
+      - destruct H1 as (_&?). split; first (split; first set_solver);
+          intros F; apply elem_of_gset_to_coPset in F; apply H1, elem_of_gset_to_coPset; set_solver.
+    }
+    rewrite H1. iFrame "H".
+    iMod (own_update with "Htk") as "H".
+    { eapply reservation_map_update. eapply (reservation_map_alloc _ x (●MN 0)).
+      - apply elem_of_gset_to_coPset; set_solver.
+      - apply mono_nat_auth_valid.
+    }
+    by iFrame.
   Qed.
 
   Lemma otreeG_wait_to_null k x :
     otreeG_wait k x 1 ⊢ |==> otreeG_wait_null k x.
   Proof.
     rewrite /otreeG_wait /otreeG_wait_null.
-    apply own_update, reservation_map_update, singleton_update, mono_nat_update.
+    apply own_update, reservation_map_update, reservation_map_update, mono_nat_update.
     auto.
   Qed.
   Lemma otreeG_wait_null_false k x q :
     otreeG_wait k x q ∗ otreeG_wait_null k x ⊢ False.
   Proof.
-    rewrite /otreeG_wait /otreeG_wait_null -own_op -reservation_map_data_op singleton_op.
+    rewrite /otreeG_wait /otreeG_wait_null -own_op -!reservation_map_data_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
-    iPureIntro. apply reservation_map_data_valid, singleton_valid, mono_nat_auth_dfrac_op_valid in H1.
+    iPureIntro. apply reservation_map_data_valid, reservation_map_data_valid, mono_nat_auth_dfrac_op_valid in H1.
     by destruct H1.
   Qed.
 
@@ -268,7 +281,7 @@ Section otree.
     otreeG_wait k x q1 ∗ otreeG_wait k x q2 ⊣⊢ otreeG_wait k x q.
   Proof.
     intros; subst. rewrite /otreeG_wait.
-    rewrite -own_op -reservation_map_data_op singleton_op -mono_nat_auth_dfrac_op dfrac_op_own.
+    rewrite -own_op -!reservation_map_data_op -mono_nat_auth_dfrac_op dfrac_op_own.
     done.
   Qed.
   Lemma otreeG_wait_div_2 k x q:
@@ -280,7 +293,7 @@ Section otree.
     rewrite /otreeG_wait. iIntros "H".
     iPoseProof (own_valid with "H") as "%V".
     iPureIntro. rewrite reservation_map_data_valid in V.
-    apply singleton_valid, mono_nat_auth_dfrac_valid in V. done.
+    apply reservation_map_data_valid, mono_nat_auth_dfrac_valid in V. done.
   Qed.
 
   Lemma otreeG_wait_to_null_2 k x q1 q2 :
@@ -358,9 +371,72 @@ Section otree.
   Qed.
 
   (** osuspend rules *)
-  Lemma osuspend_alloc_map D
+  Lemma osuspend_alloc_obl D k :
+    k ∉ D →
+    osuspend D ⊢ |==> osuspend ({[k]} ∪ D) ∗ otreeG_elem k.
+  Proof.
+    iIntros (Hk) "Hsus".
+    rewrite /osuspend -lock. iDestruct "Hsus" as "( % & %Hdom & HS & HW & HE & HM )".
+    iMod (otreeG_elem_alloc _ k with "HE") as "[HE He]"; first done.
+    iMod (otreeG_suspend_alloc_map _ k with "HS") as "[HS Hs]"; first done.
+    iMod (otreeG_wait_alloc_map _ k with "HW") as "[HW Hw]"; first done.
+    iModIntro. rewrite -lock. iFrame "He". iExists (<[k:=∅]>OSus). iSplitR.
+    { iPureIntro. rewrite dom_insert_L Hdom. done. }
+    iFrame "HE HS HW". iApply (big_sepM_insert _ OSus k ∅).
+    { by rewrite -not_elem_of_dom Hdom. }
+    iFrame "HM Hs". replace (⊤ ∖ gset_to_coPset (dom ∅)) with (⊤ : coPset).
+    - iFrame. done.
+    - set_solver.
+  Qed.
 
+  Lemma osuspend_elem_elem D k :
+    osuspend D ∗ otreeG_elem k ⊢ ⌜ k ∈ D ⌝.
+  Proof.
+    iIntros "[Hsus He]".
+    rewrite /osuspend -lock. iDestruct "Hsus" as "( % & %Hdom & HS & HW & HE & HM )".
+    iPoseProof (otreeG_elem_elem with "[HE He]") as "%Hin"; first iFrame. done.
+  Qed.
 
+  Lemma osuspend_suspend D k θ π :
+    osuspend D ∗ otreeG_elem k ∗ othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1
+    ⊢ |==> osuspend D ∗ ∃ x, otreeG_suspend k x θ π ∗ otreeG_wait k x 1.
+  Proof.
+    iIntros "(Hsus & He & Ho & Hg)".
+    iPoseProof (osuspend_elem_elem with "[$]") as "%Hkin".
+    rewrite /osuspend -lock. iDestruct "Hsus" as "( % & %Hdom & HS & HW & HE & HM )".
+    assert (is_Some (OSus !! k)).
+    { apply elem_of_dom. rewrite Hdom. auto. }
+    destruct H1 as (KSus&Hklu).
+    iDestruct (big_sepM_delete _ _ k _ Hklu with "HM") as "[Hk HM]".
+    iDestruct "Hk" as "(HkS & HkW & HkM)".
+    assert (∃ x, KSus !! x = None).
+    { exists (fresh (dom KSus)). apply not_elem_of_dom, is_fresh. }
+    destruct H1 as (x&Hxlu).
+    iMod (otreeG_wait_alloc _ _ x with "HkW") as "(HkW&Hw)".
+    { by apply not_elem_of_dom. }
+    iMod (otreeG_suspend_alloc _ _ _ θ π Hxlu with "HkS") as "[HkS Hs]".
+    iFrame "Hw Hs". iModIntro. iExists (<[k:=<[x:=(θ, π)]>KSus]>OSus). iSplitR.
+    { iPureIntro. rewrite dom_insert_lookup_L; eauto. }
+    iFrame "HS HW HE". iApply (big_sepM_delete _ _ k).
+    { apply lookup_insert_eq. }
+    rewrite delete_insert_eq. iFrame "HM".
+    iFrame "HkS". rewrite dom_insert_L. iFrame "HkW".
+    iApply (big_sepM_insert _ _ x); first auto.
+    iFrame "HkM". iLeft. iLeft. iFrame.
+  Qed.
+
+  Lemma osuspend_open D k x θ π :
+    osuspend D ∗ otreeG_suspend k x θ π
+    ⊢ (((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) ∨
+          (othreadG_owns θ k true (1/2)%Qp ∗ otreeG_wait k x (1/2)%Qp ∗ oblG_done π)) ∨
+         otreeG_wait_null k x) ∗
+    ((((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) ∨
+         (othreadG_owns θ k true (1/2)%Qp ∗ otreeG_wait k x (1/2)%Qp ∗ oblG_done π)) ∨
+        otreeG_wait_null k x) -∗ osuspend D).
+  Proof.
+
+    TODO
+    
 
 (* Global invariant for suspending obligations and waiting. *)
 Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
