@@ -425,17 +425,76 @@ Section otree.
     iFrame "HkM". iLeft. iLeft. iFrame.
   Qed.
 
-  Lemma osuspend_open D k x θ π :
-    osuspend D ∗ otreeG_suspend k x θ π
-    ⊢ (((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) ∨
-          (othreadG_owns θ k true (1/2)%Qp ∗ otreeG_wait k x (1/2)%Qp ∗ oblG_done π)) ∨
-         otreeG_wait_null k x) ∗
-    ((((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) ∨
-         (othreadG_owns θ k true (1/2)%Qp ∗ otreeG_wait k x (1/2)%Qp ∗ oblG_done π)) ∨
-        otreeG_wait_null k x) -∗ osuspend D).
+  Lemma osuspend_done_parent D k x θ π TP :
+    osuspend D ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ∗ otreeG_wait k x (1/2)%Qp ∗
+    othreadG_owns θ k false (1/2)%Qp ∗ othread TP ∗ othreadG_elem θ ∗
+    oblG_owner k θ (1/2/2)%Qp ∗ oblG_done π
+    ⊢ |==> osuspend D ∗ othreadG_owns θ k true (1/2)%Qp ∗ otreeG_edge π k 1 ∗ othread TP.
   Proof.
+    iIntros "(Rsus & Re & Rs & Rw & To & Tthr & Te & Bo & Bs)".
+    iPoseProof (osuspend_elem_elem with "[Rsus Re]") as "%Hkin"; first iFrame.
+    rewrite /osuspend -lock. iDestruct "Rsus" as "( % & %Hdom & RS & RW & RE & RM )".
+    assert (is_Some (OSus !! k)).
+    { apply elem_of_dom. rewrite Hdom. auto. }
+    destruct H1 as (KSus&Hklu).
+    iDestruct (big_sepM_delete _ _ k _ Hklu with "RM") as "[Rk RM]".
+    iDestruct "Rk" as "(RkS & RkW & RkM)".
+    iPoseProof (otreeG_suspend_lookup with "[RkS Rs]") as "%Hxlu"; first iFrame.
+    iDestruct (big_sepM_delete _ _ x _ Hxlu with "RkM") as "[Rkx RkM]".
+    iDestruct "Rkx" as "[[Rkx | Rkx] | Rkx]".
+    - iDestruct "Rkx" as "(Rkx1 & Rkx2)".
+      iMod (othread_obl_acquire_2 with "[Tthr Te To Rkx1 Bo]") as "(Tthr & To1 & To2)"; first iFrame.
+      iFrame "Rkx2 Tthr To2".
+      iPoseProof (big_sepM_delete _ _ x _ Hxlu with "[RkM To1 Rw Bs]") as "RkM".
+      { iFrame "RkM". iLeft. iRight. iFrame. }
+      iPoseProof (big_sepM_delete _ _ k _ Hklu with "[RM RkM RkS RkW]") as "RM".
+      { iFrame "RM". iFrame. }
+      iModIntro. iExists OSus. iFrame. done.
+    - iDestruct "Rkx" as "(Rko & Rkw & Rks)".
+      iPoseProof (othreadG_owns_agree with "[To Rko]") as "%"; first iFrame. done.
+    - iPoseProof (otreeG_wait_null_false with "[Rw Rkx]") as "%"; first iFrame. done.
+  Qed.
 
-    TODO
+  Lemma osuspend_wait_cases D k x θ π :
+    osuspend D ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ∗ otreeG_wait k x (1/2)%Qp
+    ⊢ (otreeG_wait k x (1/2)%Qp ∗
+       othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1 ∗
+       ((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) -∗ osuspend D))
+      ∨
+        |==> (othreadG_owns θ k true (1/2)%Qp ∗ oblG_done π ∗ osuspend D).
+  Proof.
+    iIntros "(Rsus & Re & Rs & Rw)".
+    iPoseProof (osuspend_elem_elem with "[Rsus Re]") as "%Hkin"; first iFrame.
+    rewrite /osuspend -lock. iDestruct "Rsus" as "( % & %Hdom & RS & RW & RE & RM )".
+    assert (is_Some (OSus !! k)).
+    { apply elem_of_dom. rewrite Hdom. auto. }
+    destruct H1 as (KSus&Hklu).
+    iDestruct (big_sepM_delete _ _ k _ Hklu with "RM") as "[Rk RM]".
+    iDestruct "Rk" as "(RkS & RkW & RkM)".
+    iPoseProof (otreeG_suspend_lookup with "[RkS Rs]") as "%Hxlu"; first iFrame.
+    iDestruct (big_sepM_delete _ _ x _ Hxlu with "RkM") as "[Rkx RkM]".
+    iDestruct "Rkx" as "[[Rkx | Rkx] | Rkx]".
+    - iDestruct "Rkx" as "(Rkx1 & Rkx2)". iLeft. iFrame "Rw Rkx1 Rkx2".
+      iIntros "[Rkx1 Rkx2]".
+      iPoseProof (big_sepM_delete _ _ x _ Hxlu with "[RkM Rkx1 Rkx2]") as "RkM".
+      { iFrame "RkM". iLeft. iLeft. iFrame. }
+      iPoseProof (big_sepM_delete _ _ k _ Hklu with "[RM RkM RkS RkW]") as "RM".
+      { iFrame "RM". iFrame. }
+      iExists OSus. iFrame. done.
+    - iDestruct "Rkx" as "(Rkx1 & Rkx2 & Rkx3)". iRight. iFrame "Rkx1 Rkx3".
+      iMod (otreeG_wait_to_null_2 with "[Rw Rkx2]") as "Rwn".
+      2:{ iFrame. }
+      { by rewrite Qp.div_2. }
+      iPoseProof (big_sepM_delete _ _ x _ Hxlu with "[RkM Rwn]") as "RkM".
+      { iFrame "RkM". iRight. iFrame. }
+      iPoseProof (big_sepM_delete _ _ k _ Hklu with "[RM RkM RkS RkW]") as "RM".
+      { iFrame "RM". iFrame. }
+      iModIntro. iExists OSus. iFrame. done.
+    - iPoseProof (otreeG_wait_null_false with "[Rw Rkx]") as "%"; first iFrame. done.
+  Qed.
+
+
+  TODO
     
 
 (* Global invariant for suspending obligations and waiting. *)
