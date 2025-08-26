@@ -427,11 +427,11 @@ Section otree.
 
   Lemma osuspend_done_parent D k x θ π TP :
     osuspend D ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ∗ otreeG_wait k x (1/2)%Qp ∗
-    othreadG_owns θ k false (1/2)%Qp ∗ othread TP ∗ othreadG_elem θ ∗
+    othread TP ∗ othreadG_elem θ ∗ othreadG_owns θ k false (1/2)%Qp ∗
     oblG_owner k θ (1/2/2)%Qp ∗ oblG_done π
     ⊢ |==> osuspend D ∗ othreadG_owns θ k true (1/2)%Qp ∗ otreeG_edge π k 1 ∗ othread TP.
   Proof.
-    iIntros "(Rsus & Re & Rs & Rw & To & Tthr & Te & Bo & Bs)".
+    iIntros "(Rsus & Re & Rs & Rw & Tthr & Te & To & Bo & Bs)".
     iPoseProof (osuspend_elem_elem with "[Rsus Re]") as "%Hkin"; first iFrame.
     rewrite /osuspend -lock. iDestruct "Rsus" as "( % & %Hdom & RS & RW & RE & RM )".
     assert (is_Some (OSus !! k)).
@@ -493,33 +493,16 @@ Section otree.
     - iPoseProof (otreeG_wait_null_false with "[Rw Rkx]") as "%"; first iFrame. done.
   Qed.
 
+  (** otree rules *)
+  Lemma otree_alloc_obl D k θ α β :
+    k ∉ D →
+    otree D ∗
+    othreadG_owns θ k true (1/2)%Qp ∗
+    oblG_transfer_supply k α (1/2)%Qp ∗ oblG_progress_supply k β (1/2)%Qp ∗ oblG_owner k θ (1/2/2)%Qp
+    ⊢ |==> otree ({[k]} ∪ D).
+  Proof.
 
   TODO
-    
-
-(* Global invariant for suspending obligations and waiting. *)
-Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
-  `{!@osatGS.osatGS _ _ WF ps T Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
-  (D : gset obl_id) : iProp Σ :=
-  locked
-    (∃ (OSus : gmap obl_id (gmap positive (prod positive obl_id))),
-        (⌜ dom OSus = D ⌝) ∗
-        (own suspend_name (reservation_map_token (A:=gmap_viewR positive (agreeR (prodO positiveO obl_idO))) (⊤ ∖ gset_to_coPset D))) ∗
-        (own wait_name (reservation_map_token (A:=gmapUR positive mono_natUR) (⊤ ∖ gset_to_coPset D))) ∗
-        (own elem_name (gmap_view_auth (DfracOwn 1) (gset_to_gmap () D))) ∗
-        ([∗ map] k ↦ KSus ∈ OSus,
-           (own suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> KSus)))) ∗
-           (own wait_name (reservation_map_data k (∅ : gmap positive mono_natUR))) ∗
-           ([∗ map] x ↦ '(θ, π) ∈ KSus,
-              ((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) ∨
-                 (othreadG_owns θ k true (1/2)%Qp ∗ otreeG_wait k x (1/2)%Qp ∗ oblG_done π)) ∨
-                otreeG_wait_null k x)
-        )
-    )%I.
-
-
-  (** otree rules *)
-
 
 (* Global invariant for the obligation forest state. *)
 Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
