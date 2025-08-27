@@ -903,8 +903,7 @@ Section cgraph.
   End update_edge.
 
   Section move_edge.
-    (* Move an edge v1 --[l]--> v3 to be v2 --[l]--> v *)
-    (* This is only allowed if there is also an edge between v1 and v2. *)
+    (* Move an edge v1 --[l]--> v3 to be v2 --[l]--> v3 *)
     Definition move_edge g v1 v2 v3 :=
       match out_edges g v1 !! v3 with
       | Some l => insert_edge (delete_edge g v1 v3) v2 v3 l

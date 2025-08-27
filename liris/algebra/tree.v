@@ -9,12 +9,12 @@ Section tree.
   Context `{SI : indexT} {L : ofe}.
   Implicit Type t : cgraph V L.
   Implicit Type n : gmap V L.
-  Implicit Type v u : V.
+  Implicit Type v u π : V.
 
+  (** Basic definitions *)
   Definition children t v : gset V := dom (out_edges t v).
   Definition parent t (v π : V) : Prop := v ∈ children t π.
   Definition root t v : Prop := ∀ u, v ∉ children t u.
-  Definition internal t v : Prop := (∃ π, parent t v π).
 
   Definition tree_wf t : Prop := ∀ v π1 π2, parent t v π1 → parent t v π2 → π1 = π2.
 
@@ -27,7 +27,6 @@ Section tree.
   Definition descendant t : relation V := λ v u, ∃ Δ, descendants t v Δ ∧ u ∈ Δ.
 
   (** Properties *)
-
   Lemma parent_edge t v π :
     parent t v π ↔ edge t π v.
   Proof using. rewrite /parent /edge /children. apply elem_of_dom. Qed.
@@ -45,17 +44,15 @@ Section tree.
   Qed.
 
   Lemma root_not_internal t v :
-    root t v ↔ ¬ internal t v.
+    root t v ↔ (∀ π, ¬ parent t v π).
   Proof using.
-    rewrite /root /internal /parent /children. split; intros.
-    - intros [? F]. eapply H0; eauto.
-    - intros F. eapply H0; eauto.
+    rewrite /root /parent /children. split; intros; auto.
   Qed.
 
   Lemma internal_not_root t v :
-    internal t v ↔ ¬ root t v.
+    (∃ π, parent t v π) ↔ ¬ root t v.
   Proof using.
-    rewrite /root /internal /parent /children. split; intros.
+    rewrite /root /parent /children. split; intros.
     - destruct H0. eauto.
     - destruct (decide (∃ u, v ∈ dom (out_edges t u))); eauto.
       exfalso. apply H0. intros u Hu. apply n. eauto.
@@ -63,10 +60,6 @@ Section tree.
 
   Lemma children_parent t v π :
     v ∈ children t π ↔ parent t v π.
-  Proof using. done. Qed.
-
-  Lemma internal_parent_exists t v :
-    internal t v ↔ ∃ π, parent t v π.
   Proof using. done. Qed.
 
   Lemma descendants_unique t v Δ1 Δ2 :
@@ -163,9 +156,9 @@ Section tree.
   Qed.
 
   Lemma elem_of_descendants_internal t v Δ :
-    descendants t v Δ → ∀ u, u ∈ Δ → internal t u.
+    descendants t v Δ → ∀ u, u ∈ Δ → ∃ π, parent t u π.
   Proof using.
-    intros Hd. induction Hd. intros. subst. rewrite /internal.
+    intros Hd. induction Hd. intros. subst.
     destruct (decide (u ∈ children t v)); eauto.
     rewrite -H0 in n. destruct (far_descendants_aux _ _ H4 n) as (c&cd&?&?).
     eapply (H3 _ _ H1 _ H5).
@@ -183,5 +176,41 @@ Section tree.
   Proof using.
     intros. intros (?&Hd0&Hin). eapply root_not_elem_of_descendants; eauto.
   Qed.
+
+  (** Operations *)
+  (* Correct only if v is fresh *)
+  Definition alloc_root t v : cgraph V L := <[v:=∅]>t.
+
+  Lemma alloc_root_delete_edge_eq t v u :
+    v ∉ dom t →
+    alloc_root t v = delete_edge t v u.
+  Proof using.
+    intros Hf. unfold alloc_root, delete_edge.
+    assert (∀ x, out_edges t v !! x = None).
+    { intros. unfold out_edges. apply not_elem_of_dom in Hf. rewrite Hf. done. }
+    rewrite delete_id; last eauto.
+    unfold out_edges. apply not_elem_of_dom in Hf. rewrite Hf. done.
+  Qed.
+
+  Lemma alloc_root_wf t v :
+    v ∉ dom t →
+    cgraph_wf t → cgraph_wf (alloc_root t v).
+  Proof using.
+    intros Hf Hw. rewrite (alloc_root_delete_edge_eq _ _ v); last auto.
+    apply delete_edge_wf. auto.
+  Qed.
+
+(* otree:
+alloc one root (alloc obl),
+insert one edge (suspend one),
+delete many edges (resolve obl = delete children edges),
+tree_wf gives uconn that is needed for insert_edge_wf
+ *)
+(* insert_edge_wf: *)
+(*   ∀ {V : Type} {EqDecision0 : EqDecision V} {H : Countable V} {SI : indexT} {L : ofe} (g : cgraph V L) (v1 v2 : V) (l : L), *)
+(*     ¬ uconn g v1 v2 → cgraph_wf g → cgraph_wf (insert_edge g v1 v2 l) *)
+(* delete_edge_wf: *)
+(*   ∀ {V : Type} {EqDecision0 : EqDecision V} {H : Countable V} {SI : indexT} {L : ofe} (g : cgraph V L) (v1 v2 : V), *)
+(*     cgraph_wf g → cgraph_wf (delete_edge g v1 v2) *)
 
 End tree.

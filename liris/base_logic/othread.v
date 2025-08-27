@@ -51,8 +51,8 @@ Global Typeclasses Opaque othreadG_owns.
 Global Instance: Params (@othreadG_owns) 5 := {}.
 
 (* Thread: live obligations that this thread knows, also fix to empty when thread terminates *)
-Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (Θ : gset obl_id) (q : Qp) : iProp Σ :=
-  own obls_name (gmap_view_frag i (DfracOwn q) (GSet Θ)).
+Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (Ψ : gset obl_id) (q : Qp) : iProp Σ :=
+  own obls_name (gmap_view_frag i (DfracOwn q) (GSet Ψ)).
 Global Typeclasses Opaque othreadG_obls.
 Global Instance: Params (@othreadG_obls) 4 := {}.
 
@@ -252,19 +252,19 @@ Section othread.
     rewrite !fmap_insert. done.
   Qed.
 
-  Lemma othreadG_obls_lookup (OThread : gmap positive (gmap obl_id bool)) i Θ :
+  Lemma othreadG_obls_lookup (OThread : gmap positive (gmap obl_id bool)) i Ψ :
     (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
-    othreadG_obls i Θ 1
-    ⊢ ⌜ (dom <$> OThread) !! i = Some Θ ⌝.
+    othreadG_obls i Ψ 1
+    ⊢ ⌜ (dom <$> OThread) !! i = Some Ψ ⌝.
   Proof.
     rewrite /othreadG_obls -!own_op. iIntros "H". iPoseProof (own_valid with "H") as "%".
     apply gmap_view_both_valid in H0. destruct H0 as (_&_&?). iPureIntro.
     apply leibniz_equiv, lookup_fmap_Some in H0. destruct H0 as (?&?&?). inv H0. done.
   Qed.
-  Lemma othreadG_obls_lookup_frac (OThread : gmap positive (gmap obl_id bool)) i Θ q :
+  Lemma othreadG_obls_lookup_frac (OThread : gmap positive (gmap obl_id bool)) i Ψ q :
     (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
-    othreadG_obls i Θ q
-    ⊢ ∃ Θ', ⌜ (dom <$> OThread) !! i = Some Θ' ∧ Θ ⊆ Θ' ⌝.
+    othreadG_obls i Ψ q
+    ⊢ ∃ Ψ', ⌜ (dom <$> OThread) !! i = Some Ψ' ∧ Ψ ⊆ Ψ' ⌝.
   Proof.
     rewrite /othreadG_obls -!own_op. iIntros "H". iPoseProof (own_valid with "H") as "%".
     apply gmap_view_both_dfrac_valid_discrete_total in H0. destruct H0 as (?&_&_&?&?&?). iPureIntro.
@@ -272,9 +272,9 @@ Section othread.
     apply lookup_fmap_Some in H0. destruct H0 as (?&?&?). inv H0. done.
   Qed.
 
-  Lemma othreadG_obls_update (OThread : gmap positive (gmap obl_id bool)) i Θ M :
+  Lemma othreadG_obls_update (OThread : gmap positive (gmap obl_id bool)) i Ψ M :
     (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> OThread)))) ∗
-    othreadG_obls i Θ 1
+    othreadG_obls i Ψ 1
     ⊢ |==> (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> <[i:=M]>OThread)))) ∗
            othreadG_obls i (dom M) 1.
   Proof.
@@ -294,15 +294,15 @@ Section othread.
     rewrite !lookup_fmap Hlookup. done.
   Qed.
 
-  Lemma othreadG_obls_valid i Θ q :
-    othreadG_obls i Θ q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
+  Lemma othreadG_obls_valid i Ψ q :
+    othreadG_obls i Ψ q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
   Proof.
     rewrite /othreadG_obls. iIntros "H".
     iPoseProof (own_valid with "H") as "%V".
     iPureIntro. apply gmap_view_frag_valid in V. destruct V. done.
   Qed.
-  Lemma othreadG_obls_valid_2 i Θ1 Θ2 q1 q2 :
-    othreadG_obls i Θ1 q1 ∗ othreadG_obls i Θ2 q2 ⊢ ⌜ (q1 + q2 ≤ 1)%Qp ∧ Θ1 ## Θ2 ⌝.
+  Lemma othreadG_obls_valid_2 i Ψ1 Ψ2 q1 q2 :
+    othreadG_obls i Ψ1 q1 ∗ othreadG_obls i Ψ2 q2 ⊢ ⌜ (q1 + q2 ≤ 1)%Qp ∧ Ψ1 ## Ψ2 ⌝.
   Proof.
     rewrite /othreadG_obls. iIntros "[H1 H2]". iCombine "H1 H2" as "H".
     iPoseProof (own_valid with "H") as "%V".
@@ -310,17 +310,17 @@ Section othread.
     apply gset_disj_valid_op in H1. done.
   Qed.
 
-  Lemma othreadG_obls_op_1 i Θ1 Θ2 q1 q2 :
-    othreadG_obls i Θ1 q1 ∗ othreadG_obls i Θ2 q2 ⊢ othreadG_obls i (Θ1 ∪ Θ2) (q1 + q2)%Qp.
+  Lemma othreadG_obls_op_1 i Ψ1 Ψ2 q1 q2 :
+    othreadG_obls i Ψ1 q1 ∗ othreadG_obls i Ψ2 q2 ⊢ othreadG_obls i (Ψ1 ∪ Ψ2) (q1 + q2)%Qp.
   Proof.
     rewrite /othreadG_obls -own_op -gmap_view_frag_op dfrac_op_own.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
     apply gmap_view_frag_valid in H0. destruct H0. apply gset_disj_valid_op in H1.
     rewrite gset_disj_union; done.
   Qed.
-  Lemma othreadG_obls_op_2 i Θ1 Θ2 q1 q2 :
-    Θ1 ## Θ2 →
-    othreadG_obls i (Θ1 ∪ Θ2) (q1 + q2)%Qp ⊢ othreadG_obls i Θ1 q1 ∗ othreadG_obls i Θ2 q2.
+  Lemma othreadG_obls_op_2 i Ψ1 Ψ2 q1 q2 :
+    Ψ1 ## Ψ2 →
+    othreadG_obls i (Ψ1 ∪ Ψ2) (q1 + q2)%Qp ⊢ othreadG_obls i Ψ1 q1 ∗ othreadG_obls i Ψ2 q2.
   Proof.
     intros Hdj. rewrite /othreadG_obls -own_op -gmap_view_frag_op dfrac_op_own.
     rewrite gset_disj_union; done.
@@ -414,15 +414,15 @@ Section othread.
     iFrame. done.
   Qed.
 
-  Lemma othread_alloc_obl_1 TP i Θ q k :
-    oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i Θ q ∗ oblG_live k (1/2)%Qp
-    ⊢ |==> oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Θ) q ∗ othreadG_owns i k false 1.
+  Lemma othread_alloc_obl_1 TP i Ψ q k :
+    oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i Ψ q ∗ oblG_live k (1/2)%Qp
+    ⊢ |==> oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
   Proof.
     iIntros "(Os0 & Hthread & Ho & Os)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
     iPoseProof (othreadG_obls_lookup_frac with "[HO Ho]") as "%"; first iFrame.
-    destruct H0 as (Θ0&Hlui0&Hsub).
-    assert (Hlui : ∃ m, dom m = Θ0 ∧ OThread !! i = Some m).
+    destruct H0 as (Ψ0&Hlui0&Hsub).
+    assert (Hlui : ∃ m, dom m = Ψ0 ∧ OThread !! i = Some m).
     { rewrite lookup_fmap_Some in Hlui0. eauto. }
     destruct Hlui as (OObls&Hm&Hlui).
     iAssert (⌜ OObls !! k = None ⌝)%I with "[Os0 Os Hm]" as "%Hluk".
@@ -440,7 +440,7 @@ Section othread.
     iDestruct "Hi" as "(Hix & His & Him)".
     iMod (othreadG_owns_alloc _ _ _ false Hluk with "His") as "[His Hw]".
     iFrame "Hw".
-    iMod (othreadG_obls_update_local _ _ _ OObls (<[k:=false]>OObls) _ ({[k]} ∪ Θ) with "[HO Ho]") as "[HO Ho]";
+    iMod (othreadG_obls_update_local _ _ _ OObls (<[k:=false]>OObls) _ ({[k]} ∪ Ψ) with "[HO Ho]") as "[HO Ho]";
       [eauto | | iFrame |].
     { rewrite dom_insert_L. apply gset_disj_alloc_local_update. apply not_elem_of_dom in Hluk. set_solver. }
     iFrame "Ho".
@@ -452,9 +452,9 @@ Section othread.
     { apply lookup_delete_eq. }
     iFrame "Hm Hix His". iApply (big_sepM_insert _ _ k); first done. iFrame.
   Qed.
-  Lemma othread_alloc_obl Ω TP i Θ q k :
-    osat Ω ∗ othread TP ∗ othreadG_obls i Θ q ∗ oblG_elem k ∗ oblG_live k (1/2)%Qp
-    ⊢ |==> osat Ω ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Θ) q ∗ othreadG_owns i k false 1.
+  Lemma othread_alloc_obl Ω TP i Ψ q k :
+    osat Ω ∗ othread TP ∗ othreadG_obls i Ψ q ∗ oblG_elem k ∗ oblG_live k (1/2)%Qp
+    ⊢ |==> osat Ω ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
   Proof.
     iIntros "(Osat & Hthread & Ho & #He & Os)".
     iPoseProof (osat_live_open with "[Osat Os]") as "(Os & Os0 & Osacc)"; first by iFrame.
@@ -462,14 +462,14 @@ Section othread.
     iModIntro. iFrame. by iApply "Osacc".
   Qed.
 
-  Lemma othread_obls_owns_elem TP i Θ k f :
-    othread TP ∗ othreadG_obls i Θ 1 ∗ othreadG_owns i k f 1
-    ⊢ ⌜ k ∈ Θ ⌝.
+  Lemma othread_obls_owns_elem TP i Ψ k f q :
+    othread TP ∗ othreadG_obls i Ψ 1 ∗ othreadG_owns i k f q
+    ⊢ ⌜ k ∈ Ψ ⌝.
   Proof.
     iIntros "(Hthread & Ho & Hw)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
     iPoseProof (othreadG_obls_lookup with "[HO Ho]") as "%"; first iFrame.
-    assert (Hlui : ∃ m, dom m = Θ ∧ OThread !! i = Some m).
+    assert (Hlui : ∃ m, dom m = Ψ ∧ OThread !! i = Some m).
     { rewrite lookup_fmap_Some in H0. eauto. }
     destruct Hlui as (OObls&Hm&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
@@ -478,31 +478,31 @@ Section othread.
     iPureIntro. rewrite -Hm. by apply elem_of_dom.
   Qed.
 
-  Lemma othread_delete_obl_frac TP i Θ q k f :
-    k ∈ Θ →
-    othread TP ∗ othreadG_obls i Θ q ∗ othreadG_owns i k f 1
-    ⊢ |==> othread TP ∗ othreadG_obls i (Θ ∖ {[k]}) q ∗
+  Lemma othread_delete_obl_frac TP i Ψ q k f :
+    k ∈ Ψ →
+    othread TP ∗ othreadG_obls i Ψ q ∗ othreadG_owns i k f 1
+    ⊢ |==> othread TP ∗ othreadG_obls i (Ψ ∖ {[k]}) q ∗
            oblG_live k (1/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp).
   Proof.
     iIntros (Hink) "(Hthread & Ho & Hw)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
     iPoseProof (othreadG_obls_lookup_frac with "[HO Ho]") as "%"; first iFrame.
-    destruct H0 as (Θ0&Hlui0&Hsub).
-    assert (Hlui : ∃ m, dom m = Θ0 ∧ OThread !! i = Some m).
+    destruct H0 as (Ψ0&Hlui0&Hsub).
+    assert (Hlui : ∃ m, dom m = Ψ0 ∧ OThread !! i = Some m).
     { rewrite lookup_fmap_Some in Hlui0. eauto. }
     destruct Hlui as (OObls&Hm&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "(Hix & His & Him)".
     iPoseProof (othreadG_owns_lookup with "[His Hw]") as "%Hluk"; first iFrame.
     iMod (othreadG_owns_delete with "[His Hw]") as "His"; first iFrame.
-    iMod (othreadG_obls_update_local _ _ _ OObls (delete k OObls) _ (Θ ∖ {[k]}) with "[HO Ho]") as "[HO Ho]";
+    iMod (othreadG_obls_update_local _ _ _ OObls (delete k OObls) _ (Ψ ∖ {[k]}) with "[HO Ho]") as "[HO Ho]";
       [eauto | | iFrame |].
     { replace (GSet (dom OObls)) with (GSet ({[k]}) ⋅ GSet (dom (delete k OObls))).
       2:{ rewrite dom_delete_L gset_disj_union.
           - f_equal. apply elem_of_dom_2 in Hluk. rewrite -union_difference_L; set_solver.
           - set_solver.
       }
-      replace (GSet Θ) with (GSet {[k]} ⋅ GSet (Θ ∖ {[k]})).
+      replace (GSet Ψ) with (GSet {[k]} ⋅ GSet (Ψ ∖ {[k]})).
       2:{ rewrite gset_disj_union; last set_solver. f_equal. rewrite -union_difference_L; auto. set_solver. }
       apply gset_disj_dealloc_op_local_update.
     }
@@ -517,9 +517,9 @@ Section othread.
     { apply lookup_delete_eq. }
     iFrame.
   Qed.
-  Lemma othread_delete_obl TP i Θ k f :
-    othread TP ∗ othreadG_obls i Θ 1 ∗ othreadG_owns i k f 1
-    ⊢ |==> othread TP ∗ othreadG_obls i (Θ ∖ {[k]}) 1 ∗
+  Lemma othread_delete_obl TP i Ψ k f :
+    othread TP ∗ othreadG_obls i Ψ 1 ∗ othreadG_owns i k f 1
+    ⊢ |==> othread TP ∗ othreadG_obls i (Ψ ∖ {[k]}) 1 ∗
            oblG_live k (1/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp).
   Proof.
     iIntros "(Hthread & Ho & Hw)". iPoseProof (othread_obls_owns_elem with "[$]") as "%Hkin".
