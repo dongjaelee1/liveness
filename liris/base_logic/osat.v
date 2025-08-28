@@ -467,6 +467,15 @@ Section osat.
     done.
   Qed.
 
+  (* Additional rules *)
+  Lemma oblG_transfer_supply_is_bound k a q b :
+    oblG_transfer_supply k a q ∗ oblG_transfer k b ⊢ ⌜ b /≤ a ⌝.
+  Proof.
+    rewrite /oblG_transfer_supply /oblG_transfer -own_op -reservation_map_data_op.
+    iIntros "H". iPoseProof (own_valid with "H") as "%Hv".
+    apply reservation_map_data_valid, bank_valid_debt_cash in Hv. destruct Hv. done.
+  Qed.
+
   (** Progress rules *)
   Lemma oblG_progress_eq i a0 a1 :
     a0 /= a1 →
