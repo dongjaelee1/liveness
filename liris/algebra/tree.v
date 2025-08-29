@@ -6,6 +6,73 @@ From liris.cgraphs Require Import mapexcl.
 Notation tree V := (gmap V (gset V)).
 Notation forest V := (gmap V (tree V)).
 
+Section forest_pre.
+  Context {V : Type}.
+  Context `{Countable V}.
+  Implicit Type t : tree V.
+  Implicit Type f : forest V.
+  Implicit Type v u ρ π : V.
+  Implicit Type C : gset V.
+
+  Definition forest_fold f : tree V := map_fold (λ _ t a, t ∪ a) ∅ f.
+  Definition forest_to_trees f : list (tree V) := (map_to_list f).*2.
+  Definition forest_disjoint f : Prop := map_disjoint_list (forest_to_trees f).
+
+  Lemma forest_fold_internal_elem_of u f :
+    u ∈ dom (forest_fold f) →
+    u ∉ dom f →
+    ∃ ρ t, f !! ρ = Some t ∧ u ∈ dom t.
+  Proof using.
+    unfold forest_fold. revert u. pattern f. revert f. apply fin_maps.map_fold_ind; intros.
+    { exfalso. rewrite map_fold_empty in H0. set_solver. }
+    rewrite dom_insert in H4. apply not_elem_of_union in H4. destruct H4.
+    rewrite H1 in H3. rewrite dom_union_L in H3. apply elem_of_union in H3. destruct H3.
+    - exists i, x. split; auto. by rewrite lookup_insert_eq.
+    - specialize (H2 _ H3 H5). destruct H2 as (?&?&?&?).
+      assert (Hne : x0 ≠ i).
+      { intros ?; subst. by rewrite H0 in H2. }
+      exists x0, x1. rewrite lookup_insert_ne; auto.
+  Qed.
+
+  Lemma forest_disjoint_fold f :
+    forest_disjoint f → forest_fold f = ⋃ (forest_to_trees f).
+  Proof using.
+    unfold forest_disjoint, forest_to_trees, forest_fold. induction f using map_ind; intros.
+    { rewrite map_fold_empty map_to_list_empty. done. }
+    rewrite map_to_list_insert in H1; last done.
+    pose proof H1 as Hdj. rewrite fmap_cons map_disjoint_list_cons in H1. destruct H1.
+    pose proof H2. apply IHf in H3. clear IHf.
+    rewrite map_fold_insert_L; auto.
+    - pose proof (map_to_list_insert _ _ x H0).
+      assert ((map_to_list (<[i:=x]> m)).*2 ≡ₚ x :: ((map_to_list m).*2)).
+      { rewrite H4. rewrite fmap_cons. done. }
+      rewrite (map_union_list_Permutation _ _ H5).
+      + by rewrite H3 union_list_cons.
+      + rewrite map_to_list_insert; auto.
+    - intros. assert (z1 ##ₘ z2).
+      { assert (map_Forall (λ _ m2, m2 ##ₘ x) m).
+        { apply map_Forall_to_list. apply Forall_fmap in H1. eapply Forall_impl; eauto.
+          intros (?&?). auto.
+        }
+        destruct (decide (i = j1)).
+        - subst. rewrite lookup_insert_eq in H5. inv H5. rewrite lookup_insert_ne in H6; last auto.
+          specialize (H7 _ _ H6). set_solver.
+        - destruct (decide (i = j2)).
+          + subst. rewrite lookup_insert_eq in H6. inv H6. rewrite lookup_insert_ne in H5; last auto.
+            specialize (H7 _ _ H5). set_solver.
+          + rewrite lookup_insert_ne in H5; auto. rewrite lookup_insert_ne in H6; auto.
+            rewrite -(map_to_list_delete _ _ _ H5) in H2.
+            rewrite -(lookup_delete_ne _ j1) in H6; last auto.
+            rewrite -(map_to_list_delete _ _ _ H6) in H2. rewrite !fmap_cons in H2.
+            apply map_disjoint_list_cons in H2. destruct H2.
+            apply map_disjoint_list_cons in H8. destruct H8.
+            simpl in H2, H8. apply Forall_cons in H2. destruct H2. set_solver.
+      }
+      rewrite !map_union_assoc. f_equal. apply map_union_comm; auto.
+  Qed.
+
+End forest_pre.
+
 Section tree.
   Context {V : Type}.
   Context `{Countable V}.
@@ -20,18 +87,6 @@ Section tree.
   Definition internal t v : Prop := ∃ π, parent t v π.
   Definition root t ρ : Prop := ∀ π, ¬ parent t ρ π.
 
-  Definition forest_fold (f : forest V) : tree V :=
-    map_fold (λ _ t a, t ∪ a) ∅ f.
-
-  Inductive tree_wf : tree V → V → Prop :=
-  | descendants_children t ρ C (subs : forest V) :
-    t = <[ρ:=C]>(forest_fold subs) →
-    root t ρ →
-    dom subs = C →
-    (∀ c ct, subs !! c = Some ct → tree_wf ct c) →
-    tree_wf t ρ.
-
-  (** Properties *)
   Global Instance children_Decision t : ∀ π C, Decision (children t π C).
   Proof using.
     intros. unfold children. apply _.
@@ -76,6 +131,68 @@ Section tree.
     - exists C. done.
     - destruct H1 as (?&?&?). pose proof (children_unique _ _ _ _ H0 H1). by subst.
   Qed.
+
+  (** Well-formedness *)
+  Inductive tree_wf : V → tree V → Prop :=
+  | tree_wf_children ρ t (Cf : forest V) :
+    t = <[ρ:=dom Cf]>(forest_fold Cf) →
+    root t ρ →
+    ρ ∉ dom (forest_fold Cf) →
+    forest_disjoint Cf →
+    map_Forall (λ c ct, tree_wf c ct) Cf →
+    tree_wf ρ t.
+
+  Definition forest_wf : forest V → Prop :=
+    λ f, forest_disjoint f ∧ map_Forall (λ ρ t, tree_wf ρ t) f.
+
+  Lemma join_inv_children r t π C ρ Cf :
+    children t π C → Cf !! r = Some t → forest_disjoint Cf → ρ ∉ dom (forest_fold Cf) →
+    children (<[ρ:=dom Cf]>(forest_fold Cf)) π C.
+  Proof.
+    rewrite /children. intros.
+
+    
+    
+    TODO
+
+  H2 : ρ ∉ dom (forest_fold Cf)
+  H3 : forest_disjoint Cf
+  H3 : internal x0 v
+  H4 : v ∈ dom (<[ρ:=dom Cf]> (forest_fold Cf))
+  H5 : v ≠ ρ
+  H0 : v ∈ dom (forest_fold Cf)
+  n : v ∉ dom Cf
+  x : V
+  H6 : Cf !! x = Some x0
+  H7 : v ∈ dom x0
+  H8 : v ≠ x
+  ============================
+  internal (<[ρ:=dom Cf]> (forest_fold Cf)) v
+
+  Lemma tree_wf_not_root_internal t ρ v :
+    tree_wf ρ t → v ∈ dom t → v ≠ ρ → internal t v.
+  Proof.
+    intros Ht. revert v. induction Ht; intros. subst.
+    assert (v ∈ dom (forest_fold Cf)).
+    { rewrite dom_insert_L in H6. apply elem_of_union in H6. destruct H6; set_solver. }
+    (* FIXME: Error: Cannot infer an instance of type "tree V" for the variable t in context *)
+    (* destruct (decide (v ∈ (dom Cf))). *)
+    destruct (decide (v ∈ (dom Cf : gset V))).
+    - pose proof e as ?. apply elem_of_dom in e. destruct e. exists ρ, (dom Cf). split; auto.
+      by rewrite /children lookup_insert_eq.
+    - pose proof (forest_fold_internal_elem_of _ _ H0 n). destruct H8 as (?&?&?&?).
+      assert (v ≠ x).
+      { intros ->. apply not_elem_of_dom in n. by rewrite n in H8. }
+      specialize (H5 _ _ H8 _ H9 H10).
+
+      apply elem_of_dom in H6. destruct H6.
+      
+
+  Lemma tree_wf_root_unique t ρ1 ρ2 :
+    tree_wf ρ1 t → tree_wf ρ2 t → ρ1 = ρ2.
+  Proof.
+    intros Ht. revert ρ2. induction Ht; intros. inv H4.
+    assert (children 
 
   TODO
 
