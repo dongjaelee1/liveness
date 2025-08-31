@@ -145,6 +145,27 @@ Section tree.
     - left. intros π Hp. apply n. exists π. auto.
   Qed.
 
+  (** Operations *)
+  Definition tree_singleton ρ : tree V := {[ρ:=∅]}.
+  Definition forest_merge ρ f : tree V := <[ρ:=dom f]>(forest_fold f).
+  Definition forest_insert f ρ t := <[ρ:=t]>f.
+  Definition tree_split t ρ (Cf : forest V) : forest V := forest_insert Cf ρ (tree_singleton ρ).
+  Definition tree_insert t r (rt : tree V) π (πC : gset _) : tree V := <[π:={[r]} ∪ πC]>(rt ∪ t).
+
+  (** Well-formedness *)
+  Inductive tree_wf : V → tree V → Prop :=
+  | tree_wf_children ρ t (Cf : forest V) :
+    t = forest_merge ρ Cf →
+    root t ρ →
+    forest_fold Cf !! ρ = None →
+    forest_disjoint Cf →
+    map_Forall (λ c ct, tree_wf c ct) Cf →
+    tree_wf ρ t.
+
+  Definition forest_wf : forest V → Prop :=
+    λ f, forest_disjoint f ∧ map_Forall (λ ρ t, tree_wf ρ t) f.
+
+  (** Properties *)
   Lemma root_not_internal t v :
     root t v ↔ ¬ internal t v.
   Proof using. rewrite /root /internal /parent /children. firstorder. Qed.
@@ -166,20 +187,6 @@ Section tree.
     - exists C. done.
     - destruct H1 as (?&?&?). pose proof (children_unique _ _ _ _ H0 H1). by subst.
   Qed.
-
-  (** Well-formedness *)
-  Inductive tree_wf : V → tree V → Prop :=
-  | tree_wf_children ρ t (Cf : forest V) :
-    t = <[ρ:=dom Cf]>(forest_fold Cf) →
-    root t ρ →
-    (* ρ ∉ dom (forest_fold Cf) → *)
-    forest_fold Cf !! ρ = None →
-    forest_disjoint Cf →
-    map_Forall (λ c ct, tree_wf c ct) Cf →
-    tree_wf ρ t.
-
-  Definition forest_wf : forest V → Prop :=
-    λ f, forest_disjoint f ∧ map_Forall (λ ρ t, tree_wf ρ t) f.
 
   Lemma forest_fold_keeps_children t π C Cf r :
     children t π C → Cf !! r = Some t → forest_disjoint Cf →
@@ -263,6 +270,107 @@ Section tree.
     eapply root_not_internal in H3. apply H3. apply H0; auto.
     apply tree_wf_root_elem. auto.
   Qed.
+
+  Definition ancestor t : relation V := tc (parent t).
+
+  (* Lemma internal_ancestor t ρ v : *)
+  (*   tree_wf ρ t → internal t v → ancestor t v ρ. *)
+  (* Proof using. *)
+  (*   revert ρ v. induction t using map_ind; intros. *)
+  (*   { destruct H1 as (?&?&?&?). done. } *)
+    
+  (*   destruct H1 as (?&?&?&?). *)
+
+
+  (*   rewrite /ancestor /internal /parent /children. *)
+  (*   revert ρ v. induction t using map_ind; intros. *)
+  (*   { destruct H0 as (?&?&?&?). done. } *)
+  (*   destruct H1 as (?&?&?&?). *)
+
+  Global Instance children_tree_subseteq_Proper : Proper ((⊆) ==> (=) ==> (=) ==> (→)) children.
+  Proof using.
+    intros t1 t2 Hs ? v ? ? u ?. subst. unfold children. intros. eapply lookup_weaken; eauto.
+  Qed.
+  Global Instance parent_tree_subseteq_Proper : Proper ((⊆) ==> (=) ==> (=) ==> (→)) parent.
+  Proof using.
+    intros t1 t2 Hs ? v ? ? u ?. subst. intros (?&?&?). exists x. split; auto.
+    eapply children_tree_subseteq_Proper; eauto.
+  Qed.
+  Global Instance ancestor_tree_subseteq_Proper : Proper ((⊆) ==> (=) ==> (=) ==> (→)) ancestor.
+  Proof using.
+    intros t1 t2 Hs ? v ? ? u ?. subst. intro Ha. revert t2 Hs. induction Ha; intros.
+    { econstructor 1. destruct H0 as (?&?&?). exists x0. split; auto. eapply children_tree_subseteq_Proper; eauto. }
+    econstructor 2.
+    - eapply parent_tree_subseteq_Proper; eauto.
+    - by eapply IHHa.
+  Qed.
+
+  Lemma tree_wf_descendant t ρ v :
+    tree_wf ρ t → v ∈ dom t → ancestor t v ρ.
+  Proof using.
+    intro Ht. revert v. induction Ht; intros. destruct (Cf !! v) eqn:Hv.
+    - specialize (H5 _ _ Hv).
+      admit.
+    - 
+
+  Lemma tree_wf_far_descendant t ρ C v :
+    tree_wf ρ t → t !! ρ = Some C → v ∉ C →
+    ∃ c, c ∈ C ∧ ancestor t v c.
+  Proof using.
+    intro Ht. revert C v. induction Ht; intros.
+
+  Lemma tree_wf_root_ancestor t ρ v :
+    tree_wf ρ t → internal t v → ancestor t v ρ.
+  Proof using.
+    intros Ht. revert v. induction Ht; intros. destruct H6 as (π&?).
+    destruct (decide (π = ρ)).
+    { subst. by econstructor 1. }
+    
+
+
+    econstructor 2; first eauto.
+    eapply H5.
+    
+
+  Lemma internal_cases t ρ v :
+    tree_wf ρ t → internal t v → (parent t v ρ ∨ ∃ r rt, r ≠ ρ ∧ rt ⊆ t ∧ tree_wf r rt ∧ internal rt v).
+  Proof.
+    
+
+  Lemma tree_wf_internal_ind (P : V → tree V → Prop) :
+    (∀ ρ t (Cf : forest V),
+       t = forest_merge ρ Cf →
+       root t ρ →
+       forest_fold Cf !! ρ = None →
+       forest_disjoint Cf →
+       map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) Cf →
+       (∀ (v : V) (s : tree V), internal t v → s ⊆ t → root s v → P v s) →
+       P ρ t)
+    → ∀ ρ (t : tree V), tree_wf ρ t → P ρ t.
+  Proof using.
+    intros Hind ? ? Ht. induction Ht. eapply Hind; eauto.
+    subst. intros.
+
+    tree_wf_ind:
+  ∀ P : V → tree V → Prop,
+    (∀ ρ t (Cf : forest V),
+       t = forest_merge ρ Cf
+       → root t ρ
+         → forest_fold Cf !! ρ = None
+           → forest_disjoint Cf
+             → map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) Cf → (∀ (i : V) (x : tree V), Cf !! i = Some x → P i x) → P ρ t)
+    → ∀ v (g : tree V), tree_wf v g → P v g
+
+  Lemma tree_insert_wf ρ t r rt π πC :
+    tree_wf ρ t → tree_wf r rt → t ##ₘ rt →
+    t !! π = Some πC →
+    tree_wf ρ (tree_insert t r rt π πC).
+  Proof.
+    intros Ht. revert r rt π πC. induction Ht; intros. subst.
+    (* Case analysis on where π belongs: π = ρ or π is internal *)
+    
+
+  Definition tree_insert t r rt π πC : tree V := <[π:={[r]} ∪ πC]>(<[r:=rt]>t).
 
   TODO
 
