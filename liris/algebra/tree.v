@@ -106,6 +106,33 @@ Section forest_pre.
       eapply Forall_impl; eauto. intros (?&?). done.
   Qed.
 
+  Lemma forest_fold_empty : forest_fold ∅ = ∅.
+  Proof using. done. Qed.
+
+  Lemma tree_disjoint_forest_fold_disjoint t f :
+    map_Forall (λ _ (m : tree V), m ##ₘ t) f → t ##ₘ forest_fold f.
+  Proof using.
+    unfold forest_fold, forest_to_trees.
+    revert t. pattern f. revert f. apply map_first_key_ind; intros.
+    { rewrite map_to_list_empty. apply map_disjoint_empty_r. }
+    rewrite map_to_list_insert_first_key; auto. rewrite fmap_cons union_list_cons. simpl.
+    apply map_Forall_insert in H3; last auto. destruct H3. eapply H2 in H4.
+    apply map_disjoint_union_r_2; eauto.
+  Qed.
+
+  Lemma forest_fold_subseteq f ρ t :
+    forest_disjoint f → f !! ρ = Some t → t ⊆ forest_fold f.
+  Proof using.
+    revert ρ t. induction f using map_ind; intros.
+    { done. }
+    rewrite forest_fold_insert_L; auto.
+    apply forest_disjoint_insert in H1; last auto. destruct H1.
+    destruct (decide (i = ρ)).
+    - subst. rewrite lookup_insert_eq in H2. inv H2. apply map_union_subseteq_l.
+    - rewrite lookup_insert_ne in H2; last auto. apply map_union_subseteq_r'; last eauto.
+      apply tree_disjoint_forest_fold_disjoint; auto.
+  Qed.
+
 End forest_pre.
 
 Section tree.
@@ -118,6 +145,7 @@ Section tree.
 
   (** Basic definitions *)
   Definition children t π C : Prop := t !! π = Some C.
+  Definition node t v : Prop := is_Some (t !! v).
   Definition parent t : relation V := λ v π, ∃ C, children t π C ∧ v ∈ C.
   Definition internal t v : Prop := ∃ π, parent t v π.
   Definition root t ρ : Prop := ∀ π, ¬ parent t ρ π.
@@ -273,20 +301,6 @@ Section tree.
 
   Definition ancestor t : relation V := tc (parent t).
 
-  (* Lemma internal_ancestor t ρ v : *)
-  (*   tree_wf ρ t → internal t v → ancestor t v ρ. *)
-  (* Proof using. *)
-  (*   revert ρ v. induction t using map_ind; intros. *)
-  (*   { destruct H1 as (?&?&?&?). done. } *)
-    
-  (*   destruct H1 as (?&?&?&?). *)
-
-
-  (*   rewrite /ancestor /internal /parent /children. *)
-  (*   revert ρ v. induction t using map_ind; intros. *)
-  (*   { destruct H0 as (?&?&?&?). done. } *)
-  (*   destruct H1 as (?&?&?&?). *)
-
   Global Instance children_tree_subseteq_Proper : Proper ((⊆) ==> (=) ==> (=) ==> (→)) children.
   Proof using.
     intros t1 t2 Hs ? v ? ? u ?. subst. unfold children. intros. eapply lookup_weaken; eauto.
@@ -305,13 +319,50 @@ Section tree.
     - by eapply IHHa.
   Qed.
 
+  Lemma ancestor_alt t ρ v u : parent t v ρ → ancestor t u v → ancestor t u ρ.
+  Proof using.
+    intros. revert ρ H0. induction H1; intros.
+    { econstructor 2; eauto. by econstructor 1. }
+    econstructor 2; first eauto. eapply IHtc. auto.
+  Qed.
+
+  Lemma forest_merge_subseteq ρ f c t :
+    forest_fold f !! ρ = None → forest_disjoint f → f !! c = Some t → t ⊆ forest_merge ρ f.
+  Proof using.
+    unfold forest_merge. etransitivity.
+    2:{ eapply insert_subseteq. auto. }
+    unfold forest_fold, forest_to_trees.
+    eapply forest_fold_subseteq; eauto.
+  Qed.
+
   Lemma tree_wf_descendant t ρ v :
-    tree_wf ρ t → v ∈ dom t → ancestor t v ρ.
+    tree_wf ρ t → node t v → v ≠ ρ → ancestor t v ρ.
   Proof using.
     intro Ht. revert v. induction Ht; intros. destruct (Cf !! v) eqn:Hv.
-    - specialize (H5 _ _ Hv).
-      admit.
-    - 
+    - econstructor 1. exists (dom Cf). split.
+      + subst. apply lookup_insert_eq.
+      + by apply elem_of_dom.
+    - assert (v ∈ dom (forest_fold Cf)).
+      { subst. destruct H6. unfold forest_merge in H0.
+        rewrite lookup_insert_ne in H0; last auto. by apply elem_of_dom. }
+      assert (v ∉ dom Cf) by (by apply not_elem_of_dom).
+      pose proof (forest_fold_internal_elem_of _ _ H8 H9). destruct H10 as (?&?&?&?).
+      assert (node x0 v) by (by apply elem_of_dom).
+      assert (v ≠ x).
+      { intros F; subst. by rewrite Hv in H10. }
+      specialize (H5 _ _ H10 _ H12 H13). eapply (ancestor_alt _ _ x).
+      { subst. exists (dom Cf). unfold children, forest_merge.
+        split; last by eapply elem_of_dom. by rewrite lookup_insert_eq. }
+      eapply ancestor_tree_subseteq_Proper; last eapply H5; auto.
+      subst. eapply forest_merge_subseteq; eauto.
+  Qed.
+
+
+    Lemma forest_fold_internal_elem_of u f :
+    u ∈ dom (forest_fold f) →
+    u ∉ dom f →
+    ∃ ρ t, f !! ρ = Some t ∧ u ∈ dom t.
+
 
   Lemma tree_wf_far_descendant t ρ C v :
     tree_wf ρ t → t !! ρ = Some C → v ∉ C →
