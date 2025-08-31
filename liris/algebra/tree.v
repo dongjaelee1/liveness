@@ -133,6 +133,65 @@ Section forest_pre.
       apply tree_disjoint_forest_fold_disjoint; auto.
   Qed.
 
+  Lemma forest_fold_dom_forest_subseteq f :
+    forest_disjoint f → map_Forall (λ c t, c ∈ dom t) f → dom f ⊆ dom (forest_fold f).
+  Proof using.
+    induction f using map_ind; intros.
+    { done. }
+    rewrite map_Forall_insert in H2; last auto. destruct H2. intros v.
+    rewrite dom_insert_L. intros Hv. rewrite forest_fold_insert_L; auto. rewrite dom_union.
+    apply elem_of_union in Hv. destruct Hv.
+    - apply elem_of_singleton in H4. subst. set_solver.
+    - apply forest_disjoint_insert in H1; last auto. destruct H1. specialize (IHf H5 H3).
+      set_solver.
+  Qed.
+
+  Lemma forest_fold_lookup_Some_exists_root f v C :
+    forest_disjoint f → (forest_fold f) !! v = Some C → ∃ r t, f !! r = Some t ∧ t !! v = Some C.
+  Proof using.
+    revert v C. induction f using map_ind; intros.
+    { rewrite forest_fold_empty in H1. done. }
+    rewrite forest_fold_insert_L in H2; auto. rewrite forest_disjoint_insert in H1; auto. destruct H1.
+    apply lookup_union_Some_raw in H2. destruct H2.
+    - exists i, x. rewrite lookup_insert_eq. auto.
+    - destruct H2. specialize (IHf _ _ H3 H4). destruct IHf as (?&?&?&?).
+      assert (i ≠ x0).
+      { intros <-. by rewrite H0 in H5. }
+      exists x0, x1. rewrite lookup_insert_ne; auto.
+  Qed.
+
+  Lemma forest_disjoint_lookup_disjoint f r1 r2 t1 t2 :
+    forest_disjoint f → r1 ≠ r2 → f !! r1 = Some t1 → f !! r2 = Some t2 → t1 ##ₘ t2.
+  Proof using.
+    revert r1 r2 t1 t2. induction f using map_ind; intros; first done.
+    apply forest_disjoint_insert in H1; auto. destruct H1.
+    destruct (decide (i = r1)).
+    - subst. rewrite lookup_insert_eq in H3. rewrite lookup_insert_ne in H4; auto. inv H3.
+      specialize (H1 _ _ H4). auto.
+    - destruct (decide (i = r2)).
+      + subst. rewrite lookup_insert_eq in H4. rewrite lookup_insert_ne in H3; auto. inv H4.
+        specialize (H1 _ _ H3). auto.
+      + rewrite lookup_insert_ne in H4; auto. rewrite lookup_insert_ne in H3; auto.
+        eapply (IHf _ _ _ _ H5 H2 H3 H4).
+  Qed.
+
+  Lemma forest_fold_lookup_Some_root_unique f v r1 r2 t1 t2 :
+    forest_disjoint f → f !! r1 = Some t1 → is_Some (t1 !! v) → f !! r2 = Some t2 → is_Some(t2 !! v) → r1 = r2.
+  Proof using.
+    intros. destruct (decide (r1 = r2)); auto. exfalso.
+    pose proof (forest_disjoint_lookup_disjoint _ _ _ _ _ H0 n H1 H3). destruct H2, H4.
+    rewrite (map_disjoint_Some_r _ _ _ _ H5 H4) in H2. done.
+  Qed.
+
+  Lemma forest_fold_lookup_child_tree f v C t :
+    forest_disjoint f → (forest_fold f) !! v = Some C → f !! v = Some t → v ∈ dom t → t !! v = Some C.
+  Proof using.
+    intros. pose proof (forest_fold_lookup_Some_exists_root _ _ _ H0 H1). destruct H4 as (?&?&?&?).
+    apply elem_of_dom in H3. assert (is_Some (x0 !! v)) by eauto.
+    pose proof (forest_fold_lookup_Some_root_unique _ _ _ _ _ _ H0 H2 H3 H4 H6). subst x.
+    rewrite H2 in H4. inv H4. auto.
+  Qed.
+
 End forest_pre.
 
 Section tree.
@@ -356,6 +415,127 @@ Section tree.
       eapply ancestor_tree_subseteq_Proper; last eapply H5; auto.
       subst. eapply forest_merge_subseteq; eauto.
   Qed.
+
+  Lemma tree_merge_not_child_of_root ρ f v :
+    v ∈ dom (forest_merge ρ f) → v ∉ dom f → v ≠ ρ → ∃ c ct, f !! c = Some ct ∧ v ∈ dom ct.
+  Proof using.
+    unfold forest_merge. rewrite dom_insert.
+    intros. apply elem_of_union in H0. destruct H0; first set_solver.
+    eapply forest_fold_internal_elem_of; eauto.
+  Qed.
+
+  Lemma forest_merge_dom_forest_subseteq ρ f :
+    forest_disjoint f → map_Forall (λ c t, c ∈ dom t) f → dom f ⊆ dom (forest_merge ρ f).
+  Proof using.
+    intros. unfold forest_merge. rewrite dom_insert.
+    pose proof (forest_fold_dom_forest_subseteq _ H0 H1). set_solver.
+  Qed.
+
+  Lemma forest_merge_children_of_child ρ f C v t :
+    forest_disjoint f → children (forest_merge ρ f) v C → v ≠ ρ → f !! v = Some t → v ∈ dom t →
+    children t v C.
+  Proof using.
+    unfold forest_merge, children. intros. rewrite lookup_insert_ne in H1; auto.
+    eapply forest_fold_lookup_child_tree; eauto.
+  Qed.
+
+  Lemma tree_wf_children_subseteq t ρ v C :
+    tree_wf ρ t → children t v C → C ⊆ dom t.
+  Proof.
+    intros Ht. revert v C. induction Ht; intros. subst.
+    destruct (decide (v = ρ)).
+    - subst v. rewrite /children /forest_merge lookup_insert_eq in H6. inv H6.
+      eapply forest_merge_dom_forest_subseteq; eauto. eapply map_Forall_impl; first eapply H4.
+      intros. by apply tree_wf_root_elem in H0.
+    - destruct (Cf !! v) eqn:Hv.
+      + assert (children g v C).
+        { eapply (forest_merge_children_of_child ρ Cf C v g); auto. apply tree_wf_root_elem; eauto. }
+        specialize (H5 _ _ Hv _ _ H0). etransitivity; first eapply H5.
+        apply subseteq_dom. eapply forest_merge_subseteq; eauto.
+      + assert (v ∈ dom (forest_merge ρ Cf)) by (by eapply elem_of_dom).
+        assert (v ∉ dom Cf) by (by eapply not_elem_of_dom).
+        pose proof (tree_merge_not_child_of_root _ _ _ H0 H7 n). destruct H8 as (c&ct&?&?).
+
+
+        (* specialize (H5 _ _ H8). *)
+        assert (children ct c (dom ct)).
+        { eapply (forest_merge_children_of_child ρ Cf _ _ ct); auto. all: admit. }
+
+        } apply tree_wf_root_elem; eauto. }
+        { eapply forest_merge
+
+        
+  Lemma tree_merge_not_child_of_root ρ f v :
+    v ∈ dom (forest_merge ρ f) → v ∉ dom f → v ≠ ρ → ∃ c ct, f !! c = Some ct ∧ v ∈ dom ct.
+        
+
+        ; eauto.
+forest_merge_dom_forest_subseteq:
+  ∀ ρ f, forest_disjoint f → map_Forall (λ (c : V) t, c ∈ dom t) f → dom f ⊆ dom (forest_merge ρ f)
+        
+
+        
+      assert (v ∈ dom (forest_merge ρ Cf)) by (by apply elem_of_dom).
+      assert (v ∉ dom Cf).
+      { apply not_elem_of_dom.
+      
+      
+
+  Lemma forest_fold_dom_forest_subseteq f :
+    forest_disjoint f → map_Forall (λ c t, c ∈ dom t) f → dom f ⊆ dom (forest_fold f).
+      TODO
+      pose proof (forest_merge_subseteq _ _ _ _ H2 H3).
+      
+forest_merge_subseteq: ∀ ρ f (c : V) t, forest_fold f !! ρ = None → forest_disjoint f → f !! c = Some t → t ⊆ forest_merge ρ f
+
+      
+      eapply H5.
+      
+      unfold forest_merge.
+      apply elem_of_dom in H7. destruct H7.
+      assert (x ⊆ forest_merge ρ Cf).
+      { eapply forest_merge_subseteq; eauto. }
+      eapply lookup_weaken_is_Some; last eauto.
+      specialize (H4 _ _ H0). apply tree_wf_root_elem in H4. apply elem_of_dom; auto.
+    
+
+  H0 : children (forest_merge ρ Cf) x C
+  H5 : v ∈ C
+  Ht : tree_wf ρ (forest_merge ρ Cf)
+  ============================
+  node (forest_merge ρ Cf) v
+
+  Lemma internal_node t ρ v : tree_wf ρ t → internal t v → (node t v ∧ v ≠ ρ).
+  Proof.
+    intros Ht Hi. assert (v ≠ ρ).
+    { intros F; subst. apply internal_not_root in Hi. apply Hi. inv Ht; auto. }
+    split; last auto. clear H0.
+    pose proof Ht. inv H0; subst. destruct Hi as (?&C&?&?).
+
+
+    revert v Hi. induction Ht; intros ? (?&C&?&?). subst.
+    destruct (decide (x = ρ)).
+    - subst x. rewrite /children /forest_merge lookup_insert_eq in H6. inv H6.
+      apply elem_of_dom in H7. destruct H7.
+      assert (x ⊆ forest_merge ρ Cf).
+      { eapply forest_merge_subseteq; eauto. }
+      eapply lookup_weaken_is_Some; last eauto.
+      specialize (H4 _ _ H0). apply tree_wf_root_elem in H4. apply elem_of_dom; auto.
+    - assert (v ∈ dom (forest_fold Cf)).
+      { 
+      
+
+
+    
+    destruct (Cf !! v) eqn:Hv.
+    - apply elem_of_dom.  apply lookup_insert.
+    
+forest_fold_internal_elem_of:
+  ∀ {V : Type} {EqDecision0 : EqDecision V} {H : Countable V} (u : V) (f : forest V),
+    u ∈ dom (forest_fold f) → u ∉ dom f → ∃ (ρ : V) (t : tree V), f !! ρ = Some t ∧ u ∈ dom t
+forest_merge_subseteq: ∀ ρ f (c : V) t, forest_fold f !! ρ = None → forest_disjoint f → f !! c = Some t → t ⊆ forest_merge ρ f
+    
+    intros (?&?&?&?). apply elem_of_dom.
 
 
     Lemma forest_fold_internal_elem_of u f :
