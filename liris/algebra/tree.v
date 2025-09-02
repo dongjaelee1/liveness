@@ -144,6 +144,16 @@ Section forest_pre.
     apply map_disjoint_union_r_2; eauto.
   Qed.
 
+  Lemma forest_fold_disjoint_tree_disjoint t f :
+    t ##ₘ forest_fold f → map_Forall (λ _ (m : tree V), m ##ₘ t) f.
+  Proof using.
+    unfold forest_fold, forest_to_trees.
+    revert t. pattern f. revert f. apply map_first_key_ind; intros.
+    { done. }
+    rewrite map_to_list_insert_first_key in H3; auto. rewrite fmap_cons union_list_cons in H3. simpl in H3.
+    apply map_Forall_insert; auto. eapply map_disjoint_union_r in H3. destruct H3. split; auto.
+  Qed.
+
   Lemma forest_fold_subseteq f ρ t :
     forest_disjoint f → f !! ρ = Some t → t ⊆ forest_fold f.
   Proof using.
@@ -874,42 +884,48 @@ Section tree.
   Proof.
     intros Ht. revert r rt π πC. induction Ht; intros.
     assert (ρ ∉ dom rt).
-    { intros F. apply elem_of_dom in F. destruct F. eapply map_disjoint_Some_r in H9; eauto.
+    { intros F. apply elem_of_dom in F. destruct F. eapply map_disjoint_Some_r in H8; eauto.
       assert (is_Some (t !! ρ)).
       { apply elem_of_dom. apply tree_wf_root_elem. by econstructor. }
-      by rewrite H9 in H10. }
+      by rewrite H8 in H9. }
     assert (r ∉ dom t).
-    { intros F. apply elem_of_dom in F. destruct F. eapply map_disjoint_Some_r in H10; eauto.
+    { intros F. apply elem_of_dom in F. destruct F. eapply map_disjoint_Some_r in H9; eauto.
       assert (is_Some (rt !! r)).
       { apply elem_of_dom. apply tree_wf_root_elem. auto. }
-      by rewrite H10 in H11. }
+      by rewrite H9 in H10. }
+    assert (Cf !! r = None).
+    { subst. assert (dom Cf ⊆ dom (forest_merge ρ Cf)).
+      { eapply forest_merge_dom_forest_subseteq; eauto. eapply map_Forall_impl; eauto.
+        intros. eapply tree_wf_root_elem; eauto. }
+      apply not_elem_of_dom. intros F. apply H9. eapply elem_of_weaken; eauto. }
     (* induction Ht using tree_wf_internal_ind; intros. *)
     (* Case analysis: π is root or π is internal *)
-    destruct (decide (π = ρ)).
-    - subst π. rewrite /tree_insert. subst. eapply (tree_wf_children _ _ (<[r:=rt]>Cf)).
-      +
-
-        TODO
-  H1 : root (forest_merge ρ Cf) ρ
-  H2 : forest_fold Cf !! ρ = None
-  H3 : forest_disjoint Cf
-  H4 : map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) Cf
-  H5 :
-    ∀ (i : V) (x : tree V),
-      Cf !! i = Some x
-      → ∀ (r : V) (rt : tree V) π (πC : gset V), tree_wf r rt → x ##ₘ rt → x !! π = Some πC → tree_wf i (tree_insert x r rt π πC)
-  r : V
-  rt : tree V
-  πC : gset V
-  H6 : tree_wf r rt
-  H8 : forest_merge ρ Cf !! ρ = Some πC
-  H7 : forest_merge ρ Cf ##ₘ rt
-  H9 : ρ ∉ dom rt
-  H10 : r ∉ dom (forest_merge ρ Cf)
-  ============================
-  <[ρ:={[r]} ∪ πC]> (rt ∪ forest_merge ρ Cf) = forest_merge ρ (<[r:=rt]> Cf)
-
     (* internal case: exists v, a child of root, whose tree contains π. It's update is wf by IH. *)
+    destruct (decide (π = ρ)).
+    - subst π. rewrite /tree_insert. subst.
+      assert (Ha0 : forest_disjoint (<[r:=rt]> Cf)).
+      { apply forest_disjoint_insert; eauto. split; auto.
+        rewrite /forest_merge in H6. apply map_disjoint_insert_l in H6. destruct H6.
+        apply forest_fold_disjoint_tree_disjoint; auto. }
+      assert (Ha1 : (rt ∪ forest_fold Cf) !! ρ = None).
+      { apply lookup_union_None_2; auto. by apply not_elem_of_dom. }
+      eapply (tree_wf_children _ _ (<[r:=rt]>Cf)); auto.
+      + rewrite /forest_merge lookup_insert_eq in H7. inv H7. rewrite /forest_merge.
+        rewrite forest_fold_insert_L; auto.
+        rewrite -(insert_delete_eq (rt ∪ <[ρ:=dom Cf]> (forest_fold Cf)) ρ).
+        replace (delete ρ (rt ∪ <[ρ:=dom Cf]> (forest_fold Cf))) with (rt ∪ forest_fold Cf).
+        * rewrite dom_insert_L. done.
+        * rewrite -insert_union_r; last (by eapply not_elem_of_dom).
+          rewrite delete_insert_eq delete_id; auto.
+      + rewrite forest_fold_insert_L; auto.
+      + apply map_Forall_insert; auto.
+    -
+      
+
+          TODO
+
+          
+
 
 forest_merge_not_child_of_root:
   ∀ ρ f v, node (forest_merge ρ f) v → v ∉ dom f → v ≠ ρ → ∃ (c : V) (ct : tree V), f !! c = Some ct ∧ node ct v
