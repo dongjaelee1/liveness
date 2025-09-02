@@ -765,15 +765,15 @@ Section tree.
     - right. eapply tree_wf_not_root_internal; eauto.
   Qed.
 
-  Inductive tree_wf_clo : tree V → Prop :=
-  | tree_wf_clo_internal t :
-    (∀ v s, internal t v → s ⊆ t → tree_wf v s → tree_wf_clo s) →
-    tree_wf_clo t.
+  Inductive tree_wf_clo : V → tree V → Prop :=
+  | tree_wf_clo_internal ρ t :
+    (∀ v s, internal t v → s ⊆ t → tree_wf v s → tree_wf_clo v s) →
+    tree_wf_clo ρ t.
 
-  Lemma tree_wf_clo_subtree t s :
-    tree_wf_clo t → s ⊆ t → tree_wf_clo s.
+  Lemma tree_wf_clo_subtree t ρ s r :
+    tree_wf_clo ρ t → s ⊆ t → tree_wf_clo r s.
   Proof using.
-    intros. generalize dependent s. induction H0; intros.
+    intros. revert r. generalize dependent s. induction H0; intros.
     econstructor. intros u x. intros. eapply H0; eauto.
     - eapply internal_tree_subseteq_Proper; eauto.
     - etrans; eauto.
@@ -803,7 +803,7 @@ Section tree.
   Qed.
 
   Lemma tree_wf_tree_wf_clo t ρ :
-    tree_wf ρ t → tree_wf_clo t.
+    tree_wf ρ t → tree_wf_clo ρ t.
   Proof using.
     intros. induction H0. econstructor. intros.
     destruct (Cf !! v) eqn:HV.
@@ -823,107 +823,14 @@ Section tree.
   Qed.
 
   Lemma tree_wf_internal_ind (P : V → tree V → Prop) :
-    (∀ ρ t (Cf : forest V),
-       t = forest_merge ρ Cf →
-       root t ρ →
-       forest_fold Cf !! ρ = None →
-       forest_disjoint Cf →
-       map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) Cf →
-       (∀ (v : V) (s : tree V), internal t v → s ⊆ t → tree_wf v s → P v s) →
-       (* (∀ (v : V) (s : tree V), internal t v → s ⊆ t → root s v → P v s) → *)
+    (∀ ρ t,
+       tree_wf ρ t →
+       (∀ v s, internal t v → s ⊆ t → tree_wf v s → P v s) →
        P ρ t)
     → ∀ ρ (t : tree V), tree_wf ρ t → P ρ t.
   Proof using.
-    intros Hind ? ? Ht. induction Ht. eapply Hind; eauto.
-    assert (tree_wf ρ t) by (econstructor; eauto).
-    intros. pose proof (tree_wf_root_internal_descendant _ _ _ H6 H7).
-    apply descendant_descendant_alt in H10; auto.
-    assert (∀ i x, child t ρ i → x ⊆ t → tree_wf i x → P i x).
-    { intros. assert (is_Some (Cf !! i)).
-      { subst. destruct H11 as (?&?&?). rewrite /children /forest_merge lookup_insert_eq in H0. inv H0.
-        apply elem_of_dom; auto. }
-      destruct H14. assert (tree_wf i x0) by eauto.
-      assert (x0 ⊆ t).
-      { admit. }
-      
-
-      i ≠ ρ
-
-
-    TODO
-
-    clear dependent Cf. clear H1 H7. generalize dependent s. revert H6. induction H10; intros.
-    - 
-
-
-    destruct (decide (child t ρ v)).
-    - admit.
-    - clear dependent Cf. clear H1 H7. generalize dependent s. revert H6 n. induction H10; intros.
-      { done. }
-      
-
-    clear dependent Cf. clear H1 H7. generalize dependent s. revert H6. induction H10; intros.
-    { 
-
-    
-    generalize dependent s. revert H7. induction H10; intros.
-    2:{ 
-
-    eapply Hind; eauto.
-
-    
-    clear dependent Cf. clear H1 H7. generalize dependent ρ. generalize dependent t.
-    induction H9; intros.
-    rename ρ into v, t into s. rename ρ0 into ρ, t0 into t.
-    eapply Hind; eauto. intros u x. intros.
-    
-
-    intros Hind ? ? Ht. induction Ht. eapply Hind; eauto.
-    assert (tree_wf ρ t) by (econstructor; eauto).
-    intros. pose proof (tree_wf_root_internal_descendant _ _ _ H6 H7).
-    apply descendant_descendant_alt in H10; auto.
-    clear dependent Cf. clear H1 H7. generalize dependent ρ. generalize dependent t.
-    induction H9; intros.
-    rename ρ into v, t into s. rename ρ0 into ρ, t0 into t.
-    eapply Hind; eauto. intros u x. intros.
-    
-
-    
-    clear H6. generalize dependent s. generalize dependent Cf. revert H7 H1. induction H10; intros.
-    { admit. }
-    
-
-    
-    intros Hind ? ? Ht. induction Ht. eapply Hind; eauto.
-    assert (tree_wf ρ t) by (econstructor; eauto).
-    intros. pose proof (tree_wf_root_internal_descendant _ _ _ H6 H7).
-    apply descendant_descendant_alt in H10; auto.
-    clear H6. generalize dependent s. generalize dependent Cf. revert H7 H1. induction H10; intros.
-    { admit. }
-    
-
-    inv H1. eapply H
-
-
-    intros Hind ? ? Ht. induction Ht. eapply Hind; eauto.
-    assert (tree_wf ρ t) by (econstructor; eauto).
-    intros. pose proof (tree_wf_root_internal_descendant _ _ _ H6 H7).
-    (* pose proof (descendant_descendant_alt _ _ _ H6 H10). *)
-    apply descendant_descendant_alt in H10; auto.
-    
-
-    
-    subst. intros.
-
-    tree_wf_ind:
-  ∀ P : V → tree V → Prop,
-    (∀ ρ t (Cf : forest V),
-       t = forest_merge ρ Cf
-       → root t ρ
-         → forest_fold Cf !! ρ = None
-           → forest_disjoint Cf
-             → map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) Cf → (∀ (i : V) (x : tree V), Cf !! i = Some x → P i x) → P ρ t)
-    → ∀ v (g : tree V), tree_wf v g → P v g
+    intros Hind. intros. pose proof (tree_wf_tree_wf_clo _ _ H0). induction H1; eauto.
+  Qed.
 
   Lemma tree_insert_wf ρ t r rt π πC :
     tree_wf ρ t → tree_wf r rt → t ##ₘ rt →
