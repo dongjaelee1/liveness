@@ -533,13 +533,13 @@ Section tree.
   Qed.
 
   Lemma children_wf_subtree t s v C :
-    children t v C → is_Some(s !! v) → s ⊆ t → children s v C.
+    children t v C → node s v → s ⊆ t → children s v C.
   Proof using.
     unfold children. intros. destruct H1.
     pose proof (lookup_weaken _ _ _ _ H1 H2). rewrite H3 in H0. inv H0. done.
   Qed.
   Lemma child_wf_subtree t s v u :
-    child t v u → is_Some (s !! v) → s ⊆ t → child s v u.
+    child t v u → node s v → s ⊆ t → child s v u.
   Proof using.
     unfold child. intros. destruct H0 as (?&?&?).
     exists x. split; last auto. eapply children_wf_subtree; eauto.
@@ -553,9 +553,9 @@ Section tree.
       econstructor; eauto.
     }
     rename y into π. econstructor 2.
-    { eapply child_wf_subtree; first eapply H5; auto. by rewrite /forest_merge lookup_insert_eq. }
+    { eapply child_wf_subtree; first eapply H5; auto. by rewrite /node /forest_merge lookup_insert_eq. }
     assert (child (forest_merge ρ Cf) ρ π).
-    { eapply child_wf_subtree; eauto. by rewrite /forest_merge lookup_insert_eq. }
+    { eapply child_wf_subtree; eauto. by rewrite /node /forest_merge lookup_insert_eq. }
     assert (is_Some (Cf !! π)).
     { destruct H0 as (?&?&?). rewrite /children /forest_merge lookup_insert_eq in H0. inv H0.
       apply elem_of_dom; auto. }
@@ -779,6 +779,7 @@ Section tree.
       assert (tree_wf π s) by (eauto).
       assert (s ⊆ forest_merge ρ Cf) by (by eapply forest_merge_subseteq).
       eapply children_wf_subtree in H0; eauto.
+      2:{ by unfold node. }
       pose proof (tree_wf_children_subseteq _ _ _ _ H8 H0).
       assert (s ⊆ forest_fold Cf) by (by eapply forest_fold_subseteq).
       assert (is_Some (forest_fold Cf !! ρ)).
@@ -898,17 +899,16 @@ Section tree.
       { eapply forest_merge_dom_forest_subseteq; eauto. eapply map_Forall_impl; eauto.
         intros. eapply tree_wf_root_elem; eauto. }
       apply not_elem_of_dom. intros F. apply H9. eapply elem_of_weaken; eauto. }
+    assert (Ha0 : forest_disjoint (<[r:=rt]> Cf)).
+    { subst. apply forest_disjoint_insert; eauto. split; auto.
+      rewrite /forest_merge in H6. apply map_disjoint_insert_l in H6. destruct H6.
+      apply forest_fold_disjoint_tree_disjoint; auto. }
+    assert (Ha1 : (rt ∪ forest_fold Cf) !! ρ = None).
+    { apply lookup_union_None_2; auto. by apply not_elem_of_dom. }
     (* induction Ht using tree_wf_internal_ind; intros. *)
     (* Case analysis: π is root or π is internal *)
-    (* internal case: exists v, a child of root, whose tree contains π. It's update is wf by IH. *)
     destruct (decide (π = ρ)).
     - subst π. rewrite /tree_insert. subst.
-      assert (Ha0 : forest_disjoint (<[r:=rt]> Cf)).
-      { apply forest_disjoint_insert; eauto. split; auto.
-        rewrite /forest_merge in H6. apply map_disjoint_insert_l in H6. destruct H6.
-        apply forest_fold_disjoint_tree_disjoint; auto. }
-      assert (Ha1 : (rt ∪ forest_fold Cf) !! ρ = None).
-      { apply lookup_union_None_2; auto. by apply not_elem_of_dom. }
       eapply (tree_wf_children _ _ (<[r:=rt]>Cf)); auto.
       + rewrite /forest_merge lookup_insert_eq in H7. inv H7. rewrite /forest_merge.
         rewrite forest_fold_insert_L; auto.
@@ -919,18 +919,39 @@ Section tree.
           rewrite delete_insert_eq delete_id; auto.
       + rewrite forest_fold_insert_L; auto.
       + apply map_Forall_insert; auto.
-    -
-      
+    (* internal case: π is a child of root OR exists v, a child of root, whose tree contains π. It's update is wf by IH. *)
+    - destruct (Cf !! π) eqn:Hv.
+      + rename g into ct.
+        assert (Hprne : π ≠ r).
+        { intros F; subst. by rewrite H10 in Hv. }
+        assert (ct ##ₘ rt).
+        { eapply (forest_disjoint_lookup_disjoint _ π r _ _ Ha0); auto.
+          - rewrite lookup_insert_ne; auto.
+          - rewrite lookup_insert_eq; auto. }
+        assert (tree_wf π ct) by eauto.
+        assert (ct !! π = Some πC).
+        { subst. eapply forest_merge_children_of_child. 2: eapply H7. all: auto.
+          eapply tree_wf_root_elem; eauto. }
+        specialize (H4 _ _ Hv _ _ _ _ H5 H11 H13).
+        admit.
+      + assert (∃ c ct, Cf !! c = Some ct ∧ node ct π).
+        { eapply forest_merge_not_child_of_root; eauto.
+          - subst. unfold node. rewrite H7. done.
+          - apply not_elem_of_dom; auto. }
+        destruct H11 as (c&ct&?&?).
+        assert (Hcrne : c ≠ r).
+        { intros F; subst. by rewrite H10 in H11. }
+        assert (ct ##ₘ rt).
+        { eapply (forest_disjoint_lookup_disjoint _ c r _ _ Ha0); auto.
+          - rewrite lookup_insert_ne; auto.
+          - rewrite lookup_insert_eq; auto. }
+        assert (ct !! π = Some πC).
+        { eapply children_wf_subtree; first eapply H7; auto. subst t. eapply forest_merge_subseteq; eauto. }
+        specialize (H4 _ _ H11 _ _ _ _ H5 H13 H14).
+        
 
           TODO
 
-          
-
-
-forest_merge_not_child_of_root:
-  ∀ ρ f v, node (forest_merge ρ f) v → v ∉ dom f → v ≠ ρ → ∃ (c : V) (ct : tree V), f !! c = Some ct ∧ node ct v
-
-tree_wf π (tree_insert s r rt π πC)
     
 tree_insert =
 λ t (r : V) (rt : tree V) π (πC : gset V), <[π:={[r]} ∪ πC]> (rt ∪ t)
@@ -941,9 +962,6 @@ Inductive tree_wf : V → tree V → Prop :=
                          → root t ρ
                            → forest_fold Cf !! ρ = None
                              → forest_disjoint Cf → map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) Cf → tree_wf ρ t.
-
-
-  TODO
 
   Lemma descendants_unique g v Δ1 Δ2 :
     descendants g v Δ1 → descendants g v Δ2 → Δ1 = Δ2.
