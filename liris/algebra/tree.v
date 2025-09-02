@@ -465,6 +465,11 @@ Section tree.
     - eapply child_tree_subseteq_Proper; eauto.
     - by eapply IHHd.
   Qed.
+  Global Instance internal_tree_subseteq_Proper : Proper ((⊆) ==> (=) ==> (→)) internal.
+  Proof using.
+    intros t1 t2 Hs ? v ? ?. subst. destruct H1 as (?&?).
+    unfold internal. exists x. eapply child_tree_subseteq_Proper; eauto.
+  Qed.
 
   Lemma descendant_r t ρ v u : descendant t ρ v → child t v u → descendant t ρ u.
   Proof using. intros. eapply tc_r; eauto. Qed.
@@ -562,12 +567,13 @@ Section tree.
   (*     subst. eapply forest_merge_subseteq; eauto. *)
   (* Qed. *)
 
-  Lemma tree_merge_not_child_of_root ρ f v :
-    v ∈ dom (forest_merge ρ f) → v ∉ dom f → v ≠ ρ → ∃ c ct, f !! c = Some ct ∧ v ∈ dom ct.
+  Lemma forest_merge_not_child_of_root ρ f v :
+    node (forest_merge ρ f) v → v ∉ dom f → v ≠ ρ → ∃ c ct, f !! c = Some ct ∧ node ct v.
   Proof using.
-    unfold forest_merge. rewrite dom_insert.
+    intros ?. apply elem_of_dom in H0. revert H0. unfold forest_merge. rewrite dom_insert.
     intros. apply elem_of_union in H0. destruct H0; first set_solver.
-    eapply forest_fold_internal_elem_of; eauto.
+    pose proof (forest_fold_internal_elem_of _ _ H0 H1). destruct H3 as (?&?&?&?).
+    do 2 eexists; split; eauto. by apply elem_of_dom.
   Qed.
 
   Lemma forest_merge_dom_forest_subseteq ρ f :
@@ -749,6 +755,71 @@ Section tree.
       assert (¬ descendant t r i).
       { intros F. apply H6. eapply descendant_wf_subtree; eauto. }
       done.
+  Qed.
+
+  Lemma tree_wf_node_root_or_internal t ρ v :
+    tree_wf ρ t → node t v → (root t v ∨ internal t v).
+  Proof using.
+    intros. apply elem_of_dom in H1. destruct (decide (v = ρ)).
+    - subst. left. inv H0; auto.
+    - right. eapply tree_wf_not_root_internal; eauto.
+  Qed.
+
+  Inductive tree_wf_clo : tree V → Prop :=
+  | tree_wf_clo_internal t :
+    (∀ v s, internal t v → s ⊆ t → tree_wf v s → tree_wf_clo s) →
+    tree_wf_clo t.
+
+  Lemma tree_wf_clo_subtree t s :
+    tree_wf_clo t → s ⊆ t → tree_wf_clo s.
+  Proof using.
+    intros. generalize dependent s. induction H0; intros.
+    econstructor. intros u x. intros. eapply H0; eauto.
+    - eapply internal_tree_subseteq_Proper; eauto.
+    - etrans; eauto.
+  Qed.
+
+  Lemma tree_wf_node_subtree t x s r v :
+    tree_wf r x → tree_wf v s → node x v → x ⊆ t → s ⊆ t → s ⊆ x.
+  Proof using.
+    intros Ht. revert t s v. induction Ht; intros.
+    assert (tree_wf ρ t) by (by econstructor). destruct (decide (v = ρ)).
+    { subst v. pose proof (tree_wf_tree_unique _ _ _ _ H8 H9 H10 H6). by subst. }
+    pose proof n. eapply tree_wf_not_root_internal in n; eauto.
+    2:{ apply elem_of_dom. auto. }
+    destruct (Cf !! v) eqn:Hv.
+    - assert (tree_wf v g) by eauto. assert (g ⊆ t0).
+      { etrans; last eapply H8. subst. eapply forest_merge_subseteq; eauto. }
+      pose proof (tree_wf_tree_unique _ _ _ _ H9 H13 H6 H12). subst g.
+      subst t. eapply forest_merge_subseteq; eauto.
+    - assert (v ∉ dom Cf) by (by apply not_elem_of_dom). subst.
+      pose proof (forest_merge_not_child_of_root _ _ _ H7 H12 H11). destruct H0 as (?&?&?&?).
+      rename x into π, x0 into x.
+      assert (x ⊆ forest_merge ρ Cf) by (by eapply forest_merge_subseteq).
+      assert (x ⊆ t0).
+      { etrans; last eapply H8; auto. }
+      specialize (H5 _ _ H0 t0 _ _ H6 H13 H15 H9).
+      etrans; first eapply H5; auto.
+  Qed.
+
+  Lemma tree_wf_tree_wf_clo t ρ :
+    tree_wf ρ t → tree_wf_clo t.
+  Proof using.
+    intros. induction H0. econstructor. intros.
+    destruct (Cf !! v) eqn:HV.
+    - assert (tree_wf v g) by eauto. assert (g ⊆ t).
+      { subst. eapply forest_merge_subseteq; eauto. }
+      pose proof (tree_wf_tree_unique _ _ _ _ H7 H10 H8 H9). subst g. eauto.
+    - assert (v ∉ dom Cf) by (by apply not_elem_of_dom).
+      assert (v ≠ ρ).
+      { eapply tree_wf_internal_not_root; eauto. econstructor; eauto. }
+      assert (node t v).
+      { eapply tree_wf_internal_node; eauto. econstructor; eauto. }
+      subst. pose proof (forest_merge_not_child_of_root _ _ _ H11 H9 H10). destruct H0 as (?&?&?&?).
+      specialize (H5 _ _ H0). eapply tree_wf_clo_subtree; first eauto.
+      assert (tree_wf x x0) by eauto.
+      eapply (tree_wf_node_subtree (forest_merge ρ Cf) x0 s); eauto.
+      eapply forest_merge_subseteq; eauto.
   Qed.
 
   Lemma tree_wf_internal_ind (P : V → tree V → Prop) :
