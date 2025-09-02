@@ -1,7 +1,7 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
-From liris.cgraphs Require Export cgraph.
-From liris.cgraphs Require Import mapexcl.
+(* From liris.cgraphs Require Export cgraph. *)
+(* From liris.cgraphs Require Import mapexcl. *)
 
 Section aux.
   (* Inductive tc2 {A : Type} (R : relation A) : relation A := *)
@@ -216,6 +216,27 @@ Section forest_pre.
     rewrite H2 in H4. inv H4. auto.
   Qed.
 
+  Lemma forest_fold_empty_inv f :
+    (∀ v t, f !! v = Some t → t ≠ ∅) → forest_fold f = ∅ → f = ∅.
+  Proof using.
+    induction f using map_first_key_ind; intros; auto.
+    unfold forest_fold, forest_to_trees in H3.
+    rewrite map_to_list_insert_first_key in H3; auto.
+    rewrite fmap_cons union_list_cons in H3. simpl in H3.
+    assert (x ≠ (∅ : tree V)).
+    { eapply H2. eapply lookup_insert_eq. }
+    apply leibniz_equiv_iff in H3.
+    destruct (map_to_list x !! 0) eqn:Hfk.
+    2:{ destruct (map_to_list x) eqn:Hml.
+        - apply map_to_list_empty_iff in Hml. done.
+        - done.
+    }
+    destruct p. assert (x !! v = Some g).
+    { apply elem_of_map_to_list. eapply list_elem_of_lookup_2; eauto. }
+    pose proof (lookup_union_Some_l _ (⋃ (map_to_list m).*2) _ _ H5).
+    specialize (H3 v). rewrite H6 in H3. rewrite lookup_empty in H3. inv H3.
+  Qed.
+
 End forest_pre.
 
 Section tree.
@@ -227,8 +248,8 @@ Section tree.
   Implicit Type C : gset V.
 
   (** Basic definitions *)
-  Definition children t π C : Prop := t !! π = Some C.
   Definition node t v : Prop := is_Some (t !! v).
+  Definition children t π C : Prop := t !! π = Some C.
   Definition child t : relation V := λ π v, ∃ C, children t π C ∧ v ∈ C.
   Definition internal t v : Prop := ∃ π, child t π v.
   Definition root t ρ : Prop := ∀ π, ¬ child t π ρ.
@@ -237,6 +258,10 @@ Section tree.
   Definition internal_alt t v : Prop := ∃ π, parent t v π.
   Definition root_alt t ρ : Prop := ∀ π, ¬ parent t ρ π.
 
+  Global Instance node_Decision t : ∀ v, Decision (node t v).
+  Proof using.
+    intros. unfold node. apply _.
+  Qed.
   Global Instance children_Decision t : ∀ π C, Decision (children t π C).
   Proof using.
     intros. unfold children. apply _.
@@ -655,7 +680,6 @@ Section tree.
       { inv H0. rewrite /node. eauto. }
       assert (descendant_alt t ρ v).
       { apply descendant_descendant_alt; auto. eapply tree_wf_node_descendant; eauto. }
-      (* clear n. generalize dependent C. revert H0 H2. induction H3; intros. *)
       clear n H2. generalize dependent C. revert H0. induction H3; intros.
       + eapply tree_wf_root_child_children_subseteq; eauto.
       + assert (children s v C).
@@ -684,23 +708,48 @@ Section tree.
     - eapply tree_wf_internal_not_root; eauto.
   Qed.
 
-  (* Lemma tree_wf_tree_unique ρ Cf t1 t2 r : *)
-  (*   t1 ⊆ forest_merge ρ Cf → t2 ⊆ forest_merge ρ Cf → tree_wf r t1 → tree_wf r t2 → t1 = t2. *)
-  (* Proof. *)
-  (*   intros. generalize dependent Cf. generalize dependent ρ. generalize dependent t2. *)
-  (*   induction H2; intros. subst. inv H6; subst. *)
+  Lemma tree_wf_descendant_node t ρ v :
+    tree_wf ρ t → descendant t ρ v → node t v.
+  Proof using.
+    intros. apply descendant_descendant_alt in H1; auto. revert H0. induction H1; intros.
+    - inv H1. apply elem_of_dom. eapply elem_of_weaken.
+      2:{ eapply forest_merge_dom_forest_subseteq; eauto. eapply map_Forall_impl; eauto.
+          intros. apply tree_wf_root_elem; auto. }
+      destruct H0 as (?&?&?). rewrite /children /forest_merge lookup_insert_eq in H0. by inv H0.
+    - apply IHdescendant_alt in H2. eapply node_weaken; eauto.
+  Qed.
 
-  Lemma tree_wf_child_tree_unique ρ t v s1 s2 :
-    tree_wf ρ t → child t ρ v → s1 ⊆ t → tree_wf v s1 → s2 ⊆ t → tree_wf v s2 → s1 = s2.
-  Proof.
-    intros Ht. revert v s1 s2. induction Ht; intros.
+  Lemma not_node_not_descendant t ρ v :
+    tree_wf ρ t → (t !! v = None) → ¬ descendant t ρ v.
+  Proof using.
+    intros. intro Hd. pose proof (tree_wf_descendant_node _ _ _ H0 Hd). by rewrite /node H1 in H2.
+  Qed.
 
-  H6 : tree_wf ρ t
-  H11 : child t ρ i
-  H12 : x ⊆ t
-  H13 : tree_wf i x
-  H16 : x0 ⊆ t
-  H15 : tree_wf i x0
+  Lemma tree_wf_tree_unique t t1 t2 r :
+    t1 ⊆ t → t2 ⊆ t → tree_wf r t1 → tree_wf r t2 → t1 = t2.
+  Proof using.
+    intros. apply map_eq. intros. destruct (t1 !! i) eqn:Ht1, (t2 !! i) eqn:Ht2; auto.
+    - eapply lookup_weaken in Ht1; eauto. eapply lookup_weaken in Ht2; eauto.
+      rewrite Ht1 in Ht2. inv Ht2. done.
+    - destruct (decide (i = r)).
+      { subst i. exfalso. apply tree_wf_root_elem, elem_of_dom in H3. by rewrite Ht2 in H3. }
+      assert (node t1 i) by (unfold node; eauto).
+      pose proof (tree_wf_node_descendant _ _ _ H2 H4 n).
+      pose proof (not_node_not_descendant _ _ _ H3 Ht2).
+      eapply descendant_tree_subseteq_Proper in H5; eauto.
+      assert (¬ descendant t r i).
+      { intros F. apply H6. eapply descendant_wf_subtree; eauto. }
+      done.
+    - destruct (decide (i = r)).
+      { subst i. exfalso. apply tree_wf_root_elem, elem_of_dom in H2. by rewrite Ht1 in H2. }
+      assert (node t2 i) by (unfold node; eauto).
+      pose proof (tree_wf_node_descendant _ _ _ H3 H4 n).
+      pose proof (not_node_not_descendant _ _ _ H2 Ht1).
+      eapply descendant_tree_subseteq_Proper in H5; eauto.
+      assert (¬ descendant t r i).
+      { intros F. apply H6. eapply descendant_wf_subtree; eauto. }
+      done.
+  Qed.
 
   Lemma tree_wf_internal_ind (P : V → tree V → Prop) :
     (∀ ρ t (Cf : forest V),
