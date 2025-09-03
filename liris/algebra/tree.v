@@ -247,6 +247,35 @@ Section forest_pre.
     specialize (H3 v). rewrite H6 in H3. rewrite lookup_empty in H3. inv H3.
   Qed.
 
+  Lemma forest_fold_delete_L f v t :
+    forest_disjoint f → f !! v = Some t →
+    forest_fold f = t ∪ forest_fold (delete v f).
+  Proof using.
+    unfold forest_disjoint, forest_fold, forest_to_trees. intros.
+    erewrite (map_union_list_Permutation (map_to_list f).*2).
+    2:{ symmetry. eapply fmap_Permutation. eapply (map_to_list_delete _ v t H1). }
+    2: auto.
+    rewrite fmap_cons union_list_cons. done.
+  Qed.
+
+  Lemma forest_disjoint_delete_1 f v :
+    forest_disjoint f → forest_disjoint (delete v f).
+  Proof using.
+    unfold forest_disjoint, forest_to_trees. destruct (f !! v) eqn:Hv.
+    - replace (map_to_list f) with (map_to_list (<[v:=g]>(delete v f))).
+      2:{ rewrite insert_delete_id; auto. }
+      rewrite map_to_list_insert; last by rewrite lookup_delete_eq.
+      rewrite fmap_cons map_disjoint_list_cons. intros [? ?]. auto.
+    - rewrite delete_id; auto.
+  Qed.
+
+  Lemma forest_disjoint_delete f v t :
+    f !! v = Some t → forest_disjoint f ↔ map_Forall (λ _ m, m ##ₘ t) (delete v f) ∧ forest_disjoint (delete v f).
+  Proof using.
+    intros. remember (delete v f) as g. replace f with (<[v:=t]>(delete v f)); last by apply insert_delete_id.
+    subst g. apply forest_disjoint_insert. apply lookup_delete_eq.
+  Qed.
+
 End forest_pre.
 
 Section tree.
@@ -882,7 +911,7 @@ Section tree.
   Lemma tree_insert_wf ρ ρt r rt π πC :
     tree_wf ρ ρt → tree_wf r rt → ρt ##ₘ rt → ρt !! π = Some πC →
     tree_wf ρ (tree_insert ρt r rt π πC).
-  Proof.
+  Proof using.
     intros Ht. revert r rt π πC. induction Ht; intros.
     assert (ρ ∉ dom rt).
     { intros F. apply elem_of_dom in F. destruct F. eapply map_disjoint_Some_r in H8; eauto.
@@ -933,7 +962,35 @@ Section tree.
         { subst. eapply forest_merge_children_of_child. 2: eapply H7. all: auto.
           eapply tree_wf_root_elem; eauto. }
         specialize (H4 _ _ Hv _ _ _ _ H5 H11 H13).
-        admit.
+        assert (Hb0 : forest_disjoint (<[π:=tree_insert ct r rt π πC]> (delete π Cf))).
+        { rewrite /tree_insert. apply forest_disjoint_insert; first by apply lookup_delete_eq.
+          apply (forest_disjoint_delete _ _ _ Hv) in H2. destruct H2. split; auto.
+          apply forest_disjoint_insert in Ha0; auto. destruct Ha0.
+          apply (map_Forall_delete _ _ π) in H15. intros i x Hilu.
+          specialize (H2 _ _ Hilu). specialize (H15 _ _ Hilu). simpl in H2, H15.
+          apply map_disjoint_insert_r_2.
+          - eapply (map_disjoint_Some_r x ct); eauto.
+          - apply map_disjoint_union_r_2; auto. }
+        eapply (tree_wf_children _ _ (<[π:=tree_insert ct r rt π πC]>(delete π Cf))); auto.
+        * subst. rewrite /tree_insert /forest_merge. rewrite !forest_fold_insert_L; auto.
+          -- rewrite dom_insert_L dom_delete_L. rewrite -(insert_union_l (rt ∪ ct) _ π).
+             rewrite -(map_union_assoc rt ct). rewrite -(forest_fold_delete_L Cf π ct); auto.
+             rewrite (insert_insert_ne); auto. f_equal.
+             rewrite (insert_union_r rt); last by apply not_elem_of_dom. f_equal.
+             replace ({[π]} ∪ dom Cf ∖ {[π]}) with (dom Cf); auto.
+             assert (π ∈ dom Cf) by (by apply elem_of_dom).
+             rewrite -union_difference_L; auto. set_solver.
+          -- apply lookup_delete_eq.
+        * unfold tree_insert. rewrite forest_fold_insert_L; auto. 2: apply lookup_delete_eq.
+          apply lookup_union_None_2.
+          -- rewrite lookup_insert_ne; auto. apply lookup_union_None_2; first by apply not_elem_of_dom.
+             assert (ct ⊆ forest_fold Cf) by (by eapply forest_fold_subseteq).
+             eapply (lookup_weaken_None _ (forest_fold Cf)); eauto.
+          -- pose proof (forest_fold_delete_L _ π _ H2 Hv). rewrite H14 in H1.
+             apply lookup_union_None in H1. destruct H1. auto.
+        * replace Cf with (<[π:=ct]>(delete π Cf)) in H3; last by apply insert_delete_id.
+          apply map_Forall_insert in H3; last by apply lookup_delete_eq. destruct H3.
+          apply map_Forall_insert; first by apply lookup_delete_eq. split; auto.
       + assert (∃ c ct, Cf !! c = Some ct ∧ node ct π).
         { eapply forest_merge_not_child_of_root; eauto.
           - subst. unfold node. rewrite H7. done.
@@ -948,20 +1005,40 @@ Section tree.
         assert (ct !! π = Some πC).
         { eapply children_wf_subtree; first eapply H7; auto. subst t. eapply forest_merge_subseteq; eauto. }
         specialize (H4 _ _ H11 _ _ _ _ H5 H13 H14).
-        
+        rename π into u, c into π.
+        assert (Hb0 : forest_disjoint (<[π:=tree_insert ct r rt u πC]> (delete π Cf))).
+        { rewrite /tree_insert. apply forest_disjoint_insert; first by apply lookup_delete_eq.
+          apply (forest_disjoint_delete _ _ _ H11) in H2. destruct H2. split; auto.
+          apply forest_disjoint_insert in Ha0; auto. destruct Ha0.
+          apply (map_Forall_delete _ _ π) in H16. intros i x Hilu.
+          specialize (H2 _ _ Hilu). specialize (H16 _ _ Hilu). simpl in H2, H16.
+          apply map_disjoint_insert_r_2.
+          - eapply (map_disjoint_Some_r x ct); eauto.
+          - apply map_disjoint_union_r_2; auto. }
+        eapply (tree_wf_children _ _ (<[π:=tree_insert ct r rt u πC]>(delete π Cf))); auto.
+        * subst. rewrite /tree_insert /forest_merge. rewrite !forest_fold_insert_L; auto.
+          -- rewrite dom_insert_L dom_delete_L. rewrite -(insert_union_l (rt ∪ ct) _ u).
+             rewrite -(map_union_assoc rt ct). rewrite -(forest_fold_delete_L Cf π ct); auto.
+             rewrite (insert_insert_ne); auto. f_equal.
+             rewrite (insert_union_r rt); last by apply not_elem_of_dom. f_equal.
+             replace ({[π]} ∪ dom Cf ∖ {[π]}) with (dom Cf); auto.
+             assert (π ∈ dom Cf) by (by apply elem_of_dom).
+             rewrite -union_difference_L; auto. set_solver.
+          -- apply lookup_delete_eq.
+        * unfold tree_insert. rewrite forest_fold_insert_L; auto. 2: apply lookup_delete_eq.
+          apply lookup_union_None_2.
+          -- rewrite lookup_insert_ne; auto. apply lookup_union_None_2; first by apply not_elem_of_dom.
+             assert (ct ⊆ forest_fold Cf) by (by eapply forest_fold_subseteq).
+             eapply (lookup_weaken_None _ (forest_fold Cf)); eauto.
+          -- pose proof (forest_fold_delete_L _ π _ H2 H11). rewrite H15 in H1.
+             apply lookup_union_None in H1. destruct H1. auto.
+        * replace Cf with (<[π:=ct]>(delete π Cf)) in H3; last by apply insert_delete_id.
+          apply map_Forall_insert in H3; last by apply lookup_delete_eq. destruct H3.
+          apply map_Forall_insert; first by apply lookup_delete_eq. split; auto.
+  Qed.
 
           TODO
 
-    
-tree_insert =
-λ t (r : V) (rt : tree V) π (πC : gset V), <[π:={[r]} ∪ πC]> (rt ∪ t)
-     : tree V → V → tree V → V → gset V → tree V
-Inductive tree_wf : V → tree V → Prop :=
-    tree_wf_children : ∀ ρ t (Cf : forest V),
-                         t = forest_merge ρ Cf
-                         → root t ρ
-                           → forest_fold Cf !! ρ = None
-                             → forest_disjoint Cf → map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) Cf → tree_wf ρ t.
 
   Lemma descendants_unique g v Δ1 Δ2 :
     descendants g v Δ1 → descendants g v Δ2 → Δ1 = Δ2.
