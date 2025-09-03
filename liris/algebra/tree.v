@@ -1,31 +1,5 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
-(* From liris.cgraphs Require Export cgraph. *)
-(* From liris.cgraphs Require Import mapexcl. *)
-
-Section aux.
-  (* Inductive tc2 {A : Type} (R : relation A) : relation A := *)
-  (* | tc2_once : ∀ x y : A, R x y → tc2 R x y *)
-  (* | tc2_l : ∀ x y z : A, tc2 R x y → R y z → tc2 R x z. *)
-
-  (* Lemma tc_tc2 A (R : relation A) : ∀ a b, tc R a b ↔ tc2 R a b. *)
-  (* Proof. *)
-  (*   split; intros. *)
-  (*   - induction H; first by econstructor. revert x H H0. induction IHtc; intros. *)
-  (*     + econstructor 2. *)
-
-  (* Lemma tc_ind2 : *)
-  (* ∀ {A : Type} (R : relation A) (P : A → A → Prop), *)
-  (*   (∀ x y : A, R x y → P x y) *)
-  (*   → (∀ x y z : A, tc R x y → R y z → P y z → P x z) → ∀ a a0 : A, tc R a a0 → P a a0. *)
-  (* Proof. *)
-  (*   intros. induction H1; eauto. eapply H0. *)
-  (*   - eapply H; eauto. *)
-  (*   -  *)
-
-  (*   eauto. Qed. *)
-
-End aux.
 
 Notation tree V := (gmap V (gset V)).
 Notation forest V := (gmap V (tree V)).
@@ -324,31 +298,16 @@ Section tree.
     - left. intros π Hp. apply n. exists π. auto.
   Qed.
 
-  (* Instance parent_Decision_aux t v π : Decision (map_Exists (λ u C, u = π ∧ v ∈ C) t). *)
-  (* Proof using. eapply map_Exists_dec. intros. solve_decision. Qed. *)
-  (* Global Instance parent_Decision t : ∀ v π, Decision (parent t v π). *)
-  (* Proof using. *)
-  (*   intros. unfold parent, children. destruct (parent_Decision_aux t v π). *)
-  (*   - left. destruct m as (?&?&?&?&?). subst. eauto. *)
-  (*   - right. intros (C&Hlu&Helem). apply n. exists π, C. auto. *)
-  (* Qed. *)
-  (* Global Instance internal_Decision t : ∀ v, Decision (internal t v). *)
-  (* Proof using. *)
-  (*   intros. unfold internal, parent, children. apply _. *)
-  (* Qed. *)
-  (* Global Instance root_Decision t : ∀ v, Decision (root t v). *)
-  (* Proof using. *)
-  (*   intros. unfold root. destruct (internal_Decision t v). *)
-  (*   - right. intros F. destruct i. apply (F x). auto. *)
-  (*   - left. intros π Hp. apply n. exists π. auto. *)
-  (* Qed. *)
-
   (** Operations *)
-  Definition tree_singleton ρ : tree V := {[ρ:=∅]}.
   Definition forest_merge ρ f : tree V := <[ρ:=dom f]>(forest_fold f).
-  Definition forest_insert f ρ t := <[ρ:=t]>f.
-  Definition tree_split t ρ (Cf : forest V) : forest V := forest_insert Cf ρ (tree_singleton ρ).
+  Definition forest_insert f ρ t : forest V := <[ρ:=t]>f.
+  Definition forest_union f1 f2 : forest V := f1 ∪ f2.
+  Definition tree_singleton ρ : tree V := {[ρ:=∅]}.
   Definition tree_insert t r (rt : tree V) π (πC : gset _) : tree V := <[π:={[r]} ∪ πC]>(rt ∪ t).
+
+  Definition tree_split t ρ (Cf : forest V) : forest V := forest_insert Cf ρ (tree_singleton ρ).
+  Definition tree_clear f t ρ Cf : forest V := forest_union f (tree_split t ρ Cf).
+  Definition forest_move_tree f ρ t r rt π πC : forest V := forest_insert f ρ (tree_insert t r rt π πC).
 
   (** Well-formedness *)
   Inductive tree_wf : V → tree V → Prop :=
@@ -386,14 +345,6 @@ Section tree.
     - destruct H1 as (?&?&?). pose proof (children_unique _ _ _ _ H0 H1). by subst.
   Qed.
 
-  (* Lemma children_parent t v π C : *)
-  (*   children t π C → (v ∈ C ↔ parent t v π). *)
-  (* Proof using. *)
-  (*   intros. split; intros. *)
-  (*   - exists C. done. *)
-  (*   - destruct H1 as (?&?&?). pose proof (children_unique _ _ _ _ H0 H1). by subst. *)
-  (* Qed. *)
-
   Lemma forest_fold_keeps_children t π C Cf r :
     children t π C → Cf !! r = Some t → forest_disjoint Cf →
     children (forest_fold Cf) π C.
@@ -422,14 +373,6 @@ Section tree.
     rewrite /internal. intros. destruct H0 as (?&?).
     pose proof (forest_fold_keeps_child _ _ _ _ _ H0 H1 H2). eauto.
   Qed.
-
-  (* Lemma forest_fold_keeps_parent t v π Cf r : *)
-  (*   parent t v π → Cf !! r = Some t → forest_disjoint Cf → *)
-  (*   parent (forest_fold Cf) v π. *)
-  (* Proof using. *)
-  (*   rewrite /parent. intros. destruct H0 as (?&?&?). *)
-  (*   pose proof (forest_fold_keeps_children _ _ _ _ _ H0 H1 H2). eauto. *)
-  (* Qed. *)
 
   Lemma forest_merge_keeps_children t π C Cf r ρ D :
     children t π C → Cf !! r = Some t → forest_disjoint Cf →
@@ -463,7 +406,6 @@ Section tree.
     intros Ht. revert v. induction Ht; intros. subst.
     assert (v ∈ dom (forest_fold Cf)).
     { apply elem_of_dom in H5. rewrite dom_insert_L in H5. apply elem_of_union in H5. destruct H5; set_solver. }
-    (* { apply elem_of_dom in H6. rewrite dom_insert_L in H6. apply elem_of_union in H6. destruct H6; set_solver. } *)
     (* FIXME: Error: Cannot infer an instance of type "tree V" for the variable t in context *)
     (* destruct (decide (v ∈ (dom Cf))). *)
     destruct (decide (v ∈ (dom Cf : gset V))).
@@ -934,7 +876,6 @@ Section tree.
       apply forest_fold_disjoint_tree_disjoint; auto. }
     assert (Ha1 : (rt ∪ forest_fold Cf) !! ρ = None).
     { apply lookup_union_None_2; auto. by apply not_elem_of_dom. }
-    (* induction Ht using tree_wf_internal_ind; intros. *)
     (* Case analysis: π is root or π is internal *)
     destruct (decide (π = ρ)).
     - subst π. rewrite /tree_insert. subst.
@@ -1037,127 +978,20 @@ Section tree.
           apply map_Forall_insert; first by apply lookup_delete_eq. split; auto.
   Qed.
 
-          TODO
+  Lemma tree_singleton_wf ρ : tree_wf ρ (tree_singleton ρ).
+  Proof using. eapply (tree_wf_children _ _ ∅); try done. Qed.
 
 
-  Lemma descendants_unique g v Δ1 Δ2 :
-    descendants g v Δ1 → descendants g v Δ2 → Δ1 = Δ2.
-  Proof using.
-    intros Hd1. revert Δ2. induction Hd1. intros ? Hd2.
-    inv Hd2. replace cds0 with cds; first auto.
-    apply map_eq. intros i. destruct (out_edges g v !! i) eqn:Hi.
-    - assert (Hiin' : i ∈ dom (out_edges g v)) by (by apply elem_of_dom).
-      assert (Hiin : i ∈ children g v) by auto. clear Hiin'.
-      assert (is_Some (cds !! i)).
-      { destruct (cds !! i) eqn:Hcds; auto. exfalso.
-        apply not_elem_of_dom in Hcds. rewrite -H0 in Hiin.  auto. }
-      assert (is_Some (cds0 !! i)).
-      { destruct (cds0 !! i) eqn:Hcds0; auto. exfalso.
-        apply not_elem_of_dom in Hcds0. rewrite -H4 in Hiin. auto. }
-      destruct H1, H5. specialize (H2 _ _ H1). specialize (H6 _ _ H5).
-      rewrite H1 H5. f_equal. eapply H3; eauto.
-    - assert (Hiin' : i ∉ dom (out_edges g v)) by (by apply not_elem_of_dom).
-      assert (Hiin : i ∉ children g v) by auto. clear Hiin'.
-      assert (cds !! i = None).
-      { destruct (cds !! i) eqn:Hcds; auto. exfalso. apply Hiin. rewrite -H0. by apply elem_of_dom. }
-      assert (cds0 !! i = None).
-      { destruct (cds0 !! i) eqn:Hcds; auto. exfalso. apply Hiin. rewrite -H4. by apply elem_of_dom. }
-      rewrite H1 H5. auto.
-  Qed.
 
-  Lemma descendants_exists g v :
-    cgraph_wf g → ∃ Δ, descendants g v Δ.
-  Proof using.
-    intros Ht. pattern v. revert v. eapply (cgraph_ind'' (λ _ _, True)); first eauto.
-    intros v Hind _.
-    assert (∃ (cds : forest V), dom (out_edges g v) = dom cds ∧ (∀ c cd, cds !! c = Some cd → descendants g c cd)); cycle 1.
-    { destruct H0 as (?&?&?). eexists. econstructor; eauto. }
-    remember (out_edges g v) as c.
-    assert (Hind2 : ∀ y, is_Some (c !! y) → ∃ Δ, descendants g y Δ).
-    { intros. eapply Hind; eauto. rewrite /edge. by subst. }
-    clear Heqc Hind. revert Hind2. induction c using map_ind; intros Hind0.
-    { exists ∅. split; first auto. by intros. }
-    assert (∀ y : V, is_Some (m !! y) → ∃ Δ : gset V, descendants g y Δ).
-    { intros. eapply Hind0. apply lookup_insert_is_Some'. by right. }
-    specialize (IHc H1). clear H1. destruct IHc as (cds&?&?).
-    destruct (Hind0 i); first by rewrite lookup_insert_eq.
-    exists (<[i:=x0]>cds). split.
-    { set_solver. }
-    { intros. destruct (decide (c = i)).
-      - subst. rewrite lookup_insert_eq in H4. inv H4. auto.
-      - rewrite lookup_insert_ne in H4; auto.
-    }
-  Qed.
+  TODO
 
-  Lemma child_elem_of_descendants g v π Δ :
-    parent g v π → descendants g π Δ → v ∈ Δ.
-  Proof using.
-    intros Hp Hd. inv Hd. assert (Hin : is_Some (cds !! v)).
-    { destruct (cds !! v) eqn:Hcds; auto. exfalso.
-      apply not_elem_of_dom in Hcds. rewrite H0 in Hcds. set_solver. }
-    clear Hp H0 H2 π g. revert v Hin. induction cds using map_ind; intros.
-    { exfalso. destruct Hin. set_solver. }
-    destruct Hin. destruct (decide (v = i)).
-    - subst. rewrite lookup_insert_eq in H1. inv H1.
-      rewrite forest_fold_insert_L; auto. set_solver.
-    - rewrite lookup_insert_ne in H1; auto. rewrite forest_fold_insert_L; auto. set_solver.
-  Qed.
+  (** Operations *)
+  Definition forest_insert f ρ t : forest V := <[ρ:=t]>f.
+  Definition forest_union f1 f2 : forest V := f1 ∪ f2.
 
-  Lemma descendant_of_parent g v π :
-    cgraph_wf g → parent g v π → descendant g π v.
-  Proof using.
-    intros Hcwf Hp. destruct (descendants_exists _ π Hcwf) as [Δ Hd].
-    exists Δ. split; first auto. eapply child_elem_of_descendants; eauto.
-  Qed.
-
-  Lemma elem_of_descendants_internal g v Δ :
-    descendants g v Δ → ∀ u, u ∈ Δ → ∃ π, parent g u π.
-  Proof using.
-    intros Hd. induction Hd. intros. subst.
-    destruct (decide (u ∈ children g v)); eauto.
-    rewrite -H0 in n. destruct (forest_fold_internal_elem_of _ _ H4 n) as (c&cd&?&?).
-    eapply (H3 _ _ H1 _ H5).
-  Qed.
-
-  Lemma root_not_elem_of_descendants g v :
-    root g v → ∀ u Δ, descendants g u Δ → ¬ v ∈ Δ.
-  Proof using.
-    intros. intro Hf. pose proof (elem_of_descendants_internal _ _ _ H1 _ Hf).
-    apply internal_not_root in H2; auto.
-  Qed.
-  Lemma root_not_descendant g v :
-    root g v → ∀ u, ¬ descendant g u v.
-  Proof using.
-    intros. intros (?&Hd0&Hin). eapply root_not_elem_of_descendants; eauto.
-  Qed.
-
-  Lemma descendant_descendants_subseteq g ρ v Δ1 :
-    descendant g ρ v → descendants g ρ Δ1 → ∃ Δ2, descendants g v Δ2 ∧ Δ2 ⊆ Δ1.
-  Proof using.
-    unfold descendant. intros (Δ&Hr1&Hvr) Hr2.
-    pose proof (descendants_unique _ _ _ _ Hr1 Hr2). subst. clear Hr2.
-    revert v Hvr. induction Hr1; intros.
-    destruct (decide (v0 ∈ children g v)).
-    - rewrite -H0 in e. apply elem_of_dom in e. destruct e as (Δ2&Hv0). exists Δ2. split; first by apply H2.
-      subst. eapply forest_fold_descendants_subseteq; eauto.
-    - pose proof (forest_fold_internal_elem_of v0 cds). destruct H4.
-      { by subst. }
-      { by rewrite H0. }
-      destruct H4 as (cd&?&?). specialize (H3 _ _ H4 _ H5). destruct H3 as (Δ2&?&?).
-      exists Δ2. split; first auto. etransitivity; first eauto.
-      subst. eapply forest_fold_descendants_subseteq; eauto.
-  Qed.
-
-  Lemma descendant_parent_descendant g ρ π v :
-    descendant g ρ π → parent g v π → descendant g ρ v.
-  Proof using.
-    unfold descendant. intros (Δ&Hr&Hpd) Hp. exists Δ. split; first auto.
-    pose proof (descendant_descendants_subseteq g ρ π Δ). destruct H0; auto.
-    { exists Δ. split; auto. }
-    destruct H0. assert (v ∈ x).
-    { eapply child_elem_of_descendants; eauto. }
-    set_solver.
-  Qed.
+  Definition tree_split t ρ (Cf : forest V) : forest V := forest_insert Cf ρ (tree_singleton ρ).
+  Definition tree_clear f t ρ Cf : forest V := forest_union f (tree_split t ρ Cf).
+  Definition forest_move_tree f ρ t r rt π πC : forest V := forest_insert f ρ (tree_insert t r rt π πC).
 
 End tree.
 
