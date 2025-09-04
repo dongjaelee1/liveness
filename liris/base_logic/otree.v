@@ -95,35 +95,65 @@ Definition osuspend `{SI : indexT} `{WF : WFOCM.pack A} {ps T} {Σ}
     )%I.
 
 (* Global invariant for the obligation forest state. *)
-Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
+Definition oforest `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
   (D : gset obl_id) : iProp Σ :=
   locked
-    (∃ (OTree : cgraph obl_id unitO) (ORoot : gmap obl_id positive),
-        (⌜ dom OTree = D ∧ cgraph_wf OTree ⌝) ∗
+    (∃ (OForest : forest obl_id),
+        (⌜ dom (forest_fold OForest) = D ∧ forest_wf OForest ⌝) ∗
         (own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset D))) ∗
-        ([∗ map] k ↦ KCh ∈ OTree,
-           (own edge_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) KCh))) ∗
-           ((* This obligation is live and has enough transfer (+ one to go back) and progress credits for chiledren and... *)
-             ((∃ α β, oblG_transfer_supply k α (1/2)%Qp ∗ oblG_progress_supply k β (1/2)%Qp ∗
-                      ([∗ set] c ∈ (dom KCh),
-                         ∃ α' β', ⌜ WFOCM.ltR α α' ∧ WFOCM.leR β β' ⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')
-              ) ∗
-              (* is a root or... *)
-              (∃ τ, ⌜ root OTree k ∧ ORoot !! k = Some τ ⌝ ∗
-                    oblG_owner k τ (1/2/2)%Qp ∗
-                    othreadG_owns τ k true (1/2)%Qp) ∨
-                (* is an internal node, and is suspended *)
-                (∃ τ π, (⌜ parent OTree k π ∧ (∀ π', parent OTree k π' → π' = π) ∧
-                         ∃ ρ, root OTree ρ ∧ descendant OTree ρ k ∧ ORoot !! ρ = Some τ ⌝) ∗
-                        oblG_owner k τ (1/2)%Qp ∗
-                        ∃ θ, othreadG_owns θ k false (1/2)%Qp ∗
-                             (∃ x, otreeG_suspend k x θ π ∗ otreeG_wait k x (1/2)%Qp))
-             ) ∨
-               (* Or this obligation is done *)
-               (oblG_done k ∗ ⌜ root OTree k ∧ KCh = ∅ ⌝)
-        ))
+        ([∗ map] ρ ↦ ρTree ∈ OForest,
+           (* If the root is live... *)
+           (∃ τ, oblG_owner ρ τ (1/2/2)%Qp ∗ othreadG_owns τ ρ true (1/2)%Qp ∗
+                 ([∗ map] v ↦ vCh ∈ ρTree,
+                    (own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap tt vCh)))) ∗
+                    (* Obligation is live and has enough transfer (+ 1 to go back) and progress credits for chiledren and... *)
+                    (∃ α β, oblG_transfer_supply v α (1/2)%Qp ∗ oblG_progress_supply v β (1/2)%Qp ∗
+                            ([∗ set] c ∈ vCh,
+                               ∃ α' β', ⌜ WFOCM.ltR α α' ∧ WFOCM.leR β β' ⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')
+                    ) ∗
+                    ((⌜ v = ρ ⌝) ∨
+                       (* if it's an internal node, it's suspended *)
+                       (∃ π, (⌜ child ρTree π v ⌝) ∗
+                             oblG_owner v τ (1/2)%Qp ∗
+                             ∃ θ, othreadG_owns θ v false (1/2)%Qp ∗
+                                  (∃ x, otreeG_suspend v x θ π ∗ otreeG_wait v x (1/2)%Qp)))
+           )) ∨
+             (* Or the root is done *)
+             ((own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅))) ∗
+              oblG_done ρ ∗ ⌜ ρTree = tree_singleton ρ ⌝)
+        )
     )%I.
+
+(* Definition otree `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ} *)
+(*   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ} *)
+(*   (D : gset obl_id) : iProp Σ := *)
+(*   locked *)
+(*     (∃ (OTree : cgraph obl_id unitO) (ORoot : gmap obl_id positive), *)
+(*         (⌜ dom OTree = D ∧ cgraph_wf OTree ⌝) ∗ *)
+(*         (own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset D))) ∗ *)
+(*         ([∗ map] k ↦ KCh ∈ OTree, *)
+(*            (own edge_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) KCh))) ∗ *)
+(*            ((* This obligation is live and has enough transfer (+ one to go back) and progress credits for chiledren and... *) *)
+(*              ((∃ α β, oblG_transfer_supply k α (1/2)%Qp ∗ oblG_progress_supply k β (1/2)%Qp ∗ *)
+(*                       ([∗ set] c ∈ (dom KCh), *)
+(*                          ∃ α' β', ⌜ WFOCM.ltR α α' ∧ WFOCM.leR β β' ⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β') *)
+(*               ) ∗ *)
+(*               (* is a root or... *) *)
+(*               (∃ τ, ⌜ root OTree k ∧ ORoot !! k = Some τ ⌝ ∗ *)
+(*                     oblG_owner k τ (1/2/2)%Qp ∗ *)
+(*                     othreadG_owns τ k true (1/2)%Qp) ∨ *)
+(*                 (* is an internal node, and is suspended *) *)
+(*                 (∃ τ π, (⌜ parent OTree k π ∧ (∀ π', parent OTree k π' → π' = π) ∧ *)
+(*                          ∃ ρ, root OTree ρ ∧ descendant OTree ρ k ∧ ORoot !! ρ = Some τ ⌝) ∗ *)
+(*                         oblG_owner k τ (1/2)%Qp ∗ *)
+(*                         ∃ θ, othreadG_owns θ k false (1/2)%Qp ∗ *)
+(*                              (∃ x, otreeG_suspend k x θ π ∗ otreeG_wait k x (1/2)%Qp)) *)
+(*              ) ∨ *)
+(*                (* Or this obligation is done *) *)
+(*                (oblG_done k ∗ ⌜ root OTree k ∧ KCh = ∅ ⌝) *)
+(*         )) *)
+(*     )%I. *)
 
 Section otree.
   Context `{SI : indexT} `{WFA : WFOCM.pack A}.
@@ -493,17 +523,50 @@ Section otree.
     - iPoseProof (otreeG_wait_null_false with "[Rw Rkx]") as "%"; first iFrame. done.
   Qed.
 
-  (** otree rules *)
-  Lemma otree_alloc_obl D k θ α β :
+  (** oforest rules *)
+  Lemma oforest_alloc_obl D k θ α β :
     k ∉ D →
-    otree D ∗
+    oforest D ∗
     othreadG_owns θ k true (1/2)%Qp ∗
-    oblG_transfer_supply k α (1/2)%Qp ∗ oblG_progress_supply k β (1/2)%Qp ∗ oblG_owner k θ (1/2/2)%Qp
-    ⊢ |==> otree ({[k]} ∪ D).
+    oblG_owner k θ (1/2/2)%Qp ∗ oblG_transfer_supply k α (1/2)%Qp ∗ oblG_progress_supply k β (1/2)%Qp
+    ⊢ |==> oforest ({[k]} ∪ D).
   Proof.
+    iIntros (Hk) "(Rfor & To & Bo & Bts & Bps)".
+    rewrite /oforest -lock. iDestruct "Rfor" as "(% & %Hfor & Retk & RM)".
 
-  TODO
 
+
+    TODO
+
+Definition oforest `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
+  (D : gset obl_id) : iProp Σ :=
+  locked
+    (∃ (OForest : forest obl_id),
+        (⌜ dom (forest_fold OForest) = D ∧ forest_wf OForest ⌝) ∗
+        (own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset D))) ∗
+        ([∗ map] ρ ↦ ρTree ∈ OForest,
+           (* If the root is live... *)
+           (∃ τ, oblG_owner ρ τ (1/2/2)%Qp ∗ othreadG_owns τ ρ true (1/2)%Qp ∗
+                 ([∗ map] v ↦ vCh ∈ ρTree,
+                    (own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap tt vCh)))) ∗
+                    (* Obligation is live and has enough transfer (+ 1 to go back) and progress credits for chiledren and... *)
+                    (∃ α β, oblG_transfer_supply v α (1/2)%Qp ∗ oblG_progress_supply v β (1/2)%Qp ∗
+                            ([∗ set] c ∈ vCh,
+                               ∃ α' β', ⌜ WFOCM.ltR α α' ∧ WFOCM.leR β β' ⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')
+                    ) ∗
+                    ((⌜ v = ρ ⌝) ∨
+                       (* if it's an internal node, it's suspended *)
+                       (∃ π, (⌜ child ρTree π v ⌝) ∗
+                             oblG_owner v τ (1/2)%Qp ∗
+                             ∃ θ, othreadG_owns θ v false (1/2)%Qp ∗
+                                  (∃ x, otreeG_suspend v x θ π ∗ otreeG_wait v x (1/2)%Qp)))
+           )) ∨
+             (* Or the root is done *)
+             ((own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅))) ∗
+              oblG_done ρ ∗ ⌜ ρTree = tree_singleton ρ ⌝)
+        )
+    )%I.
 
 
 End otree.
