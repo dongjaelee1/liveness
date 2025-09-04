@@ -524,19 +524,47 @@ Section otree.
   Qed.
 
   (** oforest rules *)
-  Lemma oforest_alloc_obl D k θ α β :
-    k ∉ D →
+  Lemma oforest_alloc_obl D ρ θ α β :
+    ρ ∉ D →
     oforest D ∗
-    othreadG_owns θ k true (1/2)%Qp ∗
-    oblG_owner k θ (1/2/2)%Qp ∗ oblG_transfer_supply k α (1/2)%Qp ∗ oblG_progress_supply k β (1/2)%Qp
-    ⊢ |==> oforest ({[k]} ∪ D).
+    othreadG_owns θ ρ true (1/2)%Qp ∗
+    oblG_owner ρ θ (1/2/2)%Qp ∗ oblG_transfer_supply ρ α (1/2)%Qp ∗ oblG_progress_supply ρ β (1/2)%Qp
+    ⊢ |==> oforest ({[ρ]} ∪ D).
   Proof.
-    iIntros (Hk) "(Rfor & To & Bo & Bts & Bps)".
-    rewrite /oforest -lock. iDestruct "Rfor" as "(% & %Hfor & Retk & RM)".
+    iIntros (Hρ) "(Rfor & To & Bo & Bts & Bps)".
+    rewrite /oforest -lock. iDestruct "Rfor" as "(% & %Hf & Retk & RM)". destruct Hf as [Hf1 Hf2].
+    assert (Hρlu : forest_fold OForest !! ρ = None).
+    { apply not_elem_of_dom. rewrite Hf1. auto. }
+    assert (Hρlu2 : OForest !! ρ = None).
+    { apply forest_fold_not_in_forest_not_in; auto. }
+    iMod (otreeG_edge_alloc_map D ρ Hρ with "Retk") as "[Retk Reρ]".
+    iPoseProof (big_sepM_insert _ _ _ (tree_singleton ρ) Hρlu2 with "[RM To Bo Bts Bps Reρ]") as "RM".
+    { iFrame "RM". iLeft. iFrame "To Bo". iApply big_sepM_singleton. iFrame. iSplit; first done. by iLeft. }
+    iModIntro. rewrite -lock. iExists (forest_insert OForest ρ (tree_singleton ρ)).
+    iFrame. iPureIntro. split.
+    { subst D. apply forest_fold_insert_singleton_dom; auto. }
+    { apply forest_insert_singleton_wf; auto. }
+  Qed.
+
+  Definition obl_in_tree_cond (t : tree obl_id) : obl_cond :=
+    λ k o, node t k.
+
+  Lemma oforest_progress_one Ω ρ θ q1 q2 (a : A) :
+    /0 /< a →
+    osat Ω ∗ oforest (dom Ω) ∗
+    (* from othread *)
+    oblG_live ρ q1 ∗ oblG_owner ρ θ q2 ∗
+    (* from user *)
+    oblG_elem ρ ∗ oblG_progress ρ a
+    ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' |  ⌝) ∗ osat Ω' ∗ oforest (dom Ω') ∗
+                 oblG_live ρ q1 ∗ oblG_owner ρ θ q2.
 
 
+  TODO
 
-    TODO
+      oforest_progress
+    oforest_transfer > oforest_move_tree
+      oforest_resolve > oforest_clear_tree
 
 Definition oforest `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
