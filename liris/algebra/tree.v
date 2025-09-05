@@ -968,6 +968,10 @@ Section tree.
     - right. apply elem_of_dom in H1. eapply tree_wf_not_root_internal; eauto.
   Qed.
 
+  Lemma tree_wf_root_node t ρ :
+    tree_wf ρ t → node t ρ.
+  Proof using. intros. apply elem_of_dom. by eapply tree_wf_root_elem. Qed.
+
   Lemma tree_wf_tree_wf_clo t ρ :
     tree_wf ρ t → tree_wf_clo ρ t.
   Proof using.
@@ -1331,6 +1335,19 @@ Section tree.
     apply forest_tree_disjoint_tree_singleton; auto.
     - destruct H0; auto.
     - destruct H0. eapply map_Forall_impl; first eapply H3. simpl; intros. apply tree_wf_root_elem; auto.
+  Qed.
+
+  Lemma forest_merge_subseteq_Forall ρ f :
+    forest_fold f !! ρ = None →
+    forest_trees_disjoint f →
+    map_Forall (λ _ t, t ⊆ forest_merge ρ f) f.
+  Proof using. intros. intros ???. eapply forest_merge_subseteq; eauto. Qed.
+
+  Lemma forest_merge_internal_Forall ρ f :
+    map_Forall (λ v _, internal (forest_merge ρ f) v) f.
+  Proof using.
+    intros. intros ???. exists ρ, (dom f). split; last by apply elem_of_dom.
+    unfold forest_merge. rewrite /children lookup_insert_eq. done.
   Qed.
 
   (* Domain of forest under forset_fold *)
