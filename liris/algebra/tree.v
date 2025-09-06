@@ -1041,8 +1041,27 @@ Section tree.
     apply subseteq_dom in H3. apply not_elem_of_dom in H1. set_solver.
   Qed.
 
-  (* Operation invariants *)
+  Lemma forest_merge_internal_forest_fold_node ρ f v :
+    tree_wf ρ (forest_merge ρ f) → internal (forest_merge ρ f) v → node (forest_fold f) v.
+  Proof using.
+    unfold node. intros. pose proof (tree_wf_internal_node _ _ _ H0 H1).
+    pose proof (tree_wf_internal_not_root _ _ _ H0 H1).
+    destruct H2. rewrite /forest_merge lookup_insert_ne in H2; eauto.
+  Qed.
 
+  Lemma forest_fold_node_forest_merge_internal ρ f v :
+    forest_fold f !! ρ = None →
+    forest_trees_disjoint f →
+    map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) f →
+    node (forest_fold f) v → internal (forest_merge ρ f) v.
+  Proof using.
+    intros. eapply tree_wf_not_root_internal; eauto.
+    - by econstructor.
+    - apply elem_of_dom. apply elem_of_dom in H3. rewrite /forest_merge dom_insert_L. set_solver.
+    - intros F; subst. unfold node in H3. by rewrite H0 in H3.
+  Qed.
+
+  (* Operation invariants *)
   Lemma tree_insert_wf ρ ρt r rt π πC :
     tree_wf ρ ρt → tree_wf r rt → ρt ##ₘ rt → ρt !! π = Some πC →
     tree_wf ρ (tree_insert ρt r rt π πC).

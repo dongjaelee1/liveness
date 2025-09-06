@@ -566,20 +566,77 @@ Section otree.
                  osat Ω' ∗ oforest_aux (dom Ω') OForest.
   Proof.
     iIntros (Ha ? Hρ) "(S & F & #Be & Bp)". destruct H1 as [d Hρlu].
-    iPoseProof (oforest_aux_wf with "F") as "%". destruct H1 as [Hfdom Hfwf].    
-    iAssert (|==> ∃ Ωρ, ⌜ Ω ↪ₚ Ωρ | (λ k o, node ρTree k ∧ root ρTree k) ⌝ ∗ |==> ∃ Ω', ⌜ Ωρ ↪ₚ Ω' | (λ k o, internal ρTree k) ⌝ ∗ osat Ω' ∗ oforest_aux (dom Ω') OForest)%I with "[-]" as "H"; cycle 1.
-    { iMod "H" as "(%&%& H)". iMod "H" as "(%&%&S&F)".
-      iModIntro. iExists Ω'. iFrame. iPureIntro.
+    iPoseProof (oforest_aux_wf with "F") as "%". destruct H1 as [Hfdom Hfwf].
+    (* Frame other trees in the forest *)
+    rewrite /oforest_aux. iDestruct "F" as "(_ & Retk & RM)".
+    iPoseProof (big_sepM_delete _ _ _ _ Hρ with "RM") as "[RMρ RM]".
+    iAssert (
+  |==>
+    ∃ Ω' : obl_states, ⌜Ω ↪ₚ Ω' | obl_cond_in_tree ρTree⌝ ∗ osat Ω' ∗ ⌜dom (forest_fold OForest) = dom Ω' ∧ forest_wf OForest⌝ ∗
+      own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset (dom Ω'))) ∗
+      ((∃ τ : positive, oblG_owner ρ τ (1 / 2 / 2) ∗ othreadG_owns τ ρ true (1 / 2) ∗
+                                       ([∗ map] v↦vCh ∈ ρTree, own edge_name
+                                                                  (reservation_map_data v
+                                                                     (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vCh))) ∗
+                                        (∃ α β : A, oblG_transfer_supply v α (1 / 2) ∗ oblG_progress_supply v β (1 / 2) ∗
+                                           ([∗ set] c ∈ vCh, ∃ α' β' : A, ⌜α /< α' ∧ β /≤ β'⌝ ∗ oblG_transfer c α' ∗
+                                                               oblG_progress c β')) ∗
+                                        (⌜v = ρ⌝
+                                         ∨ ∃ π : positive, ⌜child ρTree π v⌝ ∗ oblG_owner v τ (1 / 2) ∗
+                                             ∃ θ : positive, othreadG_owns θ v false (1 / 2) ∗
+                                               ∃ x : positive, otreeG_suspend v x θ π ∗ otreeG_wait v x (1 / 2))))
+                                    ∨ own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅)) ∗ 
+       oblG_done ρ ∗ ⌜ρTree = tree_singleton ρ⌝))%I with "[-RM]" as "H"; cycle 1.
+    { iMod "H". iModIntro. iDestruct "H" as "(%&%&H0&%&H1&H2)".
+      iExists Ω'. iSplitR; first done. iFrame "H0 H1". iSplitR; first done.
+      iApply (big_sepM_delete _ _ _ _ Hρ with "[-]"). iFrame. }
+    (* First induction: on ρTree. Need to weaken some assumptions *)
+    iAssert (
+  |==>
+    ∃ Ω' : obl_states, ⌜Ω ↪ₚ Ω' | obl_cond_in_tree ρTree⌝ ∗ osat Ω' ∗ ⌜dom Ω = dom Ω' ∧ forest_wf OForest⌝ ∗
+      own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset (dom Ω'))) ∗
+      ((∃ τ : positive, oblG_owner ρ τ (1 / 2 / 2) ∗ othreadG_owns τ ρ true (1 / 2) ∗
+          ([∗ map] v↦vCh ∈ ρTree, own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vCh))) ∗
+           (∃ α β : A, oblG_transfer_supply v α (1 / 2) ∗ oblG_progress_supply v β (1 / 2) ∗
+              ([∗ set] c ∈ vCh, ∃ α' β' : A, ⌜α /< α' ∧ β /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
+           (⌜v = ρ⌝
+            ∨ ∃ π : positive, ⌜child ρTree π v⌝ ∗ oblG_owner v τ (1 / 2) ∗
+                ∃ θ : positive, othreadG_owns θ v false (1 / 2) ∗ ∃ x : positive, otreeG_suspend v x θ π ∗ otreeG_wait v x (1 / 2))))
+       ∨ own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅)) ∗ oblG_done ρ ∗ ⌜ρTree = tree_singleton ρ⌝)
+      )%I with "[-]" as "H"; cycle 1.
+    { iMod "H" as "(%&%&H0&%&H1)". iModIntro. iExists Ω'. iFrame. iPureIntro. destruct H2. rewrite Hfdom. done. }
+    assert (Htwf : tree_wf ρ ρTree).
+    { destruct Hfwf. eapply H2; auto. }
+    clear Hfdom. iStopProof.
+    generalize dependent d. generalize dependent Ω. generalize dependent OForest.
+    pattern ρ, ρTree. revert ρ ρTree Htwf. apply tree_wf_internal_ind.
+    intros ρ ρTree HρTreewf IH1 OForest Hρ Hfwf Ω d Hρlu.
+    iIntros "(#Be & S & Retk & Bp & RMρ)".
+    iAssert (|==> ∃ Ωρ, ⌜ Ω ↪ₚ Ωρ | (λ k o, node ρTree k ∧ root ρTree k) ∧ dom Ω = dom Ωρ ⌝ ∗ |==> ∃ Ω', ⌜ Ωρ ↪ₚ Ω' | (λ k o, internal ρTree k) ⌝ ∗ osat Ω' ∗
+      ⌜dom Ωρ = dom Ω' ∧ forest_wf OForest⌝ ∗
+      own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset (dom Ω'))) ∗
+      ((∃ τ : positive, oblG_owner ρ τ (1 / 2 / 2) ∗ othreadG_owns τ ρ true (1 / 2) ∗
+          ([∗ map] v↦vCh ∈ ρTree, own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vCh))) ∗
+           (∃ α β : A, oblG_transfer_supply v α (1 / 2) ∗ oblG_progress_supply v β (1 / 2) ∗
+              ([∗ set] c ∈ vCh, ∃ α' β' : A, ⌜α /< α' ∧ β /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
+           (⌜v = ρ⌝
+            ∨ ∃ π : positive, ⌜child ρTree π v⌝ ∗ oblG_owner v τ (1 / 2) ∗
+                ∃ θ : positive, othreadG_owns θ v false (1 / 2) ∗ ∃ x : positive, otreeG_suspend v x θ π ∗ otreeG_wait v x (1 / 2))))
+       ∨ own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅)) ∗ oblG_done ρ ∗ ⌜ρTree = tree_singleton ρ⌝)
+            )%I with "[-]" as "H"; cycle 1.
+    { iMod "H" as "(%&%& H)". iMod "H" as "(%&%&S&%&F)". destruct H1, H3.
+      iModIntro. iExists Ω'. iFrame. iPureIntro. split_and !; auto.
+      2:{ rewrite H4; auto. }
       eapply obl_states_cond_rel_split_cond. 6: eapply H1. 6: eapply H2. all: simpl.
       - intros. apply _.
       - intros. apply _.
       - apply _.
       - intros. destruct Hfwf. unfold obl_cond_in_tree. split; intros.
-        + pose proof H5. eapply tree_wf_node_root_or_internal in H5; eauto. destruct H5; auto.
-        + destruct H5; [destruct H5; auto | eapply tree_wf_internal_node; eauto].
+        + pose proof H7. eapply tree_wf_node_root_or_internal in H7; eauto. destruct H7; auto.
+        + destruct H8; [destruct H8; auto | eapply tree_wf_internal_node; eauto].
       - intros ?????. auto. }
-    iDestruct "F" as "(_ & Retk & RM)".
-    iPoseProof (big_sepM_delete _ _ _ _ Hρ with "RM") as "[RMρ RM]". iDestruct "RMρ" as "[RMρ | RMρ]"; cycle 1.
+    (* Progress of the root *)
+    iDestruct "RMρ" as "[RMρ | RMρ]"; cycle 1.
     { iDestruct "RMρ" as "(RMρd & #Bd & %Hρtree)". iPoseProof (osat_obl_is_done_weak with "[$]") as "(%&%)".
       exfalso. rewrite Hρlu in H1. inv H1. }
     iDestruct "RMρ" as "(%& RMρBo& RMρTo& RMρM)".
@@ -590,19 +647,54 @@ Section otree.
     iDestruct "RMρMρ" as "(Ha & (%&%& Hb0& Hb1 & Hb2) & Hc)".
     destruct d as [α0 τ0 β0]. iMod (osat_obl_progress_one _ _ _ _ _ _ _ Hρlu with "[S Bp Hb1]") as "(% & S & %Hprog & Hb1)".
     1: eauto. 1: iFrame.
-    iModIntro. iExists (<[ρ:=olive α0 τ0 β']> Ω). iSplitR.
-    { iPureIntro. intros ?. destruct (decide (i = ρ)).
+    destruct Hprog as [Hprog Hβ].
+    iModIntro. iExists (<[ρ:=olive α0 τ0 β']> Ω). remember (<[ρ:=olive α0 τ0 β']> Ω) as Ω0.
+    assert (HOd : dom Ω = dom Ω0).
+    { subst. rewrite dom_insert_lookup_L; auto. }
+    iSplitR.
+    { iPureIntro. subst Ω0. split; auto. intros ?. destruct (decide (i = ρ)).
       - subst i. rewrite Hρlu lookup_insert_eq. econstructor. simpl. split; auto.
         intros. exfalso. apply H5. split; [apply tree_wf_root_node; auto | apply tree_wf_root_root; auto].
       - rewrite lookup_insert_ne; auto. destruct (Ω !! i) eqn:Hilu; econstructor. split; [intros | auto].
         destruct H5. pose proof (tree_wf_root_node_root _ _ _ Hρtwf H6 H5). subst i. done. }
+    (* Second induction: on Cf. Need to weaken some premises *)
+    iAssert (
+  |==>
+    ∃ Ω' : obl_states, ⌜Ω0 ↪ₚ Ω' | λ (k : obl_id) (_ : obl_state), node (forest_fold Cf) k⌝ ∗ osat Ω' ∗
+      ⌜dom Ω0 = dom Ω' ∧ forest_wf OForest⌝ ∗ own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset (dom Ω'))) ∗
+      ((∃ τ1 : positive, oblG_owner ρ τ1 (1 / 2 / 2) ∗ othreadG_owns τ1 ρ true (1 / 2) ∗
+          ([∗ map] v↦vCh ∈ ρTree, own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vCh))) ∗
+           (∃ α1 β1 : A, oblG_transfer_supply v α1 (1 / 2) ∗ oblG_progress_supply v β1 (1 / 2) ∗
+              ([∗ set] c ∈ vCh, ∃ α' β'0 : A, ⌜α1 /< α' ∧ β1 /≤ β'0⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β'0)) ∗
+           (⌜v = ρ⌝
+            ∨ ∃ π : positive, ⌜child ρTree π v⌝ ∗ oblG_owner v τ1 (1 / 2) ∗
+                ∃ θ : positive, othreadG_owns θ v false (1 / 2) ∗ ∃ x : positive, otreeG_suspend v x θ π ∗ otreeG_wait v x (1 / 2))))
+       ∨ own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅)) ∗ oblG_done ρ ∗ ⌜ρTree = tree_singleton ρ⌝)
+      )%I with "[-]" as "H"; cycle 1.
+    { iMod "H" as "(%&%&H)". iModIntro. iFrame. iPureIntro. eapply obl_states_cond_rel_iff; first eapply H5.
+      simpl; intros. split; intros; subst.
+      - eapply forest_fold_node_forest_merge_internal; eauto.
+      - eapply forest_merge_internal_forest_fold_node; eauto. }
     assert (HCfsub : map_Forall (λ _ c, c ⊆ ρTree) Cf).
     { subst. by apply forest_merge_subseteq_Forall. }
     assert (HCfint : map_Forall (λ v _, internal ρTree v) Cf).
     { subst. by apply forest_merge_internal_Forall. }
+    assert (HρluCf : ∃ X, ρTree !! ρ = Some X ∧ (dom Cf) ⊆ X).
+    { eauto. }
+    rewrite !HOd. clear dependent Ω. clear dependent β0. clear H1 Hρlutree.
+    iStopProof. generalize dependent Cf. induction Cf using map_ind.
+    { iIntros (Hρlu HCfdisj HCftwf HρluCf HCfsub HCfint) "(#Be & Fetk & Bo & To & Fed & Bts & FρMM & Fρm & FρM & S & Bps)".
+      iModIntro. iExists Ω0. iFrame. iSplitR.
+      { iPureIntro. rewrite forest_fold_empty. intros ?. destruct (Ω0 !! i) eqn:Hlu; econstructor. split; intros; auto.
+        rewrite /node lookup_empty in H1. done. }
+      iSplitR.
+      { iPureIntro. split; auto. }
+      iLeft. iFrame. iApply (big_sepM_delete _ _ _ _ Hρlutree with "[-]"). iFrame "FρM". iFrame. by rewrite dom_empty_L. }
+    iIntros (Hρlu HCfdisj HCftwf Hρlutree HCfsub HCfint) "(#Be & Fetk & Bo & To & Fed & Bts & FρMM & Fρm & FρM & S & Bps)".
+    
 
 
-    clear H1.
+    
         
     
 osat_obl_progress_one:
@@ -655,6 +747,7 @@ Definition oforest `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
   (D : gset obl_id) : iProp Σ :=
   locked (∃ (OForest : forest obl_id), oforest_aux D OForest)%I.
+
 
 
 End otree.
