@@ -608,9 +608,9 @@ Section otree.
     assert (Htwf : tree_wf ρ ρTree).
     { destruct Hfwf. eapply H2; auto. }
     clear Hfdom. iStopProof.
-    generalize dependent d. generalize dependent Ω. generalize dependent OForest.
+    generalize dependent a. generalize dependent d. generalize dependent Ω. generalize dependent OForest.
     pattern ρ, ρTree. revert ρ ρTree Htwf. apply tree_wf_internal_ind.
-    intros ρ ρTree HρTreewf IH1 OForest Hρ Hfwf Ω d Hρlu.
+    intros ρ ρTree HρTreewf IH1 OForest Hρ Hfwf Ω d Hρlu a Ha.
     iIntros "(#Be & S & Retk & Bp & RMρ)".
     iAssert (|==> ∃ Ωρ, ⌜ Ω ↪ₚ Ωρ | (λ k o, node ρTree k ∧ root ρTree k) ∧ dom Ω = dom Ωρ ⌝ ∗ |==> ∃ Ω', ⌜ Ωρ ↪ₚ Ω' | (λ k o, internal ρTree k) ⌝ ∗ osat Ω' ∗
       ⌜dom Ωρ = dom Ω' ∧ forest_wf OForest⌝ ∗
@@ -675,26 +675,57 @@ Section otree.
       simpl; intros. split; intros; subst.
       - eapply forest_fold_node_forest_merge_internal; eauto.
       - eapply forest_merge_internal_forest_fold_node; eauto. }
+    iAssert (
+  |==>
+    ∃ Ω' : obl_states, ⌜Ω0 ↪ₚ Ω' | λ (k : obl_id) (_ : obl_state), node (forest_fold Cf) k⌝ ∗ osat Ω' ∗
+      ⌜dom Ω0 = dom Ω' ∧ forest_wf OForest⌝ ∗ own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset (dom Ω'))) ∗
+      ((∃ τ1 : positive, oblG_owner ρ τ1 (1 / 2 / 2) ∗ othreadG_owns τ1 ρ true (1 / 2) ∗
+          ([∗ set] c ∈ dom Cf, ∃ α' β'0 : A, ⌜α /< α' ∧ β /≤ β'0⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β'0) ∗
+          ([∗ map] v↦vCh ∈ (forest_fold Cf), own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vCh))) ∗
+           (∃ α1 β1 : A, oblG_transfer_supply v α1 (1 / 2) ∗ oblG_progress_supply v β1 (1 / 2) ∗
+              ([∗ set] c ∈ vCh, ∃ α' β'0 : A, ⌜α1 /< α' ∧ β1 /≤ β'0⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β'0)) ∗
+           (⌜v = ρ⌝
+            ∨ ∃ π : positive, ⌜child ρTree π v⌝ ∗ oblG_owner v τ1 (1 / 2) ∗
+                ∃ θ : positive, othreadG_owns θ v false (1 / 2) ∗ ∃ x : positive, otreeG_suspend v x θ π ∗ otreeG_wait v x (1 / 2))))
+       ∨ own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅)) ∗ oblG_done ρ ∗ ⌜ρTree = tree_singleton ρ⌝)
+      )%I with "[- Hc Ha Hb0 Hb1]" as "H"; cycle 1.
+    { iMod "H" as "(%&%&S&%&Fetk& [H | H])".
+      - iDestruct "H" as "(%&Bo&To&HCS&HM)". iModIntro. iExists Ω'. iSplitR; first done. iFrame "S Fetk". iSplitR; first done.
+        iLeft. iFrame. iApply (big_sepM_delete _ _ _ _ Hρlutree with "[-]"). iFrame "Ha Hb0 Hb1". iSplitL "HCS".
+        { iSplitL.
+          - iApply (big_sepS_impl with "[$]"). iModIntro. iIntros (? ?) "(%&%&%&H1&H2)". iExists α', β'0. iFrame.
+            destruct H8. iSplit; first done. iPureIntro. etransitivity; last eapply H9. apply WFOCM.lt_le; auto.
+          - iLeft. done. }
+        subst ρTree. rewrite /forest_merge delete_insert_id; auto.
+      - iDestruct "H" as "(RMρd & #Bd & %Hρtree)". iPoseProof (osat_obl_is_done_weak with "[$]") as "(%&%)".
+        exfalso. subst Ω0. specialize (H5 ρ). rewrite lookup_insert_eq in H5. inv H5. destruct H10.
+        rewrite H7 -H5 in H9; first inv H9. unfold node. rewrite H2. done. }
+    iAssert (
+  [∗ map] k↦y ∈ (forest_fold Cf), own edge_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (gset_to_gmap () y))) ∗
+           (∃ α1 β1 : A, oblG_transfer_supply k α1 (1 / 2) ∗ oblG_progress_supply k β1 (1 / 2) ∗
+              ([∗ set] c ∈ y, ∃ α' β'0 : A, ⌜α1 /< α' ∧ β1 /≤ β'0⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β'0)) ∗
+           (⌜k = ρ⌝
+            ∨ ∃ π : positive, ⌜child ρTree π k⌝ ∗ oblG_owner k τ (1 / 2) ∗
+                ∃ θ : positive, othreadG_owns θ k false (1 / 2) ∗ ∃ x : positive, otreeG_suspend k x θ π ∗ otreeG_wait k x (1 / 2))
+      )%I with "[RMρM]" as "RMρ".
+    { subst. rewrite /forest_merge delete_insert_id; auto. }
     assert (HCfsub : map_Forall (λ _ c, c ⊆ ρTree) Cf).
     { subst. by apply forest_merge_subseteq_Forall. }
     assert (HCfint : map_Forall (λ v _, internal ρTree v) Cf).
     { subst. by apply forest_merge_internal_Forall. }
-    assert (HρluCf : ∃ X, ρTree !! ρ = Some X ∧ (dom Cf) ⊆ X).
-    { eauto. }
     rewrite !HOd. clear dependent Ω. clear dependent β0. clear H1 Hρlutree.
-    iStopProof. generalize dependent Cf. induction Cf using map_ind.
-    { iIntros (Hρlu HCfdisj HCftwf HρluCf HCfsub HCfint) "(#Be & Fetk & Bo & To & Fed & Bts & FρMM & Fρm & FρM & S & Bps)".
-      iModIntro. iExists Ω0. iFrame. iSplitR.
-      { iPureIntro. rewrite forest_fold_empty. intros ?. destruct (Ω0 !! i) eqn:Hlu; econstructor. split; intros; auto.
-        rewrite /node lookup_empty in H1. done. }
+    iStopProof. generalize dependent Ω0. generalize dependent Cf. induction Cf using map_ind.
+    { iIntros (Hρlu HCfdisj HCftwf HCfsub HCfint Ω) "(#Be & Fetk & Bo & To & HCS & S & FρMM)".
+      iModIntro. iExists Ω. iFrame. iSplitR.
+      { iPureIntro. rewrite forest_fold_empty. intros ?. destruct (Ω !! i) eqn:Hlu; econstructor.
+        split; intros; auto. rewrite /node lookup_empty in H1. done. }
       iSplitR.
       { iPureIntro. split; auto. }
-      iLeft. iFrame. iApply (big_sepM_delete _ _ _ _ Hρlutree with "[-]"). iFrame "FρM". iFrame. by rewrite dom_empty_L. }
-    iIntros (Hρlu HCfdisj HCftwf Hρlutree HCfsub HCfint) "(#Be & Fetk & Bo & To & Fed & Bts & FρMM & Fρm & FρM & S & Bps)".
+      iLeft. iFrame. }
+    iIntros (Hρlu HCfdisj HCftwf HCfsub HCfint Ω) "(#Be & Fetk & Bo & To & HCS & S & FρMM)".
+    
     
 
-
-    
         
     
 osat_obl_progress_one:
