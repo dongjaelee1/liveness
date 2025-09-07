@@ -92,7 +92,7 @@ Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
         ([∗ map] i ↦ OObls ∈ OThread,
            (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ othreadG_obls i ∅ 1)) ∗
            (own status_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> OObls)))) ∗
-           ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2)%Qp ∗
+           ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2/2)%Qp ∗
                                     (match f with | true => oblG_owner k i (1/2/2)%Qp | _ => emp end))
         )
     )%I.
@@ -415,10 +415,10 @@ Section othread.
   Qed.
 
   Lemma othread_alloc_obl_1 TP i Ψ q k :
-    oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i Ψ q ∗ oblG_live k (1/2)%Qp
-    ⊢ |==> oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
+    oblG_live k (1/2)%Qp ∗ oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i Ψ q
+    ⊢ |==> oblG_live k (1/2)%Qp ∗ oblG_live k (1/2/2)%Qp ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
   Proof.
-    iIntros "(Os0 & Hthread & Ho & Os)".
+    iIntros "(Os0 & Os & Hthread & Ho)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
     iPoseProof (othreadG_obls_lookup_frac with "[HO Ho]") as "%"; first iFrame.
     destruct H0 as (Ψ0&Hlui0&Hsub).
@@ -435,7 +435,7 @@ Section othread.
       iCombine "Os Oks" as "Os". iPoseProof (oblG_live_frac_op with "Os") as "Os"; first done.
       iPoseProof (oblG_live_valid with "Os") as "%Hv". iPureIntro. done.
     }
-    iFrame "Os0".
+    iPoseProof (oblG_live_div_2 with "Os") as "[Os Os']". iFrame "Os0 Os'".
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "(Hix & His & Him)".
     iMod (othreadG_owns_alloc _ _ _ false Hluk with "His") as "[His Hw]".
@@ -454,11 +454,11 @@ Section othread.
   Qed.
   Lemma othread_alloc_obl Ω TP i Ψ q k :
     osat Ω ∗ othread TP ∗ othreadG_obls i Ψ q ∗ oblG_elem k ∗ oblG_live k (1/2)%Qp
-    ⊢ |==> osat Ω ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
+    ⊢ |==> osat Ω ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1 ∗ oblG_live k (1/2/2)%Qp.
   Proof.
     iIntros "(Osat & Hthread & Ho & #He & Os)".
     iPoseProof (osat_live_open with "[Osat Os]") as "(Os & Os0 & Osacc)"; first by iFrame.
-    iMod (othread_alloc_obl_1 with "[$]") as "(Os0 & Hthread & Ho & Hw)".
+    iMod (othread_alloc_obl_1 with "[$]") as "(Os0 & Os1 & Hthread & Ho & Hw)".
     iModIntro. iFrame. by iApply "Osacc".
   Qed.
 
@@ -482,7 +482,7 @@ Section othread.
     k ∈ Ψ →
     othread TP ∗ othreadG_obls i Ψ q ∗ othreadG_owns i k f 1
     ⊢ |==> othread TP ∗ othreadG_obls i (Ψ ∖ {[k]}) q ∗
-           oblG_live k (1/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp).
+           oblG_live k (1/2/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp).
   Proof.
     iIntros (Hink) "(Hthread & Ho & Hw)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
@@ -520,7 +520,7 @@ Section othread.
   Lemma othread_delete_obl TP i Ψ k f :
     othread TP ∗ othreadG_obls i Ψ 1 ∗ othreadG_owns i k f 1
     ⊢ |==> othread TP ∗ othreadG_obls i (Ψ ∖ {[k]}) 1 ∗
-           oblG_live k (1/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp).
+           oblG_live k (1/2/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp).
   Proof.
     iIntros "(Hthread & Ho & Hw)". iPoseProof (othread_obls_owns_elem with "[$]") as "%Hkin".
     iApply (othread_delete_obl_frac with "[$]"). auto.
