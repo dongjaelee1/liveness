@@ -467,9 +467,16 @@ Section osat.
     iIntros "H". iPoseProof (own_valid with "H") as "%Hv".
     apply reservation_map_data_valid, bank_valid_debt_cash in Hv. destruct Hv. done.
   Qed.
+  Lemma oblG_transfer_supply_exceed k1 k2 a q b :
+    a /< b →
+    oblG_transfer_supply k1 a q ∗ oblG_transfer k2 b ⊢ ⌜ k1 ≠ k2 ⌝.
+  Proof.
+    iIntros (Hlt) "H". destruct (decide (k1 = k2)); last done.
+    subst. iPoseProof (oblG_transfer_supply_is_bound with "H") as "%".
+    exfalso. apply (WFOCM.lt_le_false _ _ Hlt H).
+  Qed.
 
   (** Transfer bound rules *)
-
   Lemma oblG_transfer_bound_auth_alloc D k a :
     k ∉ D →
     (own tbound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset D)))
@@ -501,6 +508,11 @@ Section osat.
     a1 /≤ a0 →
     oblG_transfer_bound_auth k a0 ⊢ |==> oblG_transfer_bound_auth k a1.
   Proof. iIntros (Ha). apply own_update, reservation_map_update, auth_mra_update; eauto. apply _. Qed.
+
+  Lemma oblG_transfer_bound_mon k a0 a1 :
+    a0 /≤ a1 →
+    oblG_transfer_bound k a0 ⊢ oblG_transfer_bound k a1.
+  Proof. iIntros (Ha). apply own_mono, reservation_map_data_mono, auth_mra_know_mono; eauto. apply _. Qed.
 
   (** Progress rules *)
   Lemma oblG_progress_eq i a0 a1 :

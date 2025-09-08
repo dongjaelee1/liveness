@@ -810,8 +810,26 @@ Section otree.
 
   (* Progress of a thread *)
 
+  Lemma oforest_obligation_in_tree Ω OForest π ℵ :
+    osat Ω ∗ oforest_aux (dom Ω) OForest ∗ oblG_elem π ∗ oblG_transfer_bound π ℵ
+    ⊢ ∃ ρ ρt πC, ⌜ OForest !! ρ = Some ρt ∧ ρt !! π = Some πC ⌝ ∗
+                 (⌜ ρ = π ⌝ ∨ ∃ ℵ0, ⌜ ρ ≠ π ∧ ℵ0 /< ℵ ⌝ ∗ oblG_transfer_bound ρ ℵ0).
+  Proof.
+    iIntros "(S & F & #Beπ & #Bbπ)".
+    rewrite /oforest_aux. iDestruct "F" as "(% & Retk & RM)". destruct H1 as [Hfdom Hfwf].
+    iPoseProof (osat_elem with "[S]") as "%Hπelem"; first by iFrame.
+    destruct (OForest !! π) eqn:Hπlu.
+
+    TODO
+
+
+    iIntros (Ha ? Hρ) "(S & F & Bp)". destruct H1 as [d Hρlu].
+    iPoseProof (oforest_aux_wf with "F") as "%". destruct H1 as [Hfdom Hfwf].
+    rewrite /oforest_aux. iDestruct "F" as "(_ & Retk & RM)".
+    
+
   (* Move a tree *)
-  Lemma oforest_progress_one_tree Ω OForest ρ ρTree (a : A) :
+  Lemma oforest_transfer_one_tree Ω OForest ρ ρTree (a : A) :
     /0 /< a →
     (∃ d, Ω !! ρ = Some (obl_live d)) →
     OForest !! ρ = Some ρTree →
@@ -824,6 +842,13 @@ Section otree.
 
       (* TODO *)
 
+  Lemma forest_move_tree_wf f ρ ρt r rt π πC :
+    forest_wf f →
+    ρ ≠ r →
+    f !! r = Some rt →
+    f !! ρ = Some ρt →
+    ρt !! π = Some πC →
+    forest_wf (forest_move_tree f ρ ρt r rt π πC).
         
 
     (*   oforest_progress *)
