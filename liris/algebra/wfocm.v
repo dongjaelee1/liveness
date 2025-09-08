@@ -46,6 +46,19 @@ Module WFOCM.
       intros x y z H0 H1. eapply lt_le_lt; eauto. apply lt_le; auto.
     Qed.
 
+    Lemma lt_Irreflexive : Irreflexive ltR.
+    Proof using Type*.
+      intros x. induction x using (well_founded_ind lt_wf). intros ?. eapply H0; eauto.
+    Qed.
+
+    Lemma lt_le_false : forall a b, (ltR a b) → (leR b a) → False.
+    Proof using Type*.
+      intros. apply lt_exists_left in H0. destruct H0 as (?&?&?).
+      assert (leR (addO a x) a) by (etransitivity; eauto). assert (ltR a a).
+      { apply lt_exists_left. exists x. split; auto. }
+      apply lt_Irreflexive in H4. auto.
+    Qed.
+
     Lemma induction_type : forall P : A -> Type, (forall x : A, (forall y : A, ltR y x -> P y) -> P x) -> forall a : A, P a.
     Proof using Type*.
       intros. apply (well_founded_induction_type lt_wf). auto.

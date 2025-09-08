@@ -808,13 +808,27 @@ Section otree.
     iFrame.
   Qed.
 
-      TODO
+  (* Progress of a thread *)
+
+  (* Move a tree *)
+  Lemma oforest_progress_one_tree Ω OForest ρ ρTree (a : A) :
+    /0 /< a →
+    (∃ d, Ω !! ρ = Some (obl_live d)) →
+    OForest !! ρ = Some ρTree →
+    osat Ω ∗ oforest_aux (dom Ω) OForest ∗
+    (* from user *)
+    oblG_progress ρ a
+    ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_in_tree ρTree) ⌝) ∗
+                 osat Ω' ∗ oforest_aux (dom Ω') OForest.
+  Proof.
+
+      (* TODO *)
 
         
 
-      oforest_progress
-    oforest_transfer > oforest_move_tree
-      oforest_resolve > oforest_clear_tree
+    (*   oforest_progress *)
+    (* oforest_transfer > oforest_move_tree *)
+    (*   oforest_resolve > oforest_clear_tree *)
 
 (* Global invariant for the obligation forest state. *)
 Definition oforest_aux `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}

@@ -5,7 +5,7 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liris.algebra Require Export wfocm.
 From liris.base_logic Require Export obligation.
-From liris.algebra Require Import bank.
+From liris.algebra Require Import auth_mra bank.
 
 Section aux.
   (* Maybe move to somewhere *)
@@ -43,12 +43,15 @@ Definition obl_idO `{SI : indexT} := leibnizO obl_id.
 (** The ghost state for liveness obligations *)
 Module osatGS.
 
+  Notation wfocm_geR := (flip WFOCM.leR).
+
   Class osatGpreS `{SI : indexT} `{WF : WFOCM.pack A} (ps T : Type) (Σ : gFunctors) : Set :=
     OsatGpreS {
         osatGpreS_goal : inG Σ (gmap_viewR obl_id (prodR (agreeR $ (prop_ofO ps)) (agreeR $ (laterO (iPropO Σ)))));
         osatGpreS_status : inG Σ (reservation_mapUR mono_natUR);
         osatGpreS_transfer : inG Σ (reservation_mapUR bankUR);
-        osatGpreS_tbound : inG Σ (reservation_mapUR (agreeR (leibnizO A)));
+        osatGpreS_tbound : inG Σ (reservation_mapUR (auth_mraUR (wfocm_geR)));
+        (* osatGpreS_tbound : inG Σ (reservation_mapUR (agreeR (leibnizO A))); *)
         osatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO T)));
         osatGpreS_progress : inG Σ (reservation_mapUR bankUR);
       }.
@@ -68,7 +71,8 @@ Module osatGS.
     #[GFunctor (gmap_viewTRF obl_id (prodTRF (agreeTRF $ (prop_ofO ps)) (agreeTRF $ (laterTF idTF))));
       GFunctor (reservation_mapUR mono_natUR);
       GFunctor (reservation_mapUR bankUR);
-      GFunctor (reservation_mapUR (agreeR $ (leibnizO A)));
+      GFunctor (reservation_mapUR (auth_mraUR (wfocm_geR)));
+      (* GFunctor (reservation_mapUR (agreeR $ (leibnizO A))); *)
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO T)));
       GFunctor (reservation_mapUR bankUR)
       ].
@@ -125,11 +129,18 @@ Definition oblG_transfer_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps
 Global Typeclasses Opaque oblG_transfer_supply.
 Global Instance: Params (@oblG_transfer_supply) 8 := {}.
 
-(* Fixed bound for transfer credits *)
+(* Upper bound on transfer credits *)
 Definition oblG_transfer_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
-  own tbound_name (reservation_map_data k (to_agree $ ℵ : agreeR (leibnizO _))).
+  own tbound_name (reservation_map_data k (◯AM[wfocm_geR] ℵ)).
+  (* own tbound_name (reservation_map_data k (to_agree $ ℵ : agreeR (leibnizO _))). *)
 Global Typeclasses Opaque oblG_transfer_bound.
 Global Instance: Params (@oblG_transfer_bound) 8 := {}.
+
+Definition oblG_transfer_bound_auth `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
+  own tbound_name (reservation_map_data k (●AM[wfocm_geR] ℵ)).
+  (* own tbound_name (reservation_map_data k (to_agree $ ℵ : agreeR (leibnizO _))). *)
+Global Typeclasses Opaque oblG_transfer_bound_auth.
+Global Instance: Params (@oblG_transfer_bound_auth) 8 := {}.
 
 (* Owner: tracks the owner thread of this obligation *)
 Definition oblG_owner `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (τ : T) (q : Qp) : iProp Σ :=
@@ -156,7 +167,7 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_cl
          own goal_name (gmap_view_auth (DfracOwn 1) ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OProp))) ∗
      (own status_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own transfer_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
-     (own tbound_name (reservation_map_token (A:=agreeR (leibnizO A)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (own tbound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own progress_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      ([∗ map] k ↦ o ∈ Ω,
@@ -164,15 +175,14 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_cl
         | obl_live d =>
             oblG_live k (1/2)%Qp ∗
             (∃ α, ⌜ WFOCM.leR α (obl_transfer d) ⌝ ∗ oblG_transfer_supply k α (1/2)%Qp) ∗
-            (∃ ℵ, ⌜ WFOCM.leR (obl_transfer d) ℵ ⌝ ∗ oblG_transfer_bound k ℵ) ∗
+            (∃ ℵ, ⌜ WFOCM.leR (obl_transfer d) ℵ ⌝ ∗ oblG_transfer_bound_auth k ℵ) ∗
             (oblG_owner k (obl_owner d) (1/2)%Qp) ∗
             (∃ β, ⌜ WFOCM.leR β (obl_progress d) ⌝ ∗ oblG_progress_supply k β (1/2)%Qp)
         | obl_done P1 =>
             ∃ P2 R, oblG_goal k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
                     oblG_done_auth k ∗
-                    (∃ α, oblG_transfer_supply k α 1) ∗
-                    (∃ τ, oblG_owner k τ 1) ∗
-                    (∃ β, oblG_progress_supply k β 1)
+                    ∃ α τ β, oblG_transfer_supply k α 1 ∗ oblG_transfer_bound_auth k α ∗
+                             oblG_owner k τ 1 ∗ oblG_progress_supply k β 1
       end)
     )%I.
 
@@ -450,26 +460,6 @@ Section osat.
     by iFrame.
   Qed.
 
-  Lemma oblG_transfer_bound_agree k a0 a1 :
-    oblG_transfer_bound k a0 ∗ oblG_transfer_bound k a1 ⊢ ⌜ a0 = a1 ⌝.
-  Proof.
-    rewrite /oblG_transfer_bound. iIntros "[H1 H2]". iCombine "H1 H2" as "H".
-    iPoseProof (own_valid with "H") as "%Hv". iPureIntro.
-    apply reservation_map_data_valid in Hv. apply @to_agree_op_valid in Hv; auto.
-  Qed.
-
-  Lemma oblG_transfer_bound_alloc D k a :
-    k ∉ D →
-    (own tbound_name (reservation_map_token (A:=agreeR (leibnizO A)) (⊤ ∖ gset_to_coPset D)))
-    ⊢ |==> (own tbound_name (reservation_map_token (A:=agreeR (leibnizO A)) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
-           oblG_transfer_bound k a.
-  Proof.
-    iIntros (Hk) "Htk".
-    iPoseProof (reservation_map_token_alloc_singleton _ _ k (to_agree a : agreeR (leibnizO _)) with "Htk") as "[Htk >H]"; auto.
-    done.
-  Qed.
-
-  (* Additional rules *)
   Lemma oblG_transfer_supply_is_bound k a q b :
     oblG_transfer_supply k a q ∗ oblG_transfer k b ⊢ ⌜ b /≤ a ⌝.
   Proof.
@@ -477,6 +467,40 @@ Section osat.
     iIntros "H". iPoseProof (own_valid with "H") as "%Hv".
     apply reservation_map_data_valid, bank_valid_debt_cash in Hv. destruct Hv. done.
   Qed.
+
+  (** Transfer bound rules *)
+
+  Lemma oblG_transfer_bound_auth_alloc D k a :
+    k ∉ D →
+    (own tbound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset D)))
+    ⊢ |==> (own tbound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
+           oblG_transfer_bound_auth k a.
+  Proof.
+    iIntros (Hk) "Htk".
+    iPoseProof (reservation_map_token_alloc_singleton _ _ k (●AM[wfocm_geR] a) with "Htk") as "[Htk >H]"; auto.
+    - apply auth_mra_auth_valid.
+    - rewrite /oblG_transfer_bound_auth. by iFrame.
+  Qed.
+
+  Lemma oblG_transfer_bound_know k a :
+    oblG_transfer_bound_auth k a ⊢ oblG_transfer_bound k a.
+  Proof.
+    rewrite /oblG_transfer_bound_auth /oblG_transfer_bound. rewrite auth_mra_auth_know_op.
+    rewrite reservation_map_data_op. iIntros "[H1 H2]". iFrame.
+  Qed.
+
+  Lemma oblG_transfer_bound_know_bound k a0 a1 :
+    oblG_transfer_bound_auth k a0 ∗ oblG_transfer_bound k a1 ⊢ ⌜ a0 /≤ a1 ⌝.
+  Proof.
+    rewrite /oblG_transfer_bound_auth /oblG_transfer_bound -own_op -reservation_map_data_op.
+    iIntros "H". iPoseProof (own_valid with "H") as "%V". apply reservation_map_data_valid in V.
+    apply (auth_mra_both_valid wfocm_geR) in V. done.
+  Qed.
+
+  Lemma oblG_transfer_bound_auth_mon k a0 a1 :
+    a1 /≤ a0 →
+    oblG_transfer_bound_auth k a0 ⊢ |==> oblG_transfer_bound_auth k a1.
+  Proof. iIntros (Ha). apply own_update, reservation_map_update, auth_mra_update; eauto. apply _. Qed.
 
   (** Progress rules *)
   Lemma oblG_progress_eq i a0 a1 :
@@ -810,7 +834,8 @@ Section osat.
     }
     iMod (oblG_live_alloc _ k with "HS") as "[HS Hs]"; first done.
     iMod (oblG_transfer_alloc _ k α with "HT") as "(HT & Hts & Ht)"; first done.
-    iMod (oblG_transfer_bound_alloc _ k ℵ with "HB") as "[HB #Hb]"; first done.
+    iMod (oblG_transfer_bound_auth_alloc _ k ℵ with "HB") as "[HB Hba]"; first done.
+    iPoseProof (oblG_transfer_bound_know with "Hba") as "#Hb".
     iMod (oblG_owner_alloc _ k τ with "HO") as "[HO Ho]"; first done.
     iMod (oblG_progress_alloc _ k β with "HP") as "(HP & Hps & Hp)"; first done.
     iPoseProof (oblG_live_div_2 with "Hs") as "[Hs1 Hs2]".
@@ -909,13 +934,15 @@ Section osat.
     iMod (oblG_live_to_done with "[Hs Hs0]") as "Hs".
     { iApply oblG_live_frac_op; last iFrame. by rewrite Qp.div_2. }
     iPoseProof (oblG_done_auth_done with "Hs") as "#Hsd".
-    iPoseProof (oblG_transfer_supply_add with "[Hts Hts0]") as "(%&Hts&_)"; first iFrame.
+    iPoseProof (oblG_transfer_supply_add with "[Hts Hts0]") as "(%&Hts&%Htb)"; first iFrame.
     iPoseProof (oblG_owner_agree with "[Ho Ho0]") as "%"; first iFrame.
     destruct H1. clear H2. subst x1.
     iCombine "Ho Ho0" as "Ho". iPoseProof (oblG_owner_frac_op with "Ho") as "Ho".
     { by rewrite Qp.div_2. }
     iPoseProof (oblG_progress_supply_add with "[Hps Hps0]") as "(%&Hps&_)"; first iFrame.
     rewrite (Qp.div_2 1).
+    iMod (oblG_transfer_bound_auth_mon _ _ b with "Hb") as "Hb".
+    { destruct Htb. etransitivity; eauto. etransitivity; eauto. }
     iModIntro.
     iPoseProof ((big_sepM_insert _ (delete k Ω) k (odone P)) with "[Hm Hs Hts Hb Ho Hps HR]") as "Hm".
     { apply lookup_delete_eq. }
@@ -935,21 +962,46 @@ Section osat.
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     destruct o.
     - iDestruct "Hk" as "( Hs & (%&%Htle&Hts) & (%&%&Hb) & Ho & (%&%&Hps) )".
-      iPoseProof (oblG_transfer_bound_agree with "[Hb Hb0]") as "%"; first iFrame; eauto. subst.
+      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Hb0]") as "%"; first iFrame; eauto.
       iPoseProof (oblG_transfer_supply_add with "[Hts Hts0]") as "(%&Hts&%)"; first iFrame.
       iPoseProof (oblG_transfer_supply_split with "Hts") as "[Hts Hts0]"; first reflexivity.
       iPoseProof ((big_sepM_insert _ (delete k Ω) k (obl_live d)) with "[Hm Hs Hts Hb Ho Hps]") as "Hm".
       { apply lookup_delete_eq. }
-      { iFrame "Hm". iFrame. iPureIntro. split_and !; eauto. destruct H1. etransitivity; eauto. }
+      { iFrame "Hm". iFrame. iPureIntro. split_and !; eauto. destruct H2. etransitivity; eauto. }
       iFrame "HS HT HB HO HP".
       rewrite insert_delete_eq insert_id; last done. iFrame.
-      destruct H1. simpl; iPureIntro; split_and !; auto.
-      etransitivity; [eapply H2 | etransitivity; eauto].
+      destruct H2. simpl; iPureIntro; split_and !; auto.
+      etransitivity; last eapply H1. etransitivity; [eapply H3 | etransitivity; eauto].
     - iExFalso.
-      iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & (%&Hts) & (%&Ho) & (%&Hps))".
+      iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Htba & Ho & Hps)".
       iPoseProof (oblG_transfer_supply_add with "[Hts Hts0]") as "(%&Hts&_)"; first iFrame.
       iPoseProof (oblG_transfer_supply_dfrac_valid with "Hts") as "%Hq".
       exfalso. done.
+  Qed.
+
+  Lemma osat_transfer_bound_exceed Ω k1 k2 ℵ b :
+    ℵ /< b →
+    osat Ω ∗ oblG_elem k1 ∗ oblG_transfer_bound k1 ℵ ∗ oblG_transfer k2 b ⊢ ⌜ k1 ≠ k2 ⌝.
+  Proof.
+    iIntros (Hlt) "(Hsat & #Hek1 & #Htbk1 & Htk2)".
+    iPoseProof (osat_elem k1 with "[Hsat]") as "%Helem"; first iFrame; eauto.
+    apply elem_of_dom in Helem. destruct Helem as [o LU].
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    destruct (decide (k1 = k2)); last done. subst k2.
+    destruct o.
+    - iDestruct "Hk" as "( Hs & (%&%Htle&Hts) & (%&%&Hb) & Ho & (%&%&Hps) )".
+      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htbk1]") as "%"; first iFrame; eauto.
+      iPoseProof (oblG_transfer_supply_is_bound with "[Hts Htk2]") as "%"; first iFrame.
+      exfalso. assert (b /≤ ℵ).
+      { etransitivity; first eauto. etransitivity; first eauto. etransitivity; eauto. }
+      apply (WFOCM.lt_le_false _ _ Hlt H3).
+    - iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Htba & Ho & Hps)".
+      iPoseProof (oblG_transfer_bound_know_bound with "[Htba Htbk1]") as "%"; first iFrame; eauto.
+      iPoseProof (oblG_transfer_supply_is_bound with "[Hts Htk2]") as "%"; first iFrame.
+      exfalso. assert (b /≤ ℵ).
+      { etransitivity; eauto. }
+      apply (WFOCM.lt_le_false _ _ Hlt H1).
   Qed.
 
   Lemma osat_done_open Ω k P R :
@@ -961,13 +1013,13 @@ Section osat.
     destruct Hdone as (?&LU&HPeq0).
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
     iDestruct (big_sepM_delete _ _ k _ LU with "Hm") as "[Hk Hm]".
-    iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & (%&Hts) & (%&Ho) & (%&Hps))".
+    iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Htba & Ho & Hps)".
     iPoseProof (oblG_goal_agree with "[Hg Hg0]") as "(%Hpeq1 & HReq)".
     { iSplit; [iFrame "Hg" | iFrame "Hg0"]. }
     iSplitL "HR".
     { iNext. by iRewrite "HReq" in "HR". }
     iIntros "HR". iFrame "HS HT HB HO HP HG".
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (obl_done x)) with "[Hm Hsa Hts Ho Hps HR]") as "Hm".
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (obl_done x)) with "[Hm Hsa Hts Htba Ho Hps HR]") as "Hm".
     { apply lookup_delete_eq. }
     { iFrame "Hm". iFrame. iExists P. eauto. }
     rewrite insert_delete_eq insert_id; last done. iFrame. eauto.
@@ -1009,7 +1061,7 @@ Proof.
     first by apply reservation_map_token_valid.
   iMod (own_alloc (reservation_map_token (A:=bankUR) ⊤)) as (γT) "HT";
     first by apply reservation_map_token_valid.
-  iMod (own_alloc (reservation_map_token (A:=agreeR (leibnizO A)) ⊤)) as (γB) "HB";
+  iMod (own_alloc (reservation_map_token (A:=auth_mraUR (wfocm_geR)) ⊤)) as (γB) "HB";
     first by apply reservation_map_token_valid.
   iMod (own_alloc (reservation_map_token (A:=dfrac_agreeR (leibnizO T))⊤)) as (γO) "HO";
     first by apply reservation_map_token_valid.
