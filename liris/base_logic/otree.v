@@ -810,23 +810,36 @@ Section otree.
 
   (* Progress of a thread *)
 
-  Lemma oforest_obligation_in_tree Ω OForest π ℵ :
-    osat Ω ∗ oforest_aux (dom Ω) OForest ∗ oblG_elem π ∗ oblG_transfer_bound π ℵ
-    ⊢ ∃ ρ ρt πC, ⌜ OForest !! ρ = Some ρt ∧ ρt !! π = Some πC ⌝ ∗
-                 (⌜ ρ = π ⌝ ∨ ∃ ℵ0, ⌜ ρ ≠ π ∧ ℵ0 /< ℵ ⌝ ∗ oblG_transfer_bound ρ ℵ0).
+  Lemma oforest_obligation_in_tree Ω OForest v :
+    osat Ω ∗ oforest_aux (dom Ω) OForest ∗ oblG_elem v
+    ⊢ ∃ ρ ρt vC, ⌜ OForest !! ρ = Some ρt ∧ ρt !! v = Some vC ⌝.
   Proof.
-    iIntros "(S & F & #Beπ & #Bbπ)".
+    iIntros "(S & F & #Bev)".
     rewrite /oforest_aux. iDestruct "F" as "(% & Retk & RM)". destruct H1 as [Hfdom Hfwf].
-    iPoseProof (osat_elem with "[S]") as "%Hπelem"; first by iFrame.
-    destruct (OForest !! π) eqn:Hπlu.
+    iPoseProof (osat_elem with "[S]") as "%Hvelem"; first by iFrame.
+    destruct (OForest !! v) eqn:Hπlu.
+    - destruct Hfwf. assert (tree_wf v g) by eauto. inversion H3. subst ρ t.
+      iExists v, g, (dom Cf). iPureIntro. split; auto. subst g. by rewrite /forest_merge lookup_insert_eq.
+    - destruct Hfwf. rewrite -Hfdom in Hvelem. apply elem_of_dom in Hvelem. destruct Hvelem.
+      pose proof (forest_fold_lookup_Some_exists_root _ _ _ H1 H3). destruct H4 as (?&?&?&?).
+      iExists x0, x1, x. iPureIntro. split; auto.
+  Qed.
+
+  Lemma oforest_obligation_exceed_not_lineage Ω OForest ρ ρt v ℵ u a :
+    ℵ /< a →
+    OForest !! ρ = Some ρt →
+    v ∈ dom ρt →
+    osat Ω ∗ oforest_aux (dom Ω) OForest ∗
+    oblG_elem v ∗ oblG_transfer_bound v ℵ ∗
+    oblG_transfer u a
+    ⊢ ⌜ ¬ lineage ρt u v ⌝.
+  Proof.
+    iIntros (Ha Hρlu Hv) "(S & F & #Bev & #Bbv & Btu)".
 
     TODO
-
-
-    iIntros (Ha ? Hρ) "(S & F & Bp)". destruct H1 as [d Hρlu].
-    iPoseProof (oforest_aux_wf with "F") as "%". destruct H1 as [Hfdom Hfwf].
-    rewrite /oforest_aux. iDestruct "F" as "(_ & Retk & RM)".
+    rewrite /oforest_aux. iDestruct "F" as "(% & Retk & RM)". destruct H1 as [Hfdom Hfwf].
     
+
 
   (* Move a tree *)
   Lemma oforest_transfer_one_tree Ω OForest ρ ρTree (a : A) :
@@ -855,7 +868,6 @@ Section otree.
     (* oforest_transfer > oforest_move_tree *)
     (*   oforest_resolve > oforest_clear_tree *)
 
-(* Global invariant for the obligation forest state. *)
 Definition oforest_aux `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
   (D : gset obl_id) (OForest : forest obl_id) : iProp Σ :=
@@ -867,6 +879,7 @@ Definition oforest_aux `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
             ([∗ map] v ↦ vCh ∈ ρTree,
                (own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap tt vCh)))) ∗
                (* Obligation is live and has enough transfer (+ 1 to go back) and progress credits for chiledren and... *)
+               oblG_elem v ∗ oblG_live v (1/2/2)%Qp ∗
                (∃ α β, oblG_transfer_supply v α (1/2)%Qp ∗ oblG_progress_supply v β (1/2)%Qp ∗
                        ([∗ set] c ∈ vCh,
                           ∃ α' β', ⌜ WFOCM.ltR α α' ∧ WFOCM.leR β β' ⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')
@@ -880,13 +893,9 @@ Definition oforest_aux `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
       )) ∨
         (* Or the root is done *)
         ((own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅))) ∗
-         oblG_done ρ ∗ ⌜ ρTree = tree_singleton ρ ⌝)
+         oblG_elem ρ ∗ oblG_done ρ ∗ ⌜ ρTree = tree_singleton ρ ⌝)
    )
   )%I.
-Definition oforest `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
-  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
-  (D : gset obl_id) : iProp Σ :=
-  locked (∃ (OForest : forest obl_id), oforest_aux D OForest)%I.
 
 
 
