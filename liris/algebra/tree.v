@@ -1319,6 +1319,13 @@ Section tree.
       apply map_disjoint_dom in Hdisj. set_solver + HC12 HC22 Hdisj H0 H7.
   Qed.
 
+  Lemma tree_wf_node_lineage t ρ v :
+    tree_wf ρ t → node t v → lineage t ρ v.
+  Proof using.
+    intros. destruct (decide (v = ρ)); first by subst.
+    pose proof (tree_wf_node_descendant _ _ _ H0 H1 n). apply descendant_lineage; auto.
+  Qed.
+
   (* Operation invariants *)
   Lemma tree_insert_wf ρ ρt r rt π πC :
     tree_wf ρ ρt → tree_wf r rt → ρt ##ₘ rt → ρt !! π = Some πC →

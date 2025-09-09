@@ -175,7 +175,6 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_cl
         | obl_live d =>
             oblG_live k (1/2)%Qp ∗
             (∃ α, ⌜ WFOCM.leR α (obl_transfer d) ⌝ ∗ oblG_transfer_supply k α (1)%Qp ∗ oblG_transfer_bound_auth k α) ∗
-            (* (∃ ℵ, ⌜ WFOCM.leR (obl_transfer d) ℵ ⌝ ∗ oblG_transfer_bound_auth k ℵ) ∗ *)
             (oblG_owner k (obl_owner d) (1/2)%Qp) ∗
             (∃ β, ⌜ WFOCM.leR β (obl_progress d) ⌝ ∗ oblG_progress_supply k β (1/2)%Qp)
         | obl_done P1 =>
@@ -977,6 +976,25 @@ Section osat.
       exfalso. assert (b /≤ ℵ).
       { etransitivity; eauto. }
       apply (WFOCM.lt_le_false _ _ Hlt H1).
+  Qed.
+
+  Lemma osat_transfer_bound_transfer_le Ω k α ℵ :
+    osat Ω ∗ oblG_elem k ∗ oblG_transfer_bound k ℵ ∗ oblG_transfer k α ⊢ ⌜ α /≤ ℵ ⌝.
+  Proof.
+    iIntros "(Hsat & #Hek & #Htb & Ht)".
+    iPoseProof (osat_elem k with "[Hsat]") as "%Helem"; first iFrame; eauto.
+    apply elem_of_dom in Helem. destruct Helem as [o LU].
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    destruct o.
+    - iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
+      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb]") as "%"; first iFrame; eauto.
+      iPoseProof (oblG_transfer_supply_is_bound with "[Hts Ht]") as "%"; first iFrame.
+      iPureIntro. etrans; eauto.
+    - iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Htba & Ho & Hps)".
+      iPoseProof (oblG_transfer_bound_know_bound with "[Htba Htb]") as "%"; first iFrame; eauto.
+      iPoseProof (oblG_transfer_supply_is_bound with "[Hts Ht]") as "%"; first iFrame.
+      iPureIntro. etrans; eauto.
   Qed.
 
   Lemma osat_done_open Ω k P R :
