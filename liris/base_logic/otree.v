@@ -834,7 +834,8 @@ Section otree.
     oblG_transfer u a
     ⊢ ⌜ ¬ lineage ρt u v ⌝.
   Proof.
-    iIntros (Ha Hρlu Hv) "(S & F & #Bev & #Bbv & Btu)".
+    iIntros (Ha Hρlu Hv) "(S & F & #Bev & #Bbv & Btu)". iIntros "%Hlin".
+    
 
     TODO
     rewrite /oforest_aux. iDestruct "F" as "(% & Retk & RM)". destruct H1 as [Hfdom Hfwf].
