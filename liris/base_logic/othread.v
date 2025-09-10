@@ -636,6 +636,7 @@ Section othread.
     iExists OThread. iSplitR; first done. iFrame "HS HX HO HE".
     iApply (big_sepM_delete _ _ i _ Hlui). iFrame. iRight. iFrame.
   Qed.
+
   Lemma othread_term_open TP i :
     othread TP ∗ othreadG_elem i ∗ othreadG_term i
     ⊢ othreadG_obls i ∅ 1 ∗ (othreadG_obls i ∅ 1 -∗ othread TP).
@@ -652,6 +653,27 @@ Section othread.
     iFrame "Ho". iIntros "Ho".
     iExists OThread. iSplitR; first done. iFrame "HS HX HO HE".
     iApply (big_sepM_delete _ _ i _ Hlui). iFrame. iRight. iFrame.
+  Qed.
+
+  Lemma othread_live_open TP i k f q :
+    othread TP ∗ othreadG_elem i ∗ othreadG_owns i k f q
+    ⊢ othreadG_owns i k f q ∗
+    (oblG_live k (1/2/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp)) ∗
+    ((oblG_live k (1/2/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp)) -∗ othread TP).
+  Proof.
+    iIntros "(Hthread & He & Hw)".
+    iPoseProof (othread_elem with "[Hthread He]") as "%Hin"; first iFrame.
+    rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
+    assert (Hlui : is_Some (OThread !! i)).
+    { subst TP. by apply elem_of_dom. }
+    destruct Hlui as (OObls&Hlui).
+    iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
+    iDestruct "Hi" as "(Hix & His & Him)".
+    iPoseProof (othreadG_owns_lookup with "[His Hw]") as "%Hluk"; first iFrame.
+    iPoseProof (big_sepM_delete _ _ _ _ Hluk with "Him") as "[Hk Him]".
+    iFrame "Hw Hk". iIntros "Hk". iExists OThread. iFrame "HS HX HO HE".
+    iSplit; first done. iApply (big_sepM_delete _ _ _ _ Hlui). iFrame.
+    iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
   Qed.
 
 End othread.
