@@ -524,6 +524,21 @@ Section otree.
     oforest_aux D OForest ⊢ ⌜ dom (forest_fold OForest) = D ∧ forest_wf OForest ⌝.
   Proof. iIntros "F". rewrite /oforest_aux. iDestruct "F" as "(%Hf & Retk & RM)". done. Qed.
 
+  Lemma oforest_obligation_in_tree Ω OForest v :
+    osat Ω ∗ oforest_aux (dom Ω) OForest ∗ oblG_elem v
+    ⊢ ∃ ρ ρt vC, ⌜ OForest !! ρ = Some ρt ∧ ρt !! v = Some vC ⌝.
+  Proof.
+    iIntros "(S & F & #Bev)".
+    rewrite /oforest_aux. iDestruct "F" as "(% & Retk & RM)". destruct H1 as [Hfdom Hfwf].
+    iPoseProof (osat_elem with "[S]") as "%Hvelem"; first by iFrame.
+    destruct (OForest !! v) eqn:Hπlu.
+    - destruct Hfwf. assert (tree_wf v g) by eauto. inversion H3. subst ρ t.
+      iExists v, g, (dom Cf). iPureIntro. split; auto. subst g. by rewrite /forest_merge lookup_insert_eq.
+    - destruct Hfwf. rewrite -Hfdom in Hvelem. apply elem_of_dom in Hvelem. destruct Hvelem.
+      pose proof (forest_fold_lookup_Some_exists_root _ _ _ H1 H3). destruct H4 as (?&?&?&?).
+      iExists x0, x1, x. iPureIntro. split; auto.
+  Qed.
+
   Definition obl_cond_in_tree (t : tree obl_id) : obl_cond :=
     λ k o, node t k.
 
@@ -780,21 +795,7 @@ Section otree.
 
   (* Progress of a thread *)
 
-  Lemma oforest_obligation_in_tree Ω OForest v :
-    osat Ω ∗ oforest_aux (dom Ω) OForest ∗ oblG_elem v
-    ⊢ ∃ ρ ρt vC, ⌜ OForest !! ρ = Some ρt ∧ ρt !! v = Some vC ⌝.
-  Proof.
-    iIntros "(S & F & #Bev)".
-    rewrite /oforest_aux. iDestruct "F" as "(% & Retk & RM)". destruct H1 as [Hfdom Hfwf].
-    iPoseProof (osat_elem with "[S]") as "%Hvelem"; first by iFrame.
-    destruct (OForest !! v) eqn:Hπlu.
-    - destruct Hfwf. assert (tree_wf v g) by eauto. inversion H3. subst ρ t.
-      iExists v, g, (dom Cf). iPureIntro. split; auto. subst g. by rewrite /forest_merge lookup_insert_eq.
-    - destruct Hfwf. rewrite -Hfdom in Hvelem. apply elem_of_dom in Hvelem. destruct Hvelem.
-      pose proof (forest_fold_lookup_Some_exists_root _ _ _ H1 H3). destruct H4 as (?&?&?&?).
-      iExists x0, x1, x. iPureIntro. split; auto.
-  Qed.
-
+  (* Move a tree *)
   Lemma oforest_obligation_exceed_not_lineage Ω OForest ρ ρt v ℵ u a :
     ℵ /< a →
     OForest !! ρ = Some ρt →
@@ -838,23 +839,37 @@ Section otree.
       iApply IHHlin. iFrame. eauto.
   Qed.
 
-    TODO
-    
-
-
-  (* Move a tree *)
-  Lemma oforest_transfer_one_tree Ω OForest ρ ρTree (a : A) :
-    /0 /< a →
-    (∃ d, Ω !! ρ = Some (obl_live d)) →
-    OForest !! ρ = Some ρTree →
-    osat Ω ∗ oforest_aux (dom Ω) OForest ∗
+  Lemma oforest_transfer_one_tree Ω TP Φ θ k kt π ρ ρt ℵ a b :
+    ℵ /< a →
+    /0 /< b →
+    Φ !! ρ = Some ρt →
+    π ∈ dom ρt →
+    Φ !! k = Some kt →
+    (∃ d, Ω !! π = Some (obl_live d)) →
+    osat Ω ∗ othread TP ∗ osuspend (dom Ω) ∗ oforest_aux (dom Ω) Φ ∗
     (* from user *)
-    oblG_progress ρ a
-    ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_in_tree ρTree) ⌝) ∗
-                 osat Ω' ∗ oforest_aux (dom Ω') OForest.
+    oblG_elem π ∗ oblG_transfer_bound π ℵ ∗
+    othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
+    otreeG_elem k ∗ oblG_transfer k a ∗ oblG_transfer k b
+    ⊢ |==> ∃ Ω' Φ', (⌜ Ω ↪ₜ Ω' | (obl_cond_in_tree kt) ⌝) ∗
+                    osat Ω' ∗ othread TP ∗ osuspend (dom Ω') ∗ oforest_aux (dom Ω') Φ' ∗
+                    ∃ x, otreeG_suspend k x θ π ∗ otreeG_wait k x 1.
   Proof.
 
-      (* TODO *)
+othread_obl_release_2:
+  ∀ {SI : indexT} {A : Type} {WFA : WFOCM.pack A} {Σ : gFunctors} {ps : Type} {H : osatGS.osatGS ps positive Σ} 
+    {othreadGS0 : othreadGS.othreadGS Σ} (TP : gset positive) (i : positive) (k : obl_id),
+    othread TP ∗ othreadG_elem i ∗ othreadG_owns i k true (1 / 2) ∗ othreadG_owns i k true (1 / 2)
+    ⊢ |==> othread TP ∗ othreadG_owns i k false (1 / 2) ∗ othreadG_owns i k false (1 / 2) ∗ oblG_owner k i (1 / 2 / 2)
+otreeG_edge_alloc:
+  ∀ (π : positive) (KCh : gmap obl_id ()) (k : obl_id),
+    KCh !! k = None
+    → own edge_name (reservation_map_data π (gmap_view_auth (DfracOwn 1) KCh))
+      ⊢ |==> own edge_name (reservation_map_data π (gmap_view_auth (DfracOwn 1) (<[k:=()]> KCh))) ∗ otreeG_edge π k 1
+osuspend_suspend:
+  ∀ (D : obl_ids) (k : obl_id) (θ : positive) (π : obl_id),
+    osuspend D ∗ otreeG_elem k ∗ othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1
+    ⊢ |==> osuspend D ∗ ∃ x : positive, otreeG_suspend k x θ π ∗ otreeG_wait k x 1
 
   Lemma forest_move_tree_wf f ρ ρt r rt π πC :
     forest_wf f →
@@ -863,7 +878,9 @@ Section otree.
     f !! ρ = Some ρt →
     ρt !! π = Some πC →
     forest_wf (forest_move_tree f ρ ρt r rt π πC).
-        
+
+
+   (* TODO *)
 
     (*   oforest_progress *)
     (* oforest_transfer > oforest_move_tree *)
