@@ -898,6 +898,40 @@ Section osat.
     eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
+  Lemma osat_obl_transfer_one_with_bound Ω k α τ τ' β β' ℵ c x1 x2 :
+    (Ω !! k = Some (olive α τ β)) →
+    (/0 /< c) →
+    osat Ω ∗ oblG_owner k x1 (1/2)%Qp ∗ oblG_progress_supply k x2 (1/2)%Qp ∗
+    oblG_transfer_bound k ℵ ∗ oblG_transfer k c
+    ⊢ |==> ∃ α', osat (<[k:=olive α' τ' (β /+ β')]>Ω) ∗
+                 ⌜ obl_state_transfer (olive α τ β) (olive α' τ' (β /+ β')) ∧ α' /< ℵ ⌝ ∗
+                 oblG_owner k τ' (1/2)%Qp ∗ oblG_progress_supply k (β /+ β') (1/2)%Qp ∗
+                 oblG_transfer_bound k α' ∗ oblG_progress k β'.
+  Proof.
+    intros LU Hc. iIntros "(Hsat & Ho0 & Hps0 & #Htb & Ht)".
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
+    iMod (oblG_transfer_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
+    assert (LT : a2 /< α0).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    iPoseProof (oblG_transfer_bound_know_bound k with "[Hb Htb]") as "%LEℵ"; first by iFrame.
+    iMod (oblG_transfer_bound_auth_mon _ _ a2 with "Hb") as "Hb".
+    { apply WFOCM.lt_le; auto. }
+    iPoseProof (oblG_transfer_bound_know with "Hb") as "#Hbk".
+    iMod (oblG_owner_update_2 _ _ _ _ _ τ' with "[Ho0 Ho]") as "[Ho0 Ho]"; [apply Qp.div_2 | iFrame|].
+    simpl in *.
+    iMod (oblG_progress_supply_mon _ _ β with "Hps") as "Hps"; first done.
+    iMod (oblG_progress_supply_issue_2 _ _ _ β _ β' with "[Hps Hps0]") as "(Hps&Hps0&Hp)"; [apply Qp.div_2|iFrame|].
+    iModIntro. iExists a2. 
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (olive a2 τ' (β /+ β'))) with "[Hm Hs Hts Hb Ho Hps]") as "Hm".
+    { apply lookup_delete_eq. }
+    { iFrame "Hm". iFrame. simpl. iSplit; done. }
+    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HS HT HB HO HP".
+    rewrite insert_delete_eq. iFrame. iFrame "Hbk". simpl; iPureIntro; split; auto.
+    split; eapply WFOCM.lt_le_lt; eauto.
+  Qed.
+
   Lemma osat_obl_progress_one Ω k α τ β c x0 :
     (Ω !! k = Some (olive α τ β)) →
     (/0 /< c) →
@@ -995,6 +1029,28 @@ Section osat.
       iPoseProof (oblG_transfer_bound_know_bound with "[Htba Htb]") as "%"; first iFrame; eauto.
       iPoseProof (oblG_transfer_supply_is_bound with "[Hts Ht]") as "%"; first iFrame.
       iPureIntro. etrans; eauto.
+  Qed.
+
+  Lemma osat_transfer_bounds_meet Ω k ℵ1 ℵ2 :
+    osat Ω ∗ oblG_elem k ∗ oblG_transfer_bound k ℵ1 ∗ oblG_transfer_bound k ℵ2
+    ⊢ ∃ ℵ3, ⌜ ℵ3 /≤ ℵ1 ∧ ℵ3 /≤ ℵ2 ⌝ ∗ oblG_transfer_bound k ℵ3.
+  Proof.
+    iIntros "(Hsat & #Hek & #Htb1 & #Htb2)".
+    iPoseProof (osat_elem k with "[Hsat]") as "%Helem"; first iFrame; eauto.
+    apply elem_of_dom in Helem. destruct Helem as [o LU].
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    destruct o.
+    - iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
+      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb1]") as "%"; first (iFrame "Hb Htb1").
+      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb2]") as "%"; first (iFrame "Hb Htb2").
+      iPoseProof (oblG_transfer_bound_know with "Hb") as "#Htb3"; first iFrame.
+      iExists α. iFrame "Htb3". iPureIntro. split; auto.
+    - iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Hb & Ho & Hps)".
+      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb1]") as "%"; first (iFrame "Hb Htb1").
+      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb2]") as "%"; first (iFrame "Hb Htb2").
+      iPoseProof (oblG_transfer_bound_know with "Hb") as "#Htb3"; first iFrame.
+      iExists α. iFrame "Htb3". iPureIntro. split; auto.
   Qed.
 
   Lemma osat_done_open Ω k P R :
