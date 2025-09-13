@@ -19,7 +19,9 @@ Section forest_pre.
   Definition forest_union f1 f2 : forest V := f1 ∪ f2.
   Definition forest_disjoint : relation (forest V) := λ f1 f2, f1 ##ₘ f2.
   Definition forest_tree_disjoint f t : Prop := map_Forall (λ _ m, m ##ₘ t) f.
-  Definition forest_node_in_tree f : V → Prop := λ v, map_fold (λ _ t a, (is_Some (t !! v)) ∨ a) False f.
+  Definition map_fold_or m (Φ : V → tree V → Prop) : Prop := map_fold (λ i s a, (Φ i s) ∨ a) False m.
+  Definition forest_node_in_tree f : V → Prop := λ v, map_fold_or f (λ _ t, (is_Some (t !! v))).
+  (* Definition forest_node_in_tree f : V → Prop := λ v, map_fold (λ _ t a, (is_Some (t !! v)) ∨ a) False f. *)
 
   Lemma forest_fold_internal_elem_of u f :
     u ∈ dom (forest_fold f) →
@@ -443,14 +445,22 @@ Section forest_pre.
     is_Some (forest_fold f !! v) ↔ forest_node_in_tree f v.
   Proof using.
     split.
-    - unfold forest_node_in_tree. revert v H0. induction f using map_ind; intros.
+    - unfold forest_node_in_tree, map_fold_or. revert v H0. induction f using map_ind; intros.
       { rewrite forest_fold_empty in H1. inv H1. }
       rewrite forest_fold_insert_L in H2; auto. apply forest_trees_disjoint_insert in H1; auto. destruct H1.
       apply map_fold_or_insert; auto. apply lookup_union_is_Some in H2. destruct H2; auto.
-    - unfold forest_node_in_tree. revert v H0. induction f using map_ind; intros.
+    - unfold forest_node_in_tree, map_fold_or. revert v H0. induction f using map_ind; intros.
       { rewrite map_fold_empty in H1. inv H1. }
       rewrite forest_fold_insert_L; auto. apply forest_trees_disjoint_insert in H1; auto. destruct H1.
       apply map_fold_or_insert in H2; auto. apply lookup_union_is_Some. destruct H2; auto.
+  Qed.
+
+  Global Instance map_fold_or_Decision f (Φ : V → tree V → Prop) : (∀ k t, Decision (Φ k t)) → Decision (map_fold_or f Φ).
+  Proof using.
+    intros. unfold map_fold_or. rewrite map_fold_foldr. remember (map_to_list f) as l.
+    clear f Heql. induction l.
+    { solve_decision. }
+    rewrite foldr_cons. destruct a. simpl. apply or_dec; auto.
   Qed.
 
 End forest_pre.
@@ -1340,14 +1350,18 @@ Section tree.
     pose proof (tree_wf_node_descendant _ _ _ H0 H1 n). apply descendant_lineage; auto.
   Qed.
 
-  Definition forest_node_in_tree_internal f : V → Prop := λ v, map_fold (λ _ t a, (internal t v) ∨ a) False f.
+  Definition forest_node_in_tree_internal f : V → Prop := λ v, map_fold_or f (λ _ t, (internal t v)).
+
+  Global Instance forest_node_in_tree_internal_Decision f : ∀ k, Decision (forest_node_in_tree_internal f k).
+  Proof using. solve_decision. Qed.
 
   Lemma forest_fold_node_in_tree_root_or_internal f v :
     forest_trees_disjoint f →
     map_Forall (λ ρ t, tree_wf ρ t) f →
-    node (forest_fold f) v ↔ (v ∈ dom f) ∨ (forest_node_in_tree_internal f v).
+    node (forest_fold f) v ↔ ((v ∈ dom f) ∨ (forest_node_in_tree_internal f v)).
   Proof using.
-    intros. rewrite /node forest_fold_node_in_tree; auto. rewrite /forest_node_in_tree /forest_node_in_tree_internal.
+    intros. rewrite /node forest_fold_node_in_tree; auto.
+    rewrite /forest_node_in_tree /forest_node_in_tree_internal /map_fold_or.
     split; intros.
     - revert H0 H1 v H2. induction f using map_ind; intros.
       { by rewrite map_fold_empty in H2. }
@@ -1378,10 +1392,24 @@ Section tree.
         * right. apply IHf; auto.
   Qed.
 
+  Lemma forest_merge_internal_forest_fold_node_iff ρ f v :
+    tree_wf ρ (forest_merge ρ f) →
+    forest_fold f !! ρ = None →
+    forest_trees_disjoint f →
+    map_Forall (λ ρ t, tree_wf ρ t) f →
+    internal (forest_merge ρ f) v ↔ node (forest_fold f) v.
+  Proof using.
+    intros. split; intros.
+    - eapply forest_merge_internal_forest_fold_node; eauto.
+    - eapply forest_fold_node_forest_merge_internal; eauto.
+  Qed.
+
   Lemma forest_node_in_tree_internal_insert f v k t :
     (f !! k = None) →
     forest_node_in_tree_internal (<[k:=t]>f) v ↔ ((internal t v) ∨ forest_node_in_tree_internal f v).
-  Proof using. intros. unfold forest_node_in_tree_internal. rewrite map_fold_or_insert; auto. Qed.
+  Proof using.
+    intros. unfold forest_node_in_tree_internal, map_fold_or. rewrite map_fold_or_insert; auto.
+  Qed.
 
   (* Operation invariants *)
   Lemma tree_insert_wf ρ ρt r rt π πC :
