@@ -1314,19 +1314,43 @@ Section otree.
       iSplitR "M".
       - iRight. iFrame. auto.
       - iApply (big_sepM_impl with "M"). iModIntro. iIntros (???) "M". iLeft. iFrame. }
-
-
-    (* Done the root ρ: get Ωρ *)
+    (* Resolve the root ρ: get Ωρ *)
+    iPoseProof ("T" with "[Blρ2 Boρ2]") as "T"; first iFrame.
+    iMod (othread_delete_obl_frac _ _ _ _ _ _ INPρ with "[T TΨ Toρ Toρ2]") as "(T& TΨ& Blρ2& Boρ2)".
+    { iFrame. iApply othreadG_owns_div_2. iFrame. }
+    simpl. iDestruct "Cρ" as "(%αρ& %βρ& _& Bpsρ & Cρ)".
+    iMod (osat_obl_resolve_one with "[S BR Blρ Blρ2 Boρ Boρ2 Bpsρ]") as "(S & #Bdρ)".
+    { iFrame. iSplitR; first auto.  rewrite -(oblG_live_div_2 _ (1/2)) -(oblG_owner_div_2 _ _ (1/2)). iFrame. }
+    set (Ωρ:=<[ρ:=odone P]> Ω).
+    iAssert (
+        |==> ∃ Ω', (⌜ Ωρ ↪ₜ Ω' | obl_cond_internal_tree ρt ∧ dom Ωρ = dom Ω' ⌝) ∗
+                   osat Ω' ∗ osuspend (dom Ω') ∗
+                   own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) (gset_to_gmap () ∅))) ∗
+                   ([∗ map] r↦rt ∈ Cf,
+                      ∃ τ0, oblG_owner r τ0 (1 / 2 / 2) ∗ othreadG_owns τ0 r true (1 / 2) ∗
+                            ([∗ map] v↦vCh ∈ rt,
+                               own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vCh))) ∗
+                               oblG_elem v ∗ oblG_live v (1 / 2 / 2) ∗
+                               (∃ α β, oblG_transfer_bound v α ∗ oblG_progress_supply v β (1 / 2) ∗
+                                       ([∗ set] c ∈ vCh, ∃ α' β', ⌜α /< α' ∧ β /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
+                               (⌜v = r⌝
+                                     ∨ ∃ π, ⌜child rt π v⌝ ∗ oblG_owner v τ0 (1 / 2) ∗
+                                            ∃ θ, othreadG_owns θ v false (1 / 2) ∗
+                                                 ∃ x ψ, otreeG_suspend v x θ π ψ ∗ otreeG_wait v x (1 / 2))))
+      )%I with "[- T TΨ]" as ">H"; cycle 1.
+    { iDestruct "H" as "(%&%&S& U& Fetk& M)". iModIntro. iExists Ωρ, Ω'. destruct H1. iSplitR; last iFrame; auto.
+      iPureIntro. subst Ωρ. destruct LUOρ. split_and !; auto.
+      - intros ?. destruct (decide (i = ρ)).
+        + subst. rewrite H3 lookup_insert_eq. econstructor. simpl. split; intros; auto. done.
+        + rewrite lookup_insert_ne; auto. destruct (Ω !! i) eqn:LUOi; econstructor. split; intros; auto. done.
+      - rewrite -H2. rewrite dom_insert_lookup_L; auto. }
     (* Make ρ's children roots: update suspend state, delete edge, become root *)
-    (* Each ρ's children has a tree: update owner data of internal nodes of the tree *)
+    iAssert (|==> [∗ set] c ∈ dom Cf, ∃ u, ⌜ /0 /< u ⌝ ∗ oblG_transfer c u)%I with "[Cρ]" as ">Cs".
+    { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Cρ"). iModIntro. iIntros (??) "(%&%&%&T&_)".
+      destruct H2. apply WFOCM.lt_exists_left in H2. destruct H2 as (?&?&?).
+      iMod (oblG_transfer_mon_split _ _ _ _ H4 with "T") as "[_ T]". iModIntro. iFrame; auto. }
+    iPoseProof (big_sepM_forest_fold with "M") as "M"; first auto.
 
-tree_clear_wf f ρ Cf :
-    forest_wf f →
-    f !! ρ = Some (forest_merge ρ Cf) →
-    forest_fold Cf !! ρ = None →
-    forest_trees_disjoint Cf →
-    map_Forall (λ (c : V) (ct : tree V), tree_wf c ct) Cf →
-    forest_wf (tree_clear f ρ Cf).
 
 osuspend_done_parent:
   ∀ (D : obl_ids) (k : obl_id) (x θ : positive) (π : obl_id) (ψ : A) (TP : gset positive),
@@ -1334,20 +1358,8 @@ osuspend_done_parent:
     othreadG_owns θ k false (1 / 2) ∗ oblG_owner k θ (1 / 2 / 2) ∗ oblG_done π ∗ oblG_progress k ψ
     ⊢ |==> osuspend D ∗ othreadG_owns θ k true (1 / 2) ∗ otreeG_edge π k 1 ∗ othread TP
 
-osat_obl_resolve_one:
-  ∀ {SI : indexT} {A : Type} {WFA : WFOCM.pack A} {ps T : Type} {Σ : gFunctors} {osatGS0 : osatGS.osatGS ps T Σ} 
-    {Ξ : obl_class A ps T WFOCM.ltR} (Ω : obl_states) (k : obl_id) (P : prop_of ps) (R : iProp Σ) (x1 : T) 
-    (x2 : A),
-    osat Ω ∗ oblG_goal k P R ∗ ▷ R ∗ oblG_live k (1 / 2) ∗ oblG_owner k x1 (1 / 2) ∗ oblG_progress_supply k x2 (1 / 2)
-    ⊢ |==> osat (<[k:=odone P]> Ω) ∗ oblG_done k
-othread_delete_obl_frac:
-  ∀ {SI : indexT} {A : Type} {WFA : WFOCM.pack A} {Σ : gFunctors} {ps : Type} {H : osatGS.osatGS ps positive Σ} 
-    {othreadGS0 : othreadGS.othreadGS Σ} (TP : gset positive) (i : positive) (Ψ : obl_ids) (q : Qp) (k : obl_id) 
-    (f : bool),
-    k ∈ Ψ
-    → othread TP ∗ othreadG_obls i Ψ q ∗ othreadG_owns i k f 1
-      ⊢ |==> othread TP ∗ othreadG_obls i (Ψ ∖ {[k]}) q ∗ oblG_live k (1 / 2 / 2) ∗
-          (if f then oblG_owner k i (1 / 2 / 2) else emp)
+
+    (* Each ρ's children has a tree: update owner data of internal nodes of the tree *)
 
     (* TODO *)
 
