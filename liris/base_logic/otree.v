@@ -1283,9 +1283,7 @@ Section otree.
                                ∨ ∃ π, ⌜child rt π v⌝ ∗ oblG_owner v τ0 (1 / 2) ∗
                                       ∃ θ, othreadG_owns θ v false (1 / 2) ∗
                                            ∃ x ψ, otreeG_suspend v x θ π ψ ∗
-                                                  otreeG_wait v x (1 / 2))))
-               ∨ own edge_name (reservation_map_data r (A:=gmap_viewR obl_id unitUR) (gmap_view_auth (DfracOwn 1) ∅)) ∗
-               oblG_elem r ∗ oblG_done r ∗ ⌜rt = tree_singleton r⌝)
+                                                  otreeG_wait v x (1 / 2)))))
       )%I with "[- Fetk FM]" as ">H"; cycle 1.
     { iDestruct "H" as "(%&%&%& S& T& U& #Bdρ& TΨ& Fedρ& M)". destruct H1 as (?&?&?).
       iModIntro. iExists Ωρ, Ω', (tree_clear Φ ρ Cf). iSplitR; first eauto.
@@ -1313,7 +1311,9 @@ Section otree.
         { eapply forest_fold_dom_forest_subseteq; eauto. eapply map_Forall_impl; first eapply TWFρ4.
           intros. apply tree_wf_root_elem; auto. }
         apply not_elem_of_dom in TWFρ2. apply not_elem_of_dom. set_solver + TWFρ2 H4. }
-      iFrame "M". iRight. iFrame. auto. }
+      iSplitR "M".
+      - iRight. iFrame. auto.
+      - iApply (big_sepM_impl with "M"). iModIntro. iIntros (???) "M". iLeft. iFrame. }
 
 
     (* Done the root ρ: get Ωρ *)
