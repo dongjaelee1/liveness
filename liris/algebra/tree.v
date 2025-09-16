@@ -19,9 +19,8 @@ Section forest_pre.
   Definition forest_union f1 f2 : forest V := f1 ∪ f2.
   Definition forest_disjoint : relation (forest V) := λ f1 f2, f1 ##ₘ f2.
   Definition forest_tree_disjoint f t : Prop := map_Forall (λ _ m, m ##ₘ t) f.
-  Definition map_fold_or m (Φ : V → tree V → Prop) : Prop := map_fold (λ i s a, (Φ i s) ∨ a) False m.
-  Definition forest_node_in_tree f : V → Prop := λ v, map_fold_or f (λ _ t, (is_Some (t !! v))).
-  (* Definition forest_node_in_tree f : V → Prop := λ v, map_fold (λ _ t a, (is_Some (t !! v)) ∨ a) False f. *)
+  Definition map_fold_or (Φ : V → tree V → Prop) m : Prop := map_fold (λ i s a, (Φ i s) ∨ a) False m.
+  Definition forest_node_in_tree f : V → Prop := λ v, map_fold_or (λ _ t, (is_Some (t !! v))) f.
 
   Lemma forest_fold_internal_elem_of u f :
     u ∈ dom (forest_fold f) →
@@ -455,12 +454,22 @@ Section forest_pre.
       apply map_fold_or_insert in H2; auto. apply lookup_union_is_Some. destruct H2; auto.
   Qed.
 
-  Global Instance map_fold_or_Decision f (Φ : V → tree V → Prop) : (∀ k t, Decision (Φ k t)) → Decision (map_fold_or f Φ).
+  Global Instance map_fold_or_Decision f (Φ : V → tree V → Prop) : (∀ k t, Decision (Φ k t)) → Decision (map_fold_or Φ f).
   Proof using.
     intros. unfold map_fold_or. rewrite map_fold_foldr. remember (map_to_list f) as l.
     clear f Heql. induction l.
     { solve_decision. }
     rewrite foldr_cons. destruct a. simpl. apply or_dec; auto.
+  Qed.
+
+  Global Instance forest_node_in_tree_Decision f : ∀ v, Decision (forest_node_in_tree f v).
+  Proof using. solve_decision. Qed.
+
+  Lemma forest_node_in_tree_insert f v k t :
+    (f !! k = None) →
+    forest_node_in_tree (<[k:=t]>f) v ↔ ((is_Some (t !! v)) ∨ forest_node_in_tree f v).
+  Proof using.
+    intros. unfold forest_node_in_tree, map_fold_or. rewrite map_fold_or_insert; auto.
   Qed.
 
 End forest_pre.
@@ -1350,7 +1359,7 @@ Section tree.
     pose proof (tree_wf_node_descendant _ _ _ H0 H1 n). apply descendant_lineage; auto.
   Qed.
 
-  Definition forest_node_in_tree_internal f : V → Prop := λ v, map_fold_or f (λ _ t, (internal t v)).
+  Definition forest_node_in_tree_internal f : V → Prop := λ v, map_fold_or (λ _ t, (internal t v)) f.
 
   Global Instance forest_node_in_tree_internal_Decision f : ∀ k, Decision (forest_node_in_tree_internal f k).
   Proof using. solve_decision. Qed.

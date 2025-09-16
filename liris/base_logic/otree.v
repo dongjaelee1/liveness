@@ -1235,6 +1235,134 @@ Section otree.
     iFrame.
   Qed.
 
+  Lemma oforest_resolve_one_1 Ω1 TP ρ τρ (m : forest obl_id) i x :
+    (m !! i = None) →
+    tree_wf i x →
+    oblG_done ρ ∗
+    osat Ω1 ∗ osuspend (dom Ω1) ∗ othread TP ∗
+    own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) (gset_to_gmap () ({[i]} ∪ dom m)))) ∗
+    (∃ u, ⌜/0 /< u⌝ ∗ oblG_transfer i u) ∗
+    (∃ rC, (⌜x !! i = Some rC⌝) ∗
+           own edge_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (gset_to_gmap () rC))) ∗ 
+           oblG_elem i ∗ oblG_live i (1 / 2 / 2) ∗ otreeG_elem i ∗
+           (∃ α β, oblG_transfer_bound i α ∗ oblG_progress_supply i β (1 / 2) ∗
+                   ([∗ set] c ∈ rC, ∃ α' β', ⌜α /< α' ∧ β /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
+           oblG_owner i τρ (1 / 2) ∗
+           ∃ θ, othreadG_elem θ ∗ othreadG_owns θ i false (1 / 2) ∗
+                ∃ x0 ψ, otreeG_suspend i x0 θ ρ ψ ∗ otreeG_wait i x0 (1 / 2)) ∗
+    ([∗ map] v↦vC ∈ delete i x,
+       own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vC))) ∗
+       oblG_elem v ∗ oblG_live v (1 / 2 / 2) ∗ otreeG_elem v ∗
+       (∃ α β , oblG_transfer_bound v α ∗ oblG_progress_supply v β (1 / 2) ∗
+                ([∗ set] c ∈ vC, ∃ α' β', ⌜α /< α' ∧ β /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
+       ∃ π, ⌜child x π v⌝ ∗ oblG_owner v τρ (1 / 2) ∗
+            ∃ θ, othreadG_elem θ ∗ othreadG_owns θ v false (1 / 2) ∗
+                 ∃ x0 ψ, otreeG_suspend v x0 θ π ψ ∗ otreeG_wait v x0 (1 / 2))
+    ⊢ |==> ∃ Ω', (⌜Ω1 ↪ₜ Ω' | (λ (v : obl_id) (_ : obl_state), node x v) ∧ dom Ω1 = dom Ω'⌝) ∗
+                 osat Ω' ∗ othread TP ∗ osuspend (dom Ω') ∗
+                 own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) (gset_to_gmap () (dom m)))) ∗
+                 (∃ τ0, oblG_owner i τ0 (1 / 2 / 2) ∗ othreadG_owns τ0 i true (1 / 2) ∗
+                        ([∗ map] v↦vCh ∈ x,
+                           own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vCh))) ∗
+                           oblG_elem v ∗ oblG_live v (1 / 2 / 2) ∗ otreeG_elem v ∗
+                           (∃ α β, oblG_transfer_bound v α ∗ oblG_progress_supply v β (1 / 2) ∗
+                                   ([∗ set] c ∈ vCh, ∃ α' β', ⌜α /< α' ∧ β /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
+                           (⌜v = i⌝
+                                 ∨ ∃ π, ⌜child x π v⌝ ∗ oblG_owner v τ0 (1 / 2) ∗
+                                        ∃ θ, othreadG_elem θ ∗ othreadG_owns θ v false (1 / 2) ∗
+                                             ∃ x0 ψ, otreeG_suspend v x0 θ π ψ ∗ otreeG_wait v x0 (1 / 2)))).
+  Proof.
+    iIntros (LUmi Twfi) "(#Bdρ& S& U& T& Fetkρ& (%&%Posu&Bti)& Ri& Mi)".
+    iDestruct "Ri" as "(%& %LUxi& Fetki& #Bei& Bli& #Fei& (%&%&#Btbi&Bpsi&Csi)& Boi& %& #Teθ& Toi& %&%& #Fsi& Fwi)".
+    (* First update i: transfer and return from suspend, and remove edge *)
+    iPoseProof (osat_obl_is_live with "[S Bei Bli]") as "(%&%LUOi)"; first by iFrame. destruct d as [αi τi βi].
+    iMod (osat_obl_transfer_one_with_bound _ _ _ _ θ _ ψ _ _ _ _ LUOi Posu with "[S Boi Bpsi Btbi Bti]")
+      as "(%α'i& S& %Prog& Boi& Bpsi& #Btbi2& Bpi)"; first by iFrame. destruct Prog as [Prog LTα].
+    iPoseProof (oblG_owner_div_2 _ _ (1/2)%Qp with "Boi") as "[Boi Boi2]".
+    iMod (osuspend_done_parent with "[U Fei Fsi Fwi T Teθ Toi Boi2 Bdρ Bpi]") as "(U& Toi& Fedgei& T)"; first (iFrame; eauto).
+    iMod (otreeG_edge_delete with "[Fetkρ Fedgei]") as "Fetkρ"; first iFrame.
+    replace (delete i (gset_to_gmap () ({[i]} ∪ dom m))) with (gset_to_gmap () (dom m)); cycle 1.
+    { rewrite gset_to_gmap_union_singleton delete_insert_id; auto. apply lookup_gset_to_gmap_None, not_elem_of_dom; auto. }
+    iFrame "Fetkρ". clear dependent m u. iClear "Bdρ Btbi Fsi". 
+    (* inversion Twfi. subst ρ0 t. *)
+    (* iEval (rewrite H1 /forest_merge) in "Mi". rewrite delete_insert_id; last auto. *)
+    (* rewrite big_sepM_forest_fold; last auto. *)
+    iAssert (|==> ([∗ set] c ∈ rC, ∃ α', ⌜ α'i /< α' ⌝ ∗ oblG_transfer c α') ∗
+                  ([∗ set] c ∈ rC, ∃ u, ⌜ /0 /< u ⌝ ∗ oblG_transfer c u))%I with "[Csi]" as ">[Csi Cs]".
+    { rewrite -big_sepS_sep -big_sepS_bupd. iApply (big_sepS_impl with "Csi"). iModIntro. iIntros (??) "(%&%&%&T&_)".
+      destruct H2. apply WFOCM.lt_exists_left in H2. destruct H2 as (?&?&?).
+      iMod (oblG_transfer_mon_split _ α x2 _ H4 with "T") as "[T T2]". iModIntro. iSplitR "T2"; iFrame; auto. }
+    iAssert (
+        ([∗ map] v↦vC ∈ delete i x,
+           oblG_elem v ∗ oblG_live v (1 / 2 / 2) ∗
+           (∃ α0 β0, oblG_transfer_bound v α0 ∗ oblG_progress_supply v β0 (1 / 2) ∗
+                     ([∗ set] c ∈ vC, ∃ α' β', ⌜α0 /< α' ∧ β0 /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
+           oblG_owner v τρ (1 / 2)) ∗
+        ([∗ map] v↦vC ∈ delete i x,
+           own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap () vC))) ∗
+           otreeG_elem v ∗
+           ∃ π, ⌜child x π v⌝ ∗
+                ∃ θ0, othreadG_elem θ0 ∗ othreadG_owns θ0 v false (1 / 2) ∗
+                      ∃ x1 ψ0, otreeG_suspend v x1 θ0 π ψ0 ∗ otreeG_wait v x1 (1 / 2))
+      )%I with "[Mi]" as "[Mi Mi2]".
+    { rewrite -big_sepM_sep. iApply (big_sepM_impl with "Mi").
+      iModIntro. iIntros (???) "(Fetkk& Bek& Blk& Fek& Ck& (%&%&Bok&M))". iFrame. done. }
+    remember (<[i:=olive α'i θ (βi /+ ψ)]> Ω1) as Ωi.
+    iAssert (
+        |==> ∃ Ω', (⌜ Ωi ↪ₜ Ω' | (λ k _, internal x k) ∧ dom Ωi = dom Ω' ⌝) ∗
+                   osat Ω' ∗
+                   (∃ β0, oblG_progress_supply i β0 (1 / 2) ∗ ([∗ set] c ∈ rC, ∃ β', ⌜β0 /≤ β'⌝ ∗ oblG_progress c β')) ∗
+                   ([∗ map] v↦vCh ∈ delete i x,
+                      oblG_elem v ∗ oblG_live v (1 / 2 / 2) ∗
+                      (∃ α0 β0, oblG_transfer_bound v α0 ∗ oblG_progress_supply v β0 (1 / 2) ∗
+                                ([∗ set] c ∈ vCh, ∃ α' β', ⌜α0 /< α' ∧ β0 /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
+                      oblG_owner v θ (1 / 2))
+      )%I with "[- Fetki Bli Boi U Toi T Csi Mi2]" as "H"; cycle 1.
+    { iMod "H" as "(%&%& S& (%& Bpsi& CBps)& M)". destruct H1 as [Prog2 Dom2]. iModIntro.
+      iExists Ω'. assert (Dom1 : dom Ω1 = dom Ωi).
+      { subst. rewrite dom_insert_lookup_L; auto. }
+      rewrite Dom1 Dom2. iFrame "U T S Boi Toi". iSplitR.
+      { iPureIntro. split; last auto.
+        assert (Prog1 : Ω1 ↪ₜ Ωi | (λ k _, node x k ∧ root x k)).
+        { subst. intros ?. destruct (decide (i0 = i)).
+          - subst. rewrite LUOi lookup_insert_eq. econstructor. simpl; split; intros; auto. exfalso. apply H1.
+            split; [by eapply tree_wf_root_node | by eapply tree_wf_root_root].
+          - rewrite lookup_insert_ne; auto. destruct (Ω1 !! i0); econstructor. split; intros; auto. destruct H1.
+            pose proof (tree_wf_root_node_root _ _ _ Twfi H2 H1). done. }
+        eapply obl_states_cond_rel_split_cond. 7: eapply Prog2. 6: eapply Prog1. all: simpl; auto. 1,2,3: apply _.
+        - intros. split; intros.
+          + pose proof (tree_wf_node_root_or_internal _ _ _ Twfi H1). destruct H2; auto.
+          + destruct H1; [by destruct H1 |]. eapply tree_wf_internal_node; eauto.
+        - repeat intro. auto. }
+      rewrite (big_sepM_delete _ _ _ _ LUxi). iFrame "Fetki Bli". iSplitR "Mi2 M".
+      - iFrame "Bei Fei". iSplitL; last by iLeft. iExists α'i, β0. iFrame "Btbi2 Bpsi". iCombine "Csi CBps" as "C".
+        rewrite -big_sepS_sep. iApply (big_sepS_impl with "C"). iModIntro. iIntros (??) "((%&%&T) & (%&%&P))". iFrame; auto.
+      - iCombine "Mi2 M" as "M". rewrite -big_sepM_sep. iApply (big_sepM_impl with "M").
+        iModIntro. iIntros (???) "((Fetk& Fe& %& %& %& Te& To& %& %& Fs& Fw) & Be& Bl& C& Bo)". iFrame. iRight. iFrame. auto. }
+    iClear "Bei Fei Teθ Btbi2". remember (βi /+ ψ) as β'i. clear dependent TP ρ βi ψ Ω1 α β. clear dependent αi x0 τi α'i.
+    rename β'i into βi. 
+    
+    (* TODO *)
+
+
+    assert (HCfsub : map_Forall (λ _ c, c ⊆ ρt) Cf).
+    { subst. by apply forest_merge_subseteq_Forall. }
+    assert (HCfint : map_Forall (λ v _, internal ρt v) Cf).
+    { subst. by apply forest_merge_internal_Forall. }
+
+osat_obl_transfer_one_with_bound:
+  ∀ {SI : indexT} {A : Type} {WFA : WFOCM.pack A} {ps T : Type} {Σ : gFunctors} {osatGS0 : osatGS.osatGS ps T Σ} 
+    {Ξ : obl_class A ps T WFOCM.ltR} (Ω : obl_states) (k : obl_id) (α : A) (τ τ' : T) (β β' ℵ c : A) (x1 : T) 
+    (x2 : A),
+    Ω !! k = Some (olive α τ β)
+    → /0 /< c
+      → osat Ω ∗ oblG_owner k x1 (1 / 2) ∗ oblG_progress_supply k x2 (1 / 2) ∗ oblG_transfer_bound k ℵ ∗ 
+        oblG_transfer k c
+        ⊢ |==>
+            ∃ α' : A, osat (<[k:=olive α' τ' (β /+ β')]> Ω) ∗
+              ⌜obl_state_transfer (olive α τ β) (olive α' τ' (β /+ β')) ∧ α' /< ℵ⌝ ∗ oblG_owner k τ' (1 / 2) ∗
+              oblG_progress_supply k (β /+ β') (1 / 2) ∗ oblG_transfer_bound k α' ∗ oblG_progress k β'
+
   Lemma oforest_resolve_one Ω TP Φ ρ ρt (σ : ps) P R τ Ψ q :
     Φ !! ρ = Some ρt →
     ρ ∈ Ψ →
@@ -1321,10 +1449,11 @@ Section otree.
     simpl. iDestruct "Cρ" as "(%αρ& %βρ& _& Bpsρ & Cρ)".
     iMod (osat_obl_resolve_one with "[S BR Blρ Blρ2 Boρ Boρ2 Bpsρ]") as "(S & #Bdρ)".
     { iFrame. iSplitR; first auto.  rewrite -(oblG_live_div_2 _ (1/2)) -(oblG_owner_div_2 _ _ (1/2)). iFrame. }
-    set (Ωρ:=<[ρ:=odone P]> Ω).
+    remember (<[ρ:=odone P]> Ω) as Ωρ.
     iAssert (
-        |==> ∃ Ω', (⌜ Ωρ ↪ₜ Ω' | obl_cond_internal_tree ρt ∧ dom Ωρ = dom Ω' ⌝) ∗
-                   osat Ω' ∗ osuspend (dom Ω') ∗
+        (* |==> ∃ Ω', (⌜ Ωρ ↪ₜ Ω' | obl_cond_internal_tree ρt ∧ dom Ωρ = dom Ω' ⌝) ∗ *)
+        |==> ∃ Ω', (⌜ (Ωρ ↪ₜ Ω' | λ v _, forest_node_in_tree Cf v) ∧ dom Ωρ = dom Ω' ⌝) ∗
+                   osat Ω' ∗ othread TP ∗ osuspend (dom Ω') ∗
                    own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) (gset_to_gmap () ∅))) ∗
                    ([∗ map] r↦rt ∈ Cf,
                       ∃ τ0, oblG_owner r τ0 (1 / 2 / 2) ∗ othreadG_owns τ0 r true (1 / 2) ∗
@@ -1337,14 +1466,16 @@ Section otree.
                                      ∨ ∃ π, ⌜child rt π v⌝ ∗ oblG_owner v τ0 (1 / 2) ∗
                                             ∃ θ, othreadG_elem θ ∗ othreadG_owns θ v false (1 / 2) ∗
                                                  ∃ x ψ, otreeG_suspend v x θ π ψ ∗ otreeG_wait v x (1 / 2))))
-      )%I with "[- T TΨ]" as ">H"; cycle 1.
+      )%I with "[- TΨ]" as ">H"; cycle 1.
     { iDestruct "H" as "(%&%&S& U& Fetk& M)". iModIntro. iExists Ωρ, Ω'. destruct H1. iSplitR; last iFrame; auto.
       iPureIntro. subst Ωρ. destruct LUOρ. split_and !; auto.
       - intros ?. destruct (decide (i = ρ)).
         + subst. rewrite H3 lookup_insert_eq. econstructor. simpl. split; intros; auto. done.
         + rewrite lookup_insert_ne; auto. destruct (Ω !! i) eqn:LUOi; econstructor. split; intros; auto. done.
+      - eapply obl_states_cond_rel_iff; first eauto. simpl. intros. rewrite -forest_fold_node_in_tree; auto.
+        rewrite /obl_cond_internal_tree. subst ρt. rewrite forest_merge_internal_forest_fold_node_iff; auto.
       - rewrite -H2. rewrite dom_insert_lookup_L; auto. }
-    (* Make ρ's children roots: transfer to update tid, update suspend state, delete edge *)
+    (* Induction on ρ's children Cf. *)
     iAssert (|==> [∗ set] c ∈ dom Cf, ∃ u, ⌜ /0 /< u ⌝ ∗ oblG_transfer c u)%I with "[Cρ]" as ">Cs".
     { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Cρ"). iModIntro. iIntros (??) "(%&%&%&T&_)".
       destruct H2. apply WFOCM.lt_exists_left in H2. destruct H2 as (?&?&?).
@@ -1366,7 +1497,7 @@ Section otree.
              oblG_elem v ∗ oblG_live v (1 / 2 / 2) ∗ otreeG_elem v ∗
              (∃ α β, oblG_transfer_bound v α ∗ oblG_progress_supply v β (1 / 2) ∗
                      ([∗ set] c ∈ vC, ∃ α' β', ⌜α /< α' ∧ β /≤ β'⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β')) ∗
-             (∃ π, ⌜child (<[ρ:=dom Cf]> (forest_fold Cf)) π v⌝ ∗ oblG_owner v τρ (1 / 2) ∗
+             (∃ π, ⌜child rt π v⌝ ∗ oblG_owner v τρ (1 / 2) ∗
                    ∃ θ, othreadG_elem θ ∗ othreadG_owns θ v false (1 / 2) ∗
                         ∃ x ψ, otreeG_suspend v x θ π ψ ∗ otreeG_wait v x (1 / 2)))
       )%I with "[M]" as "(Mrs& M)".
@@ -1380,41 +1511,56 @@ Section otree.
             intros. apply tree_wf_root_elem; auto. }
           apply not_elem_of_dom in TWFρ2. apply elem_of_dom_2 in H1. set_solver + TWFρ2 H1 H3.
         + iFrame. assert (π = ρ).
-          { destruct H3 as (?&?&?). destruct (decide (π = ρ)); auto. exfalso. rewrite /children in H3.
-            assert (node ρt π).
-            { rewrite /node. subst. by rewrite /forest_merge. }
-            destruct (tree_wf_node_exists_tree _ _ π TWFρ H5) as (?&?&?).
-            assert (k ≠ π).
-            { intros ?; subst. assert (node x3 π) by (apply elem_of_dom, tree_wf_root_elem; auto).
-              pose proof (children_wf_subtree _ _ _ _ H3 H8 H6).
+          { assert (child ρt ρ k).
+            { subst. exists (dom Cf). split.
+              - by rewrite /children /forest_merge lookup_insert_eq.
+              - apply elem_of_dom; auto. }
+            subst ρt. pose proof (tree_wf_child_parent_unique _ _ _ _ _ TWFρ H3 H4). auto. }
+          subst π. iFrame. auto.
+      - iApply (big_sepM_impl with "M"). iModIntro. iIntros (i??) "(Feti& Bei& Bli& Tei& Ci& Mi)". iFrame.
+        iDestruct "Mi" as "[% | Mi]".
+        + exfalso. subst i. assert (x ⊆ forest_fold Cf) by (by eapply forest_fold_subseteq).
+          assert (ρ ∈ dom x).
+          { apply elem_of_dom. apply lookup_delete_Some in H3. by destruct H3. }
+          apply not_elem_of_dom in TWFρ2. apply subseteq_dom in H4. set_solver + TWFρ2 H4 H5.
+        + iDestruct "Mi" as "(%&%&Boi&%&Teθ&Toi&%&%&Fsi&Fwi)". iFrame. iPureIntro.
+          subst ρt. assert (π ≠ ρ).
+          { intros F; subst. destruct H4 as (?&?&?). rewrite /children lookup_insert_eq in H4. inv H4. destruct (decide (i = k)).
+            { subst. rewrite lookup_delete_eq in H3. inv H3. }
+            rewrite lookup_delete_ne in H3; auto. apply elem_of_dom in H5. destruct H5.
+            assert (dom x ## dom x3).
+            { apply map_disjoint_dom. eapply (forest_trees_disjoint_lookup_disjoint _ k i); eauto. }
+            assert (i ∈ dom x) by (eapply elem_of_dom; eauto). assert (i ∈ dom x3) by (eapply tree_wf_root_elem; eauto).
+            set_solver + H5 H6 H7. }
+          eapply forest_merge_child_inv; eauto.
+          destruct H4 as (?&?&?). rewrite /children lookup_insert_ne in H4; auto.
+          destruct (forest_fold_lookup_Some_exists_root _ _ _ TWFρ3 H4) as (?&?&?&?). assert (x4 = k).
+          { destruct (decide (x4 = k)); auto. exfalso. assert (x3 ⊆ dom x5).
+            { eapply tree_wf_children_subseteq; eauto. }
+            assert (i ∈ dom x5) by (set_solver + H6 H9).
+            assert (i ∈ dom x).
+            { apply lookup_delete_Some in H3. destruct H3. apply elem_of_dom; eauto. }
+            assert (dom x ## dom x5).
+            { apply map_disjoint_dom. eapply (forest_trees_disjoint_lookup_disjoint _ k x4); eauto. }
+            set_solver + H10 H11 H12. }
+          subst x4. rewrite H1 in H7. inv H7. apply elem_of_dom; auto. }
+    replace (dom Ω) with (dom Ωρ); cycle 1.
+    { subst. destruct LUOρ. rewrite dom_insert_lookup_L; auto. }
+    iClear "Bgρ Teτ Beρ Feρ". clear dependent Ω Φ ρt σ P R Ψ q. clear TWFρ2 αρ βρ.
+    iStopProof. revert TWFρ3 TWFρ4 Ωρ. induction Cf using map_ind.
+    { iIntros (Disj Twfs Ω1) "(#Bdρ& U& Feρ& T& S& TCs& Mrs& M)".
+      iModIntro. iExists Ω1. iFrame "U Feρ T S". iSplitR; last done. iPureIntro. split; auto.
+      rewrite /forest_node_in_tree /map_fold_or. intros ?. destruct (Ω1 !! i); econstructor. rewrite map_fold_empty. done. }
+    iIntros (Disj Twfs Ω1) "(#Bdρ& U& Feρ& T& S& TCs& Mrs& M)".
+    (* Make ρ's children roots: transfer to update tid, update suspend state, delete edge *)
+    rewrite !dom_insert_L. rewrite !big_sepM_insert; auto. rewrite big_sepS_union; cycle 1.
+    { apply not_elem_of_dom in H1. set_solver + H1. }
+    iDestruct "Mrs" as "[Ri Mrs]". iDestruct "M" as "[Mi M]". iDestruct "TCs" as "[TCi TCs]". rewrite big_sepS_singleton.
+    apply forest_trees_disjoint_insert in Disj; last auto. destruct Disj as [Disjx Disj].
+    apply map_Forall_insert in Twfs; last auto. destruct Twfs as [Twfi Twfs].
 
-            rewrite lookup_insert_ne in H3; auto.
-            assert (k ∈ dom x) by (apply tree_wf_root_elem; auto).
-          iSplitR; last iExists _, _; iFrame.
-          
-tree_wf_node_exists_tree:
-  ∀ {V : Type} {EqDecision0 : EqDecision V} {H : Countable V} (ρ : V) (t : tree V) (v : V),
-    tree_wf ρ t → node t v → ∃ s : tree V, s ⊆ t ∧ tree_wf v s
 
-
-osat_obl_transfer_one_with_bound:
-  ∀ {SI : indexT} {A : Type} {WFA : WFOCM.pack A} {ps T : Type} {Σ : gFunctors} {osatGS0 : osatGS.osatGS ps T Σ} 
-    {Ξ : obl_class A ps T WFOCM.ltR} (Ω : obl_states) (k : obl_id) (α : A) (τ τ' : T) (β β' ℵ c : A) (x1 : T) 
-    (x2 : A),
-    Ω !! k = Some (olive α τ β)
-    → /0 /< c
-      → osat Ω ∗ oblG_owner k x1 (1 / 2) ∗ oblG_progress_supply k x2 (1 / 2) ∗ oblG_transfer_bound k ℵ ∗ 
-        oblG_transfer k c
-        ⊢ |==>
-            ∃ α' : A, osat (<[k:=olive α' τ' (β /+ β')]> Ω) ∗
-              ⌜obl_state_transfer (olive α τ β) (olive α' τ' (β /+ β')) ∧ α' /< ℵ⌝ ∗ oblG_owner k τ' (1 / 2) ∗
-              oblG_progress_supply k (β /+ β') (1 / 2) ∗ oblG_transfer_bound k α' ∗ oblG_progress k β'
-osuspend_done_parent:
-  ∀ (D : obl_ids) (k : obl_id) (x θ : positive) (π : obl_id) (ψ : A) (TP : gset positive),
-    osuspend D ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1 / 2) ∗ othread TP ∗ othreadG_elem θ ∗
-    othreadG_owns θ k false (1 / 2) ∗ oblG_owner k θ (1 / 2 / 2) ∗ oblG_done π ∗ oblG_progress k ψ
-    ⊢ |==> osuspend D ∗ othreadG_owns θ k true (1 / 2) ∗ otreeG_edge π k 1 ∗ othread TP
-
+    
 
     (* Each ρ's children has a tree: update owner data of internal nodes of the tree *)
 
