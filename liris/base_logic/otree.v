@@ -801,6 +801,38 @@ Section otree.
   Qed.
 
   (* Progress of a thread *)
+  Lemma oforest_progress_one_thread Ω TP Φ i Ψ (γ : gmap obl_id (bool * Qp)) :
+    Ψ = dom γ →
+    osat Ω ∗ othread TP ∗ oforest_aux (dom Ω) Φ ∗
+    (* from user *)
+    othreadG_obls i Ψ 1 ∗
+    ([∗ map] ρ ↦ '(f, q) ∈ γ,
+       match f with
+       | true => (othreadG_owns i ρ f q ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a)
+       | false => (othreadG_owns i ρ f q)
+       end)
+    ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_owner i) ⌝) ∗
+                 osat Ω' ∗ othread TP ∗ oforest_aux (dom Ω') Φ ∗
+                 othreadG_obls i Ψ 1 ∗
+                 ([∗ map] ρ ↦ '(f, q) ∈ γ,
+                    match f with
+                    | true => (othreadG_owns i ρ f q)
+                    | false => (othreadG_owns i ρ f q)
+                    end).
+  Proof.
+
+    Ω !! k = o →
+    obl_cond_owner i k o ↔ (λ k _, ∃ ρ, ρ ∈ Ψ ∧ ∃ ρt, Φ !! ρ = Some ρt ∧ node ρt k) k o
+
+  Lemma oforest_progress_one_tree Ω OForest ρ ρTree (a : A) :
+    /0 /< a →
+    (∃ d, Ω !! ρ = Some (obl_live d)) →
+    OForest !! ρ = Some ρTree →
+    osat Ω ∗ oforest_aux (dom Ω) OForest ∗
+    (* from user *)
+    oblG_progress ρ a
+    ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_in_tree ρTree) ⌝) ∗
+                 osat Ω' ∗ oforest_aux (dom Ω') OForest.
 
   (* Move a tree *)
   Lemma oforest_exceed_not_lineage Ω OForest ρ ρt v ℵ u a :

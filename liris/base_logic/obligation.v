@@ -394,15 +394,20 @@ Section obl_states.
     - rewrite -H3 in H0. inv H0. econstructor.
   Qed.
 
+  Lemma obl_states_cond_rel_iff_lookup C1 C2 R Ω1 Ω2 :
+    obl_states_cond_rel C1 R Ω1 Ω2 →
+    (∀ k o, Ω1 !! k = Some o → (C1 k o ↔ C2 k o)) →
+    obl_states_cond_rel C2 R Ω1 Ω2.
+  Proof using.
+    intros. intros ?. specialize (H i). destruct (Ω1 !! i) eqn:Ho1, (Ω2 !! i) eqn:Ho2; inv H; econstructor.
+    specialize (H0 _ _ Ho1). destruct H3. split; intros.
+    - apply H. by apply H0.
+    - apply H1. intros ?; apply H2. by apply H0.
+  Qed.
   Lemma obl_states_cond_rel_iff C1 C2 R Ω1 Ω2 :
     obl_states_cond_rel C1 R Ω1 Ω2 →
     (∀ k o, C1 k o ↔ C2 k o) →
     obl_states_cond_rel C2 R Ω1 Ω2.
-  Proof using.
-    intros. intros ?. specialize (H i). destruct (Ω1 !! i) eqn:Ho1, (Ω2 !! i) eqn:Ho2; inv H; econstructor.
-    destruct H3. split; intros; eauto.
-    - apply H. by apply H0.
-    - apply H1. intros ?; apply H2. by apply H0.
-  Qed.
+  Proof using. intros. eapply obl_states_cond_rel_iff_lookup; eauto. Qed.
 
 End obl_states.
