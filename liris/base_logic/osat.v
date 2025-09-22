@@ -1083,9 +1083,10 @@ Section osat.
     iSplitL; [|done]. iApply "Ho". done.
   Qed.
 
-  Lemma osat_live_open Ω k q :
+  Lemma osat_live_open_owner Ω k q :
     osat Ω ∗ oblG_elem k ∗ oblG_live k q
-    ⊢ oblG_live k q ∗ oblG_live k (1/2)%Qp ∗ (oblG_live k (1/2)%Qp -∗ osat Ω).
+    ⊢ ∃ i, oblG_live k q ∗ oblG_live k (1/2)%Qp ∗ oblG_owner k i (1/2) ∗
+           ((oblG_live k (1/2)%Qp ∗ oblG_owner k i (1/2)) -∗ osat Ω).
   Proof.
     iIntros "(Hsat & #He0 & Hs0)".
     iPoseProof (osat_obl_is_live with "[Hsat Hs0]") as "%Hlive"; [iFrame; eauto|].
@@ -1093,8 +1094,16 @@ Section osat.
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
     iDestruct (big_sepM_delete _ _ k _ LU with "Hm") as "[Hk Hm]".
     iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
-    iFrame "Hs0 Hs". iIntros "Hs". iFrame "HG HS HT HB HO HP". iSplitR; first done.
+    iFrame "Hs0 Hs Ho". iIntros "[Hs Ho]". iFrame "HG HS HT HB HO HP". iSplitR; first done.
     iApply (big_sepM_delete _ _ k _ LU). iFrame. done.
+  Qed.
+  Lemma osat_live_open Ω k q :
+    osat Ω ∗ oblG_elem k ∗ oblG_live k q
+    ⊢ oblG_live k q ∗ oblG_live k (1/2)%Qp ∗ (oblG_live k (1/2)%Qp -∗ osat Ω).
+  Proof.
+    iIntros "(Hsat & #He0 & Hs0)".
+    iPoseProof (osat_live_open_owner with "[$]") as "(%&Bl&Bl2&Bo&S)". iFrame.
+    iIntros "Bl". iApply "S". iFrame.
   Qed.
 
   Lemma osat_lookup_owner Ω k τ q :

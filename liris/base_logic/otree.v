@@ -800,6 +800,98 @@ Section otree.
     iFrame.
   Qed.
 
+  Lemma oforest_exceed_not_lineage Ω OForest ρ ρt v ℵ u a :
+    ℵ /< a →
+    OForest !! ρ = Some ρt →
+    node ρt v →
+    (∃ d, Ω !! v = Some (obl_live d)) →
+    osat Ω ∗ oforest_aux (dom Ω) OForest ∗
+    oblG_elem v ∗ oblG_transfer_bound v ℵ ∗
+    oblG_transfer u a
+    ⊢ ⌜ ¬ lineage ρt u v ⌝.
+  Proof.
+    iIntros (Ha Hρlu Hv HOlu) "(S & F & #Bev & #Bbv & Btu)".
+    iIntros "%Hlin". apply lineage_lineage_up in Hlin.
+    iStopProof. revert ℵ Ha Hv HOlu. induction Hlin.
+    - iIntros (ℵ Ha Hx1 Hx2) "([#Bex #Bbx] & S & F & Btx)".
+      iPoseProof (osat_transfer_bound_exceed with "[S Btx]") as "%".
+      { eapply Ha. }
+      { iFrame. eauto. }
+      done.
+    - iIntros (ℵ Ha Hxd Hxl) "([#Bex #Bbx] & S & F & Btz)".
+      assert (node ρt y).
+      { destruct H1 as (?&?&?). by eexists. }
+      iAssert (∃ α, ⌜ α /< a ∧ (∃ d, Ω !! y = Some (obl_live d)) ⌝ ∗ oblG_elem y ∗ oblG_transfer_bound y α)%I
+        with "[-]" as "(%&%&#IH1&#IH2)".
+      { rewrite /oforest_aux. iDestruct "F" as "(% & Retk & RM)". destruct H3 as [Hfdom Hfwf].
+        iPoseProof (big_sepM_delete _ _ _ _ Hρlu with "RM") as "[Rm RM]".
+        iDestruct "Rm" as "[(%&Boρ&Toρ&Rm) | (_&Be&Bd&%)]"; cycle 1.
+        { iExFalso. destruct (decide (x = ρ)).
+          - subst x. iPoseProof (osat_obl_is_done_weak with "[S Be Bd]") as "%"; first iFrame.
+            destruct H4 as (?&?). destruct Hxl as (?&?). rewrite H5 in H4. inv H4.
+          - destruct Hfwf as [Hfwf1 Hfwf2]. assert (tree_wf ρ ρt) by eauto.
+            destruct (tree_wf_child_node _ _ _ _ H4 H1).
+            rewrite /node H3 lookup_insert_ne in H6; auto. by destruct H6. }
+        destruct H1 as (C&?&?). iPoseProof (big_sepM_delete _ _ _ _ H1 with "Rm") as "[Hy Rm]".
+        iDestruct "Hy" as "(_&Bey&Bly&Fe& (%&%&#Btby&_&Cy) & _)".
+        iPoseProof (osat_obl_is_live with "[S Bey Bly]") as "%Hyl"; first (iFrame; eauto).
+        iPoseProof (big_sepS_delete _ _ _ H3 with "Cy") as "[(%&%&%&Btx&_) Cy]". destruct H4.
+        iPoseProof (osat_transfer_bound_transfer_le with "[S Bex Bbx Btx]") as "%"; first (iFrame; eauto).
+        iExists α. iFrame "Bey Btby".
+        iPureIntro. split; auto. eapply WFOCM.le_lt_lt; last eapply Ha. etrans; eauto. eapply WFOCM.lt_le; eauto. }
+      destruct H3 as (?&?). specialize (IHHlin _ H3 H2 H4).
+      iApply IHHlin. iFrame. eauto.
+  Qed.
+
+  Lemma oforest_tree_live Ω Φ ρ ρt v u :
+    Φ !! ρ = Some ρt →
+    (∃ d, Ω !! v = Some (obl_live d)) →
+    node ρt v →
+    node ρt u →
+    osat Ω ∗ oforest_aux (dom Ω) Φ ∗ oblG_elem v ⊢ ⌜ ∃ d, Ω !! u = Some (obl_live d) ⌝.
+  Proof.
+    iIntros (LUρ Livev Nodev Nodeu) "(S & F & #Bev)".
+    iDestruct "F" as "(% & Fetk & FM)". destruct H1 as [DomF WFF].
+    assert (Nodeρ : node ρt ρ).
+    { destruct WFF. apply elem_of_dom, tree_wf_root_elem; auto. }
+    iPoseProof (big_sepM_delete _ _ _ _ LUρ with "FM") as "[Fmρ FM]".
+    destruct (Ω !! ρ) eqn:LUOρ.
+    - destruct o.
+      + iDestruct "Fmρ" as "[(%&Bo&To&Fmρ) | (H0&H1&H2&%)]".
+        * destruct Nodeu. iPoseProof (big_sepM_delete _ _ _ _ H1 with "Fmρ") as "[Fmρu Fmρ]".
+          iDestruct "Fmρu" as "(_&Beu&Blu&_)". iPoseProof (osat_obl_is_live _ u with "[$]") as "%". done.
+        * iPoseProof (osat_obl_is_done_weak _ ρ with "[$]") as "%". destruct H2. rewrite LUOρ in H2. inv H2.
+      + iDestruct "Fmρ" as "[(%&Bo&To&Fmρ) | (H0&H1&H2&%)]".
+        * destruct Nodeρ. iPoseProof (big_sepM_delete _ _ _ _ H1 with "Fmρ") as "[Fmρρ Fmρ]".
+          iDestruct "Fmρρ" as "(_&Beρ&Blρ&_)". iPoseProof (osat_obl_is_live _ ρ with "[$]") as "%".
+          destruct H2. rewrite LUOρ in H2. inv H2.
+        * subst ρt. assert (v = ρ).
+          { destruct (decide (v = ρ)); auto. destruct Nodev. rewrite /tree_singleton lookup_singleton_ne in H1; auto. inv H1. }
+          subst v. iPoseProof (osat_obl_is_done_weak _ ρ with "[$]") as "%". destruct Livev, H1. rewrite H1 in H2. inv H2.
+    - apply not_elem_of_dom in LUOρ. destruct WFF. assert (ρt ⊆ forest_fold Φ) by (eapply forest_fold_subseteq; eauto).
+      exfalso. apply subseteq_dom in H3. apply elem_of_dom in Nodeρ. rewrite -DomF in LUOρ. set_solver + Nodeρ H3 LUOρ.
+  Qed.
+
+  Lemma big_sepM_forest_fold {V : Type} `{Countable V} (f : forest V) (Φ : V → gset V → iProp Σ) :
+    forest_trees_disjoint f →
+    ([∗ map] v ↦ vC ∈ (forest_fold f), Φ v vC) ⊣⊢ [∗ map] ρ ↦ ρt ∈ f, ([∗ map] v ↦ vC ∈ ρt, Φ v vC).
+  Proof.
+    intros Disj. iSplit; iIntros "H".
+    - iStopProof. revert Disj. induction f using map_ind; iIntros (Disj) "H"; first done.
+      rewrite forest_fold_insert_L; auto.
+      apply forest_trees_disjoint_insert in Disj; auto. destruct Disj as [Dx Disj].
+      iPoseProof (big_sepM_union with "H") as "[Hx H]".
+      { apply tree_disjoint_forest_fold_disjoint; auto. }
+      iPoseProof (IHf Disj with "H") as "H". iApply big_sepM_insert; auto. iFrame.
+    - iStopProof. revert Disj. induction f using map_ind; iIntros (Disj) "H"; first done.
+      rewrite forest_fold_insert_L; auto.
+      apply forest_trees_disjoint_insert in Disj; auto. destruct Disj as [Dx Disj].
+      iPoseProof (big_sepM_insert with "H") as "[Hx H]"; auto.
+      iPoseProof (IHf Disj with "H") as "H". iApply big_sepM_union.
+      { apply tree_disjoint_forest_fold_disjoint; auto. }
+      iFrame.
+  Qed.
+
   (* Progress of a thread *)
   Lemma oforest_progress_one_thread Ω TP Φ i Ψ (γ : gmap obl_id (bool * Qp)) :
     Ψ = dom γ →
@@ -923,9 +1015,9 @@ Section otree.
         iPureIntro. destruct H2 as (?&?&?). rewrite LUOk in H2. inv H2. done. }
     iAssert (
         |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | C ⌝) ∗
-                   osat Ω' ∗ oforest_aux (dom Ω') Φ ∗ ([∗ map] ρ ↦ q ∈ γ1, othreadG_owns i ρ true q)
-      )%I with "[- T Tbi To2]" as ">H"; cycle 1.
-    { iDestruct "H" as "(%&%Prog& S& F& To1)". iModIntro. iExists Ω'. iSplitR.
+                   osat Ω' ∗ othread TP ∗ oforest_aux (dom Ω') Φ ∗ ([∗ map] ρ ↦ q ∈ γ1, othreadG_owns i ρ true q)
+      )%I with "[- Tbi To2]" as ">H"; cycle 1.
+    { iDestruct "H" as "(%&%Prog& S& T& F& To1)". iModIntro. iExists Ω'. iSplitR.
       { iPureIntro. eapply obl_states_cond_rel_iff_lookup. 1: eapply Prog. intros. split; eauto. }
       iFrame. rewrite Eqγf. iApply big_sepM_union.
       { by apply map_disjoint_fmap. }
@@ -933,11 +1025,41 @@ Section otree.
       - iApply big_sepM_fmap. done.
       - iApply big_sepM_fmap. iApply (big_sepM_impl with "To2"). iModIntro. iIntros (???) "[A B]". iFrame. }
     subst C. clear OCEq1 OCEq2. clear dependent Ψ γ γ2.
+    iStopProof. revert LUOρs. induction γ1 using map_ind.
+    { iIntros (LUOs) "(S& T& F& Tei& Bps)".
+      iModIntro. iExists Ω. iFrame. iSplitR; last done.
+      iPureIntro. intro j. destruct (Ω !! j) eqn:LUOj; econstructor. split; intros; auto.
+      destruct H1 as (?&?&?&?&?). destruct H1. done. }
+    rename i0 into ρ. iIntros (LUOs) "(S& T& F& #Tei& Bps)".
+    iPoseProof (big_sepM_insert with "Bps") as "[Bp Bps]"; first auto.
+    iDestruct "Bp" as "(#Beρ& Toρ& %& %LTa& Bpρ)".
+    iPoseProof (osat_elem with "[S Beρ]") as "%LUOρ"; first by iFrame.
+    iAssert (∃ ρt, ⌜ Φ !! ρ = Some ρt ⌝)%I with "[-]" as "%LUΦρ".
+    { rewrite /oforest_aux. iDestruct "F" as "(% & Fetk & FM)". destruct H2 as [Dom WFΦ].
+      assert (is_Some ((forest_fold Φ) !! ρ)).
+      { apply elem_of_dom. rewrite Dom. set_solver + LUOρ. }
+      destruct H2. destruct WFΦ as [DisjΦ TwfsΦ].
+      destruct (forest_fold_lookup_Some_exists_root _ _ _ DisjΦ H2) as (r&rt&LUr&LUrt).
+      iPoseProof (big_sepM_delete _ _ _ _ LUr with "FM") as "[M _]".
+      iDestruct "M" as "[(%&Boρ2&Toρ2&M) | (_& Beρ2& Bdρ& %)]".
+      - iPoseProof (big_sepM_delete _ _ _ _ LUrt with "M") as "[(_& Beρ2& Blρ& Teρ& _& [% | H]) _]".
+        + subst r. iExists rt. done.
+        + iDestruct "H" as "(%&%&Boρ& %&#Teθ& Toρ3& _)".
+          iPoseProof (othread_live_open with "[T Tei Toρ]") as "(Toρ& [Blρ2 Boρ3]& T)"; first by iFrame.
+          iExFalso. iPoseProof (osat_live_open_owner with "[S Beρ Blρ]") as "(%& _& _& Boρ'& _)"; first by iFrame.
+          iPoseProof (oblG_owner_agree with "[Boρ Boρ']") as "%"; first iFrame. destruct H4. subst i0.
+          iCombine "Boρ Boρ'" as "Boρ". iPoseProof (oblG_owner_div_2 _ _ (1) with "Boρ") as "Boρ".
+          iPoseProof (oblG_owner_agree with "[Boρ Boρ3]") as "%"; first iFrame. destruct H4.
+          apply Qp.not_add_le_r in H6. done.
+      - subst rt. destruct (decide (r = ρ)); cycle 1.
+        { rewrite /tree_singleton lookup_singleton_ne in LUrt; auto. }
+        subst r. eauto. }
+    destruct LUΦρ as [ρt LUΦρ].
 
 
     TODO
 
-  Lemma oforest_progress_one_tree Ω OForest ρ ρTree (a : A) :
+  Lemma oforest_progress_one_tree Ω OForest ρ ρTree (a : a) with:
     /0 /< a →
     (∃ d, Ω !! ρ = Some (obl_live d)) →
     OForest !! ρ = Some ρTree →
@@ -948,98 +1070,6 @@ Section otree.
                  osat Ω' ∗ oforest_aux (dom Ω') OForest.
 
   (* Move a tree *)
-  Lemma oforest_exceed_not_lineage Ω OForest ρ ρt v ℵ u a :
-    ℵ /< a →
-    OForest !! ρ = Some ρt →
-    node ρt v →
-    (∃ d, Ω !! v = Some (obl_live d)) →
-    osat Ω ∗ oforest_aux (dom Ω) OForest ∗
-    oblG_elem v ∗ oblG_transfer_bound v ℵ ∗
-    oblG_transfer u a
-    ⊢ ⌜ ¬ lineage ρt u v ⌝.
-  Proof.
-    iIntros (Ha Hρlu Hv HOlu) "(S & F & #Bev & #Bbv & Btu)".
-    iIntros "%Hlin". apply lineage_lineage_up in Hlin.
-    iStopProof. revert ℵ Ha Hv HOlu. induction Hlin.
-    - iIntros (ℵ Ha Hx1 Hx2) "([#Bex #Bbx] & S & F & Btx)".
-      iPoseProof (osat_transfer_bound_exceed with "[S Btx]") as "%".
-      { eapply Ha. }
-      { iFrame. eauto. }
-      done.
-    - iIntros (ℵ Ha Hxd Hxl) "([#Bex #Bbx] & S & F & Btz)".
-      assert (node ρt y).
-      { destruct H1 as (?&?&?). by eexists. }
-      iAssert (∃ α, ⌜ α /< a ∧ (∃ d, Ω !! y = Some (obl_live d)) ⌝ ∗ oblG_elem y ∗ oblG_transfer_bound y α)%I
-        with "[-]" as "(%&%&#IH1&#IH2)".
-      { rewrite /oforest_aux. iDestruct "F" as "(% & Retk & RM)". destruct H3 as [Hfdom Hfwf].
-        iPoseProof (big_sepM_delete _ _ _ _ Hρlu with "RM") as "[Rm RM]".
-        iDestruct "Rm" as "[(%&Boρ&Toρ&Rm) | (_&Be&Bd&%)]"; cycle 1.
-        { iExFalso. destruct (decide (x = ρ)).
-          - subst x. iPoseProof (osat_obl_is_done_weak with "[S Be Bd]") as "%"; first iFrame.
-            destruct H4 as (?&?). destruct Hxl as (?&?). rewrite H5 in H4. inv H4.
-          - destruct Hfwf as [Hfwf1 Hfwf2]. assert (tree_wf ρ ρt) by eauto.
-            destruct (tree_wf_child_node _ _ _ _ H4 H1).
-            rewrite /node H3 lookup_insert_ne in H6; auto. by destruct H6. }
-        destruct H1 as (C&?&?). iPoseProof (big_sepM_delete _ _ _ _ H1 with "Rm") as "[Hy Rm]".
-        iDestruct "Hy" as "(_&Bey&Bly&Fe& (%&%&#Btby&_&Cy) & _)".
-        iPoseProof (osat_obl_is_live with "[S Bey Bly]") as "%Hyl"; first (iFrame; eauto).
-        iPoseProof (big_sepS_delete _ _ _ H3 with "Cy") as "[(%&%&%&Btx&_) Cy]". destruct H4.
-        iPoseProof (osat_transfer_bound_transfer_le with "[S Bex Bbx Btx]") as "%"; first (iFrame; eauto).
-        iExists α. iFrame "Bey Btby".
-        iPureIntro. split; auto. eapply WFOCM.le_lt_lt; last eapply Ha. etrans; eauto. eapply WFOCM.lt_le; eauto. }
-      destruct H3 as (?&?). specialize (IHHlin _ H3 H2 H4).
-      iApply IHHlin. iFrame. eauto.
-  Qed.
-
-  Lemma oforest_tree_live Ω Φ ρ ρt v u :
-    Φ !! ρ = Some ρt →
-    (∃ d, Ω !! v = Some (obl_live d)) →
-    node ρt v →
-    node ρt u →
-    osat Ω ∗ oforest_aux (dom Ω) Φ ∗ oblG_elem v ⊢ ⌜ ∃ d, Ω !! u = Some (obl_live d) ⌝.
-  Proof.
-    iIntros (LUρ Livev Nodev Nodeu) "(S & F & #Bev)".
-    iDestruct "F" as "(% & Fetk & FM)". destruct H1 as [DomF WFF].
-    assert (Nodeρ : node ρt ρ).
-    { destruct WFF. apply elem_of_dom, tree_wf_root_elem; auto. }
-    iPoseProof (big_sepM_delete _ _ _ _ LUρ with "FM") as "[Fmρ FM]".
-    destruct (Ω !! ρ) eqn:LUOρ.
-    - destruct o.
-      + iDestruct "Fmρ" as "[(%&Bo&To&Fmρ) | (H0&H1&H2&%)]".
-        * destruct Nodeu. iPoseProof (big_sepM_delete _ _ _ _ H1 with "Fmρ") as "[Fmρu Fmρ]".
-          iDestruct "Fmρu" as "(_&Beu&Blu&_)". iPoseProof (osat_obl_is_live _ u with "[$]") as "%". done.
-        * iPoseProof (osat_obl_is_done_weak _ ρ with "[$]") as "%". destruct H2. rewrite LUOρ in H2. inv H2.
-      + iDestruct "Fmρ" as "[(%&Bo&To&Fmρ) | (H0&H1&H2&%)]".
-        * destruct Nodeρ. iPoseProof (big_sepM_delete _ _ _ _ H1 with "Fmρ") as "[Fmρρ Fmρ]".
-          iDestruct "Fmρρ" as "(_&Beρ&Blρ&_)". iPoseProof (osat_obl_is_live _ ρ with "[$]") as "%".
-          destruct H2. rewrite LUOρ in H2. inv H2.
-        * subst ρt. assert (v = ρ).
-          { destruct (decide (v = ρ)); auto. destruct Nodev. rewrite /tree_singleton lookup_singleton_ne in H1; auto. inv H1. }
-          subst v. iPoseProof (osat_obl_is_done_weak _ ρ with "[$]") as "%". destruct Livev, H1. rewrite H1 in H2. inv H2.
-    - apply not_elem_of_dom in LUOρ. destruct WFF. assert (ρt ⊆ forest_fold Φ) by (eapply forest_fold_subseteq; eauto).
-      exfalso. apply subseteq_dom in H3. apply elem_of_dom in Nodeρ. rewrite -DomF in LUOρ. set_solver + Nodeρ H3 LUOρ.
-  Qed.
-
-  Lemma big_sepM_forest_fold {V : Type} `{Countable V} (f : forest V) (Φ : V → gset V → iProp Σ) :
-    forest_trees_disjoint f →
-    ([∗ map] v ↦ vC ∈ (forest_fold f), Φ v vC) ⊣⊢ [∗ map] ρ ↦ ρt ∈ f, ([∗ map] v ↦ vC ∈ ρt, Φ v vC).
-  Proof.
-    intros Disj. iSplit; iIntros "H".
-    - iStopProof. revert Disj. induction f using map_ind; iIntros (Disj) "H"; first done.
-      rewrite forest_fold_insert_L; auto.
-      apply forest_trees_disjoint_insert in Disj; auto. destruct Disj as [Dx Disj].
-      iPoseProof (big_sepM_union with "H") as "[Hx H]".
-      { apply tree_disjoint_forest_fold_disjoint; auto. }
-      iPoseProof (IHf Disj with "H") as "H". iApply big_sepM_insert; auto. iFrame.
-    - iStopProof. revert Disj. induction f using map_ind; iIntros (Disj) "H"; first done.
-      rewrite forest_fold_insert_L; auto.
-      apply forest_trees_disjoint_insert in Disj; auto. destruct Disj as [Dx Disj].
-      iPoseProof (big_sepM_insert with "H") as "[Hx H]"; auto.
-      iPoseProof (IHf Disj with "H") as "H". iApply big_sepM_union.
-      { apply tree_disjoint_forest_fold_disjoint; auto. }
-      iFrame.
-  Qed.
-
   Lemma oforest_transfer_one_tree Ω TP Φ θ k kt π ψ ρ ρt ℵ a b :
     ℵ /< a →
     /0 /< b →
@@ -1429,9 +1459,6 @@ Section otree.
     replace (delete i (gset_to_gmap () ({[i]} ∪ dom m))) with (gset_to_gmap () (dom m)); cycle 1.
     { rewrite gset_to_gmap_union_singleton delete_insert_id; auto. apply lookup_gset_to_gmap_None, not_elem_of_dom; auto. }
     iFrame "Fetkρ". clear dependent m u. iClear "Bdρ Btbi Fsi". 
-    (* inversion Twfi. subst ρ0 t. *)
-    (* iEval (rewrite H1 /forest_merge) in "Mi". rewrite delete_insert_id; last auto. *)
-    (* rewrite big_sepM_forest_fold; last auto. *)
     iAssert (|==> ([∗ set] c ∈ rC, ∃ α', ⌜ α'i /< α' ⌝ ∗ oblG_transfer c α') ∗
                   ([∗ set] c ∈ rC, ∃ u, ⌜ /0 /< u ⌝ ∗ oblG_transfer c u))%I with "[Csi]" as ">[Csi Cs]".
     { rewrite -big_sepS_sep -big_sepS_bupd. iApply (big_sepS_impl with "Csi"). iModIntro. iIntros (??) "(%&%&%&T&_)".
@@ -1827,43 +1854,6 @@ Section otree.
       - repeat intro. auto. }
     rewrite big_sepM_insert; last auto. iFrame.
   Qed.
-
-    (* TODO *)
-
-    (*   oforest_progress *)
-    (* oforest_transfer > oforest_move_tree *)
-    (*   oforest_resolve > oforest_clear_tree *)
-
-(* Definition oforest_aux `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ} *)
-(*   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ} *)
-(*   (D : gset obl_id) (OForest : forest obl_id) : iProp Σ := *)
-(*   ((⌜ dom (forest_fold OForest) = D ∧ forest_wf OForest ⌝) ∗ *)
-(*    (own edge_name (reservation_map_token (A:=gmap_viewR obl_id unitUR) (⊤ ∖ gset_to_coPset D))) ∗ *)
-(*    ([∗ map] ρ ↦ ρTree ∈ OForest, *)
-(*       (* If the root is live... *) *)
-(*       (∃ τ, oblG_owner ρ τ (1/2/2)%Qp ∗ othreadG_owns τ ρ true (1/2)%Qp ∗ *)
-(*             ([∗ map] v ↦ vCh ∈ ρTree, *)
-(*                (own edge_name (reservation_map_data v (gmap_view_auth (DfracOwn 1) (gset_to_gmap tt vCh)))) ∗ *)
-(*                (* Obligation is live and has enough transfer (+ 1 to go back) and progress credits for chiledren and... *) *)
-(*                oblG_elem v ∗ oblG_live v (1/2/2)%Qp ∗ *)
-(*                (∃ α β, oblG_transfer_bound v α ∗ oblG_progress_supply v β (1/2)%Qp ∗ *)
-(*                        ([∗ set] c ∈ vCh, *)
-(*                           ∃ α' β', ⌜ WFOCM.ltR α α' ∧ WFOCM.leR β β' ⌝ ∗ oblG_transfer c α' ∗ oblG_progress c β') *)
-(*                ) ∗ *)
-(*                ((⌜ v = ρ ⌝) ∨ *)
-(*                   (* if it's an internal node, it's suspended *) *)
-(*                   (∃ π, (⌜ child ρTree π v ⌝) ∗ *)
-(*                         oblG_owner v τ (1/2)%Qp ∗ *)
-(*                         ∃ θ, othreadG_owns θ v false (1/2)%Qp ∗ *)
-(*                              (∃ x, otreeG_suspend v x θ π ∗ otreeG_wait v x (1/2)%Qp))) *)
-(*       )) ∨ *)
-(*         (* Or the root is done *) *)
-(*         ((own edge_name (reservation_map_data ρ (gmap_view_auth (DfracOwn 1) ∅))) ∗ *)
-(*          oblG_elem ρ ∗ oblG_done ρ ∗ ⌜ ρTree = tree_singleton ρ ⌝) *)
-(*    ) *)
-(*   )%I. *)
-
-
 
 End otree.
 
