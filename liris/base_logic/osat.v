@@ -1097,6 +1097,23 @@ Section osat.
     iApply (big_sepM_delete _ _ k _ LU). iFrame. done.
   Qed.
 
+  Lemma osat_lookup_owner Ω k τ q :
+    osat Ω ∗ oblG_elem k ∗ oblG_owner k τ q ⊢ ∃ d, ⌜ Ω !! k = Some (obl_live d) ∧ obl_owner d = τ ⌝.
+  Proof.
+    iIntros "(Hsat & #Hek1 & Hok)".
+    iPoseProof (osat_elem k with "[Hsat]") as "%Helem"; first iFrame; eauto.
+    apply elem_of_dom in Helem. destruct Helem as [o LU].
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    destruct o.
+    - iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
+      iPoseProof (oblG_owner_agree with "[Hok Ho]") as "%"; first iFrame. destruct H0.
+      iExists d. iPureIntro. split; auto.
+    - iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Htba & Ho & Hps)".
+      iPoseProof (oblG_owner_agree with "[Hok Ho]") as "%"; first iFrame. destruct H.
+      exfalso. apply Qp.not_add_le_l in H0. auto.
+  Qed.
+
 End osat.
 
 (* Allocation of an initial obligation protocol. *)

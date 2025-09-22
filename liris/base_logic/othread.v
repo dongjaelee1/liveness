@@ -676,6 +676,29 @@ Section othread.
     iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
   Qed.
 
+  Lemma othread_obls_open TP i k Ψ :
+    k ∈ Ψ →
+    othread TP ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1
+    ⊢ othreadG_obls i Ψ 1 ∗ oblG_live k (1/2/2) ∗ (oblG_live k (1/2/2) -∗ othread TP).
+  Proof.
+    iIntros (Ink) "(Hthread & He & Hobls)". 
+    iPoseProof (othread_elem with "[Hthread He]") as "%Hin"; first iFrame.
+    rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
+    assert (Hlui : is_Some (OThread !! i)).
+    { subst TP. by apply elem_of_dom. }
+    destruct Hlui as (OObls&Hlui).
+    iPoseProof (othreadG_obls_lookup with "[HO Hobls]") as "%"; first iFrame.
+    rewrite lookup_fmap in H0. rewrite Hlui in H0. inv H0.
+    assert (Hluk : is_Some (OObls !! k)) by (by apply elem_of_dom).
+    destruct Hluk as (fk&Hluk).
+    iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
+    iDestruct "Hi" as "(Hix & His & Him)".
+    iPoseProof (big_sepM_delete _ _ _ _ Hluk with "Him") as "[Hk Him]".
+    iDestruct "Hk" as "[Bl Hk]". iFrame "Bl Hobls". iIntros "Bl". iExists OThread.
+    iFrame. iSplitR; first done. iApply (big_sepM_delete _ _ _ _ Hlui). iFrame.
+    iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
+  Qed.
+
 End othread.
 
 (* Allocation of initial invariant. *)
