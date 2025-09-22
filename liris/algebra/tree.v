@@ -520,6 +520,17 @@ Section tree.
     - left. intros π Hp. apply n. exists π. auto.
   Qed.
 
+  Global Instance root_in_map_Decision_aux k (Φ : forest V) {A : Type} (m : gmap V A) :
+    Decision (map_Exists (λ ρ _, map_Exists (λ v vt, v = ρ ∧ node vt k) Φ) m).
+  Proof using. solve_decision. Qed.
+  Global Instance root_in_map_Decision k (Φ : forest V) {A : Type} (m : gmap V A) :
+    Decision (∃ ρ : V, is_Some (m !! ρ) ∧ ∃ ρt : tree V, Φ !! ρ = Some ρt ∧ node ρt k).
+  Proof using.
+    destruct (root_in_map_Decision_aux k Φ m).
+    - left. destruct m0 as (?&?&?&?). destruct H1 as (?&?&?&?&?). subst. eauto.
+    - right. intros (?&?&?&?&?). apply n. destruct H0. exists x, x1. split; auto. exists x, x0. auto.
+  Qed.
+
   (** Operations *)
   Definition forest_merge ρ f : tree V := <[ρ:=dom f]>(forest_fold f).
   Definition forest_insert f ρ t : forest V := <[ρ:=t]>f.

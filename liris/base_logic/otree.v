@@ -948,16 +948,6 @@ Section otree.
       iPoseProof (big_sepM_delete _ _ _ _ H1 with "To1") as "[To To1]". iDestruct "To" as "(Bek& Tok& _)".
       iPoseProof (othread_live_open with "[T Tei Tok]") as "(_& [Blk _]& _)"; first iFrame.
       iPoseProof (osat_obl_is_live with "[S Bek Blk]") as "A"; first iFrame. done. }
-    (* iAssert (∀ k, ⌜ k ∈ dom γ1 ⌝ →  ∃ d, ⌜ Ω !! k = Some (obl_live d) ⌝)%I with "[-]" as "%LUOρs". *)
-    (* { iIntros (k Ink). subst Ψ. apply elem_of_dom in Ink. destruct Ink. *)
-    (*   rewrite map_eq_iff in Eqγ. specialize (Eqγ k). rewrite lookup_fmap H1 in Eqγ. *)
-    (*   destruct x. symmetry in Eqγ. apply lookup_union_Some in Eqγ; last auto. simpl in Eqγ. destruct Eqγ. *)
-    (*   - iPoseProof (big_sepM_delete _ _ _ _ H2 with "To1") as "[To To1]". iDestruct "To" as "(Bek& Tok& _)". *)
-    (*     iPoseProof (othread_live_open with "[T Tei Tok]") as "(_& [Blk _]& _)"; first iFrame. *)
-    (*     iPoseProof (osat_obl_is_live with "[S Bek Blk]") as "A"; first iFrame. done. *)
-    (*   - iPoseProof (big_sepM_delete _ _ _ _ H2 with "To2") as "[To To2]". iDestruct "To" as "(Bek& Tok)". *)
-    (*     iPoseProof (othread_live_open with "[T Tei Tok]") as "(_& [Blk _]& _)"; first iFrame. *)
-    (*     iPoseProof (osat_obl_is_live with "[S Bek Blk]") as "A"; first iFrame. done. } *)
     set (C:=λ (k : obl_id) (o : obl_state), ∃ ρ, is_Some (γ1 !! ρ) ∧ ∃ ρt, Φ !! ρ = Some ρt ∧ node ρt k).
     iAssert (∀ k o, ⌜ Ω !! k = Some o ⌝ → ⌜ obl_cond_owner i k o ⌝ → ⌜ C k o ⌝)%I with "[-]" as "%OCEq1".
     { subst C. simpl. iIntros (k o LUOk OC). destruct o; last done. rewrite /obl_cond_owner in OC.
@@ -1025,12 +1015,12 @@ Section otree.
       - iApply big_sepM_fmap. done.
       - iApply big_sepM_fmap. iApply (big_sepM_impl with "To2"). iModIntro. iIntros (???) "[A B]". iFrame. }
     subst C. clear OCEq1 OCEq2. clear dependent Ψ γ γ2.
-    iStopProof. revert LUOρs. induction γ1 using map_ind.
-    { iIntros (LUOs) "(S& T& F& Tei& Bps)".
+    iStopProof. revert Ω TP Φ i LUOρs. induction γ1 using map_ind.
+    { iIntros (Ω TP Φ i LUOs) "(S& T& F& Tei& Bps)".
       iModIntro. iExists Ω. iFrame. iSplitR; last done.
       iPureIntro. intro j. destruct (Ω !! j) eqn:LUOj; econstructor. split; intros; auto.
       destruct H1 as (?&?&?&?&?). destruct H1. done. }
-    rename i0 into ρ. iIntros (LUOs) "(S& T& F& #Tei& Bps)".
+    rename i into ρ. iIntros (Ω TP Φ i LUOs) "(S& T& F& #Tei& Bps)".
     iPoseProof (big_sepM_insert with "Bps") as "[Bp Bps]"; first auto.
     iDestruct "Bp" as "(#Beρ& Toρ& %& %LTa& Bpρ)".
     iPoseProof (osat_elem with "[S Beρ]") as "%LUOρ"; first by iFrame.
@@ -1054,20 +1044,32 @@ Section otree.
       - subst rt. destruct (decide (r = ρ)); cycle 1.
         { rewrite /tree_singleton lookup_singleton_ne in LUrt; auto. }
         subst r. eauto. }
-    destruct LUΦρ as [ρt LUΦρ].
-
-
-    TODO
-
-  Lemma oforest_progress_one_tree Ω OForest ρ ρTree (a : a) with:
-    /0 /< a →
-    (∃ d, Ω !! ρ = Some (obl_live d)) →
-    OForest !! ρ = Some ρTree →
-    osat Ω ∗ oforest_aux (dom Ω) OForest ∗
-    (* from user *)
-    oblG_progress ρ a
-    ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_in_tree ρTree) ⌝) ∗
-                 osat Ω' ∗ oforest_aux (dom Ω') OForest.
+    destruct LUΦρ as [ρt LUΦρ]. assert (∃ d, Ω !! ρ = Some (obl_live d)).
+    { apply LUOs. rewrite dom_insert_L. set_solver. }
+    iMod (oforest_progress_one_tree _ _ _ _ _ LTa H2 LUΦρ with "[S F Bpρ]") as "(%Ω1& %Prog1& S& F)"; first iFrame.
+    (* iPoseProof (oforest_aux_wf with "F") as "%". destruct H3 as [Dom WFF]. *)
+    assert (LUO1s : ∀ x0, x0 ∈ dom m → ∃ x, Ω1 !! x0 = Some (obl_live x)).
+    { intros. assert (x0 ∈ dom (<[ρ:=x]> m)).
+      { rewrite dom_insert_L. set_solver + H3. }
+      apply LUOs in H4. destruct H4. specialize (Prog1 x0). inv Prog1.
+      - destruct H7. rewrite H4 in H5. inv H5. destruct (decide (obl_cond_in_tree ρt x0 (obl_live x1))).
+        + apply H7 in o. destruct y; eauto. done.
+        + apply H8 in n. subst y. eauto.
+      - by rewrite H4 in H6. }
+    iMod (IHγ1 _ _ _ _ LUO1s with "[S T F Tei Bps]") as "(%Ω2& %Prog2& S& T& F& Tos)"; first by iFrame.
+    iExists Ω2. iModIntro. iSplitR.
+    { iPureIntro. eapply obl_states_cond_rel_split_cond. 7: eapply Prog2. 6: eapply Prog1. all: simpl.
+      1,2,3: apply _.
+      - intros. rewrite /obl_cond_in_tree. split; intros.
+        + destruct H3 as (?&?&?&?&?).  apply lookup_insert_is_Some in H3. destruct H3.
+          * subst. left. rewrite LUΦρ in H4. inv H4. auto.
+          * destruct H3. right. eauto.
+        + destruct H3 as [? | (?&?&?&?&?)].
+          * exists ρ. split; eauto. by rewrite lookup_insert_eq.
+          * exists x0. split; eauto. apply elem_of_dom. apply elem_of_dom in H3. rewrite dom_insert_L. set_solver + H3.
+      - repeat intros ?. eauto. }
+    rewrite (big_sepM_insert); last auto. iFrame.
+  Qed.
 
   (* Move a tree *)
   Lemma oforest_transfer_one_tree Ω TP Φ θ k kt π ψ ρ ρt ℵ a b :
