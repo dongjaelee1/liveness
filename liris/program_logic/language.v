@@ -10,11 +10,9 @@ Canonical Structure thread_idO `{SI : indexT} := leibnizO thread_id.
 Notation thread_ids := (gset thread_id).
 
 Section language_mixin.
-  Context {expr val state observation fuel : Type}.
+  Context {expr val state observation : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
-  Context (fuel_leR fuelR : fuel → fuel → Prop).
-  Context (fuel_addO : fuel → fuel → fuel).
   (** We annotate the reduction relation with observations [κ], which we will
      use in the definition of weakest preconditions to predict future
      observations and assert correctness of the predictions. *)
@@ -27,7 +25,6 @@ Section language_mixin.
     mixin_to_of_val v : to_val (of_val v) = Some v;
     mixin_of_to_val e v : to_val e = Some v → of_val v = e;
     mixin_val_stuck e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → to_val e = None;
-    mixin_fuel_wf :: @WFOCM.t _ fuel_leR fuel_addO fuelR;
     mixin_fork_thread_ids e σ τ κ e' σ' efs :
       prim_step e σ τ κ e' σ' efs → (τ ## (dom efs))
   }.
@@ -39,40 +36,29 @@ Structure language :=
       val : Type;
       state : Type;
       observation : Type;
-      fuel : Type;
       of_val : val → expr;
       to_val : expr → option val;
-      fuel_leR : fuel → fuel → Prop;
-      fuelR : fuel → fuel → Prop;
-      fuel_addO : fuel → fuel → fuel;
       prim_step : expr → state → thread_ids → list observation →
                   expr → state → gmap thread_id expr → Prop;
-      language_mixin : LanguageMixin of_val to_val fuel_leR fuelR fuel_addO prim_step
+      language_mixin : LanguageMixin of_val to_val prim_step
     }.
 
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments Language {_ _ _ _ _ _ _ _ _ _ _} _.
+Global Arguments Language {_ _ _ _ _ _ _} _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
-Global Arguments fuel_leR {_} _ _.
-Global Arguments fuelR {_} _ _.
-Global Arguments fuel_addO {_} _ _.
 Global Arguments prim_step {_} _ _ _ _ _ _ _.
 
-Canonical Structure fuelO `{SI : indexT} Λ := leibnizO (fuel Λ).
 Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
 Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
 Canonical Structure exprO `{SI : indexT} Λ := leibnizO (expr Λ).
 
-Notation sched_fuels Λ := (gmap thread_id (fuel Λ)).
 Notation thread_pool Λ := (gmap thread_id (expr Λ)).
 
-(** Thread pool with fuels to model scheduler fairness.
-    If a thread is done (is a val), fuel = None. *)
 Definition cfg (Λ : language) :=
-  (thread_pool Λ * sched_fuels Λ * state Λ)%type.
+  (thread_pool Λ * state Λ)%type.
 
 Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
   fill_not_val e :
@@ -103,8 +89,6 @@ Section language.
   Lemma of_to_val e v : to_val e = Some v → of_val v = e.
   Proof. apply language_mixin. Qed.
   Lemma val_stuck e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → to_val e = None.
-  Proof. apply language_mixin. Qed.
-  Lemma fuel_wf : WFOCM.t (@fuel_leR Λ) (@fuel_addO Λ) (@fuelR Λ).
   Proof. apply language_mixin. Qed.
   Lemma fork_thread_ids e σ τ κ e' σ' efs : prim_step e σ τ κ e' σ' efs → (τ ## (dom efs)).
   Proof. apply language_mixin. Qed.
@@ -137,31 +121,19 @@ Section language.
       prim_step e σ τ κ e' σ' efs →
       if a is WeaklyAtomic then irreducible e' σ' (τ ∪ (dom efs)) else is_Some (to_val e').
 
-  Definition thread_pool_inv (ths : thread_pool Λ) (δ : sched_fuels Λ) : Prop :=
-    map_Forall2 (λ i e f, True) ths δ.
-
-  Definition fuels_fair_update (S : thread_ids) (δ1 δ2 : sched_fuels Λ) : Prop :=
-    map_Forall2 (λ i f1 f2, if decide (i ∈ S) then True else (fuelR f2 f1)) δ1 δ2.
-
-  Definition fuels_fair_fork (efs : thread_pool Λ) (δ1 δ2 : sched_fuels Λ) : Prop :=
-    ∃ (δ' : sched_fuels Λ), (thread_pool_inv efs δ') ∧ (δ2 = δ1 ∪ δ').
-
-  (** An atomic thread step under scheduler fairness governed by fuel.
+  (** An atomic thread step.
    We formalize an execution of a program as the infinite sequence of program states,
    where the last state for a terminating program is repeated infinitely.
    Note that if a thread spawns, it never deallocates. *)
   Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-  | step_atomic e1 σ1 e2 σ2 ths i efs δ1 δ2 δ3 :
-    ρ1 = (ths, δ1, σ1) →
+  | step_atomic e1 σ1 e2 σ2 ths i efs :
+    ρ1 = (ths, σ1) →
     ths !! i = Some e1 →
-    (* fair scheduling *)
-    fuels_fair_update {[i]} δ1 δ2 →
     (* atomic execution *)
     ((is_Some (to_val e1) ∧ e1 = e2 ∧ σ1 = σ2 ∧ efs = ∅)
      ∨ prim_step e1 σ1 (dom ths) κ e2 σ2 efs) →
     (* fork. *)
-    fuels_fair_fork efs δ2 δ3 →
-    ρ2 = (<[i:=e2]>ths ∪ efs, δ3, σ2) →
+    ρ2 = (<[i:=e2]>ths ∪ efs, σ2) →
     step ρ1 κ ρ2.
   Local Hint Constructors step : core.
 
