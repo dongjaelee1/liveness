@@ -760,6 +760,18 @@ Section osat.
   Proof.
     iIntros "[Hsat Hg]". iApply osat_elem; iFrame. iApply oblG_elem_unfold. iFrame.
   Qed.
+  Lemma osat_elem_cases Ω k :
+    osat Ω ∗ oblG_elem k ⊢ ⌜ ∃ d, Ω !! k = Some (obl_live d) ⌝ ∨ oblG_done k.
+  Proof.
+    iIntros "(Hsat & He)". iPoseProof (osat_elem with "[$]") as "%".
+    apply elem_of_dom in H. destruct H.
+    rewrite /osat -!lock.
+    iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
+    destruct x.
+    - iLeft. eauto.
+    - iPoseProof (big_sepM_delete _ _ _ _ H with "Hm") as "[H _]".
+      iDestruct "H" as "(%&%&_&_&_&DA&_)". iRight. by iApply oblG_done_auth_done.
+  Qed.
 
   Lemma osat_obl_is_live Ω k q :
     osat Ω ∗ oblG_elem k ∗ oblG_live k q
