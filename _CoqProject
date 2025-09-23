@@ -43,10 +43,10 @@ liris/base_logic/otree.v
 liris/base_logic/othread.v
 
 # FIXME
-# liris/program_logic/language.v
-# liris/program_logic/sched_fair_interp.v
-# liris/program_logic/thread_obligation.v
-# liris/program_logic/weakestpre.v
+liris/program_logic/language.v
+liris/program_logic/sched_fair_interp.v
+liris/program_logic/thread_obligation.v
+liris/program_logic/weakestpre.v
 # liris/program_logic/lifting.v
 # liris/program_logic/ectx_language.v
 # liris/program_logic/ectx_lifting.v

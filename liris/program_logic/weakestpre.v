@@ -7,7 +7,8 @@ From iris.bi Require Export fixpoint.
 From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 Import uPred.
-From liris.program_logic Require Export thread_obligation.
+From liris.base_logic Require Export otree.
+(* From liris.program_logic Require Export thread_obligation. *)
 From liris.algebra Require Import ordinal_wfocm.
 
 Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {

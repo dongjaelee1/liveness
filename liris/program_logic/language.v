@@ -126,14 +126,14 @@ Section language.
    where the last state for a terminating program is repeated infinitely.
    Note that if a thread spawns, it never deallocates. *)
   Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-  | step_atomic e1 σ1 e2 σ2 ths i efs :
+  | step_atomic e1 σ1 e2 σ2 efs ths i :
     ρ1 = (ths, σ1) →
+    ρ2 = (<[i:=e2]>ths ∪ efs, σ2) →
     ths !! i = Some e1 →
     (* atomic execution *)
-    ((is_Some (to_val e1) ∧ e1 = e2 ∧ σ1 = σ2 ∧ efs = ∅)
-     ∨ prim_step e1 σ1 (dom ths) κ e2 σ2 efs) →
-    (* fork. *)
-    ρ2 = (<[i:=e2]>ths ∪ efs, σ2) →
+    prim_step e1 σ1 (dom ths) κ e2 σ2 efs →
+    (* ((is_Some (to_val e1) ∧ e1 = e2 ∧ σ1 = σ2 ∧ efs = ∅) *)
+    (*  ∨ prim_step e1 σ1 (dom ths) κ e2 σ2 efs) → *)
     step ρ1 κ ρ2.
   Local Hint Constructors step : core.
 
@@ -219,120 +219,6 @@ Section language.
     stuck e σ τ → stuck (K e) σ τ.
   Proof. rewrite -!not_not_stuck. eauto using not_stuck_fill_inv. Qed.
 
-  (** Properties about step. *)
-  Lemma thread_pool_inv_dom ths δ :
-    thread_pool_inv ths δ → dom ths = dom δ.
-  Proof. by eapply map_Forall2_dom_L. Qed.
-
-  Lemma fuels_fair_update_dom S δ0 δ1 :
-    fuels_fair_update S δ0 δ1 → dom δ0 = dom δ1.
-  Proof. by eapply map_Forall2_dom_L. Qed.
-
-  Lemma fuels_fair_update_thread_pool_inv ths δ0 S δ1 :
-    thread_pool_inv ths δ0 →
-    fuels_fair_update S δ0 δ1 →
-    thread_pool_inv ths δ1.
-  Proof.
-    revert δ0 δ1. pattern ths. revert ths. eapply map_ind; intros.
-    { apply map_Forall2_empty_inv_l in H; subst. apply map_Forall2_empty_inv_l in H0; subst.
-      apply map_Forall2_empty.
-    }
-    eapply map_Forall2_insert_inv_l in H1; [|done]. destruct H1 as (?&?&?&?&?&?). subst.
-    eapply map_Forall2_insert_inv_l in H2; [|done]. destruct H2 as (?&?&?&?&?&?). subst.
-    apply map_Forall2_insert; auto.
-    split; [done | by eapply H0].
-  Qed.
-
-  Lemma insert_thread_pool_inv ths e1 δ i e2 :
-    ths !! i = Some e1 →
-    thread_pool_inv ths δ →
-    thread_pool_inv (<[i:=e2]>ths) δ.
-  Proof.
-    intros Hs Hi. rewrite <- (insert_delete ths i e1) in Hi; [|done].
-    apply map_Forall2_insert_inv_l in Hi; [|by eapply lookup_delete].
-    destruct Hi as (?&?&?&?&?&?). subst.
-    rewrite <- (insert_delete ths i e1); [|done]. rewrite (insert_insert (delete i ths)).
-    apply map_Forall2_insert; try done. apply lookup_delete.
-  Qed.
-
-  (* Lemma fuels_thread_yield_thread_pool_inv ths e1 δ i e2 : *)
-  (*   ths !! i = Some e1 → *)
-  (*   to_val e1 = None → *)
-  (*   thread_pool_inv ths δ → *)
-  (*   thread_pool_inv (<[i:=e2]>ths) (fuels_thread_yield i e2 δ). *)
-  (* Proof. *)
-  (*   intros Hs Hv Hi. rewrite <- (insert_delete ths i e1) in Hi; [|done]. *)
-  (*   apply map_Forall2_insert_inv_l in Hi; [|by eapply lookup_delete]. *)
-  (*   destruct Hi as (?&?&?&?&?&?). subst. *)
-  (*   rewrite <- (insert_delete ths i e1); [|done]. rewrite (insert_insert (delete i ths)). *)
-  (*   rewrite /fuels_thread_yield. destruct (to_val e2) eqn:He. *)
-  (*   - rewrite insert_insert. apply map_Forall2_insert; try done. *)
-  (*     + apply lookup_delete. *)
-  (*     + split; [left; done | done]. *)
-  (*   - apply map_Forall2_insert; try done. *)
-  (*     + apply lookup_delete. *)
-  (*     + split; [right | done]. rewrite Hv in H1. destruct H1 as [(?&?) | (?&?)]; [| done]. *)
-  (*       by destruct H. *)
-  (* Qed. *)
-
-  Lemma disjoint_union_thread_pool_inv ths δ efs δ' :
-    (dom ths ## dom efs) →
-    thread_pool_inv ths δ →
-    thread_pool_inv efs δ' →
-    thread_pool_inv (ths ∪ efs) (δ ∪ δ').
-  Proof.
-    revert δ. pattern ths. revert ths. eapply map_ind; intros.
-    { apply map_Forall2_empty_inv_l in H0; subst. rewrite !left_id_L. auto. }
-    eapply map_Forall2_insert_inv_l in H2; [|done]. destruct H2 as (?&?&?&?&?&?). subst.
-    assert (Hefs : efs !! i = None).
-    { apply map_disjoint_dom in H1. eapply map_disjoint_Some_l; [done | apply lookup_insert]. }
-    rewrite -!insert_union_l. apply map_Forall2_insert.
-    { rewrite lookup_union_l; auto. }
-    { rewrite lookup_union_l; [auto |]. apply not_elem_of_dom_1. apply not_elem_of_dom_2 in Hefs.
-      replace (dom δ') with (dom efs); [auto|].
-      by eapply map_Forall2_dom_L.
-    }
-    split; [done|].
-    apply H0; try done. set_solver.
-  Qed.
-
-  Lemma fuels_fair_fork_thread_pool_inv ths δ1 efs δ2 :
-    (dom ths ## dom efs) →
-    thread_pool_inv ths δ1 →
-    fuels_fair_fork efs δ1 δ2 →
-    thread_pool_inv (ths ∪ efs) δ2.
-  Proof.
-    intros. destruct H1 as (δ'&?&?). subst. by apply disjoint_union_thread_pool_inv.
-  Qed.
-
-  Lemma step_thread_pool_inv ρ1 κ ρ2 :
-    thread_pool_inv ρ1.1.1 ρ1.1.2 →
-    step ρ1 κ ρ2 →
-    thread_pool_inv ρ2.1.1 ρ2.1.2.
-  Proof.
-    intros Hi Hs. inv Hs. simpl in *.
-    assert (Hd : dom ths ## dom efs).
-    { destruct H2.
-      - destruct H as (_&_&_&H). subst efs. set_solver.
-      - by eapply fork_thread_ids.
-    }
-    eapply fuels_fair_fork_thread_pool_inv; [| | done].
-    { rewrite dom_insert_lookup; done. }
-    (* eapply fuels_thread_yield_thread_pool_inv; [done | by eapply val_stuck |]. *)
-    eapply fuels_fair_update_thread_pool_inv; [|done].
-    by eapply insert_thread_pool_inv.
-  Qed.
-
-  Lemma thread_ids_preserve δ1 δ2 δ3 S efs :
-    dom δ1 ## dom efs →
-    fuels_fair_update S δ1 δ2 →
-    fuels_fair_fork efs δ2 δ3 →
-    dom δ1 ∪ dom efs = dom δ3.
-  Proof.
-    intros. apply fuels_fair_update_dom in H0. destruct H1 as (δ'&TI&Hu).
-    apply thread_pool_inv_dom in TI. subst. rewrite dom_union_L -H0 TI. done.
-  Qed.
-
   Record pure_step (e1 e2 : expr Λ) := {
     pure_step_safe σ1 τ : reducible_no_obs e1 σ1 τ;
     pure_step_det σ1 κ τ e2' σ2 efs :
@@ -412,8 +298,8 @@ Section language.
    or, there is an [i] such that [i]th thread does not participate in the
    pure steps between [t1] and [t3] and [t2] corresponds to taking a step in
    the [i]th thread starting from [t1]. *)
-  Lemma erased_step_pure_step_tp t1 δ1 σ1 t2 δ2 σ2 t3 :
-    erased_step (t1, δ1, σ1) (t2, δ2, σ2) →
+  Lemma erased_step_pure_step_tp t1 σ1 t2 σ2 t3 :
+    erased_step (t1, σ1) (t2, σ2) →
     pure_steps_tp t1 t3 →
     (σ1 = σ2 ∧ pure_steps_tp t2 t3) ∨
     (∃ i e efs e' κ,
@@ -421,22 +307,16 @@ Section language.
       t2 = <[i:=e']>t1 ∪ efs ∧
       prim_step e σ1 (dom t1) κ e' σ2 efs).
   Proof.
-    intros [κ [e σ e' σ' ths i efs δ11 δ12 δ13 t11 Hi Hf0 Hstep Hf1 t12]] Hps; simplify_eq/=.
+    intros [κ [e σ e' σ' efs ths i t11 t12 Hi Hstep]] Hps; simplify_eq/=.
     assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None).
-    { exists (delete i ths). split; [by rewrite insert_delete | by apply lookup_delete]. }
+    { exists (delete i ths). split; [rewrite insert_delete_id | apply lookup_delete_eq]; auto. }
     destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi.
     apply map_Forall2_insert_inv_l in Hps as (e'' & t31 & -> & Ht31 & Hsteps & Hps); [| done].
     destruct Hsteps as [e|e1 e2 e3 Hpstep Hprs].
-    - destruct Hstep as [Hstep | Hstep].
-      + left. destruct Hstep as (?&?&?&?). subst. split; auto. rewrite insert_insert right_id.
-        apply map_Forall2_insert_2; done.
-      + right. exists i, e, efs, e', κ. split_and!. 1,2: by apply lookup_insert. all: done.
-    - destruct Hstep as [Hstep | Hstep].
-      + left. destruct Hstep as (?&?&?&?). subst. split; auto. rewrite insert_insert right_id.
-        apply map_Forall2_insert_2; [|done]. etransitivity; [|done]. econstructor 2; done.
-      + edestruct Hpstep as (?&?&?&?); first done. destruct H1. simplify_eq.
-        left. split; first done. rewrite insert_insert right_id_L.
-        by eapply map_Forall2_insert.
+    - right. exists i, e, efs, e', κ. split_and!. 1,2: by apply lookup_insert_eq. all: done.
+    - edestruct Hpstep as (?&?&?&?); first done. destruct H1. simplify_eq.
+      left. split; first done. rewrite insert_insert_eq right_id_L.
+      by eapply map_Forall2_insert.
   Qed.
 
 End language.
