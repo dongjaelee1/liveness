@@ -11,22 +11,24 @@ From liris.base_logic Require Export otree.
 (* From liris.program_logic Require Export thread_obligation. *)
 From liris.algebra Require Import ordinal_wfocm.
 
+Notation prog_state Λ := (prod (thread_pool Λ) (state Λ)).
+
 Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {
   (** Invariants. *)
   #[global] liris_invGS :: invGS_gen hlc Σ;
   (** Liveness obligation interpretation. *)
-  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (state Λ) Σ;
-  (** Scheduler fairness interpretation. *)
-  #[global] liris_schedfairGS :: schedfairGS.schedfairGS (WF:=@fuel_wf Λ) Σ;
-  (** Connecting liveness obligations and scheduler fairness. *)
-  #[global] liris_threadoblGS :: threadoblGS.threadoblGS Σ;
+  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (prog_state Λ) thread_id Σ;
+  (** Liveness obligations assigned to threads. *)
+  #[global] liris_othreadGS :: othreadGS.othreadGS Σ;
+  (** Forest of liveness obligation. *)
+  #[global] liris_otreeGS :: otreeGS.otreeGS Ord.t Σ;
 
   (** The state interpretation is an invariant that should hold in
-  between each step of reduction. Here [Λstate] is the global state,
+  between each step of reduction.
+  Here [prog_state] is the global state (with thread pool),
   the first [nat] is the number of steps already performed by the
-  program, [list (observation Λ)] are the remaining observations, and the
-  last thread_ids is the set of allocated thread identifiers. *)
-  state_interp : state Λ → nat → list (observation Λ) → thread_ids → iProp Σ;
+  program, and [list (observation Λ)] are the remaining observations. *)
+  state_interp : prog_state Λ → nat → list (observation Λ) → iProp Σ;
 
   (** A fixed postcondition for any forked-off thread. For most languages, e.g.
   heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -51,21 +53,21 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
   of the definition [state_interp_mono] does not significantly
   complicate the formalization in Iris, we prefer simplifying the
   client. *)
-  state_interp_mono σ ns κs τ:
-    state_interp σ ns κs τ ⊢ |={∅}=> state_interp σ (S ns) κs τ
+  state_interp_mono σ ns κs :
+    state_interp σ ns κs ⊢ |={∅}=> state_interp σ (S ns) κs
 }.
-Global Opaque liris_invGS liris_osatGS liris_schedfairGS liris_threadoblGS.
+Global Opaque liris_invGS liris_osatGS liris_othreadGS liris_otreeGS.
 Global Arguments LirisG {SI hlc Λ Σ}.
 
-Global Instance wp_obl_class {Λ : language} : obl_class (state Λ) (prod Ord.t (fuel Λ)) :=
-  osat_obl_class_def ord_wfocm_pack (WFOCM.lt_wf (t:=@fuel_wf Λ)) (state Λ).
+Global Instance wp_obl_class {Λ : language} : obl_class Ord.t (prog_state Λ) thread_id Ord.lt.
+Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
 
 Notation lirisGS := (lirisGS_gen HasLc).
-Notation "'⌈' Λ '⌉'" := (Ord.from_wf_set (@WFOCM.lt_wf _ _ _ _ (@fuel_wf Λ))).
-Notation schedfairIL Λ := (schedfairI (H:=@fuel_wf Λ)).
-Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=state Λ)).
-Notation oftIL Λ := (oftI (WF:=@fuel_wf Λ) (obl_ps:=state Λ)).
-Notation obl_statesL Λ := (obl_states' (@wp_obl_class Λ)).
+(* Notation "'⌈' Λ '⌉'" := (Ord.from_wf_set (@WFOCM.lt_wf _ _ _ _ (@fuel_wf Λ))). *)
+(* Notation schedfairIL Λ := (schedfairI (H:=@fuel_wf Λ)). *)
+(* Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=state Λ)). *)
+(* Notation oftIL Λ := (oftI (WF:=@fuel_wf Λ) (obl_ps:=state Λ)). *)
+(* Notation obl_statesL Λ := (obl_states' (@wp_obl_class Λ)). *)
 
 (** The predicate we take the fixpoint of in order to define the lWP. *)
 (** In the step case, we both provide [S (num_laters_per_step ns)]
@@ -82,6 +84,23 @@ Notation obl_statesL Λ := (obl_states' (@wp_obl_class Λ)).
     later credits, e.g. because they use [BiFUpdPlainly]. *)
 
 (* Ω must make strict progress *)
+Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
+  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
+  (∀ (Ω1 : obl_states) (Θ : thread_pool Λ) σ1 ns κ κs,
+     (⌜ Θ !! i = Some e1 ⌝ ∗ osat Ω1 ∗ othread (dom Θ) ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗
+      state_interp (Θ, σ1) ns (κ ++ κs)) ={E,∅}=∗
+     (* ∃ b, ▷? b |={∅}=> *)
+     (⌜if s is NotStuck then reducible e1 σ1 (dom Θ) else True⌝) ∗
+     ∃ b l Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ (Θ, σ1) ⌝) ∗
+              ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
+                           (if b then l = (S $ num_laters_per_step ns) else l = 0) -∗
+                           £ l ={∅}▷=∗^l |={∅,E}=>
+     ∃ Ω2 Ω2', (⌜ (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) ∧ (Ω2 ↪ₛ⋆ Ω2' @ (<[i:=e2]>Θ, σ2)) ⌝) ∗
+               (osat Ω2' ∗ othread (dom (<[i:=e2]>Θ)) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗
+                state_interp (<[i:=e2]>Θ, σ2) (S ns) κs) ∗
+               ν e2 efs
+  )%I.
+
 Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ δ1 (Ω1 : obl_statesL Λ) γ1 σ1 ns κ κs τ,

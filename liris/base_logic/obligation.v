@@ -122,7 +122,7 @@ Variant obl_states_step `{Ξ : obl_class} (s : obl_ps) : relation obl_states :=
 
 Notation "A ↪ₛ B @ s" := (obl_states_step s A B) (at level 20, format "A  ↪ₛ  B  @  s").
 Notation "A ↪ₛ⁺ B @ s" := (tc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⁺  B  @  s").
-Notation "A ↪ₛ⋆ B @ s" := (rtc (obl_states_resolve s) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s").
+Notation "A ↪ₛ⋆ B @ s" := (rtc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s").
 
 (* This version:
 Inductive obl_states_cond_rel_seq `{Ξ : obl_class} : (list (obl_cond * (relation obl_state))) → relation obl_states :=

@@ -2,7 +2,7 @@ From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From liris.base_logic Require Import osat.
+From liris.base_logic Require Export osat.
 
 (** The ghost state for thread obligations *)
 Module othreadGS.

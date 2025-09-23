@@ -2,8 +2,6 @@ From stdpp Require Import base.
 From liris Require Export wfocm.
 From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
 
-Global Notation "'ω'" := Ord.omega.
-
 Global Program Instance ord_OCM : OCM.t Ord.le Hessenberg.add :=
   OCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.
 Next Obligation.

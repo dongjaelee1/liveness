@@ -3,7 +3,7 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From liris.algebra Require Export tree.
-From liris.base_logic Require Import osat othread.
+From liris.base_logic Require Export othread.
 
 (** The ghost state for liveness obligation forest *)
 Module otreeGS.
@@ -1945,7 +1945,7 @@ Section otree.
     rewrite -lock. iFrame. auto.
   Qed.
 
-  Lemma oforest_done_suspend D Φ k x θ π ψ :
+  Lemma oforest_aux_done_suspend D Φ k x θ π ψ :
     osuspend D ∗ oforest_aux D Φ ∗
     (* from user *)
     otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2) ∗
@@ -1969,6 +1969,18 @@ Section otree.
         { subst. rewrite /tree_singleton lookup_singleton_ne in LUtπ; auto. }
         subst π. iPoseProof (otreeG_edge_lookup with "[Eρ Tedgek]") as "%"; first iFrame. done.
     - iMod "W" as "(?&?&?&?)". by iFrame.
+  Qed.
+
+  Lemma oforest_done_suspend D k x θ π ψ :
+    osuspend D ∗ oforest D ∗
+    (* from user *)
+    otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2) ∗
+    otreeG_elem π ∗ oblG_done π
+    ⊢ |==> osuspend D ∗ oforest D ∗ othreadG_owns θ k true (1/2) ∗ oblG_progress k ψ.
+  Proof.
+    rewrite /oforest -!lock. iIntros "(U&F&#Tek&#Tsk&Twk&#Teπ&Bdπ)".
+    iDestruct "F" as "[% F]". iMod (oforest_aux_done_suspend with "[$]") as "H".
+    iDestruct "H" as "(U&F&Tok&Bpk)". iModIntro. iFrame.
   Qed.
 
 End otree.
