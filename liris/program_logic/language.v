@@ -125,17 +125,21 @@ Section language.
    We formalize an execution of a program as the infinite sequence of program states,
    where the last state for a terminating program is repeated infinitely.
    Note that if a thread spawns, it never deallocates. *)
-  Inductive step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-  | step_atomic e1 σ1 e2 σ2 efs ths i :
-    ρ1 = (ths, σ1) →
-    ρ2 = (<[i:=e2]>ths ∪ efs, σ2) →
-    ths !! i = Some e1 →
+  Inductive thread_step (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
+  | thread_step_atomic e1 σ1 e2 σ2 efs Θ :
+    ρ1 = (Θ, σ1) →
+    ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
+    Θ !! i = Some e1 →
     (* atomic execution *)
-    prim_step e1 σ1 (dom ths) κ e2 σ2 efs →
+    prim_step e1 σ1 (dom Θ) κ e2 σ2 efs →
     (* ((is_Some (to_val e1) ∧ e1 = e2 ∧ σ1 = σ2 ∧ efs = ∅) *)
     (*  ∨ prim_step e1 σ1 (dom ths) κ e2 σ2 efs) → *)
-    step ρ1 κ ρ2.
-  Local Hint Constructors step : core.
+    thread_step i ρ1 κ ρ2.
+  Local Hint Constructors thread_step : core.
+
+  Definition step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
+    ∃ i, thread_step i ρ1 κ ρ2.
+  Local Hint Unfold step : core.
 
   Inductive nsteps : nat → cfg Λ → list (observation Λ) → cfg Λ → Prop :=
     | nsteps_refl ρ :
@@ -154,7 +158,7 @@ Section language.
     rtc erased_step ρ1 ρ2 ↔ ∃ n κs, nsteps n ρ1 κs ρ2.
   Proof.
     split.
-    - induction 1; firstorder eauto. (* FIXME: [naive_solver eauto] should be able to handle this *)
+    - induction 1; firstorder eauto. eexists. eexists. econstructor 2; eauto.
     - intros (n & κs & Hsteps). unfold erased_step.
       induction Hsteps; eauto using rtc_refl, rtc_l.
   Qed.
@@ -307,7 +311,7 @@ Section language.
       t2 = <[i:=e']>t1 ∪ efs ∧
       prim_step e σ1 (dom t1) κ e' σ2 efs).
   Proof.
-    intros [κ [e σ e' σ' efs ths i t11 t12 Hi Hstep]] Hps; simplify_eq/=.
+    intros [κ [i [e σ e' σ' efs ths t11 t12 Hi Hstep]]] Hps; simplify_eq/=.
     assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None).
     { exists (delete i ths). split; [rewrite insert_delete_id | apply lookup_delete_eq]; auto. }
     destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi.
@@ -323,6 +327,6 @@ End language.
 
 Global Hint Mode PureExec + - - ! - : typeclass_instances.
 
-Global Arguments step_atomic {Λ ρ1 κ ρ2}.
+Global Arguments thread_step_atomic {Λ i ρ1 κ ρ2}.
 
 Notation pure_steps_tp := (map_Forall2 (λ _, rtc pure_step)).

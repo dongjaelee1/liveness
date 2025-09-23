@@ -35,11 +35,11 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
   keep track of resources precisely, as in e.g. Iron. *)
   fork_post : val Λ → iProp Σ;
 
-  (** The number of additional logical steps (i.e., later modality in the
-  definition of lWP) and later credits per physical step is
-  [S (num_laters_per_step ns)], where [ns] is the number of physical steps
-  executed so far. We add one to [num_laters_per_step] to ensure that there
-  is always at least one later and later credit for each physical step. *)
+  (** The number of additional logical steps (i.e., later modality in the *)
+  (* definition of lWP) and later credits per physical step is *)
+  (* [S (num_laters_per_step ns)], where [ns] is the number of physical steps *)
+  (* executed so far. We add one to [num_laters_per_step] to ensure that there *)
+  (* is always at least one later and later credit for each physical step. *)
   num_laters_per_step : nat → nat;
 
   (** When performing pure steps, the state interpretation needs to be
@@ -83,6 +83,8 @@ Notation lirisGS := (lirisGS_gen HasLc).
   - The step-taking update can even be used by clients that opt out of
     later credits, e.g. because they use [BiFUpdPlainly]. *)
 
+(* TODO : ordinal later credit *)
+
 (* Ω must make strict progress *)
 Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
@@ -91,11 +93,11 @@ Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i 
       state_interp (Θ, σ1) ns (κ ++ κs)) ={E,∅}=∗
      (* ∃ b, ▷? b |={∅}=> *)
      (⌜if s is NotStuck then reducible e1 σ1 (dom Θ) else True⌝) ∗
-     ∃ b l Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ (Θ, σ1) ⌝) ∗
+     ∃ (b : bool) (l : nat) Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ (Θ, σ1) ⌝) ∗
               ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
-                           (if b then l = (S $ num_laters_per_step ns) else l = 0) -∗
+                           (⌜ if b then l = (S $ num_laters_per_step ns) else l = 0 ⌝) -∗
                            £ l ={∅}▷=∗^l |={∅,E}=>
-     ∃ Ω2 Ω2', (⌜ (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) ∧ (Ω2 ↪ₛ⋆ Ω2' @ (<[i:=e2]>Θ, σ2)) ⌝) ∗
+     ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₛ⋆ Ω2' @ (<[i:=e2]>Θ, σ2)) ⌝) ∗
                (osat Ω2' ∗ othread (dom (<[i:=e2]>Θ)) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗
                 state_interp (<[i:=e2]>Θ, σ2) (S ns) κs) ∗
                ν e2 efs
