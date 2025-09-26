@@ -21,11 +21,11 @@ liris/prelude/wf_structs.v
 
 liris/bi/weakestpre.v
 
-liris/cgraphs/mapexcl.v
-liris/cgraphs/multiset.v
-liris/cgraphs/util.v
-liris/cgraphs/uforests.v
-liris/cgraphs/cgraph.v
+#liris/cgraphs/mapexcl.v
+#liris/cgraphs/multiset.v
+#liris/cgraphs/util.v
+#liris/cgraphs/uforests.v
+#liris/cgraphs/cgraph.v
 
 liris/algebra/ocm.v
 liris/algebra/wfocm.v
@@ -35,24 +35,27 @@ liris/algebra/bank.v
 liris/algebra/bcred.v
 liris/algebra/auth_mra.v
 liris/algebra/tree.v
+liris/algebra/ordinal_ucmra.v
 
 # liris/base_logic/digraph.v
 liris/base_logic/obligation.v
 liris/base_logic/osat.v
 liris/base_logic/otree.v
 liris/base_logic/othread.v
+liris/base_logic/relational_updates.v
+liris/base_logic/later_credits.v
+liris/base_logic/fancy_updates.v
+liris/base_logic/satisfiable.v
 
-# FIXME
 liris/program_logic/language.v
-liris/program_logic/sched_fair_interp.v
-liris/program_logic/thread_obligation.v
+#liris/program_logic/sched_fair_interp.v
+#liris/program_logic/thread_obligation.v
 liris/program_logic/weakestpre.v
 # liris/program_logic/lifting.v
 # liris/program_logic/ectx_language.v
 # liris/program_logic/ectx_lifting.v
 # liris/program_logic/ectxi_language.v
 
-# FIXME
 # liris_heap_lang/locations.v
 # liris_heap_lang/lang.v
 # liris_heap_lang/class_instances.v
