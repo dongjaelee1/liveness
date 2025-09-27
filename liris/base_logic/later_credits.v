@@ -8,7 +8,7 @@ From iris.algebra Require Export auth.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Export own.
-From liris.algebra Require Import ordinal_ucmra.
+From liris.algebra Require Export ordinal_ucmra.
 From liris.base_logic Require Export relational_updates.
 
 Section aux.
@@ -61,20 +61,20 @@ Class auth_rupd `{SI : indexT} (A : ucmra) := {
     auth_valid_trivial (x : A) : ✓ x
   }.
 
-Class auth_rupd_preG `{SI : indexT} (Σ : gFunctors) (A : ucmra) := {
-    #[global] auth_rupd_inG :: inG Σ (authR A);
+Class auth_rupd_GpreS `{SI : indexT} (Σ : gFunctors) (A : ucmra) := {
+    #[global] auth_rupd_GpreS_auth :: inG Σ (authR A);
   }.
 
-Class auth_rupdG `{SI : indexT} (Σ : gFunctors) (A : ucmra) :=
+Class auth_rupdGS `{SI : indexT} (Σ : gFunctors) (A : ucmra) :=
   Auth_rupdG {
-      #[global] auth_rupdG_pre :: auth_rupd_preG Σ A;
-      auth_rupdG_name : gname;
+      #[global] auth_rupd_inG :: auth_rupd_GpreS Σ A;
+      auth_rupd_name : gname;
     }.
 
 Definition auth_rupdΣ `{SI : indexT} (A : ucmra): gFunctors :=
   #[GFunctor (authR A)].
 
-Global Instance subG_auth_rupd_preG `{SI : indexT} {Σ : gFunctors} {A : ucmra} : subG (auth_rupdΣ A) Σ → auth_rupd_preG Σ A.
+Global Instance subG_auth_rupdΣ `{SI : indexT} {Σ : gFunctors} {A : ucmra} : subG (auth_rupdΣ A) Σ → auth_rupd_GpreS Σ A.
 Proof. solve_inG. Qed.
 
 (** In the following section, we prove abstractly the properties of finite and
@@ -83,23 +83,23 @@ Section auth_rupd.
   Context `{SI : indexT} (Σ : gFunctors) (X : ucmra) `{!auth_rupd X}.
 
   (** We instantiate the relational updates with the relation from [auth_rupd]. *)
-  Global Instance auth_rupdG_instance `{!auth_rupdG Σ X} : rupdG Σ X :=
+  Global Instance auth_rupdGS_instance `{!auth_rupdGS Σ X} : rupdG Σ X :=
     {|
-      rupd_pred := λ x, own auth_rupdG_name (● x);
+      rupd_pred := λ x, own auth_rupd_name (● x);
       rupd_rel := auth_rupd_rel;
       rupd_rel_wf := auth_rupd_rel_wf;
     |}.
 
   (** the connective for the total supply of credits *)
-  Definition rupdA `{!auth_rupdG Σ X} (a : X) : iProp Σ := own auth_rupdG_name (● a).
+  Definition rupdA `{!auth_rupdGS Σ X} (a : X) : iProp Σ := own auth_rupd_name (● a).
   (** the connective for the later credits *)
-  Definition rupdF `{!auth_rupdG Σ X} (a : X) : iProp Σ := own auth_rupdG_name (◯ a).
+  Definition rupdF `{!auth_rupdGS Σ X} (a : X) : iProp Σ := own auth_rupd_name (◯ a).
 
   (** We prove a generic lemma about updating the ghost state of [auth_rupd] in Iris.
      It effectively says that if we are willing to decrease our later credits (the [b]s),
      then we can also decrease the total supply of later credits (the [a]s).
    *)
-  Lemma auth_rupd_rel_update `{!auth_rupdG Σ X} (a b b' : X) :
+  Lemma auth_rupd_rel_update `{!auth_rupdGS Σ X} (a b b' : X) :
     ✓ a → b ≼ a → auth_rupd_rel b' b → ∃ a', (a, b) ~l~> (a', b') ∧ auth_rupd_rel a' a.
   Proof.
     intros Hv Hincl Hstep.
@@ -125,7 +125,7 @@ Section auth_rupd.
      credits (e.g., by going from 1 to 0 credits), then we are allowed to
      eliminate a later modality (because it appears in front of our goal).
      *)
-  Lemma auth_rupd_step `{!auth_rupdG Σ X} (a a' : X) P :
+  Lemma auth_rupd_step `{!auth_rupdGS Σ X} (a a' : X) P :
     auth_rupd_rel a' a →
     rupdF a ∗ (rupdF a' -∗ ▷ |==>r P) ⊢ |==>r P.
   Proof.
@@ -145,7 +145,7 @@ Section auth_rupd.
   (** A corollary of the definition of relational updates
      is that we can always weaken the number of credits,
      meaning we can drop some if we want to.  *)
-  Lemma auth_rupd_weaken `{!auth_rupdG Σ X} (a a' : X):
+  Lemma auth_rupd_weaken `{!auth_rupdGS Σ X} (a a' : X):
     rc auth_rupd_rel a' a → (rupdF a ⊢ |==>r rupdF a').
   Proof.
     destruct 1 as [->|Hstep]; first by apply rupd_intro.
@@ -156,7 +156,7 @@ Section auth_rupd.
   (** We can split and combine credits as we see fit. The [⋅]
      operation will be instantiated with the right notion of
      plus for each kind of later credit further below. *)
-  Lemma rupdF_split `{!auth_rupdG Σ X} x y :
+  Lemma rupdF_split `{!auth_rupdGS Σ X} x y :
     rupdF (x ⋅ y) ⊣⊢ rupdF x ∗ rupdF y.
   Proof.
     rewrite /rupdF -own_op auth_frag_op //=.
@@ -168,7 +168,7 @@ Section auth_rupd.
      later credits that we would like to allocate for the rest of the proof.
   *)
   Section allocation.
-    Context `{!auth_rupdG Σ X}.
+    Context `{!auth_rupdGS Σ X}.
 
     Definition A P := (∃ x : X, rupdF x -∗ |==>r P)%I.
 
@@ -322,7 +322,7 @@ Section auth_rupd.
        induction. Löb induction means (▷ P ⊢ P) implies ⊢ P. In other words, we
        can assume our goal underneath a later. The corresponding principle for
        later credits is:
-          (₤1 -∗ P) ⊢ P implies ⊢ P
+          (£1 -∗ P) ⊢ P implies ⊢ P
      It means that if we are willing to spend one credit, then we can get access
      to our goal.
 
@@ -333,12 +333,12 @@ Section auth_rupd.
   *)
 
   (* credits induction *)
-  Class CreditExchange `{!auth_rupdG Σ X} (P : iProp Σ) := {
+  Class CreditExchange `{!auth_rupdGS Σ X} (P : iProp Σ) := {
       credit_to_later:
       rupdF (auth_rupd_next ε) ∗ ▷ P ⊢ P
     }.
 
-  Lemma credit_ind `{!auth_rupdG Σ X} P `{!CreditExchange P} :
+  Lemma credit_ind `{!auth_rupdGS Σ X} P `{!CreditExchange P} :
     □ ((rupdF (auth_rupd_next ε) -∗ P) → P) ⊢ P.
   Proof.
     iIntros "#H". iLöb as "IH".
@@ -347,14 +347,14 @@ Section auth_rupd.
   Qed.
 
 
-  Global Instance rupd_credit_exchange `{!auth_rupdG Σ X} P : CreditExchange (|==>r P).
+  Global Instance rupd_credit_exchange `{!auth_rupdGS Σ X} P : CreditExchange (|==>r P).
   Proof.
     econstructor. iIntros "[Hf Hl]".
     iApply (auth_rupd_step with "[Hf Hl]"); first apply auth_rupd_next_step.
     iFrame. by iIntros "_".
   Qed.
 
-  Global Instance forall_credit_exchange `{!auth_rupdG Σ X} {Y} (Φ : Y → iProp Σ) :
+  Global Instance forall_credit_exchange `{!auth_rupdGS Σ X} {Y} (Φ : Y → iProp Σ) :
     (∀ x, CreditExchange (Φ x)) → (CreditExchange (∀ x, Φ x)).
   Proof.
     intros HC. econstructor. iIntros "[Hc Hl]" (x).
@@ -362,7 +362,7 @@ Section auth_rupd.
     iFrame. iNext. iApply "Hl".
   Qed.
 
-  Global Instance exists_credit_exchange `{@FiniteIndex SI} `{!auth_rupdG Σ X} {Y} `{!Inhabited Y} (Φ : Y → iProp Σ) :
+  Global Instance exists_credit_exchange `{@FiniteIndex SI} `{!auth_rupdGS Σ X} {Y} `{!Inhabited Y} (Φ : Y → iProp Σ) :
     (∀ x, CreditExchange (Φ x)) → (CreditExchange (∃ x, Φ x)).
   Proof.
     intros HC. econstructor. iIntros "[Hc Hl]".
@@ -370,7 +370,7 @@ Section auth_rupd.
     iExists x. destruct (HC x) as [HC0]. iApply (HC0 with "[Hc Hl]"). iFrame.
   Qed.
 
-  Global Instance and_credit_exchange `{!auth_rupdG Σ X} P Q :
+  Global Instance and_credit_exchange `{!auth_rupdGS Σ X} P Q :
     (CreditExchange P) → (CreditExchange Q) → CreditExchange (P ∧ Q).
   Proof.
     intros HP HQ. destruct HP as [HP0], HQ as [HQ0]. econstructor.
@@ -380,7 +380,7 @@ Section auth_rupd.
     - rewrite bi.and_elim_r. auto.
   Qed.
 
-  Global Instance or_credit_exchange `{@FiniteBoundedExistential SI} `{!auth_rupdG Σ X} P Q :
+  Global Instance or_credit_exchange `{@FiniteBoundedExistential SI} `{!auth_rupdGS Σ X} P Q :
     (CreditExchange P) → (CreditExchange Q) → CreditExchange (P ∨ Q).
   Proof.
     intros HP HQ. destruct HP as [HP0], HQ as [HQ0]. econstructor.
@@ -389,7 +389,7 @@ Section auth_rupd.
     - iRight. iApply (HQ0 with "[Hc HQ]"). iFrame.
   Qed.
 
-  Global Instance wand_credit_exchange `{!auth_rupdG Σ X} P Q :
+  Global Instance wand_credit_exchange `{!auth_rupdGS Σ X} P Q :
     (CreditExchange Q) → CreditExchange (P -∗ Q).
   Proof.
     intros HP. destruct HP as [HP]. econstructor.
@@ -397,7 +397,7 @@ Section auth_rupd.
     iFrame. iNext. by iApply "HPQ".
   Qed.
 
-  (* Global Instance fupd_credit_exchange `{!auth_rupdG Σ X} `{!invG Σ} E1 E2 P : CreditExchange (|={E1, E2}=> P)%I. *)
+  (* Global Instance fupd_credit_exchange `{!auth_rupdGS Σ X} `{!invG Σ} E1 E2 P : CreditExchange (|={E1, E2}=> P)%I. *)
   (* Proof. *)
   (*   rewrite fupd_eq /fupd_def. apply _. *)
   (* Qed. *)
@@ -405,8 +405,8 @@ Section auth_rupd.
 End auth_rupd.
 
 (** The notation for later credits that we use in the rest of this developemnt. *)
-Notation "₤ a" := (rupdF _ _ a) (at level 60).
-Notation "●₤ a" := (rupdA _ _ a) (at level 60).
+Notation "£ a" := (rupdF _ _ a) (at level 60).
+Notation "●£ a" := (rupdA _ _ a) (at level 60).
 
 Global Arguments A {SI Σ X _ _} P.
 Global Arguments sat_A {_ _ _ _ _ _ _ _ _ _} P.
@@ -428,8 +428,8 @@ Qed.
 
 
 (* (* global resource lemma *) *)
-(* Lemma auth_rupd_global `{SI : indexT} {Σ : gFunctors} M `{!auth_rupd M} `{!auth_rupd_preG Σ M} k : *)
-(*   ∀ P, global P → ∃ _: auth_rupdG Σ M, global (P ∗ (●₤ k ∗ ₤ k)). *)
+(* Lemma auth_rupd_global `{SI : indexT} {Σ : gFunctors} M `{!auth_rupd M} `{!auth_rupd_GpreS Σ M} k : *)
+(*   ∀ P, global P → ∃ _: auth_rupdGS Σ M, global (P ∗ (●£ k ∗ £ k)). *)
 (* Proof. *)
 (*   intros P HP. *)
 (*   eapply (global_fresh_res (● k ⋅ ◯ k)) in HP as [γ HP]; *)
@@ -441,9 +441,9 @@ Qed.
 
 (** ** Transfinite Later Credits *)
 (** We now instantiate the generic definition from above with ordinals to
-   obtain a transfinite version of later credits ₤ (α: ord). *)
-Notation tlcG Σ := (auth_rupdG Σ OrdUR).
-Notation tlcPreG Σ := (auth_rupd_preG Σ OrdUR).
+   obtain a transfinite version of later credits £ (α: ord). *)
+Notation tlcGS Σ := (auth_rupdGS Σ OrdUR).
+Notation tlcGpreS Σ := (auth_rupd_GpreS Σ OrdUR).
 Notation tlcΣ := (auth_rupdΣ OrdUR).
 
 Section transfinite_iris.
@@ -481,33 +481,33 @@ Section transfinite_iris.
       auth_valid_trivial := ord_valid_trivial
     |}.
 
-  Lemma tlc_split `{!tlcG Σ} (α β: ord) :
-    ₤ (α ⊕ β) ⊣⊢ ₤ α ∗ ₤ β.
+  Lemma tlc_split `{!tlcGS Σ} (α β: ord) :
+    £ (α ⊕ β) ⊣⊢ £ α ∗ £ β.
   Proof. apply rupdF_split. Qed.
 
-  Lemma tlc_succ `{!tlcG Σ} (α: ord) :
-    ₤ (succ α) ⊣⊢ ₤ (succ zero) ∗ ₤ α.
+  Lemma tlc_succ `{!tlcGS Σ} (α: ord) :
+    £ (succ α) ⊣⊢ £ one ∗ £ α.
   Proof.
     by rewrite -tlc_split natural_addition_succ natural_addition_zero_left_id.
   Qed.
 
-  Lemma tlc_later_strong `{!tlcG Σ} α β P :
+  Lemma tlc_later_strong `{!tlcGS Σ} α β P :
     β ≺ α →
-    ₤ α ∗ (₤ β -∗ ▷ |==>r P) ⊢ |==>r P.
+    £ α ∗ (£ β -∗ ▷ |==>r P) ⊢ |==>r P.
   Proof.
     intros Hlt; apply auth_rupd_step. apply Hlt.
   Qed.
 
-  Lemma tlc_later `{!tlcG Σ} P :
-    ₤ (succ zero) ∗ (▷ |==>r P) ⊢ |==>r P.
+  Lemma tlc_later `{!tlcGS Σ} P :
+    £ one ∗ (▷ |==>r P) ⊢ |==>r P.
   Proof.
     iIntros "[Hf Hupd]". iApply (tlc_later_strong (succ zero) zero with "[Hf Hupd]").
     - apply succ_greater.
     - iFrame. by iIntros "_".
   Qed.
 
-  Lemma tlc_laterN `{!tlcG Σ} P n :
-    ₤(Nat.iter n succ_def zero) ∗ (▷^n |==>r P) ⊢ |==>r P.
+  Lemma tlc_laterN `{!tlcGS Σ} P n :
+    £(n2o n) ∗ (▷^n |==>r P) ⊢ |==>r P.
   Proof.
     iIntros "[Hc Hu]". iInduction n as [ | n ] "IH"; first done.
     simpl. rewrite tlc_succ. iDestruct "Hc" as "[Hc0 Hc]".
@@ -515,20 +515,19 @@ Section transfinite_iris.
     iFrame. iNext. iApply ("IH" with "Hc Hu").
   Qed.
 
-  Lemma tlc_weaken `{!tlcG Σ} (α β: ord) :
-    β ⪯ α → (₤ α ⊢ |==>r ₤ β).
+  Lemma tlc_weaken `{!tlcGS Σ} (α β: ord) :
+    β ⪯ α → (£ α ⊢ |==>r £ β).
   Proof.
     intros Hle; eapply auth_rupd_weaken, Hle.
   Qed.
 
-  Lemma tlc_zero `{!tlcG Σ} : ⊢ |==> ₤ zero.
+  Lemma tlc_zero `{!tlcGS Σ} : ⊢ |==> £ zero.
   Proof.
     iApply own_unit.
   Qed.
 
-
-  Lemma tlc_loeb `{!tlcG Σ} P `{!CreditExchange Σ OrdUR P} :
-    □ ((₤(succ zero) -∗ P) → P) ⊢ P.
+  Lemma tlc_loeb `{!tlcGS Σ} P `{!CreditExchange Σ OrdUR P} :
+    □ ((£ one -∗ P) → P) ⊢ P.
   Proof.
     exact (credit_ind Σ OrdUR P).
   Qed.

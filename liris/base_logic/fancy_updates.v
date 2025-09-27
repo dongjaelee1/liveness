@@ -1,116 +1,127 @@
-(** From the artifact of
-    Later Credits: Resourceful Reasoning for the Later Modality
-    by Spies et al. 2022
- *)
+(** Transfinite later credit version *)
 
 From stdpp Require Export coPset.
-From iris.prelude Require Import options.
 From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Export own.
 From transfinite.base_logic.lib Require Import wsat.
 From liris.base_logic Require Export later_credits.
-(* From liris.base_logic Require Export relational_updates. *)
+From iris.prelude Require Import options.
 Export wsatGS.
 Import uPred.
-Import le_upd_if.
 
-
-Class invGpreS `{SI : indexT} (Σ : gFunctors) : Set := InvGpreS {
-  #[local] invGpreS_wsat :: wsatGpreS Σ;
-  #[local] invGpreS_lc :: lcGpreS Σ;
-}.
+Class invGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+  InvGpreS {
+      #[local] invGpreS_wsat :: wsatGpreS Σ;
+      #[local] invGpreS_lc :: tlcGpreS Σ;
+    }.
 
 (* [invGS_lc] needs to be global in order to enable the use of lemmas like
 [lc_split] that require [lcGS], and not [invGS]. [invGS_wsat] also needs to be
 global as the lemmas in [invariants.v] require it. *)
-Class invGS_gen `{SI : indexT} (hlc : has_lc) (Σ : gFunctors) : Set := InvG {
+Class invGS `{SI : indexT} (Σ : gFunctors) : Set := InvG {
   #[global] invGS_wsat :: wsatGS Σ;
-  #[global] invGS_lc :: lcGS Σ;
+  #[global] invGS_lc :: tlcGS Σ;
 }.
-Global Hint Mode invGS_gen - - - : typeclass_instances.
+Global Hint Mode invGS - - : typeclass_instances.
 Global Hint Mode invGpreS - - : typeclass_instances.
 
-Notation invGS := (invGS_gen HasLc).
-
 Definition invΣ `{SI : indexT} : gFunctors :=
-  #[wsatΣ; lcΣ].
+  #[wsatΣ; tlcΣ].
 Global Instance subG_invΣ `{SI : indexT} {Σ} : subG invΣ Σ → invGpreS Σ.
 Proof. solve_inG. Qed.
 
-
-Definition fupd_def {SI} {Σ: gFunctors SI} {X} `{!invG Σ} `{!rupdG Σ X} (E1 E2 : coPset) (P : iProp Σ) : iProp Σ :=
+Local Definition uPred_fupd_def `{SI : indexT} `{!invGS Σ} (E1 E2 : coPset) (P : iProp Σ) : iProp Σ :=
   (wsat ∗ ownE E1 -∗ |==>r ◇ (wsat ∗ ownE E2 ∗ P))%I.
-Definition fupd_aux : seal (@fupd_def). Proof. by eexists. Qed.
-Definition fupd' := fupd_aux.(unseal).
-Global Arguments fupd' {SI Σ X _ _}.
-Lemma fupd_eq {SI} {Σ: gFunctors SI} {X} `{!invG Σ} `{!rupdG Σ X} : @fupd _ fupd' = fupd_def.
-Proof. rewrite -fupd_aux.(seal_eq) //. Qed.
+Local Definition uPred_fupd_aux : seal (@uPred_fupd_def). Proof. by eexists. Qed.
+Definition uPred_fupd := uPred_fupd_aux.(unseal).
+Global Arguments uPred_fupd {SI Σ _}.
+Local Lemma uPred_fupd_unseal `{SI : indexT} `{!invGS Σ} : @fupd _ uPred_fupd = uPred_fupd_def.
+Proof. rewrite -uPred_fupd_aux.(seal_eq) //. Qed.
 
-Lemma fupd_mixin {SI} {Σ: gFunctors SI} {X} `{!invG Σ} `{!rupdG Σ X} : BiFUpdMixin (iPropI Σ) fupd'.
+Lemma uPred_fupd_mixin `{SI : indexT} `{!invGS Σ} : BiFUpdMixin (uPredI (iResUR Σ)) uPred_fupd.
 Proof.
   split.
-  - rewrite fupd_eq. solve_proper.
-  - intros E1 E2 P (E1''&->&?)%subseteq_disjoint_union_L.
-    rewrite fupd_eq /fupd_def ownE_op //.
-    by iIntros "$ ($ & $ & HE) !> !> [$ $] !> !>".
-  - rewrite fupd_eq /fupd_def.
+  - rewrite uPred_fupd_unseal. solve_proper.
+  - intros E1 E2 (E1''&->&?)%subseteq_disjoint_union_L.
+    rewrite uPred_fupd_unseal /uPred_fupd_def ownE_op //.
+    by iIntros "($ & $ & HE) !> !> [$ $] !> !>".
+  - rewrite uPred_fupd_unseal.
     iIntros (E1 E2 P) ">H [Hw HE]". iApply "H"; by iFrame.
-  - rewrite fupd_eq. iIntros (E1 E2 P Q HPQ) "HP HwE". rewrite -HPQ. by iApply "HP".
-  - rewrite fupd_eq /fupd_def. iIntros (E1 E2 E3 P) "HP HwE".
+  - rewrite uPred_fupd_unseal.
+    iIntros (E1 E2 P Q HPQ) "HP HwE". rewrite -HPQ. by iApply "HP".
+  - rewrite uPred_fupd_unseal. iIntros (E1 E2 E3 P) "HP HwE".
     iMod ("HP" with "HwE") as ">(Hw & HE & HP)". iApply "HP"; by iFrame.
-  - intros E1 E2 Ef P HE1Ef. rewrite fupd_eq /fupd_def ownE_op //.
+  - intros E1 E2 Ef P HE1Ef. rewrite uPred_fupd_unseal /uPred_fupd_def ownE_op //.
     iIntros "Hvs (Hw & HE1 &HEf)".
     iMod ("Hvs" with "[Hw HE1]") as ">($ & HE2 & HP)"; first by iFrame.
     iDestruct (ownE_op' with "[HE2 HEf]") as "[? $]"; first by iFrame.
     iIntros "!> !>". by iApply "HP".
-  - rewrite fupd_eq /fupd_def. by iIntros (????) "[HwP $]".
+  - rewrite uPred_fupd_unseal /uPred_fupd_def. by iIntros (????) "[HwP $]".
 Qed.
-Global Instance fupd_bi_fupd {SI} {Σ: gFunctors SI} {X} `{!invG Σ} `{!rupdG Σ X} : BiFUpd (iPropI Σ) :=
-  {| bi_fupd_mixin := fupd_mixin |}.
+Global Instance uPred_bi_fupd `{SI : indexT} `{!invGS Σ} : BiFUpd (uPredI (iResUR Σ)) :=
+  {| bi_fupd_mixin := uPred_fupd_mixin |}.
 
-Global Instance fupd_bi_bupd_fupd {SI} {Σ: gFunctors SI} {X} `{!invG Σ} `{!rupdG Σ X}: BiBUpdFUpd (iPropI Σ).
-Proof. rewrite /BiBUpdFUpd fupd_eq. by iIntros (E P) ">? [$ $] !> !>". Qed.
+Global Instance uPred_bi_bupd_fupd `{SI : indexT} `{!invGS Σ} : BiBUpdFUpd (uPredI (iResUR Σ)).
+Proof. rewrite /BiBUpdFUpd uPred_fupd_unseal. by iIntros (E P) ">? [$ $] !> !>". Qed.
 
 
-Lemma fupd_step {SI} {Σ: gFunctors SI} {X} `{!invG Σ} `{!rupdG Σ X} P E1 E2:
-(∀ x, rupd_pred x -∗ |==> (∃ y, ⌜tc rupd_rel y x⌝ ∗ rupd_pred y ∗ ▷ |={E1, E2}=> P)) -∗ |={E1, E2}=> P.
+(** Additional lemmas *)
+Lemma fupd_step `{SI : indexT} {Σ : gFunctors} `{!invGS Σ} P E1 E2:
+  (∀ x, ●£ x -∗ |==> (∃ y, ⌜(y ≺ x)%O⌝ ∗ ●£ y ∗ ▷ |={E1, E2}=> P)) -∗ |={E1, E2}=> P.
 Proof.
-  rewrite fupd_eq /fupd_def. iIntros "Hupd Hwsat".
+  rewrite uPred_fupd_unseal /uPred_fupd_def. iIntros "Hupd Hwsat".
   rewrite /bupd /bi_bupd_bupd; simpl.
-  iApply (rupd_step); iIntros (x) "Hpr".
+  iApply rupd_step; iIntros (x) "Hpr".
   iSpecialize ("Hupd" with "Hpr").
   pose (@uPred_bi_bupd SI (iResUR Σ)).
-  iApply (bupd_wand_l with "[$Hupd Hwsat]").
+  iApply (bupd_wand_l with "[Hupd Hwsat]"). iSplitR "Hupd"; last iApply "Hupd".
   iIntros "Hupd". iDestruct "Hupd" as (y Htc) "[Hpr Hupd]".
-  iExists y. iFrame. iSplit; first done.
-  iNext.
-  by iApply "Hupd".
+  iExists y. iFrame. iSplit.
+  { iPureIntro. by econstructor. }
+  iNext. by iApply "Hupd".
 Qed.
 
-
-Lemma rupd_fupd {SI} {Σ: gFunctors SI} {X} `{!invG Σ} `{!rupdG Σ X} P E:
+Lemma rupd_fupd `{SI : indexT} {Σ : gFunctors} `{!invGS Σ} P E:
   (|==>r P) -∗ |={E}=> P.
 Proof.
-  rewrite fupd_eq /fupd_def. iIntros "Hupd Hwsat".
+  rewrite uPred_fupd_unseal /uPred_fupd_def. iIntros "Hupd Hwsat".
   by iMod "Hupd" as "$".
 Qed.
 
 
-(* there is a canonical satisfiability instance for every notion of satisfiable *)
-Definition sat_at {SI} {Σ: gFunctors SI} {X} `{!invG Σ} `{rG: !rupdG Σ X} (sat: iProp Σ → Prop) E := (sat_frame sat (wsat ∗ ownE E)%I).
-Global Instance: Params (@sat_at) 7 := {}.
+(** Later credits *)
 
-Section canonical_sat_at.
-  Context {SI} {Σ: gFunctors SI} `{!invG Σ} `{rG: !rupdG Σ X} {sat: iProp Σ → Prop} `{Sat: !Satisfiable sat} `{RUpd: !SatisfiableRUpd sat} `{Later: !SatisfiableLater sat}.
+(** [lc_fupd_elim_later] allows to eliminate a later from a hypothesis at an update.
+  This is typically used as [iMod (lc_fupd_elim_later with "Hcredit HP") as "HP".],
+  where ["Hcredit"] is a credit available in the context and ["HP"] is the
+  assumption from which a later should be stripped. *)
+Lemma lc_fupd_elim_later `{SI : indexT} `{!invGS Σ} E P :
+   £ one%O -∗ (▷ P) -∗ |={E}=> P.
+Proof.
+  iIntros "Hf Hupd".
+  rewrite uPred_fupd_unseal /uPred_fupd_def.
+  iIntros "[$ $]". iApply (tlc_later with "[Hf Hupd]").
+  iFrame "Hf". iNext. by iModIntro.
+Qed.
 
-  Global Instance sat_at_satisfiable_at_fupd:
-    SatisfiableAtFupd (sat_at sat).
-  Proof using Later RUpd Sat.
-    split; rewrite /sat_at /sat_frame; intros E1 E2 P Hs; eapply sat_later, sat_rupd, sat_mono, Hs.
-    iIntros "((W & O) & P)". rewrite fupd_eq /fupd_def.
-    iSpecialize ("P" with "[W O]"); first by iFrame.
-    iMod "P". iModIntro. iApply except_0_later.
-    iMod "P" as "($ & $ & $)".
-  Qed.
-End canonical_sat_at.
+(** If the goal is a fancy update, this lemma can be used to make a later appear
+  in front of it in exchange for a later credit.
+  This is typically used as [iApply (lc_fupd_add_later with "Hcredit")],
+  where ["Hcredit"] is a credit available in the context. *)
+Lemma lc_fupd_add_later `{SI : indexT} `{!invGS Σ} E1 E2 P :
+  £ one%O -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
+Proof.
+  iIntros "Hf Hupd". iApply (fupd_trans E1 E1).
+  iApply (lc_fupd_elim_later with "Hf Hupd").
+Qed.
+
+(** Similar to above, but here we are adding [n] laters. *)
+Lemma lc_fupd_add_laterN `{SI : indexT} `{!invGS Σ} E1 E2 P n :
+  £ (n2o n) -∗ (▷^n |={E1, E2}=> P) -∗ |={E1, E2}=> P.
+Proof.
+  iIntros "Hf Hupd". iInduction n as [|n] "IH"; first done.
+  rewrite n2o_succ tlc_succ. iDestruct "Hf" as "[H1 Hf]".
+  iApply (lc_fupd_add_later with "H1"); iNext.
+  iApply ("IH" with "[$] [$]").
+Qed.

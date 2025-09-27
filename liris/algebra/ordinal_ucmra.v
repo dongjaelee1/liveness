@@ -7,6 +7,33 @@ From iris.algebra Require Export cmra.
 (* From iris.algebra Require Export cmra local_updates proofmode_classes. *)
 From transfinite.stepindex Require Export ordinal_arith.
 
+Section aux.
+
+  Local Open Scope ordinals.
+
+  Definition n2o (n : nat) : ord := (Nat.iter n succ_def zero).
+
+  Lemma n2o_zero : n2o 0 = zero.
+  Proof. done. Qed.
+
+  Lemma n2o_one : n2o 1 = one.
+  Proof. done. Qed.
+
+  Lemma n2o_succ n : n2o (S n) = succ_def (n2o n).
+  Proof. done. Qed.
+
+  Lemma n2o_add n m : n2o (n + m) = (n2o n) ⊕ (n2o m).
+  Proof.
+    revert m. induction n; intros.
+    - by rewrite natural_addition_zero_left_id.
+    - simpl. rewrite IHn. by rewrite natural_addition_succ.
+  Qed.
+
+  Lemma n2o_succ_add n : n2o (S n) = one ⊕ (n2o n).
+  Proof. rewrite -n2o_one -n2o_add. done. Qed.
+
+End aux.
+
 (** Ordinals *)
 Section ordinals.
   Context `{SI : indexT}.
