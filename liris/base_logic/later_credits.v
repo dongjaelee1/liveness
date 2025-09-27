@@ -446,7 +446,10 @@ Notation tlcGS Σ := (auth_rupdGS Σ OrdUR).
 Notation tlcGpreS Σ := (auth_rupd_GpreS Σ OrdUR).
 Notation tlcΣ := (auth_rupdΣ OrdUR).
 
-Section transfinite_iris.
+Notation "'£ω'" := (£ ω%O) (at level 60).
+Notation "'£n' a" := (£ (n2o a)) (at level 60).
+
+Section transfinite_lc.
   Context `{SI : indexT} (Σ : gFunctors).
   Local Open Scope ordinals.
 
@@ -532,4 +535,21 @@ Section transfinite_iris.
     exact (credit_ind Σ OrdUR P).
   Qed.
 
-End transfinite_iris.
+  (* For natural numbers *)
+  Lemma tlc_omega `{!tlcGS Σ} (n : nat) :
+    £ω ⊢ |==>r £n n.
+  Proof. apply tlc_weaken, omega_upper_bound. Qed.
+
+  Lemma tlc_split_nat `{!tlcGS Σ} (n m : nat) :
+    £n (n + m) ⊣⊢ £n n ∗ £n m.
+  Proof. rewrite n2o_add. apply tlc_split. Qed.
+
+  Lemma tlc_one_nat `{!tlcGS Σ} :
+    £n 1 ⊣⊢ £ one.
+  Proof. by rewrite n2o_one. Qed.
+
+  Lemma tlc_succ_nat `{!tlcGS Σ} (n : nat) :
+    £n (S n) ⊣⊢ £ one ∗ £n n.
+  Proof. rewrite n2o_succ. apply tlc_succ. Qed.
+
+End transfinite_lc.

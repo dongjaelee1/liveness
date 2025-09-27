@@ -13,9 +13,9 @@ Import uPred.
 
 Notation prog_state Λ := (prod (thread_pool Λ) (state Λ)).
 
-Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors) := LirisG {
+Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
   (** Invariants. *)
-  #[global] liris_invGS :: invGS_gen hlc Σ;
+  #[global] liris_invGS :: invGS Σ;
   (** Liveness obligation interpretation. *)
   #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (prog_state Λ) thread_id Σ;
   (** Liveness obligations assigned to threads. *)
@@ -35,13 +35,6 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
   keep track of resources precisely, as in e.g. Iron. *)
   fork_post : val Λ → iProp Σ;
 
-  (** The number of additional logical steps (i.e., later modality in the *)
-  (* definition of lWP) and later credits per physical step is *)
-  (* [S (num_laters_per_step ns)], where [ns] is the number of physical steps *)
-  (* executed so far. We add one to [num_laters_per_step] to ensure that there *)
-  (* is always at least one later and later credit for each physical step. *)
-  num_laters_per_step : nat → nat;
-
   (** When performing pure steps, the state interpretation needs to be
   adapted for the change in the [ns] parameter.
 
@@ -57,62 +50,34 @@ Class lirisGS_gen `{SI : indexT} (hlc : has_lc) (Λ : language) (Σ : gFunctors)
     state_interp σ ns κs ⊢ |={∅}=> state_interp σ (S ns) κs
 }.
 Global Opaque liris_invGS liris_osatGS liris_othreadGS liris_otreeGS.
-Global Arguments LirisG {SI hlc Λ Σ}.
+Global Arguments LirisG {SI Λ Σ}.
 
 Global Instance wp_obl_class {Λ : language} : obl_class Ord.t (prog_state Λ) thread_id Ord.lt.
 Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
 
-Notation lirisGS := (lirisGS_gen HasLc).
+(* Notation lirisGS := (lirisGS_gen HasLc). *)
 (* Notation "'⌈' Λ '⌉'" := (Ord.from_wf_set (@WFOCM.lt_wf _ _ _ _ (@fuel_wf Λ))). *)
 (* Notation schedfairIL Λ := (schedfairI (H:=@fuel_wf Λ)). *)
 (* Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=state Λ)). *)
 (* Notation oftIL Λ := (oftI (WF:=@fuel_wf Λ) (obl_ps:=state Λ)). *)
 (* Notation obl_statesL Λ := (obl_states' (@wp_obl_class Λ)). *)
 
-(** The predicate we take the fixpoint of in order to define the lWP. *)
-(** In the step case, we both provide [S (num_laters_per_step ns)]
-  later credits, as well as an iterated update modality that allows
-  stripping as many laters, where [ns] is the number of steps already taken.
-  We have both as each of these provides distinct advantages:
-  - Later credits do not have to be used right away, but can be kept to
-    eliminate laters at a later point.
-  - The step-taking update composes well in parallel: we can independently
-    compose two clients who want to eliminate their laters for the same
-    physical step, which is not possible with later credits, as they
-    can only be used by exactly one client.
-  - The step-taking update can even be used by clients that opt out of
-    later credits, e.g. because they use [BiFUpdPlainly]. *)
+(** Predicates we take the fixpoint of in order to define the lWP. *)
 
 (* Ω must make strict progress *)
-Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
+Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ (Ω1 : obl_states) (Θ : thread_pool Λ) σ1 ns κ κs,
      (⌜ Θ !! i = Some e1 ⌝ ∗ osat Ω1 ∗ othread (dom Θ) ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗
       state_interp (Θ, σ1) ns (κ ++ κs)) ={E,∅}=∗
-     (* ∃ b, ▷? b |={∅}=> *)
      (⌜if s is NotStuck then reducible e1 σ1 (dom Θ) else True⌝) ∗
-     ∃ (b : bool) (l : nat) Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ (Θ, σ1) ⌝) ∗
-              ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
-                           (⌜ if b then l = (S $ num_laters_per_step ns) else l = 0 ⌝) -∗
-                           £ l ={∅}▷=∗^l |={∅,E}=>
+     ∃ Ω1' (b : bool), (⌜ Ω1 ↪ₛ⋆ Ω1' @ (Θ, σ1) ⌝) ∗
+                    ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
+                                 (if b then £ω else emp) -∗ |={∅,E}=>
      ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₛ⋆ Ω2' @ (<[i:=e2]>Θ, σ2)) ⌝) ∗
                (osat Ω2' ∗ othread (dom (<[i:=e2]>Θ)) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗
                 state_interp (<[i:=e2]>Θ, σ2) (S ns) κs) ∗
                ν e2 efs
-  )%I.
-
-Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
-  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
-  (∀ δ1 (Ω1 : obl_statesL Λ) γ1 σ1 ns κ κs τ,
-     (⌜ τ = dom δ1 ⌝ ∗ schedfairIL Λ δ1 ∗ osat Ω1 ∗ toIL Λ γ1 ∗ oftIL Λ Ω1 δ1 γ1 ∗ state_interp σ1 ns (κ ++ κs) τ) ={E,∅}=∗
-     (⌜if s is NotStuck then reducible e1 σ1 τ else True⌝) ∗
-     ∃ Ω2, (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ1)⌝) ∗
-           ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                        ∀ δ2 δ3, (⌜fuels_fair_update {[i]} δ1 δ2 ∧ fuels_fair_fork efs δ2 δ3⌝) -∗
-                                 £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-     ∃ Ω3 Ω4, (⌜(Ω2 ↪ₚ⁺ Ω3) ∧ (Ω3 ↪ₛ⋆ Ω4 @ σ2)⌝) ∗
-              ∃ γ2, (schedfairIL Λ δ3 ∗ osat Ω4 ∗ toIL Λ γ2 ∗ oftIL Λ Ω4 δ3 γ2 ∗ state_interp σ2 (S ns) κs (τ ∪ dom efs)) ∗
-                    ν e2 efs
   )%I.
 
 Section lwp_step.

@@ -32,7 +32,14 @@ Section aux.
   Lemma n2o_succ_add n : n2o (S n) = one ⊕ (n2o n).
   Proof. rewrite -n2o_one -n2o_add. done. Qed.
 
+  Definition omega_def := limit n2o.
+  Notation "'ω'" := (omega_def) : ordinals.
+
+  Lemma omega_upper_bound : ∀ (n : nat), n2o n ⪯ ω.
+  Proof. intros. apply limit_upper_bound. Qed.
+
 End aux.
+Notation "'ω'" := (omega_def) : ordinals.
 
 (** Ordinals *)
 Section ordinals.
