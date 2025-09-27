@@ -8,7 +8,7 @@ From iris.algebra Require Export auth.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Export own.
-From liris.algebra Require Export ordinal_ucmra.
+From liris.algebra Require Import ordinal_ucmra.
 From liris.base_logic Require Export relational_updates.
 
 Section aux.

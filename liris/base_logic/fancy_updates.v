@@ -5,6 +5,7 @@ From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Export own.
 From transfinite.base_logic.lib Require Import wsat.
+From liris.algebra Require Import ordinal_ucmra.
 From liris.base_logic Require Export later_credits.
 From iris.prelude Require Import options.
 Export wsatGS.

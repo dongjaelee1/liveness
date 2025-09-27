@@ -1,15 +1,15 @@
 From iris.proofmode Require Import base proofmode classes.
-From transfinite.base_logic.lib Require Export fancy_updates.
+(* From transfinite.base_logic.lib Require Export fancy_updates. *)
 From liris Require Export language.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
 From iris.bi Require Export fixpoint.
 From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
-Import uPred.
-From liris.base_logic Require Export otree.
+From liris.base_logic Require Export otree fancy_updates.
 (* From liris.program_logic Require Export thread_obligation. *)
 From liris.algebra Require Import ordinal_wfocm.
+Import uPred.
 
 Notation prog_state Λ := (prod (thread_pool Λ) (state Λ)).
 
@@ -82,8 +82,6 @@ Notation lirisGS := (lirisGS_gen HasLc).
     can only be used by exactly one client.
   - The step-taking update can even be used by clients that opt out of
     later credits, e.g. because they use [BiFUpdPlainly]. *)
-
-(* TODO : ordinal later credit *)
 
 (* Ω must make strict progress *)
 Definition lwp_step `{SI : indexT} `{!lirisGS_gen hlc Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
