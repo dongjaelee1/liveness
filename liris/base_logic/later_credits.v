@@ -170,12 +170,12 @@ Section auth_rupd.
   Section allocation.
     Context `{!auth_rupdGS Σ X}.
 
-    Definition A P := (∃ x : X, rupdF x -∗ |==>r P)%I.
+    Definition ALC P := (∃ x : X, rupdF x -∗ |==>r P)%I.
 
     (* some laws for the allocation modality *)
-    Lemma A_later P : A P ⊣⊢ A (▷ P).
+    Lemma ALC_later P : ALC P ⊣⊢ ALC (▷ P).
     Proof.
-      rewrite /A; apply bi.equiv_entails; split.
+      rewrite /ALC; apply bi.equiv_entails; split.
       - iDestruct 1 as (x) "Hwand". iExists x. by rewrite -(bi.later_intro P).
       - iDestruct 1 as (x) "Hwand". iExists (x ⋅ auth_rupd_next ε).
         rewrite rupdF_split. iIntros "[Hx Hnext]".
@@ -184,27 +184,27 @@ Section auth_rupd.
         iFrame "Hnext". iIntros "_". iNext. by iApply rupd_intro.
     Qed.
 
-    Lemma A_rupd P : A P ⊣⊢ A (|==>r P).
+    Lemma ALC_rupd P : ALC P ⊣⊢ ALC (|==>r P).
     Proof.
-      rewrite /A; apply bi.equiv_entails; split.
+      rewrite /ALC; apply bi.equiv_entails; split.
       - iDestruct 1 as (x) "Hwand". iExists x.
         iIntros "Hupd". iApply rupd_intro. by iApply "Hwand".
       - iDestruct 1 as (x) "Hwand". iExists x.
         by rewrite rupd_trans.
     Qed.
  
-    Lemma A_bupd P : A P ⊣⊢ A (|==> P).
+    Lemma ALC_bupd P : ALC P ⊣⊢ ALC (|==> P).
     Proof.
-      rewrite /A; apply bi.equiv_entails; split.
+      rewrite /ALC; apply bi.equiv_entails; split.
       - iDestruct 1 as (x) "Hwand". iExists x.
         iIntros "Hupd". iMod ("Hwand" with "Hupd"). by iFrame.
       - iDestruct 1 as (x) "Hwand". iExists x.
         by rewrite rupd_bupd_r.
     Qed.
 
-    Lemma A_credits x P : A P ⊣⊢ A (rupdF x -∗ P).
+    Lemma ALC_credits x P : ALC P ⊣⊢ ALC (rupdF x -∗ P).
     Proof.
-      rewrite /A; apply bi.equiv_entails; split.
+      rewrite /ALC; apply bi.equiv_entails; split.
       - iDestruct 1 as (y) "Hwand". iExists y.
         iIntros "Hupd". iMod ("Hwand" with "Hupd").
         iModIntro. by iIntros "_".
@@ -214,7 +214,7 @@ Section auth_rupd.
         iModIntro. by iApply "P".
     Qed.
 
-    Lemma A_fmap P Q : A (P -∗ Q) ⊢ A P -∗ A Q.
+    Lemma ALC_fmap P Q : ALC (P -∗ Q) ⊢ ALC P -∗ ALC Q.
     Proof.
       iIntros "APQ AP".
       iDestruct "APQ" as (x1) "APQ".
@@ -225,86 +225,86 @@ Section auth_rupd.
       iApply rupd_intro. by iApply "PQ".
     Qed.
 
-    Lemma A_intro P : P ⊢ A P.
+    Lemma ALC_intro P : P ⊢ ALC P.
     Proof.
       iIntros "P". iExists ε. iIntros "_". by iApply rupd_intro.
     Qed.
 
-    Lemma A_alloc x P : (rupdF x -∗ |==>r P) ⊢ A P.
-    Proof. by rewrite A_rupd A_credits -A_intro. Qed.
+    Lemma ALC_alloc x P : (rupdF x -∗ |==>r P) ⊢ ALC P.
+    Proof. by rewrite ALC_rupd ALC_credits -ALC_intro. Qed.
 
-    Lemma A_wand P Q : (P -∗ Q) ⊢ A P -∗ A Q.
+    Lemma ALC_wand P Q : (P -∗ Q) ⊢ ALC P -∗ ALC Q.
     Proof.
-      iIntros "HPQ HP". iApply (A_fmap with "[HPQ] HP").
-      by iApply A_intro.
+      iIntros "HPQ HP". iApply (ALC_fmap with "[HPQ] HP").
+      by iApply ALC_intro.
     Qed.
 
-    Lemma A_mono P Q : (P ⊢ Q) → A P ⊢ A Q.
+    Lemma ALC_mono P Q : (P ⊢ Q) → ALC P ⊢ ALC Q.
     Proof.
-      iIntros (HPQ) "HP". iApply A_wand; last eauto.
+      iIntros (HPQ) "HP". iApply ALC_wand; last eauto.
       iApply HPQ.
     Qed.
 
-    Global Instance A_ent_proper : Proper ((⊢) ==> (⊢)) A.
+    Global Instance ALC_ent_proper : Proper ((⊢) ==> (⊢)) ALC.
     Proof.
-      intros P Q PQ. by apply A_mono.
+      intros P Q PQ. by apply ALC_mono.
     Qed.
 
-    Global Instance A_flip_ent_proper : Proper (flip (⊢) ==> flip (⊢)) A.
+    Global Instance ALC_flip_ent_proper : Proper (flip (⊢) ==> flip (⊢)) ALC.
     Proof.
-      intros P Q PQ. by apply A_mono.
+      intros P Q PQ. by apply ALC_mono.
     Qed.
 
-    Global Instance A_ne : NonExpansive A.
+    Global Instance ALC_ne : NonExpansive ALC.
     Proof.
-      intros n P Q EQ; rewrite /A. by do 4 f_equiv.
+      intros n P Q EQ; rewrite /ALC. by do 4 f_equiv.
     Qed.
 
-    Global Instance A_equiv_proper : Proper ((≡) ==> (≡)) A := ne_proper _.
+    Global Instance ALC_equiv_proper : Proper ((≡) ==> (≡)) ALC := ne_proper _.
 
-    Global Instance A_contractive : Contractive A.
+    Global Instance ALC_contractive : Contractive ALC.
     Proof.
       intros n P Q Heq.
-      rewrite (A_later P) (A_later Q). f_equiv.
+      rewrite (ALC_later P) (ALC_later Q). f_equiv.
       by f_contractive.
     Qed.
 
-    Global Instance from_modal_A P : FromModal True modality_id P (A P) P.
+    Global Instance from_modal_ALC P : FromModal True modality_id P (ALC P) P.
     Proof.
-      rewrite /FromModal //=. intros. apply A_intro.
+      rewrite /FromModal //=. intros. apply ALC_intro.
     Qed.
 
-    Global Instance from_pure_A a φ P :
-      FromPure a P φ → FromPure a (A P) φ.
-    Proof. rewrite /FromPure. intros <-. apply A_intro. Qed.
+    Global Instance from_pure_ALC a φ P :
+      FromPure a P φ → FromPure a (ALC P) φ.
+    Proof. rewrite /FromPure. intros <-. apply ALC_intro. Qed.
 
-    Global Instance elim_rupd_A (p : bool) P Q :
-      ElimModal True p false (A P) P (A Q) Q.
+    Global Instance elim_rupd_ALC (p : bool) P Q :
+      ElimModal True p false (ALC P) P (ALC Q) Q.
     Proof.
       rewrite /ElimModal bi.intuitionistically_if_elim //=.
-      iIntros "_ [HP HPQ]". by iApply (A_wand with "HPQ").
+      iIntros "_ [HP HPQ]". by iApply (ALC_wand with "HPQ").
     Qed.
 
-    Global Instance frame_A b R P Q :
-      Frame b R P Q → Frame b R (A P) (A Q).
+    Global Instance frame_ALC b R P Q :
+      Frame b R P Q → Frame b R (ALC P) (ALC Q).
     Proof.
       rewrite /Frame. iIntros (Hent) "[R Q]". iMod "Q".
       iApply Hent; iFrame.
     Qed.
 
-    Global Instance into_wand_A R P Q :
-      IntoWand false false R P Q → IntoWand false false (A R) (A P) (A Q).
+    Global Instance into_wand_ALC R P Q :
+      IntoWand false false R P Q → IntoWand false false (ALC R) (ALC P) (ALC Q).
     Proof.
       rewrite /IntoWand /= => HR; simpl in *.
       iIntros "R P". rewrite HR.
-      iApply (A_fmap with "R P").
+      iApply (ALC_fmap with "R P").
     Qed.
 
-    Lemma sat_A {sat : iProp Σ → Prop}
+    Lemma sat_ALC {sat : iProp Σ → Prop}
       `{!Satisfiable sat} `{!SatisfiableRUpd sat} `{!SatisfiableRUpdUpdate sat} `{!SatisfiableExists X sat} P :
-      sat (A P) → sat P.
+      sat (ALC P) → sat P.
     Proof.
-      rewrite /A. intros Hsat.
+      rewrite /ALC. intros Hsat.
       eapply sat_exists in Hsat as [x Hsat].
       eapply sat_pred_upd with (Q := rupdF x) in Hsat.
       { eapply sat_rupd, sat_mono, Hsat. iIntros "[HP Hx]". by iApply "HP". }
@@ -316,17 +316,17 @@ Section auth_rupd.
       - iModIntro. iExists _. iFrame. by rewrite (right_id ε).
     Qed.
 
-    Notation "'A?' p P" := (Nat.iter (Nat.b2n p) A P) (at level 20, p at level 9, P at level 20) : bi_scope.
+    Notation "'ALC?' p P" := (Nat.iter (Nat.b2n p) ALC P) (at level 20, p at level 9, P at level 20) : bi_scope.
 
-    Global Instance from_modal_Ab b P : FromModal True modality_id P (A? b P) P.
+    Global Instance from_modal_ALCb b P : FromModal True modality_id P (ALC? b P) P.
     Proof. destruct b; simpl. 1: apply _. done. Qed.
 
-    Global Instance from_pure_Ab a φ b P :
-      FromPure a P φ → FromPure a (A? b P) φ.
+    Global Instance from_pure_ALCb a φ b P :
+      FromPure a P φ → FromPure a (ALC? b P) φ.
     Proof. destruct b; simpl; intros. 1: apply _. done. Qed.
 
-    Global Instance elim_rupd_Ab (p : bool) b P Q :
-      ElimModal True p false (A? b P) P (A? b Q) Q.
+    Global Instance elim_rupd_ALCb (p : bool) b P Q :
+      ElimModal True p false (ALC? b P) P (ALC? b Q) Q.
     Proof.
       destruct b; simpl. 1: apply _.
       rewrite /ElimModal bi.intuitionistically_if_elim //=.
@@ -420,14 +420,14 @@ Section auth_rupd.
   (* Qed. *)
 
 End auth_rupd.
-Notation "'A?' p P" := (Nat.iter (Nat.b2n p) A P) (at level 20, p at level 9, P at level 20) : bi_scope.
 
 (** The notation for later credits that we use in the rest of this developemnt. *)
 Notation "£ a" := (rupdF _ _ a) (at level 60).
 Notation "●£ a" := (rupdA _ _ a) (at level 60).
 
-Global Arguments A {SI Σ X _ _} P.
-Global Arguments sat_A {_ _ _ _ _ _ _ _ _ _} P.
+Global Arguments ALC {SI Σ X _ _} P.
+Global Arguments sat_ALC {_ _ _ _ _ _ _ _ _ _} P.
+Notation "'ALC?' p P" := (Nat.iter (Nat.b2n p) ALC P) (at level 20, p at level 9, P at level 20) : bi_scope.
 
 
 Lemma auth_rupd_rel_irrefl `{SI : indexT} {M: ucmra} `{!auth_rupd M} x: ¬ auth_rupd_rel x x.
