@@ -316,6 +316,23 @@ Section auth_rupd.
       - iModIntro. iExists _. iFrame. by rewrite (right_id ε).
     Qed.
 
+    Notation "'A?' p P" := (Nat.iter (Nat.b2n p) A P) (at level 20, p at level 9, P at level 20) : bi_scope.
+
+    Global Instance from_modal_Ab b P : FromModal True modality_id P (A? b P) P.
+    Proof. destruct b; simpl. 1: apply _. done. Qed.
+
+    Global Instance from_pure_Ab a φ b P :
+      FromPure a P φ → FromPure a (A? b P) φ.
+    Proof. destruct b; simpl; intros. 1: apply _. done. Qed.
+
+    Global Instance elim_rupd_Ab (p : bool) b P Q :
+      ElimModal True p false (A? b P) P (A? b Q) Q.
+    Proof.
+      destruct b; simpl. 1: apply _.
+      rewrite /ElimModal bi.intuitionistically_if_elim //=.
+      iIntros "_ [HP HPQ]". by iApply ("HPQ" with "HP").
+    Qed.
+
   End allocation.
 
   (** Later credits admit an induction principle that is similar to Löb
@@ -403,6 +420,7 @@ Section auth_rupd.
   (* Qed. *)
 
 End auth_rupd.
+Notation "'A?' p P" := (Nat.iter (Nat.b2n p) A P) (at level 20, p at level 9, P at level 20) : bi_scope.
 
 (** The notation for later credits that we use in the rest of this developemnt. *)
 Notation "£ a" := (rupdF _ _ a) (at level 60).
