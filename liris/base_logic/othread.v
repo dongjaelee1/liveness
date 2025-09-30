@@ -414,6 +414,21 @@ Section othread.
     iFrame. done.
   Qed.
 
+  Lemma othread_alloc_threads Θ TP :
+    Θ ## TP →
+    othread TP
+    ⊢ |==> othread (TP ∪ Θ) ∗ ([∗ set] i ∈ Θ, othreadG_elem i ∗ othreadG_obls i ∅ 1 ∗ othreadG_exec i (1/2)%Qp).
+  Proof.
+    revert TP. pattern Θ. revert Θ. apply set_ind.
+    { solve_proper. }
+    { iIntros (??) "T". rewrite union_empty_r_L. iFrame. by iModIntro. }
+    iIntros (i Θ Nin IH TP Disj) "T".
+    iMod (IH with "T") as "(T& Hs)"; first set_solver.
+    iMod (othread_alloc_thread i with "T") as "(T& Hi)"; first set_solver.
+    iModIntro. replace ({[i]} ∪ (TP ∪ Θ)) with (TP ∪ ({[i]} ∪ Θ)); last set_solver.
+    iFrame. iApply big_sepS_union; first set_solver. rewrite big_sepS_singleton. iFrame.
+  Qed.
+
   Lemma othread_alloc_obl_1 TP i Ψ q k :
     oblG_live k (1/2)%Qp ∗ oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i Ψ q
     ⊢ |==> oblG_live k (1/2)%Qp ∗ oblG_live k (1/2/2)%Qp ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
