@@ -68,76 +68,80 @@ Section liveness.
     iFrame. iPureIntro. split; done.
   Qed.
 
-  Lemma lwp_step_progress_get_lc_suspended_obls Ψ s i E e1 ν :
+  Lemma lwp_step_progress_get_lc_suspended_obls π K Ψ s i E e1 ν :
+    Ψ = dom K →
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
-       (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-        [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+       (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+        ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+        ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
        ALC (|={∅}=>
               ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                           othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+                           othreadG_obls i Ψ 1 -∗
+                           ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+                             ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+                              (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
                            ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                            |={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs))
     ⊢ lwp_step s i E e1 ν.
   Proof.
-    rewrite /lwp_step. iIntros "H % % % % % I". iDestruct "I" as "(S& T& U& F& I)".
+    rewrite /lwp_step. iIntros (Dom) "H % % % % % I". iDestruct "I" as "(S& T& U& F& I)".
     iMod ("H" with "I") as "(%Hstuck& (#Tei& Tbsi& Bps)& H)".
     iModIntro. iSplitR; first done. iExists true. iMod "H" as ">H".
     iModIntro. iExists Ω1. iSplitR; first done. iIntros (??? Hstep).
-    iMod (oforest_progress_one_thread _ _ _ Ψ (gset_to_gmap (true, q) Ψ) with "[S T F Tbsi Bps]")
-      as "(%& %Hprog& S& T& F& Tbsi &Tos)".
-    { by rewrite dom_gset_to_gmap. }
-    { iFrame. iSplitR; first auto. rewrite big_sepM_gset_to_gmap. iApply (big_sepS_impl with "Bps").
-      iIntros "!>" (??). iIntros "(E& O& P)". iFrame. iPureIntro. apply Ord.S_lt. }
-    rewrite big_sepM_gset_to_gmap.
-    iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
-    { symmetry. eapply fork_thread_ids; eauto. }
-    iMod ("H" with "[//] Tbsi Tos Efs") as "[I H]". iModIntro. iExists Ω', Ω'.
-    assert (dom Ω1 = dom Ω') by (eapply obl_states_cond_rel_dom; eauto). rewrite !H.    
-    iFrame. iPureIntro. split; done.
+    iDestruct "Bps" as "(#Beπ& #Feπ& Bps& M)".
+    iAssert ([∗ map] k ↦ _ ∈ K, oblG_elem k)%I with "[Bps]" as "#Bes".
+    { rewrite Dom -big_sepM_dom. iApply (big_sepM_impl with "Bps"). iIntros "!>" (???) "[H _]". iFrame. }
+    iMod (oforest_wait_cases_many _ _ _ ((λ '(x, ψ), (x, i, ψ)) <$>K) with "[S U F M]") as "(S& F& [(Fws& Fos& U) | (U& #Bdπ& M)])".
+    { iFrame. iSplitR; first eauto. iSplitR; first eauto.
+      rewrite big_sepM_fmap. iApply (big_sepM_impl with "M"). iIntros "!>" (???). destruct x. by iIntros. }
+    - rewrite !big_sepM_fmap.
+      iAssert (
+          ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k false (1/2)) ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_edge π k 1)
+        )%I with "[Fos]" as "[Fos Fes]".
+      { iApply big_sepM_sep. iApply (big_sepM_impl with "Fos"). iIntros "!>" (???) "A". destruct x. iFrame. }
+      iMod (oforest_progress_one_thread _ _ _ Ψ (gset_to_gmap (false, (1/2)%Qp) Ψ) with "[S T F Tbsi Fos]")
+        as "(%& %Hprog& S& T& F& Tbsi& Fos)".
+      { by rewrite dom_gset_to_gmap. }
+      { iFrame. iSplitR; first auto. rewrite big_sepM_gset_to_gmap big_sepS_sep Dom -!big_sepM_dom.
+        iSplitR; first auto. iApply (big_sepM_impl with "Fos"). iIntros "!>" (???) "H". by destruct x. }
+      iPoseProof (big_sepM_gset_to_gmap with "Fos") as "Fos". iPoseProof ("U" with "[Fes Fos]") as "U".
+      { subst Ψ. rewrite -big_sepM_dom. iPoseProof (big_sepM_sep_2 with "Fos Fes") as "Fs".
+        iApply (big_sepM_impl with "Fs"). iIntros "!>" (???) "H". by destruct x. }
+      iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
+      { symmetry. eapply fork_thread_ids; eauto. }
+      iMod ("H" with "[//] Tbsi [Bps Fws] Efs") as "[I H]".
+      { iLeft. iSplitR "Fws".
+        - iPoseProof (big_sepS_sep with "Bps") as "[H1 H2]". iFrame.
+        - iApply (big_sepM_impl with "Fws"). iIntros "!>" (???) "H". by destruct x. }
+      iModIntro. iExists Ω', Ω'.
+      assert (dom Ω1 = dom Ω') by (eapply obl_states_cond_rel_dom; eauto). rewrite !H.    
+      iFrame. iPureIntro. split; done.
+    - rewrite !big_sepM_fmap.
+      iAssert (
+          ([∗ map] k ↦ _ ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k Ord.one) ∗
+          ([∗ map] k ↦ '(x, ψ) ∈ K, oblG_progress k ψ)
+        )%I with "[Bps M]" as "[Tos Bps]".
+      { subst Ψ. rewrite -big_sepM_dom -big_sepM_sep. iPoseProof (big_sepM_sep_2 with "Bps M") as "M".
+        iApply (big_sepM_impl with "M"). iIntros "!>" (???) "H". destruct x. iDestruct "H" as "((_&B)&C&D)". iFrame. }
+      iMod (oforest_progress_one_thread _ _ _ Ψ (gset_to_gmap (true, (1/2)%Qp) Ψ) with "[S T F Tbsi Tos]")
+        as "(%& %Hprog& S& T& F& Tbsi& Fos)".
+      { by rewrite dom_gset_to_gmap. }
+      { iFrame. iSplitR; first auto. rewrite big_sepM_gset_to_gmap big_sepS_sep Dom -!big_sepM_dom.
+        iSplitR; first auto. iApply (big_sepM_impl with "Tos"). iIntros "!>" (???) "[H1 H2]".
+        iFrame. iPureIntro. apply Ord.S_pos. }
+      iPoseProof (big_sepM_gset_to_gmap with "Fos") as "Fos".
+      iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
+      { symmetry. eapply fork_thread_ids; eauto. }
+      iMod ("H" with "[//] Tbsi [Bps Fos] Efs") as "[I H]".
+      { iRight. iSplitR; first auto. subst Ψ. rewrite -big_sepM_dom.
+        iPoseProof (big_sepM_sep_2 with "Fos Bps") as "H".
+        iApply (big_sepM_impl with "H"). iIntros "!>" (???) "H". by destruct x. }
+      iModIntro. iExists Ω', Ω'.
+      assert (dom Ω1 = dom Ω') by (eapply obl_states_cond_rel_dom; eauto). rewrite !H.    
+      iFrame. iPureIntro. split; done.
   Qed.
-
-osuspend_wait_cases:
-  ∀ {SI : indexT} {A : Type} {WFA : WFOCM.pack A} {Σ : gFunctors} {ps : Type} {H : osatGS.osatGS ps positive Σ} 
-    {H0 : othreadGS.othreadGS Σ} {otreeGS0 : otreeGS.otreeGS A Σ} (D : obl_ids) (k : obl_id) (x θ : positive) 
-    (π : obl_id) (ψ : A),
-    osuspend D ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1 / 2)
-    ⊢ otreeG_wait k x (1 / 2) ∗ othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1 ∗
-      (othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1 -∗ osuspend D)
-      ∨ (|==> othreadG_owns θ k true (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ osuspend D)
-oforest_done_suspend:
-  ∀ {SI : indexT} {A : Type} {WFA : WFOCM.pack A} {Σ : gFunctors} {ps : Type} {H : osatGS.osatGS ps positive Σ} 
-    {H0 : othreadGS.othreadGS Σ} {otreeGS0 : otreeGS.otreeGS A Σ} (D : obl_ids) (k : obl_id) (x θ : positive) 
-    (π : obl_id) (ψ : A),
-    osuspend D ∗ oforest D ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1 / 2) ∗ otreeG_elem π ∗ 
-    oblG_done π ⊢ |==> osuspend D ∗ oforest D ∗ othreadG_owns θ k true (1 / 2) ∗ oblG_progress k ψ
-lwp_step `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
-  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
-  (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs,
-     (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
-     (⌜if s is NotStuck then reducible e1 σ1 Θ else True⌝) ∗
-     ∃ (b : bool), ALC? b |={∅}=>
-     ∃ Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ σ1 ⌝) ∗
-            ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗ |={∅,E}=>
-     ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₛ⋆ Ω2' @ σ2) ⌝) ∗
-               (osat Ω2' ∗ othread (Θ ∪ dom efs) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗
-                state_interp σ2 (Θ ∪ dom efs) κs) ∗
-               ν e2 efs)%I.
-oforest_progress_one_thread:
-  ∀ {SI : indexT} {A : Type} {WFA : WFOCM.pack A} {Σ : gFunctors} {ps : Type} {H : osatGS.osatGS ps positive Σ} 
-    {H0 : othreadGS.othreadGS Σ} {otreeGS0 : otreeGS.otreeGS A Σ} {Ξ : obl_class A ps positive WFOCM.ltR} 
-    (Ω : obl_states) (TP : gset positive) (i : positive) (Ψ : obl_ids) (γ : gmap obl_id (bool * Qp)),
-    Ψ = dom γ
-    → osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-      ([∗ map] ρ↦pat ∈ γ, match pat with
-                          | (true as f, q) => oblG_elem ρ ∗ othreadG_owns i ρ f q ∗
-                              ∃ a : A, ⌜WFOCM.ltR OCM.unit a⌝ ∗ oblG_progress ρ a
-                          | (false as f, q) => oblG_elem ρ ∗ othreadG_owns i ρ f q
-                          end)
-      ⊢ |==>
-          ∃ Ω' : obl_states, ⌜Ω ↪ₚ Ω' | obl_cond_owner i⌝ ∗ osat Ω' ∗ othread TP ∗ oforest (dom Ω') ∗ 
-            othreadG_obls i Ψ 1 ∗ ([∗ map] ρ↦'((true as f, q) | (false as f, q)) ∈ γ, othreadG_owns i ρ f q)
 
   Lemma lwp_step_progress s i E e1 ν :
     (∀ σ1 ns κ κs τ,
