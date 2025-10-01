@@ -68,26 +68,26 @@ Section liveness.
     iFrame. iPureIntro. split; done.
   Qed.
 
-  Lemma lwp_step_progress_get_lc_suspended_obls π K Ψ s i E e1 ν :
-    Ψ = dom K →
+  Lemma lwp_step_progress_get_lc_suspended_obls s i E e1 ν :
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
-       (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-        ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
-        ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
-       ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                           othreadG_obls i Ψ 1 -∗
-                           ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
-                             ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
-                              (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
-                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
-                           |={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs))
+       ∃ π Ψ K,
+         (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+          ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+         ALC (|={∅}=>
+                ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                             othreadG_obls i Ψ 1 -∗
+                             ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+                               ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+                                (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+                             ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                             |={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs))
     ⊢ lwp_step s i E e1 ν.
   Proof.
-    rewrite /lwp_step. iIntros (Dom) "H % % % % % I". iDestruct "I" as "(S& T& U& F& I)".
-    iMod ("H" with "I") as "(%Hstuck& (#Tei& Tbsi& Bps)& H)".
+    rewrite /lwp_step. iIntros "H % % % % % I". iDestruct "I" as "(S& T& U& F& I)".
+    iMod ("H" with "I") as "(%Hstuck& %&%&%& (%Dom& #Tei& Tbsi& Bps)& H)".
     iModIntro. iSplitR; first done. iExists true. iMod "H" as ">H".
     iModIntro. iExists Ω1. iSplitR; first done. iIntros (??? Hstep).
     iDestruct "Bps" as "(#Beπ& #Feπ& Bps& M)".
@@ -143,262 +143,87 @@ Section liveness.
       iFrame. iPureIntro. split; done.
   Qed.
 
-  Lemma lwp_step_progress s i E e1 ν :
-    (∀ σ1 ns κ κs τ,
-       state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
-       ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
-              (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
-              ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                           toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] j ∈ dom efs, toL_thread j 1 []) -∗
-                           £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-       state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗ ν e2 efs)
-    ⊢ lwp_step s i E e1 ν.
-  Proof.
-    rewrite /lwp_step. iIntros "H % % % % % % % % I". iDestruct "I" as "(%Idom&Id1&IO1&Ig1&#Ioft1&Is1)".
-    iMod ("H" with "Is1") as "(%&%&Ht&Hcs&Hstuck&H)".
-    iPoseProof (oblS_credit_eq_list with "Hcs") as "Hcs".
-    { rewrite ord_S_add. reflexivity. }
-    iPoseProof (oblS_credit_split_list with "Hcs") as "[Hcs0 Hcs]".
-    iModIntro. iSplitL "Hstuck"; first done.
-    iExists Ω1. iSplit; first done. iIntros (??? Hstep ?? Hsf) "Hlc".
-    destruct Hsf as [Hffu Hfff].
-    iPoseProof (toI_toL_thread_lookup with "[Ig1 Ht]") as "%LUg"; first iFrame. destruct LUg as (L'&LUg&PermL).
-    symmetry in PermL. iPoseProof (toL_thread_perm _ _ _ _ PermL with "Ht") as "Ht". rewrite !(big_opL_permutation _ _ _ PermL).
-    iPoseProof "Ioft1" as "Ioft1'". iDestruct "Ioft1'" as "[IoftO IoftM]".
-    iPoseProof (big_sepM2_lookup_iff with "IoftM") as "%A".
-    specialize (A i). destruct A. destruct H0 as [f LUd1]; first eauto. clear H.
-    iPoseProof (toI_obl_reset_fuel with "[Ig1 Ht Hcs]") as "[[% Hfb] Ig]"; first iFrame.
-    destruct (WFOCM.exists_pos (t:=@fuel_wf Λ)) as [c LTc].
-    simpl.
-    iMod (schedfairI_credit_from_all _ _ _ c Hffu with "[Id1 Hfb]") as "(Id2&Hfb&Hc)".
-    { iFrame. apply elem_of_dom_2 in LUd1. iApply (big_sepS_delete _ _ _ LUd1 with "[Hfb]"). iSplitL.
-      - case_decide; [iFrame|done].
-      - iApply big_sepS_intro. iModIntro. iIntros. case_decide; [set_solver|done].
-    }
-    iPoseProof (sfS_fuel_credit_forall_get with "Hc") as "Hc"; first done.
-    assert (∃ f2, δ2 !! i = Some f2).
-    { pose proof (map_Forall2_lookup_l _ _ _ Hffu _ _ LUd1). destruct H as (?&?&?). eauto. }
-    destruct H as [f2 LUd2]. iAssert (∃ f1, sfS_fuel_bound i f1 1)%I with "[Hfb]" as "Hfb".
-    { apply elem_of_dom_2 in LUd2. iPoseProof (big_sepS_delete _ _ _ LUd2 with "Hfb") as "[H _]".
-      case_decide; first iFrame. exfalso. set_solver.
-    }
-    iDestruct "Hfb" as "[% Hfb]". iDestruct ("Ig" with "Hfb") as "[Ig1 Ht]".
-    iPoseProof (toL_thread_perm _ _ _ _ PermL with "Ht") as "Ht".
-    rename L into L_orig, L' into L.
-
-    iPoseProof (toI_assigned_obls_split_dom _ (dom Ω1) with "[Ig1]") as "(%&%&%HDD&#HD1&#HD2)"; first by iFrame.
-    destruct HDD as [HOD HDD].
-    set (FR:=λ (α : obl_id) (f : fuel Λ), ∃ (i' : thread_id) (L' : list obl_id),
-            γ1 !! i' = Some L' ∧ α ∈ L' ∧ ∃ f', δ2 !! i' = Some f' ∧ (fuel_leR f' f)).
-    iMod (osat_progress _ L FR FR with "[IO1 Hcs0]") as "(%Ω2&IO2&%HOP&%HMF)".
-    { clear L_orig PermL.
-      iPoseProof (osat_obl_is_done_weak_set _ D1 with "[IO1]") as "%HD1"; first by iFrame.
-      iFrame "IO1". iPoseProof (big_sepM2_forall with "IoftM") as "%M". destruct M as [M1 M2].
-      iPoseProof "HD2" as "%HD2".
-      assert (mp : ∀ (P Q : Type), P → (P → Q) → Q) by intuition. eapply mp; [eapply oftI_schedule_1|]; eauto.
-      { intros. apply elem_of_list_lookup_1 in H1. destruct H1. eapply M2; eauto. Unshelve. all: try apply _. }
-      intros MF. pose proof (dom_union_inv_L _ _ _ HDD HOD). destruct H as (m1&m2&HOm&Hmm&Hm1&Hm2).
-      subst. rewrite big_sepM_union; [|auto]. iSplitR.
-      - iApply (big_sepM_impl (λ _ _, emp)%I); first done.
-        iModIntro. iIntros (k o LUk) "_". assert (k ∈ dom m1) by (eapply elem_of_dom_2; eauto).
-        specialize (HD1 _ H). destruct HD1. rewrite lookup_union_l in H0.
-        2:{ apply not_elem_of_dom. set_solver. }
-        rewrite LUk in H0. inv H0. auto.
-      - iAssert (
-  ([∗ map] k↦y ∈ m2, match y with
-                    | obl_live (_, b) =>
-                        if decide (k ∈ L)
-                        then ∃ c0 : Ord.t, ⌜WFOCM.ltR OCM.unit c0⌝ ∧ oblS_credit k c0 ∧ ⌜∃ b' : fuel Λ, FR k b'⌝
-                        else True
-                    | _ => True
-                    end) ∗
-  ([∗ map] k↦y ∈ m2, match y with
-                    | obl_live (_, b) =>
-                        if decide (k ∈ L)
-                        then True
-                        else ⌜∃ b' : fuel Λ, fuelR b' b ∧ FR k b'⌝
-                    | _ => True
-                     end))%I with "[-]" as "H".
-        2:{ rewrite -big_sepM_sep. iApply (big_sepM_impl with "H"). iModIntro. iIntros (k o LUk) "[H1 H2]".
-            destruct o; try auto. destruct a. destruct (decide (k ∈ L)); iFrame.
-        }
-        iSplitL.
-        + iAssert (
-  ([∗ map] k↦y ∈ m2, match y with
-                    | obl_live (_, _) =>
-                        if decide (k ∈ L)
-                        then ∃ c0 : Ord.t, ⌜WFOCM.ltR OCM.unit c0⌝ ∧ oblS_credit k c0
-                        else True
-                    | _ => True
-                    end) ∗
-  ([∗ map] k↦y ∈ m2, match y with
-                    | obl_live (_, _) =>
-                        if decide (k ∈ L)
-                        then ⌜∃ b' : fuel Λ, FR k b'⌝
-                        else True
-                    | _ => True
-                     end))%I with "[-]" as "H".
-          2:{ rewrite -big_sepM_sep. iApply (big_sepM_impl with "H"). iModIntro. iIntros (k o LUk) "[H1 H2]".
-              destruct o; try auto. destruct a. destruct (decide (k ∈ L)); iFrame.
-          }
-          iSplitL.
-          * iClear (HOD HDD HD1 M2 MF HD2 Hmm LUg) "#". iStopProof. revert m2. induction L.
-            { iIntros. iApply (big_sepM_impl (λ _ _, True)%I); first done. iModIntro. iIntros.
-              destruct x; try auto. destruct a. destruct (decide (k ∈ [])); [set_solver|auto].
-            }
-            iIntros (m2) "Hc". iPoseProof (big_sepL_cons with "Hc") as "[C Hc]".
-            iAssert (
-  ([∗ map] k↦y ∈ m2, match y with
-                    | obl_live (_, _) =>
-                        if decide (k = a)
-                        then ∃ c0 : Ord.t, ⌜WFOCM.ltR OCM.unit c0⌝ ∧ oblS_credit k c0
-                        else True
-                    | _ => True
-                    end) ∗
-  ([∗ map] k↦y ∈ m2, match y with
-                    | obl_live (_, _) =>
-                        if decide (k ∈ L)
-                        then ∃ c0 : Ord.t, ⌜WFOCM.ltR OCM.unit c0⌝ ∧ oblS_credit k c0
-                        else True
-                    | _ => True
-                     end))%I with "[-]" as "H".
-            2:{ rewrite -big_sepM_sep. iApply (big_sepM_impl with "H"). iModIntro.
-                iIntros (k o LU) "[H1 H2]". destruct (decide (k ∈ a :: L)).
-                - apply elem_of_cons in e. destruct e.
-                  + subst. destruct o; auto. destruct a0. rewrite decide_True; done.
-                  + destruct o; auto. destruct a0. iClear "H1". rewrite decide_True; done.
-                - destruct o; auto. destruct a0. auto.
-            }
-            iSplitL "C".
-            { destruct (m2 !! a) eqn:LU.
-              - iApply (big_sepM_delete _ _ _ _ LU with "[C]"). iSplitL.
-                + destruct o; auto. destruct a0. rewrite decide_True; [|auto].
-                  iFrame. iPureIntro. apply Ord.S_pos.
-                + iApply (big_sepM_impl (λ _ _, True)%I); first done.
-                  iModIntro. iIntros (k x LU2) "_". destruct x; auto. destruct a0.
-                  destruct (decide (k = a)); auto. subst. rewrite lookup_delete in LU2. inv LU2.
-              - iApply (big_sepM_impl (λ _ _, True)%I); first done.
-                iModIntro. iIntros (k x LU2) "_". destruct x; auto. destruct a0.
-                destruct (decide (k = a)); auto. subst. rewrite LU in LU2. inv LU2.
-            }
-            iApply (IHL with "Hc").
-          * iApply big_sepM_forall; first apply _.
-            iIntros (k o LU). destruct o; auto. destruct a. destruct (decide (k ∈ L)); auto.
-            iPureIntro. subst FR. simpl.
-            specialize (Hffu i). rewrite LUd1 in Hffu. inv Hffu. symmetry in H0.
-            exists y, i, L. repeat split; eauto. exists y. split; auto.
-            eapply (@PreOrder_Reflexive _ _ (OCM.le_PreOrder (t:=(@fuel_wf Λ).(WFOCM.ocm)))).
-        + iApply big_sepM_forall; first apply _. iIntros (k o LU). destruct o; auto. destruct a.
-          destruct (decide (k ∈ L)); auto. iPureIntro. subst FR.
-          pose proof (map_Forall_union_1_2 _ _ _ Hmm MF) as MF2. specialize (MF2 _ _ LU).
-          destruct MF2 as (i'&L'&LUg1'&INL'&MF2). destruct (decide (i' = i)).
-          * subst. rewrite LUg in LUg1'. inv LUg1'. done.
-          * rewrite decide_False in MF2; [|set_solver]. destruct MF2 as (f'&LTf'&f2'&LUd2'&LEf2).
-            exists f'. split; [auto|]. exists i', L'. repeat split; auto. exists f2'. split; auto.
-    }
-    destruct Hfff as (δ'&Hd1&Hd2). apply thread_pool_inv_dom in Hd1. pose proof (fork_thread_ids _ _ _ _ _ _ _ Hstep) as Hefs.
-    assert (Hd3 : dom δ2 ## dom δ').
-    { subst. rewrite -Hd1. apply fuels_fair_update_dom in Hffu. rewrite -Hffu. auto. }
-    iPoseProof (big_sepM2_dom with "IoftM") as "%Hg1".
-    assert (Hg2 : dom γ1 ## dom δ').
-    { rewrite -Hg1. subst. rewrite -Hd1. auto. }
-    pose proof (fuels_fair_update_dom _ _ _ Hffu) as Hddd.
-    iPoseProof (oftI_schedule_2 _ _ _ _ _ Hddd with "[Ig1 Ioft1]") as "#Ioft2".
-    { econstructor 2; first eapply HOP. reflexivity. }
-    { subst FR. simpl in HMF. eapply map_Forall_impl; first eauto. intros. destruct x; auto. destruct a.
-      case_decide; eauto.
-    }
-    { iFrame. iApply "Ioft1". }
-    iMod (schedfairI_alloc_threads _ _ _ Hd2 Hd3 with "Id2") as "[Id2 Hfbs]".
-    set (γ2 := γ1 ∪ (gset_to_gmap [] (dom δ'))).
-    iMod (toI_alloc_threads _ γ2 with "[Ig1 Hfbs]") as "[Ig2 Hts]".
-    1,2: eauto.
-    { iFrame. }
-    iPoseProof (oftI_alloc_threads _ _ δ3 _ γ2 δ' with "Ioft2") as "#Ioft3".
-    1,2,3: auto.
-
-    rewrite -Hd1. iDestruct ("H" with "[//] Ht Hc Hts Hlc") as "H".
-    iApply (step_fupdN_wand with "H"). iNext. iIntros ">[Is2 H]".
-    iModIntro. iExists Ω2, Ω2. iSplit.
-    { iPureIntro. split.
-      - by econstructor 1.
-      - reflexivity.
-    }
-    iExists γ2. by iFrame.
-  Qed.
-
-  (* For ghost_step, enable allocating and fulfilling an obligation. *)
-  Lemma ghost_step_alloc_obl a T R E ν :
-    (∀ σ ns κs τ,
-       state_interp σ ns κs τ ={E,∅}=∗
-       ∃ i L, toL_thread i 1 L ∗
-              ∀ κ, (toL_thread i 1 (κ :: L) ∗ oblG_goal κ T R ∗ oblS_active κ ∗ toS_assigned i κ ∗ oblS_credit κ a ∗ ∃ b, oblS_bound κ b) ={∅,E}=∗
-                   state_interp σ ns κs τ ∗ ν)
+  (* For ghost_step, enable allocating, transferring, resolving and waiting for obligations. *)
+  Lemma ghost_step_wait_obls E ν :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ i π Ψ K,
+         (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+         (othreadG_obls i Ψ 1 -∗
+          (([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2)) ∨
+             (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+          |={∅,E}=> state_interp σ Θ κs ∗ ν))
     ⊢ ghost_step E ν.
   Proof.
-    rewrite /ghost_step. iIntros "H % % % % % % % I". iDestruct "I" as "(%Idom&Id1&IO1&Ig1&#Ioft1&Is1)".
-    iDestruct ("H" with "Is1") as ">(%&%&Ht&H)".
-    iPoseProof (toI_toL_thread_lookup with "[Ig1 Ht]") as "(%&%LUg&%PermL)"; first iFrame.
-    iPoseProof "Ioft1" as "Ioft1'". iDestruct "Ioft1'" as "[IoftO IoftM]".
-    iPoseProof (big_sepM2_lookup_iff with "IoftM") as "%A".
-    specialize (A i). destruct A. destruct H0 as [f LUd]; first eauto. clear H.
-    iMod (osat_alloc_obl _ (a ⊕ ⌈Λ⌉)%ord f T R with "IO1") as "(%κ & %LUκ & IO2 & #Hog & Hoi & Hol & Hoc & #Hob)".
-    iPoseProof (oblS_credit_split with "Hoc") as "[Hoc1 Hoc2]".
-    iMod (osat_step_one_obl_init_live with "[IO2 Hoi]") as "[IO2 #Hoa]"; first apply lookup_insert.
-    { iFrame. rewrite /oblG_elem. eauto. }
-    rewrite insert_insert.
-    iMod (toI_alloc_obl with "[Ig1 Ht Hol Hoc2]") as "(Ig1 & Ht & #Hta)".
-    { iFrame. rewrite /oblG_elem. iSplit; eauto. }
-    iPoseProof (oftI_alloc_obl _ _ _ κ i f f _ (a ⊕ ⌈Λ⌉)%ord LUκ LUd _ LUg with "[]") as "#Ioft2"; first auto.
-    Unshelve.
-    2:{ eapply (@PreOrder_Reflexive _ _ (OCM.le_PreOrder (t:=(@fuel_wf Λ).(WFOCM.ocm)))). }
-    iMod ("H" with "[Ht Hoc1]") as "[Hs H]".
-    { iFrame. eauto. }
-    iModIntro. iExists (<[κ:=obl_live ((a ⊕ ⌈ Λ ⌉)%ord, f)]> Ω). iSplit.
-    { iPureIntro. econstructor 2.
-      - econstructor 1. exists κ. exists ((a ⊕ ⌈ Λ ⌉)%ord, f). split; [auto | reflexivity].
-      - econstructor 2; [|reflexivity]. eapply (obl_states_step_step_one _ κ).
-        apply map_Forall2_insert; auto. split.
-        + rewrite decide_True; done.
-        + intros j. destruct (decide (j = κ)).
-          * subst. rewrite !LUκ. econstructor.
-          * destruct (Ω !! j); done.
-    }
-    iExists (<[i:=κ :: L]> γ). iPoseProof (oftI_one_permutation _ _ _ i (κ :: l') (κ :: L) with "Ioft2") as "Ioft3".
-    { apply lookup_insert. }
-    { econstructor. auto. }
-    rewrite insert_insert. by iFrame.
+    rewrite /ghost_step. iIntros "H % % % % I". iDestruct "I" as "(S& T& U& F& I)".
+    iMod ("H" with "I") as "(%&%&%&%& (%Dom& #Tei& Tbsi& Bps)& H)".
+    iDestruct "Bps" as "(#Beπ& #Feπ& M)".
+    iMod (oforest_wait_cases_many _ _ _ ((λ '(x, ψ), (x, i, ψ)) <$>K) with "[S U F M]") as "(S& F& [(Fws& Fos& U) | (U& #Bdπ& M)])".
+    { iFrame. iSplitR; first eauto. iSplitR; first eauto.
+      rewrite big_sepM_fmap. iApply (big_sepM_impl with "M"). iIntros "!>" (???). destruct x. by iIntros. }
+    - rewrite !big_sepM_fmap.
+      iPoseProof ("U" with "Fos") as "U".
+      iMod ("H" with "Tbsi [Fws]") as "[I H]".
+      { iLeft. iApply (big_sepM_impl with "Fws"). iIntros "!>" (???) "H". by destruct x. }
+      iModIntro. iExists Ω. iFrame. done.
+    - rewrite !big_sepM_fmap.
+      iMod ("H" with "Tbsi [M]") as "[I H]".
+      { iRight. iSplitR; first auto. iApply (big_sepM_impl with "M"). iIntros "!>" (???) "H". by destruct x. }
+      iModIntro. iExists Ω. iFrame. done.
   Qed.
 
-  Lemma ghost_step_fulfill_obl κ E ν :
-    (∀ σ ns κs τ,
-       state_interp σ ns κs τ ={E,∅}=∗
-       ∃ i L T R, (toL_thread i 1 (κ :: L) ∗ oblG_goal κ T R ∗ oblS_active κ ∗ ⌜ T σ ⌝ ∗ ▷ R) ∗
-                  (toL_thread i 1 L ∗ oblS_done κ ={∅,E}=∗
-                   state_interp σ ns κs τ ∗ ν))
+  Lemma ghost_step_alloc_obl E ν :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ i Ψ q,
+         othreadG_elem i ∗ othreadG_obls i Ψ q ∗
+         (∃ T P α β, ∀ k,
+            ⌜k ∉ Ψ⌝ -∗ othreadG_obls i ({[k]} ∪ Ψ) q -∗
+            oblG_elem k -∗ oblG_goal k T P -∗
+            oblG_transfer_bound k α -∗ oblG_transfer k α -∗ oblG_progress k β -∗
+            othreadG_owns i k true (1/2)%Qp -∗ otreeG_elem k -∗
+            |={∅,E}=> state_interp σ Θ κs ∗ ν))
     ⊢ ghost_step E ν.
   Proof.
-    rewrite /ghost_step. iIntros "H % % % % % % % I". iDestruct "I" as "(%Idom&Id1&IO1&Ig1&#Ioft1&Is1)".
-    iDestruct ("H" with "Is1") as ">(%&%&%&%& (Ht&#Hog&#Hoa&%HT&HR) &H)".
-    iPoseProof (toI_toL_thread_lookup with "[Ig1 Ht]") as "(%&%LUg&%PermL)"; first iFrame.
-    iMod (toI_fulfill_obl with "[Ig1 Ht]") as "[Hol Htt]"; first iFrame.
-    iPoseProof (osat_obl_is_live with "[IO1 Hol]") as "[% %LUO]".
-    { iFrame. rewrite /oblG_elem. eauto. }
-    iMod (osat_step_one_obl_live_done with "[IO1 Hol HR]") as "[IO2 #Hod]"; first (iFrame; eauto).
-    iPoseProof ("Htt" with "Hod") as "[Ig2 Ht]".
-    iPoseProof (toI_oblS_done_notin with "[Ig2]") as "%NIN"; first by iFrame.
-    assert (IN : is_Some (Ω !! κ)) by eauto.
-    iPoseProof (oftI_fulfill_obl _ _ _ κ i _ _ T IN LUg PermL NIN with "Ioft1") as "Ioft2".
-    iMod ("H" with "[Ht]") as "[Hs H]"; first by iFrame.
-    iModIntro. iExists (<[κ:=obl_done T]> Ω). iSplit.
-    { iPureIntro. econstructor 2; [|reflexivity]. eapply (obl_states_step_step_one _ κ).
-      intros x. destruct (decide (x = κ)).
-      - subst. rewrite LUO lookup_insert. econstructor. simpl. auto.
-      - rewrite lookup_insert_ne; auto. destruct (Ω !! x); econstructor; auto.
-    }
-    iExists (<[i:=L]> γ). iFrame. auto.
+    rewrite /ghost_step. iIntros "H % % % % I". iDestruct "I" as "(S& T& U& F& I)".
+    iMod ("H" with "I") as "(%&%&%& #Tei& Tbs& %&%&%&%& H)".
+    iMod (osat_alloc_obl _ α i  β T P with "S") as "(%k& %Nink& S& #Bgk& Blk& Btk& #Btbk& Bok& Bpsk& Bpk)".
+    iPoseProof (oblG_elem_unfold with "[Bgk]") as "#Bek"; first eauto.
+    assert (Nink2 : k ∉ dom Ω) by (by apply not_elem_of_dom in Nink).
+    iMod (osuspend_alloc_obl _ _ Nink2 with "U") as "(U& #Fek)".
+    iMod (othread_alloc_obl with "[S T Tbs Blk]") as "(S& T& %NinkΨ& Tbs& Tok& Blk)"; first (iFrame; eauto).
+    iPoseProof (oblG_owner_div_2 _ _ (1/2)%Qp with "Bok") as "[Bok1 Bok2]".
+    iMod (othread_obl_acquire with "[T Tok Bok1]") as "(T& Tok)"; first (iFrame; eauto).
+    iPoseProof (othreadG_owns_div_2 _ _ _ (1)%Qp with "Tok") as "[Tok1 Tok2]".
+    iMod (oforest_alloc_obl _ _ _ α β Nink2 with "[F Tok1 Blk Bok2 Bpsk]") as "F"; first (iFrame; eauto).
+    iMod ("H" with "[//] Tbs Bek Bgk Btbk Btk Bpk Tok2 Fek") as "[I H]".
+    iModIntro. iExists (<[k:=olive α i β]> Ω). rewrite !dom_insert_L. iFrame.
+    iPureIntro. eapply rtc_l; last reflexivity. eapply obl_states_step_alloc.
+    exists k. eauto.
   Qed.
 
+  Lemma ghost_step_resolve_obl E ν :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ i Ψ q k T P,
+         othreadG_elem i ∗ othreadG_obls i Ψ q ∗ othreadG_owns i k true (1/2)%Qp ∗ ⌜k ∈ Ψ⌝ ∗
+         oblG_goal k T P ∗ ⌜T σ⌝ ∗ (▷ P) ∗
+         (othreadG_obls i (Ψ ∖ {[k]}) q -∗ oblG_done k -∗
+          |={∅,E}=> state_interp σ Θ κs ∗ ν))
+    ⊢ ghost_step E ν.
+  Proof.
+    rewrite /ghost_step. iIntros "H % % % % I". iDestruct "I" as "(S& T& U& F& I)".
+    iMod ("H" with "I") as "(%&%&%&%&%&%& #Tei& Tbs& Toi& %Ink& #Bgk& GT& GP& H)".
+    iMod (oforest_resolve_one with "[$]") as "(%&%&%&%Prog& S& T& U& F& #Bdk& Tbs)"; first auto.
+    iMod ("H" with "Tbs Bdk") as "[I H]". iModIntro. iFrame. iPureIntro. destruct Prog as [Prog1 Prog2].
+    eapply rtc_l.
+    - eapply obl_states_step_resolve; eauto.
+    - eapply rtc_l; last reflexivity. eapply obl_states_step_transfer; eauto.
+  Qed.
+
+
+  (* lwp versions *)
   Lemma lwp_progress s i E e1 Φ :
     to_val e1 = None →
     (∀ σ1 ns κ κs τ,

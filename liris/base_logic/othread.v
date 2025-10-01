@@ -431,7 +431,8 @@ Section othread.
 
   Lemma othread_alloc_obl_1 TP i Ψ q k :
     oblG_live k (1/2)%Qp ∗ oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i Ψ q
-    ⊢ |==> oblG_live k (1/2)%Qp ∗ oblG_live k (1/2/2)%Qp ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
+    ⊢ |==> ⌜k ∉ Ψ⌝ ∗ oblG_live k (1/2)%Qp ∗ oblG_live k (1/2/2)%Qp ∗
+           othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
   Proof.
     iIntros "(Os0 & Os & Hthread & Ho)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
@@ -458,8 +459,9 @@ Section othread.
     iMod (othreadG_obls_update_local _ _ _ OObls (<[k:=false]>OObls) _ ({[k]} ∪ Ψ) with "[HO Ho]") as "[HO Ho]";
       [eauto | | iFrame |].
     { rewrite dom_insert_L. apply gset_disj_alloc_local_update. apply not_elem_of_dom in Hluk. set_solver. }
-    iFrame "Ho".
-    iModIntro. iExists (<[i:=(<[k:=false]>OObls)]>OThread). iSplitR.
+    iFrame "Ho". iModIntro. iSplitR.
+    { iPureIntro. apply not_elem_of_dom in Hluk. rewrite Hm in Hluk. set_solver. }
+    iExists (<[i:=(<[k:=false]>OObls)]>OThread). iSplitR.
     { rewrite dom_insert_lookup_L; done. }
     iFrame "HS HX HO". iSplitL "HE".
     { rewrite !fmap_insert. rewrite insert_id; first done. rewrite lookup_fmap Hlui. done. }
@@ -469,12 +471,12 @@ Section othread.
   Qed.
   Lemma othread_alloc_obl Ω TP i Ψ q k :
     osat Ω ∗ othread TP ∗ othreadG_obls i Ψ q ∗ oblG_elem k ∗ oblG_live k (1/2)%Qp
-    ⊢ |==> osat Ω ∗ othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1 ∗ oblG_live k (1/2/2)%Qp.
+    ⊢ |==> osat Ω ∗ othread TP ∗ ⌜k ∉ Ψ⌝ ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1 ∗ oblG_live k (1/2/2)%Qp.
   Proof.
     iIntros "(Osat & Hthread & Ho & #He & Os)".
     iPoseProof (osat_live_open with "[Osat Os]") as "(Os & Os0 & Osacc)"; first by iFrame.
-    iMod (othread_alloc_obl_1 with "[$]") as "(Os0 & Os1 & Hthread & Ho & Hw)".
-    iModIntro. iFrame. by iApply "Osacc".
+    iMod (othread_alloc_obl_1 with "[$]") as "(%& Os0 & Os1 & Hthread & Ho & Hw)".
+    iModIntro. iFrame. iSplitL; first by iApply "Osacc". done.
   Qed.
 
   Lemma othread_obls_owns_elem TP i Ψ k f q :
