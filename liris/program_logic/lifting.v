@@ -18,7 +18,7 @@ Implicit Types Φ : val Λ → iProp Σ.
 
 Section liveness.
 
-  (* For lwp_step, enable progress, fork, using later credits, and loeb induction. *)
+  (* For lwp_step, enable progress and fork. *)
   Lemma lwp_step_progress_no_lc s i E e1 ν :
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
@@ -144,7 +144,7 @@ Section liveness.
       iFrame. iPureIntro. split; done.
   Qed.
 
-  (* For ghost_step, enable allocating, transferring, resolving and waiting for obligations. *)
+  (* For ghost_step, enable allocating, progressing, transferring, resolving and waiting for obligations. *)
   Lemma ghost_step_wait_obls E ν :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
@@ -268,7 +268,7 @@ Section liveness.
     clear IHK. iSplitR; first eauto. iFrame. iIntros "M". iApply "K". iFrame.
   Qed.
 
-  Lemma ghost_step_get_progress_gen E ν :
+  Lemma ghost_step_progress_obls_gen E ν :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
        ∃ K,
@@ -299,137 +299,248 @@ Section liveness.
   Qed.
 
   (* lwp versions *)
-  Lemma lwp_progress s i E e1 Φ :
+  Lemma lwp_lift_step_fupd s i E e1 Φ :
     to_val e1 = None →
-    (∀ σ1 ns κ κs τ,
-       state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
-       ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
-              (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
-              ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                           toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] i ∈ dom efs, toL_thread i 1 []) -∗
-                           £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-       state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
+    (∀ Θ σ1 κ κs,
+       state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
+       |={∅}=> ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                           |={∅,E}=>
+       state_interp σ2 (Θ ∪ dom efs) κs ∗
        lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
-    iIntros (He) "H". rewrite lwp_unfold /lwp_pre He. iApply lwp_step_progress. iFrame.
+    iIntros (He) "H". rewrite lwp_unfold /lwp_pre He. iApply lwp_step_progress_no_lc. iFrame.
   Qed.
 
-  Lemma lwp_alloc_obl a T R s i E e Φ :
-    (∀ σ ns κs τ,
-       state_interp σ ns κs τ ={E,∅}=∗
-       ∃ j L, toL_thread j 1 L ∗
-              ∀ κ, (toL_thread j 1 (κ :: L) ∗ oblG_goal κ T R ∗ oblS_active κ ∗ toS_assigned j κ ∗ oblS_credit κ a ∗ ∃ b, oblS_bound κ b) ={∅,E}=∗
-                   state_interp σ ns κs τ ∗ lWP e @ s; i; E {{ Φ }})
-    ⊢ lWP e @ s; i; E {{ Φ }}.
+  Lemma lwp_lift_step_fupd_lc s i E e1 Φ :
+    to_val e1 = None →
+    (∀ Θ σ1 κ κs,
+       state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
+       ∃ Ψ q,
+         (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
+          [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+         ALC (|={∅}=>
+                ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                             othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+                             ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                             |={∅,E}=>
+                state_interp σ2 (Θ ∪ dom efs) κs ∗
+                lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
-    iIntros "H". iApply ghost_step_elim. iApply (ghost_step_alloc_obl a T R). iFrame.
+    iIntros (He) "H". rewrite lwp_unfold /lwp_pre He. iApply lwp_step_progress_get_lc_with_obls. iFrame.
   Qed.
 
-  Lemma lwp_fulfill_obl κ s i E e Φ :
-    (∀ σ ns κs τ,
-       state_interp σ ns κs τ ={E,∅}=∗
-       ∃ j L T R, (toL_thread j 1 (κ :: L) ∗ oblG_goal κ T R ∗ oblS_active κ ∗ ⌜ T σ ⌝ ∗ ▷ R) ∗
-                  (toL_thread j 1 L ∗ oblS_done κ ={∅,E}=∗
-                   state_interp σ ns κs τ ∗ lWP e @ s; i; E {{ Φ }}))
+  Lemma lwp_lift_step_fupd_suspended s i E e1 Φ :
+    to_val e1 = None →
+    (∀ Θ σ1 κ κs,
+       state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
+       ∃ π Ψ K,
+         (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+          ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+         ALC (|={∅}=>
+                ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                             othreadG_obls i Ψ 1 -∗
+                             ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+                               ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+                                (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+                             ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                             |={∅,E}=>
+                state_interp σ2 (Θ ∪ dom efs) κs ∗
+                lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros (He) "H". rewrite lwp_unfold /lwp_pre He. iApply lwp_step_progress_get_lc_suspended_obls. iFrame.
+  Qed.
+
+  Lemma lwp_wait_obls s i E e Φ :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ j Ψ π K,
+         (⌜Ψ = dom K⌝ ∗ othreadG_elem j ∗ othreadG_obls j Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x j π ψ ∗ otreeG_wait k x (1/2))) ∗
+         (othreadG_obls j Ψ 1 -∗
+          (([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2)) ∨
+             (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns j k true (1/2) ∗ oblG_progress k ψ))) -∗
+          |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; i; E {{ Φ }}))
     ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof.
-    iIntros "H". iApply ghost_step_elim. iApply (ghost_step_fulfill_obl κ). iFrame.
+    iIntros "H". by iMod (ghost_step_wait_obls with "H") as "H".
+  Qed.
+
+  Lemma lwp_alloc_obl s i E e Φ :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ j Ψ q,
+         othreadG_elem j ∗ othreadG_obls j Ψ q ∗
+         (∃ T P α β, ∀ k,
+            ⌜k ∉ Ψ⌝ -∗ othreadG_obls j ({[k]} ∪ Ψ) q -∗
+            oblG_elem k -∗ oblG_goal k T P -∗
+            oblG_transfer_bound k α -∗ oblG_transfer k α -∗ oblG_progress k β -∗
+            othreadG_owns j k true (1/2)%Qp -∗ otreeG_elem k -∗
+          |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; i; E {{ Φ }}))
+    ⊢ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "H". by iMod (ghost_step_alloc_obl with "H") as "H".
+  Qed.
+
+  Lemma lwp_resolve_obl s i E e Φ :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ j Ψ q k T P,
+         othreadG_elem j ∗ othreadG_obls j Ψ q ∗ othreadG_owns j k true (1/2)%Qp ∗ ⌜k ∈ Ψ⌝ ∗
+         oblG_goal k T P ∗ ⌜T σ⌝ ∗ (▷ P) ∗
+         (othreadG_obls j (Ψ ∖ {[k]}) q -∗ oblG_done k -∗
+          |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; i; E {{ Φ }}))
+    ⊢ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "H". by iMod (ghost_step_resolve_obl with "H") as "H".
+  Qed.
+
+  Lemma lwp_transfer_obls_gen s i E e Φ :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ π ℵ K,
+         (oblG_elem π ∗ oblG_transfer_bound π ℵ ∗
+          ([∗ map] k ↦ '(θ, ψ, α, β) ∈ K,
+             ⌜(ℵ < α)%ord ∧ (Ord.O < β)%ord⌝ ∗ othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
+             oblG_elem k ∗ otreeG_elem k ∗ oblG_transfer k α ∗ oblG_transfer k β)) ∗
+         (((oblG_done π ∗
+            [∗ map] k ↦ '(θ, ψ, α, β) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_transfer k α ∗ oblG_transfer k β) ∨
+             ([∗ map] k ↦ '(θ, ψ, α, β) ∈ K, ∃ x, otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)%Qp)) -∗
+          |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; i; E {{ Φ }}))
+    ⊢ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "H". by iMod (ghost_step_transfer_obls_gen with "H") as "H".
+  Qed.
+
+  Lemma lwp_progress_obls_gen s i E e Φ :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ K,
+         (([∗ map] k ↦ '(θ, ψ) ∈ K,
+             othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
+             ∃ a, ⌜(Ord.O < a)%ord⌝ ∗ oblG_elem k ∗ oblG_transfer k a) ∗
+          (([∗ map] k ↦ '(θ, ψ) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_progress k ψ) -∗
+          |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; i; E {{ Φ }})))
+    ⊢ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "H". by iMod (ghost_step_progress_obls_gen with "H") as "H".
   Qed.
 
 End liveness.
 
 Local Hint Resolve reducible_no_obs_reducible : core.
 
-Lemma lwp_lift_step_fupdN s i E Φ e1 :
-  to_val e1 = None →
-  (∀ σ1 ns κ κs τ,
-     state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
-     ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
-            (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
-            ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                         toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] j ∈ dom efs, toL_thread j 1 []) -∗
-                         £ (S (num_laters_per_step ns)) ={∅}▷=∗^(S $ num_laters_per_step ns) |={∅,E}=>
-     state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
-     lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
-  ⊢ lWP e1 @ s; i; E {{ Φ }}.
-Proof. apply lwp_progress. Qed.
-
-Lemma lwp_lift_step_fupd s i E Φ e1 :
-  to_val e1 = None →
-  (∀ σ1 ns κ κs τ,
-     state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
-     ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
-            (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
-            ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                         toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] j ∈ dom efs, toL_thread j 1 []) -∗
-                         £ 1 ={∅}=∗ ▷ |={∅,E}=>
-     state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
-     lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
-  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Lemma lwp_lc_later_ord s i E e Φ :
+  £ (ordinals.one_def) -∗ (▷ lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
 Proof.
-  iIntros (?) "Hlwp". rewrite -lwp_lift_step_fupdN; [|done].
-  iIntros (?????) "Hσ". iMod ("Hlwp" with "Hσ") as "(% & % & Ht & Hcs & % & Hlwp)".
-  iModIntro. iExists _, _. iFrame "Ht Hcs". iSplit; first done. iIntros (??? ?) "Ht Hc Hts Hcred".
-  iPoseProof (lc_weaken 1 with "Hcred") as "Hcred"; first lia.
-  simpl. rewrite -step_fupdN_intro; [|done]. rewrite -bi.laterN_intro.
-  iMod ("Hlwp" with "[//] Ht Hc Hts Hcred") as "Hlwp".
-  iApply step_fupd_intro; done.
+  iIntros "LC H". by iMod (lc_fupd_elim_later_ord with "LC H") as "H".
+Qed.
+Lemma lwp_lc_later s i E e Φ :
+  £n 1 -∗ (▷ lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
+Proof. iApply lwp_lc_later_ord. Qed.
+Lemma lwp_lc_laterN n s i E e Φ :
+  £n n -∗ (▷^n lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
+Proof.
+  iIntros "LC H". iApply fupd_lwp. iApply (lc_fupd_add_laterN E E with "LC"). iNext. by iModIntro.
 Qed.
 
 Lemma lwp_lift_stuck i E Φ e :
   to_val e = None →
-  (∀ δ (Ω : obl_statesL Λ) γ σ ns κs τ,
-     (⌜ τ = dom δ ⌝ ∗ schedfairIL Λ δ ∗ osat Ω ∗ toIL Λ γ ∗ oftIL Λ Ω δ γ ∗ state_interp σ ns κs τ) ={E,∅}=∗
-     ⌜ stuck e σ τ ⌝)
+  (∀ Ω Θ σ κs,
+     (osat Ω ∗ othread Θ ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗ state_interp σ Θ κs)
+     ={E,∅}=∗
+     ⌜ stuck e σ Θ ⌝)
   ⊢ lWP e @ i; E ?{{ Φ }}.
 Proof.
-  rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (??? σ ns κ κs nt) "Hσ".
+  rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (?? σ κ κs) "Hσ".
   iMod ("H" with "Hσ") as %[? Hirr]. iModIntro. iSplit; first done.
-  iExists Ω1. iSplit; first done.
+  iExists false. simpl. iModIntro. iExists Ω1. iSplit; first done.
   iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
 Qed.
 
 (** Derived lifting lemmas. *)
-Lemma lwp_lift_step s i E Φ e1 :
-  to_val e1 = None →
-  (∀ σ1 ns κ κs τ,
-     state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
-     ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
-            (⌜ if s is NotStuck then reducible e1 σ1 τ else True ⌝) ∗
-            ▷ ∀ e2 σ2 efs, (⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝) -∗
-                           toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] j ∈ dom efs, toL_thread j 1 []) -∗
-                           £ 1 ={∅,E}=∗
-                           state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
-                           lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
-  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Lemma lwp_lift_pure_step_no_fork `{!Inhabited (state Λ)} s i E E' Φ e1 :
+  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
+  (∀ κ σ1 Θ e2 σ2 efs, prim_step e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
+  (|={E,E'}=> |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }})
+⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
-  iIntros (?) "H". iApply lwp_lift_step_fupd; [done|]. iIntros (?????) "Hσ".
-  iMod ("H" with "Hσ") as "(%&%&H1&H2&$&H)". iModIntro. iExists _, _. iFrame "H1 H2".
-  iIntros (??? ?) "Ht Hfc Hts Hcred !> !>". iApply ("H" with "[//] Ht Hfc Hts Hcred").
+  iIntros (Hsafe Hstep) "H". iApply lwp_lift_step_fupd.
+  { specialize (Hsafe inhabitant ∅). destruct s; eauto using reducible_not_val. }
+  iIntros (Θ σ1 κ κs) "Hσ". iMod "H".
+  iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+  iSplit.
+  { iPureIntro. destruct s; done. }
+  iModIntro. iIntros (e2 σ2 efs ?) "Hefs".
+  destruct (Hstep κ σ1 Θ e2 σ2 efs) as (-> & <- & ->); auto.
+  replace (Θ ∪ dom ∅) with Θ by set_solver.
+  iMod "Hclose" as "_". iMod ("H" with "[//]") as "H".
+  iModIntro. rewrite big_sepM_empty. iFrame.
 Qed.
 
-Lemma lwp_lift_pure_step_no_fork `{!Inhabited (state Λ)} s i E E' Φ e1 :
-  (∀ σ1 τ, if s is NotStuck then reducible e1 σ1 τ else to_val e1 = None) →
-  (∀ κ σ1 τ e2 σ2 efs, prim_step e1 σ1 τ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
-  (|={E,E'}=> ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈Λ⌉)) ∗
-                    ▷ (toL_thread i q L ={E',E}=∗ ∀ κ τ e2 efs σ,
-     ⌜prim_step e1 σ τ κ e2 σ efs⌝ -∗ sfS_fuel_credit_forallL Λ -∗ £ 1 -∗ lWP e2 @ s; i; E {{ Φ }}))
+Lemma lwp_lift_pure_step_no_fork_lc `{!Inhabited (state Λ)} s i E E' Φ e1 :
+  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
+  (∀ κ σ1 Θ e2 σ2 efs, prim_step e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
+  (|={E,E'}=>
+     ∃ Ψ q,
+     (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
+      [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+     ALC (|={∅}=>
+            othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+            |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
-  iIntros (Hsafe Hstep) "H". iApply lwp_lift_step.
+  iIntros (Hsafe Hstep) "H". iApply lwp_lift_step_fupd_lc.
   { specialize (Hsafe inhabitant ∅). destruct s; eauto using reducible_not_val. }
-  iIntros (σ1 ns κ κs τ) "Hσ". iMod "H".
+  iIntros (Θ σ1 κ κs) "Hσ". iMod "H".
   iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
-  iDestruct "H" as "(%&%&Ht&Hcs&H)". iFrame "Ht Hcs". iSplit.
+  iSplit.
   { iPureIntro. destruct s; done. }
-  iNext. iIntros (e2 σ2 efs ?) "Ht Hcf Hts Hcred".
-  destruct (Hstep κ σ1 τ e2 σ2 efs) as (-> & <- & ->); auto.
-  replace (τ ∪ dom ∅) with τ by set_solver.
-  iMod (state_interp_mono with "Hσ") as "$". iMod "Hclose" as "_".
-  iMod ("H" with "Ht") as "H".
-  iModIntro. rewrite big_sepM_empty. iSplitL; [|done].
-  iApply ("H" with "[//] Hcf Hcred").
+  iDestruct "H" as "(%&%& D& H)". iExists _, _. iFrame "D".
+  iMod "H" as ">H".
+  iModIntro. iIntros (e2 σ2 efs ?) "Tbs Bos Efs".
+  destruct (Hstep κ σ1 Θ e2 σ2 efs) as (-> & <- & ->); auto.
+  replace (Θ ∪ dom ∅) with Θ by set_solver.
+  iMod "Hclose" as "_". iMod ("H" with "Tbs Bos [//]") as "H".
+  iModIntro. rewrite big_sepM_empty. iFrame.
+Qed.
+
+Lemma lwp_lift_pure_step_no_fork_suspended `{!Inhabited (state Λ)} s i E E' Φ e1 :
+  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
+  (∀ κ σ1 Θ e2 σ2 efs, prim_step e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
+  (|={E,E'}=>
+     ∃ π Ψ K,
+     (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+      ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+      ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+     ALC (|={∅}=>
+            othreadG_obls i Ψ 1 -∗
+            ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+              ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+               (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+            |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (Hsafe Hstep) "H". iApply lwp_lift_step_fupd_suspended.
+  { specialize (Hsafe inhabitant ∅). destruct s; eauto using reducible_not_val. }
+  iIntros (Θ σ1 κ κs) "Hσ". iMod "H".
+  iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+  iSplit.
+  { iPureIntro. destruct s; done. }
+  iDestruct "H" as "(%&%&%& D& H)". iExists _, _, _. iFrame "D".
+  iMod "H" as ">H".
+  iModIntro. iIntros (e2 σ2 efs ?) "Tbs Bos Efs".
+  destruct (Hstep κ σ1 Θ e2 σ2 efs) as (-> & <- & ->); auto.
+  replace (Θ ∪ dom ∅) with Θ by set_solver.
+  iMod "Hclose" as "_". iMod ("H" with "Tbs Bos [//]") as "H".
+  iModIntro. rewrite big_sepM_empty. iFrame.
 Qed.
 
 Lemma lwp_lift_pure_stuck `{!Inhabited (state Λ)} i E Φ e :
@@ -439,100 +550,245 @@ Proof.
   iIntros (Hstuck) "_". iApply lwp_lift_stuck.
   - destruct(to_val e) as [v|] eqn:He; last done.
     rewrite -He. by case (Hstuck inhabitant ∅).
-  - iIntros (???????) "_". iApply fupd_mask_intro; auto with set_solver.
+  - iIntros (????) "_". iApply fupd_mask_intro; auto with set_solver.
 Qed.
 
-(* To fetch toL_thread from the invariant, atomic step needs to update mask. *)
-Lemma lwp_lift_atomic_step_fupd {s i E1 E2 Φ} e1 :
+Lemma lwp_lift_atomic_step_fupd {s i E Φ} e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs τ, state_interp σ1 ns (κ ++ κs) τ ={E1,∅}=∗
-    ∃ (q : Qp) (L : list obl_id), toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈ Λ ⌉)) ∗
-    ⌜if s is NotStuck then reducible e1 σ1 τ else True⌝ ∗
-    ∀ e2 σ2 efs, ⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝ -∗
-    toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] j ∈ dom efs, toL_thread j 1 []) -∗ £ 1 ={∅,E1}=∗ |={E1}[E2]▷=>
-      state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
-      from_option Φ False (to_val e2) ∗
-      [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
-  ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
+  (∀ Θ σ1 κ κs,
+     state_interp σ1 Θ (κ ++ κs) ={E}=∗
+     (⌜if s is NotStuck then reducible e1 σ1 Θ else True⌝) ∗
+     ∀ e2 σ2 efs, (⌜prim_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+                  ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                  |={E}=>
+     state_interp σ2 (Θ ∪ dom efs) κs ∗
+     from_option Φ False (to_val e2) ∗
+     [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (?) "H".
-  iApply (lwp_lift_step_fupd s i E1 _ e1)=>//; iIntros (σ1 ns κ κs τ) "Hσ1".
-  iMod ("H" $! σ1 with "Hσ1") as "(%&%&Ht&Hcs&$&H)".
-  iModIntro. iFrame "Ht Hcs". iIntros (????) "Ht Hcf Hts Hcred".
-  iMod ("H" with "[//] Ht Hcf Hts Hcred") as "H".
-  iMod "H" as "H". iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
-  iNext. iMod "Hclose" as "_". iMod "H" as "(Hs&Hq&Hefs)". iFrame.
+  iApply (lwp_lift_step_fupd s i E e1)=>//; iIntros (Θ σ1 κ κs) "Hσ1".
+  iMod ("H" with "Hσ1") as "(%& H)".
+  iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+  iSplit; first auto. iModIntro. iIntros (????) "Hefs".
+  iMod "Hclose" as "_". iMod ("H" with "[//] Hefs") as "H".
+  iDestruct "H" as "(Hs&Hq&Hefs)". iFrame.
   destruct (to_val e2) eqn:?; last by iExFalso.
   iApply lwp_value; last done. by apply of_to_val.
 Qed.
 
-Lemma lwp_lift_atomic_step {s i E Φ} e1 :
+Lemma lwp_lift_atomic_step_fupd_lc {s i E1 E2 Φ} e1 :
   to_val e1 = None →
-  (∀ σ1 ns κ κs τ, state_interp σ1 ns (κ ++ κs) τ ={E,∅}=∗
-    ∃ (q : Qp) (L : list obl_id), toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈ Λ ⌉)) ∗
-    ⌜if s is NotStuck then reducible e1 σ1 τ else True⌝ ∗
-      ∀ e2 σ2 efs, ⌜prim_step e1 σ1 τ κ e2 σ2 efs⌝ -∗
-      toL_thread i q L -∗ sfS_fuel_credit_forallL Λ -∗ ([∗ set] j ∈ dom efs, toL_thread j 1 []) -∗ £ 1 ={∅,E}=∗ |={E}▷=>
-      state_interp σ2 (S ns) κs (τ ∪ dom efs) ∗
-      from_option Φ False (to_val e2) ∗
-      [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
-  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  (∀ Θ σ1 κ κs,
+     state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
+     (⌜if s is NotStuck then reducible e1 σ1 Θ else True⌝) ∗
+     ∃ Ψ q,
+       (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
+        [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+       ALC (|={∅}=>
+              ∀ e2 σ2 efs, (⌜prim_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+                           othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                           |={E2,E1}=>
+              state_interp σ2 (Θ ∪ dom efs) κs ∗
+              from_option Φ False (to_val e2) ∗
+              [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+  ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
 Proof.
-  iIntros (?) "H". iApply lwp_lift_atomic_step_fupd; [done|].
-  iIntros (?????) "?". iMod ("H" with "[$]") as "(%&%&$&$&$&H)".
-  iIntros "!> *". iIntros (Hstep) "Ht Hcf Hts Hcred".
-  iMod ("H" with "[//] Ht Hcf Hts Hcred") as "H".
-  by iApply "H".
+  iIntros (?) "H".
+  iApply (lwp_lift_step_fupd_lc s i E1 e1); first auto.
+  iIntros (Θ σ1 κ κs) "Hσ1". iMod ("H" with "Hσ1") as "(%& H)".
+  iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+  iSplit; first auto.
+  iDestruct "H" as "(%&%& D& H)". iExists _, _. iFrame "D".
+  iMod "H" as ">H". iModIntro. iIntros (????) "H1 H2 Hefs".
+  iMod "Hclose" as "_". iMod ("H" with "[//] H1 H2 Hefs") as "H".
+  iDestruct "H" as "(Hs&Hq&Hefs)". iFrame.
+  destruct (to_val e2) eqn:?; last by iExFalso.
+  iApply lwp_value; last done. by apply of_to_val.
+Qed.
+
+Lemma lwp_lift_atomic_step_fupd_suspended {s i E1 E2 Φ} e1 :
+  to_val e1 = None →
+  (∀ Θ σ1 κ κs,
+     state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
+     (⌜if s is NotStuck then reducible e1 σ1 Θ else True⌝) ∗
+     ∃ π Ψ K,
+       (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+        ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+        ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+       ALC (|={∅}=>
+              ∀ e2 σ2 efs, (⌜prim_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+                           othreadG_obls i Ψ 1 -∗
+                           ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+                             ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+                              (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                           |={E2,E1}=>
+              state_interp σ2 (Θ ∪ dom efs) κs ∗
+              from_option Φ False (to_val e2) ∗
+              [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+  ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
+Proof.
+  iIntros (?) "H".
+  iApply (lwp_lift_step_fupd_suspended s i E1 e1); first auto.
+  iIntros (Θ σ1 κ κs) "Hσ1". iMod ("H" with "Hσ1") as "(%& H)".
+  iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+  iSplit; first auto.
+  iDestruct "H" as "(%&%&%& D& H)". iExists _, _, _. iFrame "D".
+  iMod "H" as ">H". iModIntro. iIntros (????) "H1 H2 Hefs".
+  iMod "Hclose" as "_". iMod ("H" with "[//] H1 H2 Hefs") as "H".
+  iDestruct "H" as "(Hs&Hq&Hefs)". iFrame.
+  destruct (to_val e2) eqn:?; last by iExFalso.
+  iApply lwp_value; last done. by apply of_to_val.
 Qed.
 
 Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s i E E' Φ} e1 e2 :
-  (∀ σ1 τ, if s is NotStuck then reducible e1 σ1 τ else to_val e1 = None) →
-  (∀ σ1 κ τ e2' σ2 efs', prim_step e1 σ1 τ κ e2' σ2 efs' →
-                         κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
-  (|={E,E'}=> ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈ Λ ⌉)) ∗
-                    ▷ (toL_thread i q L ={E',E}=∗ sfS_fuel_credit_forallL Λ -∗ £ 1 -∗
-                    lWP e2 @ s; i; E {{ Φ }})) ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
+  (∀ σ1 κ Θ e2' σ2 efs', prim_step e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+  (|={E,E'}=> |={E',E}=> lWP e2 @ s; i; E {{ Φ }})
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (? Hpuredet) "H". iApply (lwp_lift_pure_step_no_fork s i E E'); try done.
   { naive_solver. }
-  iMod "H" as "(%&%&$&$&H)". iIntros "!> !> Ht". iMod ("H" with "Ht") as "H".
+  iMod "H". iModIntro. iMod "H".
+  iIntros "!> % % % % %". iIntros ((_&?&->&?)%Hpuredet); auto.
+Qed.
+
+Lemma lwp_lift_pure_det_step_no_fork_lc `{!Inhabited (state Λ)} {s i E E' Φ} e1 e2 :
+  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
+  (∀ σ1 κ Θ e2' σ2 efs', prim_step e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+  (|={E,E'}=>
+     ∃ Ψ q,
+     (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
+      [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+     ALC (|={∅}=>
+            othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+            |={E',E}=> lWP e2 @ s; i; E {{ Φ }}))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (? Hpuredet) "H". iApply (lwp_lift_pure_step_no_fork_lc s i E E'); try done.
+  { naive_solver. }
+  iMod "H" as "(%&%& D& H)". iModIntro. iExists _, _. iFrame "D".
+  iMod "H" as ">H". iIntros "!> H1 H2". iMod ("H" with "H1 H2") as "H".
+  iIntros "!> % % % % %". iIntros ((_&?&->&?)%Hpuredet); auto.
+Qed.
+
+Lemma lwp_lift_pure_det_step_no_fork_suspended `{!Inhabited (state Λ)} {s i E E' Φ} e1 e2 :
+  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
+  (∀ σ1 κ Θ e2' σ2 efs', prim_step e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+  (|={E,E'}=>
+     ∃ π Ψ K,
+     (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+      ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+      ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+     ALC (|={∅}=>
+            othreadG_obls i Ψ 1 -∗
+            ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+              ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+               (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+            |={E',E}=> lWP e2 @ s; i; E {{ Φ }}))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (? Hpuredet) "H". iApply (lwp_lift_pure_step_no_fork_suspended s i E E'); try done.
+  { naive_solver. }
+  iMod "H" as "(%&%&%& D& H)". iModIntro. iExists _, _, _. iFrame "D".
+  iMod "H" as ">H". iIntros "!> H1 H2". iMod ("H" with "H1 H2") as "H".
   iIntros "!> % % % % %". iIntros ((_&?&->&?)%Hpuredet); auto.
 Qed.
 
 Lemma lwp_pure_step_fupd `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ :
   PureExec φ n e1 e2 →
   φ →
-  (Nat.iter n (λ P, |={E,E'}=> ∃ q L, toL_thread i q L ∗ ([∗ list] α ∈ L, oblS_credit α (Ord.S ⌈ Λ ⌉)%ord) ∗
-                                     ▷ (toL_thread i q L ={E',E}=∗ P))
-     ((Nat.iter n (λ C, C ∗ sfS_fuel_credit_forallL Λ) emp) -∗ £ n -∗ lWP e2 @ s; i; E {{ Φ }}))
+  (Nat.iter n (λ P, |={E,E'}=> |={E',E}=> P)
+     (lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (Hexec Hφ) "Hlwp". specialize (Hexec Hφ).
   iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
-  { iMod lc_zero as "Hz". by iApply "Hlwp". }
+  { by iApply "Hlwp". }
   iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
-  - intros σ. specialize (Hsafe σ). intros. specialize (Hsafe τ). destruct s; eauto using reducible_not_val.
+  - intros σ Θ. specialize (Hsafe σ Θ). destruct s; eauto using reducible_not_val.
   - done.
-  - iDestruct "Hlwp" as ">(%&%&Ht&Hcs&Hlwp)". iFrame "Ht Hcs". iIntros "!> !> Ht".
-    iMod ("Hlwp" with "Ht") as "Hlwp". iIntros "!> Hcf Hcred".
-    iApply "IH". iApply (bi.iter_modal_mono with "[Hcf Hcred] [Hlwp]").
-    { iIntros (P Q) "PQ H". iMod "H" as "(%&%&$&$&H)". iIntros "!> !> Ht".
-      iMod ("H" with "Ht") as "H". iModIntro. by iApply "PQ".
-    }
-    2:{ iApply "Hlwp". }
-    iIntros "Hs H Hl". iPoseProof ((lc_succ n) with "[Hcred Hl]") as "Hcred"; first iFrame.
-    iApply ("Hs" with "[Hcf H] Hcred"). iFrame.
+  - iMod "Hlwp". iModIntro. iMod "Hlwp". iModIntro. by iApply "IH".
 Qed.
 
-(* Need to fetch toL_thread anyways (most of the times), this lemma not useful w/ obligations? *)
+Lemma lwp_pure_step_fupd_lc `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ :
+  PureExec φ n e1 e2 →
+  φ →
+  (Nat.iter n (λ P, |={E,E'}=>
+                 ∃ Ψ q,
+                 (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
+                  [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+                 ALC (|={∅}=>
+                        othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q)
+                        ={E',E}=∗ P))
+     (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (Hexec Hφ) "Hlwp". specialize (Hexec Hφ).
+  iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
+  { iMod tlc_zero as "Hz". by iApply "Hlwp". }
+  iApply (lwp_lift_pure_det_step_no_fork_lc (E':=E')).
+  - intros σ Θ. specialize (Hsafe σ Θ). destruct s; eauto using reducible_not_val.
+  - done.
+  - iDestruct "Hlwp" as ">(%&%& D& H)".
+    iModIntro. iExists _, _. iFrame "D".
+    iDestruct "H" as "(%& H)". iExists (ordinals.succ_def x). iIntros "LC".
+    iPoseProof (tlc_succ with "LC") as "[LC LC2]".
+    iMod ("H" with "LC2") as "H". iModIntro. iMod "H". iIntros "!> H1 H2". iMod ("H" with "H1 H2") as "H".
+    iApply "IH". iModIntro.
+    iRevert "H". iApply (bi.iter_modal_mono with "[-]").
+    + iIntros (??) "PQ >H". iDestruct "H" as "(%&%& D& H)".
+      iModIntro. iFrame "D". iMod "H" as ">H". iIntros "!> H1 H2".
+      iMod ("H" with "H1 H2"). by iApply "PQ".
+    + iIntros "H1 H2". iApply "H1". iApply tlc_succ. iFrame.
+Qed.
 
-(* Lemma lwp_pure_step_later `{!Inhabited (state Λ)} s i E e1 e2 φ n Φ : *)
-(*   PureExec φ n e1 e2 → *)
-(*   φ → *)
-(*   ▷^n (£ n -∗ LWP e2 @ s; E {{ Φ }}) ⊢ LWP e1 @ s; E {{ Φ }}. *)
-(* Proof. *)
-(*   intros Hexec ?. rewrite -lwp_pure_step_fupd //. clear Hexec. *)
-(*   enough (∀ P, ▷^n P ⊢ |={E}▷=>^n P) as Hlwp by apply Hlwp. intros ?. *)
-(*   induction n as [|n IH]; by rewrite //= -step_fupd_intro // IH. *)
-(* Qed. *)
+Lemma lwp_pure_step_fupd_suspended `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ :
+  PureExec φ n e1 e2 →
+  φ →
+  (Nat.iter n (λ P, |={E,E'}=>
+                 ∃ π Ψ K,
+                 (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+                  ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+                  ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+                 ALC (|={∅}=>
+                        othreadG_obls i Ψ 1 -∗
+                        ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+                          ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+                           (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ)))
+                        ={E',E}=∗ P))
+     (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (Hexec Hφ) "Hlwp". specialize (Hexec Hφ).
+  iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
+  { iMod tlc_zero as "Hz". by iApply "Hlwp". }
+  iApply (lwp_lift_pure_det_step_no_fork_suspended (E':=E')).
+  - intros σ Θ. specialize (Hsafe σ Θ). destruct s; eauto using reducible_not_val.
+  - done.
+  - iDestruct "Hlwp" as ">(%&%&%& D& H)".
+    iModIntro. iExists _, _, _. iFrame "D".
+    iDestruct "H" as "(%& H)". iExists (ordinals.succ_def x). iIntros "LC".
+    iPoseProof (tlc_succ with "LC") as "[LC LC2]".
+    iMod ("H" with "LC2") as "H". iModIntro. iMod "H". iIntros "!> H1 H2". iMod ("H" with "H1 H2") as "H".
+    iApply "IH". iModIntro.
+    iRevert "H". iApply (bi.iter_modal_mono with "[-]").
+    + iIntros (??) "PQ >H". iDestruct "H" as "(%&%&%& D& H)".
+      iModIntro. iFrame "D". iMod "H" as ">H". iIntros "!> H1 H2".
+      iMod ("H" with "H1 H2"). by iApply "PQ".
+    + iIntros "H1 H2". iApply "H1". iApply tlc_succ. iFrame.
+Qed.
+
+Lemma lwp_pure_step `{!Inhabited (state Λ)} s i E e1 e2 φ n Φ :
+  PureExec φ n e1 e2 →
+  φ →
+  lWP e2 @ s; i; E {{ Φ }} ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  intros Hexec ?. rewrite -(lwp_pure_step_fupd _ _ E E) //. clear Hexec.
+  enough (∀ P, P ⊢ Nat.iter n (λ Q, |={E}=> |={E}=> Q) P) as Hlwp by apply Hlwp. intros ?.
+  induction n as [|n IH]; by rewrite //= -!fupd_intro // IH.
+Qed.
+
 End lifting.
