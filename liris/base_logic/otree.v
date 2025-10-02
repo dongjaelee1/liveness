@@ -1507,16 +1507,18 @@ Section otree.
     oblG_elem π ∗ oblG_transfer_bound π ℵ ∗
     othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
     oblG_elem k ∗ otreeG_elem k ∗ oblG_transfer k a ∗ oblG_transfer k b
-    ⊢ (oblG_done π) ∨
+    ⊢ (osat Ω ∗ othread TP ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗
+       othreadG_owns θ k true (1/2)%Qp ∗ oblG_transfer k a ∗ oblG_transfer k b ∗
+       oblG_done π) ∨
         (|==> ∃ (C : obl_cond) Ω',
-            (⌜ Ω ↪ₜ Ω' | C ⌝) ∗
+            (⌜ (Ω ↪ₜ Ω' | C) ∧ (∀ k o, (C k o ∨ ¬ C k o)) ⌝) ∗
             osat Ω' ∗ othread TP ∗ osuspend (dom Ω') ∗ oforest (dom Ω') ∗
             ∃ x, otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)%Qp).
   Proof.
     iIntros (LTa LTb) "(S&T&U&F& #Beπ& #Btbπ& #Teθ& Toθ& #Bek& #Tek& Btka& Btkb)".
     rewrite /oforest -lock. iDestruct "F" as "(%&F)".
     iPoseProof (osat_elem_cases _ π with "[S]") as "[%Liveπ | #Bdπ]"; first by iFrame.
-    2:{ iLeft. auto. }
+    2:{ iLeft. iFrame. auto. }
     iRight. iPoseProof (oforest_aux_wf with "F") as "%". destruct H1 as [Dom [Disj Twfs]].
     iPoseProof (osat_elem π with "[S]") as "%Inπ"; first by iFrame.
     assert (LUπ : is_Some (forest_fold OForest !! π)).
@@ -1527,7 +1529,8 @@ Section otree.
     iMod (oforest_aux_transfer_one_tree _ _ _ θ k kt π ψ ρ ρt ℵ a b with "[$]") as "H".
     1,2,3,4,5,6: eauto.
     { rewrite /node LUtπ. done. }
-    iDestruct "H" as "(%&%&%&S&T&U&F&H)". iModIntro. iFrame. iExists _. iSplitR; first eauto.
+    iDestruct "H" as "(%&%&%&S&T&U&F&H)". iModIntro. iFrame. iExists _. iSplitR.
+    { iPureIntro. split; first eauto. intros. destruct (decide (node kt k0)); auto. }
     rewrite -lock. iFrame.
   Qed.
 
