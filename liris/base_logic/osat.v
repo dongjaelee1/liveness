@@ -944,6 +944,39 @@ Section osat.
     split; eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
+  Lemma osat_obl_transfer_one_with_bound_stay Ω k α τ β β' ℵ c x2 :
+    (Ω !! k = Some (olive α τ β)) →
+    (/0 /< c) →
+    osat Ω ∗ oblG_progress_supply k x2 (1/2)%Qp ∗
+    oblG_transfer_bound k ℵ ∗ oblG_transfer k c
+    ⊢ |==> ∃ α', osat (<[k:=olive α' τ (β /+ β')]>Ω) ∗
+                 ⌜ obl_state_transfer (olive α τ β) (olive α' τ (β /+ β')) ∧ α' /< ℵ ⌝ ∗
+                 oblG_progress_supply k (β /+ β') (1/2)%Qp ∗
+                 oblG_transfer_bound k α' ∗ oblG_progress k β'.
+  Proof.
+    intros LU Hc. iIntros "(Hsat & Hps0 & #Htb & Ht)".
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
+    iMod (oblG_transfer_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
+    assert (LT : a2 /< α0).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    iPoseProof (oblG_transfer_bound_know_bound k with "[Hb Htb]") as "%LEℵ"; first by iFrame.
+    iMod (oblG_transfer_bound_auth_mon _ _ a2 with "Hb") as "Hb".
+    { apply WFOCM.lt_le; auto. }
+    iPoseProof (oblG_transfer_bound_know with "Hb") as "#Hbk".
+    simpl in *.
+    iMod (oblG_progress_supply_mon _ _ β with "Hps") as "Hps"; first done.
+    iMod (oblG_progress_supply_issue_2 _ _ _ β _ β' with "[Hps Hps0]") as "(Hps&Hps0&Hp)"; [apply Qp.div_2|iFrame|].
+    iModIntro. iExists a2. 
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (olive a2 τ (β /+ β'))) with "[Hm Hs Hts Hb Ho Hps]") as "Hm".
+    { apply lookup_delete_eq. }
+    { iFrame "Hm". iFrame. simpl. iSplit; done. }
+    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HS HT HB HO HP".
+    rewrite insert_delete_eq. iFrame. iFrame "Hbk". simpl; iPureIntro; split; auto.
+    split; eapply WFOCM.lt_le_lt; eauto.
+  Qed.
+
   Lemma osat_obl_progress_one Ω k α τ β c x0 :
     (Ω !! k = Some (olive α τ β)) →
     (/0 /< c) →
