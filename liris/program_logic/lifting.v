@@ -268,6 +268,35 @@ Section liveness.
     clear IHK. iSplitR; first eauto. iFrame. iIntros "M". iApply "K". iFrame.
   Qed.
 
+  Lemma ghost_step_get_progress_gen E ν :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ K,
+         (([∗ map] k ↦ '(θ, ψ) ∈ K,
+             othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
+             ∃ a, ⌜(Ord.O < a)%ord⌝ ∗ oblG_elem k ∗ oblG_transfer k a) ∗
+          (([∗ map] k ↦ '(θ, ψ) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_progress k ψ) -∗
+           |={∅,E}=> state_interp σ Θ κs ∗ ν)))
+    ⊢ ghost_step E ν.
+  Proof.
+    rewrite /ghost_step. iIntros "H % % % % I". iDestruct "I" as "(S& T& U& F& I)".
+    iMod ("H" with "I") as "(%& M& H)".
+    iStopProof. revert Ω. induction K using map_ind; iIntros (Ω) "(S& T& U& F& M& K)".
+    { iMod ("K" with "[]") as "[I K]".
+      - done.
+      - iModIntro. iExists Ω. iFrame. done. }
+    rewrite !big_sepM_insert; auto. destruct x as [θ ψ].
+    iDestruct "M" as "((#Teθ& Toi& %& %LTa& #Bei& Bti)& M)".
+    iMod (oforest_get_progress_one _ _ θ i a ψ with "[S T F Toi Bti]") as "(%&%&%& S& T& F& Toi& Bpi)".
+    { simpl; auto. }
+    { iFrame. auto. }
+    destruct H0 as [Prog1 DecC]. iMod (IHK Ω' with "[-]") as "H".
+    2:{ iDestruct "H" as "(%& %Prog2& H)". iModIntro. iFrame. iPureIntro. etrans; last eauto.
+        eapply rtc_l; last reflexivity. eapply obl_states_step_transfer; eauto. }
+    clear IHK. assert (dom Ω' = dom Ω).
+    { apply obl_states_cond_rel_dom in Prog1. auto. }
+    rewrite -!H0. iFrame. iIntros "M". iApply "K". iFrame.
+  Qed.
 
   (* lwp versions *)
   Lemma lwp_progress s i E e1 Φ :
