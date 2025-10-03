@@ -27,12 +27,9 @@ Below you can find the relevant parts:
 *)
 
 Section ectxi_language_mixin.
-  Context {expr val ectx_item state observation fuel : Type}.
+  Context {expr val ectx_item state observation : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
-  Context (fuel_leR : fuel → fuel → Prop).
-  Context (fuelR : fuel → fuel → Prop).
-  Context (fuel_addO : fuel → fuel → fuel).
   Context (fill_item : ectx_item → expr → expr).
   Context (base_step : expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop).
 
@@ -40,7 +37,6 @@ Section ectxi_language_mixin.
     mixin_to_of_val v : to_val (of_val v) = Some v;
     mixin_of_to_val e v : to_val e = Some v → of_val v = e;
     mixin_val_stuck e1 σ1 τ κ e2 σ2 efs : base_step e1 σ1 τ κ e2 σ2 efs → to_val e1 = None;
-    mixin_fuel_wf : WFOCM.t fuel_leR fuel_addO fuelR;
     mixin_fork_thread_ids e1 σ1 τ κ e2 σ2 efs :
       base_step e1 σ1 τ κ e2 σ2 efs → τ ## dom efs;
 
@@ -69,29 +65,22 @@ Structure ectxiLanguage := EctxiLanguage {
   ectx_item : Type;
   state : Type;
   observation : Type;
-  fuel : Type;
 
   of_val : val → expr;
   to_val : expr → option val;
-  fuel_leR : fuel → fuel → Prop;
-  fuelR : fuel → fuel → Prop;
-  fuel_addO : fuel → fuel → fuel;
   fill_item : ectx_item → expr → expr;
   base_step : expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop;
 
   ectxi_language_mixin :
-    EctxiLanguageMixin of_val to_val fuel_leR fuelR fuel_addO fill_item base_step
+    EctxiLanguageMixin of_val to_val fill_item base_step
 }.
 
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments EctxiLanguage {_ _ _ _ _ _ _ _ _ _ _ _ _} _.
+Global Arguments EctxiLanguage {_ _ _ _ _ _ _ _ _} _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
-Global Arguments fuel_leR {_} _ _.
-Global Arguments fuelR {_} _ _.
-Global Arguments fuel_addO {_} _ _.
 Global Arguments fill_item {_} _ _.
 Global Arguments base_step {_} _ _ _ _ _ _ _.
 
@@ -119,14 +108,13 @@ Section ectxi_language.
   Proof. apply foldl_app. Qed.
 
   Definition ectxi_lang_ectx_mixin :
-    EctxLanguageMixin of_val to_val (@fuel_leR Λ) fuelR fuel_addO [] (flip (++)) fill base_step.
+    EctxLanguageMixin of_val to_val [] (flip (++)) fill base_step.
   Proof.
     assert (fill_val : ∀ K e, is_Some (to_val (fill K e)) → is_Some (to_val e)).
     { intros K. induction K as [|Ki K IH]=> e //=. by intros ?%IH%fill_item_val. }
     assert (fill_not_val : ∀ K e, to_val e = None → to_val (fill K e) = None).
     { intros K e. rewrite !eq_None_not_Some. eauto. }
     split.
-    - apply ectxi_language_mixin.
     - apply ectxi_language_mixin.
     - apply ectxi_language_mixin.
     - apply ectxi_language_mixin.
@@ -176,8 +164,8 @@ Coercion ectxi_lang_ectx : ectxiLanguage >-> ectxLanguage.
 Coercion ectxi_lang : ectxiLanguage >-> language.
 
 Definition EctxLanguageOfEctxi (Λ : ectxiLanguage) : ectxLanguage :=
-  let '@EctxiLanguage E V C St K F of_val to_val fuel_leR fuelR fuel_addO fill base mix := Λ in
-  @EctxLanguage E V (list C) St K F of_val to_val fuel_leR fuelR fuel_addO _ _ _ _
-    (@ectxi_lang_ectx_mixin (@EctxiLanguage E V C St K F of_val to_val fuel_leR fuelR fuel_addO fill base mix)).
+  let '@EctxiLanguage E V C St K of_val to_val fill base mix := Λ in
+  @EctxLanguage E V (list C) St K of_val to_val _ _ _ _
+    (@ectxi_lang_ectx_mixin (@EctxiLanguage E V C St K of_val to_val fill base mix)).
 
 Global Arguments EctxLanguageOfEctxi : simpl never.
