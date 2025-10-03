@@ -56,16 +56,16 @@ liris/program_logic/ectx_language.v
 liris/program_logic/ectx_lifting.v
 liris/program_logic/ectxi_language.v
 
-# liris_heap_lang/locations.v
-# liris_heap_lang/lang.v
-# liris_heap_lang/class_instances.v
-# liris_heap_lang/pretty.v
-# liris_heap_lang/metatheory.v
-# liris_heap_lang/tactics.v
-# liris_heap_lang/primitive_laws.v
-# liris_heap_lang/derived_laws.v
-# liris_heap_lang/notation.v
-# liris_heap_lang/proofmode.v
+liris_heap_lang/locations.v
+liris_heap_lang/lang.v
+liris_heap_lang/class_instances.v
+liris_heap_lang/pretty.v
+liris_heap_lang/metatheory.v
+liris_heap_lang/tactics.v
+liris_heap_lang/primitive_laws.v
+liris_heap_lang/derived_laws.v
+liris_heap_lang/notation.v
+liris_heap_lang/proofmode.v
 # TODO
 # liris_heap_lang/adequacy.v
 # liris_heap_lang/total_adequacy.v
