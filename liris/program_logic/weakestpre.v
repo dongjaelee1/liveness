@@ -1,5 +1,4 @@
 From iris.proofmode Require Import base proofmode classes.
-(* From transfinite.base_logic.lib Require Export fancy_updates. *)
 From liris Require Export language.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
@@ -7,7 +6,6 @@ From iris.bi Require Export fixpoint.
 From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 From liris.base_logic Require Export otree fancy_updates.
-(* From liris.program_logic Require Export thread_obligation. *)
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
 
@@ -38,23 +36,16 @@ Global Arguments LirisG {SI Λ Σ}.
 Global Instance wp_obl_class {Λ : language} : obl_class Ord.t (state Λ) thread_id Ord.lt.
 Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
 
-(* Notation lirisGS := (lirisGS_gen HasLc). *)
-(* Notation "'⌈' Λ '⌉'" := (Ord.from_wf_set (@WFOCM.lt_wf _ _ _ _ (@fuel_wf Λ))). *)
-(* Notation schedfairIL Λ := (schedfairI (H:=@fuel_wf Λ)). *)
-(* Notation toIL Λ := (toI (WF:=@fuel_wf Λ) (ps:=state Λ)). *)
-(* Notation oftIL Λ := (oftI (WF:=@fuel_wf Λ) (obl_ps:=state Λ)). *)
-(* Notation obl_statesL Λ := (obl_states' (@wp_obl_class Λ)). *)
-
 (** Predicates we take the fixpoint of in order to define the lWP. *)
 (* Ω must make strict progress *)
 Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs,
      (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
-     (⌜if s is NotStuck then reducible e1 σ1 Θ else True⌝) ∗
+     (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
      ∃ (b : bool), ALC? b |={∅}=>
      ∃ Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ σ1 ⌝) ∗
-            ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗ |={∅,E}=>
+            ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗ |={∅,E}=>
      ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₛ⋆ Ω2' @ σ2) ⌝) ∗
                (osat Ω2' ∗ othread (Θ ∪ dom efs) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗
                 state_interp σ2 (Θ ∪ dom efs) κs) ∗
@@ -390,8 +381,8 @@ Proof.
       * iPureIntro. destruct b, H2; split; auto; by etransitivity.
       * rewrite lwp_unfold /lwp_pre. rewrite He2. by iApply ghost_step_intro.
     + iMod ("H" $! _ _ _ [] _ with "H0") as "[H H']".
-      iDestruct "H" as %(? & ? & ? & ? & ?). by edestruct (atomic _ _ _ _ _ _ H1).
-  - destruct (atomic _ _ _ _ _ _ H1) as [v <-%of_to_val].
+      iDestruct "H" as %(? & ? & ? & ? & ?). by edestruct (atomic _ _ _ _ _ _ _ H1).
+  - destruct (atomic _ _ _ _ _ _ _ H1) as [v <-%of_to_val].
     rewrite lwp_value_fupd'. iMod ("H" with "[H0]") as "H"; first by iFrame.
     iDestruct "H" as "(%&%&H0&>H)". iModIntro. iFrame.
     iExists Ω2. iSplit.
@@ -427,7 +418,7 @@ Proof.
   iExists b. iMod "IH" as ">(%& %& IH)".
   iModIntro. iExists _. iSplitR; first done.
   iIntros (e2 σ2 efs Hstep).
-  destruct (fill_step_inv e σ1 Θ κ e2 σ2 efs) as (e2'&->&?); auto.
+  destruct (fill_step_inv i e σ1 Θ κ e2 σ2 efs) as (e2'&->&?); auto.
   iMod ("IH" $! e2' σ2 efs with "[//]") as "(%& %& %& $& IH& IHfork)".
   iIntros "!>". iExists Ω2. iSplitR; first done. iSplitL "IH HΦ".
   - iDestruct "IH" as "[IH _]". by iApply "IH".
