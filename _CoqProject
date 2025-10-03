@@ -38,6 +38,7 @@ liris/algebra/tree.v
 liris/algebra/ordinal_ucmra.v
 
 # liris/base_logic/digraph.v
+liris/base_logic/threads_map.v
 liris/base_logic/obligation.v
 liris/base_logic/osat.v
 liris/base_logic/otree.v
