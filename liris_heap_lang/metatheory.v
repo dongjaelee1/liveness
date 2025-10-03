@@ -1,5 +1,5 @@
 From stdpp Require Import gmap stringmap.
-From iris.heap_lang Require Export lang.
+From liris.heap_lang Require Export lang.
 From iris.prelude Require Import options.
 
 (* This file contains some metatheory about the heap_lang language,
@@ -19,7 +19,7 @@ Fixpoint is_closed_expr (X : stringset) (e : expr) : bool :=
   | Val v => is_closed_val v
   | Var x => bool_decide (x ∈ X)
   | Rec f x e => is_closed_expr (set_binder_insert f (set_binder_insert x X)) e
-  | UnOp _ e | Fst e | Snd e | InjL e | InjR e | Fork e | Free e | Load e =>
+  | UnOp _ e | Fst e | Snd e | InjL e | InjR e | Fork e | Exit e | Free e | Load e =>
      is_closed_expr X e
   | App e1 e2 | BinOp _ e1 e2 | Pair e1 e2 | AllocN e1 e2 | Store e1 e2 | Xchg e1 e2 | FAA e1 e2 =>
      is_closed_expr X e1 && is_closed_expr X e2
@@ -52,6 +52,7 @@ Fixpoint subst_map (vs : gmap string val) (e : expr) : expr :=
   | InjR e => InjR (subst_map vs e)
   | Case e0 e1 e2 => Case (subst_map vs e0) (subst_map vs e1) (subst_map vs e2)
   | Fork e => Fork (subst_map vs e)
+  | Exit e => Exit (subst_map vs e)
   | AllocN e1 e2 => AllocN (subst_map vs e1) (subst_map vs e2)
   | Free e => Free (subst_map vs e)
   | Load e => Load (subst_map vs e)
@@ -158,7 +159,7 @@ Proof.
     { eapply heap_array_map_disjoint;
         rewrite length_replicate Z2Nat.id; auto with lia. }
     destruct Hix as [(?&?&?&?&?&[-> Hlt%inj_lt]%lookup_replicate_1)%heap_array_lookup|
-                     [j Hj]%elem_of_map_to_list%elem_of_list_lookup_1].
+                     [j Hj]%elem_of_map_to_list%list_elem_of_lookup_1].
     + simplify_eq/=. rewrite !Z2Nat.id in Hlt; eauto with lia.
     + apply map_Forall_to_list in Hσ.
       by eapply Forall_lookup in Hσ; eauto; simpl in *.
@@ -167,16 +168,16 @@ Proof.
 Qed.
 
 (* The stepping relation preserves closedness *)
-Lemma base_step_is_closed e1 σ1 obs e2 σ2 es :
+Lemma base_step_is_closed i e1 σ1 Θ obs e2 σ2 es :
   is_closed_expr ∅ e1 →
   map_Forall (λ _ v, from_option is_closed_val true v) σ1.(heap) →
-  base_step e1 σ1 obs e2 σ2 es →
-  is_closed_expr ∅ e2 ∧ Forall (is_closed_expr ∅) es ∧
+  base_step i e1 σ1 Θ obs e2 σ2 es →
+  is_closed_expr ∅ e2 ∧
+  map_Forall (λ _ e, is_closed_expr ∅ e) es ∧
   map_Forall (λ _ v, from_option is_closed_val true v) σ2.(heap).
 Proof.
   intros Cl1 Clσ1 STEP.
-  induction STEP; simpl in *; split_and!;
-    try apply map_Forall_insert_2; try by naive_solver.
+  induction STEP; simpl in *; split_and!; try done; try apply map_Forall_insert_2; try by naive_solver.
   - subst. repeat apply is_closed_subst'; naive_solver.
   - unfold un_op_eval in *. repeat case_match; naive_solver.
   - eapply bin_op_eval_closed; eauto; naive_solver.
@@ -185,8 +186,8 @@ Proof.
   - select (_ !! _ = Some _) ltac:(fun H => by specialize (Clσ1 _ _ H)).
   - select (_ !! _ = Some _) ltac:(fun H => by specialize (Clσ1 _ _ H)).
   - case_match; try apply map_Forall_insert_2; by naive_solver.
+  - done.
 Qed.
-
 
 Lemma subst_map_empty e : subst_map ∅ e = e.
 Proof.
@@ -204,9 +205,9 @@ Proof.
     end. by case (vs !! _); simplify_option_eq.
   - destruct (decide _) as [[??]|[<-%dec_stable|[<-%dec_stable ?]]%not_and_l_alt].
     + rewrite !binder_delete_insert // !binder_delete_delete; eauto with f_equal.
-    + by rewrite /= delete_insert_delete delete_idemp.
-    + by rewrite /= binder_delete_insert // delete_insert_delete
-        !binder_delete_delete delete_idemp.
+    + by rewrite /= delete_insert_eq delete_delete_eq.
+    + by rewrite /= binder_delete_insert // delete_insert_eq
+        !binder_delete_delete delete_delete_eq.
 Qed.
 Lemma subst_map_singleton x v e :
   subst_map {[x:=v]} e = subst x v e.
@@ -226,7 +227,7 @@ Lemma subst_map_binder_insert_2 b1 v1 b2 v2 vs e :
 Proof.
   destruct b1 as [|s1], b2 as [|s2]=> /=; auto using subst_map_insert.
   rewrite subst_map_insert. destruct (decide (s1 = s2)) as [->|].
-  - by rewrite delete_idemp subst_subst delete_insert_delete.
+  - by rewrite delete_delete_eq subst_subst delete_insert_eq.
   - by rewrite delete_insert_ne // subst_map_insert subst_subst_ne.
 Qed.
 Lemma subst_map_binder_insert_2_empty b1 v1 b2 v2 e :
