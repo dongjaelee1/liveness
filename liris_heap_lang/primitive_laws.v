@@ -12,11 +12,15 @@ From liris.heap_lang Require Export class_instances.
 From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 
-Class heapGS_gen `{SI : indexT} hlc Σ := HeapGS {
-  heapGS_invGS : invGS_gen hlc Σ;
-  heapGS_osatGS : osatGS.osatGS (WF:=ord_wfocm_pack) (language.state heap_lang) Σ;
-  heapGS_schedfairGS : schedfairGS.schedfairGS (WF:=@fuel_wf heap_lang) Σ;
-  heapGS_threadoblGS : threadoblGS.threadoblGS Σ;
+TODO
+(* Define threadsGS *)
+
+Class heapGS_gen `{SI : indexT} Σ := HeapGS {
+  heapGS_invGS : invGS Σ;
+  heapGS_osatGS : osatGS.osatGS (WF:=ord_wfocm_pack) (language.state heap_lang) thread_id Σ;
+  heapGS_othreadGS : othreadGS.othreadGS Σ;
+  heapGS_otreeGS : otreeGS.otreeGS Ord.t Σ;
+
   #[global] heapGS_gen_heapGS :: gen_heapGS loc (option val) Σ;
   #[global] heapGS_inv_heapGS :: inv_heapGS loc (option val) Σ;
   #[global] heapGS_proph_mapGS :: proph_mapGS proph_id (val * val) Σ;
