@@ -7,12 +7,13 @@ From iris.prelude Require Import options.
 Section wp.
 Context {Λ : ectxLanguage} `{SI : indexT} `{!lirisGS Λ Σ} {Hinh : Inhabited (state Λ)}.
 Implicit Types s : stuckness.
+Implicit Types i : thread_id.
 Implicit Types P : iProp Σ.
 Implicit Types Φ : val Λ → iProp Σ.
 Implicit Types v : val Λ.
 Implicit Types e : expr Λ.
 Local Hint Resolve base_prim_reducible base_reducible_prim_step : core.
-Local Definition reducible_not_val_inhabitant e τ := reducible_not_val e inhabitant τ.
+Local Definition reducible_not_val_inhabitant i e τ := reducible_not_val i e inhabitant τ.
 Local Hint Resolve reducible_not_val_inhabitant : core.
 Local Hint Resolve base_stuck_stuck : core.
 
@@ -20,8 +21,8 @@ Lemma lwp_lift_base_step_fupd {s i E Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
-     |={∅}=> ∀ e2 σ2 efs, (⌜ base_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
+     |={∅}=> ∀ e2 σ2 efs, (⌜ base_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                          ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                          |={∅,E}=>
      state_interp σ2 (Θ ∪ dom efs) κs ∗
@@ -38,12 +39,12 @@ Lemma lwp_lift_base_step_fupd_lc {s i E Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ Ψ q,
        (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
         [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
        ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜ base_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+              ∀ e2 σ2 efs, (⌜ base_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                            othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
                            ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                            |={∅,E}=>
@@ -61,13 +62,13 @@ Lemma lwp_lift_base_step_fupd_suspended {s i E Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ π Ψ K,
        (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
         ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
        ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜ base_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+              ∀ e2 σ2 efs, (⌜ base_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                            othreadG_obls i Ψ 1 -∗
                            ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
                              ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
@@ -90,7 +91,7 @@ Lemma lwp_lift_base_stuck i E Φ e :
   (∀ Ω Θ σ κs,
      (osat Ω ∗ othread Θ ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗ state_interp σ Θ κs)
      ={E,∅}=∗
-     ⌜ base_stuck e σ Θ ⌝)
+     ⌜ base_stuck i e σ Θ ⌝)
   ⊢ lWP e @ i; E ?{{ Φ }}.
 Proof.
   iIntros (??) "H". iApply lwp_lift_stuck; first done.
@@ -100,7 +101,7 @@ Qed.
 Lemma lwp_lift_pure_base_stuck i E Φ e :
   to_val e = None →
   sub_redexes_are_values e →
-  (∀ σ τ, base_stuck e σ τ) →
+  (∀ σ τ, base_stuck i e σ τ) →
   ⊢ lWP e @ i; E ?{{ Φ }}.
 Proof using Hinh.
   iIntros (?? Hstuck). iApply lwp_lift_base_stuck; [done|done|].
@@ -111,8 +112,8 @@ Lemma lwp_lift_atomic_base_step_fupd {s i E Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
-     ∀ e2 σ2 efs, (⌜base_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
+     ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                   ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                   |={E}=>
      state_interp σ2 (Θ ∪ dom efs) κs ∗
@@ -130,12 +131,12 @@ Lemma lwp_lift_atomic_base_step_fupd_lc {s i E1 E2 Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ Ψ q,
        (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
         [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
        ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜base_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+              ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                            othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
                            ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                            |={E2,E1}=>
@@ -155,13 +156,13 @@ Lemma lwp_lift_atomic_base_step_fupd_suspended {s i E1 E2 Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ π Ψ K,
        (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
         ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
        ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜base_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+              ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                            othreadG_obls i Ψ 1 -∗
                            ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
                              ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
@@ -184,8 +185,8 @@ Lemma lwp_lift_atomic_base_step_no_fork_fupd {s i E Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
-     ∀ e2 σ2 efs, (⌜base_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
+     ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                   |={E}=>
      ⌜efs = ∅⌝ ∗ state_interp σ2 Θ κs ∗
      from_option Φ False (to_val e2))
@@ -202,12 +203,12 @@ Lemma lwp_lift_atomic_base_step_no_fork_fupd_lc {s i E1 E2 Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ Ψ q,
        (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
         [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
        ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜base_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+              ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                            othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
                            |={E2,E1}=>
               ⌜efs = ∅⌝ ∗ state_interp σ2 Θ κs ∗
@@ -225,13 +226,13 @@ Lemma lwp_lift_atomic_base_step_no_fork_fupd_suspended {s i E1 E2 Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
-     (⌜ base_reducible e1 σ1 Θ ⌝) ∗
+     (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ π Ψ K,
        (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
         ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
        ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜base_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+              ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                            othreadG_obls i Ψ 1 -∗
                            ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
                              ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
@@ -250,9 +251,9 @@ Qed.
 
 Lemma lwp_lift_pure_det_base_step_no_fork {s i E E' Φ} e1 e2 :
   to_val e1 = None →
-  (∀ σ1 τ, base_reducible e1 σ1 τ) →
+  (∀ σ1 τ, base_reducible i e1 σ1 τ) →
   (∀ σ1 κ τ e2' σ2 efs',
-    base_step e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+    base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,E'}=> |={E',E}=> lWP e2 @ s; i; E {{ Φ }})
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof using Hinh.
@@ -262,9 +263,9 @@ Qed.
 
 Lemma lwp_lift_pure_det_base_step_no_fork_lc {s i E E' Φ} e1 e2 :
   to_val e1 = None →
-  (∀ σ1 τ, base_reducible e1 σ1 τ) →
+  (∀ σ1 τ, base_reducible i e1 σ1 τ) →
   (∀ σ1 κ τ e2' σ2 efs',
-     base_step e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+     base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,E'}=>
      ∃ Ψ q,
      (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
@@ -280,9 +281,9 @@ Qed.
 
 Lemma lwp_lift_pure_det_base_step_no_fork_suspended {s i E E' Φ} e1 e2 :
   to_val e1 = None →
-  (∀ σ1 τ, base_reducible e1 σ1 τ) →
+  (∀ σ1 τ, base_reducible i e1 σ1 τ) →
   (∀ σ1 κ τ e2' σ2 efs',
-     base_step e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+     base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,E'}=>
      ∃ π Ψ K,
      (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
@@ -302,9 +303,9 @@ Qed.
 
 Lemma lwp_lift_pure_det_base_step_no_fork' {s i E Φ} e1 e2 :
   to_val e1 = None →
-  (∀ σ1 τ, base_reducible e1 σ1 τ) →
+  (∀ σ1 τ, base_reducible i e1 σ1 τ) →
   (∀ σ1 κ τ e2' σ2 efs',
-     base_step e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+     base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (lWP e2 @ s; i; E {{ Φ }})
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof using Hinh.
@@ -313,9 +314,9 @@ Qed.
 
 Lemma lwp_lift_pure_det_base_step_no_fork_lc' {s i E Φ} e1 e2 :
   to_val e1 = None →
-  (∀ σ1 τ, base_reducible e1 σ1 τ) →
+  (∀ σ1 τ, base_reducible i e1 σ1 τ) →
   (∀ σ1 κ τ e2' σ2 efs',
-     base_step e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+     base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,∅}=>
      ∃ Ψ q,
      (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
@@ -330,9 +331,9 @@ Qed.
 
 Lemma lwp_lift_pure_det_base_step_no_fork_suspended' {s i E Φ} e1 e2 :
   to_val e1 = None →
-  (∀ σ1 τ, base_reducible e1 σ1 τ) →
+  (∀ σ1 τ, base_reducible i e1 σ1 τ) →
   (∀ σ1 κ τ e2' σ2 efs',
-     base_step e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+     base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,∅}=>
      ∃ π Ψ K,
      (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
