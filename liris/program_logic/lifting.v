@@ -22,8 +22,8 @@ Section liveness.
   Lemma lwp_step_progress_no_lc s i E e1 ν :
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
-       |={∅}=> ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+       (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
+       |={∅}=> ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                            ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                            |={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs)
     ⊢ lwp_step s i E e1 ν.
@@ -41,12 +41,12 @@ Section liveness.
   Lemma lwp_step_progress_get_lc_with_obls s i E e1 ν :
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
+       (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
        ∃ Ψ q,
          (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
           [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
          ALC (|={∅}=>
-                ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                              othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
                              ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                              |={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs))
@@ -72,13 +72,13 @@ Section liveness.
   Lemma lwp_step_progress_get_lc_suspended_obls s i E e1 ν :
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
+       (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
        ∃ π Ψ K,
          (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
           ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
          ALC (|={∅}=>
-                ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                              othreadG_obls i Ψ 1 -∗
                              ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
                                ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
@@ -303,8 +303,8 @@ Section liveness.
     to_val e1 = None →
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
-       |={∅}=> ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+       (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
+       |={∅}=> ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                            ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                            |={∅,E}=>
        state_interp σ2 (Θ ∪ dom efs) κs ∗
@@ -318,12 +318,12 @@ Section liveness.
     to_val e1 = None →
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
+       (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
        ∃ Ψ q,
          (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
           [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
          ALC (|={∅}=>
-                ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                              othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
                              ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                              |={∅,E}=>
@@ -338,13 +338,13 @@ Section liveness.
     to_val e1 = None →
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-       (⌜ if s is NotStuck then reducible e1 σ1 Θ else True ⌝) ∗
+       (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
        ∃ π Ψ K,
          (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
           ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
          ALC (|={∅}=>
-                ∀ e2 σ2 efs, (⌜ prim_step e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                              othreadG_obls i Ψ 1 -∗
                              ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
                                ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
@@ -456,7 +456,7 @@ Lemma lwp_lift_stuck i E Φ e :
   (∀ Ω Θ σ κs,
      (osat Ω ∗ othread Θ ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗ state_interp σ Θ κs)
      ={E,∅}=∗
-     ⌜ stuck e σ Θ ⌝)
+     ⌜ stuck i e σ Θ ⌝)
   ⊢ lWP e @ i; E ?{{ Φ }}.
 Proof.
   rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (?? σ κ κs) "Hσ".
@@ -467,9 +467,9 @@ Qed.
 
 (** Derived lifting lemmas. *)
 Lemma lwp_lift_pure_step_no_fork `{!Inhabited (state Λ)} s i E E' Φ e1 :
-  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
-  (∀ κ σ1 Θ e2 σ2 efs, prim_step e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
-  (|={E,E'}=> |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }})
+  (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+  (∀ κ σ1 Θ e2 σ2 efs, prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
+  (|={E,E'}=> |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }})
 ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (Hsafe Hstep) "H". iApply lwp_lift_step_fupd.
@@ -486,15 +486,15 @@ Proof.
 Qed.
 
 Lemma lwp_lift_pure_step_no_fork_lc `{!Inhabited (state Λ)} s i E E' Φ e1 :
-  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
-  (∀ κ σ1 Θ e2 σ2 efs, prim_step e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
+  (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+  (∀ κ σ1 Θ e2 σ2 efs, prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
   (|={E,E'}=>
      ∃ Ψ q,
      (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
       [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
      ALC (|={∅}=>
             othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
-            |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
+            |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (Hsafe Hstep) "H". iApply lwp_lift_step_fupd_lc.
@@ -513,8 +513,8 @@ Proof.
 Qed.
 
 Lemma lwp_lift_pure_step_no_fork_suspended `{!Inhabited (state Λ)} s i E E' Φ e1 :
-  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
-  (∀ κ σ1 Θ e2 σ2 efs, prim_step e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
+  (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+  (∀ κ σ1 Θ e2 σ2 efs, prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
   (|={E,E'}=>
      ∃ π Ψ K,
      (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
@@ -525,7 +525,7 @@ Lemma lwp_lift_pure_step_no_fork_suspended `{!Inhabited (state Λ)} s i E E' Φ 
             ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
               ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
                (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
-            |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
+            |={E',E}=> ∀ κ Θ e2 efs σ, ⌜prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (Hsafe Hstep) "H". iApply lwp_lift_step_fupd_suspended.
@@ -544,7 +544,7 @@ Proof.
 Qed.
 
 Lemma lwp_lift_pure_stuck `{!Inhabited (state Λ)} i E Φ e :
-  (∀ σ τ, stuck e σ τ) →
+  (∀ σ τ, stuck i e σ τ) →
   True ⊢ lWP e @ i; E ?{{ Φ }}.
 Proof.
   iIntros (Hstuck) "_". iApply lwp_lift_stuck.
@@ -557,8 +557,8 @@ Lemma lwp_lift_atomic_step_fupd {s i E Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E}=∗
-     (⌜if s is NotStuck then reducible e1 σ1 Θ else True⌝) ∗
-     ∀ e2 σ2 efs, (⌜prim_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+     (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
+     ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                   ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                   |={E}=>
      state_interp σ2 (Θ ∪ dom efs) κs ∗
@@ -581,12 +581,12 @@ Lemma lwp_lift_atomic_step_fupd_lc {s i E1 E2 Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
-     (⌜if s is NotStuck then reducible e1 σ1 Θ else True⌝) ∗
+     (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
      ∃ Ψ q,
        (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
         [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
        ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜prim_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+              ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                            othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
                            ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                            |={E2,E1}=>
@@ -612,13 +612,13 @@ Lemma lwp_lift_atomic_step_fupd_suspended {s i E1 E2 Φ} e1 :
   to_val e1 = None →
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
-     (⌜if s is NotStuck then reducible e1 σ1 Θ else True⌝) ∗
+     (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
      ∃ π Ψ K,
        (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
         ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
        ALC (|={∅}=>
-              ∀ e2 σ2 efs, (⌜prim_step e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+              ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                            othreadG_obls i Ψ 1 -∗
                            ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
                              ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
@@ -644,8 +644,8 @@ Proof.
 Qed.
 
 Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s i E E' Φ} e1 e2 :
-  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
-  (∀ σ1 κ Θ e2' σ2 efs', prim_step e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+  (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+  (∀ σ1 κ Θ e2' σ2 efs', prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,E'}=> |={E',E}=> lWP e2 @ s; i; E {{ Φ }})
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
@@ -656,8 +656,8 @@ Proof.
 Qed.
 
 Lemma lwp_lift_pure_det_step_no_fork_lc `{!Inhabited (state Λ)} {s i E E' Φ} e1 e2 :
-  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
-  (∀ σ1 κ Θ e2' σ2 efs', prim_step e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+  (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+  (∀ σ1 κ Θ e2' σ2 efs', prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,E'}=>
      ∃ Ψ q,
      (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
@@ -675,8 +675,8 @@ Proof.
 Qed.
 
 Lemma lwp_lift_pure_det_step_no_fork_suspended `{!Inhabited (state Λ)} {s i E E' Φ} e1 e2 :
-  (∀ σ1 Θ, if s is NotStuck then reducible e1 σ1 Θ else to_val e1 = None) →
-  (∀ σ1 κ Θ e2' σ2 efs', prim_step e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+  (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+  (∀ σ1 κ Θ e2' σ2 efs', prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,E'}=>
      ∃ π Ψ K,
      (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
@@ -708,8 +708,8 @@ Proof.
   iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
   { by iApply "Hlwp". }
   iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
-  - intros σ Θ. specialize (Hsafe σ Θ). destruct s; eauto using reducible_not_val.
-  - done.
+  - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
+  - eauto.
   - iMod "Hlwp". iModIntro. iMod "Hlwp". iModIntro. by iApply "IH".
 Qed.
 
@@ -730,8 +730,8 @@ Proof.
   iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
   { iMod tlc_zero as "Hz". by iApply "Hlwp". }
   iApply (lwp_lift_pure_det_step_no_fork_lc (E':=E')).
-  - intros σ Θ. specialize (Hsafe σ Θ). destruct s; eauto using reducible_not_val.
-  - done.
+  - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
+  - eauto.
   - iDestruct "Hlwp" as ">(%&%& D& H)".
     iModIntro. iExists _, _. iFrame "D".
     iDestruct "H" as "(%& H)". iExists (ordinals.succ_def x). iIntros "LC".
@@ -766,8 +766,8 @@ Proof.
   iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
   { iMod tlc_zero as "Hz". by iApply "Hlwp". }
   iApply (lwp_lift_pure_det_step_no_fork_suspended (E':=E')).
-  - intros σ Θ. specialize (Hsafe σ Θ). destruct s; eauto using reducible_not_val.
-  - done.
+  - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
+  - eauto.
   - iDestruct "Hlwp" as ">(%&%&%& D& H)".
     iModIntro. iExists _, _, _. iFrame "D".
     iDestruct "H" as "(%& H)". iExists (ordinals.succ_def x). iIntros "LC".
