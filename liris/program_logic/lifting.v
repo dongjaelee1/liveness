@@ -6,6 +6,84 @@ From liris.program_logic Require Export weakestpre.
 From liris Require Import ordinal_wfocm.
 From iris.prelude Require Import options.
 
+TODO
+
+Local Definition obl_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  k : iProp Σ :=
+  oblG_elem k ∗ otreeG_elem k.
+Local Definition obl_aux : seal (@obl_def). Proof. by eexists. Qed.
+Definition obl := obl_aux.(unseal).
+Local Definition obl_unseal :
+  @obl = @obl_def := obl_aux.(seal_eq).
+Global Arguments obl {SI Λ Σ _}.
+
+Local Definition othread_obls_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  i Ψ q : iProp Σ :=
+  othreadG_obls i Ψ q ∗ othreadG_exec i (q/2) ∗ othreadG_elem i.
+Local Definition othread_obls_aux : seal (@othread_obls_def). Proof. by eexists. Qed.
+Definition othread_obls := othread_obls_aux.(unseal).
+Local Definition othread_obls_unseal :
+  @othread_obls = @othread_obls_def := othread_obls_aux.(seal_eq).
+Global Arguments othread_obls {SI Λ Σ _}.
+
+Local Definition othread_owns_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  i ρ b q : iProp Σ :=
+  othreadG_owns i ρ b q ∗ oblG_elem ρ ∗ otreeG_elem ρ ∗ othreadG_elem i.
+Local Definition othread_owns_aux : seal (@othread_owns_def). Proof. by eexists. Qed.
+Definition othread_owns := othread_owns_aux.(unseal).
+Local Definition othread_owns_unseal :
+  @othread_owns = @othread_owns_def := othread_owns_aux.(seal_eq).
+Global Arguments othread_owns {SI Λ Σ _}.
+
+
+          [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+
+    (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+          ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+   othreadG_obls i Ψ 1 -∗
+                             ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+                               ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+                                (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+
+         (⌜Ψ = dom K⌝ ∗ othreadG_elem j ∗ othreadG_obls j Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x j π ψ ∗ otreeG_wait k x (1/2))) ∗
+         (othreadG_obls j Ψ 1 -∗
+          (([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2)) ∨
+             (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns j k true (1/2) ∗ oblG_progress k ψ))) -∗
+
+         othreadG_elem j ∗ othreadG_obls j Ψ q ∗
+         (∃ T P α β, ∀ k,
+            ⌜k ∉ Ψ⌝ -∗ othreadG_obls j ({[k]} ∪ Ψ) q -∗
+            oblG_elem k -∗ oblG_goal k T P -∗
+            oblG_transfer_bound k α -∗ oblG_transfer k α -∗ oblG_progress k β -∗
+            othreadG_owns j k true (1/2)%Qp -∗ otreeG_elem k -∗
+
+            othreadG_elem j ∗ othreadG_obls j Ψ q ∗ othreadG_owns j k true (1/2)%Qp ∗ ⌜k ∈ Ψ⌝ ∗
+         oblG_goal k T P ∗ ⌜T σ⌝ ∗ (▷ P) ∗
+         (othreadG_obls j (Ψ ∖ {[k]}) q -∗ oblG_done k -∗
+
+          (oblG_elem π ∗ oblG_transfer_bound π ℵ ∗
+          ([∗ map] k ↦ '(θ, ψ, α, β) ∈ K,
+             ⌜(ℵ < α)%ord ∧ (Ord.O < β)%ord⌝ ∗ othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
+             oblG_elem k ∗ otreeG_elem k ∗ oblG_transfer k α ∗ oblG_transfer k β)) ∗
+         (((oblG_done π ∗
+            [∗ map] k ↦ '(θ, ψ, α, β) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_transfer k α ∗ oblG_transfer k β) ∨
+             ([∗ map] k ↦ '(θ, ψ, α, β) ∈ K, ∃ x, otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)%Qp)) -∗
+
+          (([∗ map] k ↦ '(θ, ψ) ∈ K,
+             othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
+             ∃ a, ⌜(Ord.O < a)%ord⌝ ∗ oblG_elem k ∗ oblG_transfer k a) ∗
+          (([∗ map] k ↦ '(θ, ψ) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_progress k ψ) -∗
+
+Section properties.
+Context `{SI : indexT} `{!lirisGS Λ Σ}.
+
+Global Instance obl_persistent k : Persistent (obl k).
+Proof. rewrite obl_unseal. apply _. Qed.
+
+End properties.
+
 Section lifting.
 Context `{SI : indexT} `{!lirisGS Λ Σ}.
 Implicit Types s : stuckness.
@@ -297,6 +375,8 @@ Section liveness.
     { apply obl_states_cond_rel_dom in Prog1. auto. }
     rewrite -!H0. iFrame. iIntros "M". iApply "K". iFrame.
   Qed.
+
+  Lemma ghost_step_terminate E ν :
 
   (* lwp versions *)
   Lemma lwp_lift_step_fupd s i E e1 Φ :

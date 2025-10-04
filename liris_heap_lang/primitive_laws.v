@@ -13,10 +13,7 @@ From liris.heap_lang Require Export class_instances.
 From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 
-TODO
-(* Define threadsGS *)
-
-Class heapGS_gen `{SI : indexT} Σ := HeapGS {
+Class heapGS `{SI : indexT} Σ := HeapGS {
   heapGS_invGS : invGS Σ;
   heapGS_osatGS : osatGS.osatGS (WF:=ord_wfocm_pack) (language.state heap_lang) thread_id Σ;
   heapGS_othreadGS : othreadGS.othreadGS Σ;
@@ -25,82 +22,33 @@ Class heapGS_gen `{SI : indexT} Σ := HeapGS {
   #[global] heapGS_gen_heapGS :: gen_heapGS loc (option val) Σ;
   #[global] heapGS_inv_heapGS :: inv_heapGS loc (option val) Σ;
   #[global] heapGS_proph_mapGS :: proph_mapGS proph_id (val * val) Σ;
-  heapGS_step_name : gname;
-  heapGS_step_cnt : mono_natG Σ;
+  #[global] heapGS_thread_mapGS :: thread_mapGS thread_id (option val) Σ;
 }.
-Local Existing Instance heapGS_step_cnt.
 
-Notation heapGS := (heapGS_gen HasLc).
-
-Section steps.
-  Context `{SI : indexT} `{!heapGS_gen hlc Σ}.
-
-  Local Definition steps_auth (n : nat) : iProp Σ :=
-    mono_nat_auth_own heapGS_step_name 1 n.
-
-  Definition steps_lb (n : nat) : iProp Σ :=
-    mono_nat_lb_own heapGS_step_name n.
-
-  Lemma steps_lb_0 :
-    ⊢ |==> steps_lb 0.
-  Proof. by apply mono_nat_lb_own_0. Qed.
-
-  Local Lemma steps_lb_valid n m :
-    steps_auth n -∗ steps_lb m -∗ ⌜m ≤ n⌝.
-  Proof.
-    iIntros "Hauth Hlb".
-    by iDestruct (mono_nat_lb_own_valid with "Hauth Hlb") as %[_ Hle].
-  Qed.
-
-  Local Lemma steps_lb_get n :
-    steps_auth n -∗ steps_lb n.
-  Proof. apply mono_nat_lb_own_get. Qed.
-
-  Local Lemma steps_auth_update n n' :
-    n ≤ n' → steps_auth n ==∗ steps_auth n' ∗ steps_lb n'.
-  Proof. intros Hle. by apply mono_nat_own_update. Qed.
-
-  Local Lemma steps_auth_update_S n :
-    steps_auth n ==∗ steps_auth (S n).
-  Proof.
-    iIntros "Hauth".
-    iMod (mono_nat_own_update with "Hauth") as "[$ _]"; [lia|done].
-  Qed.
-
-  Lemma steps_lb_le n n' :
-    n' ≤ n → steps_lb n -∗ steps_lb n'.
-  Proof. intros Hle. by iApply mono_nat_lb_own_le. Qed.
-
-End steps.
-
-Global Program Instance heapGS_lirisGS `{SI : indexT} `{!heapGS_gen hlc Σ} : lirisGS_gen hlc heap_lang Σ := {
-  liris_invGS := heapGS_invGS;
-  liris_osatGS := heapGS_osatGS;
-  liris_schedfairGS := heapGS_schedfairGS;
-  liris_threadoblGS := heapGS_threadoblGS;
-  state_interp σ step_cnt κs _ :=
-    (gen_heap_interp σ.(heap) ∗ proph_map_interp κs σ.(used_proph_id) ∗
-     steps_auth step_cnt)%I;
-  fork_post _ := True%I;
-  num_laters_per_step n := n;
-}.
-Next Obligation.
-  iIntros (???? σ ns κs τ)  "/= ($ & $ & H)".
-  by iMod (steps_auth_update_S with "H") as "$".
-Qed.
+Global Program Instance heapGS_lirisGS `{SI : indexT} `{!heapGS Σ} : lirisGS heap_lang Σ := {
+    liris_invGS := heapGS_invGS;
+    liris_osatGS := heapGS_osatGS;
+    liris_othreadGS := heapGS_othreadGS;
+    liris_otreeGS := heapGS_otreeGS;
+    state_interp σ Θ κs :=
+      (thread_map_interp Θ σ.(thread_map) ∗
+       gen_heap_interp σ.(heap) ∗
+       proph_map_interp κs σ.(used_proph_id))%I;
+    fork_post i v := (thread i false (Some v))%I;
+  }.
 
 (** Since we use an [option val] instance of [gen_heap], we need to add a
 [Some]. We also seal the definition to avoid confusion between the version from
 [gen_heap], and our version with [Some]. That also helps for scopes and
 coercions. *)
-Local Definition pointsto_def `{SI : indexT} `{@heapGS_gen SI hlc Σ}
+Local Definition pointsto_def `{SI : indexT} `{@heapGS SI Σ}
     (l : loc) (dq : dfrac) (v : val) : iProp Σ :=
   pointsto l dq (Some v).
 Local Definition pointsto_aux : seal (@pointsto_def). Proof. by eexists. Qed.
 Definition pointsto := pointsto_aux.(unseal).
 Local Definition pointsto_unseal :
   @pointsto = @pointsto_def := pointsto_aux.(seal_eq).
-Global Arguments pointsto {SI hlc Σ _}.
+Global Arguments pointsto {SI Σ _}.
 
 Notation "l ↦ dq v" := (pointsto l dq v)
   (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
@@ -109,7 +57,7 @@ Notation "l ↦ dq v" := (pointsto l dq v)
 make setoid rewriting in the predicate [I] work we need actual definitions
 here. *)
 Section definitions.
-  Context `{SI : indexT} `{!heapGS_gen hlc Σ}.
+  Context `{SI : indexT} `{!heapGS Σ}.
   Definition inv_pointsto_own (l : loc) (v : val) (I : val → Prop) : iProp Σ :=
     inv_pointsto_own l (Some v) (from_option I False).
   Definition inv_pointsto (l : loc) (I : val → Prop) : iProp Σ :=
@@ -125,8 +73,28 @@ Notation "l '↦_' I □" := (inv_pointsto l I%stdpp%type)
 Notation "l ↦_ I v" := (inv_pointsto_own l v I%stdpp%type)
   (at level 20, I at level 9, format "l  ↦_ I  v") : bi_scope.
 
+(** Wrapper for thread exec token *)
+Local Definition thread_exec_def `{SI : indexT} `{@heapGS SI Σ}
+    (i : thread_id) : iProp Σ :=
+  thread i true None.
+Local Definition thread_exec_aux : seal (@thread_exec_def). Proof. by eexists. Qed.
+Definition thread_exec := thread_exec_aux.(unseal).
+Local Definition thread_exec_unseal :
+  @thread_exec = @thread_exec_def := thread_exec_aux.(seal_eq).
+Global Arguments thread_exec {SI Σ _}.
+
+Local Definition thread_exit_def `{SI : indexT} `{@heapGS SI Σ}
+    (i : thread_id) (v : val) : iProp Σ :=
+  thread i false (Some v).
+Local Definition thread_exit_aux : seal (@thread_exit_def). Proof. by eexists. Qed.
+Definition thread_exit := thread_exit_aux.(unseal).
+Local Definition thread_exit_unseal :
+  @thread_exit = @thread_exit_def := thread_exit_aux.(seal_eq).
+Global Arguments thread_exit {SI Σ _}.
+
+
 Section lifting.
-Context `{SI : indexT} `{!heapGS_gen hlc Σ}.
+Context `{SI : indexT} `{!heapGS Σ}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ Ψ : val → iProp Σ.
 Implicit Types efs : list expr.
