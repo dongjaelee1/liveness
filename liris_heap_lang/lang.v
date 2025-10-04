@@ -201,12 +201,12 @@ Definition vals_compare_safe (vl v1 : val) : Prop :=
 Global Arguments vals_compare_safe !_ !_ /.
 
 (** The state:
-    threads of [option val]s, with [None] representing executing threads,
-    [Some v] representing threads that terminated with val [v].
+    thread_map of [option val]s, with [None] representing executing thread_map,
+    [Some v] representing thread_map that terminated with val [v].
     heaps of [option val]s, with [None] representing deallocated locations.
  *)
 Record state : Type := {
-  threads: gmap thread_id (option val);
+  thread_map: gmap thread_id (option val);
   heap: gmap loc (option val);
   used_proph_id: gset proph_id;
 }.
@@ -410,7 +410,7 @@ Global Instance val_countable : Countable val.
 Proof. refine (inj_countable of_val to_val _); auto using to_of_val. Qed.
 
 Global Instance state_inhabited : Inhabited state :=
-  populate {| threads := inhabitant; heap := inhabitant; used_proph_id := inhabitant |}.
+  populate {| thread_map := inhabitant; heap := inhabitant; used_proph_id := inhabitant |}.
 Global Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
 Global Instance expr_inhabited : Inhabited expr := populate (Val inhabitant).
 
@@ -591,16 +591,16 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
     | _, _ => None
     end.
 
-Definition state_upd_threads (f: gmap thread_id (option val) → gmap thread_id (option val)) (σ: state) : state :=
-  {| threads := f σ.(threads); heap := σ.(heap); used_proph_id := σ.(used_proph_id) |}.
-Global Arguments state_upd_threads _ !_ /.
+Definition state_upd_thread_map (f: gmap thread_id (option val) → gmap thread_id (option val)) (σ: state) : state :=
+  {| thread_map := f σ.(thread_map); heap := σ.(heap); used_proph_id := σ.(used_proph_id) |}.
+Global Arguments state_upd_thread_map _ !_ /.
 
 Definition state_upd_heap (f: gmap loc (option val) → gmap loc (option val)) (σ: state) : state :=
-  {| threads := σ.(threads); heap := f σ.(heap); used_proph_id := σ.(used_proph_id) |}.
+  {| thread_map := σ.(thread_map); heap := f σ.(heap); used_proph_id := σ.(used_proph_id) |}.
 Global Arguments state_upd_heap _ !_ /.
 
 Definition state_upd_used_proph_id (f: gset proph_id → gset proph_id) (σ: state) : state :=
-  {| threads := σ.(threads); heap := σ.(heap); used_proph_id := f σ.(used_proph_id) |}.
+  {| thread_map := σ.(thread_map); heap := σ.(heap); used_proph_id := f σ.(used_proph_id) |}.
 Global Arguments state_upd_used_proph_id _ !_ /.
 
 Fixpoint heap_array (l : loc) (vs : list val) : gmap loc (option val) :=
@@ -731,10 +731,10 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
      j ∉ Θ →
      base_step i (Fork e) σ Θ [] (Val $ LitV LitUnit) σ {[j := e]}
   | ExitS v σ Θ :
-     σ.(threads) !! i = None →
+     σ.(thread_map) !! i = None →
      base_step i (Exit (Val v)) σ Θ
                []
-               (Val v) (state_upd_threads <[i:=Some v]> σ)
+               (Val v) (state_upd_thread_map <[i:=Some v]> σ)
                ∅
 
   | NewProphS σ Θ p :

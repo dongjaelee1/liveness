@@ -6,6 +6,7 @@ From iris.bi.lib Require Import fractional.
 From transfinite.base_logic.lib Require Import mono_nat.
 From transfinite.base_logic.lib Require Export gen_heap proph_map gen_inv_heap.
 From liris.algebra Require Import ordinal_wfocm.
+From liris.base_logic Require Export thread_map.
 From liris.program_logic Require Export weakestpre.
 From liris.program_logic Require Import ectx_lifting.
 From liris.heap_lang Require Export class_instances.
