@@ -136,7 +136,7 @@ Definition oforest `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
 Section otree.
   Context `{SI : indexT} `{WFA : WFOCM.pack A}.
   Context {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS A Σ}.
-  Context `{Ξ : obl_class A ps positive WFOCM.ltR}.
+  Context `{Ξl : obl_live_class A positive WFOCM.ltR} `{Ξd : obl_done_class ps}.
 
   Global Instance otreeG_suspend_persistent k x θ π ψ : Persistent (otreeG_suspend k x θ π ψ).
   Proof. rewrite /otreeG_suspend. apply _. Qed.
@@ -254,7 +254,7 @@ Section otree.
     own wait_name (reservation_map_data k (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset X)))
     ⊢ |==> (own wait_name (reservation_map_data k (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset ({[x]} ∪ X))))) ∗
            otreeG_wait k x 1.
-  Proof.
+  Proof using Type*.
     iIntros (Hx) "H".
     rewrite (reservation_map_token_difference (gset_to_coPset {[x]}) (⊤ ∖ gset_to_coPset X)); cycle 1.
     { apply elem_of_subseteq. intros. rewrite elem_of_difference. split; first set_solver.
@@ -391,7 +391,7 @@ Section otree.
   Lemma osuspend_alloc_obl D k :
     k ∉ D →
     osuspend D ⊢ |==> osuspend ({[k]} ∪ D) ∗ otreeG_elem k.
-  Proof.
+  Proof using Type*.
     iIntros (Hk) "Hsus".
     rewrite /osuspend -lock. iDestruct "Hsus" as "( % & %Hdom & HS & HW & HE & HM )".
     iMod (otreeG_elem_alloc _ k with "HE") as "[HE He]"; first done.
@@ -417,7 +417,7 @@ Section otree.
   Lemma osuspend_suspend D k θ π ψ :
     osuspend D ∗ otreeG_elem k ∗ othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1
     ⊢ |==> osuspend D ∗ ∃ x, otreeG_suspend k x θ π ψ ∗ otreeG_wait k x 1.
-  Proof.
+  Proof using Type*.
     iIntros "(Hsus & He & Ho & Hg)".
     iPoseProof (osuspend_elem_elem with "[$]") as "%Hkin".
     rewrite /osuspend -lock. iDestruct "Hsus" as "( % & %Hdom & HS & HW & HE & HM )".

@@ -100,7 +100,7 @@ Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
 Section othread.
   Context `{SI : indexT} `{WFA : WFOCM.pack A}.
   Context {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS Σ}.
-  Context `{Ξ : obl_class A ps positive WFOCM.ltR}.
+  Context `{Ξl : obl_live_class A positive WFOCM.ltR} `{Ξd : obl_done_class ps}.
 
   Global Instance othreadG_term_persistent i : Persistent (othreadG_term i).
   Proof. rewrite /othreadG_term. apply _. Qed.
@@ -429,7 +429,9 @@ Section othread.
     Θ ## TP →
     othread TP
     ⊢ |==> othread (TP ∪ Θ) ∗ ([∗ set] i ∈ Θ, othreadG_elem i ∗ othreadG_obls i ∅ 1 ∗ othreadG_exec i (1/2)%Qp).
-  Proof.
+  Proof using Type*.
+    (* (* FIXME: if not clear Ξd, used but not delcared error at Qed *) *)
+    (* clear Ξd. *)
     revert TP. pattern Θ. revert Θ. apply set_ind.
     { solve_proper. }
     { iIntros (??) "T". rewrite union_empty_r_L. iFrame. by iModIntro. }
@@ -444,7 +446,7 @@ Section othread.
     oblG_live k (1/2)%Qp ∗ oblG_live k (1/2)%Qp ∗ othread TP ∗ othreadG_obls i Ψ q
     ⊢ |==> ⌜k ∉ Ψ⌝ ∗ oblG_live k (1/2)%Qp ∗ oblG_live k (1/2/2)%Qp ∗
            othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k false 1.
-  Proof.
+  Proof using Type*.
     iIntros "(Os0 & Os & Hthread & Ho)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
     iPoseProof (othreadG_obls_lookup_frac with "[HO Ho]") as "%"; first iFrame.
@@ -511,7 +513,7 @@ Section othread.
     othread TP ∗ othreadG_obls i Ψ q ∗ othreadG_owns i k f 1
     ⊢ |==> othread TP ∗ othreadG_obls i (Ψ ∖ {[k]}) q ∗
            oblG_live k (1/2/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp).
-  Proof.
+  Proof using Type*.
     iIntros (Hink) "(Hthread & Ho & Hw)".
     rewrite /othread -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
     iPoseProof (othreadG_obls_lookup_frac with "[HO Ho]") as "%"; first iFrame.
@@ -549,7 +551,7 @@ Section othread.
     othread TP ∗ othreadG_obls i Ψ 1 ∗ othreadG_owns i k f 1
     ⊢ |==> othread TP ∗ othreadG_obls i (Ψ ∖ {[k]}) 1 ∗
            oblG_live k (1/2/2)%Qp ∗ (if f then oblG_owner k i (1 / 2 / 2) else emp).
-  Proof.
+  Proof using Type*.
     iIntros "(Hthread & Ho & Hw)". iPoseProof (othread_obls_owns_elem with "[$]") as "%Hkin".
     iApply (othread_delete_obl_frac with "[$]"). auto.
   Qed.

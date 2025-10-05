@@ -162,7 +162,9 @@ Global Typeclasses Opaque oblG_progress_supply.
 Global Instance: Params (@oblG_progress_supply) 8 := {}.
 
 (* Global invariant for the obligation ghost state. *)
-Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_class A ps T WFOCM.ltR} (Ω : obl_states) : iProp Σ :=
+Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
+  `{obl_live_class A T WFOCM.ltR} `{obl_done_class ps}
+  (Ω : obl_states) : iProp Σ :=
   locked
     ((∃ (OProp : gmap obl_id (prop_of ps * iProp Σ)),
          (⌜ dom OProp = dom Ω ⌝) ∗
@@ -175,22 +177,24 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{obl_cl
      (own elem_name (gmap_view_auth (DfracOwn 1) (gset_to_gmap () (dom Ω)))) ∗
      ([∗ map] k ↦ o ∈ Ω,
         match o with
-        | obl_live d =>
+        | inl d =>
             oblG_live k (1/2)%Qp ∗
             (∃ α, ⌜ WFOCM.leR α (obl_transfer d) ⌝ ∗ oblG_transfer_supply k α (1)%Qp ∗ oblG_transfer_bound_auth k α) ∗
             (oblG_owner k (obl_owner d) (1/2)%Qp) ∗
             (∃ β, ⌜ WFOCM.leR β (obl_progress d) ⌝ ∗ oblG_progress_supply k β (1/2)%Qp)
-        | obl_done P1 =>
+        | inr d =>
+            let P1 := (obl_atom d) in
             ∃ P2 R, oblG_goal k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
                     oblG_done_auth k ∗
                     ∃ α τ β, oblG_transfer_supply k α 1 ∗ oblG_transfer_bound_auth k α ∗
                              oblG_owner k τ 1 ∗ oblG_progress_supply k β 1
-      end)
+        end)
     )%I.
 
 (** Properties *)
 Section osat.
-  Context `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ} `{Ξ : obl_class A ps T WFOCM.ltR}.
+  Context `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
+    `{Ξl : obl_live_class A T WFOCM.ltR} `{Ξd : obl_done_class ps}.
 
   Local Instance goal_unfold_contractive : Contractive (@goal_unfold SI Σ).
   Proof. solve_contractive. Qed.
@@ -826,7 +830,7 @@ Section osat.
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP&HE & Hm)".
     iPoseProof (big_sepM_delete with "Hm") as "[LU Hm]"; first eauto.
     destruct o.
-    - iExists d. done.
+    - iExists o. done.
     - iExFalso. iDestruct "LU" as "(% & % & _ & _ & _ & DONE & _)".
       iPoseProof (oblG_live_done_false with "[Hl DONE]") as "%F"; [iFrame | done].
       iPoseProof (oblG_done_auth_done with "[$]") as "#D". done.
@@ -841,7 +845,7 @@ Section osat.
 
   Lemma osat_obl_is_done Ω k (P : prop_of ps) R :
     osat Ω ∗ oblG_goal k P R ∗ oblG_done k
-    ⊢ ∃ P', ⌜Ω !! k = Some (obl_done P') ∧ P' ≡ P⌝.
+    ⊢ ∃ P', ⌜Ω !! k = Some (odone P') ∧ P' ≡ P⌝.
   Proof.
     iIntros "(Hsat & #He & Hl)".
     iPoseProof (osat_goal_elem with "[$]") as "%Hin".
@@ -854,7 +858,7 @@ Section osat.
     - iPoseProof (oblG_goal_lookup with "[$]") as "(%&%&%&%&_)".
       iDestruct "LU" as "(%&%&Hg2&%&_)". iPoseProof (oblG_goal_agree with "[He Hg2]") as "[% HR]".
       { iFrame "Hg2". eauto. }
-      subst. iPureIntro. exists P0. split; eauto. rewrite H1. auto.
+      subst. iPureIntro. exists (obl_atom o). destruct o. rewrite -H2 /odone. simpl. split; eauto.
   Qed.
 
   Lemma osat_obl_is_done_weak Ω k :
@@ -869,7 +873,7 @@ Section osat.
     destruct o.
     - iExFalso. iDestruct "LU" as "(LIVE & _)".
       iPoseProof (oblG_live_done_false with "[LIVE Hl]") as "%F"; [iFrame | done].
-    - iExists P. done.
+    - iExists o. done.
   Qed.
   Lemma osat_obl_is_done_weak_set Ω D :
     osat Ω ∗ ([∗ set] k ∈ D, oblG_elem k ∗ oblG_done k)
@@ -1164,7 +1168,7 @@ Section osat.
     iSplitL "HR".
     { iNext. by iRewrite "HReq" in "HR". }
     iIntros "HR". iFrame "HS HT HB HO HP HG".
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (obl_done x)) with "[Hm Hsa Hts Htba Ho Hps HR]") as "Hm".
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (odone x)) with "[Hm Hsa Hts Htba Ho Hps HR]") as "Hm".
     { apply lookup_delete_eq. }
     { iFrame "Hm". iFrame. iExists P. eauto. }
     rewrite insert_delete_eq insert_id; last done. iFrame. eauto.
@@ -1213,7 +1217,7 @@ Section osat.
     destruct o.
     - iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
       iPoseProof (oblG_owner_agree with "[Hok Ho]") as "%"; first iFrame. destruct H0.
-      iExists d. iPureIntro. split; auto.
+      iExists o. iPureIntro. split; auto.
     - iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Htba & Ho & Hps)".
       iPoseProof (oblG_owner_agree with "[Hok Ho]") as "%"; first iFrame. destruct H.
       exfalso. apply Qp.not_add_le_l in H0. auto.
@@ -1222,7 +1226,8 @@ Section osat.
 End osat.
 
 (* Allocation of an initial obligation protocol. *)
-Lemma osat_alloc `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGpreS ps T Σ} `{obl_class A ps T WFOCM.ltR} :
+Lemma osat_alloc `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGpreS ps T Σ}
+  `{obl_live_class A T WFOCM.ltR} `{obl_done_class ps} :
   ⊢ |==> ∃ _ : osatGS ps T Σ, osat ∅.
 Proof.
   iIntros.

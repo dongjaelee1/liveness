@@ -21,48 +21,64 @@ Proof.
   - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
 Qed.
 
-Class obl_class (obl_count obl_ps obl_ownerid : Type) (obl_count_ltR : relation obl_count) := {
+Class obl_live_class (obl_count obl_ownerid : Type) (obl_count_ltR : relation obl_count) := {
     obl_count_ltR_well_founded : well_founded obl_count_ltR;
     #[global] obl_count_ltR_Transitive :: Transitive obl_count_ltR;
     #[global] obl_ownerid_EqDecision :: EqDecision obl_ownerid;
   }.
 
-Record obl_live_data `{Ξ : obl_class} := {
+Record obl_live_state `{Ξl : obl_live_class} := {
     obl_transfer : obl_count;
     obl_owner : obl_ownerid;
     obl_progress : obl_count;
   }.
 
-Inductive obl_state `{Ξ : obl_class} : Type :=
-| obl_live (d : obl_live_data) | obl_done (P : prop_of obl_ps).
+Class obl_done_class (obl_ps : Type) := {
+    #[global] obl_ps_inhabited :: Inhabited obl_ps;
+  }.
 
-Definition olive `{Ξ : obl_class} α τ β := obl_live (Build_obl_live_data _ _ _ _ _ α τ β).
-Definition odone `{Ξ : obl_class} P := obl_done P.
+Record obl_done_state `{Ξd : obl_done_class} := {
+    obl_atom : prop_of obl_ps;
+  }.
+
+Definition obl_state `{Ξl : obl_live_class} `{Ξd : obl_done_class} :=
+  sum obl_live_state obl_done_state.
+
+Definition obl_live `{Ξl : obl_live_class} `{Ξd : obl_done_class} (d : obl_live_state) : obl_state :=
+  inl d.
+
+Definition obl_done `{Ξl : obl_live_class} `{Ξd : obl_done_class} (d : obl_done_state) : obl_state :=
+  inr d.
+
+Definition olive `{Ξl : obl_live_class} `{Ξd : obl_done_class} α τ β :=
+  obl_live (Build_obl_live_state _ _ _ _ α τ β).
+Definition odone `{Ξl : obl_live_class} `{Ξd : obl_done_class} (P : prop_of obl_ps) :=
+  obl_done (Build_obl_done_state _ _ P).
 
 (* Transition to make logical progress that can obtain a later. *)
-Definition obl_state_progress `{Ξ : obl_class} : relation obl_state :=
+Definition obl_state_progress `{Ξl : obl_live_class} `{Ξd : obl_done_class} : relation obl_state :=
   λ o1 o2,
     match o1, o2 with
-    | obl_live d1, obl_live d2 =>
+    | inl d1, inl d2 =>
         obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)
     | _, _ => False
     end.
 
 (* Transition to transfer a liveness obligation. *)
-Definition obl_state_transfer `{Ξ : obl_class} : relation obl_state :=
+Definition obl_state_transfer `{Ξl : obl_live_class} `{Ξd : obl_done_class} : relation obl_state :=
   λ o1 o2,
     (match o1, o2 with
-     | obl_live d1, obl_live d2 =>
+     | inl d1, inl d2 =>
          obl_count_ltR (obl_transfer d2) (obl_transfer d1)
      | _, _ => False
      end).
 
 (* Transition to resolve a liveness obligation. *)
-Definition obl_state_resolve `{Ξ : obl_class} (s : obl_ps) : relation obl_state :=
+Definition obl_state_resolve `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) : relation obl_state :=
   λ o1 o2,
     (match o1, o2 with
-     | obl_live _, obl_done P =>
-         P s
+     | inl _, inr d =>
+         obl_atom d s
      | _, _ => False
      end).
 
@@ -72,45 +88,48 @@ Definition obl_id := positive.
 
 Notation obl_ids := (gset obl_id).
 Notation obl_states := (gmap obl_id obl_state).
-(* Notation obl_states' Ξ := (gmap obl_id (obl_state (Ξ:=Ξ))). *)
 
-Definition obl_cond `{Ξ : obl_class} := (obl_id → obl_state → Prop).
+Notation obl_live_states := (gmap obl_id (option obl_live_state)).
+Definition get_obl_live_states `{Ξl : obl_live_class} `{Ξd : obl_done_class} (Ω : obl_states) : obl_live_states :=
+  (λ o, match o with inl l => Some l | _ => None end) <$> Ω.
+
+Definition obl_cond `{Ξl : obl_live_class} `{Ξd : obl_done_class} := (obl_id → obl_state → Prop).
 (* This version:
-Definition obl_states_cond_rel `{Ξ : obl_class} (C : obl_cond) (R : relation obl_state) : relation obl_states :=
+Definition obl_states_cond_rel `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) (R : relation obl_state) : relation obl_states :=
 seems to cause universe problem in proving a list related lemma (app_comm_cons).
  *)
-Definition obl_states_cond_rel `{Ξ : obl_class} (C : obl_cond) (R : obl_state → obl_state → Prop) : relation obl_states :=
+Definition obl_states_cond_rel `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) (R : obl_state → obl_state → Prop) : relation obl_states :=
   λ Ω1 Ω2, map_Forall2 (λ k o1 o2, (C k o1 → R o1 o2) ∧ ((¬ C k o1) → o1 = o2)) Ω1 Ω2.
 
-Definition obl_states_progress `{Ξ : obl_class} (C : obl_cond) : relation obl_states :=
+Definition obl_states_progress `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) : relation obl_states :=
   obl_states_cond_rel C obl_state_progress.
 
 Notation "A ↪ₚ B | C" := (obl_states_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
 Notation "A ↪ₚ⁺ B | C" := (tc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⁺  B  |  C").
 Notation "A ↪ₚ⋆ B | C" := (rtc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⋆  B  |  C").
 
-Definition obl_states_transfer `{Ξ : obl_class} (C : obl_cond) : relation obl_states :=
+Definition obl_states_transfer `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) : relation obl_states :=
   obl_states_cond_rel C obl_state_transfer.
 
 Notation "A ↪ₜ B | C" := (obl_states_transfer C A B) (at level 20, format "A  ↪ₜ  B  |  C").
 Notation "A ↪ₜ⁺ B | C" := (tc (obl_states_transfer C) A B) (at level 20, format "A  ↪ₜ⁺  B  |  C").
 Notation "A ↪ₜ⋆ B | C" := (rtc (obl_states_transfer C) A B) (at level 20, format "A  ↪ₜ⋆  B  |  C").
 
-Definition obl_states_resolve `{Ξ : obl_class} (s : obl_ps) (C : obl_cond) : relation obl_states :=
+Definition obl_states_resolve `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) (C : obl_cond) : relation obl_states :=
   obl_states_cond_rel C (obl_state_resolve s).
 
 Notation "A ↪ᵣ B @ s | C" := (obl_states_resolve s C A B) (at level 20, format "A  ↪ᵣ  B  @  s  |  C").
 Notation "A ↪ᵣ⁺ B @ s | C" := (tc (obl_states_resolve s C) A B) (at level 20, format "A  ↪ᵣ⁺  B  @  s  |  C").
 Notation "A ↪ᵣ⋆ B @ s | C" := (rtc (obl_states_resolve s C) A B) (at level 20, format "A  ↪ᵣ⋆  B  @  s  |  C").
 
-Definition obl_states_alloc `{Ξ : obl_class} : relation obl_states :=
+Definition obl_states_alloc `{Ξl : obl_live_class} `{Ξd : obl_done_class} : relation obl_states :=
   λ Ω1 Ω2, ∃ k d, Ω1 !! k = None ∧ Ω2 = <[k:=obl_live d]> Ω1.
 
 Infix "↪ₐ" := (obl_states_alloc) (at level 20).
 Infix "↪ₐ⁺" := (tc obl_states_alloc) (at level 20).
 Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 
-Variant obl_states_step `{Ξ : obl_class} (s : obl_ps) : relation obl_states :=
+Variant obl_states_step `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) : relation obl_states :=
   | obl_states_step_progress Ω1 Ω2 :
     (∃ C, Ω1 ↪ₚ Ω2 | C) → obl_states_step s Ω1 Ω2
   | obl_states_step_transfer Ω1 Ω2 :
@@ -125,10 +144,10 @@ Notation "A ↪ₛ⁺ B @ s" := (tc (obl_states_step s) A B) (at level 20, forma
 Notation "A ↪ₛ⋆ B @ s" := (rtc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s").
 
 (* This version:
-Inductive obl_states_cond_rel_seq `{Ξ : obl_class} : (list (obl_cond * (relation obl_state))) → relation obl_states :=
+Inductive obl_states_cond_rel_seq `{Ξl : obl_live_class} `{Ξd : obl_done_class} : (list (obl_cond * (relation obl_state))) → relation obl_states :=
 seems to cause universe problem in proving a list related lemma (app_comm_cons).
  *)
-Inductive obl_states_cond_rel_seq `{Ξ : obl_class} : (list (obl_cond * (obl_state → obl_state → Prop))) → relation obl_states :=
+Inductive obl_states_cond_rel_seq `{Ξl : obl_live_class} `{Ξd : obl_done_class} : (list (obl_cond * (obl_state → obl_state → Prop))) → relation obl_states :=
 | obl_states_cond_rel_seq_nil Ω :
   obl_states_cond_rel_seq [] Ω Ω
 | obl_states_cond_rel_seq_cons C R tl Ω1 Ω2 Ω :
@@ -137,11 +156,11 @@ Inductive obl_states_cond_rel_seq `{Ξ : obl_class} : (list (obl_cond * (obl_sta
   obl_states_cond_rel_seq ((C, R) :: tl) Ω1 Ω.
 
 Section obl_states.
-  Context `{Ξ : obl_class}.
+  Context `{Ξl : obl_live_class} `{Ξd : obl_done_class}.
 
   (** Additional definitions *)
   Definition obl_cond_owner (i : obl_ownerid) : obl_cond :=
-    λ _ o, match o with | obl_live d => (obl_owner d = i) | _ => False end.
+    λ _ o, match o with | inl d => (obl_owner d = i) | _ => False end.
 
   Definition obl_cond_id_prop (Δ : obl_id → Prop) : obl_cond :=
     λ k _, Δ k.
