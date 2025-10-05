@@ -32,15 +32,15 @@ Section definitions.
   Definition thread_map_interp (Θ : gset P) R : iProp Σ :=
     (⌜dom R = Θ⌝ ∗ ghost_map_auth (thread_map_name tG) 1 R)%I.
 
-  Local Definition thread_def (p : P) (b : bool) (v : V) : iProp Σ :=
-    (if b then p ↪[thread_map_name tG] v else p ↪[thread_map_name tG]□ v)%I.
+  Local Definition thread_def (p : P) (b : bool) (v : V) (q : Qp) : iProp Σ :=
+    (if b then p ↪[thread_map_name tG]{#q} v else p ↪[thread_map_name tG]□ v)%I.
   Local Definition thread_aux : seal (@thread_def). Proof. by eexists. Qed.
   Definition thread := thread_aux.(unseal).
   Local Definition thread_unseal : @thread = @thread_def := thread_aux.(seal_eq).
 End definitions.
 
 Lemma thread_map_init `{SI: indexT} `{Countable P, !thread_mapGpreS P V Σ} τs :
-  ⊢ |==> ∃ _ : thread_mapGS P V Σ, thread_map_interp (dom τs) τs ∗ ([∗ map] p↦v ∈ τs, thread p true v).
+  ⊢ |==> ∃ _ : thread_mapGS P V Σ, thread_map_interp (dom τs) τs ∗ ([∗ map] p↦v ∈ τs, thread p true v 1).
 Proof.
   iMod (ghost_map_alloc τs) as (γ) "[Hh M]".
   iModIntro. iExists (ThreadMapGS _ P V _ _ _ _ γ).
@@ -55,27 +55,25 @@ Section thread_map.
   Implicit Types Θ : gset P.
 
   (** General properties of pointsto *)
-  Global Instance thread_timeless p b v : Timeless (thread p b v).
+  Global Instance thread_timeless p b v q : Timeless (thread p b v q).
   Proof. rewrite thread_unseal /thread_def. apply _. Qed.
-  Global Instance thread_false_persistent p v : Persistent (thread p false v).
+  Global Instance thread_false_persistent p v q : Persistent (thread p false v q).
   Proof. rewrite thread_unseal /thread_def. apply _. Qed.
 
-  Lemma thread_true_exclusive p b v1 v2 :
-    thread p true v1 -∗ thread p b v2 -∗ False.
-  Proof.
-    rewrite thread_unseal /thread_def. iIntros "Hp1 Hp2".
-    destruct b; by iDestruct (ghost_map_elem_ne with "Hp1 Hp2") as %?.
-  Qed.
+  Global Instance thread_true_fractional p v : fractional.Fractional (λ q, thread p true v q).
+  Proof. rewrite thread_unseal /thread_def. apply _. Qed.
+  Global Instance thread_true_as_fractional p v q : fractional.AsFractional (thread p true v q) (λ q0, thread p true v q0) q.
+  Proof. rewrite thread_unseal /thread_def. apply _. Qed.
 
-  Lemma thread_false_agree p v1 v2 :
-    thread p false v1 -∗ thread p false v2 -∗ ⌜ v1 = v2 ⌝.
-  Proof.
-    rewrite thread_unseal /thread_def. iIntros "Hp1 Hp2".
-    by iDestruct (ghost_map_elem_agree with "Hp1 Hp2") as %?.
-  Qed.
+  Lemma thread_true_frac_ne p1 p2 v1 v2 q1 q2 :
+    ¬ ✓ ((DfracOwn q1) ⋅ (DfracOwn q2)) → thread p1 true v1 q1 -∗ thread p2 true v2 q2 -∗ ⌜p1 ≠ p2⌝.
+  Proof. rewrite thread_unseal /thread_def. apply ghost_map_elem_frac_ne. Qed.
+  Lemma thread_agree p b1 b2 v1 v2 q1 q2 :
+    thread p b1 v1 q1 -∗ thread p b2 v2 q2 -∗ ⌜v1 = v2⌝.
+  Proof. rewrite thread_unseal /thread_def. destruct b1, b2; apply ghost_map_elem_agree. Qed.
 
-  Lemma thread_true_to_false p v :
-    thread p true v ==∗ thread p false v.
+  Lemma thread_true_to_false p v q q' :
+    thread p true v q ==∗ thread p false v q'.
   Proof.
     rewrite thread_unseal /thread_def. iApply ghost_map_elem_persist.
   Qed.
@@ -83,7 +81,7 @@ Section thread_map.
   Lemma thread_map_new_thread p v Θ R :
     p ∉ dom R →
     thread_map_interp Θ R ==∗
-    thread_map_interp (Θ ∪ {[p]}) (<[p:=v]>R) ∗ thread p true v.
+    thread_map_interp (Θ ∪ {[p]}) (<[p:=v]>R) ∗ thread p true v 1.
   Proof.
     iIntros (Hp) "[% HR]".
     rewrite thread_unseal /thread_def.
@@ -92,16 +90,16 @@ Section thread_map.
     iFrame. iPureIntro. rewrite dom_insert_L. subst. set_solver.
   Qed.
 
-  Lemma thread_map_thread_read p b v Θ R :
-    thread_map_interp Θ R -∗ thread p b v -∗ (⌜ R !! p = Some v ⌝).
+  Lemma thread_map_thread_read p b v Θ R q :
+    thread_map_interp Θ R -∗ thread p b v q -∗ (⌜ R !! p = Some v ⌝).
   Proof.
     iIntros "[% HR] Ht". rewrite thread_unseal /thread_def.
     destruct b; iApply (ghost_map_lookup with "HR Ht").
   Qed.
 
   Lemma thread_map_thread_update p v v' Θ R :
-    thread_map_interp Θ R ∗ thread p true v ==∗
-    thread_map_interp Θ (<[p:=v']>R) ∗ thread p true v'.
+    thread_map_interp Θ R ∗ thread p true v 1 ==∗
+    thread_map_interp Θ (<[p:=v']>R) ∗ thread p true v' 1.
   Proof.
     iIntros "[[% HR] Hp]". rewrite /thread_map_interp thread_unseal /thread_def.
     iCombine "HR Hp" gives %HR.

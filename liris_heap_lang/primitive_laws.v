@@ -34,7 +34,7 @@ Global Program Instance heapGS_lirisGS `{SI : indexT} `{!heapGS Σ} : lirisGS he
       (thread_map_interp Θ σ.(thread_map) ∗
        gen_heap_interp σ.(heap) ∗
        proph_map_interp κs σ.(used_proph_id))%I;
-    fork_post i v := (thread i false (Some v))%I;
+    fork_post i v := (thread i false (Some v) 1)%I;
   }.
 
 (** Since we use an [option val] instance of [gen_heap], we need to add a
@@ -73,24 +73,24 @@ Notation "l '↦_' I □" := (inv_pointsto l I%stdpp%type)
 Notation "l ↦_ I v" := (inv_pointsto_own l v I%stdpp%type)
   (at level 20, I at level 9, format "l  ↦_ I  v") : bi_scope.
 
-(** Wrapper for thread exec token *)
-Local Definition thread_exec_def `{SI : indexT} `{@heapGS SI Σ}
-    (i : thread_id) : iProp Σ :=
-  thread i true None.
-Local Definition thread_exec_aux : seal (@thread_exec_def). Proof. by eexists. Qed.
-Definition thread_exec := thread_exec_aux.(unseal).
-Local Definition thread_exec_unseal :
-  @thread_exec = @thread_exec_def := thread_exec_aux.(seal_eq).
-Global Arguments thread_exec {SI Σ _}.
+(** Wrappers for othread and thread tokens *)
+Local Definition thread_obls_def `{SI : indexT} `{@heapGS SI Σ}
+  (i : thread_id) Ψ q : iProp Σ :=
+  (othread_obls i Ψ q ∗ thread i true None q)%I.
+Local Definition thread_obls_aux : seal (@thread_obls_def). Proof. by eexists. Qed.
+Definition thread_obls := thread_obls_aux.(unseal).
+Local Definition thread_obls_unseal :
+  @thread_obls = @thread_obls_def := thread_obls_aux.(seal_eq).
+Global Arguments thread_obls {SI Σ _}.
 
-Local Definition thread_exit_def `{SI : indexT} `{@heapGS SI Σ}
-    (i : thread_id) (v : val) : iProp Σ :=
-  thread i false (Some v).
-Local Definition thread_exit_aux : seal (@thread_exit_def). Proof. by eexists. Qed.
-Definition thread_exit := thread_exit_aux.(unseal).
-Local Definition thread_exit_unseal :
-  @thread_exit = @thread_exit_def := thread_exit_aux.(seal_eq).
-Global Arguments thread_exit {SI Σ _}.
+Local Definition thread_term_def `{SI : indexT} `{@heapGS SI Σ}
+  (i : thread_id) (v : val) : iProp Σ :=
+  (othread_term i ∗ thread i false (Some v) 1)%I.
+Local Definition thread_term_aux : seal (@thread_term_def). Proof. by eexists. Qed.
+Definition thread_term := thread_term_aux.(unseal).
+Local Definition thread_term_unseal :
+  @thread_term = @thread_term_def := thread_term_aux.(seal_eq).
+Global Arguments thread_term {SI Σ _}.
 
 
 Section lifting.
@@ -101,99 +101,41 @@ Implicit Types efs : list expr.
 Implicit Types σ : state.
 Implicit Types v : val.
 Implicit Types l : loc.
+Implicit Types i j : thread_id.
 
-Lemma lwp_lb_update s i n E e Φ :
-  TCEq (to_val e) None →
-  steps_lb n -∗
-  lWP e @ s; i; E {{ v, steps_lb (S n) -∗ Φ v }} -∗
-  lWP e @ s; i; E {{ Φ }}.
+Local Ltac unfold_defs :=
+  try rewrite thread_term_unseal /thread_term_def;
+  try rewrite thread_obls_unseal /thread_obls_def.
+
+Global Instance thread_term_persistent i v : Persistent (thread_term i v).
+Proof. rewrite thread_term_unseal /thread_term_def. apply _. Qed.
+Global Instance thread_term_timeless i v : Timeless (thread_term i v).
+Proof. rewrite thread_term_unseal /thread_term_def. apply _. Qed.
+Global Instance thread_obls_timeless i Δ q : Timeless (thread_obls i Δ q).
+Proof. rewrite thread_obls_unseal /thread_obls_def. apply _. Qed.
+
+Lemma thread_term_agree i v1 v2 : thread_term i v1 -∗ thread_term i v2 -∗ ⌜v1 = v2⌝.
 Proof.
-  (** TODO: We should try to use a generic lifting lemma (and avoid [lwp_unfold])
-  here, since this breaks the lWP abstraction. *)
-  rewrite !lwp_unfold /lwp_pre /=. iIntros (->) "Hlb Hlwp".
-  iIntros (δ1 Ω1 γ1 σ1 ns κ κs m) "(Hτ & Hsf & Hos & Hto & Hoft & Hσ & Hκ & Hsteps)".
-  iDestruct (steps_lb_valid with "Hsteps Hlb") as %?.
-  iMod ("Hlwp" $! δ1 Ω1 γ1 σ1 ns κ κs m with "[$Hτ $Hsf $Hos $Hto $Hoft $Hσ $Hκ $Hsteps]") as "[%Hs Hlwp]".
-  iModIntro. iSplit; [done|]. iDestruct "Hlwp" as "(%&%&Hlwp)". iExists _. iSplit; [done|].
-  iIntros (e2 σ2 efs Hstep) "% % % Hcred".
-  iDestruct ("Hlwp" with "[//] [//] Hcred") as "Hlwp".
-  iMod "Hlwp" as "Hlwp". iModIntro. iNext. iMod "Hlwp" as "Hlwp". iIntros "!>".
-  iApply (step_fupdN_wand with "Hlwp").
-  iIntros "Hlwp". iMod "Hlwp" as "(% & % & % & % & ($ & $ & $ & $ & $ & $ & Hsteps)& Hlwp & $)".
-  iDestruct (steps_lb_get with "Hsteps") as "#HlbS".
-  iDestruct (steps_lb_le _ (S n) with "HlbS") as "#HlbS'"; [lia|].
-  iModIntro. iExists _. iSplit; [done|]. iFrame "Hsteps".
-  iApply (lwp_wand with "Hlwp"). iIntros (v) "HΦ". by iApply "HΦ".
+  unfold_defs. iIntros "[_ H1] [_ H2]". iPoseProof (thread_agree with "H1 H2") as "%". by inv H.
 Qed.
 
-(* (** A stronger version of [tlwp_lwp_step] to turn a TlWP into a lWP. Provided *)
-(* [steps_lb n], this version gives us [S n] laters ([tlwp_lwp_step] gives just one) *)
-(* and [S n] later credits ([tlwp_lwp_step] gives i none). *) *)
-(* Lemma tlwp_lwp_step_lc s i n E e P Φ : *)
-(*   TCEq (to_val e) None → *)
-(*   steps_lb n -∗ *)
-(*   ▷^(S n) P -∗ *)
-(*   lWP e @ s; i; E [{ v, P -∗ £ (S n) ={E}=∗ Φ v }] -∗ *)
-(*   lWP e @ s; i; E {{ Φ }}. *)
-(* Proof. *)
-(*   iIntros (?) "#Hlb HP Hlwp". *)
-(*   iApply (tlwp_lwp_fupdN_strong (S n) _ _ _ _ (P ∗ £ (S n))); [done|]. iSplit. *)
-(*   - iIntros (σ ns κ m) "(Hσ & Hκ & Hsteps)". *)
-(*     iDestruct (steps_lb_valid with "[$] [$]") as %?. *)
-(*     iApply fupd_mask_intro_discard; [set_solver|]. *)
-(*     iPureIntro. rewrite /num_laters_per_step /=. lia. *)
-(*   - iSplitL "HP". *)
-(*     + iIntros "!> ?". iApply step_fupdN_intro; [done|]. *)
-(*       iIntros "!> !>". by iFrame. *)
-(*     + iApply (tlwp_wand with "Hlwp"). *)
-(*       iIntros (v) "H [??]". by iApply ("H" with "[$]"). *)
-(* Qed. *)
-
-(* (** A version of [tlwp_lwp_step_lc] that provides only a single later modality *)
-(* (but still [S n] later credits). This version is tailored to lift total Texan *)
-(* triples to a partial Texan triples with later credits, see e.g., [lwp_alloc_lc] *)
-(* below. *) *)
-(* Lemma tlwp_lwp_step_lc_texan s i n E e P Φ : *)
-(*   TCEq (to_val e) None → *)
-(*   steps_lb n -∗ *)
-(*   ▷ P -∗ *)
-(*   lWP e @ s; i; E [{ v, P -∗ £ (S n) ={E}=∗ Φ v }] -∗ *)
-(*   lWP e @ s; i; E {{ Φ }}. *)
-(* Proof. *)
-(*   iIntros (?) "#Hlb HP Hlwp". *)
-(*   iApply (tlwp_lwp_step_lc with "[$] [HP] Hlwp"); auto. *)
-(* Qed. *)
-
-Lemma lwp_step_fupdN_lb s i n E1 E2 e P Φ :
-  TCEq (to_val e) None →
-  E2 ⊆ E1 →
-  steps_lb n -∗
-  (|={E1∖E2,∅}=> |={∅}▷=>^(S n) |={∅,E1∖E2}=> P) -∗
-  lWP e @ s; i; E2 {{ v, P ={E1}=∗ Φ v }} -∗
-  lWP e @ s; i; E1 {{ Φ }}.
+Lemma thread_obls_op_1 i Δ1 Δ2 q1 q2 :
+  thread_obls i Δ1 q1 -∗ thread_obls i Δ2 q2 -∗ thread_obls i (Δ1 ∪ Δ2) (q1 + q2).
 Proof.
-  iIntros (He HE) "Hlb HP Hlwp".
-  iApply lwp_step_fupdN; [done|].
-  iSplit; [|by iFrame].
-  iIntros (σ ns κs nt) "(? & ? & Hsteps)".
-  iDestruct (steps_lb_valid with "Hsteps Hlb") as %Hle.
-  iApply fupd_mask_intro; [set_solver|].
-  iIntros "_". iPureIntro. rewrite /num_laters_per_step /=. lia.
+  unfold_defs. iIntros "(OT1& T1) (OT2& T2)".
+  iPoseProof (othread_obls_op_1 with "OT1 OT2") as "OT".
+  iCombine "T1 T2" as "T". iFrame.
+Qed.
+Lemma thread_obls_op_2 i Δ1 Δ2 q1 q2 :
+  Δ1 ## Δ2 →
+  thread_obls i (Δ1 ∪ Δ2) (q1 + q2) -∗ (thread_obls i Δ1 q1 ∗ thread_obls i Δ2 q2).
+Proof.
+  unfold_defs. iIntros (Hd) "(OT& T)".
+  iPoseProof (othread_obls_op_2 with "OT") as "[T1 T2]"; first auto.
+  iFrame. iDestruct "T" as "[T1 T2]"; iFrame.
 Qed.
 
-(* (** Recursive functions: we do not use this lemmas as it is easier to use Löb *)
-(* induction directly, but this demonstrates that we can state the expected *)
-(* reasoning principle for recursive functions, without any visible ▷. *) *)
-(* Lemma lwp_rec_löb s i E f x e Φ Ψ : *)
-(*   □ ( □ (∀ v, Ψ v -∗ lWP (rec: f x := e)%V v @ s; i; E {{ Φ }}) -∗ *)
-(*      ∀ v, Ψ v -∗ lWP (subst' x v (subst' f (rec: f x := e) e)) @ s; i; E {{ Φ }}) -∗ *)
-(*   ∀ v, Ψ v -∗ lWP (rec: f x := e)%V v @ s; i; E {{ Φ }}. *)
-(* Proof. *)
-(*   iIntros "#Hrec". iLöb as "IH". iIntros (v) "HΨ". *)
-(*   iApply lifting.lwp_pure_step_later; first done. *)
-(*   iIntros "!> _". iApply ("Hrec" with "[] HΨ"). iIntros "!>" (w) "HΨ". *)
-(*   iApply ("IH" with "HΨ"). *)
-(* Qed. *)
+TODO
 
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
 Lemma lwp_fork s i E e Φ :
