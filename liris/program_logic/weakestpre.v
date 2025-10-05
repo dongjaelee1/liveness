@@ -9,21 +9,17 @@ From liris.base_logic Require Export otree fancy_updates.
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
 
-Notation stateL Λ := (prod (obl_live_states) (state Λ)).
-
 Global Instance wp_obl_live_class : obl_live_class Ord.t thread_id Ord.lt.
 Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
 
-(* FIXME: Not inferenced? *)
-Global Instance wp_obl_done_class {Λ : language} `{Inhabited (state Λ)} : obl_done_class (stateL Λ).
-Proof. econstructor. exact (populate (∅, inhabitant)). Qed.
+Global Instance wp_obl_done_class {Λ : language} : obl_done_class (state Λ).
+Proof. econstructor. done. Qed.
 
 Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
-  #[global] state_inhabited :: Inhabited (state Λ);
   (** Invariants. *)
   #[global] liris_invGS :: invGS Σ;
   (** Liveness obligation interpretation. *)
-  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (stateL Λ) thread_id Σ;
+  #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (state Λ) thread_id Σ;
   (* #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (state Λ) thread_id Σ; *)
   (** Liveness obligations assigned to threads. *)
   #[global] liris_othreadGS :: othreadGS.othreadGS Σ;
@@ -48,16 +44,13 @@ Global Arguments LirisG {SI Λ Σ}.
 (* Ω must make strict progress *)
 Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
-  (∀ (Ω1 : gmap obl_id (obl_state (Ξd:=wp_obl_done_class))) (Θ : thread_ids) σ1 κ κs,
-  (* (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs, *)
+  (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs,
      (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
      (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
      ∃ (b : bool), ALC? b |={∅}=>
-     ∃ Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ (get_obl_live_states Ω1, σ1) ⌝) ∗
-     (* ∃ Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ σ1 ⌝) ∗ *)
+     ∃ Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ σ1 ⌝) ∗
             ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗ |={∅,E}=>
-     ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₛ⋆ Ω2' @ (get_obl_live_states Ω2, σ2)) ⌝) ∗
-     (* ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₛ⋆ Ω2' @ σ2) ⌝) ∗ *)
+     ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₛ⋆ Ω2' @ σ2) ⌝) ∗
                (osat Ω2' ∗ othread (Θ ∪ dom efs) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗
                 state_interp σ2 (Θ ∪ dom efs) κs) ∗
                ν e2 efs)%I.

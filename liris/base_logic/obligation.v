@@ -34,7 +34,7 @@ Record obl_live_state `{Ξl : obl_live_class} := {
   }.
 
 Class obl_done_class (obl_ps : Type) := {
-    #[global] obl_ps_inhabited :: Inhabited obl_ps;
+    obl_done_class_placeholder : unit;
   }.
 
 Record obl_done_state `{Ξd : obl_done_class} := {
