@@ -23,7 +23,7 @@ Lemma lwp_lift_base_step_fupd {s i E Φ} e1 :
      state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
      (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      |={∅}=> ∀ e2 σ2 efs, (⌜ base_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                         ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                         ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
                          |={∅,E}=>
      state_interp σ2 (Θ ∪ dom efs) κs ∗
      lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
@@ -41,12 +41,12 @@ Lemma lwp_lift_base_step_fupd_lc {s i E Φ} e1 :
      state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
      (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ Ψ q,
-       (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-        [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+       (othread_obls i Ψ 1 ∗
+        [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
        ALC (|={∅}=>
               ∀ e2 σ2 efs, (⌜ base_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                           othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
-                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                           othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                           ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
                            |={∅,E}=>
               state_interp σ2 (Θ ∪ dom efs) κs ∗
               lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
@@ -64,16 +64,16 @@ Lemma lwp_lift_base_step_fupd_suspended {s i E Φ} e1 :
      state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
      (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ π Ψ K,
-       (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-        ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
-        ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+       (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+        ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+        ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
        ALC (|={∅}=>
               ∀ e2 σ2 efs, (⌜ base_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                           othreadG_obls i Ψ 1 -∗
-                           ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
-                             ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
-                              (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
-                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                           othread_obls i Ψ 1 -∗
+                           ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                             ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                              (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
+                           ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
                            |={∅,E}=>
               state_interp σ2 (Θ ∪ dom efs) κs ∗
               lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
@@ -114,7 +114,7 @@ Lemma lwp_lift_atomic_base_step_fupd {s i E Φ} e1 :
      state_interp σ1 Θ (κ ++ κs) ={E}=∗
      (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                  ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                  ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
                   |={E}=>
      state_interp σ2 (Θ ∪ dom efs) κs ∗
      from_option Φ False (to_val e2) ∗
@@ -133,12 +133,12 @@ Lemma lwp_lift_atomic_base_step_fupd_lc {s i E1 E2 Φ} e1 :
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ Ψ q,
-       (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-        [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+       (othread_obls i Ψ 1 ∗
+        [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
        ALC (|={∅}=>
               ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                           othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
-                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                           othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                           ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
                            |={E2,E1}=>
               state_interp σ2 (Θ ∪ dom efs) κs ∗
               from_option Φ False (to_val e2) ∗
@@ -158,16 +158,16 @@ Lemma lwp_lift_atomic_base_step_fupd_suspended {s i E1 E2 Φ} e1 :
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ π Ψ K,
-       (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-        ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
-        ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+       (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+        ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+        ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
        ALC (|={∅}=>
               ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                           othreadG_obls i Ψ 1 -∗
-                           ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
-                             ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
-                              (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
-                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                           othread_obls i Ψ 1 -∗
+                           ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                             ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                              (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
+                           ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
                            |={E2,E1}=>
               state_interp σ2 (Θ ∪ dom efs) κs ∗
               from_option Φ False (to_val e2) ∗
@@ -205,11 +205,11 @@ Lemma lwp_lift_atomic_base_step_no_fork_fupd_lc {s i E1 E2 Φ} e1 :
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ Ψ q,
-       (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-        [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+       (othread_obls i Ψ 1 ∗
+        [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
        ALC (|={∅}=>
               ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                           othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+                           othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
                            |={E2,E1}=>
               ⌜efs = ∅⌝ ∗ state_interp σ2 Θ κs ∗
               from_option Φ False (to_val e2)))
@@ -228,15 +228,15 @@ Lemma lwp_lift_atomic_base_step_no_fork_fupd_suspended {s i E1 E2 Φ} e1 :
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜ base_reducible i e1 σ1 Θ ⌝) ∗
      ∃ π Ψ K,
-       (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-        ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
-        ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+       (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+        ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+        ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
        ALC (|={∅}=>
               ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                           othreadG_obls i Ψ 1 -∗
-                           ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
-                             ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
-                              (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+                           othread_obls i Ψ 1 -∗
+                           ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                             ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                              (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
                            |={E2,E1}=>
               ⌜efs = ∅⌝ ∗ state_interp σ2 Θ κs ∗
               from_option Φ False (to_val e2)))
@@ -268,10 +268,10 @@ Lemma lwp_lift_pure_det_base_step_no_fork_lc {s i E E' Φ} e1 e2 :
      base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,E'}=>
      ∃ Ψ q,
-     (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-      [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+     (othread_obls i Ψ 1 ∗
+      [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
      ALC (|={∅}=>
-            othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+            othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
             |={E',E}=> lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof using Hinh.
@@ -286,14 +286,14 @@ Lemma lwp_lift_pure_det_base_step_no_fork_suspended {s i E E' Φ} e1 e2 :
      base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,E'}=>
      ∃ π Ψ K,
-     (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-      ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
-      ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+     (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+      ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+      ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
      ALC (|={∅}=>
-            othreadG_obls i Ψ 1 -∗
-            ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
-              ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
-               (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+            othread_obls i Ψ 1 -∗
+            ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+              ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+               (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
             |={E',E}=> lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof using Hinh.
@@ -319,10 +319,10 @@ Lemma lwp_lift_pure_det_base_step_no_fork_lc' {s i E Φ} e1 e2 :
      base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,∅}=>
      ∃ Ψ q,
-     (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-      [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_progress ρ Ord.one) ∗
+     (othread_obls i Ψ 1 ∗
+      [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
      ALC (|={∅}=>
-            othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+            othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
             |={∅,E}=> lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof using Hinh.
@@ -336,14 +336,14 @@ Lemma lwp_lift_pure_det_base_step_no_fork_suspended' {s i E Φ} e1 e2 :
      base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (|={E,∅}=>
      ∃ π Ψ K,
-     (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-      ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
-      ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+     (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+      ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+      ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
      ALC (|={∅}=>
-            othreadG_obls i Ψ 1 -∗
-            ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
-              ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
-               (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+            othread_obls i Ψ 1 -∗
+            ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+              ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+               (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
             |={∅,E}=> lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof using Hinh.

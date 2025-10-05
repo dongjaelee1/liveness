@@ -205,17 +205,17 @@ Section osat.
   Global Instance oblG_transfer_bound_persistent k ℵ : Persistent (oblG_transfer_bound k ℵ).
   Proof. rewrite /oblG_transfer_bound. apply _. Qed.
 
-  Global Instance oblG_elem_Timeless k : Timeless (oblG_elem k).
+  Global Instance oblG_elem_timeless k : Timeless (oblG_elem k).
   Proof. rewrite /oblG_elem. apply _. Qed.
-  Global Instance oblG_live_Timeless k q : Timeless (oblG_live k q).
+  Global Instance oblG_live_timeless k q : Timeless (oblG_live k q).
   Proof. rewrite /oblG_live. apply _. Qed.
-  Global Instance oblG_done_Timeless k : Timeless (oblG_done k).
+  Global Instance oblG_done_timeless k : Timeless (oblG_done k).
   Proof. rewrite /oblG_done. apply _. Qed.
-  Global Instance oblG_transfer_Timeless k a : Timeless (oblG_transfer k a).
+  Global Instance oblG_transfer_timeless k a : Timeless (oblG_transfer k a).
   Proof. rewrite /oblG_transfer. apply _. Qed.
-  Global Instance oblG_transfer_bound_Timeless k a : Timeless (oblG_transfer_bound k a).
+  Global Instance oblG_transfer_bound_timeless k a : Timeless (oblG_transfer_bound k a).
   Proof. rewrite /oblG_transfer_bound. apply _. Qed.
-  Global Instance oblG_progress_Timeless k b : Timeless (oblG_progress k b).
+  Global Instance oblG_progress_timeless k b : Timeless (oblG_progress k b).
   Proof. rewrite /oblG_progress. apply _. Qed.
 
   Local Infix "/=" := OCM.eq (at level 70).

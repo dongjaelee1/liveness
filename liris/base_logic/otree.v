@@ -143,6 +143,15 @@ Section otree.
   Global Instance otreeG_elem_persistent k : Persistent (otreeG_elem k).
   Proof. rewrite /otreeG_elem. apply _. Qed.
 
+  Global Instance otreeG_edge_timeless π k q : Timeless (otreeG_edge π k q).
+  Proof. rewrite /otreeG_edge. apply _. Qed.
+  Global Instance otreeG_suspend_timeless k x θ π ψ : Timeless (otreeG_suspend k x θ π ψ).
+  Proof. rewrite /otreeG_suspend. apply _. Qed.
+  Global Instance otreeG_wait_timeless k x q : Timeless (otreeG_wait k x q).
+  Proof. rewrite /otreeG_wait. apply _. Qed.
+  Global Instance otreeG_elem_timeless k : Timeless (otreeG_elem k).
+  Proof. rewrite /otreeG_elem. apply _. Qed.
+
   Local Infix "/=" := OCM.eq (at level 70).
   Local Infix "/≤" := WFOCM.leR (at level 70).
   Local Infix "/+" := WFOCM.addO (at level 70).
@@ -1776,20 +1785,18 @@ Section otree.
     ρ ∈ Ψ →
     osat Ω ∗ othread TP ∗ osuspend (dom Ω) ∗ oforest_aux (dom Ω) Φ ∗
     (* from user *)
-    oblG_goal ρ P R ∗ (⌜ P σ ⌝) ∗ (▷ R) ∗
+    oblG_elem ρ ∗ oblG_goal ρ P R ∗ (⌜ P σ ⌝) ∗ (▷ R) ∗
     othreadG_elem τ ∗ othreadG_obls τ Ψ q ∗ othreadG_owns τ ρ true (1/2)%Qp
     ⊢ |==> ∃ Ωρ Ω' Φ', (⌜ (Ω ↪ᵣ Ωρ @ σ | obl_cond_one ρ) ∧ (Ωρ ↪ₜ Ω' | obl_cond_internal_tree ρt) ⌝) ∗
                        osat Ω' ∗ othread TP ∗ osuspend (dom Ω') ∗ oforest_aux (dom Ω') Φ' ∗
                        oblG_done ρ ∗ othreadG_obls τ (Ψ ∖ {[ρ]}) q.
   Proof.
-    iIntros (LUFρ INPρ) "(S& T& U& F& #Bgρ & %Pρ & BR & #Teτ & TΨ & Toρ)".
+    iIntros (LUFρ INPρ) "(S& T& U& F& #Beρ& #Bgρ & %Pρ & BR & #Teτ & TΨ & Toρ)".
     iPoseProof (oforest_aux_wf with "F") as "%". destruct H1 as [DomF WFF].
     assert (TWFρ : tree_wf ρ ρt) by (destruct WFF; eauto).
     inversion TWFρ. subst ρ0 t. rename H1 into TWFρ1, H2 into TWFρ2, H3 into TWFρ3, H4 into TWFρ4.
     (* Fix the new forest and frame trees except ρt *)
     iPoseProof (othread_live_open with "[T Toρ]") as "(Toρ & ((Blρ & Boρ) & T))"; first by iFrame.
-    iAssert (oblG_elem ρ)%I as "#Beρ".
-    { rewrite oblG_elem_unfold. eauto. }
     iPoseProof (osat_obl_is_live with "[S Blρ]") as "%LUOρ"; first by iFrame.
     rewrite /oforest_aux. iDestruct "F" as "(_ & Fetk & FM)".
     iPoseProof (big_sepM_delete _ _ _ _ LUFρ with "FM") as "(Fm & FM)".
@@ -1856,7 +1863,7 @@ Section otree.
     { iFrame. iApply othreadG_owns_div_2. iFrame. }
     simpl. iDestruct "Cρ" as "(%αρ& %βρ& _& Bpsρ & Cρ)".
     iMod (osat_obl_resolve_one with "[S BR Blρ Blρ2 Boρ Boρ2 Bpsρ]") as "(S & #Bdρ)".
-    { iFrame. iSplitR; first auto.  rewrite -(oblG_live_div_2 _ (1/2)) -(oblG_owner_div_2 _ _ (1/2)). iFrame. }
+    { iFrame. iSplitR; first auto.  rewrite -(oblG_live_div_2 _ (1/2)) -(oblG_owner_div_2 _ _ (1/2)). iFrame. eauto. }
     remember (<[ρ:=odone P]> Ω) as Ωρ.
     iAssert (
         (* |==> ∃ Ω', (⌜ Ωρ ↪ₜ Ω' | obl_cond_internal_tree ρt ∧ dom Ωρ = dom Ω' ⌝) ∗ *)
@@ -1983,17 +1990,17 @@ Section otree.
     ρ ∈ Ψ →
     osat Ω ∗ othread TP ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗
     (* from user *)
-    oblG_goal ρ P R ∗ (⌜ P σ ⌝) ∗ (▷ R) ∗
+    oblG_elem ρ ∗ oblG_goal ρ P R ∗ (⌜ P σ ⌝) ∗ (▷ R) ∗
     othreadG_elem τ ∗ othreadG_obls τ Ψ q ∗ othreadG_owns τ ρ true (1/2)%Qp
     ⊢ |==> ∃ Ωρ (C : obl_cond) Ω',
       (⌜ (Ω ↪ᵣ Ωρ @ σ | obl_cond_one ρ) ∧ (Ωρ ↪ₜ Ω' | C) ⌝) ∗
       osat Ω' ∗ othread TP ∗ osuspend (dom Ω') ∗ oforest (dom Ω') ∗
       oblG_done ρ ∗ othreadG_obls τ (Ψ ∖ {[ρ]}) q.
   Proof.
-    iIntros (Inρ) "(S& T& U& F& #Bgρ & %Pρ & BR & #Teτ & TΨ & Toρ)".
+    iIntros (Inρ) "(S& T& U& F& #Beρ& #Bgρ & %Pρ & BR & #Teτ & TΨ & Toρ)".
     rewrite /oforest -lock. iDestruct "F" as "(%& F)".
     iPoseProof (oforest_aux_othreadG_owns_true_root _ _ _ τ ρ with "[S T F Toρ]") as "%LUρ".
-    { iFrame. iSplit; auto. iApply oblG_elem_unfold. eauto. }
+    { iFrame. iSplit; auto. }
     destruct LUρ as [ρt LUρ]. iMod (oforest_aux_resolve_one _ _ _ ρ ρt σ P R τ _ _ LUρ Inρ with "[-]") as "H".
     { iFrame. auto. }
     iDestruct "H" as "(%&%&%&%& S& T& U& F& #Bdρ& Tbs)". destruct H1.

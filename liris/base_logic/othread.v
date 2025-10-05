@@ -107,6 +107,17 @@ Section othread.
   Global Instance othreadG_elem_persistent i : Persistent (othreadG_elem i).
   Proof. rewrite /othreadG_elem. apply _. Qed.
 
+  Global Instance othreadG_owns_timeless i k f q : Timeless (othreadG_owns i k f q).
+  Proof. rewrite /othreadG_owns. apply _. Qed.
+  Global Instance othreadG_obls_timeless i Ψ q : Timeless (othreadG_obls i Ψ q).
+  Proof. rewrite /othreadG_obls. apply _. Qed.
+  Global Instance othreadG_exec_timeless i q : Timeless (othreadG_exec i q).
+  Proof. rewrite /othreadG_exec. apply _. Qed.
+  Global Instance othreadG_term_timeless i : Timeless (othreadG_term i).
+  Proof. rewrite /othreadG_term. apply _. Qed.
+  Global Instance othreadG_elem_timeless i : Timeless (othreadG_elem i).
+  Proof. rewrite /othreadG_elem. apply _. Qed.
+
   (** Elem rules *)
   Lemma othreadG_elem_alloc (OThread : gmap positive (gmap obl_id bool)) i M :
     OThread !! i = None →
