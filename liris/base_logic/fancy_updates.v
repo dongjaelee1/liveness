@@ -69,7 +69,7 @@ Proof. rewrite /BiBUpdFUpd uPred_fupd_unseal. by iIntros (E P) ">? [$ $] !> !>".
 
 (** Additional lemmas *)
 Lemma fupd_step `{SI : indexT} {Σ : gFunctors} `{!invGS Σ} P E1 E2:
-  (∀ x, ●£ x -∗ |==> (∃ y, ⌜(y ≺ x)%O⌝ ∗ ●£ y ∗ ▷ |={E1, E2}=> P)) -∗ |={E1, E2}=> P.
+  (∀ x, ●£ x -∗ |==> (∃ y, ⌜(y < x)%ord⌝ ∗ ●£ y ∗ ▷ |={E1, E2}=> P)) -∗ |={E1, E2}=> P.
 Proof.
   rewrite uPred_fupd_unseal /uPred_fupd_def. iIntros "Hupd Hwsat".
   rewrite /bupd /bi_bupd_bupd; simpl.
@@ -98,7 +98,7 @@ Qed.
   where ["Hcredit"] is a credit available in the context and ["HP"] is the
   assumption from which a later should be stripped. *)
 Lemma lc_fupd_elim_later_ord `{SI : indexT} `{!invGS Σ} E P :
-   £ one%O -∗ (▷ P) -∗ |={E}=> P.
+   £ Ord.one -∗ (▷ P) -∗ |={E}=> P.
 Proof.
   iIntros "Hf Hupd".
   rewrite uPred_fupd_unseal /uPred_fupd_def.
@@ -107,28 +107,28 @@ Proof.
 Qed.
 Lemma lc_fupd_elim_later `{SI : indexT} `{!invGS Σ} E P :
    £n 1 -∗ (▷ P) -∗ |={E}=> P.
-Proof. rewrite n2o_one. apply lc_fupd_elim_later_ord. Qed.
+Proof. rewrite tlc_one_nat. apply lc_fupd_elim_later_ord. Qed.
 
 (** If the goal is a fancy update, this lemma can be used to make a later appear
   in front of it in exchange for a later credit.
   This is typically used as [iApply (lc_fupd_add_later with "Hcredit")],
   where ["Hcredit"] is a credit available in the context. *)
 Lemma lc_fupd_add_later_ord `{SI : indexT} `{!invGS Σ} E1 E2 P :
-  £ one%O -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
+  £ Ord.one -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
 Proof.
   iIntros "Hf Hupd". iApply (fupd_trans E1 E1).
   iApply (lc_fupd_elim_later with "Hf Hupd").
 Qed.
 Lemma lc_fupd_add_later `{SI : indexT} `{!invGS Σ} E1 E2 P :
   £n 1 -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
-Proof. rewrite n2o_one. apply lc_fupd_add_later_ord. Qed.
+Proof. rewrite tlc_one_nat. apply lc_fupd_add_later_ord. Qed.
 
 (** Similar to above, but here we are adding [n] laters. *)
 Lemma lc_fupd_add_laterN `{SI : indexT} `{!invGS Σ} E1 E2 P n :
-  £ (n2o n) -∗ (▷^n |={E1, E2}=> P) -∗ |={E1, E2}=> P.
+  £ (Ord.from_nat n) -∗ (▷^n |={E1, E2}=> P) -∗ |={E1, E2}=> P.
 Proof.
   iIntros "Hf Hupd". iInduction n as [|n] "IH"; first done.
-  rewrite n2o_succ tlc_succ. iDestruct "Hf" as "[H1 Hf]".
+  rewrite tlc_succ_nat. iDestruct "Hf" as "[H1 Hf]".
   iApply (lc_fupd_add_later with "H1"); iNext.
   iApply ("IH" with "[$] [$]").
 Qed.

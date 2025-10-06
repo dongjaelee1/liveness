@@ -813,7 +813,7 @@ End liveness.
 Local Hint Resolve reducible_no_obs_reducible : core.
 
 Lemma lwp_lc_later_ord s i E e Φ :
-  £ (ordinals.one_def) -∗ (▷ lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
+  £ Ord.one -∗ (▷ lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "LC H". by iMod (lc_fupd_elim_later_ord with "LC H") as "H".
 Qed.
@@ -1130,7 +1130,7 @@ Proof.
   - eauto.
   - iDestruct "Hlwp" as ">($& %&%& D& H)".
     iModIntro. iExists _, _. iFrame "D".
-    iDestruct "H" as "(%& H)". iExists (ordinals.succ_def x). iIntros "LC".
+    iDestruct "H" as "(%& H)". iExists (Ord.S x). iIntros "LC".
     iPoseProof (tlc_succ with "LC") as "[LC LC2]".
     iMod ("H" with "LC2") as "H". iModIntro. iMod "H". iIntros "!> Hc H1 H2". iMod ("H" with "Hc H1 H2") as "H".
     iApply "IH". iModIntro.
@@ -1138,7 +1138,7 @@ Proof.
     + iIntros (??) "PQ >[$ H]". iDestruct "H" as "(%&%& D& H)".
       iModIntro. iFrame "D". iMod "H" as ">H". iIntros "!> Hc H1 H2".
       iMod ("H" with "Hc H1 H2"). by iApply "PQ".
-    + iIntros "H1 H2". iApply "H1". iApply tlc_succ. iFrame.
+    + iIntros "H1 H2". iApply "H1". iApply tlc_succ_nat. iFrame.
 Qed.
 
 Lemma lwp_pure_step_fupd_suspended `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ C ς :
@@ -1169,7 +1169,7 @@ Proof.
   - eauto.
   - iDestruct "Hlwp" as ">($& %&%&%& D& H)".
     iModIntro. iExists _, _, _. iFrame "D".
-    iDestruct "H" as "(%& H)". iExists (ordinals.succ_def x). iIntros "LC".
+    iDestruct "H" as "(%& H)". iExists (Ord.S x). iIntros "LC".
     iPoseProof (tlc_succ with "LC") as "[LC LC2]".
     iMod ("H" with "LC2") as "H". iModIntro. iMod "H". iIntros "!> Hc H1 H2". iMod ("H" with "Hc H1 H2") as "H".
     iApply "IH". iModIntro.
@@ -1177,7 +1177,7 @@ Proof.
     + iIntros (??) "PQ >[$ H]". iDestruct "H" as "(%&%&%& D& H)".
       iModIntro. iFrame "D". iMod "H" as ">H". iIntros "!> Hc H1 H2".
       iMod ("H" with "Hc H1 H2"). by iApply "PQ".
-    + iIntros "H1 H2". iApply "H1". iApply tlc_succ. iFrame.
+    + iIntros "H1 H2". iApply "H1". iApply tlc_succ_nat. iFrame.
 Qed.
 
 Lemma lwp_pure_step `{!Inhabited (state Λ)} s i E e1 e2 φ n Φ C ς :

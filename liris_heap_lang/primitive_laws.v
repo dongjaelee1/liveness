@@ -135,14 +135,91 @@ Proof.
   iFrame. iDestruct "T" as "[T1 T2]"; iFrame.
 Qed.
 
-Global Instance thread_obls_thread_cond i Δ q : PureExecCond thread_cond (λ i, thread_obls i Δ q) i.
+Global Instance thread_obls_thread_cond i q : PureExecCond thread_cond (λ i, thread i true None q) i.
 Proof.
-  iIntros (???) "Hc [T H]". unfold_defs. rewrite /thread_cond. iDestruct "Hc" as "[H1 H2]".
-  iPoseProof (thread_map_thread_read with "T H2") as "%". done.
+  iIntros (???) "Hc [T H]". iPoseProof (thread_map_thread_read with "T Hc") as "%". done.
+Qed.
+
+Lemma iter_modal_mono_modal M1 M2 P n :
+  (∀ A B, (A -∗ B) -∗ (M1 A -∗ M1 B)) →
+  (∀ A, M1 A -∗ M2 A) →
+  (Nat.iter n M1 P -∗ Nat.iter n M2 P).
+Proof.
+  intros. revert P. induction n; intros; simpl; eauto.
+  iIntros "H". iApply H0. iApply (H with "[] H"). iApply IHn.
+Qed.
+
+(** "pure" steps that are reducible with the thread_obls predicate *)
+Lemma lwp_pure_step_fupd s i E E' e1 e2 φ n Φ Δ q :
+  PureExec φ thread_cond n e1 e2 →
+  φ →
+  (Nat.iter n (λ P, |={E,E'}=> thread_obls i Δ q ∗ (thread_obls i Δ q ={E',E}=∗ P))
+     (lWP e2 @ s; i; E {{ Φ }}))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (Hexec Hp) "H". unfold_defs. iApply (lwp_pure_step_fupd); eauto.
+  iApply (iter_modal_mono_modal with "H").
+  - iIntros (??) "AB H". iMod "H" as "[$ H]". iIntros "!> G". iApply "AB". iApply ("H" with "G").
+  - iIntros (?) "H". iMod "H" as "[A H]". iModIntro. iDestruct "A" as "[A B]". iFrame "B".
+    iIntros "B". iApply "H". iFrame.
+Qed.
+
+Lemma lwp_pure_step_fupd_lc s i E E' e1 e2 φ n Φ :
+  PureExec φ thread_cond n e1 e2 →
+  φ →
+  (Nat.iter n (λ P, |={E,E'}=>
+                 ∃ Δ q,
+                 (thread_obls i Δ 1 ∗
+                  [∗ set] ρ ∈ Δ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
+                 ALC (|={∅}=>
+                        thread_obls i Δ 1 -∗ ([∗ set] ρ ∈ Δ, othread_owns i ρ q)
+                        ={E',E}=∗ P))
+     (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (Hexec Hp) "H". iApply (lwp_pure_step_fupd_lc); eauto.
+  iApply (iter_modal_mono_modal with "H").
+  - iIntros (??) "AB H". iMod "H" as "(%&%& (H1& H2)& H)". iFrame.
+    iModIntro. iMod "H" as ">H". iIntros "!> A B". iApply "AB". iApply ("H" with "A B").
+  - iIntros (?) "H". iMod "H" as "(%&%& (H1& H2)& H)". iModIntro.
+    unfold_defs. iDestruct "H1" as "[T1 T2]". iFrame. iMod "H" as ">H". iIntros "!> A B C". iApply ("H" with "[$] [$]").
+Qed.
+
+Lemma lwp_pure_step_fupd_suspended s i E E' e1 e2 φ n Φ :
+  PureExec φ thread_cond n e1 e2 →
+  φ →
+  (Nat.iter n (λ P, |={E,E'}=>
+                 ∃ π Δ K,
+                 (⌜Δ = dom K⌝ ∗ thread_obls i Δ 1 ∗ obl π ∗
+                  ([∗ set] ρ ∈ Δ, obl_pc ρ Ord.one) ∗
+                  ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
+                 ALC (|={∅}=>
+                        thread_obls i Δ 1 -∗
+                        ((([∗ set] ρ ∈ Δ, obl_pc ρ Ord.one) ∗
+                          ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                           (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ)))
+                        ={E',E}=∗ P))
+     (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (Hexec Hp) "H". iApply (lwp_pure_step_fupd_suspended); eauto.
+  iApply (iter_modal_mono_modal with "H").
+  - iIntros (??) "AB H". iMod "H" as "(%&%&%& (H1& H2& H3)& H)". iFrame.
+    iModIntro. iMod "H" as ">H". iIntros "!> A B". iApply "AB". iApply ("H" with "A B").
+  - iIntros (?) "H". iMod "H" as "(%&%&%& (H1& H2& H3)& H)". iModIntro.
+    unfold_defs. iDestruct "H2" as "[T1 T2]". iFrame. iMod "H" as ">H". iIntros "!> A B C". iApply ("H" with "[$] [$]").
+Qed.
+
+Lemma lwp_pure_step s i E e1 e2 φ n Φ Δ q :
+  PureExec φ thread_cond n e1 e2 →
+  φ →
+  (thread_obls i Δ q ∗ (thread_obls i Δ q -∗ lWP e2 @ s; i; E {{ Φ }}))%I ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (Hexec Hp) "H". unfold_defs. iApply (lwp_pure_step); eauto.
+  iDestruct "H" as "[[A B] H]". iFrame. iIntros "B". iApply ("H" with "[$]").
 Qed.
 
 TODO
-(** "pure" steps that are reducible with a token *)
 
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
 Lemma lwp_fork s i E e Φ :
@@ -176,6 +253,8 @@ Proof.
   iMod (steps_auth_update_S with "Hsteps") as "Hsteps".
   by iFrame.
 Qed.
+
+(** Exit *)
 
 (** Heap *)
 
