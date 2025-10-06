@@ -109,36 +109,43 @@ Section pure_exec.
   Local Ltac solve_exec_safe := intros; subst; do 3 eexists; econstructor; eauto.
   Local Ltac solve_exec_puredet := simpl; intros; by inv_base_step.
   Local Ltac solve_pure_exec :=
-    subst; intros ?; apply nsteps_once, pure_base_step_pure_step;
-      constructor; [solve_exec_safe | solve_exec_puredet].
+    subst; intros ?; apply nsteps_once, pure_base_step_pure_step; constructor; [solve_exec_safe | solve_exec_puredet].
+
+  (** This heap lang tracks termination status of a thread using a state,
+      checking the state on every step.
+      This means every step is pure only with a condition.
+   *)
+
+  Definition thread_cond (i : thread_id) (σ : state) : Prop :=
+    σ.(thread_map) !! i = Some (None).
 
   Global Instance pure_recc f x (erec : expr) :
-    PureExec True 1 (Rec f x erec) (Val $ RecV f x erec).
+    PureExec True thread_cond 1 (Rec f x erec) (Val $ RecV f x erec).
   Proof. solve_pure_exec. Qed.
   Global Instance pure_pairc (v1 v2 : val) :
-    PureExec True 1 (Pair (Val v1) (Val v2)) (Val $ PairV v1 v2).
+    PureExec True thread_cond 1 (Pair (Val v1) (Val v2)) (Val $ PairV v1 v2).
   Proof. solve_pure_exec. Qed.
   Global Instance pure_injlc (v : val) :
-    PureExec True 1 (InjL $ Val v) (Val $ InjLV v).
+    PureExec True thread_cond 1 (InjL $ Val v) (Val $ InjLV v).
   Proof. solve_pure_exec. Qed.
   Global Instance pure_injrc (v : val) :
-    PureExec True 1 (InjR $ Val v) (Val $ InjRV v).
+    PureExec True thread_cond 1 (InjR $ Val v) (Val $ InjRV v).
   Proof. solve_pure_exec. Qed.
 
   Global Instance pure_beta f x (erec : expr) (v1 v2 : val) `{!AsRecV v1 f x erec} :
-    PureExec True 1 (App (Val v1) (Val v2)) (subst' x v2 (subst' f v1 erec)).
+    PureExec True thread_cond 1 (App (Val v1) (Val v2)) (subst' x v2 (subst' f v1 erec)).
   Proof. unfold AsRecV in *. solve_pure_exec. Qed.
 
   Global Instance pure_unop op v v' :
-    PureExec (un_op_eval op v = Some v') 1 (UnOp op (Val v)) (Val v').
+    PureExec (un_op_eval op v = Some v') thread_cond 1 (UnOp op (Val v)) (Val v').
   Proof. solve_pure_exec. Qed.
 
   Global Instance pure_binop op v1 v2 v' :
-    PureExec (bin_op_eval op v1 v2 = Some v') 1 (BinOp op (Val v1) (Val v2)) (Val v') | 10.
+    PureExec (bin_op_eval op v1 v2 = Some v') thread_cond 1 (BinOp op (Val v1) (Val v2)) (Val v') | 10.
   Proof. solve_pure_exec. Qed.
   (* Lower-cost instance for [EqOp]. *)
   Global Instance pure_eqop v1 v2 :
-    PureExec (vals_compare_safe v1 v2) 1
+    PureExec (vals_compare_safe v1 v2) thread_cond 1
       (BinOp EqOp (Val v1) (Val v2))
       (Val $ LitV $ LitBool $ bool_decide (v1 = v2)) | 1.
   Proof.
@@ -149,23 +156,23 @@ Section pure_exec.
   Qed.
 
   Global Instance pure_if_true e1 e2 :
-    PureExec True 1 (If (Val $ LitV $ LitBool true) e1 e2) e1.
+    PureExec True thread_cond 1 (If (Val $ LitV $ LitBool true) e1 e2) e1.
   Proof. solve_pure_exec. Qed.
   Global Instance pure_if_false e1 e2 :
-    PureExec True 1 (If (Val $ LitV  $ LitBool false) e1 e2) e2.
+    PureExec True thread_cond 1 (If (Val $ LitV  $ LitBool false) e1 e2) e2.
   Proof. solve_pure_exec. Qed.
 
   Global Instance pure_fst v1 v2 :
-    PureExec True 1 (Fst (Val $ PairV v1 v2)) (Val v1).
+    PureExec True thread_cond 1 (Fst (Val $ PairV v1 v2)) (Val v1).
   Proof. solve_pure_exec. Qed.
   Global Instance pure_snd v1 v2 :
-    PureExec True 1 (Snd (Val $ PairV v1 v2)) (Val v2).
+    PureExec True thread_cond 1 (Snd (Val $ PairV v1 v2)) (Val v2).
   Proof. solve_pure_exec. Qed.
 
   Global Instance pure_case_inl v e1 e2 :
-    PureExec True 1 (Case (Val $ InjLV v) e1 e2) (App e1 (Val v)).
+    PureExec True thread_cond 1 (Case (Val $ InjLV v) e1 e2) (App e1 (Val v)).
   Proof. solve_pure_exec. Qed.
   Global Instance pure_case_inr v e1 e2 :
-    PureExec True 1 (Case (Val $ InjRV v) e1 e2) (App e2 (Val v)).
+    PureExec True thread_cond 1 (Case (Val $ InjRV v) e1 e2) (App e2 (Val v)).
   Proof. solve_pure_exec. Qed.
 End pure_exec.

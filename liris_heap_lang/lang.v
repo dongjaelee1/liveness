@@ -655,35 +655,49 @@ Qed.
 
 Inductive base_step (i : thread_id) : expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop :=
   | RecS f x e σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (Rec f x e) σ Θ [] (Val $ RecV f x e) σ ∅
   | PairS v1 v2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (Pair (Val v1) (Val v2)) σ Θ [] (Val $ PairV v1 v2) σ ∅
   | InjLS v σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (InjL $ Val v) σ Θ [] (Val $ InjLV v) σ ∅
   | InjRS v σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (InjR $ Val v) σ Θ [] (Val $ InjRV v) σ ∅
   | BetaS f x e1 v2 e' σ Θ :
+     σ.(thread_map) !! i = Some None →
      e' = subst' x v2 (subst' f (RecV f x e1) e1) →
      base_step i (App (Val $ RecV f x e1) (Val v2)) σ Θ [] e' σ ∅
   | UnOpS op v v' σ Θ :
+     σ.(thread_map) !! i = Some None →
      un_op_eval op v = Some v' →
      base_step i (UnOp op (Val v)) σ Θ [] (Val v') σ ∅
   | BinOpS op v1 v2 v' σ Θ :
+     σ.(thread_map) !! i = Some None →
      bin_op_eval op v1 v2 = Some v' →
      base_step i (BinOp op (Val v1) (Val v2)) σ Θ [] (Val v') σ ∅
   | IfTrueS e1 e2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (If (Val $ LitV $ LitBool true) e1 e2) σ Θ [] e1 σ ∅
   | IfFalseS e1 e2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (If (Val $ LitV $ LitBool false) e1 e2) σ Θ [] e2 σ ∅
   | FstS v1 v2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (Fst (Val $ PairV v1 v2)) σ Θ [] (Val v1) σ ∅
   | SndS v1 v2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (Snd (Val $ PairV v1 v2)) σ Θ [] (Val v2) σ ∅
   | CaseLS v e1 e2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (Case (Val $ InjLV v) e1 e2) σ Θ [] (App e1 (Val v)) σ ∅
   | CaseRS v e1 e2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      base_step i (Case (Val $ InjRV v) e1 e2) σ Θ [] (App e2 (Val v)) σ ∅
   | AllocNS n v σ Θ l :
+     σ.(thread_map) !! i = Some None →
      (0 < n)%Z →
      (∀ i, (0 ≤ i)%Z → (i < n)%Z → σ.(heap) !! (l +ₗ i) = None) →
      base_step i (AllocN (Val $ LitV $ LitInt n) (Val v)) σ Θ
@@ -691,27 +705,32 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
                (Val $ LitV $ LitLoc l) (state_init_heap l n v σ)
                ∅
   | FreeS l v σ Θ :
+     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some v →
      base_step i (Free (Val $ LitV $ LitLoc l)) σ Θ
                []
                (Val $ LitV LitUnit) (state_upd_heap <[l:=None]> σ)
                ∅
   | LoadS l v σ Θ :
+     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some v →
      base_step i (Load (Val $ LitV $ LitLoc l)) σ Θ [] (of_val v) σ ∅
   | StoreS l v w σ Θ :
+     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some v →
      base_step i (Store (Val $ LitV $ LitLoc l) (Val w)) σ Θ
                []
                (Val $ LitV LitUnit) (state_upd_heap <[l:=Some w]> σ)
                ∅
   | XchgS l v1 v2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some v1 →
      base_step i (Xchg (Val $ LitV $ LitLoc l) (Val v2)) σ Θ
                []
                (Val v1) (state_upd_heap <[l:=Some v2]> σ)
                ∅
   | CmpXchgS l v1 v2 vl σ Θ b :
+     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some vl →
      (* Crucially, this compares the same way as [EqOp]! *)
      vals_compare_safe vl v1 →
@@ -721,6 +740,7 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
                (Val $ PairV vl (LitV $ LitBool b)) (if b then state_upd_heap <[l:=Some v2]> σ else σ)
                ∅
   | FaaS l i1 i2 σ Θ :
+     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some (LitV (LitInt i1)) →
      base_step i (FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2)) σ Θ
                []
@@ -728,22 +748,28 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
                ∅
 
   | ForkS e σ Θ j :
+     σ.(thread_map) !! i = Some None →
      j ∉ Θ →
-     base_step i (Fork e) σ Θ [] (Val $ LitV LitUnit) σ {[j := e]}
+     base_step i (Fork e) σ Θ
+               []
+               (Val $ LitV LitUnit) (state_upd_thread_map <[j:=None]> σ)
+               {[j := e]}
   | ExitS v σ Θ :
-     σ.(thread_map) !! i = None →
+     σ.(thread_map) !! i = Some None →
      base_step i (Exit (Val v)) σ Θ
                []
                (Val v) (state_upd_thread_map <[i:=Some v]> σ)
                ∅
 
   | NewProphS σ Θ p :
+     σ.(thread_map) !! i = Some None →
      p ∉ σ.(used_proph_id) →
      base_step i NewProph σ Θ
                []
                (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ)
                ∅
   | ResolveS p v e σ Θ w σ' κs ts :
+     σ.(thread_map) !! i = Some None →
      base_step i e σ Θ κs (Val v) σ' ts →
      base_step i (Resolve e (Val $ LitV $ LitProphecy p) (Val w)) σ Θ
                (κs ++ [(p, (v, w))]) (Val v) σ' ts.
@@ -772,6 +798,7 @@ Qed.
 
 Lemma alloc_fresh i v n σ Θ :
   let l := Loc.fresh (dom σ.(heap)) in
+  σ.(thread_map) !! i = Some None →
   (0 < n)%Z →
   base_step i (AllocN ((Val $ LitV $ LitInt $ n)) (Val v)) σ Θ []
     (Val $ LitV $ LitLoc l) (state_init_heap l n v σ) ∅.
@@ -784,12 +811,14 @@ Qed.
 
 Lemma new_proph_id_fresh i σ Θ :
   let p := fresh σ.(used_proph_id) in
+  σ.(thread_map) !! i = Some None →
   base_step i NewProph σ Θ [] (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ) ∅.
 Proof. constructor; auto. apply is_fresh. Qed.
 
 Lemma new_thread_id_fresh i e σ Θ :
   let j := fresh Θ in
-  base_step i (Fork e) σ Θ [] (Val (LitV LitUnit)) σ {[j := e]}.
+  σ.(thread_map) !! i = Some None →
+  base_step i (Fork e) σ Θ [] (Val (LitV LitUnit)) (state_upd_thread_map <[j:=None]> σ) {[j := e]}.
 Proof. constructor; auto. apply is_fresh. Qed.
 
 Lemma fork_thread_ids_disjoint i e1 σ1 Θ κ e2 σ2 efs :

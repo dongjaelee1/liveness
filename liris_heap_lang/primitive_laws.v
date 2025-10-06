@@ -135,7 +135,14 @@ Proof.
   iFrame. iDestruct "T" as "[T1 T2]"; iFrame.
 Qed.
 
+Global Instance thread_obls_thread_cond i Δ q : PureExecCond thread_cond (λ i, thread_obls i Δ q) i.
+Proof.
+  iIntros (???) "Hc [T H]". unfold_defs. rewrite /thread_cond. iDestruct "Hc" as "[H1 H2]".
+  iPoseProof (thread_map_thread_read with "T H2") as "%". done.
+Qed.
+
 TODO
+(** "pure" steps that are reducible with a token *)
 
 (** Fork: Not using Texan triples to avoid some unnecessary [True] *)
 Lemma lwp_fork s i E e Φ :
@@ -151,7 +158,7 @@ Lemma lwp_fork s i E e Φ :
                                       lWP e @ s; j; ⊤ {{ lift_term j (λ _ : val, True) }}))) -∗
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
-  iIntros "H". iApply lwp_lift_atomic_base_step; [done|].
+  iIntros "H". iApply lwp_lift_atomic_base_step_fupd; [done|].
   iIntros (σ1 ns κ κs τ) "Hσ". iSpecialize ("H" $! σ1 ns (κ ++ κs) τ with "Hσ").
   iMod "H" as "(%&%& $ & $ &H)". iModIntro. iSplit; first by eauto with base_step.
   iIntros (v2 σ2 efs Hstep) "HL Hsf HLs Hcred"; inv_base_step.
