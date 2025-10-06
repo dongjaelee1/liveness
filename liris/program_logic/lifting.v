@@ -659,6 +659,53 @@ Section liveness.
     - iApply (big_sepS_impl with "Efs"). iIntros "!>" (??) "(?&?&?)". iFrame. done.
   Qed.
 
+  Inductive get_lc := NoLc | GetLc | GetLcSus.
+
+  Lemma lwp_lift_step_fupd_gen (glc : get_lc) s i E e1 Φ :
+    (∀ Θ σ1 κ κs,
+       state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
+       match glc with
+       | NoLc =>
+           (|={∅}=> ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                                ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
+                                |={∅,E}=>
+              state_interp σ2 (Θ ∪ dom efs) κs ∗
+              lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
+       | GetLc =>
+           (∃ Ψ q,
+               (othread_obls i Ψ 1 ∗ [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
+               ALC (|={∅}=>
+                      ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                                   othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                                   ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
+                                   |={∅,E}=>
+                      state_interp σ2 (Θ ∪ dom efs) κs ∗
+                      lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+       | GetLcSus =>
+           (∃ π Ψ K,
+               (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+                ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
+               ALC (|={∅}=>
+                      ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                                   othread_obls i Ψ 1 -∗
+                                   ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                                     ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                                      (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
+                                   ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
+                                   |={∅,E}=>
+                      state_interp σ2 (Θ ∪ dom efs) κs ∗
+                      lWP e2 @ s; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+       end)
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  Proof.
+    destruct glc.
+    - apply lwp_lift_step_fupd.
+    - apply lwp_lift_step_fupd_lc.
+    - apply lwp_lift_step_fupd_suspended.
+  Qed.
+
   Lemma lwp_wait_obls s i E e Φ :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
@@ -929,6 +976,42 @@ Proof.
   iModIntro. rewrite big_sepM_empty. iFrame.
 Qed.
 
+Lemma lwp_lift_pure_step_no_fork_gen (glc : get_lc) `{!Inhabited (state Λ)} s i E E' Φ e1 C ς :
+  (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+  (∀ κ σ1 Θ e2 σ2 efs, C i σ1 → prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
+  (∀ σ Θ κ, ς i -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
+  (|={E,E'}=>
+     ς i ∗
+     match glc with
+     | NoLc =>
+         ((ς i ={E',E}=∗ ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
+     | GetLc =>
+         (∃ Ψ q,
+             (othread_obls i Ψ 1 ∗
+              [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
+             ALC (|={∅}=>
+                    ς i -∗ othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                    |={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
+     | GetLcSus =>
+         (∃ π Ψ K,
+             (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+              ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+              ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
+             ALC (|={∅}=>
+                    ς i -∗ othread_obls i Ψ 1 -∗
+                    ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                      ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                       (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
+                    |={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; i; E {{ Φ }}))
+     end)
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  destruct glc.
+  - apply lwp_lift_pure_step_no_fork.
+  - apply lwp_lift_pure_step_no_fork_lc.
+  - apply lwp_lift_pure_step_no_fork_suspended.
+Qed.
+
 Lemma lwp_lift_pure_stuck `{!Inhabited (state Λ)} i E Φ e :
   (∀ σ τ, stuck i e σ τ) →
   True ⊢ lWP e @ i; E ?{{ Φ }}.
@@ -939,20 +1022,20 @@ Proof.
   - iIntros (????) "_". iApply fupd_mask_intro; auto with set_solver.
 Qed.
 
-Lemma lwp_lift_atomic_step_fupd {s i E Φ} e1 :
+Lemma lwp_lift_atomic_step_fupd {s i E1 E2 Φ} e1 :
   (∀ Θ σ1 κ κs,
-     state_interp σ1 Θ (κ ++ κs) ={E}=∗
+     state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
      ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
                   ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
-                  |={E}=>
+                  |={E2,E1}=>
      state_interp σ2 (Θ ∪ dom efs) κs ∗
      from_option Φ False (to_val e2) ∗
      [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
-  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
 Proof.
   iIntros "H".
-  iApply (lwp_lift_step_fupd s i E e1); iIntros (Θ σ1 κ κs) "Hσ1".
+  iApply (lwp_lift_step_fupd s i E1 e1); iIntros (Θ σ1 κ κs) "Hσ1".
   iMod ("H" with "Hσ1") as "(%& H)".
   iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
   iSplit; first auto. iModIntro. iIntros (????) "Hefs".
@@ -1026,6 +1109,55 @@ Proof.
   iApply lwp_value; last done. by apply of_to_val.
 Qed.
 
+Lemma lwp_lift_atomic_step_fupd_gen (glc : get_lc) {s i E1 E2 Φ} e1 :
+  (∀ Θ σ1 κ κs,
+     state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
+     (⌜to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
+     match glc with
+     | NoLc =>
+         (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+                       ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
+                       |={E2,E1}=>
+            state_interp σ2 (Θ ∪ dom efs) κs ∗
+            from_option Φ False (to_val e2) ∗
+            [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
+     | GetLc =>
+         (∃ Ψ q,
+             (othread_obls i Ψ 1 ∗
+              [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
+             ALC (|={∅}=>
+                    ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+                                 othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                                 ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
+                                 |={E2,E1}=>
+                    state_interp σ2 (Θ ∪ dom efs) κs ∗
+                    from_option Φ False (to_val e2) ∗
+                    [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+     | GetLcSus =>
+         (∃ π Ψ K,
+             (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+              ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+              ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
+             ALC (|={∅}=>
+                    ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
+                                 othread_obls i Ψ 1 -∗
+                                 ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                                   ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                                    (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
+                                 ([∗ set] j ∈ dom efs, othread_obls j ∅ 1) -∗
+                                 |={E2,E1}=>
+                    state_interp σ2 (Θ ∪ dom efs) κs ∗
+                    from_option Φ False (to_val e2) ∗
+                    [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+     end)
+  ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
+Proof.
+  destruct glc.
+  - apply lwp_lift_atomic_step_fupd.
+  - apply lwp_lift_atomic_step_fupd_lc.
+  - apply lwp_lift_atomic_step_fupd_suspended.
+Qed.
+
 Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s i E E' Φ C ς} e1 e2 :
   (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
   (∀ σ1 κ Θ e2' σ2 efs', C i σ1 → prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
@@ -1085,6 +1217,42 @@ Proof.
   iIntros "!> % % % % %". iIntros ([? ?]). edestruct Hpuredet as (?&?&?&?); eauto. by subst.
 Qed.
 
+Lemma lwp_lift_pure_det_step_no_fork_gen (glc : get_lc) `{!Inhabited (state Λ)} {s i E E' Φ C ς} e1 e2 :
+  (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+  (∀ σ1 κ Θ e2' σ2 efs', C i σ1 → prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+  (∀ σ Θ κ, ς i -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
+  (|={E,E'}=>
+     ς i ∗
+     match glc with
+     | NoLc =>
+         (ς i ={E',E}=∗ lWP e2 @ s; i; E {{ Φ }})
+     | GetLc =>
+         (∃ Ψ q,
+             (othread_obls i Ψ 1 ∗
+              [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
+             ALC (|={∅}=>
+                    ς i -∗ othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                    |={E',E}=> lWP e2 @ s; i; E {{ Φ }}))
+     | GetLcSus =>
+         (∃ π Ψ K,
+             (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+              ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+              ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
+             ALC (|={∅}=>
+                    ς i -∗ othread_obls i Ψ 1 -∗
+                    ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                      ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                       (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ))) -∗
+                    |={E',E}=> lWP e2 @ s; i; E {{ Φ }}))
+     end)
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  destruct glc.
+  - apply lwp_lift_pure_det_step_no_fork.
+  - apply lwp_lift_pure_det_step_no_fork_lc.
+  - apply lwp_lift_pure_det_step_no_fork_suspended.
+Qed.
+
 Class PureExecCond (C : thread_id → state Λ → Prop) ς (i : thread_id) :=
   pure_exec_cond : ∀ σ Θ κ, ς i -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝.
 
@@ -1093,7 +1261,7 @@ Lemma lwp_pure_step_fupd `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ C ς :
   φ →
   PureExecCond C ς i →
   (Nat.iter n (λ P, |={E,E'}=> ς i ∗ (ς i ={E',E}=∗ P))
-     (lWP e2 @ s; i; E {{ Φ }}))
+     (emp -∗ lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (Hexec Hφ HCC) "Hlwp". specialize (Hexec Hφ).
@@ -1180,6 +1348,43 @@ Proof.
     + iIntros "H1 H2". iApply "H1". iApply tlc_succ_nat. iFrame.
 Qed.
 
+Lemma lwp_pure_step_fupd_gen (glc : get_lc) `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ C ς :
+  PureExec φ C n e1 e2 →
+  φ →
+  PureExecCond C ς i →
+  (Nat.iter n (λ P, |={E,E'}=>
+                 ς i ∗
+                 match glc with
+                 | NoLc =>
+                     (ς i ={E',E}=∗ P)
+                 | GetLc =>
+                     (∃ Ψ q,
+                         (othread_obls i Ψ 1 ∗
+                          [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
+                         ALC (|={∅}=>
+                                ς i -∗ othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q)
+                                ={E',E}=∗ P))
+                 | GetLcSus =>
+                     (∃ π Ψ K,
+                         (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+                          ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                          ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
+                         ALC (|={∅}=>
+                                ς i -∗ othread_obls i Ψ 1 -∗
+                                ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                                  ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                                   (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ)))
+                                ={E',E}=∗ P))
+                 end)
+     ((match glc with NoLc => emp | _ => £n n end) -∗ (lWP e2 @ s; i; E {{ Φ }})))
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  destruct glc.
+  - apply lwp_pure_step_fupd.
+  - apply lwp_pure_step_fupd_lc.
+  - apply lwp_pure_step_fupd_suspended.
+Qed.
+
 Lemma lwp_pure_step `{!Inhabited (state Λ)} s i E e1 e2 φ n Φ C ς :
   PureExec φ C n e1 e2 →
   φ →
@@ -1188,7 +1393,7 @@ Lemma lwp_pure_step `{!Inhabited (state Λ)} s i E e1 e2 φ n Φ C ς :
 Proof.
   intros Hexec ? HCC. rewrite -(lwp_pure_step_fupd _ _ E E) //. clear Hexec.
   induction n as [|n IH]; simpl; iIntros "[Hc H]".
-  { by iApply "H". }
+  { iIntros "_". by iApply "H". }
   iModIntro. iFrame "Hc". iIntros "Hc". iModIntro. iApply IH. iFrame.
 Qed.
 
