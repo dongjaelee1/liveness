@@ -157,11 +157,11 @@ Lemma lwp_pure_step_fupd s i E E' e1 e2 φ n Φ Δ q :
      (lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
-  iIntros (Hexec Hp) "H". unfold_defs. iApply (lwp_pure_step_fupd); eauto.
+  iIntros (Hexec Hp) "H". iApply (lwp_pure_step_fupd); eauto.
   iApply (iter_modal_mono_modal with "H").
-  - iIntros (??) "AB H". iMod "H" as "[$ H]". iIntros "!> G". iApply "AB". iApply ("H" with "G").
-  - iIntros (?) "H". iMod "H" as "[A H]". iModIntro. iDestruct "A" as "[A B]". iFrame "B".
-    iIntros "B". iApply "H". iFrame.
+  - iIntros (??) "AB H". iMod "H" as "($& H)". iIntros "!> G". iApply "AB". iApply ("H" with "G").
+  - iIntros (?) "H". iMod "H" as "(A& H)". iModIntro.
+    unfold_defs. iDestruct "A" as "[A B]". iFrame "B". iIntros "B". iApply "H". iFrame.
 Qed.
 
 Lemma lwp_pure_step_fupd_lc s i E E' e1 e2 φ n Φ :
@@ -208,6 +208,44 @@ Proof.
     iModIntro. iMod "H" as ">H". iIntros "!> A B". iApply "AB". iApply ("H" with "A B").
   - iIntros (?) "H". iMod "H" as "(%&%&%& (H1& H2& H3)& H)". iModIntro.
     unfold_defs. iDestruct "H2" as "[T1 T2]". iFrame. iMod "H" as ">H". iIntros "!> A B C". iApply ("H" with "[$] [$]").
+Qed.
+
+Lemma lwp_pure_step_fupd_gen (glc : get_lc) s i E E' e1 e2 φ n Φ :
+  PureExec φ thread_cond n e1 e2 →
+  φ →
+  (match glc with
+   | NoLc =>
+       ∃ Δ q, (Nat.iter n (λ P, |={E,E'}=> thread_obls i Δ q ∗ (thread_obls i Δ q ={E',E}=∗ P))
+                 (lWP e2 @ s; i; E {{ Φ }}))
+  | GetLc =>
+      (Nat.iter n (λ P, |={E,E'}=>
+                     ∃ Δ q,
+                     (thread_obls i Δ 1 ∗
+                      [∗ set] ρ ∈ Δ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
+                     ALC (|={∅}=>
+                            thread_obls i Δ 1 -∗ ([∗ set] ρ ∈ Δ, othread_owns i ρ q)
+                            ={E',E}=∗ P))
+         (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+  | GetLcSus =>
+      (Nat.iter n (λ P, |={E,E'}=>
+                     ∃ π Δ K,
+                     (⌜Δ = dom K⌝ ∗ thread_obls i Δ 1 ∗ obl π ∗
+                      ([∗ set] ρ ∈ Δ, obl_pc ρ Ord.one) ∗
+                      ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
+                     ALC (|={∅}=>
+                            thread_obls i Δ 1 -∗
+                            ((([∗ set] ρ ∈ Δ, obl_pc ρ Ord.one) ∗
+                              ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                               (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ)))
+                            ={E',E}=∗ P))
+         (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+   end)
+  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+Proof.
+  destruct glc.
+  - iIntros (??) "(%&%&H)". iApply lwp_pure_step_fupd; eauto.
+  - apply lwp_pure_step_fupd_lc.
+  - apply lwp_pure_step_fupd_suspended.
 Qed.
 
 Lemma lwp_pure_step s i E e1 e2 φ n Φ Δ q :

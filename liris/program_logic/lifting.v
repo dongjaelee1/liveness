@@ -1261,7 +1261,7 @@ Lemma lwp_pure_step_fupd `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ C ς :
   φ →
   PureExecCond C ς i →
   (Nat.iter n (λ P, |={E,E'}=> ς i ∗ (ς i ={E',E}=∗ P))
-     (emp -∗ lWP e2 @ s; i; E {{ Φ }}))
+     (lWP e2 @ s; i; E {{ Φ }}))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (Hexec Hφ HCC) "Hlwp". specialize (Hexec Hφ).
@@ -1352,31 +1352,35 @@ Lemma lwp_pure_step_fupd_gen (glc : get_lc) `{!Inhabited (state Λ)} s i E E' e1
   PureExec φ C n e1 e2 →
   φ →
   PureExecCond C ς i →
-  (Nat.iter n (λ P, |={E,E'}=>
-                 ς i ∗
-                 match glc with
-                 | NoLc =>
-                     (ς i ={E',E}=∗ P)
-                 | GetLc =>
-                     (∃ Ψ q,
-                         (othread_obls i Ψ 1 ∗
-                          [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
-                         ALC (|={∅}=>
-                                ς i -∗ othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q)
-                                ={E',E}=∗ P))
-                 | GetLcSus =>
-                     (∃ π Ψ K,
-                         (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
-                          ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
-                          ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-                         ALC (|={∅}=>
-                                ς i -∗ othread_obls i Ψ 1 -∗
-                                ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
-                                  ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                                   (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ)))
-                                ={E',E}=∗ P))
-                 end)
-     ((match glc with NoLc => emp | _ => £n n end) -∗ (lWP e2 @ s; i; E {{ Φ }})))
+  (match glc with
+   | NoLc =>
+       (Nat.iter n (λ P, |={E,E'}=> ς i ∗ (ς i ={E',E}=∗ P))
+          (lWP e2 @ s; i; E {{ Φ }}))
+   | GetLc =>
+       (Nat.iter n (λ P, |={E,E'}=>
+                      ς i ∗
+                      ∃ Ψ q,
+                        (othread_obls i Ψ 1 ∗
+                         [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ obl_pc ρ Ord.one) ∗
+                        ALC (|={∅}=>
+                               ς i -∗ othread_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q)
+                               ={E',E}=∗ P))
+          (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+   | GetLcSus =>
+       (Nat.iter n (λ P, |={E,E'}=>
+                      ς i ∗
+                      ∃ π Ψ K,
+                        (⌜Ψ = dom K⌝ ∗ othread_obls i Ψ 1 ∗ obl π ∗
+                         ([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                         ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
+                        ALC (|={∅}=>
+                               ς i -∗ othread_obls i Ψ 1 -∗
+                               ((([∗ set] ρ ∈ Ψ, obl_pc ρ Ord.one) ∗
+                                 ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
+                                  (obl_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ obl_pc k ψ)))
+                               ={E',E}=∗ P))
+          (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+   end)
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   destruct glc.
@@ -1393,7 +1397,7 @@ Lemma lwp_pure_step `{!Inhabited (state Λ)} s i E e1 e2 φ n Φ C ς :
 Proof.
   intros Hexec ? HCC. rewrite -(lwp_pure_step_fupd _ _ E E) //. clear Hexec.
   induction n as [|n IH]; simpl; iIntros "[Hc H]".
-  { iIntros "_". by iApply "H". }
+  { by iApply "H". }
   iModIntro. iFrame "Hc". iIntros "Hc". iModIntro. iApply IH. iFrame.
 Qed.
 
