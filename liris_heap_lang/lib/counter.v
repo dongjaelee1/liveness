@@ -1,10 +1,16 @@
 From iris.algebra Require Import lib.frac_auth numbers auth.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Export invariants.
-From iris.program_logic Require Export weakestpre.
-From iris.heap_lang Require Export lang.
-From iris.heap_lang Require Import proofmode notation.
+(** Fix step index to ordinals *)
+From transfinite.stepindex Require Import ordinals.
+From liris.base_logic Require Export invariants.
+From liris.program_logic Require Export weakestpre.
+From liris.heap_lang Require Export lang.
+From liris.heap_lang Require Import notation.
+From liris.heap_lang Require Import primitive_laws.
+(* From liris.heap_lang Require Import proofmode. *)
 From iris.prelude Require Import options.
+
+Local Instance ordI : indexT := ordI.
 
 Definition newcounter : val := λ: <>, ref #0.
 Definition incr : val := rec: "incr" "l" :=
@@ -15,6 +21,8 @@ Definition read : val := λ: "l", !"l".
 (** Monotone counter *)
 Class mcounterG Σ :=
   MCounterG { #[local] mcounter_inG :: inG Σ (authR max_natUR) }.
+(* Class mcounterG `{SI : indexT} Σ := *)
+(*   MCounterG { #[local] mcounter_inG :: inG Σ (authR max_natUR) }. *)
 
 Definition mcounterΣ : gFunctors := #[GFunctor (authR max_natUR)].
 
@@ -34,21 +42,26 @@ Section mono_proof.
   Global Instance mcounter_persistent l n : Persistent (mcounter l n).
   Proof. apply _. Qed.
 
-  Lemma newcounter_mono_spec :
-    {{{ True }}} newcounter #() {{{ l, RET #l; mcounter l 0 }}}.
+  Lemma newcounter_mono_spec i Δ q :
+    l{{{ thread_obls i Δ q }}} newcounter #() @ i l{{{ l, RET #l; thread_obls i Δ q ∗ mcounter l 0 }}}.
   Proof.
-    iIntros (Φ) "_ HΦ". rewrite /newcounter /=. wp_lam. wp_alloc l as "Hl".
+    iIntros (Φ) "T HΦ". rewrite /newcounter /=.
+    iApply (lwp_pure_step with "[$T HΦ]"). 1: done.
+    iIntros "T". iApply lwp_fupd.
+    iApply (lwp_alloc with "T"). iIntros (l) "[T [Hl Hm]]".
     iMod (own_alloc (● (MaxNat O) ⋅ ◯ (MaxNat O))) as (γ) "[Hγ Hγ']";
       first by apply auth_both_valid_discrete.
     iMod (inv_alloc N _ (mcounter_inv γ l) with "[Hl Hγ]").
     { iNext. iExists 0. by iFrame. }
-    iModIntro. iApply "HΦ". rewrite /mcounter; eauto 10.
+    iModIntro. iApply "HΦ". iFrame.
   Qed.
 
-  Lemma incr_mono_spec l n :
-    {{{ mcounter l n }}} incr #l {{{ RET #(); mcounter l (S n) }}}.
+  TODO
+
+  Lemma incr_mono_spec i Δ q l n :
+    l{{{ thread_obls i Δ q ∗ mcounter l n }}} incr #l @ i l{{{ RET #(); thread_obls i Δ q ∗ mcounter l (S n) }}}.
   Proof.
-    iIntros (Φ) "Hl HΦ". iLöb as "IH". wp_rec.
+    iIntros (Φ) "[T Hl] HΦ". iLöb as "IH". wp_rec.
     iDestruct "Hl" as (γ) "[#? Hγf]".
     wp_bind (! _)%E. iInv N as (c) ">[Hγ Hl]".
     wp_load. iModIntro. iSplitL "Hl Hγ"; [iNext; iExists c; by iFrame|].

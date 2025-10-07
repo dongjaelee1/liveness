@@ -71,10 +71,11 @@ liris_heap_lang/metatheory.v
 liris_heap_lang/primitive_laws.v
 liris_heap_lang/derived_laws.v
 liris_heap_lang/proofmode.v
-# TODO
 # liris_heap_lang/adequacy.v
 # liris_heap_lang/total_adequacy.v
 # liris_heap_lang/proph_erasure.v
+
+liris_heap_lang/lib/counter.v
 # liris_heap_lang/lib/spawn.v
 # liris_heap_lang/lib/par.v
 # liris_heap_lang/lib/assert.v
@@ -86,7 +87,6 @@ liris_heap_lang/proofmode.v
 # liris_heap_lang/lib/nondet_bool.v
 # liris_heap_lang/lib/lazy_coin.v
 # liris_heap_lang/lib/clairvoyant_coin.v
-# liris_heap_lang/lib/counter.v
 # liris_heap_lang/lib/atomic_heap.v
 # liris_heap_lang/lib/increment.v
 # liris_heap_lang/lib/diverge.v
