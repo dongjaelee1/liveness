@@ -556,6 +556,32 @@ Section liveness.
     iMod ("H" with "Tti") as "[I H]". iModIntro. iFrame. done.
   Qed.
 
+  Lemma ghost_step_done_acc E ν :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ k T P,
+         oblG_goal k T P ∗ oblG_done k ∗
+         ((▷ P) ={∅,E}=∗ (▷ P) ∗ state_interp σ Θ κs ∗ ν))
+    ⊢ ghost_step E ν.
+  Proof.
+    rewrite /ghost_step. iIntros "H % % % % I". iDestruct "I" as "(S& T& U& F& I)".
+    iMod ("H" with "I") as "(%&%&%& #Bg& #Bd& H)".
+    iPoseProof (osat_done_open _ k T P with "[$S $Bg $Bd]") as "[HP S]".
+    iMod ("H" with "HP") as "(HP& $& $)".
+    iFrame. iModIntro. iSplitR; first done. by iApply "S".
+  Qed.
+
+  Lemma ghost_step_done_pers E ν k T P :
+    Persistent P →
+    oblG_goal k T P -∗ oblG_done k -∗ ((▷ P) -∗ ν) -∗ ghost_step E ν.
+  Proof.
+    iIntros (?) "#Bg #Bd H". iApply ghost_step_done_acc.
+    iIntros (???) "I".
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iFrame "Bg Bd". iIntros "#HP". iMod "Hclose" as "_". iFrame.
+    iModIntro. iFrame "HP". by iApply "H".
+  Qed.
+
   (* lwp versions with interface definitions *)
   Lemma lwp_lift_step_fupd s i E e1 Φ :
     (∀ Θ σ1 κ κs,
@@ -853,6 +879,28 @@ Section liveness.
     iIntros "H". iApply ghost_step_elim. iApply ghost_step_terminate.
     iIntros (???) "I". iMod ("H" with "I") as "(%& (Tbs& Tx& #Te& _)& H)".
     iModIntro. iExists j. iFrame. iIntros "A". iApply "H". auto.
+  Qed.
+
+  Lemma lwp_done_acc s i E e Φ :
+    (∀ Θ σ κs,
+       state_interp σ Θ κs ={E,∅}=∗
+       ∃ k T P,
+         obl_goal k T P ∗ obl_done k ∗
+         ((▷ P) ={∅,E}=∗ (▷ P) ∗ state_interp σ Θ κs ∗ lWP e @ s; i; E {{ Φ }}))
+    ⊢ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    unfold_defs. iIntros "H". iApply ghost_step_elim. iApply ghost_step_done_acc.
+    iIntros (???) "I". iMod ("H" with "I") as "(%&%&%& (Bg& Bg0)& (Bd& Bd0)& H)".
+    iModIntro. iFrame.
+  Qed.
+
+  Lemma lwp_done_pers s i E e Φ k T P :
+    Persistent P →
+    obl_goal k T P -∗ obl_done k -∗ ((▷ P) -∗ lWP e @ s; i; E {{ Φ }}) -∗
+    lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    unfold_defs. iIntros (?) "[#Bg _] [#Bd _] H". iApply ghost_step_elim.
+    iApply (ghost_step_done_pers with "Bg Bd H").
   Qed.
 
 End liveness.
