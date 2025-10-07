@@ -79,7 +79,7 @@ Section thread_map.
   Qed.
 
   Lemma thread_map_new_thread p v Θ R :
-    p ∉ dom R →
+    p ∉ Θ →
     thread_map_interp Θ R ==∗
     thread_map_interp (Θ ∪ {[p]}) (<[p:=v]>R) ∗ thread p true v 1.
   Proof.

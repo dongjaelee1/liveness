@@ -48,6 +48,8 @@ liris/base_logic/relational_updates.v
 liris/base_logic/later_credits.v
 liris/base_logic/fancy_updates.v
 liris/base_logic/satisfiable.v
+liris/base_logic/invariants.v
+liris/base_logic/gen_inv_heap.v
 
 liris/program_logic/language.v
 #liris/program_logic/sched_fair_interp.v
@@ -57,6 +59,7 @@ liris/program_logic/lifting.v
 liris/program_logic/ectx_language.v
 liris/program_logic/ectx_lifting.v
 liris/program_logic/ectxi_language.v
+liris/program_logic/atomic.v
 
 liris_heap_lang/locations.v
 liris_heap_lang/lang.v
