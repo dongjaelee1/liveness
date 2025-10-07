@@ -32,6 +32,10 @@
   make -j8
   make install
 ```
+  Install additional libraries:
+```
+  ./configure
+```
 
 4. Run `make -jN` to build the full development, where `N` is the number of threads
    to use for the build process.
