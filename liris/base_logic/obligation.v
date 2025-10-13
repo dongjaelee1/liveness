@@ -28,7 +28,7 @@ Class obl_live_class (obl_count obl_ownerid : Type) (obl_count_ltR : relation ob
   }.
 
 Record obl_live_state `{Ξl : obl_live_class} := {
-    obl_transfer : obl_count;
+    obl_suspend : obl_count;
     obl_owner : obl_ownerid;
     obl_progress : obl_count;
   }.
@@ -60,16 +60,16 @@ Definition obl_state_progress `{Ξl : obl_live_class} `{Ξd : obl_done_class} : 
   λ o1 o2,
     match o1, o2 with
     | inl d1, inl d2 =>
-        obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)
+        obl_suspend d1 = obl_suspend d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)
     | _, _ => False
     end.
 
-(* Transition to transfer a liveness obligation. *)
-Definition obl_state_transfer `{Ξl : obl_live_class} `{Ξd : obl_done_class} : relation obl_state :=
+(* Transition to suspend a liveness obligation. *)
+Definition obl_state_suspend `{Ξl : obl_live_class} `{Ξd : obl_done_class} : relation obl_state :=
   λ o1 o2,
     (match o1, o2 with
      | inl d1, inl d2 =>
-         obl_count_ltR (obl_transfer d2) (obl_transfer d1)
+         obl_count_ltR (obl_suspend d2) (obl_suspend d1)
      | _, _ => False
      end).
 
@@ -108,12 +108,12 @@ Notation "A ↪ₚ B | C" := (obl_states_progress C A B) (at level 20, format "A
 Notation "A ↪ₚ⁺ B | C" := (tc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⁺  B  |  C").
 Notation "A ↪ₚ⋆ B | C" := (rtc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⋆  B  |  C").
 
-Definition obl_states_transfer `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) : relation obl_states :=
-  obl_states_cond_rel C obl_state_transfer.
+Definition obl_states_suspend `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) : relation obl_states :=
+  obl_states_cond_rel C obl_state_suspend.
 
-Notation "A ↪ₜ B | C" := (obl_states_transfer C A B) (at level 20, format "A  ↪ₜ  B  |  C").
-Notation "A ↪ₜ⁺ B | C" := (tc (obl_states_transfer C) A B) (at level 20, format "A  ↪ₜ⁺  B  |  C").
-Notation "A ↪ₜ⋆ B | C" := (rtc (obl_states_transfer C) A B) (at level 20, format "A  ↪ₜ⋆  B  |  C").
+Notation "A ↪ₜ B | C" := (obl_states_suspend C A B) (at level 20, format "A  ↪ₜ  B  |  C").
+Notation "A ↪ₜ⁺ B | C" := (tc (obl_states_suspend C) A B) (at level 20, format "A  ↪ₜ⁺  B  |  C").
+Notation "A ↪ₜ⋆ B | C" := (rtc (obl_states_suspend C) A B) (at level 20, format "A  ↪ₜ⋆  B  |  C").
 
 Definition obl_states_resolve `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) (C : obl_cond) : relation obl_states :=
   obl_states_cond_rel C (obl_state_resolve s).
@@ -132,7 +132,7 @@ Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 Variant obl_states_step `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) : relation obl_states :=
   | obl_states_step_progress Ω1 Ω2 :
     (∃ C, Ω1 ↪ₚ Ω2 | C) → obl_states_step s Ω1 Ω2
-  | obl_states_step_transfer Ω1 Ω2 :
+  | obl_states_step_suspend Ω1 Ω2 :
     (∃ C, Ω1 ↪ₜ Ω2 | C) → obl_states_step s Ω1 Ω2
   | obl_states_step_resolve Ω1 Ω2 :
     (∃ C, Ω1 ↪ᵣ Ω2 @ s | C) → obl_states_step s Ω1 Ω2
@@ -174,7 +174,7 @@ Section obl_states.
     intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
     destruct H1 as (?&?&?). destruct H2 as (?&?&?). split_and !; try (etrans; eauto).
   Qed.
-  Global Instance obl_state_transfer_Transitive : Transitive obl_state_transfer.
+  Global Instance obl_state_suspend_Transitive : Transitive obl_state_suspend.
   Proof using.
     intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
     etrans; eauto.
@@ -187,14 +187,14 @@ Section obl_states.
   Lemma obl_state_progress_live o1 o2 :
     obl_state_progress o1 o2 →
     ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
-             (obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)).
+             (obl_suspend d1 = obl_suspend d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)).
   Proof using.
     intros. destruct o1, o2; try done. simpl in H. do 2 eexists. split_and; eauto.
   Qed.
   Lemma obl_state_progress_tc_live o1 o2 :
     tc obl_state_progress o1 o2 →
     ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
-             (obl_transfer d1 = obl_transfer d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)).
+             (obl_suspend d1 = obl_suspend d2 ∧ obl_owner d1 = obl_owner d2 ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)).
   Proof using.
     intros. induction H.
     { apply (obl_state_progress_live x y); auto. }
@@ -238,57 +238,57 @@ Section obl_states.
       apply H1. eapply IHrtc; eauto.
   Qed.
 
-  Lemma obl_state_transfer_live o1 o2 :
-    obl_state_transfer o1 o2 →
+  Lemma obl_state_suspend_live o1 o2 :
+    obl_state_suspend o1 o2 →
     ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
-             (obl_count_ltR (obl_transfer d2) (obl_transfer d1)).
+             (obl_count_ltR (obl_suspend d2) (obl_suspend d1)).
   Proof using.
     intros. destruct o1, o2; try done. simpl in H. do 2 eexists. split_and; eauto.
   Qed.
-  Lemma obl_state_transfer_tc_live o1 o2 :
-    tc obl_state_transfer o1 o2 →
+  Lemma obl_state_suspend_tc_live o1 o2 :
+    tc obl_state_suspend o1 o2 →
     ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
-             (obl_count_ltR (obl_transfer d2) (obl_transfer d1)).
+             (obl_count_ltR (obl_suspend d2) (obl_suspend d1)).
   Proof using.
     intros. induction H.
-    { apply (obl_state_transfer_live x y); auto. }
-    apply obl_state_transfer_live in H.
+    { apply (obl_state_suspend_live x y); auto. }
+    apply obl_state_suspend_live in H.
     destruct H as (?&?&?&?&?). destruct IHtc as (?&?&?&?&?).
     subst. inv H3. exists x0, x3. split_and !; auto.
     etrans; eauto.
   Qed.
 
-  Lemma obl_state_transfer_preserves_live o1 o2 :
-    obl_state_transfer o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Lemma obl_state_suspend_preserves_live o1 o2 :
+    obl_state_suspend o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
   Proof using.
     intros. split; intros [? ?]; subst.
     - destruct o2; try eauto; done.
     - destruct o1; try eauto; done.
   Qed.
-  Lemma obl_state_transfer_tc_preserves_live o1 o2 :
-    tc obl_state_transfer o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Lemma obl_state_suspend_tc_preserves_live o1 o2 :
+    tc obl_state_suspend o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
   Proof using.
     intros. split.
     - induction H.
-      { apply (obl_state_transfer_preserves_live x y); auto. }
-      intros [? ?]. subst. apply obl_state_transfer_preserves_live in H. destruct H.
+      { apply (obl_state_suspend_preserves_live x y); auto. }
+      intros [? ?]. subst. apply obl_state_suspend_preserves_live in H. destruct H.
       apply IHtc in H; eauto.
     - induction H.
-      { apply (obl_state_transfer_preserves_live x y); auto. }
-      intros [? ?]. subst. apply obl_state_transfer_preserves_live in H. destruct H.
+      { apply (obl_state_suspend_preserves_live x y); auto. }
+      intros [? ?]. subst. apply obl_state_suspend_preserves_live in H. destruct H.
       apply H1. eapply IHtc; eauto.
   Qed.
-  Lemma obl_state_transfer_rtc_preserves_live o1 o2 :
-    rtc obl_state_transfer o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
+  Lemma obl_state_suspend_rtc_preserves_live o1 o2 :
+    rtc obl_state_suspend o1 o2 → (∃ d1, o1 = obl_live d1) ↔ (∃ d2, o2 = obl_live d2).
   Proof using.
     intros. split.
     - induction H.
       { eauto. }
-      intros [? ?]. subst. apply obl_state_transfer_preserves_live in H. destruct H.
+      intros [? ?]. subst. apply obl_state_suspend_preserves_live in H. destruct H.
       apply IHrtc in H; eauto.
     - induction H.
       { eauto. }
-      intros [? ?]. subst. apply obl_state_transfer_preserves_live in H. destruct H.
+      intros [? ?]. subst. apply obl_state_suspend_preserves_live in H. destruct H.
       apply H1. eapply IHrtc; eauto.
   Qed.
 
@@ -313,7 +313,7 @@ Section obl_states.
   Global Instance obl_cond_owner_Decision i : ∀ k o, Decision (obl_cond_owner i k o).
   Proof using. intros. unfold obl_cond_owner. destruct o; solve_decision. Qed.
 
-  Lemma obl_state_transfer_cond_id_prop Δ : obl_rel_preserves_cond (obl_cond_id_prop Δ) obl_state_transfer.
+  Lemma obl_state_suspend_cond_id_prop Δ : obl_rel_preserves_cond (obl_cond_id_prop Δ) obl_state_suspend.
   Proof using.
     intros k o0 o1 Hc Hr. destruct o0, o1; try done.
   Qed.

@@ -49,7 +49,7 @@ Module osatGS.
     OsatGpreS {
         osatGpreS_goal : inG Σ (gmap_viewR obl_id (prodR (agreeR $ (prop_ofO ps)) (agreeR $ (laterO (iPropO Σ)))));
         osatGpreS_status : inG Σ (reservation_mapUR mono_natUR);
-        osatGpreS_transfer : inG Σ (reservation_mapUR bankUR);
+        osatGpreS_suspend : inG Σ (reservation_mapUR bankUR);
         osatGpreS_tbound : inG Σ (reservation_mapUR (auth_mraUR (wfocm_geR)));
         osatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO T)));
         osatGpreS_progress : inG Σ (reservation_mapUR bankUR);
@@ -61,7 +61,7 @@ Module osatGS.
         osat_inG : osatGpreS ps T Σ;
         goal_name : gname;
         status_name : gname;
-        transfer_name : gname;
+        suspend_name : gname;
         tbound_name : gname;
         owner_name : gname;
         progress_name : gname;
@@ -88,7 +88,7 @@ Import osatGS.
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances osat_inG
-  osatGpreS_goal osatGpreS_status osatGpreS_transfer osatGpreS_tbound osatGpreS_owner osatGpreS_progress osatGpreS_elem.
+  osatGpreS_goal osatGpreS_status osatGpreS_suspend osatGpreS_tbound osatGpreS_owner osatGpreS_progress osatGpreS_elem.
 
 (* Goal *)
 Definition goal_unfold `{SI : indexT} {Σ} (R : iProp Σ) : later (iProp Σ) := Next R.
@@ -120,29 +120,29 @@ Definition oblG_done `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_
 Global Typeclasses Opaque oblG_done.
 Global Instance: Params (@oblG_done) 8 := {}.
 
-(* Transfer: manage credits for transfer *)
-Definition oblG_transfer `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) : iProp Σ :=
-  own transfer_name (reservation_map_data k (cash α)).
-Global Typeclasses Opaque oblG_transfer.
-Global Instance: Params (@oblG_transfer) 8 := {}.
+(* Suspend: manage credits for suspend *)
+Definition oblG_suspend `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) : iProp Σ :=
+  own suspend_name (reservation_map_data k (cash α)).
+Global Typeclasses Opaque oblG_suspend.
+Global Instance: Params (@oblG_suspend) 8 := {}.
 
-Definition oblG_transfer_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) (q : Qp) : iProp Σ :=
-  own transfer_name (reservation_map_data k (debt α q)).
-Global Typeclasses Opaque oblG_transfer_supply.
-Global Instance: Params (@oblG_transfer_supply) 8 := {}.
+Definition oblG_suspend_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) (q : Qp) : iProp Σ :=
+  own suspend_name (reservation_map_data k (debt α q)).
+Global Typeclasses Opaque oblG_suspend_supply.
+Global Instance: Params (@oblG_suspend_supply) 8 := {}.
 
-(* Upper bound on transfer credits *)
-Definition oblG_transfer_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
+(* Upper bound on suspend credits *)
+Definition oblG_suspend_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
   own tbound_name (reservation_map_data k (◯AM[wfocm_geR] ℵ)).
   (* own tbound_name (reservation_map_data k (to_agree $ ℵ : agreeR (leibnizO _))). *)
-Global Typeclasses Opaque oblG_transfer_bound.
-Global Instance: Params (@oblG_transfer_bound) 8 := {}.
+Global Typeclasses Opaque oblG_suspend_bound.
+Global Instance: Params (@oblG_suspend_bound) 8 := {}.
 
-Definition oblG_transfer_bound_auth `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
+Definition oblG_suspend_bound_auth `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
   own tbound_name (reservation_map_data k (●AM[wfocm_geR] ℵ)).
   (* own tbound_name (reservation_map_data k (to_agree $ ℵ : agreeR (leibnizO _))). *)
-Global Typeclasses Opaque oblG_transfer_bound_auth.
-Global Instance: Params (@oblG_transfer_bound_auth) 8 := {}.
+Global Typeclasses Opaque oblG_suspend_bound_auth.
+Global Instance: Params (@oblG_suspend_bound_auth) 8 := {}.
 
 (* Owner: tracks the owner thread of this obligation *)
 Definition oblG_owner `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (τ : T) (q : Qp) : iProp Σ :=
@@ -170,7 +170,7 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
          (⌜ dom OProp = dom Ω ⌝) ∗
          own goal_name (gmap_view_auth (DfracOwn 1) ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OProp))) ∗
      (own status_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
-     (own transfer_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (own suspend_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own tbound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own progress_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
@@ -179,14 +179,14 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
         match o with
         | inl d =>
             oblG_live k (1/2)%Qp ∗
-            (∃ α, ⌜ WFOCM.leR α (obl_transfer d) ⌝ ∗ oblG_transfer_supply k α (1)%Qp ∗ oblG_transfer_bound_auth k α) ∗
+            (∃ α, ⌜ WFOCM.leR α (obl_suspend d) ⌝ ∗ oblG_suspend_supply k α (1)%Qp ∗ oblG_suspend_bound_auth k α) ∗
             (oblG_owner k (obl_owner d) (1/2)%Qp) ∗
             (∃ β, ⌜ WFOCM.leR β (obl_progress d) ⌝ ∗ oblG_progress_supply k β (1/2)%Qp)
         | inr d =>
             let P1 := (obl_atom d) in
             ∃ P2 R, oblG_goal k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
                     oblG_done_auth k ∗
-                    ∃ α τ β, oblG_transfer_supply k α 1 ∗ oblG_transfer_bound_auth k α ∗
+                    ∃ α τ β, oblG_suspend_supply k α 1 ∗ oblG_suspend_bound_auth k α ∗
                              oblG_owner k τ 1 ∗ oblG_progress_supply k β 1
         end)
     )%I.
@@ -206,8 +206,8 @@ Section osat.
   Proof. rewrite /oblG_elem. apply _. Qed.
   Global Instance oblG_done_persistent k : Persistent (oblG_done k).
   Proof. rewrite /oblG_done. apply _. Qed.
-  Global Instance oblG_transfer_bound_persistent k ℵ : Persistent (oblG_transfer_bound k ℵ).
-  Proof. rewrite /oblG_transfer_bound. apply _. Qed.
+  Global Instance oblG_suspend_bound_persistent k ℵ : Persistent (oblG_suspend_bound k ℵ).
+  Proof. rewrite /oblG_suspend_bound. apply _. Qed.
 
   Global Instance oblG_elem_timeless k : Timeless (oblG_elem k).
   Proof. rewrite /oblG_elem. apply _. Qed.
@@ -215,10 +215,10 @@ Section osat.
   Proof. rewrite /oblG_live. apply _. Qed.
   Global Instance oblG_done_timeless k : Timeless (oblG_done k).
   Proof. rewrite /oblG_done. apply _. Qed.
-  Global Instance oblG_transfer_timeless k a : Timeless (oblG_transfer k a).
-  Proof. rewrite /oblG_transfer. apply _. Qed.
-  Global Instance oblG_transfer_bound_timeless k a : Timeless (oblG_transfer_bound k a).
-  Proof. rewrite /oblG_transfer_bound. apply _. Qed.
+  Global Instance oblG_suspend_timeless k a : Timeless (oblG_suspend k a).
+  Proof. rewrite /oblG_suspend. apply _. Qed.
+  Global Instance oblG_suspend_bound_timeless k a : Timeless (oblG_suspend_bound k a).
+  Proof. rewrite /oblG_suspend_bound. apply _. Qed.
   Global Instance oblG_progress_timeless k b : Timeless (oblG_progress k b).
   Proof. rewrite /oblG_progress. apply _. Qed.
 
@@ -348,122 +348,122 @@ Section osat.
     rewrite /oblG_live. by iFrame.
   Qed.
 
-  (** Transfer rules *)
-  Lemma oblG_transfer_eq i a0 a1 :
+  (** Suspend rules *)
+  Lemma oblG_suspend_eq i a0 a1 :
     a0 /= a1 →
-    oblG_transfer i a0 = oblG_transfer i a1.
-  Proof. intros EQ. rewrite /oblG_transfer. by erewrite cash_eq. Qed.
-  Lemma oblG_transfer_eq_list L a0 a1 :
+    oblG_suspend i a0 = oblG_suspend i a1.
+  Proof. intros EQ. rewrite /oblG_suspend. by erewrite cash_eq. Qed.
+  Lemma oblG_suspend_eq_list L a0 a1 :
     a0 /= a1 →
-    ([∗ list] i ∈ L, oblG_transfer i a0)%I ≡ ([∗ list] i ∈ L, oblG_transfer i a1)%I.
-  Proof. intros. apply big_opL_proper. intros. erewrite oblG_transfer_eq; eauto. Qed.
-  Lemma oblG_transfer_eq_set L a0 a1 :
+    ([∗ list] i ∈ L, oblG_suspend i a0)%I ≡ ([∗ list] i ∈ L, oblG_suspend i a1)%I.
+  Proof. intros. apply big_opL_proper. intros. erewrite oblG_suspend_eq; eauto. Qed.
+  Lemma oblG_suspend_eq_set L a0 a1 :
     a0 /= a1 →
-    ([∗ set] i ∈ L, oblG_transfer i a0)%I ≡ ([∗ set] i ∈ L, oblG_transfer i a1)%I.
-  Proof. intros. apply big_opS_proper. intros. erewrite oblG_transfer_eq; eauto. Qed.
+    ([∗ set] i ∈ L, oblG_suspend i a0)%I ≡ ([∗ set] i ∈ L, oblG_suspend i a1)%I.
+  Proof. intros. apply big_opS_proper. intros. erewrite oblG_suspend_eq; eauto. Qed.
 
-  Lemma oblG_transfer_mon i a0 a1 :
+  Lemma oblG_suspend_mon i a0 a1 :
     a0 /≤ a1 →
-    oblG_transfer i a1 ⊢ |==> oblG_transfer i a0.
+    oblG_suspend i a1 ⊢ |==> oblG_suspend i a0.
   Proof.
-    intros LE. rewrite /oblG_transfer. apply own_update.
+    intros LE. rewrite /oblG_suspend. apply own_update.
     by apply reservation_map_update, cash_update.
   Qed.
-  Lemma oblG_transfer_mon_list L a0 a1 :
+  Lemma oblG_suspend_mon_list L a0 a1 :
     a0 /≤ a1 →
-    ([∗ list] i ∈ L, oblG_transfer i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_transfer i a0).
+    ([∗ list] i ∈ L, oblG_suspend i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_suspend i a0).
   Proof.
     iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-    iModIntro. iIntros. by iApply oblG_transfer_mon.
+    iModIntro. iIntros. by iApply oblG_suspend_mon.
   Qed.
-  Lemma oblG_transfer_mon_set L a0 a1 :
+  Lemma oblG_suspend_mon_set L a0 a1 :
     a0 /≤ a1 →
-    ([∗ set] i ∈ L, oblG_transfer i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_transfer i a0).
+    ([∗ set] i ∈ L, oblG_suspend i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_suspend i a0).
   Proof.
     iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
-    iModIntro. iIntros. by iApply oblG_transfer_mon.
+    iModIntro. iIntros. by iApply oblG_suspend_mon.
   Qed.
 
-  Lemma oblG_transfer_split i a0 a1 :
-    oblG_transfer i (a0 /+ a1) ⊣⊢ oblG_transfer i a0 ∗ oblG_transfer i a1.
+  Lemma oblG_suspend_split i a0 a1 :
+    oblG_suspend i (a0 /+ a1) ⊣⊢ oblG_suspend i a0 ∗ oblG_suspend i a1.
   Proof.
-    rewrite /oblG_transfer. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
+    rewrite /oblG_suspend. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
     - iEval (rewrite -cash_add) in "H". iDestruct "H" as "[H1 H2]". iFrame.
     - iEval (rewrite -cash_add). iSplitL "H1"; iFrame.
   Qed.
-  Lemma oblG_transfer_split_list L a0 a1 :
-    ([∗ list] i ∈ L, oblG_transfer i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, oblG_transfer i a0) ∗ ([∗ list] i ∈ L, oblG_transfer i a1).
+  Lemma oblG_suspend_split_list L a0 a1 :
+    ([∗ list] i ∈ L, oblG_suspend i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, oblG_suspend i a0) ∗ ([∗ list] i ∈ L, oblG_suspend i a1).
   Proof.
-    rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply oblG_transfer_split.
+    rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply oblG_suspend_split.
   Qed.
-  Lemma oblG_transfer_split_set L a0 a1 :
-    ([∗ set] i ∈ L, oblG_transfer i (a0 /+ a1)) ⊣⊢ ([∗ set] i ∈ L, oblG_transfer i a0) ∗ ([∗ set] i ∈ L, oblG_transfer i a1).
+  Lemma oblG_suspend_split_set L a0 a1 :
+    ([∗ set] i ∈ L, oblG_suspend i (a0 /+ a1)) ⊣⊢ ([∗ set] i ∈ L, oblG_suspend i a0) ∗ ([∗ set] i ∈ L, oblG_suspend i a1).
   Proof.
-    rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply oblG_transfer_split.
-  Qed.
-
-  Lemma oblG_transfer_mon_split i a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    oblG_transfer i a2 ⊢ |==> oblG_transfer i a0 ∗ oblG_transfer i a1.
-  Proof.
-    intros LE. iIntros "H". iApply oblG_transfer_split. iApply oblG_transfer_mon; done.
-  Qed.
-  Lemma oblG_transfer_mon_split_list L a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    ([∗ list] i ∈ L, oblG_transfer i a2) ⊢ |==> ([∗ list] i ∈ L, oblG_transfer i a0) ∗ ([∗ list] i ∈ L, oblG_transfer i a1).
-  Proof.
-    iIntros (LE) "H". iPoseProof (oblG_transfer_mon_list with "H") as ">H"; first done.
-    by iApply oblG_transfer_split_list.
-  Qed.
-  Lemma oblG_transfer_mon_split_set L a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    ([∗ set] i ∈ L, oblG_transfer i a2) ⊢ |==> ([∗ set] i ∈ L, oblG_transfer i a0) ∗ ([∗ set] i ∈ L, oblG_transfer i a1).
-  Proof.
-    iIntros (LE) "H". iPoseProof (oblG_transfer_mon_set with "H") as ">H"; first done.
-    by iApply oblG_transfer_split_set.
+    rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply oblG_suspend_split.
   Qed.
 
-  Lemma oblG_transfer_supply_mon k a0 a1 q :
+  Lemma oblG_suspend_mon_split i a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    oblG_suspend i a2 ⊢ |==> oblG_suspend i a0 ∗ oblG_suspend i a1.
+  Proof.
+    intros LE. iIntros "H". iApply oblG_suspend_split. iApply oblG_suspend_mon; done.
+  Qed.
+  Lemma oblG_suspend_mon_split_list L a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    ([∗ list] i ∈ L, oblG_suspend i a2) ⊢ |==> ([∗ list] i ∈ L, oblG_suspend i a0) ∗ ([∗ list] i ∈ L, oblG_suspend i a1).
+  Proof.
+    iIntros (LE) "H". iPoseProof (oblG_suspend_mon_list with "H") as ">H"; first done.
+    by iApply oblG_suspend_split_list.
+  Qed.
+  Lemma oblG_suspend_mon_split_set L a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    ([∗ set] i ∈ L, oblG_suspend i a2) ⊢ |==> ([∗ set] i ∈ L, oblG_suspend i a0) ∗ ([∗ set] i ∈ L, oblG_suspend i a1).
+  Proof.
+    iIntros (LE) "H". iPoseProof (oblG_suspend_mon_set with "H") as ">H"; first done.
+    by iApply oblG_suspend_split_set.
+  Qed.
+
+  Lemma oblG_suspend_supply_mon k a0 a1 q :
     a0 /≤ a1 →
-    oblG_transfer_supply k a0 q ⊢ |==> oblG_transfer_supply k a1 q.
+    oblG_suspend_supply k a0 q ⊢ |==> oblG_suspend_supply k a1 q.
   Proof.
-    intros LE. rewrite /oblG_transfer_supply. apply own_update.
+    intros LE. rewrite /oblG_suspend_supply. apply own_update.
     by apply reservation_map_update, debt_update.
   Qed.
 
-  Lemma oblG_transfer_supply_add i a0 a1 q0 q1 :
-    oblG_transfer_supply i a0 q0 ∗ oblG_transfer_supply i a1 q1
-    ⊢ ∃ b, oblG_transfer_supply i b (q0 + q1) ∗ ⌜ b /≤ a0 ∧ b /≤ a1 ⌝.
+  Lemma oblG_suspend_supply_add i a0 a1 q0 q1 :
+    oblG_suspend_supply i a0 q0 ∗ oblG_suspend_supply i a1 q1
+    ⊢ ∃ b, oblG_suspend_supply i b (q0 + q1) ∗ ⌜ b /≤ a0 ∧ b /≤ a1 ⌝.
   Proof.
-    rewrite /oblG_transfer_supply. iIntros "[H1 H2]".
+    rewrite /oblG_suspend_supply. iIntros "[H1 H2]".
     iPoseProof (own_op with "[H1 H2]") as "H"; first (iSplitL "H1"; iFrame).
     iEval (rewrite -reservation_map_data_op) in "H".
     destruct (debt_add a0 a1 q0 q1) as (b&Heq&Hle0&Hle1). rewrite Heq.
     iExists _. iSplitL; done.
   Qed.
 
-  Lemma oblG_transfer_supply_split i a q0 q1 q :
+  Lemma oblG_suspend_supply_split i a q0 q1 q :
     q = (q0 + q1)%Qp →
-    oblG_transfer_supply i a q ⊢ oblG_transfer_supply i a q0 ∗ oblG_transfer_supply i a q1.
+    oblG_suspend_supply i a q ⊢ oblG_suspend_supply i a q0 ∗ oblG_suspend_supply i a q1.
   Proof.
-    rewrite /oblG_transfer_supply. iIntros (Hq) "H".
+    rewrite /oblG_suspend_supply. iIntros (Hq) "H".
     iApply own_op. iEval (rewrite -reservation_map_data_op).
     subst. rewrite debt_split. done.
   Qed.
-  Lemma oblG_transfer_supply_div_2 k a q :
-    oblG_transfer_supply k a q ⊢ oblG_transfer_supply k a (q/2) ∗ oblG_transfer_supply k a (q/2).
-  Proof. rewrite oblG_transfer_supply_split; first done. by rewrite Qp.div_2. Qed.
-  Lemma oblG_transfer_supply_dfrac_valid k a q :
-    oblG_transfer_supply k a q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
+  Lemma oblG_suspend_supply_div_2 k a q :
+    oblG_suspend_supply k a q ⊢ oblG_suspend_supply k a (q/2) ∗ oblG_suspend_supply k a (q/2).
+  Proof. rewrite oblG_suspend_supply_split; first done. by rewrite Qp.div_2. Qed.
+  Lemma oblG_suspend_supply_dfrac_valid k a q :
+    oblG_suspend_supply k a q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
   Proof.
-    rewrite /oblG_transfer_supply. iIntros "H".
+    rewrite /oblG_suspend_supply. iIntros "H".
     iPoseProof (own_valid with "H") as "%V".
     iPureIntro. rewrite reservation_map_data_valid in V.
     rewrite bank_valid_debt in V. destruct V. auto.
   Qed.
 
-  Lemma oblG_transfer_spend i a0 a1 q :
-    oblG_transfer_supply i a0 q ∗ oblG_transfer i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ oblG_transfer_supply i a2 q.
+  Lemma oblG_suspend_spend i a0 a1 q :
+    oblG_suspend_supply i a0 q ∗ oblG_suspend i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ oblG_suspend_supply i a2 q.
   Proof.
     rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)".
     { rewrite -reservation_map_data_op.
@@ -478,83 +478,83 @@ Section osat.
     iExists a2. subst. iModIntro. iSplitR; done.
   Qed.
 
-  Lemma oblG_transfer_spend_2 i a0 a1 q0 q1 c :
-    oblG_transfer_supply i a0 q0 ∗ oblG_transfer_supply i a1 q1 ∗ oblG_transfer i c
-    ⊢ |==> ∃ a2, ⌜(c /+ a2) /≤ a0 ∧ (c /+ a2) /≤ a1⌝ ∗ oblG_transfer_supply i a2 q0 ∗ oblG_transfer_supply i a2 q1.
+  Lemma oblG_suspend_spend_2 i a0 a1 q0 q1 c :
+    oblG_suspend_supply i a0 q0 ∗ oblG_suspend_supply i a1 q1 ∗ oblG_suspend i c
+    ⊢ |==> ∃ a2, ⌜(c /+ a2) /≤ a0 ∧ (c /+ a2) /≤ a1⌝ ∗ oblG_suspend_supply i a2 q0 ∗ oblG_suspend_supply i a2 q1.
   Proof.
-    iIntros "(H0&H1&H2)". iDestruct (oblG_transfer_supply_add with "[H0 H1]") as "(%&H&%)"; first iFrame.
-    iMod (oblG_transfer_spend with "[H H2]") as "(%&%&H)"; first iFrame.
-    iDestruct (oblG_transfer_supply_split with "H") as "[H0 H1]"; first reflexivity.
+    iIntros "(H0&H1&H2)". iDestruct (oblG_suspend_supply_add with "[H0 H1]") as "(%&H&%)"; first iFrame.
+    iMod (oblG_suspend_spend with "[H H2]") as "(%&%&H)"; first iFrame.
+    iDestruct (oblG_suspend_supply_split with "H") as "[H0 H1]"; first reflexivity.
     iModIntro. iFrame. iPureIntro. destruct H. split.
     - etransitivity; [eapply H0 | eauto].
     - etransitivity; [eauto | eapply H].
   Qed.
 
-  Lemma oblG_transfer_alloc D k a :
+  Lemma oblG_suspend_alloc D k a :
     k ∉ D →
-    (own transfer_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset D)))
-    ⊢ |==> (own transfer_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
-           oblG_transfer_supply k a 1 ∗ oblG_transfer k a.
+    (own suspend_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset D)))
+    ⊢ |==> (own suspend_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
+           oblG_suspend_supply k a 1 ∗ oblG_suspend k a.
   Proof.
     iIntros (Hk) "Htk".
     iPoseProof (reservation_map_token_alloc_singleton _ _ k (debt a 1 ⋅ cash a) with "Htk") as "[Htk >H]"; auto.
     { rewrite bank_valid_debt_cash. done. }
-    iDestruct "H" as "[H1 H2]". rewrite /oblG_transfer_supply /oblG_transfer.
+    iDestruct "H" as "[H1 H2]". rewrite /oblG_suspend_supply /oblG_suspend.
     by iFrame.
   Qed.
 
-  Lemma oblG_transfer_supply_is_bound k a q b :
-    oblG_transfer_supply k a q ∗ oblG_transfer k b ⊢ ⌜ b /≤ a ⌝.
+  Lemma oblG_suspend_supply_is_bound k a q b :
+    oblG_suspend_supply k a q ∗ oblG_suspend k b ⊢ ⌜ b /≤ a ⌝.
   Proof.
-    rewrite /oblG_transfer_supply /oblG_transfer -own_op -reservation_map_data_op.
+    rewrite /oblG_suspend_supply /oblG_suspend -own_op -reservation_map_data_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%Hv".
     apply reservation_map_data_valid, bank_valid_debt_cash in Hv. destruct Hv. done.
   Qed.
-  Lemma oblG_transfer_supply_exceed k1 k2 a q b :
+  Lemma oblG_suspend_supply_exceed k1 k2 a q b :
     a /< b →
-    oblG_transfer_supply k1 a q ∗ oblG_transfer k2 b ⊢ ⌜ k1 ≠ k2 ⌝.
+    oblG_suspend_supply k1 a q ∗ oblG_suspend k2 b ⊢ ⌜ k1 ≠ k2 ⌝.
   Proof.
     iIntros (Hlt) "H". destruct (decide (k1 = k2)); last done.
-    subst. iPoseProof (oblG_transfer_supply_is_bound with "H") as "%".
+    subst. iPoseProof (oblG_suspend_supply_is_bound with "H") as "%".
     exfalso. apply (WFOCM.lt_le_false _ _ Hlt H).
   Qed.
 
-  (** Transfer bound rules *)
-  Lemma oblG_transfer_bound_auth_alloc D k a :
+  (** Suspend bound rules *)
+  Lemma oblG_suspend_bound_auth_alloc D k a :
     k ∉ D →
     (own tbound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset D)))
     ⊢ |==> (own tbound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
-           oblG_transfer_bound_auth k a.
+           oblG_suspend_bound_auth k a.
   Proof.
     iIntros (Hk) "Htk".
     iPoseProof (reservation_map_token_alloc_singleton _ _ k (●AM[wfocm_geR] a) with "Htk") as "[Htk >H]"; auto.
     - apply auth_mra_auth_valid.
-    - rewrite /oblG_transfer_bound_auth. by iFrame.
+    - rewrite /oblG_suspend_bound_auth. by iFrame.
   Qed.
 
-  Lemma oblG_transfer_bound_know k a :
-    oblG_transfer_bound_auth k a ⊢ oblG_transfer_bound k a.
+  Lemma oblG_suspend_bound_know k a :
+    oblG_suspend_bound_auth k a ⊢ oblG_suspend_bound k a.
   Proof.
-    rewrite /oblG_transfer_bound_auth /oblG_transfer_bound. rewrite auth_mra_auth_know_op.
+    rewrite /oblG_suspend_bound_auth /oblG_suspend_bound. rewrite auth_mra_auth_know_op.
     rewrite reservation_map_data_op. iIntros "[H1 H2]". iFrame.
   Qed.
 
-  Lemma oblG_transfer_bound_know_bound k a0 a1 :
-    oblG_transfer_bound_auth k a0 ∗ oblG_transfer_bound k a1 ⊢ ⌜ a0 /≤ a1 ⌝.
+  Lemma oblG_suspend_bound_know_bound k a0 a1 :
+    oblG_suspend_bound_auth k a0 ∗ oblG_suspend_bound k a1 ⊢ ⌜ a0 /≤ a1 ⌝.
   Proof.
-    rewrite /oblG_transfer_bound_auth /oblG_transfer_bound -own_op -reservation_map_data_op.
+    rewrite /oblG_suspend_bound_auth /oblG_suspend_bound -own_op -reservation_map_data_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%V". apply reservation_map_data_valid in V.
     apply (auth_mra_both_valid wfocm_geR) in V. done.
   Qed.
 
-  Lemma oblG_transfer_bound_auth_mon k a0 a1 :
+  Lemma oblG_suspend_bound_auth_mon k a0 a1 :
     a1 /≤ a0 →
-    oblG_transfer_bound_auth k a0 ⊢ |==> oblG_transfer_bound_auth k a1.
+    oblG_suspend_bound_auth k a0 ⊢ |==> oblG_suspend_bound_auth k a1.
   Proof. iIntros (Ha). apply own_update, reservation_map_update, auth_mra_update; eauto. apply _. Qed.
 
-  Lemma oblG_transfer_bound_mon k a0 a1 :
+  Lemma oblG_suspend_bound_mon k a0 a1 :
     a0 /≤ a1 →
-    oblG_transfer_bound k a0 ⊢ oblG_transfer_bound k a1.
+    oblG_suspend_bound k a0 ⊢ oblG_suspend_bound k a1.
   Proof. iIntros (Ha). apply own_mono, reservation_map_data_mono, auth_mra_know_mono; eauto. apply _. Qed.
 
   (** Progress rules *)
@@ -895,7 +895,7 @@ Section osat.
                 oblG_goal k P R ∗
                 oblG_elem k ∗
                 oblG_live k (1/2)%Qp ∗
-                oblG_transfer k α ∗ oblG_transfer_bound k α ∗
+                oblG_suspend k α ∗ oblG_suspend_bound k α ∗
                 oblG_owner k τ (1/2)%Qp ∗
                 oblG_progress_supply k β (1/2)%Qp ∗ oblG_progress k β.
   Proof.
@@ -909,9 +909,9 @@ Section osat.
       rewrite !lookup_fmap. rewrite not_elem_of_dom_1; [done | set_solver].
     }
     iMod (oblG_live_alloc _ k with "HS") as "[HS Hs]"; first done.
-    iMod (oblG_transfer_alloc _ k α with "HT") as "(HT & Hts & Ht)"; first done.
-    iMod (oblG_transfer_bound_auth_alloc _ k α with "HB") as "[HB Hba]"; first done.
-    iPoseProof (oblG_transfer_bound_know with "Hba") as "#Hb".
+    iMod (oblG_suspend_alloc _ k α with "HT") as "(HT & Hts & Ht)"; first done.
+    iMod (oblG_suspend_bound_auth_alloc _ k α with "HB") as "[HB Hba]"; first done.
+    iPoseProof (oblG_suspend_bound_know with "Hba") as "#Hb".
     iMod (oblG_owner_alloc _ k τ with "HO") as "[HO Ho]"; first done.
     iMod (oblG_progress_alloc _ k β with "HP") as "(HP & Hps & Hp)"; first done.
     iPoseProof (oblG_live_div_2 with "Hs") as "[Hs1 Hs2]".
@@ -932,26 +932,26 @@ Section osat.
     iFrame. eauto.
   Qed.
 
-  Lemma osat_obl_transfer_one Ω k α τ τ' β β' c x1 x2 :
+  Lemma osat_obl_suspend_one Ω k α τ τ' β β' c x1 x2 :
     (Ω !! k = Some (olive α τ β)) →
     (/0 /< c) →
     osat Ω ∗ oblG_owner k x1 (1/2)%Qp ∗ oblG_progress_supply k x2 (1/2)%Qp ∗
-    oblG_transfer k c
+    oblG_suspend k c
     ⊢ |==> ∃ α', osat (<[k:=olive α' τ' (β /+ β')]>Ω) ∗
-                 ⌜ obl_state_transfer (olive α τ β) (olive α' τ' (β /+ β')) ⌝ ∗
+                 ⌜ obl_state_suspend (olive α τ β) (olive α' τ' (β /+ β')) ⌝ ∗
                  oblG_owner k τ' (1/2)%Qp ∗ oblG_progress_supply k (β /+ β') (1/2)%Qp ∗
-                 oblG_transfer_bound k α' ∗ oblG_progress k β'.
+                 oblG_suspend_bound k α' ∗ oblG_progress k β'.
   Proof.
     intros LU Hc. iIntros "(Hsat & Ho0 & Hps0 & Ht)".
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP&HE & Hm)".
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
-    iMod (oblG_transfer_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
+    iMod (oblG_suspend_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
     assert (LT : a2 /< α0).
     { apply WFOCM.lt_exists_right. exists c. split; done. }
-    iMod (oblG_transfer_bound_auth_mon _ _ a2 with "Hb") as "Hb".
+    iMod (oblG_suspend_bound_auth_mon _ _ a2 with "Hb") as "Hb".
     { apply WFOCM.lt_le; auto. }
-    iPoseProof (oblG_transfer_bound_know with "Hb") as "#Hbk".
+    iPoseProof (oblG_suspend_bound_know with "Hb") as "#Hbk".
     iMod (oblG_owner_update_2 _ _ _ _ _ τ' with "[Ho0 Ho]") as "[Ho0 Ho]"; [apply Qp.div_2 | iFrame|].
     simpl in *.
     iMod (oblG_progress_supply_mon _ _ β with "Hps") as "Hps"; first done.
@@ -965,27 +965,27 @@ Section osat.
     simpl; iPureIntro; split; auto. eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
-  Lemma osat_obl_transfer_one_with_bound Ω k α τ τ' β β' ℵ c x1 x2 :
+  Lemma osat_obl_suspend_one_with_bound Ω k α τ τ' β β' ℵ c x1 x2 :
     (Ω !! k = Some (olive α τ β)) →
     (/0 /< c) →
     osat Ω ∗ oblG_owner k x1 (1/2)%Qp ∗ oblG_progress_supply k x2 (1/2)%Qp ∗
-    oblG_transfer_bound k ℵ ∗ oblG_transfer k c
+    oblG_suspend_bound k ℵ ∗ oblG_suspend k c
     ⊢ |==> ∃ α', osat (<[k:=olive α' τ' (β /+ β')]>Ω) ∗
-                 ⌜ obl_state_transfer (olive α τ β) (olive α' τ' (β /+ β')) ∧ α' /< ℵ ⌝ ∗
+                 ⌜ obl_state_suspend (olive α τ β) (olive α' τ' (β /+ β')) ∧ α' /< ℵ ⌝ ∗
                  oblG_owner k τ' (1/2)%Qp ∗ oblG_progress_supply k (β /+ β') (1/2)%Qp ∗
-                 oblG_transfer_bound k α' ∗ oblG_progress k β'.
+                 oblG_suspend_bound k α' ∗ oblG_progress k β'.
   Proof.
     intros LU Hc. iIntros "(Hsat & Ho0 & Hps0 & #Htb & Ht)".
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP&HE & Hm)".
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
-    iMod (oblG_transfer_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
+    iMod (oblG_suspend_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
     assert (LT : a2 /< α0).
     { apply WFOCM.lt_exists_right. exists c. split; done. }
-    iPoseProof (oblG_transfer_bound_know_bound k with "[Hb Htb]") as "%LEℵ"; first by iFrame.
-    iMod (oblG_transfer_bound_auth_mon _ _ a2 with "Hb") as "Hb".
+    iPoseProof (oblG_suspend_bound_know_bound k with "[Hb Htb]") as "%LEℵ"; first by iFrame.
+    iMod (oblG_suspend_bound_auth_mon _ _ a2 with "Hb") as "Hb".
     { apply WFOCM.lt_le; auto. }
-    iPoseProof (oblG_transfer_bound_know with "Hb") as "#Hbk".
+    iPoseProof (oblG_suspend_bound_know with "Hb") as "#Hbk".
     iMod (oblG_owner_update_2 _ _ _ _ _ τ' with "[Ho0 Ho]") as "[Ho0 Ho]"; [apply Qp.div_2 | iFrame|].
     simpl in *.
     iMod (oblG_progress_supply_mon _ _ β with "Hps") as "Hps"; first done.
@@ -999,27 +999,27 @@ Section osat.
     split; eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
-  Lemma osat_obl_transfer_one_with_bound_stay Ω k α τ β β' ℵ c x2 :
+  Lemma osat_obl_suspend_one_with_bound_stay Ω k α τ β β' ℵ c x2 :
     (Ω !! k = Some (olive α τ β)) →
     (/0 /< c) →
     osat Ω ∗ oblG_progress_supply k x2 (1/2)%Qp ∗
-    oblG_transfer_bound k ℵ ∗ oblG_transfer k c
+    oblG_suspend_bound k ℵ ∗ oblG_suspend k c
     ⊢ |==> ∃ α', osat (<[k:=olive α' τ (β /+ β')]>Ω) ∗
-                 ⌜ obl_state_transfer (olive α τ β) (olive α' τ (β /+ β')) ∧ α' /< ℵ ⌝ ∗
+                 ⌜ obl_state_suspend (olive α τ β) (olive α' τ (β /+ β')) ∧ α' /< ℵ ⌝ ∗
                  oblG_progress_supply k (β /+ β') (1/2)%Qp ∗
-                 oblG_transfer_bound k α' ∗ oblG_progress k β'.
+                 oblG_suspend_bound k α' ∗ oblG_progress k β'.
   Proof.
     intros LU Hc. iIntros "(Hsat & Hps0 & #Htb & Ht)".
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP&HE & Hm)".
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
-    iMod (oblG_transfer_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
+    iMod (oblG_suspend_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
     assert (LT : a2 /< α0).
     { apply WFOCM.lt_exists_right. exists c. split; done. }
-    iPoseProof (oblG_transfer_bound_know_bound k with "[Hb Htb]") as "%LEℵ"; first by iFrame.
-    iMod (oblG_transfer_bound_auth_mon _ _ a2 with "Hb") as "Hb".
+    iPoseProof (oblG_suspend_bound_know_bound k with "[Hb Htb]") as "%LEℵ"; first by iFrame.
+    iMod (oblG_suspend_bound_auth_mon _ _ a2 with "Hb") as "Hb".
     { apply WFOCM.lt_le; auto. }
-    iPoseProof (oblG_transfer_bound_know with "Hb") as "#Hbk".
+    iPoseProof (oblG_suspend_bound_know with "Hb") as "#Hbk".
     simpl in *.
     iMod (oblG_progress_supply_mon _ _ β with "Hps") as "Hps"; first done.
     iMod (oblG_progress_supply_issue_2 _ _ _ β _ β' with "[Hps Hps0]") as "(Hps&Hps0&Hp)"; [apply Qp.div_2|iFrame|].
@@ -1087,9 +1087,9 @@ Section osat.
     rewrite insert_delete_eq. iFrame. eauto.
   Qed.
 
-  Lemma osat_transfer_bound_exceed Ω k1 k2 ℵ b :
+  Lemma osat_suspend_bound_exceed Ω k1 k2 ℵ b :
     ℵ /< b →
-    osat Ω ∗ oblG_elem k1 ∗ oblG_transfer_bound k1 ℵ ∗ oblG_transfer k2 b ⊢ ⌜ k1 ≠ k2 ⌝.
+    osat Ω ∗ oblG_elem k1 ∗ oblG_suspend_bound k1 ℵ ∗ oblG_suspend k2 b ⊢ ⌜ k1 ≠ k2 ⌝.
   Proof.
     iIntros (Hlt) "(Hsat & #Hek1 & #Htbk1 & Htk2)".
     iPoseProof (osat_elem k1 with "[Hsat]") as "%Helem"; first iFrame; eauto.
@@ -1099,21 +1099,21 @@ Section osat.
     destruct (decide (k1 = k2)); last done. subst k2.
     destruct o.
     - iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
-      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htbk1]") as "%"; first iFrame; eauto.
-      iPoseProof (oblG_transfer_supply_is_bound with "[Hts Htk2]") as "%"; first iFrame.
+      iPoseProof (oblG_suspend_bound_know_bound with "[Hb Htbk1]") as "%"; first iFrame; eauto.
+      iPoseProof (oblG_suspend_supply_is_bound with "[Hts Htk2]") as "%"; first iFrame.
       exfalso. assert (b /≤ ℵ).
       { etransitivity; eauto. }
       apply (WFOCM.lt_le_false _ _ Hlt H2).
     - iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Htba & Ho & Hps)".
-      iPoseProof (oblG_transfer_bound_know_bound with "[Htba Htbk1]") as "%"; first iFrame; eauto.
-      iPoseProof (oblG_transfer_supply_is_bound with "[Hts Htk2]") as "%"; first iFrame.
+      iPoseProof (oblG_suspend_bound_know_bound with "[Htba Htbk1]") as "%"; first iFrame; eauto.
+      iPoseProof (oblG_suspend_supply_is_bound with "[Hts Htk2]") as "%"; first iFrame.
       exfalso. assert (b /≤ ℵ).
       { etransitivity; eauto. }
       apply (WFOCM.lt_le_false _ _ Hlt H1).
   Qed.
 
-  Lemma osat_transfer_bound_transfer_le Ω k α ℵ :
-    osat Ω ∗ oblG_elem k ∗ oblG_transfer_bound k ℵ ∗ oblG_transfer k α ⊢ ⌜ α /≤ ℵ ⌝.
+  Lemma osat_suspend_bound_suspend_le Ω k α ℵ :
+    osat Ω ∗ oblG_elem k ∗ oblG_suspend_bound k ℵ ∗ oblG_suspend k α ⊢ ⌜ α /≤ ℵ ⌝.
   Proof.
     iIntros "(Hsat & #Hek & #Htb & Ht)".
     iPoseProof (osat_elem k with "[Hsat]") as "%Helem"; first iFrame; eauto.
@@ -1122,18 +1122,18 @@ Section osat.
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     destruct o.
     - iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
-      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb]") as "%"; first iFrame; eauto.
-      iPoseProof (oblG_transfer_supply_is_bound with "[Hts Ht]") as "%"; first iFrame.
+      iPoseProof (oblG_suspend_bound_know_bound with "[Hb Htb]") as "%"; first iFrame; eauto.
+      iPoseProof (oblG_suspend_supply_is_bound with "[Hts Ht]") as "%"; first iFrame.
       iPureIntro. etrans; eauto.
     - iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Htba & Ho & Hps)".
-      iPoseProof (oblG_transfer_bound_know_bound with "[Htba Htb]") as "%"; first iFrame; eauto.
-      iPoseProof (oblG_transfer_supply_is_bound with "[Hts Ht]") as "%"; first iFrame.
+      iPoseProof (oblG_suspend_bound_know_bound with "[Htba Htb]") as "%"; first iFrame; eauto.
+      iPoseProof (oblG_suspend_supply_is_bound with "[Hts Ht]") as "%"; first iFrame.
       iPureIntro. etrans; eauto.
   Qed.
 
-  Lemma osat_transfer_bounds_meet Ω k ℵ1 ℵ2 :
-    osat Ω ∗ oblG_elem k ∗ oblG_transfer_bound k ℵ1 ∗ oblG_transfer_bound k ℵ2
-    ⊢ ∃ ℵ3, ⌜ ℵ3 /≤ ℵ1 ∧ ℵ3 /≤ ℵ2 ⌝ ∗ oblG_transfer_bound k ℵ3.
+  Lemma osat_suspend_bounds_meet Ω k ℵ1 ℵ2 :
+    osat Ω ∗ oblG_elem k ∗ oblG_suspend_bound k ℵ1 ∗ oblG_suspend_bound k ℵ2
+    ⊢ ∃ ℵ3, ⌜ ℵ3 /≤ ℵ1 ∧ ℵ3 /≤ ℵ2 ⌝ ∗ oblG_suspend_bound k ℵ3.
   Proof.
     iIntros "(Hsat & #Hek & #Htb1 & #Htb2)".
     iPoseProof (osat_elem k with "[Hsat]") as "%Helem"; first iFrame; eauto.
@@ -1142,14 +1142,14 @@ Section osat.
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     destruct o.
     - iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
-      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb1]") as "%"; first (iFrame "Hb Htb1").
-      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb2]") as "%"; first (iFrame "Hb Htb2").
-      iPoseProof (oblG_transfer_bound_know with "Hb") as "#Htb3"; first iFrame.
+      iPoseProof (oblG_suspend_bound_know_bound with "[Hb Htb1]") as "%"; first (iFrame "Hb Htb1").
+      iPoseProof (oblG_suspend_bound_know_bound with "[Hb Htb2]") as "%"; first (iFrame "Hb Htb2").
+      iPoseProof (oblG_suspend_bound_know with "Hb") as "#Htb3"; first iFrame.
       iExists α. iFrame "Htb3". iPureIntro. split; auto.
     - iDestruct "Hk" as "( %&% & #Hg & %HPeq & HR & Hsa & %&%&%& Hts & Hb & Ho & Hps)".
-      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb1]") as "%"; first (iFrame "Hb Htb1").
-      iPoseProof (oblG_transfer_bound_know_bound with "[Hb Htb2]") as "%"; first (iFrame "Hb Htb2").
-      iPoseProof (oblG_transfer_bound_know with "Hb") as "#Htb3"; first iFrame.
+      iPoseProof (oblG_suspend_bound_know_bound with "[Hb Htb1]") as "%"; first (iFrame "Hb Htb1").
+      iPoseProof (oblG_suspend_bound_know_bound with "[Hb Htb2]") as "%"; first (iFrame "Hb Htb2").
+      iPoseProof (oblG_suspend_bound_know with "Hb") as "#Htb3"; first iFrame.
       iExists α. iFrame "Htb3". iPureIntro. split; auto.
   Qed.
 

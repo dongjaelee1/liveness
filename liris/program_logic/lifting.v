@@ -35,7 +35,7 @@ Global Arguments obl_pc {SI Λ Σ _}.
 
 Local Definition obl_tc_def `{SI : indexT} `{@lirisGS SI Λ Σ}
   k a : iProp Σ :=
-  oblG_transfer k a ∗ obl k.
+  oblG_suspend k a ∗ obl k.
 Local Definition obl_tc_aux : seal (@obl_tc_def). Proof. by eexists. Qed.
 Definition obl_tc := obl_tc_aux.(unseal).
 Local Definition obl_tc_unseal :
@@ -44,7 +44,7 @@ Global Arguments obl_tc {SI Λ Σ _}.
 
 Local Definition obl_bound_def `{SI : indexT} `{@lirisGS SI Λ Σ}
   k a : iProp Σ :=
-  oblG_transfer_bound k a ∗ obl k.
+  oblG_suspend_bound k a ∗ obl k.
 Local Definition obl_bound_aux : seal (@obl_bound_def). Proof. by eexists. Qed.
 Definition obl_bound := obl_bound_aux.(unseal).
 Local Definition obl_bound_unseal :
@@ -190,25 +190,25 @@ Section liveness_preds.
   Lemma obl_tc_mon k a0 a1 :
     (a0 <= a1)%ord → obl_tc k a1 ==∗ obl_tc k a0.
   Proof.
-    unfold_defs. iIntros (Hle) "(P& Be& Fe)". iFrame. by iApply oblG_transfer_mon.
+    unfold_defs. iIntros (Hle) "(P& Be& Fe)". iFrame. by iApply oblG_suspend_mon.
   Qed.
   Lemma obl_tc_split k a0 a1 :
     obl_tc k (a0 ⊕ a1)%ord ⊣⊢ obl_tc k a0 ∗ obl_tc k a1.
   Proof.
-    unfold_defs. rewrite oblG_transfer_split. iSplit.
+    unfold_defs. rewrite oblG_suspend_split. iSplit.
     - iIntros "((P1& P2)& #Be& #Fe)"; iFrame; eauto.
     - iIntros "((P1& B1& F1)& (P2& B2& F2))"; iFrame.
   Qed.
   Lemma obl_tc_eq k a0 a1 :
     (a0 == a1)%ord → obl_tc k a1 = obl_tc k a0.
   Proof.
-    unfold_defs. intros. rewrite (oblG_transfer_eq k a0 a1); auto.
+    unfold_defs. intros. rewrite (oblG_suspend_eq k a0 a1); auto.
   Qed.
   Lemma obl_tc_mon_split k a0 a1 a2 :
     ((a0 ⊕ a1) <= a2)%ord → obl_tc k a2 ==∗ obl_tc k a0 ∗ obl_tc k a1.
   Proof.
     unfold_defs. iIntros (Hle) "(P& #Be& #Fe)".
-    iMod (oblG_transfer_mon_split with "P") as "[P1 P2]"; first done.
+    iMod (oblG_suspend_mon_split with "P") as "[P1 P2]"; first done.
     iFrame; eauto.
   Qed.
 
@@ -388,7 +388,7 @@ Section liveness.
       iFrame. iPureIntro. split; done.
   Qed.
 
-  (* For ghost_step, enable allocating, progressing, transferring, resolving and waiting for obligations. *)
+  (* For ghost_step, enable allocating, progressing, suspendring, resolving and waiting for obligations. *)
   Lemma ghost_step_wait_obls E ν :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
@@ -426,7 +426,7 @@ Section liveness.
          (∃ T P α β, ∀ k,
             ⌜k ∉ Ψ⌝ -∗ othreadG_obls i ({[k]} ∪ Ψ) q -∗
             oblG_elem k -∗ oblG_goal k T P -∗
-            oblG_transfer_bound k α -∗ oblG_transfer k α -∗ oblG_progress k β -∗
+            oblG_suspend_bound k α -∗ oblG_suspend k α -∗ oblG_progress k β -∗
             othreadG_owns i k true (1/2)%Qp -∗ otreeG_elem k -∗
             |={∅,E}=> state_interp σ Θ κs ∗ ν))
     ⊢ ghost_step E ν.
@@ -463,19 +463,19 @@ Section liveness.
     iMod ("H" with "Tbs Bdk") as "[I H]". iModIntro. iFrame. iPureIntro. destruct Prog as [Prog1 Prog2].
     eapply rtc_l.
     - eapply obl_states_step_resolve; eauto.
-    - eapply rtc_l; last reflexivity. eapply obl_states_step_transfer; eauto.
+    - eapply rtc_l; last reflexivity. eapply obl_states_step_suspend; eauto.
   Qed.
 
-  Lemma ghost_step_transfer_obls_gen E ν :
+  Lemma ghost_step_suspend_obls_gen E ν :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
        ∃ π ℵ K,
-         (oblG_elem π ∗ oblG_transfer_bound π ℵ ∗
+         (oblG_elem π ∗ oblG_suspend_bound π ℵ ∗
           ([∗ map] k ↦ '(θ, ψ, α, β) ∈ K,
              ⌜(ℵ < α)%ord ∧ (Ord.O < β)%ord⌝ ∗ othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
-             oblG_elem k ∗ otreeG_elem k ∗ oblG_transfer k α ∗ oblG_transfer k β)) ∗
+             oblG_elem k ∗ otreeG_elem k ∗ oblG_suspend k α ∗ oblG_suspend k β)) ∗
          (((oblG_done π ∗
-            [∗ map] k ↦ '(θ, ψ, α, β) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_transfer k α ∗ oblG_transfer k β) ∨
+            [∗ map] k ↦ '(θ, ψ, α, β) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_suspend k α ∗ oblG_suspend k β) ∨
              ([∗ map] k ↦ '(θ, ψ, α, β) ∈ K, ∃ x, otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)%Qp)) -∗
           |={∅,E}=> state_interp σ Θ κs ∗ ν))
     ⊢ ghost_step E ν.
@@ -497,7 +497,7 @@ Section liveness.
     rewrite !big_sepM_insert; auto. destruct x as [[[θ ψ] α] β].
     iDestruct "M" as "[(%LT& #Teθ& Toi& #Bii& #Tei& Bti1& Bti2) M]". destruct LT as [LT1 LT2].
     destruct Live as [d Live].
-    iDestruct (oforest_transfer_one_tree _ _ i θ π ψ ℵ α β with "[$]")
+    iDestruct (oforest_suspend_one_tree _ _ i θ π ψ ℵ α β with "[$]")
       as "[(S& T& U& F& Toi& Bti1& Bti2& #Bdπ) | >(%&%&%Prog1& S& T& U& F& Susi)]".
     1,2: simpl; auto.
     { iPoseProof (osat_obl_is_done_weak _ π with "[S]") as "%"; first (iFrame; eauto).
@@ -507,7 +507,7 @@ Section liveness.
       - apply H0 in H3 . destruct y; try done. rewrite -H1. eauto.
       - apply H2 in H3. rewrite -H1 -H3. eauto. }
     2:{ iDestruct "H" as "(%& %Prog2& H)". iModIntro. iFrame. iPureIntro. etrans; last eauto.
-        eapply rtc_l; last reflexivity. eapply obl_states_step_transfer; eauto. }
+        eapply rtc_l; last reflexivity. eapply obl_states_step_suspend; eauto. }
     clear IHK. iSplitR; first eauto. iFrame. iIntros "M". iApply "K". iFrame.
   Qed.
 
@@ -517,7 +517,7 @@ Section liveness.
        ∃ K,
          (([∗ map] k ↦ '(θ, ψ) ∈ K,
              othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
-             ∃ a, ⌜(Ord.O < a)%ord⌝ ∗ oblG_elem k ∗ oblG_transfer k a) ∗
+             ∃ a, ⌜(Ord.O < a)%ord⌝ ∗ oblG_elem k ∗ oblG_suspend k a) ∗
           (([∗ map] k ↦ '(θ, ψ) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_progress k ψ) -∗
            |={∅,E}=> state_interp σ Θ κs ∗ ν)))
     ⊢ ghost_step E ν.
@@ -535,7 +535,7 @@ Section liveness.
     { iFrame. auto. }
     destruct H0 as [Prog1 DecC]. iMod (IHK Ω' with "[-]") as "H".
     2:{ iDestruct "H" as "(%& %Prog2& H)". iModIntro. iFrame. iPureIntro. etrans; last eauto.
-        eapply rtc_l; last reflexivity. eapply obl_states_step_transfer; eauto. }
+        eapply rtc_l; last reflexivity. eapply obl_states_step_suspend; eauto. }
     clear IHK. assert (dom Ω' = dom Ω).
     { apply obl_states_cond_rel_dom in Prog1. auto. }
     rewrite -!H0. iFrame. iIntros "M". iApply "K". iFrame.
@@ -807,7 +807,7 @@ Section liveness.
     iFrame. iFrame "Tei". iPoseProof (big_sepS_delete _ _ k with "Es") as "[_ Es2]"; auto.
   Qed.
 
-  Lemma lwp_transfer_obls_gen s i E e Φ :
+  Lemma lwp_suspend_obls_gen s i E e Φ :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
        ∃ π ℵ K,
@@ -821,7 +821,7 @@ Section liveness.
     ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof.
     unfold_defs.
-    iIntros "H". iApply ghost_step_elim. iApply ghost_step_transfer_obls_gen.
+    iIntros "H". iApply ghost_step_elim. iApply ghost_step_suspend_obls_gen.
     iIntros (???) "I".
     iMod ("H" with "I") as "(%&%&%& ((#Btbp& #Bep& #Fep)& M)& H)".
     iModIntro. iExists π, ℵ, K. iFrame "Bep Btbp".

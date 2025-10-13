@@ -95,7 +95,7 @@ Section lwp_step.
 End lwp_step.
 
 (** Modality for updating obligation state. *)
-(* Can allocate, transfer, progress, or fulfills obligations. Note this has no later modality. *)
+(* Can allocate, suspend, progress, or fulfills obligations. Note this has no later modality. *)
 Definition ghost_step `{SI : indexT} `{!lirisGS Λ Σ} (E : coPset)
   (ν : iPropO Σ) : iPropO Σ :=
   (∀ (Ω : obl_states) (Θ : thread_ids) σ κs,
