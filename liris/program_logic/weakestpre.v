@@ -603,36 +603,41 @@ Proof.
 Qed.
 
 (** * Derived rules *)
-Lemma lwp_mono s i E e Φ Ψ : (∀ v, Φ v ⊢ Ψ v) → lWP e @ s; i; E {{ Φ }} ⊢ lWP e @ s; i; E {{ Ψ }}.
+Lemma lwp_mono s ς i E e Φ Ψ : (∀ v, Φ v ⊢ Ψ v) → lWP e @ s; ς; i; E {{ Φ }} ⊢ lWP e @ s; ς; i; E {{ Ψ }}.
 Proof.
   iIntros (HΦ) "H"; iApply (lwp_strong_mono with "H"); auto.
   iIntros (v) "?". by iApply HΦ.
 Qed.
-Lemma lwp_stuck_mono s1 s2 i E e Φ :
-  s1 ⊑ s2 → lWP e @ s1; i; E {{ Φ }} ⊢ lWP e @ s2; i; E {{ Φ }}.
+Lemma lwp_stuck_mono s1 s2 ς i E e Φ :
+  s1 ⊑ s2 → lWP e @ s1; ς; i; E {{ Φ }} ⊢ lWP e @ s2; ς; i; E {{ Φ }}.
 Proof. iIntros (?) "H". iApply (lwp_strong_mono with "H"); auto. Qed.
-Lemma lwp_stuck_weaken s i E e Φ :
-  lWP e @ s; i; E {{ Φ }} ⊢ lWP e @ i; E ?{{ Φ }}.
+Lemma lwp_stuck_weaken s ς i E e Φ :
+  lWP e @ s; ς; i; E {{ Φ }} ⊢ lWP e @ ς; i; E ?{{ Φ }}.
 Proof. apply lwp_stuck_mono. by destruct s. Qed.
-Lemma lwp_mask_mono s i E1 E2 e Φ : E1 ⊆ E2 → lWP e @ s; i; E1 {{ Φ }} ⊢ lWP e @ s; i; E2 {{ Φ }}.
+Lemma lwp_mask_mono s ς i E1 E2 e Φ : E1 ⊆ E2 → lWP e @ s; ς; i; E1 {{ Φ }} ⊢ lWP e @ s; ς; i; E2 {{ Φ }}.
 Proof. iIntros (?) "H"; iApply (lwp_strong_mono with "H"); auto. Qed.
-Global Instance lwp_mono' s i E e :
-  Proper (pointwise_relation _ (⊢) ==> (⊢)) (lwp (PROP:=iProp Σ) s i E e).
+Global Instance lwp_mono' s ς i E e :
+  Proper (pointwise_relation _ (⊢) ==> (⊢)) (lwp (PROP:=iProp Σ) s ς i E e).
 Proof. by intros Φ Φ' ?; apply lwp_mono. Qed.
-Global Instance lwp_flip_mono' s i E e :
-  Proper (pointwise_relation _ (flip (⊢)) ==> (flip (⊢))) (lwp (PROP:=iProp Σ) s i E e).
+Global Instance lwp_flip_mono' s ς i E e :
+  Proper (pointwise_relation _ (flip (⊢)) ==> (flip (⊢))) (lwp (PROP:=iProp Σ) s ς i E e).
 Proof. by intros Φ Φ' ?; apply lwp_mono. Qed.
 
-Lemma lwp_value_fupd s i E Φ e v : IntoVal e v → lWP e @ s; i; E {{ Φ }} ⊣⊢ ghost_step E (Φ v).
+Lemma lwp_value_fupd s ς i E Φ e v : IntoVal e v → lWP e @ s; ς; i; E {{ Φ }} ⊣⊢ (ς -∗ ghost_step E (Φ v)).
 Proof. intros <-. by apply lwp_value_fupd'. Qed.
-Lemma lwp_value' s i E Φ v : Φ v ⊢ lWP (of_val v) @ s; i; E {{ Φ }}.
-Proof. rewrite lwp_value_fupd'. apply ghost_step_intro. Qed.
-Lemma lwp_value s i E Φ e v : IntoVal e v → Φ v ⊢ lWP e @ s; i; E {{ Φ }}.
+Lemma lwp_value' s ς i E Φ v : (ς -∗ Φ v) ⊢ lWP (of_val v) @ s; ς; i; E {{ Φ }}.
+Proof.
+  rewrite lwp_value_fupd'. iIntros "H Hc".
+  iPoseProof ("H" with "Hc") as "Hc". iStopProof. apply ghost_step_intro.
+Qed.
+Lemma lwp_value s ς i E Φ e v : IntoVal e v → (ς -∗ Φ v) ⊢ lWP e @ s; ς; i; E {{ Φ }}.
 Proof. intros <-. apply lwp_value'. Qed.
 
-Lemma lwp_frame_l s i E e Φ R : R ∗ lWP e @ s; i; E {{ Φ }} ⊢ lWP e @ s; i; E {{ v, R ∗ Φ v }}.
+Lemma lwp_frame_l s ς i E e Φ R :
+  R ∗ lWP e @ s; ς; i; E {{ Φ }} ⊢ lWP e @ s; ς; i; E {{ v, R ∗ Φ v }}.
 Proof. iIntros "[? H]". iApply (lwp_strong_mono with "H"); auto with iFrame. Qed.
-Lemma lwp_frame_r s i E e Φ R : lWP e @ s; i; E {{ Φ }} ∗ R ⊢ lWP e @ s; i; E {{ v, Φ v ∗ R }}.
+Lemma lwp_frame_r s ς i E e Φ R :
+  lWP e @ s; ς; i; E {{ Φ }} ∗ R ⊢ lWP e @ s; ς; i; E {{ v, Φ v ∗ R }}.
 Proof. iIntros "[H ?]". iApply (lwp_strong_mono with "H"); auto with iFrame. Qed.
 
 (** This lemma states that if we can prove that [n] laters are used in
@@ -642,11 +647,11 @@ Proof. iIntros "[H ?]". iApply (lwp_strong_mono with "H"); auto with iFrame. Qed
    the lWP or in the proof of the n-steps fancy update. In order to
    describe this unusual resource flow, we use ordinary conjunction as
    a premise. *)
-Lemma lwp_step_fupd_2 s i E1 E2 e P Φ :
+Lemma lwp_step_fupd_2 s ς i E1 E2 e P Φ :
   TCEq (to_val e) None → E2 ⊆ E1 →
   ((|={E1∖E2,∅}=> |={∅,E1∖E2}=> P) ∗
-   lWP e @ s; i; E2 {{ v, P ={E1}=∗ Φ v }}) -∗
-  lWP e @ s; i; E1 {{ Φ }}.
+   lWP e @ s; ς; i; E2 {{ v, P ={E1}=∗ Φ v }}) -∗
+  lWP e @ s; ς; i; E1 {{ Φ }}.
 Proof.
   iIntros (??) "H". iApply (lwp_step_fupd with "[H]"); [done|].
   iApply (sep_mono_l with "H"). iIntros "HP".
@@ -657,41 +662,43 @@ Proof.
   by rewrite difference_empty_L (comm_L (∪)) -union_difference_L.
 Qed.
 
-Lemma lwp_frame_step_l s i E1 E2 e Φ R :
+Lemma lwp_frame_step_l s ς i E1 E2 e Φ R :
   TCEq (to_val e) None → E2 ⊆ E1 →
-  (|={E1,E2}=> |={E2,E1}=> R) ∗ lWP e @ s; i; E2 {{ Φ }} ⊢ lWP e @ s; i; E1 {{ v, R ∗ Φ v }}.
+  (|={E1,E2}=> |={E2,E1}=> R) ∗ lWP e @ s; ς; i; E2 {{ Φ }} ⊢ lWP e @ s; ς; i; E1 {{ v, R ∗ Φ v }}.
 Proof.
   iIntros (??) "[Hu Hwp]". iApply lwp_step_fupd; first done.
   iFrame "Hu". iApply (lwp_mono with "Hwp"). by iIntros (?) "$$".
 Qed.
-Lemma lwp_frame_step_r s i E1 E2 e Φ R :
+Lemma lwp_frame_step_r s ς i E1 E2 e Φ R :
   TCEq (to_val e) None → E2 ⊆ E1 →
-  lWP e @ s; i; E2 {{ Φ }} ∗ (|={E1,E2}=> |={E2,E1}=> R) ⊢ lWP e @ s; i; E1 {{ v, Φ v ∗ R }}.
+  lWP e @ s; ς; i; E2 {{ Φ }} ∗ (|={E1,E2}=> |={E2,E1}=> R) ⊢ lWP e @ s; ς; i; E1 {{ v, Φ v ∗ R }}.
 Proof.
-  rewrite [(lWP _ @ _; _; _ {{ _ }} ∗ _)%I]comm; setoid_rewrite (comm _ _ R).
+  rewrite [(lWP _ @ _; _; _; _ {{ _ }} ∗ _)%I]comm; setoid_rewrite (comm _ _ R).
   apply lwp_frame_step_l.
 Qed.
-Lemma lwp_frame_step_l' s i E e Φ R :
-  TCEq (to_val e) None → R ∗ lWP e @ s; i; E {{ Φ }} ⊢ lWP e @ s; i; E {{ v, R ∗ Φ v }}.
-Proof. iIntros (?) "[??]". iApply (lwp_frame_step_l s i E E); try iFrame; eauto. Qed.
-Lemma lwp_frame_step_r' s i E e Φ R :
-  TCEq (to_val e) None → lWP e @ s; i; E {{ Φ }} ∗ R ⊢ lWP e @ s; i; E {{ v, Φ v ∗ R }}.
-Proof. iIntros (?) "[??]". iApply (lwp_frame_step_r s i E E); try iFrame; eauto. Qed.
+Lemma lwp_frame_step_l' s ς i E e Φ R :
+  TCEq (to_val e) None →
+  R ∗ lWP e @ s; ς; i; E {{ Φ }} ⊢ lWP e @ s; ς; i; E {{ v, R ∗ Φ v }}.
+Proof. iIntros (?) "[??]". iApply (lwp_frame_step_l s ς i E E); try iFrame; eauto. Qed.
+Lemma lwp_frame_step_r' s ς i E e Φ R :
+  TCEq (to_val e) None →
+  lWP e @ s; ς; i; E {{ Φ }} ∗ R ⊢ lWP e @ s; ς; i; E {{ v, Φ v ∗ R }}.
+Proof. iIntros (?) "[??]". iApply (lwp_frame_step_r s ς i E E); try iFrame; eauto. Qed.
 
-Lemma lwp_wand s i E e Φ Ψ :
-  lWP e @ s; i; E {{ Φ }} -∗ (∀ v, Φ v -∗ Ψ v) -∗ lWP e @ s; i; E {{ Ψ }}.
+Lemma lwp_wand s ς i E e Φ Ψ :
+  lWP e @ s; ς; i; E {{ Φ }} -∗ (∀ v, Φ v -∗ Ψ v) -∗ lWP e @ s; ς; i; E {{ Ψ }}.
 Proof.
   iIntros "Hwp H". iApply (lwp_strong_mono with "Hwp"); auto.
   iIntros (?) "?". by iApply "H".
 Qed.
-Lemma lwp_wand_l s i E e Φ Ψ :
-  (∀ v, Φ v -∗ Ψ v) ∗ lWP e @ s; i; E {{ Φ }} ⊢ lWP e @ s; i; E {{ Ψ }}.
+Lemma lwp_wand_l s ς i E e Φ Ψ :
+  (∀ v, Φ v -∗ Ψ v) ∗ lWP e @ s; ς; i; E {{ Φ }} ⊢ lWP e @ s; ς; i; E {{ Ψ }}.
 Proof. iIntros "[H Hwp]". iApply (lwp_wand with "Hwp H"). Qed.
-Lemma lwp_wand_r s i E e Φ Ψ :
-  lWP e @ s; i; E {{ Φ }} ∗ (∀ v, Φ v -∗ Ψ v) ⊢ lWP e @ s; i; E {{ Ψ }}.
+Lemma lwp_wand_r s ς i E e Φ Ψ :
+  lWP e @ s; ς; i; E {{ Φ }} ∗ (∀ v, Φ v -∗ Ψ v) ⊢ lWP e @ s; ς; i; E {{ Ψ }}.
 Proof. iIntros "[Hwp H]". iApply (lwp_wand with "Hwp H"). Qed.
-Lemma lwp_frame_wand s i E e Φ R :
-  R -∗ lWP e @ s; i; E {{ v, R -∗ Φ v }} -∗ lWP e @ s; i; E {{ Φ }}.
+Lemma lwp_frame_wand s ς i E e Φ R :
+  R -∗ lWP e @ s; ς; i; E {{ v, R -∗ Φ v }} -∗ lWP e @ s; ς; i; E {{ Φ }}.
 Proof.
   iIntros "HR HWP". iApply (lwp_wand with "HWP").
   iIntros (v) "HΦ". by iApply "HΦ".
@@ -707,89 +714,91 @@ Section proofmode_classes.
   Implicit Types v : val Λ.
   Implicit Types e : expr Λ.
 
-  Global Instance frame_lwp p s i E e R Φ Ψ :
+  Global Instance frame_lwp p s ς i E e R Φ Ψ :
     (FrameInstantiateExistDisabled → ∀ v, Frame p R (Φ v) (Ψ v)) →
-    Frame p R (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Ψ }}) | 2.
+    Frame p R (lWP e @ s; ς; i; E {{ Φ }}) (lWP e @ s; ς; i; E {{ Ψ }}) | 2.
   Proof.
     rewrite /Frame=> HR. rewrite lwp_frame_l. apply lwp_mono, HR. constructor.
   Qed.
 
-  Global Instance is_except_0_lwp s i E e Φ : IsExcept0 (lWP e @ s; i; E {{ Φ }}).
+  Global Instance is_except_0_lwp s ς i E e Φ : IsExcept0 (lWP e @ s; ς; i; E {{ Φ }}).
   Proof. by rewrite /IsExcept0 -{2}fupd_lwp -except_0_fupd -fupd_intro. Qed.
 
-  Global Instance elim_modal_bupd_lwp p s i E e P Φ :
-    ElimModal True p false (|==> P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}).
+  Global Instance elim_modal_bupd_lwp p s ς i E e P Φ :
+    ElimModal True p false (|==> P) P (lWP e @ s; ς; i; E {{ Φ }}) (lWP e @ s; ς; i; E {{ Φ }}).
   Proof.
     by rewrite /ElimModal intuitionistically_if_elim
       (bupd_fupd E) fupd_frame_r wand_elim_r fupd_lwp.
   Qed.
 
-  Global Instance elim_modal_fupd_lwp p s i E e P Φ :
-    ElimModal True p false (|={E}=> P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}).
+  Global Instance elim_modal_fupd_lwp p s ς i E e P Φ :
+    ElimModal True p false (|={E}=> P) P (lWP e @ s; ς; i; E {{ Φ }}) (lWP e @ s; ς; i; E {{ Φ }}).
   Proof.
     by rewrite /ElimModal intuitionistically_if_elim
       fupd_frame_r wand_elim_r fupd_lwp.
   Qed.
+
   (** Error message instance for non-mask-changing view shifts.
   Also uses a slightly different error: we cannot apply [fupd_mask_subseteq]
   if [e] is not atomic, so we tell the user to first add a leading [fupd]
   and then change the mask of that. *)
-  Global Instance elim_modal_fupd_lwp_wrong_mask p s i E1 E2 e P Φ :
+  Global Instance elim_modal_fupd_lwp_wrong_mask p s ς i E1 E2 e P Φ :
     ElimModal
       (pm_error "Goal and eliminated modality must have the same mask.
 Use [iApply fupd_lwp; iMod (fupd_mask_subseteq E2)] to adjust the mask of your goal to [E2]")
       p false
-      (|={E2}=> P) False (lWP e @ s; i; E1 {{ Φ }}) False | 100.
+      (|={E2}=> P) False (lWP e @ s; ς; i; E1 {{ Φ }}) False | 100.
   Proof. intros []. Qed.
 
-  Global Instance elim_modal_fupd_lwp_atomic p s i E1 E2 e P Φ :
+  Global Instance elim_modal_fupd_lwp_atomic p s ς i E1 E2 e P Φ :
     ElimModal (Atomic (stuckness_to_atomicity s) e) p false
             (|={E1,E2}=> P) P
-            (lWP e @ s; i; E1 {{ Φ }}) (lWP e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})%I | 100.
+            (lWP e @ s; ς; i; E1 {{ Φ }}) (lWP e @ s; ς; i; E2 {{ v, |={E2,E1}=> Φ v }})%I | 100.
   Proof.
     intros ?. by rewrite intuitionistically_if_elim
       fupd_frame_r wand_elim_r lwp_atomic.
   Qed.
+
   (** Error message instance for mask-changing view shifts. *)
-  Global Instance elim_modal_fupd_lwp_atomic_wrong_mask p s i E1 E2 E2' e P Φ :
+  Global Instance elim_modal_fupd_lwp_atomic_wrong_mask p s ς i E1 E2 E2' e P Φ :
     ElimModal
       (pm_error "Goal and eliminated modality must have the same mask.
 Use [iMod (fupd_mask_subseteq E2)] to adjust the mask of your goal to [E2]")
       p false
       (|={E2,E2'}=> P) False
-      (lWP e @ s; i; E1 {{ Φ }}) False | 200.
+      (lWP e @ s; ς; i; E1 {{ Φ }}) False | 200.
   Proof. intros []. Qed.
 
-  Global Instance elim_modal_ghost_step_lwp p s i E e P Φ :
-    ElimModal True p false (ghost_step E P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}).
+  Global Instance elim_modal_ghost_step_lwp p s ς i E e P Φ :
+    ElimModal True p false (ghost_step E P) P (lWP e @ s; ς; i; E {{ Φ }}) (lWP e @ s; ς; i; E {{ Φ }}).
   Proof.
     rewrite /ElimModal intuitionistically_if_elim. iIntros (?) "[H1 H2]".
     iApply ghost_step_elim. iApply (ghost_step_mono with "H2 H1").
   Qed.
 
-  Global Instance add_modal_fupd_lwp s i E e P Φ :
-    AddModal (|={E}=> P) P (lWP e @ s; i; E {{ Φ }}).
+  Global Instance add_modal_fupd_lwp s ς i E e P Φ :
+    AddModal (|={E}=> P) P (lWP e @ s; ς; i; E {{ Φ }}).
   Proof. by rewrite /AddModal fupd_frame_r wand_elim_r fupd_lwp. Qed.
 
-  Global Instance add_modal_ghost_step_lwp s i E e P Φ :
-    AddModal (ghost_step E P) P (lWP e @ s; i; E {{ Φ }}).
+  Global Instance add_modal_ghost_step_lwp s ς i E e P Φ :
+    AddModal (ghost_step E P) P (lWP e @ s; ς; i; E {{ Φ }}).
   Proof. rewrite /AddModal. iIntros "[H1 H2]". iMod "H1". by iApply "H2". Qed.
 
-  Global Instance elim_acc_lwp_atomic {X} i E1 E2 α β γ e s Φ :
+  Global Instance elim_acc_lwp_atomic {X} ς i E1 E2 α β γ e s Φ :
     ElimAcc (X:=X) (Atomic (stuckness_to_atomicity s) e)
             (fupd E1 E2) (fupd E2 E1)
-            α β γ (lWP e @ s; i; E1 {{ Φ }})
-            (λ x, lWP e @ s; i; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I | 100.
+            α β γ (lWP e @ s; ς; i; E1 {{ Φ }})
+            (λ x, lWP e @ s; ς; i; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I | 100.
   Proof.
     iIntros (?) "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
     iApply (lwp_wand with "(Hinner Hα)").
     iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
   Qed.
 
-  Global Instance elim_acc_lwp_nonatomic {X} i E α β γ e s Φ :
+  Global Instance elim_acc_lwp_nonatomic {X} ς i E α β γ e s Φ :
     ElimAcc (X:=X) True (fupd E E) (fupd E E)
-            α β γ (lWP e @ s; i; E {{ Φ }})
-            (λ x, lWP e @ s; i; E {{ v, |={E}=> β x ∗ (γ x -∗? Φ v) }})%I.
+            α β γ (lWP e @ s; ς; i; E {{ Φ }})
+            (λ x, lWP e @ s; ς; i; E {{ v, |={E}=> β x ∗ (γ x -∗? Φ v) }})%I.
   Proof.
     iIntros (_) "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
     iApply lwp_fupd.
