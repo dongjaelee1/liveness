@@ -2081,6 +2081,53 @@ Section otree.
       iFrame. iModIntro. iRight. by iFrame.
   Qed.
 
+  Lemma oforest_wait_or_done_red Ω D π
+    (κ : gmap obl_id (positive * positive * A * iProp Σ)) :
+    osat Ω ∗ osuspend D ∗ oforest D ∗
+    (* from user *)
+    oblG_elem π ∗ otreeG_elem π ∗
+    ([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
+       (P ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)) ∨
+         (oblG_done π ∗ othreadG_owns θ k true (1/2) ∗ oblG_progress k ψ)
+    )
+    ⊢ |==> osat Ω ∗ osuspend D ∗ oforest D ∗
+           (([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
+               (P ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2))) ∨
+              ([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
+                 (oblG_done π ∗ othreadG_owns θ k true (1/2) ∗ oblG_progress k ψ))
+           ).
+  Proof.
+    induction κ using map_ind; iIntros "(S& U& F& #Beπ& #Feπ& M)".
+    { iFrame. rewrite !big_sepM_empty. by iLeft. }
+    rewrite !big_sepM_insert; auto. destruct x as [[[x θ] ψ] P].
+    iDestruct "M" as "(Mi& M)". iMod (IHκ with "[$S $U $F $Beπ $Feπ $M]") as "(S&U&F&M)". clear IHκ.
+    iDestruct "M" as "[M | M]".
+    - iDestruct "Mi" as "[(HP& #Fei& #Fsi& Fwi) | (#Bdπ& Toi& Bpi)]".
+      + iModIntro. iFrame "S U F". iLeft. iFrame. eauto.
+      + remember (fst <$> m) as K.
+        iAssert (
+            ([∗ map] k↦'(x0, θ0, ψ0) ∈ K, otreeG_elem k ∗ otreeG_suspend k x0 θ0 π ψ0 ∗ otreeG_wait k x0 (1 / 2)) ∗
+            ([∗ map] k↦'(x0, θ0, ψ0, P0) ∈ m, P0)
+          )%I with "[M]" as "[M MR]".
+        { subst K. rewrite !big_sepM_fmap -big_sepM_sep. iApply (big_sepM_impl with "M").
+          iIntros "!>" (???) "H". destruct x0 as [[[? ?] ?] ? ]. simpl.
+          iDestruct "H" as "($&$&$&$)". }
+        iMod (osuspend_wait_cases_many_done with "[$U $F $Feπ $Bdπ $M]") as "(U&F&M)".
+        iModIntro. iFrame "S U F". iRight. iFrame. iSplitR; first eauto.
+        subst K. rewrite !big_sepM_fmap. iPoseProof (big_sepM_sep_2 with "MR M") as "M".
+        iApply (big_sepM_impl with "M"). iIntros "!>" (???) "H". destruct x0 as [[[? ?] ? ] ?].
+        iDestruct "H" as "(_& $& $)". eauto.
+    - iDestruct "Mi" as "[(HP& #Fei& #Fsi& Fwi) | (#Bdπ& Toi& Bpi)]".
+      + destruct (map_choose_or_empty m).
+        * destruct H2 as (?& ?& ?). destruct x1 as [[[? ?] ? ]?].
+          iPoseProof (big_sepM_lookup_acc _ _ _ _ H2 with "M") as "[(#Bdπ & Mx) M]".
+          iPoseProof ("M" with "[$Bdπ $Mx]") as "M".
+          iMod (oforest_done_suspend with "[$U $F $Fwi]") as "(U& F& Toi& Bpi)"; first eauto.
+          iModIntro. iFrame "S U F". iRight. iFrame. auto.
+        * subst. iModIntro. iFrame "S U F". iLeft. rewrite !big_sepM_empty. iFrame. auto.
+      + iModIntro. iFrame "S U F". iRight. iFrame. auto.
+  Qed.
+
   (* Convert a suspend credit to progress credits *)
   Lemma oforest_aux_get_progress_one Ω TP Φ θ k kt a ψ :
     /0 /< a →
