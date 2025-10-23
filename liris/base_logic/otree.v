@@ -2128,6 +2128,8 @@ Section otree.
       + iModIntro. iFrame "S U F". iRight. iFrame. auto.
   Qed.
 
+  (* TODO thread's view of it's obligation: owned, suspended, maybe *)
+
   (* Convert a suspend credit to progress credits *)
   Lemma oforest_aux_get_progress_one Ω TP Φ θ k kt a ψ :
     /0 /< a →
