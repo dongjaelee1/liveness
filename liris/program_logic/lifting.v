@@ -1297,7 +1297,7 @@ Qed.
 Class PureExecCond (C : thread_id → state Λ → Prop) ς (i : thread_id) :=
   pure_exec_cond : ∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝.
 
-Lemma lwp_pure_step_fupd `{!Inhabited (state Λ)} s ς i E e1 e2 φ n Φ C :
+Lemma lwp_pure_step `{!Inhabited (state Λ)} s ς i E e1 e2 φ n Φ C :
   PureExec φ C n e1 e2 →
   φ →
   PureExecCond C ς i →
@@ -1314,7 +1314,7 @@ Proof.
   - by iApply "IH".
 Qed.
 
-Lemma lwp_pure_step_fupd_lc `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ C :
+Lemma lwp_pure_step_lc `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ C :
   PureExec φ C n e1 e2 →
   φ →
   PureExecCond C ς i →
@@ -1346,7 +1346,7 @@ Proof.
     + iIntros "H1 H2". iApply "H1". iApply tlc_succ_nat. iFrame.
 Qed.
 
-Lemma lwp_pure_step_fupd_suspended `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ C :
+Lemma lwp_pure_step_suspended `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ C :
   PureExec φ C n e1 e2 →
   φ →
   PureExecCond C ς i →
@@ -1382,7 +1382,7 @@ Proof.
     + iIntros "H1 H2". iApply "H1". iApply tlc_succ_nat. iFrame.
 Qed.
 
-Lemma lwp_pure_step_fupd_gen (glc : get_lc) `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ C :
+Lemma lwp_pure_step_gen (glc : get_lc) `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ C :
   PureExec φ C n e1 e2 →
   φ →
   PureExecCond C ς i →
@@ -1413,9 +1413,9 @@ Lemma lwp_pure_step_fupd_gen (glc : get_lc) `{!Inhabited (state Λ)} s ς i E E'
   ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
 Proof.
   destruct glc.
-  - apply lwp_pure_step_fupd.
-  - apply lwp_pure_step_fupd_lc.
-  - apply lwp_pure_step_fupd_suspended.
+  - apply lwp_pure_step.
+  - apply lwp_pure_step_lc.
+  - apply lwp_pure_step_suspended.
 Qed.
 
 End lifting.
