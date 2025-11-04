@@ -262,28 +262,36 @@ End liveness_preds.
 
 Section liveness.
 
+  (* From a thread's view, its obligation has the following life cycle:
+     owned -> suspended -> returned -> owned -> ... -> resolved
+   *)
+  Variant obl_thread_view : Type :=
+    | owned_otv (q : Qp)
+    | suspended_otv (x : positive) (π : obl_id) (ψ : Ord.t) (β : Ord.t)
+    | returned_otv (q : Qp) (π : obl_id) (ψ : Ord.t).
+
   (* For lwp_step, enable progress and fork. *)
-  Lemma lwp_step_progress_no_lc s i E e1 ν :
+  Lemma lwp_step_pc s i E e1 ν :
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-       ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                    ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
-                    |={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs)
+       ∃ π Ψ K,
+         (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_progress ρ Ord.one) ∗
+          ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
+         ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                      othreadG_obls i Ψ 1 -∗
+                      ((([∗ set] ρ ∈ Ψ, oblG_progress ρ Ord.one) ∗
+                        ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
+                         (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_progress k ψ))) -∗
+                      ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
+                      ALC (|={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs))
     ⊢ lwp_step s i E e1 ν.
   Proof.
-    rewrite /lwp_step. iIntros "H % % % % % I". iDestruct "I" as "(S& T& U& F& I)".
-    iMod ("H" with "I") as "(%Hstuck& H)".
-    iModIntro. iSplitR; first done.
-    iExists Ω1. iSplitR; first done.
-    iIntros (??? Hstep). iModIntro. iExists false.
-    iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
-    { symmetry. eapply fork_thread_ids; eauto. }
-    iMod ("H" with "[//] Efs") as "[I H]". iModIntro. iExists Ω1, Ω1.
-    iFrame. iPureIntro. split; done.
-  Qed.
 
-  Lemma lwp_step_progress_get_lc_with_obls s i E e1 ν :
+
+
+  Lemma lwp_step_account_pc s i E e1 ν :
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
@@ -308,14 +316,13 @@ Section liveness.
     rewrite big_sepM_gset_to_gmap.
     iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
     { symmetry. eapply fork_thread_ids; eauto. }
-    iModIntro. iExists true.
-    iMod ("H" with "[//] Tbsi Tos Efs") as ">[I H]".
-    iModIntro. iExists Ω', Ω'.
+    iModIntro. iMod ("H" with "[//] Tbsi Tos Efs") as ">[I H]".
+    iModIntro. iExists Ω1, Ω', Ω'.
     assert (dom Ω1 = dom Ω') by (eapply obl_states_cond_rel_dom; eauto). rewrite !H.    
     iFrame. iPureIntro. split; done.
   Qed.
 
-  Lemma lwp_step_progress_get_lc_suspended_obls s i E e1 ν :
+  Lemma lwp_step_suspended_pc s i E e1 ν :
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
@@ -357,12 +364,11 @@ Section liveness.
         iApply (big_sepM_impl with "Fs"). iIntros "!>" (???) "H". by destruct x. }
       iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
       { symmetry. eapply fork_thread_ids; eauto. }
-      iExists true. iModIntro.
-      iMod ("H" with "[//] Tbsi [Bps Fws] Efs") as ">[I H]".
+      iModIntro. iMod ("H" with "[//] Tbsi [Bps Fws] Efs") as ">[I H]".
       { iLeft. iSplitR "Fws".
         - iPoseProof (big_sepS_sep with "Bps") as "[H1 H2]". iFrame.
         - iApply (big_sepM_impl with "Fws"). iIntros "!>" (???) "H". by destruct x. }
-      iModIntro. iExists Ω', Ω'.
+      iModIntro. iExists Ω1, Ω', Ω'.
       assert (dom Ω1 = dom Ω') by (eapply obl_states_cond_rel_dom; eauto). rewrite !H.    
       iFrame. iPureIntro. split; done.
     - rewrite !big_sepM_fmap.
@@ -381,12 +387,11 @@ Section liveness.
       iPoseProof (big_sepM_gset_to_gmap with "Fos") as "Fos".
       iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
       { symmetry. eapply fork_thread_ids; eauto. }
-      iModIntro. iExists true.
-      iMod ("H" with "[//] Tbsi [Bps Fos] Efs") as ">[I H]".
+      iModIntro. iMod ("H" with "[//] Tbsi [Bps Fos] Efs") as ">[I H]".
       { iRight. iSplitR; first auto. subst Ψ. rewrite -big_sepM_dom.
         iPoseProof (big_sepM_sep_2 with "Fos Bps") as "H".
         iApply (big_sepM_impl with "H"). iIntros "!>" (???) "H". by destruct x. }
-      iModIntro. iExists Ω', Ω'.
+      iModIntro. iExists Ω1, Ω', Ω'.
       assert (dom Ω1 = dom Ω') by (eapply obl_states_cond_rel_dom; eauto). rewrite !H.    
       iFrame. iPureIntro. split; done.
   Qed.
