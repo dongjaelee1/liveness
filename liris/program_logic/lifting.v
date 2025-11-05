@@ -262,15 +262,6 @@ End liveness_preds.
 
 Section liveness.
 
-  (* From a thread's view, its obligation has the following life cycle:
-     owned -> suspended -> returned -> owned -> ... -> resolved.
-     We can wrap this for loops: owned -> (suspended \/ returned) -> owned -> ...
-   *)
-  Variant obl_thread_view : Type :=
-    | owned_otv (q : Qp)
-    | suspended_otv (x : positive) (π : obl_id) (ψ : Ord.t) (β : Ord.t)
-    | returned_otv (q : Qp) (π : obl_id) (ψ : Ord.t).
-
   TODO
 
   (* For lwp_step, enable progress and fork. *)

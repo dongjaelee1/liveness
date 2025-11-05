@@ -133,6 +133,31 @@ Definition oforest `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
   (D : gset obl_id) : iProp Σ :=
   locked (∃ (OForest : forest obl_id), oforest_aux D OForest)%I.
 
+(* From a thread's view, its obligation has the following life cycle:
+     owned -> suspended -> returned -> owned -> ... -> resolved.
+     We can wrap this for loops: owned -> (suspended \/ returned) -> owned -> ...
+ *)
+Variant thread_view_obl {A : Type} `{WFA : WFOCM.pack A} : Type :=
+  | tvo_owned (q : Qp)
+  | tvo_suspended (x : positive) (π : obl_id) (ψ : A) (α : A)
+  | tvo_returned (q : Qp) (π : obl_id) (ψ : A) (α : A).
+
+Definition threadG_tvos `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS A Σ}
+  (i : positive) (f : Qp) (Δ : gmap obl_id (thread_view_obl (WFA:=WFA))) : iProp Σ :=
+  locked
+    (othreadG_obls i (dom Δ) f ∗
+     [∗ map] k ↦ v ∈ Δ,
+       oblG_elem k ∗ otreeG_elem k ∗
+       match v with
+       | tvo_owned q =>
+           othreadG_owns i k true q
+       | tvo_suspended x π ψ α =>
+           otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2) ∗ oblG_elem π ∗ otreeG_elem π ∗ oblG_progress k α
+       | tvo_returned q π ψ α =>
+           othreadG_owns i k true q ∗ oblG_elem π ∗ otreeG_elem π ∗ oblG_done π ∗ oblG_progress k ψ ∗ oblG_progress k α
+       end)%I.
+
 Section otree.
   Context `{SI : indexT} `{WFA : WFOCM.pack A}.
   Context {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS A Σ}.
@@ -2081,7 +2106,7 @@ Section otree.
       iFrame. iModIntro. iRight. by iFrame.
   Qed.
 
-  Lemma oforest_wait_or_done_red Ω D π
+  Lemma oforest_big_wait_or_done_comm Ω D π
     (κ : gmap obl_id (positive * positive * A * iProp Σ)) :
     osat Ω ∗ osuspend D ∗ oforest D ∗
     (* from user *)
@@ -2127,8 +2152,6 @@ Section otree.
         * subst. iModIntro. iFrame "S U F". iLeft. rewrite !big_sepM_empty. iFrame. auto.
       + iModIntro. iFrame "S U F". iRight. iFrame. auto.
   Qed.
-
-  (* TODO thread's view of it's obligation: owned, suspended, maybe *)
 
   (* Convert a suspend credit to progress credits *)
   Lemma oforest_aux_get_progress_one Ω TP Φ θ k kt a ψ :
@@ -2335,6 +2358,78 @@ Section otree.
     { iPureIntro. split; first eauto. intros. destruct (decide (node kt k0)); auto. }
     rewrite -lock. iFrame.
   Qed.
+
+  (* Rules for updating thread view *)
+  Lemma threadG_tvos_step Ω TP i f Δ (γ : gmap  :
+    osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗
+    (* from user *)
+    othreadG_elem i ∗ threadG_tvos i f Δ ∗
+    
+
+  TODO
+Definition threadG_tvos `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS A Σ}
+  (i : positive) (f : Qp) (Δ : gmap obl_id (thread_view_obl (WFA:=WFA))) : iProp Σ :=
+  locked
+    (othreadG_obls i (dom Δ) f ∗
+     [∗ map] k ↦ v ∈ Δ,
+       oblG_elem k ∗ otreeG_elem k ∗
+       match v with
+       | tvo_owned q =>
+           othreadG_owns i k true q
+       | tvo_suspended x π ψ α =>
+           otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2) ∗ oblG_elem π ∗ otreeG_elem π ∗ oblG_progress k α
+       | tvo_returned q π ψ α =>
+           othreadG_owns i k true q ∗ oblG_elem π ∗ otreeG_elem π ∗ oblG_done π ∗ oblG_progress k ψ ∗ oblG_progress k α
+       end)%I.
+  Lemma oforest_progress_one_thread Ω TP i Ψ (γ : gmap obl_id (bool * Qp)) :
+    Ψ = dom γ →
+    osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗
+    (* from user *)
+    othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
+    ([∗ map] ρ ↦ '(f, q) ∈ γ,
+       match f with
+       | true => (oblG_elem ρ ∗ othreadG_owns i ρ f q ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a)
+       | false => (oblG_elem ρ ∗ othreadG_owns i ρ f q)
+       end)
+    ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_owner i) ⌝) ∗
+                 osat Ω' ∗ othread TP ∗ oforest (dom Ω') ∗
+                 othreadG_obls i Ψ 1 ∗
+                 ([∗ map] ρ ↦ '(f, q) ∈ γ,
+                    match f with
+                    | true => (othreadG_owns i ρ f q)
+                    | false => (othreadG_owns i ρ f q)
+                    end).
+  Lemma oforest_suspend_one_tree Ω TP k θ π ψ ℵ a b :
+    ℵ /< a →
+    /0 /< b →
+    osat Ω ∗ othread TP ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗
+    (* from user *)
+    oblG_elem π ∗ oblG_suspend_bound π ℵ ∗
+    othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
+    oblG_elem k ∗ otreeG_elem k ∗ oblG_suspend k a ∗ oblG_suspend k b
+    ⊢ (osat Ω ∗ othread TP ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗
+       othreadG_owns θ k true (1/2)%Qp ∗ oblG_suspend k a ∗ oblG_suspend k b ∗
+       oblG_done π) ∨
+        (|==> ∃ (C : obl_cond) Ω',
+            (⌜ (Ω ↪ₛ Ω' | C) ∧ (∀ k o, (C k o ∨ ¬ C k o)) ⌝) ∗
+            osat Ω' ∗ othread TP ∗ osuspend (dom Ω') ∗ oforest (dom Ω') ∗
+            ∃ x, otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)%Qp).
+  Lemma oforest_big_wait_or_done_comm Ω D π
+    (κ : gmap obl_id (positive * positive * A * iProp Σ)) :
+    osat Ω ∗ osuspend D ∗ oforest D ∗
+    (* from user *)
+    oblG_elem π ∗ otreeG_elem π ∗
+    ([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
+       (P ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)) ∨
+         (oblG_done π ∗ othreadG_owns θ k true (1/2) ∗ oblG_progress k ψ)
+    )
+    ⊢ |==> osat Ω ∗ osuspend D ∗ oforest D ∗
+           (([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
+               (P ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2))) ∨
+              ([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
+                 (oblG_done π ∗ othreadG_owns θ k true (1/2) ∗ oblG_progress k ψ))
+           ).
 
 End otree.
 
