@@ -111,9 +111,9 @@ Notation "A ↪ₚ⋆ B | C" := (rtc (obl_states_progress C) A B) (at level 20, 
 Definition obl_states_suspend `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) : relation obl_states :=
   obl_states_cond_rel C obl_state_suspend.
 
-Notation "A ↪ₜ B | C" := (obl_states_suspend C A B) (at level 20, format "A  ↪ₜ  B  |  C").
-Notation "A ↪ₜ⁺ B | C" := (tc (obl_states_suspend C) A B) (at level 20, format "A  ↪ₜ⁺  B  |  C").
-Notation "A ↪ₜ⋆ B | C" := (rtc (obl_states_suspend C) A B) (at level 20, format "A  ↪ₜ⋆  B  |  C").
+Notation "A ↪ₛ B | C" := (obl_states_suspend C A B) (at level 20, format "A  ↪ₛ  B  |  C").
+Notation "A ↪ₛ⁺ B | C" := (tc (obl_states_suspend C) A B) (at level 20, format "A  ↪ₛ⁺  B  |  C").
+Notation "A ↪ₛ⋆ B | C" := (rtc (obl_states_suspend C) A B) (at level 20, format "A  ↪ₛ⋆  B  |  C").
 
 Definition obl_states_resolve `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) (C : obl_cond) : relation obl_states :=
   obl_states_cond_rel C (obl_state_resolve s).
@@ -133,15 +133,15 @@ Variant obl_states_step `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl
   | obl_states_step_progress Ω1 Ω2 :
     (∃ C, Ω1 ↪ₚ Ω2 | C) → obl_states_step s Ω1 Ω2
   | obl_states_step_suspend Ω1 Ω2 :
-    (∃ C, Ω1 ↪ₜ Ω2 | C) → obl_states_step s Ω1 Ω2
+    (∃ C, Ω1 ↪ₛ Ω2 | C) → obl_states_step s Ω1 Ω2
   | obl_states_step_resolve Ω1 Ω2 :
     (∃ C, Ω1 ↪ᵣ Ω2 @ s | C) → obl_states_step s Ω1 Ω2
   | obl_states_step_alloc Ω1 Ω2 :
     Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2.
 
-Notation "A ↪ₛ B @ s" := (obl_states_step s A B) (at level 20, format "A  ↪ₛ  B  @  s").
-Notation "A ↪ₛ⁺ B @ s" := (tc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⁺  B  @  s").
-Notation "A ↪ₛ⋆ B @ s" := (rtc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s").
+Notation "A ↪ₒ B @ s" := (obl_states_step s A B) (at level 20, format "A  ↪ₒ  B  @  s").
+Notation "A ↪ₒ⁺ B @ s" := (tc (obl_states_step s) A B) (at level 20, format "A  ↪ₒ⁺  B  @  s").
+Notation "A ↪ₒ⋆ B @ s" := (rtc (obl_states_step s) A B) (at level 20, format "A  ↪ₒ⋆  B  @  s").
 
 (* This version:
 Inductive obl_states_cond_rel_seq `{Ξl : obl_live_class} `{Ξd : obl_done_class} : (list (obl_cond * (relation obl_state))) → relation obl_states :=

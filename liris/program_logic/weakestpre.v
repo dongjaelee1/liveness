@@ -49,11 +49,11 @@ Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
   (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs,
      (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
      (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
-     ∃ Ω2, (⌜ Ω1 ↪ₛ⋆ Ω2 @ σ1 ⌝) ∗
+     ∃ Ω2, (⌜ Ω1 ↪ₒ⋆ Ω2 @ σ1 ⌝) ∗
            ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                         |={∅}=>
      ALC (|={∅,E}=>
-            ∃ Ω3 Ω4 Ω5, (⌜ (Ω2 ↪ₛ⋆ Ω3 @ σ2) ∧ (Ω3 ↪ₚ Ω4 | obl_cond_owner i) ∧ (Ω4 ↪ₛ⋆ Ω5 @ σ2) ⌝) ∗
+            ∃ Ω3 Ω4 Ω5, (⌜ (Ω2 ↪ₒ⋆ Ω3 @ σ2) ∧ (Ω3 ↪ₚ Ω4 | obl_cond_owner i) ∧ (Ω4 ↪ₒ⋆ Ω5 @ σ2) ⌝) ∗
                         (osat Ω5 ∗ othread (Θ ∪ dom efs) ∗ osuspend (dom Ω5) ∗ oforest (dom Ω5) ∗ state_interp σ2 (Θ ∪ dom efs) κs) ∗
                         ν e2 efs))%I.
 
@@ -63,10 +63,10 @@ Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
 (*   (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs, *)
 (*      (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗ *)
 (*      (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗ *)
-(*      ∃ Ω1', (⌜ Ω1 ↪ₛ⋆ Ω1' @ σ1 ⌝) ∗ *)
+(*      ∃ Ω1', (⌜ Ω1 ↪ₒ⋆ Ω1' @ σ1 ⌝) ∗ *)
 (*             ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗ *)
 (*                          |={∅}=> ∃ (b : bool), ALC? b |={∅,E}=> *)
-(*      ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₛ⋆ Ω2' @ σ2) ⌝) ∗ *)
+(*      ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₒ⋆ Ω2' @ σ2) ⌝) ∗ *)
 (*                (osat Ω2' ∗ othread (Θ ∪ dom efs) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗ state_interp σ2 (Θ ∪ dom efs) κs) ∗ *)
 (*                ν e2 efs)%I. *)
 
@@ -113,7 +113,7 @@ Definition ghost_step `{SI : indexT} `{!lirisGS Λ Σ} (E : coPset)
   (ν : iPropO Σ) : iPropO Σ :=
   (∀ (Ω1 : obl_states) (Θ : thread_ids) σ κs,
      (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ Θ κs) ={E}=∗
-     ∃ Ω2, (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ)⌝) ∗
+     ∃ Ω2, (⌜(Ω1 ↪ₒ⋆ Ω2 @ σ)⌝) ∗
            (osat Ω2 ∗ othread Θ ∗ osuspend (dom Ω2) ∗ oforest (dom Ω2) ∗ state_interp σ Θ κs) ∗
            ν)%I.
 

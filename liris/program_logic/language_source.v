@@ -15,17 +15,17 @@ Definition source_rel `{SRC : source} : relation A :=
 
 Infix "↪" := (source_concrete_rel) (at level 60).
 Infix "↪ₐ" := (source_abstract_rel) (at level 60).
-Infix "↪ₛ" := (source_rel) (at level 60).
+Infix "↪ₒ" := (source_rel) (at level 60).
 
 (* We use the transitive closure.
    It's normalization is equivalent to normalization of source_rel. *)
 Infix "↪⁺" := (tc source_concrete_rel) (at level 60).
 Infix "↪ₐ⁺" := (tc source_abstract_rel) (at level 60).
-Infix "↪ₛ⁺" := (tc source_rel) (at level 60).
+Infix "↪ₒ⁺" := (tc source_rel) (at level 60).
 
 Infix "↪⋆" := (rtc source_concrete_rel) (at level 60).
 Infix "↪ₐ⋆" := (rtc source_abstract_rel) (at level 60).
-Infix "↪ₛ⋆" := (rtc source_rel) (at level 60).
+Infix "↪ₒ⋆" := (rtc source_rel) (at level 60).
 
 Lemma sn_tc {X} (R : X → X → Prop) (x : X): sn R x ↔ sn (tc R) x.
 Proof.
@@ -44,14 +44,14 @@ Section src_update.
   Definition src_abstract_update E (P : iProp Σ) : iProp Σ :=
     (∀ a : A, source_interp a -∗ |={E}=> ∃ b : A, ⌜a ↪ₐ⁺ b⌝ ∗ source_interp b ∗ P)%I.
   Definition src_update E (P : iProp Σ) : iProp Σ :=
-    (∀ a : A, source_interp a -∗ |={E}=> ∃ b : A, ⌜a ↪ₛ⁺ b⌝ ∗ source_interp b ∗ P)%I.
+    (∀ a : A, source_interp a -∗ |={E}=> ∃ b : A, ⌜a ↪ₒ⁺ b⌝ ∗ source_interp b ∗ P)%I.
 
   Definition weak_src_concrete_update E (P : iProp Σ) : iProp Σ :=
     (∀ a : A, source_interp a -∗ |={E}=> ∃ b : A, ⌜a ↪⋆ b⌝ ∗ source_interp b ∗ P)%I.
   Definition weak_src_abstract_update E (P : iProp Σ) : iProp Σ :=
     (∀ a : A, source_interp a -∗ |={E}=> ∃ b : A, ⌜a ↪ₐ⋆ b⌝ ∗ source_interp b ∗ P)%I.
   Definition weak_src_update E (P : iProp Σ) : iProp Σ :=
-    (∀ a : A, source_interp a -∗ |={E}=> ∃ b : A, ⌜a ↪ₛ⋆ b⌝ ∗ source_interp b ∗ P)%I.
+    (∀ a : A, source_interp a -∗ |={E}=> ∃ b : A, ⌜a ↪ₒ⋆ b⌝ ∗ source_interp b ∗ P)%I.
 
   Lemma src_concrete_update_bind E P Q :
     src_concrete_update E P ∗ (P -∗ src_concrete_update E Q) ⊢ src_concrete_update E Q.
