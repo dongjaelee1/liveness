@@ -65,8 +65,13 @@ Definition otreeG_wait `{SI : indexT} `{!otreeGS A Σ} (k : obl_id) (x : positiv
 Global Typeclasses Opaque otreeG_wait.
 Global Instance: Params (@otreeG_wait) 6 := {}.
 
-Definition otreeG_wait_null `{SI : indexT} `{!otreeGS A Σ} (k : obl_id) (x : positive) : iProp Σ :=
+Definition otreeG_wait_null_auth `{SI : indexT} `{!otreeGS A Σ} (k : obl_id) (x : positive) : iProp Σ :=
   own wait_name (reservation_map_data k (reservation_map_data x (●MN 1))).
+Global Typeclasses Opaque otreeG_wait_null_auth.
+Global Instance: Params (@otreeG_wait_null_auth) 6 := {}.
+
+Definition otreeG_wait_null `{SI : indexT} `{!otreeGS A Σ} (k : obl_id) (x : positive) : iProp Σ :=
+  own wait_name (reservation_map_data k (reservation_map_data x (◯MN 1))).
 Global Typeclasses Opaque otreeG_wait_null.
 Global Instance: Params (@otreeG_wait_null) 6 := {}.
 
@@ -95,7 +100,7 @@ Definition osuspend `{SI : indexT} {A : Type} `{WF : WFOCM.pack A} {ps T} {Σ}
            ([∗ map] x ↦ '(θ, π, ψ) ∈ KSus,
               ((othreadG_owns θ k false (1/2)%Qp ∗ otreeG_edge π k 1) ∨
                  (othreadG_owns θ k true (1/2)%Qp ∗ otreeG_wait k x (1/2)%Qp ∗ oblG_done π ∗ oblG_progress k ψ)) ∨
-                otreeG_wait_null k x)
+                otreeG_wait_null_auth k x)
         )
     )%I.
 
@@ -149,10 +154,10 @@ Definition threadG_tvos_aux `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps}
      | tvo_owned q α =>
          othreadG_owns i k true q ∗ oblG_progress k α
      | tvo_maybe x π ψ γ α =>
-         oblG_elem π ∗ otreeG_elem π ∗ (⌜ WFOCM.leR α γ ⌝) ∗
-         ((otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2) ∗ oblG_progress k γ)
+         oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ (⌜ WFOCM.leR α γ ⌝) ∗
+         ((otreeG_wait k x (1/2) ∗ oblG_progress k γ)
           ∨
-            (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ oblG_progress k α))
+            (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k α))
      end)%I.
 
 Definition threadG_tvos `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
@@ -169,6 +174,8 @@ Section otree.
   Proof. rewrite /otreeG_suspend. apply _. Qed.
   Global Instance otreeG_elem_persistent k : Persistent (otreeG_elem k).
   Proof. rewrite /otreeG_elem. apply _. Qed.
+  Global Instance otreeG_wait_null_persistent k x : Persistent (otreeG_wait_null k x).
+  Proof. rewrite /otreeG_wait_null. apply _. Qed.
 
   Global Instance otreeG_edge_timeless π k q : Timeless (otreeG_edge π k q).
   Proof. rewrite /otreeG_edge. apply _. Qed.
@@ -176,6 +183,8 @@ Section otree.
   Proof. rewrite /otreeG_suspend. apply _. Qed.
   Global Instance otreeG_wait_timeless k x q : Timeless (otreeG_wait k x q).
   Proof. rewrite /otreeG_wait. apply _. Qed.
+  Global Instance otreeG_wait_null_timeless k x : Timeless (otreeG_wait_null k x).
+  Proof. rewrite /otreeG_wait_null. apply _. Qed.
   Global Instance otreeG_elem_timeless k : Timeless (otreeG_elem k).
   Proof. rewrite /otreeG_elem. apply _. Qed.
 
@@ -305,19 +314,34 @@ Section otree.
   Qed.
 
   Lemma otreeG_wait_to_null k x :
-    otreeG_wait k x 1 ⊢ |==> otreeG_wait_null k x.
+    otreeG_wait k x 1 ⊢ |==> otreeG_wait_null_auth k x.
   Proof.
-    rewrite /otreeG_wait /otreeG_wait_null.
+    rewrite /otreeG_wait /otreeG_wait_null_auth.
     apply own_update, reservation_map_update, reservation_map_update, mono_nat_update.
     auto.
+  Qed.
+  Lemma otreeG_wait_null_auth_false k x q :
+    otreeG_wait k x q ∗ otreeG_wait_null_auth k x ⊢ False.
+  Proof.
+    rewrite /otreeG_wait /otreeG_wait_null_auth -own_op -!reservation_map_data_op.
+    iIntros "H". iPoseProof (own_valid with "H") as "%".
+    iPureIntro. apply reservation_map_data_valid, reservation_map_data_valid, mono_nat_auth_dfrac_op_valid in H1.
+    by destruct H1.
+  Qed.
+  Lemma otreeG_wait_null_auth_wait_null k x :
+    otreeG_wait_null_auth k x ⊢ otreeG_wait_null k x.
+  Proof.
+    rewrite /otreeG_wait_null_auth /otreeG_wait_null.
+    apply own_mono.
+    do 2 apply reservation_map_data_mono. apply mono_nat_included.
   Qed.
   Lemma otreeG_wait_null_false k x q :
     otreeG_wait k x q ∗ otreeG_wait_null k x ⊢ False.
   Proof.
     rewrite /otreeG_wait /otreeG_wait_null -own_op -!reservation_map_data_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
-    iPureIntro. apply reservation_map_data_valid, reservation_map_data_valid, mono_nat_auth_dfrac_op_valid in H1.
-    by destruct H1.
+    iPureIntro. do 2 apply reservation_map_data_valid in H1.
+    apply mono_nat_both_dfrac_valid in H1. destruct H1. lia.
   Qed.
 
   Lemma otreeG_wait_frac_op k x q1 q2 q :
@@ -342,7 +366,7 @@ Section otree.
 
   Lemma otreeG_wait_to_null_2 k x q1 q2 :
     (q1 + q2 = 1)%Qp →
-    otreeG_wait k x q1 ∗ otreeG_wait k x q2 ⊢ |==> otreeG_wait_null k x.
+    otreeG_wait k x q1 ∗ otreeG_wait k x q2 ⊢ |==> otreeG_wait_null_auth k x.
   Proof.
     iIntros (Hq) "H".
     iPoseProof (otreeG_wait_frac_op with "H") as "H"; first (rewrite Hq; reflexivity).
@@ -496,7 +520,7 @@ Section otree.
       iModIntro. iExists OSus. iFrame. done.
     - iDestruct "Rkx" as "(Rko & Rkw & Rks)".
       iPoseProof (othreadG_owns_agree with "[To Rko]") as "%"; first iFrame. done.
-    - iPoseProof (otreeG_wait_null_false with "[Rw Rkx]") as "%"; first iFrame. done.
+    - iPoseProof (otreeG_wait_null_auth_false with "[Rw Rkx]") as "%"; first iFrame. done.
   Qed.
 
   Lemma osuspend_wait_cases D k x θ π ψ :
@@ -534,7 +558,7 @@ Section otree.
       iPoseProof (big_sepM_delete _ _ k _ Hklu with "[RM RkM RkS RkW]") as "RM".
       { iFrame "RM". iFrame. }
       iModIntro. iExists OSus. iFrame. done.
-    - iPoseProof (otreeG_wait_null_false with "[Rw Rkx]") as "%"; first iFrame. done.
+    - iPoseProof (otreeG_wait_null_auth_false with "[Rw Rkx]") as "%"; first iFrame. done.
   Qed.
 
   Lemma osuspend_wait_cases_many_live Ω D π (κ : gmap obl_id (positive * positive * A)) :
@@ -565,7 +589,7 @@ Section otree.
             ([∗ map] x↦'(θ, π0, ψ) ∈ KSus,
                (((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π0 k 1) ∨
                   (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π0 ∗ oblG_progress k ψ)) ∨
-              (otreeG_wait_null k x)))))
+              (otreeG_wait_null_auth k x)))))
       )%I with "[- RS RW RE]" as "H"; cycle 1.
     { iDestruct "H" as "(S& Fws& Hs& M)". iFrame "RS RW RE S Fws Hs". iIntros "Hs".
       iExists OSus. iSplitR; first done. iApply ("M" with "Hs"). }
@@ -588,7 +612,7 @@ Section otree.
       iApply (big_sepM_delete _ _ _ _ Hin). iFrame. iApply (big_sepM_delete _ _ _ _ Hxlu). iFrame.
     - iDestruct "Rkx" as "(_&_&Bdπ&_)". iPoseProof (osat_obl_is_done_weak with "[S Bdπ]") as "%"; first by iFrame.
       destruct Hlive, H2. rewrite H3 in H2. done.
-    - iPoseProof (otreeG_wait_null_false with "[Fwi Rkx]") as "%"; first iFrame. done.
+    - iPoseProof (otreeG_wait_null_auth_false with "[Fwi Rkx]") as "%"; first iFrame. done.
   Qed.
 
   (** oforest rules *)
@@ -2149,31 +2173,32 @@ Section otree.
     iApply (osat_obl_is_live with "[$S $Bep $Blp]").
   Qed.
 
-  Lemma oforest_tvos_update Ω D i (M1 M2 : gmap obl_id thread_view_obl) :
+  Lemma oforest_tvos_acc Ω D i (M1 M2 : gmap obl_id thread_view_obl) :
     map_Forall2 (λ _ d1 d2,
-                     match d1, d2 with
-                     | tvo_owned q1 α1, tvo_owned q2 α2 =>
-                         (q1 = q2)
-                     | tvo_maybe x1 π1 ψ1 γ1 α1, tvo_maybe x2 π2 ψ2 γ2 α2 =>
-                         (x1 = x2) ∧ (π1 = π2) ∧ (ψ1 = ψ2)
-                     | _, _ => False
-                     end) M1 M2 →
+                   match d1, d2 with
+                   | tvo_owned q1 α1, tvo_owned q2 α2 =>
+                       (q1 = q2)
+                   | tvo_maybe x1 π1 ψ1 γ1 α1, tvo_maybe x2 π2 ψ2 γ2 α2 =>
+                       (x1 = x2) ∧ (π1 = π2) ∧ (ψ1 = ψ2)
+                   | _, _ => False
+                   end) M1 M2 →
     D ⊆ dom Ω →
     osat Ω ∗ osuspend D ∗ oforest (dom Ω) ∗
     (* from user *)
     threadG_tvos_aux i M1
-    ⊢ |==> oforest (dom Ω) ∗
+    ⊢ |==> osat Ω ∗ oforest (dom Ω) ∗
         ([∗ map] k ↦ v ∈ M1,
            oblG_elem k ∗ otreeG_elem k ∗
            match v with
            | tvo_owned q α =>
                othreadG_owns i k true q ∗ oblG_progress k α
            | tvo_maybe x π ψ γ α =>
-               oblG_elem π ∗ otreeG_elem π ∗ (⌜ α /≤ γ ⌝) ∗
-               ((otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2) ∗ oblG_progress k γ ∗
+               oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ (⌜ α /≤ γ ⌝) ∗
+               ((otreeG_wait k x (1/2) ∗ oblG_progress k γ ∗
                  othreadG_owns i k false (1/2) ∗ otreeG_edge π k 1)
                 ∨
-                  (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ oblG_progress k α))
+                  (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k α ∗
+                   otreeG_wait_null_auth k x))
            end) ∗
         (* Return leftover from extracting progress credits from above: M -> M' *)
         (([∗ map] k ↦ v ∈ M2,
@@ -2182,12 +2207,13 @@ Section otree.
             | tvo_owned q α =>
                 othreadG_owns i k true q ∗ oblG_progress k α
             | tvo_maybe x π ψ γ α =>
-                oblG_elem π ∗ otreeG_elem π ∗ (⌜ α /≤ γ ⌝) ∗
-                ((otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2) ∗ oblG_progress k γ ∗
+                oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ (⌜ α /≤ γ ⌝) ∗
+                ((otreeG_wait k x (1/2) ∗ oblG_progress k γ ∗
                   othreadG_owns i k false (1/2) ∗ otreeG_edge π k 1)
                  ∨
-                   (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ oblG_progress k α))
-            end) -∗ (osat Ω ∗ osuspend D ∗ threadG_tvos_aux i M2)).
+                   (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k α ∗
+                    otreeG_wait_null_auth k x))
+            end) -∗ (osuspend D ∗ threadG_tvos_aux i M2)).
   Proof.
     iIntros (MF SubDF) "(S & U & F & M)".
     iPoseProof (tvos_aux_elems with "[$S $U $M]") as "%ElemsM0".
@@ -2196,17 +2222,17 @@ Section otree.
     clear ElemsM0. rewrite /osuspend -lock. iDestruct "U" as "(% & %Hdom & RS & RW & RE & RM )".
     iFrame "RS RW RE".
     iAssert (
-        |==> oforest (dom Ω) ∗
+        |==> osat Ω ∗ oforest (dom Ω) ∗
           ([∗ map] k↦v ∈ M1,
              oblG_elem k ∗ otreeG_elem k ∗
              match v with
              | tvo_owned q α =>
                  othreadG_owns i k true q ∗ oblG_progress k α
              | tvo_maybe x π ψ γ α =>
-                 oblG_elem π ∗ otreeG_elem π ∗ (⌜ α /≤ γ ⌝) ∗
-                 ((otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1 / 2) ∗ oblG_progress k γ ∗
+                 oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ (⌜ α /≤ γ ⌝) ∗
+                 ((otreeG_wait k x (1 / 2) ∗ oblG_progress k γ ∗
                    othreadG_owns i k false (1 / 2) ∗ otreeG_edge π k 1)
-                  ∨ (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ oblG_progress k α))
+                  ∨ (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k α ∗ otreeG_wait_null_auth k x))
              end) ∗
           (([∗ map] k↦v ∈ M2,
               oblG_elem k ∗ otreeG_elem k ∗
@@ -2214,23 +2240,22 @@ Section otree.
               | tvo_owned q α =>
                   othreadG_owns i k true q ∗ oblG_progress k α
               | tvo_maybe x π ψ γ α =>
-                  oblG_elem π ∗ otreeG_elem π ∗ (⌜ α /≤ γ ⌝) ∗
-                  ((otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1 / 2) ∗ oblG_progress k γ ∗
+                  oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ (⌜ α /≤ γ ⌝) ∗
+                  ((otreeG_wait k x (1 / 2) ∗ oblG_progress k γ ∗
                     othreadG_owns i k false (1 / 2) ∗ otreeG_edge π k 1)
-                   ∨ (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ oblG_progress k α))
+                   ∨ (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k α ∗ otreeG_wait_null_auth k x))
               end) -∗
-           (osat Ω ∗
-            ([∗ map] k↦KSus ∈ OSus,
+           (([∗ map] k↦KSus ∈ OSus,
                own suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> (KSus : gmap positive (positive * obl_id * leibnizO A))))) ∗
                own wait_name (reservation_map_data k (reservation_map_token (⊤ ∖ gset_to_coPset (dom KSus)))) ∗
                ([∗ map] x↦'(θ, π, ψ) ∈ KSus,
                   ((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∨
                      (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ))
-                  ∨ otreeG_wait_null k x))) ∗
+                  ∨ otreeG_wait_null_auth k x))) ∗
            threadG_tvos_aux i M2)
       )%I with "[-]" as "H"; cycle 1.
-    { iMod "H" as "(F& MA& Acc)". iFrame "F MA". iIntros "!> MA".
-      iPoseProof ("Acc" with "MA") as "(($& H)& $)".
+    { iMod "H" as "(S& F& MA& Acc)". iFrame "S F MA". iIntros "!> MA".
+      iPoseProof ("Acc" with "MA") as "(H& $)".
       iExists OSus. iSplitR; first done. iApply "H". }
     iStopProof. subst D. revert M2 MF OSus ElemsM SubDF.
     induction M1 using map_ind; iIntros (M2 MF OSus ElemsM SubDF) "(S& U& F& M)".
@@ -2239,19 +2264,18 @@ Section otree.
     apply map_Forall2_insert_inv_l in MF; last auto. destruct MF as [x2 [m2 [-> [LUm2k [MFx MF]]]]].
     rewrite /threadG_tvos_aux. rewrite !big_sepM_insert; auto. iDestruct "M" as "((#Bek& #Fek& Mk)& M)".
     destruct x, x2. 2,3: done.
-    - iMod (IHM1 m2 with "[$S $U $F $M]") as "(F& H& ACC)". 1,2,3: auto.
-      clear IHM1. iModIntro. iFrame "F Mk H". iSplitR; first auto.
-      iIntros "(Mk& M)". iPoseProof ("ACC" with "M") as "[[S H] M]". iFrame.
+    - iMod (IHM1 m2 with "[$S $U $F $M]") as "(S& F& H& ACC)". 1,2,3: auto.
+      clear IHM1. iModIntro. iFrame "S F Mk H". iSplitR; first auto.
+      iIntros "(Mk& M)". iPoseProof ("ACC" with "M") as "[U M]". iFrame.
     - destruct MFx as [<- [<- <-]].
-      iDestruct "Mk" as "(#Bep& #Fep& %LEag& [Mk | Mk])".
+      iDestruct "Mk" as "(#Bep& #Fep& #Fuk& %LEag& [Mk | Mk])".
       + apply elem_of_dom in DomSk. destruct DomSk as [KSusk ElemSk].
         iPoseProof (big_sepM_delete _ _ _ _ ElemSk with "U") as "[Uk U]".
-        iDestruct "Uk" as "(Uk1& Uk2& UkM)". iDestruct "Mk" as "(#Fuk& Fwk& Bpk)".
+        iDestruct "Uk" as "(Uk1& Uk2& UkM)". iDestruct "Mk" as "(Fwk& Bpk)".
         iPoseProof (otreeG_suspend_lookup with "[$Uk1 $Fuk]") as "%ElemKk".
         iPoseProof (big_sepM_delete _ _ _ _ ElemKk with "UkM") as "[[[Ukx | Ukx] | Ukx] UkM]".
         * iDestruct "Ukx" as "[Ukx1 Ukx2]".
-          iPoseProof (oforest_has_edge_live with "[$S $F $Bep $Ukx2]") as "(%& %LUOp)".
-          iMod (IHM1 with "[$S $U $F $M]") as "(F& M& ACC)".
+          iMod (IHM1 with "[$S $U $F $M]") as "(S& F& M& ACC)".
           { eauto. }
           { intros a b LUa. specialize (ElemsM _ _ LUa). destruct ElemsM as [A1 A2].
             assert (NEQ : a ≠ k).
@@ -2260,22 +2284,24 @@ Section otree.
             rewrite dom_delete_L. set_solver + A2 NEQ. }
           { rewrite dom_delete_L. set_solver + SubDF. }
           clear IHM1.
-          iModIntro. iFrame "F M". iSplitL "Fwk Bpk Ukx1 Ukx2".
-          { iFrame "Bek Fek Bep Fep". iSplit; first done. iLeft. iFrame. auto. }
-          iIntros "[Mk M]". iPoseProof ("ACC" with "M") as "[[S U] M]". iFrame "M".
-          iDestruct "Mk" as "(_&_&_&_& %LEag2& [Mk | Mk])".
-          -- iDestruct "Mk" as "(_& Fwk& Bpk& Tok& Fgk)". iFrame "S". iSplitR "Fwk Bpk".
+          iModIntro. iFrame "S F M". iSplitL "Fwk Bpk Ukx1 Ukx2".
+          { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iLeft. iFrame. }
+          iIntros "[Mk M]". iPoseProof ("ACC" with "M") as "[U M]". iFrame "M".
+          iDestruct "Mk" as "(_&_&_&_&_& %LEag2& [Mk | Mk])".
+          -- iDestruct "Mk" as "(Fwk& Bpk& Tok& Fgk)". iSplitR "Fwk Bpk".
              ++ iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame.
                 iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame.
-             ++ iFrame "Bek Fek Bep Fep". iSplit; first done. iLeft. iFrame. auto.
-          -- iExFalso. iDestruct "Mk" as "(_& Bdp& _)".
-             iPoseProof (osat_obl_is_done_weak with "[$S $Bep $Bdp]") as "(%& %)".
-             rewrite LUOp in H2. done.
+             ++ iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iLeft. iFrame.
+          -- iDestruct "Mk" as "(Tok& #Bdp& Bpk& #Fwnk& Bpk2& Fwnak)".
+             iSplitR "Tok Bpk Bpk2"; cycle 1.
+             { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iRight. iFrame. auto. }
+             iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame "Uk1 Uk2 U".
+             iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame.
         * iDestruct "Ukx" as "(Tok& Fwk2& #Bdp& Bpk2)".
-          iPoseProof (osat_obl_is_done_weak with "[$S $Bep $Bdp]") as "(%& %LUOp)".
-          iMod (otreeG_wait_to_null_2 with "[$Fwk $Fwk2]") as "Fwk".
+          iMod (otreeG_wait_to_null_2 with "[$Fwk $Fwk2]") as "Fwnak".
           { apply Qp.div_2. }
-          iMod (IHM1 with "[$S $U $F $M]") as "(F& M& ACC)".
+          iPoseProof (otreeG_wait_null_auth_wait_null with "Fwnak") as "#Fwnk".
+          iMod (IHM1 with "[$S $U $F $M]") as "(S& F& M& ACC)".
           { eauto. }
           { intros a b LUa. specialize (ElemsM _ _ LUa). destruct ElemsM as [A1 A2].
             assert (NEQ : a ≠ k).
@@ -2285,41 +2311,53 @@ Section otree.
           { rewrite dom_delete_L. set_solver + SubDF. }
           clear IHM1.
           iMod (oblG_progress_mon _ _ _ LEag with "Bpk") as "Bpk".
-          iModIntro. iFrame "F M". iSplitL "Tok Bpk2 Bpk".
-          { iFrame "Bek Fek Bep Fep". iSplit; first done. iRight. iFrame. auto. }
-          iIntros "[Mk M]". iPoseProof ("ACC" with "M") as "[[S U] M]". iFrame "M".
-          iDestruct "Mk" as "(_&_&_&_& [Mk | Mk])".
-          -- iDestruct "Mk" as "(_& Fwk& Bpk& Tok& Fgk)". iFrame "S". iSplitR "Fwk Bpk".
+          iModIntro. iFrame "S F M". iSplitL "Tok Bpk2 Bpk Fwnak".
+          { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iRight. iFrame. auto. }
+          iIntros "[Mk M]". iPoseProof ("ACC" with "M") as "[U M]". iFrame "M".
+          iDestruct "Mk" as "(_&_&_&_&_& %LEag2& [Mk | Mk])".
+          -- iDestruct "Mk" as "(Fwk& Bpk& Tok& Fgk)". iSplitR "Fwk Bpk".
              ++ iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame.
                 iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame.
-             ++ iFrame "Bek Fek Bep Fep". iLeft. iFrame. auto.
-          -- iExFalso. iDestruct "Mk" as "(_& Bdp& _)".
-             iPoseProof (osat_obl_is_done_weak with "[$S $Bep $Bdp]") as "(%& %)".
-             rewrite LUOp in H2. done.
-          
-
-          
-          
+             ++ iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iLeft. iFrame.
+          -- iDestruct "Mk" as "(Tok& #bdp& Bpk& _& Bpk2& Fwnka)". iSplitR "Tok Bpk Bpk2"; cycle 1.
+             { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iRight. iFrame. auto. }
+             iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame "Uk1 Uk2 U".
+             iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame.
+        * iPoseProof (otreeG_wait_null_auth_false with "[$Fwk $Ukx]") as "%F". done.
+      + iDestruct "Mk" as "(Tok& #Bdp& Bpk& #Fwnk& Bpk2)".
+        apply elem_of_dom in DomSk. destruct DomSk as [KSusk ElemSk].
+        iPoseProof (big_sepM_delete _ _ _ _ ElemSk with "U") as "[Uk U]".
+        iDestruct "Uk" as "(Uk1& Uk2& UkM)".
+        iPoseProof (otreeG_suspend_lookup with "[$Uk1 $Fuk]") as "%ElemKk".
+        iPoseProof (big_sepM_delete _ _ _ _ ElemKk with "UkM") as "[[[Ukx | Ukx] | Ukx] UkM]".
+        * iExFalso. iDestruct "Ukx" as "[Tok2 _]".
+          iPoseProof (othreadG_owns_agree with "[$Tok $Tok2]") as "%F". inv F.
+        * iExFalso. iDestruct "Ukx" as "(_& Fwk& _)".
+          iPoseProof (otreeG_wait_null_false with "[$Fwk $Fwnk]") as "%F". inv F.
+        * iMod (IHM1 with "[$S $U $F $M]") as "(S& F& M& ACC)".
+          { eauto. }
+          { intros a b LUa. specialize (ElemsM _ _ LUa). destruct ElemsM as [A1 A2].
+            assert (NEQ : a ≠ k).
+            { intros <-. rewrite H1 in LUa. done. }
+            split_and !; auto.
+            rewrite dom_delete_L. set_solver + A2 NEQ. }
+          { rewrite dom_delete_L. set_solver + SubDF. }
+          clear IHM1.
+          iModIntro. iFrame "S F M". iSplitL "Tok Bpk2 Bpk Ukx".
+          { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iRight. iFrame. auto. }
+          iIntros "[Mk M]". iPoseProof ("ACC" with "M") as "[U M]". iFrame "M".
+          iDestruct "Mk" as "(_&_&_&_&_& %LEag2& [Mk | Mk])".
+          -- iDestruct "Mk" as "(Fwk& Bpk& Tok& Fgk)". iSplitR "Fwk Bpk".
+             ++ iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame.
+                iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame.
+             ++ iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iLeft. iFrame.
+          -- iDestruct "Mk" as "(Tok& #bdp& Bpk& _& Bpk2& Fwnka)". iSplitR "Tok Bpk Bpk2"; cycle 1.
+             { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iRight. iFrame. auto. }
+             iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame "Uk1 Uk2 U".
+             iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame.
+  Qed.
 
     TODO
-
-    apply elem_of_dom in Hin. destruct Hin as [KSus Hin]. iPoseProof (big_sepM_delete _ _ _ _ Hin with "M") as "[Mi M]".
-    assert (Hins2 : map_Forall (λ (k : obl_id) (_ : positive * positive * A), k ∈ dom (delete i OSus)) m).
-    { intros ???. specialize (Hins i0 x0 H2). destruct (decide (i0 = i)).
-      - subst. by rewrite H1 in H2.
-      - rewrite dom_delete_L. set_solver + Hins n. }
-    iPoseProof (IHκ _ Hins2 with "[S M Ws]") as "(S& Ws& As& Ms)".
-    { iSplitR; first auto. iFrame. }
-    clear IHκ. iDestruct "Mi" as "(RkS & RkW & RkM)".
-    iPoseProof (otreeG_suspend_lookup with "[RkS]") as "%Hxlu"; first by iFrame.
-    iDestruct (big_sepM_delete _ _ x _ Hxlu with "RkM") as "[Rkx RkM]".
-    iDestruct "Rkx" as "[[Rkx | Rkx] | Rkx]".
-    - iFrame. iIntros "[Hi Hs]". iPoseProof ("Ms" with "Hs") as "Ms".
-      iApply (big_sepM_delete _ _ _ _ Hin). iFrame. iApply (big_sepM_delete _ _ _ _ Hxlu). iFrame.
-    - iDestruct "Rkx" as "(_&_&Bdπ&_)". iPoseProof (osat_obl_is_done_weak with "[S Bdπ]") as "%"; first by iFrame.
-      destruct Hlive, H2. rewrite H3 in H2. done.
-    - iPoseProof (otreeG_wait_null_false with "[Fwi Rkx]") as "%"; first iFrame. done.
-  Qed.
 
   Lemma oforest_big_wait_or_done_comm Ω D π
     (κ : gmap obl_id (positive * positive * A * iProp Σ)) :
