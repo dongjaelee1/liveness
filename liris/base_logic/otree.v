@@ -1243,6 +1243,56 @@ Section otree.
                  end).
   Proof.
     iIntros (Domγ) "(S& T& F& #Tei& Tbi& Tos)".
+    iAssert (∃ (γ1 γ2 : gmap obl_id thread_view_obl),
+                (⌜ γ = γ1 ∪ γ2 ∧ γ1 ##ₘ γ2 ⌝) ∗
+                ([∗ map] ρ ↦ v ∈ γ1,
+                   oblG_elem ρ ∗
+                   match v with
+                   | tvo_owned q _ =>
+                       (othreadG_owns i ρ true q ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a)
+                   | tvo_maybe _ _ _ _ _ =>
+                       (othreadG_owns i ρ true (1/2) ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a)
+                   end) ∗
+                ([∗ map] ρ ↦ v ∈ γ2,
+                   oblG_elem ρ ∗
+                   match v with
+                   | tvo_owned _ _ => False
+                   | tvo_maybe _ _ _ _ _ =>
+                       (othreadG_owns i ρ false (1/2))
+                   end)
+            )%I with "[Tos]" as "TH".
+    { iClear "Tei". clear Domγ. iStopProof. induction γ using map_ind.
+      { iIntros "H". iExists ∅, ∅. iSplitR.
+        { iPureIntro. split; auto. apply map_disjoint_empty_l. }
+        iSplitR; done. }
+      iIntros "H". iPoseProof (big_sepM_insert with "H") as "[[#Bei Ti] H]"; first auto.
+      iPoseProof (IHγ with "H") as "(%&%&%&H1&H2)". clear IHγ. destruct H2.
+      assert (γ1 !! i0 = None ∧ γ2 !! i0 = None).
+      { rewrite map_eq_iff in H2. specialize (H2 i0). rewrite H1 in H2.
+        symmetry in H2. apply lookup_union_None in H2. auto. }
+      destruct H4. destruct x.
+      - iExists (<[i0:=tvo_owned q α]>γ1), γ2. iSplitR.
+        { iPureIntro. split_and !.
+          - rewrite H2 insert_union_l. auto.
+          - apply map_disjoint_insert_l. split; auto. }
+        iFrame "H2". iApply big_sepM_insert; first auto. iFrame. auto.
+      - iDestruct "Ti" as "[Ti | Ti]".
+        + iExists γ1, (<[i0:=tvo_maybe x π ψ γ α]>γ2). iSplitR.
+          { iPureIntro. split_and !.
+            - rewrite H2 insert_union_r; auto.
+            - apply map_disjoint_insert_r. split; auto. }
+          iFrame "H1". iApply big_sepM_insert; first auto. iFrame. auto.
+        + iExists (<[i0:=tvo_maybe x π ψ γ α]>γ1), γ2. iSplitR.
+          { iPureIntro. split_and !.
+            - rewrite H2 insert_union_l. auto.
+            - apply map_disjoint_insert_l. split; auto. }
+          iFrame "H2". iApply big_sepM_insert; first auto. iFrame. auto. }
+    iDestruct "TH" as "(%&%&%& To1& To2)". destruct H1 as (Eqγ& Disjγ).
+
+    TODO
+      (* Reuse above proof? *)
+
+
     iAssert (∀ k, ⌜ k ∈ dom γ ⌝ →  ∃ d, ⌜ Ω !! k = Some (obl_live d) ⌝)%I with "[-]" as "%LUOρs".
     { iIntros (k Ink). subst Ψ. apply elem_of_dom in Ink. destruct Ink.
       iPoseProof (big_sepM_delete _ _ _ _ H1 with "Tos") as "[To Tos]". destruct x.
