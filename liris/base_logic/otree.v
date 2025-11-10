@@ -1245,7 +1245,8 @@ Section otree.
     iDestruct "H" as "(%&%&S&T&F&H)". iModIntro. iFrame. rewrite /oforest -lock. by iFrame.
   Qed.
 
-  Lemma oforest_aux_progress_one_thread_tvos Ω TP Φ i Ψ (γ : gmap obl_id thread_view_obl) :
+  Lemma oforest_aux_progress_one_thread_tvos Ω TP Φ i Ψ
+    (γ : gmap obl_id thread_view_obl) (P : obl_id → Qp → A → iProp Σ) (Q1 Q2 : obl_id → positive → obl_id → A → A → A → iProp Σ) :
     Ψ = dom γ →
     osat Ω ∗ othread TP ∗ oforest_aux (dom Ω) Φ ∗
     (* from user *)
@@ -1253,20 +1254,22 @@ Section otree.
     ([∗ map] ρ ↦ v ∈ γ,
        oblG_elem ρ ∗
        match v with
-       | tvo_owned q _ =>
-           othreadG_owns i ρ true q ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a
-       | tvo_maybe _ _ _ _ _ =>
-           ((othreadG_owns i ρ false (1/2)) ∨ (othreadG_owns i ρ true (1/2) ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a))
+       | tvo_owned q α =>
+           (P ρ q α) ∗ othreadG_owns i ρ true q ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a
+       | tvo_maybe x π ψ c α =>
+           (((Q1 ρ x π ψ c α) ∗ othreadG_owns i ρ false (1/2))
+            ∨ ((Q2 ρ x π ψ c α) ∗ othreadG_owns i ρ true (1/2) ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a))
        end)
     ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_owner i) ⌝) ∗
               osat Ω' ∗ othread TP ∗ oforest_aux (dom Ω') Φ ∗
               othreadG_obls i Ψ 1 ∗
               ([∗ map] ρ ↦ v ∈ γ,
                  match v with
-                 | tvo_owned q _ =>
-                     othreadG_owns i ρ true q
-                 | tvo_maybe _ _ _ _ _ =>
-                     ((othreadG_owns i ρ false (1/2)) ∨ (othreadG_owns i ρ true (1/2)))
+                 | tvo_owned q α =>
+                     (P ρ q α) ∗ othreadG_owns i ρ true q
+                 | tvo_maybe x π ψ c α =>
+                     (((Q1 ρ x π ψ c α) ∗ othreadG_owns i ρ false (1/2))
+                      ∨ ((Q2 ρ x π ψ c α) ∗ othreadG_owns i ρ true (1/2)))
                  end).
   Proof.
     iIntros (Domγ) "(S& T& F& #Tei& Tbi& Tos)".
@@ -1274,6 +1277,10 @@ Section otree.
                 (⌜ γ = γ1 ∪ γ2 ∧ γ1 ##ₘ γ2 ⌝) ∗
                 ([∗ map] ρ ↦ v ∈ γ1,
                    oblG_elem ρ ∗
+                   (match v with
+                    | tvo_owned q α => (P ρ q α)
+                    | tvo_maybe x π ψ c α => (Q2 ρ x π ψ c α)
+                    end) ∗
                    ∃ f, othreadG_owns i ρ true f ∗
                         (match v with
                          | tvo_owned q _ => ⌜ f = q ⌝
@@ -1284,8 +1291,8 @@ Section otree.
                    oblG_elem ρ ∗
                    match v with
                    | tvo_owned _ _ => False
-                   | tvo_maybe _ _ _ _ _ =>
-                       (othreadG_owns i ρ false (1/2))
+                   | tvo_maybe x π ψ c α =>
+                       ((Q1 ρ x π ψ c α) ∗ othreadG_owns i ρ false (1/2))
                    end)
             )%I with "[Tos]" as "TH".
     { iClear "Tei". clear Domγ. iStopProof. induction γ using map_ind.
@@ -1303,7 +1310,7 @@ Section otree.
           - rewrite H2 insert_union_l. auto.
           - apply map_disjoint_insert_l. split; auto. }
         iFrame "H2". iApply big_sepM_insert; first auto. iFrame.
-        iDestruct "Ti" as "($& $)". auto.
+        iDestruct "Ti" as "($& $& $)". auto.
       - iDestruct "Ti" as "[Ti | Ti]".
         + iExists γ1, (<[i0:=tvo_maybe x π ψ γ α]>γ2). iSplitR.
           { iPureIntro. split_and !.
@@ -1315,8 +1322,23 @@ Section otree.
             - rewrite H2 insert_union_l. auto.
             - apply map_disjoint_insert_l. split; auto. }
           iFrame "H2". iApply big_sepM_insert; first auto. iFrame.
-          iDestruct "Ti" as "($& $)". auto. }
+          iDestruct "Ti" as "($& $& $)". auto. }
     iDestruct "TH" as "(%&%&%& To1& To2)". destruct H1 as (Eqγ& Disjγ).
+    iAssert (
+        ([∗ map] ρ↦v ∈ γ1,
+           oblG_elem ρ ∗
+           ∃ f : Qp, othreadG_owns i ρ true f ∗
+                     match v with
+                     | tvo_owned q _ => ⌜f = q⌝
+                     | tvo_maybe _ _ _ _ _ => ⌜f = (1 / 2)%Qp⌝
+                     end ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a) ∗
+        ([∗ map] ρ↦v ∈ γ1,
+           match v with
+           | tvo_owned q α => P ρ q α
+           | tvo_maybe x π ψ c α => Q2 ρ x π ψ c α
+           end)
+      )%I with "[To1]" as "[To1 To1R]".
+    { iApply big_sepM_sep. iApply (big_sepM_impl with "To1"). iIntros "!>" (???) "(#Bek& R& H)". iFrame. auto. }
     iAssert (∀ k, ⌜ k ∈ dom γ1 ⌝ →  ∃ d, ⌜ Ω !! k = Some (obl_live d) ⌝)%I with "[-]" as "%LUOρs".
     { iIntros (k Ink). subst Ψ. apply elem_of_dom in Ink. destruct Ink.
       iPoseProof (big_sepM_delete _ _ _ _ H1 with "To1") as "[To To1]".
@@ -1346,7 +1368,8 @@ Section otree.
         apply lookup_union_Some in H1; last auto. destruct H1.
         + iPureIntro. exists ρ. split_and !; auto. exists ρt. split; auto. unfold node; eauto.
         + iPoseProof (big_sepM_delete _ _ _ _ H1 with "To2") as "[H To2]". iDestruct "H" as "[#Beρ H]".
-          destruct x; first done. iPoseProof (othreadG_owns_agree with "[$Toρ $H]") as "%F". inv F.
+          destruct x; first done. iDestruct "H" as "(_& H)".
+          iPoseProof (othreadG_owns_agree with "[$Toρ $H]") as "%F". inv F.
       - iDestruct "H" as "(%&%&Bok& %&Teθ& Tok& %&%& Tsk& Twk)".
         iPoseProof (osat_lookup_owner with "[$S $Bek $Bok]") as "[% %]".
         destruct H2. rewrite LUOk in H2. inv H2.
@@ -1355,7 +1378,8 @@ Section otree.
         apply lookup_union_Some in H2; last auto. destruct H2.
         + iPureIntro. exists ρ. split_and !; auto. exists ρt. split; auto. unfold node; eauto.
         + iPoseProof (big_sepM_delete _ _ _ _ H2 with "To2") as "[H To2]". iDestruct "H" as "[#Beρ H]".
-          destruct x0; first done. iPoseProof (othreadG_owns_agree with "[$Toρ $H]") as "%F". inv F.
+          destruct x0; first done. iDestruct "H" as "(_& H)".
+          iPoseProof (othreadG_owns_agree with "[$Toρ $H]") as "%F". inv F.
     }
     iAssert (∀ k o, ⌜ Ω !! k = Some o ⌝ → ⌜ C k o ⌝ → ⌜ obl_cond_owner i k o ⌝)%I with "[-]" as "%OCEq2".
     { subst C. simpl. iIntros (k o LUOk OC). destruct OC as (ρ&?&ρt&LUΦρ&Nodek). destruct H1 as [q LUγρ].
@@ -1390,14 +1414,15 @@ Section otree.
                         | tvo_owned q _ => ⌜ f = q ⌝
                         | _ => ⌜ f = (1/2)%Qp ⌝
                         end)
-      )%I with "[- Tbi To2]" as ">H"; cycle 1.
+      )%I with "[- Tbi To2 To1R]" as ">H"; cycle 1.
     { iDestruct "H" as "(%&%Prog& S& T& F& To1)". iModIntro. iExists Ω'. iSplitR.
       { iPureIntro. eapply obl_states_cond_rel_iff_lookup. 1: eapply Prog. intros. split; eauto. }
       iFrame. rewrite Eqγ. iApply big_sepM_union; first auto.
-      iSplitL "To1".
-      - iApply (big_sepM_impl with "To1"). iIntros "!>" (???) "(%& H& HR)". destruct x.
+      iSplitL "To1 To1R".
+      - iPoseProof (big_sepM_sep with "[$To1 $To1R]") as "To1".
+        iApply (big_sepM_impl with "To1"). iIntros "!>" (???) "((%& H& HR)& R)". destruct x.
         + iPoseProof "HR" as "%"; subst; iFrame.
-        + iPoseProof "HR" as "%"; subst; iFrame.
+        + iRight. iPoseProof "HR" as "%"; subst; iFrame.
       - iApply (big_sepM_impl with "To2"). iIntros "!>" (???) "[_ H]". destruct x; by iFrame.
     }
     subst C. clear OCEq1 OCEq2. clear dependent Ψ γ γ2.
@@ -1438,7 +1463,8 @@ Section otree.
     rewrite (big_sepM_insert); last auto. iFrame.
   Qed.
 
-  Lemma oforest_progress_one_thread_tvos Ω TP i Ψ (γ : gmap obl_id thread_view_obl) :
+  Lemma oforest_progress_one_thread_tvos Ω TP i Ψ
+    (γ : gmap obl_id thread_view_obl) (P : obl_id → Qp → A → iProp Σ) (Q1 Q2 : obl_id → positive → obl_id → A → A → A → iProp Σ) :
     Ψ = dom γ →
     osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗
     (* from user *)
@@ -1446,20 +1472,22 @@ Section otree.
     ([∗ map] ρ ↦ v ∈ γ,
        oblG_elem ρ ∗
        match v with
-       | tvo_owned q _ =>
-           othreadG_owns i ρ true q ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a
-       | tvo_maybe _ _ _ _ _ =>
-           ((othreadG_owns i ρ false (1/2)) ∨ (othreadG_owns i ρ true (1/2) ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a))
+       | tvo_owned q α =>
+           (P ρ q α) ∗ othreadG_owns i ρ true q ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a
+       | tvo_maybe x π ψ c α =>
+           (((Q1 ρ x π ψ c α) ∗ othreadG_owns i ρ false (1/2))
+            ∨ ((Q2 ρ x π ψ c α) ∗ othreadG_owns i ρ true (1/2) ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a))
        end)
     ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_owner i) ⌝) ∗
               osat Ω' ∗ othread TP ∗ oforest (dom Ω') ∗
               othreadG_obls i Ψ 1 ∗
               ([∗ map] ρ ↦ v ∈ γ,
                  match v with
-                 | tvo_owned q _ =>
-                     othreadG_owns i ρ true q
-                 | tvo_maybe _ _ _ _ _ =>
-                     ((othreadG_owns i ρ false (1/2)) ∨ (othreadG_owns i ρ true (1/2)))
+                 | tvo_owned q α =>
+                     (P ρ q α) ∗ othreadG_owns i ρ true q
+                 | tvo_maybe x π ψ c α =>
+                     (((Q1 ρ x π ψ c α) ∗ othreadG_owns i ρ false (1/2))
+                      ∨ ((Q2 ρ x π ψ c α) ∗ othreadG_owns i ρ true (1/2)))
                  end).
   Proof.
     iIntros (?) "(H1&H2&H3&H4&H5&H6)".
@@ -2915,64 +2943,51 @@ Section otree.
           { iPureIntro. etransitivity; last eauto. eapply WFOCM.lt_le; eauto. }
           iRight. iFrame.
     }
-
-    TODO
+    set (P:= (λ k q β, oblG_progress k β) : obl_id → Qp → A → iProp Σ).
+    set (Q1:= (λ k x π ψ γ β, (otreeG_wait k x (1 / 2) ∗ oblG_progress k γ ∗ otreeG_edge π k 1)%I) : obl_id → positive → obl_id → A → A → A → iProp Σ).
+    set (Q2:= (λ k x π ψ γ β, (oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k β ∗ otreeG_wait_null_auth k x)%I) : obl_id → positive → obl_id → A → A → A → iProp Σ).
     iAssert (
         ([∗ map] ρ↦v ∈ Δ2,
            oblG_elem ρ ∗
            match v with
-           | tvo_owned q _ =>
-               othreadG_owns i ρ true q ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
-           | tvo_maybe _ _ _ _ _ =>
-               othreadG_owns i ρ false (1 / 2) ∨ othreadG_owns i ρ true (1 / 2) ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
+           | tvo_owned q α =>
+               (P ρ q α) ∗ othreadG_owns i ρ true q ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
+           | tvo_maybe x π ψ c α =>
+               ((Q1 ρ x π ψ c α) ∗ othreadG_owns i ρ false (1 / 2))
+               ∨ ((Q2 ρ x π ψ c α) ∗ othreadG_owns i ρ true (1 / 2) ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a)
            end) ∗
         ([∗ map] k↦v ∈ Δ2,
            oblG_elem k ∗ otreeG_elem k ∗
            match v with
            | tvo_owned q β =>
-               oblG_progress k β
+               True
            | tvo_maybe x π ψ γ β =>
-               oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ ⌜β /≤ γ⌝ ∗
-               ((otreeG_wait k x (1 / 2) ∗ oblG_progress k γ ∗ otreeG_edge π k 1)
-                ∨ (oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k β ∗ otreeG_wait_null_auth k x))
+               oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ ⌜β /≤ γ⌝
            end)
       )%I with "[VM]" as "[VMH VMR]".
-    { rewrite -big_sepM_sep. iApply (big_sepM_impl with "VM"). iIntros "!>" (???) "(#Bek& #Fek& M)". destruct x.
-      - iDestruct "M" as "($& P1& P2)". iSplitL "P2"; (iFrame; auto).
+    { subst P Q1 Q2. rewrite -big_sepM_sep. iApply (big_sepM_impl with "VM"). iIntros "!>" (???) "(#Bek& #Fek& M)".
+      iFrame "Bek Fek". destruct x.
+      - iDestruct "M" as "($& P1& P2)". iSplitL "P1"; (iFrame; auto).
       - iDestruct "M" as "($& $& $& $& [M | M])".
-        + iDestruct "M" as "(M1& M2& M3& M4)". iSplitL "M3"; (iFrame; auto). iFrame "Bek Fek". iLeft. iFrame.
-        + iDestruct "M" as "(M1& M2& M3& M4& M5& M6& M7)". iFrame "Bek Fek". iSplitL "M1 M7".
-          * iRight. iFrame.
-          * iRight. iFrame.
+        + iDestruct "M" as "(M1& M2& M3& M4)". iLeft. iFrame.
+        + iDestruct "M" as "(M1& M2& M3& M4& M5& M6& M7)". iRight. iFrame.
     }
     assert (MDom : dom Δ1 = dom Δ2) by (eapply map_Forall2_dom_L; eauto).
     iMod (oforest_progress_one_thread_tvos with "[$S $T $F $Tei $Tbi $VMH]") as "(%& %Prog& S& T& F& Tbi& VMH)".
     1: auto.
     iPoseProof ("AccU" with "[VMR VMH]") as "[U VM]".
-    { iPoseProof (big_sepM_sep with "[$VMR $VMH]") as "M". iApply (big_sepM_impl with "M").
-      iIntros "!>" (???) "[(#Bek& #Fek& M1) M2]". destruct x; (iFrame; auto).
-      - iFrame.
-    iModIntro. 
+    { subst P Q1 Q2. iPoseProof (big_sepM_sep with "[$VMR $VMH]") as "M". iApply (big_sepM_impl with "M").
+      iIntros "!>" (???) "[(#Bek& #Fek& M1) M2]". iFrame "Bek Fek". destruct x.
+      - iDestruct "M2" as "($& $)".
+      - iDestruct "M1" as "($&$&$&$)". iDestruct "M2" as "[M | M]".
+        + iLeft. iDestruct "M" as "(($&$&$)& $)".
+        + iRight. iDestruct "M" as "(($&$&$&$&$)& $)".
+    }
+    iModIntro. iExists Ω'. iSplit; first auto. rewrite MDom. assert (dom Ω = dom Ω').
+    { eapply obl_states_cond_rel_dom; eauto. }
+    rewrite H1. iFrame.
+  Qed.
 
-    TODO
-
-oforest_progress_one_thread_tvos:
-  ∀ (Ω : obl_states) (TP : gset positive) (i : positive) (Ψ : obl_ids) (γ : gmap obl_id thread_view_obl),
-    Ψ = dom γ
-    → osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-      ([∗ map] ρ↦v ∈ γ, oblG_elem ρ ∗
-       match v with
-       | tvo_owned q _ => othreadG_owns i ρ true q ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
-       | tvo_maybe _ _ _ _ _ =>
-           othreadG_owns i ρ false (1 / 2) ∨ othreadG_owns i ρ true (1 / 2) ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
-       end)
-      ⊢ |==>
-          ∃ Ω' : obl_states, ⌜Ω ↪ₚ Ω' | obl_cond_owner i⌝ ∗ osat Ω' ∗ othread TP ∗ oforest (dom Ω') ∗ 
-            othreadG_obls i Ψ 1 ∗
-            ([∗ map] ρ↦v ∈ γ, match v with
-                              | tvo_owned q _ => othreadG_owns i ρ true q
-                              | tvo_maybe _ _ _ _ _ => othreadG_owns i ρ false (1 / 2) ∨ othreadG_owns i ρ true (1 / 2)
-                              end)
 
 End otree.
 
