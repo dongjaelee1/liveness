@@ -632,6 +632,29 @@ Section osat.
     by iApply oblG_progress_split_set.
   Qed.
 
+  Lemma oblG_progress_lt i a0 a1 :
+    a0 /< a1 →
+    oblG_progress i a1 ⊢ |==> oblG_progress i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress i c.
+  Proof.
+    intros LT. apply WFOCM.lt_exists_left in LT. destruct LT as (?& ?& ?).
+    iIntros "H". iMod (oblG_progress_mon_split _ _ _ _ H0 with "H") as "[H1 H2]".
+    iModIntro. iSplitL "H1"; iFrame. done.
+  Qed.
+  Lemma oblG_progress_lt_list L a0 a1 :
+    a0 /< a1 →
+    ([∗ list] i ∈ L, oblG_progress i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_progress i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress i c).
+  Proof.
+    iIntros (LT) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+    iModIntro. iIntros. by iApply oblG_progress_lt.
+  Qed.
+  Lemma oblG_progress_lt_set L a0 a1 :
+    a0 /< a1 →
+    ([∗ set] i ∈ L, oblG_progress i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_progress i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress i c).
+  Proof.
+    iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+    iModIntro. iIntros. by iApply oblG_progress_lt.
+  Qed.
+
   Lemma oblG_progress_supply_mon k a0 a1 q :
     a0 /≤ a1 →
     oblG_progress_supply k a0 q ⊢ |==> oblG_progress_supply k a1 q.

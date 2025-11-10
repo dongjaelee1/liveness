@@ -2385,7 +2385,7 @@ Section otree.
   Lemma tvos_aux_elems Ω D i (Δ : gmap obl_id thread_view_obl) :
     osat Ω ∗ osuspend D ∗
     (* from user *)
-    tvos_superposition i Δ
+    tvos_all i Δ
     ⊢ [∗ map] k ↦ v ∈ Δ,
           (⌜ k ∈ dom Ω ∧ k ∈ D ∧
            match v with
@@ -2395,7 +2395,7 @@ Section otree.
   Proof.
     iIntros "(S & U & M)".
     iStopProof. induction Δ using map_ind; iIntros "(S& U& M)"; first done.
-    rewrite /tvos_superposition. rewrite !big_sepM_insert; auto.
+    rewrite /tvos_all. rewrite !big_sepM_insert; auto.
     iDestruct "M" as "((#Bei& #Fei& Cx)& M)".
     iPoseProof (IHΔ with "[$]") as "#MIH". iFrame "MIH".
     iClear "MIH M".
@@ -2407,23 +2407,7 @@ Section otree.
       iPureIntro. split_and !; auto.
   Qed.
 
-  Lemma oforest_has_edge_live Ω π k q :
-    osat Ω ∗ oforest (dom Ω) ∗ oblG_elem π ∗ otreeG_edge π k q
-    ⊢ ∃ d, ⌜ Ω !! π = Some (obl_live d) ⌝.
-  Proof.
-    rewrite /oforest -lock. iIntros "(S& (%& F)& Bep& Fgp)".
-    iPoseProof (oforest_in_tree with "[$S $F $Bep]") as "(%&%&%&%)". destruct H1 as [LUr LUp].
-    rewrite /oforest_aux. iDestruct "F" as "(% & Fetk & FM)". destruct H1 as [Hfdom Hfwf].
-    iPoseProof (big_sepM_delete _ _ _ _ LUr with "FM") as "[Fr FM]".
-    iDestruct "Fr" as "[(%&Boρ&Toρ&Rm) | (OWNG&Be&Bd&%)]"; cycle 1.
-    { subst. rewrite /tree_singleton lookup_singleton in LUp.
-      destruct (decide (ρ = π)); auto. subst.
-      iPoseProof (otreeG_edge_lookup with "[$OWNG $Fgp]") as "%". done. }
-    iPoseProof (big_sepM_delete _ _ _ _ LUp with "Rm") as "[(_&_&Blp&_) Rm]".
-    iApply (osat_obl_is_live with "[$S $Bep $Blp]").
-  Qed.
-
-  Lemma oforest_tvos_acc Ω D i (M1 M2 : gmap obl_id thread_view_obl) :
+  Lemma oforest_tvos_all_acc Ω D i (M1 M2 : gmap obl_id thread_view_obl) :
     map_Forall2 (λ _ d1 d2,
                    match d1, d2 with
                    | tvo_owned q1 α1, tvo_owned q2 α2 =>
@@ -2435,7 +2419,7 @@ Section otree.
     D ⊆ dom Ω →
     osat Ω ∗ osuspend D ∗ oforest (dom Ω) ∗
     (* from user *)
-    tvos_superposition i M1
+    tvos_all i M1
     ⊢ |==> osat Ω ∗ oforest (dom Ω) ∗
         ([∗ map] k ↦ v ∈ M1,
            oblG_elem k ∗ otreeG_elem k ∗
@@ -2463,7 +2447,7 @@ Section otree.
                  ∨
                    (othreadG_owns i k true (1/2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k α ∗
                     otreeG_wait_null_auth k x))
-            end) -∗ (osuspend D ∗ tvos_superposition i M2)).
+            end) -∗ (osuspend D ∗ tvos_all i M2)).
   Proof.
     iIntros (MF SubDF) "(S & U & F & M)".
     iPoseProof (tvos_aux_elems with "[$S $U $M]") as "%ElemsM0".
@@ -2502,7 +2486,7 @@ Section otree.
                   ((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∨
                      (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ))
                   ∨ otreeG_wait_null_auth k x))) ∗
-           tvos_superposition i M2)
+           tvos_all i M2)
       )%I with "[-]" as "H"; cycle 1.
     { iMod "H" as "(S& F& MA& Acc)". iFrame "S F MA". iIntros "!> MA".
       iPoseProof ("Acc" with "MA") as "(H& $)".
@@ -2512,7 +2496,7 @@ Section otree.
     { apply map_Forall2_empty_inv_l in MF. subst. rewrite !big_sepM_empty. by iFrame. }
     rename i0 into k. apply map_Forall_insert in ElemsM; last auto. destruct ElemsM as [[DomOk DomSk] ElemsM].
     apply map_Forall2_insert_inv_l in MF; last auto. destruct MF as [x2 [m2 [-> [LUm2k [MFx MF]]]]].
-    rewrite /tvos_superposition. rewrite !big_sepM_insert; auto. iDestruct "M" as "((#Bek& #Fek& Mk)& M)".
+    rewrite /tvos_all. rewrite !big_sepM_insert; auto. iDestruct "M" as "((#Bek& #Fek& Mk)& M)".
     destruct x, x2. 2,3: done.
     - iMod (IHM1 m2 with "[$S $U $F $M]") as "(S& F& H& ACC)". 1,2,3: auto.
       clear IHM1. iModIntro. iFrame "S F Mk H". iSplitR; first auto.
@@ -2607,7 +2591,21 @@ Section otree.
              iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame.
   Qed.
 
-    TODO
+  Lemma oforest_has_edge_live Ω π k q :
+    osat Ω ∗ oforest (dom Ω) ∗ oblG_elem π ∗ otreeG_edge π k q
+    ⊢ ∃ d, ⌜ Ω !! π = Some (obl_live d) ⌝.
+  Proof.
+    rewrite /oforest -lock. iIntros "(S& (%& F)& Bep& Fgp)".
+    iPoseProof (oforest_in_tree with "[$S $F $Bep]") as "(%&%&%&%)". destruct H1 as [LUr LUp].
+    rewrite /oforest_aux. iDestruct "F" as "(% & Fetk & FM)". destruct H1 as [Hfdom Hfwf].
+    iPoseProof (big_sepM_delete _ _ _ _ LUr with "FM") as "[Fr FM]".
+    iDestruct "Fr" as "[(%&Boρ&Toρ&Rm) | (OWNG&Be&Bd&%)]"; cycle 1.
+    { subst. rewrite /tree_singleton lookup_singleton in LUp.
+      destruct (decide (ρ = π)); auto. subst.
+      iPoseProof (otreeG_edge_lookup with "[$OWNG $Fgp]") as "%". done. }
+    iPoseProof (big_sepM_delete _ _ _ _ LUp with "Rm") as "[(_&_&Blp&_) Rm]".
+    iApply (osat_obl_is_live with "[$S $Bep $Blp]").
+  Qed.
 
   Lemma oforest_big_wait_or_done_comm Ω D π
     (κ : gmap obl_id (positive * positive * A * iProp Σ)) :
@@ -2857,86 +2855,124 @@ Section otree.
     rewrite -lock. iFrame.
   Qed.
 
-  (* Rules for updating thread view *)
-  Lemma threadG_tvos_progress_one_thread Ω TP i Δ1 Δ2 :
-    osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗
+  (* Rules for updating thread view:
+     progress, suspend (owned -> maybe), check (maybe -> owned with done \/ maybe with α reset), refresh progress credits *)
+  Lemma threadG_tvos_progress_one_thread Ω TP i (Δ1 Δ2 : gmap obl_id thread_view_obl) :
+    osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗ osuspend (dom Ω) ∗
     (* from user *)
-    othreadG_elem i ∗ threadG_tvos i 1 Δ1 ∗
+    othreadG_elem i ∗ othreadG_obls i (dom Δ1) 1 ∗ tvos_all i Δ1 ∗
     ⌜ map_Forall2 (λ k d1 d2,
                      match d1, d2 with
                      | tvo_owned q1 α1, tvo_owned q2 α2 =>
                          (q1 = q2) ∧ (α2 /< α1)
-                     | tvo_maybe x1 π1 ψ1 γ1 q1 α1, tvo_maybe x2 π2 ψ2 γ2 q2 α2 =>
-                         (x1 = x2) ∧ (π1 = π2) ∧ (ψ1 = ψ2) ∧ (γ1 = γ2) ∧ (q1 = q2) ∧ (α2 /< α1)
+                     | tvo_maybe x1 π1 ψ1 γ1 α1, tvo_maybe x2 π2 ψ2 γ2 α2 =>
+                         (x1 = x2) ∧ (π1 = π2) ∧ (ψ1 = ψ2) ∧ (γ1 = γ2) ∧ (α2 /< α1)
                      | _, _ => False
-                     end
-      ) Δ1 Δ2 ⌝
+                     end) Δ1 Δ2 ⌝
     ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_owner i) ⌝) ∗
-              osat Ω' ∗ othread TP ∗ oforest (dom Ω') ∗
-              threadG_tvos i 1 Δ2.
+              osat Ω' ∗ othread TP ∗ oforest (dom Ω') ∗ osuspend (dom Ω') ∗
+              othreadG_obls i (dom Δ2) 1 ∗
+              tvos_all i Δ2.
   Proof.
-    
+    iIntros "(S& T& F& U& #Tei& Tbi& Vall& %MF)".
+    iMod (oforest_tvos_all_acc _ _ _ Δ1 Δ2 with "[$S $U $F $Vall]") as "(S& F& VM& AccU)".
+    { eapply map_Forall2_impl; eauto. simpl; intros. destruct x1, x2; auto.
+      - by destruct H1.
+      - destruct H1 as [? [? [? ?]]]. auto.
+    }
+    { auto. }
+    iAssert (
+        |==> [∗ map] k↦v ∈ Δ2,
+          oblG_elem k ∗ otreeG_elem k ∗
+          match v with
+          | tvo_owned q β =>
+              othreadG_owns i k true q ∗ oblG_progress k β ∗
+              ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress k a
+          | tvo_maybe x π ψ γ β =>
+              oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ ⌜β /≤ γ⌝ ∗
+              ((otreeG_wait k x (1 / 2) ∗ oblG_progress k γ ∗ othreadG_owns i k false (1 / 2) ∗ otreeG_edge π k 1) ∨
+                 (othreadG_owns i k true (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ 
+                  oblG_progress k β ∗ otreeG_wait_null_auth k x ∗
+                  ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress k a
+              ))
+          end
+      )%I with "[VM]" as ">VM".
+    { iClear "Tei". iStopProof. revert Δ2 MF. induction Δ1 using map_ind; iIntros (? MF) "VM".
+      { apply map_Forall2_empty_inv_l in MF. subst. iModIntro. done. }
+      apply map_Forall2_insert_inv_l in MF; last auto. destruct MF as (x2& m2& EQDm2& LUm2& MFx& MF).
+      subst. rewrite !big_sepM_insert; auto. iDestruct "VM" as "((#Bei& #Fei& V)& VM)".
+      iMod (IHΔ1 _ MF with "VM") as "VM2". iFrame "Bei Fei VM2". clear IHΔ1 MF.
+      destruct x, x2; try done.
+      - destruct MFx. subst. iDestruct "V" as "[V P]".
+        iMod (oblG_progress_lt _ _ _ H3 with "P") as "[P Pc]". by iFrame.
+      - destruct MFx as [? [? [? [? ?]]]]. subst. iDestruct "V" as "($&$&$& %& [V | V])".
+        + iModIntro. iSplitR.
+          { iPureIntro. etransitivity; last eauto. eapply WFOCM.lt_le; eauto. }
+          iLeft. iFrame.
+        + iDestruct "V" as "(V0& V1& V2& V3& P& V4)".
+          iMod (oblG_progress_lt _ _ _ H6 with "P") as "[P Pc]".
+          iModIntro. iSplitR.
+          { iPureIntro. etransitivity; last eauto. eapply WFOCM.lt_le; eauto. }
+          iRight. iFrame.
+    }
 
-  TODO
-oforest_wait_cases_many:
-  ∀ (Ω : obl_states) (D : obl_ids) (π : obl_id) (κ : gmap obl_id (positive * positive * A)),
-    osat Ω ∗ osuspend D ∗ oforest D ∗ oblG_elem π ∗ otreeG_elem π ∗
-    ([∗ map] k↦'(x, θ, ψ) ∈ κ, otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1 / 2))
-    ⊢ |==> osat Ω ∗ oforest D ∗
-        (([∗ map] k↦'(x, _, _) ∈ κ, otreeG_wait k x (1 / 2)) ∗
-         ([∗ map] k↦'(_, θ, _) ∈ κ, othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∗
-         (([∗ map] k↦'(_, θ, _) ∈ κ, othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) -∗
-          osuspend D)
-         ∨ osuspend D ∗ oblG_done π ∗
-         ([∗ map] k↦'(_, θ, ψ) ∈ κ, othreadG_owns θ k true (1 / 2) ∗ oblG_progress k ψ))
-  Lemma oforest_progress_one_thread Ω TP i Ψ (γ : gmap obl_id (bool * Qp)) :
-    Ψ = dom γ →
-    osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗
-    (* from user *)
-    othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-    ([∗ map] ρ ↦ '(f, q) ∈ γ,
-       match f with
-       | true => (oblG_elem ρ ∗ othreadG_owns i ρ f q ∗ ∃ a, ⌜ /0 /< a ⌝ ∗ oblG_progress ρ a)
-       | false => (oblG_elem ρ ∗ othreadG_owns i ρ f q)
+    TODO
+    iAssert (
+        ([∗ map] ρ↦v ∈ Δ2,
+           oblG_elem ρ ∗
+           match v with
+           | tvo_owned q _ =>
+               othreadG_owns i ρ true q ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
+           | tvo_maybe _ _ _ _ _ =>
+               othreadG_owns i ρ false (1 / 2) ∨ othreadG_owns i ρ true (1 / 2) ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
+           end) ∗
+        ([∗ map] k↦v ∈ Δ2,
+           oblG_elem k ∗ otreeG_elem k ∗
+           match v with
+           | tvo_owned q β =>
+               oblG_progress k β
+           | tvo_maybe x π ψ γ β =>
+               oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ ⌜β /≤ γ⌝ ∗
+               ((otreeG_wait k x (1 / 2) ∗ oblG_progress k γ ∗ otreeG_edge π k 1)
+                ∨ (oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ oblG_progress k β ∗ otreeG_wait_null_auth k x))
+           end)
+      )%I with "[VM]" as "[VMH VMR]".
+    { rewrite -big_sepM_sep. iApply (big_sepM_impl with "VM"). iIntros "!>" (???) "(#Bek& #Fek& M)". destruct x.
+      - iDestruct "M" as "($& P1& P2)". iSplitL "P2"; (iFrame; auto).
+      - iDestruct "M" as "($& $& $& $& [M | M])".
+        + iDestruct "M" as "(M1& M2& M3& M4)". iSplitL "M3"; (iFrame; auto). iFrame "Bek Fek". iLeft. iFrame.
+        + iDestruct "M" as "(M1& M2& M3& M4& M5& M6& M7)". iFrame "Bek Fek". iSplitL "M1 M7".
+          * iRight. iFrame.
+          * iRight. iFrame.
+    }
+    assert (MDom : dom Δ1 = dom Δ2) by (eapply map_Forall2_dom_L; eauto).
+    iMod (oforest_progress_one_thread_tvos with "[$S $T $F $Tei $Tbi $VMH]") as "(%& %Prog& S& T& F& Tbi& VMH)".
+    1: auto.
+    iPoseProof ("AccU" with "[VMR VMH]") as "[U VM]".
+    { iPoseProof (big_sepM_sep with "[$VMR $VMH]") as "M". iApply (big_sepM_impl with "M").
+      iIntros "!>" (???) "[(#Bek& #Fek& M1) M2]". destruct x; (iFrame; auto).
+      - iFrame.
+    iModIntro. 
+
+    TODO
+
+oforest_progress_one_thread_tvos:
+  ∀ (Ω : obl_states) (TP : gset positive) (i : positive) (Ψ : obl_ids) (γ : gmap obl_id thread_view_obl),
+    Ψ = dom γ
+    → osat Ω ∗ othread TP ∗ oforest (dom Ω) ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
+      ([∗ map] ρ↦v ∈ γ, oblG_elem ρ ∗
+       match v with
+       | tvo_owned q _ => othreadG_owns i ρ true q ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
+       | tvo_maybe _ _ _ _ _ =>
+           othreadG_owns i ρ false (1 / 2) ∨ othreadG_owns i ρ true (1 / 2) ∗ ∃ a : A, ⌜/0 /< a⌝ ∗ oblG_progress ρ a
        end)
-    ⊢ |==> ∃ Ω', (⌜ Ω ↪ₚ Ω' | (obl_cond_owner i) ⌝) ∗
-                 osat Ω' ∗ othread TP ∗ oforest (dom Ω') ∗
-                 othreadG_obls i Ψ 1 ∗
-                 ([∗ map] ρ ↦ '(f, q) ∈ γ,
-                    match f with
-                    | true => (othreadG_owns i ρ f q)
-                    | false => (othreadG_owns i ρ f q)
-                    end).
-  Lemma oforest_suspend_one_tree Ω TP k θ π ψ ℵ a b :
-    ℵ /< a →
-    /0 /< b →
-    osat Ω ∗ othread TP ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗
-    (* from user *)
-    oblG_elem π ∗ oblG_suspend_bound π ℵ ∗
-    othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
-    oblG_elem k ∗ otreeG_elem k ∗ oblG_suspend k a ∗ oblG_suspend k b
-    ⊢ (osat Ω ∗ othread TP ∗ osuspend (dom Ω) ∗ oforest (dom Ω) ∗
-       othreadG_owns θ k true (1/2)%Qp ∗ oblG_suspend k a ∗ oblG_suspend k b ∗
-       oblG_done π) ∨
-        (|==> ∃ (C : obl_cond) Ω',
-            (⌜ (Ω ↪ₛ Ω' | C) ∧ (∀ k o, (C k o ∨ ¬ C k o)) ⌝) ∗
-            osat Ω' ∗ othread TP ∗ osuspend (dom Ω') ∗ oforest (dom Ω') ∗
-            ∃ x, otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)%Qp).
-  Lemma oforest_big_wait_or_done_comm Ω D π
-    (κ : gmap obl_id (positive * positive * A * iProp Σ)) :
-    osat Ω ∗ osuspend D ∗ oforest D ∗
-    (* from user *)
-    oblG_elem π ∗ otreeG_elem π ∗
-    ([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
-       (P ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2)) ∨
-         (oblG_done π ∗ othreadG_owns θ k true (1/2) ∗ oblG_progress k ψ)
-    )
-    ⊢ |==> osat Ω ∗ osuspend D ∗ oforest D ∗
-           (([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
-               (P ∗ otreeG_elem k ∗ otreeG_suspend k x θ π ψ ∗ otreeG_wait k x (1/2))) ∨
-              ([∗ map] k ↦ '(x, θ, ψ, P) ∈ κ,
-                 (oblG_done π ∗ othreadG_owns θ k true (1/2) ∗ oblG_progress k ψ))
-           ).
+      ⊢ |==>
+          ∃ Ω' : obl_states, ⌜Ω ↪ₚ Ω' | obl_cond_owner i⌝ ∗ osat Ω' ∗ othread TP ∗ oforest (dom Ω') ∗ 
+            othreadG_obls i Ψ 1 ∗
+            ([∗ map] ρ↦v ∈ γ, match v with
+                              | tvo_owned q _ => othreadG_owns i ρ true q
+                              | tvo_maybe _ _ _ _ _ => othreadG_owns i ρ false (1 / 2) ∨ othreadG_owns i ρ true (1 / 2)
+                              end)
 
 End otree.
 
