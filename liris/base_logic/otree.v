@@ -141,11 +141,41 @@ Definition oforest `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
 (* From a thread's view, its obligation has the following life cycle:
      owned -> maybe = suspended \/ returned -> owned -> ... -> resolved.
  *)
-Variant thread_view_obl {A : Type} `{WFA : WFOCM.pack A} : Type :=
-  | tvo_owned (q : Qp) (δ : A) (α : A)
-  | tvo_maybe (x : positive) (π : obl_id) (ψ : A) (δ0 δ1 : A) (α0 α1 : A).
 
-Definition tvos_owned `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
+Variant tvo_sus {A : Type} `{WFA : WFOCM.pack A} : Type :=
+  | tvo_sus_data (x : positive) (π : obl_id) (ψ δ α : A).
+
+Variant thread_view_obl {A : Type} `{WFA : WFOCM.pack A} : Type :=
+  | tvo (l : list tvo_sus) (δ : A) (α : A).
+(* | tvo_maybe (x : positive) (π : obl_id) (ψ : A) (δ0 δ1 : A) (α0 α1 : A). *)
+
+Fixpoint tvo_interp `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS A Σ}
+  (i : positive) (k : obl_id) (l : list tvo_sus) (δ : A) (α : A) : iProp Σ :=
+  match l with
+  | nil =>
+      othreadG_owns i k true (1/2) ∗ oblG_suspend k δ ∗ oblG_progress k α
+  | hd :: tl =>
+      match hd with
+      | tvo_sus_data x π ψ η β =>
+         oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ (⌜ WFOCM.leR δ η ∧ WFOCM.leR α β ⌝) ∗
+         ((otreeG_wait k x (1/2) ∗ oblG_suspend k η ∗ oblG_progress k β)
+          ∨
+            (oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ tvo_interp i k tl δ α))
+      end
+  end.
+
+Definition tvos_interp `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS A Σ}
+  (i : positive) (Δ : gmap obl_id (thread_view_obl (WFA:=WFA))) : iProp Σ :=
+  ([∗ map] k ↦ v ∈ Δ,
+     oblG_elem k ∗ otreeG_elem k ∗
+     match v with
+     | tvo l δ α => tvo_interp i k l δ α
+     end)%I.
+
+Definition tvos_owned
+  `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS A Σ}
   (i : positive) (Δ : gmap obl_id (thread_view_obl (WFA:=WFA))) : iProp Σ :=
   ([∗ map] k ↦ v ∈ Δ,
