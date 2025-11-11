@@ -42,8 +42,9 @@ liris/algebra/ordinal_existential_properties.v
 liris/base_logic/thread_map.v
 liris/base_logic/obligation.v
 liris/base_logic/osat.v
-liris/base_logic/otree.v
 liris/base_logic/othread.v
+liris/base_logic/otree.v
+liris/base_logic/thread_view_obls.v
 liris/base_logic/relational_updates.v
 liris/base_logic/later_credits.v
 liris/base_logic/fancy_updates.v
