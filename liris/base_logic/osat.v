@@ -988,6 +988,37 @@ Section osat.
     simpl; iPureIntro; split; auto. eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
+  Lemma osat_obl_suspend_one_simple Ω k α τ τ' β c x1 :
+    (Ω !! k = Some (olive α τ β)) →
+    (/0 /< c) →
+    osat Ω ∗ oblG_owner k x1 (1/2)%Qp ∗
+    oblG_suspend k c
+    ⊢ |==> ∃ α', osat (<[k:=olive α' τ' β]>Ω) ∗
+                 ⌜ obl_state_suspend (olive α τ β) (olive α' τ' β) ⌝ ∗
+                 oblG_owner k τ' (1/2)%Qp ∗
+                 oblG_suspend_bound k α'.
+  Proof.
+    intros LU Hc. iIntros "(Hsat & Ho0 & Ht)".
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP&HE & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
+    iMod (oblG_suspend_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
+    assert (LT : a2 /< α0).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    iMod (oblG_suspend_bound_auth_mon _ _ a2 with "Hb") as "Hb".
+    { apply WFOCM.lt_le; auto. }
+    iPoseProof (oblG_suspend_bound_know with "Hb") as "#Hbk".
+    iMod (oblG_owner_update_2 _ _ _ _ _ τ' with "[Ho0 Ho]") as "[Ho0 Ho]"; [apply Qp.div_2 | iFrame|].
+    simpl in *.
+    iModIntro. iExists a2. 
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (olive a2 τ' β)) with "[Hm Hs Hts Hb Ho Hps]") as "Hm".
+    { apply lookup_delete_eq. }
+    { iFrame "Hm". iFrame. simpl. iSplit; done. }
+    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HS HT HB HO HP HE".
+    rewrite insert_delete_eq. iFrame. iFrame "Hbk".
+    simpl; iPureIntro; split; auto. eapply WFOCM.lt_le_lt; eauto.
+  Qed.
+
   Lemma osat_obl_suspend_one_with_bound Ω k α τ τ' β β' ℵ c x1 x2 :
     (Ω !! k = Some (olive α τ β)) →
     (/0 /< c) →
@@ -1015,6 +1046,38 @@ Section osat.
     iMod (oblG_progress_supply_issue_2 _ _ _ β _ β' with "[Hps Hps0]") as "(Hps&Hps0&Hp)"; [apply Qp.div_2|iFrame|].
     iModIntro. iExists a2. 
     iPoseProof ((big_sepM_insert _ (delete k Ω) k (olive a2 τ' (β /+ β'))) with "[Hm Hs Hts Hb Ho Hps]") as "Hm".
+    { apply lookup_delete_eq. }
+    { iFrame "Hm". iFrame. simpl. iSplit; done. }
+    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HS HT HB HO HP".
+    rewrite insert_delete_eq. iFrame. iFrame "Hbk". simpl; iPureIntro; split; auto.
+    split; eapply WFOCM.lt_le_lt; eauto.
+  Qed.
+
+  Lemma osat_obl_suspend_one_with_bound_simple Ω k α τ τ' β ℵ c x1 :
+    (Ω !! k = Some (olive α τ β)) →
+    (/0 /< c) →
+    osat Ω ∗ oblG_owner k x1 (1/2)%Qp ∗
+    oblG_suspend_bound k ℵ ∗ oblG_suspend k c
+    ⊢ |==> ∃ α', osat (<[k:=olive α' τ' β]>Ω) ∗
+                 ⌜ obl_state_suspend (olive α τ β) (olive α' τ' β) ∧ α' /< ℵ ⌝ ∗
+                 oblG_owner k τ' (1/2)%Qp ∗
+                 oblG_suspend_bound k α'.
+  Proof.
+    intros LU Hc. iIntros "(Hsat & Ho0 & #Htb & Ht)".
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP&HE & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
+    iMod (oblG_suspend_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
+    assert (LT : a2 /< α0).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    iPoseProof (oblG_suspend_bound_know_bound k with "[Hb Htb]") as "%LEℵ"; first by iFrame.
+    iMod (oblG_suspend_bound_auth_mon _ _ a2 with "Hb") as "Hb".
+    { apply WFOCM.lt_le; auto. }
+    iPoseProof (oblG_suspend_bound_know with "Hb") as "#Hbk".
+    iMod (oblG_owner_update_2 _ _ _ _ _ τ' with "[Ho0 Ho]") as "[Ho0 Ho]"; [apply Qp.div_2 | iFrame|].
+    simpl in *.
+    iModIntro. iExists a2. 
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (olive a2 τ' β)) with "[Hm Hs Hts Hb Ho Hps]") as "Hm".
     { apply lookup_delete_eq. }
     { iFrame "Hm". iFrame. simpl. iSplit; done. }
     rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HS HT HB HO HP".
@@ -1055,13 +1118,43 @@ Section osat.
     split; eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
-  Lemma osat_obl_progress_one Ω k α τ β c x0 :
+  Lemma osat_obl_suspend_one_with_bound_stay_simple Ω k α τ β ℵ c :
     (Ω !! k = Some (olive α τ β)) →
     (/0 /< c) →
-    osat Ω ∗ oblG_progress k c ∗ oblG_progress_supply k x0 (1/2)%Qp
+    osat Ω ∗
+    oblG_suspend_bound k ℵ ∗ oblG_suspend k c
+    ⊢ |==> ∃ α', osat (<[k:=olive α' τ β]>Ω) ∗
+                 ⌜ obl_state_suspend (olive α τ β) (olive α' τ β) ∧ α' /< ℵ ⌝ ∗
+                 oblG_suspend_bound k α'.
+  Proof.
+    intros LU Hc. iIntros "(Hsat & #Htb & Ht)".
+    rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP&HE & Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    iDestruct "Hk" as "( Hs & (%&%Htle&Hts&Hb) & Ho & (%&%&Hps) )".
+    iMod (oblG_suspend_spend _ α0 with "[Hts Ht]") as "(%&%&Hts)"; first iFrame.
+    assert (LT : a2 /< α0).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    iPoseProof (oblG_suspend_bound_know_bound k with "[Hb Htb]") as "%LEℵ"; first by iFrame.
+    iMod (oblG_suspend_bound_auth_mon _ _ a2 with "Hb") as "Hb".
+    { apply WFOCM.lt_le; auto. }
+    iPoseProof (oblG_suspend_bound_know with "Hb") as "#Hbk".
+    simpl in *.
+    iModIntro. iExists a2. 
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (olive a2 τ β)) with "[Hm Hs Hts Hb Ho Hps]") as "Hm".
+    { apply lookup_delete_eq. }
+    { iFrame "Hm". iFrame. simpl. iSplit; done. }
+    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HS HT HB HO HP".
+    rewrite insert_delete_eq. iFrame. iFrame "Hbk". simpl; iPureIntro; split; auto.
+    split; eapply WFOCM.lt_le_lt; eauto.
+  Qed.
+
+  Lemma osat_obl_progress_one Ω k α τ β c x0 q :
+    (Ω !! k = Some (olive α τ β)) →
+    (/0 /< c) →
+    osat Ω ∗ oblG_progress k c ∗ oblG_progress_supply k x0 q
     ⊢ |==> ∃ β', osat (<[k:=olive α τ β']>Ω) ∗
                  ⌜ obl_state_progress (olive α τ β) (olive α τ β') ∧ β' /< x0  ⌝ ∗
-                 oblG_progress_supply k β' (1/2)%Qp.
+                 oblG_progress_supply k β' q.
   Proof.
     intros LU Hc. iIntros "(Hsat & Hp & Hps0)".
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS&HT&HB&HO&HP&HE & Hm)".

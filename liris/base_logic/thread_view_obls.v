@@ -27,7 +27,9 @@ Fixpoint tvo_interp `{SI : indexT} {A : Type} `{WFA : WFOCM.pack A} {ps} {Σ}
       match hd with
       | tvo_sus_data x π ψ η β =>
           (oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k x i π ψ ∗ (⌜ WFOCM.leR δ η ∧ WFOCM.leR α β ⌝) ∗
-           ((otreeG_wait k x (1/2) ∗ oblG_suspend k η ∗ oblG_progress k β)
+           ((otreeG_wait k x (1/2) ∗ oblG_suspend k η ∗ oblG_progress k β ∗
+             ((othreadG_owns i k true (1/2) ∗ oblG_suspend k δ ∗ oblG_progress k α)
+              ==∗ tvo_interp i k tl δ α))
             ∨
               (oblG_done π ∗ oblG_progress k ψ ∗ otreeG_wait_null k x ∗ tvo_interp i k tl δ α)))
       end
@@ -104,11 +106,28 @@ Section tvos.
   Context {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS.otreeGS A Σ}.
   Context `{Ξl : obl_live_class A positive WFOCM.ltR} `{Ξd : obl_done_class ps}.
 
+  Local Existing Instances
+    otreeGS.otree_inG otreeGS.otreeGpreS_edge otreeGS.otreeGpreS_suspend otreeGS.otreeGpreS_wait otreeGS.otreeGpreS_elem.
+
   Local Infix "/=" := OCM.eq (at level 70).
   Local Infix "/≤" := WFOCM.leR (at level 70).
   Local Infix "/+" := WFOCM.addO (at level 70).
   Local Infix "/<" := WFOCM.ltR (at level 70).
   Local Notation "/0" := OCM.unit.
+
+  Lemma tvos_elems Ω D i (Δ : gmap obl_id thread_view_obl) :
+    osat Ω ∗ osuspend D ∗
+    tvos_interp i Δ
+    ⊢ [∗ map] k ↦ v ∈ Δ, (⌜ k ∈ dom Ω ∧ k ∈ D ⌝).
+  Proof.
+    induction Δ using map_ind; iIntros "(S& U& M)"; first done.
+    rewrite /tvos_interp. rewrite !big_sepM_insert; auto.
+    iDestruct "M" as "((#Bei& #Fei& Cx)& M)".
+    iPoseProof (IHΔ with "[$]") as "#MIH". iFrame "MIH".
+    iClear "MIH M".
+    iPoseProof (osat_elem with "[$S $Bei]") as "%". iPoseProof (osuspend_elem_elem with "[$U $Fei]") as "%".
+    iPureIntro. done.
+  Qed.
 
   Fixpoint tvo_interp_temp
     (B1 B2 : obl_id → A → A → iProp Σ) (C P1 P2 : obl_id → A → A → positive → obl_id → A → A → A → iProp Σ)
@@ -192,6 +211,120 @@ Section tvos.
     - iDestruct "H" as "(P2& H)". iPoseProof (IHl with "H") as "(H& ACC)". iFrame "H". iIntros "H".
       iPoseProof ("ACC" with "H") as "H". iFrame. iRight. iFrame.
   Qed.
+
+  Lemma tvo_interp_temp_impl i k l δ α :
+    tvo_interp_temp
+      (λ (k0 : obl_id) (δ1 α2 : A), oblG_suspend k0 δ1 ∗ oblG_progress k0 α2)
+      (λ (_ : obl_id) (_ _ : A), True)
+      (λ (k0 : obl_id) (δ1 α2 : A) (x0 : positive) (π0 : obl_id) (ψ0 η β : A), oblG_elem π0 ∗ otreeG_elem π0 ∗ otreeG_suspend k0 x0 i π0 ψ0 ∗ ⌜δ1 /≤ η ∧ α2 /≤ β⌝)
+      (λ (k0 : obl_id) (_ _ : A) (x0 : positive) (π0 : obl_id) (_ η β : A), otreeG_wait k0 x0 (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π0 k0 1)
+      (λ (k0 : obl_id) (_ _ : A) (x0 : positive) (π0 : obl_id) (ψ0 _ _ : A), oblG_done π0 ∗ oblG_progress k0 ψ0 ∗ otreeG_wait_null k0 x0 ∗ otreeG_wait_null_auth k0 x0)
+      i k l δ α
+    ⊢ tvo_interp i k l δ α.
+  Proof.
+    induction l; simpl; iIntros "H".
+    { iDestruct "H" as "(($& $)& $& _)". }
+    destruct a. iDestruct "H" as "((#Bep& #Fep& #Fuk& %LE)& [M | M])".
+    - iFrame "Bep Fep Fuk". iSplitR; first auto. iLeft. iDestruct "M" as "(($& $& $& _)& _)".
+    - iFrame "Bep Fep Fuk". iSplitR; first auto. iRight. iDestruct "M" as "(($& $& $& _)& M)".
+      iPoseProof (IHl with "M") as "M". iFrame.
+  Qed.
+
+  Lemma tvo_interp_acc (* Ω *) i k l δ α α0 (KSus : gmap positive (prodO (prodO positiveO obl_idO) (leibnizO A))) :
+    (* oblG_elem k ∗ otreeG_elem k ∗ *)
+    (* osat Ω ∗ oforest (dom Ω) ∗ *)
+    tvo_interp i k l δ α
+    ∗ (own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> (KSus : gmap positive (positive * obl_id * leibnizO A))))) ∗
+       own otreeGS.wait_name (reservation_map_data k (reservation_map_token (⊤ ∖ gset_to_coPset (dom KSus)))) ∗
+       ([∗ map] x↦'(θ, π, ψ) ∈ KSus,
+          ((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∨
+             (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ)) ∨
+            otreeG_wait_null_auth k x))
+    ⊢ |==>
+          (* osat Ω ∗ oforest (dom Ω) ∗ *)
+          (
+            (* oblG_elem k ∗ otreeG_elem k ∗ *)
+           tvo_interp_temp
+             (λ (k0 : obl_id) (δ0 α1 : A), oblG_suspend k0 δ0 ∗ oblG_progress k0 α1)
+             (λ (_ : obl_id) (_ _ : A), True)
+             (λ (k0 : obl_id) (δ0 α1 : A) (x : positive) (π : obl_id) (ψ η β : A), oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k0 x i π ψ ∗ ⌜δ0 /≤ η ∧ α1 /≤ β⌝)
+             (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (_ η β : A), otreeG_wait k0 x (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π k0 1)
+             (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (ψ _ _ : A), oblG_done π ∗ oblG_progress k0 ψ ∗ otreeG_wait_null k0 x ∗ otreeG_wait_null_auth k0 x)
+             i k l δ α) ∗
+          ((
+              (* oblG_elem k ∗ otreeG_elem k ∗ *)
+            tvo_interp_temp
+              (λ (k0 : obl_id) (δ0 α1 : A), oblG_suspend k0 δ0 ∗ oblG_progress k0 α1)
+              (λ (_ : obl_id) (_ _ : A), True)
+              (λ (k0 : obl_id) (δ0 α1 : A) (x : positive) (π : obl_id) (ψ η β : A), oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k0 x i π ψ ∗ ⌜δ0 /≤ η ∧ α1 /≤ β⌝)
+              (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (_ η β : A), otreeG_wait k0 x (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π k0 1)
+              (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (ψ _ _ : A), oblG_done π ∗ oblG_progress k0 ψ ∗ otreeG_wait_null k0 x ∗ otreeG_wait_null_auth k0 x)
+              i k l δ α0) -∗
+           ((own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> (KSus : gmap positive (positive * obl_id * leibnizO A))))) ∗
+             own otreeGS.wait_name (reservation_map_data k (reservation_map_token (⊤ ∖ gset_to_coPset (dom KSus)))) ∗
+             ([∗ map] x↦'(θ, π, ψ) ∈ KSus,
+                ((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∨
+                   (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ)) ∨
+                  otreeG_wait_null_auth k x)) ∗
+            (
+              (* oblG_elem k ∗ otreeG_elem k ∗ *)
+              tvo_interp i k l δ α0))).
+  Proof.
+    revert δ α α0 KSus.
+    induction l; intros; iIntros "(V& (Uk1& Uk2& UkM))".
+    (* induction l; intros; iIntros "(#Bek& #Fek& S& F& V& (Uk1& Uk2& UkM))". *)
+    { simpl. iModIntro. iFrame. iSplitL "V".
+      - iDestruct "V" as "($& $& $)".
+      - iIntros "($& $& ($&$)& $& _)". }
+    simpl. destruct a. iDestruct "V" as "(#Bep& #Fep& #Fuk& %LE& [V | V])".
+    - destruct LE as [LEdg LEag]. iDestruct "V" as "(Fwk& Bsk& Bpk)".
+      iPoseProof (otreeG_suspend_lookup with "[$Uk1 $Fuk]") as "%ElemKk".
+      iPoseProof (big_sepM_delete _ _ _ _ ElemKk with "UkM") as "[[[Ukx | Ukx] | Ukx] UkM]".
+      + iDestruct "Ukx" as "[Ukx1 Ukx2]".
+        iModIntro. iSplitL "Fwk Bsk Bpk Ukx1 Ukx2".
+        { iFrame "Bep Fep Fuk". iSplit; first done. iLeft. iFrame. }
+        iIntros "((_&_&_& %LEag2)& [Mk | Mk])".
+        * destruct LEag2 as [LEdg2 LEag2].
+          iDestruct "Mk" as "((Fwk& Bsk& Bpk& Fgk)& Tok)". iSplitR "Fwk Bsk Bpk".
+          -- iFrame. iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame.
+          -- iFrame "Bep Fep Fuk". iSplit; first done. iLeft. iFrame.
+        * iDestruct "Mk" as "((#Bdp& Bpk& #Fwnk& Fwnak)& Tok)".
+          iSplitR "Tok Bpk".
+          -- iFrame. iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame.
+          -- iFrame "Bep Fep Fuk". iSplit; first done. iRight. iFrame "Bdp Bpk Fwnk".
+             iApply (tvo_interp_temp_impl with "Tok").
+      + iDestruct "Ukx" as "(Tok& Fwk2& #Bdp& Bpk2)".
+        iMod (otreeG_wait_to_null_2 with "[$Fwk $Fwk2]") as "Fwnak".
+        { apply Qp.div_2. }
+        iPoseProof (otreeG_wait_null_auth_wait_null with "Fwnak") as "#Fwnk".
+        iMod (oblG_suspend_mon _ _ _ LEdg with "Bsk") as "Bsk".
+        iMod (oblG_progress_mon _ _ _ LEag with "Bpk") as "Bpk".
+        iModIntro. iSplitL "Tok Bpk2 Bsk Bpk Fwnak".
+        { iFrame "Bep Fep Fuk". iSplit; first done. iRight. iFrame. iFrame "Bdp Fwnk".
+
+          TODO
+
+          auto. }
+        iIntros "[Mk M]". iPoseProof ("ACC" with "M") as "[U M]". iFrame "M".
+        iDestruct "Mk" as "(_&_&_&_&_& %LEag2& [Mk | Mk])".
+        -- destruct LEag2 as [LEdg2 LEag2].
+           iDestruct "Mk" as "(Fwk& Bsk& Bpk& Tok& Fgk)". iSplitR "Fwk Bsk Bpk".
+           ++ iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame.
+              iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame.
+           ++ iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iLeft. iFrame.
+        -- destruct LEag2 as [LEdg2 LEag2].
+           iDestruct "Mk" as "(Tok& #bdp& Bpk& _& Bsk& Bpk2& Fwnka)". iSplitR "Tok Bpk Bsk Bpk2"; cycle 1.
+           { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iRight. iFrame. auto. }
+           iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame "Uk1 Uk2 U".
+           iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame.
+        * iPoseProof (otreeG_wait_null_auth_false with "[$Fwk $Ukx]") as "%F". done.
+
+    
+otreeG_suspend_lookup
+     : ∀ (k : positive) (KSus : gmap positive (prodO (prodO positiveO obl_idO) (leibnizO A))) (x θ : positive) 
+         (π : obl_id) (ψ : A),
+         own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> KSus))) ∗
+         otreeG_suspend k x θ π ψ ⊢ ⌜KSus !! x = Some (θ, π, ψ)⌝
 
   Lemma oforest_aux_progress_one_thread_tvos Ω TP Φ i Ψ (γ : gmap obl_id thread_view_obl)
     (B : obl_id → A → A → iProp Σ) (Q P1 P2 : obl_id → A → A → positive → obl_id → A → A → A → iProp Σ) :
@@ -433,134 +566,122 @@ Section tvos.
     iDestruct "H" as "(%&%&S&T&F&H)". iModIntro. iFrame. rewrite /oforest -lock. by iFrame.
   Qed.
 
-  Lemma tvos_elems Ω D i (Δ : gmap obl_id thread_view_obl) :
-    osat Ω ∗ osuspend D ∗
-    tvos_interp i Δ
-    ⊢ [∗ map] k ↦ v ∈ Δ, (⌜ k ∈ dom Ω ∧ k ∈ D ⌝).
-  Proof.
-    induction Δ using map_ind; iIntros "(S& U& M)"; first done.
-    rewrite /tvos_interp. rewrite !big_sepM_insert; auto.
-    iDestruct "M" as "((#Bei& #Fei& Cx)& M)".
-    iPoseProof (IHΔ with "[$]") as "#MIH". iFrame "MIH".
-    iClear "MIH M".
-    iPoseProof (osat_elem with "[$S $Bei]") as "%". iPoseProof (osuspend_elem_elem with "[$U $Fei]") as "%".
-    iPureIntro. done.
-  Qed.
+(*   Local Existing Instances *)
+(*     otreeGS.otree_inG otreeGS.otreeGpreS_edge otreeGS.otreeGpreS_suspend otreeGS.otreeGpreS_wait otreeGS.otreeGpreS_elem. *)
 
-  Local Existing Instances
-    otreeGS.otree_inG otreeGS.otreeGpreS_edge otreeGS.otreeGpreS_suspend otreeGS.otreeGpreS_wait otreeGS.otreeGpreS_elem.
+(*   Lemma tvo_interp_temp_impl i k l δ α : *)
+(*     tvo_interp_temp *)
+(*       (λ (k0 : obl_id) (δ1 α2 : A), oblG_suspend k0 δ1 ∗ oblG_progress k0 α2) *)
+(*       (λ (_ : obl_id) (_ _ : A), True) *)
+(*       (λ (k0 : obl_id) (δ1 α2 : A) (x0 : positive) (π0 : obl_id) (ψ0 η β : A), oblG_elem π0 ∗ otreeG_elem π0 ∗ otreeG_suspend k0 x0 i π0 ψ0 ∗ ⌜δ1 /≤ η ∧ α2 /≤ β⌝) *)
+(*       (λ (k0 : obl_id) (_ _ : A) (x0 : positive) (π0 : obl_id) (_ η β : A), otreeG_wait k0 x0 (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π0 k0 1) *)
+(*       (λ (k0 : obl_id) (_ _ : A) (x0 : positive) (π0 : obl_id) (ψ0 _ _ : A), oblG_done π0 ∗ oblG_progress k0 ψ0 ∗ otreeG_wait_null k0 x0 ∗ otreeG_wait_null_auth k0 x0) *)
+(*       i k l δ α *)
+(*     ⊢ tvo_interp i k l δ α. *)
+(*   Proof. *)
+(*     induction l; simpl; iIntros "H". *)
+(*     { iDestruct "H" as "(($& $)& $& _)". } *)
+(*     destruct a. iDestruct "H" as "((#Bep& #Fep& #Fuk& %LE)& [M | M])". *)
+(*     - iFrame "Bep Fep Fuk". iSplitR; first auto. iLeft. iDestruct "M" as "(($& $& $& _)& _)". *)
+(*     - iFrame "Bep Fep Fuk". iSplitR; first auto. iRight. iDestruct "M" as "(($& $& $& _)& M)". *)
+(*       iPoseProof (IHl with "M") as "M". iFrame. *)
+(*   Qed. *)
 
-  Lemma tvo_interp_temp_impl i k l δ α :
-    tvo_interp_temp
-      (λ (k0 : obl_id) (δ1 α2 : A), oblG_suspend k0 δ1 ∗ oblG_progress k0 α2)
-      (λ (_ : obl_id) (_ _ : A), True)
-      (λ (k0 : obl_id) (δ1 α2 : A) (x0 : positive) (π0 : obl_id) (ψ0 η β : A), oblG_elem π0 ∗ otreeG_elem π0 ∗ otreeG_suspend k0 x0 i π0 ψ0 ∗ ⌜δ1 /≤ η ∧ α2 /≤ β⌝)
-      (λ (k0 : obl_id) (_ _ : A) (x0 : positive) (π0 : obl_id) (_ η β : A), otreeG_wait k0 x0 (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π0 k0 1)
-      (λ (k0 : obl_id) (_ _ : A) (x0 : positive) (π0 : obl_id) (ψ0 _ _ : A), oblG_done π0 ∗ oblG_progress k0 ψ0 ∗ otreeG_wait_null k0 x0 ∗ otreeG_wait_null_auth k0 x0)
-      i k l δ α
-    ⊢ tvo_interp i k l δ α.
-  Proof.
-    induction l; simpl; iIntros "H".
-    { iDestruct "H" as "(($& $)& $& _)". }
-    destruct a. iDestruct "H" as "((#Bep& #Fep& #Fuk& %LE)& [M | M])".
-    - iFrame "Bep Fep Fuk". iSplitR; first auto. iLeft. iDestruct "M" as "(($& $& $& _)& _)".
-    - iFrame "Bep Fep Fuk". iSplitR; first auto. iRight. iDestruct "M" as "(($& $& $& _)& M)".
-      iPoseProof (IHl with "M") as "M". iFrame.
-  Qed.
+(*   Lemma tvo_interp_acc (* Ω *) i k l δ α α0 (KSus : gmap positive (prodO (prodO positiveO obl_idO) (leibnizO A))) : *)
+(*     (* oblG_elem k ∗ otreeG_elem k ∗ *) *)
+(*     (* osat Ω ∗ oforest (dom Ω) ∗ *) *)
+(*     tvo_interp i k l δ α *)
+(*     ∗ (own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> (KSus : gmap positive (positive * obl_id * leibnizO A))))) ∗ *)
+(*        own otreeGS.wait_name (reservation_map_data k (reservation_map_token (⊤ ∖ gset_to_coPset (dom KSus)))) ∗ *)
+(*        ([∗ map] x↦'(θ, π, ψ) ∈ KSus, *)
+(*           ((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∨ *)
+(*              (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ)) ∨ *)
+(*             otreeG_wait_null_auth k x)) *)
+(*     ⊢ |==> *)
+(*           (* osat Ω ∗ oforest (dom Ω) ∗ *) *)
+(*           ( *)
+(*             (* oblG_elem k ∗ otreeG_elem k ∗ *) *)
+(*            tvo_interp_temp *)
+(*              (λ (k0 : obl_id) (δ0 α1 : A), oblG_suspend k0 δ0 ∗ oblG_progress k0 α1) *)
+(*              (λ (_ : obl_id) (_ _ : A), True) *)
+(*              (λ (k0 : obl_id) (δ0 α1 : A) (x : positive) (π : obl_id) (ψ η β : A), oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k0 x i π ψ ∗ ⌜δ0 /≤ η ∧ α1 /≤ β⌝) *)
+(*              (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (_ η β : A), otreeG_wait k0 x (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π k0 1) *)
+(*              (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (ψ _ _ : A), oblG_done π ∗ oblG_progress k0 ψ ∗ otreeG_wait_null k0 x ∗ otreeG_wait_null_auth k0 x) *)
+(*              i k l δ α) ∗ *)
+(*           (( *)
+(*               (* oblG_elem k ∗ otreeG_elem k ∗ *) *)
+(*             tvo_interp_temp *)
+(*               (λ (k0 : obl_id) (δ0 α1 : A), oblG_suspend k0 δ0 ∗ oblG_progress k0 α1) *)
+(*               (λ (_ : obl_id) (_ _ : A), True) *)
+(*               (λ (k0 : obl_id) (δ0 α1 : A) (x : positive) (π : obl_id) (ψ η β : A), oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k0 x i π ψ ∗ ⌜δ0 /≤ η ∧ α1 /≤ β⌝) *)
+(*               (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (_ η β : A), otreeG_wait k0 x (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π k0 1) *)
+(*               (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (ψ _ _ : A), oblG_done π ∗ oblG_progress k0 ψ ∗ otreeG_wait_null k0 x ∗ otreeG_wait_null_auth k0 x) *)
+(*               i k l δ α0) -∗ *)
+(*            ((own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> (KSus : gmap positive (positive * obl_id * leibnizO A))))) ∗ *)
+(*              own otreeGS.wait_name (reservation_map_data k (reservation_map_token (⊤ ∖ gset_to_coPset (dom KSus)))) ∗ *)
+(*              ([∗ map] x↦'(θ, π, ψ) ∈ KSus, *)
+(*                 ((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∨ *)
+(*                    (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ)) ∨ *)
+(*                   otreeG_wait_null_auth k x)) ∗ *)
+(*             ( *)
+(*               (* oblG_elem k ∗ otreeG_elem k ∗ *) *)
+(*               tvo_interp i k l δ α0))). *)
+(*   Proof. *)
+(*     revert δ α α0 KSus. *)
+(*     induction l; intros; iIntros "(V& (Uk1& Uk2& UkM))". *)
+(*     (* induction l; intros; iIntros "(#Bek& #Fek& S& F& V& (Uk1& Uk2& UkM))". *) *)
+(*     { simpl. iModIntro. iFrame. iSplitL "V". *)
+(*       - iDestruct "V" as "($& $& $)". *)
+(*       - iIntros "($& $& ($&$)& $& _)". } *)
+(*     simpl. destruct a. iDestruct "V" as "(#Bep& #Fep& #Fuk& %LE& [V | V])". *)
+(*     - destruct LE as [LEdg LEag]. iDestruct "V" as "(Fwk& Bsk& Bpk)". *)
+(*       iPoseProof (otreeG_suspend_lookup with "[$Uk1 $Fuk]") as "%ElemKk". *)
+(*       iPoseProof (big_sepM_delete _ _ _ _ ElemKk with "UkM") as "[[[Ukx | Ukx] | Ukx] UkM]". *)
+(*       + iDestruct "Ukx" as "[Ukx1 Ukx2]". *)
+(*         iModIntro. iSplitL "Fwk Bsk Bpk Ukx1 Ukx2". *)
+(*         { iFrame "Bep Fep Fuk". iSplit; first done. iLeft. iFrame. } *)
+(*         iIntros "((_&_&_& %LEag2)& [Mk | Mk])". *)
+(*         * destruct LEag2 as [LEdg2 LEag2]. *)
+(*           iDestruct "Mk" as "((Fwk& Bsk& Bpk& Fgk)& Tok)". iSplitR "Fwk Bsk Bpk". *)
+(*           -- iFrame. iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame. *)
+(*           -- iFrame "Bep Fep Fuk". iSplit; first done. iLeft. iFrame. *)
+(*         * iDestruct "Mk" as "((#Bdp& Bpk& #Fwnk& Fwnak)& Tok)". *)
+(*           iSplitR "Tok Bpk". *)
+(*           -- iFrame. iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame. *)
+(*           -- iFrame "Bep Fep Fuk". iSplit; first done. iRight. iFrame "Bdp Bpk Fwnk". *)
+(*              iApply (tvo_interp_temp_impl with "Tok"). *)
+(*       + iDestruct "Ukx" as "(Tok& Fwk2& #Bdp& Bpk2)". *)
+(*         iMod (otreeG_wait_to_null_2 with "[$Fwk $Fwk2]") as "Fwnak". *)
+(*         { apply Qp.div_2. } *)
+(*         iPoseProof (otreeG_wait_null_auth_wait_null with "Fwnak") as "#Fwnk". *)
+(*         iMod (oblG_suspend_mon _ _ _ LEdg with "Bsk") as "Bsk". *)
+(*         iMod (oblG_progress_mon _ _ _ LEag with "Bpk") as "Bpk". *)
+(*         iModIntro. iSplitL "Tok Bpk2 Bsk Bpk Fwnak". *)
+(*         { iFrame "Bep Fep Fuk". iSplit; first done. iRight. iFrame. iFrame "Bdp Fwnk". *)
 
-  Lemma tvo_interp_acc (* Ω *) i k l δ α α0 (KSus : gmap positive (prodO (prodO positiveO obl_idO) (leibnizO A))) :
-    (* oblG_elem k ∗ otreeG_elem k ∗ *)
-    (* osat Ω ∗ oforest (dom Ω) ∗ *)
-    tvo_interp i k l δ α
-    ∗ (own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> (KSus : gmap positive (positive * obl_id * leibnizO A))))) ∗
-       own otreeGS.wait_name (reservation_map_data k (reservation_map_token (⊤ ∖ gset_to_coPset (dom KSus)))) ∗
-       ([∗ map] x↦'(θ, π, ψ) ∈ KSus,
-          ((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∨
-             (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ)) ∨
-            otreeG_wait_null_auth k x))
-    ⊢ |==>
-          (* osat Ω ∗ oforest (dom Ω) ∗ *)
-          (
-            (* oblG_elem k ∗ otreeG_elem k ∗ *)
-           tvo_interp_temp
-             (λ (k0 : obl_id) (δ0 α1 : A), oblG_suspend k0 δ0 ∗ oblG_progress k0 α1)
-             (λ (_ : obl_id) (_ _ : A), True)
-             (λ (k0 : obl_id) (δ0 α1 : A) (x : positive) (π : obl_id) (ψ η β : A), oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k0 x i π ψ ∗ ⌜δ0 /≤ η ∧ α1 /≤ β⌝)
-             (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (_ η β : A), otreeG_wait k0 x (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π k0 1)
-             (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (ψ _ _ : A), oblG_done π ∗ oblG_progress k0 ψ ∗ otreeG_wait_null k0 x ∗ otreeG_wait_null_auth k0 x)
-             i k l δ α) ∗
-          ((
-              (* oblG_elem k ∗ otreeG_elem k ∗ *)
-            tvo_interp_temp
-              (λ (k0 : obl_id) (δ0 α1 : A), oblG_suspend k0 δ0 ∗ oblG_progress k0 α1)
-              (λ (_ : obl_id) (_ _ : A), True)
-              (λ (k0 : obl_id) (δ0 α1 : A) (x : positive) (π : obl_id) (ψ η β : A), oblG_elem π ∗ otreeG_elem π ∗ otreeG_suspend k0 x i π ψ ∗ ⌜δ0 /≤ η ∧ α1 /≤ β⌝)
-              (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (_ η β : A), otreeG_wait k0 x (1 / 2) ∗ oblG_suspend k0 η ∗ oblG_progress k0 β ∗ otreeG_edge π k0 1)
-              (λ (k0 : obl_id) (_ _ : A) (x : positive) (π : obl_id) (ψ _ _ : A), oblG_done π ∗ oblG_progress k0 ψ ∗ otreeG_wait_null k0 x ∗ otreeG_wait_null_auth k0 x)
-              i k l δ α0) -∗
-           ((own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> (KSus : gmap positive (positive * obl_id * leibnizO A))))) ∗
-             own otreeGS.wait_name (reservation_map_data k (reservation_map_token (⊤ ∖ gset_to_coPset (dom KSus)))) ∗
-             ([∗ map] x↦'(θ, π, ψ) ∈ KSus,
-                ((othreadG_owns θ k false (1 / 2) ∗ otreeG_edge π k 1) ∨
-                   (othreadG_owns θ k true (1 / 2) ∗ otreeG_wait k x (1 / 2) ∗ oblG_done π ∗ oblG_progress k ψ)) ∨
-                  otreeG_wait_null_auth k x)) ∗
-            (
-              (* oblG_elem k ∗ otreeG_elem k ∗ *)
-              tvo_interp i k l δ α0))).
-  Proof.
-    revert δ α α0 KSus.
-    induction l; intros; iIntros "(V& (Uk1& Uk2& UkM))".
-    (* induction l; intros; iIntros "(#Bek& #Fek& S& F& V& (Uk1& Uk2& UkM))". *)
-    { simpl. iModIntro. iFrame. iSplitL "V".
-      - iDestruct "V" as "($& $& $)".
-      - iIntros "($& $& ($&$)& $& _)". }
-    simpl. destruct a. iDestruct "V" as "(#Bep& #Fep& #Fuk& %LE& [V | V])".
-    - destruct LE as [LEdg LEag]. iDestruct "V" as "(Fwk& Bsk& Bpk)".
-      iPoseProof (otreeG_suspend_lookup with "[$Uk1 $Fuk]") as "%ElemKk".
-      iPoseProof (big_sepM_delete _ _ _ _ ElemKk with "UkM") as "[[[Ukx | Ukx] | Ukx] UkM]".
-      + iDestruct "Ukx" as "[Ukx1 Ukx2]".
-        iModIntro. iSplitL "Fwk Bsk Bpk Ukx1 Ukx2".
-        { iFrame "Bep Fep Fuk". iSplit; first done. iLeft. iFrame. }
-        iIntros "((_&_&_& %LEag2)& [Mk | Mk])".
-        * destruct LEag2 as [LEdg2 LEag2].
-          iDestruct "Mk" as "((Fwk& Bsk& Bpk& Fgk)& Tok)". iSplitR "Fwk Bsk Bpk".
-          -- iFrame. iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame.
-          -- iFrame "Bep Fep Fuk". iSplit; first done. iLeft. iFrame.
-        * iDestruct "Mk" as "((#Bdp& Bpk& #Fwnk& Fwnak)& Tok)".
-          iSplitR "Tok Bpk".
-          -- iFrame. iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame.
-          -- iFrame "Bep Fep Fuk". iSplit; first done. iRight. iFrame "Bdp Bpk Fwnk".
-             iApply (tvo_interp_temp_impl with "Tok").
-      + iDestruct "Ukx" as "(Tok& Fwk2& #Bdp& Bpk2)".
-        iMod (otreeG_wait_to_null_2 with "[$Fwk $Fwk2]") as "Fwnak".
-        { apply Qp.div_2. }
-        iPoseProof (otreeG_wait_null_auth_wait_null with "Fwnak") as "#Fwnk".
-        iMod (oblG_suspend_mon _ _ _ LEdg with "Bsk") as "Bsk".
-        iMod (oblG_progress_mon _ _ _ LEag with "Bpk") as "Bpk".
-        iModIntro. iSplitL "Tok Bpk2 Bsk Bpk Fwnak".
-        { iFrame "Bep Fep Fuk". iSplit; first done. iRight. iFrame. iFrame "Bdp Fwnk".
+(*           TODO *)
 
-          auto. }
-        iIntros "[Mk M]". iPoseProof ("ACC" with "M") as "[U M]". iFrame "M".
-        iDestruct "Mk" as "(_&_&_&_&_& %LEag2& [Mk | Mk])".
-        -- destruct LEag2 as [LEdg2 LEag2].
-           iDestruct "Mk" as "(Fwk& Bsk& Bpk& Tok& Fgk)". iSplitR "Fwk Bsk Bpk".
-           ++ iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame.
-              iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame.
-           ++ iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iLeft. iFrame.
-        -- destruct LEag2 as [LEdg2 LEag2].
-           iDestruct "Mk" as "(Tok& #bdp& Bpk& _& Bsk& Bpk2& Fwnka)". iSplitR "Tok Bpk Bsk Bpk2"; cycle 1.
-           { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iRight. iFrame. auto. }
-           iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame "Uk1 Uk2 U".
-           iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame.
-        * iPoseProof (otreeG_wait_null_auth_false with "[$Fwk $Ukx]") as "%F". done.
+(*           auto. } *)
+(*         iIntros "[Mk M]". iPoseProof ("ACC" with "M") as "[U M]". iFrame "M". *)
+(*         iDestruct "Mk" as "(_&_&_&_&_& %LEag2& [Mk | Mk])". *)
+(*         -- destruct LEag2 as [LEdg2 LEag2]. *)
+(*            iDestruct "Mk" as "(Fwk& Bsk& Bpk& Tok& Fgk)". iSplitR "Fwk Bsk Bpk". *)
+(*            ++ iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame. *)
+(*               iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame. iLeft. iLeft. iFrame. *)
+(*            ++ iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iLeft. iFrame. *)
+(*         -- destruct LEag2 as [LEdg2 LEag2]. *)
+(*            iDestruct "Mk" as "(Tok& #bdp& Bpk& _& Bsk& Bpk2& Fwnka)". iSplitR "Tok Bpk Bsk Bpk2"; cycle 1. *)
+(*            { iFrame "Bek Fek Bep Fep Fuk". iSplit; first done. iRight. iFrame. auto. } *)
+(*            iApply (big_sepM_delete _ _ _ _ ElemSk). iFrame "Uk1 Uk2 U". *)
+(*            iApply (big_sepM_delete _ _ _ _ ElemKk). iFrame "UkM". iRight. iFrame. *)
+(*         * iPoseProof (otreeG_wait_null_auth_false with "[$Fwk $Ukx]") as "%F". done. *)
 
     
-otreeG_suspend_lookup
-     : ∀ (k : positive) (KSus : gmap positive (prodO (prodO positiveO obl_idO) (leibnizO A))) (x θ : positive) 
-         (π : obl_id) (ψ : A),
-         own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> KSus))) ∗
-         otreeG_suspend k x θ π ψ ⊢ ⌜KSus !! x = Some (θ, π, ψ)⌝
+(* otreeG_suspend_lookup *)
+(*      : ∀ (k : positive) (KSus : gmap positive (prodO (prodO positiveO obl_idO) (leibnizO A))) (x θ : positive)  *)
+(*          (π : obl_id) (ψ : A), *)
+(*          own otreeGS.suspend_name (reservation_map_data k (gmap_view_auth (DfracOwn 1) (to_agree <$> KSus))) ∗ *)
+(*          otreeG_suspend k x θ π ψ ⊢ ⌜KSus !! x = Some (θ, π, ψ)⌝ *)
 
   (* Lemma oforest_tvos_all_acc Ω D i (M1 M2 : gmap obl_id thread_view_obl) : *)
   (*   map_Forall2 (λ _ d1 d2, *)
