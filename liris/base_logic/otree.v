@@ -757,7 +757,7 @@ Section otree.
     { subst. by rewrite /forest_merge lookup_insert_eq. }
     iPoseProof (big_sepM_delete _ _ _ _ Hρlutree with "RMρ") as "[RMρMρ RMρM]".
     iDestruct "RMρMρ" as "(_ & Hl & (%&%& Hb0 & Hb1 & Hb2))".
-    destruct d as [α0 τ0 β0]. iMod (osat_obl_progress_one _ _ _ _ _ _ _ Hρlu with "[S Bp Hb1]") as "(% & S & %Hprog & Hb1)".
+    destruct d as [α0 τ0 β0]. iMod (osat_obl_progress_one _ _ _ _ _ _ _ _ Hρlu with "[S Bp Hb1]") as "(% & S & %Hprog & Hb1)".
     1: eauto. 1: iFrame.
     destruct Hprog as [Hprog Hβ].
     iModIntro. iExists (<[ρ:=olive α0 τ0 β']> Ω). remember (<[ρ:=olive α0 τ0 β']> Ω) as Ω0.
