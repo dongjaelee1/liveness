@@ -21,12 +21,14 @@ Proof.
   - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
 Qed.
 
-Class obl_live_class (obl_count : Type) (obl_count_ltR : relation obl_count) := {
+Class obl_live_class (obl_count obl_ownerid : Type) (obl_count_ltR : relation obl_count) := {
     obl_count_ltR_well_founded : well_founded obl_count_ltR;
     #[global] obl_count_ltR_Transitive :: Transitive obl_count_ltR;
+    #[global] obl_ownerid_EqDecision :: EqDecision obl_ownerid;
   }.
 
 Record obl_live_state `{Ξl : obl_live_class} := {
+    obl_owner : obl_ownerid;
     obl_progress : obl_count;
   }.
 
@@ -47,8 +49,8 @@ Definition obl_live `{Ξl : obl_live_class} `{Ξd : obl_done_class} (d : obl_liv
 Definition obl_done `{Ξl : obl_live_class} `{Ξd : obl_done_class} (d : obl_done_state) : obl_state :=
   inr d.
 
-Definition olive `{Ξl : obl_live_class} `{Ξd : obl_done_class} α :=
-  obl_live (Build_obl_live_state _ _ _ α).
+Definition olive `{Ξl : obl_live_class} `{Ξd : obl_done_class} θ α :=
+  obl_live (Build_obl_live_state _ _ _ _ θ α).
 Definition odone `{Ξl : obl_live_class} `{Ξd : obl_done_class} (P : prop_of obl_ps) :=
   obl_done (Build_obl_done_state _ _ P).
 
@@ -57,7 +59,7 @@ Definition obl_state_progress `{Ξl : obl_live_class} `{Ξd : obl_done_class} : 
   λ o1 o2,
     (match o1, o2 with
      | inl d1, inl d2 =>
-         obl_count_ltR (obl_progress d2) (obl_progress d1)
+         (obl_owner d1 = obl_owner d2) ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)
      | _, _ => False
      end).
 
@@ -117,6 +119,9 @@ Section obl_states.
   Context `{Ξl : obl_live_class} `{Ξd : obl_done_class}.
 
   (** Additional definitions *)
+  Definition obl_cond_owner (i : obl_ownerid) : obl_cond :=
+    λ _ o, match o with | inl d => (obl_owner d = i) | _ => False end.
+
   Definition obl_rel_preserves_cond (C : obl_cond) (R : relation obl_state) : Prop :=
     ∀ k o0 o1, C k o0 → R o0 o1 → C k o1.
 
@@ -124,7 +129,7 @@ Section obl_states.
   Global Instance obl_state_progress_Transitive : Transitive obl_state_progress.
   Proof using.
     intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
-    etrans; eauto.
+    destruct H1 as (?&?). destruct H2 as (?&?). split_and !; try (etrans; eauto).
   Qed.
   Global Instance obl_state_resolve_Transitive s : Transitive (obl_state_resolve s).
   Proof using.
@@ -134,6 +139,7 @@ Section obl_states.
   Lemma obl_state_progress_live o1 o2 :
     obl_state_progress o1 o2 →
     ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
+             (obl_owner d1 = obl_owner d2) ∧
              (obl_count_ltR (obl_progress d2) (obl_progress d1)).
   Proof using.
     intros. destruct o1, o2; try done. simpl in H. do 2 eexists. split_and; eauto.
@@ -141,14 +147,15 @@ Section obl_states.
   Lemma obl_state_progress_tc_live o1 o2 :
     tc obl_state_progress o1 o2 →
     ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
+             (obl_owner d1 = obl_owner d2) ∧
              (obl_count_ltR (obl_progress d2) (obl_progress d1)).
   Proof using.
     intros. induction H.
     { apply (obl_state_progress_live x y); auto. }
     apply obl_state_progress_live in H.
-    destruct H as (?&?&?&?&?). destruct IHtc as (?&?&?&?&?).
-    subst. inv H3. exists x0, x3. split_and !; auto.
-    etrans; eauto.
+    destruct H as (?&?&?&?&?&?). destruct IHtc as (?&?&?&?&?&?).
+    subst. inv H2. exists x0, x3. split_and !; auto.
+    all: etrans; eauto.
   Qed.
 
   Lemma obl_state_progress_preserves_live o1 o2 :
@@ -197,6 +204,14 @@ Section obl_states.
       + specialize (H2 HC). subst. apply H4; auto.
     - rewrite -H in H2. inv H2. econstructor.
   Qed.
+
+  Lemma obl_state_progress_cond_owner i : obl_rel_preserves_cond (obl_cond_owner i) obl_state_progress.
+  Proof using.
+    intros k o0 o1 Hc Hr. destruct o0, o1; try done. simpl in *. destruct Hr. inv H. auto.
+  Qed.
+
+  Global Instance obl_cond_owner_Decision i : ∀ k o, Decision (obl_cond_owner i k o).
+  Proof using. intros. unfold obl_cond_owner. destruct o; solve_decision. Qed.
 
   Lemma obl_states_cond_rel_dom C R Ω1 Ω2 : obl_states_cond_rel C R Ω1 Ω2 → dom Ω1 = dom Ω2.
   Proof using. intros. eapply map_Forall2_dom_L; eauto. Qed.
