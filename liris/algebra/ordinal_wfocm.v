@@ -2,6 +2,22 @@ From stdpp Require Import base.
 From liris Require Export wfocm.
 From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
 
+Section ord_props.
+
+  Local Open Scope ord.
+
+  Definition limit_fun {A : Type} (f : Ord.t -> A -> Ord.t) : Ord.t -> Ord.t :=
+    fun o => Ord.join (f o).
+
+  Lemma limit_fun_upperbound {A : Type} (f : Ord.t -> A -> Ord.t) : forall o a, (f o a) <= (limit_fun f o).
+  Proof. intros. apply Ord.join_upperbound. Qed.
+
+  Lemma limit_fun_supremum {A : Type} (f : Ord.t -> A -> Ord.t) : forall o u, (∀ a, f o a <= u) -> (limit_fun f o <= u).
+  Proof. intros. eapply Ord.join_supremum. eauto. Qed.
+
+End ord_props.
+
+
 Global Program Instance ord_OCM : OCM.t Ord.le Hessenberg.add :=
   OCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.
 Next Obligation.
@@ -42,6 +58,7 @@ Qed.
 
 Global Program Instance ord_wfocm_pack : WFOCM.pack Ord.t :=
   WFOCM.Build_pack _ _ _ _ ord_wfocm.
+
 
 Section ord_facts.
 

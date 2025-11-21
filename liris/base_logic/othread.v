@@ -91,9 +91,20 @@ Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
         ([∗ map] i ↦ OObls ∈ OThread,
            (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ othreadG_obls i ∅ 1)) ∗
            (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) OObls))) ∗
-           ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2/2)%Qp ∗ oblG_owner k i (1/2/2)%Qp)
+           ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2)%Qp ∗ oblG_owner k i (1/2)%Qp)
         )
     )%I.
+
+(* Global invariant that relates obl_states with the thread pool. *)
+Definition oassigned `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
+  `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS Σ}
+  (OS : gset obl_id) (TP : gset positive) : iProp Σ :=
+  locked
+    ([∗ set] k ∈ OS, ∃ i, othreadG_owns i k (1/2)%Qp
+    )%I.
+  (* locked *)
+  (*   ([∗ set] k ∈ OS, ∃ i, oblG_owner k i (1/2/2)%Qp ∗ othreadG_owns i k (1/2)%Qp *)
+  (*   )%I. *)
 
 Section othread.
   Context `{SI : indexT} `{WFA : WFOCM.pack A}.
