@@ -91,20 +91,16 @@ Definition othread `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
         ([∗ map] i ↦ OObls ∈ OThread,
            (othreadG_exec i (1/2)%Qp ∨ (othreadG_term_auth i ∗ othreadG_obls i ∅ 1)) ∗
            (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) OObls))) ∗
-           ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2)%Qp ∗ oblG_owner k i (1/2)%Qp)
+           ([∗ map] k ↦ f ∈ OObls, oblG_live k (1/2/2)%Qp ∗ oblG_owner k i (1/2/2)%Qp)
         )
     )%I.
 
-(* Global invariant that relates obl_states with the thread pool. *)
+(* Global invariant that relates obl_states to the thread pool. *)
 Definition oassigned `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ}
   `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGS Σ}
-  (OS : gset obl_id) (TP : gset positive) : iProp Σ :=
+  (OS : gset obl_id) : iProp Σ :=
   locked
-    ([∗ set] k ∈ OS, ∃ i, othreadG_owns i k (1/2)%Qp
-    )%I.
-  (* locked *)
-  (*   ([∗ set] k ∈ OS, ∃ i, oblG_owner k i (1/2/2)%Qp ∗ othreadG_owns i k (1/2)%Qp *)
-  (*   )%I. *)
+    ([∗ set] k ∈ OS, oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2)%Qp ∗ othreadG_owns i k (1/2)%Qp) ∨ (oblG_done k)))%I.
 
 Section othread.
   Context `{SI : indexT} `{WFA : WFOCM.pack A}.
@@ -625,11 +621,47 @@ Section othread.
     iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
   Qed.
 
+  (** oassigned rules *)
+  Lemma oassigned_add_obl OS k :
+    oassigned OS ∗
+    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2)%Qp ∗ othreadG_owns i k (1/2)%Qp) ∨ oblG_done k))
+    ⊢ oassigned ({[k]} ∪ OS).
+  Proof.
+    iIntros "(A& H)". rewrite /oassigned -!lock. destruct (decide (k ∈ OS)).
+    - replace ({[k]} ∪ OS) with OS; last set_solver. iFrame.
+    - iApply big_sepS_union; first set_solver. rewrite big_sepS_singleton. iFrame.
+  Qed.
+
+  Lemma oassigned_delete_obl OS k :
+    k ∈ OS →
+    oassigned OS
+    ⊢ oassigned (OS ∖ {[k]}) ∗
+    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2)%Qp ∗ othreadG_owns i k (1/2)%Qp) ∨ oblG_done k)).
+  Proof.
+    rewrite /oassigned -!lock. iIntros (INk) "A".
+    iPoseProof (big_sepS_delete with "A") as "[$ $]". auto.
+  Qed.
+
+  Lemma othread_assigned_lookup Ω TP k d i Ψ :
+    Ω !! k = Some (obl_live d) →
+    obl_owner d = i →
+    osat Ω ∗ othread TP ∗ oassigned (dom Ω) ∗ othreadG_obls i Ψ 1
+    ⊢ ⌜ k ∈ Ψ ⌝.
+  Proof.
+    rewrite /oassigned -lock. iIntros (LUOk Okd) "(S& T& A& Tbs)".
+    iPoseProof (big_sepS_delete _ _ k with "A") as "[A _]".
+    { by apply elem_of_dom. }
+    iDestruct "A" as "(#Bek& [(%& Bok& Tok) | #Bdk])".
+    - iPoseProof (osat_lookup_owner with "[$S $Bek $Bok]") as "(%&%&%)". rewrite LUOk in H0. inv H0.
+      iApply (othread_obls_owns_elem with "[$T $Tbs $Tok]").
+    - iPoseProof (osat_obl_is_done_weak with "[$S $Bek $Bdk]") as "(%&%)". rewrite LUOk in H0. inv H0.
+  Qed.
+
 End othread.
 
 (* Allocation of initial invariant. *)
 Lemma othread_alloc `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!othreadGpreS Σ} :
-  ⊢ |==> ∃ _ : othreadGS Σ, othread ∅.
+  ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ oassigned ∅.
 Proof.
   iIntros.
   iMod (own_alloc (reservation_map_token (A:=(gmap_viewR obl_id unitUR)) ⊤)) as (γS) "HS";
@@ -641,7 +673,8 @@ Proof.
   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive unitUR)) as (γE) "HE";
     first by apply gmap_view_auth_valid.
   iModIntro; iExists (OthreadG SI _ _ γS γO γX γE).
-  rewrite /othread -lock. iExists ∅. iSplitR; first done.
+  rewrite /othread /oassigned -!lock. iSplitL; last done.
+  iExists ∅. iSplitR; first done.
   replace (⊤ ∖ gset_to_coPset ∅) with (⊤ : coPset); [iFrame; done|].
   set_solver.
 Qed.

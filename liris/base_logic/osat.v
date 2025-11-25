@@ -145,7 +145,7 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
         | inl d =>
             oblG_live k (1/2)%Qp ∗
             (oblG_owner k (obl_owner d) (1/2)%Qp) ∗
-            (∃ α, ⌜ WFOCM.leR α (obl_progress d) ⌝ ∗ oblG_progress_supply k α (1/2)%Qp)
+            (∃ α, ⌜ WFOCM.leR α (obl_progress d) ⌝ ∗ oblG_progress_supply k α (1)%Qp)
         | inr d =>
             let P1 := (obl_atom d) in
             ∃ P2 R, oblG_goal k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
@@ -665,7 +665,7 @@ Section osat.
                 oblG_elem k ∗
                 oblG_live k (1/2)%Qp ∗
                 oblG_owner k θ (1/2)%Qp ∗
-                oblG_progress_supply k α (1/2)%Qp ∗ oblG_progress k α.
+                oblG_progress k α.
   Proof.
     iIntros "Hsat".
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
@@ -681,9 +681,8 @@ Section osat.
     iMod (oblG_progress_alloc _ k α with "HP") as "(HP & Hps & Hp)"; first done.
     iPoseProof (oblG_live_div_2 with "Hs") as "[Hs1 Hs2]".
     iPoseProof (oblG_owner_div_2 with "Ho") as "[Ho1 Ho2]".
-    iPoseProof (oblG_progress_supply_div_2 with "Hps") as "[Hps1 Hps2]".
     iMod (oblG_elem_alloc _ k (olive θ α) with "HE") as "[HE He]"; first (by apply not_elem_of_dom).
-    iModIntro. iExists k. rewrite /oblG_goal. iFrame "Hg Hs2 Hps2 Hp He Ho2".
+    iModIntro. iExists k. rewrite /oblG_goal. iFrame "Hg Hs2 Hp He Ho2".
     iSplitR.
     { iPureIntro. by apply not_elem_of_dom. }
     rewrite -!lock. iSplitL "HG".
@@ -697,19 +696,18 @@ Section osat.
     iFrame. eauto.
   Qed.
 
-  Lemma osat_obl_progress_one Ω k θ α c x0 q :
+  Lemma osat_obl_progress_one Ω k θ α c :
     (Ω !! k = Some (olive θ α)) →
     (/0 /< c) →
-    osat Ω ∗ oblG_progress k c ∗ oblG_progress_supply k x0 q
+    osat Ω ∗ oblG_progress k c
     ⊢ |==> ∃ α', osat (<[k:=olive θ α']>Ω) ∗
-                 ⌜ obl_state_progress (olive θ α) (olive θ α') ∧ α' /< x0  ⌝ ∗
-                 oblG_progress_supply k α' q.
+              ⌜ obl_state_progress (olive θ α) (olive θ α') ⌝.
   Proof.
-    intros LU Hc. iIntros "(Hsat & Hp & Hps0)".
+    intros LU Hc. iIntros "(Hsat & Hp)".
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     iDestruct "Hk" as "(Hs& Ho& (%&%&Hps))".
-    iMod (oblG_progress_spend_2 _ α0 with "[Hps Hps0 Hp]") as "(%&%&Hps&Hps0)"; first iFrame. destruct H0 as [Hc1 Hc2].
+    iMod (oblG_progress_spend _ α0 with "[$Hps $Hp]") as "(%&%&Hps)".
     assert (LT : a2 /< α0).
     { apply WFOCM.lt_exists_right. exists c. split; done. }
     iModIntro. iExists a2.
@@ -718,18 +716,16 @@ Section osat.
     { iFrame "Hm". iFrame. simpl. done. }
     rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HS HE HP".
     rewrite insert_delete_eq. iFrame. simpl; iPureIntro; split_and !; auto.
-    - eapply WFOCM.lt_le_lt; eauto.
-    - eapply WFOCM.lt_exists_right; eauto.
+    eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
-  Lemma osat_obl_resolve_one Ω k P R x0 x1 :
+  Lemma osat_obl_resolve_one Ω k P R x0 :
     osat Ω ∗ oblG_elem k ∗ oblG_goal k P R ∗ (▷ R) ∗
     oblG_live k (1/2)%Qp ∗
-    oblG_owner k x0 (1/2)%Qp ∗
-    oblG_progress_supply k x1 (1/2)%Qp
+    oblG_owner k x0 (1/2)%Qp
     ⊢ |==> osat (<[k:=odone P]>Ω) ∗ oblG_done k.
   Proof.
-    iIntros "(Hsat & #He & #Hg & HR & Hs0 & Ho0 & Hps0)".
+    iIntros "(Hsat & #He & #Hg & HR & Hs0 & Ho0)".
     iDestruct (osat_obl_is_live with "[Hsat He Hs0]") as "(%&%LU)".
     { iFrame. eauto. }
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
@@ -742,8 +738,6 @@ Section osat.
     destruct H0. clear H1. subst x0.
     iCombine "Ho Ho0" as "Ho". iPoseProof (oblG_owner_frac_op with "Ho") as "Ho".
     { by rewrite Qp.div_2. }
-    iPoseProof (oblG_progress_supply_add with "[Hps Hps0]") as "(%&Hps&_)"; first iFrame.
-    rewrite (Qp.div_2 1).
     iModIntro.
     iPoseProof ((big_sepM_insert _ (delete k Ω) k (odone P)) with "[Hm Hs Ho Hps HR]") as "Hm".
     { apply lookup_delete_eq. }
