@@ -43,7 +43,7 @@ Definition obl_idO `{SI : indexT} := leibnizO obl_id.
 (** The ghost state for liveness obligations *)
 Module osatGS.
 
-  Notation wfocm_geR := (flip WFOCM.leR).
+  (* Notation wfocm_geR := (flip WFOCM.leR). *)
 
   Class osatGpreS `{SI : indexT} `{WF : WFOCM.pack A} (ps T : Type) (Σ : gFunctors) : Set :=
     OsatGpreS {
@@ -51,7 +51,7 @@ Module osatGS.
         osatGpreS_status : inG Σ (reservation_mapUR mono_natUR);
         osatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO T)));
         osatGpreS_progress : inG Σ (reservation_mapUR bankUR);
-        osatGpreS_bound : inG Σ (reservation_mapUR (auth_mraUR (wfocm_geR)));
+        (* osatGpreS_bound : inG Σ (reservation_mapUR (auth_mraUR (wfocm_geR))); *)
         osatGpreS_elem : inG Σ (gmap_viewR obl_id unitUR);
       }.
 
@@ -62,7 +62,7 @@ Module osatGS.
         status_name : gname;
         owner_name : gname;
         progress_name : gname;
-        bound_name : gname;
+        (* bound_name : gname; *)
         elem_name : gname;
       }.
 
@@ -71,7 +71,7 @@ Module osatGS.
       GFunctor (reservation_mapUR mono_natUR);
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO T)));
       GFunctor (reservation_mapUR bankUR);
-      GFunctor (reservation_mapUR (auth_mraUR (wfocm_geR)));
+      (* GFunctor (reservation_mapUR (auth_mraUR (wfocm_geR))); *)
       GFunctor (gmap_viewR positive unitUR)
       ].
 
@@ -85,7 +85,7 @@ Import osatGS.
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances osat_inG
-  osatGpreS_goal osatGpreS_status osatGpreS_owner osatGpreS_progress osatGpreS_bound osatGpreS_elem.
+  osatGpreS_goal osatGpreS_status osatGpreS_owner osatGpreS_progress osatGpreS_elem.
 
 (* Goal *)
 Definition goal_unfold `{SI : indexT} {Σ} (R : iProp Σ) : later (iProp Σ) := Next R.
@@ -134,16 +134,16 @@ Definition oblG_progress_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps
 Global Typeclasses Opaque oblG_progress_supply.
 Global Instance: Params (@oblG_progress_supply) 8 := {}.
 
-(* Upper bound of progress credits *)
-Definition oblG_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
-  own bound_name (reservation_map_data k (◯AM[wfocm_geR] ℵ)).
-Global Typeclasses Opaque oblG_bound.
-Global Instance: Params (@oblG_bound) 8 := {}.
+(* (* Upper bound of progress credits *) *)
+(* Definition oblG_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ := *)
+(*   own bound_name (reservation_map_data k (◯AM[wfocm_geR] ℵ)). *)
+(* Global Typeclasses Opaque oblG_bound. *)
+(* Global Instance: Params (@oblG_bound) 8 := {}. *)
 
-Definition oblG_bound_auth `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
-  own bound_name (reservation_map_data k (●AM[wfocm_geR] ℵ)).
-Global Typeclasses Opaque oblG_bound_auth.
-Global Instance: Params (@oblG_bound_auth) 8 := {}.
+(* Definition oblG_bound_auth `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ := *)
+(*   own bound_name (reservation_map_data k (●AM[wfocm_geR] ℵ)). *)
+(* Global Typeclasses Opaque oblG_bound_auth. *)
+(* Global Instance: Params (@oblG_bound_auth) 8 := {}. *)
 
 (* Global invariant for the obligation ghost state. *)
 Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
@@ -156,15 +156,16 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
      (own status_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own progress_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
-     (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (* (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗ *)
      (own elem_name (gmap_view_auth (DfracOwn 1) (gset_to_gmap () (dom Ω)))) ∗
      ([∗ map] k ↦ o ∈ Ω,
         match o with
         | inl d =>
             oblG_live k (1/2)%Qp ∗
             (oblG_owner k (obl_owner d) (1/2)%Qp) ∗
-            (∃ α ℵ, (⌜ WFOCM.leR α (obl_progress d) ∧ WFOCM.leR (obl_progress d) ℵ ⌝) ∗
-                    oblG_progress_supply k α (1)%Qp ∗ oblG_bound_auth k ℵ)
+            (∃ α, (⌜ WFOCM.leR α (obl_progress d) ⌝) ∗ oblG_progress_supply k α (1)%Qp)
+            (* (∃ α ℵ, (⌜ WFOCM.leR α (obl_progress d) ∧ WFOCM.leR (obl_progress d) ℵ ⌝) ∗ *)
+            (*         oblG_progress_supply k α (1)%Qp ∗ oblG_bound_auth k ℵ) *)
         | inr d =>
             let P1 := (obl_atom d) in
             ∃ P2 R, oblG_goal k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
@@ -188,8 +189,8 @@ Section osat.
   Proof. rewrite /oblG_elem. apply _. Qed.
   Global Instance oblG_done_persistent k : Persistent (oblG_done k).
   Proof. rewrite /oblG_done. apply _. Qed.
-  Global Instance oblG_bound_persistent k ℵ : Persistent (oblG_bound k ℵ).
-  Proof. rewrite /oblG_bound. apply _. Qed.
+  (* Global Instance oblG_bound_persistent k ℵ : Persistent (oblG_bound k ℵ). *)
+  (* Proof. rewrite /oblG_bound. apply _. Qed. *)
 
   Global Instance oblG_elem_timeless k : Timeless (oblG_elem k).
   Proof. rewrite /oblG_elem. apply _. Qed.
@@ -199,8 +200,8 @@ Section osat.
   Proof. rewrite /oblG_done. apply _. Qed.
   Global Instance oblG_progress_timeless k b : Timeless (oblG_progress k b).
   Proof. rewrite /oblG_progress. apply _. Qed.
-  Global Instance oblG_bound_timeless k a : Timeless (oblG_bound k a).
-  Proof. rewrite /oblG_bound. apply _. Qed.
+  (* Global Instance oblG_bound_timeless k a : Timeless (oblG_bound k a). *)
+  (* Proof. rewrite /oblG_bound. apply _. Qed. *)
 
   Local Infix "/=" := OCM.eq (at level 70).
   Local Infix "/≤" := WFOCM.leR (at level 70).
@@ -526,43 +527,43 @@ Section osat.
     by iFrame.
   Qed.
 
-  (** Progress bound rules *)
-  Lemma oblG_bound_auth_alloc D k a :
-    k ∉ D →
-    (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset D)))
-    ⊢ |==> (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
-           oblG_bound_auth k a.
-  Proof.
-    iIntros (Hk) "Htk".
-    iPoseProof (reservation_map_token_alloc_singleton _ _ k (●AM[wfocm_geR] a) with "Htk") as "[Htk >H]"; auto.
-    - apply auth_mra_auth_valid.
-    - rewrite /oblG_bound_auth. by iFrame.
-  Qed.
+  (* (** Progress bound rules *) *)
+  (* Lemma oblG_bound_auth_alloc D k a : *)
+  (*   k ∉ D → *)
+  (*   (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset D))) *)
+  (*   ⊢ |==> (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗ *)
+  (*          oblG_bound_auth k a. *)
+  (* Proof. *)
+  (*   iIntros (Hk) "Htk". *)
+  (*   iPoseProof (reservation_map_token_alloc_singleton _ _ k (●AM[wfocm_geR] a) with "Htk") as "[Htk >H]"; auto. *)
+  (*   - apply auth_mra_auth_valid. *)
+  (*   - rewrite /oblG_bound_auth. by iFrame. *)
+  (* Qed. *)
 
-  Lemma oblG_bound_know k a :
-    oblG_bound_auth k a ⊢ oblG_bound k a.
-  Proof.
-    rewrite /oblG_bound_auth /oblG_bound. rewrite auth_mra_auth_know_op.
-    rewrite reservation_map_data_op. iIntros "[H1 H2]". iFrame.
-  Qed.
+  (* Lemma oblG_bound_know k a : *)
+  (*   oblG_bound_auth k a ⊢ oblG_bound k a. *)
+  (* Proof. *)
+  (*   rewrite /oblG_bound_auth /oblG_bound. rewrite auth_mra_auth_know_op. *)
+  (*   rewrite reservation_map_data_op. iIntros "[H1 H2]". iFrame. *)
+  (* Qed. *)
 
-  Lemma oblG_bound_know_bound k a0 a1 :
-    oblG_bound_auth k a0 ∗ oblG_bound k a1 ⊢ ⌜ a0 /≤ a1 ⌝.
-  Proof.
-    rewrite /oblG_bound_auth /oblG_bound -own_op -reservation_map_data_op.
-    iIntros "H". iPoseProof (own_valid with "H") as "%V". apply reservation_map_data_valid in V.
-    apply (auth_mra_both_valid wfocm_geR) in V. done.
-  Qed.
+  (* Lemma oblG_bound_know_bound k a0 a1 : *)
+  (*   oblG_bound_auth k a0 ∗ oblG_bound k a1 ⊢ ⌜ a0 /≤ a1 ⌝. *)
+  (* Proof. *)
+  (*   rewrite /oblG_bound_auth /oblG_bound -own_op -reservation_map_data_op. *)
+  (*   iIntros "H". iPoseProof (own_valid with "H") as "%V". apply reservation_map_data_valid in V. *)
+  (*   apply (auth_mra_both_valid wfocm_geR) in V. done. *)
+  (* Qed. *)
 
-  Lemma oblG_bound_auth_mon k a0 a1 :
-    a1 /≤ a0 →
-    oblG_bound_auth k a0 ⊢ |==> oblG_bound_auth k a1.
-  Proof. iIntros (Ha). apply own_update, reservation_map_update, auth_mra_update; eauto. apply _. Qed.
+  (* Lemma oblG_bound_auth_mon k a0 a1 : *)
+  (*   a1 /≤ a0 → *)
+  (*   oblG_bound_auth k a0 ⊢ |==> oblG_bound_auth k a1. *)
+  (* Proof. iIntros (Ha). apply own_update, reservation_map_update, auth_mra_update; eauto. apply _. Qed. *)
 
-  Lemma oblG_bound_mon k a0 a1 :
-    a0 /≤ a1 →
-    oblG_bound k a0 ⊢ oblG_bound k a1.
-  Proof. iIntros (Ha). apply own_mono, reservation_map_data_mono, auth_mra_know_mono; eauto. apply _. Qed.
+  (* Lemma oblG_bound_mon k a0 a1 : *)
+  (*   a0 /≤ a1 → *)
+  (*   oblG_bound k a0 ⊢ oblG_bound k a1. *)
+  (* Proof. iIntros (Ha). apply own_mono, reservation_map_data_mono, auth_mra_know_mono; eauto. apply _. Qed. *)
 
   (** Owner rules *)
   Lemma oblG_owner_agree k θ0 θ1 q0 q1 :
