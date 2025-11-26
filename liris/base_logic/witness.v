@@ -85,9 +85,6 @@ Section wit_states.
   Context `{Ξl : wit_live_class}.
 
   (** Additional definitions *)
-  Definition wit_cond_owner (i : wit_ownerid) : wit_cond :=
-    λ _ o, match o with | inl d => (wit_owner d = i) | _ => False end.
-
   Definition wit_rel_preserves_cond (C : wit_cond) (R : relation wit_state) : Prop :=
     ∀ k o0 o1, C k o0 → R o0 o1 → C k o1.
 
@@ -95,9 +92,9 @@ Section wit_states.
   Global Instance wit_state_progress_Transitive : Transitive wit_state_progress.
   Proof using.
     intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
-    destruct H1 as (?&?). destruct H2 as (?&?). split_and !; try (etrans; eauto).
+    etrans; eauto.
   Qed.
-  Global Instance wit_state_resolve_Transitive s : Transitive (wit_state_resolve s).
+  Global Instance wit_state_resolve_Transitive : Transitive (wit_state_resolve).
   Proof using.
     intros x y z H1 H2. destruct x, y, z; simpl in *; try done.
   Qed.
@@ -105,7 +102,6 @@ Section wit_states.
   Lemma wit_state_progress_live o1 o2 :
     wit_state_progress o1 o2 →
     ∃ d1 d2, o1 = wit_live d1 ∧ o2 = wit_live d2 ∧
-             (wit_owner d1 = wit_owner d2) ∧
              (wit_count_ltR (wit_progress d2) (wit_progress d1)).
   Proof using.
     intros. destruct o1, o2; try done. simpl in H. do 2 eexists. split_and; eauto.
@@ -113,14 +109,13 @@ Section wit_states.
   Lemma wit_state_progress_tc_live o1 o2 :
     tc wit_state_progress o1 o2 →
     ∃ d1 d2, o1 = wit_live d1 ∧ o2 = wit_live d2 ∧
-             (wit_owner d1 = wit_owner d2) ∧
              (wit_count_ltR (wit_progress d2) (wit_progress d1)).
   Proof using.
     intros. induction H.
     { apply (wit_state_progress_live x y); auto. }
     apply wit_state_progress_live in H.
-    destruct H as (?&?&?&?&?&?). destruct IHtc as (?&?&?&?&?&?).
-    subst. inv H2. exists x0, x3. split_and !; auto.
+    destruct H as (?&?&?&?&?). destruct IHtc as (?&?&?&?&?).
+    subst. inv H3. exists x0, x3. split_and !; auto.
     all: etrans; eauto.
   Qed.
 
@@ -170,14 +165,6 @@ Section wit_states.
       + specialize (H2 HC). subst. apply H4; auto.
     - rewrite -H in H2. inv H2. econstructor.
   Qed.
-
-  Lemma wit_state_progress_cond_owner i : wit_rel_preserves_cond (wit_cond_owner i) wit_state_progress.
-  Proof using.
-    intros k o0 o1 Hc Hr. destruct o0, o1; try done. simpl in *. destruct Hr. inv H. auto.
-  Qed.
-
-  Global Instance wit_cond_owner_Decision i : ∀ k o, Decision (wit_cond_owner i k o).
-  Proof using. intros. unfold wit_cond_owner. destruct o; solve_decision. Qed.
 
   Lemma wit_states_cond_rel_dom C R Ω1 Ω2 : wit_states_cond_rel C R Ω1 Ω2 → dom Ω1 = dom Ω2.
   Proof using. intros. eapply map_Forall2_dom_L; eauto. Qed.
