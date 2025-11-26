@@ -111,9 +111,9 @@ Variant obl_states_step `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl
   | obl_states_step_alloc Ω1 Ω2 :
     Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2.
 
-Notation "A ↪ₒ B @ s" := (obl_states_step s A B) (at level 20, format "A  ↪ₒ  B  @  s").
-Notation "A ↪ₒ⁺ B @ s" := (tc (obl_states_step s) A B) (at level 20, format "A  ↪ₒ⁺  B  @  s").
-Notation "A ↪ₒ⋆ B @ s" := (rtc (obl_states_step s) A B) (at level 20, format "A  ↪ₒ⋆  B  @  s").
+Notation "A ↪ₛ B @ s" := (obl_states_step s A B) (at level 20, format "A  ↪ₛ  B  @  s").
+Notation "A ↪ₛ⁺ B @ s" := (tc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⁺  B  @  s").
+Notation "A ↪ₛ⋆ B @ s" := (rtc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s").
 
 Section obl_states.
   Context `{Ξl : obl_live_class} `{Ξd : obl_done_class}.
