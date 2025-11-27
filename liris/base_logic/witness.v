@@ -88,6 +88,18 @@ Section wit_states.
   Definition wit_rel_preserves_cond (C : wit_cond) (R : relation wit_state) : Prop :=
     ∀ k o0 o1, C k o0 → R o0 o1 → C k o1.
 
+  Definition wit_cond_one (v : obl_id) : wit_cond :=
+    λ k _, k = v.
+
+  Definition wit_cond_live : wit_cond :=
+    λ _ w, match w with | inl _ => True | inr _ => False end.
+
+  Global Instance wit_cond_one_dec : ∀ v k w, Decision (wit_cond_one v k w).
+  Proof using. intros. rewrite /wit_cond_one. solve_decision. Qed.
+
+  Global Instance wit_cond_live_dec : ∀ k w, Decision (wit_cond_live k w).
+  Proof using. intros. rewrite /wit_cond_live. destruct w; solve_decision. Qed.
+
   (** Properties *)
   Global Instance wit_state_progress_Transitive : Transitive wit_state_progress.
   Proof using.

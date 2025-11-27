@@ -229,7 +229,7 @@ Section owitness.
     apply credit_bound_credit_valid_compare in H0. done.
   Qed.
 
-  Lemma owitnessG_credit_alloc D k a :
+  Lemma owitnessG_witness_alloc D k a :
     k ∉ D →
     (own witness_name (reservation_map_token (A:=bcredUR) (⊤ ∖ gset_to_coPset D)))
     ⊢ |==> (own witness_name (reservation_map_token (A:=bcredUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
@@ -243,8 +243,101 @@ Section owitness.
   Qed.
 
   (** owitness rules *)
+  Lemma owitness_alloc_wit W k ℵ :
+    k ∉ dom W →
+    owitness W
+    ⊢ |==> owitness (<[k:=wlive ℵ]>W) ∗ owitnessG_witness k ℵ.
+  Proof.
+    iIntros (Nink) "N".
+    rewrite /owitness -!lock. iDestruct "N" as "(Ow& NM)".
+    iMod (owitnessG_witness_alloc _ k ℵ with "Ow") as "(Ow& Nw& Nc)"; first done.
+    iModIntro. rewrite dom_insert_L. iFrame "Ow Nw".
+    iApply big_sepM_insert.
+    { by eapply not_elem_of_dom. }
+    iFrame. simpl. done.
+  Qed.
 
-  TODO
+  Lemma owitness_wit_progress_one W k w1 w2 :
+    W !! k = Some w1 →
+    wit_state_progress w1 w2 →
+    owitness W
+    ⊢ |==> owitness (<[k:=w2]>W) ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ owitnessG_credit k c.
+  Proof.
+    iIntros (Luk Prog) "N".
+    rewrite /owitness -!lock. iDestruct "N" as "(On& Nm)".
+    assert (Ink : k ∈ dom W).
+    { apply elem_of_dom. eauto. }
+    rewrite dom_insert_L.
+    destruct w1, w2; try done. destruct w as [α], w0 as [α0]; simpl in *.
+    iPoseProof (big_sepM_delete _ _ _ _ Luk with "Nm") as "[Mk Nm]".
+    simpl. iDestruct "Mk" as "(%& %& Nck)".
+    assert (Lt : α0 /< α1).
+    { eapply WFOCM.lt_le_lt; eauto. }
+    apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
+    iMod (owitnessG_credit_mon_split _ _ _ _ Le with "Nck") as "[Nck Nck0]".
+    iModIntro. iFrame "Nck0". iSplitL; last done. iSplitL "On".
+    { replace ({[k]} ∪ dom W) with (dom W); eauto. set_solver. }
+    rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
+    { apply lookup_delete_eq. }
+    iFrame. simpl. done.
+  Qed.
+
+  Lemma owitness_wit_progress W1 W2 :
+    (W1 ↓ₚ W2 | wit_cond_live) →
+    owitness W1
+    ⊢ |==> owitness W2 ∗
+        ([∗ map] k ↦ w ∈ W1, match w with
+                             | inl _ => (∃ c, ⌜ /0 /< c ⌝ ∗ owitnessG_credit k c)
+                             | inr _ => oblG_done k
+                             end).
+  Proof.
+    iIntros (Prog) "N".
+    assert (Dom : dom W1 = dom W2) by (eapply wit_states_cond_rel_dom; eauto).
+    rewrite /owitness -!lock. iDestruct "N" as "(On& Nm)".
+    rewrite -Dom. iFrame "On".
+    iStopProof. clear Dom. revert W2 Prog. induction W1 using map_ind; iIntros (W2 Prog) "Nm".
+    { apply map_Forall2_empty_inv_l in Prog. subst. iModIntro. iFrame. done. }
+    apply map_Forall2_insert_inv_l in Prog; last auto. destruct Prog as (w2& m2& EqW2& LUm2& (HC1& HC2)& Prog).
+    subst. rewrite !big_sepM_insert; auto.
+    iDestruct "Nm" as "[Nmx Nm]". iMod (IHW1 _ Prog with "Nm") as "[Nm Cs]". clear IHW1.
+    iFrame "Nm Cs". destruct x; simpl in *.
+    - pose proof (HC1 I). destruct w2; simpl in *; last done.
+      destruct w as [α], w0 as [α0]; simpl in *. iDestruct "Nmx" as "(%& %& Nck)".
+      assert (Lt : α0 /< α1).
+      { eapply WFOCM.lt_le_lt; eauto. }
+      apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
+      iMod (owitnessG_credit_mon_split _ _ _ _ Le with "Nck") as "[Nck Nck0]".
+      iModIntro. iSplitL "Nck"; by iFrame.
+    - assert (inr u = w2) by (by apply HC2).
+      destruct w2; first done. inv H1. iPoseProof "Nmx" as "#H". by auto.
+  Qed.
+
+  Lemma owitness_obl_resolve_one Ω k P R x0 :
+    owitness Ω ∗ oblG_elem k ∗ oblG_goal k P R ∗ (▷ R) ∗
+    oblG_live k (1/2)%Qp ∗
+    oblG_owner k x0 (1/2)%Qp
+    ⊢ |==> owitness (<[k:=odone P]>Ω) ∗ oblG_done k.
+  Proof.
+    iIntros "(Hsat & #He & #Hg & HR & Hs0 & Ho0)".
+    iDestruct (owitness_obl_is_live with "[Hsat He Hs0]") as "(%&%LU)".
+    { iFrame. eauto. }
+    rewrite /owitness -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
+    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
+    iDestruct "Hk" as "(Hs& Ho& (%&%&Hps))".
+    iMod (oblG_live_to_done with "[Hs Hs0]") as "Hs".
+    { iApply oblG_live_frac_op; last iFrame. by rewrite Qp.div_2. }
+    iPoseProof (oblG_done_auth_done with "Hs") as "#Hsd".
+    iPoseProof (oblG_owner_agree with "[Ho Ho0]") as "%"; first iFrame.
+    destruct H0. clear H1. subst x0.
+    iCombine "Ho Ho0" as "Ho". iPoseProof (oblG_owner_frac_op with "Ho") as "Ho".
+    { by rewrite Qp.div_2. }
+    iModIntro.
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (odone P)) with "[Hm Hs Ho Hps HR]") as "Hm".
+    { apply lookup_delete_eq. }
+    { iFrame "Hm". iFrame. eauto. }
+    rewrite dom_insert_lookup_L; last done. iFrame "HS HP".
+    rewrite insert_delete_eq. iFrame. eauto.
+  Qed.
 
   Lemma owitness_elem k Ω :
     owitness Ω ∗ oblG_elem k ⊢ ⌜k ∈ dom Ω⌝.
@@ -344,93 +437,6 @@ Section owitness.
     - iApply IH. iFrame.
   Qed.
 
-  Lemma owitness_alloc_obl Ω θ α P R :
-    owitness Ω
-    ⊢ |==> ∃ k, ⌜Ω !! k = None⌝ ∗ owitness (<[k:=olive θ α]>Ω) ∗
-                oblG_goal k P R ∗
-                oblG_elem k ∗
-                oblG_live k (1/2)%Qp ∗
-                oblG_owner k θ (1/2)%Qp ∗
-                oblG_progress k α.
-  Proof.
-    iIntros "Hsat".
-    rewrite /owitness -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
-    assert (∃ k, k ∉ dom Ω).
-    { exists (fresh (dom Ω)). apply is_fresh. }
-    destruct H as [k Hk].
-    iMod (own_update with "HG") as "[HG Hg]".
-    { eapply (gmap_view_alloc _ k DfracDiscarded (to_agree $ P, to_agree $ goal_unfold R)); try done.
-      rewrite !lookup_fmap. rewrite not_elem_of_dom_1; [done | set_solver].
-    }
-    iMod (oblG_live_alloc _ k with "HS") as "[HS Hs]"; first done.
-    iMod (oblG_owner_alloc _ k θ with "HO") as "[HO Ho]"; first done.
-    iMod (oblG_progress_alloc _ k α with "HP") as "(HP & Hps & Hp)"; first done.
-    iPoseProof (oblG_live_div_2 with "Hs") as "[Hs1 Hs2]".
-    iPoseProof (oblG_owner_div_2 with "Ho") as "[Ho1 Ho2]".
-    iMod (oblG_elem_alloc _ k (olive θ α) with "HE") as "[HE He]"; first (by apply not_elem_of_dom).
-    iModIntro. iExists k. rewrite /oblG_goal. iFrame "Hg Hs2 Hp He Ho2".
-    iSplitR.
-    { iPureIntro. by apply not_elem_of_dom. }
-    rewrite -!lock. iSplitL "HG".
-    { iExists (<[k:=(P, R)]>OProp). iSplitR.
-      - iPureIntro. set_solver.
-      - rewrite fmap_insert. done.
-    }
-    rewrite dom_insert_L. iFrame "HS HO HP HE".
-    iApply big_sepM_insert.
-    { by apply not_elem_of_dom_1. }
-    iFrame. eauto.
-  Qed.
-
-  Lemma owitness_obl_progress_one Ω k θ α c :
-    (Ω !! k = Some (olive θ α)) →
-    (/0 /< c) →
-    owitness Ω ∗ oblG_progress k c
-    ⊢ |==> ∃ α', owitness (<[k:=olive θ α']>Ω) ∗
-              ⌜ obl_state_progress (olive θ α) (olive θ α') ⌝.
-  Proof.
-    intros LU Hc. iIntros "(Hsat & Hp)".
-    rewrite /owitness -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
-    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
-    iDestruct "Hk" as "(Hs& Ho& (%&%&Hps))".
-    iMod (oblG_progress_spend _ α0 with "[$Hps $Hp]") as "(%&%&Hps)".
-    assert (LT : a2 /< α0).
-    { apply WFOCM.lt_exists_right. exists c. split; done. }
-    iModIntro. iExists a2.
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (olive θ a2)) with "[Hm Hs Ho Hps]") as "Hm".
-    { apply lookup_delete_eq. }
-    { iFrame "Hm". iFrame. simpl. done. }
-    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HS HE HP".
-    rewrite insert_delete_eq. iFrame. simpl; iPureIntro; split_and !; auto.
-    eapply WFOCM.lt_le_lt; eauto.
-  Qed.
-
-  Lemma owitness_obl_resolve_one Ω k P R x0 :
-    owitness Ω ∗ oblG_elem k ∗ oblG_goal k P R ∗ (▷ R) ∗
-    oblG_live k (1/2)%Qp ∗
-    oblG_owner k x0 (1/2)%Qp
-    ⊢ |==> owitness (<[k:=odone P]>Ω) ∗ oblG_done k.
-  Proof.
-    iIntros "(Hsat & #He & #Hg & HR & Hs0 & Ho0)".
-    iDestruct (owitness_obl_is_live with "[Hsat He Hs0]") as "(%&%LU)".
-    { iFrame. eauto. }
-    rewrite /owitness -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
-    iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
-    iDestruct "Hk" as "(Hs& Ho& (%&%&Hps))".
-    iMod (oblG_live_to_done with "[Hs Hs0]") as "Hs".
-    { iApply oblG_live_frac_op; last iFrame. by rewrite Qp.div_2. }
-    iPoseProof (oblG_done_auth_done with "Hs") as "#Hsd".
-    iPoseProof (oblG_owner_agree with "[Ho Ho0]") as "%"; first iFrame.
-    destruct H0. clear H1. subst x0.
-    iCombine "Ho Ho0" as "Ho". iPoseProof (oblG_owner_frac_op with "Ho") as "Ho".
-    { by rewrite Qp.div_2. }
-    iModIntro.
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (odone P)) with "[Hm Hs Ho Hps HR]") as "Hm".
-    { apply lookup_delete_eq. }
-    { iFrame "Hm". iFrame. eauto. }
-    rewrite dom_insert_lookup_L; last done. iFrame "HS HP".
-    rewrite insert_delete_eq. iFrame. eauto.
-  Qed.
 
   Lemma owitness_done_open Ω k P R :
     owitness Ω ∗ oblG_goal k P R ∗ oblG_done k

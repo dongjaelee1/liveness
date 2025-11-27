@@ -720,20 +720,18 @@ Section osat.
     - iApply IH. iFrame.
   Qed.
 
-  Lemma osat_alloc_obl Ω θ α P R :
+  Lemma osat_alloc_obl Ω k θ α P R :
+    k ∉ dom Ω →
     osat Ω
-    ⊢ |==> ∃ k, ⌜Ω !! k = None⌝ ∗ osat (<[k:=olive θ α]>Ω) ∗
-                oblG_goal k P R ∗
-                oblG_elem k ∗
-                oblG_live k (1/2)%Qp ∗
-                oblG_owner k θ (1/2)%Qp ∗
-                oblG_progress k α.
+    ⊢ |==> osat (<[k:=olive θ α]>Ω) ∗
+        oblG_goal k P R ∗
+        oblG_elem k ∗
+        oblG_live k (1/2)%Qp ∗
+        oblG_owner k θ (1/2)%Qp ∗
+        oblG_progress k α.
   Proof.
-    iIntros "Hsat".
+    iIntros (Hk) "Hsat".
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
-    assert (∃ k, k ∉ dom Ω).
-    { exists (fresh (dom Ω)). apply is_fresh. }
-    destruct H as [k Hk].
     iMod (own_update with "HG") as "[HG Hg]".
     { eapply (gmap_view_alloc _ k DfracDiscarded (to_agree $ P, to_agree $ goal_unfold R)); try done.
       rewrite !lookup_fmap. rewrite not_elem_of_dom_1; [done | set_solver].
@@ -744,10 +742,8 @@ Section osat.
     iPoseProof (oblG_live_div_2 with "Hs") as "[Hs1 Hs2]".
     iPoseProof (oblG_owner_div_2 with "Ho") as "[Ho1 Ho2]".
     iMod (oblG_elem_alloc _ k (olive θ α) with "HE") as "[HE He]"; first (by apply not_elem_of_dom).
-    iModIntro. iExists k. rewrite /oblG_goal. iFrame "Hg Hs2 Hp He Ho2".
-    iSplitR.
-    { iPureIntro. by apply not_elem_of_dom. }
-    rewrite -!lock. iSplitL "HG".
+    iModIntro. rewrite /oblG_goal. iFrame "Hg Hs2 Hp He Ho2".
+    iSplitL "HG".
     { iExists (<[k:=(P, R)]>OProp). iSplitR.
       - iPureIntro. set_solver.
       - rewrite fmap_insert. done.
