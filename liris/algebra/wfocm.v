@@ -59,6 +59,13 @@ Module WFOCM.
       apply lt_Irreflexive in H4. auto.
     Qed.
 
+    Global Instance eq_Proper : Proper (OCM.eq ==> OCM.eq ==> iff) ltR.
+    Proof using.
+      repeat intro. destruct H0, H1. split; intros.
+      - eapply (lt_le_lt _ x0); eauto. eapply (le_lt_lt _ x); eauto.
+      - eapply (lt_le_lt _ y0); eauto. eapply (le_lt_lt _ y); eauto.
+    Qed.
+
     Lemma induction_type : forall P : A -> Type, (forall x : A, (forall y : A, ltR y x -> P y) -> P x) -> forall a : A, P a.
     Proof using Type*.
       intros. apply (well_founded_induction_type lt_wf). auto.
