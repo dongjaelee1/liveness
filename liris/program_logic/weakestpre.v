@@ -5,26 +5,32 @@ From liris Require Export language.
 From iris.bi Require Export fixpoint.
 From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
-From liris.base_logic Require Export otree fancy_updates.
+From liris.base_logic Require Export fancy_updates.
+From liris.base_logic Require Export osat othread owitness.
+(* From liris.base_logic Require Export otree fancy_updates. *)
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
 
 Global Instance wp_obl_live_class : obl_live_class Ord.t thread_id Ord.lt.
 Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
-
 Global Instance wp_obl_done_class {Λ : language} : obl_done_class (state Λ).
 Proof. econstructor. done. Qed.
+Global Instance wp_wit_live_class : wit_live_class Ord.t Ord.lt.
+Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
 
 Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
   (** Invariants. *)
   #[global] liris_invGS :: invGS Σ;
-  (** Liveness obligation interpretation. *)
+  (** Liveness obligations. *)
   #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (state Λ) thread_id Σ;
-  (* #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (state Λ) thread_id Σ; *)
   (** Liveness obligations assigned to threads. *)
   #[global] liris_othreadGS :: othreadGS.othreadGS Σ;
-  (** Forest of liveness obligation. *)
-  #[global] liris_otreeGS :: otreeGS.otreeGS Ord.t Σ;
+  (** Liveness witnesses. *)
+  #[global] liris_owitnessGS :: owitnessGS.owitnessGS (WF:=ord_wfocm_pack) Σ;
+  (** Witness function. *)
+  wit_fun : Ord.t → Ord.t;
+  (* (** Forest of liveness obligation. *) *)
+  (* #[global] liris_otreeGS :: otreeGS.otreeGS Ord.t Σ; *)
 
   (** The state interpretation is an invariant that should hold in
   between each step of reduction.
@@ -38,24 +44,26 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
  fork_post : thread_id → val Λ → iProp Σ;
 }.
 
-Global Opaque liris_invGS liris_osatGS liris_othreadGS liris_otreeGS.
+Global Opaque liris_invGS liris_osatGS liris_othreadGS liris_owitnessGS.
 Global Arguments LirisG {SI Λ Σ}.
+
 (** Predicates we take the fixpoint of in order to define the lWP. *)
-(* Ω must make strict progress to obtain later credits *)
-(* ς is partial information of the state, so that we can observe from outside *)
+(* Ω must make strict progress for every step (to bound step index) *)
+(* W witnesses progresses of obligations; it's instantiated using fair scheduler in the adequacy proof *)
 Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
-  (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs,
-     (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
+  (∀ (Ω1 : obl_states) (W1 : wit_states) (Θ : thread_ids) σ1 κ κs,
+     (osat Ω1 ∗ othread Θ ∗ oassigned (dom Ω1) ∗ owitness W1 ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
      (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
-     ∃ Ω2, (⌜ Ω1 ↪ₒ⋆ Ω2 @ σ1 ⌝) ∗
+     ∃ Ω2, (⌜ Ω1 ↪ₛ⋆ Ω2 @ σ1 ⌝) ∗
            ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                         |={∅}=>
      ALC (|={∅,E}=>
-            ∃ Ω3 Ω4 Ω5, (⌜ (Ω2 ↪ₒ⋆ Ω3 @ σ2) ∧ (Ω3 ↪ₚ Ω4 | obl_cond_owner i) ∧ (Ω4 ↪ₒ⋆ Ω5 @ σ2) ⌝) ∗
-                        (osat Ω5 ∗ othread (Θ ∪ dom efs) ∗ osuspend (dom Ω5) ∗ oforest (dom Ω5) ∗ state_interp σ2 (Θ ∪ dom efs) κs) ∗
-                        ν e2 efs))%I.
+            ∃ Ω3 Ω4 Ω5, (⌜ (Ω2 ↪ₛ⋆ Ω3 @ σ2) ∧ (Ω3 ↪ₚ Ω4 | obl_cond_owner i) ∧ (Ω4 ↪ₛ⋆ Ω5 @ σ2) ⌝) ∗
+            ∀ W2 W3 W4, (⌜ (W1 ↓ₛ⋆ W2) ∧ (W2 ↓ₚ W3 | wit_cond_live) ∧ (W3 ↓ₛ⋆ W4) ∧ obl_wit wit_fun Ω4 W4 ⌝) ∗
+            (osat Ω4 ∗ othread (Θ ∪ dom efs) ∗ oassigned (dom Ω4) ∗ owitness W4 ∗ state_interp σ2 (Θ ∪ dom efs) κs) ∗
+            ν e2 efs))%I.
 
 (* Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ} *)
 (*   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ) *)
