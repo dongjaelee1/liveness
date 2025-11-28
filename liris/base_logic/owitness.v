@@ -73,7 +73,7 @@ Definition obl_wit `{WFA : WFOCM.pack A}
   map_Forall2 (λ k o w,
                  match o, w with
                  | inl d, inl e =>
-                     OCM.eq (wit_progress e) (ξ (obl_progress d))
+                     WFOCM.leR (wit_progress e) (ξ (obl_progress d))
                      (* WFOCM.leR (obl_progress d) (wit_progress e) ∧ WFOCM.leR (wit_progress e) (ξ (obl_progress d)) *)
                  | inr _, inr _ => True
                  | _, _ => False
@@ -342,76 +342,76 @@ Section owitness.
     obl_wit ξ ∅ ∅.
   Proof. apply map_Forall2_empty. Qed.
 
-  Lemma obl_wit_progress ξ Ω1 Ω2 W1 (i : T) :
-    Proper (WFOCM.ltR ==> WFOCM.ltR) ξ →
-    obl_wit ξ Ω1 W1 →
-    (Ω1 ↪ₚ Ω2 | obl_cond_owner i) →
-    ∃ W2, (W1 ↓ₚ W2 | λ k _, ∃ d, Ω1 !! k = Some (obl_live d) ∧ (obl_owner d = i)) ∧
-          obl_wit ξ Ω2 W2.
-  Proof.
-    intros Hξ. revert Ω2 W1. induction Ω1 using map_ind; intros Ω2 W1 OW OP.
-    { apply map_Forall2_empty_inv_l in OP, OW. subst. exists ∅. split; apply map_Forall2_empty. }
-    rename m into Ω1, W1 into W1', Ω2 into Ω2', i0 into k, x into o.
-    apply map_Forall2_insert_inv_l in OP; last auto. destruct OP as (o2& Ω2& EqO2& LUO2& (HCO1& HCO2)& OP).
-    apply map_Forall2_insert_inv_l in OW; last auto. destruct OW as (w2& W2& EqW2& LUW2& HW2& OW).
-    pose proof (IHΩ1 _ _ OW OP) as IH. clear IHΩ1 OW OP. destruct IH as (Wi& WPi& OWi). subst.
-    assert (WDom : dom W2 = dom Wi) by (eapply wit_states_cond_rel_dom; eauto).
-    assert (LUWi : Wi !! k = None).
-    { apply not_elem_of_dom. rewrite -WDom. apply not_elem_of_dom. auto. }
-    destruct o, w2; try done.
-    - destruct o as [θ α], w as [ℵ]. simpl in *. destruct (decide (θ = i)).
-      + subst. pose proof (HCO1 eq_refl). clear HCO1 HCO2. destruct o2; last done.
-        destruct o as [θ' α']. simpl in *. destruct H1; subst.
-        exists (<[k:=wlive (ξ α')]>Wi). split.
-        * apply map_Forall2_insert; auto. simpl. split_and !; auto.
-          -- intros. destruct H1 as (?&?&?). subst. rewrite HW2. apply Hξ. auto.
-          -- intros. exfalso. apply H1; clear H1. eexists. split.
-              { apply lookup_insert_eq. }
-             done.
-          -- intros ?. specialize (WPi i). destruct (W2 !! i) eqn:LUi1.
-             ++ destruct (decide (i = k)).
-                { subst. rewrite LUW2 in LUi1; done. }
-                rewrite LUi1 in WPi. destruct (Wi !! i) eqn:LUi2.
-                ** rewrite LUi1. inv WPi. destruct H4. econstructor. split; intro.
-                   { destruct H4 as (?&?&?). rewrite lookup_insert_ne in H4; eauto. }
-                   { apply H3. intros ?. apply H4. destruct H5 as (?&?&?). rewrite lookup_insert_ne; eauto. }
-                ** inv WPi.
-             ++ rewrite LUi1 in WPi. destruct (Wi !! i) eqn:LUi2.
-                ** inv WPi.
-                ** rewrite LUi1. econstructor.
-        * apply map_Forall2_insert; auto. simpl. split_and !; auto. done.
-      + pose proof (HCO2 n). subst. clear HCO1 HCO2.
-        exists (<[k:=wlive ℵ]>Wi). split; apply map_Forall2_insert; auto.
-        simpl. split_and !; auto.
-        -- intros. exfalso. destruct H1 as (?&?&?). subst. rewrite lookup_insert_eq in H1. inv H1.
-        -- intros j. specialize (WPi j). destruct (W2 !! j) eqn:LUj1.
-           ++ destruct (decide (j = k)).
-              { subst. rewrite LUW2 in LUj1; done. }
-              rewrite LUj1 in WPi. destruct (Wi !! j) eqn:LUj2.
-              ** rewrite LUj1. inv WPi. destruct H3. econstructor. split; intro.
-                 { destruct H3 as (?&?&?). rewrite lookup_insert_ne in H3; eauto. }
-                 { apply H2. intros ?. apply H3. destruct H4 as (?&?&?). rewrite lookup_insert_ne; eauto. }
-              ** inv WPi.
-           ++ rewrite LUj1 in WPi. destruct (Wi !! j) eqn:LUj2.
-              ** inv WPi.
-              ** rewrite LUj1. econstructor.
-    - simpl in *. assert (inr o = o2) by (by apply HCO2). clear HCO1 HCO2. subst.
-      exists (<[k:=wdone]>Wi). split; apply map_Forall2_insert; auto.
-      simpl. split_and !; auto.
-      * intros. destruct H1 as (?&?&?). rewrite lookup_insert_eq in H1. inv H1.
-      * intros. destruct u. done.
-      * intros j. specialize (WPi j). destruct (W2 !! j) eqn:LUj1.
-        -- destruct (decide (j = k)).
-           { subst. rewrite LUW2 in LUj1; done. }
-           rewrite LUj1 in WPi. destruct (Wi !! j) eqn:LUj2.
-           ++ rewrite LUj1. inv WPi. destruct H3. econstructor. split; intro.
-              { destruct H3 as (?&?&?). rewrite lookup_insert_ne in H3; eauto. }
-              { apply H2. intros ?. apply H3. destruct H4 as (?&?&?). rewrite lookup_insert_ne; eauto. }
-           ++ inv WPi.
-        -- rewrite LUj1 in WPi. destruct (Wi !! j) eqn:LUj2.
-           ++ inv WPi.
-           ++ rewrite LUj1. econstructor.
-  Qed.
+  (* Lemma obl_wit_progress ξ Ω1 Ω2 W1 (i : T) : *)
+  (*   Proper (WFOCM.ltR ==> WFOCM.ltR) ξ → *)
+  (*   obl_wit ξ Ω1 W1 → *)
+  (*   (Ω1 ↪ₚ Ω2 | obl_cond_owner i) → *)
+  (*   ∃ W2, (W1 ↓ₚ W2 | λ k _, ∃ d, Ω1 !! k = Some (obl_live d) ∧ (obl_owner d = i)) ∧ *)
+  (*         obl_wit ξ Ω2 W2. *)
+  (* Proof. *)
+  (*   intros Hξ. revert Ω2 W1. induction Ω1 using map_ind; intros Ω2 W1 OW OP. *)
+  (*   { apply map_Forall2_empty_inv_l in OP, OW. subst. exists ∅. split; apply map_Forall2_empty. } *)
+  (*   rename m into Ω1, W1 into W1', Ω2 into Ω2', i0 into k, x into o. *)
+  (*   apply map_Forall2_insert_inv_l in OP; last auto. destruct OP as (o2& Ω2& EqO2& LUO2& (HCO1& HCO2)& OP). *)
+  (*   apply map_Forall2_insert_inv_l in OW; last auto. destruct OW as (w2& W2& EqW2& LUW2& HW2& OW). *)
+  (*   pose proof (IHΩ1 _ _ OW OP) as IH. clear IHΩ1 OW OP. destruct IH as (Wi& WPi& OWi). subst. *)
+  (*   assert (WDom : dom W2 = dom Wi) by (eapply wit_states_cond_rel_dom; eauto). *)
+  (*   assert (LUWi : Wi !! k = None). *)
+  (*   { apply not_elem_of_dom. rewrite -WDom. apply not_elem_of_dom. auto. } *)
+  (*   destruct o, w2; try done. *)
+  (*   - destruct o as [θ α], w as [ℵ]. simpl in *. destruct (decide (θ = i)). *)
+  (*     + subst. pose proof (HCO1 eq_refl). clear HCO1 HCO2. destruct o2; last done. *)
+  (*       destruct o as [θ' α']. simpl in *. destruct H1; subst. *)
+  (*       exists (<[k:=wlive (ξ α')]>Wi). split. *)
+  (*       * apply map_Forall2_insert; auto. simpl. split_and !; auto. *)
+  (*         -- intros. destruct H1 as (?&?&?). subst. rewrite HW2. apply Hξ. auto. *)
+  (*         -- intros. exfalso. apply H1; clear H1. eexists. split. *)
+  (*             { apply lookup_insert_eq. } *)
+  (*            done. *)
+  (*         -- intros ?. specialize (WPi i). destruct (W2 !! i) eqn:LUi1. *)
+  (*            ++ destruct (decide (i = k)). *)
+  (*               { subst. rewrite LUW2 in LUi1; done. } *)
+  (*               rewrite LUi1 in WPi. destruct (Wi !! i) eqn:LUi2. *)
+  (*               ** rewrite LUi1. inv WPi. destruct H4. econstructor. split; intro. *)
+  (*                  { destruct H4 as (?&?&?). rewrite lookup_insert_ne in H4; eauto. } *)
+  (*                  { apply H3. intros ?. apply H4. destruct H5 as (?&?&?). rewrite lookup_insert_ne; eauto. } *)
+  (*               ** inv WPi. *)
+  (*            ++ rewrite LUi1 in WPi. destruct (Wi !! i) eqn:LUi2. *)
+  (*               ** inv WPi. *)
+  (*               ** rewrite LUi1. econstructor. *)
+  (*       * apply map_Forall2_insert; auto. simpl. split_and !; auto. done. *)
+  (*     + pose proof (HCO2 n). subst. clear HCO1 HCO2. *)
+  (*       exists (<[k:=wlive ℵ]>Wi). split; apply map_Forall2_insert; auto. *)
+  (*       simpl. split_and !; auto. *)
+  (*       -- intros. exfalso. destruct H1 as (?&?&?). subst. rewrite lookup_insert_eq in H1. inv H1. *)
+  (*       -- intros j. specialize (WPi j). destruct (W2 !! j) eqn:LUj1. *)
+  (*          ++ destruct (decide (j = k)). *)
+  (*             { subst. rewrite LUW2 in LUj1; done. } *)
+  (*             rewrite LUj1 in WPi. destruct (Wi !! j) eqn:LUj2. *)
+  (*             ** rewrite LUj1. inv WPi. destruct H3. econstructor. split; intro. *)
+  (*                { destruct H3 as (?&?&?). rewrite lookup_insert_ne in H3; eauto. } *)
+  (*                { apply H2. intros ?. apply H3. destruct H4 as (?&?&?). rewrite lookup_insert_ne; eauto. } *)
+  (*             ** inv WPi. *)
+  (*          ++ rewrite LUj1 in WPi. destruct (Wi !! j) eqn:LUj2. *)
+  (*             ** inv WPi. *)
+  (*             ** rewrite LUj1. econstructor. *)
+  (*   - simpl in *. assert (inr o = o2) by (by apply HCO2). clear HCO1 HCO2. subst. *)
+  (*     exists (<[k:=wdone]>Wi). split; apply map_Forall2_insert; auto. *)
+  (*     simpl. split_and !; auto. *)
+  (*     * intros. destruct H1 as (?&?&?). rewrite lookup_insert_eq in H1. inv H1. *)
+  (*     * intros. destruct u. done. *)
+  (*     * intros j. specialize (WPi j). destruct (W2 !! j) eqn:LUj1. *)
+  (*       -- destruct (decide (j = k)). *)
+  (*          { subst. rewrite LUW2 in LUj1; done. } *)
+  (*          rewrite LUj1 in WPi. destruct (Wi !! j) eqn:LUj2. *)
+  (*          ++ rewrite LUj1. inv WPi. destruct H3. econstructor. split; intro. *)
+  (*             { destruct H3 as (?&?&?). rewrite lookup_insert_ne in H3; eauto. } *)
+  (*             { apply H2. intros ?. apply H3. destruct H4 as (?&?&?). rewrite lookup_insert_ne; eauto. } *)
+  (*          ++ inv WPi. *)
+  (*       -- rewrite LUj1 in WPi. destruct (Wi !! j) eqn:LUj2. *)
+  (*          ++ inv WPi. *)
+  (*          ++ rewrite LUj1. econstructor. *)
+  (* Qed. *)
 
   (* TODO : sched fair case *)
 

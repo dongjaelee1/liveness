@@ -595,10 +595,10 @@ Section othread.
     iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
   Qed.
 
-  Lemma othread_obls_open TP i k Ψ :
+  Lemma othread_obls_open TP i k Ψ q :
     k ∈ Ψ →
-    othread TP ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1
-    ⊢ othreadG_obls i Ψ 1 ∗
+    othread TP ∗ othreadG_elem i ∗ othreadG_obls i Ψ q
+    ⊢ othreadG_obls i Ψ q ∗
     (oblG_live k (1/2/2) ∗ oblG_owner k i (1/2/2)) ∗
     ((oblG_live k (1/2/2) ∗ oblG_owner k i (1/2/2)) -∗ othread TP).
   Proof.
@@ -608,9 +608,10 @@ Section othread.
     assert (Hlui : is_Some (OThread !! i)).
     { subst TP. by apply elem_of_dom. }
     destruct Hlui as (OObls&Hlui).
-    iPoseProof (othreadG_obls_lookup with "[HO Hobls]") as "%"; first iFrame.
+    iPoseProof (othreadG_obls_lookup_frac with "[$HO $Hobls]") as "(%& (%& %))".
     rewrite lookup_fmap in H0. rewrite Hlui in H0. inv H0.
-    assert (Hluk : is_Some (OObls !! k)) by (by apply elem_of_dom).
+    assert (Hluk : is_Some (OObls !! k)).
+    { apply elem_of_dom. set_solver. }
     destruct Hluk as (fk&Hluk).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "(Hix & His & Him)".
@@ -655,6 +656,16 @@ Section othread.
     - iPoseProof (osat_lookup_owner with "[$S $Bek $Bok]") as "(%&%&%)". rewrite LUOk in H0. inv H0.
       iApply (othread_obls_owns_elem with "[$T $Tbs $Tok]").
     - iPoseProof (osat_obl_is_done_weak with "[$S $Bek $Bdk]") as "(%&%)". rewrite LUOk in H0. inv H0.
+  Qed.
+
+  Lemma othread_obls_lookup Ω TP k i Ψ q :
+    k ∈ Ψ →
+    osat Ω ∗ othread TP ∗ othreadG_elem i ∗ othreadG_obls i Ψ q ∗ oblG_elem k
+    ⊢ ∃ d, ⌜ Ω !! k = Some (obl_live d) ∧ obl_owner d = i ⌝.
+  Proof.
+    iIntros (Ink) "(S& T& #Tei& Tbs& #Bek)".
+    iPoseProof (othread_obls_open with "[$T $Tei $Tbs]") as "(Tbs& (Bli& Bok)& Acc)". 1: eauto.
+    iPoseProof (osat_lookup_owner with "[$S $Bek $Bok]") as "(%& %)". iExists d. done.
   Qed.
 
 End othread.

@@ -777,6 +777,81 @@ Section osat.
     eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
+  Lemma osat_obl_progress Ω (C : obl_cond) :
+    (∀ k o, C k o → ∃ d, o = obl_live d) →
+    osat Ω ∗
+    ([∗ map] k ↦ o ∈ Ω, (⌜ C k o ⌝ ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress k c) ∨ (⌜ ¬ C k o ⌝))
+    ⊢ |==> ∃ Ω', osat Ω' ∗ ⌜ Ω ↪ₚ Ω' | C ⌝.
+  Proof.
+    iIntros (HC) "(Hsat & Cs)".
+    iAssert (∃ Ω1 Ω2, (⌜ Ω1 ##ₘ Ω2 ∧ Ω = Ω1 ∪ Ω2 ∧ map_Forall (λ k o, C k o) Ω1 ∧ map_Forall (λ k o, ¬ C k o) Ω2 ⌝) ∗
+                      ([∗ map] k ↦ o ∈ Ω1, (⌜ C k o ⌝ ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress k c)) ∗
+                      ([∗ map] k ↦ o ∈ Ω2, (⌜ ¬ C k o ⌝))
+            )%I with "[Cs]" as "(%& %& (%Disj& %EQO& %CO1& %CO2)& Cs& NCs)".
+    { iStopProof. induction Ω using map_ind; iIntros "M".
+      { iExists ∅, ∅. rewrite !big_sepM_empty. done. }
+      rewrite !big_sepM_insert; auto. iDestruct "M" as "(H& M)".
+      iPoseProof (IHΩ with "M") as "(%& %& (%Disj& %EqO& %HC1& %HC2)& M1& M2)". clear IHΩ.
+      assert (i ∉ dom Ω1 ∧ i ∉ dom Ω2).
+      { subst. apply not_elem_of_dom in H. set_solver + H. }
+      destruct H0 as [Nin1 Nin2]. apply not_elem_of_dom in Nin1, Nin2.
+      iDestruct "H" as "[(%Ci& (%& %Hc& Bpi)) | %NCi]".
+      - iExists (<[i:=x]>Ω1), Ω2. iFrame. iSplitR.
+        { iPureIntro. split_and !; auto.
+          - apply map_disjoint_insert_l_2; auto.
+          - subst. apply insert_union_l.
+          - apply map_Forall_insert; auto. }
+        iApply big_sepM_insert; auto. iFrame. done.
+      - iExists Ω1, (<[i:=x]>Ω2). iFrame. iSplitR.
+        { iPureIntro. split_and !; auto.
+          - apply map_disjoint_insert_r_2; auto.
+          - subst. apply insert_union_r; auto.
+          - apply map_Forall_insert; auto. }
+        iApply big_sepM_insert; auto.
+    }
+    assert (Sub : Ω1 ⊆ Ω).
+    { subst. apply map_union_subseteq_l. }
+    iAssert (|==> ∃ Ω' : obl_states, osat Ω' ∗ ⌜Ω ↪ₚ Ω' | (λ k _, k ∈ dom Ω1)⌝)%I with "[-]" as ">H"; cycle 1.
+    { iDestruct "H" as "(%& S& %)". iModIntro. iFrame. iPureIntro.
+      eapply obl_states_cond_rel_iff_lookup; first eapply H.
+      intros. simpl. subst. split; intros.
+      - apply elem_of_dom in H1. destruct H1. erewrite lookup_union_Some_l in H0; last eauto. inv H0.
+        apply CO1 in H1. auto.
+      - apply lookup_union_Some in H0; last auto. destruct H0.
+        + apply elem_of_dom; eauto.
+        + apply CO2 in H0. done.
+    }
+    iClear "NCs". iStopProof. clear dependent Ω2. revert CO1 Ω Sub.
+    induction Ω1 using map_ind; iIntros (CO Ω Sub) "(S& M)".
+    { iExists Ω. iModIntro. iFrame. iPureIntro. repeat intro. destruct (Ω !! i) eqn:LUi.
+      - econstructor. split; intros; done.
+      - econstructor.
+    }
+    rewrite !big_sepM_insert; auto. apply map_Forall_insert in CO; auto. destruct CO as (Ci& CO).
+    iDestruct "M" as "((_& %& %LTc& Bpi)& M)". iMod (IHΩ1 CO with "[$S $M]") as "(%& S& %Prog1)".
+    { etransitivity; last eapply Sub. eapply insert_subseteq; auto. }
+    clear IHΩ1.
+    assert (LUi1 : Ω !! i = Some x).
+    { eapply lookup_weaken; last eapply Sub. apply lookup_insert_eq. }
+    assert (LUi2 : Ω' !! i = Some x).
+    { eapply obl_states_cond_rel_lookup in Prog1. erewrite LUi1 in Prog1. inv Prog1. destruct H2.
+      apply not_elem_of_dom in H. apply H2 in H. subst; auto.
+    }
+    pose proof Ci. apply HC in H0. destruct H0 as ([θ α]& ?).
+    iMod (osat_obl_progress_one with "[$S $Bpi]") as "(%& S& %Progi)"; auto.
+    { subst; eauto. }
+    iFrame. iPureIntro. assert (Prog2 : Ω' ↪ₚ <[i:=olive θ α']> Ω' | λ k _, k = i).
+    { intro j. destruct (decide (j = i)).
+      { subst. rewrite LUi2. rewrite lookup_insert_eq. econstructor. simpl. split; intros; done. }
+      rewrite lookup_insert_ne; auto. destruct (Ω' !! j) eqn:LUj; econstructor. split; intros; done.
+    }
+    eapply obl_states_cond_rel_split_cond. 6,7: eauto. all: simpl.
+    1,2: intros; solve_decision.
+    1: apply _.
+    - intros. rewrite dom_insert_L. set_solver.
+    - repeat intro. auto.
+  Qed.
+
   Lemma osat_obl_resolve_one Ω k P R x0 :
     osat Ω ∗ oblG_elem k ∗ oblG_goal k P R ∗ (▷ R) ∗
     oblG_live k (1/2)%Qp ∗
