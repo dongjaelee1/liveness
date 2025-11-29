@@ -11,6 +11,36 @@ From liris.base_logic Require Export osat othread owitness.
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
 
+Section curry5.
+  Definition curry5 {A B C D E F : Type} (f : A * B * C * D * E → F) (a : A) (b : B) (c : C) (d : D) (e : E) : F :=
+    f (a, b, c, d, e).
+  Definition uncurry5 {A B C D E F : Type} (f : A → B → C → D → E → F) : (A * B * C * D * E) → F :=
+    λ '(a, b, c, d, e), f a b c d e.
+
+  Lemma curry5_uncurry5 : ∀ {A B C D E F : Type} (f : A → B → C → D → E → F), curry5 (uncurry5 f) = f.
+  Proof. done. Qed.
+  Lemma uncurry5_curry5 : ∀ {A B C D E F : Type} (f : A * B * C * D * E → F) (p : A * B * C * D * E), uncurry5 (curry5 f) p = f p.
+  Proof. intros. destruct p as [[[[a b] c] d] e]. done. Qed.
+
+  Global Instance uncurry5_proper' : ∀ {A : Type} {RA : relation A} {B : Type} {RB : relation B} {C : Type} {RC : relation C} {D : Type} {RD : relation D} {E : Type} {RE : relation E} {F : Type} {RF : relation F},
+    Proper
+      ((RA ==> RB ==> RC ==> RD ==> RE ==> RF) ==>
+         prod_relation (prod_relation (prod_relation (prod_relation RA RB) RC) RD) RE ==> RF)
+      (@uncurry5 A B C D E F).
+  Proof.
+    intros. repeat intro.
+    destruct x0 as [[[[a0 b0] c0] d0] e0], y0 as [[[[a1 b1] c1] d1] e1].
+    simpl. destruct H0 as [[[[? ?] ?] ?] ?]. simpl in *. by eapply H.
+  Qed.
+  Global Instance uncurry5_proper : ∀ {A : Type} {H : Equiv A} {B : Type} {H0 : Equiv B} {C : Type} {H1 : Equiv C} {D : Type} {H2 : Equiv D} {E : Type} {H3 : Equiv E} {F : Type} {H4 : Equiv F},
+    Proper ((equiv ==> equiv ==> equiv ==> equiv ==> equiv ==> equiv) ==> equiv ==> equiv) (@uncurry5 A B C D E F).
+  Proof. intros. eapply uncurry5_proper'. Qed.
+
+  Global Instance uncurry5_ne : ∀ {SI : indexT} {A B C D E F : ofe} (n : index),
+    Proper ((dist n ==> dist n ==> dist n ==> dist n ==> dist n ==> dist n) ==> dist n ==> dist n) (@uncurry5 A B C D E F).
+  Proof. intros. apply uncurry5_proper. Qed.
+End curry5.
+
 Global Instance wp_obl_live_class : obl_live_class Ord.t thread_id Ord.lt.
 Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
 Global Instance wp_obl_done_class {Λ : language} : obl_done_class (state Λ).
@@ -28,7 +58,7 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
   (** Liveness witnesses. *)
   #[global] liris_owitnessGS :: owitnessGS.owitnessGS (WF:=ord_wfocm_pack) Σ;
   (** Witness function. *)
-  wit_fun : Ord.t → Ord.t;
+  owfun : Ord.t → Ord.t;
   (* (** Forest of liveness obligation. *) *)
   (* #[global] liris_otreeGS :: otreeGS.otreeGS Ord.t Σ; *)
 
@@ -47,85 +77,326 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
 Global Opaque liris_invGS liris_osatGS liris_othreadGS liris_owitnessGS.
 Global Arguments LirisG {SI Λ Σ}.
 
-(** Predicates we take the fixpoint of in order to define the lWP. *)
-(* Ω must make strict progress for every step (to bound step index) *)
-(* W witnesses progresses of obligations; it's instantiated using fair scheduler in the adequacy proof *)
-Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
-  (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
-  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
-  (∀ (Ω1 : obl_states) (W1 : wit_states) (Θ : thread_ids) σ1 κ κs,
-     (osat Ω1 ∗ othread Θ ∗ oassigned (dom Ω1) ∗ owitness W1 ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
-     (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
-     ∃ Ω2, (⌜ Ω1 ↪ₛ⋆ Ω2 @ σ1 ⌝) ∗
-           ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                        |={∅}=>
-     ALC (|={∅,E}=>
-            ∃ Ω3 Ω4 Ω5, (⌜ (Ω2 ↪ₛ⋆ Ω3 @ σ2) ∧ (Ω3 ↪ₚ Ω4 | obl_cond_owner i) ∧ (Ω4 ↪ₛ⋆ Ω5 @ σ2) ⌝) ∗
-            ∀ W2 W3 W4, (⌜ (W1 ↓ₛ⋆ W2) ∧ (W2 ↓ₚ W3 | wit_cond_live) ∧ (W3 ↓ₛ⋆ W4) ∧ obl_wit wit_fun Ω4 W4 ⌝) ∗
-            (osat Ω4 ∗ othread (Θ ∪ dom efs) ∗ oassigned (dom Ω4) ∗ owitness W4 ∗ state_interp σ2 (Θ ∪ dom efs) κs) ∗
-            ν e2 efs))%I.
+Definition oproto `{SI : indexT} `{!lirisGS Λ Σ} (Ω : obl_states) (W : wit_states) (Θ : thread_ids) : iProp Σ :=
+  (osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ owitness W ∗ ⌜ obl_wit owfun Ω W ⌝)%I.
 
-(* Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ} *)
-(*   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ) *)
-(*   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ := *)
-(*   (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs, *)
-(*      (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗ *)
-(*      (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗ *)
-(*      ∃ Ω1', (⌜ Ω1 ↪ₒ⋆ Ω1' @ σ1 ⌝) ∗ *)
-(*             ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗ *)
-(*                          |={∅}=> ∃ (b : bool), ALC? b |={∅,E}=> *)
-(*      ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₒ⋆ Ω2' @ σ2) ⌝) ∗ *)
-(*                (osat Ω2' ∗ othread (Θ ∪ dom efs) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗ state_interp σ2 (Θ ∪ dom efs) κs) ∗ *)
-(*                ν e2 efs)%I. *)
+(** Modality for updating obligation states. *)
+(* Can allocate, progress, or fulfill obligations, no later modality. *)
+Definition oupd_pre `{SI : indexT} `{!lirisGS Λ Σ} (E : coPset)
+  (oupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
+  λ P,
+    (P ∨
+       (∀ (Ω1 : obl_states) (W1 : wit_states) (Θ : thread_ids) σ κs,
+          (oproto Ω1 W1 Θ ∗ state_interp σ Θ κs) ={E}=∗
+          ∃ Ω2, (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ)⌝) ∗
+          ∀ W2, (⌜(W1 ↓ₛ⋆ W2) ∧ obl_wit owfun Ω2 W2 ⌝) -∗
+          (oproto Ω2 W2 Θ ∗ state_interp σ Θ κs) ∗ oupd P))%I.
 
-Section lwp_step.
+Lemma oupd_pre_mono `{SI : indexT} `{!lirisGS Λ Σ} E
+  (oupd1 oupd2 : iPropO Σ -d> iPropO Σ) :
+  ⊢ ((□ ∀ P, oupd1 P -∗ oupd2 P) →
+     ∀ P, oupd_pre E oupd1 P -∗ oupd_pre E oupd2 P)%I.
+Proof.
+  iIntros "#Hmono"; iIntros (P) "Houpd". rewrite /oupd_pre.
+  iDestruct "Houpd" as "[H | Houpd]".
+  { iLeft. done. }
+  iRight. iIntros (?????) "I". iMod ("Houpd" with "[$I]") as "(%& %& H)".
+  iModIntro. iExists _. iSplitR; first done. iIntros (??).
+  iPoseProof ("H" with "[//]") as "[$ H]". by iApply "Hmono".
+Qed.
 
-  Global Instance lwp_step_ne `{SI : indexT} `{!lirisGS Λ Σ} s i E e n :
-    Proper (pointwise_relation _ (dist n) ==> dist n) (lwp_step s i E e).
+Local Instance oupd_pre_mono' `{SI : indexT} `{!lirisGS Λ Σ} E :
+  BiMonoPred (oupd_pre E).
+Proof.
+  constructor.
+  - iIntros (oupd1 oupd2 NE1 NE2) "#H". iApply oupd_pre_mono. iModIntro. iApply "H".
+  - intros oupd Houpd n P1 P2 ?. rewrite /oupd_pre.
+    do 22 (f_equiv || done).
+Qed.
+
+(* take the least fixpoint of the above definition, with partial sate information *)
+Local Definition oupd_def `{SI : indexT} `{!lirisGS Λ Σ} E : iProp Σ → iProp Σ :=
+  λ P, ((bi_least_fixpoint (oupd_pre E)) P)%I.
+Local Definition oupd_aux : seal (@oupd_def). by eexists. Qed.
+Definition oupd := oupd_aux.(unseal).
+Arguments oupd {SI Λ Σ _}.
+Local Definition oupd_unseal : @oupd = @oupd_def := oupd_aux.(seal_eq).
+Notation "'|={' E '}=>o' P" := (oupd E P) (at level 99, P at level 200, format "|={ E }=>o  P").
+
+Section oupd.
+  Context `{SI : indexT} `{!lirisGS Λ Σ}.
+
+  Lemma oupd_unfold E P :
+    (|={E}=>o P) ⊣⊢ (oupd_pre E (oupd E) P).
   Proof.
-    intros Φ Ψ HΦ. rewrite /lwp_step.
-    do 35 (f_equiv || done).
-  Qed.
-  Global Instance lwp_step_proper `{SI : indexT} `{!lirisGS Λ Σ} s i E e :
-    Proper (pointwise_relation _ (≡) ==> (≡)) (lwp_step s i E e).
-  Proof.
-    by intros Φ Φ' ?; apply equiv_dist=>n; apply lwp_step_ne=>v; apply equiv_dist.
-  Qed.
-
-  Lemma lwp_step_mono `{SI : indexT} `{!lirisGS Λ Σ} s
-    (ν1 ν2 : expr Λ -d> thread_pool Λ -d> iPropO Σ) :
-    ⊢ ((□ ∀ e efs, ν1 e efs -∗ ν2 e efs) →
-       ∀ i E e, lwp_step s i E e ν1 -∗ lwp_step s i E e ν2)%I.
-  Proof.
-    iIntros "#Hmono"; iIntros (???) "Hwp". rewrite /lwp_step.
-    iIntros (?????) "H". iSpecialize ("Hwp" with "[$]").
-    iMod "Hwp" as "($& %& $& Hwp)".
-    iModIntro. iIntros (???) "H0". iDestruct ("Hwp" with "[$]") as ">Hwp".
-    iModIntro. iMod "Hwp" as ">(%& %& %& $& Hwp)".
-    iModIntro. iDestruct "Hwp" as "(H1&H2)". iFrame.
-    by iApply "Hmono".
+    rewrite oupd_unseal. rewrite /oupd_def.
+    rewrite (least_fixpoint_unfold (oupd_pre E)). done.
   Qed.
 
-  Lemma fupd_lwp_step `{SI : indexT} `{!lirisGS Λ Σ} s i E e lwp :
-    (|={E}=> lwp_step s i E e lwp) ⊢ lwp_step s i E e lwp.
+  Global Instance oupd_ne E :
+    NonExpansive (oupd E).
   Proof.
-    iIntros "Hf". rewrite /lwp_step. iIntros.
-    iMod "Hf" as "Hf". iSpecialize ("Hf" with "[$]"). done.
+    intros n P1 P2 HP. rewrite !oupd_unseal /oupd_def. f_equiv. done.
+  Qed.
+  Global Instance oupd_proper E :
+    Proper ((≡) ==> (≡)) (oupd E).
+  Proof.
+    intros P P' ?. apply equiv_dist=>n. apply oupd_ne. apply equiv_dist. done.
   Qed.
 
-End lwp_step.
+  Lemma oupd_ind_strong E (Ψ : iProp Σ → iProp Σ) :
+    (∀ n, Proper (dist n ==> dist n) Ψ) →
+    ⊢ (□ (∀ P, oupd_pre E (λ P, Ψ P ∧ |={E}=>o P) P -∗ Ψ P)
+       → ∀ P, (|={E}=>o P) -∗ Ψ P)%I.
+  Proof.
+    iIntros (HΨ). iIntros "#IH" (P) "H". rewrite oupd_unseal.
+    iApply (least_fixpoint_ind _ Ψ with "[] H").
+    iIntros "!#" (?) "H". iApply "IH".
+    iApply (bi_mono_pred with "[] H").
+    { repeat intro. do 3 (f_equiv || done). }
+    { repeat intro. rewrite -!oupd_unseal. f_equiv; f_equiv; done. }
+    iIntros "!>" (?) "H". iSplit.
+    - iDestruct "H" as "[H _]". done.
+    - iDestruct "H" as "[_ H]". done.
+  Qed.
 
-(** Modality for updating obligation state. *)
-(* Can allocate, suspend, progress, or fulfill obligations. Note this gives no later modality. *)
-Definition ghost_step `{SI : indexT} `{!lirisGS Λ Σ} (E : coPset)
-  (ν : iPropO Σ) : iPropO Σ :=
-  (∀ (Ω1 : obl_states) (Θ : thread_ids) σ κs,
-     (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ Θ κs) ={E}=∗
-     ∃ Ω2, (⌜(Ω1 ↪ₒ⋆ Ω2 @ σ)⌝) ∗
-           (osat Ω2 ∗ othread Θ ∗ osuspend (dom Ω2) ∗ oforest (dom Ω2) ∗ state_interp σ Θ κs) ∗
-           ν)%I.
+  Lemma oupd_ind E Ψ :
+    (∀ n, Proper (dist n ==> dist n) Ψ)
+    → ⊢ (□ (∀ P, oupd_pre E (λ P, Ψ P) P -∗ Ψ P)
+         → ∀ P, (|={E}=>o P) -∗ Ψ P)%I.
+  Proof.
+    iIntros (HΨ) "#H". iApply oupd_ind_strong. iIntros "!>" (P) "Houpd".
+    iApply "H". iApply (oupd_pre_mono with "[] Houpd").
+    iIntros "!>" (?) "[$ _]".
+  Qed.
 
-Section ghost_step.
+  (** A standard update can be turned into an obligation update. *)
+  Lemma bupd_oupd E P : (|==> P) ⊢ (|={E}=>o P).
+  Proof.
+    rewrite oupd_unfold. iIntros "Hupd". iRight. iIntros (?????) "I".
+    iModIntro. iExists Ω1. iSplitR; first done.
+    iIntros (?) "(%& %)".
+    rewrite /oproto. iDestruct "I" as "[(S& T& A& N& %OW) I]".
+    iFrame.
+
+
+    TODO
+
+    
+    iMod "Hupd" as "P". iModIntro. iLeft. by iFrame.
+  Qed.
+
+  (** We can always introduce a relational update. *)
+  Lemma oupd_intro P : P ⊢ |={E}=>o P.
+  Proof.
+    rewrite oupd_unfold.
+    iIntros "P" (x) "Hpr"; iModIntro.
+    iLeft; by iFrame.
+  Qed.
+
+  (** We can combine two relational updates into one. *)
+  Lemma oupd_bind P Q :
+    (P -∗ |={E}=>o Q) ⊢ (|={E}=>o P) -∗ (|={E}=>o Q).
+  Proof.
+    iLöb as "IH". iIntros "PQ".
+    rewrite {2}(oupd_unfold P) {4}(oupd_unfold Q).
+    iIntros  "Hupd" (x) "Hpr". iMod ("Hupd" with "Hpr") as "[Hupd|Hupd]".
+    - (* base case for the update around P *)
+      iDestruct "Hupd" as "[Hpr Hupd]".
+      iSpecialize ("PQ" with "Hupd").
+      rewrite {3}(oupd_unfold Q).
+      iMod ("PQ" with "Hpr") as "[Hupd|Hupd]".
+      + iModIntro. by iLeft.
+      + iModIntro. iRight. iDestruct "Hupd" as  (x'' Hstep'') "[Hpr Hupd]".
+        iExists _; iFrame. iPureIntro.
+        by eapply tc_rtc_r.
+    - iModIntro. iRight. iDestruct "Hupd" as (x') "(Hstep & Hpr & Hupd)".
+      iExists _; iFrame. iNext. by iApply ("IH" with "PQ Hupd").
+  Qed.
+
+  (** This lemma will allow us to spend one credit for a later elimination.
+     Since the relational update is defined parametrically over the type X
+     and the credit supply, the "spending of a credit" is generalized here. *)
+  Lemma oupd_step P :
+    (∀ x, oupd_pred x -∗ |==> ∃ y, ⌜tc oupd_rel y x⌝ ∗ oupd_pred y ∗ ▷ |={E}=>o P) ⊢ |={E}=>o P.
+  Proof.
+    rewrite {2}(oupd_unfold P).
+    iIntros "Hupd" (x) "Hpr". iRight. by iMod ("Hupd" with "Hpr") as "$".
+  Qed.
+
+  (* derived lemmas *)
+  Lemma oupd_mono P Q : (P ⊢ Q) → (|={E}=>o P) ⊢ (|={E}=>o Q).
+  Proof.
+    intros Hent. iApply oupd_bind.
+    iIntros "P"; iApply oupd_intro; by iApply Hent.
+  Qed.
+  Lemma oupd_trans P :  (|={E}=>o |={E}=>o P) ⊢ |={E}=>o P.
+  Proof.
+    iIntros "HP". iApply oupd_bind; eauto.
+  Qed.
+  Lemma oupd_frame_r P R : (|={E}=>o P) ∗ R ⊢ |={E}=>o P ∗ R.
+  Proof.
+    iIntros "[Hupd R]". iApply (oupd_bind with "[R]"); last done.
+    iIntros "P". iApply oupd_intro. by iFrame.
+  Qed.
+
+  Global Instance oupd_ent_proper : Proper ((⊢) ==> (⊢)) oupd.
+  Proof. intros P Q PQ. by apply oupd_mono. Qed.
+  Global Instance oupd_flip_ent_proper : Proper (flip (⊢) ==> flip (⊢)) oupd.
+  Proof. intros P Q PQ; by apply oupd_mono. Qed.
+  Global Instance oupd_equiv_proper : Proper ((≡) ==> (≡)) oupd := ne_proper _.
+
+  Lemma oupd_bupd_l P :
+    (|==> |={E}=>o P) ⊢ (|={E}=>o P).
+  Proof.
+    by rewrite bupd_oupd oupd_trans.
+  Qed.
+  Lemma oupd_bupd_r P :
+    (|={E}=>o |==> P) ⊢ (|={E}=>o P).
+  Proof.
+    by rewrite bupd_oupd oupd_trans.
+  Qed.
+
+  Lemma oupd_frame_l R Q : (R ∗ |={E}=>o Q) ⊢ |={E}=>o R ∗ Q.
+  Proof. rewrite !(comm _ R); apply oupd_frame_r. Qed.
+  Lemma oupd_wand_l P Q : (P -∗ Q) ∗ (|={E}=>o P) ⊢ |={E}=>o Q.
+  Proof. by rewrite oupd_frame_l wand_elim_l. Qed.
+  Lemma oupd_wand_r P Q : (|={E}=>o P) ∗ (P -∗ Q) ⊢ |={E}=>o Q.
+  Proof. by rewrite oupd_frame_r wand_elim_r. Qed.
+  Lemma oupd_sep P Q : (|={E}=>o P) ∗ (|={E}=>o Q) ⊢ |={E}=>o P ∗ Q.
+  Proof. by rewrite oupd_frame_r oupd_frame_l oupd_trans. Qed.
+  Lemma oupd_idemp P : (|={E}=>o |={E}=>o P) ⊣⊢ |={E}=>o P.
+  Proof.
+    apply: anti_symm.
+    - apply oupd_trans.
+    - apply oupd_intro.
+  Qed.
+
+  Global Instance oupd_homomorphism :
+    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (oupd).
+  Proof. split; [split|]; try apply _; [apply oupd_sep | apply oupd_intro]. Qed.
+
+  Lemma big_sepL_oupd {A} (Φ : nat → A → iProp Σ) l :
+    ([∗ list] k↦x ∈ l, |==> Φ k x) ⊢ |==> [∗ list] k↦x ∈ l, Φ k x.
+  Proof. by rewrite (big_opL_commute _). Qed.
+  Lemma big_sepM_oupd {A} `{Countable K} (Φ : K → A → iProp Σ) l :
+    ([∗ map] k↦x ∈ l, |==> Φ k x) ⊢ |==> [∗ map] k↦x ∈ l, Φ k x.
+  Proof. by rewrite (big_opM_commute _). Qed.
+  Lemma big_sepS_oupd `{Countable A} (Φ : A → iProp Σ) l :
+    ([∗ set]  x ∈ l, |==> Φ x) ⊢ |==> [∗ set] x ∈ l, Φ x.
+  Proof. by rewrite (big_opS_commute _). Qed.
+  Lemma big_sepMS_oupd `{Countable A} (Φ : A → iProp Σ) l :
+    ([∗ mset] x ∈ l, |==> Φ x) ⊢ |==> [∗ mset] x ∈ l, Φ x.
+  Proof. by rewrite (big_opMS_commute _). Qed.
+
+  Lemma except_0_oupd P : ◇ (|={E}=>o P) ⊢ (|={E}=>o ◇ P).
+  Proof.
+    rewrite /bi_except_0. apply or_elim; eauto using oupd_mono, or_intro_r.
+    by rewrite -oupd_intro -or_intro_l.
+  Qed.
+
+  (* A safety check that relational updates can replace basic updates *)
+  (* We do not use this to build an instance, because it would conflict
+     with the basic updates. Instead, we shadow the proofmode lemmas below. *)
+  Lemma bi_bupd_mixin_oupd : BiBUpdMixin (iPropI Σ) oupd.
+  Proof.
+    split.
+    - solve_proper.
+    - apply oupd_intro.
+    - apply oupd_mono.
+    - apply oupd_trans.
+    - apply oupd_frame_r.
+  Qed.
+
+  (* The following instances make the Iris Proof Mode aware of the later
+     elimination update. They are derived from the simpler rules above. *)
+  Global Instance elim_bupd_oupd (p : bool) P Q :
+    ElimModal True p false (|==> P) P (|={E}=>o Q) (|={E}=>o Q)%I.
+  Proof.
+    rewrite /ElimModal bi.intuitionistically_if_elim //=.
+    rewrite bupd_oupd.
+    iIntros "_ [HP HPQ]". iApply (oupd_bind with "HPQ HP").
+  Qed.
+
+  Global Instance add_modal_bupd P Q :
+    AddModal (|==> P) P (|={E}=>o Q).
+  Proof.
+    rewrite /AddModal; rewrite bupd_oupd; iIntros "[HP HPQ]".
+    iApply (oupd_bind with "HPQ HP").
+  Qed.
+
+  Global Instance from_assumption_oupd p P Q :
+    FromAssumption p P Q → KnownRFromAssumption p P (|={E}=>o Q).
+  Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply oupd_intro. Qed.
+
+  Global Instance from_pure_oupd a P φ :
+    FromPure a P φ → FromPure a (|={E}=>o P) φ.
+  Proof. rewrite /FromPure=> <-. apply oupd_intro. Qed.
+
+  Global Instance into_wand_oupd p q R P Q :
+    IntoWand false false R P Q → IntoWand p q (|={E}=>o R) (|={E}=>o P) (|={E}=>o Q).
+  Proof.
+    rewrite /IntoWand /= => HR. rewrite !intuitionistically_if_elim HR.
+    apply wand_intro_l. by rewrite oupd_sep wand_elim_r.
+  Qed.
+
+  Global Instance into_wand_oupd_persistent p q R P Q :
+    IntoWand false q R P Q → IntoWand p q (|={E}=>o R) P (|={E}=>o Q).
+  Proof.
+    rewrite /IntoWand /= => HR. rewrite intuitionistically_if_elim HR.
+    apply wand_intro_l. by rewrite oupd_frame_l wand_elim_r.
+  Qed.
+
+  Global Instance into_wand_oupd_args p q R P Q :
+    IntoWand p false R P Q → IntoWand' p q R (|={E}=>o P) (|={E}=>o Q).
+  Proof.
+    rewrite /IntoWand' /IntoWand /= => ->.
+    apply wand_intro_l. by rewrite intuitionistically_if_elim oupd_wand_r.
+  Qed.
+
+  Global Instance from_sep_oupd P Q1 Q2 :
+    FromSep P Q1 Q2 → FromSep (|={E}=>o P) (|={E}=>o Q1) (|={E}=>o Q2).
+  Proof. rewrite /FromSep=><-. apply oupd_sep. Qed.
+
+  Global Instance from_or_oupd P Q1 Q2 :
+    FromOr P Q1 Q2 → FromOr (|={E}=>o P) (|={E}=>o Q1) (|={E}=>o Q2).
+  Proof.
+    rewrite /FromOr=><-.
+    apply or_elim; apply oupd_mono; auto using or_intro_l, or_intro_r.
+  Qed.
+
+  Global Instance from_exist_oupd {A} P (Φ : A → iProp Σ) :
+    FromExist P Φ → FromExist (|={E}=>o P) (λ a, |={E}=>o Φ a)%I.
+  Proof.
+    rewrite /FromExist=><-. apply exist_elim=> a. by rewrite -(exist_intro a).
+  Qed.
+
+  Global Instance is_except_0_oupd P : IsExcept0 P → IsExcept0 (|={E}=>o P).
+  Proof.
+    rewrite /IsExcept0=> HP.
+    by rewrite -{2}HP -(except_0_idemp P) -except_0_oupd -(except_0_intro P).
+  Qed.
+
+  Global Instance from_modal_oupd P :
+    FromModal True modality_id (|={E}=>o P) (|={E}=>o P) P.
+  Proof. by rewrite /FromModal /= -oupd_intro. Qed.
+
+  Global Instance elim_modal_oupd p P Q :
+    ElimModal True p false (|={E}=>o P) P (|={E}=>o Q) (|={E}=>o Q).
+  Proof.
+    by rewrite /ElimModal
+      intuitionistically_if_elim oupd_frame_r wand_elim_r oupd_trans.
+  Qed.
+
+  Global Instance add_modal_oupd P Q : AddModal (|={E}=>o P) P (|={E}=>o Q).
+  Proof. by rewrite /AddModal oupd_frame_r wand_elim_r oupd_trans. Qed.
+
+  Global Instance frame_oupd p R P Q :
+    Frame p R P Q → Frame p R (|={E}=>o P) (|={E}=>o Q).
+  Proof. rewrite /Frame=><-. by rewrite oupd_frame_l. Qed.
+
+
+
 
   Global Instance ghost_step_ne `{SI : indexT} `{!lirisGS Λ Σ} E :
     NonExpansive (ghost_step E).
@@ -199,7 +470,76 @@ Section ghost_step.
     iPureIntro. by etransitivity.
   Qed.
 
-End ghost_step.
+End oupd.
+
+(** Predicates we take the fixpoint of in order to define the lWP. *)
+(* Ω must make strict progress for every step (to bound step index) *)
+(* W witnesses progresses of obligations; it's instantiated using fair scheduler in the adequacy proof *)
+Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
+  (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
+  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
+  (∀ (Ω1 : obl_states) (W1 : wit_states) (Θ : thread_ids) σ1 κ κs,
+     (osat Ω1 ∗ othread Θ ∗ oassigned (dom Ω1) ∗ owitness W1 ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
+     (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
+     ∃ Ω2, (⌜ Ω1 ↪ₛ⋆ Ω2 @ σ1 ⌝) ∗
+           ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+                        |={∅}=>
+     ALC (|={∅,E}=>
+            ∃ Ω3 Ω4 Ω5, (⌜ (Ω2 ↪ₛ⋆ Ω3 @ σ2) ∧ (Ω3 ↪ₚ Ω4 | obl_cond_owner i) ∧ (Ω4 ↪ₛ⋆ Ω5 @ σ2) ⌝) ∗
+            ∀ W2 W3 W4, (⌜ (W1 ↓ₛ⋆ W2) ∧ (W2 ↓ₚ W3 | wit_cond_live) ∧ (W3 ↓ₛ⋆ W4) ∧ obl_wit wit_fun Ω4 W4 ⌝) -∗
+            (osat Ω4 ∗ othread (Θ ∪ dom efs) ∗ oassigned (dom Ω4) ∗ owitness W4 ∗ state_interp σ2 (Θ ∪ dom efs) κs) ∗
+            ν e2 efs))%I.
+
+(* Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ} *)
+(*   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ) *)
+(*   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ := *)
+(*   (∀ (Ω1 : obl_states) (Θ : thread_ids) σ1 κ κs, *)
+(*      (osat Ω1 ∗ othread Θ ∗ osuspend (dom Ω1) ∗ oforest (dom Ω1) ∗ state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗ *)
+(*      (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗ *)
+(*      ∃ Ω1', (⌜ Ω1 ↪ₒ⋆ Ω1' @ σ1 ⌝) ∗ *)
+(*             ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗ *)
+(*                          |={∅}=> ∃ (b : bool), ALC? b |={∅,E}=> *)
+(*      ∃ Ω2 Ω2', (⌜ (if b then (Ω1' ↪ₚ Ω2 | (obl_cond_owner i)) else Ω1' = Ω2) ∧ (Ω2 ↪ₒ⋆ Ω2' @ σ2) ⌝) ∗ *)
+(*                (osat Ω2' ∗ othread (Θ ∪ dom efs) ∗ osuspend (dom Ω2') ∗ oforest (dom Ω2') ∗ state_interp σ2 (Θ ∪ dom efs) κs) ∗ *)
+(*                ν e2 efs)%I. *)
+
+Section lwp_step.
+
+  Global Instance lwp_step_ne `{SI : indexT} `{!lirisGS Λ Σ} s i E e n :
+    Proper (pointwise_relation _ (dist n) ==> dist n) (lwp_step s i E e).
+  Proof.
+    intros Φ Ψ HΦ. rewrite /lwp_step.
+    do 35 (f_equiv || done).
+  Qed.
+  Global Instance lwp_step_proper `{SI : indexT} `{!lirisGS Λ Σ} s i E e :
+    Proper (pointwise_relation _ (≡) ==> (≡)) (lwp_step s i E e).
+  Proof.
+    by intros Φ Φ' ?; apply equiv_dist=>n; apply lwp_step_ne=>v; apply equiv_dist.
+  Qed.
+
+  Lemma lwp_step_mono `{SI : indexT} `{!lirisGS Λ Σ} s
+    (ν1 ν2 : expr Λ -d> thread_pool Λ -d> iPropO Σ) :
+    ⊢ ((□ ∀ e efs, ν1 e efs -∗ ν2 e efs) →
+       ∀ i E e, lwp_step s i E e ν1 -∗ lwp_step s i E e ν2)%I.
+  Proof.
+    iIntros "#Hmono"; iIntros (???) "Hwp". rewrite /lwp_step.
+    iIntros (?????) "H". iSpecialize ("Hwp" with "[$]").
+    iMod "Hwp" as "($& %& $& Hwp)".
+    iModIntro. iIntros (???) "H0". iDestruct ("Hwp" with "[$]") as ">Hwp".
+    iModIntro. iMod "Hwp" as ">(%& %& %& $& Hwp)".
+    iModIntro. iDestruct "Hwp" as "(H1&H2)". iFrame.
+    by iApply "Hmono".
+  Qed.
+
+  Lemma fupd_lwp_step `{SI : indexT} `{!lirisGS Λ Σ} s i E e lwp :
+    (|={E}=> lwp_step s i E e lwp) ⊢ lwp_step s i E e lwp.
+  Proof.
+    iIntros "Hf". rewrite /lwp_step. iIntros.
+    iMod "Hf" as "Hf". iSpecialize ("Hf" with "[$]"). done.
+  Qed.
+
+End lwp_step.
+
 
 Definition lift_term `{SI : indexT} `{!lirisGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
   λ v, (othreadG_elem i ∗ othreadG_term i ∗ Φ i v)%I.
@@ -226,36 +566,6 @@ Proof.
   iIntros (e efs) "[Hlwp Hefs]". iSplitR "Hefs"; first by iApply "Hmono".
   iApply (@big_sepM_impl with "Hefs"); iIntros "!#" (k e' _) "Hlwp". by iApply "Hmono".
 Qed.
-
-Section curry5.
-  Definition curry5 {A B C D E F : Type} (f : A * B * C * D * E → F) (a : A) (b : B) (c : C) (d : D) (e : E) : F :=
-    f (a, b, c, d, e).
-  Definition uncurry5 {A B C D E F : Type} (f : A → B → C → D → E → F) : (A * B * C * D * E) → F :=
-    λ '(a, b, c, d, e), f a b c d e.
-
-  Lemma curry5_uncurry5 : ∀ {A B C D E F : Type} (f : A → B → C → D → E → F), curry5 (uncurry5 f) = f.
-  Proof. done. Qed.
-  Lemma uncurry5_curry5 : ∀ {A B C D E F : Type} (f : A * B * C * D * E → F) (p : A * B * C * D * E), uncurry5 (curry5 f) p = f p.
-  Proof. intros. destruct p as [[[[a b] c] d] e]. done. Qed.
-
-  Global Instance uncurry5_proper' : ∀ {A : Type} {RA : relation A} {B : Type} {RB : relation B} {C : Type} {RC : relation C} {D : Type} {RD : relation D} {E : Type} {RE : relation E} {F : Type} {RF : relation F},
-    Proper
-      ((RA ==> RB ==> RC ==> RD ==> RE ==> RF) ==>
-         prod_relation (prod_relation (prod_relation (prod_relation RA RB) RC) RD) RE ==> RF)
-      (@uncurry5 A B C D E F).
-  Proof.
-    intros. repeat intro.
-    destruct x0 as [[[[a0 b0] c0] d0] e0], y0 as [[[[a1 b1] c1] d1] e1].
-    simpl. destruct H0 as [[[[? ?] ?] ?] ?]. simpl in *. by eapply H.
-  Qed.
-  Global Instance uncurry5_proper : ∀ {A : Type} {H : Equiv A} {B : Type} {H0 : Equiv B} {C : Type} {H1 : Equiv C} {D : Type} {H2 : Equiv D} {E : Type} {H3 : Equiv E} {F : Type} {H4 : Equiv F},
-    Proper ((equiv ==> equiv ==> equiv ==> equiv ==> equiv ==> equiv) ==> equiv ==> equiv) (@uncurry5 A B C D E F).
-  Proof. intros. eapply uncurry5_proper'. Qed.
-
-  Global Instance uncurry5_ne : ∀ {SI : indexT} {A B C D E F : ofe} (n : index),
-    Proper ((dist n ==> dist n ==> dist n ==> dist n ==> dist n ==> dist n) ==> dist n ==> dist n) (@uncurry5 A B C D E F).
-  Proof. intros. apply uncurry5_proper. Qed.
-End curry5.
 
 (* Uncurry [lwp_pre] and equip its type with an OFE structure *)
 Definition lwp_pre' `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness) :
