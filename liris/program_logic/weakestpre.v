@@ -85,11 +85,11 @@ Definition oproto `{SI : indexT} `{!lirisGS Λ Σ} (Ω : obl_states) (W : wit_st
 Definition oupd_pre `{SI : indexT} `{!lirisGS Λ Σ} (E : coPset)
   (oupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
-    (P ∨
+    ((|={E}=> P) ∨
        (∀ (Ω1 : obl_states) (W1 : wit_states) (Θ : thread_ids) σ κs,
-          (oproto Ω1 W1 Θ ∗ state_interp σ Θ κs) ={E}=∗
-          ∃ Ω2, (⌜(Ω1 ↪ₛ⋆ Ω2 @ σ)⌝) ∗
-          ∀ W2, (⌜(W1 ↓ₛ⋆ W2) ∧ obl_wit owfun Ω2 W2 ⌝) -∗
+          (oproto Ω1 W1 Θ ∗ state_interp σ Θ κs) ={E,∅}=∗
+          ∃ Ω2, (⌜(Ω1 ↪ₛ∘ Ω2 @ σ)⌝) ∗
+          ∀ W2, (⌜(W1 ↓ₛ∘ W2) ∧ obl_wit owfun Ω2 W2 ⌝) ={∅,E}=∗
           (oproto Ω2 W2 Θ ∗ state_interp σ Θ κs) ∗ oupd P))%I.
 
 Lemma oupd_pre_mono `{SI : indexT} `{!lirisGS Λ Σ} E
@@ -102,7 +102,7 @@ Proof.
   { iLeft. done. }
   iRight. iIntros (?????) "I". iMod ("Houpd" with "[$I]") as "(%& %& H)".
   iModIntro. iExists _. iSplitR; first done. iIntros (??).
-  iPoseProof ("H" with "[//]") as "[$ H]". by iApply "Hmono".
+  iMod ("H" with "[//]") as "[$ H]". by iApply "Hmono".
 Qed.
 
 Local Instance oupd_pre_mono' `{SI : indexT} `{!lirisGS Λ Σ} E :
@@ -111,7 +111,7 @@ Proof.
   constructor.
   - iIntros (oupd1 oupd2 NE1 NE2) "#H". iApply oupd_pre_mono. iModIntro. iApply "H".
   - intros oupd Houpd n P1 P2 ?. rewrite /oupd_pre.
-    do 22 (f_equiv || done).
+    do 23 (f_equiv || done).
 Qed.
 
 (* take the least fixpoint of the above definition, with partial sate information *)
@@ -170,231 +170,207 @@ Section oupd.
     iIntros "!>" (?) "[$ _]".
   Qed.
 
-  (** A standard update can be turned into an obligation update. *)
-  Lemma bupd_oupd E P : (|==> P) ⊢ (|={E}=>o P).
+  (** A fancy update can be turned into an obligation update. *)
+  Lemma fupd_oupd E P : (|={E}=> P) ⊢ (|={E}=>o P).
   Proof.
-    rewrite oupd_unfold. iIntros "Hupd". iRight. iIntros (?????) "I".
+    rewrite oupd_unfold. iIntros "Hupd". iLeft. done.
+  Qed.
+
+  (** We can always introduce a obligation update. *)
+  Lemma oupd_intro E P : P ⊢ |={E}=>o P.
+  Proof.
+    rewrite oupd_unfold. iIntros "HP". iLeft. iModIntro. done.
+  Qed.
+
+  (** We can always eliminate a fancy update. *)
+  Lemma fupd_oupd_elim E P :
+    (|={E}=> |={E}=>o P) ⊢ |={E}=>o P.
+  Proof.
+    iIntros "H". iApply oupd_unfold.
+    iRight. iIntros (?????) "I". iMod "H".
+    iMod (fupd_mask_subseteq ∅) as "close"; first set_solver.
     iModIntro. iExists Ω1. iSplitR; first done.
-    iIntros (?) "(%& %)".
-    rewrite /oproto. iDestruct "I" as "[(S& T& A& N& %OW) I]".
-    iFrame.
-
-
-    TODO
-
-    
-    iMod "Hupd" as "P". iModIntro. iLeft. by iFrame.
+    iIntros (? (Prog& OW2)). iMod "close" as "_". iModIntro.
+    iDestruct "I" as "[OP SI]". iFrame "SI".
+    rewrite /oproto. iDestruct "OP" as "($& $& $& N& %OW1)".
+    iPoseProof (owitness_obl_wit_rc_step_same_obl _ _ _ _ OW1 Prog OW2 with "N") as "N".
+    iFrame. done.
   Qed.
 
-  (** We can always introduce a relational update. *)
-  Lemma oupd_intro P : P ⊢ |={E}=>o P.
-  Proof.
-    rewrite oupd_unfold.
-    iIntros "P" (x) "Hpr"; iModIntro.
-    iLeft; by iFrame.
-  Qed.
-
-  (** We can combine two relational updates into one. *)
-  Lemma oupd_bind P Q :
+  (** We can combine two obligation updates into one. *)
+  Lemma oupd_bind E P Q :
     (P -∗ |={E}=>o Q) ⊢ (|={E}=>o P) -∗ (|={E}=>o Q).
   Proof.
-    iLöb as "IH". iIntros "PQ".
-    rewrite {2}(oupd_unfold P) {4}(oupd_unfold Q).
-    iIntros  "Hupd" (x) "Hpr". iMod ("Hupd" with "Hpr") as "[Hupd|Hupd]".
-    - (* base case for the update around P *)
-      iDestruct "Hupd" as "[Hpr Hupd]".
-      iSpecialize ("PQ" with "Hupd").
-      rewrite {3}(oupd_unfold Q).
-      iMod ("PQ" with "Hpr") as "[Hupd|Hupd]".
-      + iModIntro. by iLeft.
-      + iModIntro. iRight. iDestruct "Hupd" as  (x'' Hstep'') "[Hpr Hupd]".
-        iExists _; iFrame. iPureIntro.
-        by eapply tc_rtc_r.
-    - iModIntro. iRight. iDestruct "Hupd" as (x') "(Hstep & Hpr & Hupd)".
-      iExists _; iFrame. iNext. by iApply ("IH" with "PQ Hupd").
-  Qed.
-
-  (** This lemma will allow us to spend one credit for a later elimination.
-     Since the relational update is defined parametrically over the type X
-     and the credit supply, the "spending of a credit" is generalized here. *)
-  Lemma oupd_step P :
-    (∀ x, oupd_pred x -∗ |==> ∃ y, ⌜tc oupd_rel y x⌝ ∗ oupd_pred y ∗ ▷ |={E}=>o P) ⊢ |={E}=>o P.
-  Proof.
-    rewrite {2}(oupd_unfold P).
-    iIntros "Hupd" (x) "Hpr". iRight. by iMod ("Hupd" with "Hpr") as "$".
+    iIntros "H HP". iRevert (Q) "H". iRevert (P) "HP".
+    iApply oupd_ind_strong.
+    { solve_proper. }
+    iIntros "!> %P IH %Q H". iDestruct "IH" as "[IH | IH]".
+    - iApply fupd_oupd_elim. iMod "IH". iModIntro. iApply ("H" with "IH").
+    - iApply oupd_unfold. iRight. iIntros (?????) "I".
+      iMod ("IH" with "I") as "(%&%& IH)".
+      iModIntro. iExists _. iSplitR; first done.
+      iIntros (??). iMod ("IH" with "[//]") as "[$ IH]".
+      iModIntro. iDestruct "IH" as "[IH _]".
+      iApply "IH". done.
   Qed.
 
   (* derived lemmas *)
-  Lemma oupd_mono P Q : (P ⊢ Q) → (|={E}=>o P) ⊢ (|={E}=>o Q).
+  Lemma oupd_mono E P Q : (P ⊢ Q) → (|={E}=>o P) ⊢ (|={E}=>o Q).
   Proof.
     intros Hent. iApply oupd_bind.
     iIntros "P"; iApply oupd_intro; by iApply Hent.
   Qed.
-  Lemma oupd_trans P :  (|={E}=>o |={E}=>o P) ⊢ |={E}=>o P.
+  Lemma oupd_trans E P :  (|={E}=>o |={E}=>o P) ⊢ |={E}=>o P.
   Proof.
     iIntros "HP". iApply oupd_bind; eauto.
   Qed.
-  Lemma oupd_frame_r P R : (|={E}=>o P) ∗ R ⊢ |={E}=>o P ∗ R.
+  Lemma oupd_frame_r E P R : (|={E}=>o P) ∗ R ⊢ |={E}=>o P ∗ R.
   Proof.
     iIntros "[Hupd R]". iApply (oupd_bind with "[R]"); last done.
     iIntros "P". iApply oupd_intro. by iFrame.
   Qed.
 
-  Global Instance oupd_ent_proper : Proper ((⊢) ==> (⊢)) oupd.
+  Global Instance oupd_ent_proper E : Proper ((⊢) ==> (⊢)) (oupd E).
   Proof. intros P Q PQ. by apply oupd_mono. Qed.
-  Global Instance oupd_flip_ent_proper : Proper (flip (⊢) ==> flip (⊢)) oupd.
+  Global Instance oupd_flip_ent_proper E : Proper (flip (⊢) ==> flip (⊢)) (oupd E).
   Proof. intros P Q PQ; by apply oupd_mono. Qed.
-  Global Instance oupd_equiv_proper : Proper ((≡) ==> (≡)) oupd := ne_proper _.
+  Global Instance oupd_equiv_proper E : Proper ((≡) ==> (≡)) (oupd E) := ne_proper _.
 
-  Lemma oupd_bupd_l P :
-    (|==> |={E}=>o P) ⊢ (|={E}=>o P).
+  Lemma oupd_fupd_l E P :
+    (|={E}=> |={E}=>o P) ⊢ (|={E}=>o P).
   Proof.
-    by rewrite bupd_oupd oupd_trans.
+    by rewrite fupd_oupd oupd_trans.
   Qed.
-  Lemma oupd_bupd_r P :
-    (|={E}=>o |==> P) ⊢ (|={E}=>o P).
+  Lemma oupd_bupd_r E P :
+    (|={E}=>o |={E}=> P) ⊢ (|={E}=>o P).
   Proof.
-    by rewrite bupd_oupd oupd_trans.
+    by rewrite fupd_oupd oupd_trans.
   Qed.
 
-  Lemma oupd_frame_l R Q : (R ∗ |={E}=>o Q) ⊢ |={E}=>o R ∗ Q.
+  Lemma oupd_frame_l E R Q : (R ∗ |={E}=>o Q) ⊢ |={E}=>o R ∗ Q.
   Proof. rewrite !(comm _ R); apply oupd_frame_r. Qed.
-  Lemma oupd_wand_l P Q : (P -∗ Q) ∗ (|={E}=>o P) ⊢ |={E}=>o Q.
+  Lemma oupd_wand_l E P Q : (P -∗ Q) ∗ (|={E}=>o P) ⊢ |={E}=>o Q.
   Proof. by rewrite oupd_frame_l wand_elim_l. Qed.
-  Lemma oupd_wand_r P Q : (|={E}=>o P) ∗ (P -∗ Q) ⊢ |={E}=>o Q.
+  Lemma oupd_wand_r E P Q : (|={E}=>o P) ∗ (P -∗ Q) ⊢ |={E}=>o Q.
   Proof. by rewrite oupd_frame_r wand_elim_r. Qed.
-  Lemma oupd_sep P Q : (|={E}=>o P) ∗ (|={E}=>o Q) ⊢ |={E}=>o P ∗ Q.
+  Lemma oupd_sep E P Q : (|={E}=>o P) ∗ (|={E}=>o Q) ⊢ |={E}=>o P ∗ Q.
   Proof. by rewrite oupd_frame_r oupd_frame_l oupd_trans. Qed.
-  Lemma oupd_idemp P : (|={E}=>o |={E}=>o P) ⊣⊢ |={E}=>o P.
+  Lemma oupd_idemp E P : (|={E}=>o |={E}=>o P) ⊣⊢ |={E}=>o P.
   Proof.
     apply: anti_symm.
     - apply oupd_trans.
     - apply oupd_intro.
   Qed.
 
-  Global Instance oupd_homomorphism :
-    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (oupd).
+  Global Instance oupd_homomorphism E :
+    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (oupd E).
   Proof. split; [split|]; try apply _; [apply oupd_sep | apply oupd_intro]. Qed.
 
-  Lemma big_sepL_oupd {A} (Φ : nat → A → iProp Σ) l :
-    ([∗ list] k↦x ∈ l, |==> Φ k x) ⊢ |==> [∗ list] k↦x ∈ l, Φ k x.
+  Lemma big_sepL_oupd {A} (Φ : nat → A → iProp Σ) E l :
+    ([∗ list] k↦x ∈ l, |={E}=>o Φ k x) ⊢ |={E}=>o [∗ list] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opL_commute _). Qed.
-  Lemma big_sepM_oupd {A} `{Countable K} (Φ : K → A → iProp Σ) l :
-    ([∗ map] k↦x ∈ l, |==> Φ k x) ⊢ |==> [∗ map] k↦x ∈ l, Φ k x.
+  Lemma big_sepM_oupd {A} `{Countable K} (Φ : K → A → iProp Σ) E l :
+    ([∗ map] k↦x ∈ l, |={E}=>o Φ k x) ⊢ |={E}=>o [∗ map] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opM_commute _). Qed.
-  Lemma big_sepS_oupd `{Countable A} (Φ : A → iProp Σ) l :
-    ([∗ set]  x ∈ l, |==> Φ x) ⊢ |==> [∗ set] x ∈ l, Φ x.
+  Lemma big_sepS_oupd `{Countable A} (Φ : A → iProp Σ) E l :
+    ([∗ set]  x ∈ l, |={E}=> Φ x) ⊢ |={E}=> [∗ set] x ∈ l, Φ x.
   Proof. by rewrite (big_opS_commute _). Qed.
-  Lemma big_sepMS_oupd `{Countable A} (Φ : A → iProp Σ) l :
-    ([∗ mset] x ∈ l, |==> Φ x) ⊢ |==> [∗ mset] x ∈ l, Φ x.
+  Lemma big_sepMS_oupd `{Countable A} (Φ : A → iProp Σ) E l :
+    ([∗ mset] x ∈ l, |={E}=> Φ x) ⊢ |={E}=> [∗ mset] x ∈ l, Φ x.
   Proof. by rewrite (big_opMS_commute _). Qed.
 
-  Lemma except_0_oupd P : ◇ (|={E}=>o P) ⊢ (|={E}=>o ◇ P).
+  Lemma except_0_oupd E P : ◇ (|={E}=>o P) ⊢ (|={E}=>o ◇ P).
   Proof.
     rewrite /bi_except_0. apply or_elim; eauto using oupd_mono, or_intro_r.
     by rewrite -oupd_intro -or_intro_l.
   Qed.
 
-  (* A safety check that relational updates can replace basic updates *)
-  (* We do not use this to build an instance, because it would conflict
-     with the basic updates. Instead, we shadow the proofmode lemmas below. *)
-  Lemma bi_bupd_mixin_oupd : BiBUpdMixin (iPropI Σ) oupd.
-  Proof.
-    split.
-    - solve_proper.
-    - apply oupd_intro.
-    - apply oupd_mono.
-    - apply oupd_trans.
-    - apply oupd_frame_r.
-  Qed.
-
   (* The following instances make the Iris Proof Mode aware of the later
      elimination update. They are derived from the simpler rules above. *)
-  Global Instance elim_bupd_oupd (p : bool) P Q :
-    ElimModal True p false (|==> P) P (|={E}=>o Q) (|={E}=>o Q)%I.
+  Global Instance elim_fupd_oupd (p : bool) E P Q :
+    ElimModal True p false (|={E}=> P) P (|={E}=>o Q) (|={E}=>o Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    rewrite bupd_oupd.
+    rewrite fupd_oupd.
     iIntros "_ [HP HPQ]". iApply (oupd_bind with "HPQ HP").
   Qed.
 
-  Global Instance add_modal_bupd P Q :
-    AddModal (|==> P) P (|={E}=>o Q).
+  Global Instance add_modal_fupd E P Q :
+    AddModal (|={E}=> P) P (|={E}=>o Q).
   Proof.
-    rewrite /AddModal; rewrite bupd_oupd; iIntros "[HP HPQ]".
+    rewrite /AddModal; rewrite fupd_oupd; iIntros "[HP HPQ]".
     iApply (oupd_bind with "HPQ HP").
   Qed.
 
-  Global Instance from_assumption_oupd p P Q :
+  Global Instance from_assumption_oupd p E P Q :
     FromAssumption p P Q → KnownRFromAssumption p P (|={E}=>o Q).
   Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply oupd_intro. Qed.
 
-  Global Instance from_pure_oupd a P φ :
+  Global Instance from_pure_oupd a E P φ :
     FromPure a P φ → FromPure a (|={E}=>o P) φ.
   Proof. rewrite /FromPure=> <-. apply oupd_intro. Qed.
 
-  Global Instance into_wand_oupd p q R P Q :
+  Global Instance into_wand_oupd p q E R P Q :
     IntoWand false false R P Q → IntoWand p q (|={E}=>o R) (|={E}=>o P) (|={E}=>o Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite !intuitionistically_if_elim HR.
     apply wand_intro_l. by rewrite oupd_sep wand_elim_r.
   Qed.
 
-  Global Instance into_wand_oupd_persistent p q R P Q :
+  Global Instance into_wand_oupd_persistent p q E R P Q :
     IntoWand false q R P Q → IntoWand p q (|={E}=>o R) P (|={E}=>o Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite intuitionistically_if_elim HR.
     apply wand_intro_l. by rewrite oupd_frame_l wand_elim_r.
   Qed.
 
-  Global Instance into_wand_oupd_args p q R P Q :
+  Global Instance into_wand_oupd_args p q E R P Q :
     IntoWand p false R P Q → IntoWand' p q R (|={E}=>o P) (|={E}=>o Q).
   Proof.
     rewrite /IntoWand' /IntoWand /= => ->.
     apply wand_intro_l. by rewrite intuitionistically_if_elim oupd_wand_r.
   Qed.
 
-  Global Instance from_sep_oupd P Q1 Q2 :
+  Global Instance from_sep_oupd E P Q1 Q2 :
     FromSep P Q1 Q2 → FromSep (|={E}=>o P) (|={E}=>o Q1) (|={E}=>o Q2).
   Proof. rewrite /FromSep=><-. apply oupd_sep. Qed.
 
-  Global Instance from_or_oupd P Q1 Q2 :
+  Global Instance from_or_oupd E P Q1 Q2 :
     FromOr P Q1 Q2 → FromOr (|={E}=>o P) (|={E}=>o Q1) (|={E}=>o Q2).
   Proof.
     rewrite /FromOr=><-.
     apply or_elim; apply oupd_mono; auto using or_intro_l, or_intro_r.
   Qed.
 
-  Global Instance from_exist_oupd {A} P (Φ : A → iProp Σ) :
+  Global Instance from_exist_oupd {A} E P (Φ : A → iProp Σ) :
     FromExist P Φ → FromExist (|={E}=>o P) (λ a, |={E}=>o Φ a)%I.
   Proof.
     rewrite /FromExist=><-. apply exist_elim=> a. by rewrite -(exist_intro a).
   Qed.
 
-  Global Instance is_except_0_oupd P : IsExcept0 P → IsExcept0 (|={E}=>o P).
+  Global Instance is_except_0_oupd E P : IsExcept0 P → IsExcept0 (|={E}=>o P).
   Proof.
     rewrite /IsExcept0=> HP.
     by rewrite -{2}HP -(except_0_idemp P) -except_0_oupd -(except_0_intro P).
   Qed.
 
-  Global Instance from_modal_oupd P :
+  Global Instance from_modal_oupd E P :
     FromModal True modality_id (|={E}=>o P) (|={E}=>o P) P.
   Proof. by rewrite /FromModal /= -oupd_intro. Qed.
 
-  Global Instance elim_modal_oupd p P Q :
+  Global Instance elim_modal_oupd p E P Q :
     ElimModal True p false (|={E}=>o P) P (|={E}=>o Q) (|={E}=>o Q).
   Proof.
     by rewrite /ElimModal
       intuitionistically_if_elim oupd_frame_r wand_elim_r oupd_trans.
   Qed.
 
-  Global Instance add_modal_oupd P Q : AddModal (|={E}=>o P) P (|={E}=>o Q).
+  Global Instance add_modal_oupd E P Q : AddModal (|={E}=>o P) P (|={E}=>o Q).
   Proof. by rewrite /AddModal oupd_frame_r wand_elim_r oupd_trans. Qed.
 
-  Global Instance frame_oupd p R P Q :
+  Global Instance frame_oupd p E R P Q :
     Frame p R P Q → Frame p R (|={E}=>o P) (|={E}=>o Q).
   Proof. rewrite /Frame=><-. by rewrite oupd_frame_l. Qed.
-
 
 
 

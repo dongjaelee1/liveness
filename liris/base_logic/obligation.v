@@ -1,4 +1,6 @@
 From iris.proofmode Require Import proofmode.
+(* Only to import rc; TODO refactor *)
+From transfinite.stepindex Require Import utils.
 
 Definition prop_of (T : Type) := (T → Prop).
 
@@ -104,16 +106,17 @@ Infix "↪ₐ⁺" := (tc obl_states_alloc) (at level 20).
 Infix "↪ₐ⋆" := (rtc obl_states_alloc) (at level 20).
 
 Variant obl_states_step `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) : relation obl_states :=
-  | obl_states_step_progress Ω1 Ω2 :
-    (∃ C, Ω1 ↪ₚ Ω2 | C) → obl_states_step s Ω1 Ω2
-  | obl_states_step_resolve Ω1 Ω2 :
-    (∃ C, Ω1 ↪ᵣ Ω2 @ s | C) → obl_states_step s Ω1 Ω2
+  | obl_states_step_progress Ω1 Ω2 C :
+    (∀ k o, Decision (C k o)) → (Ω1 ↪ₚ Ω2 | C) → obl_states_step s Ω1 Ω2
+  | obl_states_step_resolve Ω1 Ω2 C :
+    (∀ k o, Decision (C k o)) → (Ω1 ↪ᵣ Ω2 @ s | C) → obl_states_step s Ω1 Ω2
   | obl_states_step_alloc Ω1 Ω2 :
     Ω1 ↪ₐ Ω2 → obl_states_step s Ω1 Ω2.
 
 Notation "A ↪ₛ B @ s" := (obl_states_step s A B) (at level 20, format "A  ↪ₛ  B  @  s").
 Notation "A ↪ₛ⁺ B @ s" := (tc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⁺  B  @  s").
 Notation "A ↪ₛ⋆ B @ s" := (rtc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ⋆  B  @  s").
+Notation "A ↪ₛ∘ B @ s" := (rc (obl_states_step s) A B) (at level 20, format "A  ↪ₛ∘  B  @  s").
 
 Section obl_states.
   Context `{Ξl : obl_live_class} `{Ξd : obl_done_class}.

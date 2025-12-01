@@ -314,7 +314,32 @@ Section owitness.
       destruct w2; first done. inv H1. iPoseProof "Nmx" as "#H". by auto.
   Qed.
 
-  Lemma owitness_obl_resolve_one W1 W2 k :
+  Lemma owitness_wit_progress_any C W1 W2 :
+    (∀ k o, Decision (C k o)) →
+    (W1 ↓ₚ W2 | C) →
+    owitness W1 ⊢ owitness W2.
+  Proof.
+    iIntros (DC Prog) "N".
+    assert (Dom : dom W1 = dom W2) by (eapply wit_states_cond_rel_dom; eauto).
+    rewrite /owitness -!lock. iDestruct "N" as "(On& Nm)".
+    rewrite -Dom. iFrame "On".
+    iStopProof. clear Dom. revert W2 Prog. induction W1 using map_ind; iIntros (W2 Prog) "Nm".
+    { apply map_Forall2_empty_inv_l in Prog. subst. iFrame. }
+    apply map_Forall2_insert_inv_l in Prog; last auto. destruct Prog as (w2& m2& EqW2& LUm2& (HC1& HC2)& Prog).
+    subst. rewrite !big_sepM_insert; auto.
+    iDestruct "Nm" as "[Nmx Nm]". iPoseProof (IHW1 _ Prog with "Nm") as "Nm". clear IHW1.
+    iFrame "Nm". destruct x; simpl in *.
+    - destruct (decide (C i (inl w))).
+      + pose proof (HC1 c). destruct w2; simpl in *; last done.
+        iDestruct "Nmx" as "(%& %& NC)". iExists α. iFrame. iPureIntro.
+        etransitivity; last eauto. eapply WFOCM.lt_le; eauto.
+      + pose proof (HC2 n). subst. iFrame.
+    - destruct (decide (C i (inr u))).
+      + apply HC1 in c. done.
+      + apply HC2 in n. subst. auto.
+  Qed.
+
+  Lemma owitness_wit_resolve_one W1 W2 k :
     (W1 ↓ᵣ W2 | wit_cond_one k) →
     owitness W1 ∗ oblG_done k
     ⊢ |==> owitness W2.
@@ -341,6 +366,86 @@ Section owitness.
   Lemma obl_wit_init ξ :
     obl_wit ξ ∅ ∅.
   Proof. apply map_Forall2_empty. Qed.
+
+  Lemma obl_wit_dom ξ Ω W :
+    obl_wit ξ Ω W → dom Ω = dom W.
+  Proof.
+    intros. eapply map_Forall2_dom_L; eauto.
+  Qed.
+
+  Lemma obl_wit_resolve_same ξ C Ω W1 W2 :
+    (∀ (k : obl_id) (o : wit_state), Decision (C k o)) →
+    obl_wit ξ Ω W1 →
+    (W1 ↓ᵣ W2 | C) →
+    obl_wit ξ Ω W2 →
+    W1 = W2.
+  Proof.
+    revert Ω W2. induction W1 using map_ind; intros.
+    { apply map_Forall2_empty_inv_l in H1. subst. apply map_Forall2_empty_inv_r in H0. by subst. }
+    rename x into w1, m into W1, W2 into W2', Ω into Ω'.
+    apply map_Forall2_insert_inv_r in H1; auto. destruct H1 as (o& Ω& EQO& LUOi& HO1& MFO).
+    apply map_Forall2_insert_inv_l in H2; auto. destruct H2 as (w2& W2& EQW2& LUWi2& (HC1& HC2)& MFW).
+    subst. apply map_Forall2_insert in H3; auto. destruct H3 as (How& MFW2).
+    pose proof (IHW1 _ _ X MFO MFW MFW2).
+    subst. clear MFO MFW2. destruct o, w1, w2; simpl in *; try done.
+    - destruct (decide (C i (inl w))).
+      + by apply HC1 in c.
+      + apply HC2 in n. inv n. done.
+    - clear How. destruct (decide (C i (inr u))).
+      + by apply HC1 in c.
+      + apply HC2 in n. inv n. done.
+  Qed.
+
+  Lemma obl_wit_same_obl_alloc_false ξ Ω W1 W2 :
+    obl_wit ξ Ω W1 →
+    (W1 ↓ₐ W2) →
+    obl_wit ξ Ω W2 →
+    False.
+  Proof.
+    intros. destruct H1 as (k& d& LU& EQ). subst.
+    apply obl_wit_dom in H0, H2. rewrite H0 dom_insert_L in H2.
+    apply not_elem_of_dom in LU. set_solver + LU H2.
+  Qed.
+
+  Lemma owitness_obl_wit_step_same_obl ξ Ω W1 W2 :
+    obl_wit ξ Ω W1 →
+    W1 ↓ₛ W2 →
+    obl_wit ξ Ω W2 →
+    owitness W1 ⊢ owitness W2.
+  Proof.
+    iIntros (OW1 Prog OW2) "N". inv Prog.
+    - iPoseProof (owitness_wit_progress_any with "N") as "N"; eauto.
+    - pose proof (obl_wit_resolve_same _ _ _ _ _ X OW1 H0 OW2). by subst.
+    - pose proof (obl_wit_same_obl_alloc_false _ _ _ _ OW1 H0 OW2). done.
+  Qed.
+
+  Lemma owitness_obl_wit_rc_step_same_obl ξ Ω W1 W2 :
+    obl_wit ξ Ω W1 →
+    W1 ↓ₛ∘ W2 →
+    obl_wit ξ Ω W2 →
+    owitness W1 ⊢ owitness W2.
+  Proof.
+    iIntros (OW1 Prog OW2) "N". inv Prog; first done.
+    iApply (owitness_obl_wit_step_same_obl _ Ω W1 W2 with "N"); eauto.
+  Qed.
+
+  (* Maybe we don't need this *)
+  (* Lemma owitness_obl_wit_steps_same_obl ξ Ω W1 W2 : *)
+  (*   obl_wit ξ Ω W1 → *)
+  (*   W1 ↓ₛ⋆ W2 → *)
+  (*   obl_wit ξ Ω W2 → *)
+  (*   owitness W1 ⊢ owitness W2. *)
+  (* Proof. *)
+  (*   iIntros (OW1 Prog OW2). revert Ω OW1 OW2. *)
+  (*   induction Prog; iIntros (Ω OW1 OW2) "N". *)
+  (*   1: done. *)
+  (*   rename x into W1, y into W2, z into W3. *)
+  (*   iPoseProof (owitness_obl_wit_step_same_obl _ _ W1 W2 with "N") as "N"; eauto. *)
+
+  (*   pattern W2, W1. revert W1 W2 Prog. apply rtc_ind_r_weak; intros. *)
+  (*   { done. } *)
+  (*   rename x into W1, y into W2, z into W3, H0 into Steps, H1 into Step, H2 into IH. *)
+
 
   (* Lemma obl_wit_progress ξ Ω1 Ω2 W1 (i : T) : *)
   (*   Proper (WFOCM.ltR ==> WFOCM.ltR) ξ → *)

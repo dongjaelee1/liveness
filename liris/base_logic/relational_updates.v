@@ -223,16 +223,16 @@ Section rupd_lemmas.
   Proof. split; [split|]; try apply _; [apply rupd_sep | apply rupd_intro]. Qed.
 
   Lemma big_sepL_rupd {A} (Φ : nat → A → iProp Σ) l :
-    ([∗ list] k↦x ∈ l, |==> Φ k x) ⊢ |==> [∗ list] k↦x ∈ l, Φ k x.
+    ([∗ list] k↦x ∈ l, |==>r Φ k x) ⊢ |==>r [∗ list] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opL_commute _). Qed.
   Lemma big_sepM_rupd {A} `{Countable K} (Φ : K → A → iProp Σ) l :
-    ([∗ map] k↦x ∈ l, |==> Φ k x) ⊢ |==> [∗ map] k↦x ∈ l, Φ k x.
+    ([∗ map] k↦x ∈ l, |==>r Φ k x) ⊢ |==>r [∗ map] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opM_commute _). Qed.
   Lemma big_sepS_rupd `{Countable A} (Φ : A → iProp Σ) l :
-    ([∗ set]  x ∈ l, |==> Φ x) ⊢ |==> [∗ set] x ∈ l, Φ x.
+    ([∗ set]  x ∈ l, |==>r Φ x) ⊢ |==>r [∗ set] x ∈ l, Φ x.
   Proof. by rewrite (big_opS_commute _). Qed.
   Lemma big_sepMS_rupd `{Countable A} (Φ : A → iProp Σ) l :
-    ([∗ mset] x ∈ l, |==> Φ x) ⊢ |==> [∗ mset] x ∈ l, Φ x.
+    ([∗ mset] x ∈ l, |==>r Φ x) ⊢ |==>r [∗ mset] x ∈ l, Φ x.
   Proof. by rewrite (big_opMS_commute _). Qed.
 
   Lemma except_0_rupd P : ◇ (|==>r P) ⊢ (|==>r ◇ P).

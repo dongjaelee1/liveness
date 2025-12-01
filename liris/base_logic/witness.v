@@ -1,5 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From liris.base_logic Require Import obligation.
+(* Only to import rc; TODO refactor *)
+From transfinite.stepindex Require Import utils.
 
 Class wit_live_class (wit_count : Type) (wit_count_ltR : relation wit_count) := {
     wit_count_ltR_well_founded : well_founded wit_count_ltR;
@@ -70,16 +72,17 @@ Infix "↓ₐ⁺" := (tc wit_states_alloc) (at level 20).
 Infix "↓ₐ⋆" := (rtc wit_states_alloc) (at level 20).
 
 Variant wit_states_step `{Ξl : wit_live_class} : relation wit_states :=
-  | wit_states_step_progress Ω1 Ω2 :
-    (∃ C, Ω1 ↓ₚ Ω2 | C) → wit_states_step Ω1 Ω2
-  | wit_states_step_resolve Ω1 Ω2 :
-    (∃ C, Ω1 ↓ᵣ Ω2 | C) → wit_states_step Ω1 Ω2
+  | wit_states_step_progress Ω1 Ω2 C :
+    (∀ k o, Decision (C k o)) → (Ω1 ↓ₚ Ω2 | C) → wit_states_step Ω1 Ω2
+  | wit_states_step_resolve Ω1 Ω2 C :
+    (∀ k o, Decision (C k o)) → (Ω1 ↓ᵣ Ω2 | C) → wit_states_step Ω1 Ω2
   | wit_states_step_alloc Ω1 Ω2 :
     Ω1 ↓ₐ Ω2 → wit_states_step Ω1 Ω2.
 
 Notation "A ↓ₛ B" := (wit_states_step A B) (at level 20, format "A  ↓ₛ  B").
 Notation "A ↓ₛ⁺ B" := (tc (wit_states_step) A B) (at level 20, format "A  ↓ₛ⁺  B").
 Notation "A ↓ₛ⋆ B" := (rtc (wit_states_step) A B) (at level 20, format "A  ↓ₛ⋆  B").
+Notation "A ↓ₛ∘ B" := (rc (wit_states_step) A B) (at level 20, format "A  ↓ₛ∘  B").
 
 Section wit_states.
   Context `{Ξl : wit_live_class}.
