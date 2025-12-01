@@ -82,14 +82,14 @@ Definition oproto `{SI : indexT} `{!lirisGS Λ Σ} (Ω : obl_states) (W : wit_st
 
 (** Modality for updating obligation states. *)
 (* Can allocate, progress, or fulfill obligations, no later modality. *)
-Definition oupd_pre `{SI : indexT} `{!lirisGS Λ Σ} (E : coPset)
+Definition oupd_pre `{SI : indexT} `{!lirisGS Λ Σ}
   (oupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
-    ((|={E}=> P) ∨
+    ((|==> P) ∨
        (∀ (Ω1 : obl_states) (W1 : wit_states) (Θ : thread_ids) σ κs,
-          (oproto Ω1 W1 Θ ∗ state_interp σ Θ κs) ={E,∅}=∗
+          (oproto Ω1 W1 Θ ∗ state_interp σ Θ κs) ==∗
           ∃ Ω2, (⌜(Ω1 ↪ₛ∘ Ω2 @ σ)⌝) ∗
-          ∀ W2, (⌜(W1 ↓ₛ∘ W2) ∧ obl_wit owfun Ω2 W2 ⌝) ={∅,E}=∗
+          ∀ W2, (⌜(W1 ↓ₛ∘ W2) ∧ obl_wit owfun Ω2 W2 ⌝) ==∗
           (oproto Ω2 W2 Θ ∗ state_interp σ Θ κs) ∗ oupd P))%I.
 
 Lemma oupd_pre_mono `{SI : indexT} `{!lirisGS Λ Σ} E
@@ -195,6 +195,25 @@ Section oupd.
     rewrite /oproto. iDestruct "OP" as "($& $& $& N& %OW1)".
     iPoseProof (owitness_obl_wit_rc_step_same_obl _ _ _ _ OW1 Prog OW2 with "N") as "N".
     iFrame. done.
+  Qed.
+
+  (** Change to a larger mask. *)
+  Lemma oupd_mask_mono E1 E2 P :
+    E1 ⊆ E2 →
+    (|={E1}=>o P) ⊢ |={E2}=>o P.
+  Proof.
+    iIntros (Sub) "H". iRevert (P) "H".
+    iApply oupd_ind_strong.
+    iIntros "!> %P IH". iDestruct "IH" as "[IH | IH]".
+    - iApply oupd_unfold. iLeft. iApply fupd_mask_mono; eauto.
+    - iApply oupd_unfold. iRight.
+      iIntros (?????) "I".
+      iMod (fupd_mask_subseteq E1) as "close"; first auto.
+      iMod ("IH" with "I") as "(%&%& IH)".
+      iModIntro. iExists _. iSplitR; first done.
+      iIntros (??). iMod ("IH" with "[//]") as "[$ IH]".
+      iMod "close" as "_". iModIntro. iDestruct "IH" as "[IH _]".
+      iApply "IH".
   Qed.
 
   (** We can combine two obligation updates into one. *)
@@ -372,78 +391,181 @@ Section oupd.
     Frame p R P Q → Frame p R (|={E}=>o P) (|={E}=>o Q).
   Proof. rewrite /Frame=><-. by rewrite oupd_frame_l. Qed.
 
-
-
-  Global Instance ghost_step_ne `{SI : indexT} `{!lirisGS Λ Σ} E :
-    NonExpansive (ghost_step E).
-  Proof.
-    intros n Φ Ψ HΦ. rewrite /ghost_step. do 15 (f_equiv || done).
-  Qed.
-  Global Instance ghost_step_proper `{SI : indexT} `{!lirisGS Λ Σ} E :
-    Proper ((≡) ==> (≡)) (ghost_step E).
-  Proof.
-    intros Φ Φ' ?. apply equiv_dist=>n. apply ghost_step_ne. by apply equiv_dist.
-  Qed.
-
-  Lemma ghost_step_mono_fupd `{SI : indexT} `{!lirisGS Λ Σ} E (ν1 ν2 : iPropO Σ) :
-    ⊢ ((ν1 -∗ |={E}=> ν2) -∗
-       ghost_step E ν1 -∗ ghost_step E ν2)%I.
-  Proof.
-    iIntros "Hmono"; iIntros "Hwp". rewrite /ghost_step.
-    iIntros (????) "H". iSpecialize ("Hwp" with "[$]").
-    iMod "Hwp" as "(%&H0&H1&Hwp)". iFrame. by iApply "Hmono".
-  Qed.
-
-  Lemma ghost_step_mono `{SI : indexT} `{!lirisGS Λ Σ} (ν1 ν2 : iPropO Σ) :
-    ⊢ ((ν1 -∗ ν2) -∗
-       ∀ E, ghost_step E ν1 -∗ ghost_step E ν2)%I.
-  Proof.
-    iIntros "Hmono"; iIntros (E) "Hwp". iApply (ghost_step_mono_fupd with "[Hmono] Hwp").
-    iIntros "H". iModIntro. by iApply "Hmono".
-  Qed.
-
-  Lemma fupd_ghost_step `{SI : indexT} `{!lirisGS Λ Σ} E lwp :
-    (|={E}=> ghost_step E lwp) ⊢ ghost_step E lwp.
-  Proof.
-    iIntros "Hf". rewrite /ghost_step. iIntros.
-    iMod "Hf" as "Hf". iSpecialize ("Hf" with "[$]"). done.
-  Qed.
-
-  Lemma ghost_step_intro `{SI : indexT} `{!lirisGS Λ Σ} E Ψ :
-    Ψ ⊢ ghost_step E Ψ.
-  Proof.
-    iIntros "Hlwp". rewrite /ghost_step.
-    iIntros "%%%% H". iModIntro. by iFrame.
-  Qed.
-
-  Lemma ghost_step_strong_mono `{SI : indexT} `{!lirisGS Λ Σ} E1 E2 Ψ1 Ψ2 :
+  Lemma oupd_strong_mono E1 E2 P1 P2 :
     E1 ⊆ E2 →
-    ghost_step E1 Ψ1 -∗ (Ψ1 ={E2}=∗ Ψ2) -∗ ghost_step E2 Ψ2.
+    (|={E1}=>o P1) -∗ (P1 ={E2}=∗ P2) -∗ |={E2}=>o P2.
   Proof.
-    iIntros (HE) "IH Hu". rewrite /ghost_step.
-    iIntros (????) "H". iSpecialize ("IH" with "[$]").
-    iMod (fupd_mask_subseteq E1) as "close"; first done.
-    iMod "IH" as "(%&H0&H1&IH)". iFrame. iMod "close" as "_".
-    by iApply "Hu".
+    iIntros (HE) "H Hu". iPoseProof (oupd_mask_mono with "H") as "H"; first eauto.
+    iMod "H". iMod ("Hu" with "H") as "H". iModIntro. done.
   Qed.
 
-  Lemma ghost_step_atomic `{SI : indexT} `{!lirisGS Λ Σ} E1 E2 Ψ :
-    (|={E1,E2}=> ghost_step E2 (|={E2,E1}=> Ψ)) ⊢ ghost_step E1 Ψ.
+  (* Lemma oupd_mask_comm E1 E2 P Q : *)
+  (*   (|={E2}=>o |={E2,E1}=> P) -∗ (P ={E1}=∗ Q) -∗ |={E2,E1}=> |={E1}=>o Q. *)
+  (* Proof. *)
+  (*   revert P Q. *)
+  (*   cut (∀ R, (|={E2}=>o R) -∗ ∀ P E1, (R -∗ |={E2,E1}=> P) -∗ ∀ Q, (P ={E1}=∗ Q) ={E2,E1}=∗ |={E1}=>o Q). *)
+  (*   { iIntros (help P Q) "H". iApply (help with "H []"). iIntros "$". } *)
+  (*   clear E1. iApply oupd_ind_strong. *)
+  (*   { solve_proper. } *)
+  (*   iIntros "!> %R IH %P %E1 HRP %Q HPQ". iDestruct "IH" as "[IH | IH]". *)
+  (*   - iMod "IH". iMod ("HRP" with "IH") as "HP". *)
+  (*     iModIntro. iMod ("HPQ" with "HP") as "HQ". iModIntro. done. *)
+  (*   -  *)
+
+  (*     rewrite (oupd_unfold E1 Q). *)
+      
+    
+  (*   iIntros "HP". iRevert (P E1 E2 Q) "HP". iStopProof. *)
+    
+
+  (* cut (∀ Φ', lWP e @ s; emp; i; E {{ Φ' }} -∗ ∀ Φ, (∀ v, (Φ' v) -∗ (lWP K (of_val v) @ s; emp; i; E {{ Φ }})) -∗ lWP K e @ s; emp; i; E {{ Φ }}). *)
+  (* { iIntros (help Φ) "H". iApply (help with "H"); auto. } *)
+  (* iIntros (Φ') "H". iRevert (i e E Φ') "H". *)
+    
+  (*   remember (|={E2,E1}=> P)%I as R. *)
+  (*   assert (EQ : R ⊣⊢ (|={E2,E1}=> P)%I). *)
+  (*   { subst; done. } *)
+  (*   clear HeqR. iRevert (E1 P EQ). iRevert (R) "HP". iApply oupd_ind_strong. *)
+  (*   { repeat intro.  *)
+  (*   iPoseProof (oupd_ind_strong E2 with "[] HP") as "H". *)
+  (*   iRevert (P) "HP". *)
+  (*   iIntros "!> %P IH". iDestruct "IH" as "[IH | IH]". *)
+  (*   - iApply oupd_unfold. iLeft. iApply fupd_mask_mono; eauto. *)
+  (*   - iApply oupd_unfold. iRight. *)
+  (*     iIntros (?????) "I". *)
+  (*     iMod (fupd_mask_subseteq E1) as "close"; first auto. *)
+  (*     iMod ("IH" with "I") as "(%&%& IH)". *)
+  (*     iModIntro. iExists _. iSplitR; first done. *)
+  (*     iIntros (??). iMod ("IH" with "[//]") as "[$ IH]". *)
+  (*     iMod "close" as "_". iModIntro. iDestruct "IH" as "[IH _]". *)
+  (*     iApply "IH". *)
+  (* Qed. *)
+
+  Lemma oupd_atomic E1 E2 P :
+    (|={E1,E2}=> |={E2}=>o (|={E2,E1}=> P)) ⊢ |={E1}=>o P.
   Proof.
-    iIntros "IH". rewrite /ghost_step.
+    iIntros "H". rewrite !oupd_unfold.
+    iRight. iIntros (?????) "I". iMod ("H") as "[H | H]".
+    { iMod (fupd_mask_subseteq ∅) as "close"; first set_solver.
+      iModIntro. iExists Ω1. iSplitR; first done.
+      iIntros (? (Prog& OW2)). iMod "close" as "_".
+      rewrite /oproto. iDestruct "I" as "(($& $& $& N& %OW1)& $)".
+      iPoseProof (owitness_obl_wit_rc_step_same_obl _ _ _ _ OW1 Prog OW2 with "N") as "N".
+      iFrame "N %". iMod "H". iMod "H". iIntros "!> !>". done.
+    }
+    iMod ("H" with "I") as "(%& %PO& H)".
+    iModIntro. iExists _. iSplitR; first done.
+    iIntros (? PW). iMod ("H" with "[//]") as "[I H]".
+
+    TODO
+
+
+Lemma lwp_atomic s ς i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
+  (|={E1,E2}=> lWP e @ s; ς; i; E2 {{ v, |={E2,E1}=> Φ v }})
+  ⊢ lWP e @ s; ς; i; E1 {{ Φ }}.
+Proof.
+  (* iIntros "H". rewrite !lwp_unfold /lwp_pre. iIntros "Hc". *)
+  (* destruct (to_val e) as [v|] eqn:He. *)
+  (* { iApply ghost_step_atomic. by iApply "H". } *)
+  (* rewrite /lwp_step. *)
+  (* iIntros (?????) "Hp". *)
+  iMod ("H" with "Hc [$]") as ">($& %& $& H)".
+  iIntros "!>" (????). iDestruct ("H" with "[//]") as ">H".
+  iModIntro. iMod "H" as ">(%&%&%&%& H0&H&Hefs)".
+  destruct s.
+  - rewrite !lwp_unfold /lwp_pre. destruct (to_val e2) as [v2|] eqn:He2.
+    + iSpecialize ("H" with "[] [H0]"). 1,2: by iFrame.
+      iMod "H" as "(%&%&H0&H)". iMod "H". iFrame.
+      iModIntro. destruct H0 as [? [? ?]]. iExists Ω3, Ω4. iSplit.
+      * iPureIntro. split_and !; auto. by etransitivity.
+      * rewrite lwp_unfold /lwp_pre. rewrite He2. iIntros "_". by iApply ghost_step_intro.
+    + iPoseProof ("H" with "[]") as "H"; first done.
+      iMod ("H" $! _ _ _ [] _ with "H0") as "[H H']".
+      iDestruct "H" as %(? & ? & ? & ? & ?). by edestruct (atomic _ _ _ _ _ _ _ H).
+  - destruct (atomic _ _ _ _ _ _ _ H) as [v <-%of_to_val].
+    rewrite lwp_value_fupd'. iPoseProof ("H" with "[]") as "H"; first done.
+    iMod ("H" with "[H0]") as "H"; first by iFrame.
+    iDestruct "H" as "(%&%&H0&>H)". iModIntro. iFrame.
+    destruct H0 as [? [? ?]]. iExists Ω3, Ω4. iSplit.
+    { iPureIntro. split_and !; auto. by etransitivity. }
+    iApply lwp_value_fupd'. iIntros "_". by iApply ghost_step_intro.
+Qed.
+
+
+    iIntros "H". iApply oupd_unfold.
+    iRight. iIntros (?????) "I". iMod "H".
+    iRevert "I". iStopProof. revert P E1 Ω1 W1 Θ σ κs.
+    cut
+      (∀ R,
+         (|={E2}=>o R) -∗
+         ∀ E1 P, (R -∗ |={E2,E1}=> P) -∗
+                 ∀ Ω1 W1 Θ σ κs, (oproto Ω1 W1 Θ ∗ state_interp σ Θ κs ={E2,∅}=∗
+                                  ∃ Ω2, (⌜Ω1 ↪ₛ∘ Ω2 @ σ⌝) ∗
+                                        ∀ W2, (⌜W1 ↓ₛ∘ W2 ∧ obl_wit owfun Ω2 W2⌝) ={∅,E1}=∗
+                                              (oproto Ω2 W2 Θ ∗ state_interp σ Θ κs) ∗ (|={E1}=>o P))).
+    { iIntros (IH ???????) "HP I". iApply (IH with "HP [] I"). auto. }
+    iApply oupd_ind_strong.
+    { solve_proper. }
+    iIntros "!> %R IH % % RP %%%%% I". iDestruct "IH" as "[IH | IH]".
+    { iMod "IH". iMod ("RP" with "IH") as "H".
+      iMod (fupd_mask_subseteq ∅) as "close"; first set_solver.
+      iModIntro. iExists Ω1. iSplitR; first done.
+      iIntros (? (Prog& OW2)). iMod "close" as "_".
+      rewrite /oproto. iDestruct "I" as "(($& $& $& N& %OW1)& $)".
+      iPoseProof (owitness_obl_wit_rc_step_same_obl _ _ _ _ OW1 Prog OW2 with "N") as "N".
+      iFrame "N %". iIntros "!> !>". done.
+    }
+    iMod ("IH" with "I") as "IH". iDestruct "IH" as "(%& %PO& IH)".
+    iModIntro. iExists _. iSplitR; first done.
+    iIntros (? PW).
+    
+    
+    
+
+    
+    
+  (∀ E2 P E1 Ω1 W1 Θ σ κs,
+    (|={E2}=>o |={E2,E1}=> P)
+    ⊢ oproto Ω1 W1 Θ ∗ state_interp σ Θ κs ={E2,∅}=∗
+      ∃ Ω2 : obl_states, ⌜Ω1 ↪ₛ∘ Ω2 @ σ⌝ ∗
+        ∀ W2 : wit_states, ⌜W1 ↓ₛ∘ W2 ∧ obl_wit owfun Ω2 W2⌝ ={∅,E1}=∗ (oproto Ω2 W2 Θ ∗ state_interp σ Θ κs) ∗ (|={E1}=>o P)).
+
+    
+    iMod (fupd_mask_subseteq ∅) as "close"; first set_solver.
+    iModIntro. iExists Ω1. iSplitR; first done.
+    iIntros (? (Prog& OW2)). iMod "close" as "_".
+    rewrite /oproto. iDestruct "I" as "(($& $& $& N& %OW1)& $)".
+    iPoseProof (owitness_obl_wit_rc_step_same_obl _ _ _ _ OW1 Prog OW2 with "N") as "N".
+    iFrame "N %".
+
+    clear dependent W1 W2 Ω1 Θ σ κs.
+    iRevert (P) "H".
+    iApply oupd_ind_strong.
+    iIntros "!> %P IH". iDestruct "IH" as "[IH | IH]".
+    - iApply oupd_unfold. iLeft. iApply fupd_mask_mono; eauto.
+    - iApply oupd_unfold. iRight.
+      iIntros (?????) "I".
+      iMod (fupd_mask_subseteq E1) as "close"; first auto.
+      iMod ("IH" with "I") as "(%&%& IH)".
+      iModIntro. iExists _. iSplitR; first done.
+      iIntros (??). iMod ("IH" with "[//]") as "[$ IH]".
+      iMod "close" as "_". iModIntro. iDestruct "IH" as "[IH _]".
+      iApply "IH".
+  Qed.
+    
+
+    
+    iModIntro.
+    iDestruct "I" as "[OP SI]". iFrame "SI".
+    iFrame. done.
+  Qed.
+
+    iMod "H".
+
+    rewrite /ghost_step.
     iIntros (????) "H". iSpecialize ("IH" with "[$]").
     iMod "IH". iMod "IH". iDestruct "IH" as "(%&%&H&Hwp)".
     iMod "Hwp". iModIntro. by iFrame.
-  Qed.
-
-  Lemma ghost_step_idemp `{SI : indexT} `{!lirisGS Λ Σ} E Ψ :
-    ghost_step E (ghost_step E Ψ) ⊢ ghost_step E Ψ.
-  Proof.
-    iIntros "Hg". rewrite /ghost_step.
-    iIntros (????) "H". iSpecialize ("Hg" with "[$]"). iMod "Hg".
-    iDestruct "Hg" as "(%&%&H&Hg)". iSpecialize ("Hg" with "[-]"); first by iFrame.
-    iDestruct "Hg" as ">(%&%&H&Hg)". iModIntro. iFrame.
-    iPureIntro. by etransitivity.
   Qed.
 
 End oupd.
