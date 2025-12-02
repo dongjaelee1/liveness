@@ -31,7 +31,7 @@ Class obl_live_class (obl_count obl_ownerid : Type) (obl_count_ltR : relation ob
 
 Record obl_live_state `{Ξl : obl_live_class} := {
     obl_owner : obl_ownerid;
-    obl_progress : obl_count;
+    obl_fuel : obl_count;
   }.
 
 Class obl_done_class (obl_ps : Type) := {
@@ -61,7 +61,7 @@ Definition obl_state_progress `{Ξl : obl_live_class} `{Ξd : obl_done_class} : 
   λ o1 o2,
     (match o1, o2 with
      | inl d1, inl d2 =>
-         (obl_owner d1 = obl_owner d2) ∧ obl_count_ltR (obl_progress d2) (obl_progress d1)
+         (obl_owner d1 = obl_owner d2) ∧ obl_count_ltR (obl_fuel d2) (obl_fuel d1)
      | _, _ => False
      end).
 
@@ -143,7 +143,7 @@ Section obl_states.
     obl_state_progress o1 o2 →
     ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
              (obl_owner d1 = obl_owner d2) ∧
-             (obl_count_ltR (obl_progress d2) (obl_progress d1)).
+             (obl_count_ltR (obl_fuel d2) (obl_fuel d1)).
   Proof using.
     intros. destruct o1, o2; try done. simpl in H. do 2 eexists. split_and; eauto.
   Qed.
@@ -151,7 +151,7 @@ Section obl_states.
     tc obl_state_progress o1 o2 →
     ∃ d1 d2, o1 = obl_live d1 ∧ o2 = obl_live d2 ∧
              (obl_owner d1 = obl_owner d2) ∧
-             (obl_count_ltR (obl_progress d2) (obl_progress d1)).
+             (obl_count_ltR (obl_fuel d2) (obl_fuel d1)).
   Proof using.
     intros. induction H.
     { apply (obl_state_progress_live x y); auto. }

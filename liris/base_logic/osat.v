@@ -50,7 +50,7 @@ Module osatGS.
         osatGpreS_goal : inG Σ (gmap_viewR obl_id (prodR (agreeR $ (prop_ofO ps)) (agreeR $ (laterO (iPropO Σ)))));
         osatGpreS_status : inG Σ (reservation_mapUR mono_natUR);
         osatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO T)));
-        osatGpreS_progress : inG Σ (reservation_mapUR bankUR);
+        osatGpreS_fuel : inG Σ (reservation_mapUR bankUR);
         (* osatGpreS_bound : inG Σ (reservation_mapUR (auth_mraUR (wfocm_geR))); *)
         osatGpreS_elem : inG Σ (gmap_viewR obl_id unitUR);
       }.
@@ -61,7 +61,7 @@ Module osatGS.
         goal_name : gname;
         status_name : gname;
         owner_name : gname;
-        progress_name : gname;
+        fuel_name : gname;
         (* bound_name : gname; *)
         elem_name : gname;
       }.
@@ -85,7 +85,7 @@ Import osatGS.
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances osat_inG
-  osatGpreS_goal osatGpreS_status osatGpreS_owner osatGpreS_progress osatGpreS_elem.
+  osatGpreS_goal osatGpreS_status osatGpreS_owner osatGpreS_fuel osatGpreS_elem.
 
 (* Goal *)
 Definition goal_unfold `{SI : indexT} {Σ} (R : iProp Σ) : later (iProp Σ) := Next R.
@@ -123,18 +123,18 @@ Definition oblG_owner `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl
 Global Typeclasses Opaque oblG_owner.
 Global Instance: Params (@oblG_owner) 8 := {}.
 
-(* Progress: manage credits for logical progress *)
-Definition oblG_progress `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) : iProp Σ :=
-  own progress_name (reservation_map_data k (cash α)).
-Global Typeclasses Opaque oblG_progress.
-Global Instance: Params (@oblG_progress) 8 := {}.
+(* Fuel: manage credits for logical fuel *)
+Definition oblG_fuel `{SI : indexT} `{WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) : iProp Σ :=
+  own fuel_name (reservation_map_data k (cash α)).
+Global Typeclasses Opaque oblG_fuel.
+Global Instance: Params (@oblG_fuel) 8 := {}.
 
-Definition oblG_progress_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) (q : Qp) : iProp Σ :=
-  own progress_name (reservation_map_data k (debt α q)).
-Global Typeclasses Opaque oblG_progress_supply.
-Global Instance: Params (@oblG_progress_supply) 8 := {}.
+Definition oblG_fuel_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (α : A) (q : Qp) : iProp Σ :=
+  own fuel_name (reservation_map_data k (debt α q)).
+Global Typeclasses Opaque oblG_fuel_supply.
+Global Instance: Params (@oblG_fuel_supply) 8 := {}.
 
-(* (* Upper bound of progress credits *) *)
+(* (* Upper bound of fuel credits *) *)
 (* Definition oblG_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!osatGS ps T Σ} (k : obl_id) (ℵ : A) : iProp Σ := *)
 (*   own bound_name (reservation_map_data k (◯AM[wfocm_geR] ℵ)). *)
 (* Global Typeclasses Opaque oblG_bound. *)
@@ -155,7 +155,7 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
          own goal_name (gmap_view_auth (DfracOwn 1) ((λ '(P, R), (to_agree P, to_agree $ (goal_unfold R))) <$> OProp))) ∗
      (own status_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
-     (own progress_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (own fuel_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (* (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗ *)
      (own elem_name (gmap_view_auth (DfracOwn 1) (gset_to_gmap () (dom Ω)))) ∗
      ([∗ map] k ↦ o ∈ Ω,
@@ -163,13 +163,13 @@ Definition osat `{SI : indexT} `{WFA : WFOCM.pack A} `{!osatGS ps T Σ}
         | inl d =>
             oblG_live k (1/2)%Qp ∗
             (oblG_owner k (obl_owner d) (1/2)%Qp) ∗
-            (∃ α, (⌜ WFOCM.leR α (obl_progress d) ⌝) ∗ oblG_progress_supply k α (1)%Qp)
-            (* (∃ α ℵ, (⌜ WFOCM.leR α (obl_progress d) ∧ WFOCM.leR (obl_progress d) ℵ ⌝) ∗ *)
-            (*         oblG_progress_supply k α (1)%Qp ∗ oblG_bound_auth k ℵ) *)
+            (∃ α, (⌜ WFOCM.leR α (obl_fuel d) ⌝) ∗ oblG_fuel_supply k α (1)%Qp)
+            (* (∃ α ℵ, (⌜ WFOCM.leR α (obl_fuel d) ∧ WFOCM.leR (obl_fuel d) ℵ ⌝) ∗ *)
+            (*         oblG_fuel_supply k α (1)%Qp ∗ oblG_bound_auth k ℵ) *)
         | inr d =>
             let P1 := (obl_atom d) in
             ∃ P2 R, oblG_goal k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
-                    oblG_done_auth k ∗ ∃ θ α, oblG_owner k θ 1 ∗ oblG_progress_supply k α 1
+                    oblG_done_auth k ∗ ∃ θ α, oblG_owner k θ 1 ∗ oblG_fuel_supply k α 1
         end)
     )%I.
 
@@ -198,8 +198,8 @@ Section osat.
   Proof. rewrite /oblG_live. apply _. Qed.
   Global Instance oblG_done_timeless k : Timeless (oblG_done k).
   Proof. rewrite /oblG_done. apply _. Qed.
-  Global Instance oblG_progress_timeless k b : Timeless (oblG_progress k b).
-  Proof. rewrite /oblG_progress. apply _. Qed.
+  Global Instance oblG_fuel_timeless k b : Timeless (oblG_fuel k b).
+  Proof. rewrite /oblG_fuel. apply _. Qed.
   (* Global Instance oblG_bound_timeless k a : Timeless (oblG_bound k a). *)
   (* Proof. rewrite /oblG_bound. apply _. Qed. *)
 
@@ -329,166 +329,166 @@ Section osat.
     rewrite /oblG_live. by iFrame.
   Qed.
 
-  (** Progress rules *)
-  Lemma oblG_progress_eq i a0 a1 :
+  (** Fuel rules *)
+  Lemma oblG_fuel_eq i a0 a1 :
     a0 /= a1 →
-    oblG_progress i a0 = oblG_progress i a1.
-  Proof. intros EQ. rewrite /oblG_progress. by erewrite cash_eq. Qed.
-  Lemma oblG_progress_eq_list L a0 a1 :
+    oblG_fuel i a0 = oblG_fuel i a1.
+  Proof. intros EQ. rewrite /oblG_fuel. by erewrite cash_eq. Qed.
+  Lemma oblG_fuel_eq_list L a0 a1 :
     a0 /= a1 →
-    ([∗ list] i ∈ L, oblG_progress i a0)%I ≡ ([∗ list] i ∈ L, oblG_progress i a1)%I.
-  Proof. intros. apply big_opL_proper. intros. erewrite oblG_progress_eq; eauto. Qed.
-  Lemma oblG_progress_eq_set L a0 a1 :
+    ([∗ list] i ∈ L, oblG_fuel i a0)%I ≡ ([∗ list] i ∈ L, oblG_fuel i a1)%I.
+  Proof. intros. apply big_opL_proper. intros. erewrite oblG_fuel_eq; eauto. Qed.
+  Lemma oblG_fuel_eq_set L a0 a1 :
     a0 /= a1 →
-    ([∗ set] i ∈ L, oblG_progress i a0)%I ≡ ([∗ set] i ∈ L, oblG_progress i a1)%I.
-  Proof. intros. apply big_opS_proper. intros. erewrite oblG_progress_eq; eauto. Qed.
+    ([∗ set] i ∈ L, oblG_fuel i a0)%I ≡ ([∗ set] i ∈ L, oblG_fuel i a1)%I.
+  Proof. intros. apply big_opS_proper. intros. erewrite oblG_fuel_eq; eauto. Qed.
 
-  Lemma oblG_progress_mon i a0 a1 :
+  Lemma oblG_fuel_mon i a0 a1 :
     a0 /≤ a1 →
-    oblG_progress i a1 ⊢ |==> oblG_progress i a0.
+    oblG_fuel i a1 ⊢ |==> oblG_fuel i a0.
   Proof.
-    intros LE. rewrite /oblG_progress. apply own_update.
+    intros LE. rewrite /oblG_fuel. apply own_update.
     by apply reservation_map_update, cash_update.
   Qed.
-  Lemma oblG_progress_mon_list L a0 a1 :
+  Lemma oblG_fuel_mon_list L a0 a1 :
     a0 /≤ a1 →
-    ([∗ list] i ∈ L, oblG_progress i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_progress i a0).
+    ([∗ list] i ∈ L, oblG_fuel i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_fuel i a0).
   Proof.
     iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-    iModIntro. iIntros. by iApply oblG_progress_mon.
+    iModIntro. iIntros. by iApply oblG_fuel_mon.
   Qed.
-  Lemma oblG_progress_mon_set L a0 a1 :
+  Lemma oblG_fuel_mon_set L a0 a1 :
     a0 /≤ a1 →
-    ([∗ set] i ∈ L, oblG_progress i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_progress i a0).
+    ([∗ set] i ∈ L, oblG_fuel i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_fuel i a0).
   Proof.
     iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
-    iModIntro. iIntros. by iApply oblG_progress_mon.
+    iModIntro. iIntros. by iApply oblG_fuel_mon.
   Qed.
 
-  Lemma oblG_progress_split i a0 a1 :
-    oblG_progress i (a0 /+ a1) ⊣⊢ oblG_progress i a0 ∗ oblG_progress i a1.
+  Lemma oblG_fuel_split i a0 a1 :
+    oblG_fuel i (a0 /+ a1) ⊣⊢ oblG_fuel i a0 ∗ oblG_fuel i a1.
   Proof.
-    rewrite /oblG_progress. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
+    rewrite /oblG_fuel. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
     - iEval (rewrite -cash_add) in "H". iDestruct "H" as "[H1 H2]". iFrame.
     - iEval (rewrite -cash_add). iSplitL "H1"; iFrame.
   Qed.
-  Lemma oblG_progress_split_list L a0 a1 :
-    ([∗ list] i ∈ L, oblG_progress i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, oblG_progress i a0) ∗ ([∗ list] i ∈ L, oblG_progress i a1).
+  Lemma oblG_fuel_split_list L a0 a1 :
+    ([∗ list] i ∈ L, oblG_fuel i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, oblG_fuel i a0) ∗ ([∗ list] i ∈ L, oblG_fuel i a1).
   Proof.
-    rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply oblG_progress_split.
+    rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply oblG_fuel_split.
   Qed.
-  Lemma oblG_progress_split_set L a0 a1 :
-    ([∗ set] i ∈ L, oblG_progress i (a0 /+ a1)) ⊣⊢ ([∗ set] i ∈ L, oblG_progress i a0) ∗ ([∗ set] i ∈ L, oblG_progress i a1).
+  Lemma oblG_fuel_split_set L a0 a1 :
+    ([∗ set] i ∈ L, oblG_fuel i (a0 /+ a1)) ⊣⊢ ([∗ set] i ∈ L, oblG_fuel i a0) ∗ ([∗ set] i ∈ L, oblG_fuel i a1).
   Proof.
-    rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply oblG_progress_split.
-  Qed.
-
-  Lemma oblG_progress_mon_split i a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    oblG_progress i a2 ⊢ |==> oblG_progress i a0 ∗ oblG_progress i a1.
-  Proof.
-    intros LE. iIntros "H". iApply oblG_progress_split. iApply oblG_progress_mon; done.
-  Qed.
-  Lemma oblG_progress_mon_split_list L a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    ([∗ list] i ∈ L, oblG_progress i a2) ⊢ |==> ([∗ list] i ∈ L, oblG_progress i a0) ∗ ([∗ list] i ∈ L, oblG_progress i a1).
-  Proof.
-    iIntros (LE) "H". iPoseProof (oblG_progress_mon_list with "H") as ">H"; first done.
-    by iApply oblG_progress_split_list.
-  Qed.
-  Lemma oblG_progress_mon_split_set L a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    ([∗ set] i ∈ L, oblG_progress i a2) ⊢ |==> ([∗ set] i ∈ L, oblG_progress i a0) ∗ ([∗ set] i ∈ L, oblG_progress i a1).
-  Proof.
-    iIntros (LE) "H". iPoseProof (oblG_progress_mon_set with "H") as ">H"; first done.
-    by iApply oblG_progress_split_set.
+    rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply oblG_fuel_split.
   Qed.
 
-  Lemma oblG_progress_lt i a0 a1 :
+  Lemma oblG_fuel_mon_split i a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    oblG_fuel i a2 ⊢ |==> oblG_fuel i a0 ∗ oblG_fuel i a1.
+  Proof.
+    intros LE. iIntros "H". iApply oblG_fuel_split. iApply oblG_fuel_mon; done.
+  Qed.
+  Lemma oblG_fuel_mon_split_list L a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    ([∗ list] i ∈ L, oblG_fuel i a2) ⊢ |==> ([∗ list] i ∈ L, oblG_fuel i a0) ∗ ([∗ list] i ∈ L, oblG_fuel i a1).
+  Proof.
+    iIntros (LE) "H". iPoseProof (oblG_fuel_mon_list with "H") as ">H"; first done.
+    by iApply oblG_fuel_split_list.
+  Qed.
+  Lemma oblG_fuel_mon_split_set L a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    ([∗ set] i ∈ L, oblG_fuel i a2) ⊢ |==> ([∗ set] i ∈ L, oblG_fuel i a0) ∗ ([∗ set] i ∈ L, oblG_fuel i a1).
+  Proof.
+    iIntros (LE) "H". iPoseProof (oblG_fuel_mon_set with "H") as ">H"; first done.
+    by iApply oblG_fuel_split_set.
+  Qed.
+
+  Lemma oblG_fuel_lt i a0 a1 :
     a0 /< a1 →
-    oblG_progress i a1 ⊢ |==> oblG_progress i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress i c.
+    oblG_fuel i a1 ⊢ |==> oblG_fuel i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel i c.
   Proof.
     intros LT. apply WFOCM.lt_exists_left in LT. destruct LT as (?& ?& ?).
-    iIntros "H". iMod (oblG_progress_mon_split _ _ _ _ H0 with "H") as "[H1 H2]".
+    iIntros "H". iMod (oblG_fuel_mon_split _ _ _ _ H0 with "H") as "[H1 H2]".
     iModIntro. iSplitL "H1"; iFrame. done.
   Qed.
-  Lemma oblG_progress_lt_list L a0 a1 :
+  Lemma oblG_fuel_lt_list L a0 a1 :
     a0 /< a1 →
-    ([∗ list] i ∈ L, oblG_progress i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_progress i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress i c).
+    ([∗ list] i ∈ L, oblG_fuel i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_fuel i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel i c).
   Proof.
     iIntros (LT) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-    iModIntro. iIntros. by iApply oblG_progress_lt.
+    iModIntro. iIntros. by iApply oblG_fuel_lt.
   Qed.
-  Lemma oblG_progress_lt_set L a0 a1 :
+  Lemma oblG_fuel_lt_set L a0 a1 :
     a0 /< a1 →
-    ([∗ set] i ∈ L, oblG_progress i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_progress i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress i c).
+    ([∗ set] i ∈ L, oblG_fuel i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_fuel i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel i c).
   Proof.
     iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
-    iModIntro. iIntros. by iApply oblG_progress_lt.
+    iModIntro. iIntros. by iApply oblG_fuel_lt.
   Qed.
 
-  Lemma oblG_progress_supply_mon k a0 a1 q :
+  Lemma oblG_fuel_supply_mon k a0 a1 q :
     a0 /≤ a1 →
-    oblG_progress_supply k a0 q ⊢ |==> oblG_progress_supply k a1 q.
+    oblG_fuel_supply k a0 q ⊢ |==> oblG_fuel_supply k a1 q.
   Proof.
-    intros LE. rewrite /oblG_progress_supply. apply own_update.
+    intros LE. rewrite /oblG_fuel_supply. apply own_update.
     by apply reservation_map_update, debt_update.
   Qed.
 
-  Lemma oblG_progress_supply_add i a0 a1 q0 q1 :
-    oblG_progress_supply i a0 q0 ∗ oblG_progress_supply i a1 q1
-    ⊢ ∃ b, oblG_progress_supply i b (q0 + q1) ∗ ⌜ b /≤ a0 ∧ b /≤ a1 ⌝.
+  Lemma oblG_fuel_supply_add i a0 a1 q0 q1 :
+    oblG_fuel_supply i a0 q0 ∗ oblG_fuel_supply i a1 q1
+    ⊢ ∃ b, oblG_fuel_supply i b (q0 + q1) ∗ ⌜ b /≤ a0 ∧ b /≤ a1 ⌝.
   Proof.
-    rewrite /oblG_progress_supply. iIntros "[H1 H2]".
+    rewrite /oblG_fuel_supply. iIntros "[H1 H2]".
     iPoseProof (own_op with "[H1 H2]") as "H"; first (iSplitL "H1"; iFrame).
     iEval (rewrite -reservation_map_data_op) in "H".
     destruct (debt_add a0 a1 q0 q1) as (b&Heq&Hle0&Hle1). rewrite Heq.
     iExists _. iSplitL; done.
   Qed.
 
-  Lemma oblG_progress_supply_split i a q0 q1 q :
+  Lemma oblG_fuel_supply_split i a q0 q1 q :
     q = (q0 + q1)%Qp →
-    oblG_progress_supply i a q ⊢ oblG_progress_supply i a q0 ∗ oblG_progress_supply i a q1.
+    oblG_fuel_supply i a q ⊢ oblG_fuel_supply i a q0 ∗ oblG_fuel_supply i a q1.
   Proof.
-    rewrite /oblG_progress_supply. iIntros (Hq) "H".
+    rewrite /oblG_fuel_supply. iIntros (Hq) "H".
     iApply own_op. iEval (rewrite -reservation_map_data_op).
     subst. rewrite debt_split. done.
   Qed.
-  Lemma oblG_progress_supply_div_2 k a q :
-    oblG_progress_supply k a q ⊢ oblG_progress_supply k a (q/2) ∗ oblG_progress_supply k a (q/2).
-  Proof. rewrite oblG_progress_supply_split; first done. by rewrite Qp.div_2. Qed.
-  Lemma oblG_progress_supply_dfrac_valid k a q :
-    oblG_progress_supply k a q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
+  Lemma oblG_fuel_supply_div_2 k a q :
+    oblG_fuel_supply k a q ⊢ oblG_fuel_supply k a (q/2) ∗ oblG_fuel_supply k a (q/2).
+  Proof. rewrite oblG_fuel_supply_split; first done. by rewrite Qp.div_2. Qed.
+  Lemma oblG_fuel_supply_dfrac_valid k a q :
+    oblG_fuel_supply k a q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
   Proof.
-    rewrite /oblG_progress_supply. iIntros "H".
+    rewrite /oblG_fuel_supply. iIntros "H".
     iPoseProof (own_valid with "H") as "%V".
     iPureIntro. rewrite reservation_map_data_valid in V.
     rewrite bank_valid_debt in V. destruct V. auto.
   Qed.
 
-  Lemma oblG_progress_supply_issue i q0 q1 a0 a1 :
+  Lemma oblG_fuel_supply_issue i q0 q1 a0 a1 :
     (q0 + q1 = 1)%Qp →
-    oblG_progress_supply i a0 (q0 + q1)%Qp ⊢ |==> oblG_progress_supply i (a0 /+ a1) (q0 + q1)%Qp ∗ oblG_progress i a1.
+    oblG_fuel_supply i a0 (q0 + q1)%Qp ⊢ |==> oblG_fuel_supply i (a0 /+ a1) (q0 + q1)%Qp ∗ oblG_fuel i a1.
   Proof.
-    rewrite /oblG_progress_supply -own_op. intros Heq. apply own_update.
+    rewrite /oblG_fuel_supply -own_op. intros Heq. apply own_update.
     rewrite -reservation_map_data_op. apply reservation_map_update.
     rewrite Heq. apply debt_owe.
   Qed.
-  Lemma oblG_progress_supply_issue_2 i q0 q1 a0 a1 b :
+  Lemma oblG_fuel_supply_issue_2 i q0 q1 a0 a1 b :
     (q0 + q1 = 1)%Qp →
-    oblG_progress_supply i a0 q0 ∗ oblG_progress_supply i a1 q1
-    ⊢ |==> oblG_progress_supply i (a0 /+ b) q0 ∗ oblG_progress_supply i (a0 /+ b) q1 ∗ oblG_progress i b.
+    oblG_fuel_supply i a0 q0 ∗ oblG_fuel_supply i a1 q1
+    ⊢ |==> oblG_fuel_supply i (a0 /+ b) q0 ∗ oblG_fuel_supply i (a0 /+ b) q1 ∗ oblG_fuel i b.
   Proof.
-    iIntros (Heq) "H". iDestruct (oblG_progress_supply_add with "H") as "(%&H&%)".
-    iMod (oblG_progress_supply_mon _ _ a0 with "H") as "H".
+    iIntros (Heq) "H". iDestruct (oblG_fuel_supply_add with "H") as "(%&H&%)".
+    iMod (oblG_fuel_supply_mon _ _ a0 with "H") as "H".
     { destruct H. auto. }
-    iMod (oblG_progress_supply_issue _ _ _ _ b with "H") as "[H Hp]"; first done.
-    iDestruct (oblG_progress_supply_split _ _ q0 q1 with "H") as "[H0 H1]"; first done.
+    iMod (oblG_fuel_supply_issue _ _ _ _ b with "H") as "[H Hp]"; first done.
+    iDestruct (oblG_fuel_supply_split _ _ q0 q1 with "H") as "[H0 H1]"; first done.
     by iFrame.
   Qed.
 
-  Lemma oblG_progress_spend i a0 a1 q :
-    oblG_progress_supply i a0 q ∗ oblG_progress i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ oblG_progress_supply i a2 q.
+  Lemma oblG_fuel_spend i a0 a1 q :
+    oblG_fuel_supply i a0 q ∗ oblG_fuel i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ oblG_fuel_supply i a2 q.
   Proof.
     rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)".
     { rewrite -reservation_map_data_op.
@@ -502,32 +502,32 @@ Section osat.
     iSimpl. iDestruct "H" as "((%a2 & %EQ & %LE) & H)".
     iExists a2. subst. iModIntro. iSplitR; done.
   Qed.
-  Lemma oblG_progress_spend_2 i a0 a1 q0 q1 c :
-    oblG_progress_supply i a0 q0 ∗ oblG_progress_supply i a1 q1 ∗ oblG_progress i c
-    ⊢ |==> ∃ a2, ⌜(c /+ a2) /≤ a0 ∧ (c /+ a2) /≤ a1⌝ ∗ oblG_progress_supply i a2 q0 ∗ oblG_progress_supply i a2 q1.
+  Lemma oblG_fuel_spend_2 i a0 a1 q0 q1 c :
+    oblG_fuel_supply i a0 q0 ∗ oblG_fuel_supply i a1 q1 ∗ oblG_fuel i c
+    ⊢ |==> ∃ a2, ⌜(c /+ a2) /≤ a0 ∧ (c /+ a2) /≤ a1⌝ ∗ oblG_fuel_supply i a2 q0 ∗ oblG_fuel_supply i a2 q1.
   Proof.
-    iIntros "(H0&H1&H2)". iDestruct (oblG_progress_supply_add with "[H0 H1]") as "(%&H&%)"; first iFrame.
-    iMod (oblG_progress_spend with "[H H2]") as "(%&%&H)"; first iFrame.
-    iDestruct (oblG_progress_supply_split with "H") as "[H0 H1]"; first reflexivity.
+    iIntros "(H0&H1&H2)". iDestruct (oblG_fuel_supply_add with "[H0 H1]") as "(%&H&%)"; first iFrame.
+    iMod (oblG_fuel_spend with "[H H2]") as "(%&%&H)"; first iFrame.
+    iDestruct (oblG_fuel_supply_split with "H") as "[H0 H1]"; first reflexivity.
     iModIntro. iFrame. iPureIntro. destruct H. split.
     - etransitivity; [eapply H0 | eauto].
     - etransitivity; [eauto | eapply H].
   Qed.
 
-  Lemma oblG_progress_alloc D k a :
+  Lemma oblG_fuel_alloc D k a :
     k ∉ D →
-    (own progress_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset D)))
-    ⊢ |==> (own progress_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
-           oblG_progress_supply k a 1 ∗ oblG_progress k a.
+    (own fuel_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset D)))
+    ⊢ |==> (own fuel_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
+           oblG_fuel_supply k a 1 ∗ oblG_fuel k a.
   Proof.
     iIntros (Hk) "Htk".
     iPoseProof (reservation_map_token_alloc_singleton _ _ k (debt a 1 ⋅ cash a) with "Htk") as "[Htk >H]"; auto.
     { rewrite bank_valid_debt_cash. done. }
-    iDestruct "H" as "[H1 H2]". rewrite /oblG_progress_supply /oblG_progress.
+    iDestruct "H" as "[H1 H2]". rewrite /oblG_fuel_supply /oblG_fuel.
     by iFrame.
   Qed.
 
-  (* (** Progress bound rules *) *)
+  (* (** Fuel bound rules *) *)
   (* Lemma oblG_bound_auth_alloc D k a : *)
   (*   k ∉ D → *)
   (*   (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset D))) *)
@@ -728,7 +728,7 @@ Section osat.
         oblG_elem k ∗
         oblG_live k (1/2)%Qp ∗
         oblG_owner k θ (1/2)%Qp ∗
-        oblG_progress k α.
+        oblG_fuel k α.
   Proof.
     iIntros (Hk) "Hsat".
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
@@ -738,7 +738,7 @@ Section osat.
     }
     iMod (oblG_live_alloc _ k with "HS") as "[HS Hs]"; first done.
     iMod (oblG_owner_alloc _ k θ with "HO") as "[HO Ho]"; first done.
-    iMod (oblG_progress_alloc _ k α with "HP") as "(HP & Hps & Hp)"; first done.
+    iMod (oblG_fuel_alloc _ k α with "HP") as "(HP & Hps & Hp)"; first done.
     iPoseProof (oblG_live_div_2 with "Hs") as "[Hs1 Hs2]".
     iPoseProof (oblG_owner_div_2 with "Ho") as "[Ho1 Ho2]".
     iMod (oblG_elem_alloc _ k (olive θ α) with "HE") as "[HE He]"; first (by apply not_elem_of_dom).
@@ -757,7 +757,7 @@ Section osat.
   Lemma osat_obl_progress_one Ω k θ α c :
     (Ω !! k = Some (olive θ α)) →
     (/0 /< c) →
-    osat Ω ∗ oblG_progress k c
+    osat Ω ∗ oblG_fuel k c
     ⊢ |==> ∃ α', osat (<[k:=olive θ α']>Ω) ∗
               ⌜ obl_state_progress (olive θ α) (olive θ α') ⌝.
   Proof.
@@ -765,7 +765,7 @@ Section osat.
     rewrite /osat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     iDestruct "Hk" as "(Hs& Ho& (%&%&Hps))".
-    iMod (oblG_progress_spend _ α0 with "[$Hps $Hp]") as "(%&%&Hps)".
+    iMod (oblG_fuel_spend _ α0 with "[$Hps $Hp]") as "(%&%&Hps)".
     assert (LT : a2 /< α0).
     { apply WFOCM.lt_exists_right. exists c. split; done. }
     iModIntro. iExists a2.
@@ -780,12 +780,12 @@ Section osat.
   Lemma osat_obl_progress Ω (C : obl_cond) :
     (∀ k o, C k o → ∃ d, o = obl_live d) →
     osat Ω ∗
-    ([∗ map] k ↦ o ∈ Ω, (⌜ C k o ⌝ ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress k c) ∨ (⌜ ¬ C k o ⌝))
+    ([∗ map] k ↦ o ∈ Ω, (⌜ C k o ⌝ ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel k c) ∨ (⌜ ¬ C k o ⌝))
     ⊢ |==> ∃ Ω', osat Ω' ∗ ⌜ Ω ↪ₚ Ω' | C ⌝.
   Proof.
     iIntros (HC) "(Hsat & Cs)".
     iAssert (∃ Ω1 Ω2, (⌜ Ω1 ##ₘ Ω2 ∧ Ω = Ω1 ∪ Ω2 ∧ map_Forall (λ k o, C k o) Ω1 ∧ map_Forall (λ k o, ¬ C k o) Ω2 ⌝) ∗
-                      ([∗ map] k ↦ o ∈ Ω1, (⌜ C k o ⌝ ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_progress k c)) ∗
+                      ([∗ map] k ↦ o ∈ Ω1, (⌜ C k o ⌝ ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel k c)) ∗
                       ([∗ map] k ↦ o ∈ Ω2, (⌜ ¬ C k o ⌝))
             )%I with "[Cs]" as "(%& %& (%Disj& %EQO& %CO1& %CO2)& Cs& NCs)".
     { iStopProof. induction Ω using map_ind; iIntros "M".

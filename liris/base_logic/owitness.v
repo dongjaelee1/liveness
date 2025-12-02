@@ -37,7 +37,7 @@ Import owitnessGS.
 Local Existing Instances owitness_inG
   owitnessGpreS_witness.
 
-(* Progress: manage credits for logical progress *)
+(* Witness: manage credits for logical progress *)
 Definition owitnessG_witness `{SI : indexT} `{WFOCM.pack A} `{!owitnessGS Σ} (k : obl_id) (ℵ : A) : iProp Σ :=
   own witness_name (reservation_map_data k (credit_bound ℵ)).
 Global Typeclasses Opaque owitnessG_witness.
@@ -58,7 +58,7 @@ Definition owitness `{SI : indexT} `{WFA : WFOCM.pack A} {ps T} {Σ}
      ([∗ map] k ↦ w ∈ W,
         match w with
         | inl d =>
-            ∃ α, (⌜ WFOCM.leR (wit_progress d) α ⌝) ∗ owitnessG_credit k α
+            ∃ α, (⌜ WFOCM.leR (wit_credit d) α ⌝) ∗ owitnessG_credit k α
         | inr _ =>
             oblG_done k
         end)
@@ -73,8 +73,8 @@ Definition obl_wit `{WFA : WFOCM.pack A}
   map_Forall2 (λ k o w,
                  match o, w with
                  | inl d, inl e =>
-                     WFOCM.leR (wit_progress e) (ξ (obl_progress d))
-                     (* WFOCM.leR (obl_progress d) (wit_progress e) ∧ WFOCM.leR (wit_progress e) (ξ (obl_progress d)) *)
+                     WFOCM.leR (wit_credit e) (ξ (obl_fuel d))
+                     (* WFOCM.leR (obl_fuel d) (wit_credit e) ∧ WFOCM.leR (wit_credit e) (ξ (obl_fuel d)) *)
                  | inr _, inr _ => True
                  | _, _ => False
                  end
@@ -447,7 +447,7 @@ Section owitness.
   (*   rename x into W1, y into W2, z into W3, H0 into Steps, H1 into Step, H2 into IH. *)
 
 
-  (* Lemma obl_wit_progress ξ Ω1 Ω2 W1 (i : T) : *)
+  (* Lemma obl_wit_credit ξ Ω1 Ω2 W1 (i : T) : *)
   (*   Proper (WFOCM.ltR ==> WFOCM.ltR) ξ → *)
   (*   obl_wit ξ Ω1 W1 → *)
   (*   (Ω1 ↪ₚ Ω2 | obl_cond_owner i) → *)

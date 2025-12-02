@@ -9,7 +9,7 @@ Class wit_live_class (wit_count : Type) (wit_count_ltR : relation wit_count) := 
   }.
 
 Record wit_live_state `{Ξl : wit_live_class} := {
-    wit_progress : wit_count;
+    wit_credit : wit_count;
   }.
 
 Definition wit_state `{Ξl : wit_live_class} :=
@@ -31,7 +31,7 @@ Definition wit_state_progress `{Ξl : wit_live_class} : relation wit_state :=
   λ o1 o2,
     (match o1, o2 with
      | inl d1, inl d2 =>
-         wit_count_ltR (wit_progress d2) (wit_progress d1)
+         wit_count_ltR (wit_credit d2) (wit_credit d1)
      | _, _ => False
      end).
 
@@ -117,14 +117,14 @@ Section wit_states.
   Lemma wit_state_progress_live o1 o2 :
     wit_state_progress o1 o2 →
     ∃ d1 d2, o1 = wit_live d1 ∧ o2 = wit_live d2 ∧
-             (wit_count_ltR (wit_progress d2) (wit_progress d1)).
+             (wit_count_ltR (wit_credit d2) (wit_credit d1)).
   Proof using.
     intros. destruct o1, o2; try done. simpl in H. do 2 eexists. split_and; eauto.
   Qed.
   Lemma wit_state_progress_tc_live o1 o2 :
     tc wit_state_progress o1 o2 →
     ∃ d1 d2, o1 = wit_live d1 ∧ o2 = wit_live d2 ∧
-             (wit_count_ltR (wit_progress d2) (wit_progress d1)).
+             (wit_count_ltR (wit_credit d2) (wit_credit d1)).
   Proof using.
     intros. induction H.
     { apply (wit_state_progress_live x y); auto. }

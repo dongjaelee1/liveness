@@ -420,7 +420,7 @@ Section othread.
     iFrame. iApply big_sepS_union; first set_solver. rewrite big_sepS_singleton. iFrame.
   Qed.
 
-  Lemma othread_alloc_obl_1 TP i Ψ q k :
+  Local Lemma othread_alloc_obl_1 TP i Ψ q k :
     oblG_live k (1/2)%Qp ∗ oblG_live k (1/2)%Qp ∗ oblG_owner k i (1/2/2)%Qp ∗ othread TP ∗ othreadG_obls i Ψ q
     ⊢ |==> ⌜k ∉ Ψ⌝ ∗ oblG_live k (1/2)%Qp ∗ oblG_live k (1/2/2)%Qp ∗
            othread TP ∗ othreadG_obls i ({[k]} ∪ Ψ) q ∗ othreadG_owns i k 1.
