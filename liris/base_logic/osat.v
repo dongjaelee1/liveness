@@ -414,16 +414,16 @@ Section osat.
   Qed.
   Lemma oblG_fuel_lt_list L a0 a1 :
     a0 /< a1 →
-    ([∗ list] i ∈ L, oblG_fuel i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_fuel i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel i c).
+    ([∗ list] i ∈ L, oblG_fuel i a1) ⊢ |==> ([∗ list] i ∈ L, oblG_fuel i a0) ∗ ([∗ list] i ∈ L, ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel i c).
   Proof.
-    iIntros (LT) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+    iIntros (LT) "H". rewrite -big_sepL_sep. iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
     iModIntro. iIntros. by iApply oblG_fuel_lt.
   Qed.
   Lemma oblG_fuel_lt_set L a0 a1 :
     a0 /< a1 →
-    ([∗ set] i ∈ L, oblG_fuel i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_fuel i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel i c).
+    ([∗ set] i ∈ L, oblG_fuel i a1) ⊢ |==> ([∗ set] i ∈ L, oblG_fuel i a0) ∗ ([∗ set] i ∈ L, ∃ c, ⌜ /0 /< c ⌝ ∗ oblG_fuel i c).
   Proof.
-    iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+    iIntros (LE) "H". rewrite -big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
     iModIntro. iIntros. by iApply oblG_fuel_lt.
   Qed.
 

@@ -207,7 +207,7 @@ Section owitness.
     by apply reservation_map_update, cmra_update_included, credit_bound_included.
   Qed.
 
-  Lemma owitnessG_credit_spend i a0 a1 :
+  Lemma owitnessG_credit_spend_gen i a0 a1 :
     owitnessG_witness i a0 ∗ owitnessG_credit i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ owitnessG_witness i a2.
   Proof.
     rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)".
@@ -222,9 +222,16 @@ Section owitness.
     iSimpl. iDestruct "H" as "((%a2 & %EQ & %LE) & H)".
     iExists a2. subst. iModIntro. iSplitR; done.
   Qed.
+  Lemma owitnessG_credit_spend i a0 a1 :
+    /0 /< a1 →
+    owitnessG_witness i a0 ∗ owitnessG_credit i a1 ⊢ |==> ∃ a2, ⌜a2 /< a0⌝ ∗ owitnessG_witness i a2.
+  Proof.
+    iIntros (LT) "[Ow Oc]". iMod (owitnessG_credit_spend_gen with "[$]") as "(%&%&$)".
+    iPureIntro. eapply WFOCM.lt_exists_right; eauto.
+  Qed.
 
   Lemma owitnessG_compare i a0 a1 :
-    owitnessG_witness i a0 ∗ owitnessG_credit i a1 ⊢ |==> ⌜ a1 /≤ a0 ⌝.
+    owitnessG_witness i a0 ∗ owitnessG_credit i a1 ⊢ ⌜ a1 /≤ a0 ⌝.
   Proof.
     rewrite -own_op -reservation_map_data_op. iIntros "H".
     iPoseProof (own_valid with "H") as "%". apply reservation_map_data_valid in H0.
@@ -407,6 +414,17 @@ Section owitness.
     apply not_elem_of_dom in LU. set_solver + LU H2.
   Qed.
 
+  Lemma obl_wit_same_wit_alloc_false ξ Ω1 Ω2 W :
+    obl_wit ξ Ω1 W →
+    (Ω1 ↪ₐ Ω2) →
+    obl_wit ξ Ω2 W →
+    False.
+  Proof.
+    intros. destruct H1 as (k& d& LU& EQ). subst.
+    apply obl_wit_dom in H0, H2. rewrite -H0 dom_insert_L in H2.
+    apply not_elem_of_dom in LU. set_solver + LU H2.
+  Qed.
+
   Lemma owitness_obl_wit_step_same_obl ξ Ω W1 W2 :
     obl_wit ξ Ω W1 →
     W1 ↓ₛ W2 →
@@ -427,6 +445,60 @@ Section owitness.
   Proof.
     iIntros (OW1 Prog OW2) "N". inv Prog; first done.
     iApply (owitness_obl_wit_step_same_obl _ Ω W1 W2 with "N"); eauto.
+  Qed.
+
+  Lemma obl_wit_alloc ξ Ω k i a W1 W2 :
+    k ∉ dom Ω →
+    obl_wit ξ Ω W1 ->
+    W1 ↓ₛ∘ W2 ->
+    obl_wit ξ (<[k:=olive i a]> Ω) W2 ->
+    ∃ b, b /≤ (ξ a) ∧ W2 = (<[k:=wlive b]>W1).
+  Proof.
+    intros Nink OW1 ProgW OW2. inv ProgW.
+    { exfalso. eapply obl_wit_same_wit_alloc_false. 1: eapply OW1. 2: eapply OW2.
+      do 2 eexists. split; eauto. by apply not_elem_of_dom. }
+    inv H0.
+    - exfalso. apply wit_states_cond_rel_dom in H1. apply obl_wit_dom in OW1, OW2.
+      rewrite H1 in OW1. rewrite -OW1 in OW2. rewrite dom_insert_L in OW2. set_solver + Nink OW2.
+    - exfalso. apply wit_states_cond_rel_dom in H1. apply obl_wit_dom in OW1, OW2.
+      rewrite H1 in OW1. rewrite -OW1 in OW2. rewrite dom_insert_L in OW2. set_solver + Nink OW2.
+    - apply map_Forall2_insert_inv_l in OW2.
+      2: by apply not_elem_of_dom.
+      destruct OW2 as (w'& W'& EQW2& LUW2& MP& MF). subst.
+      simpl in *. destruct w'; last done.
+      destruct w as [b]. simpl in *.
+      destruct H1 as (?& ?& ?& ?).
+      assert (Dom' : dom W' = dom W1).
+      { apply obl_wit_dom in OW1, MF. by rewrite -OW1 -MF. }
+      destruct (decide (k = x)).
+      2:{ exfalso. apply (f_equal dom) in H1. rewrite !dom_insert_L in H1.
+          apply not_elem_of_dom in LUW2, H0. rewrite Dom' in LUW2, H1. set_solver + n LUW2 H0 H1.
+      }
+      subst. destruct x0 as [c].
+      assert (b = c).
+      { rewrite map_eq_iff in H1. specialize (H1 x). rewrite !lookup_insert_eq in H1. by inv H1. }
+      subst. exists c. split; auto.
+  Qed.
+
+  Lemma owitness_obl_wit_alloc ξ Ω k i a W1 W2 :
+    k ∉ dom Ω →
+    obl_wit ξ Ω W1 ->
+    W1 ↓ₛ∘ W2 ->
+    obl_wit ξ (<[k:=olive i a]> Ω) W2 ->
+    owitness (<[k:=wlive (ξ a)]> W1)
+    ⊢ |==> owitness W2.
+  Proof.
+    iIntros (Nink OW1 ProgW OW2) "N".
+    edestruct obl_wit_alloc as (?& LE& Eq); eauto. subst.
+    rewrite /owitness -!lock. iDestruct "N" as "[N1 NM]".
+    iSplitL "N1".
+    { rewrite !dom_insert_L. done. }
+    assert (Dom : dom Ω = dom W1) by (by apply obl_wit_dom in OW1).
+    assert (LUWk : W1 !! k = None).
+    { apply not_elem_of_dom. rewrite -Dom. auto. }
+    rewrite !(big_sepM_insert _ _ _ _ LUWk). iDestruct "NM" as "[N $]".
+    simpl. iDestruct "N" as "(%&%&Nc)". iFrame.
+    iPureIntro. etransitivity; eauto.
   Qed.
 
   (* Maybe we don't need this *)
