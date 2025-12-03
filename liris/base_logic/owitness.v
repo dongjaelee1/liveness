@@ -501,6 +501,51 @@ Section owitness.
     iPureIntro. etransitivity; eauto.
   Qed.
 
+  Lemma obl_wit_resolve ξ Ω k d P W1 W2 :
+    obl_wit ξ Ω W1 →
+    Ω !! k = Some (obl_live d) →
+    W1 ↓ₛ∘ W2 →
+    obl_wit ξ (<[k:=odone P]> Ω) W2 →
+    W1 ↓ᵣ W2 | wit_cond_one k.
+  Proof.
+    intros OW1 LUOk ProgW OW2. pose proof OW1 as OWk1. pose proof OW2 as OWk2.
+    specialize (OWk1 k). rewrite LUOk in OWk1.
+    specialize (OWk2 k). rewrite lookup_insert_eq in OWk2.
+    inv OWk1. inv OWk2. simpl in *. destruct y, y0; try done.
+    inv ProgW.
+    { exfalso. rewrite -H1 in H3. inv H3. }
+    inv H0.
+    - exfalso. specialize (H5 k). rewrite -H1 -H3 in H5. inv H5. destruct H7. destruct (decide (C k (inl w))).
+      + apply H0 in c. done.
+      + apply H5 in n. done.
+    - intros ?. specialize (H5 i). destruct (decide (i = k)).
+      { subst. rewrite -H1 -H3. econstructor. done. }
+      specialize (OW1 i). specialize (OW2 i). rewrite lookup_insert_ne in OW2; auto.
+      destruct (W1 !! i) eqn:LUWi1.
+      + rewrite LUWi1 in OW1. destruct (Ω !! i) eqn:LUOi.
+        * rewrite LUOi in OW1, OW2. inv OW1. inv OW2. rewrite -H6. rewrite -H6 in H5.
+          inv H5. destruct H10. econstructor. destruct o, y, w0; try done; simpl in *.
+          -- split; intros; first done. destruct (decide (C i (inl w0))).
+             ++ by apply H0 in c.
+             ++ apply H5 in n0. done.
+          -- split; intros; first done. destruct (decide (C i (inr u1))).
+             ++ by apply H0 in c.
+             ++ apply H5 in n0. done.
+        * rewrite LUOi in OW1. inv OW1.
+      + rewrite LUWi1 in OW1. destruct (Ω !! i) eqn:LUOi.
+        * rewrite LUOi in OW1. inv OW1.
+        * rewrite LUOi in OW1, OW2. inv OW2. rewrite -H0. econstructor.
+    - exfalso. destruct H5 as (?& ?& ?& ?). subst.
+      assert (Dom : dom Ω = dom W1) by (apply obl_wit_dom in OW1; auto).
+      assert (LUOx : Ω !! x = None).
+      { apply not_elem_of_dom. apply not_elem_of_dom in H0. rewrite Dom. auto. }
+      specialize (OW2 x).
+      destruct (decide (x = k)).
+      { subst. rewrite H0 in H1. done. }
+      rewrite lookup_insert_eq lookup_insert_ne in OW2; auto.
+      rewrite LUOx in OW2. inv OW2.
+  Qed.
+
   (* Maybe we don't need this *)
   (* Lemma owitness_obl_wit_steps_same_obl ξ Ω W1 W2 : *)
   (*   obl_wit ξ Ω W1 → *)

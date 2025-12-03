@@ -41,11 +41,11 @@ Section curry5.
   Proof. intros. apply uncurry5_proper. Qed.
 End curry5.
 
-Global Instance wp_obl_live_class : obl_live_class Ord.t thread_id Ord.lt.
+Global Instance wp_obl_live_class : obl_live_class Ord.t thread_id (WFOCM.ltR (pack:=ord_wfocm_pack)).
 Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
 Global Instance wp_obl_done_class {Λ : language} : obl_done_class (state Λ).
 Proof. econstructor. done. Qed.
-Global Instance wp_wit_live_class : wit_live_class Ord.t Ord.lt.
+Global Instance wp_wit_live_class : wit_live_class Ord.t (WFOCM.ltR (pack:=ord_wfocm_pack)).
 Proof. econstructor; try apply _. apply Ord.lt_well_founded. Qed.
 
 Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {

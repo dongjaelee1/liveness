@@ -124,6 +124,13 @@ Section obl_states.
   (** Additional definitions *)
   Definition obl_cond_owner (i : obl_ownerid) : obl_cond :=
     λ _ o, match o with | inl d => (obl_owner d = i) | _ => False end.
+  Global Instance obl_cond_owner_dec : ∀ i k w, Decision (obl_cond_owner i k w).
+  Proof using. intros. rewrite /obl_cond_owner. destruct w; solve_decision. Qed.
+
+  Definition obl_cond_one (v : obl_id) : obl_cond :=
+    λ k _, k = v.
+  Global Instance obl_cond_one_dec : ∀ v k w, Decision (obl_cond_one v k w).
+  Proof using. intros. rewrite /obl_cond_one. solve_decision. Qed.
 
   Definition obl_rel_preserves_cond (C : obl_cond) (R : relation obl_state) : Prop :=
     ∀ k o0 o1, C k o0 → R o0 o1 → C k o1.
@@ -212,9 +219,6 @@ Section obl_states.
   Proof using.
     intros k o0 o1 Hc Hr. destruct o0, o1; try done. simpl in *. destruct Hr. inv H. auto.
   Qed.
-
-  Global Instance obl_cond_owner_Decision i : ∀ k o, Decision (obl_cond_owner i k o).
-  Proof using. intros. unfold obl_cond_owner. destruct o; solve_decision. Qed.
 
   Lemma obl_states_cond_rel_dom C R Ω1 Ω2 : obl_states_cond_rel C R Ω1 Ω2 → dom Ω1 = dom Ω2.
   Proof using. intros. eapply map_Forall2_dom_L; eauto. Qed.

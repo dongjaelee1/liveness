@@ -71,9 +71,9 @@ Local Definition oCred_unseal :
 Global Arguments oCred {SI Λ Σ _}.
 
 Local Definition tHas_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  i Ψ q : iProp Σ :=
-  othreadG_obls i Ψ q ∗ othreadG_exec i (q/2) ∗ othreadG_elem i ∗
-  ([∗ set] k ∈ Ψ, obl k ∗ oblG_live k (1/2/2)%Qp ∗ othreadG_owns i k (1/2)%Qp).
+  i G q : iProp Σ :=
+  othreadG_obls i G q ∗ othreadG_exec i (q/2) ∗ othreadG_elem i ∗
+  ([∗ set] k ∈ G, obl k ∗ oblG_live k (1/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
 Local Definition tHas_aux : seal (@tHas_def). Proof. by eexists. Qed.
 Definition tHas := tHas_aux.(unseal).
 Local Definition tHas_unseal :
@@ -135,7 +135,7 @@ Section liveness_preds.
   Proof. unfold_defs. apply _. Qed.
   Global Instance oCred_timeless k a : Timeless (oCred k a).
   Proof. unfold_defs. apply _. Qed.
-  Global Instance tHas_timeless i Ψ q : Timeless (tHas i Ψ q).
+  Global Instance tHas_timeless i G q : Timeless (tHas i G q).
   Proof. unfold_defs. apply _. Qed.
   Global Instance tTerm_timeless i : Timeless (tTerm i).
   Proof. unfold_defs. apply _. Qed.
@@ -295,8 +295,19 @@ Section liveness_preds.
   Qed.
 
   (** tHas rules *)
-  Lemma tHas_op_1 i Ψ1 Ψ2 q1 q2 :
-    tHas i Ψ1 q1 -∗ tHas i Ψ2 q2 -∗ tHas i (Ψ1 ∪ Ψ2) (q1 + q2).
+  Lemma tHas_disj i G1 G2 q1 q2 :
+    tHas i G1 q1 -∗ tHas i G2 q2 -∗ (⌜ G1 ## G2 ⌝).
+  Proof.
+    unfold_defs. iIntros "(T1& E1& #Te1& Es1) (T2& E2& #Te2& Es2)".
+    rewrite elem_of_disjoint. iIntros (x IN1 IN2).
+    iPoseProof (big_sepS_delete _ _ _ IN1 with "Es1") as "[(_&_&Tok1) _]".
+    iPoseProof (big_sepS_delete _ _ _ IN2 with "Es2") as "[(_&_&Tok2) _]".
+    iPoseProof (othreadG_owns_valid_2 with "[$Tok1 $Tok2]") as "%F".
+    done.
+  Qed.
+
+  Lemma tHas_op_1 i G1 G2 q1 q2 :
+    tHas i G1 q1 -∗ tHas i G2 q2 -∗ tHas i (G1 ∪ G2) (q1 + q2).
   Proof.
     unfold_defs. iIntros "(T1& E1& #Te1& Es1) (T2& E2& #Te2& Es2)".
     iPoseProof (othreadG_obls_valid_2 with "[$T1 $T2]") as "%". destruct H.
@@ -305,9 +316,9 @@ Section liveness_preds.
     rewrite Qp.div_add_distr. iFrame. iSplitR; auto.
     rewrite big_sepS_union; auto. iFrame.
   Qed.
-  Lemma tHas_op_2 i Ψ1 Ψ2 q1 q2 :
-    Ψ1 ## Ψ2 →
-    tHas i (Ψ1 ∪ Ψ2) (q1 + q2) -∗ (tHas i Ψ1 q1 ∗ tHas i Ψ2 q2).
+  Lemma tHas_op_2 i G1 G2 q1 q2 :
+    G1 ## G2 →
+    tHas i (G1 ∪ G2) (q1 + q2) -∗ (tHas i G1 q1 ∗ tHas i G2 q2).
   Proof.
     unfold_defs. iIntros (Hd) "(T& E& #Te& Es)".
     iPoseProof (othreadG_obls_op_2 with "T") as "[T1 T2]"; first auto.
@@ -319,9 +330,9 @@ End liveness_preds.
 
 Section foupd.
 
-  Lemma alloc_obl E i Ψ q T P a :
-    tHas i Ψ q -∗
-    |={E}=>o ∃ k, ⌜ k ∉ Ψ ⌝ ∗ tHas i ({[k]} ∪ Ψ) q ∗ obl k ∗ oGoal k T P ∗ oEA k P ∗ oFuel k a ∗ oWit k (owfun a).
+  Lemma alloc_obl E i G q T P a :
+    tHas i G q -∗
+    |={E}=>o ∃ k, ⌜ k ∉ G ⌝ ∗ tHas i ({[k]} ∪ G) q ∗ obl k ∗ oGoal k T P ∗ oEA k P ∗ oFuel k a ∗ oWit k (owfun a).
   Proof.
     unfold_defs. iIntros "(Tbs& Texi& #Tei& Tds)". iIntros (???) "SI".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
@@ -330,13 +341,14 @@ Section foupd.
     assert (∃ k, k ∉ dom Ω1).
     { exists (fresh (dom Ω1)). apply is_fresh. }
     assert (Dom1 : dom Ω1 = dom W1).
-    (* FIXME : apply obl_wit_dom. does not work; type unification not reduced enough? *)
-    { apply (obl_wit_dom _ _ _ OW). }
+    { eapply obl_wit_dom; eauto. }
     destruct H as (k& Nink).
     iMod (osat_alloc_obl _ k i a T P with "S") as "(S& #Bgk& #Bek& Blk& Bok& Bfk)". 1: done.
     iPoseProof (oblG_owner_div_2 with "Bok") as "[Bok Bok2]".
     iMod (othread_alloc_obl with "[$S $T $Tbs $Bek $Blk $Bok2]") as "(S& T& %Nink2& Tbs& Tok& Blk)".
     iPoseProof (othreadG_owns_div_2 with "Tok") as "[Tok Tok2]".
+    iPoseProof (othreadG_owns_div_2 with "Tok2") as "[Tok' Tok2]".
+    iCombine "Tok Tok'" as "Tok". iPoseProof (othreadG_owns_frac_op with "Tok") as "Tok". 1: reflexivity.
     iPoseProof (oassigned_add_obl with "[$A $Bek Bok Tok2]") as "A".
     { iLeft. iFrame. }
     iMod (owitness_alloc_wit _ k (owfun a) with "N") as "[N #Nwk]".
@@ -355,6 +367,56 @@ Section foupd.
     iFrame "Tds". iApply big_sepS_singleton. iFrame. auto.
   Qed.
 
+  Lemma resolve_obl E i G q k T P :
+    k ∈ G →
+    tHas i G q -∗ oblG_goal k T P -∗
+    (∀ σ Θ κs, state_interp σ Θ κs ={E,∅}=∗ (⌜ T σ ⌝ ∗ ▷ P) ∗ (oDone k ={∅,E}=∗ state_interp σ Θ κs)) -∗
+    |={E}=>o tHas i (G ∖ {[k]}) q ∗ oDone k.
+  Proof.
+    unfold_defs. iIntros (InGk) "(Tbs& Texi& #Tei& Tds) #Bgk ACC".
+    iIntros (???) "SI". iMod ("ACC" with "SI") as "[(%HT& HP) ACC]".
+    iPoseProof (big_sepS_delete _ _ _ InGk with "Tds") as "[(#Bek& Blk& Tok) Tds]". iFrame "Texi Tei Tds Bek".
+    iModIntro. iApply oupd_unfold. iRight.
+    rewrite /oproto. iIntros (??) "(S& T& A& N& %OW)".
+    assert (Dom1 : dom Ω1 = dom W1).
+    { eapply obl_wit_dom; eauto. }
+    iPoseProof (osat_elem with "[$S $Bek]") as "%InOk".
+    iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Bok& Tok2) | #Bdk])"; first eauto; cycle 1.
+    { iPoseProof (oblG_live_done_false with "[$Blk $Bdk]") as "%F". done. }
+    iPoseProof (othread_obls_open _ _ k G with "[$T $Tei $Tbs]") as "(Tbs& [Blk2 Bok2]& ACC2)"; first auto.
+    iPoseProof (oblG_owner_agree with "[$Bok $Bok2]") as "(%Eq& %)". subst i0. clear H.
+    iPoseProof ("ACC2" with "[$Blk2 $Bok2]") as "T".
+    iCombine "Tok Tok2" as "Tok". iPoseProof (othreadG_owns_frac_op _ _ _ _ 1 with "Tok") as "Tok".
+    { rewrite -assoc Qp.div_2 Qp.div_2. done. }
+    iMod (othread_delete_obl_frac with "[$T $Tbs $Tok]") as "(T& Tbs& Blk2& Bok2)"; first auto.
+    iCombine "Blk Blk2" as "Blk". iPoseProof (oblG_live_div_2 with "Blk") as "Blk".
+    iCombine "Bok Bok2" as "Bok". iPoseProof (oblG_owner_div_2 with "Bok") as "Bok".
+    iPoseProof (osat_obl_is_live with "[$S $Bek $Blk]") as "(%& %LUOk)".
+    iMod (osat_obl_resolve_one with "[$S $Bek $Bgk $HP $Blk $Bok]") as "[S #Bdk]".
+    iPoseProof (oassigned_add_obl with "[$A $Bek Bdk]") as "A".
+    { iRight. auto. }
+    replace ({[k]} ∪ dom Ω1 ∖ {[k]}) with (dom Ω1); cycle 1.
+    { apply union_difference_L. set_solver. }
+    iModIntro.
+    iExists (<[k:=odone T]> Ω1). iSplitR.
+    { iPureIntro. econstructor 2. eapply (obl_states_step_resolve _ _ _ (obl_cond_one k)).
+      1: apply _.
+      intro x. destruct (decide (x = k)).
+      - subst. rewrite LUOk lookup_insert_eq. econstructor. split; intros; done.
+      - rewrite lookup_insert_ne; auto. destruct (Ω1 !! x) eqn:LUx; econstructor. split; intros; done.
+    }
+    iIntros (W2 [ProgW OW2]).
+    assert (ResolveW : W1 ↓ᵣ W2 | wit_cond_one k) by (eapply obl_wit_resolve; eauto).
+    iMod (owitness_wit_resolve_one _ _ _ ResolveW with "[$N $Bdk]") as "N".
+    iModIntro. rewrite dom_insert_L. replace ({[k]} ∪ dom Ω1) with (dom Ω1) by set_solver.
+    iFrame. iSplitR; first done. iModIntro. iMod ("ACC" with "[$Bdk $Bek]") as "$".
+    iModIntro. auto.
+  Qed.
+
+
+  TODO
+  Lemma acc_obl
+
 End foupd.
 
 Section liveness.
@@ -366,13 +428,13 @@ Section liveness.
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-       ∃ π Ψ K,
-         (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-          ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_fuel ρ Ord.one) ∗
+       ∃ π G K,
+         (⌜G = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i G 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ set] ρ ∈ G, oblG_elem ρ ∗ oblG_fuel ρ Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
          ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                      othreadG_obls i Ψ 1 -∗
-                      ((([∗ set] ρ ∈ Ψ, oblG_fuel ρ Ord.one) ∗
+                      othreadG_obls i G 1 -∗
+                      ((([∗ set] ρ ∈ G, oblG_fuel ρ Ord.one) ∗
                         ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
                          (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_fuel k ψ))) -∗
                       ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
@@ -386,11 +448,11 @@ Section liveness.
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-       ∃ Ψ q,
-         (othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗
-          [∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_fuel ρ Ord.one) ∗
+       ∃ G q,
+         (othreadG_elem i ∗ othreadG_obls i G 1 ∗
+          [∗ set] ρ ∈ G, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_fuel ρ Ord.one) ∗
          ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                      othreadG_obls i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othreadG_owns i ρ true q) -∗
+                      othreadG_obls i G 1 -∗ ([∗ set] ρ ∈ G, othreadG_owns i ρ true q) -∗
                       ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                       ALC (|={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs))
     ⊢ lwp_step s i E e1 ν.
@@ -399,7 +461,7 @@ Section liveness.
     iMod ("H" with "I") as "(%Hstuck& %&%& (#Tei& Tbsi& Bps)& H)".
     iModIntro. iSplitR; first done. iExists Ω1. iSplitR; first done.
     iIntros (??? Hstep).
-    iMod (oforest_progress_one_thread _ _ _ Ψ (gset_to_gmap (true, q) Ψ) with "[S T F Tbsi Bps]")
+    iMod (oforest_progress_one_thread _ _ _ G (gset_to_gmap (true, q) G) with "[S T F Tbsi Bps]")
       as "(%& %Hprog& S& T& F& Tbsi &Tos)".
     { by rewrite dom_gset_to_gmap. }
     { iFrame. iSplitR; first auto. rewrite big_sepM_gset_to_gmap. iApply (big_sepS_impl with "Bps").
@@ -417,13 +479,13 @@ Section liveness.
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-       ∃ π Ψ K,
-         (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-          ([∗ set] ρ ∈ Ψ, oblG_elem ρ ∗ oblG_fuel ρ Ord.one) ∗
+       ∃ π G K,
+         (⌜G = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i G 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+          ([∗ set] ρ ∈ G, oblG_elem ρ ∗ oblG_fuel ρ Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
          ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                      othreadG_obls i Ψ 1 -∗
-                      ((([∗ set] ρ ∈ Ψ, oblG_fuel ρ Ord.one) ∗
+                      othreadG_obls i G 1 -∗
+                      ((([∗ set] ρ ∈ G, oblG_fuel ρ Ord.one) ∗
                         ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
                          (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_fuel k ψ))) -∗
                       ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
@@ -445,13 +507,13 @@ Section liveness.
           ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k false (1/2)) ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_edge π k 1)
         )%I with "[Fos]" as "[Fos Fes]".
       { iApply big_sepM_sep. iApply (big_sepM_impl with "Fos"). iIntros "!>" (???) "A". destruct x. iFrame. }
-      iMod (oforest_progress_one_thread _ _ _ Ψ (gset_to_gmap (false, (1/2)%Qp) Ψ) with "[S T F Tbsi Fos]")
+      iMod (oforest_progress_one_thread _ _ _ G (gset_to_gmap (false, (1/2)%Qp) G) with "[S T F Tbsi Fos]")
         as "(%& %Hprog& S& T& F& Tbsi& Fos)".
       { by rewrite dom_gset_to_gmap. }
       { iFrame. iSplitR; first auto. rewrite big_sepM_gset_to_gmap big_sepS_sep Dom -!big_sepM_dom.
         iSplitR; first auto. iApply (big_sepM_impl with "Fos"). iIntros "!>" (???) "H". by destruct x. }
       iPoseProof (big_sepM_gset_to_gmap with "Fos") as "Fos". iPoseProof ("U" with "[Fes Fos]") as "U".
-      { subst Ψ. rewrite -big_sepM_dom. iPoseProof (big_sepM_sep_2 with "Fos Fes") as "Fs".
+      { subst G. rewrite -big_sepM_dom. iPoseProof (big_sepM_sep_2 with "Fos Fes") as "Fs".
         iApply (big_sepM_impl with "Fs"). iIntros "!>" (???) "H". by destruct x. }
       iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
       { symmetry. eapply fork_thread_ids; eauto. }
@@ -467,9 +529,9 @@ Section liveness.
           ([∗ map] k ↦ _ ∈ K, othreadG_owns i k true (1/2) ∗ oblG_fuel k Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, oblG_fuel k ψ)
         )%I with "[Bps M]" as "[Tos Bps]".
-      { subst Ψ. rewrite -big_sepM_dom -big_sepM_sep. iPoseProof (big_sepM_sep_2 with "Bps M") as "M".
+      { subst G. rewrite -big_sepM_dom -big_sepM_sep. iPoseProof (big_sepM_sep_2 with "Bps M") as "M".
         iApply (big_sepM_impl with "M"). iIntros "!>" (???) "H". destruct x. iDestruct "H" as "((_&B)&C&D)". iFrame. }
-      iMod (oforest_progress_one_thread _ _ _ Ψ (gset_to_gmap (true, (1/2)%Qp) Ψ) with "[S T F Tbsi Tos]")
+      iMod (oforest_progress_one_thread _ _ _ G (gset_to_gmap (true, (1/2)%Qp) G) with "[S T F Tbsi Tos]")
         as "(%& %Hprog& S& T& F& Tbsi& Fos)".
       { by rewrite dom_gset_to_gmap. }
       { iFrame. iSplitR; first auto. rewrite big_sepM_gset_to_gmap big_sepS_sep Dom -!big_sepM_dom.
@@ -479,7 +541,7 @@ Section liveness.
       iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
       { symmetry. eapply fork_thread_ids; eauto. }
       iModIntro. iMod ("H" with "[//] Tbsi [Bps Fos] Efs") as ">[I H]".
-      { iRight. iSplitR; first auto. subst Ψ. rewrite -big_sepM_dom.
+      { iRight. iSplitR; first auto. subst G. rewrite -big_sepM_dom.
         iPoseProof (big_sepM_sep_2 with "Fos Bps") as "H".
         iApply (big_sepM_impl with "H"). iIntros "!>" (???) "H". by destruct x. }
       iModIntro. iExists Ω1, Ω', Ω'.
@@ -491,10 +553,10 @@ Section liveness.
   Lemma ghost_step_wait_obls E ν :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
-       ∃ i Ψ π K,
-         (⌜Ψ = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i Ψ 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
+       ∃ i G π K,
+         (⌜G = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i G 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
-         (othreadG_obls i Ψ 1 -∗
+         (othreadG_obls i G 1 -∗
           (([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2)) ∨
              (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_fuel k ψ))) -∗
           |={∅,E}=> state_interp σ Θ κs ∗ ν))
@@ -520,10 +582,10 @@ Section liveness.
   Lemma ghost_step_alloc_obl E ν :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
-       ∃ i Ψ q,
-         othreadG_elem i ∗ othreadG_obls i Ψ q ∗
+       ∃ i G q,
+         othreadG_elem i ∗ othreadG_obls i G q ∗
          (∃ T P α β, ∀ k,
-            ⌜k ∉ Ψ⌝ -∗ othreadG_obls i ({[k]} ∪ Ψ) q -∗
+            ⌜k ∉ G⌝ -∗ othreadG_obls i ({[k]} ∪ G) q -∗
             oblG_elem k -∗ oblG_goal k T P -∗
             oblG_suspend_bound k α -∗ oblG_suspend k α -∗ oblG_fuel k β -∗
             othreadG_owns i k true (1/2)%Qp -∗ otreeG_elem k -∗
@@ -535,7 +597,7 @@ Section liveness.
     iMod (osat_alloc_obl _ α i  β T P with "S") as "(%k& %Nink& S& #Bgk& #Bek& Blk& Btk& #Btbk& Bok& Bpsk& Bpk)".
     assert (Nink2 : k ∉ dom Ω) by (by apply not_elem_of_dom in Nink).
     iMod (osuspend_alloc_obl _ _ Nink2 with "U") as "(U& #Fek)".
-    iMod (othread_alloc_obl with "[S T Tbs Blk]") as "(S& T& %NinkΨ& Tbs& Tok& Blk)"; first (iFrame; eauto).
+    iMod (othread_alloc_obl with "[S T Tbs Blk]") as "(S& T& %NinkG& Tbs& Tok& Blk)"; first (iFrame; eauto).
     iPoseProof (oblG_owner_div_2 _ _ (1/2)%Qp with "Bok") as "[Bok1 Bok2]".
     iMod (othread_obl_acquire with "[T Tok Bok1]") as "(T& Tok)"; first (iFrame; eauto).
     iPoseProof (othreadG_owns_div_2 _ _ _ (1)%Qp with "Tok") as "[Tok1 Tok2]".
@@ -549,10 +611,10 @@ Section liveness.
   Lemma ghost_step_resolve_obl E ν :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
-       ∃ i Ψ q k T P,
-         othreadG_elem i ∗ othreadG_obls i Ψ q ∗ othreadG_owns i k true (1/2)%Qp ∗ ⌜k ∈ Ψ⌝ ∗
+       ∃ i G q k T P,
+         othreadG_elem i ∗ othreadG_obls i G q ∗ othreadG_owns i k true (1/2)%Qp ∗ ⌜k ∈ G⌝ ∗
          oblG_elem k ∗ oblG_goal k T P ∗ ⌜T σ⌝ ∗ (▷ P) ∗
-         (othreadG_obls i (Ψ ∖ {[k]}) q -∗ oblG_done k -∗
+         (othreadG_obls i (G ∖ {[k]}) q -∗ oblG_done k -∗
           |={∅,E}=> state_interp σ Θ κs ∗ ν))
     ⊢ ghost_step E ν.
   Proof.
@@ -709,10 +771,10 @@ Section liveness.
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-       ∃ Ψ q,
-         (tHas i Ψ 1 ∗ [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+       ∃ G q,
+         (tHas i G 1 ∗ [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
          ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                      tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                      tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                       ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
                       ALC (|={∅,E}=>
                              state_interp σ2 (Θ ∪ dom efs) κs ∗
@@ -726,7 +788,7 @@ Section liveness.
     iApply lwp_step_progress_get_lc_with_obls.
     iIntros (????) "I". iMod ("H" with "I") as "(%HS& (%&%& ((Tbs& Te& #Tei& #Es)& Ds)& H))".
     destruct HS as [_ HS]. iModIntro. iSplitR; first done.
-    iExists Ψ, q. iFrame "Tbs". iSplitL "Ds".
+    iExists G, q. iFrame "Tbs". iSplitL "Ds".
     { iFrame "Tei". iApply (big_sepS_impl with "Ds"). iIntros "!>" (??) "((To& [Be Fe]& Te)& P& _)". iFrame. }
     iIntros (????) "A B Efs".
     iMod ("H" with "[//] [A Te] [B] [Efs]") as ">(I& H& Efs)"; iFrame; auto.
@@ -740,13 +802,13 @@ Section liveness.
     (∀ Θ σ1 κ κs,
        state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-       ∃ π Ψ K,
-         (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-          ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+       ∃ π G K,
+         (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+          ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
          ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                      tHas i Ψ 1 -∗
-                      ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+                      tHas i G 1 -∗
+                      ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                         ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
                          (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
                       ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
@@ -762,7 +824,7 @@ Section liveness.
     iApply lwp_step_progress_get_lc_suspended_obls.
     iIntros (????) "I". iMod ("H" with "I") as "(%HS& (%& %& %& (%& (Tbs& Txi& #Tei& #Es)& (#Bep& #Fep)& Ps& Ws)& H))".
     destruct HS as [_ HS]. iModIntro. iSplitR; first done.
-    iExists π, Ψ, K. iFrame "Tbs".
+    iExists π, G, K. iFrame "Tbs".
     iAssert ([∗ map] k↦'(x, ψ) ∈ K, otreeG_suspend k x i π ψ ∗ (oblG_elem k ∗ otreeG_elem k) ∗ (oblG_elem π ∗ otreeG_elem π) ∗ othreadG_elem i)%I with "[Ws]" as "#HK".
     { iApply (big_sepM_impl with "Ws"). iIntros (???) "!>". destruct x. iIntros "(W&S&A&B&C)". iFrame. }
     iSplitR "Hc Txi H".
@@ -780,7 +842,7 @@ Section liveness.
       + iRight. iFrame "A Bep Fep". 
         iCombine "HK B" as "A". iPoseProof (big_sepM_sep with "A") as "A".
         iApply (big_sepM_impl with "A"). iIntros "!>" (???). destruct x. iIntros "((S&E1&E2&E3)& (O&P))". iFrame.
-        iPoseProof (big_sepS_elem_of_acc _ Ψ k with "Es") as "[$ _]". subst. by apply elem_of_dom.
+        iPoseProof (big_sepS_elem_of_acc _ G k with "Es") as "[$ _]". subst. by apply elem_of_dom.
     - iApply (big_sepS_impl with "Efs"). iIntros "!>" (??) "(?&?&?)". iFrame. done.
     - iApply (lwp_cond_elim with "H Hc").
   Qed.
@@ -799,22 +861,22 @@ Section liveness.
               state_interp σ2 (Θ ∪ dom efs) κs ∗
               lWP e2 @ s; ς; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
        | GetLc =>
-           (∃ Ψ q,
-               (tHas i Ψ 1 ∗ [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+           (∃ G q,
+               (tHas i G 1 ∗ [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
                ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                            tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                            tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                             ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
                             ALC (|={∅,E}=>
                                    state_interp σ2 (Θ ∪ dom efs) κs ∗
                                    lWP e2 @ s; ς; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
        | GetLcSus =>
-           (∃ π Ψ K,
-               (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-                ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+           (∃ π G K,
+               (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+                ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                 ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
                ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                            tHas i Ψ 1 -∗
-                            ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+                            tHas i G 1 -∗
+                            ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                               ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
                                (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
                             ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
@@ -833,10 +895,10 @@ Section liveness.
   Lemma lwp_wait_obls s ς i E e Φ :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
-       ∃ j Ψ π K,
-         (⌜Ψ = dom K⌝ ∗ tHas j Ψ 1 ∗ obl π ∗
+       ∃ j G π K,
+         (⌜G = dom K⌝ ∗ tHas j G 1 ∗ obl π ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x j π ψ (1/2))) ∗
-         (tHas j Ψ 1 -∗
+         (tHas j G 1 -∗
           (([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x j π ψ (1/2)) ∨
              (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns j k (1/2) ∗ oFuel k ψ))) -∗
           |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; ς; i; E {{ Φ }}))
@@ -845,7 +907,7 @@ Section liveness.
     unfold_defs.
     iIntros "H". iApply ghost_step_elim. iApply ghost_step_wait_obls.
     iIntros (???) "I". iMod ("H" with "I") as "(%&%&%&%& (%& (Tbs& Txi& #Tei& #Es)& (#Bep& #Fep)& Ws)& H)".
-    iModIntro. iExists j, Ψ, π, K. iFrame "Tbs".
+    iModIntro. iExists j, G, π, K. iFrame "Tbs".
     iAssert ([∗ map] k↦'(x, ψ) ∈ K, otreeG_suspend k x j π ψ ∗ (oblG_elem k ∗ otreeG_elem k) ∗ (oblG_elem π ∗ otreeG_elem π) ∗ othreadG_elem j)%I with "[Ws]" as "#HK".
     { iApply (big_sepM_impl with "Ws"). iIntros (???) "!>". destruct x. iIntros "(W&S&A&B&C)". iFrame. }
     iSplitR "Txi H".
@@ -859,16 +921,16 @@ Section liveness.
     - iRight. iFrame "A Bep Fep".
       iCombine "HK B" as "A". iPoseProof (big_sepM_sep with "A") as "A".
       iApply (big_sepM_impl with "A"). iIntros "!>" (???). destruct x. iIntros "((S&E1&E2&E3)& (O&P))". iFrame.
-      iPoseProof (big_sepS_elem_of_acc _ Ψ k with "Es") as "[$ _]". subst. by apply elem_of_dom.
+      iPoseProof (big_sepS_elem_of_acc _ G k with "Es") as "[$ _]". subst. by apply elem_of_dom.
   Qed.
 
   Lemma lwp_alloc_obl s ς i E e Φ :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
-       ∃ j Ψ q,
-         tHas j Ψ q ∗
+       ∃ j G q,
+         tHas j G q ∗
          (∃ T P α β, ∀ k,
-            ⌜k ∉ Ψ⌝ -∗ tHas j ({[k]} ∪ Ψ) q -∗
+            ⌜k ∉ G⌝ -∗ tHas j ({[k]} ∪ G) q -∗
             oGoal k T P -∗
             obl_bound k α -∗ obl_sc k α -∗ oFuel k β -∗
             othread_owns j k (1/2)%Qp -∗
@@ -878,7 +940,7 @@ Section liveness.
     unfold_defs.
     iIntros "H". iApply ghost_step_elim. iApply ghost_step_alloc_obl.
     iIntros (???) "I". iMod ("H" with "I") as "(%&%&%& (Tbs& Txi& #Tei& #Es)& %&%&%&%& H)".
-    iModIntro. iExists j, Ψ, q. iFrame "Tbs Tei". iExists T, P, α, β.
+    iModIntro. iExists j, G, q. iFrame "Tbs Tei". iExists T, P, α, β.
     iIntros (k) "% Tbs #Bek #Bgk #Btbk Btk Bpk Tok #Fek".
     iApply ("H" $! k with "[//] [Tbs Txi] [] [] [Btk] [Bpk] [Tok]"); auto.
     iFrame. iFrame "Tei". iApply big_sepS_union. 1: set_solver.
@@ -888,10 +950,10 @@ Section liveness.
   Lemma lwp_resolve_obl s ς i E e Φ :
     (∀ Θ σ κs,
        state_interp σ Θ κs ={E,∅}=∗
-       ∃ j Ψ q k T P,
-         tHas j Ψ q ∗ othread_owns j k (1/2)%Qp ∗ ⌜k ∈ Ψ⌝ ∗
+       ∃ j G q k T P,
+         tHas j G q ∗ othread_owns j k (1/2)%Qp ∗ ⌜k ∈ G⌝ ∗
          oGoal k T P ∗ ⌜T σ⌝ ∗ (▷ P) ∗
-         (tHas j (Ψ ∖ {[k]}) q -∗ oDone k -∗
+         (tHas j (G ∖ {[k]}) q -∗ oDone k -∗
           |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; ς; i; E {{ Φ }}))
     ⊢ lWP e @ s; ς; i; E {{ Φ }}.
   Proof.
@@ -899,7 +961,7 @@ Section liveness.
     iIntros "H". iApply ghost_step_elim. iApply ghost_step_resolve_obl.
     iIntros (???) "I".
     iMod ("H" with "I") as "(%&%&%&%&%&%& (Tbs& Txi& #Tei& #Es)& (Tok& [#Bek #Fek]& #Tej)& %& (#Bgk& _)& %HT& P& H)".
-    iModIntro. iExists j, Ψ, q, k, T, P. iFrame. iFrame "Tei Bek Bgk". iSplitR; first auto. iSplitR; first auto.
+    iModIntro. iExists j, G, q, k, T, P. iFrame. iFrame "Tei Bek Bgk". iSplitR; first auto. iSplitR; first auto.
     iIntros "Tbs #Bdk".
     iApply ("H" with "[Tbs Txi] []"); auto.
     iFrame. iFrame "Tei". iPoseProof (big_sepS_delete _ _ k with "Es") as "[_ Es2]"; auto.
@@ -1063,10 +1125,10 @@ Lemma lwp_lift_pure_step_no_fork_lc `{!Inhabited (state Λ)} s ς i E E' Φ e1 C
   (∀ κ σ1 Θ e2 σ2 efs, C i σ1 → prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
   (∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
   (|={E,E'}=>
-     ∃ Ψ q,
-     (tHas i Ψ 1 ∗
-      [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-     (tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+     ∃ G q,
+     (tHas i G 1 ∗
+      [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+     (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
       ALC (|={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})))
   ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
 Proof.
@@ -1093,12 +1155,12 @@ Lemma lwp_lift_pure_step_no_fork_suspended `{!Inhabited (state Λ)} s ς i E E' 
   (∀ κ σ1 Θ e2 σ2 efs, C i σ1 → prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
   (∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
   (|={E,E'}=>
-     ∃ π Ψ K,
-     (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-      ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+     ∃ π G K,
+     (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+      ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
       ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-     (tHas i Ψ 1 -∗
-      ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+     (tHas i G 1 -∗
+      ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
          (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
       ALC (|={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})))
@@ -1130,19 +1192,19 @@ Lemma lwp_lift_pure_step_no_fork_gen (glc : get_lc) `{!Inhabited (state Λ)} s �
        (∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})
    | GetLc =>
        |={E,E'}=>
-         (∃ Ψ q,
-             (tHas i Ψ 1 ∗
-              [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-             (tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+         (∃ G q,
+             (tHas i G 1 ∗
+              [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+             (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
               ALC (|={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})))
    | GetLcSus =>
        |={E,E'}=>
-         (∃ π Ψ K,
-             (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-              ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+         (∃ π G K,
+             (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+              ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
               ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-             (tHas i Ψ 1 -∗
-              ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+             (tHas i G 1 -∗
+              ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                 ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
                  (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
               ALC (|={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})))
@@ -1193,11 +1255,11 @@ Lemma lwp_lift_atomic_step_fupd_lc {s ς i E1 E2 Φ} e1 :
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
-     ∃ Ψ q,
-       (tHas i Ψ 1 ∗
-        [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+     ∃ G q,
+       (tHas i G 1 ∗
+        [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
        ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                    tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                    tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                     ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
                     ALC (|={E2,E1}=>
                            state_interp σ2 (Θ ∪ dom efs) κs ∗
@@ -1224,13 +1286,13 @@ Lemma lwp_lift_atomic_step_fupd_suspended {s ς i E1 E2 Φ} e1 :
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
-     ∃ π Ψ K,
-       (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-        ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+     ∃ π G K,
+       (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+        ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
        ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                    tHas i Ψ 1 -∗
-                    ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+                    tHas i G 1 -∗
+                    ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                       ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
                        (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
                     ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
@@ -1268,24 +1330,24 @@ Lemma lwp_lift_atomic_step_fupd_gen (glc : get_lc) {s ς i E1 E2 Φ} e1 :
             (ς -∗ from_option Φ False (to_val e2)) ∗
             [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
      | GetLc =>
-         (∃ Ψ q,
-             (tHas i Ψ 1 ∗
-              [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+         (∃ G q,
+             (tHas i G 1 ∗
+              [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
              ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                          tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                          tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                           ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
                           ALC (|={E2,E1}=>
                                  state_interp σ2 (Θ ∪ dom efs) κs ∗
                                  (ς -∗ from_option Φ False (to_val e2)) ∗
                                  [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
      | GetLcSus =>
-         (∃ π Ψ K,
-             (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-              ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+         (∃ π G K,
+             (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+              ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
               ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
              ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                          tHas i Ψ 1 -∗
-                          ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+                          tHas i G 1 -∗
+                          ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                             ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
                              (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
                           ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
@@ -1319,10 +1381,10 @@ Lemma lwp_lift_pure_det_step_no_fork_lc `{!Inhabited (state Λ)} {s ς i E E' Φ
   (∀ σ1 κ Θ e2' σ2 efs', C i σ1 → prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
   (|={E,E'}=>
-     ∃ Ψ q,
-     (tHas i Ψ 1 ∗
-      [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-     (tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+     ∃ G q,
+     (tHas i G 1 ∗
+      [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+     (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
       ALC (|={E',E}=> lWP e2 @ s; ς; i; E {{ Φ }})))
   ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
 Proof.
@@ -1338,12 +1400,12 @@ Lemma lwp_lift_pure_det_step_no_fork_suspended `{!Inhabited (state Λ)} {s ς i 
   (∀ σ1 κ Θ e2' σ2 efs', C i σ1 → prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
   (∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
   (|={E,E'}=>
-     ∃ π Ψ K,
-     (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-      ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+     ∃ π G K,
+     (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+      ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
       ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-     (tHas i Ψ 1 -∗
-      ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+     (tHas i G 1 -∗
+      ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
          (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
       ALC (|={E',E}=> lWP e2 @ s; ς; i; E {{ Φ }})))
@@ -1365,19 +1427,19 @@ Lemma lwp_lift_pure_det_step_no_fork_gen (glc : get_lc) `{!Inhabited (state Λ)}
        (lWP e2 @ s; ς; i; E {{ Φ }})
    | GetLc =>
        |={E,E'}=>
-         (∃ Ψ q,
-             (tHas i Ψ 1 ∗
-              [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-             (tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+         (∃ G q,
+             (tHas i G 1 ∗
+              [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+             (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
               ALC (|={E',E}=> lWP e2 @ s; ς; i; E {{ Φ }})))
    | GetLcSus =>
        |={E,E'}=>
-         (∃ π Ψ K,
-             (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-              ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+         (∃ π G K,
+             (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+              ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
               ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-             (tHas i Ψ 1 -∗
-              ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+             (tHas i G 1 -∗
+              ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                 ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
                  (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
               ALC (|={E',E}=> lWP e2 @ s; ς; i; E {{ Φ }})))
@@ -1415,10 +1477,10 @@ Lemma lwp_pure_step_lc `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ C :
   φ →
   PureExecCond C ς i →
   (Nat.iter n (λ P, |={E,E'}=>
-                 ∃ Ψ q,
-                 (tHas i Ψ 1 ∗
-                  [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-                 (tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                 ∃ G q,
+                 (tHas i G 1 ∗
+                  [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+                 (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                   ALC (|={E',E}=> P)))
      (£n n -∗ (lWP e2 @ s; ς; i; E {{ Φ }})))
   ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
@@ -1447,12 +1509,12 @@ Lemma lwp_pure_step_suspended `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ
   φ →
   PureExecCond C ς i →
   (Nat.iter n (λ P, |={E,E'}=>
-                 ∃ π Ψ K,
-                 (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-                  ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+                 ∃ π G K,
+                 (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+                  ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                   ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-                 (tHas i Ψ 1 -∗
-                  ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+                 (tHas i G 1 -∗
+                  ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                     ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
                      (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
                   ALC (|={E',E}=> P)))
@@ -1487,20 +1549,20 @@ Lemma lwp_pure_step_gen (glc : get_lc) `{!Inhabited (state Λ)} s ς i E E' e1 e
        (lWP e2 @ s; ς; i; E {{ Φ }})
    | GetLc =>
        (Nat.iter n (λ P, |={E,E'}=>
-                      ∃ Ψ q,
-                      (tHas i Ψ 1 ∗
-                       [∗ set] ρ ∈ Ψ, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-                      (tHas i Ψ 1 -∗ ([∗ set] ρ ∈ Ψ, othread_owns i ρ q) -∗
+                      ∃ G q,
+                      (tHas i G 1 ∗
+                       [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+                      (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                        ALC (|={E',E}=> P)))
           (£n n -∗ (lWP e2 @ s; ς; i; E {{ Φ }})))
    | GetLcSus =>
        (Nat.iter n (λ P, |={E,E'}=>
-                      ∃ π Ψ K,
-                      (⌜Ψ = dom K⌝ ∗ tHas i Ψ 1 ∗ obl π ∗
-                       ([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+                      ∃ π G K,
+                      (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
+                       ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                        ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-                      (tHas i Ψ 1 -∗
-                       ((([∗ set] ρ ∈ Ψ, oFuel ρ Ord.one) ∗
+                      (tHas i G 1 -∗
+                       ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
                          ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
                           (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
                        ALC (|={E',E}=> P)))
