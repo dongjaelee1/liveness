@@ -493,38 +493,38 @@ End oupd.
 (* W witnesses progresses of obligations; it's instantiated using fair scheduler in the adequacy proof *)
 
 (* Ensure progress of thread i's obligations and every live witnesses. *)
-Definition oprog `{SI : indexT} `{!lirisGS Λ Σ} Θ i : iPropO Σ -d> iPropO Σ :=
+Definition oprog `{SI : indexT} `{!lirisGS Λ Σ} Θ1 Θ2 i : iPropO Σ -d> iPropO Σ :=
   (λ P,
      ∀ (Ω1 : obl_states) (W1 : wit_states),
-     (oproto Ω1 W1 Θ) ={∅}=∗
+     (oproto Ω1 W1 Θ1) ={∅}=∗
      ∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | obl_cond_owner i)⌝) ∗
      ∀ W2, (⌜(W1 ↓ₚ W2 | wit_cond_live) ∧ obl_wit owfun Ω2 W2 ⌝) ={∅}=∗
-     (oproto Ω2 W2 Θ) ∗ P)%I.
+     (oproto Ω2 W2 Θ2) ∗ P)%I.
 
-Notation "'@={' Θ , i '}=↓' P" := (oprog Θ i P) (at level 99, P at level 200, format "@={ Θ , i }=↓  P").
+Notation "'@={' Θ1 , Θ2 , i '}=↓' P" := (oprog Θ1 Θ2 i P) (at level 99, P at level 200, format "@={ Θ1 , Θ2 , i }=↓  P").
 
 Section oprog.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
 
-  Global Instance oprog_ne Θ i :
-    NonExpansive (oprog Θ i).
+  Global Instance oprog_ne Θ1 Θ2 i :
+    NonExpansive (oprog Θ1 Θ2 i).
   Proof.
     intros n P1 P2 HP. rewrite /oprog. do 15 (f_equiv || done).
   Qed.
-  Global Instance oprog_proper Θ i :
-    Proper ((≡) ==> (≡)) (oprog Θ i).
+  Global Instance oprog_proper Θ1 Θ2 i :
+    Proper ((≡) ==> (≡)) (oprog Θ1 Θ2 i).
   Proof.
     intros P P' ?. apply equiv_dist=>n. apply oprog_ne. apply equiv_dist. done.
   Qed.
 
-  Lemma oprog_mono Θ i P Q : (P ⊢ Q) → (@={Θ,i}=↓ P) ⊢ (@={Θ,i}=↓ Q).
+  Lemma oprog_mono Θ1 Θ2 i P Q : (P ⊢ Q) → (@={Θ1,Θ2,i}=↓ P) ⊢ (@={Θ1,Θ2,i}=↓ Q).
   Proof.
     intros Hent. rewrite /oprog. iIntros "P % % I".
     iMod ("P" with "I") as "(%& $& P)". iModIntro.
     iIntros (??). iMod ("P" with "[//]") as "[$ P]".
     by iApply Hent.
   Qed.
-  Lemma oprog_wand_l Θ i P Q : (P -∗ Q) ∗ (@={Θ,i}=↓ P) ⊢ (@={Θ,i}=↓ Q).
+  Lemma oprog_wand_l Θ1 Θ2 i P Q : (P -∗ Q) ∗ (@={Θ1,Θ2,i}=↓ P) ⊢ (@={Θ1,Θ2,i}=↓ Q).
   Proof.
     iIntros "[PQ P]".
     rewrite /oprog. iIntros "% % I".
@@ -533,17 +533,29 @@ Section oprog.
     by iApply "PQ".
   Qed.
 
-  Global Instance oprog_ent_proper Θ i : Proper ((⊢) ==> (⊢)) (oprog Θ i).
+  Global Instance oprog_ent_proper Θ1 Θ2 i : Proper ((⊢) ==> (⊢)) (oprog Θ1 Θ2 i).
   Proof. intros P Q PQ. by apply oprog_mono. Qed.
-  Global Instance oprog_flip_ent_proper Θ i : Proper (flip (⊢) ==> flip (⊢)) (oprog Θ i).
+  Global Instance oprog_flip_ent_proper Θ1 Θ2 i : Proper (flip (⊢) ==> flip (⊢)) (oprog Θ1 Θ2 i).
   Proof. intros P Q PQ; by apply oprog_mono. Qed.
-  Global Instance oprog_equiv_proper Θ i : Proper ((≡) ==> (≡)) (oprog Θ i) := ne_proper _.
+  Global Instance oprog_equiv_proper Θ1 Θ2 i : Proper ((≡) ==> (≡)) (oprog Θ1 Θ2 i) := ne_proper _.
 
-  Global Instance elim_oprog (p : bool) Θ i P Q :
-    ElimModal True p false (@={Θ,i}=↓ P) P (@={Θ,i}=↓ Q) Q.
+  Global Instance elim_oprog (p : bool) Θ1 Θ2 i P Q :
+    ElimModal True p false (@={Θ1,Θ2,i}=↓ P) P (@={Θ1,Θ2,i}=↓ Q) Q.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
     iIntros "_ [HP HPQ]". iApply (oprog_wand_l with "[$HPQ $HP]").
+  Qed.
+
+  Lemma fupd_oprog Θ1 Θ2 i P : (|={∅}=> @={Θ1,Θ2,i}=↓ P) ⊢ @={Θ1,Θ2,i}=↓ P.
+  Proof.
+    rewrite /oprog. iIntros "H % % IP". iMod ("H" with "IP") as "H". done.
+  Qed.
+  Global Instance elim_fupd_oprog (p : bool) Θ1 Θ2 i P Q :
+    ElimModal True p false (|={∅}=> P) P (@={Θ1,Θ2,i}=↓ Q) (@={Θ1,Θ2,i}=↓ Q).
+  Proof.
+    rewrite /ElimModal bi.intuitionistically_if_elim //=.
+    iIntros "_ [HP HPQ]". iApply fupd_oprog. iMod "HP".
+    iModIntro. iApply ("HPQ" with "HP").
   Qed.
 
 End oprog.
@@ -555,8 +567,8 @@ Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
       (state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
       |={Θ,σ1}=>o
       (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
-      @={Θ,i}=↓
-      ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) ={∅}=∗
+      ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
+      @={Θ,(Θ ∪ dom efs),i}=↓
       ALC (|={(Θ ∪ dom efs),σ2}=>o
            |={∅,E}=>
            (state_interp σ2 (Θ ∪ dom efs) κs) ∗ ν e2 efs))%I.
@@ -599,10 +611,11 @@ Section lwp_step.
     iIntros "#Hmono"; iIntros (???) "Hwp". rewrite /lwp_step.
     iIntros (????) "H". iSpecialize ("Hwp" with "[$]").
     iMod "Hwp". iModIntro. iMod "Hwp" as "($& Hwp)".
-    iModIntro. iMod "Hwp".
-    iIntros (???) "H0". iDestruct ("Hwp" with "[$]") as ">Hwp".
-    iModIntro. iMod "Hwp" as ">Hwp".
-    iModIntro. iMod "Hwp" as "[$ H]". iModIntro.
+    iModIntro.
+    iIntros (???) "H0".
+    iDestruct ("Hwp" with "[$]") as ">>>Hwp".
+    iModIntro. iMod "Hwp" as "Hwp".
+    iModIntro. iDestruct "Hwp" as "[$ H]".
     by iApply "Hmono".
   Qed.
 
@@ -879,7 +892,7 @@ Proof.
   - intros lwp Hlwp n (((i1&E1)&e1)&Φ1) (((i2&E2)&e2)&Φ2)
       (((?%leibniz_equiv & ?%leibniz_equiv) & ?%leibniz_equiv) & ?); simplify_eq/=.
     rewrite /curry4 /lwp_pre /lwp_step.
-    do 28 (f_equiv || done). by apply pair_ne.
+    do 27 (f_equiv || done). by apply pair_ne.
 Qed.
 
 (* take the least fixpoint of the above definition, with partial sate information *)
@@ -1035,8 +1048,8 @@ Proof.
   iIntros (????) "H". iMod ("IH" with "[$]") as "H".
   iModIntro. iMod "H" as "[% IH]".
   iModIntro. iSplit; [by destruct s1, s2|clear H0].
-  iMod "IH". iIntros (????). iDestruct ("IH" with "[//]") as ">IH".
-  iModIntro. iMod "IH" as ">IH". iModIntro.
+  iIntros (????). iMod ("IH" with "[//]") as ">IH".
+  iMod "IH" as "IH". iModIntro.
   iMod "IH" as "($& [IH Efs])". iDestruct "IH" as "[IH _]".
   iModIntro. iFrame.
   iApply (big_sepM_impl with "Efs"). iIntros "!>" (k ef _). iIntros "[H _]". done.
@@ -1062,9 +1075,8 @@ Proof.
   iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
   iMod "IH". iModIntro. iMod "IH" as "(%& IH)". iModIntro.
   iSplit; [by destruct s1, s2|clear H0].
-  iMod "IH". iIntros (????). iDestruct ("IH" with "[//]") as ">IH".
-  iModIntro. iMod "IH" as ">IH".
-  iModIntro. iMod "IH" as "[$ IH]".
+  iIntros (????). iMod ("IH" with "[//]") as ">IH".
+  iMod "IH". iModIntro. iMod "IH" as "[$ IH]".
   iMod "Hclose" as "_". iModIntro.
   iDestruct "IH" as "([IH _]& Efs)".
   iSplitR "Efs".
@@ -1095,9 +1107,9 @@ Proof.
     done.
   }
   iIntros (????) "SI". iMod ("H" with "SI") as "H". iMod "H".
-  iModIntro. iMod "H" as "[$ H]". iModIntro. iMod "H".
+  iModIntro. iMod "H" as "[$ H]". iModIntro.
   iIntros (??? STEP). iMod ("H" with "[//]") as "H".
-  iModIntro. iMod "H" as ">>(SI& H& Efs)".
+  iMod "H". iMod "H" as ">(SI& H& Efs)".
   destruct s.
   - rewrite !lwp_unfold /lwp_pre. destruct (to_val e2) as [v2|] eqn:He2.
     + iMod ("H" with "SI") as "H".
@@ -1146,11 +1158,12 @@ Proof.
   iIntros (????) "SI". iMod ("IH" with "SI") as "IH".
   iModIntro. iMod "IH" as "(%& IH)". iModIntro. iSplit.
   { iPureIntro. destruct s; last done. unfold reducible in *. naive_solver eauto using fill_step. }
-  iMod "IH". iIntros (e2 σ2 efs Hstep).
+  iIntros (e2 σ2 efs Hstep).
   destruct (fill_step_inv i e σ1 Θ κ e2 σ2 efs) as (e2'&->&?); auto.
   iDestruct ("IH" with "[//]") as ">IH".
-  iModIntro. iMod "IH" as ">IH". iModIntro. iMod "IH" as "(SI& IH& Efs)".
-  iModIntro. iFrame. iSplitL "IH HΦ".
+  iMod "IH" as ">IH". iModIntro. iMod "IH".
+  iModIntro. iDestruct "IH" as "(SI& IH& Efs)".
+  iFrame. iSplitL "IH HΦ".
   - iDestruct "IH" as "[IH _]". by iApply "IH".
   - by setoid_rewrite bi.and_elim_r.
 Qed.
@@ -1171,10 +1184,9 @@ Proof.
   iIntros (????) "SI". iMod ("IH" with "[$]") as "IH".
   iModIntro. iMod "IH" as "(%& IH)". iSplitR.
   { destruct s; eauto using reducible_fill_inv. }
-  iModIntro. iMod "IH".
-  iIntros (e2 σ2 efs Hstep). iDestruct ("IH" with "[]") as ">IH".
+  iModIntro. iIntros (e2 σ2 efs Hstep). iDestruct ("IH" with "[]") as ">IH".
   { eauto using fill_step. }
-  iModIntro. iMod "IH" as ">IH". iModIntro. iMod "IH" as "(SI& IH& Efs)".
+  iMod "IH" as ">IH". iModIntro. iMod "IH" as "(SI& IH& Efs)".
   iModIntro. iFrame. iSplitR "Efs".
   - iDestruct "IH" as "[IH _]". by iApply "IH".
   - by setoid_rewrite bi.and_elim_r.
