@@ -41,8 +41,8 @@ liris/algebra/ordinal_existential_properties.v
 # liris/base_logic/digraph.v
 liris/base_logic/thread_map.v
 liris/base_logic/ghost_lock.v
+liris/base_logic/glsat.v
 liris/base_logic/witness.v
-liris/base_logic/osat.v
 liris/base_logic/othread.v
 liris/base_logic/owitness.v
 # liris/base_logic/otree.v
