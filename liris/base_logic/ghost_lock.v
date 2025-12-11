@@ -1,17 +1,7 @@
 From iris.proofmode Require Import proofmode.
-(* Only to import rc; TODO refactor *)
+(* Only to import rc; FIXME : refactor *)
 From transfinite.stepindex Require Import utils.
-
-Definition prop_of (T : Type) := (T → Prop).
-
-Global Instance prop_of_iff (T : Type) : Equiv (prop_of T) :=
-  λ P1 P2, ∀ (s : T), (P1 s) ↔ (P2 s).
-
-Global Instance prop_of_iff_equivalence T : Equivalence (@equiv _ (prop_of_iff T)).
-Proof. firstorder. Qed.
-
-Canonical Structure prop_ofO `{SI : indexT} (T : Type) := leibnizO (prop_of T).
-
+From liris.algebra Require Export wfocm auth_mra.
 
 (* FIXME : Move to somewhere else *)
 Lemma sn_tc {X} (R : X → X → Prop) (x : X): sn R x ↔ sn (tc R) x.
@@ -23,75 +13,78 @@ Proof.
   - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
 Qed.
 
-Class obl_live_class (obl_count obl_ownerid : Type) (obl_count_ltR : relation obl_count) := {
-    obl_count_ltR_well_founded : well_founded obl_count_ltR;
-    #[global] obl_count_ltR_Transitive :: Transitive obl_count_ltR;
-    #[global] obl_ownerid_EqDecision :: EqDecision obl_ownerid;
+Class ghost_lock_class := {
+    gl_version : Type;
+    gl_fuel : Type;
+    gl_owner : Type;
+    (* for auth_mra *)
+    #[global] gl_version_auth_mra :: auth_mra_eq_class gl_version;
+    (* for gmap *)
+    #[global] gl_version_EqDecision :: EqDecision gl_version;
+    #[global] gl_Version_Countable :: Countable gl_version;
+    (* for wfocm *)
+    #[global] gl_fuel_wfocm :: WFOCM.pack gl_fuel;
+    #[global] gl_owner_EqDecision :: EqDecision gl_owner;
   }.
 
-Record obl_live_state `{Ξl : obl_live_class} := {
-    obl_owner : obl_ownerid;
-    obl_fuel : obl_count;
-  }.
+(* Core relations *)
+Definition glv_le `{GL : ghost_lock_class} : gl_version → gl_version → Prop := auth_mra_R.
+Definition glf_lt `{GL : ghost_lock_class} : gl_fuel → gl_fuel → Prop := WFOCM.ltR.
 
-Class obl_done_class (obl_ps : Type) := {
-    obl_done_class_placeholder : unit;
-  }.
+Variant ghost_lock `{GL : ghost_lock_class} : Type :=
+  | gl_locked (ver : gl_version) (fuel : gl_fuel) (owner : gl_owner)
+  | gl_unlocked (ver : gl_version)
+  | gl_retired (ver : gl_version)
+.
 
-Record obl_done_state `{Ξd : obl_done_class} := {
-    obl_atom : prop_of obl_ps;
-  }.
-
-Definition obl_state `{Ξl : obl_live_class} `{Ξd : obl_done_class} :=
-  sum obl_live_state obl_done_state.
-
-Definition obl_live `{Ξl : obl_live_class} `{Ξd : obl_done_class} (d : obl_live_state) : obl_state :=
-  inl d.
-
-Definition obl_done `{Ξl : obl_live_class} `{Ξd : obl_done_class} (d : obl_done_state) : obl_state :=
-  inr d.
-
-Definition olive `{Ξl : obl_live_class} `{Ξd : obl_done_class} θ α :=
-  obl_live (Build_obl_live_state _ _ _ _ θ α).
-Definition odone `{Ξl : obl_live_class} `{Ξd : obl_done_class} (P : prop_of obl_ps) :=
-  obl_done (Build_obl_done_state _ _ P).
-
-(* Transition to make logical progress that can obtain a later. *)
-Definition obl_state_progress `{Ξl : obl_live_class} `{Ξd : obl_done_class} : relation obl_state :=
-  λ o1 o2,
-    (match o1, o2 with
-     | inl d1, inl d2 =>
-         (obl_owner d1 = obl_owner d2) ∧ obl_count_ltR (obl_fuel d2) (obl_fuel d1)
-     | _, _ => False
-     end).
-
-(* Transition to resolve a liveness obligation. *)
-Definition obl_state_resolve `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) : relation obl_state :=
-  λ o1 o2,
-    (match o1, o2 with
-     | inl _, inr d =>
-         obl_atom d s
-     | _, _ => False
-     end).
+Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
+  | ghost_lock_progress
+      ver fuel1 fuel2 owner1 owner2
+      (LTfuel : glf_lt fuel2 fuel1)
+    :
+    ghost_lock_step (gl_locked ver fuel1 owner1) (gl_locked ver fuel2 owner2)
+  | ghost_lock_unlock
+      ver fuel owner
+    :
+    ghost_lock_step (gl_locked ver fuel owner) (gl_unlocked ver)
+  | ghost_lock_free
+      ver
+    :
+    ghost_lock_step (gl_unlocked ver) (gl_unlocked ver)
+  | ghost_lock_lock
+      ver1 ver2 fuel owner
+      (NEver : ver1 ≠ ver2)
+      (GEver : glv_le ver1 ver2)
+    :
+    ghost_lock_step (gl_unlocked ver1) (gl_locked ver2 fuel owner)
+  | ghost_lock_retire
+      ver
+    :
+    ghost_lock_step (gl_unlocked ver) (gl_retired ver)
+  | ghost_lock_done
+      ver
+    :
+    ghost_lock_step (gl_retired ver) (gl_retired ver)
+.
 
 (** To a map *)
-Definition obl_id := positive.
+Definition gl_id := positive.
 
-Notation obl_ids := (gset obl_id).
-Notation obl_states := (gmap obl_id obl_state).
+Notation gl_ids := (gset gl_id).
+Notation ghost_locks := (gmap gl_id ghost_lock).
 
-Definition obl_cond `{Ξl : obl_live_class} `{Ξd : obl_done_class} := (obl_id → obl_state → Prop).
-Definition obl_states_cond_rel `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) (R : obl_state → obl_state → Prop) : relation obl_states :=
-  λ Ω1 Ω2, map_Forall2 (λ k o1 o2, (C k o1 → R o1 o2) ∧ ((¬ C k o1) → o1 = o2)) Ω1 Ω2.
+Definition gl_cond `{GL : ghost_lock_class} := (gl_id → ghost_lock → Prop).
+Definition gls_cond_rel `{GL : ghost_lock_class} (C : gl_cond) (R : ghost_lock → ghost_lock → Prop) : ghost_locks → ghost_locks → Prop :=
+  λ Ω1 Ω2, map_Forall2 (λ k g1 g2, (C k g1 → R g1 g2) ∧ ((¬ C k g1) → g1 = g2)) Ω1 Ω2.
 
-Definition obl_states_progress `{Ξl : obl_live_class} `{Ξd : obl_done_class} (C : obl_cond) : relation obl_states :=
-  obl_states_cond_rel C obl_state_progress.
+Definition gls_progress `{GL : ghost_lock_class} (C : gl_cond) : ghost_locks → ghost_locks → Prop :=
+  gls_cond_rel C ghost_lock_progress.
 
 Notation "A ↪ₚ B | C" := (obl_states_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
 Notation "A ↪ₚ⁺ B | C" := (tc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⁺  B  |  C").
 Notation "A ↪ₚ⋆ B | C" := (rtc (obl_states_progress C) A B) (at level 20, format "A  ↪ₚ⋆  B  |  C").
 
-Definition obl_states_resolve `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) (C : obl_cond) : relation obl_states :=
+Definition obl_states_resolve `{Ξl : obl_live_class} `{Ξd : obl_done_class} (s : obl_ps) (C : gl_cond) : relation obl_states :=
   obl_states_cond_rel C (obl_state_resolve s).
 
 Notation "A ↪ᵣ B @ s | C" := (obl_states_resolve s C A B) (at level 20, format "A  ↪ᵣ  B  @  s  |  C").
@@ -122,17 +115,17 @@ Section obl_states.
   Context `{Ξl : obl_live_class} `{Ξd : obl_done_class}.
 
   (** Additional definitions *)
-  Definition obl_cond_owner (i : obl_ownerid) : obl_cond :=
+  Definition gl_cond_owner (i : obl_ownerid) : gl_cond :=
     λ _ o, match o with | inl d => (obl_owner d = i) | _ => False end.
-  Global Instance obl_cond_owner_dec : ∀ i k w, Decision (obl_cond_owner i k w).
-  Proof using. intros. rewrite /obl_cond_owner. destruct w; solve_decision. Qed.
+  Global Instance gl_cond_owner_dec : ∀ i k w, Decision (gl_cond_owner i k w).
+  Proof using. intros. rewrite /gl_cond_owner. destruct w; solve_decision. Qed.
 
-  Definition obl_cond_one (v : obl_id) : obl_cond :=
+  Definition gl_cond_one (v : gl_id) : gl_cond :=
     λ k _, k = v.
-  Global Instance obl_cond_one_dec : ∀ v k w, Decision (obl_cond_one v k w).
-  Proof using. intros. rewrite /obl_cond_one. solve_decision. Qed.
+  Global Instance gl_cond_one_dec : ∀ v k w, Decision (gl_cond_one v k w).
+  Proof using. intros. rewrite /gl_cond_one. solve_decision. Qed.
 
-  Definition obl_rel_preserves_cond (C : obl_cond) (R : relation obl_state) : Prop :=
+  Definition obl_rel_preserves_cond (C : gl_cond) (R : relation obl_state) : Prop :=
     ∀ k o0 o1, C k o0 → R o0 o1 → C k o1.
 
   (** Properties *)
@@ -215,7 +208,7 @@ Section obl_states.
     - rewrite -H in H2. inv H2. econstructor.
   Qed.
 
-  Lemma obl_state_progress_cond_owner i : obl_rel_preserves_cond (obl_cond_owner i) obl_state_progress.
+  Lemma obl_state_progress_cond_owner i : obl_rel_preserves_cond (gl_cond_owner i) obl_state_progress.
   Proof using.
     intros k o0 o1 Hc Hr. destruct o0, o1; try done. simpl in *. destruct Hr. inv H. auto.
   Qed.

@@ -149,3 +149,23 @@ Section auth_mra.
 End auth_mra.
 
 Global Typeclasses Opaque auth_mra_auth auth_mra_know.
+
+(* Properties needed to use the full set of rules *)
+Class auth_mra_class (A : Type) := {
+    auth_mra_R : A → A → Prop;
+    #[global] auth_mra_R_PreOrder :: PreOrder auth_mra_R;
+    #[global] auth_mra_equiv :: Equiv A;
+    #[global] auth_mra_equiv_Reflexive :: Reflexive (≡@{A});
+    #[global] auth_mra_AntiSymm :: AntiSymm (≡@{A}) auth_mra_R;
+    #[global] auth_mra_Proper :: Proper (((≡@{A}) ==> (≡@{A}) ==> iff)) auth_mra_R;
+  }.
+
+Class auth_mra_eq_class (A : Type) := {
+    auth_mra_eq_R : A → A → Prop;
+    #[global] auth_mra_eq_R_PreOrder :: PreOrder auth_mra_eq_R;
+    #[global] auth_mra_eq_AntiSymm :: AntiSymm (=@{A}) auth_mra_eq_R;
+    #[global] auth_mra_eq_Proper :: Proper (((=@{A}) ==> (=@{A}) ==> iff)) auth_mra_eq_R;
+  }.
+
+Global Instance auth_mra_eq_instance `{AMEC : auth_mra_eq_class A} : auth_mra_class A.
+Proof. destruct AMEC. econstructor; eauto. Qed.
