@@ -45,12 +45,14 @@ Module glsatGS.
   Class glsatGpreS `{SI : indexT} `{GL : ghost_lock_class} (Σ : gFunctors) : Set :=
     GlsatGpreS {
         glsatGpreS_elem :
-        inG Σ (gmap_viewR gl_id unitUR);
+        inG Σ (gmap_viewR gl_id (gmap_viewR gl_version unitUR));
         glsatGpreS_holds :
         inG Σ (gmap_viewR gl_id (gmap_viewR gl_version (prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ))))));
         (* Use encode of Countable to encode gl_version to positive *)
-        glsatGpreS_version :
+        glsatGpreS_state :
         inG Σ (reservation_mapUR (reservation_mapUR mono_natUR));
+        glsatGpreS_version :
+        inG Σ (reservation_mapUR (auth_mraUR glv_le));
         glsatGpreS_fuel :
         inG Σ (reservation_mapUR (reservation_mapUR bankUR));
         (* We only keep track of current owner for each lock, if the owner exists *)
@@ -63,15 +65,17 @@ Module glsatGS.
         glsat_inG : glsatGpreS Σ;
         elem_name : gname;
         holds_name : gname;
+        state_name : gname;
         version_name : gname;
         fuel_name : gname;
         owner_name : gname;
       }.
 
   Definition glsatΣ `{SI : indexT} `{GL : ghost_lock_class} : gFunctors :=
-    #[GFunctor (gmap_viewR positive unitUR);
+    #[GFunctor (gmap_viewR gl_id (gmap_viewR gl_version unitUR));
       GFunctor (gmap_viewTRF gl_id (gmap_viewTRF gl_version (prodTRF (agreeTRF $ (laterTF idTF)) (agreeTRF $ (laterTF idTF)))));
       GFunctor (reservation_mapUR (reservation_mapUR mono_natUR));
+      GFunctor (reservation_mapUR (auth_mraUR glv_le));
       GFunctor (reservation_mapUR (reservation_mapUR bankUR));
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO gl_owner)))
       ].
@@ -86,92 +90,169 @@ Import glsatGS.
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances glsat_inG
-  glsatGpreS_elem glsatGpreS_holds glsatGpreS_version glsatGpreS_fuel glsatGpreS_owner.
+  glsatGpreS_elem glsatGpreS_holds glsatGpreS_state glsatGpreS_version glsatGpreS_fuel glsatGpreS_owner.
 
 (* Elem *)
-Definition glG_elem `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} (k : gl_id) : iProp Σ :=
-  own elem_name (gmap_view_frag k DfracDiscarded ()).
+Definition glG_elem `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+  own elem_name (gmap_view_frag k DfracDiscarded (gmap_view_frag v DfracDiscarded ())).
 Global Typeclasses Opaque glG_elem.
 Global Instance: Params (@glG_elem) 5 := {}.
 
+Local Definition glG_elem_auth_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (m : gmap gl_id (gmap gl_version unit)) : iProp Σ :=
+  own elem_name (gmap_view_auth (V:=gmap_viewR gl_version unitUR)
+                   (DfracOwn 1) ((gmap_view_auth (DfracOwn 1)) <$> m)).
+Local Definition glG_elem_auth_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (m : gmap gl_version unit) : iProp Σ :=
+  own elem_name (gmap_view_frag (V:=gmap_viewR gl_version unitUR)
+                   k (DfracOwn 1) (gmap_view_auth (DfracOwn 1) m)).
+
 (* Holds *)
 Definition holds_unfold `{SI : indexT} {Σ} (P : iProp Σ) : later (iProp Σ) := Next P.
+Global Instance: Params (@holds_unfold) 2 := {}.
+
 Definition glG_holds `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (k : gl_id) (n : gl_version) (P : iProp Σ) (Q : iProp Σ) : iProp Σ :=
   own holds_name (gmap_view_frag k DfracDiscarded (gmap_view_frag n DfracDiscarded (to_agree $ holds_unfold P, to_agree $ holds_unfold Q))).
 Global Typeclasses Opaque glG_holds.
-Global Instance: Params (@holds_unfold) 2 := {}.
-Global Instance: Params (@glG_holds) 6 := {}.
+Global Instance: Params (@glG_holds) 5 := {}.
 
-(* Status: live or done *)
-Definition glG_live `{SI : indexT} `{WFOCM.pack A} `{!glsatGS ps T Σ} (k : gl_id) (q : Qp) : iProp Σ :=
-  own status_name (reservation_map_data k (●MN{#q} 0)).
-Global Typeclasses Opaque glG_live.
-Global Instance: Params (@glG_live) 8 := {}.
+Local Definition glG_holds_auth_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (m : gmap gl_id (gmap gl_version (iPropO Σ * iPropO Σ))) : iProp Σ :=
+  own holds_name (gmap_view_auth (V:=gmap_viewR gl_version (prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ)))))
+                    (DfracOwn 1) ((gmap_view_auth (DfracOwn 1)) <$> ((λ vm, (λ '(P, Q), (to_agree $ (holds_unfold P), to_agree $ (holds_unfold Q))) <$> vm) <$> m))).
+Local Definition glG_holds_auth_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (m : gmap gl_version (iPropO Σ * iPropO Σ)) : iProp Σ :=
+  own holds_name (gmap_view_frag (V:=gmap_viewR gl_version (prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ)))))
+                    k (DfracOwn 1) (gmap_view_auth (DfracOwn 1) ((λ '(P, Q), (to_agree $ (holds_unfold P), to_agree $ (holds_unfold Q))) <$> m))).
 
-Definition glG_done_auth `{SI : indexT} `{WFOCM.pack A} `{!glsatGS ps T Σ} (k : gl_id) : iProp Σ :=
-  own status_name (reservation_map_data k (●MN 1)).
-Global Typeclasses Opaque glG_done_auth.
-Global Instance: Params (@glG_done_auth) 8 := {}.
+(* State: locked or unlocked with version *)
+Definition glG_locked `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) (q : Qp) : iProp Σ :=
+  own state_name (reservation_map_data k (reservation_map_data (encode v) (●MN{#q} 0))).
+Global Typeclasses Opaque glG_locked.
+Global Instance: Params (@glG_locked) 5 := {}.
 
-Definition glG_done `{SI : indexT} `{WFOCM.pack A} `{!glsatGS ps T Σ} (k : gl_id) : iProp Σ :=
-  own status_name (reservation_map_data k (◯MN 1)).
-Global Typeclasses Opaque glG_done.
-Global Instance: Params (@glG_done) 8 := {}.
+Definition glG_unlocked_auth `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+  own state_name (reservation_map_data k (reservation_map_data (encode v) (●MN 1))).
+Global Typeclasses Opaque glG_unlocked_auth.
+Global Instance: Params (@glG_unlocked_auth) 5 := {}.
 
-(* Owner: tracks the owner thread of this obligation *)
-Definition glG_owner `{SI : indexT} `{WFOCM.pack A} `{!glsatGS ps T Σ} (k : gl_id) (θ : T) (q : Qp) : iProp Σ :=
-  own owner_name (reservation_map_data k (to_frac_agree q (θ : leibnizO T))).
-Global Typeclasses Opaque glG_owner.
-Global Instance: Params (@glG_owner) 8 := {}.
+Definition glG_unlocked `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+  own state_name (reservation_map_data k (reservation_map_data (encode v) (◯MN 1))).
+Global Typeclasses Opaque glG_unlocked.
+Global Instance: Params (@glG_unlocked) 5 := {}.
 
-(* Fuel: manage credits for logical fuel *)
-Definition glG_fuel `{SI : indexT} `{WFOCM.pack A} `{!glsatGS ps T Σ} (k : gl_id) (α : A) : iProp Σ :=
-  own fuel_name (reservation_map_data k (cash α)).
+Local Definition glG_state_token_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (E : coPset) : iProp Σ :=
+  own state_name (reservation_map_token (A:=reservation_mapUR mono_natUR) E).
+Local Definition glG_state_token_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (E : coPset) : iProp Σ :=
+  own state_name (reservation_map_data k (reservation_map_token (A:=mono_natUR) E)).
+
+(* Version: tracks an upperbound *)
+Definition glG_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+  own version_name (reservation_map_data k (◯AM[glv_le] v)).
+Global Typeclasses Opaque glG_version.
+Global Instance: Params (@glG_version) 5 := {}.
+
+Definition glG_version_auth `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+  own version_name (reservation_map_data k (●AM[glv_le] v)).
+Global Typeclasses Opaque glG_version_auth.
+Global Instance: Params (@glG_version_auth) 5 := {}.
+
+Local Definition glG_version_token `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (E : coPset) : iProp Σ :=
+  own version_name (reservation_map_token (A:=auth_mraUR glv_le) E).
+
+(* Fuel: manage credits for lock's fuel *)
+Definition glG_fuel `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) (a : gl_fuel) : iProp Σ :=
+  own fuel_name (reservation_map_data k (reservation_map_data (A:=bankUR) (encode v) (cash a))).
 Global Typeclasses Opaque glG_fuel.
-Global Instance: Params (@glG_fuel) 8 := {}.
+Global Instance: Params (@glG_fuel) 5 := {}.
 
-Definition glG_fuel_supply `{SI : indexT} `{WF : WFOCM.pack A} `{!glsatGS ps T Σ} (k : gl_id) (α : A) (q : Qp) : iProp Σ :=
-  own fuel_name (reservation_map_data k (debt α q)).
+Definition glG_fuel_supply `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) (a : gl_fuel) (q : Qp) : iProp Σ :=
+  own fuel_name (reservation_map_data k (reservation_map_data (A:=bankUR) (encode v) (debt a q))).
 Global Typeclasses Opaque glG_fuel_supply.
-Global Instance: Params (@glG_fuel_supply) 8 := {}.
+Global Instance: Params (@glG_fuel_supply) 5 := {}.
 
-(* (* Upper bound of fuel credits *) *)
-(* Definition glG_bound `{SI : indexT} `{WF : WFOCM.pack A} `{!glsatGS ps T Σ} (k : gl_id) (ℵ : A) : iProp Σ := *)
-(*   own bound_name (reservation_map_data k (◯AM[wfocm_geR] ℵ)). *)
-(* Global Typeclasses Opaque glG_bound. *)
-(* Global Instance: Params (@glG_bound) 8 := {}. *)
+Local Definition glG_fuel_token_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (E : coPset) : iProp Σ :=
+  own fuel_name (reservation_map_token (A:=reservation_mapUR bankUR) E).
+Local Definition glG_fuel_token_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (E : coPset) : iProp Σ :=
+  own fuel_name (reservation_map_data k (reservation_map_token (A:=bankUR) E)).
 
-(* Definition glG_bound_auth `{SI : indexT} `{WF : WFOCM.pack A} `{!glsatGS ps T Σ} (k : gl_id) (ℵ : A) : iProp Σ := *)
-(*   own bound_name (reservation_map_data k (●AM[wfocm_geR] ℵ)). *)
-(* Global Typeclasses Opaque glG_bound_auth. *)
-(* Global Instance: Params (@glG_bound_auth) 8 := {}. *)
+(* Owner: tracks the owner thread of a lock *)
+Definition glG_owner `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (t : gl_owner) (q : Qp) : iProp Σ :=
+  own owner_name (reservation_map_data k (to_frac_agree q (t : leibnizO gl_owner))).
+Global Typeclasses Opaque glG_owner.
+Global Instance: Params (@glG_owner) 5 := {}.
 
-(* Global invariant for the obligation ghost state. *)
-Definition glsat `{SI : indexT} `{WFA : WFOCM.pack A} `{!glsatGS ps T Σ}
-  `{obl_live_class A T WFOCM.ltR} `{obl_done_class ps}
-  (Ω : obl_states) : iProp Σ :=
+Local Definition glG_owner_token `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (E : coPset) : iProp Σ :=
+  own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO gl_owner)) E).
+
+(* TODO : add "key"s - ownE, ownD tokens for each gl_id, gl_token *)
+
+(* Global invariant for ghost locks. *)
+Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} `{!invGS Σ}
+  (Ω : ghost_locks) : iProp Σ :=
   locked
-    ((∃ (OProp : gmap gl_id (prop_of ps * iProp Σ)),
-         (⌜ dom OProp = dom Ω ⌝) ∗
+    ((∃ (Holds : gmap gl_id (iProp Σ * iProp Σ)),
+         (⌜ dom Holds = dom Ω ⌝) ∗
          own holds_name (gmap_view_auth (DfracOwn 1) ((λ '(P, R), (to_agree P, to_agree $ (holds_unfold R))) <$> OProp))) ∗
-     (own status_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (own state_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own fuel_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
-     (* (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗ *)
+     (* (own version_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗ *)
      (own elem_name (gmap_view_auth (DfracOwn 1) (gset_to_gmap () (dom Ω)))) ∗
      ([∗ map] k ↦ o ∈ Ω,
         match o with
         | inl d =>
-            glG_live k (1/2)%Qp ∗
+            glG_locked k (1/2)%Qp ∗
             (glG_owner k (obl_owner d) (1/2)%Qp) ∗
             (∃ α, (⌜ WFOCM.leR α (obl_fuel d) ⌝) ∗ glG_fuel_supply k α (1)%Qp)
             (* (∃ α ℵ, (⌜ WFOCM.leR α (obl_fuel d) ∧ WFOCM.leR (obl_fuel d) ℵ ⌝) ∗ *)
-            (*         glG_fuel_supply k α (1)%Qp ∗ glG_bound_auth k ℵ) *)
+            (*         glG_fuel_supply k α (1)%Qp ∗ glG_version_auth k ℵ) *)
         | inr d =>
             let P1 := (obl_atom d) in
             ∃ P2 R, glG_holds k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
-                    glG_done_auth k ∗ ∃ θ α, glG_owner k θ 1 ∗ glG_fuel_supply k α 1
+                    glG_unlocked_auth k ∗ ∃ θ α, glG_owner k θ 1 ∗ glG_fuel_supply k α 1
+        end)
+    )%I.
+
+Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} `{!invGS Σ}
+  (Ω : ghost_locks) : iProp Σ :=
+  locked
+    ((∃ (Holds : gmap gl_id (prop_of ps * iProp Σ)),
+         (⌜ dom OProp = dom Ω ⌝) ∗
+         own holds_name (gmap_view_auth (DfracOwn 1) ((λ '(P, R), (to_agree P, to_agree $ (holds_unfold R))) <$> OProp))) ∗
+     (own state_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (own fuel_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
+     (* (own version_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗ *)
+     (own elem_name (gmap_view_auth (DfracOwn 1) (gset_to_gmap () (dom Ω)))) ∗
+     ([∗ map] k ↦ o ∈ Ω,
+        match o with
+        | inl d =>
+            glG_locked k (1/2)%Qp ∗
+            (glG_owner k (obl_owner d) (1/2)%Qp) ∗
+            (∃ α, (⌜ WFOCM.leR α (obl_fuel d) ⌝) ∗ glG_fuel_supply k α (1)%Qp)
+            (* (∃ α ℵ, (⌜ WFOCM.leR α (obl_fuel d) ∧ WFOCM.leR (obl_fuel d) ℵ ⌝) ∗ *)
+            (*         glG_fuel_supply k α (1)%Qp ∗ glG_version_auth k ℵ) *)
+        | inr d =>
+            let P1 := (obl_atom d) in
+            ∃ P2 R, glG_holds k P2 R ∗ ⌜ P1 ≡ P2 ⌝ ∗ ▷ R ∗
+                    glG_unlocked_auth k ∗ ∃ θ α, glG_owner k θ 1 ∗ glG_fuel_supply k α 1
         end)
     )%I.
 
@@ -189,21 +270,21 @@ Section glsat.
   Proof. rewrite /glG_holds. apply _. Qed.
   Global Instance glG_elem_persistent k : Persistent (glG_elem k).
   Proof. rewrite /glG_elem. apply _. Qed.
-  Global Instance glG_done_persistent k : Persistent (glG_done k).
-  Proof. rewrite /glG_done. apply _. Qed.
-  (* Global Instance glG_bound_persistent k ℵ : Persistent (glG_bound k ℵ). *)
-  (* Proof. rewrite /glG_bound. apply _. Qed. *)
+  Global Instance glG_unlocked_persistent k : Persistent (glG_unlocked k).
+  Proof. rewrite /glG_unlocked. apply _. Qed.
+  (* Global Instance glG_version_persistent k ℵ : Persistent (glG_version k ℵ). *)
+  (* Proof. rewrite /glG_version. apply _. Qed. *)
 
   Global Instance glG_elem_timeless k : Timeless (glG_elem k).
   Proof. rewrite /glG_elem. apply _. Qed.
-  Global Instance glG_live_timeless k q : Timeless (glG_live k q).
-  Proof. rewrite /glG_live. apply _. Qed.
-  Global Instance glG_done_timeless k : Timeless (glG_done k).
-  Proof. rewrite /glG_done. apply _. Qed.
+  Global Instance glG_locked_timeless k q : Timeless (glG_locked k q).
+  Proof. rewrite /glG_locked. apply _. Qed.
+  Global Instance glG_unlocked_timeless k : Timeless (glG_unlocked k).
+  Proof. rewrite /glG_unlocked. apply _. Qed.
   Global Instance glG_fuel_timeless k b : Timeless (glG_fuel k b).
   Proof. rewrite /glG_fuel. apply _. Qed.
-  (* Global Instance glG_bound_timeless k a : Timeless (glG_bound k a). *)
-  (* Proof. rewrite /glG_bound. apply _. Qed. *)
+  (* Global Instance glG_version_timeless k a : Timeless (glG_version k a). *)
+  (* Proof. rewrite /glG_version. apply _. Qed. *)
 
   (* frac instances *)
   Global Instance mono_nat_auth_own_fractional γ n :
@@ -283,61 +364,61 @@ Section glsat.
   Qed.
 
   (** Status rules *)
-  Lemma glG_live_done_false k q :
-    glG_live k q ∗ glG_done k ⊢ False.
+  Lemma glG_locked_done_false k q :
+    glG_locked k q ∗ glG_unlocked k ⊢ False.
   Proof.
-    rewrite /glG_live /glG_done. iIntros "[Hl Hd]".
+    rewrite /glG_locked /glG_unlocked. iIntros "[Hl Hd]".
     iCombine "Hl Hd" as "V". iPoseProof (own_valid with "V") as "%V".
     iPureIntro. apply reservation_map_data_valid in V.
     apply mono_nat_both_dfrac_valid in V. destruct V. lia.
   Qed.
 
-  Lemma glG_done_auth_done k :
-    glG_done_auth k ⊢ glG_done k.
+  Lemma glG_unlocked_auth_done k :
+    glG_unlocked_auth k ⊢ glG_unlocked k.
   Proof.
-    rewrite /glG_done_auth /glG_done.
+    rewrite /glG_unlocked_auth /glG_unlocked.
     apply own_mono.
     apply reservation_map_data_mono. apply mono_nat_included.
   Qed.
 
-  Lemma glG_live_to_done k :
-    glG_live k 1 ⊢ |==> glG_done_auth k.
+  Lemma glG_locked_to_done k :
+    glG_locked k 1 ⊢ |==> glG_unlocked_auth k.
   Proof.
-    rewrite /glG_live /glG_done_auth.
+    rewrite /glG_locked /glG_unlocked_auth.
     apply own_update.
     apply reservation_map_update. apply mono_nat_update. auto.
   Qed.
 
-  Lemma glG_live_frac_op k q1 q2 q :
+  Lemma glG_locked_frac_op k q1 q2 q :
     q = (q1 + q2)%Qp →
-    glG_live k q1 ∗ glG_live k q2 ⊣⊢ glG_live k q.
+    glG_locked k q1 ∗ glG_locked k q2 ⊣⊢ glG_locked k q.
   Proof.
-    intros; subst. rewrite /glG_live. iSplit; [iIntros "[H1 H2]" | iIntros "H"].
+    intros; subst. rewrite /glG_locked. iSplit; [iIntros "[H1 H2]" | iIntros "H"].
     - iCombine "H1 H2" as "H". done.
     - iDestruct "H" as "[H1 H2]". iFrame.
   Qed.
-  Lemma glG_live_div_2 k q :
-    glG_live k (q/2) ∗ glG_live k (q/2) ⊣⊢ glG_live k q.
-  Proof. rewrite glG_live_frac_op; first done. by rewrite Qp.div_2. Qed.
-  Lemma glG_live_valid k q :
-    glG_live k q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
+  Lemma glG_locked_div_2 k q :
+    glG_locked k (q/2) ∗ glG_locked k (q/2) ⊣⊢ glG_locked k q.
+  Proof. rewrite glG_locked_frac_op; first done. by rewrite Qp.div_2. Qed.
+  Lemma glG_locked_valid k q :
+    glG_locked k q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
   Proof.
-    rewrite /glG_live. iIntros "H".
+    rewrite /glG_locked. iIntros "H".
     iPoseProof (own_valid with "H") as "%V".
     iPureIntro. rewrite reservation_map_data_valid in V.
     apply mono_nat_auth_dfrac_valid in V. by apply dfrac_valid in V.
   Qed.
 
-  Lemma glG_live_alloc D k :
+  Lemma glG_locked_alloc D k :
     k ∉ D →
-    (own status_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset D)))
-    ⊢ |==> (own status_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
-           glG_live k 1.
+    (own state_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset D)))
+    ⊢ |==> (own state_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
+           glG_locked k 1.
   Proof.
     iIntros (Hk) "Htk".
     iPoseProof (reservation_map_token_alloc_singleton _ _ k (●MN 0) with "Htk") as "[Htk >H]"; auto.
     { apply mono_nat_auth_valid. }
-    rewrite /glG_live. by iFrame.
+    rewrite /glG_locked. by iFrame.
   Qed.
 
   (** Fuel rules *)
@@ -539,41 +620,41 @@ Section glsat.
   Qed.
 
   (* (** Fuel bound rules *) *)
-  (* Lemma glG_bound_auth_alloc D k a : *)
+  (* Lemma glG_version_auth_alloc D k a : *)
   (*   k ∉ D → *)
-  (*   (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset D))) *)
-  (*   ⊢ |==> (own bound_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗ *)
-  (*          glG_bound_auth k a. *)
+  (*   (own version_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset D))) *)
+  (*   ⊢ |==> (own version_name (reservation_map_token (A:=auth_mraUR (wfocm_geR)) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗ *)
+  (*          glG_version_auth k a. *)
   (* Proof. *)
   (*   iIntros (Hk) "Htk". *)
   (*   iPoseProof (reservation_map_token_alloc_singleton _ _ k (●AM[wfocm_geR] a) with "Htk") as "[Htk >H]"; auto. *)
   (*   - apply auth_mra_auth_valid. *)
-  (*   - rewrite /glG_bound_auth. by iFrame. *)
+  (*   - rewrite /glG_version_auth. by iFrame. *)
   (* Qed. *)
 
-  (* Lemma glG_bound_know k a : *)
-  (*   glG_bound_auth k a ⊢ glG_bound k a. *)
+  (* Lemma glG_version_know k a : *)
+  (*   glG_version_auth k a ⊢ glG_version k a. *)
   (* Proof. *)
-  (*   rewrite /glG_bound_auth /glG_bound. rewrite auth_mra_auth_know_op. *)
+  (*   rewrite /glG_version_auth /glG_version. rewrite auth_mra_auth_know_op. *)
   (*   rewrite reservation_map_data_op. iIntros "[H1 H2]". iFrame. *)
   (* Qed. *)
 
-  (* Lemma glG_bound_know_bound k a0 a1 : *)
-  (*   glG_bound_auth k a0 ∗ glG_bound k a1 ⊢ ⌜ a0 /≤ a1 ⌝. *)
+  (* Lemma glG_version_know_bound k a0 a1 : *)
+  (*   glG_version_auth k a0 ∗ glG_version k a1 ⊢ ⌜ a0 /≤ a1 ⌝. *)
   (* Proof. *)
-  (*   rewrite /glG_bound_auth /glG_bound -own_op -reservation_map_data_op. *)
+  (*   rewrite /glG_version_auth /glG_version -own_op -reservation_map_data_op. *)
   (*   iIntros "H". iPoseProof (own_valid with "H") as "%V". apply reservation_map_data_valid in V. *)
   (*   apply (auth_mra_both_valid wfocm_geR) in V. done. *)
   (* Qed. *)
 
-  (* Lemma glG_bound_auth_mon k a0 a1 : *)
+  (* Lemma glG_version_auth_mon k a0 a1 : *)
   (*   a1 /≤ a0 → *)
-  (*   glG_bound_auth k a0 ⊢ |==> glG_bound_auth k a1. *)
+  (*   glG_version_auth k a0 ⊢ |==> glG_version_auth k a1. *)
   (* Proof. iIntros (Ha). apply own_update, reservation_map_update, auth_mra_update; eauto. apply _. Qed. *)
 
-  (* Lemma glG_bound_mon k a0 a1 : *)
+  (* Lemma glG_version_mon k a0 a1 : *)
   (*   a0 /≤ a1 → *)
-  (*   glG_bound k a0 ⊢ glG_bound k a1. *)
+  (*   glG_version k a0 ⊢ glG_version k a1. *)
   (* Proof. iIntros (Ha). apply own_mono, reservation_map_data_mono, auth_mra_know_mono; eauto. apply _. Qed. *)
 
   (** Owner rules *)
@@ -650,7 +731,7 @@ Section glsat.
     by rewrite -Hdom.
   Qed.
   Lemma glsat_elem_cases Ω k :
-    glsat Ω ∗ glG_elem k ⊢ ⌜ ∃ d, Ω !! k = Some (obl_live d) ⌝ ∨ glG_done k.
+    glsat Ω ∗ glG_elem k ⊢ ⌜ ∃ d, Ω !! k = Some (obl_live d) ⌝ ∨ glG_unlocked k.
   Proof.
     iIntros "(Hsat & He)". iPoseProof (glsat_elem with "[$]") as "%".
     apply elem_of_dom in H. destruct H.
@@ -659,11 +740,11 @@ Section glsat.
     destruct x.
     - iLeft. eauto.
     - iPoseProof (big_sepM_delete _ _ _ _ H with "Hm") as "[H _]".
-      iDestruct "H" as "(%&%&_&_&_&DA&_)". iRight. by iApply glG_done_auth_done.
+      iDestruct "H" as "(%&%&_&_&_&DA&_)". iRight. by iApply glG_unlocked_auth_done.
   Qed.
 
   Lemma glsat_obl_is_live Ω k q :
-    glsat Ω ∗ glG_elem k ∗ glG_live k q
+    glsat Ω ∗ glG_elem k ∗ glG_locked k q
     ⊢ ∃ d, ⌜Ω !! k = Some (obl_live d)⌝.
   Proof.
     iIntros "(Hsat & #He & Hl)".
@@ -674,11 +755,11 @@ Section glsat.
     destruct o.
     - iExists o. done.
     - iExFalso. iDestruct "LU" as "(% & % & _ & _ & _ & DONE & _)".
-      iPoseProof (glG_live_done_false with "[Hl DONE]") as "%F"; [iFrame | done].
-      iPoseProof (glG_done_auth_done with "[$]") as "#D". done.
+      iPoseProof (glG_locked_done_false with "[Hl DONE]") as "%F"; [iFrame | done].
+      iPoseProof (glG_unlocked_auth_done with "[$]") as "#D". done.
   Qed.
   Lemma glsat_obl_is_live_olive Ω k q :
-    glsat Ω ∗ glG_elem k ∗ glG_live k q
+    glsat Ω ∗ glG_elem k ∗ glG_locked k q
     ⊢ ∃ θ α, ⌜Ω !! k = Some (olive θ α)⌝.
   Proof.
     iIntros "H". iPoseProof (glsat_obl_is_live with "H") as "(%&%)".
@@ -686,7 +767,7 @@ Section glsat.
   Qed.
 
   Lemma glsat_obl_is_done Ω k (P : prop_of ps) R :
-    glsat Ω ∗ glG_holds k P R ∗ glG_done k
+    glsat Ω ∗ glG_holds k P R ∗ glG_unlocked k
     ⊢ ∃ P', ⌜Ω !! k = Some (odone P') ∧ P' ≡ P⌝.
   Proof.
     iIntros "(Hsat & #He & Hl)".
@@ -696,7 +777,7 @@ Section glsat.
     iPoseProof (big_sepM_delete with "Hm") as "[LU Hm]"; first eauto.
     destruct o.
     - iExFalso. iDestruct "LU" as "(LIVE & _)".
-      iPoseProof (glG_live_done_false with "[LIVE Hl]") as "%F"; [iFrame | done].
+      iPoseProof (glG_locked_done_false with "[LIVE Hl]") as "%F"; [iFrame | done].
     - iPoseProof (glG_holds_lookup with "[$]") as "(%&%&%&%&_)".
       iDestruct "LU" as "(%&%&Hg2&%&_)". iPoseProof (glG_holds_agree with "[He Hg2]") as "[% HR]".
       { iFrame "Hg2". eauto. }
@@ -704,7 +785,7 @@ Section glsat.
   Qed.
 
   Lemma glsat_obl_is_done_weak Ω k :
-    glsat Ω ∗ glG_elem k ∗ glG_done k
+    glsat Ω ∗ glG_elem k ∗ glG_unlocked k
     ⊢ ∃ P, ⌜Ω !! k = Some (obl_done P)⌝.
   Proof.
     iIntros "(Hsat & #He & Hl)".
@@ -714,11 +795,11 @@ Section glsat.
     iPoseProof (big_sepM_delete with "Hm") as "[LU Hm]"; first eauto.
     destruct o.
     - iExFalso. iDestruct "LU" as "(LIVE & _)".
-      iPoseProof (glG_live_done_false with "[LIVE Hl]") as "%F"; [iFrame | done].
+      iPoseProof (glG_locked_done_false with "[LIVE Hl]") as "%F"; [iFrame | done].
     - iExists o. done.
   Qed.
   Lemma glsat_obl_is_done_weak_set Ω D :
-    glsat Ω ∗ ([∗ set] k ∈ D, glG_elem k ∗ glG_done k)
+    glsat Ω ∗ ([∗ set] k ∈ D, glG_elem k ∗ glG_unlocked k)
     ⊢ [∗ set] k ∈ D, ⌜ ∃ P, Ω !! k = Some (obl_done P) ⌝.
   Proof.
     revert Ω. pattern D. revert D. apply set_ind.
@@ -737,7 +818,7 @@ Section glsat.
     ⊢ |==> glsat (<[k:=olive θ α]>Ω) ∗
         glG_holds k P R ∗
         glG_elem k ∗
-        glG_live k (1/2)%Qp ∗
+        glG_locked k (1/2)%Qp ∗
         glG_owner k θ (1/2)%Qp ∗
         glG_fuel k α.
   Proof.
@@ -747,10 +828,10 @@ Section glsat.
     { eapply (gmap_view_alloc _ k DfracDiscarded (to_agree $ P, to_agree $ holds_unfold R)); try done.
       rewrite !lookup_fmap. rewrite not_elem_of_dom_1; [done | set_solver].
     }
-    iMod (glG_live_alloc _ k with "HS") as "[HS Hs]"; first done.
+    iMod (glG_locked_alloc _ k with "HS") as "[HS Hs]"; first done.
     iMod (glG_owner_alloc _ k θ with "HO") as "[HO Ho]"; first done.
     iMod (glG_fuel_alloc _ k α with "HP") as "(HP & Hps & Hp)"; first done.
-    iPoseProof (glG_live_div_2 with "Hs") as "[Hs1 Hs2]".
+    iPoseProof (glG_locked_div_2 with "Hs") as "[Hs1 Hs2]".
     iPoseProof (glG_owner_div_2 with "Ho") as "[Ho1 Ho2]".
     iMod (glG_elem_alloc _ k (olive θ α) with "HE") as "[HE He]"; first (by apply not_elem_of_dom).
     iModIntro. rewrite /glG_holds. iFrame "Hg Hs2 Hp He Ho2".
@@ -865,9 +946,9 @@ Section glsat.
 
   Lemma glsat_obl_resolve_one Ω k P R x0 :
     glsat Ω ∗ glG_elem k ∗ glG_holds k P R ∗ (▷ R) ∗
-    glG_live k (1/2)%Qp ∗
+    glG_locked k (1/2)%Qp ∗
     glG_owner k x0 (1/2)%Qp
-    ⊢ |==> glsat (<[k:=odone P]>Ω) ∗ glG_done k.
+    ⊢ |==> glsat (<[k:=odone P]>Ω) ∗ glG_unlocked k.
   Proof.
     iIntros "(Hsat & #He & #Hg & HR & Hs0 & Ho0)".
     iDestruct (glsat_obl_is_live with "[Hsat He Hs0]") as "(%&%LU)".
@@ -875,9 +956,9 @@ Section glsat.
     rewrite /glsat -!lock. iDestruct "Hsat" as "((%&%Hdom&HG) & HS& HO& HP& HE& Hm)".
     iPoseProof (big_sepM_delete with "Hm") as "[Hk Hm]"; [eapply LU |].
     iDestruct "Hk" as "(Hs& Ho& (%&%&Hps))".
-    iMod (glG_live_to_done with "[Hs Hs0]") as "Hs".
-    { iApply glG_live_frac_op; last iFrame. by rewrite Qp.div_2. }
-    iPoseProof (glG_done_auth_done with "Hs") as "#Hsd".
+    iMod (glG_locked_to_done with "[Hs Hs0]") as "Hs".
+    { iApply glG_locked_frac_op; last iFrame. by rewrite Qp.div_2. }
+    iPoseProof (glG_unlocked_auth_done with "Hs") as "#Hsd".
     iPoseProof (glG_owner_agree with "[Ho Ho0]") as "%"; first iFrame.
     destruct H0. clear H1. subst x0.
     iCombine "Ho Ho0" as "Ho". iPoseProof (glG_owner_frac_op with "Ho") as "Ho".
@@ -891,7 +972,7 @@ Section glsat.
   Qed.
 
   Lemma glsat_done_open Ω k P R :
-    glsat Ω ∗ glG_holds k P R ∗ glG_done k
+    glsat Ω ∗ glG_holds k P R ∗ glG_unlocked k
     ⊢ (▷ R) ∗ (▷ R -∗ glsat Ω).
   Proof.
     iIntros "(Hsat & #Hg0 & #Hs0)".
@@ -913,7 +994,7 @@ Section glsat.
 
   Lemma glsat_done_open_pers Ω k P R :
     Persistent R →
-    glsat Ω ∗ glG_holds k P R ∗ glG_done k
+    glsat Ω ∗ glG_holds k P R ∗ glG_unlocked k
     ⊢ glsat Ω ∗ ▷ R.
   Proof.
     iIntros (PP) "H". iPoseProof (glsat_done_open with "H") as "[#HP Ho]".
@@ -921,9 +1002,9 @@ Section glsat.
   Qed.
 
   Lemma glsat_live_open_owner Ω k q :
-    glsat Ω ∗ glG_elem k ∗ glG_live k q
-    ⊢ ∃ i, glG_live k q ∗ glG_live k (1/2)%Qp ∗ glG_owner k i (1/2) ∗
-           ((glG_live k (1/2)%Qp ∗ glG_owner k i (1/2)) -∗ glsat Ω).
+    glsat Ω ∗ glG_elem k ∗ glG_locked k q
+    ⊢ ∃ i, glG_locked k q ∗ glG_locked k (1/2)%Qp ∗ glG_owner k i (1/2) ∗
+           ((glG_locked k (1/2)%Qp ∗ glG_owner k i (1/2)) -∗ glsat Ω).
   Proof.
     iIntros "(Hsat & #He0 & Hs0)".
     iPoseProof (glsat_obl_is_live with "[Hsat Hs0]") as "%Hlive"; [iFrame; eauto|].
@@ -935,8 +1016,8 @@ Section glsat.
     iApply (big_sepM_delete _ _ k _ LU). iFrame. done.
   Qed.
   Lemma glsat_live_open Ω k q :
-    glsat Ω ∗ glG_elem k ∗ glG_live k q
-    ⊢ glG_live k q ∗ glG_live k (1/2)%Qp ∗ (glG_live k (1/2)%Qp -∗ glsat Ω).
+    glsat Ω ∗ glG_elem k ∗ glG_locked k q
+    ⊢ glG_locked k q ∗ glG_locked k (1/2)%Qp ∗ (glG_locked k (1/2)%Qp -∗ glsat Ω).
   Proof.
     iIntros "(Hsat & #He0 & Hs0)".
     iPoseProof (glsat_live_open_owner with "[$]") as "(%&Bl&Bl2&Bo&S)". iFrame.
