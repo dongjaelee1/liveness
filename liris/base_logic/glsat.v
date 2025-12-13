@@ -1,4 +1,4 @@
-From iris.algebra Require Import gmap_view reservation_map dfrac_agree mono_nat.
+From iris.algebra Require Import gmap_view reservation_map dfrac_agree.
 From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -45,20 +45,37 @@ Module glsatGS.
   Class glsatGpreS `{SI : indexT} `{GL : ghost_lock_class} (Σ : gFunctors) : Set :=
     GlsatGpreS {
         glsatGpreS_elem :
-        inG Σ (gmap_viewR gl_id (gmap_viewR gl_version unitUR));
+        inG Σ (gmap_viewR gl_id unitUR);
         glsatGpreS_holds :
-        inG Σ (gmap_viewR gl_id (gmap_viewR gl_version (prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ))))));
-        (* Use encode of Countable to encode gl_version to positive *)
+        inG Σ (gmap_viewR gl_id (prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ)))));
         glsatGpreS_state :
-        inG Σ (reservation_mapUR (reservation_mapUR mono_natUR));
+        inG Σ (reservation_mapUR (dfrac_agreeR natO));
         glsatGpreS_version :
         inG Σ (reservation_mapUR (auth_mraUR glv_le));
         glsatGpreS_fuel :
-        inG Σ (reservation_mapUR (reservation_mapUR bankUR));
-        (* We only keep track of current owner for each lock, if the owner exists *)
+        inG Σ (reservation_mapUR bankUR);
+        (* We keep track of current owner for each lock, if the owner exists *)
         glsatGpreS_owner :
         inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO gl_owner)));
       }.
+
+  (* Class glsatGpreS `{SI : indexT} `{GL : ghost_lock_class} (Σ : gFunctors) : Set := *)
+  (*   GlsatGpreS { *)
+  (*       glsatGpreS_elem : *)
+  (*       inG Σ (gmap_viewR gl_id (gmap_viewR gl_version unitUR)); *)
+  (*       glsatGpreS_holds : *)
+  (*       inG Σ (gmap_viewR gl_id (gmap_viewR gl_version (prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ)))))); *)
+  (*       (* Use encode of Countable to encode gl_version to positive *) *)
+  (*       glsatGpreS_state : *)
+  (*       inG Σ (reservation_mapUR (reservation_mapUR mono_natUR)); *)
+  (*       glsatGpreS_version : *)
+  (*       inG Σ (reservation_mapUR (auth_mraUR glv_le)); *)
+  (*       glsatGpreS_fuel : *)
+  (*       inG Σ (reservation_mapUR (reservation_mapUR bankUR)); *)
+  (*       (* We only keep track of current owner for each lock, if the owner exists *) *)
+  (*       glsatGpreS_owner : *)
+  (*       inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO gl_owner))); *)
+  (*     }. *)
 
   Class glsatGS `{SI : indexT} `{GL : ghost_lock_class} (Σ : gFunctors) : Set :=
     GlsatG {
@@ -72,13 +89,22 @@ Module glsatGS.
       }.
 
   Definition glsatΣ `{SI : indexT} `{GL : ghost_lock_class} : gFunctors :=
-    #[GFunctor (gmap_viewR gl_id (gmap_viewR gl_version unitUR));
-      GFunctor (gmap_viewTRF gl_id (gmap_viewTRF gl_version (prodTRF (agreeTRF $ (laterTF idTF)) (agreeTRF $ (laterTF idTF)))));
-      GFunctor (reservation_mapUR (reservation_mapUR mono_natUR));
+    #[GFunctor (gmap_viewR gl_id unitUR);
+      GFunctor (gmap_viewTRF gl_id (prodTRF (agreeTRF $ (laterTF idTF)) (agreeTRF $ (laterTF idTF))));
+      GFunctor (reservation_mapUR (dfrac_agreeR $ natO));
       GFunctor (reservation_mapUR (auth_mraUR glv_le));
-      GFunctor (reservation_mapUR (reservation_mapUR bankUR));
+      GFunctor (reservation_mapUR bankUR);
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO gl_owner)))
       ].
+
+  (* Definition glsatΣ `{SI : indexT} `{GL : ghost_lock_class} : gFunctors := *)
+  (*   #[GFunctor (gmap_viewR gl_id (gmap_viewR gl_version unitUR)); *)
+  (*     GFunctor (gmap_viewTRF gl_id (gmap_viewTRF gl_version (prodTRF (agreeTRF $ (laterTF idTF)) (agreeTRF $ (laterTF idTF))))); *)
+  (*     GFunctor (reservation_mapUR (reservation_mapUR mono_natUR)); *)
+  (*     GFunctor (reservation_mapUR (auth_mraUR glv_le)); *)
+  (*     GFunctor (reservation_mapUR (reservation_mapUR bankUR)); *)
+  (*     GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO gl_owner))) *)
+  (*     ]. *)
 
   Global Instance subG_glsatΣ `{SI : indexT} `{GL : ghost_lock_class} {Σ} : subG (glsatΣ) Σ → (glsatGpreS Σ).
   Proof. solve_inG. Qed.
@@ -94,83 +120,79 @@ Local Existing Instances glsat_inG
 
 (* Elem *)
 Definition glG_elem `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (k : gl_id) (v : gl_version) : iProp Σ :=
-  own elem_name (gmap_view_frag k DfracDiscarded (gmap_view_frag v DfracDiscarded ())).
+  (k : gl_id) : iProp Σ :=
+  own elem_name (gmap_view_frag k DfracDiscarded ()).
 Global Typeclasses Opaque glG_elem.
 Global Instance: Params (@glG_elem) 5 := {}.
 
 Local Definition glG_elem_auth_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (m : gmap gl_id (gmap gl_version unit)) : iProp Σ :=
-  own elem_name (gmap_view_auth (V:=gmap_viewR gl_version unitUR)
-                   (DfracOwn 1) ((gmap_view_auth (DfracOwn 1)) <$> m)).
-Local Definition glG_elem_auth_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (k : gl_id) (m : gmap gl_version unit) : iProp Σ :=
-  own elem_name (gmap_view_frag (V:=gmap_viewR gl_version unitUR)
-                   k (DfracOwn 1) (gmap_view_auth (DfracOwn 1) m)).
+  (m : gmap gl_id unit) : iProp Σ :=
+  own elem_name (gmap_view_auth (V:=unitUR) (DfracOwn 1) m).
 
-(* Holds *)
+(* Holds: P until Q *)
 Definition holds_unfold `{SI : indexT} {Σ} (P : iProp Σ) : later (iProp Σ) := Next P.
 Global Instance: Params (@holds_unfold) 2 := {}.
 
 Definition glG_holds `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (k : gl_id) (n : gl_version) (P : iProp Σ) (Q : iProp Σ) : iProp Σ :=
-  own holds_name (gmap_view_frag k DfracDiscarded (gmap_view_frag n DfracDiscarded (to_agree $ holds_unfold P, to_agree $ holds_unfold Q))).
+  (k : gl_id) (P : iProp Σ) (Q : iProp Σ) : iProp Σ :=
+  own holds_name (gmap_view_frag k DfracDiscarded (to_agree $ holds_unfold P, to_agree $ holds_unfold Q)).
 Global Typeclasses Opaque glG_holds.
 Global Instance: Params (@glG_holds) 5 := {}.
 
 Local Definition glG_holds_auth_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (m : gmap gl_id (gmap gl_version (iPropO Σ * iPropO Σ))) : iProp Σ :=
-  own holds_name (gmap_view_auth (V:=gmap_viewR gl_version (prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ)))))
-                    (DfracOwn 1) ((gmap_view_auth (DfracOwn 1)) <$> ((λ vm, (λ '(P, Q), (to_agree $ (holds_unfold P), to_agree $ (holds_unfold Q))) <$> vm) <$> m))).
-Local Definition glG_holds_auth_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (k : gl_id) (m : gmap gl_version (iPropO Σ * iPropO Σ)) : iProp Σ :=
-  own holds_name (gmap_view_frag (V:=gmap_viewR gl_version (prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ)))))
-                    k (DfracOwn 1) (gmap_view_auth (DfracOwn 1) ((λ '(P, Q), (to_agree $ (holds_unfold P), to_agree $ (holds_unfold Q))) <$> m))).
+  (m : gmap gl_id (iPropO Σ * iPropO Σ)) : iProp Σ :=
+  own holds_name (gmap_view_auth (V:=(prodR (agreeR $ (laterO (iPropO Σ))) (agreeR $ (laterO (iPropO Σ)))))
+                    (DfracOwn 1) ((λ '(P, Q), (to_agree $ (holds_unfold P), to_agree $ (holds_unfold Q))) <$> m)).
 
-(* State: locked or unlocked with version *)
+(* State: locked or unlocked *)
 Definition glG_locked `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (k : gl_id) (v : gl_version) (q : Qp) : iProp Σ :=
-  own state_name (reservation_map_data k (reservation_map_data (encode v) (●MN{#q} 0))).
+  (k : gl_id) (q : Qp) : iProp Σ :=
+  own state_name (reservation_map_data k (to_dfrac_agree (DfracOwn q) 0)).
 Global Typeclasses Opaque glG_locked.
 Global Instance: Params (@glG_locked) 5 := {}.
 
-Definition glG_unlocked_auth `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (k : gl_id) (v : gl_version) : iProp Σ :=
-  own state_name (reservation_map_data k (reservation_map_data (encode v) (●MN 1))).
-Global Typeclasses Opaque glG_unlocked_auth.
-Global Instance: Params (@glG_unlocked_auth) 5 := {}.
-
 Definition glG_unlocked `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (k : gl_id) (v : gl_version) : iProp Σ :=
-  own state_name (reservation_map_data k (reservation_map_data (encode v) (◯MN 1))).
+  (k : gl_id) (q : Qp) : iProp Σ :=
+  own state_name (reservation_map_data k (to_dfrac_agree (DfracOwn q) 1)).
 Global Typeclasses Opaque glG_unlocked.
 Global Instance: Params (@glG_unlocked) 5 := {}.
 
+Definition glG_unlocked_inv `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) : iProp Σ :=
+  own state_name (reservation_map_data k (to_dfrac_agree (DfracDiscarded) 1)).
+Global Typeclasses Opaque glG_unlocked_inv.
+Global Instance: Params (@glG_unlocked_inv) 5 := {}.
+
 Local Definition glG_state_token_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (E : coPset) : iProp Σ :=
-  own state_name (reservation_map_token (A:=reservation_mapUR mono_natUR) E).
-Local Definition glG_state_token_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
-  (k : gl_id) (E : coPset) : iProp Σ :=
-  own state_name (reservation_map_data k (reservation_map_token (A:=mono_natUR) E)).
+  own state_name (reservation_map_token (A:=dfrac_agreeR natO) E).
 
-(* Version: tracks an upperbound *)
-Definition glG_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+(* Version: tracks the version *)
+Definition glG_version_lb `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (k : gl_id) (v : gl_version) : iProp Σ :=
   own version_name (reservation_map_data k (◯AM[glv_le] v)).
+Global Typeclasses Opaque glG_version_lb.
+Global Instance: Params (@glG_version_lb) 5 := {}.
+
+Definition glG_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+  own version_name (reservation_map_data k (●AM[glv_le] v)).
 Global Typeclasses Opaque glG_version.
 Global Instance: Params (@glG_version) 5 := {}.
 
-Definition glG_version_auth `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+Definition glG_version_inv `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (k : gl_id) (v : gl_version) : iProp Σ :=
-  own version_name (reservation_map_data k (●AM[glv_le] v)).
-Global Typeclasses Opaque glG_version_auth.
-Global Instance: Params (@glG_version_auth) 5 := {}.
+  own version_name (reservation_map_data k (●AM□[glv_le] v)).
+Global Typeclasses Opaque glG_version_inv.
+Global Instance: Params (@glG_version_inv) 5 := {}.
 
-Local Definition glG_version_token `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+Local Definition glG_version_token_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (E : coPset) : iProp Σ :=
   own version_name (reservation_map_token (A:=auth_mraUR glv_le) E).
 
-(* Fuel: manage credits for lock's fuel *)
+TODO
+
+(* Fuel: manage credits for a lock's fuel *)
 Definition glG_fuel `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (k : gl_id) (v : gl_version) (a : gl_fuel) : iProp Σ :=
   own fuel_name (reservation_map_data k (reservation_map_data (A:=bankUR) (encode v) (cash a))).
@@ -201,15 +223,16 @@ Local Definition glG_owner_token `{SI : indexT} `{GL : ghost_lock_class} `{!glsa
   (E : coPset) : iProp Σ :=
   own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO gl_owner)) E).
 
-(* TODO : add "key"s - ownE, ownD tokens for each gl_id, gl_token *)
-
 (* Global invariant for ghost locks. *)
 Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} `{!invGS Σ}
   (Ω : ghost_locks) : iProp Σ :=
   locked
-    ((∃ (Holds : gmap gl_id (iProp Σ * iProp Σ)),
-         (⌜ dom Holds = dom Ω ⌝) ∗
-         own holds_name (gmap_view_auth (DfracOwn 1) ((λ '(P, R), (to_agree P, to_agree $ (holds_unfold R))) <$> OProp))) ∗
+    ((∃ (Holds : gmap gl_id (gmap gl_version (iProp Σ * iProp Σ))),
+         (⌜ dom Holds = dom Ω ⌝) ∗ glG_holds_auth_id Holds) ∗
+     glG_elem_auth_id (⊤ ∖ 
+
+                         TODO
+     
      (own state_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO T))(⊤ ∖ gset_to_coPset (dom Ω)))) ∗
      (own fuel_name (reservation_map_token (A:=bankUR) (⊤ ∖ gset_to_coPset (dom Ω)))) ∗
@@ -229,6 +252,51 @@ Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} `{!invGS
                     glG_unlocked_auth k ∗ ∃ θ α, glG_owner k θ 1 ∗ glG_fuel_supply k α 1
         end)
     )%I.
+
+Definition glG_elem `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+Local Definition glG_elem_auth_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (m : gmap gl_id (gmap gl_version unit)) : iProp Σ :=
+Local Definition glG_elem_auth_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (m : gmap gl_version unit) : iProp Σ :=
+Definition glG_holds `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (n : gl_version) (P : iProp Σ) (Q : iProp Σ) : iProp Σ :=
+Local Definition glG_holds_auth_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (m : gmap gl_id (gmap gl_version (iPropO Σ * iPropO Σ))) : iProp Σ :=
+Local Definition glG_holds_auth_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (m : gmap gl_version (iPropO Σ * iPropO Σ)) : iProp Σ :=
+Definition glG_locked `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) (q : Qp) : iProp Σ :=
+Definition glG_unlocked_auth `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+Definition glG_unlocked `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+Local Definition glG_state_token_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (E : coPset) : iProp Σ :=
+Local Definition glG_state_token_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (E : coPset) : iProp Σ :=
+Definition glG_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+Definition glG_version_auth `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+Definition glG_version_inv `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) : iProp Σ :=
+Local Definition glG_version_token `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (E : coPset) : iProp Σ :=
+Definition glG_fuel `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) (a : gl_fuel) : iProp Σ :=
+Definition glG_fuel_supply `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (v : gl_version) (a : gl_fuel) (q : Qp) : iProp Σ :=
+Local Definition glG_fuel_token_id `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (E : coPset) : iProp Σ :=
+Local Definition glG_fuel_token_version `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (E : coPset) : iProp Σ :=
+Definition glG_owner `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (k : gl_id) (t : gl_owner) (q : Qp) : iProp Σ :=
+Local Definition glG_owner_token `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
+  (E : coPset) : iProp Σ :=
+
+
 
 Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} `{!invGS Σ}
   (Ω : ghost_locks) : iProp Σ :=
