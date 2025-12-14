@@ -20,8 +20,8 @@ Class ghost_lock_class := {
     (* for auth_mra *)
     #[global] gl_version_auth_mra :: auth_mra_eq_class gl_version;
     (* (* for gmap *) *)
-    (* #[global] gl_version_EqDecision :: EqDecision gl_version; *)
-    (* #[global] gl_Version_Countable :: Countable gl_version; *)
+    #[global] gl_version_EqDecision :: EqDecision gl_version;
+    #[global] gl_Version_Countable :: Countable gl_version;
     (* for wfocm *)
     #[global] gl_fuel_wfocm :: WFOCM.pack gl_fuel;
     #[global] gl_owner_EqDecision :: EqDecision gl_owner;

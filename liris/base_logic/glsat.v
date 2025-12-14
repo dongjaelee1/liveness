@@ -53,7 +53,7 @@ Module glsatGS.
         glsatGpreS_version :
         inG Σ (reservation_mapUR (auth_mraUR glv_le));
         glsatGpreS_fuel :
-        inG Σ (reservation_mapUR bankUR);
+        inG Σ (reservation_mapUR (reservation_mapUR bankUR));
         (* We keep track of current owner for each lock, if the owner exists *)
         glsatGpreS_owner :
         inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO gl_owner)));
@@ -93,7 +93,7 @@ Module glsatGS.
       GFunctor (gmap_viewTRF gl_id (prodTRF (agreeTRF $ (laterTF idTF)) (agreeTRF $ (laterTF idTF))));
       GFunctor (reservation_mapUR (dfrac_agreeR $ natO));
       GFunctor (reservation_mapUR (auth_mraUR glv_le));
-      GFunctor (reservation_mapUR bankUR);
+      GFunctor (reservation_mapUR (reservation_mapUR bankUR));
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO gl_owner)))
       ].
 
@@ -190,8 +190,6 @@ Local Definition glG_version_token_id `{SI : indexT} `{GL : ghost_lock_class} `{
   (E : coPset) : iProp Σ :=
   own version_name (reservation_map_token (A:=auth_mraUR glv_le) E).
 
-TODO
-
 (* Fuel: manage credits for a lock's fuel *)
 Definition glG_fuel `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (k : gl_id) (v : gl_version) (a : gl_fuel) : iProp Σ :=
@@ -222,6 +220,8 @@ Global Instance: Params (@glG_owner) 5 := {}.
 Local Definition glG_owner_token `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (E : coPset) : iProp Σ :=
   own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO gl_owner)) E).
+
+TODO
 
 (* Global invariant for ghost locks. *)
 Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} `{!invGS Σ}
