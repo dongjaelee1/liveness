@@ -14,48 +14,43 @@ Proof.
 Qed.
 
 Class ghost_lock_class := {
-    gl_version : Type;
     gl_fuel : Type;
     gl_owner : Type;
-    (* for auth_mra *)
-    #[global] gl_version_auth_mra :: auth_mra_eq_class gl_version;
-    (* (* for gmap *) *)
-    #[global] gl_version_EqDecision :: EqDecision gl_version;
-    #[global] gl_Version_Countable :: Countable gl_version;
-    (* for wfocm *)
     #[global] gl_fuel_wfocm :: WFOCM.pack gl_fuel;
     #[global] gl_owner_EqDecision :: EqDecision gl_owner;
   }.
 
-(* Core relations *)
-Definition glv_le `{GL : ghost_lock_class} : gl_version → gl_version → Prop := auth_mra_R.
-Definition glf_lt `{GL : ghost_lock_class} : gl_fuel → gl_fuel → Prop := WFOCM.ltR.
-
-Variant ghost_lock `{GL : ghost_lock_class} : Type :=
-  | gl_locked (ver : gl_version) (fuel : gl_fuel) (owner : gl_owner)
-  | gl_unlocked (ver : gl_version)
+Variant ghost_lock_state `{GL : ghost_lock_class} : Type :=
+  | gl_locked (fuel : gl_fuel) (owner : gl_owner)
+  | gl_unlocked
 .
+
+Definition gl_version := positive.
+Definition ghost_lock `{GL : ghost_lock_class} : Type := gl_version * ghost_lock_state.
+
+(* Core relations *)
+Definition glf_lt `{GL : ghost_lock_class} : gl_fuel → gl_fuel → Prop := WFOCM.ltR.
+Definition glv_le : gl_version → gl_version → Prop := Pos.le.
 
 Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
   | ghost_lock_progress
       ver fuel1 fuel2 owner1 owner2
       (LTfuel : glf_lt fuel2 fuel1)
     :
-    ghost_lock_step (gl_locked ver fuel1 owner1) (gl_locked ver fuel2 owner2)
+    ghost_lock_step (ver, gl_locked fuel1 owner1) (ver, gl_locked fuel2 owner2)
   | ghost_lock_unlock
       ver fuel owner
     :
-    ghost_lock_step (gl_locked ver fuel owner) (gl_unlocked ver)
+    ghost_lock_step (ver, gl_locked fuel owner) (ver, gl_unlocked)
   | ghost_lock_free
       ver
     :
-    ghost_lock_step (gl_unlocked ver) (gl_unlocked ver)
+    ghost_lock_step (ver, gl_unlocked) (ver, gl_unlocked)
   | ghost_lock_lock
       ver1 ver2 fuel owner
-      (NEver : ver1 ≠ ver2)
-      (GEver : glv_le ver1 ver2)
+      (GTver : (ver1 < ver2)%positive)
     :
-    ghost_lock_step (gl_unlocked ver1) (gl_locked ver2 fuel owner)
+    ghost_lock_step (ver1, gl_unlocked) (ver2, gl_locked fuel owner)
 .
 
 (** To a map *)
@@ -75,9 +70,9 @@ Definition gl_rel_preserves_cond `{GL : ghost_lock_class} (C : gl_cond) (R : gho
 
 (* Some useful gl_conds *)
 Definition gl_cond_owner `{GL : ghost_lock_class} (i : gl_owner) : gl_cond :=
-  λ _ g, match g with | gl_locked _ _ j => (j = i) | _ => False end.
+  λ _ g, match g with | (_, gl_locked _ j) => (j = i) | _ => False end.
 Global Instance gl_cond_owner_dec `{GL : ghost_lock_class} : ∀ i k g, Decision (gl_cond_owner i k g).
-Proof using. intros. rewrite /gl_cond_owner. destruct g; solve_decision. Qed.
+Proof using. intros. rewrite /gl_cond_owner. destruct g. destruct g0; solve_decision. Qed.
 
 Definition gl_cond_one `{GL : ghost_lock_class} (v : gl_id) : gl_cond :=
   λ k _, k = v.
@@ -90,7 +85,7 @@ Definition gls_cond_step `{GL : ghost_lock_class} (C : gl_cond) : ghost_locks �
 Notation "A ↪ₛ B | C" := (gls_cond_step C A B) (at level 20, format "A  ↪ₛ  B  |  C").
 
 Definition gls_alloc `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
-  λ Ω1 Ω2, ∃ k v f o, Ω1 !! k = None ∧ Ω2 = <[k:=gl_locked v f o]> Ω1.
+  λ Ω1 Ω2, ∃ k v f o, Ω1 !! k = None ∧ Ω2 = <[k:=(v, gl_locked f o)]> Ω1.
 Infix "↪ₐ" := (gls_alloc) (at level 20).
 
 Variant gls_step `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
