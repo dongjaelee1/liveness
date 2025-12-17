@@ -118,27 +118,50 @@ Section ghost_locks.
     - rewrite <- IHrtc. eapply gls_cond_rel_dom; eauto.
   Qed.
 
+  (* If C1 and C2 are disjoint, can decompose *)
   Lemma gls_cond_rel_split_cond C C1 C2 R Ω1 Ω2 Ω3 :
-    Transitive R →
-    (∀ k o, C k o ↔ (C1 k o ∨ C2 k o)) →
-    gl_rel_preserves_cond C2 R →
+    (∀ k g, C k g ↔ (C1 k g ∨ C2 k g)) →
+    (∀ k g, (¬ C1 k g) ∨ (¬ C2 k g)) →
+    gl_rel_preserves_cond C1 R →
     gls_cond_rel C1 R Ω1 Ω2 →
     gls_cond_rel C2 R Ω2 Ω3 →
     gls_cond_rel C R Ω1 Ω3.
   Proof using.
-    intros HTR HS1 HCR2. assert (HS2: ∀ k o, (¬ C k o) ↔ ((¬ C1 k o) ∧ (¬ C2 k o))).
+    intros HS1 HDisj HCR1. assert (HS2: ∀ k o, (¬ C k o) ↔ ((¬ C1 k o) ∧ (¬ C2 k o))).
     { intros. firstorder. }
     intros. intros k. specialize (H k). specialize (H0 k).
     inv H.
     - rewrite <-H2 in H0. inv H0. destruct H3 as [(HC1& HR1) | (NHC1& <-)].
       + destruct H5 as [(HC2& HR2) | (NHC2& ->)].
-        * econstructor. left. split; last by etrans. eapply HS1; eauto.
+        * specialize (HCR1 _ _ _ HC1 HR1). destruct (HDisj k y); done.
         * econstructor. left. split; eauto. eapply HS1; eauto.
       + destruct H5 as [(HC2& HR2) | (NHC2& ->)].
         * econstructor. left. split; eauto. eapply HS1; eauto.
         * econstructor. right. split; auto. eapply HS2; eauto.
     - rewrite <-H3 in H0. inv H0. econstructor.
   Qed.
+
+  (* Lemma gls_cond_rel_split_cond C C1 C2 R Ω1 Ω2 Ω3 : *)
+  (*   Transitive R → *)
+  (*   (∀ k o, C k o ↔ (C1 k o ∨ C2 k o)) → *)
+  (*   gl_rel_preserves_cond C2 R → *)
+  (*   gls_cond_rel C1 R Ω1 Ω2 → *)
+  (*   gls_cond_rel C2 R Ω2 Ω3 → *)
+  (*   gls_cond_rel C R Ω1 Ω3. *)
+  (* Proof using. *)
+  (*   intros HTR HS1 HCR2. assert (HS2: ∀ k o, (¬ C k o) ↔ ((¬ C1 k o) ∧ (¬ C2 k o))). *)
+  (*   { intros. firstorder. } *)
+  (*   intros. intros k. specialize (H k). specialize (H0 k). *)
+  (*   inv H. *)
+  (*   - rewrite <-H2 in H0. inv H0. destruct H3 as [(HC1& HR1) | (NHC1& <-)]. *)
+  (*     + destruct H5 as [(HC2& HR2) | (NHC2& ->)]. *)
+  (*       * econstructor. left. split; last by etrans. eapply HS1; eauto. *)
+  (*       * econstructor. left. split; eauto. eapply HS1; eauto. *)
+  (*     + destruct H5 as [(HC2& HR2) | (NHC2& ->)]. *)
+  (*       * econstructor. left. split; eauto. eapply HS1; eauto. *)
+  (*       * econstructor. right. split; auto. eapply HS2; eauto. *)
+  (*   - rewrite <-H3 in H0. inv H0. econstructor. *)
+  (* Qed. *)
 
   Lemma gls_cond_rel_iff_lookup C1 C2 R Ω1 Ω2 :
     gls_cond_rel C1 R Ω1 Ω2 →
