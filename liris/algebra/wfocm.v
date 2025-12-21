@@ -89,3 +89,9 @@ Module WFOCM.
     }.
 
 End WFOCM.
+
+Infix "w=" := OCM.eq (at level 70).
+Infix "w≤" := WFOCM.leR (at level 70).
+Infix "w+" := WFOCM.addO (at level 70).
+Infix "w<" := WFOCM.ltR (at level 70).
+Notation "'w0'" := OCM.unit (at level 20).

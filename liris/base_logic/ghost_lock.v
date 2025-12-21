@@ -25,17 +25,13 @@ Variant ghost_lock_state `{GL : ghost_lock_class} : Type :=
   | gl_unlocked
 .
 
-Definition gl_version := positive.
+Definition gl_version := nat.
 Definition ghost_lock `{GL : ghost_lock_class} : Type := gl_version * ghost_lock_state.
-
-(* Core relations *)
-Definition glf_lt `{GL : ghost_lock_class} : gl_fuel → gl_fuel → Prop := WFOCM.ltR.
-Definition glv_le : gl_version → gl_version → Prop := Pos.le.
 
 Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
   | ghost_lock_progress
       ver fuel1 fuel2 owner1 owner2
-      (LTfuel : glf_lt fuel2 fuel1)
+      (LTfuel : fuel2 w< fuel1)
     :
     ghost_lock_step (ver, gl_locked fuel1 owner1) (ver, gl_locked fuel2 owner2)
   | ghost_lock_unlock
@@ -48,7 +44,7 @@ Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock →
     ghost_lock_step (ver, gl_unlocked) (ver, gl_unlocked)
   | ghost_lock_lock
       ver1 ver2 fuel owner
-      (GTver : (ver1 < ver2)%positive)
+      (GTver : (ver1 < ver2)%nat)
     :
     ghost_lock_step (ver1, gl_unlocked) (ver2, gl_locked fuel owner)
 .
@@ -63,7 +59,6 @@ Notation ghost_locks := (gmap gl_id ghost_lock).
 Definition gl_cond `{GL : ghost_lock_class} := (gl_id → ghost_lock → Prop).
 Definition gls_cond_rel `{GL : ghost_lock_class} (C : gl_cond) (R : ghost_lock → ghost_lock → Prop) : ghost_locks → ghost_locks → Prop :=
   λ Ω1 Ω2, map_Forall2 (λ k g1 g2, (C k g1 ∧ R g1 g2) ∨ ((¬ C k g1) ∧ g1 = g2)) Ω1 Ω2.
-(* λ Ω1 Ω2, map_Forall2 (λ k g1 g2, (C k g1 → R g1 g2) ∧ ((¬ C k g1) → g1 = g2)) Ω1 Ω2. *)
 
 Definition gl_rel_preserves_cond `{GL : ghost_lock_class} (C : gl_cond) (R : ghost_lock → ghost_lock → Prop) : Prop :=
   ∀ k g1 g2, C k g1 → R g1 g2 → C k g2.
@@ -180,3 +175,15 @@ Section ghost_locks.
   Proof using. intros. eapply gls_cond_rel_iff_lookup; eauto. Qed.
 
 End ghost_locks.
+
+(** Witness of each version *)
+Definition gl_witness `{GL : ghost_lock_class} : Type := gl_version → gl_fuel.
+
+Fixpoint gl_witness_sum `{GL : ghost_lock_class} (w : gl_witness) (v : gl_version) : gl_fuel :=
+  match v with
+  | O => w v
+  | S u => (gl_witness_sum w u) w+ (w v)
+  end.
+Notation "'gΣ' w v" := (gl_witness_sum w v) (at level 20, format "gΣ  w  v").
+
+Definition gl_witness_constant `{GL : ghost_lock_class} (c : gl_fuel) : gl_witness := λ _, c.
