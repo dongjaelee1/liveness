@@ -597,7 +597,7 @@ Section glsat.
 
   Lemma glG_fuel_lt k a0 a1 :
     a0 w< a1 →
-    glG_fuel k a1 ⊢ |==> glG_fuel k a0 ∗ ∃ c, ⌜ w0 w< c ⌝ ∗ glG_fuel k c.
+    glG_fuel k a1 ⊢ |==> glG_fuel k a0 ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ glG_fuel k c.
   Proof.
     intros LT. apply WFOCM.lt_exists_left in LT. destruct LT as (?& ?& ?).
     iIntros "H". iMod (glG_fuel_mon_split _ _ _ _ H0 with "H") as "[H1 H2]".
@@ -605,14 +605,14 @@ Section glsat.
   Qed.
   Lemma glG_fuel_lt_list L a0 a1 :
     a0 w< a1 →
-    ([∗ list] k ∈ L, glG_fuel k a1) ⊢ |==> ([∗ list] k ∈ L, glG_fuel k a0) ∗ ([∗ list] k ∈ L, ∃ c, ⌜ w0 w< c ⌝ ∗ glG_fuel k c).
+    ([∗ list] k ∈ L, glG_fuel k a1) ⊢ |==> ([∗ list] k ∈ L, glG_fuel k a0) ∗ ([∗ list] k ∈ L, ∃ c, ⌜ wzero w< c ⌝ ∗ glG_fuel k c).
   Proof.
     iIntros (LT) "H". rewrite -big_sepL_sep. iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
     iModIntro. iIntros. by iApply glG_fuel_lt.
   Qed.
   Lemma glG_fuel_lt_set L a0 a1 :
     a0 w< a1 →
-    ([∗ set] k ∈ L, glG_fuel k a1) ⊢ |==> ([∗ set] k ∈ L, glG_fuel k a0) ∗ ([∗ set] k ∈ L, ∃ c, ⌜ w0 w< c ⌝ ∗ glG_fuel k c).
+    ([∗ set] k ∈ L, glG_fuel k a1) ⊢ |==> ([∗ set] k ∈ L, glG_fuel k a0) ∗ ([∗ set] k ∈ L, ∃ c, ⌜ wzero w< c ⌝ ∗ glG_fuel k c).
   Proof.
     iIntros (LE) "H". rewrite -big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
     iModIntro. iIntros. by iApply glG_fuel_lt.
@@ -1002,7 +1002,7 @@ Section glsat.
 
   Lemma glsat_progress_one Ω k v a t c :
     (Ω !! k = Some (v, gl_locked a t)) →
-    (w0 w< c) →
+    (wzero w< c) →
     glsat Ω ∗ glG_fuel k c
     ⊢ |==> ∃ a', glsat (<[k:=(v, gl_locked a' t)]>Ω) ∗
               (⌜ ghost_lock_step (v, gl_locked a t) (v, gl_locked a' t) ⌝).
@@ -1026,12 +1026,12 @@ Section glsat.
   Lemma glsat_obl_progress Ω (C : gl_cond) :
     (∀ k g, C k g → ∃ v a o, g = (v, gl_locked a o)) →
     glsat Ω ∗
-    ([∗ map] k ↦ g ∈ Ω, (⌜ C k g ⌝ ∗ ∃ c, ⌜ w0 w< c ⌝ ∗ glG_fuel k c) ∨ (⌜ ¬ C k g ⌝))
+    ([∗ map] k ↦ g ∈ Ω, (⌜ C k g ⌝ ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ glG_fuel k c) ∨ (⌜ ¬ C k g ⌝))
     ⊢ |==> ∃ Ω', glsat Ω' ∗ (⌜ Ω ↪ₛ Ω' | C ⌝).
   Proof.
     iIntros (HC) "(Hsat & Cs)".
     iAssert (∃ Ω1 Ω2, (⌜ Ω1 ##ₘ Ω2 ∧ Ω = Ω1 ∪ Ω2 ∧ map_Forall (λ k g, C k g) Ω1 ∧ map_Forall (λ k g, ¬ C k g) Ω2 ⌝) ∗
-                      ([∗ map] k ↦ g ∈ Ω1, (⌜ C k g ⌝ ∗ ∃ c, ⌜ w0 w< c ⌝ ∗ glG_fuel k c)) ∗
+                      ([∗ map] k ↦ g ∈ Ω1, (⌜ C k g ⌝ ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ glG_fuel k c)) ∗
                       ([∗ map] k ↦ g ∈ Ω2, (⌜ ¬ C k g ⌝))
             )%I with "[Cs]" as "(%& %& (%Disj& %EQO& %CO1& %CO2)& Cs& NCs)".
     { iStopProof. induction Ω using map_ind; iIntros "M".
@@ -1102,7 +1102,7 @@ Section glsat.
 
   Lemma glsat_progress_owner Ω k v a t1 t2 c :
     (Ω !! k = Some (v, gl_locked a t1)) →
-    (w0 w< c) →
+    (wzero w< c) →
     glsat Ω ∗ glG_owner k t1 (1/2 + 1/2/2)%Qp ∗ glG_fuel k c
     ⊢ |==> ∃ a', glsat (<[k:=(v, gl_locked a' t2)]>Ω) ∗ glG_owner k t2 (1/2 + 1/2/2)%Qp ∗
               (⌜ ghost_lock_step (v, gl_locked a t1) (v, gl_locked a' t2) ⌝).
@@ -1123,6 +1123,33 @@ Section glsat.
     rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
     rewrite insert_delete_eq. iFrame.
     iPureIntro. econstructor. eapply WFOCM.lt_le_lt; eauto.
+  Qed.
+
+  Lemma Qp_add_help_1 : (1 / 2 + 1 / 2 / 2 + 1 / 2 / 2 = 1)%Qp.
+  Proof. by rewrite -Qp.add_assoc !Qp.div_2. Qed.
+
+  Lemma glsat_unlock Ω k t :
+    glsat Ω ∗ glG_elem k ∗ glG_locked k (1/2 + 1/2/2)%Qp ∗ glG_owner k t (1/2 + 1/2/2)%Qp
+    ⊢ |==> ∃ v, glsat (<[k:=(v, gl_unlocked)]>Ω) ∗
+             glG_unlocked k (1/2 + 1/2/2)%Qp ∗
+             ∀ a, (⌜ ghost_lock_step (v, gl_locked a t) (v, gl_unlocked) ⌝).
+  Proof.
+    iIntros "(Hsat& #Ge& Gl& Go)".
+    iPoseProof (glsat_lookup_locked with "[$Hsat $Ge $Gl]") as "(%&%&%& %LU)".
+    rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
+    iDestruct "Hk" as "(#Gek& (Glk& Gvk& (%& %LEa& Gfspk)& Gok))".
+    iMod (glG_locked_to_unlocked_2 with "[$Gl $Glk]") as "(Gl& Glk)".
+    { apply Qp_add_help_1. }
+    iPoseProof (glG_owner_agree with "[$Go $Gok]") as "(%& %)". clear H0. subst t0.
+    iCombine "Go Gok" as "Gok". rewrite Qp_add_help_1.
+    iModIntro. iExists v.
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v, gl_unlocked)) with "[HM Glk Gvk Gok Gfspk]") as "HM".
+    { apply lookup_delete_eq. }
+    { iFrame "HM Ge". iFrame. iLeft. iFrame. }
+    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
+    rewrite insert_delete_eq. iFrame.
+    iPureIntro. econstructor.
   Qed.
 
   (* TODO: step rules: unlock, free, lock; done & pin rules *)
