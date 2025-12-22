@@ -373,6 +373,13 @@ Section glsat.
     rewrite /glG_locked /glG_unlocked -!own_op -!reservation_map_data_op.
     intros Heq. by apply own_update, reservation_map_update, frac_agree_update_2.
   Qed.
+  Lemma glG_unlocked_to_locked_2 k q1 q2 :
+    (q1 + q2 = 1)%Qp →
+    glG_unlocked k q1 ∗ glG_unlocked k q2 ⊢ |==> glG_locked k q1 ∗ glG_locked k q2.
+  Proof.
+    rewrite /glG_locked /glG_unlocked -!own_op -!reservation_map_data_op.
+    intros Heq. by apply own_update, reservation_map_update, frac_agree_update_2.
+  Qed.
   Lemma glG_unlocked_to_done_2 k q1 q2 :
     (q1 + q2 = 1)%Qp →
     glG_unlocked k q1 ∗ glG_unlocked k q2 ⊢ |==> glG_done k.
@@ -443,6 +450,16 @@ Section glsat.
     rewrite /glG_version. intros Hle.
     apply own_update, reservation_map_update, auth_mra_update; eauto.
     apply _.
+  Qed.
+  Lemma glG_version_update_mon_2 k v1 v2 q1 q2 :
+    (q1 + q2 = 1)%Qp →
+    (v1 ≤ v2) →
+    glG_version k v1 q1 ∗ glG_version k v1 q2 ⊢ |==> glG_version k v2 q1 ∗ glG_version k v2 q2.
+  Proof.
+    intros Hq Hle. rewrite /glG_version -!own_op -!reservation_map_data_op.
+    apply own_update, reservation_map_update.
+    rewrite -!auth_mra_auth_dfrac_op !dfrac_op_own !Hq.
+    apply auth_mra_update; eauto. apply _.
   Qed.
   Lemma glG_version_update_pin k v q :
     glG_version k v q ⊢ |==> glG_version_pin k v.
@@ -1132,7 +1149,7 @@ Section glsat.
     glsat Ω ∗ glG_elem k ∗ glG_locked k (1/2 + 1/2/2)%Qp ∗ glG_owner k t (1/2 + 1/2/2)%Qp
     ⊢ |==> ∃ v, glsat (<[k:=(v, gl_unlocked)]>Ω) ∗
              glG_unlocked k (1/2 + 1/2/2)%Qp ∗
-             ∀ a, (⌜ ghost_lock_step (v, gl_locked a t) (v, gl_unlocked) ⌝).
+             (⌜ ∀ a, ghost_lock_step (v, gl_locked a t) (v, gl_unlocked) ⌝).
   Proof.
     iIntros "(Hsat& #Ge& Gl& Go)".
     iPoseProof (glsat_lookup_locked with "[$Hsat $Ge $Gl]") as "(%&%&%& %LU)".
@@ -1152,7 +1169,44 @@ Section glsat.
     iPureIntro. econstructor.
   Qed.
 
-  (* TODO: step rules: unlock, free, lock; done & pin rules *)
+  Lemma glsat_lock Ω k v1 v2 α t a :
+    v1 < v2 →
+    glsat Ω ∗ glG_elem k ∗
+    glG_unlocked k (1/2 + 1/2/2)%Qp ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ glG_fuel_supply k α (1/2)%Qp
+    ⊢ |==> glsat (<[k:=(v2, gl_locked (α w+ a) t)]>Ω) ∗
+        glG_locked k (1/2 + 1/2/2)%Qp ∗
+        glG_version k v2 (1/2 + 1/2/2)%Qp ∗
+        glG_fuel_supply k (α w+ a) (1/2)%Qp ∗ glG_fuel k a ∗
+        glG_owner k t (1/2 + 1/2/2)%Qp ∗
+        (⌜ ghost_lock_step (v1, gl_unlocked) (v2, gl_locked (α w+ a) t) ⌝).
+  Proof.
+    iIntros (LTv) "(Hsat& #Ge& Gu& Gv& Gfs)".
+    iPoseProof (glsat_lookup_unlocked with "[$Hsat $Ge $Gu]") as "(%& %LU)".
+    iPoseProof (glsat_lookup_version with "[$Hsat $Ge $Gv]") as "(%& %LU2)".
+    rewrite LU in LU2. inv LU2.    
+    rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
+    iDestruct "Hk" as "(_& ([(Guk& Gvk& %& Gfsk) | (#Gdk& #Gvpk & _)]& %& Gok))"; cycle 1.
+    { iPoseProof (glG_unlocked_done_false with "[$Gu $Gdk]") as "%". inv H. }
+    iMod (glG_unlocked_to_locked_2 with "[$Gu $Guk]") as "(Gu& Guk)".
+    { apply Qp_add_help_1. }
+    iMod (glG_version_update_mon_2 _ _ v2 with "[$Gv $Gvk]") as "[Gv Gvk]".
+    { apply Qp_add_help_1. }
+    { lia. }
+    iMod (glG_fuel_supply_issue_2 _ _ _ α _ a with "[$Gfs $Gfsk]") as "(Gfs& Gfsk& Gf)".
+    { apply Qp.div_2. }
+    iMod (glG_owner_update _ _ t with "Gok") as "[Go Gok]". iDestruct "Gok" as "[Go' Gok]".
+    iCombine "Go Go'" as "Go".
+    iModIntro. iFrame "Gu Gv Gfs Gf Go".
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v2, gl_locked (α w+ a) t)) with "[HM Guk Gvk Gok Gfsk]") as "HM".
+    { apply lookup_delete_eq. }
+    { iFrame "HM Ge". iFrame. done. }
+    rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
+    rewrite insert_delete_eq. iFrame.
+    iPureIntro. econstructor. auto.
+  Qed.
+
+  (* TODO: step rules: lock; done & pin rules *)
 
   Lemma glsat_obl_resolve_one Ω k P R x0 :
     glsat Ω ∗ glG_elem k ∗ glG_holds k P R ∗ (▷ R) ∗

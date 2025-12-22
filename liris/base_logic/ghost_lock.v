@@ -38,10 +38,6 @@ Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock →
       ver fuel owner
     :
     ghost_lock_step (ver, gl_locked fuel owner) (ver, gl_unlocked)
-  | ghost_lock_free
-      ver
-    :
-    ghost_lock_step (ver, gl_unlocked) (ver, gl_unlocked)
   | ghost_lock_lock
       ver1 ver2 fuel owner
       (GTver : (ver1 < ver2)%nat)
