@@ -176,15 +176,3 @@ Section ghost_locks.
   Proof using. intros. eapply gls_cond_rel_iff_lookup; eauto. Qed.
 
 End ghost_locks.
-
-(** Witness of each version *)
-Definition gl_witness `{GL : ghost_lock_class} : Type := gl_version → gl_fuel.
-
-Fixpoint gl_witness_sum `{GL : ghost_lock_class} (w : gl_witness) (v : gl_version) : gl_fuel :=
-  match v with
-  | O => w v
-  | S u => (gl_witness_sum w u) w+ (w v)
-  end.
-Notation "'gΣ' w v" := (gl_witness_sum w v) (at level 20, format "gΣ  w  v").
-
-Definition gl_witness_constant `{GL : ghost_lock_class} (c : gl_fuel) : gl_witness := λ _, c.
