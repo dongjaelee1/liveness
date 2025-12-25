@@ -142,6 +142,6 @@ Fixpoint gl_witness_sum `{GL : ghost_lock_class} (ξ : gl_witness) (v : gl_versi
   | O => ξ v
   | S u => (gl_witness_sum ξ u) w+ (ξ v)
   end.
-Notation "'gΣ' ξ v" := (gl_witness_sum ξ v) (at level 20, format "gΣ  ξ  v").
+Notation "'Σ[' ξ ']' v" := (gl_witness_sum ξ v) (at level 20, format "Σ[ ξ ]  v").
 
 Definition gl_witness_constant `{GL : ghost_lock_class} (c : gl_fuel) : gl_witness := λ _, c.

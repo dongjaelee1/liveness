@@ -12,17 +12,20 @@ Module glwitGS.
 
   Class glwitGpreS `{SI : indexT} `{GL : ghost_lock_class} (Σ : gFunctors) : Set :=
     GlwitGpreS {
+        glwitGpreS_witfun : inG Σ (gmap_viewR gl_id (agreeR (leibnizO gl_witness)));
         glwitGpreS_witness : inG Σ (reservation_mapUR (reservation_mapUR bcredUR));
       }.
 
   Class glwitGS `{SI : indexT} `{GL : ghost_lock_class} (Σ : gFunctors) : Set :=
     GlwitG {
         glwit_inG : glwitGpreS Σ;
+        witfun_name : gname;
         witness_name : gname;
       }.
 
   Definition glwitΣ `{SI : indexT} `{GL : ghost_lock_class} : gFunctors :=
-    #[GFunctor (reservation_mapUR (reservation_mapUR bcredUR))
+    #[GFunctor (gmap_viewR gl_id (agreeR (leibnizO gl_witness)));
+      GFunctor (reservation_mapUR (reservation_mapUR bcredUR))
       ].
 
   Global Instance subG_glwitΣ `{SI : indexT} `{GL : ghost_lock_class} {Σ} : subG (glwitΣ) Σ → (glwitGpreS Σ).
@@ -34,7 +37,18 @@ Import glwitGS.
 (** User interface *)
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
-Local Existing Instances glwit_inG glwitGpreS_witness.
+Local Existing Instances glwit_inG glwitGpreS_witfun glwitGpreS_witness.
+
+(* Witfun: Witness for each version *)
+Definition witG_witfun `{SI : indexT} `{GL : ghost_lock_class} `{!glwitGS Σ}
+  (k : gl_id) (ξ : gl_witness) : iProp Σ :=
+  own witfun_name (gmap_view_frag k DfracDiscarded (to_agree (ξ : leibnizO gl_witness))).
+Global Typeclasses Opaque witG_witfun.
+Global Instance: Params (@witG_witfun) 5 := {}.
+
+Local Definition witG_witfun_auth_id `{SI : indexT} `{GL : ghost_lock_class} `{!glwitGS Σ}
+  (m : gmap gl_id gl_witness) : iProp Σ :=
+  own witfun_name (gmap_view_auth (V:=agreeR (leibnizO gl_witness)) (DfracOwn 1) (to_agree <$> m)).
 
 (* Witness: manage credits for ghost lock's witness progresses *)
 Definition witG_witness `{SI : indexT} `{GL : ghost_lock_class} `{!glwitGS Σ}
@@ -66,46 +80,58 @@ Definition glwit `{SI : indexT} `{GL : ghost_lock_class} {Σ}
         ∃ (vs : gset gl_version),
           witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode vs)) ∗
           ([∗ set] u ∈ vs, ⌜ u ≤ v ⌝) ∗
-        match w with
-        | wit_locked w =>
-            ∃ α, (⌜ WFOCM.leR w α ⌝) ∗ witG_credit k v α
-        | wit_unlocked =>
-            oblG_done k
-        end)
+          (∃ ξ, witG_witfun k ξ ∗
+                ((∃ β, glG_fuel_supply k β (1/2)%Qp ∗ (⌜ β w≤ Σ[ξ] v ⌝))
+                 ∨ (glG_done k ∗ glG_version_pin k v))) ∗
+          match w with
+          | wit_locked w =>
+              (∃ α, (⌜ WFOCM.leR w α ⌝) ∗ witG_credit k v α)
+          | wit_unlocked =>
+              True
+          end)
     )%I.
 
 (* Global invariant that relates witnesses to obligations *)
-Definition obl_wit `{WFA : WFOCM.pack A}
-  `{Ξl : obl_live_class A T WFOCM.ltR} `{Ξd : obl_done_class ps}
-  `{Ξw : wit_live_class A WFOCM.ltR}
-  (ξ : A → A)
-  (Ω : obl_states) (W : wit_states) : Prop :=
-  map_Forall2 (λ k o w,
-                 match o, w with
-                 | inl d, inl e =>
-                     WFOCM.leR (wit_credit e) (ξ (obl_fuel d))
-                     (* WFOCM.leR (obl_fuel d) (wit_credit e) ∧ WFOCM.leR (wit_credit e) (ξ (obl_fuel d)) *)
-                 | inr _, inr _ => True
+Definition glwit_inv `{GL : ghost_lock_class}
+  (η : gl_fuel → gl_fuel) (Ω : ghost_locks) (W : witnesses) : Prop :=
+  map_Forall2 (λ k g w,
+                 match g, w with
+                 | (v1, gl_locked a _), (v2, wit_locked b) =>
+                     (v1 = v2 ∧ b w≤ η a)
+                 | (v1, gl_unlocked), (v2, wit_unlocked) =>
+                     (v1 = v2)
                  | _, _ => False
                  end
     ) Ω W.
 
 (** Properties *)
 Section glwit.
-  Context `{SI : indexT} `{WFA : WFOCM.pack A}.
-  Context {Σ} `{!@osatGS.osatGS _ _ WFA ps T Σ} `{!glwitGS Σ}.
-  Context `{Ξl : obl_live_class A T WFOCM.ltR} `{Ξd : obl_done_class ps}.
-  Context `{Ξw : wit_live_class A WFOCM.ltR}.
+  Context `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS.glsatGS Σ} `{!invGS Σ} `{!glwitGS Σ}.
 
-  Global Instance glwitG_witness_persistent k ℵ : Persistent (glwitG_witness k ℵ).
-  Proof. rewrite /glwitG_witness. apply _. Qed.
+  (* Witfun *)
+  Global Instance witG_witfun_persistent k ξ : Persistent (witG_witfun k ξ).
+  Proof. rewrite /witG_witfun. apply _. Qed.
+  Global Instance witG_witfun_timeless k ξ : Timeless (witG_witfun k ξ).
+  Proof. rewrite /witG_witfun. apply _. Qed.
 
-  Global Instance glwitG_witness_timeless k ℵ : Timeless (glwitG_witness k ℵ).
-  Proof. rewrite /glwitG_witness. apply _. Qed.
-  Global Instance glwitG_credit_timeless k ℵ : Timeless (glwitG_credit k ℵ).
-  Proof. rewrite /glwitG_credit. apply _. Qed.
+  Local Instance witG_witfun_auth_id_timeless m : Timeless (witG_witfun_auth_id m).
+  Proof. rewrite /witG_witfun_auth_id. apply _. Qed.
 
+  (* Witness *)
+  Global Instance witG_witness_persistent k v ℵ : Persistent (witG_witness k v ℵ).
+  Proof. rewrite /witG_witness. apply _. Qed.
+  Global Instance witG_witness_timeless k v ℵ : Timeless (witG_witness k v ℵ).
+  Proof. rewrite /witG_witness. apply _. Qed.
 
+  Global Instance witG_credit_timeless k v a : Timeless (witG_credit k v a).
+  Proof. rewrite /witG_credit. apply _. Qed.
+
+  Local Instance witG_witness_token_id_timeless E : Timeless (witG_witness_token_id E).
+  Proof. rewrite /witG_witness_token_id. apply _. Qed.
+  Local Instance witG_witness_token_version_timeless k E : Timeless (witG_witness_token_version k E).
+  Proof. rewrite /witG_witness_token_version. apply _. Qed.
+
+  TODO
 
   (* Fuel *)
   Global Instance glG_fuel_timeless k v a : Timeless (glG_fuel k v a).
@@ -136,113 +162,113 @@ Section glwit.
   Local Notation "/0" := OCM.unit.
 
   (** Witness credit rules *)
-  Lemma glwitG_credit_eq i a0 a1 :
+  Lemma witG_credit_eq i a0 a1 :
     a0 /= a1 →
-    glwitG_credit i a0 = glwitG_credit i a1.
-  Proof. intros EQ. rewrite /glwitG_credit. by erewrite credit_eq. Qed.
-  Lemma glwitG_credit_eq_list L a0 a1 :
+    witG_credit i a0 = witG_credit i a1.
+  Proof. intros EQ. rewrite /witG_credit. by erewrite credit_eq. Qed.
+  Lemma witG_credit_eq_list L a0 a1 :
     a0 /= a1 →
-    ([∗ list] i ∈ L, glwitG_credit i a0)%I ≡ ([∗ list] i ∈ L, glwitG_credit i a1)%I.
-  Proof. intros. apply big_opL_proper. intros. erewrite glwitG_credit_eq; eauto. Qed.
-  Lemma glwitG_credit_eq_set L a0 a1 :
+    ([∗ list] i ∈ L, witG_credit i a0)%I ≡ ([∗ list] i ∈ L, witG_credit i a1)%I.
+  Proof. intros. apply big_opL_proper. intros. erewrite witG_credit_eq; eauto. Qed.
+  Lemma witG_credit_eq_set L a0 a1 :
     a0 /= a1 →
-    ([∗ set] i ∈ L, glwitG_credit i a0)%I ≡ ([∗ set] i ∈ L, glwitG_credit i a1)%I.
-  Proof. intros. apply big_opS_proper. intros. erewrite glwitG_credit_eq; eauto. Qed.
+    ([∗ set] i ∈ L, witG_credit i a0)%I ≡ ([∗ set] i ∈ L, witG_credit i a1)%I.
+  Proof. intros. apply big_opS_proper. intros. erewrite witG_credit_eq; eauto. Qed.
 
-  Lemma glwitG_credit_mon i a0 a1 :
+  Lemma witG_credit_mon i a0 a1 :
     a0 /≤ a1 →
-    glwitG_credit i a1 ⊢ |==> glwitG_credit i a0.
+    witG_credit i a1 ⊢ |==> witG_credit i a0.
   Proof.
-    intros LE. rewrite /glwitG_credit. apply own_update.
+    intros LE. rewrite /witG_credit. apply own_update.
     by apply reservation_map_update, credit_update.
   Qed.
-  Lemma glwitG_credit_mon_list L a0 a1 :
+  Lemma witG_credit_mon_list L a0 a1 :
     a0 /≤ a1 →
-    ([∗ list] i ∈ L, glwitG_credit i a1) ⊢ |==> ([∗ list] i ∈ L, glwitG_credit i a0).
+    ([∗ list] i ∈ L, witG_credit i a1) ⊢ |==> ([∗ list] i ∈ L, witG_credit i a0).
   Proof.
     iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-    iModIntro. iIntros. by iApply glwitG_credit_mon.
+    iModIntro. iIntros. by iApply witG_credit_mon.
   Qed.
-  Lemma glwitG_credit_mon_set L a0 a1 :
+  Lemma witG_credit_mon_set L a0 a1 :
     a0 /≤ a1 →
-    ([∗ set] i ∈ L, glwitG_credit i a1) ⊢ |==> ([∗ set] i ∈ L, glwitG_credit i a0).
+    ([∗ set] i ∈ L, witG_credit i a1) ⊢ |==> ([∗ set] i ∈ L, witG_credit i a0).
   Proof.
     iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
-    iModIntro. iIntros. by iApply glwitG_credit_mon.
+    iModIntro. iIntros. by iApply witG_credit_mon.
   Qed.
 
-  Lemma glwitG_credit_split i a0 a1 :
-    glwitG_credit i (a0 /+ a1) ⊣⊢ glwitG_credit i a0 ∗ glwitG_credit i a1.
+  Lemma witG_credit_split i a0 a1 :
+    witG_credit i (a0 /+ a1) ⊣⊢ witG_credit i a0 ∗ witG_credit i a1.
   Proof.
-    rewrite /glwitG_credit. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
+    rewrite /witG_credit. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
     - iEval (rewrite credit_split) in "H". iDestruct "H" as "[H1 H2]". iFrame.
     - iEval (rewrite credit_split). iSplitL "H1"; iFrame.
   Qed.
-  Lemma glwitG_credit_split_list L a0 a1 :
-    ([∗ list] i ∈ L, glwitG_credit i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, glwitG_credit i a0) ∗ ([∗ list] i ∈ L, glwitG_credit i a1).
+  Lemma witG_credit_split_list L a0 a1 :
+    ([∗ list] i ∈ L, witG_credit i (a0 /+ a1)) ⊣⊢ ([∗ list] i ∈ L, witG_credit i a0) ∗ ([∗ list] i ∈ L, witG_credit i a1).
   Proof.
-    rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply glwitG_credit_split.
+    rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply witG_credit_split.
   Qed.
-  Lemma glwitG_credit_split_set L a0 a1 :
-    ([∗ set] i ∈ L, glwitG_credit i (a0 /+ a1)) ⊣⊢ ([∗ set] i ∈ L, glwitG_credit i a0) ∗ ([∗ set] i ∈ L, glwitG_credit i a1).
+  Lemma witG_credit_split_set L a0 a1 :
+    ([∗ set] i ∈ L, witG_credit i (a0 /+ a1)) ⊣⊢ ([∗ set] i ∈ L, witG_credit i a0) ∗ ([∗ set] i ∈ L, witG_credit i a1).
   Proof.
-    rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply glwitG_credit_split.
-  Qed.
-
-  Lemma glwitG_credit_mon_split i a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    glwitG_credit i a2 ⊢ |==> glwitG_credit i a0 ∗ glwitG_credit i a1.
-  Proof.
-    intros LE. iIntros "H". iApply glwitG_credit_split. iApply glwitG_credit_mon; done.
-  Qed.
-  Lemma glwitG_credit_mon_split_list L a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    ([∗ list] i ∈ L, glwitG_credit i a2) ⊢ |==> ([∗ list] i ∈ L, glwitG_credit i a0) ∗ ([∗ list] i ∈ L, glwitG_credit i a1).
-  Proof.
-    iIntros (LE) "H". iPoseProof (glwitG_credit_mon_list with "H") as ">H"; first done.
-    by iApply glwitG_credit_split_list.
-  Qed.
-  Lemma glwitG_credit_mon_split_set L a0 a1 a2 :
-    a0 /+ a1 /≤ a2 →
-    ([∗ set] i ∈ L, glwitG_credit i a2) ⊢ |==> ([∗ set] i ∈ L, glwitG_credit i a0) ∗ ([∗ set] i ∈ L, glwitG_credit i a1).
-  Proof.
-    iIntros (LE) "H". iPoseProof (glwitG_credit_mon_set with "H") as ">H"; first done.
-    by iApply glwitG_credit_split_set.
+    rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply witG_credit_split.
   Qed.
 
-  Lemma glwitG_credit_lt i a0 a1 :
+  Lemma witG_credit_mon_split i a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    witG_credit i a2 ⊢ |==> witG_credit i a0 ∗ witG_credit i a1.
+  Proof.
+    intros LE. iIntros "H". iApply witG_credit_split. iApply witG_credit_mon; done.
+  Qed.
+  Lemma witG_credit_mon_split_list L a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    ([∗ list] i ∈ L, witG_credit i a2) ⊢ |==> ([∗ list] i ∈ L, witG_credit i a0) ∗ ([∗ list] i ∈ L, witG_credit i a1).
+  Proof.
+    iIntros (LE) "H". iPoseProof (witG_credit_mon_list with "H") as ">H"; first done.
+    by iApply witG_credit_split_list.
+  Qed.
+  Lemma witG_credit_mon_split_set L a0 a1 a2 :
+    a0 /+ a1 /≤ a2 →
+    ([∗ set] i ∈ L, witG_credit i a2) ⊢ |==> ([∗ set] i ∈ L, witG_credit i a0) ∗ ([∗ set] i ∈ L, witG_credit i a1).
+  Proof.
+    iIntros (LE) "H". iPoseProof (witG_credit_mon_set with "H") as ">H"; first done.
+    by iApply witG_credit_split_set.
+  Qed.
+
+  Lemma witG_credit_lt i a0 a1 :
     a0 /< a1 →
-    glwitG_credit i a1 ⊢ |==> glwitG_credit i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ glwitG_credit i c.
+    witG_credit i a1 ⊢ |==> witG_credit i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ witG_credit i c.
   Proof.
     intros LT. apply WFOCM.lt_exists_left in LT. destruct LT as (?& ?& ?).
-    iIntros "H". iMod (glwitG_credit_mon_split _ _ _ _ H1 with "H") as "[H1 H2]".
+    iIntros "H". iMod (witG_credit_mon_split _ _ _ _ H1 with "H") as "[H1 H2]".
     iModIntro. iSplitL "H1"; iFrame. done.
   Qed.
-  Lemma glwitG_credit_lt_list L a0 a1 :
+  Lemma witG_credit_lt_list L a0 a1 :
     a0 /< a1 →
-    ([∗ list] i ∈ L, glwitG_credit i a1) ⊢ |==> ([∗ list] i ∈ L, glwitG_credit i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ glwitG_credit i c).
+    ([∗ list] i ∈ L, witG_credit i a1) ⊢ |==> ([∗ list] i ∈ L, witG_credit i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ witG_credit i c).
   Proof.
     iIntros (LT) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-    iModIntro. iIntros. by iApply glwitG_credit_lt.
+    iModIntro. iIntros. by iApply witG_credit_lt.
   Qed.
-  Lemma glwitG_credit_lt_set L a0 a1 :
+  Lemma witG_credit_lt_set L a0 a1 :
     a0 /< a1 →
-    ([∗ set] i ∈ L, glwitG_credit i a1) ⊢ |==> ([∗ set] i ∈ L, glwitG_credit i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ glwitG_credit i c).
+    ([∗ set] i ∈ L, witG_credit i a1) ⊢ |==> ([∗ set] i ∈ L, witG_credit i a0 ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ witG_credit i c).
   Proof.
     iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
-    iModIntro. iIntros. by iApply glwitG_credit_lt.
+    iModIntro. iIntros. by iApply witG_credit_lt.
   Qed.
 
-  Lemma glwitG_witness_mon k a0 a1 :
+  Lemma witG_witness_mon k a0 a1 :
     a0 /≤ a1 →
-    glwitG_witness k a0 ⊢ |==> glwitG_witness k a1.
+    witG_witness k a0 ⊢ |==> witG_witness k a1.
   Proof.
-    intros LE. rewrite /glwitG_witness. apply own_update.
+    intros LE. rewrite /witG_witness. apply own_update.
     by apply reservation_map_update, cmra_update_included, credit_bound_included.
   Qed.
 
-  Lemma glwitG_credit_spend_gen i a0 a1 :
-    glwitG_witness i a0 ∗ glwitG_credit i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ glwitG_witness i a2.
+  Lemma witG_credit_spend_gen i a0 a1 :
+    witG_witness i a0 ∗ witG_credit i a1 ⊢ |==> ∃ a2, ⌜(a1 /+ a2) /≤ a0⌝ ∗ witG_witness i a2.
   Proof.
     rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)".
     { rewrite -reservation_map_data_op.
@@ -256,32 +282,32 @@ Section glwit.
     iSimpl. iDestruct "H" as "((%a2 & %EQ & %LE) & H)".
     iExists a2. subst. iModIntro. iSplitR; done.
   Qed.
-  Lemma glwitG_credit_spend i a0 a1 :
+  Lemma witG_credit_spend i a0 a1 :
     /0 /< a1 →
-    glwitG_witness i a0 ∗ glwitG_credit i a1 ⊢ |==> ∃ a2, ⌜a2 /< a0⌝ ∗ glwitG_witness i a2.
+    witG_witness i a0 ∗ witG_credit i a1 ⊢ |==> ∃ a2, ⌜a2 /< a0⌝ ∗ witG_witness i a2.
   Proof.
-    iIntros (LT) "[Ow Oc]". iMod (glwitG_credit_spend_gen with "[$]") as "(%&%&$)".
+    iIntros (LT) "[Ow Oc]". iMod (witG_credit_spend_gen with "[$]") as "(%&%&$)".
     iPureIntro. eapply WFOCM.lt_exists_right; eauto.
   Qed.
 
-  Lemma glwitG_compare i a0 a1 :
-    glwitG_witness i a0 ∗ glwitG_credit i a1 ⊢ ⌜ a1 /≤ a0 ⌝.
+  Lemma witG_compare i a0 a1 :
+    witG_witness i a0 ∗ witG_credit i a1 ⊢ ⌜ a1 /≤ a0 ⌝.
   Proof.
     rewrite -own_op -reservation_map_data_op. iIntros "H".
     iPoseProof (own_valid with "H") as "%". apply reservation_map_data_valid in H0.
     apply credit_bound_credit_valid_compare in H0. done.
   Qed.
 
-  Lemma glwitG_witness_alloc D k a :
+  Lemma witG_witness_alloc D k a :
     k ∉ D →
     (own witness_name (reservation_map_token (A:=bcredUR) (⊤ ∖ gset_to_coPset D)))
     ⊢ |==> (own witness_name (reservation_map_token (A:=bcredUR) (⊤ ∖ gset_to_coPset ({[k]} ∪ D)))) ∗
-           glwitG_witness k a ∗ glwitG_credit k a.
+           witG_witness k a ∗ witG_credit k a.
   Proof.
     iIntros (Hk) "Htk".
     iPoseProof (reservation_map_token_alloc_singleton _ _ k (credit_bound a ⋅ credit a) with "Htk") as "[Htk >H]"; auto.
     { apply credit_bound_credit_valid_eq. }
-    iDestruct "H" as "[H1 H2]". rewrite /glwitG_witness /glwitG_credit.
+    iDestruct "H" as "[H1 H2]". rewrite /witG_witness /witG_credit.
     by iFrame.
   Qed.
 
@@ -510,11 +536,11 @@ Section glwit.
   Lemma glwit_alloc_wit W k ℵ :
     k ∉ dom W →
     glwit W
-    ⊢ |==> glwit (<[k:=wlive ℵ]>W) ∗ glwitG_witness k ℵ.
+    ⊢ |==> glwit (<[k:=wlive ℵ]>W) ∗ witG_witness k ℵ.
   Proof.
     iIntros (Nink) "N".
     rewrite /glwit -!lock. iDestruct "N" as "(Ow& NM)".
-    iMod (glwitG_witness_alloc _ k ℵ with "Ow") as "(Ow& Nw& Nc)"; first done.
+    iMod (witG_witness_alloc _ k ℵ with "Ow") as "(Ow& Nw& Nc)"; first done.
     iModIntro. rewrite dom_insert_L. iFrame "Ow Nw".
     iApply big_sepM_insert.
     { by eapply not_elem_of_dom. }
@@ -525,7 +551,7 @@ Section glwit.
     W !! k = Some w1 →
     wit_state_progress w1 w2 →
     glwit W
-    ⊢ |==> glwit (<[k:=w2]>W) ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ glwitG_credit k c.
+    ⊢ |==> glwit (<[k:=w2]>W) ∗ ∃ c, ⌜ /0 /< c ⌝ ∗ witG_credit k c.
   Proof.
     iIntros (Luk Prog) "N".
     rewrite /glwit -!lock. iDestruct "N" as "(On& Nm)".
@@ -538,7 +564,7 @@ Section glwit.
     assert (Lt : α0 /< α1).
     { eapply WFOCM.lt_le_lt; eauto. }
     apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
-    iMod (glwitG_credit_mon_split _ _ _ _ Le with "Nck") as "[Nck Nck0]".
+    iMod (witG_credit_mon_split _ _ _ _ Le with "Nck") as "[Nck Nck0]".
     iModIntro. iFrame "Nck0". iSplitL; last done. iSplitL "On".
     { replace ({[k]} ∪ dom W) with (dom W); eauto. set_solver. }
     rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
@@ -551,7 +577,7 @@ Section glwit.
     glwit W1
     ⊢ |==> glwit W2 ∗
         ([∗ map] k ↦ w ∈ W1, match w with
-                             | inl _ => (∃ c, ⌜ /0 /< c ⌝ ∗ glwitG_credit k c)
+                             | inl _ => (∃ c, ⌜ /0 /< c ⌝ ∗ witG_credit k c)
                              | inr _ => oblG_done k
                              end).
   Proof.
@@ -570,7 +596,7 @@ Section glwit.
       assert (Lt : α0 /< α1).
       { eapply WFOCM.lt_le_lt; eauto. }
       apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
-      iMod (glwitG_credit_mon_split _ _ _ _ Le with "Nck") as "[Nck Nck0]".
+      iMod (witG_credit_mon_split _ _ _ _ Le with "Nck") as "[Nck Nck0]".
       iModIntro. iSplitL "Nck"; by iFrame.
     - assert (inr u = w2) by (by apply HC2).
       destruct w2; first done. inv H1. iPoseProof "Nmx" as "#H". by auto.
