@@ -49,10 +49,10 @@ Definition wit_cond_one `{GL : ghost_lock_class} (k : gl_id) : wit_cond :=
 Global Instance wit_cond_one_dec `{GL : ghost_lock_class} : ∀ k x w, Decision (wit_cond_one k x w).
 Proof using. intros. rewrite /wit_cond_one. solve_decision. Qed.
 
-Definition wit_cond_live `{GL : ghost_lock_class} : wit_cond :=
+Definition wit_cond_locked `{GL : ghost_lock_class} : wit_cond :=
   λ _ w, match w with | (_, wit_locked _) => True | (_, wit_unlocked) => False end.
-Global Instance wit_cond_live_dec `{GL : ghost_lock_class} : ∀ k w, Decision (wit_cond_live k w).
-Proof using. intros. rewrite /wit_cond_live. destruct w. destruct w; solve_decision. Qed.
+Global Instance wit_cond_locked_dec `{GL : ghost_lock_class} : ∀ k w, Decision (wit_cond_locked k w).
+Proof using. intros. rewrite /wit_cond_locked. destruct w. destruct w; solve_decision. Qed.
 
 (* Witnesses step relation *)
 Definition wits_cond_step `{GL : ghost_lock_class} (C : wit_cond) : witnesses → witnesses → Prop :=
