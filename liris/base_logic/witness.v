@@ -20,16 +20,16 @@ Variant witness_step `{GL : ghost_lock_class} : witness → witness → Prop :=
       ver wit
     :
     witness_step (ver, wit_locked wit) (ver, wit_unlocked)
-  | witness_inc
-      ver1 ver2
-      (GTver : (ver1 < ver2)%nat)
-    :
-    witness_step (ver1, wit_unlocked) (ver2, wit_unlocked)
   | witness_lock
       ver1 ver2 wit
       (GTver : (ver1 < ver2)%nat)
     :
     witness_step (ver1, wit_unlocked) (ver2, wit_locked wit)
+  | witness_inc
+      ver1 ver2
+      (GTver : (ver1 < ver2)%nat)
+    :
+    witness_step (ver1, wit_unlocked) (ver2, wit_unlocked)
 .
 
 (** To a map *)
