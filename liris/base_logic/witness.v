@@ -32,6 +32,15 @@ Variant witness_step `{GL : ghost_lock_class} : witness → witness → Prop :=
     witness_step (ver1, wit_unlocked) (ver2, wit_unlocked)
 .
 
+Definition witness_keep `{GL : ghost_lock_class} : witness → witness → Prop :=
+  λ '(v1, w1) '(v2, w2),
+    (v1 = v2) ∧
+    match w1, w2 with
+    | (wit_locked _), (wit_locked _) => True
+    | (wit_unlocked), (wit_unlocked) => True
+    | _, _ => False
+    end.
+
 (** To a map *)
 Notation witnesses := (gmap gl_id witness).
 
@@ -73,6 +82,14 @@ Notation "A ↓ B" := (wits_step A B) (at level 20, format "A  ↓  B").
 Notation "A ↓∘ B" := (rc (wits_step) A B) (at level 20, format "A  ↓∘  B").
 Notation "A ↓⁺ B" := (tc (wits_step) A B) (at level 20, format "A  ↓⁺  B").
 Notation "A ↓⋆ B" := (rtc (wits_step) A B) (at level 20, format "A  ↓⋆  B").
+
+(* Witnesses making strict progresses *)
+Definition wits_keep `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
+  λ W1 W2, map_Forall2 (λ k w1 w2, witness_keep w1 w2) W1 W2.
+
+Definition wits_cond_progress `{GL : ghost_lock_class} (C : wit_cond) : witnesses → witnesses → Prop :=
+  λ W1 W2, (W1 ↓ₛ W2 | C) ∧ wits_keep W1 W2.
+Notation "A ↓ₚ B | C" := (wits_cond_progress C A B) (at level 20, format "A  ↓ₚ  B  |  C").
 
 Section witnesses.
   Context `{GL : ghost_lock_class}.
@@ -132,16 +149,25 @@ Section witnesses.
     wits_cond_rel C2 R W1 W2.
   Proof using. intros. eapply wits_cond_rel_iff_lookup; eauto. Qed.
 
+  (* For progress *)
+  Global Instance witness_keep_transitive : Transitive witness_keep.
+  Proof using.
+    repeat intro. destruct x, y, z. inv H. inv H0. destruct w, w0, w1; simpl in *; subst; try done.
+  Qed.
+  Global Instance wits_keep_transitive : Transitive wits_keep.
+  Proof using.
+    repeat intro. specialize (H i). specialize (H0 i).
+    destruct (x !! i) eqn:Hx, (y !! i) eqn:Hy, (z !! i) eqn:Hz; inv H; inv H0; try done.
+    all: econstructor; eauto. etransitivity; eauto.
+  Qed.
+
+  Global Instance witness_keep_reflexive : Reflexive witness_keep.
+  Proof using.
+    repeat intro. destruct x. destruct w; simpl in *; subst; try done.
+  Qed.
+  Global Instance wits_keep_reflexive : Reflexive wits_keep.
+  Proof using.
+    repeat intro. destruct (x !! i) eqn:Hx; try done.
+  Qed.
+
 End witnesses.
-
-(** Witness of each version *)
-Definition gl_witness `{GL : ghost_lock_class} : Type := gl_version → gl_fuel.
-
-Fixpoint gl_witness_sum `{GL : ghost_lock_class} (ξ : gl_witness) (v : gl_version) : gl_fuel :=
-  match v with
-  | O => ξ v
-  | S u => (gl_witness_sum ξ u) w+ (ξ v)
-  end.
-Notation "'Σ[' ξ ']' v" := (gl_witness_sum ξ v) (at level 20, format "Σ[ ξ ]  v").
-
-Definition gl_witness_constant `{GL : ghost_lock_class} (c : gl_fuel) : gl_witness := λ _, c.

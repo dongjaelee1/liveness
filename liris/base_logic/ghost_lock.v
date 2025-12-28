@@ -43,12 +43,16 @@ Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock →
       (GTver : (ver1 < ver2)%nat)
     :
     ghost_lock_step (ver1, gl_unlocked) (ver2, gl_locked fuel owner)
-  | ghost_lock_inc
-      ver1 ver2
-      (GTver : (ver1 < ver2)%nat)
-    :
-    ghost_lock_step (ver1, gl_unlocked) (ver2, gl_unlocked)
 .
+
+Definition ghost_lock_keep `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
+  λ '(v1, g1) '(v2, g2),
+    (v1 = v2) ∧
+    match g1, g2 with
+    | (gl_locked _ _), (gl_locked _ _) => True
+    | (gl_unlocked), (gl_unlocked) => True
+    | _, _ => False
+    end.
 
 (** To a map *)
 Definition gl_id := positive.
@@ -95,6 +99,14 @@ Notation "A ↪∘ B" := (rc (gls_step) A B) (at level 20, format "A  ↪∘  B"
 Notation "A ↪⁺ B" := (tc (gls_step) A B) (at level 20, format "A  ↪⁺  B").
 Notation "A ↪⋆ B" := (rtc (gls_step) A B) (at level 20, format "A  ↪⋆  B").
 
+(* Ghost locks making strict progresses *)
+Definition gls_keep `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
+  λ Ω1 Ω2, map_Forall2 (λ k g1 g2, ghost_lock_keep g1 g2) Ω1 Ω2.
+
+Definition gls_cond_progress `{GL : ghost_lock_class} (C : gl_cond) : ghost_locks → ghost_locks → Prop :=
+  λ Ω1 Ω2, (Ω1 ↪ₛ Ω2 | C) ∧ gls_keep Ω1 Ω2.
+Notation "A ↪ₚ B | C" := (gls_cond_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
+
 Section ghost_locks.
   Context `{GL : ghost_lock_class}.
 
@@ -137,28 +149,6 @@ Section ghost_locks.
     - rewrite <-H3 in H0. inv H0. econstructor.
   Qed.
 
-  (* Lemma gls_cond_rel_split_cond C C1 C2 R Ω1 Ω2 Ω3 : *)
-  (*   Transitive R → *)
-  (*   (∀ k o, C k o ↔ (C1 k o ∨ C2 k o)) → *)
-  (*   gl_rel_preserves_cond C2 R → *)
-  (*   gls_cond_rel C1 R Ω1 Ω2 → *)
-  (*   gls_cond_rel C2 R Ω2 Ω3 → *)
-  (*   gls_cond_rel C R Ω1 Ω3. *)
-  (* Proof using. *)
-  (*   intros HTR HS1 HCR2. assert (HS2: ∀ k o, (¬ C k o) ↔ ((¬ C1 k o) ∧ (¬ C2 k o))). *)
-  (*   { intros. firstorder. } *)
-  (*   intros. intros k. specialize (H k). specialize (H0 k). *)
-  (*   inv H. *)
-  (*   - rewrite <-H2 in H0. inv H0. destruct H3 as [(HC1& HR1) | (NHC1& <-)]. *)
-  (*     + destruct H5 as [(HC2& HR2) | (NHC2& ->)]. *)
-  (*       * econstructor. left. split; last by etrans. eapply HS1; eauto. *)
-  (*       * econstructor. left. split; eauto. eapply HS1; eauto. *)
-  (*     + destruct H5 as [(HC2& HR2) | (NHC2& ->)]. *)
-  (*       * econstructor. left. split; eauto. eapply HS1; eauto. *)
-  (*       * econstructor. right. split; auto. eapply HS2; eauto. *)
-  (*   - rewrite <-H3 in H0. inv H0. econstructor. *)
-  (* Qed. *)
-
   Lemma gls_cond_rel_iff_lookup C1 C2 R Ω1 Ω2 :
     gls_cond_rel C1 R Ω1 Ω2 →
     (∀ k g, Ω1 !! k = Some g → (C1 k g ↔ C2 k g)) →
@@ -175,4 +165,37 @@ Section ghost_locks.
     gls_cond_rel C2 R Ω1 Ω2.
   Proof using. intros. eapply gls_cond_rel_iff_lookup; eauto. Qed.
 
+  (* For progress *)
+  Global Instance ghost_lock_keep_transitive : Transitive ghost_lock_keep.
+  Proof using.
+    repeat intro. destruct x, y, z. inv H. inv H0. destruct g0, g2, g4; simpl in *; subst; try done.
+  Qed.
+  Global Instance gls_keep_transitive : Transitive gls_keep.
+  Proof using.
+    repeat intro. specialize (H i). specialize (H0 i).
+    destruct (x !! i) eqn:Hx, (y !! i) eqn:Hy, (z !! i) eqn:Hz; inv H; inv H0; try done.
+    all: econstructor; eauto. etransitivity; eauto.
+  Qed.
+
+  Global Instance ghost_lock_keep_reflexive : Reflexive ghost_lock_keep.
+  Proof using.
+    repeat intro. destruct x. destruct g0; simpl in *; subst; try done.
+  Qed.
+  Global Instance gls_keep_reflexive : Reflexive gls_keep.
+  Proof using.
+    repeat intro. destruct (x !! i) eqn:Hx; try done.
+  Qed.
+
 End ghost_locks.
+
+(** Witness of each version *)
+Definition gl_witness `{GL : ghost_lock_class} : Type := gl_version → gl_fuel.
+
+Fixpoint gl_witness_sum `{GL : ghost_lock_class} (ξ : gl_witness) (v : gl_version) : gl_fuel :=
+  match v with
+  | O => ξ v
+  | S u => (gl_witness_sum ξ u) w+ (ξ v)
+  end.
+Notation "'Σ[' ξ ']' v" := (gl_witness_sum ξ v) (at level 20, format "Σ[ ξ ]  v").
+
+Definition gl_witness_constant `{GL : ghost_lock_class} (c : gl_fuel) : gl_witness := λ _, c.

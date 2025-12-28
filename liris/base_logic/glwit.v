@@ -46,6 +46,12 @@ Definition witG_witfun `{SI : indexT} `{GL : ghost_lock_class} `{!glwitGS Σ}
 Global Typeclasses Opaque witG_witfun.
 Global Instance: Params (@witG_witfun) 5 := {}.
 
+Definition witG_elem `{SI : indexT} `{GL : ghost_lock_class} `{!glwitGS Σ}
+  (k : gl_id) : iProp Σ :=
+  ∃ ξ, witG_witfun k ξ.
+Global Typeclasses Opaque witG_elem.
+Global Instance: Params (@witG_elem) 5 := {}.
+
 Local Definition witG_witfun_auth_id `{SI : indexT} `{GL : ghost_lock_class} `{!glwitGS Σ}
   (m : gmap gl_id gl_witness) : iProp Σ :=
   own witfun_name (gmap_view_auth (V:=agreeR (leibnizO gl_witness)) (DfracOwn 1) (to_agree <$> m)).
@@ -79,7 +85,8 @@ Definition glwit `{SI : indexT} `{GL : ghost_lock_class} {Σ}
      witG_witness_token_id (⊤ ∖ gset_to_coPset (dom W)) ∗
      ([∗ map] k ↦ '(v, w) ∈ W,
         witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq 0 (S v) : gset gl_version))) ∗
-        ([∗ set] u ∈ (set_seq 0 (S v) : gset gl_version), glG_version_lb k u ∗ ((glG_unlocked k u ∗ ⌜ u < v ⌝) ∨ ⌜ u = v ⌝)) ∗
+        ([∗ set] u ∈ (set_seq 0 v : gset gl_version), glG_version_lb k u ∗ glG_unlocked k u) ∗
+        glG_version_lb k v ∗
         (∃ ξ, witG_witfun k ξ ∗
               ((∃ β, glG_fuel_supply k β (1/2)%Qp ∗ (⌜ β w≤ Σ[ξ] v ⌝)) ∨ (glG_version_pin k v))) ∗
         match w with
@@ -90,35 +97,18 @@ Definition glwit `{SI : indexT} `{GL : ghost_lock_class} {Σ}
         end)
     )%I.
 
-(* Definition glwit `{SI : indexT} `{GL : ghost_lock_class} {Σ} *)
-(*   `{!@glsatGS.glsatGS _ GL Σ} `{!glwitGS Σ} *)
-(*   (W : witnesses) : iProp Σ := *)
-(*   locked *)
-(*     ((∃ (Wfs : gmap gl_id gl_witness), (⌜ dom W = dom Wfs ⌝) ∗ witG_witfun_auth_id Wfs) ∗ *)
-(*      witG_witness_token_id (⊤ ∖ gset_to_coPset (dom W)) ∗ *)
-(*      ([∗ map] k ↦ '(v, w) ∈ W, *)
-(*         (∃ (vs : gset gl_version), *)
-(*             witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode vs)) ∗ *)
-(*             ([∗ set] u ∈ vs, glG_version_lb k u ∗ ((glG_unlocked k u ∗ ⌜ u < v ⌝) ∨ ⌜ u = v ⌝))) ∗ *)
-(*         (∃ ξ, witG_witfun k ξ ∗ *)
-(*               ((∃ β, glG_fuel_supply k β (1/2)%Qp ∗ (⌜ β w≤ Σ[ξ] v ⌝)) ∨ (glG_version_pin k v))) ∗ *)
-(*         match w with *)
-(*         | wit_locked b => *)
-(*             (∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_credit k v α) *)
-(*         | wit_unlocked => *)
-(*             (glG_unlocked k v) *)
-(*         end) *)
-(*     )%I. *)
+TODO
 
 (* Global invariant that relates witnesses to obligations *)
 Definition glwit_inv `{GL : ghost_lock_class}
   (η : gl_fuel → gl_fuel) (Ω : ghost_locks) (W : witnesses) : Prop :=
-  map_Forall2 (λ k g w,
+  map_Forall2 (λ k '(v1, g) '(v2, w),
+                 ∃ ξ, witG_witfun k ξ ∗
+                 (v1 = v2) ∧
                  match g, w with
-                 | (v1, gl_locked a _), (v2, wit_locked b) =>
-                     (v1 = v2 ∧ b w≤ η a)
-                 | (v1, gl_unlocked), (v2, wit_unlocked) =>
-                     (v1 = v2)
+                 | (gl_locked a _), (wit_locked b) => (b w≤ η (ξ v1))
+                 (* | (gl_locked a _), (wit_locked b) => (b w≤ η a) *)
+                 | (gl_unlocked), (wit_unlocked) => True
                  | _, _ => False
                  end
     ) Ω W.
@@ -132,6 +122,11 @@ Section glwit.
   Proof. rewrite /witG_witfun. apply _. Qed.
   Global Instance witG_witfun_timeless k ξ : Timeless (witG_witfun k ξ).
   Proof. rewrite /witG_witfun. apply _. Qed.
+
+  Global Instance witG_elem_persistent k : Persistent (witG_elem k).
+  Proof. rewrite /witG_elem. apply _. Qed.
+  Global Instance witG_elem_timeless k : Timeless (witG_elem k).
+  Proof. rewrite /witG_elem. apply _. Qed.
 
   Local Instance witG_witfun_auth_id_timeless m : Timeless (witG_witfun_auth_id m).
   Proof. rewrite /witG_witfun_auth_id. apply _. Qed.
@@ -170,11 +165,15 @@ Section glwit.
   Qed.
 
   Lemma witG_witfun_agree k ξ1 ξ2 :
-    witG_witfun k ξ1 ∗ witG_witfun k ξ2 ⊢ ⌜ ξ2 = ξ2 ⌝.
+    witG_witfun k ξ1 ∗ witG_witfun k ξ2 ⊢ ⌜ ξ1 = ξ2 ⌝.
   Proof.
     rewrite /witG_witfun -own_op own_valid gmap_view_frag_op_validI.
     iIntros "(_&H)". rewrite to_agree_op_validI. iPoseProof (discrete_eq with "H") as "%". done.
   Qed.
+
+  Lemma witG_witfun_elem k ξ :
+    witG_witfun k ξ ⊢ witG_elem k.
+  Proof. rewrite /witG_elem. eauto. Qed.
 
   Lemma witG_witfun_alloc (Wfs : gmap gl_id gl_witness) k ξ :
     Wfs !! k = None →
@@ -336,10 +335,10 @@ Section glwit.
   Qed.
 
   (** glwit rules *)
-  Lemma glwit_elem W k ξ :
-    glwit W ∗ witG_witfun k ξ ⊢ ⌜k ∈ dom W⌝.
+  Lemma glwit_elem W k :
+    glwit W ∗ witG_elem k ⊢ ⌜k ∈ dom W⌝.
   Proof.
-    iIntros "(W& #Wwf)".
+    rewrite /witG_elem. iIntros "(W& (%& #Wwf))".
     rewrite /glwit -!lock. iDestruct "W" as "((%& %Dom& Wai)& Wti& WM)".
     iPoseProof (witG_witfun_lookup with "[$Wai $Wwf]") as "%".
     apply elem_of_dom_2 in H. rewrite Dom. done.
@@ -350,12 +349,12 @@ Section glwit.
     β w≤ Σ[ξ] v →
     glwit W ∗
     glG_fuel_supply k β (1/2)%Qp ∗
-    ([∗ set] u ∈ (set_seq 0 (S v) : gset gl_version),
-       glG_version_lb k u ∗ (glG_unlocked k u ∗ ⌜u < v⌝ ∨ ⌜u = v⌝))
+    ([∗ set] u ∈ (set_seq 0 v : gset gl_version), glG_version_lb k u ∗ glG_unlocked k u) ∗
+    glG_version_lb k v
     ⊢ |==> glwit (<[k:=(v, wit_locked (ηξ v))]>W) ∗ witG_witfun k ξ ∗
         [∗ set] u ∈ set_seq 0 (S v), witG_witness k u (ηξ u).
   Proof.
-    iIntros (Nink Bound) "(W& Gfs& #Gus)".
+    iIntros (Nink Bound) "(W& Gfs& #Gus& #Gvl)".
     rewrite /glwit -!lock. iDestruct "W" as "((%& %Dom& Wai)& Wti& WM)".
     iMod (witG_witfun_alloc _ k ξ with "Wai") as "[Wai #Wwf]".
     { apply not_elem_of_dom. rewrite -Dom; auto. }
@@ -370,9 +369,7 @@ Section glwit.
     rewrite dom_insert_L. iFrame "Wti".
     iApply big_sepM_insert.
     { apply not_elem_of_dom. auto. }
-    iFrame. iSplitR.
-    { auto. }
-    iSplitR "Wcs".
+    iFrame. iFrame "Gus Gvl". iSplitR "Wcs".
     { iFrame "Wwf". iLeft. by iFrame. }
     rewrite set_seq_S_end_union_L. iPoseProof (big_sepS_union with "Wcs") as "[Wc Wcs]".
     { apply set_seq_S_end_disjoint. }
@@ -403,18 +400,38 @@ Section glwit.
     rewrite dom_insert_L. iFrame "Wti".
     iApply big_sepM_insert.
     { apply not_elem_of_dom. auto. }
-    iFrame. iSplitR.
-    { iApply (big_sepS_impl with "Gus"). iIntros "!> % % [H1 H2]". iFrame.
-      apply elem_of_set_seq in H. destruct H. destruct (decide (x = v)); auto.
-      iLeft. iFrame. iPureIntro. lia. }
-    iSplitR "Wcs".
-    { iFrame "Wwf". iLeft. by iFrame. }
-    rewrite set_seq_S_end_union_L. iPoseProof (big_sepS_union with "Gus") as "[Gu _]".
+    iFrame. rewrite set_seq_S_end_union_L. iPoseProof (big_sepS_union with "Gus") as "[Gu Gus2]".
     { apply set_seq_S_end_disjoint. }
-    rewrite big_sepS_singleton. iDestruct "Gu" as "[Gu1 Gu2]". auto.
+    rewrite big_sepS_singleton. iDestruct "Gu" as "[Gu1 Gu2]". iFrame "Gu1 Gu2 Gus2".
+    iFrame "Wwf". iLeft. by iFrame.
   Qed.
 
-  TODO
+  Lemma glwit_mon W1 W2 :
+    map_Forall2 (λ _ '(v1, w1) '(v2, w2),
+                   (v1 = v2) ∧
+                   match w1, w2 with
+                   | wit_locked a1, wit_locked a2 => a2 w≤ a1
+                   | wit_unlocked, wit_unlocked => True
+                   | _, _ => False
+                   end) W1 W2 →
+    glwit W1 ⊢ glwit W2.
+  Proof.
+    iIntros (Step) "W".
+    assert (Dom : dom W1 = dom W2) by (eapply map_Forall2_dom_L; eauto).
+    rewrite /glwit -!lock. iDestruct "W" as "((%& %DomWfs& Wai)& Wti& WM)".
+    rewrite -Dom. iFrame "Wai Wti".
+    iAssert (⌜ dom W1= dom Wfs ⌝)%I as "H"; first auto. iFrame "H". iClear "H".
+    iStopProof. clear dependent Wfs. clear Dom.
+    revert W2 Step. induction W1 using map_ind; iIntros (W2 Step) "WM".
+    { apply map_Forall2_empty_inv_l in Step. subst. by iFrame. }
+    apply map_Forall2_insert_inv_l in Step; last auto.
+    destruct Step as (w2& m2& EqW2& LUm2& Stepi& Step). subst. rewrite !big_sepM_insert; auto.
+    destruct x as (v1&w1). destruct w2 as (v2&w2). iDestruct "WM" as "((VSa& #VS& #Gvli& FF& Mi)& M)".
+    destruct Stepi as [Eqvi Stepi]. subst. iFrame "VSa VS FF".
+    iPoseProof (IHW1 _ Step with "M") as "M". clear IHW1.
+    iFrame "M Gvli". destruct w1, w2; try done.
+    iDestruct "Mi" as "(%&%& $)". iPureIntro. etransitivity; eauto.
+  Qed.
 
   (* witness_step rules: progress, unlock, lock, inc/pin *)
   Lemma glwit_progress_one W k v w1 w2 :
@@ -431,7 +448,7 @@ Section glwit.
     { set_solver + Ink. }
     rewrite !dom_insert_L !DomEq. iFrame "Wai Wti".
     inv Prog. iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Mk WM]".
-    iDestruct "Mk" as "(VS& FF& %& %& Wck)".
+    iDestruct "Mk" as "(VSa& #VS& #Gvlk& FF& %& %& Wck)".
     assert (Lt : w2 w< α).
     { eapply WFOCM.lt_le_lt; eauto. }
     apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
@@ -439,118 +456,150 @@ Section glwit.
     iModIntro. iFrame "Wck0". iSplitL; last done. iSplitR; first auto.
     rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
     { apply lookup_delete_eq. }
-    iFrame. done.
+    iFrame. auto.
   Qed.
 
-  TODO
-
-  Lemma glwit_wit_progress W1 W2 :
-    (W1 ↓ₛ W2 | wit_cond_locked) →
+  Lemma glwit_progress W1 W2 :
+    (W1 ↓ₚ W2 | wit_cond_locked) →
     glwit W1
     ⊢ |==> glwit W2 ∗
-        ([∗ map] k ↦ w ∈ W1, match w with
-                             | (v, wit_locked _) => (∃ c, ⌜ wzero w< c ⌝ ∗ witG_credit k v c)
-                             | (v, wit_unlocked) => glG_unlocked k v
-                             end).
+        ([∗ map] k ↦ w ∈ W1,
+           match w with
+           | (v, wit_locked _) =>
+               (([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u) ∗
+                glG_version_lb k v ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ witG_credit k v c)
+           | (v, wit_unlocked) =>
+               ([∗ set] u ∈ (set_seq 0 (S v)), glG_version_lb k u ∗ glG_unlocked k u)
+           end).
   Proof.
-    iIntros (Prog) "N".
-    assert (Dom : dom W1 = dom W2) by (eapply wit_states_cond_rel_dom; eauto).
-    rewrite /glwit -!lock. iDestruct "N" as "(On& Nm)".
-    rewrite -Dom. iFrame "On".
-    iStopProof. clear Dom. revert W2 Prog. induction W1 using map_ind; iIntros (W2 Prog) "Nm".
-    { apply map_Forall2_empty_inv_l in Prog. subst. iModIntro. iFrame. done. }
-    apply map_Forall2_insert_inv_l in Prog; last auto. destruct Prog as (w2& m2& EqW2& LUm2& (HC1& HC2)& Prog).
-    subst. rewrite !big_sepM_insert; auto.
-    iDestruct "Nm" as "[Nmx Nm]". iMod (IHW1 _ Prog with "Nm") as "[Nm Cs]". clear IHW1.
-    iFrame "Nm Cs". destruct x; simpl in *.
-    - pose proof (HC1 I). destruct w2; simpl in *; last done.
-      destruct w as [α], w0 as [α0]; simpl in *. iDestruct "Nmx" as "(%& %& Nck)".
-      assert (Lt : α0 /< α1).
+    iIntros ([Step Keep]) "W".
+    assert (Dom : dom W1 = dom W2) by (eapply wits_cond_rel_dom; eauto).
+    rewrite /glwit -!lock. iDestruct "W" as "((%& %DomWfs& Wai)& Wti& WM)".
+    rewrite -Dom. iFrame "Wai Wti".
+    iAssert (⌜ dom W1= dom Wfs ⌝)%I as "H"; first auto. iFrame "H". iClear "H".
+    iStopProof. clear dependent Wfs. clear Dom.
+    revert W2 Step Keep. induction W1 using map_ind; iIntros (W2 Step Keep) "WM".
+    { apply map_Forall2_empty_inv_l in Step. subst. iModIntro. iFrame. done. }
+    apply map_Forall2_insert_inv_l in Keep; last auto.
+    destruct Keep as (w2& m2& EqW2& LUm2& Keepi& Keep). subst. rewrite !big_sepM_insert; auto.
+    apply map_Forall2_insert in Step; auto.
+    destruct x as (v1&w1). destruct w2 as (v2&w2). iDestruct "WM" as "((VSa& #VS& #Gvli& FF& Mi)& M)".
+    destruct Keepi as [Eqvi Keepi]. subst. iFrame "VSa VS FF".
+    destruct Step as [HC Step].
+    iMod (IHW1 _ Step Keep with "M") as "[M Rs]". clear IHW1.
+    iFrame "M Rs Gvli". destruct HC as [[HC Stepi] | [HC Eqi]].
+    - destruct w1; last done. destruct w2; last done. inv Stepi. iDestruct "Mi" as "(%& %& Mci)".
+      assert (Lt : wit0 w< α).
       { eapply WFOCM.lt_le_lt; eauto. }
       apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
-      iMod (witG_credit_mon_split _ _ _ _ Le with "Nck") as "[Nck Nck0]".
-      iModIntro. iSplitL "Nck"; by iFrame.
-    - assert (inr u = w2) by (by apply HC2).
-      destruct w2; first done. inv H1. iPoseProof "Nmx" as "#H". by auto.
-  Qed.
-  Lemma glwit_wit_progress W1 W2 (C : wit_cond) :
-    (∀ k w, C k w → ∃ v a, w = (v, wit_locked a)) →
-    (W1 ↓ₛ W2 | wit_cond_locked) →
-    glwit W1
-    ⊢ |==> glwit W2 ∗
-        ([∗ map] k ↦ w ∈ W1, match w with
-                             | (v, wit_locked _) => (∃ c, ⌜ /0 /< c ⌝ ∗ witG_credit k v c)
-                             | (v, wit_unlocked) => glG_unlocked k v
-                             end).
-  Proof.
-    iIntros (Prog) "N".
-    assert (Dom : dom W1 = dom W2) by (eapply wit_states_cond_rel_dom; eauto).
-    rewrite /glwit -!lock. iDestruct "N" as "(On& Nm)".
-    rewrite -Dom. iFrame "On".
-    iStopProof. clear Dom. revert W2 Prog. induction W1 using map_ind; iIntros (W2 Prog) "Nm".
-    { apply map_Forall2_empty_inv_l in Prog. subst. iModIntro. iFrame. done. }
-    apply map_Forall2_insert_inv_l in Prog; last auto. destruct Prog as (w2& m2& EqW2& LUm2& (HC1& HC2)& Prog).
-    subst. rewrite !big_sepM_insert; auto.
-    iDestruct "Nm" as "[Nmx Nm]". iMod (IHW1 _ Prog with "Nm") as "[Nm Cs]". clear IHW1.
-    iFrame "Nm Cs". destruct x; simpl in *.
-    - pose proof (HC1 I). destruct w2; simpl in *; last done.
-      destruct w as [α], w0 as [α0]; simpl in *. iDestruct "Nmx" as "(%& %& Nck)".
-      assert (Lt : α0 /< α1).
-      { eapply WFOCM.lt_le_lt; eauto. }
-      apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
-      iMod (witG_credit_mon_split _ _ _ _ Le with "Nck") as "[Nck Nck0]".
-      iModIntro. iSplitL "Nck"; by iFrame.
-    - assert (inr u = w2) by (by apply HC2).
-      destruct w2; first done. inv H1. iPoseProof "Nmx" as "#H". by auto.
+      iMod (witG_credit_mon_split _ _ _ _ _ Le with "Mci") as "[Mci Mci0]".
+      iModIntro. iSplitL "Mci"; first by iFrame. iFrame. iSplit; auto.
+    - inv Eqi. destruct w2; first done. iPoseProof "Mi" as "#Mi". iFrame "Mi".
+      rewrite set_seq_S_end_union_L. iApply big_sepS_union.
+      { apply set_seq_S_end_disjoint. }
+      rewrite big_sepS_singleton. auto.
   Qed.
 
-  Lemma glwit_wit_progress_any C W1 W2 :
-    (∀ k o, Decision (C k o)) →
+  Lemma glwit_progress_any C W1 W2 :
     (W1 ↓ₚ W2 | C) →
     glwit W1 ⊢ glwit W2.
   Proof.
-    iIntros (DC Prog) "N".
-    assert (Dom : dom W1 = dom W2) by (eapply wit_states_cond_rel_dom; eauto).
-    rewrite /glwit -!lock. iDestruct "N" as "(On& Nm)".
-    rewrite -Dom. iFrame "On".
-    iStopProof. clear Dom. revert W2 Prog. induction W1 using map_ind; iIntros (W2 Prog) "Nm".
-    { apply map_Forall2_empty_inv_l in Prog. subst. iFrame. }
-    apply map_Forall2_insert_inv_l in Prog; last auto. destruct Prog as (w2& m2& EqW2& LUm2& (HC1& HC2)& Prog).
-    subst. rewrite !big_sepM_insert; auto.
-    iDestruct "Nm" as "[Nmx Nm]". iPoseProof (IHW1 _ Prog with "Nm") as "Nm". clear IHW1.
-    iFrame "Nm". destruct x; simpl in *.
-    - destruct (decide (C i (inl w))).
-      + pose proof (HC1 c). destruct w2; simpl in *; last done.
-        iDestruct "Nmx" as "(%& %& NC)". iExists α. iFrame. iPureIntro.
-        etransitivity; last eauto. eapply WFOCM.lt_le; eauto.
-      + pose proof (HC2 n). subst. iFrame.
-    - destruct (decide (C i (inr u))).
-      + apply HC1 in c. done.
-      + apply HC2 in n. subst. auto.
+    iIntros ([Step Keep]) "W".
+    assert (Dom : dom W1 = dom W2) by (eapply wits_cond_rel_dom; eauto).
+    rewrite /glwit -!lock. iDestruct "W" as "((%& %DomWfs& Wai)& Wti& WM)".
+    rewrite -Dom. iFrame "Wai Wti".
+    iAssert (⌜ dom W1= dom Wfs ⌝)%I as "H"; first auto. iFrame "H". iClear "H".
+    iStopProof. clear dependent Wfs. clear Dom.
+    revert W2 Step Keep. induction W1 using map_ind; iIntros (W2 Step Keep) "WM".
+    { apply map_Forall2_empty_inv_l in Step. subst. iFrame. }
+    apply map_Forall2_insert_inv_l in Keep; last auto.
+    destruct Keep as (w2& m2& EqW2& LUm2& Keepi& Keep). subst. rewrite !big_sepM_insert; auto.
+    apply map_Forall2_insert in Step; auto.
+    destruct x as (v1&w1). destruct w2 as (v2&w2). iDestruct "WM" as "((VSa& #VS& #Gvli& FF& Mi)& M)".
+    destruct Keepi as [Eqvi Keepi]. subst. iFrame "VSa VS FF".
+    destruct Step as [HC Step].
+    iPoseProof (IHW1 _ Step Keep with "M") as "M". clear IHW1.
+    iFrame "M Gvli". destruct HC as [[HC Stepi] | [HC Eqi]].
+    - inv Stepi; try done. 
+      iDestruct "Mi" as "(%& %& Mci)". iFrame.
+      iPureIntro. etrans; last eauto. eapply WFOCM.lt_le; eauto.
+    - inv Eqi. destruct w2; try done.
   Qed.
 
-  Lemma glwit_wit_resolve_one W1 W2 k :
-    (W1 ↓ᵣ W2 | wit_cond_one k) →
-    glwit W1 ∗ oblG_done k
-    ⊢ |==> glwit W2.
+  Lemma glwit_unlock W k v a :
+    W !! k = Some (v, wit_locked a) →
+    glwit W ∗ glG_unlocked k v
+    ⊢ glwit (<[k:=(v, wit_unlocked)]>W).
   Proof.
-    iIntros (Prog) "(N& #Bdk)".
-    assert (Dom : dom W1 = dom W2) by (eapply wit_states_cond_rel_dom; eauto).
-    rewrite /glwit -!lock. iDestruct "N" as "(On& Nm)".
-    rewrite -Dom. iFrame "On".
-    iStopProof. clear Dom. revert W2 k Prog. induction W1 using map_ind; iIntros (W2 k Prog) "(#Bdk& Nm)".
-    { apply map_Forall2_empty_inv_l in Prog. subst. iModIntro. iFrame. }
-    apply map_Forall2_insert_inv_l in Prog; last auto. destruct Prog as (w2& m2& EqW2& LUm2& (HC1& HC2)& Prog).
-    subst. rewrite !big_sepM_insert; auto.
-    iDestruct "Nm" as "[Nmx Nm]". iMod (IHW1 _ k Prog with "[$Bdk $Nm]") as "Nm". clear IHW1.
-    iFrame "Nm". destruct x; simpl in *.
-    - destruct (decide (wit_cond_one k i (inl w))).
-      + pose proof w0. apply HC1 in w0. rewrite /wit_cond_one in H1. subst. destruct w2; try done.
-      + apply HC2 in n. subst. by iFrame.
-    - destruct (decide (wit_cond_one k i (inr u))).
-      + apply HC1 in w. done.
-      + apply HC2 in n. subst. by iFrame.
+    iIntros (Luk) "[W #Guk]".
+    rewrite /glwit -!lock. iDestruct "W" as "((%& %DomWfs& Wai)& Wti& WM)".
+    iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Wk WM]".
+    rewrite !dom_insert_L. replace ({[k]} ∪ dom W) with (dom W); cycle 1.
+    { apply elem_of_dom_2 in Luk. set_solver. }
+    iFrame. iSplitR; first auto.
+    rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
+    { apply lookup_delete_eq. }
+    iFrame. iDestruct "Wk" as "(VSa& VS& Gvl& FF& _)". iFrame. auto.
   Qed.
+
+  Lemma glwit_lock W k v ξ ℵ :
+    W !! k = Some (v, wit_unlocked) →
+    glwit W ∗ witG_witfun k ξ
+    ⊢ ((∃ β, glG_fuel_supply k β (1/2)%Qp ∗ (⌜ β w≤ Σ[ξ] v ⌝)) ∨ (glG_version_pin k v)) ∗
+    ((((∃ β, glG_fuel_supply k β (1/2)%Qp ∗ (⌜ β w≤ Σ[ξ] (S v) ⌝)) ∨ (glG_version_pin k (S v))) ∗
+      glG_version_lb k (S v)) ==∗
+     (glwit (<[k:=(S v, wit_locked ℵ)]>W) ∗ witG_witness k (S v) ℵ)).
+  Proof.
+    iIntros (Luk) "(W& #Wwf)".
+    rewrite /glwit -!lock. iDestruct "W" as "((%& %Dom& Wai)& Wti& WM)".
+    iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Mk WM]".
+    iDestruct "Mk" as "(VSa& #VS& #Gvlk& (%& #Wwf2& FF)& #Guk)".
+    iPoseProof (witG_witfun_agree _ ξ ξ0 with "[$Wwf $Wwf2]") as "%". subst ξ0. iClear "Wwf2".
+    iFrame "FF". iIntros "(FF& #Gvl2)".
+    iMod (witG_witness_alloc_seq _ _ _ 1 (λ _, ℵ) with "VSa") as "[VSa Wk2]".
+    iPoseProof (big_sepS_union with "Wk2") as "[Wk2 _]".
+    { set_solver. }
+    rewrite big_sepS_singleton. iDestruct "Wk2" as "[#Wwk2 Wck2]".
+    iModIntro. rewrite !dom_insert_L. replace ({[k]} ∪ dom W) with (dom W); cycle 1.
+    { apply elem_of_dom_2 in Luk. set_solver. }
+    iFrame "Wwk2 Wai Wti". iSplitR; first auto.
+    rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
+    { apply lookup_delete_eq. }
+    iFrame. replace (S v + 1) with (S (S v)) by lia. iFrame.
+    iSplitL; last auto. rewrite set_seq_S_end_union_L. iApply big_sepS_union.
+    { apply set_seq_S_end_disjoint. }
+    rewrite big_sepS_singleton. eauto.
+  Qed.
+
+  Lemma glwit_pin W k v :
+    W !! k = Some (v, wit_unlocked) →
+    glwit W
+    ⊢ (∃ ξ, witG_witfun k ξ ∗ ((∃ β, glG_fuel_supply k β (1/2)%Qp ∗ (⌜ β w≤ Σ[ξ] v ⌝)) ∨ (glG_version_pin k v))) ∗
+    (((∃ ξ, witG_witfun k ξ ∗ ((∃ β, glG_fuel_supply k β (1/2)%Qp ∗ (⌜ β w≤ Σ[ξ] (S v) ⌝)) ∨ (glG_version_pin k (S v)))) ∗
+      glG_unlocked k (S v) ∗ glG_version_lb k (S v)) ==∗
+     (glwit (<[k:=(S v, wit_unlocked)]>W))).
+  Proof.
+    iIntros (Luk) "W".
+    rewrite /glwit -!lock. iDestruct "W" as "((%& %Dom& Wai)& Wti& WM)".
+    iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Mk WM]".
+    iDestruct "Mk" as "(VSa& #VS& #Glk& FF& #Guk)".
+    iFrame "FF". iIntros "(FF& #Guk2& #Gvl2)".
+    iMod (witG_witness_alloc_seq _ _ _ 1 (λ _, wzero) with "VSa") as "[VSa Wk2]".
+    iPoseProof (big_sepS_union with "Wk2") as "[Wk2 _]".
+    { set_solver. }
+    rewrite big_sepS_singleton. iDestruct "Wk2" as "[#Wwk2 Wck2]".
+    iModIntro. rewrite !dom_insert_L. replace ({[k]} ∪ dom W) with (dom W); cycle 1.
+    { apply elem_of_dom_2 in Luk. set_solver. }
+    iFrame "Wai Wti". iSplitR; first auto.
+    rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
+    { apply lookup_delete_eq. }
+    iFrame. replace (S v + 1) with (S (S v)) by lia. iFrame.
+    iSplitL; last auto. rewrite set_seq_S_end_union_L. iApply big_sepS_union.
+    { apply set_seq_S_end_disjoint. }
+    rewrite big_sepS_singleton. eauto.
+  Qed.
+
+  TODO
 
   (** obl_wit rules *)
   Lemma obl_wit_init ξ :
