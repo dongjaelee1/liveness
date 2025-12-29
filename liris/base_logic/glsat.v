@@ -186,9 +186,13 @@ Local Definition glG_owner_token_id `{SI : indexT} `{GL : ghost_lock_class} `{!g
  *)
 Definition glG_variant_internal `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (k : gl_id) (v : gl_version) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
-  (((glG_locked k v q ∗ glG_version k v q ∗ P) ∨
-      (glG_unlocked k v ∗ glG_version k v q ∗ Q)) ∨
-     (glG_unlocked k v ∗ glG_version_done k v ∗ R)).
+  (((glG_locked k v q ∗ P) ∨ (glG_unlocked k v ∗ Q)) ∨ (glG_version_done k v ∗ R)).
+
+(* Definition glG_variant_internal `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} *)
+(*   (k : gl_id) (v : gl_version) (q : Qp) (P Q R : iProp Σ) : iProp Σ := *)
+(*   (((glG_locked k v q ∗ glG_version k v q ∗ P) ∨ *)
+(*       (glG_unlocked k v ∗ glG_version k v q ∗ Q)) ∨ *)
+(*      (glG_unlocked k v ∗ glG_version_done k v ∗ R)). *)
 
 Definition glG_variant `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} `{!invGS Σ}
   (N : namespace) (k : gl_id) (v : gl_version) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
@@ -209,10 +213,9 @@ Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
      glG_owner_token_id (⊤ ∖ gset_to_coPset (dom Ω)) ∗
      ([∗ map] k ↦ '(v, g) ∈ Ω,
         glG_version k v (1/2/2)%Qp ∗
-        (∃ (vs : gset gl_version),
-            glG_state_token_version k (⊤ ∖ gset_to_coPset (set_map encode vs)) ∗
-            ([∗ set] u ∈ vs, glG_version_lb k u ∗ ((glG_unlocked k u ∗ ⌜ u < v ⌝) ∨ ⌜ u = v ⌝))
-        ) ∗
+        glG_state_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq 0 (S v) : gset gl_version))) ∗
+        ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u) ∗
+        glG_version_lb k v ∗
         ∃ ξ, glG_witfun k ξ ∗
         ∃ α, glG_fuel_supply k α (1)%Qp ∗
         (⌜ α w≤ Σ[ξ] v ⌝) ∗
@@ -226,10 +229,6 @@ Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
             glG_unlocked k v ∗
             (∃ t, glG_owner k t (1)%Qp)
         end))%I.
-
-        witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq 0 (S v) : gset gl_version))) ∗
-        ([∗ set] u ∈ (set_seq 0 v : gset gl_version), glG_version_lb k u ∗ glG_unlocked k u) ∗
-        glG_version_lb k v ∗
 
 (* Definition glsat `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} *)
 (*   (Ω : ghost_locks) : iProp Σ := *)
@@ -467,11 +466,11 @@ Section glsat.
     rewrite /glG_state_token_version. by iFrame.
   Qed.
 
-  Lemma glG_state_alloc_gen k (D : gset gl_version) v n :
+  Lemma glG_state_alloc_gen k (D : gset gl_version) v s :
     v ∉ D →
     glG_state_token_version k (⊤ ∖ gset_to_coPset (set_map encode D))
     ⊢ |==> glG_state_token_version k (⊤ ∖ gset_to_coPset (set_map encode ({[v]} ∪ D))) ∗
-        own state_name (reservation_map_data k (reservation_map_data (encode v) (to_frac_agree 1 n))).
+        own state_name (reservation_map_data k (reservation_map_data (encode v) (to_frac_agree 1 s))).
   Proof.
     iIntros (Hk) "Htk". rewrite /glG_state_token_version.
     rewrite (reservation_map_token_difference
@@ -493,11 +492,26 @@ Section glsat.
     }
     rewrite H. iFrame "H".
     iMod (own_update with "Htk") as "H".
-    { eapply reservation_map_update. eapply (reservation_map_alloc _ (encode v) (to_frac_agree 1 n)); auto.
+    { eapply reservation_map_update. eapply (reservation_map_alloc _ (encode v) (to_frac_agree 1 s)); auto.
       - apply elem_of_gset_to_coPset; set_solver.
       - done.
     }
     by iFrame.
+  Qed.
+
+  Lemma glG_state_alloc_gen_seq k s l n (f : gl_version → nat) :
+    glG_state_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq s l : gset gl_version)))
+    ⊢ |==> glG_state_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq s (l + n) : gset gl_version))) ∗
+        [∗ set] u ∈ set_seq (s + l) n, own state_name (reservation_map_data k (reservation_map_data (encode u) (to_frac_agree 1 (f u)))).
+  Proof.
+    revert s l. induction n; iIntros (??) "H".
+    { simpl. rewrite Nat.add_right_id big_sepS_empty. by iFrame. }
+    replace (l + S n) with (S (l + n)) by lia. rewrite !set_seq_S_end_union_L.
+    rewrite big_sepS_union; cycle 1.
+    { apply set_seq_S_end_disjoint. }
+    iMod (IHn with "H") as "[H $]". iMod (glG_state_alloc_gen _ _ (s + l + n) (f (s + l + n)) with "H") as "(H& R)".
+    { intros F. apply elem_of_set_seq in F. lia. }
+    rewrite (assoc Nat.add) big_sepS_singleton. by iFrame.
   Qed.
 
   Lemma glG_locked_is_allocated (vs : gset gl_version) k v q :
@@ -802,14 +816,13 @@ Section glsat.
     rewrite bank_valid_debt in V. destruct V. auto.
   Qed.
 
-  Lemma glG_fuel_supply_issue k q0 q1 a0 a1 :
-    (q0 + q1 = 1)%Qp →
-    glG_fuel_supply k a0 (q0 + q1)%Qp
-    ⊢ |==> glG_fuel_supply k (a0 w+ a1) (q0 + q1)%Qp ∗ glG_fuel k a1.
+  Lemma glG_fuel_supply_issue k a0 a1 :
+    glG_fuel_supply k a0 (1)%Qp
+    ⊢ |==> glG_fuel_supply k (a0 w+ a1) (1)%Qp ∗ glG_fuel k a1.
   Proof.
-    rewrite /glG_fuel_supply -own_op. intros Heq. apply own_update.
+    rewrite /glG_fuel_supply -own_op. apply own_update.
     rewrite -!reservation_map_data_op. apply reservation_map_update.
-    rewrite Heq. apply debt_owe.
+    apply debt_owe.
   Qed.
   Lemma glG_fuel_supply_issue_2 k q0 q1 a0 a1 b :
     (q0 + q1 = 1)%Qp →
@@ -819,8 +832,8 @@ Section glsat.
     iIntros (Heq) "H". iDestruct (glG_fuel_supply_add with "H") as "(%&H&%)".
     iMod (glG_fuel_supply_mon _ _ a0 with "H") as "H".
     { destruct H. auto. }
-    iMod (glG_fuel_supply_issue _ _ _ _ b with "H") as "[H Hp]"; first done.
-    iDestruct "H" as "[H0 H1]". by iFrame.
+    rewrite Heq. iMod (glG_fuel_supply_issue _ _ b with "H") as "[H Hp]".
+    iEval (rewrite -Heq) in "H". iDestruct "H" as "[H0 H1]". by iFrame.
   Qed.
 
   Lemma glG_fuel_spend k a0 a1 q :
@@ -922,8 +935,8 @@ Section glsat.
     ↑N ⊆ E →
     glG_variant N k v q1 P Q R -∗ glG_version k v q2 ={E,E ∖ ↑N}=∗
     (▷ (glG_version k v q2 ∗
-        ((glG_locked k v q1 ∗ glG_version k v q1 ∗ P) ∨
-           (glG_unlocked k v ∗ glG_version k v q1 ∗ Q)))) ∗
+        ((glG_locked k v q1 ∗ P) ∨
+           (glG_unlocked k v ∗ Q)))) ∗
     (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (HE) "#GU GV". iMod (glG_variant_acc with "GU") as "[[H | H] ACC]"; first auto.
@@ -931,16 +944,17 @@ Section glsat.
       + iNext. iDestruct "H" as "[H | H]"; iFrame.
       + iIntros "H". iApply "ACC". done.
     - iModIntro. iSplitR "ACC"; last iFrame.
-      iNext. iDestruct "H" as "(_& Gvd& _)".
+      iNext. iDestruct "H" as "(Gvd& _)".
       iPoseProof (glG_version_done_valid with "[$GV $Gvd]") as "%". lia.
   Qed.
 
   Lemma glG_variant_acc_locked E N k v q1 q2 P Q R :
     ↑N ⊆ E →
-    glG_variant N k v q1 P Q R -∗ glG_locked k v q2 ={E,E ∖ ↑N}=∗
+    glG_variant N k v q1 P Q R -∗ glG_locked k v q2
+    ={E,E ∖ ↑N}=∗
     (▷ (glG_locked k v q2 ∗
-        ((glG_locked k v q1 ∗ glG_version k v q1 ∗ P) ∨
-           (glG_unlocked k v ∗ glG_version_done k v ∗ R)))) ∗
+        ((glG_locked k v q1 ∗ P) ∨
+           (glG_version_done k v ∗ R)))) ∗
     (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (HE) "#GU GV". iMod (glG_variant_acc with "GU") as "[[H | H] ACC]"; first auto.
@@ -953,24 +967,37 @@ Section glsat.
 
   Lemma glG_variant_acc_unlocked E N k v q1 P Q R :
     ↑N ⊆ E →
-    glG_variant N k v q1 P Q R -∗ glG_unlocked k v ={E,E ∖ ↑N}=∗
-    (▷ (glG_unlocked k v ∗
-        ((glG_unlocked k v ∗ glG_version k v q1 ∗ Q) ∨
-           (glG_unlocked k v ∗ glG_version_done k v ∗ R)))) ∗
+    glG_variant N k v q1 P Q R -∗ glG_unlocked k v
+    ={E,E ∖ ↑N}=∗
+    (▷ (Q ∨ (glG_version_done k v ∗ R))) ∗
     (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (HE) "#GU GV". iMod (glG_variant_acc with "GU") as "[[H | H] ACC]"; first auto.
-    - iModIntro. iSplitR "ACC".
-      + iNext. iDestruct "H" as "[H | H]"; last iFrame.
-        iDestruct "H" as "[H _]". iPoseProof (glG_locked_unlocked_false with "[$]") as "%". done.
-      + done.
+    - iModIntro. iSplitR "ACC"; last done.
+      iNext. iDestruct "H" as "[H | [_ $]]".
+      iDestruct "H" as "[H _]". iPoseProof (glG_locked_unlocked_false with "[$]") as "%". done.
     - iModIntro. iSplitR "ACC"; iFrame.
+  Qed.
+  Lemma glG_variant_acc_unlocked_pin E N k v q1 P Q R :
+    ↑N ⊆ E →
+    glG_variant N k v q1 P Q R -∗ glG_unlocked k v -∗ glG_version_pin k v
+    ={E,E ∖ ↑N}=∗
+    (▷ Q) ∗
+    (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
+  Proof.
+    iIntros (HE) "#GU GV Gvp". iMod (glG_variant_acc with "GU") as "[[H | H] ACC]"; first auto.
+    - iModIntro. iSplitR "ACC"; last done.
+      iNext. iDestruct "H" as "[H | [_ $]]".
+      iDestruct "H" as "[H _]". iPoseProof (glG_locked_unlocked_false with "[$]") as "%". done.
+    - iModIntro. iSplitR "ACC"; last iFrame.
+      iNext. iDestruct "H" as "[#Gvd _]".
+      iPoseProof (glG_version_pin_done_valid with "[$Gvp $Gvd]") as "%". lia.
   Qed.
 
   Lemma glG_variant_acc_version_locked E N k v q1 q2 q3 P Q R :
     ↑N ⊆ E →
     glG_variant N k v q1 P Q R -∗ glG_version k v q2 -∗ glG_locked k v q3 ={E,E ∖ ↑N}=∗
-    ▷ (glG_version k v q2 ∗ glG_locked k v q3 ∗ (glG_locked k v q1 ∗ glG_version k v q1 ∗ P)) ∗
+    ▷ (glG_version k v q2 ∗ glG_locked k v q3 ∗ (glG_locked k v q1 ∗ P)) ∗
     (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (HE) "#GU GV GL". iMod (glG_variant_acc_version with "GU GV") as "[H ACC]"; first auto.
@@ -983,7 +1010,7 @@ Section glsat.
   Lemma glG_variant_acc_version_unlocked E N k v q1 q2 P Q R :
     ↑N ⊆ E →
     glG_variant N k v q1 P Q R -∗ glG_version k v q2 -∗ glG_unlocked k v ={E,E ∖ ↑N}=∗
-    ▷ (glG_version k v q2 ∗ glG_unlocked k v ∗ (glG_unlocked k v ∗ glG_version k v q1 ∗ Q)) ∗
+    ▷ (glG_version k v q2 ∗ glG_unlocked k v ∗ (glG_unlocked k v ∗ Q)) ∗
     (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (HE) "#GU GV GL". iMod (glG_variant_acc_version with "GU GV") as "[H ACC]"; first auto.
@@ -993,30 +1020,30 @@ Section glsat.
     - done.
   Qed.
 
-  Lemma glG_variant_acc_done E N k v q1 P Q R :
-    ↑N ⊆ E →
-    glG_variant N k v q1 P Q R -∗ glG_version_done k v ={E,E ∖ ↑N}=∗
-    (▷ (glG_unlocked k v ∗ glG_version_done k v ∗ R)) ∗
-    (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
-  Proof.
-    iIntros (HE) "#GU #GD". iMod (glG_variant_acc with "GU") as "[[H | H] ACC]"; first auto.
-    - iModIntro. iSplitR "ACC".
-      + iNext. iDestruct "H" as "[(_& H& _) | (_& H& _)]".
-        * iPoseProof (glG_version_done_valid with "[$]") as "%". lia.
-        * iPoseProof (glG_version_done_valid with "[$]") as "%". lia.
-      + done.
-    - iModIntro. iFrame.
-  Qed.
+  (* Lemma glG_variant_acc_done E N k v q1 P Q R : *)
+  (*   ↑N ⊆ E → *)
+  (*   glG_variant N k v q1 P Q R -∗ glG_version_done k v ={E,E ∖ ↑N}=∗ *)
+  (*   (▷ (glG_version_done k v ∗ R)) ∗ *)
+  (*   (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True). *)
+  (* Proof. *)
+  (*   iIntros (HE) "#GU #GD". iMod (glG_variant_acc with "GU") as "[[H | H] ACC]"; first auto. *)
+  (*   - iModIntro. iSplitR "ACC". *)
+  (*     + iNext. iDestruct "H" as "[(H& _) | (H& _)]". *)
+  (*       * iPoseProof (glG_version_done_valid with "[$]") as "%". lia. *)
+  (*       * iPoseProof (glG_version_done_valid with "[$]") as "%". lia. *)
+  (*     + done. *)
+  (*   - iModIntro. iFrame. *)
+  (* Qed. *)
 
   (* Allocates *)
   Lemma glG_variant_alloc_locked E N k v q P Q R :
-    (▷ (glG_locked k v q ∗ glG_version k v q ∗ P)) ={E}=∗ glG_variant N k v q P Q R.
+    (▷ (glG_locked k v q ∗ P)) ={E}=∗ glG_variant N k v q P Q R.
   Proof. iIntros "H". iApply inv_alloc. iFrame. Qed.
   Lemma glG_variant_alloc_unlocked E N k v q P Q R :
-    (▷ (glG_unlocked k v ∗ glG_version k v q ∗ Q)) ={E}=∗ glG_variant N k v q P Q R.
+    (▷ (glG_unlocked k v ∗ Q)) ={E}=∗ glG_variant N k v q P Q R.
   Proof. iIntros "H". iApply inv_alloc. iFrame. Qed.
   Lemma glG_variant_alloc_done E N k v q P Q R :
-    (▷ (glG_unlocked k v ∗ glG_version_done k v ∗ R)) ={E}=∗ glG_variant N k v q P Q R.
+    (▷ (glG_version_done k v ∗ R)) ={E}=∗ glG_variant N k v q P Q R.
   Proof. iIntros "H". iApply inv_alloc. iFrame. Qed.
 
   (* (** glG_always rules *) *)
@@ -1048,26 +1075,22 @@ Section glsat.
     iPoseProof (glG_witfun_lookup with "[$]") as "%".
     rewrite H. apply elem_of_dom_2 in H0. auto.
   Qed.
-
-  Lemma glsat_elem_cases Ω k :
+  Lemma glsat_elem_lookup Ω k :
     glsat Ω ∗ glG_elem k
     ⊢ ∃ v, (⌜ (∃ a t, Ω !! k = Some (v, gl_locked a t)) ⌝) ∨
-             (glG_unlocked k v ∗ ((⌜ (Ω !! k = Some (v, gl_unlocked)) ⌝) ∨
-                                    (glG_version_pin k v))).
+             (glG_unlocked k v ∗ (⌜ Ω !! k = Some (v, gl_unlocked) ⌝)).
   Proof.
     iIntros "(Hsat & #Ge)". iPoseProof (glsat_elem with "[$]") as "%".
     apply elem_of_dom in H. destruct H.
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete _ _ _ _ H with "HM") as "[H _]".
-    destruct x. iDestruct "H" as "(_& Gv2& VS& H)". destruct g0.
+    destruct x. iDestruct "H" as "(Gv2& VSa& VS& #Gvl& %& #Gwf& %& Gfs& %& H)". destruct g0.
     - iExists _. iLeft. iPureIntro. eauto.
-    - iDestruct "H" as "(#Gu& [_ | (#Gvp& _)]& _)"; eauto.
+    - iDestruct "H" as "(#Gu& _)"; eauto.
   Qed.
 
-  TODO
-
   Lemma glsat_lookup_version Ω k v q :
-    glsat Ω ∗ glG_witfun k ∗ glG_version k v q
+    glsat Ω ∗ glG_elem k ∗ glG_version k v q
     ⊢ ∃ g, ⌜Ω !! k = Some (v, g)⌝.
   Proof.
     iIntros "(Hsat & #Ge & Gv)".
@@ -1075,14 +1098,36 @@ Section glsat.
     apply elem_of_dom in Hin; destruct Hin as [o LU].
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
-    destruct o. iDestruct "LU" as "(_& Gv2& VS& Mk)". destruct g0.
-    - iPoseProof (glG_version_agree with "[$Gv $Gv2]") as "%". destruct H; subst; eauto.
-    - iDestruct "Mk" as "(_& [_ | (#Gvp& _)]& _)".
-      + iPoseProof (glG_version_agree with "[$Gv $Gv2]") as "%". destruct H; subst; eauto.
-      + iPoseProof (glG_version_pin_pin with "[$Gv $Gvp]") as "%". subst; eauto.
+    destruct o. iDestruct "LU" as "(Gv2& VSa& VS& #Gvl& %& Gwf& %& Gfs& %Bound& Mk)".
+    iPoseProof (glG_version_agree with "[$Gv $Gv2]") as "%". destruct H; subst; eauto.
   Qed.
+  Lemma glsat_lookup_version_lb Ω k v :
+    glsat Ω ∗ glG_elem k ∗ glG_version_lb k v
+    ⊢ ∃ v' g, ⌜Ω !! k = Some (v', g) ∧ v ≤ v'⌝.
+  Proof.
+    iIntros "(Hsat & #Ge & Gv)".
+    iPoseProof (glsat_elem with "[$]") as "%Hin".
+    apply elem_of_dom in Hin; destruct Hin as [o LU].
+    rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
+    destruct o. iDestruct "LU" as "(Gv2& VSa& VS& #Gvl& %& Gwf& %& Gfs& %Bound& Mk)".
+    iPoseProof (glG_version_lb_lb with "[$Gv $Gv2]") as "%". eauto.
+  Qed.
+  Lemma glsat_lookup_version_done Ω k v :
+    glsat Ω ∗ glG_elem k ∗ glG_version_done k v
+    ⊢ ∃ v' g, ⌜Ω !! k = Some (v', g) ∧ v < v'⌝.
+  Proof.
+    iIntros "(Hsat & #Ge & Gv)".
+    iPoseProof (glsat_elem with "[$]") as "%Hin".
+    apply elem_of_dom in Hin; destruct Hin as [o LU].
+    rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
+    destruct o. iDestruct "LU" as "(Gv2& VSa& VS& #Gvl& %& Gwf& %& Gfs& %Bound& Mk)".
+    iPoseProof (glG_version_done_valid with "[$Gv $Gv2]") as "%". eauto.
+  Qed.
+
   Lemma glsat_lookup_locked Ω k v q :
-    glsat Ω ∗ glG_witfun k ∗ glG_locked k v q
+    glsat Ω ∗ glG_elem k ∗ glG_locked k v q
     ⊢ ∃ a t, ⌜Ω !! k = Some (v, gl_locked a t)⌝.
   Proof.
     iIntros "(Hsat & #Ge & Gl)".
@@ -1090,18 +1135,17 @@ Section glsat.
     apply elem_of_dom in Hin; destruct Hin as [o LU].
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
-    destruct o. iDestruct "LU" as "(_& Gv2& (%& VSa& VS)& Mk)".
+    destruct o. iDestruct "LU" as "(Gv2& VSa& VS& #Gvl& %& Gwf& %& Gfs& %Bound& Mk)".
     iPoseProof (glG_locked_is_allocated with "[$VSa $Gl]") as "%INv".
-    iPoseProof (big_sepS_delete _ _ v INv with "VS") as "[V VS]".
-    iDestruct "V" as "(#Gvl& [(#Gu& %) | %])".
-    { iPoseProof (glG_locked_unlocked_false with "[$Gl $Gu]") as "%". done. }
-    subst g. destruct g0.
-    - eauto.
-    - iDestruct "Mk" as "(#Gu& _)".
-      iPoseProof (glG_locked_unlocked_false with "[$Gl $Gu]") as "%". done.
+    pose proof INv. apply elem_of_set_seq in H. assert (0 ≤ v < (0 + g) ∨ v = g) by lia. destruct H0.
+    { assert (v ∈ (set_seq 0 g : gset gl_version)) by (by eapply elem_of_set_seq).
+      iPoseProof (big_sepS_delete _ _ _ H1 with "VS") as "[[Gvl2 Gu] VS]".
+      iPoseProof (glG_locked_unlocked_false with "[$Gl $Gu]") as "%". done. }
+    subst g. destruct g0; eauto.
+    iDestruct "Mk" as "(#Gu& _)". iPoseProof (glG_locked_unlocked_false with "[$]") as "%". done.
   Qed.
   Lemma glsat_lookup_unlocked Ω k v :
-    glsat Ω ∗ glG_witfun k ∗ glG_unlocked k v
+    glsat Ω ∗ glG_elem k ∗ glG_unlocked k v
     ⊢ ⌜ Ω !! k = Some (v, gl_unlocked) ∨ ∃ v' g, v < v' ∧ Ω !! k = Some (v', g) ⌝.
   Proof.
     iIntros "(Hsat & #Ge & #Gu)".
@@ -1109,18 +1153,15 @@ Section glsat.
     apply elem_of_dom in Hin; destruct Hin as [o LU].
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
-    destruct o. iDestruct "LU" as "(_& Gv2& (%& VSa& VS)& Mk)".
+    destruct o. iDestruct "LU" as "(Gv2& VSa& VS& #Gvl& %& Gwf& %& Gfs& %Bound& Mk)".
     iPoseProof (glG_unlocked_is_allocated with "[$VSa $Gu]") as "%INv".
-    iPoseProof (big_sepS_delete _ _ v INv with "VS") as "[V VS]".
-    iDestruct "V" as "(#Gvl& [(#Gu2& %) | %])".
-    - iRight. eauto.
-    - subst g. destruct g0.
-      + iDestruct "Mk" as "(Gl& Gv& _)".
-        iPoseProof (glG_locked_unlocked_false with "[$]") as "%". done.
-      + eauto.
+    pose proof INv. apply elem_of_set_seq in H. assert (0 ≤ v < (0 + g) ∨ v = g) by lia. destruct H0.
+    - iRight. iExists g. iPureIntro. eexists. split_and !; eauto. lia.
+    - subst g. destruct g0; eauto.
+      iDestruct "Mk" as "(Gl& _)". iPoseProof (glG_locked_unlocked_false with "[$]") as "%". done.
   Qed.
   Lemma glsat_lookup_owner Ω k t q :
-    glsat Ω ∗ glG_witfun k ∗ glG_owner k t q
+    glsat Ω ∗ glG_elem k ∗ glG_owner k t q
     ⊢ ∃ v a, ⌜Ω !! k = Some (v, gl_locked a t)⌝.
   Proof.
     iIntros "(Hsat & #Ge & Go)".
@@ -1128,78 +1169,128 @@ Section glsat.
     apply elem_of_dom in Hin; destruct Hin as [o LU].
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
-    destruct o. iDestruct "LU" as "(_& Gv2& VS& Mk)". destruct g0.
-    - iDestruct "Mk" as "(Gl& Gv& Gf& Go2)".
+    destruct o. iDestruct "LU" as "(Gv2& VSa& VS& #Gvl& %& Gwf& %& Gfs& %Bound& Mk)".
+    destruct g0.
+    - iDestruct "Mk" as "(Gl& %& Go2)".
       iPoseProof (glG_owner_agree with "[$Go $Go2]") as "(%&%)". subst. eauto.
-    - iDestruct "Mk" as "(_& _& (%&Go2))".
+    - iDestruct "Mk" as "(_& %& Go2)".
       iPoseProof (glG_owner_agree with "[$Go $Go2]") as "(%&%)".
       apply Qp.not_add_le_r in H0. done.
   Qed.
 
-  Lemma glsat_alloc_ghost_lock_locked Ω k v a t :
+  Lemma glsat_alloc_gl_locked Ω k ξ v t :
     k ∉ dom Ω →
-    glsat Ω
-    ⊢ |==> glsat (<[k:=(v, gl_locked a t)]>Ω) ∗
-        glG_witfun k ∗
+    glsat Ω ⊢ |==> glsat (<[k:=(v, gl_locked (Σ[ξ] v) t)]>Ω) ∗
+        glG_witfun k ξ ∗
+        glG_elem k ∗
         glG_locked k v (1/2 + 1/2/2)%Qp ∗
         glG_version k v (1/2 + 1/2/2)%Qp ∗
-        glG_fuel_supply k a (1/2)%Qp ∗ glG_fuel k a ∗
-        glG_owner k t (1/2 + 1/2/2)%Qp.
+        glG_fuel k (Σ[ξ] v) ∗
+        glG_owner k t (1/2 + 1/2/2)%Qp ∗
+        ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u).
   Proof.
     iIntros (Hk) "Hsat". pose proof Hk as Nin. apply not_elem_of_dom in Nin.
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
-    iMod (glG_witfun_alloc _ k (v, gl_locked a t) with "HE") as "[HE #Ge]"; first auto.
+    iDestruct "HE" as "(%& %Dom& HE)".
+    iMod (glG_witfun_alloc _ k ξ with "HE") as "[HE #Gwf]".
+    { apply not_elem_of_dom. rewrite -Dom. auto. }
     iMod (glG_state_id_alloc _ k (⊤ ∖ gset_to_coPset (set_map encode (∅ : gset gl_version))) with "HS") as "[HS HSVk]"; first auto.
-    iMod (glG_state_alloc_gen _ _ v 0 with "HSVk") as "[HSVk Gl]".
-    { set_solver. }
+    iMod (glG_state_alloc_gen_seq _ 0 0 (S v) (λ u, 0) with "HSVk") as "[HSVk Gl]".
+    iEval (rewrite set_seq_S_end_union_L) in "Gl". iPoseProof (big_sepS_union with "Gl") as "[Gl Gus]".
+    { apply set_seq_S_end_disjoint. }
+    rewrite big_sepS_singleton.
     iAssert (glG_locked k v 1)%I with "Gl" as "Gl".
+    iAssert (|==> [∗ set] u ∈ (set_seq 0 v), glG_unlocked k u)%I with "[Gus]" as ">#Gus".
+    { simpl. iClear "Gwf". iStopProof. induction v; iIntros "Gus".
+      { simpl. rewrite !big_sepS_empty. done. }
+      rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+      2,3: apply set_seq_S_end_disjoint.
+      rewrite !big_sepS_singleton. iDestruct "Gus" as "[Gu Gus]". iMod (IHv with "Gus") as "$".
+      iAssert (glG_locked k v 1)%I with "Gu" as "Gu". iDestruct "Gu" as "[Gu1 Gu2]".
+      iApply glG_locked_to_unlocked_2; last iFrame. apply Qp.div_2.
+    }
     iMod (glG_version_alloc _ k v with "HV") as "[HV Gv]"; first auto.
-    iMod (glG_fuel_alloc _ k a with "HF") as "(HF& Gfsp& Gf)"; first set_solver.
+    iMod (glG_fuel_alloc _ k (Σ[ξ] v) with "HF") as "(HF& Gfsp& Gf)"; first set_solver.
     iMod (glG_owner_alloc _ k t with "HO") as "[HO Go]"; first auto.
     iDestruct "Gl" as "[Gl1 [Gl2 Gl']]". iCombine "Gl1 Gl2" as "Gl".
     iDestruct "Gv" as "[Gv1 [Gv2 Gv']]". iCombine "Gv1 Gv2" as "Gv".
-    iDestruct "Gfsp" as "[Gfsp Gfsp']".
     iDestruct "Go" as "[Go1 [Go2 Go']]". iCombine "Go1 Go2" as "Go".
     iPoseProof (glG_version_get_lb_eq with "Gv") as "#Gvl".
-    iModIntro. rewrite !dom_insert_L. iFrame "HE HS HV HF HO". iFrame "Ge Gl Gv Gfsp Gf Go".
-    iApply big_sepM_insert; first auto. iFrame. iFrame "Ge".
-    iSplitL; last done. rewrite big_sepS_union; last set_solver. iSplitL; last done.
-    rewrite big_sepS_singleton. iFrame "Gvl". iRight. done.
+    iAssert ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u)%I with "[]" as "#Glvs".
+    { iClear "Gwf Gus". iStopProof. induction v; iIntros "#Glv".
+      { done. }
+      rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+      2: apply set_seq_S_end_disjoint.
+      rewrite !big_sepS_singleton. iPoseProof (glG_version_lb_mon _ _ v with "Glv") as "#Glv2".
+      1: auto.
+      iFrame "Glv2". iPoseProof (IHv with "Glv2") as "$".
+    }
+    iPoseProof (big_sepS_sep with "[Glvs Gus]") as "#Grs".
+    { iSplitL; [iFrame "Glvs" | iFrame "Gus"]. }
+    iPoseProof (glG_witfun_elem with "Gwf") as "#Ge".
+    iModIntro. rewrite !dom_insert_L. iFrame "HE HS HV HF HO". iFrame "Ge Gl Gv Gf Go Gwf Grs".
+    iSplitR.
+    { rewrite dom_insert_L Dom. done. }
+    iApply big_sepM_insert; first auto. iFrame. iFrame "Gwf Grs Gvl". auto.
   Qed.
 
-  Lemma glsat_alloc_ghost_lock_unlocked Ω k v a :
+  Lemma glsat_alloc_gl_unlocked Ω k ξ v :
     Inhabited gl_owner →
     k ∉ dom Ω →
     glsat Ω
     ⊢ |==> glsat (<[k:=(v, gl_unlocked)]>Ω) ∗
-        glG_witfun k ∗
+        glG_witfun k ξ ∗
+        glG_elem k ∗
         glG_unlocked k v ∗
         glG_version k v (1/2 + 1/2/2)%Qp ∗
-        glG_fuel_supply k a (1/2)%Qp ∗ glG_fuel k a.
+        glG_fuel k (Σ[ξ] v) ∗
+        ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u).
   Proof.
     iIntros (INH Hk) "Hsat". pose proof Hk as Nin. apply not_elem_of_dom in Nin.
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
-    iMod (glG_witfun_alloc _ k (v, gl_unlocked) with "HE") as "[HE #Ge]"; first auto.
+    iDestruct "HE" as "(%& %Dom& HE)".
+    iMod (glG_witfun_alloc _ k ξ with "HE") as "[HE #Gwf]".
+    { apply not_elem_of_dom. rewrite -Dom. auto. }
     iMod (glG_state_id_alloc _ k (⊤ ∖ gset_to_coPset (set_map encode (∅ : gset gl_version))) with "HS") as "[HS HSVk]"; first auto.
-    iMod (glG_state_alloc_gen _ _ v 0 with "HSVk") as "[HSVk Gl]".
-    { set_solver. }
-    iAssert (glG_locked k v 1)%I with "Gl" as "Gl".
-    iAssert (|==> glG_unlocked k v)%I with "[Gl]" as ">#Gu".
-    { iDestruct "Gl" as "[Gl1 Gl2]". iMod (glG_locked_to_unlocked_2 with "[$Gl1 $Gl2]") as "Gu".
-      1: apply Qp.div_2. done. }
+    iMod (glG_state_alloc_gen_seq _ 0 0 (S v) (λ u, 0) with "HSVk") as "[HSVk Gl]".
+    iEval (rewrite set_seq_S_end_union_L) in "Gl". iPoseProof (big_sepS_union with "Gl") as "[Gl Gus]".
+    { apply set_seq_S_end_disjoint. }
+    rewrite big_sepS_singleton.
+    iAssert (glG_locked k v 1)%I with "Gl" as "[Gl1 Gl2]".
+    iMod (glG_locked_to_unlocked_2 with "[$Gl1 $Gl2]") as "#Gu". 1: apply Qp.div_2.
+    iAssert (|==> [∗ set] u ∈ (set_seq 0 v), glG_unlocked k u)%I with "[Gus]" as ">#Gus".
+    { simpl. iClear "Gwf Gu". iStopProof. induction v; iIntros "Gus".
+      { simpl. rewrite !big_sepS_empty. done. }
+      rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+      2,3: apply set_seq_S_end_disjoint.
+      rewrite !big_sepS_singleton. iDestruct "Gus" as "[Gu Gus]". iMod (IHv with "Gus") as "$".
+      iAssert (glG_locked k v 1)%I with "Gu" as "Gu". iDestruct "Gu" as "[Gu1 Gu2]".
+      iApply glG_locked_to_unlocked_2; last iFrame. apply Qp.div_2.
+    }
     iMod (glG_version_alloc _ k v with "HV") as "[HV Gv]"; first auto.
-    iMod (glG_fuel_alloc _ k a with "HF") as "(HF& Gfsp& Gf)"; first set_solver.
+    iMod (glG_fuel_alloc _ k (Σ[ξ] v) with "HF") as "(HF& Gfsp& Gf)"; first set_solver.
     iMod (glG_owner_alloc _ k (inhabitant (A:=gl_owner)) with "HO") as "[HO Go]"; first auto.
     iDestruct "Gv" as "[Gv1 [Gv2 Gv']]". iCombine "Gv1 Gv2" as "Gv".
-    iDestruct "Gfsp" as "[Gfsp Gfsp']".
     iPoseProof (glG_version_get_lb_eq with "Gv") as "#Gvl".
-    iModIntro. rewrite !dom_insert_L. iFrame "HE HS HV HF HO". iFrame "Ge Gu Gv Gfsp Gf".
-    iApply big_sepM_insert; first auto. iFrame. iFrame "Ge Gu".
-    rewrite big_sepS_union; last set_solver. iSplitL; last done.
-    rewrite big_sepS_singleton. iFrame "Gvl". iRight. done.
+    iAssert ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u)%I with "[]" as "#Glvs".
+    { iClear "Gwf Gus Gu". iStopProof. induction v; iIntros "#Glv".
+      { done. }
+      rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+      2: apply set_seq_S_end_disjoint.
+      rewrite !big_sepS_singleton. iPoseProof (glG_version_lb_mon _ _ v with "Glv") as "#Glv2".
+      1: auto.
+      iFrame "Glv2". iPoseProof (IHv with "Glv2") as "$".
+    }
+    iPoseProof (big_sepS_sep with "[Glvs Gus]") as "#Grs".
+    { iSplitL; [iFrame "Glvs" | iFrame "Gus"]. }
+    iPoseProof (glG_witfun_elem with "Gwf") as "#Ge".
+    iModIntro. rewrite !dom_insert_L. iFrame "HE HS HV HF HO". iFrame "Ge Gu Gv Gf Gwf Grs".
+    iSplitR.
+    { rewrite dom_insert_L Dom. done. }
+    iApply big_sepM_insert; first auto. iFrame. iFrame "Gwf Grs Gvl". auto.
   Qed.
 
-  (* ghost_lock_step rules: progress, unlock, lock, inc/pin *)
+  (* ghost_lock_step rules: progress, unlock, lock *)
   Lemma glsat_progress_one Ω k v a t c :
     (Ω !! k = Some (v, gl_locked a t)) →
     (wzero w< c) →
@@ -1210,14 +1301,16 @@ Section glsat.
     intros LU Hc. iIntros "(Hsat & Gf)".
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(#Gek& Gvk& VS& (Glk& (%& %LEa& Gfspk)& Gok))".
-    iMod (glG_fuel_spend with "[$Gfspk $Gf]") as "(%&%&Gfspk)".
+    iDestruct "Hk" as "(Gvk& VSa& VS& #Gvl& %& #Gwf& %& Gfs& %Bound& Mk)".
+    iDestruct "Mk" as "(Glk& %LEa& Gok)".
+    iMod (glG_fuel_spend with "[$Gfs $Gf]") as "(%&%&Gfs)".
     assert (LT : a2 w< α).
     { apply WFOCM.lt_exists_right. exists c. split; done. }
     iModIntro. iExists a2.
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v, gl_locked a2 t)) with "[HM VS Glk Gvk Gok Gfspk]") as "HM".
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v, gl_locked a2 t)) with "[HM VSa VS Glk Gvk Gok Gfs]") as "HM".
     { apply lookup_delete_eq. }
-    { iFrame "HM". iFrame. eauto. }
+    { iFrame "HM". iFrame. iFrame "Gvl Gwf". iPureIntro. split; last done.
+      etrans; last eauto. apply WFOCM.lt_le. auto. }
     rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
     rewrite insert_delete_eq. iFrame.
     iPureIntro. econstructor. eapply WFOCM.lt_le_lt; eauto.
@@ -1318,16 +1411,18 @@ Section glsat.
     intros LU Hc. iIntros "(Hsat& Go& Gf)".
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(#Gek& Gvk& VS& (Glk& (%& %LEa& Gfspk)& Gok))".
-    iMod (glG_fuel_spend with "[$Gfspk $Gf]") as "(%&%&Gfspk)".
+    iDestruct "Hk" as "(Gvk& VSa& VS& #Gvl& %& #Gwf& %& Gfs& %Bound& Mk)".
+    iDestruct "Mk" as "(Glk& %LEa& Gok)".
+    iMod (glG_fuel_spend with "[$Gfs $Gf]") as "(%&%&Gfs)".
     assert (LT : a2 w< α).
     { apply WFOCM.lt_exists_right. exists c. split; done. }
     iMod (glG_owner_update_2 _ _ _ _ _ t2 with "[$Go $Gok]") as "[Go Gok]".
     { rewrite -Qp.add_assoc !Qp.div_2. done. }
     iModIntro. iExists a2.
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v, gl_locked a2 t2)) with "[HM VS Glk Gvk Gok Gfspk]") as "HM".
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v, gl_locked a2 t2)) with "[HM VSa VS Glk Gvk Gok Gfs]") as "HM".
     { apply lookup_delete_eq. }
-    { iFrame "HM". iFrame. eauto. }
+    { iFrame "HM". iFrame. iFrame "Gvl Gwf". iPureIntro. split; last done.
+      etrans; last eauto. apply WFOCM.lt_le. auto. }
     rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
     rewrite insert_delete_eq. iFrame.
     iPureIntro. econstructor. eapply WFOCM.lt_le_lt; eauto.
@@ -1337,7 +1432,7 @@ Section glsat.
   Proof. by rewrite -Qp.add_assoc !Qp.div_2. Qed.
 
   Lemma glsat_unlock Ω k v t :
-    glsat Ω ∗ glG_witfun k ∗ glG_locked k v (1/2 + 1/2/2)%Qp ∗ glG_owner k t (1/2 + 1/2/2)%Qp
+    glsat Ω ∗ glG_elem k ∗ glG_locked k v (1/2 + 1/2/2)%Qp ∗ glG_owner k t (1/2 + 1/2/2)%Qp
     ⊢ |==> glsat (<[k:=(v, gl_unlocked)]>Ω) ∗
         glG_unlocked k v ∗
         (⌜ ∀ a, ghost_lock_step (v, gl_locked a t) (v, gl_unlocked) ⌝).
@@ -1346,45 +1441,48 @@ Section glsat.
     iPoseProof (glsat_lookup_locked with "[$Hsat $Ge $Gl]") as "(%&%& %LU)".
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(#Gek& Gvk& VS& (Glk& (%& %LEa& Gfspk)& Gok))".
+    iDestruct "Hk" as "(Gvk& VSa& VS& #Gvl& %& #Gwf& %& Gfs& %Bound& Mk)".
+    iDestruct "Mk" as "(Glk& %LEa& Gok)".
     iMod (glG_locked_to_unlocked_2 with "[$Gl $Glk]") as "#Gu".
     { apply Qp_add_help_1. }
     iPoseProof (glG_owner_agree with "[$Go $Gok]") as "(%& %)". clear H0. subst t0.
     iCombine "Go Gok" as "Gok". rewrite Qp_add_help_1.
     iModIntro.
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v, gl_unlocked)) with "[HM VS Gu Gvk Gok Gfspk]") as "HM".
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v, gl_unlocked)) with "[HM VSa VS Gu Gvk Gok Gfs]") as "HM".
     { apply lookup_delete_eq. }
-    { iFrame "HM Ge Gu". iFrame. }
+    { iFrame "HM". iFrame. iFrame "Gvl Gwf Gu". auto. }
     rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
     rewrite insert_delete_eq. iFrame. iFrame "Gu".
     iPureIntro. econstructor.
   Qed.
 
   Lemma glsat_version_pin_false Ω k v1 v2 :
-    glsat Ω ∗ glG_witfun k ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ glG_version_pin k v2
+    glsat Ω ∗ glG_elem k ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ glG_version_pin k v2
     ⊢ False.
   Proof.
     iIntros "(Hsat& #Ge& Gv& #Gvp)".
     iPoseProof (glsat_lookup_version with "[$Hsat $Ge $Gv]") as "(%& %LU)".
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(_& Gvk& VS& _)".
+    iDestruct "Hk" as "(Gvk& VSa& VS& #Gvl& %& #Gwf& %& Gfs& %Bound& Mk)".
     iCombine "Gv Gvk" as "Gv". rewrite Qp_add_help_1.
     iPoseProof (glG_version_pin_false with "[$Gv $Gvp]") as "%". done.
   Qed.
 
-  Lemma glsat_lock Ω k v1 v2 α t a :
+  Lemma glsat_lock Ω k ξ v1 v2 t :
     v1 < v2 →
-    glsat Ω ∗ glG_witfun k ∗
-    glG_unlocked k v1 ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ glG_fuel_supply k α (1/2)%Qp
-    ⊢ |==> glsat (<[k:=(v2, gl_locked (α w+ a) t)]>Ω) ∗
+    glsat Ω ∗
+    glG_witfun k ξ ∗ glG_unlocked k v1 ∗ glG_version k v1 (1/2 + 1/2/2)%Qp
+    ⊢ |==> glsat (<[k:=(v2, gl_locked (Σ[ξ] v2) t)]>Ω) ∗
         glG_locked k v2 (1/2 + 1/2/2)%Qp ∗
         glG_version k v2 (1/2 + 1/2/2)%Qp ∗
-        glG_fuel_supply k (α w+ a) (1/2)%Qp ∗ glG_fuel k a ∗
+        glG_fuel k (Σ[ξ]{S v1, v2}) ∗
         glG_owner k t (1/2 + 1/2/2)%Qp ∗
-        (⌜ ghost_lock_step (v1, gl_unlocked) (v2, gl_locked (α w+ a) t) ⌝).
+        ([∗ set] u ∈ (set_seq (S v1) (v2 - v1 - 1)), glG_version_lb k u ∗ glG_unlocked k u) ∗
+        (⌜ ghost_lock_step (v1, gl_unlocked) (v2, gl_locked (Σ[ξ] v2) t) ⌝).
   Proof.
-    iIntros (LTv) "(Hsat& #Ge& #Gu& Gv& Gfs)".
+    iIntros (LTv) "(Hsat& #Gwf& #Gu& Gv)".
+    iPoseProof (glG_witfun_elem with "Gwf") as "#Ge".
     iPoseProof (glsat_lookup_unlocked with "[$Hsat $Ge $Gu]") as "%LU".
     iPoseProof (glsat_lookup_version with "[$Hsat $Ge $Gv]") as "(%& %LU2)".
     destruct LU as [LU | (?&?&?&?)]; cycle 1.
@@ -1392,167 +1490,155 @@ Section glsat.
     rewrite LU in LU2. inv LU2.    
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(_& Gvk& VS& (#Guk& [(%& Gfsk) | (#Gvpk& %& Gfsk)]& %& Gok))"; cycle 1.
-    { iCombine "Gv Gvk" as "Gv". rewrite Qp_add_help_1.
-      iPoseProof (glG_version_pin_false with "[$Gv $Gvpk]") as "%". done. }
-    iDestruct "VS" as "(%& VSa& VS)".
-    iAssert (⌜ v2 ∉ vs ⌝)%I as "%Ninv".
-    { destruct (decide (v2 ∈ vs)); last auto.
-      iPoseProof (big_sepS_delete _ _ _ e with "VS") as "[(Gv2& _) VS]".
-      iPoseProof (glG_version_lb_lb with "[$Gv $Gv2]") as "%". lia. }
-    iMod (glG_state_alloc_gen _ _ v2 0 Ninv with "VSa") as "(VSa& Gl)".
-    iAssert (glG_locked k v2 1) with "Gl" as "Gl".
+    iDestruct "Hk" as "(Gvk& VSa& VS& #Gvl& %& #Gwf2& %& Gfs& %Bound& _& %& Gok)".
+    iPoseProof (glG_witfun_agree with "[]") as "%EQ".
+    { iSplitL; [iFrame "Gwf" | iFrame "Gwf2"]. }
+    subst ξ0. iClear "Gwf2".
+    iMod (glG_state_alloc_gen_seq _ _ _ (v2 - v1) (λ _, 0) with "VSa") as "[VSa Gls]".
+    assert (∃ δ, v2 - v1 = S δ).
+    { inv LTv.
+      - exists O. lia.
+      - exists (m - v1). lia.
+    }
+    destruct H as (δ& EQd).
+    iEval (rewrite EQd set_seq_S_end_union_L) in "Gls".
+    iPoseProof (big_sepS_union with "Gls") as "[Gl Gus]".
+    { apply set_seq_S_end_disjoint. }
+    rewrite big_sepS_singleton.
+    iAssert (glG_locked k v2 1)%I with "[Gl]" as "Gl".
+    { replace (0 + S v1 + δ) with v2 by lia. done. }
+    iAssert (|==> [∗ set] u ∈ (set_seq (S v1) (v2 - v1 - 1)), glG_unlocked k u)%I with "[Gus]" as ">#Gus".
+    { simpl. iClear "Gwf Gu Ge Gvl". replace (v2 - v1 - 1) with δ by lia.
+      remember (S v1) as v. clear dependent v1.
+      iStopProof. revert v. induction δ; iIntros (?) "Gus".
+      { simpl. rewrite !big_sepS_empty. done. }
+      rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+      2,3: apply set_seq_S_end_disjoint.
+      rewrite !big_sepS_singleton. iDestruct "Gus" as "[Gu Gus]". iMod (IHδ with "Gus") as "$".
+      iAssert (glG_locked k (v + δ) 1)%I with "Gu" as "Gu". iDestruct "Gu" as "[Gu1 Gu2]".
+      iApply glG_locked_to_unlocked_2; last iFrame. apply Qp.div_2.
+    }
     iDestruct "Gl" as "(Gl& [Gl' Gl2])". iCombine "Gl Gl'" as "Gl".
     iMod (glG_version_update_mon_2 _ _ v2 with "[$Gv $Gvk]") as "[Gv Gvk]".
     { apply Qp_add_help_1. }
     { lia. }
-    iMod (glG_fuel_supply_issue_2 _ _ _ α _ a with "[$Gfs $Gfsk]") as "(Gfs& Gfsk& Gf)".
-    { apply Qp.div_2. }
+    iMod (glG_fuel_supply_issue _ _ (Σ[ξ] {S v1, v2}) with "Gfs") as "(Gfs& Gf)".
     iMod (glG_owner_update _ _ t with "Gok") as "[Go Gok]". iDestruct "Gok" as "[Go' Gok]".
     iCombine "Go Go'" as "Go".
-    iPoseProof (glG_version_get_lb _ _ v2 with "Gv") as "#Gvl"; first auto.
-    iModIntro. iFrame "Gl Gv Gfs Gf Go".
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v2, gl_locked (α w+ a) t)) with "[HM VS VSa Gl2 Gvk Gok Gfsk]") as "HM".
+    iPoseProof (glG_version_get_lb _ _ v2 with "Gv") as "#Gvl2"; first auto.
+    iAssert ([∗ set] u ∈ (set_seq (S v1) (v2 - v1 - 1)), glG_version_lb k u)%I with "[]" as "#Glvs".
+    { iClear "Gwf Gu Ge Gvl Gus". replace (v2 - v1 - 1) with δ by lia.
+      remember (S v1) as v. assert (v + δ ≤ v2) by lia. clear dependent v1.
+      iStopProof. revert v H. induction δ; iIntros "% % #Glv".
+      { done. }
+      rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+      2: apply set_seq_S_end_disjoint.
+      rewrite !big_sepS_singleton. assert (v + δ ≤ v2) by lia.
+      iPoseProof (glG_version_lb_mon _ _ (v + δ) with "Glv") as "#Glv2"; first auto.
+      iFrame "Glv2". iPoseProof (IHδ with "Glv") as "$". auto.
+    }
+    iModIntro. iFrame "Gl Gv Gf Go".
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v2, gl_locked (Σ[ξ] v2) t)) with "[HM VS VSa Gl2 Gvk Gok Gfs]") as "HM".
     { apply lookup_delete_eq. }
-    { iFrame "HM Ge". iFrame. iSplitL; last done. iApply big_sepS_union. 1: set_solver. iSplitR.
-      - iApply big_sepS_singleton. iFrame "Gvl". iRight. done.
-      - iApply (big_sepS_impl with "VS"). iIntros "!> % % [$ [[H %] | %]]".
-        + iLeft. iFrame "H". iPureIntro. etransitivity; eauto.
-        + subst x. iLeft. iFrame "Guk". done.
+    { iFrame "HM". replace (S v1 + (v2 - v1)) with (S v2) by lia. iFrame. iFrame "Gvl2 Gwf".
+      iSplitL.
+      - replace (set_seq 0 v2) with (set_seq 0 ((S v1) + (v2 - v1 - 1)) : gset gl_version); cycle 1.
+        { replace ((S v1) + (v2 - v1 - 1)) with v2 by lia. done. }
+        rewrite (set_seq_add_L _ (S v1)). iApply big_sepS_union.
+        { apply set_seq_add_disjoint. }
+        rewrite !big_sepS_sep. iDestruct "VS" as "[VS1 VS2]". iFrame "Gus Glvs".
+        rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+        2,3: apply set_seq_S_end_disjoint.
+        rewrite !big_sepS_singleton. iFrame. auto.
+      - iPureIntro. split.
+        all: etrans; last (rewrite gl_witness_sum_gen_sum_equiv_add; first reflexivity).
+        2,4: eapply LTv.
+        all: eapply OCM.add_le_proper; done.
     }
     rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
-    rewrite insert_delete_eq. iFrame.
+    rewrite insert_delete_eq. iFrame. iSplitL.
+    { iApply big_sepS_sep; eauto. }
     iPureIntro. econstructor. auto.
   Qed.
 
-  Lemma glsat_pin Ω k v1 v2 α :
-    v1 < v2 →
-    glsat Ω ∗ glG_witfun k ∗
-    glG_unlocked k v1 ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ glG_fuel_supply k α (1/2)%Qp
-    ⊢ |==> glsat (<[k:=(v2, gl_unlocked)]>Ω) ∗
-        glG_unlocked k v2 ∗ glG_version_pin k v2 ∗
-        (⌜ ghost_lock_step (v1, gl_unlocked) (v2, gl_unlocked) ⌝).
+  (** Rules for glG_variant and glsat *)
+  Lemma glsat_variant_acc_locked Ω k v q0 q1 E N P Q R :
+    ↑N ⊆ E →
+    glG_variant N k v q0 P Q R ∗
+    glsat Ω ∗ glG_elem k ∗ glG_locked k v q1
+    ⊢ |={E,E ∖ ↑N}=>
+          ▷ (glsat Ω ∗ glG_locked k v q1 ∗ (glG_locked k v q0 ∗ P)) ∗
+          (▷ glG_variant_internal k v q0 P Q R ={E ∖ ↑N,E}=∗ True).
   Proof.
-    iIntros (Hv) "(Hsat& #Ge& #Gu& Gv& Gfs)".
-    iPoseProof (glsat_lookup_unlocked with "[$Hsat $Ge $Gu]") as "%LU".
-    iPoseProof (glsat_lookup_version with "[$Hsat $Ge $Gv]") as "(%& %LU2)".
-    destruct LU as [LU | (?&?&?&?)]; cycle 1.
-    { rewrite H0 in LU2. inv LU2. lia. }
-    rewrite LU in LU2. inv LU2.    
-    rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
-    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(_& Gvk& VS& (_& [(%& Gfsk) | (#Gvpk & %& Gfsk)]& %& Gok))"; cycle 1.
-    { iCombine "Gv Gvk" as "Gv". rewrite Qp_add_help_1.
-      iPoseProof (glG_version_pin_false with "[$Gv $Gvpk]") as "%". done. }
-    iDestruct "VS" as "(%& VSa& VS)".
-    iAssert (⌜ v2 ∉ vs ⌝)%I as "%Ninv".
-    { destruct (decide (v2 ∈ vs)); last auto.
-      iPoseProof (big_sepS_delete _ _ _ e with "VS") as "[(Gv2& _) VS]".
-      iPoseProof (glG_version_lb_lb with "[$Gv $Gv2]") as "%". lia. }
-    iMod (glG_state_alloc_gen _ _ v2 0 Ninv with "VSa") as "(VSa& Gl)".
-    iAssert (glG_locked k v2 1) with "Gl" as "Gl".
-    iDestruct "Gl" as "(Gl& Gl')". iMod (glG_locked_to_unlocked_2 with "[$Gl $Gl']") as "#Gu2".
-    { apply Qp.div_2. }
-    iMod (glG_version_update_mon_2 _ _ v2 with "[$Gv $Gvk]") as "[Gv Gvk]".
-    { apply Qp_add_help_1. }
-    { lia. }
-    iMod (glG_version_update_pin with "Gv") as "#Gvpk".
-    iPoseProof (glG_fuel_supply_add with "[$Gfs $Gfsk]") as "(%& Gfsk& %)". rewrite Qp.div_2.
-    iPoseProof (glG_version_pin_get_lb _ _ v2 with "Gvpk") as "#Gvl". 1: auto.
-    iModIntro. iFrame "Gvpk Gu2".
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v2, gl_unlocked)) with "[HM VSa VS Gvk Gok Gfsk]") as "HM".
-    { apply lookup_delete_eq. }
-    { iFrame "HM Ge". iFrame. iSplitL "VS".
-      - iApply big_sepS_union; first set_solver. iSplitR.
-        + iApply big_sepS_singleton. iFrame "Gvl". iRight; done.
-        + iApply (big_sepS_impl with "VS"). iIntros "!> % % H". iDestruct "H" as "($& [(Gux& %) | %])".
-          * iLeft. iFrame. iPureIntro. etransitivity; eauto.
-          * subst. iLeft; eauto.
-      - iFrame "Gu2 ". iRight. iFrame. auto. }
-    rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
-    rewrite insert_delete_eq. iFrame.
-    iPureIntro. econstructor. lia.
+    iIntros (HE) "(#Gvar& G& #Ge& Gl)".
+    iMod (glG_variant_acc with "Gvar") as "[[H | H] ACC]"; first auto.
+    - iModIntro. iSplitR "ACC".
+      + iNext. iDestruct "H" as "[H | H]"; first iFrame.
+        iDestruct "H" as "[H _]". iPoseProof (glG_locked_unlocked_false with "[$Gl $H]") as "%". done.
+      + done.
+    - iModIntro. iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "[#Gvd _]".
+      iPoseProof (glsat_lookup_version_done with "[$G $Ge $Gvd]") as "%". destruct H as (?&?&?&?).
+      iPoseProof (glsat_lookup_locked with "[$G $Ge $Gl]") as "%". destruct H1 as (?&?&?).
+      rewrite H in H1. inv H1. lia.
   Qed.
 
-  (** Update rules for glG_variant *)
-  Lemma glsat_variant_unlock Ω k v t q0 q1 q2 E N P Q R :
-    (q0 + q2 = 1/2 + 1/2/2)%Qp →
+  Lemma glsat_variant_unlock Ω k v t q0 q1 E N P Q R :
+    (q0 + q1 = 1/2 + 1/2/2)%Qp →
     ↑N ⊆ E →
+    glG_variant N k v q0 P Q R ∗
     glsat Ω ∗
-    glG_witfun k ∗ glG_locked k v q0 ∗ glG_version k v q1 ∗ glG_owner k t (1/2 + 1/2/2)%Qp ∗
-    glG_variant N k v q2 P Q R
+    glG_elem k ∗ glG_locked k v q1 ∗ glG_owner k t (1/2 + 1/2/2)%Qp
     ⊢ |={E,E ∖ ↑N}=>
-          ▷ (P ∗ (▷ Q ={E ∖ ↑N,E}=∗
-                  glsat (<[k:=(v, gl_unlocked)]>Ω) ∗
-                  glG_unlocked k v ∗
-                  glG_version k v q1 ∗
-                  (⌜ ∀ a, ghost_lock_step (v, gl_locked a t) (v, gl_unlocked) ⌝))).
+          ▷ ((glsat Ω ∗ glG_locked k v (1/2 + 1/2/2)%Qp ∗ glG_owner k t (1/2 + 1/2/2)%Qp ∗ P) ∗
+             ((glsat Ω ∗ glG_locked k v (1/2 + 1/2/2)%Qp ∗ glG_owner k t (1/2 + 1/2/2)%Qp ∗ ▷ Q)
+              ={E ∖ ↑N,E}=∗
+              glsat (<[k:=(v, gl_unlocked)]>Ω) ∗
+              glG_unlocked k v ∗
+              (⌜ ∀ a, ghost_lock_step (v, gl_locked a t) (v, gl_unlocked) ⌝))).
   Proof.
-    iIntros (Hq HE) "(Hsat& #Ge& Gl& Gv& Go& #Gvariant)".
-    iMod (glG_variant_acc_version_locked with "Gvariant Gv Gl") as "H"; first auto.
-    iModIntro. iNext. iDestruct "H" as "((Gv1& Gl1& Gl2& Gv2& $)& ACC)"; first auto.
-    iIntros "HQ". iCombine "Gl1 Gl2" as "Gl". rewrite Hq.
-    iMod (glsat_unlock with "[$Hsat $Ge $Gl $Go]") as "(Hsat& #Gu& Step)".
-    iPoseProof (glsat_lookup_version with "[$Hsat $Ge $Gv1]") as "(%& %)".
-    rewrite lookup_insert_eq in H. inv H. iFrame "Step".
-    iFrame "Hsat Gv1 Gu". iApply "ACC".
-    iNext. iLeft. iRight. iFrame. eauto.
+    iIntros (Hq HE) "(#Gvar& G& #Ge& Gl& Go)".
+    iMod (glsat_variant_acc_locked with "[$Gvar $G $Ge $Gl]") as "[H ACC]"; first auto.
+    iModIntro. iNext. iDestruct "H" as "($& Gl1& Gl2& $)".
+    iCombine "Gl2 Gl1" as "Gl". rewrite Hq. iFrame "Gl Go".
+    iIntros "(G& Gl& Go& HQ)".
+    iMod (glsat_unlock with "[$G $Ge $Gl $Go]") as "($& #Gu& $)". iFrame "Gu".
+    iApply "ACC". iNext. iLeft. iRight. iFrame. eauto.
   Qed.
 
-  Lemma glsat_variant_lock Ω k v1 v2 α q1 q2 E N P Q R a t :
-    (q1 + q2 = 1/2 + 1/2/2)%Qp →
+  Lemma glsat_variant_lock Ω k ξ v1 v2 t q0 q1 E N P Q R :
+    (q0 + q1 = 1/2 + 1/2/2)%Qp →
     v1 < v2 →
     ↑N ⊆ E →
+    glG_variant N k v1 q0 P Q R ∗
     glsat Ω ∗
-    glG_witfun k ∗ glG_unlocked k v1 ∗ glG_version k v1 q1 ∗ glG_fuel_supply k α (1/2)%Qp ∗
-    glG_variant N k v1 q2 P Q R
+    glG_witfun k ξ ∗ glG_unlocked k v1 ∗ glG_version k v1 (1/2 + 1/2/2)%Qp
     ⊢ |={E,E ∖ ↑N}=>
-          ▷ (Q ∗ ((▷ R) -∗ (▷ P) ={E ∖ ↑N,E}=∗
-                  glsat (<[k:=(v2, gl_locked (α w+ a) t)]>Ω) ∗
-                  glG_locked k v2 q1 ∗
-                  glG_version k v2 q1 ∗
-                  glG_fuel_supply k (α w+ a) (1/2)%Qp ∗ glG_fuel k a ∗
-                  glG_owner k t (1/2 + 1/2/2)%Qp ∗
-                  (⌜ ghost_lock_step (v1, gl_unlocked) (v2, gl_locked (α w+ a) t) ⌝) ∗
-                  glG_variant N k v2 q2 P Q R)).
+          ▷ ((glsat Ω ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ Q) ∗
+             ((glsat Ω ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ (▷ R) ∗ (▷ P))
+              ={E ∖ ↑N,E}=∗
+              glsat (<[k:=(v2, gl_locked (Σ[ξ] v2) t)]>Ω) ∗
+              glG_locked k v2 q1 ∗
+              glG_version k v2 (1/2 + 1/2/2)%Qp ∗
+              glG_fuel k (Σ[ξ]{S v1, v2}) ∗
+              glG_owner k t (1/2 + 1/2/2)%Qp ∗
+              ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), glG_version_lb k u ∗ glG_unlocked k u) ∗
+              (⌜ ghost_lock_step (v1, gl_unlocked) (v2, gl_locked (Σ[ξ] v2) t) ⌝) ∗
+              glG_variant N k v2 q0 P Q R)).
   Proof.
-    iIntros (Hq Hv HE) "(Hsat& #Ge& #Gu& Gv& Gfs& #Gvariant)".
-    iMod (glG_variant_acc_version_unlocked with "Gvariant Gv Gu") as "H"; first auto.
-    iModIntro. iNext. iDestruct "H" as "((Gv1& _& _& Gv2& $)& ACC)"; first auto.
-    iCombine "Gv1 Gv2" as "Gv". rewrite !Hq.
-    iMod (glsat_lock _ _ _ v2 _ t a with "[$Hsat $Ge $Gu $Gv $Gfs]") as "(Hsat& Gl& Gv& Gfs& Gf& Go& Step)"; first auto.
-    rewrite -!Hq. iDestruct "Gl" as "[Gl1 Gl2]". iDestruct "Gv" as "[Gv1 Gv2]".
-    iFrame "Step Hsat Gl1 Gv1 Gfs Gf Go".
-    iIntros "HR HP". iPoseProof (glG_version_get_lb_eq with "Gv2") as "#Gvl".
-    iMod ("ACC" with "[Gvl HR]") as "_".
-    { iNext. iRight. iFrame. iPoseProof (glG_version_get_done with "Gvl") as "$"; eauto. }
+    iIntros (Hq Hv HE) "(#Gvar& G& #Gwf& #Gu& Gv)".
+    iPoseProof (glG_witfun_elem with "Gwf") as "#Ge".
+    iMod (glG_variant_acc_unlocked with "Gvar Gu") as "[H ACC]"; first auto.
+    iModIntro. iNext. iDestruct "H" as "[$ | [#Gvd _]]"; cycle 1.
+    { iPoseProof (glG_version_done_valid with "[$Gv $Gvd]") as "%". lia. }
+    iFrame "G Gv". iIntros "(G& Gv& HR& HP)".
+    iMod (glsat_lock _ _ _ v1 v2 t with "[$G $Gwf $Gu $Gv]") as "($& Gl& Gv& $& $& #Gus& $)"; first auto.
+    iPoseProof (glG_version_get_lb _ _ v2 with "Gv") as "#Gvl"; first lia.
+    iPoseProof (glG_version_get_done _ _ v1 with "Gvl") as "#Gvd"; first lia.
+    iFrame "Gv".
+    rewrite -!Hq. iDestruct "Gl" as "[Gl1 Gl2]". iFrame "Gl2 Gus".
+    iMod ("ACC" with "[HR]") as "_".
+    { iNext. iRight. iFrame. auto. }
     iApply glG_variant_alloc_locked. iFrame.
-  Qed.
-
-  Lemma glsat_variant_pin Ω k v1 v2 α q1 q2 E N P Q R :
-    (q1 + q2 = 1/2 + 1/2/2)%Qp →
-    v1 < v2 →
-    ↑N ⊆ E →
-    glsat Ω ∗
-    glG_witfun k ∗ glG_unlocked k v1 ∗ glG_version k v1 q1 ∗ glG_fuel_supply k α (1/2)%Qp ∗
-    glG_variant N k v1 q2 P Q R
-    ⊢ |={E,E ∖ ↑N}=>
-          ▷ (Q ∗ (▷ R ={E ∖ ↑N,E}=∗
-                  glsat (<[k:=(v2, gl_unlocked)]>Ω) ∗
-                  (⌜ ghost_lock_step (v1, gl_unlocked) (v2, gl_unlocked) ⌝) ∗
-                  glG_unlocked k v2 ∗ glG_version_pin k v2)).
-  Proof.
-    iIntros (Hq Hv HE) "(Hsat& #Ge& #Gu& Gv& Gfs& #Gvariant)".
-    iMod (glG_variant_acc_version_unlocked with "Gvariant Gv Gu") as "H"; first auto.
-    iModIntro. iNext. iDestruct "H" as "((Gv1& _& _& Gv2& $)& ACC)".
-    iCombine "Gv1 Gv2" as "Gv". rewrite !Hq.
-    iMod (glsat_pin _ _ _ v2 with "[$Hsat $Ge $Gu $Gv $Gfs]") as "(Hsat& #Gu2& #Gvp& Step)"; first auto.
-    iFrame "Step Hsat Gu2 Gvp". iIntros "HR".
-    iPoseProof (glG_version_pin_get_lb _ v2 v2 with "Gvp") as "#Gvl"; first lia.
-    iPoseProof (glG_version_get_done _ v2 v1 with "Gvl") as "#Gvd"; first auto.
-    iMod ("ACC" with "[Gvl HR]") as "_".
-    { iNext. iRight. iFrame. eauto. }
-    done.
   Qed.
 
 End glsat.
@@ -1562,7 +1648,7 @@ Lemma glsat_alloc `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGpreS Σ} :
   ⊢ |==> ∃ _ : glsatGS Σ, glsat ∅.
 Proof.
   iIntros.
-  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR gl_id unitUR)) as (γE) "HE";
+  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR gl_id (agreeR (leibnizO gl_witness)))) as (γE) "HE";
     first by apply gmap_view_auth_valid.
   iMod (own_alloc (reservation_map_token (A:=reservation_mapUR (dfrac_agreeR natO)) ⊤)) as (γS) "HS";
     first by apply reservation_map_token_valid.
@@ -1574,6 +1660,8 @@ Proof.
     first by apply reservation_map_token_valid.
   iModIntro; iExists (GlsatG SI GL _ _ γE γS γV γF γO).
   rewrite /glsat -lock.
+  iSplitL "HE".
+  { iExists ∅. iFrame. done. }
   replace (⊤ ∖ gset_to_coPset (dom (∅ : ghost_locks))) with (⊤ : coPset); [iFrame; done|].
   set_solver.
 Qed.
