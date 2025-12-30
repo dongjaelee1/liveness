@@ -25,11 +25,6 @@ Variant witness_step `{GL : ghost_lock_class} : witness → witness → Prop :=
       (GTver : (ver1 < ver2)%nat)
     :
     witness_step (ver1, wit_unlocked) (ver2, wit_locked wit)
-  | witness_inc
-      ver1 ver2
-      (GTver : (ver1 < ver2)%nat)
-    :
-    witness_step (ver1, wit_unlocked) (ver2, wit_unlocked)
 .
 
 Definition witness_keep `{GL : ghost_lock_class} : witness → witness → Prop :=
@@ -91,6 +86,15 @@ Definition wits_cond_progress `{GL : ghost_lock_class} (C : wit_cond) : witnesse
   λ W1 W2, (W1 ↓ₛ W2 | C) ∧ wits_keep W1 W2.
 Notation "A ↓ₚ B | C" := (wits_cond_progress C A B) (at level 20, format "A  ↓ₚ  B  |  C").
 
+Definition wits_mon `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
+  λ W1 W2, map_Forall2 (λ _ '(v1, w1) '(v2, w2),
+                          (v1 = v2) ∧
+                          match w1, w2 with
+                          | wit_locked a1, wit_locked a2 => a2 w≤ a1
+                          | wit_unlocked, wit_unlocked => True
+                          | _, _ => False
+                          end) W1 W2.
+
 Section witnesses.
   Context `{GL : ghost_lock_class}.
 
@@ -149,7 +153,7 @@ Section witnesses.
     wits_cond_rel C2 R W1 W2.
   Proof using. intros. eapply wits_cond_rel_iff_lookup; eauto. Qed.
 
-  (* For progress *)
+  (* Progress *)
   Global Instance witness_keep_transitive : Transitive witness_keep.
   Proof using.
     repeat intro. destruct x, y, z. inv H. inv H0. destruct w, w0, w1; simpl in *; subst; try done.
@@ -168,6 +172,45 @@ Section witnesses.
   Global Instance wits_keep_reflexive : Reflexive wits_keep.
   Proof using.
     repeat intro. destruct (x !! i) eqn:Hx; try done.
+  Qed.
+
+  (* Mon *)
+  Global Instance wits_mon_transitive : Transitive wits_mon.
+  Proof using.
+    repeat intro. specialize (H i). specialize (H0 i).
+    destruct (x !! i) eqn:Hx.
+    { rewrite Hx in H. rewrite Hx. inv H. rewrite -H2 in H0. inv H0.
+      destruct w, y0, y1. destruct H3, H4. subst. destruct w, w0, w1; try done.
+      - econstructor. split; eauto. etrans; eauto.
+      - econstructor. split; eauto. }
+    { rewrite Hx in H. rewrite Hx. inv H. rewrite -H1 in H0. inv H0. econstructor. }
+  Qed.
+
+  Global Instance wits_mon_reflexive : Reflexive wits_mon.
+  Proof using.
+    repeat intro. destruct (x !! i) eqn: Eqx.
+    - rewrite Eqx. econstructor. destruct w. destruct w; done.
+    - rewrite Eqx. econstructor.
+  Qed.
+
+  Lemma wits_cond_progress_mon C W1 W2 :
+    (W1 ↓ₚ W2 | C) →
+    wits_mon W1 W2.
+  Proof using.
+    intros [Step Keep].
+    revert W2 Step Keep. induction W1 using map_ind; intros.
+    { apply map_Forall2_empty_inv_l in Step. subst. apply map_Forall2_empty. }
+    apply map_Forall2_insert_inv_l in Keep; last auto.
+    destruct Keep as (w2& m2& EqW2& LUm2& Keepi& Keep). subst.
+    apply map_Forall2_insert in Step; auto.
+    destruct x as (v1&w1). destruct w2 as (v2&w2).
+    destruct Keepi as [Eqvi Keepi]. subst.
+    destruct Step as [HC Step].
+    pose proof (IHW1 _ Step Keep) as HM. clear IHW1.
+    apply map_Forall2_insert; auto. split_and !; auto.
+    destruct HC as [[HC Stepi] | [HC Eqi]].
+    - inv Stepi; try done. eapply WFOCM.lt_le; eauto.
+    - inv Eqi. destruct w2; try done.
   Qed.
 
 End witnesses.
