@@ -15,17 +15,16 @@ Qed.
 
 Class ghost_lock_class := {
     gl_fuel : Type;
-    gl_owner : Type;
     #[global] gl_fuel_wfocm :: WFOCM.pack gl_fuel;
-    #[global] gl_owner_EqDecision :: EqDecision gl_owner;
   }.
+Definition gl_version := nat.
+(* We assume that thread id is positive *)
+Definition gl_owner := positive.
 
 Variant ghost_lock_state `{GL : ghost_lock_class} : Type :=
   | gl_locked (fuel : gl_fuel) (owner : gl_owner)
   | gl_unlocked
 .
-
-Definition gl_version := nat.
 Definition ghost_lock `{GL : ghost_lock_class} : Type := gl_version * ghost_lock_state.
 
 Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
