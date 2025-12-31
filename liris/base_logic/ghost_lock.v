@@ -85,7 +85,9 @@ Definition gls_cond_step `{GL : ghost_lock_class} (C : gl_cond) : ghost_locks �
 Notation "A ↪ₛ B | C" := (gls_cond_step C A B) (at level 20, format "A  ↪ₛ  B  |  C").
 
 Definition gls_alloc `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
-  λ Ω1 Ω2, ∃ k v f o, Ω1 !! k = None ∧ Ω2 = <[k:=(v, gl_locked f o)]> Ω1.
+  λ Ω1 Ω2, ∃ k v, (Ω1 !! k = None) ∧
+                  ((∃ a t, Ω2 = <[k:=(v, gl_locked a t)]> Ω1) ∨
+                     (Ω2 = <[k:=(v, gl_unlocked)]> Ω1)).
 Infix "↪ₐ" := (gls_alloc) (at level 20).
 
 Variant gls_step `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=

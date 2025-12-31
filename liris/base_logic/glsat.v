@@ -1180,14 +1180,16 @@ Section glsat.
 
   Lemma glsat_alloc_gl_locked Ω k ξ v t :
     k ∉ dom Ω →
-    glsat Ω ⊢ |==> glsat (<[k:=(v, gl_locked (Σ[ξ] v) t)]>Ω) ∗
+    glsat Ω
+    ⊢ |==> glsat (<[k:=(v, gl_locked (Σ[ξ] v) t)]>Ω) ∗
         glG_witfun k ξ ∗
         glG_elem k ∗
         glG_locked k v (1/2 + 1/2/2)%Qp ∗
         glG_version k v (1/2 + 1/2/2)%Qp ∗
         glG_fuel k (Σ[ξ] v) ∗
         glG_owner k t (1/2 + 1/2/2)%Qp ∗
-        ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u).
+        ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u) ∗
+        (⌜ Ω ↪ₐ (<[k:=(v, gl_locked (Σ[ξ] v) t)]>Ω) ⌝).
   Proof.
     iIntros (Hk) "Hsat". pose proof Hk as Nin. apply not_elem_of_dom in Nin.
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
@@ -1229,6 +1231,8 @@ Section glsat.
     { iSplitL; [iFrame "Glvs" | iFrame "Gus"]. }
     iPoseProof (glG_witfun_elem with "Gwf") as "#Ge".
     iModIntro. rewrite !dom_insert_L. iFrame "HE HS HV HF HO". iFrame "Ge Gl Gv Gf Go Gwf Grs".
+    iSplitL; cycle 1.
+    { iPureIntro. exists k, v. split; eauto. }
     iSplitR.
     { rewrite dom_insert_L Dom. done. }
     iApply big_sepM_insert; first auto. iFrame. iFrame "Gwf Grs Gvl". auto.
@@ -1244,7 +1248,8 @@ Section glsat.
         glG_unlocked k v ∗
         glG_version k v (1/2 + 1/2/2)%Qp ∗
         glG_fuel k (Σ[ξ] v) ∗
-        ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u).
+        ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u) ∗
+        (⌜ Ω ↪ₐ (<[k:=(v, gl_unlocked)]>Ω) ⌝).
   Proof.
     iIntros (INH Hk) "Hsat". pose proof Hk as Nin. apply not_elem_of_dom in Nin.
     rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
@@ -1285,6 +1290,8 @@ Section glsat.
     { iSplitL; [iFrame "Glvs" | iFrame "Gus"]. }
     iPoseProof (glG_witfun_elem with "Gwf") as "#Ge".
     iModIntro. rewrite !dom_insert_L. iFrame "HE HS HV HF HO". iFrame "Ge Gu Gv Gf Gwf Grs".
+    iSplitL; cycle 1.
+    { iPureIntro. exists k, v. split; auto. }
     iSplitR.
     { rewrite dom_insert_L Dom. done. }
     iApply big_sepM_insert; first auto. iFrame. iFrame "Gwf Grs Gvl". auto.

@@ -64,7 +64,9 @@ Definition wits_cond_step `{GL : ghost_lock_class} (C : wit_cond) : witnesses �
 Notation "A ↓ₛ B | C" := (wits_cond_step C A B) (at level 20, format "A  ↓ₛ  B  |  C").
 
 Definition wits_alloc `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
-  λ W1 W2, ∃ k v w, W1 !! k = None ∧ W2 = <[k:=(v, wit_locked w)]> W1.
+  λ W1 W2, ∃ k v, (W1 !! k = None) ∧
+                  ((∃ a, W2 = <[k:=(v, wit_locked a)]> W1) ∨
+                     (W2 = <[k:=(v, wit_unlocked)]> W1)).
 Infix "↓ₐ" := (wits_alloc) (at level 20).
 
 Variant wits_step `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
