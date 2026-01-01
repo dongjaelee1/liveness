@@ -525,57 +525,58 @@ Section globl.
     { apply lookup_delete_eq. }
     iFrame "Hm Hix His". iApply (big_sepM_insert _ _ k); first done. iFrame.
   Qed.
-
-  TODO
   Lemma globl_alloc_obl Ω TP i G q k v :
     glsat Ω ∗ globl TP ∗
-    globlG_obls i G q ∗ globlG_elem k ∗
-    glG_locked k v (1/2/2/2)%Qp ∗ glG_owner k i (1/2 + 1/2/2)%Qp
+    globlG_obls i G q ∗
+    glG_elem k ∗ glG_locked k v (1/2/2/2)%Qp ∗ glG_owner k i (1/2 + 1/2/2)%Qp
     ⊢ |==> glsat Ω ∗ globl TP ∗
         ⌜k ∉ G⌝ ∗ globlG_obls i ({[k]} ∪ G) q ∗
         globlG_owns i k v 1 ∗ glG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
   Proof.
-    iIntros "(Osat & Hthread & Ho & #He & Os & Oo)".
-    iPoseProof (osat_live_open with "[Osat Os]") as "(Os & Os0 & Osacc)"; first by iFrame.
-    iMod (globl_alloc_obl_1 with "[$]") as "(%& Os0 & Os1 & Hthread & Ho & Hw)".
-    iModIntro. iFrame. iSplitL; first by iApply "Osacc". done.
+    iIntros "(S& O& Obs& #Ge& Gl& Go)".
+    iDestruct "Go" as "(Go& (Go1& Go2))". iDestruct "Go2" as "(Go2& Go3)".
+    iPoseProof (glsat_open_owner with "[$S $Ge $Go]") as "(Go& %& (Gl'& Go')& ACC)".
+    iCombine "Go Go1 Go' Go2" as "Go". rewrite !Qp.add_assoc.
+    iMod (globl_alloc_obl_1 with "[$Go $O $Obs $Gl $Go3]") as "(%Nin& Go& O& Obs& Oo)".
+    iDestruct "Go" as "((Go& Go')& Go0)". iPoseProof ("ACC" with "[$Gl' $Go']") as "S".
+    iCombine "Go Go0" as "Go". iFrame. done.
   Qed.
 
-  Lemma globl_obls_owns_elem TP i G k q :
-    globl TP ∗ globlG_obls i G 1 ∗ globlG_owns i k q
+  Lemma globl_obls_owns_elem TP i G k v q :
+    globl TP ∗ globlG_obls i G 1 ∗ globlG_owns i k v q
     ⊢ ⌜ k ∈ G ⌝.
   Proof.
-    iIntros "(Hthread & Ho & Hw)".
-    rewrite /globl -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
-    iPoseProof (globlG_obls_lookup with "[HO Ho]") as "%"; first iFrame.
+    iIntros "(O& Ho& Hw)".
+    rewrite /globl -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
+    iPoseProof (globlG_obls_lookup with "[$HB $Ho]") as "%".
     assert (Hlui : ∃ m, dom m = G ∧ Tgls !! i = Some m).
-    { rewrite lookup_fmap_Some in H0. eauto. }
+    { rewrite lookup_fmap_Some in H. eauto. }
     destruct Hlui as (TObls&Hm&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "(Hix & His & Him)".
-    iPoseProof (globlG_owns_lookup with "[His Hw]") as "%Hluk"; first iFrame.
+    iPoseProof (globlG_owns_lookup with "[$His $Hw]") as "%Hluk".
     iPureIntro. rewrite -Hm. by apply elem_of_dom.
   Qed.
 
-  Lemma globl_delete_obl_frac TP i G q k :
+  Lemma globl_delete_obl_frac TP i G q k v :
     k ∈ G →
-    globl TP ∗ globlG_obls i G q ∗ globlG_owns i k 1
+    globl TP ∗ globlG_obls i G q ∗ globlG_owns i k v 1
     ⊢ |==> globl TP ∗ globlG_obls i (G ∖ {[k]}) q ∗
-           globlG_live k (1/2/2)%Qp ∗ globlG_owner k i (1 / 2 / 2)%Qp.
-  Proof using Type*.
-    iIntros (Hink) "(Hthread & Ho & Hw)".
-    rewrite /globl -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
-    iPoseProof (globlG_obls_lookup_frac with "[HO Ho]") as "%"; first iFrame.
-    destruct H0 as (G0&Hlui0&Hsub).
+        glG_locked k v (1/2/2/2)%Qp ∗ glG_owner k i (1/2/2/2/2)%Qp.
+  Proof.
+    iIntros (Hink) "(O& Ho& Hw)".
+    rewrite /globl -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
+    iPoseProof (globlG_obls_lookup_frac with "[$HB $Ho]") as "%".
+    destruct H as (G0&Hlui0&Hsub).
     assert (Hlui : ∃ m, dom m = G0 ∧ Tgls !! i = Some m).
     { rewrite lookup_fmap_Some in Hlui0. eauto. }
     destruct Hlui as (TObls&Hm&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "(Hix & His & Him)".
-    iPoseProof (globlG_owns_lookup with "[His Hw]") as "%Hluk"; first iFrame.
-    iMod (globlG_owns_delete with "[His Hw]") as "His"; first iFrame.
-    iMod (globlG_obls_update_local _ _ _ TObls (delete k TObls) _ (G ∖ {[k]}) with "[HO Ho]") as "[HO Ho]";
-      [eauto | | iFrame |].
+    iPoseProof (globlG_owns_lookup with "[$His $Hw]") as "%Hluk".
+    iMod (globlG_owns_delete with "[$His $Hw]") as "His".
+    iMod (globlG_obls_update_local _ _ _ TObls (delete k TObls) _ (G ∖ {[k]}) with "[$HB $Ho]") as "[HB Ho]";
+      [eauto | | ].
     { replace (GSet (dom TObls)) with (GSet ({[k]}) ⋅ GSet (dom (delete k TObls))).
       2:{ rewrite dom_delete_L gset_disj_union.
           - f_equal. apply elem_of_dom_2 in Hluk. rewrite -union_difference_L; set_solver.
@@ -587,43 +588,43 @@ Section globl.
     }
     iFrame "Ho".
     iDestruct (big_sepM_delete _ _ k _ Hluk with "Him") as "[Hik Him]".
-    iDestruct "Hik" as "[Hik1 Hik2]". iFrame "Hik1 Hik2".
+    iDestruct "Hik" as "[$ $]".
     iModIntro. iExists (<[i:=(delete k TObls)]>Tgls). iSplitR.
     { rewrite dom_insert_lookup_L; done. }
-    iFrame "HS HX HO". iSplitL "HE".
-    { rewrite !fmap_insert. rewrite insert_id; first done. rewrite lookup_fmap Hlui. done. }
+    iFrame "HO HX HB". iSplitL "HE".
+    { rewrite /globlG_elem_auth_id. rewrite !fmap_insert. rewrite insert_id; first done.
+      rewrite lookup_fmap Hlui. done. }
     rewrite -(insert_delete_eq Tgls i). iApply (big_sepM_insert _ _ i).
     { apply lookup_delete_eq. }
     iFrame.
   Qed.
-  Lemma globl_delete_obl TP i G k :
-    globl TP ∗ globlG_obls i G 1 ∗ globlG_owns i k 1
+  Lemma globl_delete_obl TP i G k v :
+    globl TP ∗ globlG_obls i G 1 ∗ globlG_owns i k v 1
     ⊢ |==> globl TP ∗ globlG_obls i (G ∖ {[k]}) 1 ∗
-           globlG_live k (1/2/2)%Qp ∗ globlG_owner k i (1 / 2 / 2)%Qp.
+        glG_locked k v (1/2/2/2)%Qp ∗ glG_owner k i (1/2/2/2/2)%Qp.
   Proof using Type*.
-    iIntros "(Hthread & Ho & Hw)". iPoseProof (globl_obls_owns_elem with "[$]") as "%Hkin".
+    iIntros "(O & Ho & Hw)". iPoseProof (globl_obls_owns_elem with "[$]") as "%Hkin".
     iApply (globl_delete_obl_frac with "[$]"). auto.
   Qed.
 
   Lemma globl_exec_to_term TP i :
-    globl TP ∗ globlG_exec i (1/2)%Qp ∗ globlG_obls i ∅ 1
+    globl TP ∗ globlG_exec i (1/2 + 1/2/2)%Qp ∗ globlG_obls i ∅ 1
     ⊢ |==> globl TP ∗ globlG_term i.
   Proof.
-    iIntros "(Hthread & Hx & Ho)".
-    rewrite /globl -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
-    iPoseProof (globlG_obls_lookup with "[HO Ho]") as "%"; first iFrame.
+    iIntros "(O& Hx& Ho)".
+    rewrite /globl -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
+    iPoseProof (globlG_obls_lookup with "[$HB $Ho]") as "%".
     assert (Hlui : Tgls !! i = Some ∅).
-    { rewrite lookup_fmap_Some in H0. destruct H0 as (?&?&?). apply dom_empty_inv_L in H0. subst; eauto. }
+    { rewrite lookup_fmap_Some in H. destruct H as (?&?&?). apply dom_empty_inv_L in H. by subst. }
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "([Hix | [Hix _]] & His & Him)"; last first.
     { iExFalso. iPoseProof (globlG_term_auth_term with "[$]") as "Hxt".
-      iPoseProof (globlG_exec_term_false with "[$]") as "%F". inversion F.
-    }
+      iPoseProof (globlG_exec_term_false with "[$]") as "%F". done. }
     iMod (globlG_exec_to_term with "[Hx Hix]") as "Hx".
-    { rewrite -(globlG_exec_div_2 _ 1). iFrame. }
+    { iCombine "Hx Hix" as "Hx". rewrite -Qp.add_assoc !Qp.div_2. done. }
     iPoseProof (globlG_term_auth_term with "Hx") as "#Hxt".
     iModIntro. iSplitL; last done.
-    iExists Tgls. iSplitR; first done. iFrame "HS HX HO HE".
+    iExists Tgls. iSplitR; first done. iFrame "HO HB HX HE".
     iApply (big_sepM_delete _ _ i _ Hlui). iFrame. iRight. iFrame.
   Qed.
 
@@ -631,37 +632,37 @@ Section globl.
     globl TP ∗ globlG_elem i ∗ globlG_term i
     ⊢ globlG_obls i ∅ 1 ∗ (globlG_obls i ∅ 1 -∗ globl TP).
   Proof.
-    iIntros "(Hthread & He & Hx)".
-    rewrite /globl -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
+    iIntros "(O & #He & #Hx)".
+    rewrite /globl -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
     iPoseProof (globlG_elem_elem with "[$]") as "%Hini".
     assert (Hlui : ∃ m, Tgls !! i = Some m).
     { rewrite elem_of_dom in Hini. eauto. }
     destruct Hlui as (TObls&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "([Hix | [Hix Ho]] & His & Him)".
-    { iExFalso. iPoseProof (globlG_exec_term_false with "[$]") as "%F". inversion F. }
+    { iExFalso. iPoseProof (globlG_exec_term_false with "[$]") as "%F". done. }
     iFrame "Ho". iIntros "Ho".
-    iExists Tgls. iSplitR; first done. iFrame "HS HX HO HE".
+    iExists Tgls. iSplitR; first done. iFrame "HO HB HX HE".
     iApply (big_sepM_delete _ _ i _ Hlui). iFrame. iRight. iFrame.
   Qed.
 
-  Lemma globl_live_open TP i k q :
-    globl TP ∗ globlG_elem i ∗ globlG_owns i k q
-    ⊢ globlG_owns i k q ∗
-    (globlG_live k (1/2/2)%Qp ∗ globlG_owner k i (1 / 2 / 2)%Qp) ∗
-    ((globlG_live k (1/2/2)%Qp ∗ globlG_owner k i (1 / 2 / 2)%Qp) -∗ globl TP).
+  Lemma globl_owns_open TP i k v q :
+    globl TP ∗ globlG_elem i ∗ globlG_owns i k v q
+    ⊢ globlG_owns i k v q ∗
+    (glG_locked k v (1/2/2/2)%Qp ∗ glG_owner k i (1/2/2/2/2)%Qp) ∗
+    ((glG_locked k v (1/2/2/2)%Qp ∗ glG_owner k i (1/2/2/2/2)%Qp) -∗ globl TP).
   Proof.
-    iIntros "(Hthread & He & Hw)".
-    iPoseProof (globl_elem with "[Hthread He]") as "%Hin"; first iFrame.
-    rewrite /globl -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
+    iIntros "(O & #He & Hw)".
+    iPoseProof (globl_elem with "[$O $He]") as "%Hin".
+    rewrite /globl -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
     assert (Hlui : is_Some (Tgls !! i)).
     { subst TP. by apply elem_of_dom. }
     destruct Hlui as (TObls&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "(Hix & His & Him)".
-    iPoseProof (globlG_owns_lookup with "[His Hw]") as "%Hluk"; first iFrame.
+    iPoseProof (globlG_owns_lookup with "[$His $Hw]") as "%Hluk".
     iPoseProof (big_sepM_delete _ _ _ _ Hluk with "Him") as "[Hk Him]".
-    iFrame "Hw Hk". iIntros "Hk". iExists Tgls. iFrame "HS HX HO HE".
+    iFrame "Hw Hk". iIntros "Hk". iExists Tgls. iFrame "HO HB HX HE".
     iSplit; first done. iApply (big_sepM_delete _ _ _ _ Hlui). iFrame.
     iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
   Qed.
@@ -670,17 +671,17 @@ Section globl.
     k ∈ G →
     globl TP ∗ globlG_elem i ∗ globlG_obls i G q
     ⊢ globlG_obls i G q ∗
-    (globlG_live k (1/2/2) ∗ globlG_owner k i (1/2/2)) ∗
-    ((globlG_live k (1/2/2) ∗ globlG_owner k i (1/2/2)) -∗ globl TP).
+    ∃ v, (glG_locked k v (1/2/2/2)%Qp ∗ glG_owner k i (1/2/2/2/2)%Qp) ∗
+         ((glG_locked k v (1/2/2/2)%Qp ∗ glG_owner k i (1/2/2/2/2)%Qp) -∗ globl TP).
   Proof.
-    iIntros (Ink) "(Hthread & He & Hobls)". 
-    iPoseProof (globl_elem with "[Hthread He]") as "%Hin"; first iFrame.
-    rewrite /globl -!lock. iDestruct "Hthread" as "(%&%Hdom& HS & HX & HO & HE & Hm)".
+    iIntros (Ink) "(O& #He& Hobls)". 
+    iPoseProof (globl_elem with "[$O $He]") as "%Hin".
+    rewrite /globl -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
     assert (Hlui : is_Some (Tgls !! i)).
     { subst TP. by apply elem_of_dom. }
     destruct Hlui as (TObls&Hlui).
-    iPoseProof (globlG_obls_lookup_frac with "[$HO $Hobls]") as "(%& (%& %))".
-    rewrite lookup_fmap in H0. rewrite Hlui in H0. inv H0.
+    iPoseProof (globlG_obls_lookup_frac with "[$HB $Hobls]") as "(%& %& %)".
+    rewrite lookup_fmap in H. rewrite Hlui in H. inv H.
     assert (Hluk : is_Some (TObls !! k)).
     { apply elem_of_dom. set_solver. }
     destruct Hluk as (fk&Hluk).
@@ -693,60 +694,66 @@ Section globl.
     iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
   Qed.
 
-  (** oassigned rules *)
-  Lemma oassigned_add_obl OS k :
-    oassigned OS ∗
-    (globlG_elem k ∗ ((∃ i, globlG_owner k i (1/2/2)%Qp ∗ globlG_owns i k (1/2/2)%Qp) ∨ globlG_done k))
-    ⊢ oassigned ({[k]} ∪ OS).
+  (** glassigned rules *)
+  Lemma glassigned_add_obl Gls k v :
+    glassigned Gls ∗
+    (glG_elem k ∗ ((∃ i, glG_owner k i (1/2/2/2/2) ∗ globlG_owns i k v (1/2/2)) ∨ glG_unlocked k v))
+    ⊢ glassigned (<[k:=v]>Gls).
   Proof.
-    iIntros "(A& H)". rewrite /oassigned -!lock. destruct (decide (k ∈ OS)).
-    - replace ({[k]} ∪ OS) with OS; last set_solver. iFrame.
-    - iApply big_sepS_union; first set_solver. rewrite big_sepS_singleton. iFrame.
+    iIntros "(A& H)". rewrite /glassigned -!lock. destruct (Gls !! k) eqn:LUk.
+    - iPoseProof (big_sepM_delete _ _ _ _ LUk with "A") as "[_ A]".
+      rewrite -(insert_delete_eq Gls k v). iApply big_sepM_insert.
+      { apply lookup_delete_eq. }
+      iFrame.
+    - iApply big_sepM_insert; first auto. iFrame.
   Qed.
 
-  Lemma oassigned_delete_obl OS k :
-    k ∈ OS →
-    oassigned OS
-    ⊢ oassigned (OS ∖ {[k]}) ∗
-    (globlG_elem k ∗ ((∃ i, globlG_owner k i (1/2/2)%Qp ∗ globlG_owns i k (1/2/2)%Qp) ∨ globlG_done k)).
+  Lemma glassigned_delete_obl Gls k v :
+    Gls !! k = Some v →
+    glassigned Gls
+    ⊢ glassigned (delete k Gls) ∗
+    (glG_elem k ∗ ((∃ i, glG_owner k i (1/2/2/2/2) ∗ globlG_owns i k v (1/2/2)) ∨ glG_unlocked k v)).
   Proof.
-    rewrite /oassigned -!lock. iIntros (INk) "A".
-    iPoseProof (big_sepS_delete with "A") as "[$ $]". auto.
+    rewrite /glassigned -!lock. iIntros (INk) "A".
+    iPoseProof (big_sepM_delete with "A") as "[$ $]". auto.
   Qed.
 
-  Lemma globl_assigned_lookup Ω TP k d i G :
-    Ω !! k = Some (obl_live d) →
-    obl_owner d = i →
-    osat Ω ∗ globl TP ∗ oassigned (dom Ω) ∗ globlG_obls i G 1
+  Lemma globl_assigned_obls_lookup Ω TP k v a i G :
+    Ω !! k = Some (v, gl_locked a i) →
+    glsat Ω ∗ globl TP ∗ glassigned (fst <$> Ω) ∗ globlG_obls i G 1
     ⊢ ⌜ k ∈ G ⌝.
   Proof.
-    rewrite /oassigned -lock. iIntros (LUOk Okd) "(S& T& A& Tbs)".
-    iPoseProof (big_sepS_delete _ _ k with "A") as "[A _]".
-    { by apply elem_of_dom. }
-    iDestruct "A" as "(#Bek& [(%& Bok& Tok) | #Bdk])".
-    - iPoseProof (osat_lookup_owner with "[$S $Bek $Bok]") as "(%&%&%)". rewrite LUOk in H0. inv H0.
-      iApply (globl_obls_owns_elem with "[$T $Tbs $Tok]").
-    - iPoseProof (osat_obl_is_done_weak with "[$S $Bek $Bdk]") as "(%&%)". rewrite LUOk in H0. inv H0.
+    rewrite /glassigned -lock. iIntros (LUOk) "(S& O& A& Tbs)".
+    iPoseProof (big_sepM_delete _ _ k with "A") as "[A _]".
+    { rewrite lookup_fmap LUOk. done. }
+    simpl. iDestruct "A" as "(#Gek& [(%& Gok& Ook) | #Guk])".
+    - iPoseProof (glsat_lookup_owner with "[$S $Gek $Gok]") as "(%&%&%)".
+      rewrite LUOk in H. inv H. iApply (globl_obls_owns_elem with "[$O $Tbs $Ook]").
+    - iPoseProof (glsat_lookup_unlocked with "[$S $Gek $Guk]") as "[% | (%&%&%&%)]".
+      + rewrite LUOk in H. inv H.
+      + rewrite LUOk in H0. inv H0. lia.
   Qed.
 
   Lemma globl_obls_lookup Ω TP k i G q :
     k ∈ G →
-    osat Ω ∗ globl TP ∗ globlG_elem i ∗ globlG_obls i G q ∗ globlG_elem k
-    ⊢ ∃ d, ⌜ Ω !! k = Some (obl_live d) ∧ obl_owner d = i ⌝.
+    glsat Ω ∗ globl TP ∗ globlG_elem i ∗ globlG_obls i G q ∗ glG_elem k
+    ⊢ ∃ v a, ⌜ Ω !! k = Some (v, gl_locked a i) ⌝.
   Proof.
-    iIntros (Ink) "(S& T& #Tei& Tbs& #Bek)".
-    iPoseProof (globl_obls_open with "[$T $Tei $Tbs]") as "(Tbs& (Bli& Bok)& Acc)". 1: eauto.
-    iPoseProof (osat_lookup_owner with "[$S $Bek $Bok]") as "(%& %)". iExists d. done.
+    iIntros (Ink) "(S& O& #Oei& Tbs& #Gek)".
+    iPoseProof (globl_obls_open with "[$O $Oei $Tbs]") as "(Tbs& %& (Gl& Go)& Acc)". 1: eauto.
+    iPoseProof (glsat_lookup_owner with "[$S $Gek $Go]") as "(%& %& %)".
+    eauto.
   Qed.
 
 End globl.
 
 (* Allocation of initial invariant. *)
-Lemma globl_alloc `{SI : indexT} `{WFA : WFOCM.pack A} {ps} {Σ} `{!@osatGS.osatGS _ _ WFA ps positive Σ} `{!globlGpreS Σ} :
-  ⊢ |==> ∃ _ : globlGS Σ, globl ∅ ∗ oassigned ∅.
+Lemma globl_alloc `{SI : indexT} `{GL : ghost_lock_class} {Σ}
+  `{!@glsatGS.glsatGS _ GL Σ} `{!globlGS Σ} :
+  ⊢ |==> ∃ _ : globlGS Σ, globl ∅ ∗ glassigned ∅.
 Proof.
   iIntros.
-  iMod (own_alloc (reservation_map_token (A:=(gmap_viewR gl_id unitUR)) ⊤)) as (γS) "HS";
+  iMod (own_alloc (reservation_map_token (A:=(gmap_viewR gl_id (agreeR gl_versionO))) ⊤)) as (γS) "HS";
     first by apply reservation_map_token_valid.
   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive (gset_disjUR _))) as (γO) "HO";
     first by apply gmap_view_auth_valid.
@@ -754,9 +761,9 @@ Proof.
     first by apply reservation_map_token_valid.
   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive unitUR)) as (γE) "HE";
     first by apply gmap_view_auth_valid.
-  iModIntro; iExists (GloblsG SI _ _ γS γO γX γE).
-  rewrite /globl /oassigned -!lock. iSplitL; last done.
+  iModIntro; iExists (GloblG SI _ _ γS γO γX γE).
+  rewrite /globl /glassigned -!lock. iSplitL; last done.
   iExists ∅. iSplitR; first done.
-  replace (⊤ ∖ gset_to_coPset ∅) with (⊤ : coPset); [iFrame; done|].
+  replace (⊤ : coPset) with (⊤ ∖ gset_to_coPset ∅); [iFrame; done|].
   set_solver.
 Qed.

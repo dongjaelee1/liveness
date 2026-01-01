@@ -1648,6 +1648,23 @@ Section glsat.
     iApply glG_variant_alloc_locked. iFrame.
   Qed.
 
+  Lemma glsat_open_owner Ω k t q :
+    glsat Ω ∗ glG_elem k ∗ glG_owner k t q
+    ⊢ glG_owner k t q ∗
+    ∃ v, (glG_locked k v (1/2/2)%Qp ∗ glG_owner k t (1/2/2)%Qp) ∗
+         ((glG_locked k v (1/2/2)%Qp ∗ glG_owner k t (1/2/2)%Qp) -∗ glsat Ω).
+  Proof.
+    iIntros "(Hsat& #Ge& Go)".
+    iPoseProof (glsat_lookup_owner with "[$Hsat $Ge $Go]") as "(%&%& %LU)".
+    rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
+    iDestruct "Hk" as "(Gvk& VSa& VS& #Gvl& %& #Gwf& %& Gfs& %Bound& Mk)".
+    iDestruct "Mk" as "(Glk& %LEa& Gok)".
+    iFrame "Go Glk Gok". iIntros "[Glk Gok]".
+    iFrame "HE HS HV HF HO". iApply (big_sepM_delete _ _ _ _ LU).
+    iFrame "HM". iFrame. eauto.
+  Qed.
+
 End glsat.
 
 (* Allocation of an initial obligation protocol. *)
