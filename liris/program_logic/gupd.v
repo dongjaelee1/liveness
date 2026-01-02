@@ -594,14 +594,14 @@ Global Arguments gl_unlocked {SI GL Σ _}.
 (*   @gl_ver = @gl_ver_def := gl_ver_aux.(seal_eq). *)
 (* Global Arguments gl_ver {SI GL Σ _}. *)
 
-Local Definition gl_pin_def `{SI : indexT} `{@gupdGS SI GL Σ}
-  k v : iProp Σ :=
-  gl k v ∗ glG_version_pin k v.
-Local Definition gl_pin_aux : seal (@gl_pin_def). Proof. by eexists. Qed.
-Definition gl_pin := gl_pin_aux.(unseal).
-Local Definition gl_pin_unseal :
-  @gl_pin = @gl_pin_def := gl_pin_aux.(seal_eq).
-Global Arguments gl_pin {SI GL Σ _}.
+(* Local Definition gl_pin_def `{SI : indexT} `{@gupdGS SI GL Σ} *)
+(*   k v : iProp Σ := *)
+(*   gl k v ∗ glG_version_pin k v. *)
+(* Local Definition gl_pin_aux : seal (@gl_pin_def). Proof. by eexists. Qed. *)
+(* Definition gl_pin := gl_pin_aux.(unseal). *)
+(* Local Definition gl_pin_unseal : *)
+(*   @gl_pin = @gl_pin_def := gl_pin_aux.(seal_eq). *)
+(* Global Arguments gl_pin {SI GL Σ _}. *)
 
 Local Definition gl_done_def `{SI : indexT} `{@gupdGS SI GL Σ}
   k v : iProp Σ :=
@@ -632,11 +632,11 @@ Global Arguments gl_variant {SI GL Σ _}.
 
 (* Ghost lock obligations *)
 Local Definition th_obls_def `{SI : indexT} `{@gupdGS SI GL Σ}
-  i (G : gmap gl_id (gl_version * bool)) q : iProp Σ :=
+  i (G : gmap gl_id gl_version) q : iProp Σ :=
   globlG_elem i ∗ globlG_exec i (q/2 + q/2/2)%Qp ∗ globlG_obls i (dom G) q ∗
-  ([∗ map] k ↦ '(v, p) ∈ G,
+  ([∗ map] k ↦ v ∈ G,
      glG_elem k ∗ glG_locked k v (1/2 + 1/2/2/2/2)%Qp ∗
-     (if (p : bool) then glG_version_pin k v else glG_version k v (1/2 + 1/2/2)%Qp) ∗
+     glG_version k v (1/2 + 1/2/2)%Qp ∗
      glG_owner k i (1/2 + 1/2/2/2)%Qp ∗ globlG_owns i k v (1/2 + 1/2/2)%Qp).
 Local Definition th_obls_aux : seal (@th_obls_def). Proof. by eexists. Qed.
 Definition th_obls := th_obls_aux.(unseal).
