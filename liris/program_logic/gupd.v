@@ -546,3 +546,547 @@ Section fgupd.
   Proof. rewrite /Frame=><-. by rewrite fgupd_frame_l. Qed.
 
 End fgupd.
+
+(** Ghost lock predicates. *)
+(* Ghost locks *)
+Local Definition gl_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  k v : iProp Σ :=
+  glG_elem k ∗ glG_version_lb k v.
+Local Definition gl_aux : seal (@gl_def). Proof. by eexists. Qed.
+Definition gl := gl_aux.(unseal).
+Local Definition gl_unseal :
+  @gl = @gl_def := gl_aux.(seal_eq).
+Global Arguments gl {SI GL Σ _}.
+
+Local Definition gl_witfun_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  k ξ : iProp Σ :=
+  glG_witfun k ξ.
+Local Definition gl_witfun_aux : seal (@gl_witfun_def). Proof. by eexists. Qed.
+Definition gl_witfun := gl_witfun_aux.(unseal).
+Local Definition gl_witfun_unseal :
+  @gl_witfun = @gl_witfun_def := gl_witfun_aux.(seal_eq).
+Global Arguments gl_witfun {SI GL Σ _}.
+
+(* Local Definition gl_locked_def `{SI : indexT} `{@gupdGS SI GL Σ} *)
+(*   k v : iProp Σ := *)
+(*   gl k v ∗ glG_locked k v (1/2 + 1/2/2/2/2)%Qp. *)
+(* Local Definition gl_locked_aux : seal (@gl_locked_def). Proof. by eexists. Qed. *)
+(* Definition gl_locked := gl_locked_aux.(unseal). *)
+(* Local Definition gl_locked_unseal : *)
+(*   @gl_locked = @gl_locked_def := gl_locked_aux.(seal_eq). *)
+(* Global Arguments gl_locked {SI GL Σ _}. *)
+
+Local Definition gl_unlocked_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  k v : iProp Σ :=
+  gl k v ∗ glG_unlocked k v.
+Local Definition gl_unlocked_aux : seal (@gl_unlocked_def). Proof. by eexists. Qed.
+Definition gl_unlocked := gl_unlocked_aux.(unseal).
+Local Definition gl_unlocked_unseal :
+  @gl_unlocked = @gl_unlocked_def := gl_unlocked_aux.(seal_eq).
+Global Arguments gl_unlocked {SI GL Σ _}.
+
+(* Local Definition gl_ver_def `{SI : indexT} `{@gupdGS SI GL Σ} *)
+(*   k v : iProp Σ := *)
+(*   gl k v ∗ glG_version k v (1/2 + 1/2/2)%Qp. *)
+(* Local Definition gl_ver_aux : seal (@gl_ver_def). Proof. by eexists. Qed. *)
+(* Definition gl_ver := gl_ver_aux.(unseal). *)
+(* Local Definition gl_ver_unseal : *)
+(*   @gl_ver = @gl_ver_def := gl_ver_aux.(seal_eq). *)
+(* Global Arguments gl_ver {SI GL Σ _}. *)
+
+Local Definition gl_pin_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  k v : iProp Σ :=
+  gl k v ∗ glG_version_pin k v.
+Local Definition gl_pin_aux : seal (@gl_pin_def). Proof. by eexists. Qed.
+Definition gl_pin := gl_pin_aux.(unseal).
+Local Definition gl_pin_unseal :
+  @gl_pin = @gl_pin_def := gl_pin_aux.(seal_eq).
+Global Arguments gl_pin {SI GL Σ _}.
+
+Local Definition gl_done_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  k v : iProp Σ :=
+  gl k v ∗ glG_version_done k v.
+Local Definition gl_done_aux : seal (@gl_done_def). Proof. by eexists. Qed.
+Definition gl_done := gl_done_aux.(unseal).
+Local Definition gl_done_unseal :
+  @gl_done = @gl_done_def := gl_done_aux.(seal_eq).
+Global Arguments gl_done {SI GL Σ _}.
+
+Local Definition gl_fuel_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  k a : iProp Σ :=
+  glG_elem k ∗ glG_fuel k a.
+Local Definition gl_fuel_aux : seal (@gl_fuel_def). Proof. by eexists. Qed.
+Definition gl_fuel := gl_fuel_aux.(unseal).
+Local Definition gl_fuel_unseal :
+  @gl_fuel = @gl_fuel_def := gl_fuel_aux.(seal_eq).
+Global Arguments gl_fuel {SI GL Σ _}.
+
+Local Definition gl_variant_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  N k v (P Q R : iProp Σ) : iProp Σ :=
+  gl k v ∗ glG_variant N k v (1/2/2/2/2)%Qp P Q R.
+Local Definition gl_variant_aux : seal (@gl_variant_def). Proof. by eexists. Qed.
+Definition gl_variant := gl_variant_aux.(unseal).
+Local Definition gl_variant_unseal :
+  @gl_variant = @gl_variant_def := gl_variant_aux.(seal_eq).
+Global Arguments gl_variant {SI GL Σ _}.
+
+(* Ghost lock obligations *)
+Local Definition th_obls_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  i (G : gmap gl_id (gl_version * bool)) q : iProp Σ :=
+  globlG_elem i ∗ globlG_exec i (q/2 + q/2/2)%Qp ∗ globlG_obls i (dom G) q ∗
+  ([∗ map] k ↦ '(v, p) ∈ G,
+     glG_elem k ∗ glG_locked k v (1/2 + 1/2/2/2/2)%Qp ∗
+     (if (p : bool) then glG_version_pin k v else glG_version k v (1/2 + 1/2/2)%Qp) ∗
+     glG_owner k i (1/2 + 1/2/2/2)%Qp ∗ globlG_owns i k v (1/2 + 1/2/2)%Qp).
+Local Definition th_obls_aux : seal (@th_obls_def). Proof. by eexists. Qed.
+Definition th_obls := th_obls_aux.(unseal).
+Local Definition th_obls_unseal :
+  @th_obls = @th_obls_def := th_obls_aux.(seal_eq).
+Global Arguments th_obls {SI GL Σ _}.
+
+Local Definition th_term_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  i : iProp Σ :=
+  globlG_elem i ∗ globlG_term i.
+Local Definition th_term_aux : seal (@th_term_def). Proof. by eexists. Qed.
+Definition th_term := th_term_aux.(unseal).
+Local Definition th_term_unseal :
+  @th_term = @th_term_def := th_term_aux.(seal_eq).
+Global Arguments th_term {SI GL Σ _}.
+
+(* Ghost lock witnesses *)
+Local Definition wit_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  k v α : iProp Σ :=
+  gl k v ∗ witG_witness k v α.
+Local Definition wit_aux : seal (@wit_def). Proof. by eexists. Qed.
+Definition wit := wit_aux.(unseal).
+Local Definition wit_unseal :
+  @wit = @wit_def := wit_aux.(seal_eq).
+Global Arguments wit {SI GL Σ _}.
+
+Local Definition wit_credit_def `{SI : indexT} `{@gupdGS SI GL Σ}
+  k v a : iProp Σ :=
+  gl k v ∗ witG_credit k v a.
+Local Definition wit_credit_aux : seal (@wit_credit_def). Proof. by eexists. Qed.
+Definition wit_credit := wit_credit_aux.(unseal).
+Local Definition wit_credit_unseal :
+  @wit_credit = @wit_credit_def := wit_credit_aux.(seal_eq).
+Global Arguments wit_credit {SI GL Σ _}.
+
+TODO
+
+
+Local Definition oGoal_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  k T P : iProp Σ :=
+  oblG_goal k T P ∗ obl k.
+Local Definition oGoal_aux : seal (@oGoal_def). Proof. by eexists. Qed.
+Definition oGoal := oGoal_aux.(unseal).
+Local Definition oGoal_unseal :
+  @oGoal = @oGoal_def := oGoal_aux.(seal_eq).
+Global Arguments oGoal {SI Λ Σ _}.
+
+(* Eventually, P always holds. *)
+Local Definition oEA_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  k P : iProp Σ :=
+  (∃ T, oblG_goal k T P).
+Local Definition oEA_aux : seal (@oEA_def). Proof. by eexists. Qed.
+Definition oEA := oEA_aux.(unseal).
+Local Definition oEA_unseal :
+  @oEA = @oEA_def := oEA_aux.(seal_eq).
+Global Arguments oEA {SI Λ Σ _}.
+
+Local Definition oDone_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  k : iProp Σ :=
+  oblG_done k ∗ obl k.
+Local Definition oDone_aux : seal (@oDone_def). Proof. by eexists. Qed.
+Definition oDone := oDone_aux.(unseal).
+Local Definition oDone_unseal :
+  @oDone = @oDone_def := oDone_aux.(seal_eq).
+Global Arguments oDone {SI Λ Σ _}.
+
+Local Definition oFuel_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  k a : iProp Σ :=
+  oblG_fuel k a ∗ obl k.
+Local Definition oFuel_aux : seal (@oFuel_def). Proof. by eexists. Qed.
+Definition oFuel := oFuel_aux.(unseal).
+Local Definition oFuel_unseal :
+  @oFuel = @oFuel_def := oFuel_aux.(seal_eq).
+Global Arguments oFuel {SI Λ Σ _}.
+
+Local Definition oWit_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  k ℵ : iProp Σ :=
+  owitnessG_witness k ℵ ∗ obl k.
+Local Definition oWit_aux : seal (@oWit_def). Proof. by eexists. Qed.
+Definition oWit := oWit_aux.(unseal).
+Local Definition oWit_unseal :
+  @oWit = @oWit_def := oWit_aux.(seal_eq).
+Global Arguments oWit {SI Λ Σ _}.
+
+Local Definition oCred_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  k a : iProp Σ :=
+  owitnessG_credit k a ∗ obl k.
+Local Definition oCred_aux : seal (@oCred_def). Proof. by eexists. Qed.
+Definition oCred := oCred_aux.(unseal).
+Local Definition oCred_unseal :
+  @oCred = @oCred_def := oCred_aux.(seal_eq).
+Global Arguments oCred {SI Λ Σ _}.
+
+Local Definition tHas_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  i G q : iProp Σ :=
+  othreadG_obls i G q ∗ othreadG_exec i (q/2) ∗ othreadG_elem i ∗
+  ([∗ set] k ∈ G, obl k ∗ oblG_live k (1/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
+Local Definition tHas_aux : seal (@tHas_def). Proof. by eexists. Qed.
+Definition tHas := tHas_aux.(unseal).
+Local Definition tHas_unseal :
+  @tHas = @tHas_def := tHas_aux.(seal_eq).
+Global Arguments tHas {SI Λ Σ _}.
+
+Local Definition tTerm_def `{SI : indexT} `{@lirisGS SI Λ Σ}
+  i : iProp Σ :=
+  othreadG_term i ∗ othreadG_elem i.
+Local Definition tTerm_aux : seal (@tTerm_def). Proof. by eexists. Qed.
+Definition tTerm := tTerm_aux.(unseal).
+Local Definition tTerm_unseal :
+  @tTerm = @tTerm_def := tTerm_aux.(seal_eq).
+Global Arguments tTerm {SI Λ Σ _}.
+
+Section lifting.
+  Context `{SI : indexT} `{!lirisGS Λ Σ}.
+  Implicit Types s : stuckness.
+  Implicit Types i : thread_id.
+  Implicit Types v : val Λ.
+  Implicit Types e : expr Λ.
+  Implicit Types σ : state Λ.
+  Implicit Types P Q : iProp Σ.
+  Implicit Types Φ : val Λ → iProp Σ.
+
+  Local Ltac unfold_defs :=
+    try rewrite !tTerm_unseal /tTerm_def;
+    try rewrite !tHas_unseal /tHas_def;
+    try rewrite !oCred_unseal /oCred_def;
+    try rewrite !oWit_unseal /oWit_def;
+    try rewrite !oFuel_unseal /oFuel_def;
+    try rewrite !oDone_unseal /oDone_def;
+    try rewrite !oEA_unseal /oEA_def;
+    try rewrite !oGoal_unseal /oGoal_def;
+    try rewrite !obl_unseal /obl_def.
+
+  Section liveness_preds.
+
+    Global Instance obl_persistent k : Persistent (obl k).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance oGoal_persistent k T P : Persistent (oGoal k T P).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance oEA_persistent k P : Persistent (oEA k P).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance oDone_persistent k : Persistent (oDone k).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance oWit_persistent k ℵ : Persistent (oWit k ℵ).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance tTerm_persistent i : Persistent (tTerm i).
+    Proof. unfold_defs. apply _. Qed.
+
+    Global Instance obl_timeless k : Timeless (obl k).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance oDone_timeless k : Timeless (oDone k).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance oFuel_timeless k a : Timeless (oFuel k a).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance oWit_timeless k ℵ : Timeless (oWit k ℵ).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance oCred_timeless k a : Timeless (oCred k a).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance tHas_timeless i G q : Timeless (tHas i G q).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance tTerm_timeless i : Timeless (tTerm i).
+    Proof. unfold_defs. apply _. Qed.
+
+    Local Open Scope ord.
+
+    (** oFuel rules *)
+    Lemma oFuel_eq k a0 a1 :
+      (a0 == a1) → oFuel k a0 = oFuel k a1.
+    Proof.
+      unfold_defs. intros. rewrite (oblG_fuel_eq k a0 a1); auto.
+    Qed.
+    Lemma oFuel_eq_list L a0 a1 :
+      (a0 == a1) →
+      ([∗ list] i ∈ L, oFuel i a0)%I ≡ ([∗ list] i ∈ L, oFuel i a1)%I.
+    Proof. intros. apply big_opL_proper. intros. erewrite oFuel_eq; eauto. Qed.
+    Lemma oFuel_eq_set L a0 a1 :
+      a0 == a1 →
+      ([∗ set] i ∈ L, oFuel i a0)%I ≡ ([∗ set] i ∈ L, oFuel i a1)%I.
+    Proof. intros. apply big_opS_proper. intros. erewrite oFuel_eq; eauto. Qed.
+
+    Lemma oFuel_mon k a0 a1 :
+      (a0 <= a1)%ord → oFuel k a1 ==∗ oFuel k a0.
+    Proof.
+      unfold_defs. iIntros (Hle) "(P& Be)". iFrame. by iApply oblG_fuel_mon.
+    Qed.
+    Lemma oFuel_mon_list L a0 a1 :
+      a0 <= a1 →
+      ([∗ list] i ∈ L, oFuel i a1) ⊢ |==> ([∗ list] i ∈ L, oFuel i a0).
+    Proof.
+      iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+      iModIntro. iIntros. by iApply oFuel_mon.
+    Qed.
+    Lemma oFuel_mon_set L a0 a1 :
+      a0 <= a1 →
+      ([∗ set] i ∈ L, oFuel i a1) ⊢ |==> ([∗ set] i ∈ L, oFuel i a0).
+    Proof.
+      iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+      iModIntro. iIntros. by iApply oFuel_mon.
+    Qed.
+
+    Lemma oFuel_split k a0 a1 :
+      oFuel k (a0 ⊕ a1)%ord ⊣⊢ oFuel k a0 ∗ oFuel k a1.
+    Proof.
+      unfold_defs. rewrite oblG_fuel_split. iSplit.
+      - iIntros "((P1& P2)& #Be)"; iFrame; eauto.
+      - iIntros "((P1& B1)& (P2& B2))"; iFrame.
+    Qed.
+    Lemma oFuel_split_list L a0 a1 :
+      ([∗ list] i ∈ L, oFuel i (a0 ⊕ a1)) ⊣⊢ ([∗ list] i ∈ L, oFuel i a0) ∗ ([∗ list] i ∈ L, oFuel i a1).
+    Proof.
+      rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply oFuel_split.
+    Qed.
+    Lemma oFuel_split_set L a0 a1 :
+      ([∗ set] i ∈ L, oFuel i (a0 ⊕ a1)) ⊣⊢ ([∗ set] i ∈ L, oFuel i a0) ∗ ([∗ set] i ∈ L, oFuel i a1).
+    Proof.
+      rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply oFuel_split.
+    Qed.
+
+    Lemma oFuel_mon_split k a0 a1 a2 :
+      ((a0 ⊕ a1) <= a2)%ord → oFuel k a2 ==∗ oFuel k a0 ∗ oFuel k a1.
+    Proof.
+      unfold_defs. iIntros (Hle) "(P& #Be)".
+      iMod (oblG_fuel_mon_split with "P") as "[P1 P2]"; first done.
+      iFrame; eauto.
+    Qed.
+    Lemma oFuel_mon_split_list L a0 a1 a2 :
+      (a0 ⊕ a1) <= a2 →
+      ([∗ list] i ∈ L, oFuel i a2) ⊢ |==> ([∗ list] i ∈ L, oFuel i a0) ∗ ([∗ list] i ∈ L, oFuel i a1).
+    Proof.
+      iIntros (LE) "H". iPoseProof (oFuel_mon_list with "H") as ">H"; first done.
+      by iApply oFuel_split_list.
+    Qed.
+    Lemma oFuel_mon_split_set L a0 a1 a2 :
+      (a0 ⊕ a1) <= a2 →
+      ([∗ set] i ∈ L, oFuel i a2) ⊢ |==> ([∗ set] i ∈ L, oFuel i a0) ∗ ([∗ set] i ∈ L, oFuel i a1).
+    Proof.
+      iIntros (LE) "H". iPoseProof (oFuel_mon_set with "H") as ">H"; first done.
+      by iApply oFuel_split_set.
+    Qed.
+
+    Lemma oFuel_lt k a0 a1 :
+      a0 < a1 →
+      oFuel k a1 ⊢ |==> oFuel k a0 ∗ oFuel k Ord.one.
+    Proof.
+      unfold_defs. iIntros (Hlt) "(P& #Be)".
+      iMod (oblG_fuel_lt with "P") as "(P& %& %& H)". 1: done.
+      iFrame "P Be". apply ord_lt_one in H. iMod (oblG_fuel_mon_split _ _ _ _ with "H") as "[_ $]"; done.
+    Qed.
+    Lemma oFuel_lt_list L a0 a1 :
+      a0 < a1 →
+      ([∗ list] i ∈ L, oFuel i a1) ⊢ |==> ([∗ list] i ∈ L, oFuel i a0) ∗ ([∗ list] i ∈ L, oFuel i Ord.one).
+    Proof.
+      iIntros (LT) "H". rewrite -big_sepL_sep. iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+      iModIntro. iIntros. by iApply oFuel_lt.
+    Qed.
+    Lemma oFuel_lt_set L a0 a1 :
+      a0 < a1 →
+      ([∗ set] i ∈ L, oFuel i a1) ⊢ |==> ([∗ set] i ∈ L, oFuel i a0) ∗ ([∗ set] i ∈ L, oFuel i Ord.one).
+    Proof.
+      iIntros (LT) "H". rewrite -big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+      iModIntro. iIntros. by iApply oFuel_lt.
+    Qed.
+
+    (** oCred rules *)
+    Lemma oCred_eq k a0 a1 :
+      (a0 == a1)%ord → oCred k a1 = oCred k a0.
+    Proof.
+      unfold_defs. intros. rewrite (owitnessG_credit_eq k a0 a1); auto.
+    Qed.
+    Lemma oCred_mon k a0 a1 :
+      (a0 <= a1)%ord → oCred k a1 ==∗ oCred k a0.
+    Proof.
+      unfold_defs. iIntros (Hle) "(P& Be)". iFrame. by iApply owitnessG_credit_mon.
+    Qed.
+    Lemma oCred_split k a0 a1 :
+      oCred k (a0 ⊕ a1)%ord ⊣⊢ oCred k a0 ∗ oCred k a1.
+    Proof.
+      unfold_defs. rewrite owitnessG_credit_split. iSplit.
+      - iIntros "((P1& P2)& #Be)"; iFrame; eauto.
+      - iIntros "((P1& B1)& (P2& B2))"; iFrame.
+    Qed.
+    Lemma oCred_mon_split k a0 a1 a2 :
+      ((a0 ⊕ a1) <= a2)%ord → oCred k a2 ==∗ oCred k a0 ∗ oCred k a1.
+    Proof.
+      unfold_defs. iIntros (Hle) "(P& #Be)".
+      iMod (owitnessG_credit_mon_split with "P") as "[P1 P2]"; first done.
+      iFrame; eauto.
+    Qed.
+
+    (** oWit rules *)
+    Lemma oWit_mon k a0 a1 :
+      (a0 <= a1)%ord → oWit k a0 ==∗ oWit k a1.
+    Proof.
+      unfold_defs. iIntros (Hle) "(P& Be)". iFrame. by iApply owitnessG_witness_mon.
+    Qed.
+    Lemma oWit_cred_compare k a0 a1 :
+      oWit k a0 -∗ oCred k a1 -∗ ⌜ (a1 <= a0)%ord ⌝.
+    Proof.
+      unfold_defs. iIntros "(P& Be) (Cred& _)". iApply (owitnessG_compare with "[$]").
+    Qed.
+    Lemma oWit_cred_spend_gen k a0 a1 :
+      oWit k a0 -∗ oCred k a1 ==∗ ∃ a2, ⌜ ((a1 ⊕ a2) <= a0)%ord ⌝ ∗ oWit k a2.
+    Proof.
+      unfold_defs. iIntros "(Ow& $) (Oc& _)". iApply (owitnessG_credit_spend_gen with "[$]").
+    Qed.
+    Lemma oWit_cred_spend k a0 a1 :
+      (Ord.O < a1)%ord →
+      oWit k a0 -∗ oCred k a1 ==∗ ∃ a2, ⌜ (a2 < a0)%ord ⌝ ∗ oWit k a2.
+    Proof.
+      unfold_defs. iIntros (LT) "(Ow& $) (Oc& _)". iApply (owitnessG_credit_spend with "[$]"). done.
+    Qed.
+    Lemma oWit_cred_spend_one k a :
+      oWit k a -∗ oCred k Ord.one ==∗ ∃ a0, ⌜ (a0 < a)%ord ⌝ ∗ oWit k a0.
+    Proof.
+      iIntros "Ow Oc". iApply (oWit_cred_spend with "Ow Oc"). apply Ord.S_pos.
+    Qed.
+
+    (** tHas rules *)
+    Lemma tHas_disj i G1 G2 q1 q2 :
+      tHas i G1 q1 -∗ tHas i G2 q2 -∗ (⌜ G1 ## G2 ⌝).
+    Proof.
+      unfold_defs. iIntros "(T1& E1& #Te1& Es1) (T2& E2& #Te2& Es2)".
+      rewrite elem_of_disjoint. iIntros (x IN1 IN2).
+      iPoseProof (big_sepS_delete _ _ _ IN1 with "Es1") as "[(_&_&Tok1) _]".
+      iPoseProof (big_sepS_delete _ _ _ IN2 with "Es2") as "[(_&_&Tok2) _]".
+      iPoseProof (othreadG_owns_valid_2 with "[$Tok1 $Tok2]") as "%F".
+      done.
+    Qed.
+
+    Lemma tHas_op_1 i G1 G2 q1 q2 :
+      tHas i G1 q1 -∗ tHas i G2 q2 -∗ tHas i (G1 ∪ G2) (q1 + q2).
+    Proof.
+      unfold_defs. iIntros "(T1& E1& #Te1& Es1) (T2& E2& #Te2& Es2)".
+      iPoseProof (othreadG_obls_valid_2 with "[$T1 $T2]") as "%". destruct H.
+      iPoseProof (othreadG_obls_op_1 with "[$T1 $T2]") as "T". iFrame.
+      iCombine "E1 E2" as "E". iPoseProof (othreadG_exec_frac_op with "E") as "E"; first reflexivity.
+      rewrite Qp.div_add_distr. iFrame. iSplitR; auto.
+      rewrite big_sepS_union; auto. iFrame.
+    Qed.
+    Lemma tHas_op_2 i G1 G2 q1 q2 :
+      G1 ## G2 →
+      tHas i (G1 ∪ G2) (q1 + q2) -∗ (tHas i G1 q1 ∗ tHas i G2 q2).
+    Proof.
+      unfold_defs. iIntros (Hd) "(T& E& #Te& Es)".
+      iPoseProof (othreadG_obls_op_2 with "T") as "[T1 T2]"; first auto.
+      rewrite Qp.div_add_distr. iPoseProof (othreadG_exec_frac_op _ (q1/2) (q2/2) with "E") as "[E1 E2]"; first auto.
+      iFrame. iFrame "Te". rewrite -big_sepS_union; auto.
+    Qed.
+
+  End liveness_preds.
+
+  Section foupd.
+
+    Lemma obl_alloc E i G q T P a :
+      tHas i G q -∗
+      |={E}=>o ∃ k, ⌜ k ∉ G ⌝ ∗ tHas i ({[k]} ∪ G) q ∗ obl k ∗ oGoal k T P ∗ oEA k P ∗ oFuel k a ∗ oWit k (owfun a).
+    Proof.
+      unfold_defs. iIntros "(Tbs& Texi& #Tei& Tds)". iIntros (???) "SI".
+      iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+      iApply oupd_unfold. iRight.
+      rewrite /oproto. iIntros (??) "(S& T& A& N& %OW)".
+      assert (∃ k, k ∉ dom Ω1).
+      { exists (fresh (dom Ω1)). apply is_fresh. }
+      assert (Dom1 : dom Ω1 = dom W1).
+      { eapply obl_wit_dom; eauto. }
+      destruct H as (k& Nink).
+      iMod (osat_alloc_obl _ k i a T P with "S") as "(S& #Bgk& #Bek& Blk& Bok& Bfk)". 1: done.
+      iPoseProof (oblG_owner_div_2 with "Bok") as "[Bok Bok2]".
+      iMod (othread_alloc_obl with "[$S $T $Tbs $Bek $Blk $Bok2]") as "(S& T& %Nink2& Tbs& Tok& Blk)".
+      iPoseProof (othreadG_owns_div_2 with "Tok") as "[Tok Tok2]".
+      iPoseProof (othreadG_owns_div_2 with "Tok2") as "[Tok' Tok2]".
+      iCombine "Tok Tok'" as "Tok". iPoseProof (othreadG_owns_frac_op with "Tok") as "Tok". 1: reflexivity.
+      iPoseProof (oassigned_add_obl with "[$A $Bek Bok Tok2]") as "A".
+      { iLeft. iFrame. }
+      iMod (owitness_alloc_wit _ k (owfun a) with "N") as "[N #Nwk]".
+      { rewrite -Dom1. done. }
+      iModIntro. iFrame "S T". iSplitR.
+      { iPureIntro. econstructor 2. eapply obl_states_step_alloc.
+        exists k. eexists. split; last done. by apply not_elem_of_dom. }
+      iIntros (W2 [ProgW OW2]).
+      iMod (owitness_obl_wit_alloc with "N") as "N". 1: eapply Nink. all: eauto.
+      iModIntro. iSplitL "A N".
+      { rewrite dom_insert_L. iFrame. auto. }
+      iApply oupd_unfold. iLeft. iModIntro. iMod "close" as "_". iModIntro.
+      iFrame "SI Tbs Texi Tei Bek Bgk Bfk Nwk".
+      iSplitR; first auto.
+      iApply big_sepS_union. 1: set_solver.
+      iFrame "Tds". iApply big_sepS_singleton. iFrame. auto.
+    Qed.
+
+    Lemma obl_resolve E i G q k T P :
+      k ∈ G →
+      tHas i G q -∗ oGoal k T P -∗
+      (∀ σ Θ κs, state_interp σ Θ κs ={E,∅}=∗ (⌜ T σ ⌝ ∗ ▷ P) ∗ (oDone k ={∅,E}=∗ state_interp σ Θ κs)) -∗
+      |={E}=>o tHas i (G ∖ {[k]}) q ∗ oDone k.
+    Proof.
+      unfold_defs. iIntros (InGk) "(Tbs& Texi& #Tei& Tds) (#Bgk& #Bek) ACC".
+      iIntros (???) "SI". iMod ("ACC" with "SI") as "[(%HT& HP) ACC]".
+      iPoseProof (big_sepS_delete _ _ _ InGk with "Tds") as "[(_& Blk& Tok) Tds]". iFrame "Texi Tei Tds Bek".
+      iModIntro. iApply oupd_unfold. iRight.
+      rewrite /oproto. iIntros (??) "(S& T& A& N& %OW)".
+      assert (Dom1 : dom Ω1 = dom W1).
+      { eapply obl_wit_dom; eauto. }
+      iPoseProof (osat_elem with "[$S $Bek]") as "%InOk".
+      iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Bok& Tok2) | #Bdk])"; first eauto; cycle 1.
+      { iPoseProof (oblG_live_done_false with "[$Blk $Bdk]") as "%F". done. }
+      iPoseProof (othread_obls_open _ _ k G with "[$T $Tei $Tbs]") as "(Tbs& [Blk2 Bok2]& ACC2)"; first auto.
+      iPoseProof (oblG_owner_agree with "[$Bok $Bok2]") as "(%Eq& %)". subst i0. clear H.
+      iPoseProof ("ACC2" with "[$Blk2 $Bok2]") as "T".
+      iCombine "Tok Tok2" as "Tok". iPoseProof (othreadG_owns_frac_op _ _ _ _ 1 with "Tok") as "Tok".
+      { rewrite -assoc Qp.div_2 Qp.div_2. done. }
+      iMod (othread_delete_obl_frac with "[$T $Tbs $Tok]") as "(T& Tbs& Blk2& Bok2)"; first auto.
+      iCombine "Blk Blk2" as "Blk". iPoseProof (oblG_live_div_2 with "Blk") as "Blk".
+      iCombine "Bok Bok2" as "Bok". iPoseProof (oblG_owner_div_2 with "Bok") as "Bok".
+      iPoseProof (osat_obl_is_live with "[$S $Bek $Blk]") as "(%& %LUOk)".
+      iMod (osat_obl_resolve_one with "[$S $Bek $Bgk $HP $Blk $Bok]") as "[S #Bdk]".
+      iPoseProof (oassigned_add_obl with "[$A $Bek Bdk]") as "A".
+      { iRight. auto. }
+      replace ({[k]} ∪ dom Ω1 ∖ {[k]}) with (dom Ω1); cycle 1.
+      { apply union_difference_L. set_solver. }
+      iModIntro.
+      iExists (<[k:=odone T]> Ω1). iSplitR.
+      { iPureIntro. econstructor 2. eapply (obl_states_step_resolve _ _ _ (obl_cond_one k)).
+        1: apply _.
+        intro x. destruct (decide (x = k)).
+        - subst. rewrite LUOk lookup_insert_eq. econstructor. split; intros; done.
+        - rewrite lookup_insert_ne; auto. destruct (Ω1 !! x) eqn:LUx; econstructor. split; intros; done.
+      }
+      iIntros (W2 [ProgW OW2]).
+      assert (ResolveW : W1 ↓ᵣ W2 | wit_cond_one k) by (eapply obl_wit_resolve; eauto).
+      iMod (owitness_wit_resolve_one _ _ _ ResolveW with "[$N $Bdk]") as "N".
+      iModIntro. rewrite dom_insert_L. replace ({[k]} ∪ dom Ω1) with (dom Ω1) by set_solver.
+      iFrame. iSplitR; first done. iModIntro. iMod ("ACC" with "[$Bdk $Bek]") as "$".
+      iModIntro. auto.
+    Qed.
+
+    Lemma obl_ea_done E k P :
+      Persistent P →
+      oEA k P -∗ oDone k -∗ |={E}=>o ▷ P.
+    Proof.
+      unfold_defs. iIntros (PersP) "(%& #Bgk) [#Bdk #Bek]".
+      iIntros (???) "SI".
+      iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+      iApply oupd_unfold. iRight.
+      rewrite /oproto. iIntros (??) "(S& T& A& N& %OW)".
+      iPoseProof (osat_done_open_pers with "[$S $Bgk $Bdk]") as "[S HP]".
+      iModIntro. iExists Ω1. iSplitR; first done.
+      iIntros (W2 (ProgW& OW2)).
+      iPoseProof (owitness_obl_wit_rc_step_same_obl _ _ _ _ OW ProgW OW2 with "N") as "N".
+      iModIntro. iFrame. iSplit; first done. iModIntro. by iMod "close".
+    Qed.
+
+  End foupd.
