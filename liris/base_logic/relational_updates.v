@@ -59,7 +59,7 @@ End aux.
   - a well-frounded relation [rupd_rel_wf: X → X → Prop]
   - a predicate [rupd_pred: X → iProp] *)
 
-Class rupdG `{SI : indexT} (Σ : gFunctors) (X : Type):=
+Class rupdG `{SI : indexT} (Σ : gFunctors) (X : Type) :=
   RelG {
       rupd_pred : X → iProp Σ;
       rupd_rel : relation X;
