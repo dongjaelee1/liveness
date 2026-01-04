@@ -1059,30 +1059,31 @@ Section preds.
       iApply (big_sepS_impl with "Gseq2"). iIntros "!> %% ($& $)". auto.
     Qed.
 
-    Lemma gl_lock E Θ N i G q k ξ v1 v2 I P1 Q1 R1 P2 Q2 R2 :
+    Lemma gl_lock E Θ N i G q k ξ v1 v2 P1 Q1 R1 P2 Q2 R2 :
       v1 < v2 →
       ↑N ⊆ E →
-      I -∗
-      th_obls i G q -∗
       gl_current k v1 -∗
       gl_done k v1 -∗
       gl_variant N k v1 P1 Q1 R1 -∗
-      gl_witfun k ξ -∗
-      ((▷(I ∗ gl_current k v1 ∗ gl_done k v1 ∗ Q1)) -∗ |={E ∖ ↑N:Θ}=>g (I ∗ gl_current k v1 ∗ (▷ R1) ∗ (▷ P2))) -∗
-      |={E:Θ}=>g I ∗
-              th_obls i (<[k:=v2]>G) q ∗
-              gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
-              gl_variant N k v2 P2 Q2 R2 ∗
-              wit k v2 (gupd_η (Σ[ξ] v2)) ∗
-              ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit k u (gupd_η (Σ[ξ] u))) ∗
-              ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u).
+      |={E,E ∖ ↑N}=> (▷ (gl_current k v1 ∗ Q1)) ∗
+                    (th_obls i G q -∗
+                     gl_current k v1 -∗
+                     gl_witfun k ξ -∗
+                     (▷ R1) -∗
+                     (▷ P2) -∗
+                     |={Θ}=>g |={E ∖ ↑N,E}=> 
+                       (th_obls i (<[k:=v2]>G) q ∗
+                        gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
+                        gl_variant N k v2 P2 Q2 R2 ∗
+                        wit k v2 (gupd_η (Σ[ξ] v2)) ∗
+                        ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit k u (gupd_η (Σ[ξ] u))) ∗
+                        ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u))).
     Proof.
-      unfold_defs. iIntros (LTv MASK) "HI (#Oe& Ox& Ob& OS) ((#Ge& #Gvl1)& Gv1) (_& #Gu1) (_& #Gvar1) #Gwf UPD".
+      unfold_defs. iIntros (LTv MASK) "((#Ge& #Gvl1)& Gv1) (_& #Gu1) (_& #Gvar1)".
       iMod (glG_variant_acc_version_unlocked with "Gvar1 Gv1 Gu1") as "[H ACC]". 1: auto.
-      iMod ("UPD" with "[HI H]") as "UPD".
-      { iNext. iDestruct "H" as "(Gv1& _& _& HQ1)". iFrame. eauto. }
-      iModIntro. iMod "UPD" as ">(HI& (_& Gv1)& HR1& HP2)".
-      iApply fupd_mask_intro. 1: set_solver. iIntros "Fupd".
+      iModIntro. iSplitL "H".
+      { iNext. iDestruct "H" as "($& _& _& $)". eauto. }
+      iIntros "(#Oe& Ox& Ob& OS) (_& Gv1) #Gwf HR1 HP2".
       iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       iPoseProof (glsat_lookup_unlocked with "[$S $Ge $Gu1]") as "%LUO1u".
       iPoseProof (glsat_lookup_version with "[$S $Ge $Gv1]") as "%LUO1v".
@@ -1113,11 +1114,11 @@ Section preds.
       iPoseProof (glwit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { iModIntro. rewrite fmap_insert. iFrame. eauto. }
-      iMod "Fupd" as "_". iMod ("ACC" with "[HR1]") as "_".
+      iIntros "!> !>". iMod ("ACC" with "[HR1]") as "_".
       { iNext. iRight. iFrame. iApply (glG_version_get_expired _ v2 v1); auto. }
       iDestruct "Gl2" as "[Gl2 Gl']".
       iMod (glG_variant_alloc_locked _ N k v2 _ P2 Q2 R2 with "[$Gl' $HP2]") as "#Gvar2".
-      iModIntro. rewrite dom_insert_L. iFrame "HI Oe Ge Gvl2 Ox Ob Gf Gvar2 Ww".
+      iModIntro. rewrite dom_insert_L. iFrame "Oe Ge Gvl2 Ox Ob Gf Gvar2 Ww".
       iSplitL.
       { iApply big_sepM_insert.
         { apply not_elem_of_dom; auto. }
