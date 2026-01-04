@@ -14,42 +14,42 @@ Proof.
 Qed.
 
 Class ghost_lock_class := {
-    gl_fuel : Type;
-    #[global] gl_fuel_wfocm :: WFOCM.pack gl_fuel;
+    ghost_lock_fuel : Type;
+    #[global] ghost_lock_fuel_wfocm :: WFOCM.pack ghost_lock_fuel;
   }.
-Definition gl_version := nat.
+Definition ghost_lock_version := nat.
 (* We assume that thread id is positive *)
-Definition gl_owner := positive.
+Definition ghost_lock_owner := positive.
 
 Variant ghost_lock_state `{GL : ghost_lock_class} : Type :=
-  | gl_locked (fuel : gl_fuel) (owner : gl_owner)
-  | gl_unlocked
+  | ghost_lock_locked (fuel : ghost_lock_fuel) (owner : ghost_lock_owner)
+  | ghost_lock_unlocked
 .
-Definition ghost_lock `{GL : ghost_lock_class} : Type := gl_version * ghost_lock_state.
+Definition ghost_lock `{GL : ghost_lock_class} : Type := ghost_lock_version * ghost_lock_state.
 
 Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
   | ghost_lock_progress
       ver fuel1 fuel2 owner1 owner2
       (LTfuel : fuel2 w< fuel1)
     :
-    ghost_lock_step (ver, gl_locked fuel1 owner1) (ver, gl_locked fuel2 owner2)
+    ghost_lock_step (ver, ghost_lock_locked fuel1 owner1) (ver, ghost_lock_locked fuel2 owner2)
   | ghost_lock_unlock
       ver fuel owner
     :
-    ghost_lock_step (ver, gl_locked fuel owner) (ver, gl_unlocked)
+    ghost_lock_step (ver, ghost_lock_locked fuel owner) (ver, ghost_lock_unlocked)
   | ghost_lock_lock
       ver1 ver2 fuel owner
       (GTver : (ver1 < ver2)%nat)
     :
-    ghost_lock_step (ver1, gl_unlocked) (ver2, gl_locked fuel owner)
+    ghost_lock_step (ver1, ghost_lock_unlocked) (ver2, ghost_lock_locked fuel owner)
 .
 
 Definition ghost_lock_keep `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
   λ '(v1, g1) '(v2, g2),
     (v1 = v2) ∧
     match g1, g2 with
-    | (gl_locked _ _), (gl_locked _ _) => True
-    | (gl_unlocked), (gl_unlocked) => True
+    | (ghost_lock_locked _ _), (ghost_lock_locked _ _) => True
+    | (ghost_lock_unlocked), (ghost_lock_unlocked) => True
     | _, _ => False
     end.
 
@@ -68,8 +68,8 @@ Definition gl_rel_preserves_cond `{GL : ghost_lock_class} (C : gl_cond) (R : gho
   ∀ k g1 g2, C k g1 → R g1 g2 → C k g2.
 
 (* Some useful gl_conds *)
-Definition gl_cond_owner `{GL : ghost_lock_class} (i : gl_owner) : gl_cond :=
-  λ _ g, match g with | (_, gl_locked _ j) => (j = i) | _ => False end.
+Definition gl_cond_owner `{GL : ghost_lock_class} (i : ghost_lock_owner) : gl_cond :=
+  λ _ g, match g with | (_, ghost_lock_locked _ j) => (j = i) | _ => False end.
 Global Instance gl_cond_owner_dec `{GL : ghost_lock_class} : ∀ i k g, Decision (gl_cond_owner i k g).
 Proof using. intros. rewrite /gl_cond_owner. destruct g. destruct g0; solve_decision. Qed.
 
@@ -85,8 +85,8 @@ Notation "A ↪ₛ B | C" := (gls_cond_step C A B) (at level 20, format "A  ↪�
 
 Definition gls_alloc `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
   λ Ω1 Ω2, ∃ k v, (Ω1 !! k = None) ∧
-                  ((∃ a t, Ω2 = <[k:=(v, gl_locked a t)]> Ω1) ∨
-                     (Ω2 = <[k:=(v, gl_unlocked)]> Ω1)).
+                  ((∃ a t, Ω2 = <[k:=(v, ghost_lock_locked a t)]> Ω1) ∨
+                     (Ω2 = <[k:=(v, ghost_lock_unlocked)]> Ω1)).
 Infix "↪ₐ" := (gls_alloc) (at level 20).
 
 Variant gls_step `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
@@ -190,27 +190,27 @@ Section ghost_locks.
 End ghost_locks.
 
 (** Witness of each version *)
-Definition gl_witness `{GL : ghost_lock_class} : Type := gl_version → gl_fuel.
+Definition gl_witness `{GL : ghost_lock_class} : Type := ghost_lock_version → ghost_lock_fuel.
 
-Fixpoint gl_witness_sum_len `{GL : ghost_lock_class} (ξ : gl_witness) (v : gl_version) (n : nat) : gl_fuel :=
+Fixpoint gl_witness_sum_len `{GL : ghost_lock_class} (ξ : gl_witness) (v : ghost_lock_version) (n : nat) : ghost_lock_fuel :=
   match n with
   | O => wzero
   | S m => (ξ v) w+ (gl_witness_sum_len ξ (S v) m)
   end.
 Notation "'Σ[' ξ ']' [ v , n ]" := (gl_witness_sum_len ξ v n) (at level 20, format "Σ[ ξ ] [ v ,  n ]").
 
-Definition gl_witness_sum_gen `{GL : ghost_lock_class} (ξ : gl_witness) (v1 v2 : gl_version) : gl_fuel :=
+Definition gl_witness_sum_gen `{GL : ghost_lock_class} (ξ : gl_witness) (v1 v2 : ghost_lock_version) : ghost_lock_fuel :=
   Σ[ξ][v1, S (v2 - v1)].
 Notation "'Σ[' ξ ']' { v1 , v2 } " := (gl_witness_sum_gen ξ v1 v2) (at level 20, format "Σ[ ξ ] { v1 ,  v2 }").
 
-Fixpoint gl_witness_sum `{GL : ghost_lock_class} (ξ : gl_witness) (v : gl_version) : gl_fuel :=
+Fixpoint gl_witness_sum `{GL : ghost_lock_class} (ξ : gl_witness) (v : ghost_lock_version) : ghost_lock_fuel :=
   match v with
   | O => ξ v
   | S u => (gl_witness_sum ξ u) w+ (ξ v)
   end.
 Notation "'Σ[' ξ ']' v" := (gl_witness_sum ξ v) (at level 20, format "Σ[ ξ ]  v").
 
-Definition gl_witness_constant `{GL : ghost_lock_class} (c : gl_fuel) : gl_witness := λ _, c.
+Definition gl_witness_constant `{GL : ghost_lock_class} (c : ghost_lock_fuel) : gl_witness := λ _, c.
 
 Section witfun.
   Context `{GL : ghost_lock_class}.

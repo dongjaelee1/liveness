@@ -7,12 +7,12 @@ From liris.base_logic Require Export glsat.
 (** The ghost state for thread obligations *)
 Module globlGS.
 
-  Notation gl_versionO := (leibnizO gl_version).
+  Notation ghost_lock_versionO := (leibnizO ghost_lock_version).
 
   (* Assumes thread ids are positive *)
   Class globlGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     GloblGpreS {
-        globlGpreS_owns : inG Σ (reservation_mapUR (gmap_viewR gl_id (agreeR gl_versionO)));
+        globlGpreS_owns : inG Σ (reservation_mapUR (gmap_viewR gl_id (agreeR ghost_lock_versionO)));
         globlGpreS_obls : inG Σ (gmap_viewR positive (gset_disjUR gl_id));
         globlGpreS_exec : inG Σ (reservation_mapUR mono_natUR);
         globlGpreS_elem : inG Σ (gmap_viewR positive unitUR);
@@ -28,7 +28,7 @@ Module globlGS.
       }.
 
   Definition globlΣ `{SI : indexT} : gFunctors :=
-    #[GFunctor (reservation_mapUR (gmap_viewR gl_id (agreeR gl_versionO)));
+    #[GFunctor (reservation_mapUR (gmap_viewR gl_id (agreeR ghost_lock_versionO)));
       GFunctor (gmap_viewR positive (gset_disjUR gl_id));
       GFunctor (reservation_mapUR mono_natUR);
       GFunctor (gmap_viewR positive unitUR)
@@ -47,16 +47,16 @@ Local Existing Instances globl_inG
   globlGpreS_owns globlGpreS_obls globlGpreS_exec globlGpreS_elem.
 
 (* Owns: thread currently has this obl *)
-Definition globlG_owns `{SI : indexT} `{!globlGS Σ} (i : positive) (k : gl_id) (v : gl_version) (q : Qp) : iProp Σ :=
+Definition globlG_owns `{SI : indexT} `{!globlGS Σ} (i : positive) (k : gl_id) (v : ghost_lock_version) (q : Qp) : iProp Σ :=
   own owns_name (reservation_map_data i (gmap_view_frag k (DfracOwn q) (to_agree v))).
 Global Typeclasses Opaque globlG_owns.
 Global Instance: Params (@globlG_owns) 4 := {}.
 
 Local Definition globlG_owns_token_id `{SI : indexT} `{!globlGS Σ} TP : iProp Σ :=
-  (own owns_name (reservation_map_token (A:=gmap_viewR gl_id (agreeR gl_versionO)) (⊤ ∖ gset_to_coPset TP))).
+  (own owns_name (reservation_map_token (A:=gmap_viewR gl_id (agreeR ghost_lock_versionO)) (⊤ ∖ gset_to_coPset TP))).
 
 Local Definition globlG_owns_auth_obls `{SI : indexT} `{!globlGS Σ}
-  i (TObls : gmap gl_id gl_version) : iProp Σ :=
+  i (TObls : gmap gl_id ghost_lock_version) : iProp Σ :=
   (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (to_agree <$> TObls)))).
 
 (* Thread: live obligations that this thread knows, also fix to empty when thread terminates *)
@@ -66,7 +66,7 @@ Global Typeclasses Opaque globlG_obls.
 Global Instance: Params (@globlG_obls) 4 := {}.
 
 Local Definition globlG_obls_auth_id `{SI : indexT} `{!globlGS Σ}
-  (Tgls : gmap positive (gmap gl_id gl_version)) : iProp Σ :=
+  (Tgls : gmap positive (gmap gl_id ghost_lock_version)) : iProp Σ :=
   (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> Tgls)))).
 
 (* Exec: tracks whether thread is executing or terminated *)
@@ -95,7 +95,7 @@ Global Typeclasses Opaque globlG_elem.
 Global Instance: Params (@globlG_elem) 4 := {}.
 
 Local Definition globlG_elem_auth_id `{SI : indexT} `{!globlGS Σ}
-  (Tgls : gmap positive (gmap gl_id gl_version)) : iProp Σ :=
+  (Tgls : gmap positive (gmap gl_id ghost_lock_version)) : iProp Σ :=
   (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> Tgls))).
 
 (* Global invariant for the thread obligations state. *)
@@ -103,7 +103,7 @@ Definition globl `{SI : indexT} `{GL : ghost_lock_class} {Σ}
   `{!@glsatGS.glsatGS _ GL Σ} `{!globlGS Σ}
   (TP : gset positive) : iProp Σ :=
   locked
-    (∃ (Tgls : gmap positive (gmap gl_id gl_version)),
+    (∃ (Tgls : gmap positive (gmap gl_id ghost_lock_version)),
         (⌜ dom Tgls = TP ⌝) ∗
         globlG_owns_token_id TP ∗
         globlG_obls_auth_id Tgls ∗
@@ -119,7 +119,7 @@ Definition globl `{SI : indexT} `{GL : ghost_lock_class} {Σ}
 (* Global invariant that relates obl_states to the thread pool. *)
 Definition glassigned `{SI : indexT} `{GL : ghost_lock_class} {Σ}
   `{!@glsatGS.glsatGS _ GL Σ} `{!globlGS Σ}
-  (Gls : gmap gl_id gl_version) : iProp Σ :=
+  (Gls : gmap gl_id ghost_lock_version) : iProp Σ :=
   locked
     ([∗ map] k ↦ v ∈ Gls,
        glG_elem k ∗
@@ -197,7 +197,7 @@ Section globl.
   Proof. rewrite /glassigned -lock. apply _. Qed.
 
   (** Elem rules *)
-  Lemma globlG_elem_alloc (Tgls : gmap positive (gmap gl_id gl_version)) i M :
+  Lemma globlG_elem_alloc (Tgls : gmap positive (gmap gl_id ghost_lock_version)) i M :
     Tgls !! i = None →
     globlG_elem_auth_id Tgls
     ⊢  |==> globlG_elem_auth_id (<[i:=M]>Tgls) ∗
@@ -213,7 +213,7 @@ Section globl.
     rewrite fmap_insert. done.
   Qed.
 
-  Lemma globlG_elem_elem i (Tgls : gmap positive (gmap gl_id gl_version)) :
+  Lemma globlG_elem_elem i (Tgls : gmap positive (gmap gl_id ghost_lock_version)) :
     globlG_elem_auth_id Tgls ∗ globlG_elem i
     ⊢ ⌜ i ∈ dom Tgls ⌝.
   Proof.
@@ -231,12 +231,12 @@ Section globl.
   Proof.
     rewrite /globlG_owns_token_id /globlG_owns_auth_obls.
     iIntros (Hi) "Htk".
-    iPoseProof (reservation_map_token_alloc_singleton _ _ i (gmap_view_auth (DfracOwn 1) (to_agree <$> (∅ : gmap gl_id gl_version))) with "Htk") as "[Htk >H]"; auto.
+    iPoseProof (reservation_map_token_alloc_singleton _ _ i (gmap_view_auth (DfracOwn 1) (to_agree <$> (∅ : gmap gl_id ghost_lock_version))) with "Htk") as "[Htk >H]"; auto.
     { apply gmap_view_auth_valid. }
     by iFrame.
   Qed.
 
-  Lemma globlG_owns_alloc i (TObls : gmap gl_id gl_version) k v :
+  Lemma globlG_owns_alloc i (TObls : gmap gl_id ghost_lock_version) k v :
     TObls !! k = None →
     globlG_owns_auth_obls i TObls
     ⊢ |==> globlG_owns_auth_obls i (<[k:=v]>TObls) ∗
@@ -251,7 +251,7 @@ Section globl.
     iFrame "Ho". rewrite fmap_insert. done.
   Qed.
 
-  Lemma globlG_owns_delete i (TObls : gmap gl_id gl_version) k v :
+  Lemma globlG_owns_delete i (TObls : gmap gl_id ghost_lock_version) k v :
     globlG_owns_auth_obls i TObls ∗ globlG_owns i k v 1
     ⊢ |==> globlG_owns_auth_obls i (delete k TObls).
   Proof.
@@ -719,7 +719,7 @@ Section globl.
   Qed.
 
   Lemma globl_assigned_obls_lookup Ω TP k v a i G :
-    Ω !! k = Some (v, gl_locked a i) →
+    Ω !! k = Some (v, ghost_lock_locked a i) →
     glsat Ω ∗ globl TP ∗ glassigned (fst <$> Ω) ∗ globlG_obls i G 1
     ⊢ ⌜ k ∈ G ⌝.
   Proof.
@@ -737,7 +737,7 @@ Section globl.
   Lemma globl_obls_lookup Ω TP k i G q :
     k ∈ G →
     glsat Ω ∗ globl TP ∗ globlG_elem i ∗ globlG_obls i G q ∗ glG_elem k
-    ⊢ ∃ v a, ⌜ Ω !! k = Some (v, gl_locked a i) ⌝.
+    ⊢ ∃ v a, ⌜ Ω !! k = Some (v, ghost_lock_locked a i) ⌝.
   Proof.
     iIntros (Ink) "(S& O& #Oei& Tbs& #Gek)".
     iPoseProof (globl_obls_open with "[$O $Oei $Tbs]") as "(Tbs& %& (Gl& Go)& Acc)". 1: eauto.
@@ -753,7 +753,7 @@ Lemma globl_alloc `{SI : indexT} `{GL : ghost_lock_class} {Σ}
   ⊢ |==> ∃ _ : globlGS Σ, globl ∅ ∗ glassigned ∅.
 Proof.
   iIntros.
-  iMod (own_alloc (reservation_map_token (A:=(gmap_viewR gl_id (agreeR gl_versionO))) ⊤)) as (γS) "HS";
+  iMod (own_alloc (reservation_map_token (A:=(gmap_viewR gl_id (agreeR ghost_lock_versionO))) ⊤)) as (γS) "HS";
     first by apply reservation_map_token_valid.
   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive (gset_disjUR _))) as (γO) "HO";
     first by apply gmap_view_auth_valid.

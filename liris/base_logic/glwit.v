@@ -38,13 +38,13 @@ Local Existing Instances glwit_inG glwitGpreS_witness.
 
 (* Witness: manage credits for ghost lock's witness progresses *)
 Definition witG_witness `{SI : indexT} `{GL : ghost_lock_class} `{!glwitGS Σ}
-  (k : gl_id) (v : gl_version) (ℵ : gl_fuel) : iProp Σ :=
+  (k : gl_id) (v : ghost_lock_version) (ℵ : ghost_lock_fuel) : iProp Σ :=
   own witness_name (reservation_map_data k (reservation_map_data (A:=bcredUR) (encode v) (credit_bound ℵ))).
 Global Typeclasses Opaque witG_witness.
 Global Instance: Params (@witG_witness) 5 := {}.
 
 Definition witG_credit `{SI : indexT} `{GL : ghost_lock_class} `{!glwitGS Σ}
-  (k : gl_id) (v : gl_version) (a : gl_fuel) : iProp Σ :=
+  (k : gl_id) (v : ghost_lock_version) (a : ghost_lock_fuel) : iProp Σ :=
   own witness_name (reservation_map_data k (reservation_map_data (A:=bcredUR) (encode v) (credit a))).
 Global Typeclasses Opaque witG_credit.
 Global Instance: Params (@witG_credit) 5 := {}.
@@ -63,25 +63,25 @@ Definition glwit `{SI : indexT} `{GL : ghost_lock_class} {Σ}
   locked
     (witG_witness_token_id (⊤ ∖ gset_to_coPset (dom W)) ∗
      ([∗ map] k ↦ '(v, w) ∈ W,
-        witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq 0 (S v) : gset gl_version))) ∗
-        ([∗ set] u ∈ (set_seq 0 v : gset gl_version), glG_version_lb k u ∗ glG_unlocked k u) ∗
+        witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq 0 (S v) : gset ghost_lock_version))) ∗
+        ([∗ set] u ∈ (set_seq 0 v : gset ghost_lock_version), glG_version_lb k u ∗ glG_unlocked k u) ∗
         glG_version_lb k v ∗
         match w with
-        | wit_locked b =>
+        | witness_locked b =>
             (∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_credit k v α)
-        | wit_unlocked =>
+        | witness_unlocked =>
             (glG_unlocked k v)
         end)
     )%I.
 
 (* Global invariant that relates witnesses to obligations *)
 Definition glwit_inv `{GL : ghost_lock_class}
-  (η : gl_fuel → gl_fuel) (Ω : ghost_locks) (W : witnesses) : Prop :=
+  (η : ghost_lock_fuel → ghost_lock_fuel) (Ω : ghost_locks) (W : witnesses) : Prop :=
   map_Forall2 (λ k '(v1, g) '(v2, w),
                  (v1 = v2) ∧
                  match g, w with
-                 | (gl_locked a _), (wit_locked b) => (b w≤ η a)
-                 | (gl_unlocked), (wit_unlocked) => True
+                 | (ghost_lock_locked a _), (witness_locked b) => (b w≤ η a)
+                 | (ghost_lock_unlocked), (witness_unlocked) => True
                  | _, _ => False
                  end
     ) Ω W.
@@ -205,7 +205,7 @@ Section glwit.
     rewrite /witG_witness_token_version. by iFrame.
   Qed.
 
-  Lemma witG_witness_alloc k (D : gset gl_version) v a :
+  Lemma witG_witness_alloc k (D : gset ghost_lock_version) v a :
     v ∉ D →
     witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode D))
     ⊢ |==> witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode ({[v]} ∪ D))) ∗
@@ -239,8 +239,8 @@ Section glwit.
   Qed.
 
   Lemma witG_witness_alloc_seq k s l n (ηξ : gl_witness) :
-    witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq s l : gset gl_version)))
-    ⊢ |==> witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq s (l + n) : gset gl_version))) ∗
+    witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq s l : gset ghost_lock_version)))
+    ⊢ |==> witG_witness_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq s (l + n) : gset ghost_lock_version))) ∗
         [∗ set] u ∈ set_seq (s + l) n, witG_witness k u (ηξ u) ∗ witG_credit k u (ηξ u).
   Proof.
     revert s l. induction n; iIntros (??) "H".
@@ -254,17 +254,17 @@ Section glwit.
   Qed.
 
   (** glwit rules *)
-  Lemma glwit_alloc_wit_locked W k v (ηξ : gl_witness) :
+  Lemma glwit_alloc_witness_locked W k v (ηξ : gl_witness) :
     k ∉ dom W →
     glwit W ∗
-    ([∗ set] u ∈ (set_seq 0 v : gset gl_version), glG_version_lb k u ∗ glG_unlocked k u) ∗
+    ([∗ set] u ∈ (set_seq 0 v : gset ghost_lock_version), glG_version_lb k u ∗ glG_unlocked k u) ∗
     glG_version_lb k v
-    ⊢ |==> glwit (<[k:=(v, wit_locked (ηξ v))]>W) ∗
+    ⊢ |==> glwit (<[k:=(v, witness_locked (ηξ v))]>W) ∗
         [∗ set] u ∈ set_seq 0 (S v), witG_witness k u (ηξ u).
   Proof.
     iIntros (Nink) "(W& #Gus& #Gvl)".
     rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
-    iMod (witG_witness_id_alloc _ _ (⊤ ∖ gset_to_coPset (set_map encode (∅ : gset gl_version))) Nink with "Wti") as "[Wti Wtvk]".
+    iMod (witG_witness_id_alloc _ _ (⊤ ∖ gset_to_coPset (set_map encode (∅ : gset ghost_lock_version))) Nink with "Wti") as "[Wti Wtvk]".
     iMod (witG_witness_alloc_seq _ 0 0 (S v) ηξ with "Wtvk") as "(Wtvk& Ws)".
     iAssert (([∗ set] u ∈ set_seq 0 (S v), witG_witness k u (ηξ u)) ∗
              ([∗ set] u ∈ set_seq 0 (S v), witG_credit k u (ηξ u)))%I
@@ -280,16 +280,16 @@ Section glwit.
     rewrite big_sepS_singleton. iFrame. done.
   Qed.
 
-  Lemma glwit_alloc_wit_unlocked W k v (ηξ : gl_witness) :
+  Lemma glwit_alloc_witness_unlocked W k v (ηξ : gl_witness) :
     k ∉ dom W →
     glwit W ∗
-    ([∗ set] u ∈ (set_seq 0 (S v) : gset gl_version), glG_version_lb k u ∗ glG_unlocked k u)
-    ⊢ |==> glwit (<[k:=(v, wit_unlocked)]>W) ∗
+    ([∗ set] u ∈ (set_seq 0 (S v) : gset ghost_lock_version), glG_version_lb k u ∗ glG_unlocked k u)
+    ⊢ |==> glwit (<[k:=(v, witness_unlocked)]>W) ∗
         [∗ set] u ∈ set_seq 0 (S v), witG_witness k u (ηξ u).
   Proof.
     iIntros (Nink) "(W& #Gus)".
     rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
-    iMod (witG_witness_id_alloc _ _ (⊤ ∖ gset_to_coPset (set_map encode (∅ : gset gl_version))) Nink with "Wti") as "[Wti Wtvk]".
+    iMod (witG_witness_id_alloc _ _ (⊤ ∖ gset_to_coPset (set_map encode (∅ : gset ghost_lock_version))) Nink with "Wti") as "[Wti Wtvk]".
     iMod (witG_witness_alloc_seq _ 0 0 (S v) ηξ with "Wtvk") as "(Wtvk& Ws)".
     iAssert (([∗ set] u ∈ set_seq 0 (S v), witG_witness k u (ηξ u)) ∗
              ([∗ set] u ∈ set_seq 0 (S v), witG_credit k u (ηξ u)))%I
@@ -327,10 +327,10 @@ Section glwit.
 
   (* witness_step rules: progress, unlock, lock, inc/pin *)
   Lemma glwit_progress_one W k v w1 w2 :
-    W !! k = Some (v, wit_locked w1) →
-    witness_step (v, wit_locked w1) (v, wit_locked w2) →
+    W !! k = Some (v, witness_locked w1) →
+    witness_step (v, witness_locked w1) (v, witness_locked w2) →
     glwit W
-    ⊢ |==> glwit (<[k:=(v, wit_locked w2)]>W) ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ witG_credit k v c.
+    ⊢ |==> glwit (<[k:=(v, witness_locked w2)]>W) ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ witG_credit k v c.
   Proof.
     iIntros (Luk Prog) "W".
     rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
@@ -359,9 +359,9 @@ Section glwit.
            ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u) ∗
            glG_version_lb k v ∗
            match w with
-           | wit_locked _ =>
+           | witness_locked _ =>
                (∃ c, ⌜ wzero w< c ⌝ ∗ witG_credit k v c)
-           | wit_unlocked =>
+           | witness_unlocked =>
                (glG_unlocked k v)
            end).
   Proof.
@@ -399,9 +399,9 @@ Section glwit.
   Qed.
 
   Lemma glwit_unlock W k v a :
-    W !! k = Some (v, wit_locked a) →
+    W !! k = Some (v, witness_locked a) →
     glwit W ∗ glG_unlocked k v
-    ⊢ glwit (<[k:=(v, wit_unlocked)]>W).
+    ⊢ glwit (<[k:=(v, witness_unlocked)]>W).
   Proof.
     iIntros (Luk) "[W #Guk]".
     rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
@@ -415,11 +415,11 @@ Section glwit.
 
   Lemma glwit_lock W k v1 v2 (ηξ : gl_witness) :
     v1 < v2 →
-    W !! k = Some (v1, wit_unlocked) →
+    W !! k = Some (v1, witness_unlocked) →
     glwit W ∗
     ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), glG_version_lb k u ∗ glG_unlocked k u) ∗
     glG_version_lb k v2
-    ⊢ |==> glwit (<[k:=(v2, wit_locked (ηξ v2))]>W) ∗
+    ⊢ |==> glwit (<[k:=(v2, witness_locked (ηξ v2))]>W) ∗
         witG_witness k v2 (ηξ v2) ∗
         [∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), witG_witness k u (ηξ u).
   Proof.
@@ -447,7 +447,7 @@ Section glwit.
     - rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
       { apply lookup_delete_eq. }
       iFrame.
-      replace (set_seq 0 v2) with (set_seq 0 ((S v1) + (v2 - v1 - 1)) : gset gl_version); cycle 1.
+      replace (set_seq 0 v2) with (set_seq 0 ((S v1) + (v2 - v1 - 1)) : gset ghost_lock_version); cycle 1.
       { replace ((S v1) + (v2 - v1 - 1)) with v2 by lia. done. }
       rewrite (set_seq_add_L _ (S v1)). iSplitL; last auto.
       iApply big_sepS_union.
@@ -541,18 +541,18 @@ Section glwit.
 
   Lemma glwit_inv_progress_owner η Ω k v a t1 W1 :
     (∀ α β, α w< β → η α w< η β) →
-    Ω !! k = Some (v, gl_locked a t1) →
+    Ω !! k = Some (v, ghost_lock_locked a t1) →
     glwit_inv η Ω W1 →
     ∀ a' t2,
-    ghost_lock_step (v, gl_locked a t1) (v, gl_locked a' t2) →
+    ghost_lock_step (v, ghost_lock_locked a t1) (v, ghost_lock_locked a' t2) →
     ∀ W2,
     W1 ↓∘ W2 →
-    glwit_inv η (<[k:=(v, gl_locked a' t2)]> Ω) W2 →
+    glwit_inv η (<[k:=(v, ghost_lock_locked a' t2)]> Ω) W2 →
     wits_mon W1 W2.
   (* Below is not necessarily true - Wits can take refelexive step *)
-    (* ∃ w1 w2, W1 !! k = Some (v, wit_locked w1) ∧ *)
-    (*          witness_step (v, wit_locked w1) (v, wit_locked w2) ∧ *)
-    (*          wits_mon (<[k:=(v, wit_locked w2)]> W1) W2. *)
+    (* ∃ w1 w2, W1 !! k = Some (v, witness_locked w1) ∧ *)
+    (*          witness_step (v, witness_locked w1) (v, witness_locked w2) ∧ *)
+    (*          wits_mon (<[k:=(v, witness_locked w2)]> W1) W2. *)
   Proof.
     intros SMON LUO INV1 a' t2 GStep W2 WSStep INV2.
     inv GStep.
@@ -569,13 +569,13 @@ Section glwit.
   Qed.
 
   Lemma glwit_inv_unlock η Ω k v a t W1 :
-    Ω !! k = Some (v, gl_locked a t) →
+    Ω !! k = Some (v, ghost_lock_locked a t) →
     glwit_inv η Ω W1 →
-    ghost_lock_step (v, gl_locked a t) (v, gl_unlocked) →
+    ghost_lock_step (v, ghost_lock_locked a t) (v, ghost_lock_unlocked) →
     ∀ W2,
     W1 ↓∘ W2 →
-    glwit_inv η (<[k:=(v, gl_unlocked)]> Ω) W2 →
-    (∃ b, W1 !! k = Some (v, wit_locked b) ∧ wits_mon (<[k:=(v, wit_unlocked)]> W1) W2).
+    glwit_inv η (<[k:=(v, ghost_lock_unlocked)]> Ω) W2 →
+    (∃ b, W1 !! k = Some (v, witness_locked b) ∧ wits_mon (<[k:=(v, witness_unlocked)]> W1) W2).
   Proof.
     intros LUO INV1 GStep W2 WSStep INV2.
     inv GStep.
@@ -586,7 +586,7 @@ Section glwit.
     eexists. split; first eauto.
     inv WSStep.
     inv H; cycle 1.
-    { eapply (glwit_inv_alloc_same_gls_dom _ Ω (<[k:=(v, gl_unlocked)]> Ω)) in H4; eauto; first done.
+    { eapply (glwit_inv_alloc_same_gls_dom _ Ω (<[k:=(v, ghost_lock_unlocked)]> Ω)) in H4; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
     intros i. specialize (H4 i). destruct (decide (i = k)).
     { subst. rewrite H2 lookup_insert_eq. econstructor. done. }
@@ -610,13 +610,13 @@ Section glwit.
   Qed.
 
   Lemma glwit_inv_lock η Ω k v1 v2 a t W1 :
-    Ω !! k = Some (v1, gl_unlocked) →
+    Ω !! k = Some (v1, ghost_lock_unlocked) →
     glwit_inv η Ω W1 →
-    ghost_lock_step (v1, gl_unlocked) (v2, gl_locked a t) →
+    ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_locked a t) →
     ∀ W2,
     W1 ↓∘ W2 →
-    glwit_inv η (<[k:=(v2, gl_locked a t)]> Ω) W2 →
-    (W1 !! k = Some (v1, wit_unlocked) ∧ wits_mon (<[k:=(v2, wit_locked (η a))]> W1) W2).
+    glwit_inv η (<[k:=(v2, ghost_lock_locked a t)]> Ω) W2 →
+    (W1 !! k = Some (v1, witness_unlocked) ∧ wits_mon (<[k:=(v2, witness_locked (η a))]> W1) W2).
   Proof.
     intros LUO INV1 GStep W2 WSStep INV2.
     inv GStep.
@@ -627,7 +627,7 @@ Section glwit.
     split; first eauto.
     inv WSStep. clear H1.
     inv H; cycle 1.
-    { eapply (glwit_inv_alloc_same_gls_dom _ Ω (<[k:=(v2, gl_locked a t)]> Ω)) in H1; eauto; first done.
+    { eapply (glwit_inv_alloc_same_gls_dom _ Ω (<[k:=(v2, ghost_lock_locked a t)]> Ω)) in H1; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
     intros i. specialize (H1 i). destruct (decide (i = k)).
     { subst. rewrite H2 lookup_insert_eq. econstructor. split; eauto. }
@@ -655,8 +655,8 @@ Section glwit.
     glwit_inv η Ω W1 →
     ∀ v a t W2,
     W1 ↓∘ W2 →
-    glwit_inv η (<[k:=(v, gl_locked a t)]> Ω) W2 →
-    (k ∉ dom W1 ∧ wits_mon (<[k:=(v, wit_locked (η a))]> W1) W2).
+    glwit_inv η (<[k:=(v, ghost_lock_locked a t)]> Ω) W2 →
+    (k ∉ dom W1 ∧ wits_mon (<[k:=(v, witness_locked (η a))]> W1) W2).
   Proof.
     intros LUO INV1 v a t W2 WSStep INV2.
     apply not_elem_of_dom in LUO.
@@ -684,8 +684,8 @@ Section glwit.
     glwit_inv η Ω W1 →
     ∀ v W2,
     W1 ↓∘ W2 →
-    glwit_inv η (<[k:=(v, gl_unlocked)]> Ω) W2 →
-    (k ∉ dom W1 ∧ wits_mon (<[k:=(v, wit_unlocked)]> W1) W2).
+    glwit_inv η (<[k:=(v, ghost_lock_unlocked)]> Ω) W2 →
+    (k ∉ dom W1 ∧ wits_mon (<[k:=(v, witness_unlocked)]> W1) W2).
   Proof.
     intros LUO INV1 v W2 WSStep INV2.
     apply not_elem_of_dom in LUO.

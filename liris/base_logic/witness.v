@@ -4,35 +4,35 @@ From liris.base_logic Require Import ghost_lock.
 From transfinite.stepindex Require Import utils.
 
 Variant witness_state `{GL : ghost_lock_class} : Type :=
-  | wit_locked (wit : gl_fuel)
-  | wit_unlocked
+  | witness_locked (wit : ghost_lock_fuel)
+  | witness_unlocked
 .
 
-Definition witness `{GL : ghost_lock_class} : Type := gl_version * witness_state.
+Definition witness `{GL : ghost_lock_class} : Type := ghost_lock_version * witness_state.
 
 Variant witness_step `{GL : ghost_lock_class} : witness → witness → Prop :=
   | witness_progress
       ver wit1 wit2
       (LTwit : wit2 w< wit1)
     :
-    witness_step (ver, wit_locked wit1) (ver, wit_locked wit2)
+    witness_step (ver, witness_locked wit1) (ver, witness_locked wit2)
   | witness_unlock
       ver wit
     :
-    witness_step (ver, wit_locked wit) (ver, wit_unlocked)
+    witness_step (ver, witness_locked wit) (ver, witness_unlocked)
   | witness_lock
       ver1 ver2 wit
       (GTver : (ver1 < ver2)%nat)
     :
-    witness_step (ver1, wit_unlocked) (ver2, wit_locked wit)
+    witness_step (ver1, witness_unlocked) (ver2, witness_locked wit)
 .
 
 Definition witness_keep `{GL : ghost_lock_class} : witness → witness → Prop :=
   λ '(v1, w1) '(v2, w2),
     (v1 = v2) ∧
     match w1, w2 with
-    | (wit_locked _), (wit_locked _) => True
-    | (wit_unlocked), (wit_unlocked) => True
+    | (witness_locked _), (witness_locked _) => True
+    | (witness_unlocked), (witness_unlocked) => True
     | _, _ => False
     end.
 
@@ -54,7 +54,7 @@ Global Instance wit_cond_one_dec `{GL : ghost_lock_class} : ∀ k x w, Decision 
 Proof using. intros. rewrite /wit_cond_one. solve_decision. Qed.
 
 Definition wit_cond_locked `{GL : ghost_lock_class} : wit_cond :=
-  λ _ w, match w with | (_, wit_locked _) => True | (_, wit_unlocked) => False end.
+  λ _ w, match w with | (_, witness_locked _) => True | (_, witness_unlocked) => False end.
 Global Instance wit_cond_locked_dec `{GL : ghost_lock_class} : ∀ k w, Decision (wit_cond_locked k w).
 Proof using. intros. rewrite /wit_cond_locked. destruct w. destruct w; solve_decision. Qed.
 
@@ -65,8 +65,8 @@ Notation "A ↓ₛ B | C" := (wits_cond_step C A B) (at level 20, format "A  ↓
 
 Definition wits_alloc `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
   λ W1 W2, ∃ k v, (W1 !! k = None) ∧
-                  ((∃ a, W2 = <[k:=(v, wit_locked a)]> W1) ∨
-                     (W2 = <[k:=(v, wit_unlocked)]> W1)).
+                  ((∃ a, W2 = <[k:=(v, witness_locked a)]> W1) ∨
+                     (W2 = <[k:=(v, witness_unlocked)]> W1)).
 Infix "↓ₐ" := (wits_alloc) (at level 20).
 
 Variant wits_step `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
@@ -92,8 +92,8 @@ Definition wits_mon `{GL : ghost_lock_class} : witnesses → witnesses → Prop 
   λ W1 W2, map_Forall2 (λ _ '(v1, w1) '(v2, w2),
                           (v1 = v2) ∧
                           match w1, w2 with
-                          | wit_locked a1, wit_locked a2 => a2 w≤ a1
-                          | wit_unlocked, wit_unlocked => True
+                          | witness_locked a1, witness_locked a2 => a2 w≤ a1
+                          | witness_unlocked, witness_unlocked => True
                           | _, _ => False
                           end) W1 W2.
 
