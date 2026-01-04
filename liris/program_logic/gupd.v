@@ -1062,102 +1062,73 @@ Section preds.
     Lemma gl_lock E Θ N i G q k ξ v1 v2 I P1 Q1 R1 P2 Q2 R2 :
       v1 < v2 →
       ↑N ⊆ E →
+      I -∗
       th_obls i G q -∗
       gl_current k v1 -∗
       gl_done k v1 -∗
       gl_variant N k v1 P1 Q1 R1 -∗
       gl_witfun k ξ -∗
-      (I -∗ gl_current k v1 -∗ Q1 -∗ |={E ∖ ↑N:Θ}=>g (I ∗ gl_current k v1 ∗ (▷ R1) ∗ (▷ P2))) -∗
-      |={E:Θ}=>g th_obls i (<[k:=v2]>G) q ∗
+      ((▷(I ∗ gl_current k v1 ∗ gl_done k v1 ∗ Q1)) -∗ |={E ∖ ↑N:Θ}=>g (I ∗ gl_current k v1 ∗ (▷ R1) ∗ (▷ P2))) -∗
+      |={E:Θ}=>g I ∗
+              th_obls i (<[k:=v2]>G) q ∗
               gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
               gl_variant N k v2 P2 Q2 R2 ∗
               wit k v2 (gupd_η (Σ[ξ] v2)) ∗
               ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit k u (gupd_η (Σ[ξ] u))) ∗
               ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u).
     Proof.
-      unfold_defs. iIntros (LTv MASK) "(#Oe& Ox& Ob& OS) ((#Ge& #Gvl1)& Gv1) (_& #Gu1) (_& #Gvar1) #Gwf UPD".
+      unfold_defs. iIntros (LTv MASK) "HI (#Oe& Ox& Ob& OS) ((#Ge& #Gvl1)& Gv1) (_& #Gu1) (_& #Gvar1) #Gwf UPD".
       iMod (glG_variant_acc_version_unlocked with "Gvar1 Gv1 Gu1") as "[H ACC]". 1: auto.
+      iMod ("UPD" with "[HI H]") as "UPD".
+      { iNext. iDestruct "H" as "(Gv1& _& _& HQ1)". iFrame. eauto. }
+      iModIntro. iMod "UPD" as ">(HI& (_& Gv1)& HR1& HP2)".
+      iApply fupd_mask_intro. 1: set_solver. iIntros "Fupd".
+      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iPoseProof (glsat_lookup_unlocked with "[$S $Ge $Gu1]") as "%LUO1u".
+      iPoseProof (glsat_lookup_version with "[$S $Ge $Gv1]") as "%LUO1v".
+      destruct LUO1v as (?&LUO1v). destruct LUO1u as [LUO1u | (?&?&?&LUO1u)]; cycle 1.
+      { exfalso. rewrite LUO1u in LUO1v. inv LUO1v. lia. }
+      rewrite LUO1u in LUO1v. inv LUO1v.
+      iMod (glsat_lock _ _ _ v1 v2 i with "[$S $Gwf $Gu1 $Gv1]") as "(S& Gl& Gv& Gf& Go& #Gseq& %Gstep)".
+      1: auto.
+      iDestruct "Gl" as "[Gl1 [Gl2 Gl']]".
+      iMod (globl_alloc_obl with "[$S $O $Ob $Ge $Gl' $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
+      iPoseProof (glG_version_get_lb _ v2 v2 with "Gv") as "#Gvl2". 1: done.
+      set (ηξ := (λ v, gupd_η (Σ[ξ] v)) : gl_witness).
+      iMod (glwit_lock _ _ v1 v2 ηξ with "[$W $Gseq $Gvl2]") as "(W& #Ww& #Wseq)".
+      1: auto.
+      { specialize (GWI k). rewrite LUO1u in GWI. inv GWI.
+        destruct y. destruct H1. subst. by destruct w. }
+      iDestruct "Go" as "[Go Go']". iDestruct "Oo" as "[Oo1 [Oo2 Oo']]".
+      iPoseProof (glassigned_add_obl _ k v2 with "[$A $Ge Go' Oo']") as "A".
+      { iLeft. iFrame. }
+      iModIntro. iExists (<[k:=(v2, ghost_lock_locked (Σ[ξ] v2) i)]> Ω1). iSplitR.
+      { iPureIntro. econstructor 2. eapply (gls_step_cond_step _ _ (gl_cond_one k)).
+        intros x. destruct (decide (x = k)).
+        - subst. rewrite LUO1u lookup_insert_eq. econstructor. left. split; try done.
+        - rewrite lookup_insert_ne; auto. destruct (Ω1 !! x) eqn:LUOx; econstructor. right; done.
+      }
+      iIntros (? [WStep GWI2]).
+      pose proof (glwit_inv_lock _ _ _ v1 v2 _ _ _ LUO1u GWI Gstep W2 WStep GWI2) as [LUW1 WMon].
+      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      rewrite /gproto. iFrame "S O W". iSplitL "A".
+      { iModIntro. rewrite fmap_insert. iFrame. eauto. }
+      iMod "Fupd" as "_". iMod ("ACC" with "[HR1]") as "_".
+      { iNext. iRight. iFrame. iApply (glG_version_get_expired _ v2 v1); auto. }
+      iDestruct "Gl2" as "[Gl2 Gl']".
+      iMod (glG_variant_alloc_locked _ N k v2 _ P2 Q2 R2 with "[$Gl' $HP2]") as "#Gvar2".
+      iModIntro. rewrite dom_insert_L. iFrame "HI Oe Ge Gvl2 Ox Ob Gf Gvar2 Ww".
+      iSplitL.
+      { iApply big_sepM_insert.
+        { apply not_elem_of_dom; auto. }
+        iFrame. iCombine "Gl1 Gl2" as "$". iCombine "Oo1 Oo2" as "$". auto. }
+      iSplitL.
+      { iApply (big_sepS_impl with "Wseq"). iIntros "!> %% $".
+        iPoseProof (big_sepS_delete _ _ _ H with "Gseq") as "[[$ _] _]". auto. }
+      { iApply (big_sepS_impl with "Gseq"). iIntros "!> %% [$ $]". auto. }
+    Qed.
 
       TODO
-      
-glG_variant_acc_version_unlocked:
-  ∀ {SI : indexT} {GL : ghost_lock_class} {Σ : gFunctors} {glsatGS0 : glsatGS.glsatGS Σ} 
-    {invGS0 : invGS Σ} (E : coPset) (N : namespace) (k : gl_id) (v : ghost_lock_version) 
-    (q1 q2 : Qp) (P Q R : iProp Σ),
-    ↑N ⊆ E
-    → glG_variant N k v q1 P Q R -∗
-      glG_version k v q2 -∗
-      glG_unlocked k v ={E,E ∖ ↑N}=∗
-      ▷ (glG_version k v q2 ∗ glG_unlocked k v ∗ glG_unlocked k v ∗ Q) ∗
-      (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True)
-
-      
-      iApply fupd_mask_intro. 1: set_solver. iIntros "Fupd".
-      iApply gupd_unfold.
-      
-      iMod (glsat_variant_lock _ k ξ v1 v2 i _ _ _ _ _ _ _ P2 Q2 R2 with "[$Gvar1 ]")
-      
-
-TODO
-
-glsat_variant_lock:
-  ∀ {SI : indexT} {GL : ghost_lock_class} {Σ : gFunctors} {glsatGS0 : glsatGS.glsatGS Σ} 
-    {invGS0 : invGS Σ} (Ω : ghost_locks) (k : gl_id) (ξ : gl_witness) (v1 v2 : nat) 
-    (t : ghost_lock_owner) (q0 q1 : Qp) (E : coPset) (N : namespace) (P Q R : iProp Σ),
-    (q0 + q1)%Qp = (1 / 2 + 1 / 2 / 2)%Qp
-    → v1 < v2
-      → ↑N ⊆ E
-        → glG_variant N k v1 q0 P Q R ∗ glsat Ω ∗ glG_witfun k ξ ∗ glG_unlocked k v1 ∗
-          glG_version k v1 (1 / 2 + 1 / 2 / 2)
-          ⊢ |={E,E ∖ ↑N}=>
-              ▷ ((glsat Ω ∗ glG_version k v1 (1 / 2 + 1 / 2 / 2) ∗ Q) ∗
-                 (glsat Ω ∗ glG_version k v1 (1 / 2 + 1 / 2 / 2) ∗ ▷ R ∗ ▷ P ={
-                  E ∖ ↑N,E}=∗
-                  glsat (<[k:=(v2, ghost_lock_locked (Σ[ξ] v2) t)]> Ω) ∗ 
-                  glG_locked k v2 q1 ∗ glG_version k v2 (1 / 2 + 1 / 2 / 2) ∗
-                  glG_fuel k (Σ[ξ]{S v1, v2}) ∗ glG_owner k t (1 / 2 + 1 / 2 / 2) ∗
-                  ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), glG_version_lb k u ∗ glG_unlocked k u) ∗
-                  ⌜ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_locked (Σ[ξ] v2) t)⌝ ∗
-                  glG_variant N k v2 q0 P Q R))
-globl_alloc_obl:
-  ∀ {SI : indexT} {GL : ghost_lock_class} {Σ : gFunctors} {GLSAT : glsatGS.glsatGS Σ} 
-    {globlGS0 : globlGS.globlGS Σ} (Ω : ghost_locks) (TP : gset positive) 
-    (i : positive) (G : gl_ids) (q : Qp) (k : gl_id) (v : ghost_lock_version),
-    glsat Ω ∗ globl TP ∗ globlG_obls i G q ∗ glG_elem k ∗ glG_locked k v (1 / 2 / 2 / 2) ∗
-    glG_owner k i (1 / 2 + 1 / 2 / 2)
-    ⊢ |==> glsat Ω ∗ globl TP ∗ ⌜k ∉ G⌝ ∗ globlG_obls i ({[k]} ∪ G) q ∗ globlG_owns i k v 1 ∗
-        glG_owner k i (1 / 2 + 1 / 2 / 2 / 2 + 1 / 2 / 2 / 2 / 2)
-glwit_lock:
-  ∀ {SI : indexT} {GL : ghost_lock_class} {Σ : gFunctors} {GLSAT : glsatGS.glsatGS Σ} 
-    {glwitGS0 : glwitGS.glwitGS Σ} (W : witnesses) (k : gl_id) (v1 v2 : nat) 
-    (ηξ : gl_witness),
-    v1 < v2
-    → W !! k = Some (v1, witness_unlocked)
-      → glwit W ∗ ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), glG_version_lb k u ∗ glG_unlocked k u) ∗
-        glG_version_lb k v2
-        ⊢ |==> glwit (<[k:=(v2, witness_locked (ηξ v2))]> W) ∗ witG_witness k v2 (ηξ v2) ∗
-            ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), witG_witness k u (ηξ u))
-glassigned_add_obl:
-  ∀ {SI : indexT} {GL : ghost_lock_class} {Σ : gFunctors} {GLSAT : glsatGS.glsatGS Σ} 
-    {globlGS0 : globlGS.globlGS Σ} (Gls : gmap gl_id ghost_lock_version) 
-    (k : gl_id) (v : ghost_lock_version),
-    glassigned Gls ∗ glG_elem k ∗
-    ((∃ i : ghost_lock_owner, glG_owner k i (1 / 2 / 2 / 2 / 2) ∗ globlG_owns i k v (1 / 2 / 2))
-     ∨ glG_unlocked k v)
-    ⊢ glassigned (<[k:=v]> Gls)
-glwit_inv_lock:
-  ∀ {GL : ghost_lock_class} (η : ghost_lock_fuel → ghost_lock_fuel) (Ω : ghost_locks) 
-    (k : gl_id) (v1 v2 : ghost_lock_version) (a : ghost_lock_fuel) (t : ghost_lock_owner) 
-    (W1 : witnesses),
-    Ω !! k = Some (v1, ghost_lock_unlocked)
-    → glwit_inv η Ω W1
-      → ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_locked a t)
-        → ∀ W2 : witnesses,
-            W1 ↓∘ W2
-            → glwit_inv η (<[k:=(v2, ghost_lock_locked a t)]> Ω) W2
-              → W1 !! k = Some (v1, witness_unlocked)
-                ∧ wits_mon (<[k:=(v2, witness_locked (η a))]> W1) W2
-
 
 
 glsat_variant_unlock:
