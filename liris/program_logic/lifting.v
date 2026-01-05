@@ -3,433 +3,113 @@ semantics to the program logic. *)
 
 From iris.proofmode Require Import proofmode.
 From liris.program_logic Require Export weakestpre.
-From liris Require Import ordinal_wfocm.
-From iris.prelude Require Import options.
-
-Local Definition obl_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  k : iProp Σ :=
-  oblG_elem k.
-Local Definition obl_aux : seal (@obl_def). Proof. by eexists. Qed.
-Definition obl := obl_aux.(unseal).
-Local Definition obl_unseal :
-  @obl = @obl_def := obl_aux.(seal_eq).
-Global Arguments obl {SI Λ Σ _}.
-
-Local Definition oGoal_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  k T P : iProp Σ :=
-  oblG_goal k T P ∗ obl k.
-Local Definition oGoal_aux : seal (@oGoal_def). Proof. by eexists. Qed.
-Definition oGoal := oGoal_aux.(unseal).
-Local Definition oGoal_unseal :
-  @oGoal = @oGoal_def := oGoal_aux.(seal_eq).
-Global Arguments oGoal {SI Λ Σ _}.
-
-(* Eventually, P always holds. *)
-Local Definition oEA_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  k P : iProp Σ :=
-  (∃ T, oblG_goal k T P).
-Local Definition oEA_aux : seal (@oEA_def). Proof. by eexists. Qed.
-Definition oEA := oEA_aux.(unseal).
-Local Definition oEA_unseal :
-  @oEA = @oEA_def := oEA_aux.(seal_eq).
-Global Arguments oEA {SI Λ Σ _}.
-
-Local Definition oDone_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  k : iProp Σ :=
-  oblG_done k ∗ obl k.
-Local Definition oDone_aux : seal (@oDone_def). Proof. by eexists. Qed.
-Definition oDone := oDone_aux.(unseal).
-Local Definition oDone_unseal :
-  @oDone = @oDone_def := oDone_aux.(seal_eq).
-Global Arguments oDone {SI Λ Σ _}.
-
-Local Definition oFuel_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  k a : iProp Σ :=
-  oblG_fuel k a ∗ obl k.
-Local Definition oFuel_aux : seal (@oFuel_def). Proof. by eexists. Qed.
-Definition oFuel := oFuel_aux.(unseal).
-Local Definition oFuel_unseal :
-  @oFuel = @oFuel_def := oFuel_aux.(seal_eq).
-Global Arguments oFuel {SI Λ Σ _}.
-
-Local Definition oWit_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  k ℵ : iProp Σ :=
-  owitnessG_witness k ℵ ∗ obl k.
-Local Definition oWit_aux : seal (@oWit_def). Proof. by eexists. Qed.
-Definition oWit := oWit_aux.(unseal).
-Local Definition oWit_unseal :
-  @oWit = @oWit_def := oWit_aux.(seal_eq).
-Global Arguments oWit {SI Λ Σ _}.
-
-Local Definition oCred_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  k a : iProp Σ :=
-  owitnessG_credit k a ∗ obl k.
-Local Definition oCred_aux : seal (@oCred_def). Proof. by eexists. Qed.
-Definition oCred := oCred_aux.(unseal).
-Local Definition oCred_unseal :
-  @oCred = @oCred_def := oCred_aux.(seal_eq).
-Global Arguments oCred {SI Λ Σ _}.
-
-Local Definition tHas_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  i G q : iProp Σ :=
-  othreadG_obls i G q ∗ othreadG_exec i (q/2) ∗ othreadG_elem i ∗
-  ([∗ set] k ∈ G, obl k ∗ oblG_live k (1/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
-Local Definition tHas_aux : seal (@tHas_def). Proof. by eexists. Qed.
-Definition tHas := tHas_aux.(unseal).
-Local Definition tHas_unseal :
-  @tHas = @tHas_def := tHas_aux.(seal_eq).
-Global Arguments tHas {SI Λ Σ _}.
-
-Local Definition tTerm_def `{SI : indexT} `{@lirisGS SI Λ Σ}
-  i : iProp Σ :=
-  othreadG_term i ∗ othreadG_elem i.
-Local Definition tTerm_aux : seal (@tTerm_def). Proof. by eexists. Qed.
-Definition tTerm := tTerm_aux.(unseal).
-Local Definition tTerm_unseal :
-  @tTerm = @tTerm_def := tTerm_aux.(seal_eq).
-Global Arguments tTerm {SI Λ Σ _}.
+(* From iris.prelude Require Import options. *)
+From liris.algebra Require Import ordinal_wfocm.
 
 Section lifting.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
-  Implicit Types v : val Λ.
   Implicit Types e : expr Λ.
   Implicit Types σ : state Λ.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
 
   Local Ltac unfold_defs :=
-    try rewrite !tTerm_unseal /tTerm_def;
-    try rewrite !tHas_unseal /tHas_def;
-    try rewrite !oCred_unseal /oCred_def;
-    try rewrite !oWit_unseal /oWit_def;
-    try rewrite !oFuel_unseal /oFuel_def;
-    try rewrite !oDone_unseal /oDone_def;
-    try rewrite !oEA_unseal /oEA_def;
-    try rewrite !oGoal_unseal /oGoal_def;
-    try rewrite !obl_unseal /obl_def.
+    try rewrite !gupd.wit_credit_unseal /gupd.wit_credit_def;
+    try rewrite !gupd.wit_unseal /gupd.wit_def;
+    try rewrite !gupd.th_term_unseal /gupd.th_term_def;
+    try rewrite !gupd.th_obls_unseal /gupd.th_obls_def;
+    try rewrite !gupd.gl_variant_cases_unseal /gupd.gl_variant_cases_def;
+    try rewrite !gupd.gl_variant_unseal /gupd.gl_variant_def;
+    try rewrite !gupd.gl_fuel_unseal /gupd.gl_fuel_def;
+    try rewrite !gupd.gl_expired_unseal /gupd.gl_expired_def;
+    try rewrite !gupd.gl_current_unseal /gupd.gl_current_def;
+    try rewrite !gupd.gl_done_unseal /gupd.gl_done_def;
+    try rewrite !gupd.gl_locked_unseal /gupd.gl_locked_def;
+    try rewrite !gupd.gl_witfun_unseal /gupd.gl_witfun_def;
+    try rewrite !gupd.gl_unseal /gupd.gl_def.
 
-  Section liveness_preds.
+  Section sfoupd.
 
-    Global Instance obl_persistent k : Persistent (obl k).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance oGoal_persistent k T P : Persistent (oGoal k T P).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance oEA_persistent k P : Persistent (oEA k P).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance oDone_persistent k : Persistent (oDone k).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance oWit_persistent k ℵ : Persistent (oWit k ℵ).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance tTerm_persistent i : Persistent (tTerm i).
-    Proof. unfold_defs. apply _. Qed.
-
-    Global Instance obl_timeless k : Timeless (obl k).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance oDone_timeless k : Timeless (oDone k).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance oFuel_timeless k a : Timeless (oFuel k a).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance oWit_timeless k ℵ : Timeless (oWit k ℵ).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance oCred_timeless k a : Timeless (oCred k a).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance tHas_timeless i G q : Timeless (tHas i G q).
-    Proof. unfold_defs. apply _. Qed.
-    Global Instance tTerm_timeless i : Timeless (tTerm i).
-    Proof. unfold_defs. apply _. Qed.
-
-    Local Open Scope ord.
-
-    (** oFuel rules *)
-    Lemma oFuel_eq k a0 a1 :
-      (a0 == a1) → oFuel k a0 = oFuel k a1.
+    Lemma gl_alloc_obl E i G q ξ N v P Q R :
+      th_obls i G q -∗
+      (▷ P) -∗
+      |={E}=>g ∃ k, (⌜ G !! k = None ⌝) ∗
+                   th_obls i (<[k:=v]>G) q ∗
+                   gl_witfun k ξ ∗ gl k v ∗ gl_fuel k (Σ[ξ] v) ∗
+                   gl_variant N k v P Q R ∗
+                   wit k v (gupd_η (Σ[ξ] v)) ∗
+                   ([∗ set] u ∈ set_seq 0 v, gl_done k u).
     Proof.
-      unfold_defs. intros. rewrite (oblG_fuel_eq k a0 a1); auto.
-    Qed.
-    Lemma oFuel_eq_list L a0 a1 :
-      (a0 == a1) →
-      ([∗ list] i ∈ L, oFuel i a0)%I ≡ ([∗ list] i ∈ L, oFuel i a1)%I.
-    Proof. intros. apply big_opL_proper. intros. erewrite oFuel_eq; eauto. Qed.
-    Lemma oFuel_eq_set L a0 a1 :
-      a0 == a1 →
-      ([∗ set] i ∈ L, oFuel i a0)%I ≡ ([∗ set] i ∈ L, oFuel i a1)%I.
-    Proof. intros. apply big_opS_proper. intros. erewrite oFuel_eq; eauto. Qed.
-
-    Lemma oFuel_mon k a0 a1 :
-      (a0 <= a1)%ord → oFuel k a1 ==∗ oFuel k a0.
-    Proof.
-      unfold_defs. iIntros (Hle) "(P& Be)". iFrame. by iApply oblG_fuel_mon.
-    Qed.
-    Lemma oFuel_mon_list L a0 a1 :
-      a0 <= a1 →
-      ([∗ list] i ∈ L, oFuel i a1) ⊢ |==> ([∗ list] i ∈ L, oFuel i a0).
-    Proof.
-      iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-      iModIntro. iIntros. by iApply oFuel_mon.
-    Qed.
-    Lemma oFuel_mon_set L a0 a1 :
-      a0 <= a1 →
-      ([∗ set] i ∈ L, oFuel i a1) ⊢ |==> ([∗ set] i ∈ L, oFuel i a0).
-    Proof.
-      iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
-      iModIntro. iIntros. by iApply oFuel_mon.
+      iIntros "Tb HP %%% $". iApply (gl_alloc_obl_0 _ Θ with "Tb HP").
     Qed.
 
-    Lemma oFuel_split k a0 a1 :
-      oFuel k (a0 ⊕ a1)%ord ⊣⊢ oFuel k a0 ∗ oFuel k a1.
+    Lemma gl_alloc_done E ξ N v P Q R :
+      (▷ Q) -∗
+      |={E}=>g ∃ k, gl_witfun k ξ ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k (Σ[ξ] v) ∗
+                   gl_variant N k v P Q R ∗
+                   wit k v (gupd_η (Σ[ξ] v)) ∗
+                   ([∗ set] u ∈ set_seq 0 (S v), gl_done k u).
     Proof.
-      unfold_defs. rewrite oblG_fuel_split. iSplit.
-      - iIntros "((P1& P2)& #Be)"; iFrame; eauto.
-      - iIntros "((P1& B1)& (P2& B2))"; iFrame.
-    Qed.
-    Lemma oFuel_split_list L a0 a1 :
-      ([∗ list] i ∈ L, oFuel i (a0 ⊕ a1)) ⊣⊢ ([∗ list] i ∈ L, oFuel i a0) ∗ ([∗ list] i ∈ L, oFuel i a1).
-    Proof.
-      rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply oFuel_split.
-    Qed.
-    Lemma oFuel_split_set L a0 a1 :
-      ([∗ set] i ∈ L, oFuel i (a0 ⊕ a1)) ⊣⊢ ([∗ set] i ∈ L, oFuel i a0) ∗ ([∗ set] i ∈ L, oFuel i a1).
-    Proof.
-      rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply oFuel_split.
+      iIntros "HQ %%% $". iApply (gl_alloc_done_0 _ Θ with "HQ").
     Qed.
 
-    Lemma oFuel_mon_split k a0 a1 a2 :
-      ((a0 ⊕ a1) <= a2)%ord → oFuel k a2 ==∗ oFuel k a0 ∗ oFuel k a1.
+    Lemma gl_lock E i G q k ξ N v1 v2 P1 Q1 R1 P2 Q2 R2 :
+      v1 < v2 →
+      ↑N ⊆ E →
+      gl_current k v1 -∗
+      gl_done k v1 -∗
+      gl_variant N k v1 P1 Q1 R1 -∗
+      |={E,E ∖ ↑N}=> (▷ (gl_current k v1 ∗ Q1)) ∗
+                    (th_obls i G q -∗
+                     gl_current k v1 -∗
+                     gl_witfun k ξ -∗
+                     (▷ R1) -∗
+                     (▷ P2) -∗
+                     |={∅}=>g |={E ∖ ↑N,E}=> 
+                       (th_obls i (<[k:=v2]>G) q ∗
+                        gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
+                        gl_variant N k v2 P2 Q2 R2 ∗
+                        wit k v2 (gupd_η (Σ[ξ] v2)) ∗
+                        ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit k u (gupd_η (Σ[ξ] u))) ∗
+                        ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u))).
     Proof.
-      unfold_defs. iIntros (Hle) "(P& #Be)".
-      iMod (oblG_fuel_mon_split with "P") as "[P1 P2]"; first done.
-      iFrame; eauto.
-    Qed.
-    Lemma oFuel_mon_split_list L a0 a1 a2 :
-      (a0 ⊕ a1) <= a2 →
-      ([∗ list] i ∈ L, oFuel i a2) ⊢ |==> ([∗ list] i ∈ L, oFuel i a0) ∗ ([∗ list] i ∈ L, oFuel i a1).
-    Proof.
-      iIntros (LE) "H". iPoseProof (oFuel_mon_list with "H") as ">H"; first done.
-      by iApply oFuel_split_list.
-    Qed.
-    Lemma oFuel_mon_split_set L a0 a1 a2 :
-      (a0 ⊕ a1) <= a2 →
-      ([∗ set] i ∈ L, oFuel i a2) ⊢ |==> ([∗ set] i ∈ L, oFuel i a0) ∗ ([∗ set] i ∈ L, oFuel i a1).
-    Proof.
-      iIntros (LE) "H". iPoseProof (oFuel_mon_set with "H") as ">H"; first done.
-      by iApply oFuel_split_set.
-    Qed.
-
-    Lemma oFuel_lt k a0 a1 :
-      a0 < a1 →
-      oFuel k a1 ⊢ |==> oFuel k a0 ∗ oFuel k Ord.one.
-    Proof.
-      unfold_defs. iIntros (Hlt) "(P& #Be)".
-      iMod (oblG_fuel_lt with "P") as "(P& %& %& H)". 1: done.
-      iFrame "P Be". apply ord_lt_one in H. iMod (oblG_fuel_mon_split _ _ _ _ with "H") as "[_ $]"; done.
-    Qed.
-    Lemma oFuel_lt_list L a0 a1 :
-      a0 < a1 →
-      ([∗ list] i ∈ L, oFuel i a1) ⊢ |==> ([∗ list] i ∈ L, oFuel i a0) ∗ ([∗ list] i ∈ L, oFuel i Ord.one).
-    Proof.
-      iIntros (LT) "H". rewrite -big_sepL_sep. iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-      iModIntro. iIntros. by iApply oFuel_lt.
-    Qed.
-    Lemma oFuel_lt_set L a0 a1 :
-      a0 < a1 →
-      ([∗ set] i ∈ L, oFuel i a1) ⊢ |==> ([∗ set] i ∈ L, oFuel i a0) ∗ ([∗ set] i ∈ L, oFuel i Ord.one).
-    Proof.
-      iIntros (LT) "H". rewrite -big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
-      iModIntro. iIntros. by iApply oFuel_lt.
+      iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
+      iIntros "!> Tb Gc Gw HR HP". iPoseProof ("H" with "Tb Gc Gw HR HP") as "H".
+      iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
     Qed.
 
-    (** oCred rules *)
-    Lemma oCred_eq k a0 a1 :
-      (a0 == a1)%ord → oCred k a1 = oCred k a0.
+    Lemma gl_unlock E i G q N k v P Q R :
+      ↑N ⊆ E →
+      G !! k = Some v →
+      th_obls i G q -∗
+      gl_variant N k v P Q R -∗
+      |={E,E ∖ ↑N}=> (▷ (th_obls i G q ∗ gl_locked k v ∗ P)) ∗
+                    (th_obls i G q -∗
+                     gl_locked k v -∗
+                     (▷ Q) -∗
+                     |={∅}=>g |={E ∖ ↑N,E}=>
+                       (th_obls i (delete k G) q ∗ gl_current k v ∗ gl_done k v)).
     Proof.
-      unfold_defs. intros. rewrite (owitnessG_credit_eq k a0 a1); auto.
-    Qed.
-    Lemma oCred_mon k a0 a1 :
-      (a0 <= a1)%ord → oCred k a1 ==∗ oCred k a0.
-    Proof.
-      unfold_defs. iIntros (Hle) "(P& Be)". iFrame. by iApply owitnessG_credit_mon.
-    Qed.
-    Lemma oCred_split k a0 a1 :
-      oCred k (a0 ⊕ a1)%ord ⊣⊢ oCred k a0 ∗ oCred k a1.
-    Proof.
-      unfold_defs. rewrite owitnessG_credit_split. iSplit.
-      - iIntros "((P1& P2)& #Be)"; iFrame; eauto.
-      - iIntros "((P1& B1)& (P2& B2))"; iFrame.
-    Qed.
-    Lemma oCred_mon_split k a0 a1 a2 :
-      ((a0 ⊕ a1) <= a2)%ord → oCred k a2 ==∗ oCred k a0 ∗ oCred k a1.
-    Proof.
-      unfold_defs. iIntros (Hle) "(P& #Be)".
-      iMod (owitnessG_credit_mon_split with "P") as "[P1 P2]"; first done.
-      iFrame; eauto.
+      iIntros (Mask LUGk) "Tb Gv". iMod (gl_unlock_0 with "Tb Gv") as "[$ H]". 1,2: eauto.
+      iIntros "!> Tb Gl HQ". iPoseProof ("H" with "Tb Gl HQ") as "H".
+      iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
     Qed.
 
-    (** oWit rules *)
-    Lemma oWit_mon k a0 a1 :
-      (a0 <= a1)%ord → oWit k a0 ==∗ oWit k a1.
+    Lemma gl_change_owner i1 i2 G1 G2 q1 q2 k v :
+      G1 !! k = Some v →
+      th_obls i1 G1 q1 -∗
+      th_obls i2 G2 q2 -∗
+      gl_fuel k Ord.one -∗
+      |={∅}=>g th_obls i1 (delete k G1) q1 ∗ th_obls i2 (<[k:=v]>G2) q2 ∗ ⌜ G2 !! k = None ⌝.
     Proof.
-      unfold_defs. iIntros (Hle) "(P& Be)". iFrame. by iApply owitnessG_witness_mon.
-    Qed.
-    Lemma oWit_cred_compare k a0 a1 :
-      oWit k a0 -∗ oCred k a1 -∗ ⌜ (a1 <= a0)%ord ⌝.
-    Proof.
-      unfold_defs. iIntros "(P& Be) (Cred& _)". iApply (owitnessG_compare with "[$]").
-    Qed.
-    Lemma oWit_cred_spend_gen k a0 a1 :
-      oWit k a0 -∗ oCred k a1 ==∗ ∃ a2, ⌜ ((a1 ⊕ a2) <= a0)%ord ⌝ ∗ oWit k a2.
-    Proof.
-      unfold_defs. iIntros "(Ow& $) (Oc& _)". iApply (owitnessG_credit_spend_gen with "[$]").
-    Qed.
-    Lemma oWit_cred_spend k a0 a1 :
-      (Ord.O < a1)%ord →
-      oWit k a0 -∗ oCred k a1 ==∗ ∃ a2, ⌜ (a2 < a0)%ord ⌝ ∗ oWit k a2.
-    Proof.
-      unfold_defs. iIntros (LT) "(Ow& $) (Oc& _)". iApply (owitnessG_credit_spend with "[$]"). done.
-    Qed.
-    Lemma oWit_cred_spend_one k a :
-      oWit k a -∗ oCred k Ord.one ==∗ ∃ a0, ⌜ (a0 < a)%ord ⌝ ∗ oWit k a0.
-    Proof.
-      iIntros "Ow Oc". iApply (oWit_cred_spend with "Ow Oc"). apply Ord.S_pos.
+      iIntros (LUG1) "Tb1 Tb2 Gf %%% $".
+      iMod (gl_change_owner_0 with "Tb1 Tb2 Gf") as "H". 1: eauto.
+      by iModIntro.
     Qed.
 
-    (** tHas rules *)
-    Lemma tHas_disj i G1 G2 q1 q2 :
-      tHas i G1 q1 -∗ tHas i G2 q2 -∗ (⌜ G1 ## G2 ⌝).
-    Proof.
-      unfold_defs. iIntros "(T1& E1& #Te1& Es1) (T2& E2& #Te2& Es2)".
-      rewrite elem_of_disjoint. iIntros (x IN1 IN2).
-      iPoseProof (big_sepS_delete _ _ _ IN1 with "Es1") as "[(_&_&Tok1) _]".
-      iPoseProof (big_sepS_delete _ _ _ IN2 with "Es2") as "[(_&_&Tok2) _]".
-      iPoseProof (othreadG_owns_valid_2 with "[$Tok1 $Tok2]") as "%F".
-      done.
-    Qed.
-
-    Lemma tHas_op_1 i G1 G2 q1 q2 :
-      tHas i G1 q1 -∗ tHas i G2 q2 -∗ tHas i (G1 ∪ G2) (q1 + q2).
-    Proof.
-      unfold_defs. iIntros "(T1& E1& #Te1& Es1) (T2& E2& #Te2& Es2)".
-      iPoseProof (othreadG_obls_valid_2 with "[$T1 $T2]") as "%". destruct H.
-      iPoseProof (othreadG_obls_op_1 with "[$T1 $T2]") as "T". iFrame.
-      iCombine "E1 E2" as "E". iPoseProof (othreadG_exec_frac_op with "E") as "E"; first reflexivity.
-      rewrite Qp.div_add_distr. iFrame. iSplitR; auto.
-      rewrite big_sepS_union; auto. iFrame.
-    Qed.
-    Lemma tHas_op_2 i G1 G2 q1 q2 :
-      G1 ## G2 →
-      tHas i (G1 ∪ G2) (q1 + q2) -∗ (tHas i G1 q1 ∗ tHas i G2 q2).
-    Proof.
-      unfold_defs. iIntros (Hd) "(T& E& #Te& Es)".
-      iPoseProof (othreadG_obls_op_2 with "T") as "[T1 T2]"; first auto.
-      rewrite Qp.div_add_distr. iPoseProof (othreadG_exec_frac_op _ (q1/2) (q2/2) with "E") as "[E1 E2]"; first auto.
-      iFrame. iFrame "Te". rewrite -big_sepS_union; auto.
-    Qed.
-
-  End liveness_preds.
-
-  Section foupd.
-
-    Lemma obl_alloc E i G q T P a :
-      tHas i G q -∗
-      |={E}=>o ∃ k, ⌜ k ∉ G ⌝ ∗ tHas i ({[k]} ∪ G) q ∗ obl k ∗ oGoal k T P ∗ oEA k P ∗ oFuel k a ∗ oWit k (owfun a).
-    Proof.
-      unfold_defs. iIntros "(Tbs& Texi& #Tei& Tds)". iIntros (???) "SI".
-      iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-      iApply oupd_unfold. iRight.
-      rewrite /oproto. iIntros (??) "(S& T& A& N& %OW)".
-      assert (∃ k, k ∉ dom Ω1).
-      { exists (fresh (dom Ω1)). apply is_fresh. }
-      assert (Dom1 : dom Ω1 = dom W1).
-      { eapply obl_wit_dom; eauto. }
-      destruct H as (k& Nink).
-      iMod (osat_alloc_obl _ k i a T P with "S") as "(S& #Bgk& #Bek& Blk& Bok& Bfk)". 1: done.
-      iPoseProof (oblG_owner_div_2 with "Bok") as "[Bok Bok2]".
-      iMod (othread_alloc_obl with "[$S $T $Tbs $Bek $Blk $Bok2]") as "(S& T& %Nink2& Tbs& Tok& Blk)".
-      iPoseProof (othreadG_owns_div_2 with "Tok") as "[Tok Tok2]".
-      iPoseProof (othreadG_owns_div_2 with "Tok2") as "[Tok' Tok2]".
-      iCombine "Tok Tok'" as "Tok". iPoseProof (othreadG_owns_frac_op with "Tok") as "Tok". 1: reflexivity.
-      iPoseProof (oassigned_add_obl with "[$A $Bek Bok Tok2]") as "A".
-      { iLeft. iFrame. }
-      iMod (owitness_alloc_wit _ k (owfun a) with "N") as "[N #Nwk]".
-      { rewrite -Dom1. done. }
-      iModIntro. iFrame "S T". iSplitR.
-      { iPureIntro. econstructor 2. eapply obl_states_step_alloc.
-        exists k. eexists. split; last done. by apply not_elem_of_dom. }
-      iIntros (W2 [ProgW OW2]).
-      iMod (owitness_obl_wit_alloc with "N") as "N". 1: eapply Nink. all: eauto.
-      iModIntro. iSplitL "A N".
-      { rewrite dom_insert_L. iFrame. auto. }
-      iApply oupd_unfold. iLeft. iModIntro. iMod "close" as "_". iModIntro.
-      iFrame "SI Tbs Texi Tei Bek Bgk Bfk Nwk".
-      iSplitR; first auto.
-      iApply big_sepS_union. 1: set_solver.
-      iFrame "Tds". iApply big_sepS_singleton. iFrame. auto.
-    Qed.
-
-    Lemma obl_resolve E i G q k T P :
-      k ∈ G →
-      tHas i G q -∗ oGoal k T P -∗
-      (∀ σ Θ κs, state_interp σ Θ κs ={E,∅}=∗ (⌜ T σ ⌝ ∗ ▷ P) ∗ (oDone k ={∅,E}=∗ state_interp σ Θ κs)) -∗
-      |={E}=>o tHas i (G ∖ {[k]}) q ∗ oDone k.
-    Proof.
-      unfold_defs. iIntros (InGk) "(Tbs& Texi& #Tei& Tds) (#Bgk& #Bek) ACC".
-      iIntros (???) "SI". iMod ("ACC" with "SI") as "[(%HT& HP) ACC]".
-      iPoseProof (big_sepS_delete _ _ _ InGk with "Tds") as "[(_& Blk& Tok) Tds]". iFrame "Texi Tei Tds Bek".
-      iModIntro. iApply oupd_unfold. iRight.
-      rewrite /oproto. iIntros (??) "(S& T& A& N& %OW)".
-      assert (Dom1 : dom Ω1 = dom W1).
-      { eapply obl_wit_dom; eauto. }
-      iPoseProof (osat_elem with "[$S $Bek]") as "%InOk".
-      iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Bok& Tok2) | #Bdk])"; first eauto; cycle 1.
-      { iPoseProof (oblG_live_done_false with "[$Blk $Bdk]") as "%F". done. }
-      iPoseProof (othread_obls_open _ _ k G with "[$T $Tei $Tbs]") as "(Tbs& [Blk2 Bok2]& ACC2)"; first auto.
-      iPoseProof (oblG_owner_agree with "[$Bok $Bok2]") as "(%Eq& %)". subst i0. clear H.
-      iPoseProof ("ACC2" with "[$Blk2 $Bok2]") as "T".
-      iCombine "Tok Tok2" as "Tok". iPoseProof (othreadG_owns_frac_op _ _ _ _ 1 with "Tok") as "Tok".
-      { rewrite -assoc Qp.div_2 Qp.div_2. done. }
-      iMod (othread_delete_obl_frac with "[$T $Tbs $Tok]") as "(T& Tbs& Blk2& Bok2)"; first auto.
-      iCombine "Blk Blk2" as "Blk". iPoseProof (oblG_live_div_2 with "Blk") as "Blk".
-      iCombine "Bok Bok2" as "Bok". iPoseProof (oblG_owner_div_2 with "Bok") as "Bok".
-      iPoseProof (osat_obl_is_live with "[$S $Bek $Blk]") as "(%& %LUOk)".
-      iMod (osat_obl_resolve_one with "[$S $Bek $Bgk $HP $Blk $Bok]") as "[S #Bdk]".
-      iPoseProof (oassigned_add_obl with "[$A $Bek Bdk]") as "A".
-      { iRight. auto. }
-      replace ({[k]} ∪ dom Ω1 ∖ {[k]}) with (dom Ω1); cycle 1.
-      { apply union_difference_L. set_solver. }
-      iModIntro.
-      iExists (<[k:=odone T]> Ω1). iSplitR.
-      { iPureIntro. econstructor 2. eapply (obl_states_step_resolve _ _ _ (obl_cond_one k)).
-        1: apply _.
-        intro x. destruct (decide (x = k)).
-        - subst. rewrite LUOk lookup_insert_eq. econstructor. split; intros; done.
-        - rewrite lookup_insert_ne; auto. destruct (Ω1 !! x) eqn:LUx; econstructor. split; intros; done.
-      }
-      iIntros (W2 [ProgW OW2]).
-      assert (ResolveW : W1 ↓ᵣ W2 | wit_cond_one k) by (eapply obl_wit_resolve; eauto).
-      iMod (owitness_wit_resolve_one _ _ _ ResolveW with "[$N $Bdk]") as "N".
-      iModIntro. rewrite dom_insert_L. replace ({[k]} ∪ dom Ω1) with (dom Ω1) by set_solver.
-      iFrame. iSplitR; first done. iModIntro. iMod ("ACC" with "[$Bdk $Bek]") as "$".
-      iModIntro. auto.
-    Qed.
-
-    Lemma obl_ea_done E k P :
-      Persistent P →
-      oEA k P -∗ oDone k -∗ |={E}=>o ▷ P.
-    Proof.
-      unfold_defs. iIntros (PersP) "(%& #Bgk) [#Bdk #Bek]".
-      iIntros (???) "SI".
-      iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-      iApply oupd_unfold. iRight.
-      rewrite /oproto. iIntros (??) "(S& T& A& N& %OW)".
-      iPoseProof (osat_done_open_pers with "[$S $Bgk $Bdk]") as "[S HP]".
-      iModIntro. iExists Ω1. iSplitR; first done.
-      iIntros (W2 (ProgW& OW2)).
-      iPoseProof (owitness_obl_wit_rc_step_same_obl _ _ _ _ OW ProgW OW2 with "N") as "N".
-      iModIntro. iFrame. iSplit; first done. iModIntro. by iMod "close".
-    Qed.
-
-  End foupd.
+  End sfoupd.
 
   Section lwp_step.
 
@@ -438,74 +118,84 @@ Section lifting.
       (∀ Θ σ1 κ κs,
          state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
          (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-         ∃ G, tHas i G 1 ∗ ([∗ set] g ∈ G, oFuel g Ord.one) ∗
-         ∃ R, ([∗ set] r ∈ R, obl r) ∗
+         ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗
+         ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
            (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
-              tHas i G 1 -∗ ([∗ set] r ∈ R, oCred r Ord.one ∨ oDone r) -∗
-              ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+              th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+              ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
               ALC (|={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs)))
       ⊢ lwp_step s i E e1 ν.
     Proof.
       unfold_defs. iIntros "H". iIntros (????) "SI".
-      iMod ("H" with "SI") as "($& %& (Tbs& Txi& #Tei& Gds)& GFs& %& #REs& H)".
-      iIntros "!> !> % % % %Step % % (S& T& A& N& %OW1)".
-      iAssert (⌜ G ⊆ dom Ω1 ⌝)%I as "%GOSub".
+      iMod ("H" with "SI") as "($& %& (#Oe& Ox& Ob& OS)& GFs& %& #REs& H)".
+      iIntros "!> !> % % % %Step % % (S& O& A& W& %GWI1)".
+      iAssert (⌜ dom G ⊆ dom Ω1 ⌝)%I as "%GOSub".
       { rewrite elem_of_subseteq. iIntros (x INGx).
-        iPoseProof (big_sepS_delete _ _ x INGx with "GFs") as "[(_& #Bex) _]".
-        iApply (osat_elem with "[$S $Bex]"). }
-      iAssert ([∗ map] k ↦ o ∈ Ω1, (⌜ k ∈ G ⌝ ∗ oblG_fuel k Ord.one) ∨ (⌜ k ∉ G ⌝))%I with "[GFs]" as "GFs".
-      { iApply big_sepM_dom. replace (dom Ω1) with (G ∪ (dom Ω1 ∖ G)).
+        apply elem_of_dom in INGx. destruct INGx as (?& INGx).
+        iPoseProof (big_sepM_delete _ _ _ _ INGx with "GFs") as "[(#Bex& _) _]".
+        iApply (glsat_elem with "[$S $Bex]").
+      }
+      iAssert ([∗ map] k ↦ _ ∈ Ω1, (⌜ k ∈ dom G ⌝ ∗ glG_fuel (GL:=ord_ghost_lock_class) k Ord.one) ∨ (⌜ k ∉ dom G ⌝))%I with "[GFs]" as "GFs".
+      { rewrite !big_sepM_dom. replace (dom Ω1) with ((dom G) ∪ (dom Ω1 ∖ (dom G))).
         2:{ rewrite -union_difference_L; auto. }
-        iApply (big_sepS_union).
-        { set_solver. }
+        iApply (big_sepS_union). 1: set_solver.
         iSplitL.
-        - iApply (big_sepS_impl with "GFs"). iIntros "!>" (??) "(Bfx& _)". iLeft. iFrame. done.
-        - iApply big_sepS_intro. iIntros "!>" (??). iRight. iPureIntro. set_solver + H. }
-      iAssert (∀ g, ⌜ g ∈ G ⌝ → ∃ o, ⌜ Ω1 !! g = Some o ∧ obl_cond_owner i g o ⌝)%I as "%LUG".
-      { iIntros (g INGg). iPoseProof (big_sepS_delete _ _ g INGg with "Gds") as "[(#Beg& Blg& Tog) _]".
-        iPoseProof (othread_obls_lookup _ _ g _ G _ INGg with "[$S $T $Tei $Tbs $Beg]") as "(%& %& %)".
-        iExists (inl d). iPureIntro. done. }
-      iAssert (∀ k, ⌜ k ∈ dom Ω1 ⌝ → ⌜ k ∉ G ⌝ → ∃ o, ⌜ Ω1 !! k = Some o ∧ ¬ obl_cond_owner i k o ⌝)%I as "%NotG".
+        - iApply (big_sepS_impl with "GFs"). iIntros "!>" (??) "(_& Bfx)". iLeft. iFrame. done.
+        - iApply big_sepS_intro. iIntros "!>" (??). iRight. iPureIntro. set_solver + H.
+      }
+      iAssert (∀ g, ⌜ g ∈ dom G ⌝ → ∃ o, ⌜ Ω1 !! g = Some o ∧ gl_cond_owner i g o ⌝)%I as "%LUG".
+      { iIntros (g INGg). pose proof INGg. apply elem_of_dom in H. destruct H as (?& LUGg).
+        iPoseProof (big_sepM_delete _ _ _ _ LUGg with "OS") as "[(#Ge& Gl& Gv& Go& Oo) _]".
+        iPoseProof (globl_obls_lookup _ _ g _ _ _ INGg with "[$S $O $Oe $Ob $Ge]") as "(%& %& %)".
+        iExists _. iPureIntro. done.
+      }
+      iAssert (∀ k, ⌜ k ∈ dom Ω1 ⌝ → ⌜ k ∉ dom G ⌝ → ∃ o, ⌜ Ω1 !! k = Some o ∧ ¬ gl_cond_owner i k o ⌝)%I as "%NotG".
       { iIntros (k INOk NINGk). apply elem_of_dom in INOk. destruct INOk.
-        destruct (decide (obl_cond_owner i k x)); eauto.
-        iExFalso. destruct x; last done. simpl in *.
-        iPoseProof (othread_assigned_lookup _ _ k with "[$S $T $A $Tbs]") as "%".
+        destruct (decide (gl_cond_owner i k x)); eauto.
+        iExFalso. destruct x. destruct g1; last done. simpl in *. subst.
+        iPoseProof (globl_assigned_obls_lookup _ _ k with "[$S $O $A $Ob]") as "%".
         { apply H. }
-        { auto. }
-        done. }
-      iAssert ([∗ map] k ↦ o ∈ Ω1, (⌜ obl_cond_owner i k o ⌝ ∗ (∃ c, ⌜ WFOCM.ltR OCM.unit c ⌝ ∗ oblG_fuel k c))
-                                   ∨ (⌜ ¬ obl_cond_owner i k o ⌝))%I with "[GFs]" as "GFs".
+        done.
+      }
+      iAssert ([∗ map] k ↦ o ∈ Ω1, (⌜ gl_cond_owner i k o ⌝ ∗ (∃ c, ⌜ WFOCM.ltR OCM.unit c ⌝ ∗ glG_fuel k c)) ∨ (⌜ ¬ gl_cond_owner i k o ⌝))%I with "[GFs]" as "GFs".
       { iApply (big_sepM_impl with "GFs"). iIntros "!>" (???) "[(%& Bfk) | %]".
         - iLeft. iFrame "Bfk". iPureIntro; split.
           + apply LUG in H0. destruct H0 as (?& ?& ?). rewrite H in H0. inv H0. auto.
           + apply Ord.S_pos.
         - iRight. iPureIntro. apply NotG in H0.
           + destruct H0 as (?& ?& ?). rewrite H in H0. inv H0. auto.
-          + apply elem_of_dom; eauto. }
-      assert (DomOW : dom Ω1 = dom W1) by (eapply obl_wit_dom; eauto).
-      iAssert (⌜ R ⊆ dom W1 ⌝)%I as "%RWSub".
+          + apply elem_of_dom; eauto.
+      }
+      assert (DomOW : dom Ω1 = dom W1) by (eapply glwit_inv_dom; eauto).
+      iAssert (⌜ dom R ⊆ dom W1 ⌝)%I as "%RWSub".
       { rewrite -DomOW. rewrite elem_of_subseteq. iIntros (x INRx).
-        iPoseProof (big_sepS_delete _ _ x INRx with "REs") as "[#Beg _]".
-        iPoseProof (osat_elem with "[$S $Beg]") as "%". done. }
-      iMod (osat_obl_progress with "[$S $GFs]") as "(%Ω2& S& %ProgO)".
-      { intros. destruct o; eauto. done. }
-      iModIntro. iExists Ω2. iSplitR; first done. iIntros (W2 (ProgW& OW2)).
-      iMod (owitness_wit_progress with "N") as "[N Ws]". 1: eauto.
-      assert (HW1 : ∃ WR WR', WR ##ₘ WR' ∧ W1 = WR ∪ WR' ∧ dom WR = R).
-      { revert R RWSub. clear OW1 DomOW ProgW. induction W1 using map_ind; intros.
-        { assert (R = ∅) by (set_solver + RWSub). subst. exists ∅, ∅. done. }
-        rename i0 into r. rewrite dom_insert_L in RWSub. destruct (decide (r ∈ R)).
-        - set (R2 := R ∖ {[r]}). assert (R2 ⊆ dom m).
-          { subst R2. set_solver + RWSub. }
-          apply IHW1 in H0. destruct H0 as (WR&WR'&?&?&?).
+        pose proof INRx. apply elem_of_dom in H. destruct H.
+        iPoseProof (big_sepM_delete _ _ _ _ H with "REs") as "[[#Beg _] _]".
+        iPoseProof (glsat_elem with "[$S $Beg]") as "%". done.
+      }
+      iMod (glsat_progress with "[$S $GFs]") as "(%Ω2& S& %ProgO)".
+      { intros. destruct g. destruct g0; eauto. done. }
+      iModIntro. iExists Ω2. iSplitR; first done. iIntros (W2 (ProgW& GWI2)).
+      iMod (glwit_progress with "W") as "[W Ws]". 1: eauto.
+      assert (HW1 : ∃ WR WR', WR ##ₘ WR' ∧ W1 = WR ∪ WR' ∧ dom R = dom WR).
+      { clear GWI1 DomOW ProgW.
+        revert R RWSub. induction W1 using map_ind; intros.
+        { assert (dom R = ∅) by (set_solver). apply dom_empty_inv_L in H. subst. exists ∅, ∅. done. }
+        rename i0 into r. rewrite dom_insert_L in RWSub. destruct (decide (r ∈ dom R)).
+        - set (R2 := delete r R). assert (dom R2 ⊆ dom m).
+          { subst R2. rewrite dom_delete_L. set_solver + RWSub. }
+          apply elem_of_dom in e. destruct e. rename H1 into LUR.
+          destruct (IHW1 _ H0) as (WR&WR'&?&?&?).
           exists (<[r:=x]>WR), WR'. subst R2.
           assert (WR !! r = None ∧ WR' !! r = None).
-          { apply lookup_union_None. rewrite -H1; auto. }
-          destruct H3. split_and !.
+          { apply lookup_union_None. rewrite -H2; auto. }
+          destruct H4. split_and !.
           + apply map_disjoint_insert_l. split; auto.
           + subst. rewrite insert_union_l. done.
-          + rewrite dom_insert_L. rewrite H2. rewrite -union_difference_L; auto. set_solver + e.
-        - assert (R ⊆ dom m).
+          + replace R with (<[r:=x0]> (delete r R)).
+            * rewrite !dom_insert_L H3. auto.
+            * rewrite insert_delete_id; auto.
+        - assert (dom R ⊆ dom m).
           { set_solver + RWSub n. }
           pose proof H0. apply IHW1 in H1. destruct H1 as (WR& WR'& ?&?&?).
           assert (WR !! r = None ∧ WR' !! r = None).
@@ -515,22 +205,87 @@ Section lifting.
           + subst. rewrite insert_union_r; done.
       }
       destruct HW1 as (WR& WR'& DisjWR& EQWR& DomWR).
-      assert (DomO : dom Ω1 = dom Ω2).
-      { eapply obl_states_cond_rel_dom. eauto. }
-      rewrite DomO.
-      iMod (othread_alloc_threads (dom efs) with "T") as "[T Efs]".
-      { eauto. symmetry. eapply fork_thread_ids; eauto. }
-      iAssert (|==> [∗ set] r ∈ R, owitnessG_credit r Ord.one ∗ oblG_elem r ∨ oblG_done r ∗ oblG_elem r)%I with "[Ws]" as ">Rs".
-      { subst W1. iPoseProof (big_sepM_union with "Ws") as "[Ws1 Ws2]"; first auto.
-        subst R. iApply big_sepM_dom. iApply big_sepM_bupd. iApply (big_sepM_impl with "Ws1").
-        iIntros "!>" (???) "H". assert (k ∈ dom WR) by (eapply elem_of_dom; eauto).
-        iPoseProof (big_sepS_delete _ _ _ H0 with "REs") as "[$ _]". destruct x.
-        - iLeft. simpl. iDestruct "H" as "(%&%&NCk)".
-          apply ord_lt_one in H1. iMod (owitnessG_credit_mon_split _ _ _ _ with "NCk") as "[_ $]"; done.
-        - by iRight. }
-      iMod ("H" with "[//] [$Tbs $Txi $Tei $Gds] Rs [Efs]") as "H".
+      assert (DomO : fst <$> Ω1 = fst <$> Ω2).
+      { destruct ProgO. apply map_eq. intros j. rewrite !lookup_fmap. specialize (H0 j).
+        destruct (Ω1 !! j) eqn:LUO1.
+        - inv H0. destruct g, y. inv H3. rewrite LUO1 -H2. done.
+        - inv H0. rewrite LUO1 -H1. done.
+      }
+      assert (EQfst : fst <$> Ω2 = fst <$> W1).
+      { rewrite -DomO. apply map_eq. intros j. destruct ProgO.
+        specialize (GWI1 j). rewrite !lookup_fmap. destruct (W1 !! j) eqn:LUW1.
+        - rewrite LUW1. rewrite LUW1 in GWI1. inv GWI1. destruct x. destruct w. destruct H3. by subst.
+        - rewrite LUW1. rewrite LUW1 in GWI1. inv GWI1. done.
+      }
+      iAssert (⌜ ∀ k v, R !! k = Some v → ∃ w, WR !! k = Some w ∧ v ≤ w.1 ⌝)%I as "%Rver".
+      { iIntros (k v LUR). iPoseProof (big_sepM_delete _ _ _ _ LUR with "REs") as "[(#Ge& #Gvl) _]".
+        iPoseProof (glsat_lookup_version_lb with "[$S $Ge $Gvl]")as "(%&%&%&%)".
+        rewrite map_eq_iff in EQfst. specialize (EQfst k). rewrite !lookup_fmap H in EQfst.
+        assert (is_Some (WR !! k)).
+        { apply elem_of_dom. rewrite -DomWR. apply elem_of_dom; eauto. }
+        destruct H1 as (?& LUWRk).
+        assert (WR' !! k = None).
+        { eapply map_disjoint_Some_l; eauto.  }
+        destruct (W1 !! k) eqn:LUW1.
+        - rewrite LUW1 in EQfst. inv EQfst. apply lookup_union_Some_inv_l in LUW1; eauto.
+        - rewrite LUW1 in EQfst. inv EQfst.
+      }
+      iAssert (|==> [∗ map] r↦v ∈ R, (witG_credit (GL:=ord_ghost_lock_class) r v Ord.one) ∨
+                                    (glG_unlocked r v))%I
+        with "[Ws]" as ">Rs".
+      { subst W1. iPoseProof (big_sepM_union with "Ws") as "[Ws1 _]"; first auto.
+        iApply big_sepM_bupd. iClear "Oe REs". clear dependent WR'.
+        iStopProof. revert R DomWR Rver. induction WR using map_ind; iIntros (R DomWR Rver) "M".
+        { apply dom_empty_inv_L in DomWR. subst. done. }
+        rename i0 into r. rewrite dom_insert_L in DomWR. destruct (R !! r) eqn:LUR; cycle 1.
+        { exfalso. apply not_elem_of_dom in LUR. set_solver + DomWR LUR. }
+        remember (delete r R) as R0.
+        assert (dom R0 = dom m).
+        { subst. rewrite dom_delete_L. apply not_elem_of_dom in H. rewrite DomWR. set_solver + H. }
+        assert (R0 !! r = None).
+        { subst. apply lookup_delete_eq. }
+        assert (R = <[r:=g]>R0).
+        { subst. rewrite insert_delete_id; auto. }
+        rewrite H2.
+        assert (∀ k v, R0 !! k = Some v → ∃ w, m !! k = Some w ∧ v ≤ w.1).
+        { intros. specialize (Rver k v). subst. destruct (decide (k = r)).
+          { subst. rewrite lookup_delete_eq in H3. inv H3. }
+          rewrite lookup_delete_ne in H3; auto. apply Rver in H3. destruct H3 as (?&?&?).
+          rewrite lookup_insert_ne in H3; eauto.
+        }
+        destruct (Rver _ _ LUR) as (w& LUmk& LEv). rewrite lookup_insert_eq in LUmk.
+        clear dependent R. inv LUmk. rewrite !big_sepM_insert; auto.
+        destruct w. iDestruct "M" as "[H M]". iPoseProof (IHWR _ H0 H3 with "M") as "$".
+        iDestruct "H" as "(#H1& #H2& H)". simpl in LEv. destruct w.
+        - assert (g = n ∨ g < n) by lia. destruct H2.
+          + subst. iDestruct "H" as "(%& %& Wc)". apply ord_lt_one in H2.
+            iLeft. iMod (witG_credit_mon_split with "Wc") as "[_ $]"; done.
+          + assert (g ∈ (set_seq 0 n : gset _)).
+            { apply elem_of_set_seq. lia. }
+            iPoseProof (big_sepS_delete _ _ _ H4 with "H1") as "[(_& Gu) _]".
+            iRight. auto.
+        - assert (g = n ∨ g < n) by lia. destruct H2.
+          + subst. iRight. auto.
+          + assert (g ∈ (set_seq 0 n : gset _)).
+            { apply elem_of_set_seq. lia. }
+            iPoseProof (big_sepS_delete _ _ _ H4 with "H1") as "[(_& Gu) _]".
+            iRight. auto.
+      }
+      iAssert ([∗ map] r↦v ∈ R,
+                 ((glG_elem r ∗ glG_version_lb r v) ∗
+                  witG_credit (GL:=ord_ghost_lock_class) r v Ord.one) ∨
+                   ((glG_elem r ∗ glG_version_lb r v) ∗ glG_unlocked r v))%I
+        with "[Rs]" as "Rs".
+      { iPoseProof (big_sepM_sep with "[$Rs $REs]") as "H". iApply (big_sepM_impl with "H").
+        iIntros "!> %%% ([Wc | #Gu]& #Ge& #Gvl)".
+        - iLeft. iFrame. auto.
+        - iRight. auto.
+      }
+      iMod (globl_alloc_threads (dom efs) with "O") as "[O Efs]".
+      { symmetry. eapply fork_thread_ids; eauto. }
+      iMod ("H" with "[//] [$Ob $Ox $Oe $OS] Rs [Efs]") as "H".
       { iApply (big_sepS_impl with "Efs"). iIntros "!> %% ($& $& $)". done. }
-      iModIntro. rewrite /oproto. iFrame. iSplitR.
+      iModIntro. rewrite DomO /gproto. iFrame. iSplitR.
       { done. }
       iMod "H". iModIntro. done.
     Qed.
@@ -544,7 +299,7 @@ Section lifting.
            (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
            ∃ G q,
              (othreadG_elem i ∗ othreadG_obls i G 1 ∗
-              [∗ set] ρ ∈ G, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ oblG_fuel ρ Ord.one) ∗
+              [∗ set] ρ ∈ G, oblG_elem ρ ∗ othreadG_owns i ρ true q ∗ glG_fuel ρ Ord.one) ∗
              ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                           othreadG_obls i G 1 -∗ ([∗ set] ρ ∈ G, othreadG_owns i ρ true q) -∗
                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
@@ -575,13 +330,13 @@ Section lifting.
            (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
            ∃ π G K,
              (⌜G = dom K⌝ ∗ othreadG_elem i ∗ othreadG_obls i G 1 ∗ oblG_elem π ∗ otreeG_elem π ∗
-              ([∗ set] ρ ∈ G, oblG_elem ρ ∗ oblG_fuel ρ Ord.one) ∗
+              ([∗ set] ρ ∈ G, oblG_elem ρ ∗ glG_fuel ρ Ord.one) ∗
               ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
              ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
                           othreadG_obls i G 1 -∗
-                          ((([∗ set] ρ ∈ G, oblG_fuel ρ Ord.one) ∗
+                          ((([∗ set] ρ ∈ G, glG_fuel ρ Ord.one) ∗
                             ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2))) ∨
-                             (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_fuel k ψ))) -∗
+                             (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ glG_fuel k ψ))) -∗
                           ([∗ set] j ∈ dom efs, othreadG_elem j ∗ othreadG_obls j ∅ 1 ∗ othreadG_exec j (1/2)) -∗
                           ALC (|={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs))
         ⊢ lwp_step s i E e1 ν.
@@ -620,8 +375,8 @@ Section lifting.
           iFrame. iPureIntro. split; done.
         - rewrite !big_sepM_fmap.
           iAssert (
-              ([∗ map] k ↦ _ ∈ K, othreadG_owns i k true (1/2) ∗ oblG_fuel k Ord.one) ∗
-              ([∗ map] k ↦ '(x, ψ) ∈ K, oblG_fuel k ψ)
+              ([∗ map] k ↦ _ ∈ K, othreadG_owns i k true (1/2) ∗ glG_fuel k Ord.one) ∗
+              ([∗ map] k ↦ '(x, ψ) ∈ K, glG_fuel k ψ)
             )%I with "[Bps M]" as "[Tos Bps]".
           { subst G. rewrite -big_sepM_dom -big_sepM_sep. iPoseProof (big_sepM_sep_2 with "Bps M") as "M".
             iApply (big_sepM_impl with "M"). iIntros "!>" (???) "H". destruct x. iDestruct "H" as "((_&B)&C&D)". iFrame. }
@@ -652,7 +407,7 @@ Section lifting.
               ([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_elem k ∗ otreeG_suspend k x i π ψ ∗ otreeG_wait k x (1/2))) ∗
              (othreadG_obls i G 1 -∗
               (([∗ map] k ↦ '(x, ψ) ∈ K, otreeG_wait k x (1/2)) ∨
-                 (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ oblG_fuel k ψ))) -∗
+                 (oblG_done π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othreadG_owns i k true (1/2) ∗ glG_fuel k ψ))) -∗
               |={∅,E}=> state_interp σ Θ κs ∗ ν))
         ⊢ ghost_step E ν.
       Proof.
@@ -681,7 +436,7 @@ Section lifting.
              (∃ T P α β, ∀ k,
                 ⌜k ∉ G⌝ -∗ othreadG_obls i ({[k]} ∪ G) q -∗
                 oblG_elem k -∗ oblG_goal k T P -∗
-                oblG_suspend_bound k α -∗ oblG_suspend k α -∗ oblG_fuel k β -∗
+                oblG_suspend_bound k α -∗ oblG_suspend k α -∗ glG_fuel k β -∗
                 othreadG_owns i k true (1/2)%Qp -∗ otreeG_elem k -∗
                 |={∅,E}=> state_interp σ Θ κs ∗ ν))
         ⊢ ghost_step E ν.
@@ -773,7 +528,7 @@ Section lifting.
              (([∗ map] k ↦ '(θ, ψ) ∈ K,
                  othreadG_elem θ ∗ othreadG_owns θ k true (1/2)%Qp ∗
                  ∃ a, ⌜(Ord.O < a)%ord⌝ ∗ oblG_elem k ∗ oblG_suspend k a) ∗
-              (([∗ map] k ↦ '(θ, ψ) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ oblG_fuel k ψ) -∗
+              (([∗ map] k ↦ '(θ, ψ) ∈ K, othreadG_owns θ k true (1/2)%Qp ∗ glG_fuel k ψ) -∗
                |={∅,E}=> state_interp σ Θ κs ∗ ν)))
         ⊢ ghost_step E ν.
       Proof.
@@ -847,7 +602,7 @@ Section lifting.
          state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
          (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
          ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                      ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                      ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                       |={∅,E}=>
          state_interp σ2 (Θ ∪ dom efs) κs ∗
          lWP e2 @ s; ς; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
@@ -870,10 +625,10 @@ Section lifting.
          state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
          (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
          ∃ G q,
-           (tHas i G 1 ∗ [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+           (th_obls i G 1 ∗ [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
            ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                        tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
-                        ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                        th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+                        ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                         ALC (|={∅,E}=>
                                state_interp σ2 (Θ ∪ dom efs) κs ∗
                                lWP e2 @ s; ς; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
@@ -901,15 +656,15 @@ Section lifting.
          state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
          (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
          ∃ π G K,
-           (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-            ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+           (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+            ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
             ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
            ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                        tHas i G 1 -∗
-                        ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                        th_obls i G 1 -∗
+                        ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                           ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                           (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
-                        ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                           (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
+                        ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                         ALC (|={∅,E}=>
                                state_interp σ2 (Θ ∪ dom efs) κs ∗
                                lWP e2 @ s; ς; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
@@ -954,30 +709,30 @@ Section lifting.
          match glc with
          | NoLc =>
              (∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                           ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                           ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                            |={∅,E}=>
                 state_interp σ2 (Θ ∪ dom efs) κs ∗
                 lWP e2 @ s; ς; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
          | GetLc =>
              (∃ G q,
-                 (tHas i G 1 ∗ [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+                 (th_obls i G 1 ∗ [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
                  ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                              tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
-                              ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                              th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+                              ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                               ALC (|={∅,E}=>
                                      state_interp σ2 (Θ ∪ dom efs) κs ∗
                                      lWP e2 @ s; ς; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
          | GetLcSus =>
              (∃ π G K,
-                 (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-                  ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                 (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+                  ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                   ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
                  ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
-                              tHas i G 1 -∗
-                              ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                              th_obls i G 1 -∗
+                              ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                                 ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                                 (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
-                              ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                                 (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
+                              ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                               ALC (|={∅,E}=>
                                      state_interp σ2 (Θ ∪ dom efs) κs ∗
                                      lWP e2 @ s; ς; i; E {{ Φ }} ∗ [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
@@ -994,11 +749,11 @@ Section lifting.
       (∀ Θ σ κs,
          state_interp σ Θ κs ={E,∅}=∗
          ∃ j G π K,
-           (⌜G = dom K⌝ ∗ tHas j G 1 ∗ obl π ∗
+           (⌜G = dom K⌝ ∗ th_obls j G 1 ∗ obl π ∗
             ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x j π ψ (1/2))) ∗
-           (tHas j G 1 -∗
+           (th_obls j G 1 -∗
             (([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x j π ψ (1/2)) ∨
-               (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns j k (1/2) ∗ oFuel k ψ))) -∗
+               (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns j k (1/2) ∗ gl_fuel k ψ))) -∗
             |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; ς; i; E {{ Φ }}))
       ⊢ lWP e @ s; ς; i; E {{ Φ }}.
     Proof.
@@ -1026,11 +781,11 @@ Section lifting.
       (∀ Θ σ κs,
          state_interp σ Θ κs ={E,∅}=∗
          ∃ j G q,
-           tHas j G q ∗
+           th_obls j G q ∗
            (∃ T P α β, ∀ k,
-              ⌜k ∉ G⌝ -∗ tHas j ({[k]} ∪ G) q -∗
+              ⌜k ∉ G⌝ -∗ th_obls j ({[k]} ∪ G) q -∗
               oGoal k T P -∗
-              obl_bound k α -∗ obl_sc k α -∗ oFuel k β -∗
+              obl_bound k α -∗ obl_sc k α -∗ gl_fuel k β -∗
               othread_owns j k (1/2)%Qp -∗
               |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; ς; i; E {{ Φ }}))
       ⊢ lWP e @ s; ς; i; E {{ Φ }}.
@@ -1049,9 +804,9 @@ Section lifting.
       (∀ Θ σ κs,
          state_interp σ Θ κs ={E,∅}=∗
          ∃ j G q k T P,
-           tHas j G q ∗ othread_owns j k (1/2)%Qp ∗ ⌜k ∈ G⌝ ∗
+           th_obls j G q ∗ othread_owns j k (1/2)%Qp ∗ ⌜k ∈ G⌝ ∗
            oGoal k T P ∗ ⌜T σ⌝ ∗ (▷ P) ∗
-           (tHas j (G ∖ {[k]}) q -∗ oDone k -∗
+           (th_obls j (G ∖ {[k]}) q -∗ oDone k -∗
             |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; ς; i; E {{ Φ }}))
       ⊢ lWP e @ s; ς; i; E {{ Φ }}.
     Proof.
@@ -1103,7 +858,7 @@ Section lifting.
          state_interp σ Θ κs ={E,∅}=∗
          ∃ K,
            (([∗ map] k ↦ '(θ, ψ) ∈ K, othread_owns θ k (1/2)%Qp ∗ ∃ a, ⌜(Ord.O < a)%ord⌝ ∗ obl_sc k a) ∗
-            (([∗ map] k ↦ '(θ, ψ) ∈ K, othread_owns θ k (1/2)%Qp ∗ oFuel k ψ) -∗
+            (([∗ map] k ↦ '(θ, ψ) ∈ K, othread_owns θ k (1/2)%Qp ∗ gl_fuel k ψ) -∗
              |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; ς; i; E {{ Φ }})))
       ⊢ lWP e @ s; ς; i; E {{ Φ }}.
     Proof.
@@ -1128,7 +883,7 @@ Section lifting.
       (∀ Θ σ κs,
          state_interp σ Θ κs ={E,∅}=∗
          ∃ j,
-           tHas j ∅ 1 ∗
+           th_obls j ∅ 1 ∗
            (tTerm j -∗
             |={∅,E}=> state_interp σ Θ κs ∗ lWP e @ s; ς; i; E {{ Φ }}))
       ⊢ lWP e @ s; ς; i; E {{ Φ }}.
@@ -1224,9 +979,9 @@ Section lifting.
     (∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
     (|={E,E'}=>
        ∃ G q,
-       (tHas i G 1 ∗
-        [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-       (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+       (th_obls i G 1 ∗
+        [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
+       (th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
         ALC (|={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
   Proof.
@@ -1254,13 +1009,13 @@ Section lifting.
     (∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
     (|={E,E'}=>
        ∃ π G K,
-       (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-        ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+       (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+        ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-       (tHas i G 1 -∗
-        ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+       (th_obls i G 1 -∗
+        ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-           (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
+           (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
         ALC (|={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
   Proof.
@@ -1291,20 +1046,20 @@ Section lifting.
      | GetLc =>
          |={E,E'}=>
            (∃ G q,
-               (tHas i G 1 ∗
-                [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-               (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+               (th_obls i G 1 ∗
+                [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
+               (th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                 ALC (|={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})))
      | GetLcSus =>
          |={E,E'}=>
            (∃ π G K,
-               (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-                ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+               (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+                ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                 ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-               (tHas i G 1 -∗
-                ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+               (th_obls i G 1 -∗
+                ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                   ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                   (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
+                   (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
                 ALC (|={E',E}=> ∀ κ Θ e2 efs σ, ⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝ -∗ lWP e2 @ s; ς; i; E {{ Φ }})))
      end)
     ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
@@ -1330,7 +1085,7 @@ Section lifting.
        state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
        (⌜to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
        ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                    ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                    ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                     |={E2,E1}=>
        state_interp σ2 (Θ ∪ dom efs) κs ∗
        (ς -∗ from_option Φ False (to_val e2)) ∗
@@ -1354,11 +1109,11 @@ Section lifting.
        state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
        (⌜to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
        ∃ G q,
-         (tHas i G 1 ∗
-          [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+         (th_obls i G 1 ∗
+          [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
          ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                      tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
-                      ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                      th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+                      ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                       ALC (|={E2,E1}=>
                              state_interp σ2 (Θ ∪ dom efs) κs ∗
                              (ς -∗ from_option Φ False (to_val e2)) ∗
@@ -1385,15 +1140,15 @@ Section lifting.
        state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
        (⌜to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
        ∃ π G K,
-         (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-          ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+         (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+          ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
          ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                      tHas i G 1 -∗
-                      ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                      th_obls i G 1 -∗
+                      ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                         ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                         (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
-                      ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                         (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
+                      ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                       ALC (|={E2,E1}=>
                              state_interp σ2 (Θ ∪ dom efs) κs ∗
                              (ς -∗ from_option Φ False (to_val e2)) ∗
@@ -1422,33 +1177,33 @@ Section lifting.
        match glc with
        | NoLc =>
            (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                         ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                         ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                          |={E2,E1}=>
               state_interp σ2 (Θ ∪ dom efs) κs ∗
               (ς -∗ from_option Φ False (to_val e2)) ∗
               [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})
        | GetLc =>
            (∃ G q,
-               (tHas i G 1 ∗
-                [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
+               (th_obls i G 1 ∗
+                [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
                ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                            tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
-                            ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                            th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+                            ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                             ALC (|={E2,E1}=>
                                    state_interp σ2 (Θ ∪ dom efs) κs ∗
                                    (ς -∗ from_option Φ False (to_val e2)) ∗
                                    [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
        | GetLcSus =>
            (∃ π G K,
-               (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-                ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+               (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+                ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                 ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
                ∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) -∗
-                            tHas i G 1 -∗
-                            ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                            th_obls i G 1 -∗
+                            ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                               ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                               (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
-                            ([∗ set] j ∈ dom efs, tHas j ∅ 1) -∗
+                               (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
+                            ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                             ALC (|={E2,E1}=>
                                    state_interp σ2 (Θ ∪ dom efs) κs ∗
                                    (ς -∗ from_option Φ False (to_val e2)) ∗
@@ -1480,9 +1235,9 @@ Section lifting.
     (∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
     (|={E,E'}=>
        ∃ G q,
-       (tHas i G 1 ∗
-        [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-       (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+       (th_obls i G 1 ∗
+        [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
+       (th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
         ALC (|={E',E}=> lWP e2 @ s; ς; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
   Proof.
@@ -1499,13 +1254,13 @@ Section lifting.
     (∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝) →
     (|={E,E'}=>
        ∃ π G K,
-       (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-        ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+       (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+        ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
         ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-       (tHas i G 1 -∗
-        ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+       (th_obls i G 1 -∗
+        ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
           ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-           (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
+           (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
         ALC (|={E',E}=> lWP e2 @ s; ς; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
   Proof.
@@ -1526,20 +1281,20 @@ Section lifting.
      | GetLc =>
          |={E,E'}=>
            (∃ G q,
-               (tHas i G 1 ∗
-                [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-               (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+               (th_obls i G 1 ∗
+                [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
+               (th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                 ALC (|={E',E}=> lWP e2 @ s; ς; i; E {{ Φ }})))
      | GetLcSus =>
          |={E,E'}=>
            (∃ π G K,
-               (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-                ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+               (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+                ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                 ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-               (tHas i G 1 -∗
-                ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+               (th_obls i G 1 -∗
+                ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                   ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                   (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
+                   (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
                 ALC (|={E',E}=> lWP e2 @ s; ς; i; E {{ Φ }})))
      end)
     ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
@@ -1576,9 +1331,9 @@ Section lifting.
     PureExecCond C ς i →
     (Nat.iter n (λ P, |={E,E'}=>
                    ∃ G q,
-                   (tHas i G 1 ∗
-                    [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-                   (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+                   (th_obls i G 1 ∗
+                    [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
+                   (th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                     ALC (|={E',E}=> P)))
        (£n n -∗ (lWP e2 @ s; ς; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
@@ -1608,13 +1363,13 @@ Section lifting.
     PureExecCond C ς i →
     (Nat.iter n (λ P, |={E,E'}=>
                    ∃ π G K,
-                   (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-                    ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                   (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+                    ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                     ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-                   (tHas i G 1 -∗
-                    ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                   (th_obls i G 1 -∗
+                    ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                       ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                       (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
+                       (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
                     ALC (|={E',E}=> P)))
        (£n n -∗ (lWP e2 @ s; ς; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; ς; i; E {{ Φ }}.
@@ -1648,21 +1403,21 @@ Section lifting.
      | GetLc =>
          (Nat.iter n (λ P, |={E,E'}=>
                         ∃ G q,
-                        (tHas i G 1 ∗
-                         [∗ set] ρ ∈ G, othread_owns i ρ q ∗ oFuel ρ Ord.one) ∗
-                        (tHas i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
+                        (th_obls i G 1 ∗
+                         [∗ set] ρ ∈ G, othread_owns i ρ q ∗ gl_fuel ρ Ord.one) ∗
+                        (th_obls i G 1 -∗ ([∗ set] ρ ∈ G, othread_owns i ρ q) -∗
                          ALC (|={E',E}=> P)))
             (£n n -∗ (lWP e2 @ s; ς; i; E {{ Φ }})))
      | GetLcSus =>
          (Nat.iter n (λ P, |={E,E'}=>
                         ∃ π G K,
-                        (⌜G = dom K⌝ ∗ tHas i G 1 ∗ obl π ∗
-                         ([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                        (⌜G = dom K⌝ ∗ th_obls i G 1 ∗ obl π ∗
+                         ([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                          ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∗
-                        (tHas i G 1 -∗
-                         ((([∗ set] ρ ∈ G, oFuel ρ Ord.one) ∗
+                        (th_obls i G 1 -∗
+                         ((([∗ set] ρ ∈ G, gl_fuel ρ Ord.one) ∗
                            ([∗ map] k ↦ '(x, ψ) ∈ K, obl_wait k x i π ψ (1/2))) ∨
-                            (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ oFuel k ψ))) -∗
+                            (oDone π ∗ ([∗ map] k ↦ '(x, ψ) ∈ K, othread_owns i k (1/2) ∗ gl_fuel k ψ))) -∗
                          ALC (|={E',E}=> P)))
             (£n n -∗ (lWP e2 @ s; ς; i; E {{ Φ }})))
      end)

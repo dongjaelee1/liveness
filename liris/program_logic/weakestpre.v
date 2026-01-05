@@ -230,7 +230,7 @@ Section sfgupd.
     iIntros "!> !>". iMod "Hclose". done.
   Qed.
 
-  Lemma fupd_sfgupd_elim_lwp E P :
+  Lemma fupd_sfgupd_elim E P :
     (|={E}=> |={E}=>g P) ⊢ |={E}=>g P.
   Proof.
     iIntros "H". iIntros (???) "SI". iMod "H". iApply "H". done.
@@ -333,7 +333,7 @@ Section sfgupd.
     ElimModal True p false (|={E}=> P) P (|={E}=>g Q) (|={E}=>g Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply fupd_sfgupd_elim_lwp.
+    iIntros "_ [HP HPQ]". iApply fupd_sfgupd_elim.
     iMod "HP". by iApply "HPQ".
   Qed.
 

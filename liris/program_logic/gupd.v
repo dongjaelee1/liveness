@@ -22,6 +22,7 @@ Class gupdGS `{SI : indexT} (Σ : gFunctors) :=
       #[global] gupd_glwitGS :: glwitGS.glwitGS (GL:=ord_ghost_lock_class) Σ;
       (** Fair scheduler function for witnesses. *)
       gupd_η : ghost_lock_fuel → ghost_lock_fuel;
+      gupd_η_mon : Proper (WFOCM.ltR ==> WFOCM.ltR) gupd_η;
     }.
 
 Global Opaque gupd_invGS gupd_glsatGS gupd_globlGS gupd_glwitGS.
@@ -367,6 +368,14 @@ Section fgupd.
     iModIntro. iFrame.
   Qed.
 
+  Lemma gupd_fgupd E Θ P : (|={Θ}=>g P) ⊢ (|={E:Θ}=>g P).
+  Proof.
+    rewrite /fgupd. iIntros "Hupd".
+    iApply fupd_mask_intro. 1: set_solver.
+    iIntros "Hclose". iMod "Hupd".
+    iModIntro. iMod "Hclose". by iFrame.
+  Qed.
+
   Lemma fgupd_intro E Θ P : P ⊢ |={E:Θ}=>g P.
   Proof.
     iIntros "$". iMod (fupd_mask_subseteq ∅) as "Hclose". 1: set_solver.
@@ -377,6 +386,13 @@ Section fgupd.
     (|={E}=> |={E:Θ}=>g P) ⊢ |={E:Θ}=>g P.
   Proof.
     iIntros "H". iMod "H". iApply "H".
+  Qed.
+
+  Lemma gupd_fgupd_elim E Θ P :
+    (|={Θ}=>g |={E:Θ}=>g P) ⊢ |={E:Θ}=>g P.
+  Proof.
+    iIntros "H". iApply fupd_mask_intro. 1: set_solver.
+    iIntros "Fupd". iMod "H". iMod "Fupd" as "_". done.
   Qed.
 
   (** Change to a larger mask. *)
@@ -480,10 +496,25 @@ Section fgupd.
     iMod "HP". by iApply "HPQ".
   Qed.
 
+  Global Instance elim_gupd_fgupd (p : bool) E Θ P Q :
+    ElimModal True p false (|={Θ}=>g P) P (|={E:Θ}=>g Q) (|={E:Θ}=>g Q)%I.
+  Proof.
+    rewrite /ElimModal bi.intuitionistically_if_elim //=.
+    iIntros "_ [HP HPQ]". iApply gupd_fgupd_elim.
+    iMod "HP". by iApply "HPQ".
+  Qed.
+
   Global Instance add_modal_fupd_fgupd E Θ P Q :
     AddModal (|={E}=> P) P (|={E:Θ}=>g Q).
   Proof.
     rewrite /AddModal; rewrite fupd_fgupd; iIntros "[HP HPQ]".
+    iApply (fgupd_bind with "HPQ HP").
+  Qed.
+
+  Global Instance add_modal_gupd_fgupd E Θ P Q :
+    AddModal (|={Θ}=>g P) P (|={E:Θ}=>g Q).
+  Proof.
+    rewrite /AddModal; rewrite gupd_fgupd; iIntros "[HP HPQ]".
     iApply (fgupd_bind with "HPQ HP").
   Qed.
 
@@ -1000,7 +1031,7 @@ Section preds.
 
   Section fgupd.
 
-    Lemma gl_alloc_obl E Θ i G q ξ N v P Q R :
+    Lemma gl_alloc_obl_0 E Θ i G q ξ N v P Q R :
       th_obls i G q -∗
       (▷ P) -∗
       |={E:Θ}=>g ∃ k, (⌜ G !! k = None ⌝) ∗
@@ -1051,7 +1082,7 @@ Section preds.
       { iApply (big_sepS_impl with "Gseq"). iIntros "!> %% ($& $)". auto. }
     Qed.
 
-    Lemma gl_alloc_done E Θ ξ N v P Q R :
+    Lemma gl_alloc_done_0 E Θ ξ N v P Q R :
       (▷ Q) -∗
       |={E:Θ}=>g ∃ k, gl_witfun k ξ ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k (Σ[ξ] v) ∗
                      gl_variant N k v P Q R ∗
@@ -1094,7 +1125,7 @@ Section preds.
       iApply (big_sepS_impl with "Gseq2"). iIntros "!> %% ($& $)". auto.
     Qed.
 
-    Lemma gl_lock E Θ i G q k ξ N v1 v2 P1 Q1 R1 P2 Q2 R2 :
+    Lemma gl_lock_0 E i G q k ξ N v1 v2 P1 Q1 R1 P2 Q2 R2 :
       v1 < v2 →
       ↑N ⊆ E →
       gl_current k v1 -∗
@@ -1106,7 +1137,7 @@ Section preds.
                      gl_witfun k ξ -∗
                      (▷ R1) -∗
                      (▷ P2) -∗
-                     |={Θ}=>g |={E ∖ ↑N,E}=> 
+                     ∀ Θ, |={Θ}=>g |={E ∖ ↑N,E}=> 
                        (th_obls i (<[k:=v2]>G) q ∗
                         gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
                         gl_variant N k v2 P2 Q2 R2 ∗
@@ -1118,7 +1149,7 @@ Section preds.
       iMod (glG_variant_acc_version_unlocked with "Gvar1 Gv1 Gu1") as "[H ACC]". 1: auto.
       iModIntro. iSplitL "H".
       { iNext. iDestruct "H" as "($& _& _& $)". eauto. }
-      iIntros "(#Oe& Ox& Ob& OS) (_& Gv1) #Gwf HR1 HP2".
+      iIntros "(#Oe& Ox& Ob& OS) (_& Gv1) #Gwf HR1 HP2 %".
       iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       iPoseProof (glsat_lookup_unlocked with "[$S $Ge $Gu1]") as "%LUO1u".
       iPoseProof (glsat_lookup_version with "[$S $Ge $Gv1]") as "%LUO1v".
@@ -1164,7 +1195,7 @@ Section preds.
       { iApply (big_sepS_impl with "Gseq"). iIntros "!> %% [$ $]". auto. }
     Qed.
 
-    Lemma gl_unlock E Θ i G q N k v P Q R :
+    Lemma gl_unlock_0 E i G q N k v P Q R :
       ↑N ⊆ E →
       G !! k = Some v →
       th_obls i G q -∗
@@ -1173,7 +1204,7 @@ Section preds.
                     (th_obls i G q -∗
                      gl_locked k v -∗
                      (▷ Q) -∗
-                     |={Θ}=>g |={E ∖ ↑N,E}=>
+                     ∀ Θ, |={Θ}=>g |={E ∖ ↑N,E}=>
                        (th_obls i (delete k G) q ∗ gl_current k v ∗ gl_done k v)).
     Proof.
       unfold_defs. iIntros (MASK LUGk) "(#Oe& Ox& Ob& OS) ((#Ge& #Gvl)& #Gvar)".
@@ -1182,7 +1213,7 @@ Section preds.
       iModIntro. iSplitL "Ox Ob Go Oo OS H".
       { iNext. iFrame "Oe Ox Ob". iDestruct "H" as "(Gv& Gl& $& $)".
         rewrite (big_sepM_delete _ _ _ _ LUGk). iFrame. eauto. }
-      iIntros "(_& Ox& Ob& OS) (_& Gl1) HQ".
+      iIntros "(_& Ox& Ob& OS) (_& Gl1) HQ %".
       iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       iPoseProof (big_sepM_delete _ _ _ _ LUGk with "OS") as "[(_& Gl& Gv& Go& Oo) OS]".
       iPoseProof (glsat_lookup_locked with "[$S $Ge $Gl]") as "%LUO1l".
@@ -1228,15 +1259,14 @@ Section preds.
       iFrame.
     Qed.
 
-    Lemma gl_change_owner Θ i1 i2 G1 G2 q1 q2 k v :
-      (∀ α β, (α < β)%ord → (gupd_η α < gupd_η β)%ord) →
+    Lemma gl_change_owner_0 Θ i1 i2 G1 G2 q1 q2 k v :
       G1 !! k = Some v →
       th_obls i1 G1 q1 -∗
       th_obls i2 G2 q2 -∗
       gl_fuel k Ord.one -∗
       |={Θ}=>g th_obls i1 (delete k G1) q1 ∗ th_obls i2 (<[k:=v]>G2) q2 ∗ ⌜ G2 !! k = None ⌝.
     Proof.
-      unfold_defs. iIntros (Monη LUGk) "(#Oe1& Ox1& Ob1& OS1) (#Oe2& Ox2& Ob2& OS2) (#Ge& Gf)".
+      unfold_defs. iIntros (LUGk) "(#Oe1& Ox1& Ob1& OS1) (#Oe2& Ox2& Ob2& OS2) (#Ge& Gf)".
       iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       iPoseProof (big_sepM_delete _ _ _ _ LUGk with "OS1") as "[(_& Gl& Gv& Go& Oo) OS1]".
       iPoseProof (glsat_lookup_locked with "[$S $Ge $Gl]") as "%LUO1l".
@@ -1266,7 +1296,7 @@ Section preds.
         - rewrite lookup_insert_ne; auto. destruct (Ω1 !! x) eqn:LUOx; econstructor. right; done.
       }
       iIntros (? [WStep GWI2]).
-      pose proof (glwit_inv_progress_owner _ _ k v _ _ _ Monη LUO1l GWI _ _ Gstep W2 WStep GWI2) as WMon.
+      pose proof (glwit_inv_progress_owner _ _ k v _ _ _ gupd_η_mon LUO1l GWI _ _ Gstep W2 WStep GWI2) as WMon.
       iPoseProof (glwit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { iModIntro. rewrite insert_delete_eq. rewrite fmap_insert. iFrame. eauto. }
