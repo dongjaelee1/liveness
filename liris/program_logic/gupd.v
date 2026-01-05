@@ -592,15 +592,6 @@ End fgupd.
 
 (** Ghost lock predicates. *)
 (* Ghost locks *)
-Local Definition gl_def `{SI : indexT} `{@gupdGS SI Σ}
-  k v : iProp Σ :=
-  glG_elem k ∗ glG_version_lb k v.
-Local Definition gl_aux : seal (@gl_def). Proof. by eexists. Qed.
-Definition gl := gl_aux.(unseal).
-Local Definition gl_unseal :
-  @gl = @gl_def := gl_aux.(seal_eq).
-Global Arguments gl {SI Σ _}.
-
 Local Definition gl_witfun_def `{SI : indexT} `{@gupdGS SI Σ}
   k ξ : iProp Σ :=
   glG_witfun k ξ.
@@ -609,6 +600,16 @@ Definition gl_witfun := gl_witfun_aux.(unseal).
 Local Definition gl_witfun_unseal :
   @gl_witfun = @gl_witfun_def := gl_witfun_aux.(seal_eq).
 Global Arguments gl_witfun {SI Σ _}.
+
+Local Definition gl_def `{SI : indexT} `{@gupdGS SI Σ}
+  k v : iProp Σ :=
+  glG_elem k ∗ glG_version_lb k v ∗
+  ([∗ set] u ∈ set_seq 0 v, glG_version_lb k u ∗ glG_unlocked k u).
+Local Definition gl_aux : seal (@gl_def). Proof. by eexists. Qed.
+Definition gl := gl_aux.(unseal).
+Local Definition gl_unseal :
+  @gl = @gl_def := gl_aux.(seal_eq).
+Global Arguments gl {SI Σ _}.
 
 (* Local Definition gl_locked_def `{SI : indexT} `{@gupdGS SI GL Σ} *)
 (*   k v : iProp Σ := *)
@@ -815,6 +816,34 @@ Section preds.
     Proof.
       unfold_defs. rewrite /glG_elem /glG_version_lb /glG_variant /glG_variant_internal.
       solve_contractive.
+    Qed.
+
+    (** gl rules *)
+    Local Lemma gl_history_mon k v1 v2 :
+      v1 ≤ v2 →
+      ([∗ set] u ∈ set_seq 0 v2, glG_version_lb k u ∗ glG_unlocked k u) -∗
+      ([∗ set] u ∈ set_seq 0 v1, glG_version_lb k u ∗ glG_unlocked k u).
+    Proof.
+      intros Hv. induction Hv; iIntros "#Gseq".
+      { auto. }
+      rewrite set_seq_S_end_union_L. iPoseProof (big_sepS_union with "Gseq") as "[H1 H2]".
+      { apply set_seq_S_end_disjoint. }
+      iApply IHHv. auto.
+    Qed.
+
+    Local Lemma gl_history_add k v1 v2 :
+      v1 < v2 →
+      ([∗ set] u ∈ set_seq 0 v1, glG_version_lb k u ∗ glG_unlocked k u) -∗
+      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), glG_version_lb k u ∗ glG_unlocked k u) -∗
+      ([∗ set] u ∈ set_seq 0 v2, glG_version_lb k u ∗ glG_unlocked k u).
+    Proof.
+
+      TODO
+      intros Hv. induction Hv; iIntros "#Gseq".
+      { auto. }
+      rewrite set_seq_S_end_union_L. iPoseProof (big_sepS_union with "Gseq") as "[H1 H2]".
+      { apply set_seq_S_end_disjoint. }
+      iApply IHHv. auto.
     Qed.
 
     (** gl_locked and gl_done rules *)
@@ -1074,12 +1103,13 @@ Section preds.
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { rewrite fmap_insert. simpl. iFrame. eauto. }
       iModIntro. iMod "Fupd" as "_". iModIntro.
-      iExists k. iFrame "Oe Gwf Ge Gvl Ww GVar Gf Ox". iSplitR.
+      iExists k. iFrame "Oe Gwf Ge Gvl Ww GVar Gf Ox Gseq". iSplitR.
       { iPureIntro. apply not_elem_of_dom. auto. }
       iSplitL.
       { rewrite dom_insert_L. iFrame "Ob". iApply big_sepM_insert. 1: apply not_elem_of_dom; auto.
         iFrame "OS Ge Gv Go". iCombine "Gl0 Gl1" as "$". iCombine "Oo0 Oo1" as "$". }
-      { iApply (big_sepS_impl with "Gseq"). iIntros "!> %% ($& $)". auto. }
+      { iApply (big_sepS_impl with "Gseq"). iIntros "!> %% ($& $)". iFrame "Ge".
+        iApply (gl_history_mon with "Gseq"). apply elem_of_set_seq in H. lia. }
     Qed.
 
     Lemma gl_alloc_done_0 E Θ ξ N v P Q R :
@@ -1121,8 +1151,9 @@ Section preds.
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { rewrite fmap_insert. simpl. iFrame. eauto. }
       iModIntro. iMod "Fupd" as "_". iModIntro.
-      iExists k. iFrame "Gwf Ge Gvl Ww GVar Gf Gv Gu".
-      iApply (big_sepS_impl with "Gseq2"). iIntros "!> %% ($& $)". auto.
+      iExists k. iFrame "Gwf Ge Gvl Ww GVar Gf Gv Gu Gseq".
+      iApply (big_sepS_impl with "Gseq2"). iIntros "!> %% ($& $)". iFrame "Ge".
+      iApply (gl_history_mon with "Gseq"). apply elem_of_set_seq in H. lia.
     Qed.
 
     Lemma gl_lock_0 E i G q k ξ N v1 v2 P1 Q1 R1 P2 Q2 R2 :
@@ -1185,6 +1216,8 @@ Section preds.
       iDestruct "Gl2" as "[Gl2 Gl']".
       iMod (glG_variant_alloc_locked _ N k v2 _ P2 Q2 R2 with "[$Gl' $HP2]") as "#Gvar2".
       iModIntro. rewrite dom_insert_L. iFrame "Oe Ge Gvl2 Ox Ob Gf Gvar2 Ww".
+      iDestruct "Gvl1" as "[Gvl1' His1]".
+      TODO
       iSplitL.
       { iApply big_sepM_insert.
         { apply not_elem_of_dom; auto. }
