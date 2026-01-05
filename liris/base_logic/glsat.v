@@ -186,7 +186,8 @@ Local Definition glG_owner_token_id `{SI : indexT} `{GL : ghost_lock_class} `{!g
  *)
 Definition glG_variant_internal `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ}
   (k : gl_id) (v : ghost_lock_version) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
-  (((glG_locked k v q ∗ P) ∨ (glG_unlocked k v ∗ Q)) ∨ (glG_version_expired k v ∗ R)).
+  (((glG_locked k v q ∗ P) ∨ (glG_unlocked k v ∗ Q)) ∨
+     (glG_unlocked k v ∗ glG_version_expired k v ∗ R)).
 
 (* Definition glG_variant_internal `{SI : indexT} `{GL : ghost_lock_class} `{!glsatGS Σ} *)
 (*   (k : gl_id) (v : ghost_lock_version) (q : Qp) (P Q R : iProp Σ) : iProp Σ := *)
@@ -944,7 +945,7 @@ Section glsat.
       + iNext. iDestruct "H" as "[H | H]"; iFrame.
       + iIntros "H". iApply "ACC". done.
     - iModIntro. iSplitR "ACC"; last iFrame.
-      iNext. iDestruct "H" as "(Gvd& _)".
+      iNext. iDestruct "H" as "(_& Gvd& _)".
       iPoseProof (glG_version_expired_valid with "[$GV $Gvd]") as "%". lia.
   Qed.
 
@@ -954,7 +955,7 @@ Section glsat.
     ={E,E ∖ ↑N}=∗
     (▷ (glG_locked k v q2 ∗
         ((glG_locked k v q1 ∗ P) ∨
-           (glG_version_expired k v ∗ R)))) ∗
+           (glG_unlocked k v ∗ glG_version_expired k v ∗ R)))) ∗
     (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (HE) "#GU GV". iMod (glG_variant_acc with "GU") as "[[H | H] ACC]"; first auto.
@@ -969,7 +970,7 @@ Section glsat.
     ↑N ⊆ E →
     glG_variant N k v q1 P Q R -∗ glG_unlocked k v
     ={E,E ∖ ↑N}=∗
-    (▷ (Q ∨ (glG_version_expired k v ∗ R))) ∗
+    (▷ (Q ∨ (glG_unlocked k v ∗ glG_version_expired k v ∗ R))) ∗
     (▷ glG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (HE) "#GU GV". iMod (glG_variant_acc with "GU") as "[[H | H] ACC]"; first auto.
@@ -990,7 +991,7 @@ Section glsat.
       iNext. iDestruct "H" as "[H | [_ $]]".
       iDestruct "H" as "[H _]". iPoseProof (glG_locked_unlocked_false with "[$]") as "%". done.
     - iModIntro. iSplitR "ACC"; last iFrame.
-      iNext. iDestruct "H" as "[#Gvd _]".
+      iNext. iDestruct "H" as "(_& #Gvd& _)".
       iPoseProof (glG_version_pin_expired_valid with "[$Gvp $Gvd]") as "%". lia.
   Qed.
 
@@ -1043,7 +1044,7 @@ Section glsat.
     (▷ (glG_unlocked k v ∗ Q)) ={E}=∗ glG_variant N k v q P Q R.
   Proof. iIntros "H". iApply inv_alloc. iFrame. Qed.
   Lemma glG_variant_alloc_expired E N k v q P Q R :
-    (▷ (glG_version_expired k v ∗ R)) ={E}=∗ glG_variant N k v q P Q R.
+    (▷ (glG_unlocked k v ∗ glG_version_expired k v ∗ R)) ={E}=∗ glG_variant N k v q P Q R.
   Proof. iIntros "H". iApply inv_alloc. iFrame. Qed.
 
   (* (** glG_always rules *) *)
@@ -1583,7 +1584,7 @@ Section glsat.
       + iNext. iDestruct "H" as "[H | H]"; first iFrame.
         iDestruct "H" as "[H _]". iPoseProof (glG_locked_unlocked_false with "[$Gl $H]") as "%". done.
       + done.
-    - iModIntro. iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "[#Gvd _]".
+    - iModIntro. iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "(_& #Gvd& _)".
       iPoseProof (glsat_lookup_version_expired with "[$G $Ge $Gvd]") as "%". destruct H as (?&?&?&?).
       iPoseProof (glsat_lookup_locked with "[$G $Ge $Gl]") as "%". destruct H1 as (?&?&?).
       rewrite H in H1. inv H1. lia.
@@ -1635,7 +1636,7 @@ Section glsat.
     iIntros (Hq Hv HE) "(#Gvar& G& #Gwf& #Gu& Gv)".
     iPoseProof (glG_witfun_elem with "Gwf") as "#Ge".
     iMod (glG_variant_acc_unlocked with "Gvar Gu") as "[H ACC]"; first auto.
-    iModIntro. iNext. iDestruct "H" as "[$ | [#Gvd _]]"; cycle 1.
+    iModIntro. iNext. iDestruct "H" as "[$ | (_& #Gvd& _)]"; cycle 1.
     { iPoseProof (glG_version_expired_valid with "[$Gv $Gvd]") as "%". lia. }
     iFrame "G Gv". iIntros "(G& Gv& HR& HP)".
     iMod (glsat_lock _ _ _ v1 v2 t with "[$G $Gwf $Gu $Gv]") as "($& Gl& Gv& $& $& #Gus& $)"; first auto.
