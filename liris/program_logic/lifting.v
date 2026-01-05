@@ -121,7 +121,8 @@ Section lifting.
          ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗
          ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
            (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
-              th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+              th_obls i G 1 -∗
+              ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
               ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
               ALC (|={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs)))
       ⊢ lwp_step s i E e1 ν.
@@ -218,7 +219,7 @@ Section lifting.
         - rewrite LUW1. rewrite LUW1 in GWI1. inv GWI1. done.
       }
       iAssert (⌜ ∀ k v, R !! k = Some v → ∃ w, WR !! k = Some w ∧ v ≤ w.1 ⌝)%I as "%Rver".
-      { iIntros (k v LUR). iPoseProof (big_sepM_delete _ _ _ _ LUR with "REs") as "[(#Ge& #Gvl) _]".
+      { iIntros (k v LUR). iPoseProof (big_sepM_delete _ _ _ _ LUR with "REs") as "[(#Ge& #Gvl& #His) _]".
         iPoseProof (glsat_lookup_version_lb with "[$S $Ge $Gvl]")as "(%&%&%&%)".
         rewrite map_eq_iff in EQfst. specialize (EQfst k). rewrite !lookup_fmap H in EQfst.
         assert (is_Some (WR !! k)).
@@ -272,12 +273,11 @@ Section lifting.
             iRight. auto.
       }
       iAssert ([∗ map] r↦v ∈ R,
-                 ((glG_elem r ∗ glG_version_lb r v) ∗
-                  witG_credit (GL:=ord_ghost_lock_class) r v Ord.one) ∨
-                   ((glG_elem r ∗ glG_version_lb r v) ∗ glG_unlocked r v))%I
+                 ((glG_elem r ∗ glG_version_lb r v ∗ ([∗ set] u ∈ set_seq 0 v, glG_version_lb r u ∗ glG_unlocked r u)) ∗ witG_credit (GL:=ord_ghost_lock_class) r v Ord.one) ∨
+                   ((glG_elem r ∗ glG_version_lb r v ∗ ([∗ set] u ∈ set_seq 0 v, glG_version_lb r u ∗ glG_unlocked r u)) ∗ glG_unlocked r v))%I
         with "[Rs]" as "Rs".
       { iPoseProof (big_sepM_sep with "[$Rs $REs]") as "H". iApply (big_sepM_impl with "H").
-        iIntros "!> %%% ([Wc | #Gu]& #Ge& #Gvl)".
+        iIntros "!> %%% ([Wc | #Gu]& #Ge& #Gvl& #His)".
         - iLeft. iFrame. auto.
         - iRight. auto.
       }

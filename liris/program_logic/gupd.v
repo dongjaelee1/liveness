@@ -833,17 +833,16 @@ Section preds.
 
     Local Lemma gl_history_add k v1 v2 :
       v1 < v2 →
-      ([∗ set] u ∈ set_seq 0 v1, glG_version_lb k u ∗ glG_unlocked k u) -∗
+      ([∗ set] u ∈ set_seq 0 (S v1), glG_version_lb k u ∗ glG_unlocked k u) -∗
       ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), glG_version_lb k u ∗ glG_unlocked k u) -∗
       ([∗ set] u ∈ set_seq 0 v2, glG_version_lb k u ∗ glG_unlocked k u).
     Proof.
-
-      TODO
-      intros Hv. induction Hv; iIntros "#Gseq".
-      { auto. }
-      rewrite set_seq_S_end_union_L. iPoseProof (big_sepS_union with "Gseq") as "[H1 H2]".
-      { apply set_seq_S_end_disjoint. }
-      iApply IHHv. auto.
+      iIntros (Hv) "#Seq1 #Seq2".
+      replace (set_seq 0 v2) with (set_seq 0 ((S v1) + (v2 - v1 - 1)) : gset _); cycle 1.
+      { replace ((S v1) + (v2 - v1 - 1)) with v2 by lia. done. }
+      rewrite (set_seq_add_L _ (S v1)). iApply big_sepS_union.
+      { apply set_seq_add_disjoint. }
+      auto.
     Qed.
 
     (** gl_locked and gl_done rules *)
@@ -1217,15 +1216,22 @@ Section preds.
       iMod (glG_variant_alloc_locked _ N k v2 _ P2 Q2 R2 with "[$Gl' $HP2]") as "#Gvar2".
       iModIntro. rewrite dom_insert_L. iFrame "Oe Ge Gvl2 Ox Ob Gf Gvar2 Ww".
       iDestruct "Gvl1" as "[Gvl1' His1]".
-      TODO
+      iPoseProof (gl_history_add _ v1 v2 with "[His1] Gseq") as "#His2".
+      1: auto.
+      { rewrite set_seq_S_end_union_L. iApply big_sepS_union.
+        { apply set_seq_S_end_disjoint. }
+        rewrite big_sepS_singleton. auto. }
+      iFrame "His2".
       iSplitL.
       { iApply big_sepM_insert.
         { apply not_elem_of_dom; auto. }
         iFrame. iCombine "Gl1 Gl2" as "$". iCombine "Oo1 Oo2" as "$". auto. }
       iSplitL.
       { iApply (big_sepS_impl with "Wseq"). iIntros "!> %% $".
-        iPoseProof (big_sepS_delete _ _ _ H with "Gseq") as "[[$ _] _]". auto. }
-      { iApply (big_sepS_impl with "Gseq"). iIntros "!> %% [$ $]". auto. }
+        iPoseProof (big_sepS_delete _ _ _ H with "Gseq") as "[[$ _] _]".
+        iFrame "Ge". iApply (gl_history_mon with "His2"). apply elem_of_set_seq in H. lia. }
+      { iApply (big_sepS_impl with "Gseq"). iIntros "!> %% [$ $]".
+        iFrame "Ge". iApply (gl_history_mon with "His2"). apply elem_of_set_seq in H. lia. }
     Qed.
 
     Lemma gl_unlock_0 E i G q N k v P Q R :
