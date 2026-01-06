@@ -150,11 +150,11 @@ Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ Θ σ1 κ κs,
       (state_interp σ1 Θ (κ ++ κs)) ={E,∅}=∗
-      |={Θ}=>g
+      |=[Θ]=>g
       (⌜if s is NotStuck then reducible i e1 σ1 Θ else True⌝) ∗
       ∀ e2 σ2 efs, (⌜ prim_step i e1 σ1 Θ κ e2 σ2 efs ⌝) -∗
       @={Θ,(Θ ∪ dom efs),i}=↓
-      ALC (|={(Θ ∪ dom efs)}=>g
+      ALC (|=[(Θ ∪ dom efs)]=>g
            |={∅,E}=> (state_interp σ2 (Θ ∪ dom efs) κs) ∗ ν e2 efs))%I.
 
 Section lwp_step.

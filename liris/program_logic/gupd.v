@@ -79,14 +79,14 @@ Definition gupd := gupd_aux.(unseal).
 (* Arguments gupd {SI _ Σ _}. *)
 Arguments gupd {SI Σ _}.
 Local Definition gupd_unseal : @gupd = @gupd_def := gupd_aux.(seal_eq).
-Notation "'|={' Θ '}=>g' P" := (gupd Θ P) (at level 99, P at level 200, format "|={ Θ }=>g  P").
+Notation "'|=[' Θ ']=>g' P" := (gupd Θ P) (at level 99, P at level 200, format "|=[ Θ ]=>g  P").
 
 Section gupd.
   Context `{SI : indexT} `{!gupdGS Σ}.
   Implicit Type Θ : (gset positive).
 
   Lemma gupd_unfold Θ P :
-    (|={Θ}=>g P) ⊣⊢ (gupd_pre Θ (gupd Θ) P).
+    (|=[Θ]=>g P) ⊣⊢ (gupd_pre Θ (gupd Θ) P).
   Proof.
     rewrite gupd_unseal. rewrite /gupd_def.
     rewrite (least_fixpoint_unfold (gupd_pre Θ)). done.
@@ -105,8 +105,8 @@ Section gupd.
 
   Lemma gupd_ind_strong (Ψ : iProp Σ → iProp Σ) Θ :
     (∀ n, Proper (dist n ==> dist n) Ψ) →
-    ⊢ (□ (∀ P, gupd_pre Θ (λ P, Ψ P ∧ |={Θ}=>g P) P -∗ Ψ P)
-       → ∀ P, (|={Θ}=>g P) -∗ Ψ P)%I.
+    ⊢ (□ (∀ P, gupd_pre Θ (λ P, Ψ P ∧ |=[Θ]=>g P) P -∗ Ψ P)
+       → ∀ P, (|=[Θ]=>g P) -∗ Ψ P)%I.
   Proof.
     iIntros (HΨ). iIntros "#IH" (P) "H". rewrite gupd_unseal.
     iApply (least_fixpoint_ind _ Ψ with "[] H").
@@ -122,7 +122,7 @@ Section gupd.
   Lemma gupd_ind Θ Ψ :
     (∀ n, Proper (dist n ==> dist n) Ψ)
     → ⊢ (□ (∀ P, gupd_pre Θ (λ P, Ψ P) P -∗ Ψ P)
-         → ∀ P, (|={Θ}=>g P) -∗ Ψ P)%I.
+         → ∀ P, (|=[Θ]=>g P) -∗ Ψ P)%I.
   Proof.
     iIntros (HΨ) "#H". iApply gupd_ind_strong. iIntros "!>" (P) "Hgupd".
     iApply "H". iApply (gupd_pre_mono with "[] Hgupd").
@@ -130,20 +130,20 @@ Section gupd.
   Qed.
 
   (** A fancy update can be turned into an obligation update. *)
-  Lemma fupd_gupd Θ P : (|={∅}=> P) ⊢ (|={Θ}=>g P).
+  Lemma fupd_gupd Θ P : (|={∅}=> P) ⊢ (|=[Θ]=>g P).
   Proof.
     rewrite gupd_unfold. iIntros "Hupd". iLeft. done.
   Qed.
 
   (** We can always introduce a obligation update. *)
-  Lemma gupd_intro Θ P : P ⊢ |={Θ}=>g P.
+  Lemma gupd_intro Θ P : P ⊢ |=[Θ]=>g P.
   Proof.
     rewrite gupd_unfold. iIntros "HP". iLeft. iModIntro. done.
   Qed.
 
   (** We can always eliminate a fancy update. *)
   Lemma fupd_gupd_elim Θ P :
-    (|={∅}=> |={Θ}=>g P) ⊢ |={Θ}=>g P.
+    (|={∅}=> |=[Θ]=>g P) ⊢ |=[Θ]=>g P.
   Proof.
     iIntros "H". iApply gupd_unfold.
     iRight. iIntros (??) "I". iMod "H".
@@ -157,7 +157,7 @@ Section gupd.
 
   (** We can combine two obligation updates into one. *)
   Lemma gupd_bind Θ P Q :
-    (P -∗ |={Θ}=>g Q) ⊢ (|={Θ}=>g P) -∗ (|={Θ}=>g Q).
+    (P -∗ |=[Θ]=>g Q) ⊢ (|=[Θ]=>g P) -∗ (|=[Θ]=>g Q).
   Proof.
     iIntros "H HP". iRevert (Q) "H". iRevert (P) "HP".
     iApply gupd_ind_strong.
@@ -173,16 +173,16 @@ Section gupd.
   Qed.
 
   (* derived lemmas *)
-  Lemma gupd_mono Θ P Q : (P ⊢ Q) → (|={Θ}=>g P) ⊢ (|={Θ}=>g Q).
+  Lemma gupd_mono Θ P Q : (P ⊢ Q) → (|=[Θ]=>g P) ⊢ (|=[Θ]=>g Q).
   Proof.
     intros Hent. iApply gupd_bind.
     iIntros "P"; iApply gupd_intro; by iApply Hent.
   Qed.
-  Lemma gupd_trans Θ P :  (|={Θ}=>g |={Θ}=>g P) ⊢ |={Θ}=>g P.
+  Lemma gupd_trans Θ P :  (|=[Θ]=>g |=[Θ]=>g P) ⊢ |=[Θ]=>g P.
   Proof.
     iIntros "HP". iApply gupd_bind; eauto.
   Qed.
-  Lemma gupd_frame_r Θ P R : (|={Θ}=>g P) ∗ R ⊢ |={Θ}=>g P ∗ R.
+  Lemma gupd_frame_r Θ P R : (|=[Θ]=>g P) ∗ R ⊢ |=[Θ]=>g P ∗ R.
   Proof.
     iIntros "[Hupd R]". iApply (gupd_bind with "[R]"); last done.
     iIntros "P". iApply gupd_intro. by iFrame.
@@ -195,25 +195,25 @@ Section gupd.
   Global Instance gupd_equiv_proper Θ : Proper ((≡) ==> (≡)) (gupd Θ) := ne_proper _.
 
   Lemma gupd_fupd_l Θ P :
-    (|={∅}=> |={Θ}=>g P) ⊢ (|={Θ}=>g P).
+    (|={∅}=> |=[Θ]=>g P) ⊢ (|=[Θ]=>g P).
   Proof.
     by erewrite fupd_gupd, gupd_trans.
   Qed.
   Lemma gupd_fupd_r Θ P :
-    (|={Θ}=>g |={∅}=> P) ⊢ (|={Θ}=>g P).
+    (|=[Θ]=>g |={∅}=> P) ⊢ (|=[Θ]=>g P).
   Proof.
     by erewrite fupd_gupd, gupd_trans.
   Qed.
 
-  Lemma gupd_frame_l Θ R Q : (R ∗ |={Θ}=>g Q) ⊢ |={Θ}=>g R ∗ Q.
+  Lemma gupd_frame_l Θ R Q : (R ∗ |=[Θ]=>g Q) ⊢ |=[Θ]=>g R ∗ Q.
   Proof. rewrite !(comm _ R); apply gupd_frame_r. Qed.
-  Lemma gupd_wand_l Θ P Q : (P -∗ Q) ∗ (|={Θ}=>g P) ⊢ |={Θ}=>g Q.
+  Lemma gupd_wand_l Θ P Q : (P -∗ Q) ∗ (|=[Θ]=>g P) ⊢ |=[Θ]=>g Q.
   Proof. by rewrite gupd_frame_l wand_elim_l. Qed.
-  Lemma gupd_wand_r Θ P Q : (|={Θ}=>g P) ∗ (P -∗ Q) ⊢ |={Θ}=>g Q.
+  Lemma gupd_wand_r Θ P Q : (|=[Θ]=>g P) ∗ (P -∗ Q) ⊢ |=[Θ]=>g Q.
   Proof. by rewrite gupd_frame_r wand_elim_r. Qed.
-  Lemma gupd_sep Θ P Q : (|={Θ}=>g P) ∗ (|={Θ}=>g Q) ⊢ |={Θ}=>g P ∗ Q.
+  Lemma gupd_sep Θ P Q : (|=[Θ]=>g P) ∗ (|=[Θ]=>g Q) ⊢ |=[Θ]=>g P ∗ Q.
   Proof. by rewrite gupd_frame_r gupd_frame_l gupd_trans. Qed.
-  Lemma gupd_idemp Θ P : (|={Θ}=>g |={Θ}=>g P) ⊣⊢ |={Θ}=>g P.
+  Lemma gupd_idemp Θ P : (|=[Θ]=>g |=[Θ]=>g P) ⊣⊢ |=[Θ]=>g P.
   Proof.
     apply: anti_symm.
     - apply gupd_trans.
@@ -225,19 +225,19 @@ Section gupd.
   Proof. split; [split|]; try apply _; [apply gupd_sep | apply gupd_intro]. Qed.
 
   Lemma big_sepL_gupd {A} (Φ : nat → A → iProp Σ) Θ l :
-    ([∗ list] k↦x ∈ l, |={Θ}=>g Φ k x) ⊢ |={Θ}=>g [∗ list] k↦x ∈ l, Φ k x.
+    ([∗ list] k↦x ∈ l, |=[Θ]=>g Φ k x) ⊢ |=[Θ]=>g [∗ list] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opL_commute _). Qed.
   Lemma big_sepM_gupd {A} `{Countable K} (Φ : K → A → iProp Σ) Θ l :
-    ([∗ map] k↦x ∈ l, |={Θ}=>g Φ k x) ⊢ |={Θ}=>g [∗ map] k↦x ∈ l, Φ k x.
+    ([∗ map] k↦x ∈ l, |=[Θ]=>g Φ k x) ⊢ |=[Θ]=>g [∗ map] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opM_commute _). Qed.
   Lemma big_sepS_gupd `{Countable A} (Φ : A → iProp Σ) Θ l :
-    ([∗ set]  x ∈ l, |={Θ}=>g Φ x) ⊢ |={Θ}=>g [∗ set] x ∈ l, Φ x.
+    ([∗ set]  x ∈ l, |=[Θ]=>g Φ x) ⊢ |=[Θ]=>g [∗ set] x ∈ l, Φ x.
   Proof. by rewrite (big_opS_commute _). Qed.
   Lemma big_sepMS_gupd `{Countable A} (Φ : A → iProp Σ) Θ l :
-    ([∗ mset] x ∈ l, |={Θ}=>g Φ x) ⊢ |={Θ}=>g [∗ mset] x ∈ l, Φ x.
+    ([∗ mset] x ∈ l, |=[Θ]=>g Φ x) ⊢ |=[Θ]=>g [∗ mset] x ∈ l, Φ x.
   Proof. by rewrite (big_opMS_commute _). Qed.
 
-  Lemma except_0_gupd Θ P : ◇ (|={Θ}=>g P) ⊢ (|={Θ}=>g ◇ P).
+  Lemma except_0_gupd Θ P : ◇ (|=[Θ]=>g P) ⊢ (|=[Θ]=>g ◇ P).
   Proof.
     rewrite /bi_except_0. apply or_elim; eauto using gupd_mono, or_intro_r.
     by rewrite -gupd_intro -or_intro_l.
@@ -246,7 +246,7 @@ Section gupd.
   (* The following instances make the Iris Proof Mode aware of the
      obligation update. They are derived from the simpler rules above. *)
   (* Global Instance elim_fupd_gupd (p : bool) Θ P Q : *)
-  (*   ElimModal True p false (|={∅}=> P) P (|={Θ}=>g Q) (|={Θ}=>g Q)%I. *)
+  (*   ElimModal True p false (|={∅}=> P) P (|=[Θ]=>g Q) (|=[Θ]=>g Q)%I. *)
   (* Proof. *)
   (*   rewrite /ElimModal bi.intuitionistically_if_elim //=. *)
   (*   rewrite fupd_gupd. *)
@@ -254,7 +254,7 @@ Section gupd.
   (* Qed. *)
 
   Global Instance elim_fupd_gupd (p : bool) E Θ P Q :
-    ElimModal True p false (|={∅,E}=> P) P (|={Θ}=>g Q) (|={E,∅}=> |={Θ}=>g Q)%I.
+    ElimModal True p false (|={∅,E}=> P) P (|=[Θ]=>g Q) (|={E,∅}=> |=[Θ]=>g Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
     iIntros "_ [HP HPQ]". iApply fupd_gupd_elim. iMod "HP".
@@ -262,87 +262,87 @@ Section gupd.
   Qed.
 
   Global Instance add_modal_fupd_gupd Θ P Q :
-    AddModal (|={∅}=> P) P (|={Θ}=>g Q).
+    AddModal (|={∅}=> P) P (|=[Θ]=>g Q).
   Proof.
     rewrite /AddModal; rewrite fupd_gupd; iIntros "[HP HPQ]".
     iApply (gupd_bind with "HPQ HP").
   Qed.
 
   Global Instance from_assumption_gupd p Θ P Q :
-    FromAssumption p P Q → KnownRFromAssumption p P (|={Θ}=>g Q).
+    FromAssumption p P Q → KnownRFromAssumption p P (|=[Θ]=>g Q).
   Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply gupd_intro. Qed.
 
   Global Instance from_pure_gupd a Θ P φ :
-    FromPure a P φ → FromPure a (|={Θ}=>g P) φ.
+    FromPure a P φ → FromPure a (|=[Θ]=>g P) φ.
   Proof. rewrite /FromPure=> <-. apply gupd_intro. Qed.
 
   Global Instance into_wand_gupd p q Θ R P Q :
-    IntoWand false false R P Q → IntoWand p q (|={Θ}=>g R) (|={Θ}=>g P) (|={Θ}=>g Q).
+    IntoWand false false R P Q → IntoWand p q (|=[Θ]=>g R) (|=[Θ]=>g P) (|=[Θ]=>g Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite !intuitionistically_if_elim HR.
     apply wand_intro_l. by rewrite gupd_sep wand_elim_r.
   Qed.
 
   Global Instance into_wand_gupd_persistent p q Θ R P Q :
-    IntoWand false q R P Q → IntoWand p q (|={Θ}=>g R) P (|={Θ}=>g Q).
+    IntoWand false q R P Q → IntoWand p q (|=[Θ]=>g R) P (|=[Θ]=>g Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite intuitionistically_if_elim HR.
     apply wand_intro_l. by rewrite gupd_frame_l wand_elim_r.
   Qed.
 
   Global Instance into_wand_gupd_args p q Θ R P Q :
-    IntoWand p false R P Q → IntoWand' p q R (|={Θ}=>g P) (|={Θ}=>g Q).
+    IntoWand p false R P Q → IntoWand' p q R (|=[Θ]=>g P) (|=[Θ]=>g Q).
   Proof.
     rewrite /IntoWand' /IntoWand /= => ->.
     apply wand_intro_l. by rewrite intuitionistically_if_elim gupd_wand_r.
   Qed.
 
   Global Instance from_sep_gupd Θ P Q1 Q2 :
-    FromSep P Q1 Q2 → FromSep (|={Θ}=>g P) (|={Θ}=>g Q1) (|={Θ}=>g Q2).
+    FromSep P Q1 Q2 → FromSep (|=[Θ]=>g P) (|=[Θ]=>g Q1) (|=[Θ]=>g Q2).
   Proof. rewrite /FromSep=><-. apply gupd_sep. Qed.
 
   Global Instance from_or_gupd Θ P Q1 Q2 :
-    FromOr P Q1 Q2 → FromOr (|={Θ}=>g P) (|={Θ}=>g Q1) (|={Θ}=>g Q2).
+    FromOr P Q1 Q2 → FromOr (|=[Θ]=>g P) (|=[Θ]=>g Q1) (|=[Θ]=>g Q2).
   Proof.
     rewrite /FromOr=><-.
     apply or_elim; apply gupd_mono; auto using or_intro_l, or_intro_r.
   Qed.
 
   Global Instance from_exist_gupd {A} Θ P (Φ : A → iProp Σ) :
-    FromExist P Φ → FromExist (|={Θ}=>g P) (λ a, |={Θ}=>g Φ a)%I.
+    FromExist P Φ → FromExist (|=[Θ]=>g P) (λ a, |=[Θ]=>g Φ a)%I.
   Proof.
     rewrite /FromExist=><-. apply exist_elim=> a. by rewrite -(exist_intro a).
   Qed.
 
-  Global Instance is_except_0_gupd Θ P : IsExcept0 P → IsExcept0 (|={Θ}=>g P).
+  Global Instance is_except_0_gupd Θ P : IsExcept0 P → IsExcept0 (|=[Θ]=>g P).
   Proof.
     rewrite /IsExcept0=> HP.
     by rewrite -{2}HP -(except_0_idemp P) -except_0_gupd -(except_0_intro P).
   Qed.
 
   Global Instance from_modal_gupd Θ P :
-    FromModal True modality_id (|={Θ}=>g P) (|={Θ}=>g P) P.
+    FromModal True modality_id (|=[Θ]=>g P) (|=[Θ]=>g P) P.
   Proof. by rewrite /FromModal /= -gupd_intro. Qed.
 
   Global Instance elim_modal_gupd p Θ P Q :
-    ElimModal True p false (|={Θ}=>g P) P (|={Θ}=>g Q) (|={Θ}=>g Q).
+    ElimModal True p false (|=[Θ]=>g P) P (|=[Θ]=>g Q) (|=[Θ]=>g Q).
   Proof.
     by rewrite /ElimModal
       intuitionistically_if_elim gupd_frame_r wand_elim_r gupd_trans.
   Qed.
 
-  Global Instance add_modal_gupd Θ P Q : AddModal (|={Θ}=>g P) P (|={Θ}=>g Q).
+  Global Instance add_modal_gupd Θ P Q : AddModal (|=[Θ]=>g P) P (|=[Θ]=>g Q).
   Proof. by rewrite /AddModal gupd_frame_r wand_elim_r gupd_trans. Qed.
 
   Global Instance frame_gupd p Θ R P Q :
-    Frame p R P Q → Frame p R (|={Θ}=>g P) (|={Θ}=>g Q).
+    Frame p R P Q → Frame p R (|=[Θ]=>g P) (|=[Θ]=>g Q).
   Proof. rewrite /Frame=><-. by rewrite gupd_frame_l. Qed.
 
 End gupd.
 
 (* Wrapper to use fupd. *)
 Definition fgupd `{SI : indexT} `{!gupdGS Σ} E Θ : iPropO Σ -d> iPropO Σ :=
-  (λ P, |={E,∅}=> |={Θ}=>g |={∅,E}=> P)%I.
+  (λ P, |={E,∅}=> |=[Θ]=>g |={∅,E}=> P)%I.
 Notation "'|={' E : Θ '}=>g' P" := (fgupd E Θ P) (at level 99, P at level 200, format "|={ E : Θ }=>g  P").
 
 Section fgupd.
@@ -368,7 +368,7 @@ Section fgupd.
     iModIntro. iFrame.
   Qed.
 
-  Lemma gupd_fgupd E Θ P : (|={Θ}=>g P) ⊢ (|={E:Θ}=>g P).
+  Lemma gupd_fgupd E Θ P : (|=[Θ]=>g P) ⊢ (|={E:Θ}=>g P).
   Proof.
     rewrite /fgupd. iIntros "Hupd".
     iApply fupd_mask_intro. 1: set_solver.
@@ -389,7 +389,7 @@ Section fgupd.
   Qed.
 
   Lemma gupd_fgupd_elim E Θ P :
-    (|={Θ}=>g |={E:Θ}=>g P) ⊢ |={E:Θ}=>g P.
+    (|=[Θ]=>g |={E:Θ}=>g P) ⊢ |={E:Θ}=>g P.
   Proof.
     iIntros "H". iApply fupd_mask_intro. 1: set_solver.
     iIntros "Fupd". iMod "H". iMod "Fupd" as "_". done.
@@ -497,7 +497,7 @@ Section fgupd.
   Qed.
 
   Global Instance elim_gupd_fgupd (p : bool) E Θ P Q :
-    ElimModal True p false (|={Θ}=>g P) P (|={E:Θ}=>g Q) (|={E:Θ}=>g Q)%I.
+    ElimModal True p false (|=[Θ]=>g P) P (|={E:Θ}=>g Q) (|={E:Θ}=>g Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
     iIntros "_ [HP HPQ]". iApply gupd_fgupd_elim.
@@ -512,7 +512,7 @@ Section fgupd.
   Qed.
 
   Global Instance add_modal_gupd_fgupd E Θ P Q :
-    AddModal (|={Θ}=>g P) P (|={E:Θ}=>g Q).
+    AddModal (|=[Θ]=>g P) P (|={E:Θ}=>g Q).
   Proof.
     rewrite /AddModal; rewrite gupd_fgupd; iIntros "[HP HPQ]".
     iApply (fgupd_bind with "HPQ HP").
@@ -1167,7 +1167,7 @@ Section preds.
                      gl_witfun k ξ -∗
                      (▷ R1) -∗
                      (▷ P2) -∗
-                     ∀ Θ, |={Θ}=>g |={E ∖ ↑N,E}=> 
+                     ∀ Θ, |=[Θ]=>g |={E ∖ ↑N,E}=> 
                        (th_obls i (<[k:=v2]>G) q ∗
                         gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
                         gl_variant N k v2 P2 Q2 R2 ∗
@@ -1243,7 +1243,7 @@ Section preds.
                     (th_obls i G q -∗
                      gl_locked k v -∗
                      (▷ Q) -∗
-                     ∀ Θ, |={Θ}=>g |={E ∖ ↑N,E}=>
+                     ∀ Θ, |=[Θ]=>g |={E ∖ ↑N,E}=>
                        (th_obls i (delete k G) q ∗ gl_current k v ∗ gl_done k v)).
     Proof.
       unfold_defs. iIntros (MASK LUGk) "(#Oe& Ox& Ob& OS) ((#Ge& #Gvl)& #Gvar)".
@@ -1303,7 +1303,7 @@ Section preds.
       th_obls i1 G1 q1 -∗
       th_obls i2 G2 q2 -∗
       gl_fuel k Ord.one -∗
-      |={Θ}=>g th_obls i1 (delete k G1) q1 ∗ th_obls i2 (<[k:=v]>G2) q2 ∗ ⌜ G2 !! k = None ⌝.
+      |=[Θ]=>g th_obls i1 (delete k G1) q1 ∗ th_obls i2 (<[k:=v]>G2) q2 ∗ ⌜ G2 !! k = None ⌝.
     Proof.
       unfold_defs. iIntros (LUGk) "(#Oe1& Ox1& Ob1& OS1) (#Oe2& Ox2& Ob2& OS2) (#Ge& Gf)".
       iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
@@ -1343,6 +1343,21 @@ Section preds.
       iFrame "Ob1 Ob2". assert (LUkG2 : G2 !! k = None) by (apply not_elem_of_dom; auto).
       iSplitL; last auto.
       iApply big_sepM_insert. 1: auto. iFrame. iCombine "Oo Oo1" as "Oo". auto.
+    Qed.
+
+    Lemma gl_terminate_0 Θ i :
+      th_obls i ∅ 1 -∗ |=[Θ]=>g th_term i.
+    Proof.
+      unfold_defs. iIntros "(#Oe& Ox& Ob& OS)".
+      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iMod (globl_exec_to_term with "[$O $Ox $Ob]") as "[O #Ot]".
+      iModIntro. iExists Ω1. iSplitR; first done.
+      iIntros (? [WStep GWI2]).
+      pose proof (glwit_inv_rc_step_same_gls _ _ _ _ GWI WStep GWI2) as WMon.
+      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      rewrite /gproto. iFrame "S O W A". iSplitR.
+      { eauto. }
+      iIntros "!> !>". auto.
     Qed.
 
     (** Variant access rules *)
