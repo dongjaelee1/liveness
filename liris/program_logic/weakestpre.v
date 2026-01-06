@@ -42,19 +42,6 @@ Section curry5.
 End curry5.
 
 Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
-  (* (** Invariants. *) *)
-  (* #[global] liris_invGS :: invGS Σ; *)
-  (* (** Liveness obligations. *) *)
-  (* #[global] liris_osatGS :: osatGS.osatGS (WF:=ord_wfocm_pack) (state Λ) thread_id Σ; *)
-  (* (** Liveness obligations assigned to threads. *) *)
-  (* #[global] liris_othreadGS :: othreadGS.othreadGS Σ; *)
-  (* (** Liveness witnesses. *) *)
-  (* #[global] liris_owitnessGS :: owitnessGS.owitnessGS (WF:=ord_wfocm_pack) Σ; *)
-  (* (** Witness function. *) *)
-  (* owfun : Ord.t → Ord.t; *)
-  (* (** Forest of liveness obligation. *) *)
-  (* #[global] liris_otreeGS :: otreeGS.otreeGS Ord.t Σ; *)
-
   (** Ghost lock protocol including invariants. *)
   #[global] liris_gupdGS :: gupdGS Σ;
 

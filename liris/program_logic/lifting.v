@@ -67,7 +67,8 @@ Section lifting.
                      gl_witfun k ξ -∗
                      (▷ R1) -∗
                      (▷ P2) -∗
-                     |={∅}=>g |={E ∖ ↑N,E}=> 
+                     ∀ E',
+                     |={E'}=>g |={E ∖ ↑N,E}=> 
                        (th_obls i (<[k:=v2]>G) q ∗
                         gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
                         gl_variant N k v2 P2 Q2 R2 ∗
@@ -77,7 +78,7 @@ Section lifting.
     Proof.
       iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
       iIntros "!> Tb Gc Gw HR HP". iPoseProof ("H" with "Tb Gc Gw HR HP") as "H".
-      iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
+      iIntros "% %%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
     Qed.
 
     Lemma gl_unlock E i G q N k v P Q R :
@@ -89,28 +90,29 @@ Section lifting.
                     (th_obls i G q -∗
                      gl_locked k v -∗
                      (▷ Q) -∗
-                     |={∅}=>g |={E ∖ ↑N,E}=>
+                     ∀ E',
+                     |={E'}=>g |={E ∖ ↑N,E}=>
                        (th_obls i (delete k G) q ∗ gl_current k v ∗ gl_done k v)).
     Proof.
       iIntros (Mask LUGk) "Tb Gv". iMod (gl_unlock_0 with "Tb Gv") as "[$ H]". 1,2: eauto.
       iIntros "!> Tb Gl HQ". iPoseProof ("H" with "Tb Gl HQ") as "H".
-      iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
+      iIntros "% %%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
     Qed.
 
-    Lemma gl_change_owner i1 i2 G1 G2 q1 q2 k v :
+    Lemma gl_change_owner E i1 i2 G1 G2 q1 q2 k v :
       G1 !! k = Some v →
       th_obls i1 G1 q1 -∗
       th_obls i2 G2 q2 -∗
       gl_fuel k Ord.one -∗
-      |={∅}=>g th_obls i1 (delete k G1) q1 ∗ th_obls i2 (<[k:=v]>G2) q2 ∗ ⌜ G2 !! k = None ⌝.
+      |={E}=>g th_obls i1 (delete k G1) q1 ∗ th_obls i2 (<[k:=v]>G2) q2 ∗ ⌜ G2 !! k = None ⌝.
     Proof.
       iIntros (LUG1) "Tb1 Tb2 Gf %%% $".
       iMod (gl_change_owner_0 with "Tb1 Tb2 Gf") as "H". 1: eauto.
       by iModIntro.
     Qed.
 
-    Lemma gl_terminate i :
-      th_obls i ∅ 1 -∗ |={∅}=>g th_term i.
+    Lemma gl_terminate E i :
+      th_obls i ∅ 1 -∗ |={E}=>g th_term i.
     Proof.
       iIntros "Tb %%% $". iMod (gl_terminate_0 with "Tb") as "#Tt". auto.
     Qed.
@@ -355,7 +357,7 @@ Section lifting.
   Class PureExecCond (C : thread_id → state Λ → Prop) ς (i : thread_id) :=
     pure_exec_cond : ∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝.
 
-  Lemma lwp_lift_pure_step_no_fork s i E E' e1 Φ ς C :
+  Lemma lwp_lift_pure_step_no_fork s i E E' e1 Φ C ς :
     (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
     (∀ κ σ1 Θ e2 σ2 efs, C i σ1 → prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
     PureExecCond C ς i →
@@ -408,7 +410,7 @@ Section lifting.
               ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
               ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
               ALC (|={E2,E1}=> state_interp σ2 (Θ ∪ dom efs) κs ∗
-                            (from_option Φ False (to_val e2)) ∗
+                            (from_option (λ v, |={E1}=>g (Φ v)) False (to_val e2)) ∗
                             [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
       ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
@@ -423,10 +425,10 @@ Section lifting.
     iIntros "!> Tb Wcs Efs". iMod ("H" with "Tb Wcs Efs") as "H".
     iMod "Hclose" as "_". iMod "H" as "($&Hq&$)".
     iModIntro. destruct (to_val e2) eqn:?; last by iExFalso.
-    iApply lwp_value; last eauto. by apply of_to_val.
+    iApply lwp_value_sfgupd; last eauto. by apply of_to_val.
   Qed.
 
-  Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s ς i E E' Φ C} e1 e2 :
+  Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s i E E' Φ C ς} e1 e2 :
     (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
     (∀ σ1 κ Θ e2' σ2 efs', C i σ1 → prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
     PureExecCond C ς i →
@@ -447,7 +449,7 @@ Section lifting.
     iIntros "!> % % % % %". iIntros ([? ?]). edestruct Hpuredet as (?&?&?&?); eauto. by subst.
   Qed.
 
-  Lemma lwp_pure_step `{!Inhabited (state Λ)} s ς i E E' e1 e2 φ n Φ C :
+  Lemma lwp_pure_step `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ C ς :
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς i →
