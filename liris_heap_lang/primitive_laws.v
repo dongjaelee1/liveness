@@ -109,6 +109,9 @@ Proof. rewrite thread_term_unseal /thread_term_def. apply _. Qed.
 Global Instance thread_exec_timeless i q : Timeless (thread_exec i q).
 Proof. rewrite thread_exec_unseal /thread_exec_def. apply _. Qed.
 
+Lemma thread_term_unfold i v : thread_term i v = thread i false (Some v) 1.
+Proof. unfold_defs. done. Qed.
+
 Lemma thread_term_agree i v1 v2 : thread_term i v1 -∗ thread_term i v2 -∗ ⌜v1 = v2⌝.
 Proof.
   unfold_defs. iIntros "H1 H2". iPoseProof (thread_agree with "H1 H2") as "%". by inv H.

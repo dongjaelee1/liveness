@@ -71,117 +71,44 @@ Section mp_proof.
     iIntros "Tx Tb _ !> !> _".
     iMod (gl_fuel_mon_split k 99 1 with "Gfk") as "[Gfk Gfk1]".
     { rewrite -Hessenberg.add_from_nat. reflexivity. }
-    (* How to proceed? *)
-
-    TODO
-
-    lazymatch goal with
-    | |- environments.envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
-        first [ reshape_expr e ltac:(fun K e' => idtac)
-              | fail 1 "wp_bind: cannot find" ]
-    | _ => fail "wp_bind: not a 'wp'"
-    end.
-    lazymatch goal with
-    | |- environments.envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
-        first [ reshape_expr e ltac:(fun K e' => iApply lwp_bind)
-              | fail 1 "wp_bind: cannot find" ]
-    | _ => fail "wp_bind: not a 'wp'"
-    end.
     iApply lwp_bind.
-    { econstructor; simpl; eauto.
-      - intros. inv H; simpl in *. econstructor; simpl; eauto.
-        + rewrite /fill.
-
-        eapply fill_prim_step.
-        Unset Printing Notations.
-        
-
-        econstructor.
-
-        econstructor; simpl; eauto.
-        + Set Printing All.
-
-
-    lazymatch goal with
-    | |- environments.envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
-        first [ reshape_expr e ltac:(fun K e' => unify e' (Store _ _))
-              | fail 1 "wp_bind: cannot find" ]
-    | _ => fail "wp_bind: not a 'wp'"
-    end.
-
-
-Tactic Notation "wp_bind" open_constr(efoc) :=
-  iStartProof;
-  lazymatch goal with
-  | |- environments.envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first [ reshape_expr e ltac:(fun K e' => unify e' efoc; wp_bind_core K)
-          | fail 1 "wp_bind: cannot find" efoc "in" e ]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first [ reshape_expr e ltac:(fun K e' => unify e' efoc; twp_bind_core K)
-          | fail 1 "wp_bind: cannot find" efoc "in" e ]
-  | _ => fail "wp_bind: not a 'wp'"
-  end.
-
-    iApply lwp_bind.
-    { econstructor; simpl; eauto.
-      - intros. inv H; simpl in *. econstructor; simpl; eauto.
-        + Set Printing All.
-
-        apply Ectx_step'. fill_prim_step. econstructor; simpl; eauto.
-        + rewrite fill_app.
-
-    iApply (lwp_pure_step 1).
-    { instantiate (2:=True).
-      subst; intros ?; apply nsteps_once, pure_base_step_pure_step; constructor; simpl; eauto.
-      - intros; subst; do 3 eexists. simpl. econstructor; eauto.
-
-      [solve_exec_safe | solve_exec_puredet].
-
-      Set Printing All. apply pure_beta.
-      eapply pure_recc. solve_pure_exec.
-
-      econstructor; eauto. econstructor. }
-    {
-      solve_pure_exec. eapply pure_recc. econstructor; simpl; eauto.
-      - intros. eapply base_prim_reducible_no_obs. econstructor; simpl; eauto.
-        
-
-      Unset Printing Notations. eapply pure_exec_fill.
-
-    1: done.
-
-    iApply lwp_lift_base_step.
-    iApply lwp_bind.
-
-    iApply (lwp_store _ _ _ _ _ _ _ _ ∅ 0 with "[$Tx $Tb Gfk1]").
-
+    { replace (App (Rec BAnon BAnon (Exit (Val (LitV LitUnit))))) with (fill_item (AppRCtx (Rec BAnon BAnon (Exit (Val (LitV LitUnit)))))).
+      2:{ simpl. done. }
+      eapply ectxi_lang_ctx_item.
+    }
     iMod (gl_unlock with "Tb GVkv") as "[>(Tb& Glk& VP) ACC]".
     { set_solver. }
     { rewrite lookup_insert_eq. auto. }
-
     iApply lwp_sfgupd.
     iApply (lwp_store _ _ _ _ _ _ _ _ ∅ 0 with "[$VP $Tx $Tb Gfk1]").
     { rewrite !big_sepM_singleton. iFrame. by iApply big_sepM_empty. }
     iIntros "(_& Tx& Tb& _& ptl)".
     iPoseProof ("ACC" with "Tb Glk ptl") as "ACC". iSpecialize ("ACC" $! (⊤ ∖ ↑N)).
     iMod "ACC". iModIntro. iMod "ACC" as "(Tb& Gc& #Gd)". iModIntro.
-    
-    
-
-    TODO
-    
-    iApply lwp_store.
-gl_variant_acc_own:
-  ∀ {SI : indexT} {Σ : gFunctors} {gupdGS0 : gupdGS Σ} (E : coPset) (i : positive) 
-    (G : gmap gl_id ghost_lock_version) (q : Qp) (N : namespace) (k : gl_id) 
-    (v : ghost_lock_version) (P Q R : iProp Σ),
-    ↑N ⊆ E
-    → G !! k = Some v
-      → th_obls i G q -∗
-        gl_variant N k v P Q R ={E,E ∖ ↑N}=∗
-        ▷ (th_obls i G q ∗ gl_locked k v ∗ P) ∗ (▷ gl_variant_cases k v P Q R ={E ∖ ↑N,E}=∗ True)
-
-    TODO
+    simpl.
+    replace (App (Rec BAnon BAnon (Exit (Val (LitV LitUnit)))) #()) with (fill_item (AppLCtx #()) (Rec BAnon BAnon (Exit (Val (LitV LitUnit))))).
+    2:{ done. }
+    iApply lwp_bind.
+    iApply (lwp_pure_step 1). 1: done.
+    simpl. iModIntro. iFrame "Tx".
+    iExists ∅. iSplitL "Tb".
+    { rewrite delete_insert_id; auto. }
+    iSplitR; first done.
+    iExists ∅. iSplitR; first done.
+    iIntros "Tx Tb _ !> !> _".
+    iApply lwp_value.
+    iApply (lwp_pure_step 1). 1: done.
+    simpl. iModIntro. iFrame "Tx".
+    iExists ∅. iSplitL "Tb".
+    { auto. }
+    iSplitR; first done.
+    iExists ∅. iSplitR; first done.
+    iIntros "Tx Tb _ !> !> _".
+    iApply (lwp_exit with "Tb Tx [HΦ]").
+    iModIntro. iIntros "#Tt1 #Tt2". iIntros "!> !>".
+    iApply "HΦ". rewrite /lift_term. iFrame "Tt1".
+    rewrite -thread_term_unfold. auto.
+  Qed.
 
   Lemma newcounter_mp_spec i Δ q :
     l{{{ thread_obls i Δ q }}} newcounter #() @ i l{{{ l, RET #l; thread_obls i Δ q ∗ mp l 0 }}}.
