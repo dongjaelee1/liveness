@@ -8,7 +8,7 @@ From transfinite.base_logic.lib Require Export gen_heap proph_map.
 (* From transfinite.base_logic.lib Require Export gen_heap proph_map gen_inv_heap. *)
 From liris.base_logic Require Export thread_map gen_inv_heap.
 (* From liris.program_logic Require Export weakestpre. *)
-From liris.program_logic Require Export atomic.
+From liris.program_logic Require Export atomic lifting.
 From liris.program_logic Require Import ectx_lifting.
 From liris.heap_lang Require Export class_instances.
 From liris.heap_lang Require Import tactics notation.
@@ -157,7 +157,7 @@ Proof.
 Qed.
 
 (** "pure" steps that are reducible with the thread_exec predicate *)
-Lemma lwp_pure_step s i q E E' e1 e2 φ n Φ :
+Lemma lwp_pure_step n s i q E E' e1 e2 φ Φ :
   PureExec φ thread_cond n e1 e2 →
   φ →
   Nat.iter n

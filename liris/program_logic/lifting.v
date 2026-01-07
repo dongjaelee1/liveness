@@ -449,7 +449,7 @@ Section lifting.
     iIntros "!> % % % % %". iIntros ([? ?]). edestruct Hpuredet as (?&?&?&?); eauto. by subst.
   Qed.
 
-  Lemma lwp_pure_step `{!Inhabited (state Λ)} s i E E' e1 e2 φ n Φ C ς :
+  Lemma lwp_pure_step `{!Inhabited (state Λ)} n s i E E' e1 e2 φ Φ C ς :
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς i →

@@ -606,9 +606,9 @@ Proof.
   iApply (big_sepM_impl with "Efs"). iIntros "!>" (k ef _). iIntros "[H _]". done.
 Qed.
 
-Lemma lwp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
+Lemma lwp_strong_mono_sfgupd s1 s2 i E1 E2 e Φ Ψ :
   s1 ⊑ s2 → E1 ⊆ E2 →
-  lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
+  lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v -∗ |={E2}=>g Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
 Proof.
   iIntros (? HE) "H HΦ".
   iRevert "HΦ". iRevert (E2 HE). iRevert (i e E1 Φ) "H".
@@ -619,8 +619,10 @@ Proof.
   { iIntros (???) "SI".
     iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
     iMod ("IH" with "SI") as "IH".
-    iModIntro. iMod "IH". iModIntro. iMod "IH" as "[$ IH]".
-    iMod "Hclose" as "_". by iApply "HΦ".
+    iApply fupd_mask_intro. 1: set_solver.
+    iIntros "Hclose2". iMod "IH". iMod "Hclose2" as "_". iMod "IH" as "[SI IH]".
+    iMod "Hclose" as "_".
+    iMod ("HΦ" with "IH SI") as "$". done.
   }
   iIntros (????) "H". iSpecialize ("IH" with "[$]").
   iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
@@ -636,16 +638,27 @@ Proof.
     iIntros "[_ H]". by iApply (lwp_stuckness_mono with "H").
 Qed.
 
+Lemma lwp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
+  s1 ⊑ s2 → E1 ⊆ E2 →
+  lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
+Proof.
+  iIntros (? HE) "H HΦ".
+  iApply (lwp_strong_mono_sfgupd with "H [HΦ]"). all: auto.
+  iIntros "% H". iMod ("HΦ" with "H") as "$". done.
+Qed.
+
 Lemma fupd_lwp s i E e Φ :
   (|={E}=> lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
 Proof.
-  rewrite lwp_unfold /lwp_pre. iIntros "H". destruct (to_val e) as [v|] eqn:?.
-  { by iMod "H". }
-  rewrite /lwp_step. iMod "H". done.
+  iIntros "H". iApply sfgupd_elim_lwp. iMod "H". by iModIntro.
 Qed.
 Lemma lwp_fupd s i E e Φ :
   lWP e @ s; i; E {{ v, |={E}=> Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
 Proof. iIntros "H". iApply (lwp_strong_mono s s i E with "H"); auto. Qed.
+
+Lemma lwp_sfgupd s i E e Φ :
+  lWP e @ s; i; E {{ v, |={E}=>g Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
+Proof. iIntros "H". iApply (lwp_strong_mono_sfgupd s s i E with "H"); auto. Qed.
 
 Lemma lwp_atomic s i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
   (|={E1,E2}=> lWP e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})

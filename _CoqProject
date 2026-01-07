@@ -75,13 +75,13 @@ liris_heap_lang/class_instances.v
 liris_heap_lang/pretty.v
 liris_heap_lang/metatheory.v
 liris_heap_lang/primitive_laws.v
-liris_heap_lang/derived_laws.v
-liris_heap_lang/proofmode.v
+# liris_heap_lang/derived_laws.v
+# liris_heap_lang/proofmode.v
 # liris_heap_lang/adequacy.v
 # liris_heap_lang/total_adequacy.v
 # liris_heap_lang/proph_erasure.v
 
-liris_heap_lang/lib/counter.v
+# liris_heap_lang/lib/counter.v
 # liris_heap_lang/lib/spawn.v
 # liris_heap_lang/lib/par.v
 # liris_heap_lang/lib/assert.v
@@ -99,3 +99,5 @@ liris_heap_lang/lib/counter.v
 # liris_heap_lang/lib/arith.v
 # liris_heap_lang/lib/array.v
 # liris_heap_lang/lib/logatom_lock.v
+
+liris_heap_lang/examples/message_passing.v
