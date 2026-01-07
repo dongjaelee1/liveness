@@ -793,6 +793,10 @@ Section preds.
     Proof. unfold_defs. apply _. Qed.
     Global Instance gl_fuel_timeless k a : Timeless (gl_fuel k a).
     Proof. unfold_defs. apply _. Qed.
+    Global Instance gl_variant_cases_timeless k v P Q R :
+      Timeless P → Timeless Q → Timeless R →
+      Timeless (gl_variant_cases k v P Q R).
+    Proof. intros. unfold_defs. apply _. Qed.
     Global Instance th_obls_timeless i G q : Timeless (th_obls i G q).
     Proof. unfold_defs. apply _. Qed.
     Global Instance th_term_timeless i : Timeless (th_term i).
@@ -846,6 +850,13 @@ Section preds.
     Qed.
 
     (** gl_locked and gl_done rules *)
+    Lemma gl_locked_done_false k v :
+      gl_locked k v -∗ gl_done k v -∗ False.
+    Proof.
+      unfold_defs. iIntros "((#Ge& #Gvl& GHis)& Gl) (_& #Gu)".
+      iPoseProof (glG_locked_unlocked_false with "[$]") as "%". done.
+    Qed.
+
     (* TODO *)
 
     (** gl_current and gl_expired rules *)
@@ -1361,6 +1372,13 @@ Section preds.
     Qed.
 
     (** Variant access rules *)
+    Lemma gl_variant_cases_unfold k v P Q R :
+      gl_variant_cases k v P Q R ∗-∗
+      ((gl_locked k v ∗ P) ∨ (gl_done k v ∗ Q)) ∨ (gl_expired k v ∗ R).
+    Proof.
+      rewrite !gl_variant_cases_unseal /gl_variant_cases_def. auto.
+    Qed.
+
     Local Lemma gl_variant_cases_internal k v P Q R :
       gl_variant_cases k v P Q R -∗
       glG_variant_internal k v (1 / 2 / 2 / 2 / 2) P Q R.
@@ -1371,7 +1389,7 @@ Section preds.
       - iRight. iDestruct "H" as "((((_& _)& $)& $)& $)".
     Qed.
 
-    Lemma gl_variant_acc E N k v P Q R :
+    Lemma gl_variant_acc_cases E N k v P Q R :
       ↑N ⊆ E →
       gl_variant N k v P Q R ={E,E ∖ ↑N}=∗
       (▷ gl_variant_cases k v P Q R) ∗ (▷ gl_variant_cases k v P Q R ={E ∖ ↑N,E}=∗ True).
@@ -1390,6 +1408,16 @@ Section preds.
         + iNext. iRight. iDestruct "H" as "($& $& $)". eauto.
         + iIntros "H". iMod ("ACC" with "[H]") as "_"; last done.
           iNext. iApply gl_variant_cases_internal. unfold_defs. done.
+    Qed.
+
+    Lemma gl_variant_acc E N k v P Q R :
+      ↑N ⊆ E →
+      gl_variant N k v P Q R ={E,E ∖ ↑N}=∗
+      (▷ (((gl_locked k v ∗ P) ∨ (gl_done k v ∗ Q)) ∨ (gl_expired k v ∗ R))) ∗
+      (▷ gl_variant_cases k v P Q R ={E ∖ ↑N,E}=∗ True).
+    Proof.
+      iIntros (H) "Gv". iMod (gl_variant_acc_cases with "Gv") as "[H $]". 1: auto.
+      iModIntro. iNext. by iApply gl_variant_cases_unfold.
     Qed.
 
     Lemma gl_variant_acc_own E i G q N k v P Q R :

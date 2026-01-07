@@ -45,32 +45,33 @@ Section mp_proof.
   Global Instance mp_persistent k l : Persistent (mp k l).
   Proof. apply _. Qed.
 
-  Lemma tac_wp_expr_eval `{!heapGS Σ} Δ s i E Φ e e' :
+  Lemma tac_lwp_expr_eval `{!heapGS Σ} Δ s i E Φ e e' :
     (∀ (e'':=e'), e = e'') →
     environments.envs_entails Δ (lWP e' @ s; i; E {{ Φ }}) →
     environments.envs_entails Δ (lWP e @ s; i; E {{ Φ }}).
   Proof. by intros ->. Qed.
 
-  Tactic Notation "wp_expr_eval" tactic3(t) :=
+  Tactic Notation "lwp_expr_eval" tactic3(t) :=
     iStartProof;
     lazymatch goal with
     | |- environments.envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
-        notypeclasses refine (tac_wp_expr_eval _ _ _ _ _ e _ _ _);
+        notypeclasses refine (tac_lwp_expr_eval _ _ _ _ _ e _ _ _);
         [let x := fresh in intros x; t; unfold x; notypeclasses refine eq_refl|]
-    | _ => fail "wp_expr_eval: not a 'wp'"
+    | _ => fail "lwp_expr_eval: not a 'wp'"
     end.
-  Ltac wp_expr_simpl := wp_expr_eval simpl.
+  Ltac lwp_expr_simpl := lwp_expr_eval simpl.
 
-  Tactic Notation "wp_bind" open_constr(efoc) :=
+  Tactic Notation "lwp_bind" open_constr(efoc) :=
     iStartProof;
     lazymatch goal with
     | |- environments.envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
         first [let e := eval simpl in e in
                  reshape_expr e ltac:(fun K e' =>
                                         unify e' efoc;
-                                        iApply (lwp_bind (fill K) _ _ _ e'))
-              | fail 1 "wp_bind: cannot find" efoc "in" e ]
-    | _ => fail "wp_bind: not a 'wp'"
+                                        iApply (lwp_bind (fill K) _ _ _ e');
+                                        lwp_expr_simpl)
+              | fail 1 "lwp_bind: cannot find" efoc "in" e ]
+    | _ => fail "lwp_bind: not a 'wp'"
     end.
 
   Lemma mp_writer_spec i l :
@@ -94,7 +95,7 @@ Section mp_proof.
     iIntros "Tx TG _ !> !> _".
     iMod (gl_fuel_mon_split k 99 1 with "Gfk") as "[Gfk Gfk1]".
     { rewrite -Hessenberg.add_from_nat. reflexivity. }
-    wp_bind (Store _ _).
+    lwp_bind (Store _ _).
     (* wp_bind (Rec BAnon BAnon _). *)
     (* iApply lwp_bind. *)
     (* { replace (App (Rec BAnon BAnon (Exit (Val (LitV LitUnit))))) with (fill_item (AppRCtx (Rec BAnon BAnon (Exit (Val (LitV LitUnit)))))). *)
@@ -111,7 +112,7 @@ Section mp_proof.
     iPoseProof ("ACC" with "TG Glk ptl") as ">ACC".
     iModIntro. iMod "ACC" as "(TG& Gc& #Gd)". iModIntro.
     (* simpl. *)
-    wp_bind (Rec BAnon BAnon _).
+    lwp_bind (Rec BAnon BAnon _).
     (* replace (App (Rec BAnon BAnon (Exit (Val (LitV LitUnit)))) #()) with (fill_item (AppLCtx #()) (Rec BAnon BAnon (Exit (Val (LitV LitUnit))))). *)
     (* 2:{ done. } *)
     (* iApply lwp_bind. *)
@@ -145,73 +146,74 @@ Section mp_proof.
     iIntros (Φ) "HP HΦ".
     iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG)".
     rewrite /reader /=.
+    (* Liveness induction *)
+    remember (mp_ηξ 0) as a. clear Heqa.
+    iStopProof. induction a using WFOCM.ind. rename x into a, H into IHa.
+    iIntros "(#(Gwfk& Gk& Wkv& GVkv)& Tx& TG& HΦ)".
     (* Pure steps *)
     iApply (lwp_pure_step 1). 1: done.
-    simpl. iModIntro. iFrame "Tx".
-    iExists ∅. iSplitL "TG".
-    { auto. }
-    iSplitR; first done.
-    iExists ∅. iSplitR; first done.
-    iIntros "Tx TG _ !> !> _".
-    wp_bind (Load _).
-
-    TODO
-
+    simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+    iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+    lwp_bind (Load _).
+    iMod (gl_variant_acc with "GVkv") as "[>PQR ACC]". 1: set_solver.
+    iDestruct "PQR" as "[[HP | HQ] | HR]"; cycle -1.
+    { iDestruct "HR" as "[_ %]". done. }
+    - iDestruct "HP" as "[Glk ptr]".
+      iApply (lwp_load _ _ _ _ _ _ _ _ (<[k:=0]>∅) 0 with "[$ptr $Tx $TG]").
+      { rewrite big_sepM_singleton. iSplitR; first done. auto. }
+      iIntros "(_& Tx& TG& Rs& ptr)".
+      rewrite big_sepM_singleton. iDestruct "Rs" as "[Wck | #Gdk]"; cycle 1.
+      { iPoseProof (gl_locked_done_false with "Glk Gdk") as "%". done. }
+      iMod ("ACC" with "[Glk ptr]") as "_".
+      { iModIntro. iApply gl_variant_cases_unfold. iLeft. iLeft. iFrame. }
+      iModIntro.
+      lwp_expr_simpl. lwp_bind (Rec BAnon (BNamed _) _).
+      iApply (lwp_pure_step 1). 1: done.
+      simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iApply lwp_value.
+      iApply (lwp_pure_step 1). 1: done.
+      simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      lwp_bind (BinOp _ _ _).
+      iApply (lwp_pure_step 1).
+      { simpl. auto. }
+      simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iApply lwp_value.
+      iApply (lwp_pure_step 1). 1: done.
+      simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iMod (wit_credit_spend_one with "Wkv Wck") as "(%& %LTa& #Wkv')".
+      iApply (IHa a0 LTa). iFrame. auto.
+    - iDestruct "HQ" as "[#Gdk ptr]".
+      iApply (lwp_load _ _ _ _ _ _ _ _ ∅ 0 with "[$ptr $Tx $TG]").
+      { iSplit; done. }
+      iIntros "(_& Tx& TG& _& ptr)".
+      iMod ("ACC" with "[ptr]") as "_".
+      { iModIntro. iApply gl_variant_cases_unfold. iLeft. iRight. iFrame. auto. }
+      iModIntro.
+      lwp_expr_simpl. lwp_bind (Rec BAnon (BNamed _) _).
+      iApply (lwp_pure_step 1). 1: done.
+      simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iApply lwp_value.
+      iApply (lwp_pure_step 1). 1: done.
+      simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      lwp_bind (BinOp _ _ _).
+      iApply (lwp_pure_step 1).
+      { simpl. auto. }
+      simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iApply lwp_value.
+      iApply (lwp_pure_step 1). 1: done.
+      simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iApply (lwp_exit with "TG Tx [HΦ]").
+      iModIntro. iIntros "#Tt1 #Tt2". iIntros "!>".
+      iApply "HΦ". rewrite /lift_term. iFrame "Tt1".
+      rewrite -thread_term_unfold. auto.
   Qed.
 
-  Lemma newcounter_mp_spec i Δ q :
-    l{{{ thread_obls i Δ q }}} newcounter #() @ i l{{{ l, RET #l; thread_obls i Δ q ∗ mp l 0 }}}.
-  Proof.
-    iIntros (Φ) "T HΦ". rewrite /newcounter /=.
-    iApply (lwp_pure_step with "[$T HΦ]"). 1: done.
-    iIntros "T". iApply lwp_fupd.
-    iApply (lwp_alloc with "T"). iIntros (l) "[T [Hl Hm]]".
-    iMod (own_alloc (● (MaxNat O) ⋅ ◯ (MaxNat O))) as (γ) "[Hγ Hγ']";
-      first by apply auth_both_valid_discrete.
-    iMod (inv_alloc N _ (mp_inv γ l) with "[Hl Hγ]").
-    { iNext. iExists 0. by iFrame. }
-    iModIntro. iApply "HΦ". iFrame.
-  Qed.
-
-  TODO
-
-  Lemma incr_mp_spec i Δ q l n :
-    l{{{ thread_obls i Δ q ∗ mp l n }}} incr #l @ i l{{{ RET #(); thread_obls i Δ q ∗ mp l (S n) }}}.
-  Proof.
-    iIntros (Φ) "[T Hl] HΦ". iLöb as "IH". wp_rec.
-    iDestruct "Hl" as (γ) "[#? Hγf]".
-    wp_bind (! _)%E. iInv N as (c) ">[Hγ Hl]".
-    wp_load. iModIntro. iSplitL "Hl Hγ"; [iNext; iExists c; by iFrame|].
-    wp_pures. wp_bind (CmpXchg _ _ _).
-    iInv N as (c') ">[Hγ Hl]".
-    destruct (decide (c' = c)) as [->|].
-    - iCombine "Hγ Hγf"
-        gives %[?%max_nat_included _]%auth_both_valid_discrete.
-      iMod (own_update_2 with "Hγ Hγf") as "[Hγ Hγf]".
-      { apply auth_update, (max_nat_local_update _ _ (MaxNat (S c))). simpl. auto. }
-      wp_cmpxchg_suc. iModIntro. iSplitL "Hl Hγ".
-      { iNext. iExists (S c). rewrite Nat2Z.inj_succ Z.add_1_l. by iFrame. }
-      wp_pures. iApply "HΦ". iModIntro. iExists γ; repeat iSplit; eauto.
-      iApply (own_mono with "Hγf").
-      (* FIXME: FIXME(Coq #6294): needs new unification *)
-      apply: auth_frag_mono. by apply max_nat_included, le_n_S.
-    - wp_cmpxchg_fail; first (by intros [= ?%Nat2Z.inj]). iModIntro.
-      iSplitL "Hl Hγ"; [iNext; iExists c'; by iFrame|].
-      wp_pures. iApply ("IH" with "[Hγf] [HΦ]"); last by auto.
-      rewrite {3}/mp; eauto 10.
-  Qed.
-
-  Lemma read_mp_spec l j :
-    {{{ mp l j }}} read #l {{{ i, RET #i; ⌜j ≤ i⌝ ∧ mp l i }}}.
-  Proof.
-    iIntros (ϕ) "Hc HΦ". iDestruct "Hc" as (γ) "[#Hinv Hγf]".
-    rewrite /read /=. wp_lam. iInv N as (c) ">[Hγ Hl]".
-    wp_load.
-    iCombine "Hγ Hγf"
-      gives %[?%max_nat_included _]%auth_both_valid_discrete.
-    iMod (own_update_2 with "Hγ Hγf") as "[Hγ Hγf]".
-    { apply auth_update, (max_nat_local_update _ _ (MaxNat c)); auto. }
-    iModIntro. iSplitL "Hl Hγ"; [iNext; iExists c; by iFrame|].
-    iApply ("HΦ" with "[-]"). rewrite /mp; eauto 10.
-  Qed.
 End mp_proof.
