@@ -401,6 +401,90 @@ Section sfgupd.
     Frame p R P Q → Frame p R (|={E}=>g P) (|={E}=>g Q).
   Proof. rewrite /Frame=><-. by rewrite sfgupd_frame_l. Qed.
 
+  (** Update rules *)
+  Lemma gl_alloc_obl E i G q ξ N v P Q R :
+    th_obls i G q -∗
+    (▷ P) -∗
+    |={E}=>g ∃ k, (⌜ G !! k = None ⌝) ∗
+                 th_obls i (<[k:=v]>G) q ∗
+                 gl_witfun k ξ ∗ gl k v ∗ gl_fuel k (Σ[ξ] v) ∗
+                 gl_variant N k v P Q R ∗
+                 wit k v (gupd_η (Σ[ξ] v)) ∗
+                 ([∗ set] u ∈ set_seq 0 v, gl_done k u).
+  Proof.
+    iIntros "Tb HP %%% $". iApply (gl_alloc_obl_0 _ Θ with "Tb HP").
+  Qed.
+
+  Lemma gl_alloc_done E ξ N v P Q R :
+    (▷ Q) -∗
+    |={E}=>g ∃ k, gl_witfun k ξ ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k (Σ[ξ] v) ∗
+                 gl_variant N k v P Q R ∗
+                 wit k v (gupd_η (Σ[ξ] v)) ∗
+                 ([∗ set] u ∈ set_seq 0 (S v), gl_done k u).
+  Proof.
+    iIntros "HQ %%% $". iApply (gl_alloc_done_0 _ Θ with "HQ").
+  Qed.
+
+  Lemma gl_lock E0 E i G q k ξ N v1 v2 P1 Q1 R1 P2 Q2 R2 :
+    v1 < v2 →
+    ↑N ⊆ E →
+    gl_current k v1 -∗
+    gl_done k v1 -∗
+    gl_variant N k v1 P1 Q1 R1 -∗
+    |={E,E ∖ ↑N}=> (▷ (gl_current k v1 ∗ Q1)) ∗
+                  (th_obls i G q -∗
+                   gl_current k v1 -∗
+                   gl_witfun k ξ -∗
+                   (▷ R1) -∗
+                   (▷ P2) -∗
+                   |={E0}=>g |={E ∖ ↑N,E}=> 
+                     (th_obls i (<[k:=v2]>G) q ∗
+                      gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
+                      gl_variant N k v2 P2 Q2 R2 ∗
+                      wit k v2 (gupd_η (Σ[ξ] v2)) ∗
+                      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit k u (gupd_η (Σ[ξ] u))) ∗
+                      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u))).
+  Proof.
+    iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
+    iIntros "!> Tb Gc Gw HR HP". iPoseProof ("H" with "Tb Gc Gw HR HP") as "H".
+    iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
+  Qed.
+
+  Lemma gl_unlock E0 E i G q N k v P Q R :
+    ↑N ⊆ E →
+    G !! k = Some v →
+    th_obls i G q -∗
+    gl_variant N k v P Q R -∗
+    |={E,E ∖ ↑N}=> (▷ (th_obls i G q ∗ gl_locked k v ∗ P)) ∗
+                  (th_obls i G q -∗
+                   gl_locked k v -∗
+                   (▷ Q) -∗
+                   |={E0}=>g |={E ∖ ↑N,E}=>
+                     (th_obls i (delete k G) q ∗ gl_current k v ∗ gl_done k v)).
+  Proof.
+    iIntros (Mask LUGk) "Tb Gv". iMod (gl_unlock_0 with "Tb Gv") as "[$ H]". 1,2: eauto.
+    iIntros "!> Tb Gl HQ". iPoseProof ("H" with "Tb Gl HQ") as "H".
+    iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
+  Qed.
+
+  Lemma gl_change_owner E i1 i2 G1 G2 q1 q2 k v :
+    G1 !! k = Some v →
+    th_obls i1 G1 q1 -∗
+    th_obls i2 G2 q2 -∗
+    gl_fuel k Ord.one -∗
+    |={E}=>g th_obls i1 (delete k G1) q1 ∗ th_obls i2 (<[k:=v]>G2) q2 ∗ ⌜ G2 !! k = None ⌝.
+  Proof.
+    iIntros (LUG1) "Tb1 Tb2 Gf %%% $".
+    iMod (gl_change_owner_0 with "Tb1 Tb2 Gf") as "H". 1: eauto.
+    by iModIntro.
+  Qed.
+
+  Lemma gl_terminate E i :
+    th_obls i ∅ 1 -∗ |={E}=>g th_term i.
+  Proof.
+    iIntros "Tb %%% $". iMod (gl_terminate_0 with "Tb") as "#Tt". auto.
+  Qed.
+
 End sfgupd.
 
 Definition lift_term `{SI : indexT} `{!lirisGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
