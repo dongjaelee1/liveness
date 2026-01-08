@@ -106,9 +106,9 @@ Section mp_proof.
     { set_solver. }
     { rewrite lookup_insert_eq. auto. }
     iApply lwp_sfgupd.
-    iApply (lwp_store _ _ _ _ _ _ _ _ ∅ 0 with "[$VP $Tx $TG Gfk1]").
+    iApply (lwp_store _ ∅ 0 with "[$VP $Tx $TG Gfk1]").
     { rewrite !big_sepM_singleton. iFrame. by iApply big_sepM_empty. }
-    iIntros "(_& Tx& TG& _& ptl)".
+    iIntros "[(_& Tx& TG& _) ptl]".
     iPoseProof ("ACC" with "TG Glk ptl") as ">ACC".
     iModIntro. iMod "ACC" as "(TG& Gc& #Gd)". iModIntro.
     (* simpl. *)
@@ -159,9 +159,9 @@ Section mp_proof.
     iDestruct "PQR" as "[[HP | HQ] | HR]"; cycle -1.
     { iDestruct "HR" as "[_ %]". done. }
     - iDestruct "HP" as "[Glk ptr]".
-      iApply (lwp_load _ _ _ _ _ _ _ _ (<[k:=0]>∅) 0 with "[$ptr $Tx $TG]").
+      iApply (lwp_load _ (<[k:=0]>∅) 0 with "[$ptr $Tx $TG]").
       { rewrite big_sepM_singleton. iSplitR; first done. auto. }
-      iIntros "(_& Tx& TG& Rs& ptr)".
+      iIntros "[(_& Tx& TG& Rs) ptr]".
       rewrite big_sepM_singleton. iDestruct "Rs" as "[Wck | #Gdk]"; cycle 1.
       { iPoseProof (gl_locked_done_false with "Glk Gdk") as "%". done. }
       iMod ("ACC" with "[Glk ptr]") as "_".
@@ -187,9 +187,9 @@ Section mp_proof.
       iMod (wit_credit_spend_one with "Wkv Wck") as "(%& %LTa& #Wkv')".
       iApply (IHa a0 LTa). iFrame. auto.
     - iDestruct "HQ" as "[#Gdk ptr]".
-      iApply (lwp_load _ _ _ _ _ _ _ _ ∅ 0 with "[$ptr $Tx $TG]").
+      iApply (lwp_load _ ∅ 0 with "[$ptr $Tx $TG]").
       { iSplit; done. }
-      iIntros "(_& Tx& TG& _& ptr)".
+      iIntros "[(_& Tx& TG& _) ptr]".
       iMod ("ACC" with "[ptr]") as "_".
       { iModIntro. iApply gl_variant_cases_unfold. iLeft. iRight. iFrame. auto. }
       iModIntro.

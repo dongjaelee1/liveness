@@ -1,26 +1,20 @@
 (** This file extends the HeapLang program logic with some derived laws (not
 using the lifting lemmas) about arrays and prophecies.
 
-We collect both the total WP [twp_X] and partial WP [wp_X] versions of the laws.
-The versions with later credits [wp_X_lc] are omitted because they are too
-specific and can simply be derived using [twp_wp_step_lc] when needed.
-
 For utility functions on arrays (e.g., freeing/copying an array), see
 [heap_lang.lib.array]. *)
-
-TODO
 
 From stdpp Require Import fin_maps.
 From iris.bi Require Import lib.fractional.
 From iris.proofmode Require Import proofmode.
-From iris.heap_lang Require Export primitive_laws.
-From iris.heap_lang Require Import tactics notation.
+From liris.heap_lang Require Export primitive_laws.
+From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 
 (** The [array] connective is a version of [pointsto] that works
 with lists of values. *)
 
-Definition array `{!heapGS_gen hlc Σ} (l : loc) (dq : dfrac) (vs : list val) : iProp Σ :=
+Definition array `{SI : indexT} `{!heapGS Σ} (l : loc) (dq : dfrac) (vs : list val) : iProp Σ :=
   [∗ list] i ↦ v ∈ vs, (l +ₗ i) ↦{dq} v.
 
 Notation "l ↦∗ dq vs" := (array l dq vs)
@@ -31,11 +25,10 @@ Notation "l ↦∗ dq vs" := (array l dq vs)
 lead to overlapping instances. *)
 
 Section lifting.
-Context `{!heapGS_gen hlc Σ}.
+Context `{SI : indexT} `{!heapGS Σ}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ : val → iProp Σ.
 Implicit Types σ : state.
-Implicit Types v : val.
 Implicit Types vs : list val.
 Implicit Types l : loc.
 Implicit Types sz off : nat.
@@ -86,11 +79,11 @@ Proof.
   rewrite length_take min_l; last by lia. iFrame "Hl2".
   iIntros (w) "Hl2".
   clear Hlookup. assert (<[off:=w]> vs !! off = Some w) as Hlookup.
-  { apply list_lookup_insert. lia. }
+  { apply list_lookup_insert_eq. lia. }
   rewrite -[in (l ↦∗{_} <[off:=w]> vs)%I](take_drop_middle (<[off:=w]> vs) off w Hlookup).
-  iApply array_app. rewrite take_insert; last by lia. iFrame.
+  iApply array_app. rewrite take_insert_ge; last by lia. iFrame.
   iApply array_cons. rewrite length_take min_l; last by lia. iFrame.
-  rewrite drop_insert_gt; last by lia. done.
+  rewrite drop_insert_lt; last by lia. done.
 Qed.
 
 (** * Rules for allocation *)
@@ -105,309 +98,227 @@ Proof.
   setoid_rewrite <-Loc.add_assoc. iApply "IH". done.
 Qed.
 
-Lemma twp_allocN s E v n :
+Lemma lwp_allocN G R o s q i E v n :
   (0 < n)%Z →
-  [[{ True }]] AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; E
-  [[{ l, RET LitV (LitLoc l); l ↦∗ replicate (Z.to_nat n) v ∗
-         [∗ list] i ∈ seq 0 (Z.to_nat n), meta_token (l +ₗ (i : nat)) ⊤ }]].
+  l{{{ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+       ([∗ map] r↦v ∈ R, gl r v) }}}
+    AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
+  l{{{ l, RET LitV (LitLoc l);
+         (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗
+         ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗
+         l ↦∗ replicate (Z.to_nat n) v ∗
+         [∗ list] i ∈ seq 0 (Z.to_nat n), meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
-  iIntros (Hzs Φ) "_ HΦ". iApply twp_allocN_seq; [done..|].
-  iIntros (l) "Hlm". iApply "HΦ".
+  iIntros (Hzs Φ) "T HΦ". iApply (lwp_allocN_seq with "T"); [auto.. | ].
+  iIntros (l) "[T Hlm]". iApply "HΦ". iFrame "T".
   iDestruct (big_sepL_sep with "Hlm") as "[Hl $]".
   by iApply pointsto_seq_array.
 Qed.
-Lemma wp_allocN s E v n :
-  (0 < n)%Z →
-  {{{ True }}} AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; E
-  {{{ l, RET LitV (LitLoc l); l ↦∗ replicate (Z.to_nat n) v ∗
-         [∗ list] i ∈ seq 0 (Z.to_nat n), meta_token (l +ₗ (i : nat)) ⊤ }}}.
-Proof.
-  iIntros (? Φ) "_ HΦ". iApply (twp_wp_step with "HΦ").
-  iApply twp_allocN; [auto..|]; iIntros (l) "H HΦ". by iApply "HΦ".
-Qed.
 
-Lemma twp_allocN_vec s E v n :
+Lemma lwp_allocN_vec G R o s q i E v n :
   (0 < n)%Z →
-  [[{ True }]]
-    AllocN #n v @ s ; E
-  [[{ l, RET #l; l ↦∗ vreplicate (Z.to_nat n) v ∗
-         [∗ list] i ∈ seq 0 (Z.to_nat n), meta_token (l +ₗ (i : nat)) ⊤ }]].
-Proof.
-  iIntros (Hzs Φ) "_ HΦ". iApply twp_allocN; [ lia | done | .. ].
-  iIntros (l) "[Hl Hm]". iApply "HΦ". rewrite vec_to_list_replicate. iFrame.
-Qed.
-Lemma wp_allocN_vec s E v n :
-  (0 < n)%Z →
-  {{{ True }}}
-    AllocN #n v @ s ; E
-  {{{ l, RET #l; l ↦∗ vreplicate (Z.to_nat n) v ∗
+  l{{{ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+       ([∗ map] r↦v ∈ R, gl r v) }}}
+    AllocN #n v @ s; i; E
+  l{{{ l, RET #l;
+         (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗
+         ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗
+         l ↦∗ vreplicate (Z.to_nat n) v ∗
          [∗ list] i ∈ seq 0 (Z.to_nat n), meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
-  iIntros (? Φ) "_ HΦ". iApply (twp_wp_step with "HΦ").
-  iApply twp_allocN_vec; [auto..|]; iIntros (l) "H HΦ". by iApply "HΦ".
+  iIntros (Hzs Φ) "T HΦ". iApply (lwp_allocN with "T") ; [ lia | ].
+  iIntros (l) "[T [Hl Hm]]". iApply "HΦ". rewrite vec_to_list_replicate. iFrame.
 Qed.
 
 (** * Rules for accessing array elements *)
-Lemma twp_load_offset s E l dq off vs v :
+Lemma lwp_load_offset G R o s q i E l dq off vs v :
   vs !! off = Some v →
-  [[{ l ↦∗{dq} vs }]] ! #(l +ₗ off) @ s; E [[{ RET v; l ↦∗{dq} vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗{dq} vs }}}
+    ! #(l +ₗ off) @ s; i; E
+  l{{{ RET v; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗{dq} vs }}}.
 Proof.
-  iIntros (Hlookup Φ) "Hl HΦ".
+  iIntros (Hlookup Φ) "[T Hl] HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
-  iApply (twp_load with "Hl1"). iIntros "Hl1". iApply "HΦ".
+  iApply (lwp_load with "[$T $Hl1]"). iIntros "[T Hl1]". iApply "HΦ". iFrame.
   iDestruct ("Hl2" $! v) as "Hl2". rewrite list_insert_id; last done.
   iApply "Hl2". iApply "Hl1".
 Qed.
-Lemma wp_load_offset s E l dq off vs v :
-  vs !! off = Some v →
-  {{{ ▷ l ↦∗{dq} vs }}} ! #(l +ₗ off) @ s; E {{{ RET v; l ↦∗{dq} vs }}}.
-Proof.
-  iIntros (? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_load_offset with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
-Qed.
 
-Lemma twp_load_offset_vec s E l dq sz (off : fin sz) (vs : vec val sz) :
-  [[{ l ↦∗{dq} vs }]] ! #(l +ₗ off) @ s; E [[{ RET vs !!! off; l ↦∗{dq} vs }]].
-Proof. apply twp_load_offset. by apply vlookup_lookup. Qed.
-Lemma wp_load_offset_vec s E l dq sz (off : fin sz) (vs : vec val sz) :
-  {{{ ▷ l ↦∗{dq} vs }}} ! #(l +ₗ off) @ s; E {{{ RET vs !!! off; l ↦∗{dq} vs }}}.
-Proof. apply wp_load_offset. by apply vlookup_lookup. Qed.
+Lemma lwp_load_offset_vec G R o s q i E l dq sz (off : fin sz) (vs : vec val sz) :
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗{dq} vs }}}
+    ! #(l +ₗ off) @ s; i; E
+  l{{{ RET vs !!! off; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗{dq} vs }}}.
+Proof. apply lwp_load_offset. by apply vlookup_lookup. Qed.
 
-Lemma twp_store_offset s E l off vs v :
+Lemma lwp_store_offset G R o s q i E l off (vs : list val) (v : val) :
   is_Some (vs !! off) →
-  [[{ l ↦∗ vs }]] #(l +ₗ off) <- v @ s; E [[{ RET #(); l ↦∗ <[off:=v]> vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
+    #(l +ₗ off) <- v @ s; i; E
+  l{{{ RET #(); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ (l ↦∗ (<[off:=v]> vs)) }}}.
 Proof.
-  iIntros ([w Hlookup] Φ) "Hl HΦ".
+  iIntros ([w Hlookup] Φ) "[T Hl] HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
-  iApply (twp_store with "Hl1"). iIntros "Hl1".
-  iApply "HΦ". iApply "Hl2". iApply "Hl1".
-Qed.
-Lemma wp_store_offset s E l off vs v :
-  is_Some (vs !! off) →
-  {{{ ▷ l ↦∗ vs }}} #(l +ₗ off) <- v @ s; E {{{ RET #(); l ↦∗ <[off:=v]> vs }}}.
-Proof.
-  iIntros (? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_store_offset with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
+  iApply (lwp_store with "[$T $Hl1]"). iIntros "[T Hl1]".
+  iApply "HΦ". iFrame "T". iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma twp_store_offset_vec s E l sz (off : fin sz) (vs : vec val sz) v :
-  [[{ l ↦∗ vs }]] #(l +ₗ off) <- v @ s; E [[{ RET #(); l ↦∗ vinsert off v vs }]].
+Lemma lwp_store_offset_vec G R o s q i E l sz (off : fin sz) (vs : vec val sz) v :
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
+    #(l +ₗ off) <- v @ s; i; E
+  l{{{ RET #(); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ vinsert off v vs }}}.
 Proof.
-  setoid_rewrite vec_to_list_insert. apply twp_store_offset.
+  setoid_rewrite vec_to_list_insert. apply lwp_store_offset.
   eexists. by apply vlookup_lookup.
 Qed.
-Lemma wp_store_offset_vec s E l sz (off : fin sz) (vs : vec val sz) v :
-  {{{ ▷ l ↦∗ vs }}} #(l +ₗ off) <- v @ s; E {{{ RET #(); l ↦∗ vinsert off v vs }}}.
-Proof.
-  iIntros (Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_store_offset_vec with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
-Qed.
 
-Lemma twp_xchg_offset s E l off vs v v' :
+Lemma lwp_xchg_offset G R o s q i E l off (vs : list val) (v v' : val) :
   vs !! off = Some v →
-  [[{ l ↦∗ vs }]] Xchg #(l +ₗ off) v' @ s; E [[{ RET v; l ↦∗ <[off:=v']> vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
+    Xchg #(l +ₗ off) v' @ s; i; E
+  l{{{ RET v; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ <[off:=v']> vs }}}.
 Proof.
-  iIntros (Hlookup Φ) "Hl HΦ".
+  iIntros (Hlookup Φ) "[T Hl] HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
-  iApply (twp_xchg with "Hl1"). iIntros "Hl1".
-  iApply "HΦ". iApply "Hl2". iApply "Hl1".
-Qed.
-Lemma wp_xchg_offset s E l off vs v v' :
-  vs !! off = Some v →
-  {{{ ▷ l ↦∗ vs }}} Xchg #(l +ₗ off) v' @ s; E {{{ RET v; l ↦∗ <[off:=v']> vs }}}.
-Proof.
-  iIntros (? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_xchg_offset with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
+  iApply (lwp_xchg with "[$T $Hl1]"). iIntros "[T Hl1]".
+  iApply "HΦ". iFrame. iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma twp_xchg_offset_vec s E l sz (off : fin sz) (vs : vec val sz) v :
-  [[{ l ↦∗ vs }]] Xchg #(l +ₗ off) v @ s; E [[{ RET (vs !!! off); l ↦∗ vinsert off v vs }]].
+Lemma lwp_xchg_offset_vec G R o s q i E l sz (off : fin sz) (vs : vec val sz) v :
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
+    Xchg #(l +ₗ off) v @ s; i; E
+  l{{{ RET (vs !!! off); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ vinsert off v vs }}}.
 Proof.
-  setoid_rewrite vec_to_list_insert. apply twp_xchg_offset.
+  setoid_rewrite vec_to_list_insert. apply lwp_xchg_offset.
   by apply vlookup_lookup.
 Qed.
-Lemma wp_xchg_offset_vec s E l sz (off : fin sz) (vs : vec val sz) v :
-   {{{ ▷ l ↦∗ vs }}} Xchg #(l +ₗ off) v @ s; E {{{ RET (vs !!! off); l ↦∗ vinsert off v vs }}}.
-Proof.
-  iIntros (Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_xchg_offset_vec with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
-Qed.
 
-Lemma twp_cmpxchg_suc_offset s E l off vs v' v1 v2 :
+Lemma lwp_cmpxchg_suc_offset G R o s q i E l off vs (v' v1 v2 : val) :
   vs !! off = Some v' →
   v' = v1 →
   vals_compare_safe v' v1 →
-  [[{ l ↦∗ vs }]]
-    CmpXchg #(l +ₗ off) v1 v2 @ s; E
-  [[{ RET (v', #true); l ↦∗ <[off:=v2]> vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
+    CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
+  l{{{ RET (v', #true); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ <[off:=v2]> vs }}}.
 Proof.
-  iIntros (Hlookup ?? Φ) "Hl HΦ".
+  iIntros (Hlookup ?? Φ) "[T Hl] HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
-  iApply (twp_cmpxchg_suc with "Hl1"); [done..|].
-  iIntros "Hl1". iApply "HΦ". iApply "Hl2". iApply "Hl1".
-Qed.
-Lemma wp_cmpxchg_suc_offset s E l off vs v' v1 v2 :
-  vs !! off = Some v' →
-  v' = v1 →
-  vals_compare_safe v' v1 →
-  {{{ ▷ l ↦∗ vs }}}
-    CmpXchg #(l +ₗ off) v1 v2 @ s; E
-  {{{ RET (v', #true); l ↦∗ <[off:=v2]> vs }}}.
-Proof.
-  iIntros (??? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_cmpxchg_suc_offset with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
+  iApply (lwp_cmpxchg_suc with "[$T $Hl1]"); [done..|].
+  iIntros "[T Hl1]". iApply "HΦ". iFrame. iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma twp_cmpxchg_suc_offset_vec s E l sz (off : fin sz) (vs : vec val sz) v1 v2 :
+Lemma lwp_cmpxchg_suc_offset_vec G R o s q i E l sz (off : fin sz) (vs : vec val sz) v1 v2 :
   vs !!! off = v1 →
   vals_compare_safe (vs !!! off) v1 →
-  [[{ l ↦∗ vs }]]
-    CmpXchg #(l +ₗ off) v1 v2 @ s; E
-  [[{ RET (vs !!! off, #true); l ↦∗ vinsert off v2 vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
+    CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
+  l{{{ RET (vs !!! off, #true); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ vinsert off v2 vs }}}.
 Proof.
   intros. setoid_rewrite vec_to_list_insert.
-  apply twp_cmpxchg_suc_offset; [|done..].
+  apply lwp_cmpxchg_suc_offset; [|done..].
   by apply vlookup_lookup.
 Qed.
-Lemma wp_cmpxchg_suc_offset_vec s E l sz (off : fin sz) (vs : vec val sz) v1 v2 :
-  vs !!! off = v1 →
-  vals_compare_safe (vs !!! off) v1 →
-  {{{ ▷ l ↦∗ vs }}}
-    CmpXchg #(l +ₗ off) v1 v2 @ s; E
-  {{{ RET (vs !!! off, #true); l ↦∗ vinsert off v2 vs }}}.
-Proof.
-  iIntros (?? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_cmpxchg_suc_offset_vec with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
-Qed.
 
-Lemma twp_cmpxchg_fail_offset s E l dq off vs v0 v1 v2 :
+Lemma lwp_cmpxchg_fail_offset G R o s q i E l dq off vs (v0 v1 v2 : val) :
   vs !! off = Some v0 →
   v0 ≠ v1 →
   vals_compare_safe v0 v1 →
-  [[{ l ↦∗{dq} vs }]]
-    CmpXchg #(l +ₗ off) v1 v2 @ s; E
-  [[{ RET (v0, #false); l ↦∗{dq} vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗{dq} vs }}}
+    CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
+  l{{{ RET (v0, #false); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗{dq} vs }}}.
 Proof.
-  iIntros (Hlookup HNEq Hcmp Φ) "Hl HΦ".
+  iIntros (Hlookup HNEq Hcmp Φ) "[T Hl] HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
-  iApply (twp_cmpxchg_fail with "Hl1"); first done.
+  iApply (lwp_cmpxchg_fail with "[$T $Hl1]"); first done.
   { destruct Hcmp; by [ left | right ]. }
-  iIntros "Hl1". iApply "HΦ". iDestruct ("Hl2" $! v0) as "Hl2".
+  iIntros "[T Hl1]". iApply "HΦ". iFrame "T". iDestruct ("Hl2" $! v0) as "Hl2".
   rewrite list_insert_id; last done. iApply "Hl2". iApply "Hl1".
 Qed.
-Lemma wp_cmpxchg_fail_offset s E l dq off vs v0 v1 v2 :
-  vs !! off = Some v0 →
-  v0 ≠ v1 →
-  vals_compare_safe v0 v1 →
-  {{{ ▷ l ↦∗{dq} vs }}}
-    CmpXchg #(l +ₗ off) v1 v2 @ s; E
-  {{{ RET (v0, #false); l ↦∗{dq} vs }}}.
-Proof.
-  iIntros (??? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_cmpxchg_fail_offset with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
-Qed.
 
-Lemma twp_cmpxchg_fail_offset_vec s E l dq sz (off : fin sz) (vs : vec val sz) v1 v2 :
+Lemma lwp_cmpxchg_fail_offset_vec G R o s q i E l dq sz (off : fin sz) (vs : vec val sz) (v1 v2 : val) :
   vs !!! off ≠ v1 →
   vals_compare_safe (vs !!! off) v1 →
-  [[{ l ↦∗{dq} vs }]]
-    CmpXchg #(l +ₗ off) v1 v2 @ s; E
-  [[{ RET (vs !!! off, #false); l ↦∗{dq} vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗{dq} vs }}}
+    CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
+  l{{{ RET (vs !!! off, #false); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗{dq} vs }}}.
 Proof.
-  intros. apply twp_cmpxchg_fail_offset; [|done..].
-  by apply vlookup_lookup.
-Qed.
-Lemma wp_cmpxchg_fail_offset_vec s E l dq sz (off : fin sz) (vs : vec val sz) v1 v2 :
-  vs !!! off ≠ v1 →
-  vals_compare_safe (vs !!! off) v1 →
-  {{{ ▷ l ↦∗{dq} vs }}}
-    CmpXchg #(l +ₗ off) v1 v2 @ s; E
-  {{{ RET (vs !!! off, #false); l ↦∗{dq} vs }}}.
-Proof.
-  intros. eapply wp_cmpxchg_fail_offset; [|done..].
+  intros. apply lwp_cmpxchg_fail_offset; [|done..].
   by apply vlookup_lookup.
 Qed.
 
-Lemma twp_faa_offset s E l off vs (i1 i2 : Z) :
+Lemma lwp_faa_offset G R o s q i E l off vs (i1 i2 : Z) :
   vs !! off = Some #i1 →
-  [[{ l ↦∗ vs }]] FAA #(l +ₗ off) #i2 @ s; E
-  [[{ RET LitV (LitInt i1); l ↦∗ <[off:=#(i1 + i2)]> vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+       ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
+    FAA #(l +ₗ off) #i2 @ s; i; E
+  l{{{ RET LitV (LitInt i1); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
 Proof.
-  iIntros (Hlookup Φ) "Hl HΦ".
+  iIntros (Hlookup Φ) "[T Hl] HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
-  iApply (twp_faa with "Hl1").
-  iIntros "Hl1". iApply "HΦ". iApply "Hl2". iApply "Hl1".
-Qed.
-Lemma wp_faa_offset s E l off vs (i1 i2 : Z) :
-  vs !! off = Some #i1 →
-  {{{ ▷ l ↦∗ vs }}} FAA #(l +ₗ off) #i2 @ s; E
-  {{{ RET LitV (LitInt i1); l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
-Proof.
-  iIntros (? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_faa_offset with "H"); [by eauto..|]; iIntros "H HΦ". by iApply "HΦ".
+  iApply (lwp_faa with "[$T $Hl1]").
+  iIntros "[T Hl1]". iApply "HΦ". iFrame. iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma twp_faa_offset_vec s E l sz (off : fin sz) (vs : vec val sz) (i1 i2 : Z) :
+Lemma lwp_faa_offset_vec G R o s q i E l sz (off : fin sz) (vs : vec val sz) (i1 i2 : Z) :
   vs !!! off = #i1 →
-  [[{ l ↦∗ vs }]] FAA #(l +ₗ off) #i2 @ s; E
-  [[{ RET LitV (LitInt i1); l ↦∗ vinsert off #(i1 + i2) vs }]].
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
+    FAA #(l +ₗ off) #i2 @ s; i; E
+  l{{{ RET LitV (LitInt i1); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ vinsert off #(i1 + i2) vs }}}.
 Proof.
-  intros. setoid_rewrite vec_to_list_insert. apply twp_faa_offset.
+  intros. setoid_rewrite vec_to_list_insert. apply lwp_faa_offset.
   by apply vlookup_lookup.
-Qed.
-Lemma wp_faa_offset_vec s E l sz (off : fin sz) (vs : vec val sz) (i1 i2 : Z) :
-  vs !!! off = #i1 →
-  {{{ ▷ l ↦∗ vs }}} FAA #(l +ₗ off) #i2 @ s; E
-  {{{ RET LitV (LitInt i1); l ↦∗ vinsert off #(i1 + i2) vs }}}.
-Proof.
-  iIntros (? Φ) ">H HΦ". iApply (twp_wp_step with "HΦ").
-  iApply (twp_faa_offset_vec with "H"); [by eauto..|]; iIntros "H HΦ".
-  by iApply "HΦ".
 Qed.
 
 (** Derived prophecy laws *)
 
 (** Lemmas for some particular expression inside the [Resolve]. *)
-Lemma wp_resolve_proph s E (p : proph_id) (pvs : list (val * val)) v :
-  {{{ proph p pvs }}}
-    ResolveProph (Val $ LitV $ LitProphecy p) (Val v) @ s; E
-  {{{ pvs', RET (LitV LitUnit); ⌜pvs = (LitV LitUnit, v)::pvs'⌝ ∗ proph p pvs' }}}.
+Lemma lwp_resolve_proph G R o s q i E (p : proph_id) (pvs : list (val * val)) v :
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ proph p pvs }}}
+    ResolveProph (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E
+  l{{{ pvs', RET (LitV LitUnit); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ ⌜pvs = (LitV LitUnit, v)::pvs'⌝ ∗ proph p pvs' }}}.
 Proof.
-  iIntros (Φ) "Hp HΦ". iApply (wp_resolve with "Hp"); first done.
-  iApply lifting.wp_pure_step_later; first done.
-  iIntros "!> _". iApply wp_value. iIntros (vs') "HEq Hp". iApply "HΦ". iFrame.
+  iIntros (Φ) "[[Tx T] Hp] HΦ". iApply (lwp_resolve with "Hp Tx"); first done.
+  iIntros "Tx". iApply lifting.lwp_pure_step; first done. simpl.
+  iFrame "Tx". iIntros "!>". iDestruct "T" as "($& $& $)".
+  iIntros "Tx TG Rs". iExists o. iIntros "LC !> !> _".
+  iApply lwp_value. iIntros (vs') "HEq Hp". iApply "HΦ". iFrame.
 Qed.
 
-Lemma wp_resolve_cmpxchg_suc s E l (p : proph_id) (pvs : list (val * val)) v1 v2 v :
+Lemma lwp_resolve_cmpxchg_suc G R o s q i E l (p : proph_id) (pvs : list (val * val)) (v1 v2 v : val) :
   vals_compare_safe v1 v1 →
-  {{{ proph p pvs ∗ ▷ l ↦ v1 }}}
-    Resolve (CmpXchg #l v1 v2) #p v @ s; E
-  {{{ RET (v1, #true) ; ∃ pvs', ⌜pvs = ((v1, #true)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦ v2 }}}.
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ proph p pvs ∗ ▷ l ↦ v1 }}}
+    Resolve (CmpXchg #l v1 v2) #p v @ s; i; E
+  l{{{ RET (v1, #true) ; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ ∃ pvs', ⌜pvs = ((v1, #true)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦ v2 }}}.
 Proof.
-  iIntros (Hcmp Φ) "[Hp Hl] HΦ".
-  iApply (wp_resolve with "Hp"); first done.
+  iIntros (Hcmp Φ) "[[Tx T] [Hp >Hl]] HΦ".
+  iApply (lwp_resolve with "Hp Tx"); first done. iIntros "Tx".
   assert (val_is_unboxed v1) as Hv1; first by destruct Hcmp.
-  iApply (wp_cmpxchg_suc with "Hl"); [done..|]. iIntros "!> Hl".
+  iApply (lwp_cmpxchg_suc with "[$Tx $T $Hl]"); [done..|]. iIntros "[T Hl]".
   iIntros (pvs' ->) "Hp". iApply "HΦ". eauto with iFrame.
 Qed.
 
-Lemma wp_resolve_cmpxchg_fail s E l (p : proph_id) (pvs : list (val * val)) dq v' v1 v2 v :
+Lemma lwp_resolve_cmpxchg_fail G R o s q i E l (p : proph_id) (pvs : list (val * val)) dq (v' v1 v2 v : val) :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  {{{ proph p pvs ∗ ▷ l ↦{dq} v' }}}
-    Resolve (CmpXchg #l v1 v2) #p v @ s; E
-  {{{ RET (v', #false) ; ∃ pvs', ⌜pvs = ((v', #false)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦{dq} v' }}}.
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+        ([∗ map] r↦v ∈ R, gl r v)) ∗ proph p pvs ∗ ▷ l ↦{dq} v' }}}
+    Resolve (CmpXchg #l v1 v2) #p v @ s; i; E
+  l{{{ RET (v', #false) ; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ ∃ pvs', ⌜pvs = ((v', #false)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦{dq} v' }}}.
 Proof.
-  iIntros (NEq Hcmp Φ) "[Hp Hl] HΦ".
-  iApply (wp_resolve with "Hp"); first done.
-  iApply (wp_cmpxchg_fail with "Hl"); [done..|]. iIntros "!> Hl".
+  iIntros (NEq Hcmp Φ) "[[Tx T] [Hp >Hl]] HΦ".
+  iApply (lwp_resolve with "Hp Tx"); first done. iIntros "Tx".
+  iApply (lwp_cmpxchg_fail with "[$Tx $T $Hl]"); [done..|]. iIntros "[T Hl]".
   iIntros (pvs' ->) "Hp". iApply "HΦ". eauto with iFrame.
 Qed.
 
