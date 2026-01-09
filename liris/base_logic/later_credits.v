@@ -428,9 +428,12 @@ Section auth_rupd.
 
 End auth_rupd.
 
+Global Arguments rupdF {SI Σ X _} a.
+Global Arguments rupdA {SI Σ X _} a.
+
 (** The notation for later credits that we use in the rest of this developemnt. *)
-Notation "£ a" := (rupdF _ _ a) (at level 60).
-Notation "●£ a" := (rupdA _ _ a) (at level 60).
+Notation "£ a" := (rupdF a) (at level 60).
+Notation "●£ a" := (rupdA a) (at level 60).
 
 Global Arguments ALC {SI Σ X _ _} P.
 Global Arguments sat_ALC {_ _ _ _ _ _ _ _ _ _} P.
@@ -475,7 +478,7 @@ Notation "'£ω'" := (£ ω%ord) (at level 60).
 Notation "'£n' a" := (£ (Ord.from_nat a)) (at level 60).
 
 Section transfinite_lc.
-  Context `{SI : indexT} (Σ : gFunctors).
+  Context `{SI : indexT} `{!tlcGS Σ}.
   Local Open Scope ord.
 
   Lemma ord_auth_step_frame (a a' f : OrdR) :
@@ -509,29 +512,29 @@ Section transfinite_lc.
       auth_valid_trivial := ord_valid_trivial
     |}.
 
-  Lemma tlc_equiv `{!tlcGS Σ} (α β : Ord.t) :
+  Lemma tlc_equiv (α β : Ord.t) :
     α == β → £ α ⊣⊢ £ β.
   Proof. intros. by apply rupdF_equiv. Qed.
 
-  Lemma tlc_split `{!tlcGS Σ} (α β : Ord.t) :
+  Lemma tlc_split (α β : Ord.t) :
     £ (α ⊕ β) ⊣⊢ £ α ∗ £ β.
   Proof. apply rupdF_split. Qed.
 
-  Lemma tlc_succ `{!tlcGS Σ} (α : Ord.t) :
+  Lemma tlc_succ (α : Ord.t) :
     £ (Ord.S α) ⊣⊢ £ Ord.one ∗ £ α.
   Proof.
     rewrite -tlc_split. symmetry. rewrite tlc_equiv; first reflexivity.
     rewrite Hessenberg.add_S_l Hessenberg.add_O_l. reflexivity.
   Qed.
 
-  Lemma tlc_later_strong `{!tlcGS Σ} α β P :
+  Lemma tlc_later_strong α β P :
     β < α →
     £ α ∗ (£ β -∗ ▷ |==>r P) ⊢ |==>r P.
   Proof.
     intros Hlt; apply auth_rupd_step. apply Hlt.
   Qed.
 
-  Lemma tlc_later `{!tlcGS Σ} P :
+  Lemma tlc_later P :
     £ Ord.one ∗ (▷ |==>r P) ⊢ |==>r P.
   Proof.
     iIntros "[Hf Hupd]". iApply (tlc_later_strong (Ord.S Ord.O) Ord.O with "[Hf Hupd]").
@@ -539,7 +542,7 @@ Section transfinite_lc.
     - iFrame. by iIntros "_".
   Qed.
 
-  Lemma tlc_laterN `{!tlcGS Σ} P n :
+  Lemma tlc_laterN P n :
     £(Ord.from_nat n) ∗ (▷^n |==>r P) ⊢ |==>r P.
   Proof.
     iIntros "[Hc Hu]". iInduction n as [ | n ] "IH"; first done.
@@ -548,7 +551,7 @@ Section transfinite_lc.
     iFrame. iNext. iApply ("IH" with "Hc Hu").
   Qed.
 
-  Lemma tlc_weaken `{!tlcGS Σ} (α β : Ord.t) :
+  Lemma tlc_weaken (α β : Ord.t) :
     β <= α → (£ α ⊢ |==>r £ β).
   Proof.
     intros Hle. apply ClassicOrd.le_eq_or_lt in Hle. destruct Hle.
@@ -556,32 +559,32 @@ Section transfinite_lc.
     - rewrite tlc_equiv; eauto. done.
   Qed.
 
-  Lemma tlc_zero `{!tlcGS Σ} : ⊢ |==> £ Ord.O.
+  Lemma tlc_zero : ⊢ |==> £ Ord.O.
   Proof. iApply own_unit. Qed.
 
-  Lemma tlc_loeb `{!tlcGS Σ} P `{!CreditExchange Σ OrdUR P} :
+  Lemma tlc_loeb P `{!CreditExchange Σ OrdUR P} :
     □ ((£ Ord.one -∗ P) → P) ⊢ P.
   Proof.
     exact (credit_ind Σ OrdUR P).
   Qed.
 
   (* For natural numbers *)
-  Lemma tlc_omega `{!tlcGS Σ} (n : nat) :
+  Lemma tlc_omega (n : nat) :
     £ω ⊢ |==>r £n n.
   Proof. apply tlc_weaken, Ord.lt_le, Ord.omega_upperbound. Qed.
 
-  Lemma tlc_split_nat `{!tlcGS Σ} (n m : nat) :
+  Lemma tlc_split_nat (n m : nat) :
     £n (n + m) ⊣⊢ £n n ∗ £n m.
   Proof.
     rewrite tlc_equiv. 2: eapply Hessenberg.add_from_nat.
     apply tlc_split.
   Qed.
 
-  Lemma tlc_one_nat `{!tlcGS Σ} :
+  Lemma tlc_one_nat :
     £n 1 ⊣⊢ £ Ord.one.
   Proof. by rewrite Ord.from_nat_1. Qed.
 
-  Lemma tlc_succ_nat `{!tlcGS Σ} (n : nat) :
+  Lemma tlc_succ_nat (n : nat) :
     £n (S n) ⊣⊢ £ Ord.one ∗ £n n.
   Proof. rewrite Ord.from_nat_S. apply tlc_succ. Qed.
 

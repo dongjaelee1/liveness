@@ -360,7 +360,7 @@ Section lifting.
     iIntros "!> % % % % %". iIntros ([? ?]). edestruct Hpuredet as (?&?&?&?); eauto. by subst.
   Qed.
 
-  Lemma lwp_pure_step `{!Inhabited (state Λ)} n s i E E' e1 e2 φ Φ C ς :
+  Lemma lwp_pure_step `{!Inhabited (state Λ)} (n : nat) (o : Ord.t) s i E E' e1 e2 φ Φ C ς :
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς i →
@@ -371,26 +371,58 @@ Section lifting.
                    (ς -∗
                     th_obls i G 1 -∗
                     ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
-                    ALC (|={E',E}=> P)))
-       (£n n -∗ (lWP e2 @ s; i; E {{ Φ }})))
+                    ALC (£ o ={E',E}=∗ P)))
+       (lWP e2 @ s; i; E {{ Φ }}))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hexec Hφ HCC) "Hlwp". specialize (Hexec Hφ).
     iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
-    { iMod tlc_zero as "Hz". by iApply "Hlwp". }
+    { auto. }
     iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
     - intros σ Θ HC. specialize (Hsafe i σ Θ HC). destruct s; eauto using reducible_not_val.
     - eauto.
     - iDestruct "Hlwp" as ">($& %& $& $& %& $& H)".
       iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Hc Gb Wcs") as "H".
-      iDestruct "H" as "(%& H)". iExists (Ord.S x). iIntros "LC".
-      iPoseProof (tlc_succ with "LC") as "[LC LC2]".
-      iMod ("H" with "LC2") as "H". iModIntro. iMod "H".
-      iApply "IH". iModIntro.
-      iRevert "H". iApply (bi.iter_modal_mono with "[-]").
-      + iIntros (??) "PQ >H". iDestruct "H" as "($& %& $& $& %& $& H)".
-        iIntros "!> Hc Tb Wcs". iMod ("H" with "Hc Tb Wcs") as ">H". by iApply "PQ".
-      + iIntros "H1 H2". iApply "H1". iApply tlc_succ_nat. iFrame.
+      iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
+      iPoseProof (tlc_split with "LC") as "[LC LC2]".
+      iMod ("H" with "LC2") as "H". iModIntro. iMod ("H" with "LC") as "H".
+      iApply "IH". iModIntro. auto.
+  Qed.
+
+  Lemma lwp_pure_step' `{!Inhabited (state Λ)} n G R (o : Ord.t) s i E e1 e2 φ Φ C ς :
+    PureExec φ C n e1 e2 →
+    φ →
+    PureExecCond C ς i →
+    (ς ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g n) ∗ ([∗ map] r ↦ v ∈ R, gl r v) ∗
+     (ς -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit_credit r v n ∨ gl_done r v) -∗
+      £ (o × n)%ord -∗ lWP e2 @ s; i ; E {{ Φ }}))
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros (Hexec HΦ HCC) "(Hc& TG& Gfs& #Rs& Hlwp)".
+    iApply (lwp_pure_step n o _ _ E E). 1: auto.
+    iStopProof. clear Hexec. pattern n. induction n.
+    { iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
+      iMod tlc_zero as "Hz". iPoseProof (tlc_equiv Ord.O (o × 0)%ord with "Hz") as "Hz".
+      { by rewrite Jacobsthal.mult_O_r. }
+      iMod (gl_check_witnesses with "Rs") as "Ws".
+      iApply ("IH" with "Hc TG [Ws] Hz").
+      rewrite Ord.from_nat_O. done. }
+    iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
+    iAssert (([∗ map] g↦_ ∈ G, gl_fuel g n) ∗ ([∗ map] g↦_ ∈ G, gl_fuel g 1))%I with "[Gfs]" as "[Gfs Gf]".
+    { rewrite !big_sepM_dom. iApply (gl_fuel_split_set).
+      rewrite (gl_fuel_eq_set _ (n ⊕ 1)%ord (S n)). 1: auto.
+      rewrite comm -Hessenberg.add_from_nat. done. }
+    iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
+    iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
+    iIntros "Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").
+    { iCombine "Ws RWs" as "Ws". rewrite -big_sepM_sep. iApply (big_sepM_impl with "Ws").
+      iIntros "!> %%% [[Wc1 | #Gd1] [Wc2 | #Gd2]]"; auto.
+      iLeft. rewrite (wit_credit_eq _ _ (n ⊕ Ord.one)%ord (S n)).
+      - iApply wit_credit_split. iFrame.
+      - rewrite -Ord.from_nat_1 -Hessenberg.add_from_nat comm. done. }
+    { rewrite (tlc_equiv (o × S n)%ord ((o × n) ⊕ o)%ord).
+      - rewrite tlc_split. iFrame.
+      - rewrite Ord.from_nat_S Jacobsthal.mult_S comm. done. }
   Qed.
 
 End lifting.

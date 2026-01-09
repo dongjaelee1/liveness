@@ -291,7 +291,7 @@ Proof.
   iIntros (Φ) "[[Tx T] Hp] HΦ". iApply (lwp_resolve with "Hp Tx"); first done.
   iIntros "Tx". iApply lifting.lwp_pure_step; first done. simpl.
   iFrame "Tx". iIntros "!>". iDestruct "T" as "($& $& $)".
-  iIntros "Tx TG Rs". iExists o. iIntros "LC !> !> _".
+  iIntros "Tx TG Rs". iExists o. iIntros "_ !> LC !>".
   iApply lwp_value. iIntros (vs') "HEq Hp". iApply "HΦ". iFrame.
 Qed.
 

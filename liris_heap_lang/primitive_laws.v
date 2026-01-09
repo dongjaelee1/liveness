@@ -160,7 +160,7 @@ Proof.
 Qed.
 
 (** "pure" steps that are reducible with the thread_exec predicate *)
-Lemma lwp_pure_step n s i q E E' e1 e2 φ Φ :
+Lemma lwp_pure_step n o s i q E E' e1 e2 φ Φ :
   PureExec φ thread_cond n e1 e2 →
   φ →
   Nat.iter n
@@ -171,8 +171,8 @@ Lemma lwp_pure_step n s i q E E' e1 e2 φ Φ :
                  (thread_exec i q -∗
                   th_obls i G 1 -∗
                   ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
-                  ALC (|={E',E}=> P)))
-    (£n n -∗ lWP e2 @ s; i; E {{ v, Φ v }})
+                  ALC (£ o ={E',E}=∗ P)))
+    (lWP e2 @ s; i; E {{ v, Φ v }})
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof.
   iIntros (Hexec Hp) "H". iApply (lwp_pure_step); eauto.

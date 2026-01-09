@@ -88,11 +88,11 @@ Section mp_proof.
     iMod (gl_fuel_lt k 100 with "Gfk") as "[Gfk Gfk1]".
     { apply Ord.omega_upperbound. }
     (* Pure steps *)
-    iApply (lwp_pure_step 1). 1: done.
+    iApply (lwp_pure_step 1 Ord.O). 1: done.
     simpl. iModIntro. iFrame "Tx TG". iSplitL "Gfk1".
     { iApply big_sepM_singleton. auto. }
     iExists ∅. iSplitR; first done.
-    iIntros "Tx TG _ !> !> _".
+    iIntros "Tx TG _ !> _ !>".
     iMod (gl_fuel_mon_split k 99 1 with "Gfk") as "[Gfk Gfk1]".
     { rewrite -Hessenberg.add_from_nat. reflexivity. }
     lwp_bind (Store _ _).
@@ -116,21 +116,21 @@ Section mp_proof.
     (* replace (App (Rec BAnon BAnon (Exit (Val (LitV LitUnit)))) #()) with (fill_item (AppLCtx #()) (Rec BAnon BAnon (Exit (Val (LitV LitUnit))))). *)
     (* 2:{ done. } *)
     (* iApply lwp_bind. *)
-    iApply (lwp_pure_step 1). 1: done.
+    iApply (lwp_pure_step 1 Ord.O). 1: done.
     simpl. iModIntro. iFrame "Tx".
     iExists ∅. iSplitL "TG".
     { rewrite delete_insert_id; auto. }
     iSplitR; first done.
     iExists ∅. iSplitR; first done.
-    iIntros "Tx TG _ !> !> _".
+    iIntros "Tx TG _ !> _ !>".
     iApply lwp_value.
-    iApply (lwp_pure_step 1). 1: done.
+    iApply (lwp_pure_step 1 Ord.O). 1: done.
     simpl. iModIntro. iFrame "Tx".
     iExists ∅. iSplitL "TG".
     { auto. }
     iSplitR; first done.
     iExists ∅. iSplitR; first done.
-    iIntros "Tx TG _ !> !> _".
+    iIntros "Tx TG _ !> _ !>".
     iApply (lwp_exit with "TG Tx [HΦ]").
     iModIntro. iIntros "#Tt1 #Tt2". iIntros "!> !>".
     iApply "HΦ". rewrite /lift_term. iFrame "Tt1".
@@ -151,9 +151,9 @@ Section mp_proof.
     iStopProof. induction a using WFOCM.ind. rename x into a, H into IHa.
     iIntros "(#(Gwfk& Gk& Wkv& GVkv)& Tx& TG& HΦ)".
     (* Pure steps *)
-    iApply (lwp_pure_step 1). 1: done.
+    iApply (lwp_pure_step 1 Ord.O). 1: done.
     simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-    iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+    iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
     lwp_bind (Load _).
     iMod (gl_variant_acc with "GVkv") as "[>PQR ACC]". 1: set_solver.
     iDestruct "PQR" as "[[HP | HQ] | HR]"; cycle -1.
@@ -168,22 +168,22 @@ Section mp_proof.
       { iModIntro. iApply gl_variant_cases_unfold. iLeft. iLeft. iFrame. }
       iModIntro.
       lwp_expr_simpl. lwp_bind (Rec BAnon (BNamed _) _).
-      iApply (lwp_pure_step 1). 1: done.
+      iApply (lwp_pure_step 1 Ord.O). 1: done.
       simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       iApply lwp_value.
-      iApply (lwp_pure_step 1). 1: done.
+      iApply (lwp_pure_step 1 Ord.O). 1: done.
       simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       lwp_bind (BinOp _ _ _).
-      iApply (lwp_pure_step 1).
+      iApply (lwp_pure_step 1 Ord.O).
       { simpl. auto. }
       simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       iApply lwp_value.
-      iApply (lwp_pure_step 1). 1: done.
+      iApply (lwp_pure_step 1 Ord.O). 1: done.
       simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       iMod (wit_credit_spend_one with "Wkv Wck") as "(%& %LTa& #Wkv')".
       iApply (IHa a0 LTa). iFrame. auto.
     - iDestruct "HQ" as "[#Gdk ptr]".
@@ -194,22 +194,22 @@ Section mp_proof.
       { iModIntro. iApply gl_variant_cases_unfold. iLeft. iRight. iFrame. auto. }
       iModIntro.
       lwp_expr_simpl. lwp_bind (Rec BAnon (BNamed _) _).
-      iApply (lwp_pure_step 1). 1: done.
+      iApply (lwp_pure_step 1 Ord.O). 1: done.
       simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       iApply lwp_value.
-      iApply (lwp_pure_step 1). 1: done.
+      iApply (lwp_pure_step 1 Ord.O). 1: done.
       simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       lwp_bind (BinOp _ _ _).
-      iApply (lwp_pure_step 1).
+      iApply (lwp_pure_step 1 Ord.O).
       { simpl. auto. }
       simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       iApply lwp_value.
-      iApply (lwp_pure_step 1). 1: done.
+      iApply (lwp_pure_step 1 Ord.O). 1: done.
       simpl. iModIntro. iFrame "Tx TG". iSplitR; first done.
-      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> !> _".
+      iExists ∅. iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       iApply (lwp_exit with "TG Tx [HΦ]").
       iModIntro. iIntros "#Tt1 #Tt2". iIntros "!>".
       iApply "HΦ". rewrite /lift_term. iFrame "Tt1".

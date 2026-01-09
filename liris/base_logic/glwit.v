@@ -459,6 +459,35 @@ Section glwit.
       iPoseProof (big_sepS_sep with "Wks") as "[$ _]".
   Qed.
 
+  Lemma glwit_get_credit_zero W :
+    glwit W
+    ⊢ glwit W ∗
+        ([∗ map] k ↦ '(v, w) ∈ W,
+           ([∗ set] u ∈ (set_seq 0 v), glG_version_lb k u ∗ glG_unlocked k u) ∗
+           glG_version_lb k v ∗
+           match w with
+           | witness_locked _ =>
+               (witG_credit k v wzero)
+           | witness_unlocked =>
+               (glG_unlocked k v)
+           end).
+  Proof.
+    iIntros "W".
+    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    iFrame "Wti".
+    iStopProof. induction W using map_ind; iIntros "WM".
+    { iFrame. done. }
+    rewrite !big_sepM_insert; auto.
+    destruct x as (v1&w1). iDestruct "WM" as "((VSa& #VS& #Gvli& Mi)& M)".
+    iFrame "VSa VS".
+    iPoseProof (IHW with "M") as "[M Rs]". clear IHW.
+    iFrame "M Rs Gvli". destruct w1.
+    - iDestruct "Mi" as "(%& %& Wc)". rewrite (witG_credit_eq _ _ α (α w+ wzero)); cycle 1.
+      { rewrite right_id. done. }
+      iPoseProof (witG_credit_split with "Wc") as "[Wc Wcz]". iSplitR "Wcz"; iFrame. auto.
+    - iPoseProof "Mi" as "#Mi". auto.
+  Qed.
+
   (** glwit_inv rules *)
   Lemma glwit_inv_empty ξ :
     glwit_inv ξ ∅ ∅.

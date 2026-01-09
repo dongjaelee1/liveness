@@ -1371,6 +1371,123 @@ Section preds.
       iIntros "!> !>". auto.
     Qed.
 
+    Lemma gl_check_witnesses_0 Θ R :
+      ([∗ map] r ↦ v ∈ R, gl r v) -∗
+      |=[Θ]=>g ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.O ∨ gl_done r v).
+    Proof.
+      unfold_defs. iIntros "#REs".
+      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI1)".
+      iPoseProof (glwit_get_credit_zero with "W") as "[W Ws]".
+      assert (DomOW : dom Ω1 = dom W1) by (eapply glwit_inv_dom; eauto).
+      iAssert (⌜ dom R ⊆ dom W1 ⌝)%I as "%RWSub".
+      { rewrite -DomOW. rewrite elem_of_subseteq. iIntros (x INRx).
+        pose proof INRx. apply elem_of_dom in H. destruct H.
+        iPoseProof (big_sepM_delete _ _ _ _ H with "REs") as "[[#Beg _] _]".
+        iPoseProof (glsat_elem with "[$S $Beg]") as "%". done.
+      }
+      iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
+      assert (HW1 : ∃ WR WR', WR ##ₘ WR' ∧ W1 = WR ∪ WR' ∧ dom R = dom WR).
+      { clear GWI1 DomOW WStep.
+        revert R RWSub. induction W1 using map_ind; intros.
+        { assert (dom R = ∅) by (set_solver). apply dom_empty_inv_L in H. subst. exists ∅, ∅. done. }
+        rename i into r. rewrite dom_insert_L in RWSub. destruct (decide (r ∈ dom R)).
+        - set (R2 := delete r R). assert (dom R2 ⊆ dom m).
+          { subst R2. rewrite dom_delete_L. set_solver + RWSub. }
+          apply elem_of_dom in e. destruct e. rename H1 into LUR.
+          destruct (IHW1 _ H0) as (WR&WR'&?&?&?).
+          exists (<[r:=x]>WR), WR'. subst R2.
+          assert (WR !! r = None ∧ WR' !! r = None).
+          { apply lookup_union_None. rewrite -H2; auto. }
+          destruct H4. split_and !.
+          + apply map_disjoint_insert_l. split; auto.
+          + subst. rewrite insert_union_l. done.
+          + replace R with (<[r:=x0]> (delete r R)).
+            * rewrite !dom_insert_L H3. auto.
+            * rewrite insert_delete_id; auto.
+        - assert (dom R ⊆ dom m).
+          { set_solver + RWSub n. }
+          pose proof H0. apply IHW1 in H1. destruct H1 as (WR& WR'& ?&?&?).
+          assert (WR !! r = None ∧ WR' !! r = None).
+          { apply lookup_union_None. rewrite -H2; auto. }
+          destruct H4. exists WR, (<[r:=x]>WR'). split_and !; auto.
+          + apply map_disjoint_insert_r. split; auto.
+          + subst. rewrite insert_union_r; done.
+      }
+      destruct HW1 as (WR& WR'& DisjWR& EQWR& DomWR).
+      assert (EQfst : fst <$> Ω1 = fst <$> W1).
+      { apply map_eq. intros j. specialize (GWI1 j). rewrite !lookup_fmap. destruct (W1 !! j) eqn:LUW1.
+        - rewrite LUW1. rewrite LUW1 in GWI1. inv GWI1. destruct x. destruct w. destruct H1. by subst.
+        - rewrite LUW1. rewrite LUW1 in GWI1. inv GWI1. done.
+      }
+      iAssert (⌜ ∀ k v, R !! k = Some v → ∃ w, WR !! k = Some w ∧ v ≤ w.1 ⌝)%I as "%Rver".
+      { iIntros (k v LUR). iPoseProof (big_sepM_delete _ _ _ _ LUR with "REs") as "[(#Ge& #Gvl& #His) _]".
+        iPoseProof (glsat_lookup_version_lb with "[$S $Ge $Gvl]")as "(%&%&%&%)".
+        rewrite map_eq_iff in EQfst. specialize (EQfst k). rewrite !lookup_fmap H in EQfst.
+        assert (is_Some (WR !! k)).
+        { apply elem_of_dom. rewrite -DomWR. apply elem_of_dom; eauto. }
+        destruct H1 as (?& LUWRk).
+        assert (WR' !! k = None).
+        { eapply map_disjoint_Some_l; eauto.  }
+        destruct (W1 !! k) eqn:LUW1.
+        - rewrite LUW1 in EQfst. inv EQfst. apply lookup_union_Some_inv_l in LUW1; eauto.
+        - rewrite LUW1 in EQfst. inv EQfst.
+      }
+      iAssert (|==> [∗ map] r↦v ∈ R, (witG_credit (GL:=ord_ghost_lock_class) r v Ord.O) ∨
+                                    (glG_unlocked r v))%I
+        with "[Ws]" as ">Rs".
+      { subst W1. iPoseProof (big_sepM_union with "Ws") as "[Ws1 _]"; first auto.
+        iApply big_sepM_bupd. iClear "REs". clear dependent WR'.
+        iStopProof. revert R DomWR Rver. induction WR using map_ind; iIntros (R DomWR Rver) "M".
+        { apply dom_empty_inv_L in DomWR. subst. done. }
+        rename i into r. rewrite dom_insert_L in DomWR. destruct (R !! r) eqn:LUR; cycle 1.
+        { exfalso. apply not_elem_of_dom in LUR. set_solver + DomWR LUR. }
+        remember (delete r R) as R0.
+        assert (dom R0 = dom m).
+        { subst. rewrite dom_delete_L. apply not_elem_of_dom in H. rewrite DomWR. set_solver + H. }
+        assert (R0 !! r = None).
+        { subst. apply lookup_delete_eq. }
+        assert (R = <[r:=g]>R0).
+        { subst. rewrite insert_delete_id; auto. }
+        rewrite H2.
+        assert (∀ k v, R0 !! k = Some v → ∃ w, m !! k = Some w ∧ v ≤ w.1).
+        { intros. specialize (Rver k v). subst. destruct (decide (k = r)).
+          { subst. rewrite lookup_delete_eq in H3. inv H3. }
+          rewrite lookup_delete_ne in H3; auto. apply Rver in H3. destruct H3 as (?&?&?).
+          rewrite lookup_insert_ne in H3; eauto.
+        }
+        destruct (Rver _ _ LUR) as (w& LUmk& LEv). rewrite lookup_insert_eq in LUmk.
+        clear dependent R. inv LUmk. rewrite !big_sepM_insert; auto.
+        destruct w. iDestruct "M" as "[H M]". iPoseProof (IHWR _ H0 H3 with "M") as "$".
+        iDestruct "H" as "(#H1& #H2& H)". simpl in LEv. destruct w.
+        - assert (g = n ∨ g < n) by lia. destruct H2.
+          + subst. by iFrame.
+          + assert (g ∈ (set_seq 0 n : gset _)).
+            { apply elem_of_set_seq. lia. }
+            iPoseProof (big_sepS_delete _ _ _ H4 with "H1") as "[(_& Gu) _]".
+            iRight. auto.
+        - assert (g = n ∨ g < n) by lia. destruct H2.
+          + subst. iRight. auto.
+          + assert (g ∈ (set_seq 0 n : gset _)).
+            { apply elem_of_set_seq. lia. }
+            iPoseProof (big_sepS_delete _ _ _ H4 with "H1") as "[(_& Gu) _]".
+            iRight. auto.
+      }
+      iAssert ([∗ map] r↦v ∈ R,
+                 ((glG_elem r ∗ glG_version_lb r v ∗ ([∗ set] u ∈ set_seq 0 v, glG_version_lb r u ∗ glG_unlocked r u)) ∗ witG_credit (GL:=ord_ghost_lock_class) r v Ord.O) ∨
+                   ((glG_elem r ∗ glG_version_lb r v ∗ ([∗ set] u ∈ set_seq 0 v, glG_version_lb r u ∗ glG_unlocked r u)) ∗ glG_unlocked r v))%I
+        with "[Rs]" as "Rs".
+      { iPoseProof (big_sepM_sep with "[$Rs $REs]") as "H". iApply (big_sepM_impl with "H").
+        iIntros "!> %%% ([Wc | #Gu]& #Ge& #Gvl& #His)".
+        - iLeft. iFrame. auto.
+        - iRight. auto.
+      }
+      pose proof (glwit_inv_rc_step_same_gls _ _ _ _ GWI1 WStep GWI2) as WMon.
+      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      rewrite /gproto. iFrame "S O W A". iSplitR.
+      { eauto. }
+      iIntros "!> !>". auto.
+    Qed.
+
     (** Variant access rules *)
     Lemma gl_variant_cases_unfold k v P Q R :
       gl_variant_cases k v P Q R ∗-∗

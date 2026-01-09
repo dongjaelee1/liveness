@@ -94,4 +94,5 @@ Infix "w=" := OCM.eq (at level 70).
 Infix "w≤" := WFOCM.leR (at level 70).
 Infix "w+" := WFOCM.addO (at level 70).
 Infix "w<" := WFOCM.ltR (at level 70).
-Notation "'wzero'" := OCM.unit (at level 20).
+Notation "'wzero'" := OCM.unit (only parsing).
+(* Notation "'wzero'" := OCM.unit (at level 20). *)

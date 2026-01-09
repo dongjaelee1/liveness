@@ -485,6 +485,13 @@ Section sfgupd.
     iIntros "Tb %%% $". iMod (gl_terminate_0 with "Tb") as "#Tt". auto.
   Qed.
 
+  Lemma gl_check_witnesses E R :
+    ([∗ map] r ↦ v ∈ R, gl r v) -∗
+    |={E}=>g ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.O ∨ gl_done r v).
+  Proof.
+    iIntros "Rs %%% $". iMod (gl_check_witnesses_0 with "Rs") as "H". auto.
+  Qed.
+
 End sfgupd.
 
 Definition lift_term `{SI : indexT} `{!lirisGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
