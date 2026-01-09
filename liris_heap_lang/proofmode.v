@@ -22,35 +22,23 @@ Tactic Notation "lwp_expr_eval" tactic3(t) :=
   end.
 Ltac lwp_expr_simpl := lwp_expr_eval simpl.
 
-TODO
-
-Lemma tac_lwp_pure `{SI : indexT} `{!heapGS Σ} Δ Δ' s i E K e1 e2 φ C ς n Φ :
-  PureExec φ C n e1 e2 →
+Lemma tac_lwp_pure `{SI : indexT} `{!heapGS Σ} Δ G R o s q i E K e1 e2 φ n Φ :
+  PureExec φ thread_cond n e1 e2 →
   φ →
-  lifting.PureExecCond C ς i →
-  MaybeIntoLaterNEnvs n Δ Δ' →
-  envs_entails Δ' (lWP (fill K e2) @ s; i; E {{ Φ }}) →
+  (* MaybeIntoLaterNEnvs n Δ Δ' → *)
+  envs_entails Δ ((thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g n) ∗ ([∗ map] r↦v0 ∈ R, gl r v0)) ∗
+                  ((£ (o × n)%ord ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v0 ∈ R, wit_credit r v0 n ∨ gl_done r v0)) -∗ lWP (fill K e2) @ s; i; E {{ Φ }})) →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ???? HΔ'. rewrite into_laterN_env_sound /=.
-  (* We want [pure_exec_fill] to be available to TC search locally. *)
-  pose proof @pure_exec_fill.
-  rewrite HΔ'. iIntros "H". iApply lifting.lwp_pure_step. 1: auto.
-
-  -lifting.lwp_pure_step //.
-  iIntros "Hwp !> _" => //.
-Qed.
-Lemma tac_twp_pure `{!heapGS Σ} Δ s E K e1 e2 φ n Φ :
-  PureExec φ n e1 e2 →
-  φ →
-  envs_entails Δ (WP (fill K e2) @ s; E [{ Φ }]) →
-  envs_entails Δ (WP (fill K e1) @ s; E [{ Φ }]).
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  rewrite -total_lifting.twp_pure_step //.
+  iIntros "[T H]". iApply lifting.lwp_pure_step'. 1: auto.
+  iDestruct "T" as "(Tx& TG& Gfs& Rs)". iFrame.
+  iIntros "Tx TG Ws LC". iApply "H". iFrame.
 Qed.
+
+TODO
 
 Lemma tac_lwp_pure_credit `{!heapGS Σ} Δ Δ' s E j K e1 e2 ϕ Φ :
   PureExec ϕ 1 e1 e2 →

@@ -76,7 +76,7 @@ liris_heap_lang/pretty.v
 liris_heap_lang/metatheory.v
 liris_heap_lang/primitive_laws.v
 liris_heap_lang/derived_laws.v
-# liris_heap_lang/proofmode.v
+liris_heap_lang/proofmode.v
 # liris_heap_lang/adequacy.v
 # liris_heap_lang/total_adequacy.v
 # liris_heap_lang/proph_erasure.v
