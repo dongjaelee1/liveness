@@ -6,7 +6,7 @@ From liris.heap_lang Require Import notation.
 From iris.prelude Require Import options.
 Import uPred.
 
-Lemma tac_lwp_expr_eval `{SI : indexT} `{!heapGS Σ} Δ s i E Φ e e' :
+Lemma tac_lwp_expr_eval `{!heapGS Σ} Δ s i E Φ e e' :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (lWP e' @ s; i; E {{ Φ }}) →
   envs_entails Δ (lWP e @ s; i; E {{ Φ }}).
@@ -22,7 +22,25 @@ Tactic Notation "lwp_expr_eval" tactic3(t) :=
   end.
 Ltac lwp_expr_simpl := lwp_expr_eval simpl.
 
-Lemma tac_lwp_pure `{SI : indexT} `{!heapGS Σ} Δ G R o s q i E K e1 e2 φ n Φ :
+Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
+  PureExec φ thread_cond n e1 e2 →
+  φ →
+  envs_entails Δ (∃ q E' G R (o : Ord.t),
+        ([∗ map] r↦v ∈ R, gl r v) ∗
+        (Nat.iter n (λ P, |={E,E'}=>
+                       thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗
+                       (thread_exec i q -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗ ALC (£ o ={E',E}=∗ P)))
+           (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
+  envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
+Proof.
+  rewrite envs_entails_unseal=> ?? ->.
+  (* We want [pure_exec_fill] to be available to TC search locally. *)
+  pose proof @pure_exec_fill.
+  iIntros "(%&%&%&%&%& #Rs& Iter)". iApply lifting.lwp_pure_step_alt. 1: auto.
+  iFrame "Rs Iter".
+Qed.
+
+Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ G R o s q i E K e1 e2 φ n Φ :
   PureExec φ thread_cond n e1 e2 →
   φ →
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
@@ -33,46 +51,18 @@ Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "[T H]". iApply lifting.lwp_pure_step'. 1: auto.
+  iIntros "[T H]". iApply lifting.lwp_pure_step_simple. 1: auto.
   iDestruct "T" as "(Tx& TG& Gfs& Rs)". iFrame.
   iIntros "Tx TG Ws LC". iApply "H". iFrame.
 Qed.
 
-TODO
-
-Lemma tac_lwp_pure_credit `{!heapGS Σ} Δ Δ' s E j K e1 e2 ϕ Φ :
-  PureExec ϕ 1 e1 e2 →
-  ϕ →
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  match envs_app false (Esnoc Enil j (£ 1)) Δ' with
-  | Some Δ'' =>
-     envs_entails Δ'' (WP fill K e2 @ s; E {{ Φ }})
-  | None => False
-  end →
-  envs_entails Δ (WP (fill K e1) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ??? HΔ.
-  pose proof @pure_exec_fill.
-  rewrite -lifting.lwp_pure_step_later; last done.
-  rewrite into_laterN_env_sound /=. apply later_mono.
-  destruct (envs_app _ _ _) as [Δ''|] eqn:HΔ'; [ | contradiction ].
-  rewrite envs_app_sound //; simpl.
-  rewrite right_id. apply wand_intro_r. by rewrite wand_elim_l.
-Qed.
-
-Lemma tac_lwp_value_nofupd `{!heapGS Σ} Δ s E Φ v :
-  envs_entails Δ (Φ v) → envs_entails Δ (WP (Val v) @ s; E {{ Φ }}).
+Lemma tac_lwp_value_nofupd `{!heapGS Σ} Δ s i E Φ v :
+  envs_entails Δ (Φ v) → envs_entails Δ (lWP (Val v) @ s; i; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. by apply lwp_value. Qed.
-Lemma tac_twp_value_nofupd `{!heapGS Σ} Δ s E Φ v :
-  envs_entails Δ (Φ v) → envs_entails Δ (WP (Val v) @ s; E [{ Φ }]).
-Proof. rewrite envs_entails_unseal=> ->. by apply twp_value. Qed.
 
-Lemma tac_lwp_value `{!heapGS Σ} Δ s E (Φ : val → iPropI Σ) v :
-  envs_entails Δ (|={E}=> Φ v) → envs_entails Δ (WP (Val v) @ s; E {{ Φ }}).
-Proof. rewrite envs_entails_unseal=> ->. by rewrite lwp_value_fupd. Qed.
-Lemma tac_twp_value `{!heapGS Σ} Δ s E (Φ : val → iPropI Σ) v :
-  envs_entails Δ (|={E}=> Φ v) → envs_entails Δ (WP (Val v) @ s; E [{ Φ }]).
-Proof. rewrite envs_entails_unseal=> ->. by rewrite twp_value_fupd. Qed.
+Lemma tac_lwp_value `{!heapGS Σ} Δ s i E (Φ : val → iPropI Σ) v :
+  envs_entails Δ (|={E}=>g Φ v) → envs_entails Δ (lWP (Val v) @ s; i; E {{ Φ }}).
+Proof. rewrite envs_entails_unseal=> ->. by rewrite lwp_value_sfgupd. Qed.
 
 (** Simplify the goal if it is [WP] of a value.
   If the postcondition already allows a fupd, do not add a second one.
@@ -80,18 +70,12 @@ Proof. rewrite envs_entails_unseal=> ->. by rewrite twp_value_fupd. Qed.
   here are bidirectional, so we never will make a goal unprovable. *)
 Ltac lwp_value_head :=
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E (Val _) (λ _, fupd ?E _ _)) =>
+  | |- envs_entails _ (lwp ?s ?i ?E (Val _) (λ _, fupd ?E _ _)) =>
       eapply tac_lwp_value_nofupd
-  | |- envs_entails _ (wp ?s ?E (Val _) (λ _, wp _ ?E _ _)) =>
+  | |- envs_entails _ (lwp ?s ?i ?E (Val _) (λ _, lwp _ _ ?E _ _)) =>
       eapply tac_lwp_value_nofupd
-  | |- envs_entails _ (wp ?s ?E (Val _) _) =>
+  | |- envs_entails _ (lwp ?s ?i ?E (Val _) _) =>
       eapply tac_lwp_value
-  | |- envs_entails _ (twp ?s ?E (Val _) (λ _, fupd ?E _ _)) =>
-      eapply tac_twp_value_nofupd
-  | |- envs_entails _ (twp ?s ?E (Val _) (λ _, twp _ ?E _ _)) =>
-      eapply tac_twp_value_nofupd
-  | |- envs_entails _ (twp ?s ?E (Val _) _) =>
-      eapply tac_twp_value
   end.
 
 Ltac lwp_finish :=
@@ -116,7 +100,7 @@ The use of [open_constr] in this tactic is essential. It will convert all holes
 Tactic Notation "lwp_pure" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
+  | |- envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
     let e := eval simpl in e in
     reshape_expr e ltac:(fun K e' =>
       unify e' efoc;
@@ -124,52 +108,16 @@ Tactic Notation "lwp_pure" open_constr(efoc) :=
       [tc_solve                       (* PureExec *)
       |try solve_vals_compare_safe    (* The pure condition for PureExec --
          handles trivial goals, including [vals_compare_safe] *)
-      |tc_solve                       (* IntoLaters *)
-      |lwp_finish                      (* new goal *)
+      (* |tc_solve                       (* IntoLaters *) *)
+      |idtac (* new goal *)
+      (* |idtac "use lwp_finish to cleanup new lwp"    (* new goal *) *)
+      (* |lwp_finish                      (* new goal *) *)
       ])
     || fail "lwp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    let e := eval simpl in e in
-    reshape_expr e ltac:(fun K e' =>
-      unify e' efoc;
-      eapply (tac_twp_pure _ _ _ K e');
-      [tc_solve                       (* PureExec *)
-      |try solve_vals_compare_safe    (* The pure condition for PureExec *)
-      |lwp_finish                      (* new goal *)
-      ])
-    || fail "lwp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
-  | _ => fail "lwp_pure: not a 'wp'"
+  | _ => fail "lwp_pure: not a 'lwp'"
   end.
 Tactic Notation "lwp_pure" :=
   lwp_pure _.
-
-Tactic Notation "lwp_pure" open_constr(efoc) "credit:" constr(H) :=
-  iStartProof;
-  let Htmp := iFresh in
-  let finish _ :=
-    pm_reduce;
-    (iDestructHyp Htmp as H || fail 2 "lwp_pure:" H "is not fresh");
-    lwp_finish
-    in
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    let e := eval simpl in e in
-    reshape_expr e ltac:(fun K e' =>
-      unify e' efoc;
-      eapply (tac_lwp_pure_credit _ _ _ _ Htmp K e');
-      [tc_solve                       (* PureExec *)
-      |try solve_vals_compare_safe    (* The pure condition for PureExec --
-         handles trivial goals, including [vals_compare_safe] *)
-      |tc_solve                       (* IntoLaters *)
-      |finish ()                      (* new goal *)
-      ])
-    || fail "lwp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    fail "lwp_pure: credit generation is not supported for a TWP"
-  | _ => fail "lwp_pure: not a 'wp'"
-  end.
-Tactic Notation "lwp_pure" "credit:" constr(H) :=
-  lwp_pure _ credit: H.
 
 (* TODO: do this in one go, without [repeat]. *)
 Ltac lwp_pures :=
@@ -199,779 +147,784 @@ Tactic Notation "lwp_unop" := lwp_pure (UnOp _ _).
 Tactic Notation "lwp_binop" := lwp_pure (BinOp _ _ _).
 Tactic Notation "lwp_op" := lwp_unop || lwp_binop.
 Tactic Notation "lwp_lam" := lwp_rec.
-Tactic Notation "lwp_let" := lwp_pure (Rec BAnon (BNamed _) _); lwp_lam.
-Tactic Notation "lwp_seq" := lwp_pure (Rec BAnon BAnon _); lwp_lam.
+Tactic Notation "lwp_let" := lwp_pure (Rec BAnon (BNamed _) _).
+Tactic Notation "lwp_seq" := lwp_pure (Rec BAnon BAnon _).
 Tactic Notation "lwp_proj" := lwp_pure (Fst _) || lwp_pure (Snd _).
 Tactic Notation "lwp_case" := lwp_pure (Case _ _ _).
-Tactic Notation "lwp_match" := lwp_case; lwp_pure (Rec _ _ _); lwp_lam.
+(* Tactic Notation "lwp_match" := lwp_case; lwp_pure (Rec _ _ _); lwp_lam. *)
 Tactic Notation "lwp_inj" := lwp_pure (InjL _) || lwp_pure (InjR _).
 Tactic Notation "lwp_pair" := lwp_pure (Pair _ _).
 Tactic Notation "lwp_closure" := lwp_pure (Rec _ _ _).
 
-Lemma tac_lwp_bind `{!heapGS Σ} K Δ s E Φ e f :
+(* Tactic Notation "lwp_if" := lwp_pure (If _ _ _). *)
+(* Tactic Notation "lwp_if_true" := lwp_pure (If (LitV (LitBool true)) _ _). *)
+(* Tactic Notation "lwp_if_false" := lwp_pure (If (LitV (LitBool false)) _ _). *)
+(* Tactic Notation "lwp_unop" := lwp_pure (UnOp _ _). *)
+(* Tactic Notation "lwp_binop" := lwp_pure (BinOp _ _ _). *)
+(* Tactic Notation "lwp_op" := lwp_unop || lwp_binop. *)
+(* Tactic Notation "lwp_lam" := lwp_rec. *)
+(* Tactic Notation "lwp_let" := lwp_pure (Rec BAnon (BNamed _) _); lwp_lam. *)
+(* Tactic Notation "lwp_seq" := lwp_pure (Rec BAnon BAnon _); lwp_lam. *)
+(* Tactic Notation "lwp_proj" := lwp_pure (Fst _) || lwp_pure (Snd _). *)
+(* Tactic Notation "lwp_case" := lwp_pure (Case _ _ _). *)
+(* Tactic Notation "lwp_match" := lwp_case; lwp_pure (Rec _ _ _); lwp_lam. *)
+(* Tactic Notation "lwp_inj" := lwp_pure (InjL _) || lwp_pure (InjR _). *)
+(* Tactic Notation "lwp_pair" := lwp_pure (Pair _ _). *)
+(* Tactic Notation "lwp_closure" := lwp_pure (Rec _ _ _). *)
+
+Lemma tac_lwp_bind `{!heapGS Σ} K Δ s i E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (WP e @ s; E {{ v, WP f (Val v) @ s; E {{ Φ }} }})%I →
-  envs_entails Δ (WP fill K e @ s; E {{ Φ }}).
+  envs_entails Δ (lWP e @ s; i; E {{ v, lWP f (Val v) @ s; i; E {{ Φ }} }})%I →
+  envs_entails Δ (lWP fill K e @ s; i; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> -> ->. by apply: lwp_bind. Qed.
-Lemma tac_twp_bind `{!heapGS Σ} K Δ s E Φ e f :
-  f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (WP e @ s; E [{ v, WP f (Val v) @ s; E [{ Φ }] }])%I →
-  envs_entails Δ (WP fill K e @ s; E [{ Φ }]).
-Proof. rewrite envs_entails_unseal=> -> ->. by apply: twp_bind. Qed.
 
 Ltac lwp_bind_core K :=
   lazymatch eval hnf in K with
   | [] => idtac
   | _ => eapply (tac_lwp_bind K); [simpl; reflexivity|reduction.pm_prettify]
   end.
-Ltac twp_bind_core K :=
-  lazymatch eval hnf in K with
-  | [] => idtac
-  | _ => eapply (tac_twp_bind K); [simpl; reflexivity|reduction.pm_prettify]
-  end.
 
 Tactic Notation "lwp_bind" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
+  | |- envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
     first [ reshape_expr e ltac:(fun K e' => unify e' efoc; lwp_bind_core K)
           | fail 1 "lwp_bind: cannot find" efoc "in" e ]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first [ reshape_expr e ltac:(fun K e' => unify e' efoc; twp_bind_core K)
-          | fail 1 "lwp_bind: cannot find" efoc "in" e ]
-  | _ => fail "lwp_bind: not a 'wp'"
+  | _ => fail "lwp_bind: not a 'lwp'"
   end.
 
-(** Heap tactics *)
-Section heap.
-Context `{!heapGS Σ}.
-Implicit Types P Q : iProp Σ.
-Implicit Types Φ : val → iProp Σ.
-Implicit Types Δ : envs (uPredI (iResUR Σ)).
-Implicit Types v : val.
-Implicit Types z : Z.
+(* TODO *)
 
-Lemma tac_lwp_allocN Δ Δ' s E j K v n Φ :
-  (0 < n)%Z →
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  (∀ l,
-    match envs_app false (Esnoc Enil j (array l (DfracOwn 1) (replicate (Z.to_nat n) v))) Δ' with
-    | Some Δ'' =>
-       envs_entails Δ'' (WP fill K (Val $ LitV $ LitLoc l) @ s; E {{ Φ }})
-    | None => False
-    end) →
-  envs_entails Δ (WP fill K (AllocN (Val $ LitV $ LitInt n) (Val v)) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ? ? HΔ.
-  rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_allocN.
-  rewrite left_id into_laterN_env_sound; apply later_mono, forall_intro=> l.
-  specialize (HΔ l).
-  destruct (envs_app _ _ _) as [Δ''|] eqn:HΔ'; [ | contradiction ].
-  rewrite envs_app_sound //; simpl.
-  apply wand_intro_l. by rewrite (sep_elim_l (l ↦∗ _)%I) right_id wand_elim_r.
-Qed.
-Lemma tac_twp_allocN Δ s E j K v n Φ :
-  (0 < n)%Z →
-  (∀ l,
-    match envs_app false (Esnoc Enil j (array l (DfracOwn 1) (replicate (Z.to_nat n) v))) Δ with
-    | Some Δ' =>
-       envs_entails Δ' (WP fill K (Val $ LitV $ LitLoc l) @ s; E [{ Φ }])
-    | None => False
-    end) →
-  envs_entails Δ (WP fill K (AllocN (Val $ LitV $ LitInt n) (Val v)) @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal=> ? HΔ.
-  rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, twp_allocN.
-  rewrite left_id. apply forall_intro=> l.
-  specialize (HΔ l).
-  destruct (envs_app _ _ _) as [Δ'|] eqn:HΔ'; [ | contradiction ].
-  rewrite envs_app_sound //; simpl.
-  apply wand_intro_l. by rewrite (sep_elim_l (l ↦∗ _)%I) right_id wand_elim_r.
-Qed.
+(* (** Heap tactics *) *)
+(* Section heap. *)
+(* Context `{!heapGS Σ}. *)
+(* Implicit Types P Q : iProp Σ. *)
+(* Implicit Types Φ : val → iProp Σ. *)
+(* Implicit Types Δ : envs (uPredI (iResUR Σ)). *)
+(* Implicit Types v : val. *)
+(* Implicit Types z : Z. *)
 
-Lemma tac_lwp_alloc Δ Δ' s E j K v Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  (∀ l,
-    match envs_app false (Esnoc Enil j (l ↦ v)) Δ' with
-    | Some Δ'' =>
-       envs_entails Δ'' (WP fill K (Val $ LitV l) @ s; E {{ Φ }})
-    | None => False
-    end) →
-  envs_entails Δ (WP fill K (Alloc (Val v)) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ? HΔ.
-  rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_alloc.
-  rewrite left_id into_laterN_env_sound; apply later_mono, forall_intro=> l.
-  specialize (HΔ l).
-  destruct (envs_app _ _ _) as [Δ''|] eqn:HΔ'; [ | contradiction ].
-  rewrite envs_app_sound //; simpl.
-  apply wand_intro_l. by rewrite (sep_elim_l (l ↦ v)%I) right_id wand_elim_r.
-Qed.
-Lemma tac_twp_alloc Δ s E j K v Φ :
-  (∀ l,
-    match envs_app false (Esnoc Enil j (l ↦ v)) Δ with
-    | Some Δ' =>
-       envs_entails Δ' (WP fill K (Val $ LitV $ LitLoc l) @ s; E [{ Φ }])
-    | None => False
-    end) →
-  envs_entails Δ (WP fill K (Alloc (Val v)) @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal=> HΔ.
-  rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, twp_alloc.
-  rewrite left_id. apply forall_intro=> l.
-  specialize (HΔ l).
-  destruct (envs_app _ _ _) as [Δ''|] eqn:HΔ'; [ | contradiction ].
-  rewrite envs_app_sound //; simpl.
-  apply wand_intro_l. by rewrite (sep_elim_l (l ↦ v)%I) right_id wand_elim_r.
-Qed.
+(* Lemma tac_lwp_allocN Δ Δ' s E j K v n Φ : *)
+(*   (0 < n)%Z → *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   (∀ l, *)
+(*     match envs_app false (Esnoc Enil j (array l (DfracOwn 1) (replicate (Z.to_nat n) v))) Δ' with *)
+(*     | Some Δ'' => *)
+(*        envs_entails Δ'' (WP fill K (Val $ LitV $ LitLoc l) @ s; E {{ Φ }}) *)
+(*     | None => False *)
+(*     end) → *)
+(*   envs_entails Δ (WP fill K (AllocN (Val $ LitV $ LitInt n) (Val v)) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ? ? HΔ. *)
+(*   rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_allocN. *)
+(*   rewrite left_id into_laterN_env_sound; apply later_mono, forall_intro=> l. *)
+(*   specialize (HΔ l). *)
+(*   destruct (envs_app _ _ _) as [Δ''|] eqn:HΔ'; [ | contradiction ]. *)
+(*   rewrite envs_app_sound //; simpl. *)
+(*   apply wand_intro_l. by rewrite (sep_elim_l (l ↦∗ _)%I) right_id wand_elim_r. *)
+(* Qed. *)
+(* Lemma tac_twp_allocN Δ s E j K v n Φ : *)
+(*   (0 < n)%Z → *)
+(*   (∀ l, *)
+(*     match envs_app false (Esnoc Enil j (array l (DfracOwn 1) (replicate (Z.to_nat n) v))) Δ with *)
+(*     | Some Δ' => *)
+(*        envs_entails Δ' (WP fill K (Val $ LitV $ LitLoc l) @ s; E [{ Φ }]) *)
+(*     | None => False *)
+(*     end) → *)
+(*   envs_entails Δ (WP fill K (AllocN (Val $ LitV $ LitInt n) (Val v)) @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ? HΔ. *)
+(*   rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, twp_allocN. *)
+(*   rewrite left_id. apply forall_intro=> l. *)
+(*   specialize (HΔ l). *)
+(*   destruct (envs_app _ _ _) as [Δ'|] eqn:HΔ'; [ | contradiction ]. *)
+(*   rewrite envs_app_sound //; simpl. *)
+(*   apply wand_intro_l. by rewrite (sep_elim_l (l ↦∗ _)%I) right_id wand_elim_r. *)
+(* Qed. *)
 
-Lemma tac_lwp_free Δ Δ' s E i K l v Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦ v)%I →
-  (let Δ'' := envs_delete false i false Δ' in
-   envs_entails Δ'' (WP fill K (Val $ LitV LitUnit) @ s; E {{ Φ }})) →
-  envs_entails Δ (WP fill K (Free (LitV l)) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ? Hlk Hfin.
-  rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_free.
-  rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl.
-  rewrite -Hfin wand_elim_r (envs_lookup_sound' _ _ _ _ _ Hlk).
-  apply later_mono, sep_mono_r, wand_intro_r. rewrite right_id //.
-Qed.
-Lemma tac_twp_free Δ s E i K l v Φ :
-  envs_lookup i Δ = Some (false, l ↦ v)%I →
-  (let Δ' := envs_delete false i false Δ in
-   envs_entails Δ' (WP fill K (Val $ LitV LitUnit) @ s; E [{ Φ }])) →
-  envs_entails Δ (WP fill K (Free (LitV l)) @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal=> Hlk Hfin.
-  rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, twp_free.
-  rewrite envs_lookup_split //; simpl.
-  rewrite -Hfin wand_elim_r (envs_lookup_sound' _ _ _ _ _ Hlk).
-  apply sep_mono_r, wand_intro_r. rewrite right_id //.
-Qed.
+(* Lemma tac_lwp_alloc Δ Δ' s E j K v Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   (∀ l, *)
+(*     match envs_app false (Esnoc Enil j (l ↦ v)) Δ' with *)
+(*     | Some Δ'' => *)
+(*        envs_entails Δ'' (WP fill K (Val $ LitV l) @ s; E {{ Φ }}) *)
+(*     | None => False *)
+(*     end) → *)
+(*   envs_entails Δ (WP fill K (Alloc (Val v)) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ? HΔ. *)
+(*   rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_alloc. *)
+(*   rewrite left_id into_laterN_env_sound; apply later_mono, forall_intro=> l. *)
+(*   specialize (HΔ l). *)
+(*   destruct (envs_app _ _ _) as [Δ''|] eqn:HΔ'; [ | contradiction ]. *)
+(*   rewrite envs_app_sound //; simpl. *)
+(*   apply wand_intro_l. by rewrite (sep_elim_l (l ↦ v)%I) right_id wand_elim_r. *)
+(* Qed. *)
+(* Lemma tac_twp_alloc Δ s E j K v Φ : *)
+(*   (∀ l, *)
+(*     match envs_app false (Esnoc Enil j (l ↦ v)) Δ with *)
+(*     | Some Δ' => *)
+(*        envs_entails Δ' (WP fill K (Val $ LitV $ LitLoc l) @ s; E [{ Φ }]) *)
+(*     | None => False *)
+(*     end) → *)
+(*   envs_entails Δ (WP fill K (Alloc (Val v)) @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> HΔ. *)
+(*   rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, twp_alloc. *)
+(*   rewrite left_id. apply forall_intro=> l. *)
+(*   specialize (HΔ l). *)
+(*   destruct (envs_app _ _ _) as [Δ''|] eqn:HΔ'; [ | contradiction ]. *)
+(*   rewrite envs_app_sound //; simpl. *)
+(*   apply wand_intro_l. by rewrite (sep_elim_l (l ↦ v)%I) right_id wand_elim_r. *)
+(* Qed. *)
 
-Lemma tac_lwp_load Δ Δ' s E i K b l q v Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (b, l ↦{q} v)%I →
-  envs_entails Δ' (WP fill K (Val v) @ s; E {{ Φ }}) →
-  envs_entails Δ (WP fill K (Load (LitV l)) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ?? Hi.
-  rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_load.
-  rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl.
-  apply later_mono.
-  destruct b; simpl.
-  * iIntros "[#$ He]". iIntros "_". iApply Hi. iApply "He". iFrame "#".
-  * by apply sep_mono_r, wand_mono.
-Qed.
-Lemma tac_twp_load Δ s E i K b l dq v Φ :
-  envs_lookup i Δ = Some (b, l ↦{dq} v)%I →
-  envs_entails Δ (WP fill K (Val v) @ s; E [{ Φ }]) →
-  envs_entails Δ (WP fill K (Load (LitV l)) @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal=> ? Hi.
-  rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, twp_load.
-  rewrite envs_lookup_split //; simpl.
-  destruct b; simpl.
-  - iIntros "[#$ He]". iIntros "_". iApply Hi. iApply "He". iFrame "#".
-  - iIntros "[$ He]". iIntros "Hl". iApply Hi. iApply "He". iFrame "Hl".
-Qed.
+(* Lemma tac_lwp_free Δ Δ' s E i K l v Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (false, l ↦ v)%I → *)
+(*   (let Δ'' := envs_delete false i false Δ' in *)
+(*    envs_entails Δ'' (WP fill K (Val $ LitV LitUnit) @ s; E {{ Φ }})) → *)
+(*   envs_entails Δ (WP fill K (Free (LitV l)) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ? Hlk Hfin. *)
+(*   rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_free. *)
+(*   rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl. *)
+(*   rewrite -Hfin wand_elim_r (envs_lookup_sound' _ _ _ _ _ Hlk). *)
+(*   apply later_mono, sep_mono_r, wand_intro_r. rewrite right_id //. *)
+(* Qed. *)
+(* Lemma tac_twp_free Δ s E i K l v Φ : *)
+(*   envs_lookup i Δ = Some (false, l ↦ v)%I → *)
+(*   (let Δ' := envs_delete false i false Δ in *)
+(*    envs_entails Δ' (WP fill K (Val $ LitV LitUnit) @ s; E [{ Φ }])) → *)
+(*   envs_entails Δ (WP fill K (Free (LitV l)) @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> Hlk Hfin. *)
+(*   rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, twp_free. *)
+(*   rewrite envs_lookup_split //; simpl. *)
+(*   rewrite -Hfin wand_elim_r (envs_lookup_sound' _ _ _ _ _ Hlk). *)
+(*   apply sep_mono_r, wand_intro_r. rewrite right_id //. *)
+(* Qed. *)
 
-Lemma tac_lwp_store Δ Δ' s E i K l v v' Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦ v)%I →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ' with
-  | Some Δ'' => envs_entails Δ'' (WP fill K (Val $ LitV LitUnit) @ s; E {{ Φ }})
-  | None => False
-  end →
-  envs_entails Δ (WP fill K (Store (LitV l) (Val v')) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ???.
-  destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  rewrite -lwp_bind. eapply wand_apply; first by eapply wand_entails, lwp_store.
-  rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
-  rewrite right_id. by apply later_mono, sep_mono_r, wand_mono.
-Qed.
-Lemma tac_twp_store Δ s E i K l v v' Φ :
-  envs_lookup i Δ = Some (false, l ↦ v)%I →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ with
-  | Some Δ' => envs_entails Δ' (WP fill K (Val $ LitV LitUnit) @ s; E [{ Φ }])
-  | None => False
-  end →
-  envs_entails Δ (WP fill K (Store (LitV l) v') @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal. intros.
-  destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  rewrite -twp_bind. eapply wand_apply; first by eapply wand_entails, twp_store.
-  rewrite envs_simple_replace_sound //; simpl.
-  rewrite right_id. by apply sep_mono_r, wand_mono.
-Qed.
+(* Lemma tac_lwp_load Δ Δ' s E i K b l q v Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (b, l ↦{q} v)%I → *)
+(*   envs_entails Δ' (WP fill K (Val v) @ s; E {{ Φ }}) → *)
+(*   envs_entails Δ (WP fill K (Load (LitV l)) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ?? Hi. *)
+(*   rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_load. *)
+(*   rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl. *)
+(*   apply later_mono. *)
+(*   destruct b; simpl. *)
+(*   * iIntros "[#$ He]". iIntros "_". iApply Hi. iApply "He". iFrame "#". *)
+(*   * by apply sep_mono_r, wand_mono. *)
+(* Qed. *)
+(* Lemma tac_twp_load Δ s E i K b l dq v Φ : *)
+(*   envs_lookup i Δ = Some (b, l ↦{dq} v)%I → *)
+(*   envs_entails Δ (WP fill K (Val v) @ s; E [{ Φ }]) → *)
+(*   envs_entails Δ (WP fill K (Load (LitV l)) @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ? Hi. *)
+(*   rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, twp_load. *)
+(*   rewrite envs_lookup_split //; simpl. *)
+(*   destruct b; simpl. *)
+(*   - iIntros "[#$ He]". iIntros "_". iApply Hi. iApply "He". iFrame "#". *)
+(*   - iIntros "[$ He]". iIntros "Hl". iApply Hi. iApply "He". iFrame "Hl". *)
+(* Qed. *)
 
-Lemma tac_lwp_xchg Δ Δ' s E i K l v v' Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦ v)%I →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ' with
-  | Some Δ'' => envs_entails Δ'' (WP fill K (Val $ v) @ s; E {{ Φ }})
-  | None => False
-  end →
-  envs_entails Δ (WP fill K (Xchg (LitV l) (Val v')) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ???.
-  destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  rewrite -lwp_bind. eapply wand_apply; first by eapply wand_entails, lwp_xchg.
-  rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
-  rewrite right_id.
-  by apply later_mono, sep_mono_r, wand_mono.
-Qed.
-Lemma tac_twp_xchg Δ s E i K l v v' Φ :
-  envs_lookup i Δ = Some (false, l ↦ v)%I →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ with
-  | Some Δ' => envs_entails Δ' (WP fill K (Val $ v) @ s; E [{ Φ }])
-  | None => False
-  end →
-  envs_entails Δ (WP fill K (Xchg (LitV l) v') @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal. intros.
-  destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  rewrite -twp_bind. eapply wand_apply; first by eapply wand_entails, twp_xchg.
-  rewrite envs_simple_replace_sound //; simpl.
-  rewrite right_id. by apply sep_mono_r, wand_mono.
-Qed.
+(* Lemma tac_lwp_store Δ Δ' s E i K l v v' Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (false, l ↦ v)%I → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ' with *)
+(*   | Some Δ'' => envs_entails Δ'' (WP fill K (Val $ LitV LitUnit) @ s; E {{ Φ }}) *)
+(*   | None => False *)
+(*   end → *)
+(*   envs_entails Δ (WP fill K (Store (LitV l) (Val v')) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ???. *)
+(*   destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   rewrite -lwp_bind. eapply wand_apply; first by eapply wand_entails, lwp_store. *)
+(*   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. by apply later_mono, sep_mono_r, wand_mono. *)
+(* Qed. *)
+(* Lemma tac_twp_store Δ s E i K l v v' Φ : *)
+(*   envs_lookup i Δ = Some (false, l ↦ v)%I → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ with *)
+(*   | Some Δ' => envs_entails Δ' (WP fill K (Val $ LitV LitUnit) @ s; E [{ Φ }]) *)
+(*   | None => False *)
+(*   end → *)
+(*   envs_entails Δ (WP fill K (Store (LitV l) v') @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal. intros. *)
+(*   destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   rewrite -twp_bind. eapply wand_apply; first by eapply wand_entails, twp_store. *)
+(*   rewrite envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. by apply sep_mono_r, wand_mono. *)
+(* Qed. *)
 
-Lemma tac_lwp_cmpxchg Δ Δ' s E i K l v v1 v2 Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦ v)%I →
-  vals_compare_safe v v1 →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ' with
-  | Some Δ'' =>
-     v = v1 →
-     envs_entails Δ'' (WP fill K (Val $ PairV v (LitV $ LitBool true)) @ s; E {{ Φ }})
-  | None => False
-  end →
-  (v ≠ v1 →
-   envs_entails Δ' (WP fill K (Val $ PairV v (LitV $ LitBool false)) @ s; E {{ Φ }})) →
-  envs_entails Δ (WP fill K (CmpXchg (LitV l) (Val v1) (Val v2)) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ??? Hsuc Hfail.
-  destruct (envs_simple_replace _ _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  destruct (decide (v = v1)) as [Heq|Hne].
-  - rewrite -lwp_bind. eapply wand_apply.
-    { eapply wand_entails, lwp_cmpxchg_suc; eauto. }
-    rewrite into_laterN_env_sound -later_sep /= {1}envs_simple_replace_sound //; simpl.
-    apply later_mono, sep_mono_r. rewrite right_id. apply wand_mono; auto.
-  - rewrite -lwp_bind. eapply wand_apply.
-    { eapply wand_entails, lwp_cmpxchg_fail; eauto. }
-    rewrite into_laterN_env_sound -later_sep /= {1}envs_lookup_split //; simpl.
-    apply later_mono, sep_mono_r. apply wand_mono; auto.
-Qed.
-Lemma tac_twp_cmpxchg Δ s E i K l v v1 v2 Φ :
-  envs_lookup i Δ = Some (false, l ↦ v)%I →
-  vals_compare_safe v v1 →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ with
-  | Some Δ' =>
-     v = v1 →
-     envs_entails Δ' (WP fill K (Val $ PairV v (LitV $ LitBool true)) @ s; E [{ Φ }])
-  | None => False
-  end →
-  (v ≠ v1 →
-   envs_entails Δ (WP fill K (Val $ PairV v (LitV $ LitBool false)) @ s; E [{ Φ }])) →
-  envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal=> ?? Hsuc Hfail.
-  destruct (envs_simple_replace _ _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  destruct (decide (v = v1)) as [Heq|Hne].
-  - rewrite -twp_bind. eapply wand_apply.
-    { eapply wand_entails, twp_cmpxchg_suc; eauto. }
-    rewrite /= {1}envs_simple_replace_sound //; simpl.
-    apply sep_mono_r. rewrite right_id. apply wand_mono; auto.
-  - rewrite -twp_bind. eapply wand_apply.
-    { eapply wand_entails, twp_cmpxchg_fail; eauto. }
-    rewrite /= {1}envs_lookup_split //; simpl.
-    apply sep_mono_r. apply wand_mono; auto.
-Qed.
+(* Lemma tac_lwp_xchg Δ Δ' s E i K l v v' Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (false, l ↦ v)%I → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ' with *)
+(*   | Some Δ'' => envs_entails Δ'' (WP fill K (Val $ v) @ s; E {{ Φ }}) *)
+(*   | None => False *)
+(*   end → *)
+(*   envs_entails Δ (WP fill K (Xchg (LitV l) (Val v')) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ???. *)
+(*   destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   rewrite -lwp_bind. eapply wand_apply; first by eapply wand_entails, lwp_xchg. *)
+(*   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. *)
+(*   by apply later_mono, sep_mono_r, wand_mono. *)
+(* Qed. *)
+(* Lemma tac_twp_xchg Δ s E i K l v v' Φ : *)
+(*   envs_lookup i Δ = Some (false, l ↦ v)%I → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ v')) Δ with *)
+(*   | Some Δ' => envs_entails Δ' (WP fill K (Val $ v) @ s; E [{ Φ }]) *)
+(*   | None => False *)
+(*   end → *)
+(*   envs_entails Δ (WP fill K (Xchg (LitV l) v') @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal. intros. *)
+(*   destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   rewrite -twp_bind. eapply wand_apply; first by eapply wand_entails, twp_xchg. *)
+(*   rewrite envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. by apply sep_mono_r, wand_mono. *)
+(* Qed. *)
 
-Lemma tac_lwp_cmpxchg_fail Δ Δ' s E i K b l dq v v1 v2 Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (b, l ↦{dq} v)%I →
-  v ≠ v1 → vals_compare_safe v v1 →
-  envs_entails Δ' (WP fill K (Val $ PairV v (LitV $ LitBool false)) @ s; E {{ Φ }}) →
-  envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ???? Hi.
-  rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_cmpxchg_fail.
-  rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl.
-  apply later_mono. destruct b; simpl.
-  - iIntros "[#$ He]". iIntros "_". iApply Hi. iApply "He". iFrame "#".
-  - iIntros "[$ He]". iIntros "Hl". iApply Hi. iApply "He". iFrame "Hl".
-Qed.
-Lemma tac_twp_cmpxchg_fail Δ s E i K b l dq v v1 v2 Φ :
-  envs_lookup i Δ = Some (b, l ↦{dq} v)%I →
-  v ≠ v1 → vals_compare_safe v v1 →
-  envs_entails Δ (WP fill K (Val $ PairV v (LitV $ LitBool false)) @ s; E [{ Φ }]) →
-  envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal. intros ??? Hi. rewrite -twp_bind.
-  eapply wand_apply; first by apply wand_entails, twp_cmpxchg_fail.
-  (* [//] solves some evars and enables further simplification. *)
-  rewrite envs_lookup_split /= // /=.
-  destruct b; simpl.
-  - iIntros "[#$ He]". iIntros "_". iApply Hi. iApply "He". iFrame "#".
-  - iIntros "[$ He]". iIntros "Hl". iApply Hi. iApply "He". iFrame "Hl".
-Qed.
+(* Lemma tac_lwp_cmpxchg Δ Δ' s E i K l v v1 v2 Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (false, l ↦ v)%I → *)
+(*   vals_compare_safe v v1 → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ' with *)
+(*   | Some Δ'' => *)
+(*      v = v1 → *)
+(*      envs_entails Δ'' (WP fill K (Val $ PairV v (LitV $ LitBool true)) @ s; E {{ Φ }}) *)
+(*   | None => False *)
+(*   end → *)
+(*   (v ≠ v1 → *)
+(*    envs_entails Δ' (WP fill K (Val $ PairV v (LitV $ LitBool false)) @ s; E {{ Φ }})) → *)
+(*   envs_entails Δ (WP fill K (CmpXchg (LitV l) (Val v1) (Val v2)) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ??? Hsuc Hfail. *)
+(*   destruct (envs_simple_replace _ _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   destruct (decide (v = v1)) as [Heq|Hne]. *)
+(*   - rewrite -lwp_bind. eapply wand_apply. *)
+(*     { eapply wand_entails, lwp_cmpxchg_suc; eauto. } *)
+(*     rewrite into_laterN_env_sound -later_sep /= {1}envs_simple_replace_sound //; simpl. *)
+(*     apply later_mono, sep_mono_r. rewrite right_id. apply wand_mono; auto. *)
+(*   - rewrite -lwp_bind. eapply wand_apply. *)
+(*     { eapply wand_entails, lwp_cmpxchg_fail; eauto. } *)
+(*     rewrite into_laterN_env_sound -later_sep /= {1}envs_lookup_split //; simpl. *)
+(*     apply later_mono, sep_mono_r. apply wand_mono; auto. *)
+(* Qed. *)
+(* Lemma tac_twp_cmpxchg Δ s E i K l v v1 v2 Φ : *)
+(*   envs_lookup i Δ = Some (false, l ↦ v)%I → *)
+(*   vals_compare_safe v v1 → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ with *)
+(*   | Some Δ' => *)
+(*      v = v1 → *)
+(*      envs_entails Δ' (WP fill K (Val $ PairV v (LitV $ LitBool true)) @ s; E [{ Φ }]) *)
+(*   | None => False *)
+(*   end → *)
+(*   (v ≠ v1 → *)
+(*    envs_entails Δ (WP fill K (Val $ PairV v (LitV $ LitBool false)) @ s; E [{ Φ }])) → *)
+(*   envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ?? Hsuc Hfail. *)
+(*   destruct (envs_simple_replace _ _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   destruct (decide (v = v1)) as [Heq|Hne]. *)
+(*   - rewrite -twp_bind. eapply wand_apply. *)
+(*     { eapply wand_entails, twp_cmpxchg_suc; eauto. } *)
+(*     rewrite /= {1}envs_simple_replace_sound //; simpl. *)
+(*     apply sep_mono_r. rewrite right_id. apply wand_mono; auto. *)
+(*   - rewrite -twp_bind. eapply wand_apply. *)
+(*     { eapply wand_entails, twp_cmpxchg_fail; eauto. } *)
+(*     rewrite /= {1}envs_lookup_split //; simpl. *)
+(*     apply sep_mono_r. apply wand_mono; auto. *)
+(* Qed. *)
 
-Lemma tac_lwp_cmpxchg_suc Δ Δ' s E i K l v v1 v2 Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦ v)%I →
-  v = v1 → vals_compare_safe v v1 →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ' with
-  | Some Δ'' =>
-     envs_entails Δ'' (WP fill K (Val $ PairV v (LitV $ LitBool true)) @ s; E {{ Φ }})
-  | None => False
-  end →
-  envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ?????; subst.
-  destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  rewrite -lwp_bind. eapply wand_apply.
-  { eapply wand_entails, lwp_cmpxchg_suc; eauto. }
-  rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
-  rewrite right_id. by apply later_mono, sep_mono_r, wand_mono.
-Qed.
-Lemma tac_twp_cmpxchg_suc Δ s E i K l v v1 v2 Φ :
-  envs_lookup i Δ = Some (false, l ↦ v)%I →
-  v = v1 → vals_compare_safe v v1 →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ with
-  | Some Δ' =>
-     envs_entails Δ' (WP fill K (Val $ PairV v (LitV $ LitBool true)) @ s; E [{ Φ }])
-  | None => False
-  end →
-  envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal=>????; subst.
-  destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  rewrite -twp_bind. eapply wand_apply.
-  { eapply wand_entails, twp_cmpxchg_suc; eauto. }
-  rewrite envs_simple_replace_sound //; simpl.
-  rewrite right_id. by apply sep_mono_r, wand_mono.
-Qed.
+(* Lemma tac_lwp_cmpxchg_fail Δ Δ' s E i K b l dq v v1 v2 Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (b, l ↦{dq} v)%I → *)
+(*   v ≠ v1 → vals_compare_safe v v1 → *)
+(*   envs_entails Δ' (WP fill K (Val $ PairV v (LitV $ LitBool false)) @ s; E {{ Φ }}) → *)
+(*   envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ???? Hi. *)
+(*   rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, lwp_cmpxchg_fail. *)
+(*   rewrite into_laterN_env_sound -later_sep envs_lookup_split //; simpl. *)
+(*   apply later_mono. destruct b; simpl. *)
+(*   - iIntros "[#$ He]". iIntros "_". iApply Hi. iApply "He". iFrame "#". *)
+(*   - iIntros "[$ He]". iIntros "Hl". iApply Hi. iApply "He". iFrame "Hl". *)
+(* Qed. *)
+(* Lemma tac_twp_cmpxchg_fail Δ s E i K b l dq v v1 v2 Φ : *)
+(*   envs_lookup i Δ = Some (b, l ↦{dq} v)%I → *)
+(*   v ≠ v1 → vals_compare_safe v v1 → *)
+(*   envs_entails Δ (WP fill K (Val $ PairV v (LitV $ LitBool false)) @ s; E [{ Φ }]) → *)
+(*   envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal. intros ??? Hi. rewrite -twp_bind. *)
+(*   eapply wand_apply; first by apply wand_entails, twp_cmpxchg_fail. *)
+(*   (* [//] solves some evars and enables further simplification. *) *)
+(*   rewrite envs_lookup_split /= // /=. *)
+(*   destruct b; simpl. *)
+(*   - iIntros "[#$ He]". iIntros "_". iApply Hi. iApply "He". iFrame "#". *)
+(*   - iIntros "[$ He]". iIntros "Hl". iApply Hi. iApply "He". iFrame "Hl". *)
+(* Qed. *)
 
-Lemma tac_lwp_faa Δ Δ' s E i K l z1 z2 Φ :
-  MaybeIntoLaterNEnvs 1 Δ Δ' →
-  envs_lookup i Δ' = Some (false, l ↦ LitV z1)%I →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ LitV (LitInt (z1 + z2)))) Δ' with
-  | Some Δ'' => envs_entails Δ'' (WP fill K (Val $ LitV z1) @ s; E {{ Φ }})
-  | None => False
-  end →
-  envs_entails Δ (WP fill K (FAA (LitV l) (LitV z2)) @ s; E {{ Φ }}).
-Proof.
-  rewrite envs_entails_unseal=> ???.
-  destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ].
-  rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, (lwp_faa _ _ _ z1 z2).
-  rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl.
-  rewrite right_id. by apply later_mono, sep_mono_r, wand_mono.
-Qed.
-Lemma tac_twp_faa Δ s E i K l z1 z2 Φ :
-  envs_lookup i Δ = Some (false, l ↦ LitV z1)%I →
-  match envs_simple_replace i false (Esnoc Enil i (l ↦ LitV (LitInt (z1 + z2)))) Δ with
-  | Some Δ' => envs_entails Δ' (WP fill K (Val $ LitV z1) @ s; E [{ Φ }])
-  | None => False
-  end →
-  envs_entails Δ (WP fill K (FAA (LitV l) (LitV z2)) @ s; E [{ Φ }]).
-Proof.
-  rewrite envs_entails_unseal=> ??.
-  destruct (envs_simple_replace _ _ _) as [Δ'|] eqn:HΔ'; [ | contradiction ].
-  rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, (twp_faa _ _ _ z1 z2).
-  rewrite envs_simple_replace_sound //; simpl.
-  rewrite right_id. by apply sep_mono_r, wand_mono.
-Qed.
-End heap.
+(* Lemma tac_lwp_cmpxchg_suc Δ Δ' s E i K l v v1 v2 Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (false, l ↦ v)%I → *)
+(*   v = v1 → vals_compare_safe v v1 → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ' with *)
+(*   | Some Δ'' => *)
+(*      envs_entails Δ'' (WP fill K (Val $ PairV v (LitV $ LitBool true)) @ s; E {{ Φ }}) *)
+(*   | None => False *)
+(*   end → *)
+(*   envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ?????; subst. *)
+(*   destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   rewrite -lwp_bind. eapply wand_apply. *)
+(*   { eapply wand_entails, lwp_cmpxchg_suc; eauto. } *)
+(*   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. by apply later_mono, sep_mono_r, wand_mono. *)
+(* Qed. *)
+(* Lemma tac_twp_cmpxchg_suc Δ s E i K l v v1 v2 Φ : *)
+(*   envs_lookup i Δ = Some (false, l ↦ v)%I → *)
+(*   v = v1 → vals_compare_safe v v1 → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ v2)) Δ with *)
+(*   | Some Δ' => *)
+(*      envs_entails Δ' (WP fill K (Val $ PairV v (LitV $ LitBool true)) @ s; E [{ Φ }]) *)
+(*   | None => False *)
+(*   end → *)
+(*   envs_entails Δ (WP fill K (CmpXchg (LitV l) v1 v2) @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=>????; subst. *)
+(*   destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   rewrite -twp_bind. eapply wand_apply. *)
+(*   { eapply wand_entails, twp_cmpxchg_suc; eauto. } *)
+(*   rewrite envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. by apply sep_mono_r, wand_mono. *)
+(* Qed. *)
 
-(** The tactic [lwp_apply_core lem tac_suc tac_fail] evaluates [lem] to a
-hypothesis [H] that can be applied, and then runs [lwp_bind_core K; tac_suc H]
-for every possible evaluation context [K].
+(* Lemma tac_lwp_faa Δ Δ' s E i K l z1 z2 Φ : *)
+(*   MaybeIntoLaterNEnvs 1 Δ Δ' → *)
+(*   envs_lookup i Δ' = Some (false, l ↦ LitV z1)%I → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ LitV (LitInt (z1 + z2)))) Δ' with *)
+(*   | Some Δ'' => envs_entails Δ'' (WP fill K (Val $ LitV z1) @ s; E {{ Φ }}) *)
+(*   | None => False *)
+(*   end → *)
+(*   envs_entails Δ (WP fill K (FAA (LitV l) (LitV z2)) @ s; E {{ Φ }}). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ???. *)
+(*   destruct (envs_simple_replace _ _ _) as [Δ''|] eqn:HΔ''; [ | contradiction ]. *)
+(*   rewrite -lwp_bind. eapply wand_apply; first by apply wand_entails, (lwp_faa _ _ _ z1 z2). *)
+(*   rewrite into_laterN_env_sound -later_sep envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. by apply later_mono, sep_mono_r, wand_mono. *)
+(* Qed. *)
+(* Lemma tac_twp_faa Δ s E i K l z1 z2 Φ : *)
+(*   envs_lookup i Δ = Some (false, l ↦ LitV z1)%I → *)
+(*   match envs_simple_replace i false (Esnoc Enil i (l ↦ LitV (LitInt (z1 + z2)))) Δ with *)
+(*   | Some Δ' => envs_entails Δ' (WP fill K (Val $ LitV z1) @ s; E [{ Φ }]) *)
+(*   | None => False *)
+(*   end → *)
+(*   envs_entails Δ (WP fill K (FAA (LitV l) (LitV z2)) @ s; E [{ Φ }]). *)
+(* Proof. *)
+(*   rewrite envs_entails_unseal=> ??. *)
+(*   destruct (envs_simple_replace _ _ _) as [Δ'|] eqn:HΔ'; [ | contradiction ]. *)
+(*   rewrite -twp_bind. eapply wand_apply; first by apply wand_entails, (twp_faa _ _ _ z1 z2). *)
+(*   rewrite envs_simple_replace_sound //; simpl. *)
+(*   rewrite right_id. by apply sep_mono_r, wand_mono. *)
+(* Qed. *)
+(* End heap. *)
 
-- The tactic [tac_suc] should do [iApplyHyp H] to actually apply the hypothesis,
-  but can perform other operations in addition (see [lwp_apply] and [awp_apply]
-  below).
-- The tactic [tac_fail cont] is called when [tac_suc H] fails for all evaluation
-  contexts [K], and can perform further operations before invoking [cont] to
-  try again.
+(* (** The tactic [lwp_apply_core lem tac_suc tac_fail] evaluates [lem] to a *)
+(* hypothesis [H] that can be applied, and then runs [lwp_bind_core K; tac_suc H] *)
+(* for every possible evaluation context [K]. *)
 
-TC resolution of [lem] premises happens *after* [tac_suc H] got executed. *)
-Ltac lwp_apply_core lem tac_suc tac_fail := first
-  [iPoseProofCore lem as false (fun H =>
-     lazymatch goal with
-     | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-       reshape_expr e ltac:(fun K e' =>
-         lwp_bind_core K; tac_suc H)
-     | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-       reshape_expr e ltac:(fun K e' =>
-         twp_bind_core K; tac_suc H)
-     | _ => fail 1 "lwp_apply: not a 'wp'"
-     end)
-  |tac_fail ltac:(fun _ => lwp_apply_core lem tac_suc tac_fail)
-  |let P := type of lem in
-   fail "lwp_apply: cannot apply" lem ":" P ].
+(* - The tactic [tac_suc] should do [iApplyHyp H] to actually apply the hypothesis, *)
+(*   but can perform other operations in addition (see [lwp_apply] and [awp_apply] *)
+(*   below). *)
+(* - The tactic [tac_fail cont] is called when [tac_suc H] fails for all evaluation *)
+(*   contexts [K], and can perform further operations before invoking [cont] to *)
+(*   try again. *)
 
-Tactic Notation "lwp_apply" open_constr(lem) :=
-  lwp_apply_core lem ltac:(fun H => iApplyHyp H; try iNext; try lwp_expr_simpl)
-                    ltac:(fun cont => fail).
-Tactic Notation "lwp_smart_apply" open_constr(lem) :=
-  lwp_apply_core lem ltac:(fun H => iApplyHyp H; try iNext; try lwp_expr_simpl)
-                    ltac:(fun cont => lwp_pure _; []; cont ()).
+(* TC resolution of [lem] premises happens *after* [tac_suc H] got executed. *) *)
+(* Ltac lwp_apply_core lem tac_suc tac_fail := first *)
+(*   [iPoseProofCore lem as false (fun H => *)
+(*      lazymatch goal with *)
+(*      | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*        reshape_expr e ltac:(fun K e' => *)
+(*          lwp_bind_core K; tac_suc H) *)
+(*      | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*        reshape_expr e ltac:(fun K e' => *)
+(*          twp_bind_core K; tac_suc H) *)
+(*      | _ => fail 1 "lwp_apply: not a 'wp'" *)
+(*      end) *)
+(*   |tac_fail ltac:(fun _ => lwp_apply_core lem tac_suc tac_fail) *)
+(*   |let P := type of lem in *)
+(*    fail "lwp_apply: cannot apply" lem ":" P ]. *)
 
-Tactic Notation "lwp_apply" open_constr(lem) "as" constr(pat) :=
-  lwp_apply lem; last iIntros pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) ")"
-    constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) ")" constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) ")" constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 x3 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) ")"
-    constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 x3 x4 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) ")" constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) ")" constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) ")"
-    constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7)
-    simple_intropattern(x8) ")" constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7)
-    simple_intropattern(x8) simple_intropattern(x9) ")" constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 x9 ) pat.
-Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7)
-    simple_intropattern(x8) simple_intropattern(x9) simple_intropattern(x10) ")"
-    constr(pat) :=
-  lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 ) pat.
+(* Tactic Notation "lwp_apply" open_constr(lem) := *)
+(*   lwp_apply_core lem ltac:(fun H => iApplyHyp H; try iNext; try lwp_expr_simpl) *)
+(*                     ltac:(fun cont => fail). *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) := *)
+(*   lwp_apply_core lem ltac:(fun H => iApplyHyp H; try iNext; try lwp_expr_simpl) *)
+(*                     ltac:(fun cont => lwp_pure _; []; cont ()). *)
 
-
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" constr(pat) :=
-  lwp_smart_apply lem; last iIntros pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) ")"
-    constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) ")" constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) ")" constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 x3 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) ")"
-    constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) ")" constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) ")" constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) ")"
-    constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7)
-    simple_intropattern(x8) ")" constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7)
-    simple_intropattern(x8) simple_intropattern(x9) ")" constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 x9 ) pat.
-Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1)
-    simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4)
-    simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7)
-    simple_intropattern(x8) simple_intropattern(x9) simple_intropattern(x10) ")"
-    constr(pat) :=
-  lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 ) pat.
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" constr(pat) := *)
+(*   lwp_apply lem; last iIntros pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) ")" *)
+(*     constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) ")" constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) ")" constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 x3 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) ")" *)
+(*     constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 x3 x4 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) ")" constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) ")" constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) ")" *)
+(*     constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) *)
+(*     simple_intropattern(x8) ")" constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) *)
+(*     simple_intropattern(x8) simple_intropattern(x9) ")" constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 x9 ) pat. *)
+(* Tactic Notation "lwp_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) *)
+(*     simple_intropattern(x8) simple_intropattern(x9) simple_intropattern(x10) ")" *)
+(*     constr(pat) := *)
+(*   lwp_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 ) pat. *)
 
 
-(** Tactic tailored for atomic triples: the first, simple one just runs
-[iAuIntro] on the goal, as atomic triples always have an atomic update as their
-premise. The second one additionally does some framing: it gets rid of [Hs] from
-the context, reducing clutter. You get them all back in the continuation of the
-atomic operation. *)
-Tactic Notation "awp_apply" open_constr(lem) :=
-  (* [pm_prettify] is needed to clean up telescopes. *)
-  lwp_apply_core lem ltac:(fun H => iApplyHyp H; pm_prettify) ltac:(fun cont => fail);
-  last iAuIntro.
-Tactic Notation "awp_apply" open_constr(lem) "without" constr(Hs) :=
-  (* Convert "list of hypothesis" into specialization pattern. *)
-  let Hs := String.words Hs in
-  let Hs := eval vm_compute in (INamed <$> Hs) in
-  lwp_apply_core lem
-    ltac:(fun H =>
-      iApply (lwp_frame_wand with
-        [SGoal $ SpecGoal GSpatial false [] Hs false]);
-         [iAccu|iApplyHyp H; pm_prettify])
-    ltac:(fun cont => fail);
-  last iAuIntro.
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) ")" *)
+(*     constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) ")" constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) ")" constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 x3 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) ")" *)
+(*     constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) ")" constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) ")" constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) ")" *)
+(*     constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) *)
+(*     simple_intropattern(x8) ")" constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) *)
+(*     simple_intropattern(x8) simple_intropattern(x9) ")" constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 x9 ) pat. *)
+(* Tactic Notation "lwp_smart_apply" open_constr(lem) "as" "(" simple_intropattern(x1) *)
+(*     simple_intropattern(x2) simple_intropattern(x3) simple_intropattern(x4) *)
+(*     simple_intropattern(x5) simple_intropattern(x6) simple_intropattern(x7) *)
+(*     simple_intropattern(x8) simple_intropattern(x9) simple_intropattern(x10) ")" *)
+(*     constr(pat) := *)
+(*   lwp_smart_apply lem; last iIntros ( x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 ) pat. *)
 
-Tactic Notation "lwp_alloc" ident(l) "as" constr(H) :=
-  let Htmp := iFresh in
-  let finish _ :=
-    first [intros l | fail 1 "lwp_alloc:" l "not fresh"];
-    pm_reduce;
-    lazymatch goal with
-    | |- False => fail 1 "lwp_alloc:" H "not fresh"
-    | _ => iDestructHyp Htmp as H; lwp_finish
-    end in
-  lwp_pures;
-  (** The code first tries to use allocation lemma for a single reference,
-     ie, [tac_lwp_alloc] (respectively, [tac_twp_alloc]).
-     If that fails, it tries to use the lemma [tac_lwp_allocN]
-     (respectively, [tac_twp_allocN]) for allocating an array.
-     Notice that we could have used the array allocation lemma also for single
-     references. However, that would produce the resource l ↦∗ [v] instead of
-     l ↦ v for single references. These are logically equivalent assertions
-     but are not equal. *)
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    let process_single _ :=
-        first
-          [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_alloc _ _ _ _ Htmp K))
-          |fail 1 "lwp_alloc: cannot find 'Alloc' in" e];
-        [tc_solve
-        |finish ()]
-    in
-    let process_array _ :=
-        first
-          [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_allocN _ _ _ _ Htmp K))
-          |fail 1 "lwp_alloc: cannot find 'Alloc' in" e];
-        [idtac|tc_solve
-         |finish ()]
-    in (process_single ()) || (process_array ())
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    let process_single _ :=
-        first
-          [reshape_expr e ltac:(fun K e' => eapply (tac_twp_alloc _ _ _ Htmp K))
-          |fail 1 "lwp_alloc: cannot find 'Alloc' in" e];
-        finish ()
-    in
-    let process_array _ :=
-        first
-          [reshape_expr e ltac:(fun K e' => eapply (tac_twp_allocN _ _ _ Htmp K))
-          |fail 1 "lwp_alloc: cannot find 'Alloc' in" e];
-        [idtac
-        |finish ()]
-    in (process_single ()) || (process_array ())
-  | _ => fail "lwp_alloc: not a 'wp'"
-  end.
 
-Tactic Notation "lwp_alloc" ident(l) :=
-  lwp_alloc l as "?".
+(* (** Tactic tailored for atomic triples: the first, simple one just runs *)
+(* [iAuIntro] on the goal, as atomic triples always have an atomic update as their *)
+(* premise. The second one additionally does some framing: it gets rid of [Hs] from *)
+(* the context, reducing clutter. You get them all back in the continuation of the *)
+(* atomic operation. *) *)
+(* Tactic Notation "awp_apply" open_constr(lem) := *)
+(*   (* [pm_prettify] is needed to clean up telescopes. *) *)
+(*   lwp_apply_core lem ltac:(fun H => iApplyHyp H; pm_prettify) ltac:(fun cont => fail); *)
+(*   last iAuIntro. *)
+(* Tactic Notation "awp_apply" open_constr(lem) "without" constr(Hs) := *)
+(*   (* Convert "list of hypothesis" into specialization pattern. *) *)
+(*   let Hs := String.words Hs in *)
+(*   let Hs := eval vm_compute in (INamed <$> Hs) in *)
+(*   lwp_apply_core lem *)
+(*     ltac:(fun H => *)
+(*       iApply (lwp_frame_wand with *)
+(*         [SGoal $ SpecGoal GSpatial false [] Hs false]); *)
+(*          [iAccu|iApplyHyp H; pm_prettify]) *)
+(*     ltac:(fun cont => fail); *)
+(*   last iAuIntro. *)
 
-Tactic Notation "lwp_free" :=
-  let solve_pointsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
-    iAssumptionCore || fail "lwp_free: cannot find" l "↦ ?" in
-  lwp_pures;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_free _ _ _ _ _ K))
-      |fail 1 "lwp_free: cannot find 'Free' in" e];
-    [tc_solve
-    |solve_pointsto ()
-    |pm_reduce; lwp_finish]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_twp_free _ _ _ _ K))
-      |fail 1 "lwp_free: cannot find 'Free' in" e];
-    [solve_pointsto ()
-    |pm_reduce; lwp_finish]
-  | _ => fail "lwp_free: not a 'wp'"
-  end.
+(* Tactic Notation "lwp_alloc" ident(l) "as" constr(H) := *)
+(*   let Htmp := iFresh in *)
+(*   let finish _ := *)
+(*     first [intros l | fail 1 "lwp_alloc:" l "not fresh"]; *)
+(*     pm_reduce; *)
+(*     lazymatch goal with *)
+(*     | |- False => fail 1 "lwp_alloc:" H "not fresh" *)
+(*     | _ => iDestructHyp Htmp as H; lwp_finish *)
+(*     end in *)
+(*   lwp_pures; *)
+(*   (** The code first tries to use allocation lemma for a single reference, *)
+(*      ie, [tac_lwp_alloc] (respectively, [tac_twp_alloc]). *)
+(*      If that fails, it tries to use the lemma [tac_lwp_allocN] *)
+(*      (respectively, [tac_twp_allocN]) for allocating an array. *)
+(*      Notice that we could have used the array allocation lemma also for single *)
+(*      references. However, that would produce the resource l ↦∗ [v] instead of *)
+(*      l ↦ v for single references. These are logically equivalent assertions *)
+(*      but are not equal. *) *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     let process_single _ := *)
+(*         first *)
+(*           [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_alloc _ _ _ _ Htmp K)) *)
+(*           |fail 1 "lwp_alloc: cannot find 'Alloc' in" e]; *)
+(*         [tc_solve *)
+(*         |finish ()] *)
+(*     in *)
+(*     let process_array _ := *)
+(*         first *)
+(*           [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_allocN _ _ _ _ Htmp K)) *)
+(*           |fail 1 "lwp_alloc: cannot find 'Alloc' in" e]; *)
+(*         [idtac|tc_solve *)
+(*          |finish ()] *)
+(*     in (process_single ()) || (process_array ()) *)
+(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*     let process_single _ := *)
+(*         first *)
+(*           [reshape_expr e ltac:(fun K e' => eapply (tac_twp_alloc _ _ _ Htmp K)) *)
+(*           |fail 1 "lwp_alloc: cannot find 'Alloc' in" e]; *)
+(*         finish () *)
+(*     in *)
+(*     let process_array _ := *)
+(*         first *)
+(*           [reshape_expr e ltac:(fun K e' => eapply (tac_twp_allocN _ _ _ Htmp K)) *)
+(*           |fail 1 "lwp_alloc: cannot find 'Alloc' in" e]; *)
+(*         [idtac *)
+(*         |finish ()] *)
+(*     in (process_single ()) || (process_array ()) *)
+(*   | _ => fail "lwp_alloc: not a 'wp'" *)
+(*   end. *)
 
-Tactic Notation "lwp_load" :=
-  let solve_pointsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
-    iAssumptionCore || fail "lwp_load: cannot find" l "↦ ?" in
-  lwp_pures;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_load _ _ _ _ _ K))
-      |fail 1 "lwp_load: cannot find 'Load' in" e];
-    [tc_solve
-    |solve_pointsto ()
-    |lwp_finish]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_twp_load _ _ _ _ K))
-      |fail 1 "lwp_load: cannot find 'Load' in" e];
-    [solve_pointsto ()
-    |lwp_finish]
-  | _ => fail "lwp_load: not a 'wp'"
-  end.
+(* Tactic Notation "lwp_alloc" ident(l) := *)
+(*   lwp_alloc l as "?". *)
 
-Tactic Notation "lwp_store" :=
-  let solve_pointsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
-    iAssumptionCore || fail "lwp_store: cannot find" l "↦ ?" in
-  lwp_pures;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_store _ _ _ _ _ K))
-      |fail 1 "lwp_store: cannot find 'Store' in" e];
-    [tc_solve
-    |solve_pointsto ()
-    |pm_reduce; first [lwp_seq|lwp_finish]]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_twp_store _ _ _ _ K))
-      |fail 1 "lwp_store: cannot find 'Store' in" e];
-    [solve_pointsto ()
-    |pm_reduce; first [lwp_seq|lwp_finish]]
-  | _ => fail "lwp_store: not a 'wp'"
-  end.
+(* Tactic Notation "lwp_free" := *)
+(*   let solve_pointsto _ := *)
+(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
+(*     iAssumptionCore || fail "lwp_free: cannot find" l "↦ ?" in *)
+(*   lwp_pures; *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_free _ _ _ _ _ K)) *)
+(*       |fail 1 "lwp_free: cannot find 'Free' in" e]; *)
+(*     [tc_solve *)
+(*     |solve_pointsto () *)
+(*     |pm_reduce; lwp_finish] *)
+(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_twp_free _ _ _ _ K)) *)
+(*       |fail 1 "lwp_free: cannot find 'Free' in" e]; *)
+(*     [solve_pointsto () *)
+(*     |pm_reduce; lwp_finish] *)
+(*   | _ => fail "lwp_free: not a 'wp'" *)
+(*   end. *)
 
-Tactic Notation "lwp_xchg" :=
-  let solve_pointsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
-    iAssumptionCore || fail "lwp_xchg: cannot find" l "↦ ?" in
-  lwp_pures;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_xchg _ _ _ _ _ K))
-      |fail 1 "lwp_xchg: cannot find 'Xchg' in" e];
-    [tc_solve
-    |solve_pointsto ()
-    |pm_reduce; first [lwp_seq|lwp_finish]]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_twp_xchg _ _ _ _ K))
-      |fail 1 "lwp_xchg: cannot find 'Xchg' in" e];
-    [solve_pointsto ()
-    |pm_reduce; first [lwp_seq|lwp_finish]]
-  | _ => fail "lwp_xchg: not a 'wp'"
-  end.
+(* Tactic Notation "lwp_load" := *)
+(*   let solve_pointsto _ := *)
+(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
+(*     iAssumptionCore || fail "lwp_load: cannot find" l "↦ ?" in *)
+(*   lwp_pures; *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_load _ _ _ _ _ K)) *)
+(*       |fail 1 "lwp_load: cannot find 'Load' in" e]; *)
+(*     [tc_solve *)
+(*     |solve_pointsto () *)
+(*     |lwp_finish] *)
+(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_twp_load _ _ _ _ K)) *)
+(*       |fail 1 "lwp_load: cannot find 'Load' in" e]; *)
+(*     [solve_pointsto () *)
+(*     |lwp_finish] *)
+(*   | _ => fail "lwp_load: not a 'wp'" *)
+(*   end. *)
 
-Tactic Notation "lwp_cmpxchg" "as" simple_intropattern(H1) "|" simple_intropattern(H2) :=
-  let solve_pointsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
-    iAssumptionCore || fail "lwp_cmpxchg: cannot find" l "↦ ?" in
-  lwp_pures;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_cmpxchg _ _ _ _ _ K))
-      |fail 1 "lwp_cmpxchg: cannot find 'CmpXchg' in" e];
-    [tc_solve
-    |solve_pointsto ()
-    |try solve_vals_compare_safe
-    |pm_reduce; intros H1; lwp_finish
-    |intros H2; lwp_finish]
-  | |- envs_entails _ (twp ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_twp_cmpxchg _ _ _ _ K))
-      |fail 1 "lwp_cmpxchg: cannot find 'CmpXchg' in" e];
-    [solve_pointsto ()
-    |try solve_vals_compare_safe
-    |pm_reduce; intros H1; lwp_finish
-    |intros H2; lwp_finish]
-  | _ => fail "lwp_cmpxchg: not a 'wp'"
-  end.
+(* Tactic Notation "lwp_store" := *)
+(*   let solve_pointsto _ := *)
+(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
+(*     iAssumptionCore || fail "lwp_store: cannot find" l "↦ ?" in *)
+(*   lwp_pures; *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_store _ _ _ _ _ K)) *)
+(*       |fail 1 "lwp_store: cannot find 'Store' in" e]; *)
+(*     [tc_solve *)
+(*     |solve_pointsto () *)
+(*     |pm_reduce; first [lwp_seq|lwp_finish]] *)
+(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_twp_store _ _ _ _ K)) *)
+(*       |fail 1 "lwp_store: cannot find 'Store' in" e]; *)
+(*     [solve_pointsto () *)
+(*     |pm_reduce; first [lwp_seq|lwp_finish]] *)
+(*   | _ => fail "lwp_store: not a 'wp'" *)
+(*   end. *)
 
-Tactic Notation "lwp_cmpxchg_fail" :=
-  let solve_pointsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
-    iAssumptionCore || fail "lwp_cmpxchg_fail: cannot find" l "↦ ?" in
-  lwp_pures;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_cmpxchg_fail _ _ _ _ _ K))
-      |fail 1 "lwp_cmpxchg_fail: cannot find 'CmpXchg' in" e];
-    [tc_solve
-    |solve_pointsto ()
-    |try (simpl; congruence) (* value inequality *)
-    |try solve_vals_compare_safe
-    |lwp_finish]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_twp_cmpxchg_fail _ _ _ _ K))
-      |fail 1 "lwp_cmpxchg_fail: cannot find 'CmpXchg' in" e];
-    [solve_pointsto ()
-    |try (simpl; congruence) (* value inequality *)
-    |try solve_vals_compare_safe
-    |lwp_finish]
-  | _ => fail "lwp_cmpxchg_fail: not a 'wp'"
-  end.
+(* Tactic Notation "lwp_xchg" := *)
+(*   let solve_pointsto _ := *)
+(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
+(*     iAssumptionCore || fail "lwp_xchg: cannot find" l "↦ ?" in *)
+(*   lwp_pures; *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_xchg _ _ _ _ _ K)) *)
+(*       |fail 1 "lwp_xchg: cannot find 'Xchg' in" e]; *)
+(*     [tc_solve *)
+(*     |solve_pointsto () *)
+(*     |pm_reduce; first [lwp_seq|lwp_finish]] *)
+(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_twp_xchg _ _ _ _ K)) *)
+(*       |fail 1 "lwp_xchg: cannot find 'Xchg' in" e]; *)
+(*     [solve_pointsto () *)
+(*     |pm_reduce; first [lwp_seq|lwp_finish]] *)
+(*   | _ => fail "lwp_xchg: not a 'wp'" *)
+(*   end. *)
 
-Tactic Notation "lwp_cmpxchg_suc" :=
-  let solve_pointsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
-    iAssumptionCore || fail "lwp_cmpxchg_suc: cannot find" l "↦ ?" in
-  lwp_pures;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_cmpxchg_suc _ _ _ _ _ K))
-      |fail 1 "lwp_cmpxchg_suc: cannot find 'CmpXchg' in" e];
-    [tc_solve
-    |solve_pointsto ()
-    |try (simpl; congruence) (* value equality *)
-    |try solve_vals_compare_safe
-    |pm_reduce; lwp_finish]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_twp_cmpxchg_suc _ _ _ _ K))
-      |fail 1 "lwp_cmpxchg_suc: cannot find 'CmpXchg' in" e];
-    [solve_pointsto ()
-    |try (simpl; congruence) (* value equality *)
-    |try solve_vals_compare_safe
-    |pm_reduce; lwp_finish]
-  | _ => fail "lwp_cmpxchg_suc: not a 'wp'"
-  end.
+(* Tactic Notation "lwp_cmpxchg" "as" simple_intropattern(H1) "|" simple_intropattern(H2) := *)
+(*   let solve_pointsto _ := *)
+(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
+(*     iAssumptionCore || fail "lwp_cmpxchg: cannot find" l "↦ ?" in *)
+(*   lwp_pures; *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_cmpxchg _ _ _ _ _ K)) *)
+(*       |fail 1 "lwp_cmpxchg: cannot find 'CmpXchg' in" e]; *)
+(*     [tc_solve *)
+(*     |solve_pointsto () *)
+(*     |try solve_vals_compare_safe *)
+(*     |pm_reduce; intros H1; lwp_finish *)
+(*     |intros H2; lwp_finish] *)
+(*   | |- envs_entails _ (twp ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_twp_cmpxchg _ _ _ _ K)) *)
+(*       |fail 1 "lwp_cmpxchg: cannot find 'CmpXchg' in" e]; *)
+(*     [solve_pointsto () *)
+(*     |try solve_vals_compare_safe *)
+(*     |pm_reduce; intros H1; lwp_finish *)
+(*     |intros H2; lwp_finish] *)
+(*   | _ => fail "lwp_cmpxchg: not a 'wp'" *)
+(*   end. *)
 
-Tactic Notation "lwp_faa" :=
-  let solve_pointsto _ :=
-    let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in
-    iAssumptionCore || fail "lwp_faa: cannot find" l "↦ ?" in
-  lwp_pures;
-  lazymatch goal with
-  | |- envs_entails _ (wp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_faa _ _ _ _ _ K))
-      |fail 1 "lwp_faa: cannot find 'FAA' in" e];
-    [tc_solve
-    |solve_pointsto ()
-    |pm_reduce; lwp_finish]
-  | |- envs_entails _ (twp ?s ?E ?e ?Q) =>
-    first
-      [reshape_expr e ltac:(fun K e' => eapply (tac_twp_faa _ _ _ _ K))
-      |fail 1 "lwp_faa: cannot find 'FAA' in" e];
-    [solve_pointsto ()
-    |pm_reduce; lwp_finish]
-  | _ => fail "lwp_faa: not a 'wp'"
-  end.
+(* Tactic Notation "lwp_cmpxchg_fail" := *)
+(*   let solve_pointsto _ := *)
+(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
+(*     iAssumptionCore || fail "lwp_cmpxchg_fail: cannot find" l "↦ ?" in *)
+(*   lwp_pures; *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_cmpxchg_fail _ _ _ _ _ K)) *)
+(*       |fail 1 "lwp_cmpxchg_fail: cannot find 'CmpXchg' in" e]; *)
+(*     [tc_solve *)
+(*     |solve_pointsto () *)
+(*     |try (simpl; congruence) (* value inequality *) *)
+(*     |try solve_vals_compare_safe *)
+(*     |lwp_finish] *)
+(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_twp_cmpxchg_fail _ _ _ _ K)) *)
+(*       |fail 1 "lwp_cmpxchg_fail: cannot find 'CmpXchg' in" e]; *)
+(*     [solve_pointsto () *)
+(*     |try (simpl; congruence) (* value inequality *) *)
+(*     |try solve_vals_compare_safe *)
+(*     |lwp_finish] *)
+(*   | _ => fail "lwp_cmpxchg_fail: not a 'wp'" *)
+(*   end. *)
+
+(* Tactic Notation "lwp_cmpxchg_suc" := *)
+(*   let solve_pointsto _ := *)
+(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
+(*     iAssumptionCore || fail "lwp_cmpxchg_suc: cannot find" l "↦ ?" in *)
+(*   lwp_pures; *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_cmpxchg_suc _ _ _ _ _ K)) *)
+(*       |fail 1 "lwp_cmpxchg_suc: cannot find 'CmpXchg' in" e]; *)
+(*     [tc_solve *)
+(*     |solve_pointsto () *)
+(*     |try (simpl; congruence) (* value equality *) *)
+(*     |try solve_vals_compare_safe *)
+(*     |pm_reduce; lwp_finish] *)
+(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_twp_cmpxchg_suc _ _ _ _ K)) *)
+(*       |fail 1 "lwp_cmpxchg_suc: cannot find 'CmpXchg' in" e]; *)
+(*     [solve_pointsto () *)
+(*     |try (simpl; congruence) (* value equality *) *)
+(*     |try solve_vals_compare_safe *)
+(*     |pm_reduce; lwp_finish] *)
+(*   | _ => fail "lwp_cmpxchg_suc: not a 'wp'" *)
+(*   end. *)
+
+(* Tactic Notation "lwp_faa" := *)
+(*   let solve_pointsto _ := *)
+(*     let l := match goal with |- _ = Some (_, (?l ↦{_} _)%I) => l end in *)
+(*     iAssumptionCore || fail "lwp_faa: cannot find" l "↦ ?" in *)
+(*   lwp_pures; *)
+(*   lazymatch goal with *)
+(*   | |- envs_entails _ (wp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_lwp_faa _ _ _ _ _ K)) *)
+(*       |fail 1 "lwp_faa: cannot find 'FAA' in" e]; *)
+(*     [tc_solve *)
+(*     |solve_pointsto () *)
+(*     |pm_reduce; lwp_finish] *)
+(*   | |- envs_entails _ (twp ?s ?E ?e ?Q) => *)
+(*     first *)
+(*       [reshape_expr e ltac:(fun K e' => eapply (tac_twp_faa _ _ _ _ K)) *)
+(*       |fail 1 "lwp_faa: cannot find 'FAA' in" e]; *)
+(*     [solve_pointsto () *)
+(*     |pm_reduce; lwp_finish] *)
+(*   | _ => fail "lwp_faa: not a 'wp'" *)
+(*   end. *)

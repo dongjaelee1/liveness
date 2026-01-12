@@ -389,7 +389,26 @@ Section lifting.
       iApply "IH". iModIntro. auto.
   Qed.
 
-  Lemma lwp_pure_step' `{!Inhabited (state Λ)} n G R (o : Ord.t) s i E e1 e2 φ Φ C ς :
+  Lemma lwp_pure_step_alt `{!Inhabited (state Λ)} (n : nat) G R (o : Ord.t) s i E E' e1 e2 φ Φ C ς :
+    PureExec φ C n e1 e2 →
+    φ →
+    PureExecCond C ς i →
+    ([∗ map] r ↦ v ∈ R, gl r v) ∗
+    (Nat.iter n (λ P, |={E,E'}=> ς ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗
+                                (ς -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗ ALC (£ o ={E',E}=∗ P))) (lWP e2 @ s; i; E {{ Φ }}))
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros (Hexec HΦ HCC) "(#Rs& LWP)".
+    iApply (lwp_pure_step n o _ _ E E'). 1: auto.
+    iStopProof. clear Hexec. pattern n. induction n.
+    { simpl. iIntros "(#Rs& LWP)". auto. }
+    simpl. iIntros "(#Rs& LWP)".
+    iMod "LWP" as "($& $& $& LWP)". iFrame "Rs".
+    iIntros "!> Hc TG Wcs". iMod ("LWP" with "Hc TG Wcs") as "LWP". iIntros "LC".
+    iApply IHn. iFrame "Rs". iMod ("LWP" with "LC") as "LWP". iModIntro. iFrame "LWP".
+  Qed.
+
+  Lemma lwp_pure_step_simple `{!Inhabited (state Λ)} n G R (o : Ord.t) s i E e1 e2 φ Φ C ς :
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς i →

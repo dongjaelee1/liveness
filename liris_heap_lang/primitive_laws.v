@@ -14,8 +14,12 @@ From liris.heap_lang Require Export class_instances.
 From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 From liris.algebra Require Import ordinal_wfocm.
+(** Fix step index to ordinals *)
+From transfinite.stepindex Require Import ordinals.
 
-Class heapGS `{SI : indexT} Σ := HeapGS {
+Global Instance ordSI : indexT := ordI.
+
+Class heapGS Σ := HeapGS {
   heapGS_gupdGS : gupdGS Σ;
 
   #[global] heapGS_gen_heapGS :: gen_heapGS loc (option val) Σ;
@@ -24,7 +28,7 @@ Class heapGS `{SI : indexT} Σ := HeapGS {
   #[global] heapGS_thread_mapGS :: thread_mapGS thread_id (option val) Σ;
 }.
 
-Global Program Instance heapGS_lirisGS `{SI : indexT} `{!heapGS Σ} : lirisGS heap_lang Σ := {
+Global Program Instance heapGS_lirisGS `{!heapGS Σ} : lirisGS heap_lang Σ := {
     liris_gupdGS := heapGS_gupdGS;
     state_interp σ Θ κs :=
       (thread_map_interp Θ σ.(thread_map) ∗
@@ -37,14 +41,14 @@ Global Program Instance heapGS_lirisGS `{SI : indexT} `{!heapGS Σ} : lirisGS he
 [Some]. We also seal the definition to avoid confusion between the version from
 [gen_heap], and our version with [Some]. That also helps for scopes and
 coercions. *)
-Local Definition pointsto_def `{SI : indexT} `{@heapGS SI Σ}
+Local Definition pointsto_def `{heapGS Σ}
     (l : loc) (dq : dfrac) (v : val) : iProp Σ :=
   pointsto l dq (Some v).
 Local Definition pointsto_aux : seal (@pointsto_def). Proof. by eexists. Qed.
 Definition pointsto := pointsto_aux.(unseal).
 Local Definition pointsto_unseal :
   @pointsto = @pointsto_def := pointsto_aux.(seal_eq).
-Global Arguments pointsto {SI Σ _}.
+Global Arguments pointsto {Σ _}.
 
 Notation "l ↦ dq v" := (pointsto l dq v)
   (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
@@ -53,7 +57,7 @@ Notation "l ↦ dq v" := (pointsto l dq v)
 make setoid rewriting in the predicate [I] work we need actual definitions
 here. *)
 Section definitions.
-  Context `{SI : indexT} `{!heapGS Σ}.
+  Context `{!heapGS Σ}.
   Definition inv_pointsto_own (l : loc) (v : val) (I : val → Prop) : iProp Σ :=
     inv_pointsto_own l (Some v) (from_option I False).
   Definition inv_pointsto (l : loc) (I : val → Prop) : iProp Σ :=
@@ -70,7 +74,7 @@ Notation "l ↦_ I v" := (inv_pointsto_own l v I%stdpp%type)
   (at level 20, I at level 9, format "l  ↦_ I  v") : bi_scope.
 
 (** Wrappers for othread and thread tokens *)
-Local Definition thread_exec_def `{SI : indexT} `{@heapGS SI Σ}
+Local Definition thread_exec_def `{heapGS Σ}
   (i : thread_id) q : iProp Σ :=
   (thread i true None q)%I.
   (* (othread_obls i Ψ q ∗ thread i true None q)%I. *)
@@ -78,9 +82,9 @@ Local Definition thread_exec_aux : seal (@thread_exec_def). Proof. by eexists. Q
 Definition thread_exec := thread_exec_aux.(unseal).
 Local Definition thread_exec_unseal :
   @thread_exec = @thread_exec_def := thread_exec_aux.(seal_eq).
-Global Arguments thread_exec {SI Σ _}.
+Global Arguments thread_exec {Σ _}.
 
-Local Definition thread_term_def `{SI : indexT} `{@heapGS SI Σ}
+Local Definition thread_term_def `{heapGS Σ}
   (i : thread_id) (v : val) : iProp Σ :=
   (thread i false (Some v) 1)%I.
   (* (othread_term i ∗ thread i false (Some v) 1)%I. *)
@@ -88,10 +92,10 @@ Local Definition thread_term_aux : seal (@thread_term_def). Proof. by eexists. Q
 Definition thread_term := thread_term_aux.(unseal).
 Local Definition thread_term_unseal :
   @thread_term = @thread_term_def := thread_term_aux.(seal_eq).
-Global Arguments thread_term {SI Σ _}.
+Global Arguments thread_term {Σ _}.
 
 Section lifting.
-Context `{SI : indexT} `{!heapGS Σ}.
+Context `{!heapGS Σ}.
 Implicit Types P Q : iProp Σ.
 Implicit Types Φ Ψ : val → iProp Σ.
 Implicit Types efs : gmap thread_id expr.
