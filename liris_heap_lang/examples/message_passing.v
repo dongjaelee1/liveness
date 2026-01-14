@@ -1,4 +1,3 @@
-From iris.algebra Require Import lib.frac_auth numbers auth.
 From iris.proofmode Require Import proofmode.
 From liris.base_logic Require Export invariants.
 From liris.program_logic Require Export weakestpre.
@@ -142,6 +141,16 @@ Section mp_proof.
       iModIntro. iIntros "#Tt1 #Tt2". iIntros "!>".
       iApply "HΦ". rewrite /lift_term. iFrame "Tt1".
       rewrite -thread_term_unfold. auto.
+  Qed.
+
+  Lemma mp_pre i l E G q :
+    th_obls i G q ∗ l ↦ #0
+    ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_fuel k (Σ[mp_ξ] 0) ∗ mp k l.
+  Proof.
+    rewrite /mp /mp_proto. iIntros "[TG ptr]".
+    iMod (gl_alloc_obl _ _ _ _ mp_ξ N 0 (l ↦ #0) with "TG ptr")
+      as "(%& %& TG& #Gwf& #Gl& Gf& #GV& #Wit& _)".
+    iFrame "Gwf Gl GV Wit". iFrame. auto.
   Qed.
 
 End mp_proof.
