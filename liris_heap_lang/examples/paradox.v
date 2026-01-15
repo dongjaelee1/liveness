@@ -1,5 +1,7 @@
-From iris.algebra Require Import mono_nat.
+From iris.bi Require Import lib.fractional.
+From iris.algebra Require Import gmap mono_nat.
 From iris.proofmode Require Import proofmode.
+(* From transfinite.base_logic Require Import lib.ghost_map. *)
 From liris.base_logic Require Export invariants.
 From liris.program_logic Require Export weakestpre.
 From liris.heap_lang Require Export lang.
@@ -7,60 +9,231 @@ From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 
-Section hyp.
-  Context `{!heapGS Σ}.
+From iris.proofmode Require Import coq_tactics reduction spec_patterns.
 
-  (** "pure" steps that are reducible with the thread_exec predicate, without submitting fuels. *)
-  Hypothesis lwp_pure_step_no_lc :
-    ∀ n s i q E E' e1 e2 φ Φ,
-    PureExec φ thread_cond n e1 e2 →
-    φ →
-    Nat.iter n
-      (λ P,
-         |={E,E'}=> thread_exec i q ∗
-                   ∃ R, ([∗ map] r↦v ∈ R, gl r v) ∗
-                        (thread_exec i q -∗
-                         ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
-                         (|={E',E}=> P)))
-      (lWP e2 @ s; i; E {{ v, Φ v }})
-    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+(** "pure" steps that are reducible with the thread_exec predicate, without submitting fuels. *)
+Class heapGS_no_lc `(HGS : heapGS Σ) := {
+    lwp_pure_step_no_lc :
+    ∀ n R s i q E E' e1 e2 φ Φ,
+      PureExec φ thread_cond n e1 e2 →
+      φ →
+      ([∗ map] r↦v ∈ R, gl r v) ∗
+      Nat.iter n
+        (λ P,
+           |={E,E'}=> thread_exec i q ∗
+                     (thread_exec i q -∗
+                      ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+                      (|={E',E}=> P)))
+        (lWP e2 @ s; i; E {{ v, Φ v }})
+      ⊢ lWP e1 @ s; i; E {{ Φ }};    
+  }.
 
-End hyp.
+Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@heapGS_no_lc Σ _}
+  Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
+  PureExec φ thread_cond n e1 e2 →
+  φ →
+  envs_entails Δ (∃ q E' R,
+        ([∗ map] r↦v ∈ R, gl r v) ∗
+        (Nat.iter n (λ P, |={E,E'}=>
+                       thread_exec i q ∗
+                       (thread_exec i q -∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗ (|={E',E}=> P)))
+           (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
+  envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
+Proof.
+  rewrite envs_entails_unseal=> ?? ->.
+  (* We want [pure_exec_fill] to be available to TC search locally. *)
+  pose proof @pure_exec_fill.
+  iIntros "(%&%&%& #Rs& Iter)". iApply lwp_pure_step_no_lc. 1: auto.
+  iFrame "Rs Iter".
+Qed.
 
-Definition writer : val :=
-  λ: "l", "l" <- #1;;
-          Exit #().
+Tactic Notation "lwp_pure_no_lc" open_constr(efoc) :=
+  iStartProof;
+  lazymatch goal with
+  | |- envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
+      let e := eval simpl in e in
+        reshape_expr e ltac:(fun K e' =>
+                               unify e' efoc;
+                               eapply (tac_lwp_pure_no_lc _ _ _ _ K e');
+                               [tc_solve                       (* PureExec *)
+                               |try solve_vals_compare_safe    (* The pure condition for PureExec --
+         handles trivial goals, including [vals_compare_safe] *)
+                               (* |tc_solve                       (* IntoLaters *) *)
+                               |idtac (* new goal *)
+                                  (* |idtac "use lwp_finish to cleanup new lwp"    (* new goal *) *)
+                                  (* |lwp_finish                      (* new goal *) *)
+                            ])
+        || fail "lwp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
+  | _ => fail "lwp_pure: not a 'lwp'"
+  end.
+Tactic Notation "lwp_pure_no_lc" :=
+  lwp_pure_no_lc _.
 
-Definition reader : val := 
-  rec: "reader" "l" :=
-    let: "n" := !"l" in
-    if: "n" = #1
-    then Exit #()
-    else "reader" "l".
+Tactic Notation "lwp_rec_no_lc" :=
+  let H := fresh in
+  assert (H := AsRecV_recv);
+  lwp_pure_no_lc (App _ _);
+  clear H.
 
-Section mp_proof.
-  Context `{!heapGS Σ} (N : namespace).
+Tactic Notation "lwp_if_no_lc" := lwp_pure_no_lc (If _ _ _).
+Tactic Notation "lwp_if_true_no_lc" := lwp_pure_no_lc (If (LitV (LitBool true)) _ _).
+Tactic Notation "lwp_if_false_no_lc" := lwp_pure_no_lc (If (LitV (LitBool false)) _ _).
+Tactic Notation "lwp_unop_no_lc" := lwp_pure_no_lc (UnOp _ _).
+Tactic Notation "lwp_binop_no_lc" := lwp_pure_no_lc (BinOp _ _ _).
+Tactic Notation "lwp_op_no_lc" := lwp_unop_no_lc || lwp_binop_no_lc.
+Tactic Notation "lwp_lam_no_lc" := lwp_rec_no_lc.
+Tactic Notation "lwp_let_no_lc" := lwp_pure_no_lc (Rec BAnon (BNamed _) _).
+Tactic Notation "lwp_seq_no_lc" := lwp_pure_no_lc (Rec BAnon BAnon _).
+Tactic Notation "lwp_proj_no_lc" := lwp_pure_no_lc (Fst _) || lwp_pure_no_lc (Snd _).
+Tactic Notation "lwp_case_no_lc" := lwp_pure_no_lc (Case _ _ _).
+Tactic Notation "lwp_inj_no_lc" := lwp_pure_no_lc (InjL _) || lwp_pure_no_lc (InjR _).
+Tactic Notation "lwp_pair_no_lc" := lwp_pure_no_lc (Pair _ _).
+Tactic Notation "lwp_closure_no_lc" := lwp_pure_no_lc (Rec _ _ _).
 
-  Definition mp_ξ : gl_witness := λ _, ω%ord.
-  Definition mp_ηξ : gl_witness := λ v, gupd_η (Σ[mp_ξ] v).
+Definition loop : val := 
+  rec: "loop" <> :=
+    "loop" #().
 
-  Definition mp_proto (k : gl_id) (v : ghost_lock_version) (l : loc) : iProp Σ :=
-    gl_witfun k mp_ξ ∗ gl k v ∗ wit k v (mp_ηξ v) ∗
-    gl_variant N k v (l ↦ #0) (l ↦ #1) (False).
+(** Monotone counters *)
+Class mcntsG Σ :=
+  MCounterG {
+      #[local] mcnts_inG :: inG Σ (gmapUR positive mono_natUR);
+    }.
 
-  Definition mp (k : gl_id) (l : loc) : iProp Σ :=
-    mp_proto k 0 l.
+Definition mcntsΣ : gFunctors :=
+  #[GFunctor (gmapUR positive mono_natUR)].
+
+Global Instance subG_mcntsΣ {Σ} : subG mcntsΣ Σ → mcntsG Σ.
+Proof. solve_inG. Qed.
+
+Section proof.
+  Context `{!heapGS Σ, !mcntsG Σ} `{@heapGS_no_lc Σ _}.
+
+  Definition cnt_auth (γ : gname) (i : positive) n (q : Qp) : iProp Σ :=
+    own γ ({[i := ●MN{#q} n]}).
+  Definition cnt_lb (γ : gname) (i : positive) n : iProp Σ :=
+    own γ ({[i := ◯MN n]}).
+  Definition cnt_base (γ : gname) : iProp Σ :=
+    own γ (∅ : gmapUR positive mono_natUR).
+
+  Section cnt.
+
+    Global Instance cnt_auth_timeless γ i n q : Timeless (cnt_auth γ i n q).
+    Proof. rewrite /cnt_auth. apply _. Qed.
+    Global Instance cnt_lb_timeless γ i n : Timeless (cnt_lb γ i n).
+    Proof. rewrite /cnt_lb. apply _. Qed.
+
+    Global Instance cnt_lb_persistent γ i n : Persistent (cnt_lb γ i n).
+    Proof. rewrite /cnt_lb. apply _. Qed.
+
+    Global Instance cnt_auth_fractional γ i n :
+      Fractional (cnt_auth γ i n).
+    Proof.
+      rewrite /cnt_auth. intros p q.
+      by rewrite -own_op singleton_op -mono_nat_auth_dfrac_op.
+    Qed.
+    Global Instance cnt_auth_as_fractional γ i n q :
+      AsFractional (cnt_auth γ i n q) (cnt_auth γ i n) q.
+    Proof. split; [auto|apply _]. Qed.
+
+    Lemma alloc_cnt_base γ :
+      ⊢ |==> cnt_base γ.
+    Proof. rewrite /cnt_base. apply own_unit. Qed.
+
+    Lemma alloc_cnt_auth γ n :
+      cnt_base γ ⊢ |==> cnt_base γ ∗ ∃ i, cnt_auth γ i n 1.
+    Proof.
+      rewrite /cnt_base /cnt_auth. iIntros "B".
+      iMod (own_updateP (λ m', ∃ i, m' = <[i:=●MN n]> ∅ ∧ ∅ !! i = None) with "B") as "(%&%& B)".
+      { eapply @alloc_updateP'. 1: apply _. apply mono_nat_auth_valid. }
+      destruct H0 as (?&?&?). subst. rewrite insert_singleton_op; last auto.
+      iDestruct "B" as "[$ $]". auto.
+    Qed.
+
+    Lemma get_cnt_lb γ i q n1 n2 :
+      n1 ≤ n2 →
+      cnt_auth γ i n2 q ⊢ cnt_lb γ i n1.
+    Proof.
+      rewrite /cnt_auth /cnt_lb. iIntros (HLe) "H".
+      assert ({[i := ●MN{#q} n2]} ≡ ({[i := ●MN{#q} n2 ⋅ ◯MN n2]} : gmap _ _)).
+      { rewrite -mono_nat_auth_lb_op. done. }
+      rewrite H0. iDestruct "H" as "[_ H]". rewrite (mono_nat_lb_op_le_l _ _ HLe).
+      iDestruct "H" as "[$ _]".
+    Qed.
+
+    Lemma cnt_auth_op_valid γ i n1 n2 q1 q2 :
+      cnt_auth γ i n1 q1 -∗ cnt_auth γ i n2 q2 -∗ ⌜ n1 = n2 ∧ (q1 + q2 ≤ 1)%Qp ⌝.
+    Proof.
+      rewrite /cnt_auth. iIntros "H1 H2". iCombine "H1 H2" as "H".
+      iPoseProof (own_valid with "H") as "%".
+      apply singleton_valid, mono_nat_auth_dfrac_op_valid in H0.
+      destruct H0. done.
+    Qed.
+
+    Lemma cnt_auth_lb_valid γ i q n m :
+      cnt_auth γ i n q -∗ cnt_lb γ i m -∗ ⌜ m ≤ n ∧ (q ≤ 1)%Qp ⌝.
+    Proof.
+      rewrite /cnt_auth /cnt_lb. iIntros "H1 H2". iCombine "H1 H2" as "H".
+      iPoseProof (own_valid with "H") as "%".
+      apply singleton_valid, mono_nat_both_dfrac_valid in H0.
+      destruct H0. done.
+    Qed.
+
+  End cnt.
+
+  Context (N N_inv N1 : namespace).
+  Hypothesis N_disj_1 : N ## N_inv.
+
+  Definition cnt_ξ : gl_witness := λ _, 100.
+  Definition cnt_ηξ : gl_witness := λ v, gupd_η (Σ[cnt_ξ] v).
+
+  Definition px_inv r i j k : iProp Σ :=
+    ∃ n, cnt_auth r j n (1/2)%Qp ∗
+         ([∗ list] a ∈ seq 0 (S n), (£ 100 ∨ cnt_lb r i a) ∗
+                                    gl k a ∗ wit k a (cnt_ηξ a) ∗
+                                    gl_variant N_inv k a True (cnt_lb r j (a + 1)) (cnt_lb r j (a + 1))).
+
+  Definition px r i j k : iProp Σ :=
+    ∃ x, gl_done x 0 ∗ gl_variant N x 0 False (px_inv r i j k) False.
 
   (** The main proofs. *)
-  Global Instance mp_proto_persistent k v l : Persistent (mp_proto k v l).
-  Proof. apply _. Qed.
-  Global Instance mp_persistent k l : Persistent (mp k l).
-  Proof. apply _. Qed.
+  Global Instance px_persistent r i j k : Persistent (px r i j k).
+  Proof. rewrite /px. apply _. Qed.
 
-  Lemma mp_writer_spec i l :
+  (** Receives later credits via px_inv *)
+  Lemma px_loop1_spec i α r ci cj ck :
+    l{{{ thread_exec i 1 ∗ th_obls i (<[α:=0]>∅) 1 ∗ gl_variant N1 α 0 True False False ∗
+         px r ci cj ck ∗
+         ∃ n, cnt_auth r ci n 1%Qp ∗
+              cnt_lb r cj n ∗ gl ck n ∗ wit ck n (cnt_ηξ n) ∗
+              gl_variant N_inv ck n True (cnt_lb r cj (S n)) (cnt_lb r cj (S n)) }}}
+      loop #() @ i
+    l{{{ RET #(); lift_term i fork_post #() }}}.
+  Proof.
+    iIntros (Φ) "(Tx& TG& #GVα& (%x& #Gdx& #GVx)& %n& Cai& #Cljn& #Gckn& #Wckn& #GVckn) HΦ".
+    (* iApply fupd_lwp. *)
+    (* iMod (gl_variant_acc_done with "Gdx GVx") as "[[H | H] ACC]". 1: done. *)
+    (* 2:{ iMod "H" as "[_ %]". done. } *)
+    (** Lob induction *)
+    iRevert (n) "Gckn Cljn Wckn GVckn Cai". iLöb as "IH".
+    rewrite /loop.
+    lwp_lam_no_lc. iExists _, ⊤,  iFrame "Tx".
+
+  Abort.
+
+  Lemma px_loop2_spec j r ci cj ck :
+    l{{{ thread_exec j 1 ∗ th_obls j (<[ck:=0]>∅) 1 ∗ gl_fuel ck 100 ∗
+         px r ci cj ck ∗ cnt_auth r cj 0 (1/2)%Qp }}}
+      loop #() @ j
+    l{{{ RET #(); lift_term j fork_post #() }}}.
+  Proof.
+
+  Abort.
+
+  Lemma px_writer_spec i l :
     l{{{ ∃ k, mp k l ∗
               thread_exec i 1 ∗ th_obls i (<[k:=0]>∅) 1 ∗
-              gl_fuel k (Σ[mp_ξ] 0) }}}
+              gl_fuel k (Σ[px_ξ] 0) }}}
       writer #l @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof.
@@ -102,7 +275,7 @@ Section mp_proof.
     rewrite -thread_term_unfold. auto.
   Qed.
 
-  Lemma mp_reader_spec i l :
+  Lemma px_reader_spec i l :
     l{{{ ∃ k, mp k l ∗
               thread_exec i 1 ∗ th_obls i ∅ 1 }}}
       reader #l @ i
@@ -112,7 +285,7 @@ Section mp_proof.
     iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG)".
     rewrite /reader /=.
     (* Liveness induction *)
-    remember (mp_ηξ 0) as a. clear Heqa.
+    remember (px_ηξ 0) as a. clear Heqa.
     iStopProof. induction a using WFOCM.ind. rename x into a, H into IHa.
     iIntros "(#(Gwfk& Gk& Wkv& GVkv)& Tx& TG& HΦ)".
     (* Pure steps *)
@@ -162,4 +335,4 @@ Section mp_proof.
       rewrite -thread_term_unfold. auto.
   Qed.
 
-End mp_proof.
+End proof.
