@@ -13,7 +13,7 @@ From liris.program_logic Require Import ectx_lifting.
 From liris.heap_lang Require Export class_instances.
 From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
-From liris.algebra Require Import ordinal_wfocm.
+From liris.algebra Require Export ordinal_wfocm.
 (** Fix step index to ordinals *)
 From transfinite.stepindex Require Import ordinals.
 

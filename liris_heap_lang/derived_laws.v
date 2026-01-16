@@ -72,7 +72,7 @@ Lemma update_array l dq vs off v :
   ⊢ l ↦∗{dq} vs -∗ ((l +ₗ off) ↦{dq} v ∗ ∀ v', (l +ₗ off) ↦{dq} v' -∗ l ↦∗{dq} <[off:=v']>vs).
 Proof.
   iIntros (Hlookup) "Hl".
-  rewrite -[X in (l ↦∗{_} X)%I](take_drop_middle _ off v); last done.
+  rewrite - [X in (l ↦∗{_} X)%I] (take_drop_middle _ off v); last done.
   iDestruct (array_app with "Hl") as "[Hl1 Hl]".
   iDestruct (array_cons with "Hl") as "[Hl2 Hl3]".
   assert (off < length vs) as H by (apply lookup_lt_is_Some; by eexists).
@@ -80,7 +80,7 @@ Proof.
   iIntros (w) "Hl2".
   clear Hlookup. assert (<[off:=w]> vs !! off = Some w) as Hlookup.
   { apply list_lookup_insert_eq. lia. }
-  rewrite -[in (l ↦∗{_} <[off:=w]> vs)%I](take_drop_middle (<[off:=w]> vs) off w Hlookup).
+  rewrite -[in (l ↦∗{_} <[off:=w]> vs)%I] (take_drop_middle (<[off:=w]> vs) off w Hlookup).
   iApply array_app. rewrite take_insert_ge; last by lia. iFrame.
   iApply array_cons. rewrite length_take min_l; last by lia. iFrame.
   rewrite drop_insert_lt; last by lia. done.

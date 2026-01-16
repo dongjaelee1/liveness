@@ -186,10 +186,16 @@ Section proof.
 
   Definition cnt_ξ : gl_witness := λ _, 100.
   Definition cnt_ηξ : gl_witness := λ v, gupd_η (Σ[cnt_ξ] v).
+  Definition lf_cnt_ηξ : Ord.t → Ord.t := limit_fun (λ _ v, cnt_ηξ v).
+
+  Lemma lf_cnt_ηξ_lt o : ∀ v, (cnt_ηξ v <= lf_cnt_ηξ o)%ord.
+  Proof.
+    intros. rewrite /lf_cnt_ηξ. etrans; last eapply (limit_fun_upperbound _ _ v). done.
+  Qed.
 
   Definition px_inv r i j k : iProp Σ :=
     ∃ n, cnt_auth r j n (1/2)%Qp ∗
-         ([∗ list] a ∈ seq 0 (S n), (£ 100 ∨ cnt_lb r i a) ∗
+         ([∗ list] a ∈ seq 0 (S n), (£ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∨ cnt_lb r i a) ∗
                                     gl k a ∗ wit k a (cnt_ηξ a) ∗
                                     gl_variant N_inv k a True (cnt_lb r j (a + 1)) (cnt_lb r j (a + 1))).
 
@@ -203,21 +209,44 @@ Section proof.
   (** Receives later credits via px_inv *)
   Lemma px_loop1_spec i α r ci cj ck :
     l{{{ thread_exec i 1 ∗ th_obls i (<[α:=0]>∅) 1 ∗ gl_variant N1 α 0 True False False ∗
-         px r ci cj ck ∗
+         £ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∗ px r ci cj ck ∗
          ∃ n, cnt_auth r ci n 1%Qp ∗
               cnt_lb r cj n ∗ gl ck n ∗ wit ck n (cnt_ηξ n) ∗
               gl_variant N_inv ck n True (cnt_lb r cj (S n)) (cnt_lb r cj (S n)) }}}
       loop #() @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof.
-    iIntros (Φ) "(Tx& TG& #GVα& (%x& #Gdx& #GVx)& %n& Cai& #Cljn& #Gckn& #Wckn& #GVckn) HΦ".
+    iIntros (Φ) "(Tx& TG& #GVα& LC& (%x& #Gdx& #GVx)& %n& Cai& #Cljn& #Gckn& #Wckn& #GVckn) HΦ".
     (* iApply fupd_lwp. *)
     (* iMod (gl_variant_acc_done with "Gdx GVx") as "[[H | H] ACC]". 1: done. *)
     (* 2:{ iMod "H" as "[_ %]". done. } *)
     (** Lob induction *)
     iRevert (n) "Gckn Cljn Wckn GVckn Cai". iLöb as "IH".
-    rewrite /loop.
-    lwp_lam_no_lc. iExists _, ⊤,  iFrame "Tx".
+    iIntros (n) "#Gckn #Cljn #Wckn #GVckn Cai".
+    (** Witness induction *)
+    remember (cnt_ηξ n) as w. iPoseProof (tlc_split with "LC") as "[LC LCw]".
+    (* TODO: make interface defs and lemmas for tlc *)
+    iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ w with "LCw") as "LCw".
+    { subst w. apply lf_cnt_ηξ_lt. }
+    iModIntro. clear Heqw. iRevert "Wckn LCw".
+    iInduction w as [w IHw] using (well_founded_induction Ord.lt_well_founded).
+    iIntros "#Wckn LCw".
+    iEval (rewrite /loop).
+    lwp_lam_no_lc. iExists _, ⊤, (<[ck:=n]>∅). iFrame "Tx". iSplitR.
+    { rewrite big_sepM_singleton. auto. }
+    iIntros "!> Tx Wcs !>". lwp_finish.
+    iEval (rewrite -/loop).
+    rewrite big_sepM_singleton. iDestruct "Wcs" as "[Wc | #Gdckn]".
+    - (** Witness induction *)
+      iMod (wit_credit_spend_one with "Wckn Wc") as "(%& %LTw& #Wckn')".
+      iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ a0 with "LCw") as "LCw".
+      { apply Ord.lt_le; auto. }      
+      iPoseProof ("IHw" $! _ LTw with "Tx TG HΦ Cai LC [Wckn] LCw") as "LWP".
+      { auto. }
+      auto.
+    - (** Version n is done; fetch next version and use Löb induction *)
+      
+      
 
   Abort.
 
