@@ -179,6 +179,13 @@ Section proof.
       destruct H0. done.
     Qed.
 
+    Lemma cnt_auth_update γ i n1 n2 :
+      n1 ≤ n2 →
+      cnt_auth γ i n1 1 ⊢ |==> cnt_auth γ i n2 1.
+    Proof.
+      rewrite /cnt_auth. iIntros (LE). apply own_update, singleton_update, mono_nat_update. auto.
+    Qed.
+
   End cnt.
 
   Context (N N_inv N1 : namespace).
@@ -186,16 +193,17 @@ Section proof.
 
   Definition cnt_ξ : gl_witness := λ _, 100.
   Definition cnt_ηξ : gl_witness := λ v, gupd_η (Σ[cnt_ξ] v).
-  Definition lf_cnt_ηξ : Ord.t → Ord.t := limit_fun (λ _ v, cnt_ηξ v).
+  (* Definition lf_cnt_ηξ : Ord.t → Ord.t := limit_fun (λ _ v, cnt_ηξ v). *)
 
-  Lemma lf_cnt_ηξ_lt o : ∀ v, (cnt_ηξ v <= lf_cnt_ηξ o)%ord.
-  Proof.
-    intros. rewrite /lf_cnt_ηξ. etrans; last eapply (limit_fun_upperbound _ _ v). done.
-  Qed.
+  (* Lemma lf_cnt_ηξ_lt o : ∀ v, (cnt_ηξ v <= lf_cnt_ηξ o)%ord. *)
+  (* Proof. *)
+  (*   intros. rewrite /lf_cnt_ηξ. etrans; last eapply (limit_fun_upperbound _ _ v). done. *)
+  (* Qed. *)
 
   Definition px_inv r i j k : iProp Σ :=
     ∃ n, cnt_auth r j n (1/2)%Qp ∗
-         ([∗ list] a ∈ seq 0 (S n), (£ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∨ cnt_lb r i a) ∗
+         ([∗ list] a ∈ seq 0 (S n), (£ (1)%ord ∨ cnt_lb r i a) ∗
+         (* ([∗ list] a ∈ seq 0 (S n), (£ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∨ cnt_lb r i a) ∗ *)
                                     gl k a ∗ wit k a (cnt_ηξ a) ∗
                                     gl_variant N_inv k a True (cnt_lb r j (a + 1)) (cnt_lb r j (a + 1))).
 
@@ -209,13 +217,14 @@ Section proof.
   (** Receives later credits via px_inv *)
   Lemma px_loop1_spec i α r ci cj ck :
     l{{{ thread_exec i 1 ∗ th_obls i (<[α:=0]>∅) 1 ∗ gl_variant N1 α 0 True False False ∗
-         £ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∗ px r ci cj ck ∗
+         £ (1)%ord ∗ px r ci cj ck ∗
+         (* £ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∗ px r ci cj ck ∗ *)
          ∃ n, cnt_auth r ci n 1%Qp ∗
               cnt_lb r cj n ∗ gl ck n ∗ wit ck n (cnt_ηξ n) ∗
               gl_variant N_inv ck n True (cnt_lb r cj (S n)) (cnt_lb r cj (S n)) }}}
       loop #() @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
-  Proof.
+  Proof using Type*.
     iIntros (Φ) "(Tx& TG& #GVα& LC& (%x& #Gdx& #GVx)& %n& Cai& #Cljn& #Gckn& #Wckn& #GVckn) HΦ".
     (* iApply fupd_lwp. *)
     (* iMod (gl_variant_acc_done with "Gdx GVx") as "[[H | H] ACC]". 1: done. *)
@@ -224,13 +233,15 @@ Section proof.
     iRevert (n) "Gckn Cljn Wckn GVckn Cai". iLöb as "IH".
     iIntros (n) "#Gckn #Cljn #Wckn #GVckn Cai".
     (** Witness induction *)
-    remember (cnt_ηξ n) as w. iPoseProof (tlc_split with "LC") as "[LC LCw]".
-    (* TODO: make interface defs and lemmas for tlc *)
-    iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ w with "LCw") as "LCw".
-    { subst w. apply lf_cnt_ηξ_lt. }
-    iModIntro. clear Heqw. iRevert "Wckn LCw".
+    remember (cnt_ηξ n) as w.
+    (* iPoseProof (tlc_split with "LC") as "[LC LCw]". *)
+    (** TODO: make interface defs and lemmas for tlc *)
+    (* iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ w with "LCw") as "LCw". *)
+    (* { subst w. apply lf_cnt_ηξ_lt. } *)
+    (* iModIntro. *)
+    clear Heqw. iRevert "Wckn".
     iInduction w as [w IHw] using (well_founded_induction Ord.lt_well_founded).
-    iIntros "#Wckn LCw".
+    iIntros "#Wckn".
     iEval (rewrite /loop).
     lwp_lam_no_lc. iExists _, ⊤, (<[ck:=n]>∅). iFrame "Tx". iSplitR.
     { rewrite big_sepM_singleton. auto. }
@@ -239,16 +250,43 @@ Section proof.
     rewrite big_sepM_singleton. iDestruct "Wcs" as "[Wc | #Gdckn]".
     - (** Witness induction *)
       iMod (wit_credit_spend_one with "Wckn Wc") as "(%& %LTw& #Wckn')".
-      iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ a0 with "LCw") as "LCw".
-      { apply Ord.lt_le; auto. }      
-      iPoseProof ("IHw" $! _ LTw with "Tx TG HΦ Cai LC [Wckn] LCw") as "LWP".
+      (* iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ a0 with "LCw") as "LCw". *)
+      (* { apply Ord.lt_le; auto. }       *)
+      iPoseProof ("IHw" $! _ LTw with "Tx TG LC HΦ Cai [Wckn]") as "LWP".
       { auto. }
       auto.
     - (** Version n is done; fetch next version and use Löb induction *)
-      
-      
-
-  Abort.
+      iAssert (|={⊤}=> cnt_lb r cj (S n))%I with "[]" as ">#Cljn0".
+      { iMod (gl_variant_acc_done with "Gdckn GVckn") as "[[>#H | >(Gex& #H)] ACC]". 1: set_solver.
+        - iMod ("ACC" with "[]") as "_"; auto.
+          iNext. iApply gl_variant_cases_unfold. iLeft. iRight. auto.
+        - iMod ("ACC" with "[Gex]") as "_"; auto.
+          iNext. iApply gl_variant_cases_unfold. iRight. auto.
+      }
+      (** TODO: non-atomic invariant access *)
+      iApply fupd_lwp. iMod (gl_variant_acc_done with "Gdx GVx") as "[[H | >[_ %HF]] ACC]".
+      1: set_solver. 2: done.
+      (** TODO: interface lemmas for lwp_lc_later in lifting. also fupd and later-mod comm? *)
+      iCombine "IH H" as "H". iMod (lc_fupd_elim_later with "LC H") as "H".
+      iClear "IH". iDestruct "H" as "[IH H]". iDestruct "H" as "(%& Caj& Cs)".
+      iPoseProof (cnt_auth_lb_valid with "Caj Cljn0") as "%". destruct H0 as [Le _].
+      rewrite (seq_S n0) big_sepL_snoc. iDestruct "Cs" as "[Cs (LC& #Gckn0& #Wckn0& #GVckn0)]".
+      iDestruct "LC" as "[LC | #Clin0]"; cycle 1.
+      { iPoseProof (cnt_auth_lb_valid with "Cai Clin0") as "%". destruct H0.
+        exfalso. lia. }
+      iPoseProof (get_cnt_lb _ _ _ n0 n0 with "Caj") as "#Cljn0'". 1: auto.
+      iMod (cnt_auth_update _ _ _ n0 with "Cai") as "Cai".
+      { lia. }
+      iPoseProof (get_cnt_lb _ _ _ n0 with "Cai") as "#Clin0". 1: auto.
+      iPoseProof (big_sepL_snoc with "[$Cs]") as "Cs".
+      { iFrame "Clin0". eauto. }
+      rewrite -(seq_S n0). iMod ("ACC" with "[Caj Cs]") as "_".
+      { iNext. iApply gl_variant_cases_unfold. iLeft. iRight. rewrite /px_inv. iFrame. eauto. }
+      iModIntro. iPoseProof ("IH" with "Tx TG LC HΦ") as "H".
+      iPoseProof ("H" $! n0 with "Gckn0 Cljn0' Wckn0 [GVckn0] Cai") as "H".
+      { simpl. replace (S n0) with (n0 + 1) by lia. eauto. }
+      iFrame.
+  Qed.
 
   Lemma px_loop2_spec j r ci cj ck :
     l{{{ thread_exec j 1 ∗ th_obls j (<[ck:=0]>∅) 1 ∗ gl_fuel ck 100 ∗
