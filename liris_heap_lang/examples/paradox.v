@@ -188,6 +188,8 @@ Section proof.
 
   End cnt.
 
+  Typeclasses Opaque cnt_auth.
+
   Context (N N_inv N1 : namespace).
   Hypothesis N_disj_1 : N ## N_inv.
 
@@ -216,7 +218,8 @@ Section proof.
 
   (** Receives later credits via px_inv *)
   Lemma px_loop1_spec i α r ci cj ck :
-    l{{{ thread_exec i 1 ∗ th_obls i (<[α:=0]>∅) 1 ∗ gl_variant N1 α 0 True False False ∗
+    l{{{ thread_exec i 1 ∗ th_obls i (<[α:=0]>∅) 1 ∗
+         gl_variant N1 α 0 True False False ∗
          £ (1)%ord ∗ px r ci cj ck ∗
          (* £ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∗ px r ci cj ck ∗ *)
          ∃ n, cnt_auth r ci n 1%Qp ∗
@@ -288,118 +291,64 @@ Section proof.
       iFrame.
   Qed.
 
-  Lemma px_loop2_spec j r ci cj ck :
-    l{{{ thread_exec j 1 ∗ th_obls j (<[ck:=0]>∅) 1 ∗ gl_fuel ck 100 ∗
-         px r ci cj ck ∗ cnt_auth r cj 0 (1/2)%Qp }}}
+  Lemma px_loop2_spec j n r ci cj ck :
+    l{{{ thread_exec j 1 ∗ th_obls j (<[ck:=n]>∅) 1 ∗
+         gl_variant N_inv ck n True (cnt_lb r cj (n + 1)) (cnt_lb r cj (n + 1)) ∗
+         gl_witfun ck cnt_ξ ∗ gl_fuel ck (Σ[cnt_ξ]{n, n}) ∗
+         px r ci cj ck ∗ cnt_auth r cj n (1/2)%Qp }}}
       loop #() @ j
     l{{{ RET #(); lift_term j fork_post #() }}}.
-  Proof.
-
-  Abort.
-
-  Lemma px_writer_spec i l :
-    l{{{ ∃ k, mp k l ∗
-              thread_exec i 1 ∗ th_obls i (<[k:=0]>∅) 1 ∗
-              gl_fuel k (Σ[px_ξ] 0) }}}
-      writer #l @ i
-    l{{{ RET #(); lift_term i fork_post #() }}}.
-  Proof.
-    iIntros (Φ) "HP HΦ".
-    (* iApply lwp_sfgupd. *)
-    iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG& Gfk)".
-    rewrite /writer /=.
-    iMod (gl_fuel_lt k 100 with "Gfk") as "[Gfk Gfk1]".
-    { apply Ord.omega_upperbound. }
-    (* Pure steps *)
-    lwp_lam. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done.
-    iSplitL "Gfk1".
-    { iModIntro. rewrite big_sepM_singleton. iFrame. }
-    iIntros "!> Tx TG _ !> _ !>".
-    lwp_finish.
-    iMod (gl_fuel_mon_split k 99 1 with "Gfk") as "[Gfk Gfk1]".
-    { rewrite -Hessenberg.add_from_nat. reflexivity. }
-    lwp_bind (Store _ _).
-    iMod (gl_unlock with "TG GVkv") as "[>(TG& Glk& VP) ACC]".
+  Proof using Type*.
+    iIntros (Φ) "(Tx& TG& #GVck& #Gw& Gf& (%x& #Gdx& #GVx)& Caj) HΦ".
+    (** Lob induction *)
+    iRevert (n) "GVck TG Gf Caj". iLöb as "IH".
+    iIntros (n) "#GVck TG Gf Caj".
+    iEval (rewrite /loop).
+    iMod (gl_fuel_mon _ 1 with "Gf") as "Gf".
+    { rewrite gl_witness_sum_gen_eq /cnt_ξ. apply OrdArith.le_from_nat. lia. }
+    lwp_lam. iFrame "Tx TG". iExists ⊤, ∅, 2. iSplitR; first done.
+    iModIntro. iSplitL "Gf".
+    { iApply big_sepM_singleton. rewrite Ord.from_nat_1. eauto. }
+    iIntros "Tx TG _ !> LC !>". lwp_finish.
+    iEval (rewrite -/loop).
+    iPoseProof (tlc_split_nat 1 1 with "LC") as "[LC LC1]".
+    (** TODO: better interface for sfgupd-fupd access patterns *)
+    iApply sfgupd_elim_lwp. iApply (sfgupd_fupd_acc _ ∅).
+    iMod (gl_variant_acc_done with "Gdx GVx") as "[[H | >[_ %HF]] ACC]".
+    1: set_solver. 2: done.
+    (** TODO: interface lemmas for lwp_lc_later in lifting. also fupd and later-mod comm? *)
+    iCombine "IH H" as "H". iMod (lc_fupd_elim_later with "LC1 H") as "H".
+    iClear "IH". iDestruct "H" as "[IH H]". iDestruct "H" as "(%& Caj2& Cs)".
+    iPoseProof (cnt_auth_op_valid with "Caj Caj2") as "%". destruct H0 as [? _]. subst n0.
+    iCombine "Caj Caj2" as "Caj".
+    iMod (cnt_auth_update _ _ _ (n + 1) with "Caj") as "[Caj Caj2]". 1: lia.
+    iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
+    iMod (gl_unlock with "TG GVck") as "[>(TG& Glock& _) ACC2]".
     { set_solver. }
-    { rewrite lookup_insert_eq. auto. }
-    iApply lwp_sfgupd.
-    iApply (lwp_store _ ∅ 0 with "[$VP $Tx $TG Gfk1]").
-    { rewrite !big_sepM_singleton. iFrame. by iApply big_sepM_empty. }
-    iIntros "[(_& Tx& TG& _) ptl]".
-    iPoseProof ("ACC" with "TG Glk ptl") as ">ACC".
-    iModIntro. iMod "ACC" as "(TG& Gc& #Gd)". iModIntro.
-    (* simpl. *)
-    lwp_pure.
-    simpl. iFrame "Tx". iExists ⊤, ∅, ∅, 0. iSplitR; first done. iModIntro. iSplitL "TG".
-    { rewrite delete_insert_id; auto. }
-    iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-    lwp_pure.
-    simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-    iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-    iApply (lwp_exit with "TG Tx [HΦ]").
-    iModIntro. iIntros "#Tt1 #Tt2". iIntros "!>".
-    iApply "HΦ". rewrite /lift_term. iFrame "Tt1".
-    rewrite -thread_term_unfold. auto.
-  Qed.
-
-  Lemma px_reader_spec i l :
-    l{{{ ∃ k, mp k l ∗
-              thread_exec i 1 ∗ th_obls i ∅ 1 }}}
-      reader #l @ i
-    l{{{ RET #(); lift_term i fork_post #() }}}.
-  Proof.
-    iIntros (Φ) "HP HΦ".
-    iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG)".
-    rewrite /reader /=.
-    (* Liveness induction *)
-    remember (px_ηξ 0) as a. clear Heqa.
-    iStopProof. induction a using WFOCM.ind. rename x into a, H into IHa.
-    iIntros "(#(Gwfk& Gk& Wkv& GVkv)& Tx& TG& HΦ)".
-    (* Pure steps *)
-    lwp_rec. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-    iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-    lwp_bind (Load _).
-    iMod (gl_variant_acc with "GVkv") as "[>PQR ACC]". 1: set_solver.
-    iDestruct "PQR" as "[[HP | HQ] | HR]"; cycle -1.
-    { iDestruct "HR" as "[_ %]". done. }
-    - iDestruct "HP" as "[Glk ptr]".
-      iApply (lwp_load _ (<[k:=0]>∅) 0 with "[$ptr $Tx $TG]").
-      { rewrite big_sepM_singleton. iSplitR; first done. auto. }
-      iIntros "[(_& Tx& TG& Rs) ptr]".
-      rewrite big_sepM_singleton. iDestruct "Rs" as "[Wck | #Gdk]"; cycle 1.
-      { iPoseProof (gl_locked_done_false with "Glk Gdk") as "%". done. }
-      iMod ("ACC" with "[Glk ptr]") as "_".
-      { iModIntro. iApply gl_variant_cases_unfold. iLeft. iLeft. iFrame. }
-      iModIntro.
-      lwp_let. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-      iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      lwp_lam. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-      iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      lwp_op. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-      iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      lwp_if. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-      iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      iMod (wit_credit_spend_one with "Wkv Wck") as "(%& %LTa& #Wkv')".
-      iApply (IHa a0 LTa). iFrame. auto.
-    - iDestruct "HQ" as "[#Gdk ptr]".
-      iApply (lwp_load _ ∅ 0 with "[$ptr $Tx $TG]").
-      { iSplit; done. }
-      iIntros "[(_& Tx& TG& _) ptr]".
-      iMod ("ACC" with "[ptr]") as "_".
-      { iModIntro. iApply gl_variant_cases_unfold. iLeft. iRight. iFrame. auto. }
-      iModIntro.
-      lwp_let. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-      iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      lwp_lam. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-      iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      lwp_op. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-      iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      lwp_if. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-      iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      iApply (lwp_exit with "TG Tx [HΦ]").
-      iModIntro. iIntros "#Tt1 #Tt2". iIntros "!>".
-      iApply "HΦ". rewrite /lift_term. iFrame "Tt1".
-      rewrite -thread_term_unfold. auto.
+    { rewrite lookup_insert_eq. done. }
+    iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+    iMod ("ACC2" with "TG Glock Cljn1") as "ACC2".
+    iApply fupd_sfgupd_elim. iMod "close" as "_". iMod "ACC2" as "(TG& Gcur& #Gdckn)".
+    iMod (gl_lock ∅ _ _ ∅ _ _ _ _ _ (n + 1) _ _ _ True (cnt_lb r cj (n + 2)) (cnt_lb r cj (n + 2))
+           with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
+    1: lia. 1: set_solver.
+    iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+    iMod ("ACC2" with "[TG] Gcur Gw Cljn1 []") as "ACC2".
+    { rewrite delete_insert_id. 1: iFrame. done. }
+    { done. }
+    iApply fupd_sfgupd_elim. iMod "close" as "_".
+    iMod "ACC2" as "(TG& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)".
+    iMod ("ACC" with "[LC Cs Caj2]") as "_".
+    { iNext. iApply gl_variant_cases_unfold. iLeft. iRight. rewrite /px_inv.
+      iFrame "Gdx Caj2". rewrite (seq_S (n + 1)). iApply big_sepL_app.
+      replace (S n) with (n + 1) by lia. iFrame "Cs".
+      iApply big_sepL_singleton. iEval (simpl). replace (n + 1 + 1) with (n + 2) by lia.
+      iFrame "LC Glckn1 Wckn1 GVckn1".
+    }
+    iApply fupd_mask_intro. 1: set_solver. iIntros "close !>". iMod "close" as "_". iModIntro.
+    iApply ("IH" with "Tx HΦ [GVckn1] TG [Gf] Caj").
+    { replace (n + 1 + 1) with (n + 2) by lia. auto. }
+    { replace (S n) with (n + 1) by lia. auto. }
   Qed.
 
 End proof.

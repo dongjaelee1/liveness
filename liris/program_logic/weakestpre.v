@@ -316,6 +316,15 @@ Section sfgupd.
     by rewrite -sfgupd_intro -or_intro_l.
   Qed.
 
+  Lemma sfgupd_fupd_acc E1 E2 P :
+    (|={E1,E2}=> |={E2}=>g |={E2,E1}=> P) ⊢ (|={E1}=>g P).
+  Proof.
+    iIntros "H %%% I". iMod "H". iPoseProof ("H" with "I") as "H".
+    iMod "H". iModIntro. iMod "H". iModIntro. iMod "H" as "[$ H]".
+    auto.
+  Qed.
+
+  (** Modality instances *)
   Global Instance elim_fupd_sfgupd (p : bool) E P Q :
     ElimModal True p false (|={E}=> P) P (|={E}=>g Q) (|={E}=>g Q)%I.
   Proof.
@@ -425,7 +434,7 @@ Section sfgupd.
     iIntros "HQ %%% $". iApply (gl_alloc_done_0 _ Θ with "HQ").
   Qed.
 
-  Lemma gl_lock E0 E i G q k ξ N v1 v2 P1 Q1 R1 P2 Q2 R2 :
+  Lemma gl_lock E0 E i G q k ξ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
     v1 < v2 →
     ↑N ⊆ E →
     gl_current k v1 -∗
