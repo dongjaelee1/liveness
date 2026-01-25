@@ -1,8 +1,9 @@
 From stdpp Require Import base.
 From liris Require Export wfocm.
 From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
+From liris.prelude Require Import axioms.
 
-Section ord_props.
+Section limit.
 
   Local Open Scope ord.
 
@@ -15,8 +16,74 @@ Section ord_props.
   Lemma limit_fun_supremum {A : Type} (f : Ord.t -> A -> Ord.t) : forall o u, (∀ a, f o a <= u) -> (limit_fun f o <= u).
   Proof. intros. eapply Ord.join_supremum. eauto. Qed.
 
-End ord_props.
+End limit.
 
+Section measure.
+  Context {L : Type} {ltL : L → L → Prop} {WF_ltL : well_founded ltL}.
+
+  Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
+
+  Remark measure_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
+  Proof using. intros. destruct m. auto. Qed.
+
+  Inductive code : Type :=
+  | code_base
+  | code_loop (c : code).
+
+  Fixpoint measure_rec (l : L) (ACC : Acc ltL l) {struct ACC} : ∀ (c : code), Ord.t :=
+  (fix go c {struct c} :=
+     match c with
+     | code_base => Ord.one
+     | code_loop d =>
+         ((go d) ×
+            (Ord.join (λ (m : L_sub l),
+                         Ord.join (λ (a : code),
+                                     measure_rec (proj1_sig m) (Acc_inv ACC (measure_oblig l m)) a))))%ord
+     end).
+
+  Definition measure (l : L) (c : code) : Ord.t := measure_rec l (WF_ltL l) c.
+
+  Lemma measure_rec_proof_irrelevance l ACC1 ACC2 c :
+    measure_rec l ACC1 c = measure_rec l ACC2 c.
+  Proof using Type*.
+    revert ACC1 ACC2 c. induction l as [l IH] using (well_founded_ind WF_ltL).
+    intros. induction c.
+    { destruct ACC1, ACC2. simpl. auto. }
+    destruct ACC1, ACC2.
+    simpl. f_equal.
+    - assumption.
+    - f_equal. apply func_ext. intros. f_equal. apply func_ext. intros d.
+      apply IH. destruct x. auto.
+  Qed.
+
+  Lemma measure_unfold l c :
+    measure l c =
+    match c with
+    | code_base => Ord.one
+    | code_loop d =>
+        (measure l d ×
+           (Ord.join (λ (m : L_sub l),
+                        Ord.join (λ (a : code),
+                                    measure (proj1_sig m) a))))%ord
+    end.
+  Proof using.
+    unfold measure. destruct (WF_ltL l). destruct c; simpl; auto.
+    f_equal. simpl. f_equal. apply func_ext. intros. f_equal. apply func_ext. intros d.
+    apply measure_rec_proof_irrelevance.
+  Qed.
+
+  Lemma measure_layer_lt (l1 l2 : L) (c : code) :
+    ltL l1 l2 →
+    ∀ (d : code), ((measure l2 c × measure l1 d) <= measure l2 (code_loop c))%ord.
+  Proof using.
+    intros Hlt d. rewrite (measure_unfold _ (code_loop c)).
+    apply Jacobsthal.le_mult_r.
+    etransitivity; cycle 1.
+    { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
+    simpl. apply Ord.join_upperbound.
+  Qed.
+
+End measure.
 
 Global Program Instance ord_OCM : OCM.t Ord.le Hessenberg.add :=
   OCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.

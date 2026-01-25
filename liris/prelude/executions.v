@@ -48,6 +48,22 @@ Qed.
 
 Section classical_proofs.
 
+  (* Fixpoint acc_nat {A} (R : relation A) (n : nat) x : Prop := *)
+  (*   match n with *)
+  (*   | O => (∀ y, R y x → False) *)
+  (*   | S m => (∀ y, R y x → acc_nat R m y) *)
+  (*   end. *)
+
+  (* Lemma acc_acc_nat {A} (R : relation A) x : *)
+  (*   Acc R x → ∃ n, acc_nat R n x. *)
+  (* Proof. *)
+  (*   intros. induction H. destruct (classic (∃ y, R y x)). *)
+  (*   - destruct H1 as (y& Hy). destruct (H0 _ Hy) as (n& Hn). *)
+  (*     exists (S n). simpl. intros. *)
+  (*     admit. *)
+  (*   - exists 0. simpl. intros. eapply (not_ex_all_not_help) in H1. apply H1 in H2. auto. *)
+  (* Abort. *)
+
   (* From transfinite Iris. *)
   Lemma sn_not_ex_loop {A} (R : relation A) x :
     ¬ex_loop R x → sn R x.
