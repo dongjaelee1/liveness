@@ -2,7 +2,7 @@ From stdpp Require Import base.
 From liris.prelude Require Import axioms wf_structs ordinal_facts.
 
 Section measure.
-  Context {L : Type} {ltL : L → L → Prop} {WF_ltL : well_founded ltL}.
+  Context {L : Type} {ltL : L → L → Prop} {wf_ltL : well_founded ltL}.
   Context {η : Ord.t → Ord.t} {η_proper_le : Proper (Ord.le ==> Ord.le) η}.
 
   Inductive measurable_syntax : Type :=
@@ -34,12 +34,12 @@ Section measure.
 
   (* Assumes Jacobsthal.expn ω ω is large enough for self-terminating codes. *)
   Definition measure (l : L) (s : measurable_syntax) : Ord.t :=
-    measure_rec (ω ↑ ω)%ord l (WF_ltL l) s.
+    measure_rec (ω ↑ ω)%ord l (wf_ltL l) s.
 
   Lemma measure_rec_proof_irrelevance α l ACC1 ACC2 s :
     measure_rec α l ACC1 s = measure_rec α l ACC2 s.
   Proof using Type*.
-    revert ACC1 ACC2 s. induction l as [l IH] using (well_founded_ind WF_ltL).
+    revert ACC1 ACC2 s. induction l as [l IH] using (well_founded_ind wf_ltL).
     intros. induction s.
     { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
@@ -63,12 +63,10 @@ Section measure.
                                          measure (proj1_sig m) t)))))%ord
     end.
   Proof using Type*.
-    unfold measure. destruct (WF_ltL l). destruct s; simpl; auto.
+    unfold measure. destruct (wf_ltL l). destruct s; simpl; auto.
     f_equal. do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
     apply measure_rec_proof_irrelevance.
   Qed.
-
-  Global Opaque measure_rec measure.
 
   (** Reduction rules *)
   Lemma measure_unit (l : L) n :
@@ -126,6 +124,7 @@ Section measure.
   Qed.
 
 End measure.
+Global Opaque measure_rec measure.
 
 Section aux.
 
@@ -178,6 +177,14 @@ Section layer.
     | S m => layer_join (λ _, layer b m)
     end.
 
+  Lemma layer_unfold b n :
+    layer b n =
+    match n with
+    | O => b
+    | S m => layer_join (λ _, layer b m)
+    end.
+  Proof. destruct n; auto. Qed.
+
   Global Instance layer_proper_lt_nat b :
     Proper (lt ==> layer_lt) (layer b).
   Proof.
@@ -220,23 +227,31 @@ Section layer.
            layer_lt l (layer_next b).
   Proof. intros. eapply layer_join_upperbound; eauto. Qed.
 
-  Fixpoint layer_next_iter (l : nat) : layerT :=
+  Fixpoint layer_next_iter (b : layerT) (l : nat) : layerT :=
     match l with
-    | O => layer_zero
-    | S l' => layer_next (layer_next_iter l')
+    | O => b
+    | S l' => layer_next (layer_next_iter b l')
     end.
 
-  Lemma layer_next_iter_proper_lt :
-    Proper (lt ==> layer_lt) (layer_next_iter).
+  Lemma layer_next_iter_unfold b l :
+    layer_next_iter b l =
+    match l with
+    | O => b
+    | S l' => layer_next (layer_next_iter b l')
+    end.
+  Proof. destruct l; auto. Qed.
+
+  Lemma layer_next_iter_proper_lt b :
+    Proper (lt ==> layer_lt) (layer_next_iter b).
   Proof.
     repeat intro. induction H.
     - simpl. eapply (layer_next_upperbound _ _ 0). auto.
     - etransitivity; first eauto. simpl. eapply (layer_next_upperbound _ _ 0). auto.
   Qed.
 
-  Lemma layer_next_iter_upperbound l1 l2 :
+  Lemma layer_next_iter_upperbound b l1 l2 :
     l1 < l2 →
-    ∀ n, layer_lt (layer (layer_next_iter l1) n) (layer_next_iter l2).
+    ∀ n, layer_lt (layer (layer_next_iter b l1) n) (layer_next_iter b l2).
   Proof.
     intros LT. induction LT; intros.
     - simpl. eapply layer_next_upperbound; eauto.
@@ -246,7 +261,7 @@ Section layer.
   (** Some useful instances *)
   (* A pair of nats with the lexicographical order *)
   Definition layer_pair (l n : nat) : layerT :=
-    layer (layer_next_iter l) n.
+    layer (layer_next_iter layer_zero l) n.
 
   Lemma layer_pair_lt_fst l1 l2 :
     l1 < l2 →
@@ -292,3 +307,4 @@ Section layer.
   Proof. intros. eapply layer_pair_lt_fst. auto. Qed.
 
 End layer.
+Global Opaque layer layer_next_iter.
