@@ -126,6 +126,17 @@ Section measure.
 End measure.
 Global Opaque measure_rec measure.
 
+Declare Scope msyn_scope.
+Delimit Scope msyn_scope with M.
+
+Coercion ms_unit : nat >-> measurable_syntax.
+Notation "s1 ;; s2" := (ms_add s1%M s2%M)
+  (at level 100, s2 at level 200,
+   format "'[' '[hv' '[' s1 ']' ;;  ']' '/' s2 ']'") : msyn_scope.
+Notation "'extend:' s" := (ms_extend s%M)
+  (at level 200, s at level 200,
+   format "'[' 'extend:'  s ']'") : msyn_scope.
+
 Section aux.
 
   Definition ord_tree_lt_tc {A : Type} : ord_tree A -> ord_tree A -> Prop :=
