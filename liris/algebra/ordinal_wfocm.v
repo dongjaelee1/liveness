@@ -26,57 +26,73 @@ Section measure.
   Remark measure_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
   Proof using. intros. destruct m. auto. Qed.
 
-  Inductive code : Type :=
-  | code_base
-  | code_loop (c : code).
+  Inductive syntax_blocking : Type :=
+  | sb_unit
+  | sb_add (s1 s2 : syntax_blocking)
+  | sb_iter (s : syntax_blocking)
+  | sb_blocking (s : syntax_blocking).
 
-  Fixpoint measure_rec (l : L) (ACC : Acc ltL l) {struct ACC} : ∀ (c : code), Ord.t :=
-  (fix go c {struct c} :=
-     match c with
-     | code_base => Ord.one
-     | code_loop d =>
-         ((go d) ×
+  Fixpoint measure_rec (α : Ord.t) (l : L) (ACC : Acc ltL l) {struct ACC} :
+    ∀ (s : syntax_blocking), Ord.t :=
+  (fix go s {struct s} :=
+     match s with
+     | sb_unit =>
+         Ord.one
+     | sb_add s1 s2 =>
+         (go s1 ⊕ go s2)%ord
+     | sb_iter s1 =>
+         (go s1 × α)%ord
+     | sb_blocking s1 =>
+         (go s1 ×
             (Ord.join (λ (m : L_sub l),
-                         Ord.join (λ (a : code),
-                                     measure_rec (proj1_sig m) (Acc_inv ACC (measure_oblig l m)) a))))%ord
+                         Ord.join (λ (a : syntax_blocking),
+                                     measure_rec α (proj1_sig m) (Acc_inv ACC (measure_oblig l m)) a))))%ord
      end).
 
-  Definition measure (l : L) (c : code) : Ord.t := measure_rec l (WF_ltL l) c.
+  (* Assumes Jacobsthal.expn ω ω is large enough for ordinary iterations. *)
+  Definition measure (l : L) (s : syntax_blocking) : Ord.t :=
+    measure_rec (ω ↑ ω)%ord l (WF_ltL l) s.
 
-  Lemma measure_rec_proof_irrelevance l ACC1 ACC2 c :
-    measure_rec l ACC1 c = measure_rec l ACC2 c.
+  Lemma measure_rec_proof_irrelevance α l ACC1 ACC2 s :
+    measure_rec α l ACC1 s = measure_rec α l ACC2 s.
   Proof using Type*.
-    revert ACC1 ACC2 c. induction l as [l IH] using (well_founded_ind WF_ltL).
-    intros. induction c.
+    revert ACC1 ACC2 s. induction l as [l IH] using (well_founded_ind WF_ltL).
+    intros. induction s.
     { destruct ACC1, ACC2. simpl. auto. }
-    destruct ACC1, ACC2.
-    simpl. f_equal.
-    - assumption.
-    - f_equal. apply func_ext. intros. f_equal. apply func_ext. intros d.
-      apply IH. destruct x. auto.
+    { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
+    { destruct ACC1, ACC2. simpl. simpl in IHs. rewrite IHs. auto. }
+    { destruct ACC1, ACC2. simpl. f_equal.
+      - assumption.
+      - f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+        apply IH. destruct x. auto. }
   Qed.
 
-  Lemma measure_unfold l c :
-    measure l c =
-    match c with
-    | code_base => Ord.one
-    | code_loop d =>
-        (measure l d ×
+  Lemma measure_unfold l s :
+    measure l s =
+    match s with
+    | sb_unit =>
+        Ord.one
+    | sb_add s1 s2 =>
+        (measure l s1 ⊕ measure l s2)%ord
+    | sb_iter s1 =>
+        (measure l s1 × (ω ↑ ω))%ord
+    | sb_blocking s1 =>
+        (measure l s1 ×
            (Ord.join (λ (m : L_sub l),
-                        Ord.join (λ (a : code),
+                        Ord.join (λ (a : syntax_blocking),
                                     measure (proj1_sig m) a))))%ord
     end.
   Proof using.
-    unfold measure. destruct (WF_ltL l). destruct c; simpl; auto.
-    f_equal. simpl. f_equal. apply func_ext. intros. f_equal. apply func_ext. intros d.
+    unfold measure. destruct (WF_ltL l). destruct s; simpl; auto.
+    f_equal. f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
     apply measure_rec_proof_irrelevance.
   Qed.
 
-  Lemma measure_layer_lt (l1 l2 : L) (c : code) :
+  Lemma measure_layer_lt (l1 l2 : L) (s : syntax_blocking) :
     ltL l1 l2 →
-    ∀ (d : code), ((measure l2 c × measure l1 d) <= measure l2 (code_loop c))%ord.
+    ∀ (a : syntax_blocking), ((measure l2 s × measure l1 a) <= measure l2 (sb_blocking s))%ord.
   Proof using.
-    intros Hlt d. rewrite (measure_unfold _ (code_loop c)).
+    intros Hlt d. rewrite (measure_unfold _ (sb_blocking s)).
     apply Jacobsthal.le_mult_r.
     etransitivity; cycle 1.
     { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
