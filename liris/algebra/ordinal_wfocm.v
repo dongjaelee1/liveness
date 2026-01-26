@@ -25,8 +25,7 @@ Section measure.
   Inductive measurable_syntax : Type :=
   | ms_unit (n : nat)
   | ms_add (s1 s2 : measurable_syntax)
-  | ms_iter (s : measurable_syntax)
-  | ms_blocking (s : measurable_syntax).
+  | ms_extend (s : measurable_syntax).
 
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
   Remark measure_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
@@ -40,18 +39,17 @@ Section measure.
          n
      | ms_add s1 s2 =>
          (go s1 ⊕ go s2)%ord
-     | ms_iter s1 =>
-         (go s1 × α)%ord
-     | ms_blocking s1 =>
-         (go s1 ×
-            (η (Ord.join (λ (m : L_sub l),
-                            Ord.join (λ (t : measurable_syntax),
-                                        measure_rec α
-                                          (proj1_sig m) (Acc_inv ACC (measure_oblig l m))
-                                          t)))))%ord
+     | ms_extend s1 =>
+         ((go s1 × α) ⊕
+            (go s1 ×
+               (η (Ord.join (λ (m : L_sub l),
+                               Ord.join (λ (t : measurable_syntax),
+                                           measure_rec α
+                                             (proj1_sig m) (Acc_inv ACC (measure_oblig l m))
+                                             t))))))%ord
      end).
 
-  (* Assumes Jacobsthal.expn ω ω is large enough for ordinary iterations. *)
+  (* Assumes Jacobsthal.expn ω ω is large enough for self-terminating codes. *)
   Definition measure (l : L) (s : measurable_syntax) : Ord.t :=
     measure_rec (ω ↑ ω)%ord l (WF_ltL l) s.
 
@@ -62,11 +60,9 @@ Section measure.
     intros. induction s.
     { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
-    { destruct ACC1, ACC2. simpl. simpl in IHs. rewrite IHs. auto. }
-    { destruct ACC1, ACC2. simpl. f_equal.
-      - assumption.
-      - do 2 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
-        apply IH. destruct x. auto. }
+    { destruct ACC1, ACC2. simpl. simpl in IHs. rewrite !IHs. f_equal.
+      do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+      apply IH. destruct x. auto. }
   Qed.
 
   Lemma measure_unfold l s :
@@ -76,33 +72,74 @@ Section measure.
         n
     | ms_add s1 s2 =>
         (measure l s1 ⊕ measure l s2)%ord
-    | ms_iter s1 =>
-        (measure l s1 × (ω ↑ ω))%ord
-    | ms_blocking s1 =>
-        (measure l s1 ×
-           η (Ord.join (λ (m : L_sub l),
-                          Ord.join (λ (t : measurable_syntax),
-                                      measure (proj1_sig m) t))))%ord
+    | ms_extend s1 =>
+        ((measure l s1 × (ω ↑ ω)) ⊕
+           (measure l s1 ×
+              η (Ord.join (λ (m : L_sub l),
+                             Ord.join (λ (t : measurable_syntax),
+                                         measure (proj1_sig m) t)))))%ord
     end.
   Proof using Type*.
     unfold measure. destruct (WF_ltL l). destruct s; simpl; auto.
-    f_equal. do 2 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+    f_equal. do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
     apply measure_rec_proof_irrelevance.
   Qed.
 
   Global Opaque measure_rec measure.
 
-  Lemma measure_layer_lt (l1 l2 : L) (s : measurable_syntax) :
+  (** Reduction rules *)
+  Lemma measure_unit (l : L) n :
+    measure l (ms_unit n) = (n)%ord.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_unit _)).
+    auto.
+  Qed.
+
+  Lemma measure_add (l : L) s1 s2 :
+    measure l (ms_add s1 s2) = (measure l s1 ⊕ measure l s2)%ord.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_add _ _)).
+    auto.
+  Qed.
+
+  Lemma measure_extend_le (l1 l2 : L) (s : measurable_syntax) :
     ltL l1 l2 →
     ∀ (t : measurable_syntax),
-    ((measure l2 s × η (measure l1 t)) <= measure l2 (ms_blocking s))%ord.
+    (((measure l2 s × (ω ↑ ω)) ⊕ (measure l2 s × η (measure l1 t)))
+     <= measure l2 (ms_extend s))%ord.
   Proof using Type*.
-    intros Hlt d. rewrite (measure_unfold _ (ms_blocking s)).
-    apply Jacobsthal.le_mult_r.
+    intros Hlt d. rewrite (measure_unfold _ (ms_extend _)).
+    apply Hessenberg.le_add_r. apply Jacobsthal.le_mult_r.
     apply η_proper_le.
     etransitivity; cycle 1.
     { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
     simpl. apply Ord.join_upperbound.
+  Qed.
+
+  Lemma measure_extend_le_const (l : L) (s : measurable_syntax) :
+    ((measure l s × (ω ↑ ω)) <= measure l (ms_extend s))%ord.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_extend _)).
+    etransitivity; last eapply Hessenberg.add_base_l.
+    reflexivity.
+  Qed.
+
+  Lemma measure_extend_le_layer (l1 l2 : L) (s : measurable_syntax) :
+    ltL l1 l2 →
+    ∀ (t : measurable_syntax),
+    ((measure l2 s × η (measure l1 t)) <= measure l2 (ms_extend s))%ord.
+  Proof using Type*.
+    intros Hlt d. etransitivity; last eapply (measure_extend_le l1 l2); eauto.
+    eapply Hessenberg.add_base_r.
+  Qed.
+  Lemma measure_extend_le_layer_alt (l1 l2 : L) (o : Ord.t) (s : measurable_syntax) :
+    ltL l1 l2 →
+    (∃ (t : measurable_syntax), (o <= η (measure l1 t))%ord) →
+    ((measure l2 s × o) <= measure l2 (ms_extend s))%ord.
+  Proof using Type*.
+    intros Hlt (t& ?).
+    etransitivity; last eapply (measure_extend_le_layer l1 l2); eauto.
+    eapply Jacobsthal.le_mult_r. eauto.
   Qed.
 
 End measure.
