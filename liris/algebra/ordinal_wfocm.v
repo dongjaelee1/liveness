@@ -20,37 +20,39 @@ End limit.
 
 Section measure.
   Context {L : Type} {ltL : L → L → Prop} {WF_ltL : well_founded ltL}.
+  Context {η : Ord.t → Ord.t} {η_proper_le : Proper (Ord.le ==> Ord.le) η}.
+
+  Inductive measurable_syntax : Type :=
+  | ms_unit (n : nat)
+  | ms_add (s1 s2 : measurable_syntax)
+  | ms_iter (s : measurable_syntax)
+  | ms_blocking (s : measurable_syntax).
 
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
-
   Remark measure_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
   Proof using. intros. destruct m. auto. Qed.
 
-  Inductive syntax_blocking : Type :=
-  | sb_unit (n : nat)
-  | sb_add (s1 s2 : syntax_blocking)
-  | sb_iter (s : syntax_blocking)
-  | sb_blocking (s : syntax_blocking).
-
   Fixpoint measure_rec (α : Ord.t) (l : L) (ACC : Acc ltL l) {struct ACC} :
-    ∀ (s : syntax_blocking), Ord.t :=
+    ∀ (s : measurable_syntax), Ord.t :=
   (fix go s {struct s} :=
      match s with
-     | sb_unit n =>
+     | ms_unit n =>
          n
-     | sb_add s1 s2 =>
+     | ms_add s1 s2 =>
          (go s1 ⊕ go s2)%ord
-     | sb_iter s1 =>
+     | ms_iter s1 =>
          (go s1 × α)%ord
-     | sb_blocking s1 =>
+     | ms_blocking s1 =>
          (go s1 ×
-            (Ord.join (λ (m : L_sub l),
-                         Ord.join (λ (t : syntax_blocking),
-                                     measure_rec α (proj1_sig m) (Acc_inv ACC (measure_oblig l m)) t))))%ord
+            (η (Ord.join (λ (m : L_sub l),
+                            Ord.join (λ (t : measurable_syntax),
+                                        measure_rec α
+                                          (proj1_sig m) (Acc_inv ACC (measure_oblig l m))
+                                          t)))))%ord
      end).
 
   (* Assumes Jacobsthal.expn ω ω is large enough for ordinary iterations. *)
-  Definition measure (l : L) (s : syntax_blocking) : Ord.t :=
+  Definition measure (l : L) (s : measurable_syntax) : Ord.t :=
     measure_rec (ω ↑ ω)%ord l (WF_ltL l) s.
 
   Lemma measure_rec_proof_irrelevance α l ACC1 ACC2 s :
@@ -63,37 +65,41 @@ Section measure.
     { destruct ACC1, ACC2. simpl. simpl in IHs. rewrite IHs. auto. }
     { destruct ACC1, ACC2. simpl. f_equal.
       - assumption.
-      - f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+      - do 2 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
         apply IH. destruct x. auto. }
   Qed.
 
   Lemma measure_unfold l s :
     measure l s =
     match s with
-    | sb_unit n =>
+    | ms_unit n =>
         n
-    | sb_add s1 s2 =>
+    | ms_add s1 s2 =>
         (measure l s1 ⊕ measure l s2)%ord
-    | sb_iter s1 =>
+    | ms_iter s1 =>
         (measure l s1 × (ω ↑ ω))%ord
-    | sb_blocking s1 =>
+    | ms_blocking s1 =>
         (measure l s1 ×
-           (Ord.join (λ (m : L_sub l),
-                        Ord.join (λ (t : syntax_blocking),
-                                    measure (proj1_sig m) t))))%ord
+           η (Ord.join (λ (m : L_sub l),
+                          Ord.join (λ (t : measurable_syntax),
+                                      measure (proj1_sig m) t))))%ord
     end.
-  Proof using.
+  Proof using Type*.
     unfold measure. destruct (WF_ltL l). destruct s; simpl; auto.
-    f_equal. f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+    f_equal. do 2 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
     apply measure_rec_proof_irrelevance.
   Qed.
 
-  Lemma measure_layer_lt (l1 l2 : L) (s : syntax_blocking) :
+  Global Opaque measure_rec measure.
+
+  Lemma measure_layer_lt (l1 l2 : L) (s : measurable_syntax) :
     ltL l1 l2 →
-    ∀ (t : syntax_blocking), ((measure l2 s × measure l1 t) <= measure l2 (sb_blocking s))%ord.
-  Proof using.
-    intros Hlt d. rewrite (measure_unfold _ (sb_blocking s)).
+    ∀ (t : measurable_syntax),
+    ((measure l2 s × η (measure l1 t)) <= measure l2 (ms_blocking s))%ord.
+  Proof using Type*.
+    intros Hlt d. rewrite (measure_unfold _ (ms_blocking s)).
     apply Jacobsthal.le_mult_r.
+    apply η_proper_le.
     etransitivity; cycle 1.
     { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
     simpl. apply Ord.join_upperbound.

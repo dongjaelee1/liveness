@@ -22,7 +22,8 @@ Class gupdGS `{SI : indexT} (Σ : gFunctors) :=
       #[global] gupd_glwitGS :: glwitGS.glwitGS (GL:=ord_ghost_lock_class) Σ;
       (** Fair scheduler function for witnesses. *)
       gupd_η : ghost_lock_fuel → ghost_lock_fuel;
-      gupd_η_mon : Proper (WFOCM.ltR ==> WFOCM.ltR) gupd_η;
+      gupd_η_proper_lt : Proper (WFOCM.ltR ==> WFOCM.ltR) gupd_η;
+      gupd_η_proper_le : Proper (WFOCM.leR ==> WFOCM.leR) gupd_η;
     }.
 
 Global Opaque gupd_invGS gupd_glsatGS gupd_globlGS gupd_glwitGS.
@@ -1346,7 +1347,7 @@ Section preds.
         - rewrite lookup_insert_ne; auto. destruct (Ω1 !! x) eqn:LUOx; econstructor. right; done.
       }
       iIntros (? [WStep GWI2]).
-      pose proof (glwit_inv_progress_owner _ _ k v _ _ _ gupd_η_mon LUO1l GWI _ _ Gstep W2 WStep GWI2) as WMon.
+      pose proof (glwit_inv_progress_owner _ _ k v _ _ _ gupd_η_proper_lt LUO1l GWI _ _ Gstep W2 WStep GWI2) as WMon.
       iPoseProof (glwit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { iModIntro. rewrite insert_delete_eq. rewrite fmap_insert. iFrame. eauto. }
