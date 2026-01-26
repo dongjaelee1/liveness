@@ -27,7 +27,7 @@ Section measure.
   Proof using. intros. destruct m. auto. Qed.
 
   Inductive syntax_blocking : Type :=
-  | sb_unit
+  | sb_unit (n : nat)
   | sb_add (s1 s2 : syntax_blocking)
   | sb_iter (s : syntax_blocking)
   | sb_blocking (s : syntax_blocking).
@@ -36,8 +36,8 @@ Section measure.
     ∀ (s : syntax_blocking), Ord.t :=
   (fix go s {struct s} :=
      match s with
-     | sb_unit =>
-         Ord.one
+     | sb_unit n =>
+         n
      | sb_add s1 s2 =>
          (go s1 ⊕ go s2)%ord
      | sb_iter s1 =>
@@ -45,8 +45,8 @@ Section measure.
      | sb_blocking s1 =>
          (go s1 ×
             (Ord.join (λ (m : L_sub l),
-                         Ord.join (λ (a : syntax_blocking),
-                                     measure_rec α (proj1_sig m) (Acc_inv ACC (measure_oblig l m)) a))))%ord
+                         Ord.join (λ (t : syntax_blocking),
+                                     measure_rec α (proj1_sig m) (Acc_inv ACC (measure_oblig l m)) t))))%ord
      end).
 
   (* Assumes Jacobsthal.expn ω ω is large enough for ordinary iterations. *)
@@ -70,8 +70,8 @@ Section measure.
   Lemma measure_unfold l s :
     measure l s =
     match s with
-    | sb_unit =>
-        Ord.one
+    | sb_unit n =>
+        n
     | sb_add s1 s2 =>
         (measure l s1 ⊕ measure l s2)%ord
     | sb_iter s1 =>
@@ -79,8 +79,8 @@ Section measure.
     | sb_blocking s1 =>
         (measure l s1 ×
            (Ord.join (λ (m : L_sub l),
-                        Ord.join (λ (a : syntax_blocking),
-                                    measure (proj1_sig m) a))))%ord
+                        Ord.join (λ (t : syntax_blocking),
+                                    measure (proj1_sig m) t))))%ord
     end.
   Proof using.
     unfold measure. destruct (WF_ltL l). destruct s; simpl; auto.
@@ -90,7 +90,7 @@ Section measure.
 
   Lemma measure_layer_lt (l1 l2 : L) (s : syntax_blocking) :
     ltL l1 l2 →
-    ∀ (a : syntax_blocking), ((measure l2 s × measure l1 a) <= measure l2 (sb_blocking s))%ord.
+    ∀ (t : syntax_blocking), ((measure l2 s × measure l1 t) <= measure l2 (sb_blocking s))%ord.
   Proof using.
     intros Hlt d. rewrite (measure_unfold _ (sb_blocking s)).
     apply Jacobsthal.le_mult_r.
