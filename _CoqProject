@@ -17,6 +17,7 @@
 
 liris/prelude/axioms.v
 liris/prelude/wf_structs.v
+liris/prelude/ordinal_facts.v
 # liris/prelude/tree.v
 
 liris/bi/weakestpre.v
@@ -31,6 +32,7 @@ liris/algebra/ocm.v
 liris/algebra/wfocm.v
 liris/algebra/ordinal_wfocm.v
 liris/algebra/nat_wfocm.v
+liris/algebra/measure.v
 liris/algebra/bank.v
 liris/algebra/bcred.v
 liris/algebra/auth_mra.v

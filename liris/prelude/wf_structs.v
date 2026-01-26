@@ -2,19 +2,21 @@ From liris Require Import axioms.
 From Coq Require Export Relations.Relation_Operators.
 From Coq Require Import RelationClasses Relations.Operators_Properties.
 
-Set Implicit Arguments.
-
-(** Reference: Coq development of Fair Operational Semantics. *)
+(* Set Implicit Arguments. *)
 
 Lemma well_founded_irrefl A (R : A -> A -> Prop) (WF : well_founded R) : forall x, ~ R x x.
 Proof. intros x HR. specialize (WF x). induction WF; eauto. Qed.
 
+(** ord_tree: tree with join. *)
+(* Reference: Coq development of Fair Operational Semantics. *)
 Inductive ord_tree (A : Type) : Type :=
 | ord_tree_base
 | ord_tree_cons (childs : A -> ord_tree A)
 .
+Arguments ord_tree_base {A}.
+Arguments ord_tree_cons {A}.
 
-Variant ord_tree_lt A : ord_tree A -> ord_tree A -> Prop :=
+Variant ord_tree_lt {A} : ord_tree A -> ord_tree A -> Prop :=
   | ord_tree_lt_intro
       childs a
     :
@@ -40,12 +42,13 @@ Proof.
   assert (forall x : A, exists y : ord_tree A, (fun (a : A) (o : ord_tree A) => P a -> R a o) x y).
   { intros. destruct (classic (P x)).
     { specialize (ORD _ H0). destruct ORD. eauto. }
-    { eexists (ord_tree_base _). intros. congruence. }
+    { eexists (ord_tree_base). intros. congruence. }
   }
   specialize (H H0); clear H0. destruct H as [f H]. exists (ord_tree_cons f).
   intros. exists (f a). split; [eauto |]. econstructor; eauto.
 Qed.
 
+(** succ *)
 Variant succ_rel (n : nat) : nat -> Prop := succ_rel_intro : succ_rel n (S n).
 
 Lemma succ_rel_well_founded : well_founded succ_rel.
@@ -66,12 +69,13 @@ Proof.
       * econstructor 2. econstructor. eapply IHn. auto.
 Qed.
 
-Variant double_rel A B (RA : A -> A -> Prop) (RB : B -> B -> Prop)
+(** double *)
+Variant double_rel {A B} (RA : A -> A -> Prop) (RB : B -> B -> Prop)
   : A * B -> A * B -> Prop :=
 | double_rel_left a0 a1 b (LT : RA a0 a1) : double_rel RA RB (a0, b) (a1, b)
 | double_rel_right a b0 b1 (LT : RB b0 b1) : double_rel RA RB (a, b0) (a, b1).
 
-Lemma double_rel_well_founded A B (RA : A -> A -> Prop) (RB : B -> B -> Prop)
+Lemma double_rel_well_founded {A B} {RA : A -> A -> Prop} {RB : B -> B -> Prop}
   (WFA : well_founded RA) (WFB : well_founded RB)
   :
   well_founded (double_rel RA RB).
@@ -106,6 +110,7 @@ Proof.
   { intros. eapply (H (a, b0)). econstructor 2. auto. }
 Qed.
 
+(** clos *)
 Lemma clos_trans_well_founded
   A (R : A -> A -> Prop) (WF : well_founded R)
   :
@@ -128,14 +133,15 @@ Qed.
 Lemma clos_trans_step A (R : A -> A -> Prop) x y : clos_trans_n1 _ R x y -> exists z, R z y /\ (x = z \/ clos_trans_n1 _ R x z).
 Proof. intros. destruct H; eauto. Qed.
 
-Lemma clos_trans_n1_trans A (R : A -> A -> Prop) : Transitive (clos_trans_n1 _ R).
+Global Instance clos_trans_n1_trans A (R : A -> A -> Prop) : Transitive (clos_trans_n1 _ R).
 Proof.
   unfold Transitive. intros.
   eapply clos_trans_tn1_iff.
   econstructor 2; eapply clos_trans_tn1_iff; eauto.
 Qed.
 
-Variant option_lt A (R : A -> A -> Prop) : option A -> option A -> Prop :=
+(** option *)
+Variant option_lt {A} (R : A -> A -> Prop) : option A -> option A -> Prop :=
   | optoin_lt_top a :
     option_lt R (Some a) None
   | optoin_lt_normal a0 a1 (LT : R a0 a1) :
@@ -150,7 +156,8 @@ Proof.
   intros. inversion H1. eauto.
 Qed.
 
-Variant sum_lt A B (RA : A -> A -> Prop) (RB : B -> B -> Prop) : A + B -> A + B -> Prop :=
+(** sum *)
+Variant sum_lt {A B} (RA : A -> A -> Prop) (RB : B -> B -> Prop) : A + B -> A + B -> Prop :=
   | sum_lt_left a0 a1 (LT : RA a0 a1) :
     sum_lt RA RB (inl a0) (inl a1)
   | sum_lt_right b0 b1 (LT : RB b0 b1) :
@@ -174,7 +181,8 @@ Proof.
   intros. inversion H1; eauto.
 Qed.
 
-Variant prod_lt A B (RA : A -> A -> Prop) (RB : B -> B -> Prop) : A * B -> A * B -> Prop :=
+(** prod *)
+Variant prod_lt {A B} (RA : A -> A -> Prop) (RB : B -> B -> Prop) : A * B -> A * B -> Prop :=
   | prod_lt_left a0 a1 b0 b1
       (ALT : RA a0 a1)
     :
@@ -197,7 +205,8 @@ Proof.
   econstructor. intros. inversion H; eauto. destruct ALE; subst; eauto.
 Qed.
 
-Variant option_bot_lt A (R : A -> A -> Prop) : option A -> option A -> Prop :=
+(** option_bot *)
+Variant option_bot_lt {A} (R : A -> A -> Prop) : option A -> option A -> Prop :=
   | optoin_bot_lt_bot a :
     option_bot_lt R None (Some a)
   | optoin_bot_lt_normal a0 a1
