@@ -6,7 +6,7 @@ Section measure.
   Context {η : Ord.t → Ord.t} {η_proper_le : Proper (Ord.le ==> Ord.le) η}.
 
   Inductive measurable_syntax : Type :=
-  | ms_unit (n : nat)
+  | ms_finite (n : nat)
   | ms_add (s1 s2 : measurable_syntax)
   | ms_extend (s : measurable_syntax).
 
@@ -18,7 +18,7 @@ Section measure.
     ∀ (s : measurable_syntax), Ord.t :=
   (fix go s {struct s} :=
      match s with
-     | ms_unit n =>
+     | ms_finite n =>
          n
      | ms_add s1 s2 =>
          (go s1 ⊕ go s2)%ord
@@ -51,7 +51,7 @@ Section measure.
   Lemma measure_unfold l s :
     measure l s =
     match s with
-    | ms_unit n =>
+    | ms_finite n =>
         n
     | ms_add s1 s2 =>
         (measure l s1 ⊕ measure l s2)%ord
@@ -69,18 +69,16 @@ Section measure.
   Qed.
 
   (** Reduction rules *)
-  Lemma measure_unit (l : L) n :
-    measure l (ms_unit n) = (n)%ord.
+  Lemma measure_finite (l : L) n :
+    measure l (ms_finite n) = (n)%ord.
   Proof using Type*.
-    rewrite (measure_unfold _ (ms_unit _)).
-    auto.
+    rewrite (measure_unfold _ (ms_finite _)). auto.
   Qed.
 
   Lemma measure_add (l : L) s1 s2 :
     measure l (ms_add s1 s2) = (measure l s1 ⊕ measure l s2)%ord.
   Proof using Type*.
-    rewrite (measure_unfold _ (ms_add _ _)).
-    auto.
+    rewrite (measure_unfold _ (ms_add _ _)). auto.
   Qed.
 
   Lemma measure_extend_le (l1 l2 : L) (s : measurable_syntax) :
@@ -129,13 +127,9 @@ Global Opaque measure_rec measure.
 Declare Scope msyn_scope.
 Delimit Scope msyn_scope with M.
 
-Coercion ms_unit : nat >-> measurable_syntax.
-Notation "s1 ;; s2" := (ms_add s1%M s2%M)
-  (at level 100, s2 at level 200,
-   format "'[' '[hv' '[' s1 ']' ;;  ']' '/' s2 ']'") : msyn_scope.
-Notation "'extend:' s" := (ms_extend s%M)
-  (at level 200, s at level 200,
-   format "'[' 'extend:'  s ']'") : msyn_scope.
+Coercion ms_finite : nat >-> measurable_syntax.
+Infix "+" := ms_add : msyn_scope.
+Notation "'⟪' s '⟫'" := (ms_extend s%M) (at level 200, format "⟪ s ⟫") : msyn_scope.
 
 Section aux.
 
@@ -318,4 +312,11 @@ Section layer.
   Proof. intros. eapply layer_pair_lt_fst. auto. Qed.
 
 End layer.
-Global Opaque layer layer_next_iter.
+Global Opaque layer layer_next layer_next_iter.
+
+Declare Scope layer_scope.
+Delimit Scope layer_scope with L.
+
+Infix "<" := layer_lt : layer_scope.
+Notation "b '⨣' n" := (layer b%L n) (at level 50, format "b  ⨣  n") : layer_scope.
+Notation "'⌈' l '⌉'" := (layer_next l%L) (at level 200, format "⌈ l ⌉") : layer_scope.
