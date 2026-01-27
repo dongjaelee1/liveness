@@ -6,8 +6,8 @@ From liris.base_logic Require Export globl glwit.
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
 
-Global Instance ord_ghost_lock_class : ghost_lock_class :=
-  Build_ghost_lock_class Ord.t ord_wfocm_pack.
+(* Global Instance ord_ghost_lock_class : ghost_lock_class := *)
+(*   Build_ghost_lock_class Ord.t ord_wfocm_pack. *)
 
 (* Class gupdGS `{SI : indexT} `{GL : ghost_lock_class} (Σ : gFunctors) := *)
 Class gupdGS `{SI : indexT} (Σ : gFunctors) :=

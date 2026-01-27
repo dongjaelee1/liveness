@@ -2,8 +2,7 @@ From stdpp Require Import base.
 From liris.prelude Require Import axioms wf_structs ordinal_facts.
 
 Section measure.
-  Context {L : Type} {ltL : L → L → Prop} {wf_ltL : well_founded ltL}.
-  Context {η : Ord.t → Ord.t} {η_proper_le : Proper (Ord.le ==> Ord.le) η}.
+  Context `{!well_founded_class L} `{!ord_mono_fun_class}.
 
   Inductive measurable_syntax : Type :=
   | ms_finite (n : nat)
@@ -129,7 +128,7 @@ Delimit Scope msyn_scope with M.
 
 Coercion ms_finite : nat >-> measurable_syntax.
 Infix "+" := ms_add : msyn_scope.
-Notation "'⟪' s '⟫'" := (ms_extend s%M) (at level 200, format "⟪ s ⟫") : msyn_scope.
+Notation "'⟪' s '⟫'" := (ms_extend s%M) (at level 50, format "⟪ s ⟫") : msyn_scope.
 
 Section aux.
 
@@ -158,16 +157,16 @@ End aux.
 
 Section layer.
 
-  Definition layerT : Type := ord_tree nat.
-  Definition layer_lt : layerT → layerT → Prop := ord_tree_lt_tc.
+  Definition layer : Type := ord_tree nat.
+  Definition layer_lt : layer → layer → Prop := ord_tree_lt_tc.
 
   Lemma layer_lt_well_founded : well_founded layer_lt.
   Proof. apply ord_tree_lt_tc_well_founded. Qed.
   Global Instance layer_lt_transitive : Transitive layer_lt.
   Proof. apply _. Qed.
 
-  Definition layer_zero : layerT := ord_tree_base.
-  Definition layer_join (ls : nat → layerT) : layerT :=
+  Definition layer_zero : layer := ord_tree_base.
+  Definition layer_join (ls : nat → layer) : layer :=
     ord_tree_cons ls.
 
   Lemma layer_join_upperbound ls :
@@ -176,22 +175,22 @@ Section layer.
   Proof. intros. subst. econstructor 1. econstructor. Qed.
 
   (** A layer has a base and has a nat-like ordering that starts from the base. *)
-  Fixpoint layer (b : layerT) (n : nat) : layerT :=
+  Fixpoint layer_def (b : layer) (n : nat) : layer :=
     match n with
     | O => b
-    | S m => layer_join (λ _, layer b m)
+    | S m => layer_join (λ _, layer_def b m)
     end.
 
   Lemma layer_unfold b n :
-    layer b n =
+    layer_def b n =
     match n with
     | O => b
-    | S m => layer_join (λ _, layer b m)
+    | S m => layer_join (λ _, layer_def b m)
     end.
   Proof. destruct n; auto. Qed.
 
   Global Instance layer_proper_lt_nat b :
-    Proper (lt ==> layer_lt) (layer b).
+    Proper (lt ==> layer_lt) (layer_def b).
   Proof.
     repeat intro. induction H.
     - simpl. eapply layer_join_upperbound; auto.
@@ -199,7 +198,7 @@ Section layer.
   Qed.
 
   Lemma layer_lt_base_S :
-    ∀ b n, layer_lt b (layer b (S n)).
+    ∀ b n, layer_lt b (layer_def b (S n)).
   Proof.
     intros. induction n; simpl.
     { apply layer_join_upperbound; auto. exact 0. }
@@ -208,7 +207,7 @@ Section layer.
   Qed.
 
   Lemma layer_nat_cases :
-    ∀ b n, (n = 0 ∧ b = layer b n) ∨ (0 < n ∧ layer_lt b (layer b n)).
+    ∀ b n, (n = 0 ∧ b = layer_def b n) ∨ (0 < n ∧ layer_lt b (layer_def b n)).
   Proof.
     intros. destruct n.
     - left. split; auto.
@@ -216,8 +215,8 @@ Section layer.
   Qed.
 
   Lemma layer_lt_base_upperbound b1 b2 :
-    (∀ n, layer_lt (layer b1 n) b2) →
-    ∀ n m, layer_lt (layer b1 n) (layer b2 m).
+    (∀ n, layer_lt (layer_def b1 n) b2) →
+    ∀ n m, layer_lt (layer_def b1 n) (layer_def b2 m).
   Proof.
     intros. destruct (layer_nat_cases b2 m).
     - destruct H0; subst. rewrite <- H1. eauto.
@@ -225,14 +224,14 @@ Section layer.
   Qed.
 
   (** An upperbound of any layer with base b. *)
-  Definition layer_next (b : layerT) : layerT := layer_join (layer b).
+  Definition layer_next (b : layer) : layer := layer_join (layer_def b).
 
   Lemma layer_next_upperbound b :
-    ∀ l n, l = layer b n →
+    ∀ l n, l = layer_def b n →
            layer_lt l (layer_next b).
   Proof. intros. eapply layer_join_upperbound; eauto. Qed.
 
-  Fixpoint layer_next_iter (b : layerT) (l : nat) : layerT :=
+  Fixpoint layer_next_iter (b : layer) (l : nat) : layer :=
     match l with
     | O => b
     | S l' => layer_next (layer_next_iter b l')
@@ -256,7 +255,7 @@ Section layer.
 
   Lemma layer_next_iter_upperbound b l1 l2 :
     l1 < l2 →
-    ∀ n, layer_lt (layer (layer_next_iter b l1) n) (layer_next_iter b l2).
+    ∀ n, layer_lt (layer_def (layer_next_iter b l1) n) (layer_next_iter b l2).
   Proof.
     intros LT. induction LT; intros.
     - simpl. eapply layer_next_upperbound; eauto.
@@ -265,8 +264,8 @@ Section layer.
 
   (** Some useful instances *)
   (* A pair of nats with the lexicographical order *)
-  Definition layer_pair (l n : nat) : layerT :=
-    layer (layer_next_iter layer_zero l) n.
+  Definition layer_pair (l n : nat) : layer :=
+    layer_def (layer_next_iter layer_zero l) n.
 
   Lemma layer_pair_lt_fst l1 l2 :
     l1 < l2 →
@@ -281,8 +280,8 @@ Section layer.
     repeat intro. unfold layer_pair. apply layer_proper_lt_nat. auto.
   Qed.
 
-  Definition layer_pair_omega (n : nat) : layerT :=
-    layer (layer_join (λ l, layer_pair l 0)) n.
+  Definition layer_pair_omega (n : nat) : layer :=
+    layer_def (layer_join (λ l, layer_pair l 0)) n.
 
   Lemma layer_pair_omega_upperbound l :
     ∀ n m, layer_lt (layer_pair l n) (layer_pair_omega m).
@@ -304,19 +303,22 @@ Section layer.
   Qed.
 
   (* A nat *)
-  Definition layer_nat (n : nat) : layerT := layer_pair 0 n.
-  Definition layer_nat_omega : layerT := layer_pair 1 0.
+  Definition layer_nat (n : nat) : layer := layer_pair 0 n.
+  Definition layer_nat_omega : layer := layer_pair 1 0.
 
   Lemma layer_omega_upperbound :
     ∀ n, layer_lt (layer_nat n) layer_nat_omega.
   Proof. intros. eapply layer_pair_lt_fst. auto. Qed.
 
 End layer.
-Global Opaque layer layer_next layer_next_iter.
+Global Opaque layer layer_def layer_next layer_next_iter.
+
+Global Instance layer_well_founded_class : well_founded_class layer :=
+  Build_well_founded_class _ _ layer_lt_well_founded.
 
 Declare Scope layer_scope.
 Delimit Scope layer_scope with L.
 
 Infix "<" := layer_lt : layer_scope.
-Notation "b '⨣' n" := (layer b%L n) (at level 50, format "b  ⨣  n") : layer_scope.
-Notation "'⌈' l '⌉'" := (layer_next l%L) (at level 200, format "⌈ l ⌉") : layer_scope.
+Notation "b '⨣' n" := (layer_def b%L n) (at level 50, format "b  ⨣  n") : layer_scope.
+Notation "'⌈' l '⌉'" := (layer_next l%L) (at level 50, format "⌈ l ⌉") : layer_scope.

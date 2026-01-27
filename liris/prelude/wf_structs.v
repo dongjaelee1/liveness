@@ -4,6 +4,12 @@ From Coq Require Import RelationClasses Relations.Operators_Properties.
 
 (* Set Implicit Arguments. *)
 
+(** This is very general, so instantiate with care. *)
+Class well_founded_class (L : Type) := {
+    ltL : L -> L -> Prop;
+    wf_ltL : well_founded ltL;
+  }.
+
 Lemma well_founded_irrefl A (R : A -> A -> Prop) (WF : well_founded R) : forall x, ~ R x x.
 Proof. intros x HR. specialize (WF x). induction WF; eauto. Qed.
 

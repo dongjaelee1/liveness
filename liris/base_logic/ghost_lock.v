@@ -189,89 +189,89 @@ Section ghost_locks.
 
 End ghost_locks.
 
-(** Witness of each version *)
-Definition gl_witness `{GL : ghost_lock_class} : Type := ghost_lock_version → ghost_lock_fuel.
+(* (** Witness of each version *) *)
+(* Definition gl_witness `{GL : ghost_lock_class} : Type := ghost_lock_version → ghost_lock_fuel. *)
 
-Fixpoint gl_witness_sum_len `{GL : ghost_lock_class} (ξ : gl_witness) (v : ghost_lock_version) (n : nat) : ghost_lock_fuel :=
-  match n with
-  | O => wzero
-  | S m => (ξ v) w+ (gl_witness_sum_len ξ (S v) m)
-  end.
-Notation "'Σ[' ξ ']' [ v , n ]" := (gl_witness_sum_len ξ v n) (at level 20, format "Σ[ ξ ] [ v ,  n ]").
+(* Fixpoint gl_witness_sum_len `{GL : ghost_lock_class} (ξ : gl_witness) (v : ghost_lock_version) (n : nat) : ghost_lock_fuel := *)
+(*   match n with *)
+(*   | O => wzero *)
+(*   | S m => (ξ v) w+ (gl_witness_sum_len ξ (S v) m) *)
+(*   end. *)
+(* Notation "'Σ[' ξ ']' [ v , n ]" := (gl_witness_sum_len ξ v n) (at level 20, format "Σ[ ξ ] [ v ,  n ]"). *)
 
-Definition gl_witness_sum_gen `{GL : ghost_lock_class} (ξ : gl_witness) (v1 v2 : ghost_lock_version) : ghost_lock_fuel :=
-  Σ[ξ][v1, S (v2 - v1)].
-Notation "'Σ[' ξ ']' { v1 , v2 } " := (gl_witness_sum_gen ξ v1 v2) (at level 20, format "Σ[ ξ ] { v1 ,  v2 }").
+(* Definition gl_witness_sum_gen `{GL : ghost_lock_class} (ξ : gl_witness) (v1 v2 : ghost_lock_version) : ghost_lock_fuel := *)
+(*   Σ[ξ][v1, S (v2 - v1)]. *)
+(* Notation "'Σ[' ξ ']' { v1 , v2 } " := (gl_witness_sum_gen ξ v1 v2) (at level 20, format "Σ[ ξ ] { v1 ,  v2 }"). *)
 
-Fixpoint gl_witness_sum `{GL : ghost_lock_class} (ξ : gl_witness) (v : ghost_lock_version) : ghost_lock_fuel :=
-  match v with
-  | O => ξ v
-  | S u => (gl_witness_sum ξ u) w+ (ξ v)
-  end.
-Notation "'Σ[' ξ ']' v" := (gl_witness_sum ξ v) (at level 20, format "Σ[ ξ ]  v").
+(* Fixpoint gl_witness_sum `{GL : ghost_lock_class} (ξ : gl_witness) (v : ghost_lock_version) : ghost_lock_fuel := *)
+(*   match v with *)
+(*   | O => ξ v *)
+(*   | S u => (gl_witness_sum ξ u) w+ (ξ v) *)
+(*   end. *)
+(* Notation "'Σ[' ξ ']' v" := (gl_witness_sum ξ v) (at level 20, format "Σ[ ξ ]  v"). *)
 
-Definition gl_witness_constant `{GL : ghost_lock_class} (c : ghost_lock_fuel) : gl_witness := λ _, c.
+(* Definition gl_witness_constant `{GL : ghost_lock_class} (c : ghost_lock_fuel) : gl_witness := λ _, c. *)
 
-Section witfun.
-  Context `{GL : ghost_lock_class}.
+(* Section witfun. *)
+(*   Context `{GL : ghost_lock_class}. *)
 
-  Lemma gl_witness_sum_len_S ξ v n : Σ[ξ][v, S n] = ((ξ v) w+ Σ[ξ][S v, n]).
-  Proof using. done. Qed.
+(*   Lemma gl_witness_sum_len_S ξ v n : Σ[ξ][v, S n] = ((ξ v) w+ Σ[ξ][S v, n]). *)
+(*   Proof using. done. Qed. *)
 
-  Lemma gl_witness_sum_len_start_end ξ v n : (Σ[ξ][v, n] w+ ξ (v + n)) w= (ξ v w+ Σ[ξ][S v, n]).
-  Proof using.
-    revert v. induction n; intros.
-    { simpl. replace (v + 0) with v by lia. rewrite comm. done. }
-    rewrite !gl_witness_sum_len_S. replace (v + S n) with ((S v) + n) by lia.
-    rewrite -assoc. rewrite (IHn (S v)). done.
-  Qed.
+(*   Lemma gl_witness_sum_len_start_end ξ v n : (Σ[ξ][v, n] w+ ξ (v + n)) w= (ξ v w+ Σ[ξ][S v, n]). *)
+(*   Proof using. *)
+(*     revert v. induction n; intros. *)
+(*     { simpl. replace (v + 0) with v by lia. rewrite comm. done. } *)
+(*     rewrite !gl_witness_sum_len_S. replace (v + S n) with ((S v) + n) by lia. *)
+(*     rewrite -assoc. rewrite (IHn (S v)). done. *)
+(*   Qed. *)
 
-  Lemma gl_witness_sum_gen_S ξ v1 v2 :
-    v1 ≤ v2 →
-    Σ[ξ]{v1, S v2} w= ((ξ (S v2)) w+ Σ[ξ]{v1, v2}).
-  Proof using.
-    intros LE.
-    rewrite /gl_witness_sum_gen gl_witness_sum_len_S.
-    replace (S v2 - v1) with (S (v2 - v1)) by lia.
-    rewrite -(gl_witness_sum_len_start_end _ v1 (S (v2 - v1))).
-    replace (v1 + S (v2 - v1)) with (S v2) by lia.
-    rewrite comm. done.
-  Qed.
+(*   Lemma gl_witness_sum_gen_S ξ v1 v2 : *)
+(*     v1 ≤ v2 → *)
+(*     Σ[ξ]{v1, S v2} w= ((ξ (S v2)) w+ Σ[ξ]{v1, v2}). *)
+(*   Proof using. *)
+(*     intros LE. *)
+(*     rewrite /gl_witness_sum_gen gl_witness_sum_len_S. *)
+(*     replace (S v2 - v1) with (S (v2 - v1)) by lia. *)
+(*     rewrite -(gl_witness_sum_len_start_end _ v1 (S (v2 - v1))). *)
+(*     replace (v1 + S (v2 - v1)) with (S v2) by lia. *)
+(*     rewrite comm. done. *)
+(*   Qed. *)
 
-  Lemma gl_witness_sum_gen_eq ξ v :
-    Σ[ξ]{v, v} w= ξ v.
-  Proof using.
-    rewrite /gl_witness_sum_gen. replace (S (v - v)) with (S O) by lia.
-    simpl. rewrite right_id. done.
-  Qed.
+(*   Lemma gl_witness_sum_gen_eq ξ v : *)
+(*     Σ[ξ]{v, v} w= ξ v. *)
+(*   Proof using. *)
+(*     rewrite /gl_witness_sum_gen. replace (S (v - v)) with (S O) by lia. *)
+(*     simpl. rewrite right_id. done. *)
+(*   Qed. *)
 
-  Lemma gl_witness_sum_S ξ v
-    : Σ[ξ] (S v) = ((Σ[ξ] v) w+ (ξ (S v))).
-  Proof using. done. Qed.
+(*   Lemma gl_witness_sum_S ξ v *)
+(*     : Σ[ξ] (S v) = ((Σ[ξ] v) w+ (ξ (S v))). *)
+(*   Proof using. done. Qed. *)
 
-  Lemma gl_witness_sum_gen_sum_equiv ξ v : Σ[ξ] v w= Σ[ξ] {0, v}.
-  Proof using.
-    induction v; unfold gl_witness_sum_gen.
-    { simpl. rewrite right_id. done. }
-    rewrite gl_witness_sum_S IHv. rewrite gl_witness_sum_len_S.
-    unfold gl_witness_sum_gen.
-    replace (S (v - 0)) with (S v) by lia. replace (S v - 0) with (S v) by lia.
-    rewrite gl_witness_sum_len_start_end. done.
-  Qed.
+(*   Lemma gl_witness_sum_gen_sum_equiv ξ v : Σ[ξ] v w= Σ[ξ] {0, v}. *)
+(*   Proof using. *)
+(*     induction v; unfold gl_witness_sum_gen. *)
+(*     { simpl. rewrite right_id. done. } *)
+(*     rewrite gl_witness_sum_S IHv. rewrite gl_witness_sum_len_S. *)
+(*     unfold gl_witness_sum_gen. *)
+(*     replace (S (v - 0)) with (S v) by lia. replace (S v - 0) with (S v) by lia. *)
+(*     rewrite gl_witness_sum_len_start_end. done. *)
+(*   Qed. *)
 
-  Lemma gl_witness_sum_gen_sum_equiv_add ξ v1 v2 :
-    (v1 < v2) →
-    Σ[ξ] v2 w= (Σ[ξ] v1 w+ Σ[ξ] {S v1, v2}).
-  Proof using.
-    revert v1. induction v2; intros.
-    { lia. }
-    destruct (decide (v1 < v2)).
-    { clear H. specialize (IHv2 _ l). rewrite gl_witness_sum_S IHv2.
-      rewrite (gl_witness_sum_gen_S _ (S v1) v2); last lia.
-      rewrite (comm _ (ξ (S v2)) (Σ[ξ]{S v1, v2})) assoc. done.
-    }
-    assert (v1 = v2) by lia. subst. clear n H. rewrite gl_witness_sum_gen_eq.
-    rewrite gl_witness_sum_S. done.
-  Qed.
+(*   Lemma gl_witness_sum_gen_sum_equiv_add ξ v1 v2 : *)
+(*     (v1 < v2) → *)
+(*     Σ[ξ] v2 w= (Σ[ξ] v1 w+ Σ[ξ] {S v1, v2}). *)
+(*   Proof using. *)
+(*     revert v1. induction v2; intros. *)
+(*     { lia. } *)
+(*     destruct (decide (v1 < v2)). *)
+(*     { clear H. specialize (IHv2 _ l). rewrite gl_witness_sum_S IHv2. *)
+(*       rewrite (gl_witness_sum_gen_S _ (S v1) v2); last lia. *)
+(*       rewrite (comm _ (ξ (S v2)) (Σ[ξ]{S v1, v2})) assoc. done. *)
+(*     } *)
+(*     assert (v1 = v2) by lia. subst. clear n H. rewrite gl_witness_sum_gen_eq. *)
+(*     rewrite gl_witness_sum_S. done. *)
+(*   Qed. *)
 
-End witfun.
+(* End witfun. *)
