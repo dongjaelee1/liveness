@@ -4,7 +4,10 @@ From liris.prelude Require Import axioms wf_structs ordinal_facts.
 Section measure.
   Context `{!well_founded_class L} `{!ord_mono_fun_class}.
 
-  Inductive measurable_syntax : Type :=
+  (** The language's source of nondeterminism is limited to the type Ψ.
+      For example, Ψ = expr * state * ... and so on. *)
+  Inductive measurable_syntax  : Type :=
+  | ms_nondet {Ψ : Type} (t : ord_tree Ψ)
   | ms_finite (n : nat)
   | ms_add (s1 s2 : measurable_syntax)
   | ms_extend (s : measurable_syntax).
@@ -17,6 +20,8 @@ Section measure.
     ∀ (s : measurable_syntax), Ord.t :=
   (fix go s {struct s} :=
      match s with
+     | ms_nondet t =>
+         Ord.from_wf (ord_tree_lt_well_founded _) t
      | ms_finite n =>
          n
      | ms_add s1 s2 =>
@@ -41,6 +46,7 @@ Section measure.
     revert ACC1 ACC2 s. induction l as [l IH] using (well_founded_ind wf_ltL).
     intros. induction s.
     { destruct ACC1, ACC2. simpl. auto. }
+    { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs. rewrite !IHs. f_equal.
       do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
@@ -50,6 +56,8 @@ Section measure.
   Lemma measure_unfold l s :
     measure l s =
     match s with
+    | ms_nondet t =>
+        Ord.from_wf (ord_tree_lt_well_founded _) t
     | ms_finite n =>
         n
     | ms_add s1 s2 =>
@@ -68,6 +76,12 @@ Section measure.
   Qed.
 
   (** Reduction rules *)
+  Lemma measure_nondet {Ψ : Type} (l : L) (t : ord_tree Ψ) :
+    measure l (ms_nondet t) = Ord.from_wf (ord_tree_lt_well_founded _) t.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_nondet _)). auto.
+  Qed.
+
   Lemma measure_finite (l : L) n :
     measure l (ms_finite n) = (n)%ord.
   Proof using Type*.
@@ -92,6 +106,14 @@ Section measure.
     etransitivity; cycle 1.
     { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
     simpl. apply Ord.join_upperbound.
+  Qed.
+
+  (** Properties *)
+  Lemma measure_nondet_lt {Ψ : Type} l (t1 t2 : ord_tree Ψ) :
+    ord_tree_lt t1 t2 →
+    (measure l (ms_nondet t1) < measure l (ms_nondet t2))%ord.
+  Proof using.
+    intros. rewrite !measure_nondet. apply Ord.lt_from_wf. auto.
   Qed.
 
   Lemma measure_extend_le_const (l : L) (s : measurable_syntax) :
