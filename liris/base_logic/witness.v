@@ -39,6 +39,31 @@ Definition witness_keep `{GL : ghost_lock_class} : witness → witness → Prop 
 (** To a map *)
 Notation witnesses := (gmap gl_id witness).
 
+(** For witnesses, take one step at a time. *)
+Definition wits_one `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
+  λ W1 W2, ∃ k w1 w2, (W1 !! k = Some w1) ∧ (witness_step w1 w2) ∧ (W2 = <[k:=w2]>W1).
+Infix "↓₁" := (wits_one) (at level 20).
+
+Definition wits_alloc `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
+  λ W1 W2, ∃ k v, (W1 !! k = None) ∧
+                  ((∃ a, W2 = <[k:=(v, witness_locked a)]> W1) ∨
+                     (W2 = <[k:=(v, witness_unlocked)]> W1)).
+Infix "↓ₐ" := (wits_alloc) (at level 20).
+
+Variant wits_step `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
+  (* | wits_step_cond_step W1 W2 C : *)
+  (*   (W1 ↓ₛ W2 | C) → wits_step W1 W2 *)
+  | wits_step_one W1 W2 :
+    W1 ↓₁ W2 → wits_step W1 W2
+  | wits_step_alloc W1 W2 :
+    W1 ↓ₐ W2 → wits_step W1 W2.
+
+Notation "A ↓ B" := (wits_step A B) (at level 20, format "A  ↓  B").
+Notation "A ↓∘ B" := (rc (wits_step) A B) (at level 20, format "A  ↓∘  B").
+Notation "A ↓⁺ B" := (tc (wits_step) A B) (at level 20, format "A  ↓⁺  B").
+Notation "A ↓⋆ B" := (rtc (wits_step) A B) (at level 20, format "A  ↓⋆  B").
+
+(** Definitions for strict progress of witnesses. *)
 (* Only witnesses that satisfy wit_cond makes R *)
 Definition wit_cond `{GL : ghost_lock_class} := (gl_id → witness → Prop).
 Definition wits_cond_rel `{GL : ghost_lock_class} (C : wit_cond) (R : witness → witness → Prop) : witnesses → witnesses → Prop :=
@@ -63,23 +88,6 @@ Definition wits_cond_step `{GL : ghost_lock_class} (C : wit_cond) : witnesses �
   wits_cond_rel C witness_step.
 Notation "A ↓ₛ B | C" := (wits_cond_step C A B) (at level 20, format "A  ↓ₛ  B  |  C").
 
-Definition wits_alloc `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
-  λ W1 W2, ∃ k v, (W1 !! k = None) ∧
-                  ((∃ a, W2 = <[k:=(v, witness_locked a)]> W1) ∨
-                     (W2 = <[k:=(v, witness_unlocked)]> W1)).
-Infix "↓ₐ" := (wits_alloc) (at level 20).
-
-Variant wits_step `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
-  | wits_step_cond_step W1 W2 C :
-    (W1 ↓ₛ W2 | C) → wits_step W1 W2
-  | wits_step_alloc W1 W2 :
-    W1 ↓ₐ W2 → wits_step W1 W2.
-
-Notation "A ↓ B" := (wits_step A B) (at level 20, format "A  ↓  B").
-Notation "A ↓∘ B" := (rc (wits_step) A B) (at level 20, format "A  ↓∘  B").
-Notation "A ↓⁺ B" := (tc (wits_step) A B) (at level 20, format "A  ↓⁺  B").
-Notation "A ↓⋆ B" := (rtc (wits_step) A B) (at level 20, format "A  ↓⋆  B").
-
 (* Witnesses making strict progresses *)
 Definition wits_keep `{GL : ghost_lock_class} : witnesses → witnesses → Prop :=
   λ W1 W2, map_Forall2 (λ k w1 w2, witness_keep w1 w2) W1 W2.
@@ -101,6 +109,33 @@ Section witnesses.
   Context `{GL : ghost_lock_class}.
 
   (** Properties *)
+  (** For the one step relation. *)
+  Lemma wits_one_dom W1 W2 : W1 ↪₁ W2 → dom W1 = dom W2.
+  Proof using.
+    intros. destruct H as (?&?&?&?&?&?). subst. rewrite dom_insert_lookup_L; eauto.
+  Qed.
+
+  Lemma wits_one_to_wits_cond W1 W2 : W1 ↓₁ W2 -> ∃ k, (W1 ↓ₛ W2 | wit_cond_one k).
+  Proof using.
+    intros. destruct H as (?&?&?&?&?&?). subst. exists x. intros ?. destruct (decide (i = x)).
+    - subst. rewrite H lookup_insert_eq. econstructor. left. done.
+    - rewrite lookup_insert_ne; last auto. destruct (W1 !! i) eqn:LU; econstructor. right. done.
+  Qed.
+
+  Lemma wits_cond_to_wits_one W1 W2 : (∃ k, is_Some (W1 !! k) ∧ (W1 ↓ₛ W2 | wit_cond_one k)) → W1 ↓₁ W2.
+  Proof using.
+    intros (k& (g&?)& ?). pose proof H0 as STEP. specialize (H0 k). rewrite H in H0. inv H0.
+    exists k, g, y. destruct H3; cycle 1.
+    { destruct H0. done. }
+    destruct H0. split_and !; auto.
+    apply map_eq_iff. intros. destruct (decide (i = k)).
+    - subst. rewrite lookup_insert_eq. auto.
+    - rewrite lookup_insert_ne; last auto. specialize (STEP i). inv STEP; auto. destruct H5.
+      + destruct H5. done.
+      + destruct H5. subst. auto.
+  Qed.
+
+  (** For the conditional step relation *)
   Lemma wits_cond_rel_dom C R W1 W2 : wits_cond_rel C R W1 W2 → dom W1 = dom W2.
   Proof using. intros. eapply map_Forall2_dom_L; eauto. Qed.
   Lemma wits_cond_rel_tc_dom C R W1 W2 : tc (wits_cond_rel C R) W1 W2 → dom W1 = dom W2.
@@ -155,7 +190,7 @@ Section witnesses.
     wits_cond_rel C2 R W1 W2.
   Proof using. intros. eapply wits_cond_rel_iff_lookup; eauto. Qed.
 
-  (* Progress *)
+  (** For progress *)
   Global Instance witness_keep_transitive : Transitive witness_keep.
   Proof using.
     repeat intro. destruct x, y, z. inv H. inv H0. destruct w, w0, w1; simpl in *; subst; try done.
@@ -176,7 +211,7 @@ Section witnesses.
     repeat intro. destruct (x !! i) eqn:Hx; try done.
   Qed.
 
-  (* Mon *)
+  (** For mon *)
   Global Instance wits_mon_transitive : Transitive wits_mon.
   Proof using.
     repeat intro. specialize (H i). specialize (H0 i).

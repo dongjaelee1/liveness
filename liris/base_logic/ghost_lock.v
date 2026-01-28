@@ -59,6 +59,31 @@ Definition gl_id := positive.
 Notation gl_ids := (gset gl_id).
 Notation ghost_locks := (gmap gl_id ghost_lock).
 
+(** For ghost_locks, take one step at a time. *)
+Definition gls_one `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
+  λ Ω1 Ω2, ∃ k g1 g2, (Ω1 !! k = Some g1) ∧ (ghost_lock_step g1 g2) ∧ (Ω2 = <[k:=g2]>Ω1).
+Infix "↪₁" := (gls_one) (at level 20).
+
+Definition gls_alloc `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
+  λ Ω1 Ω2, ∃ k v, (Ω1 !! k = None) ∧
+                  ((∃ a t, Ω2 = <[k:=(v, ghost_lock_locked a t)]> Ω1) ∨
+                     (Ω2 = <[k:=(v, ghost_lock_unlocked)]> Ω1)).
+Infix "↪ₐ" := (gls_alloc) (at level 20).
+
+Variant gls_step `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
+  (* | gls_step_cond_step Ω1 Ω2 C : *)
+  (*   (Ω1 ↪ₛ Ω2 | C) → gls_step Ω1 Ω2 *)
+  | gls_step_one Ω1 Ω2 :
+    Ω1 ↪₁ Ω2 → gls_step Ω1 Ω2
+  | gls_step_alloc Ω1 Ω2 :
+    Ω1 ↪ₐ Ω2 → gls_step Ω1 Ω2.
+
+Notation "A ↪ B" := (gls_step A B) (at level 20, format "A  ↪  B").
+Notation "A ↪∘ B" := (rc (gls_step) A B) (at level 20, format "A  ↪∘  B").
+Notation "A ↪⁺ B" := (tc (gls_step) A B) (at level 20, format "A  ↪⁺  B").
+Notation "A ↪⋆ B" := (rtc (gls_step) A B) (at level 20, format "A  ↪⋆  B").
+
+(** Definitions for strict progress of ghost_locks. *)
 (* Only ghost locks that satisfy gl_cond makes R *)
 Definition gl_cond `{GL : ghost_lock_class} := (gl_id → ghost_lock → Prop).
 Definition gls_cond_rel `{GL : ghost_lock_class} (C : gl_cond) (R : ghost_lock → ghost_lock → Prop) : ghost_locks → ghost_locks → Prop :=
@@ -78,27 +103,10 @@ Definition gl_cond_one `{GL : ghost_lock_class} (v : gl_id) : gl_cond :=
 Global Instance gl_cond_one_dec `{GL : ghost_lock_class} : ∀ v k g, Decision (gl_cond_one v k g).
 Proof using. intros. rewrite /gl_cond_one. solve_decision. Qed.
 
-(* Ghost locks step relation *)
+(* Ghost locks conditional step relation *)
 Definition gls_cond_step `{GL : ghost_lock_class} (C : gl_cond) : ghost_locks → ghost_locks → Prop :=
   gls_cond_rel C ghost_lock_step.
 Notation "A ↪ₛ B | C" := (gls_cond_step C A B) (at level 20, format "A  ↪ₛ  B  |  C").
-
-Definition gls_alloc `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
-  λ Ω1 Ω2, ∃ k v, (Ω1 !! k = None) ∧
-                  ((∃ a t, Ω2 = <[k:=(v, ghost_lock_locked a t)]> Ω1) ∨
-                     (Ω2 = <[k:=(v, ghost_lock_unlocked)]> Ω1)).
-Infix "↪ₐ" := (gls_alloc) (at level 20).
-
-Variant gls_step `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
-  | gls_step_cond_step Ω1 Ω2 C :
-    (Ω1 ↪ₛ Ω2 | C) → gls_step Ω1 Ω2
-  | gls_step_alloc Ω1 Ω2 :
-    Ω1 ↪ₐ Ω2 → gls_step Ω1 Ω2.
-
-Notation "A ↪ B" := (gls_step A B) (at level 20, format "A  ↪  B").
-Notation "A ↪∘ B" := (rc (gls_step) A B) (at level 20, format "A  ↪∘  B").
-Notation "A ↪⁺ B" := (tc (gls_step) A B) (at level 20, format "A  ↪⁺  B").
-Notation "A ↪⋆ B" := (rtc (gls_step) A B) (at level 20, format "A  ↪⋆  B").
 
 (* Ghost locks making strict progresses *)
 Definition gls_keep `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
@@ -112,6 +120,33 @@ Section ghost_locks.
   Context `{GL : ghost_lock_class}.
 
   (** Properties *)
+  (** For the one step relation. *)
+  Lemma gls_one_dom Ω1 Ω2 : Ω1 ↪₁ Ω2 → dom Ω1 = dom Ω2.
+  Proof using.
+    intros. destruct H as (?&?&?&?&?&?). subst. rewrite dom_insert_lookup_L; eauto.
+  Qed.
+
+  Lemma gls_one_to_gls_cond Ω1 Ω2 : Ω1 ↪₁ Ω2 -> ∃ k, (Ω1 ↪ₛ Ω2 | gl_cond_one k).
+  Proof using.
+    intros. destruct H as (?&?&?&?&?&?). subst. exists x. intros ?. destruct (decide (i = x)).
+    - subst. rewrite H lookup_insert_eq. econstructor. left. done.
+    - rewrite lookup_insert_ne; last auto. destruct (Ω1 !! i) eqn:LU; econstructor. right. done.
+  Qed.
+
+  Lemma gls_cond_to_gls_one Ω1 Ω2 : (∃ k, is_Some (Ω1 !! k) ∧ (Ω1 ↪ₛ Ω2 | gl_cond_one k)) → Ω1 ↪₁ Ω2.
+  Proof using.
+    intros (k& (g&?)& ?). pose proof H0 as STEP. specialize (H0 k). rewrite H in H0. inv H0.
+    exists k, g, y. destruct H3; cycle 1.
+    { destruct H0. done. }
+    destruct H0. split_and !; auto.
+    apply map_eq_iff. intros. destruct (decide (i = k)).
+    - subst. rewrite lookup_insert_eq. auto.
+    - rewrite lookup_insert_ne; last auto. specialize (STEP i). inv STEP; auto. destruct H5.
+      + destruct H5. done.
+      + destruct H5. subst. auto.
+  Qed.
+
+  (** For the conditional step relation *)
   Lemma gls_cond_rel_dom C R Ω1 Ω2 : gls_cond_rel C R Ω1 Ω2 → dom Ω1 = dom Ω2.
   Proof using. intros. eapply map_Forall2_dom_L; eauto. Qed.
   Lemma gls_cond_rel_tc_dom C R Ω1 Ω2 : tc (gls_cond_rel C R) Ω1 Ω2 → dom Ω1 = dom Ω2.
@@ -166,7 +201,7 @@ Section ghost_locks.
     gls_cond_rel C2 R Ω1 Ω2.
   Proof using. intros. eapply gls_cond_rel_iff_lookup; eauto. Qed.
 
-  (* For progress *)
+  (** For progress *)
   Global Instance ghost_lock_keep_transitive : Transitive ghost_lock_keep.
   Proof using.
     repeat intro. destruct x, y, z. inv H. inv H0. destruct g0, g2, g4; simpl in *; subst; try done.

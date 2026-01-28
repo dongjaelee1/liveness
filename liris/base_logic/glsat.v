@@ -1218,7 +1218,7 @@ Section glsat.
     iApply big_sepM_insert; first auto. iFrame. iFrame "Gwf Grs Gvl". auto.
   Qed.
 
-  (* ghost_lock_step rules: progress, unlock, lock *)
+  (** ghost lock step rules: progress, unlock, lock *)
   Lemma glsat_progress_one Ω k v a t c :
     (Ω !! k = Some (v, ghost_lock_locked a t)) →
     (Ord.O < c)%ord →

@@ -499,6 +499,8 @@ Section glwit.
     intros. eapply map_Forall2_dom_L; eauto.
   Qed.
 
+  TODO
+
   Lemma glwit_inv_cond_step_same_gls C Ω W1 W2 :
     glwit_inv Ω W1 →
     (W1 ↓ₛ W2 | C) →
