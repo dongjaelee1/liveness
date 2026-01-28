@@ -7,7 +7,6 @@ From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 From liris.base_logic Require Export fancy_updates.
 From liris.program_logic Require Export gupd.
-(* From liris.algebra Require Import ordinal_wfocm. *)
 From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
 Import uPred.
 
@@ -70,7 +69,7 @@ Definition gprog `{SI : indexT} `{!lirisGS Λ Σ} Θ1 Θ2 i : iPropO Σ -d> iPro
      ∀ (Ω1 : ghost_locks) (W1 : witnesses),
      (gproto Ω1 W1 Θ1) ={∅}=∗
      ∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | gl_cond_owner i)⌝) ∗
-     ∀ W2, (⌜(W1 ↓ₚ W2 | wit_cond_locked) ∧ glwit_inv gupd_η Ω2 W2 ⌝) ={∅}=∗
+     ∀ W2, (⌜(W1 ↓ₚ W2 | wit_cond_locked) ∧ glwit_inv Ω2 W2 ⌝) ={∅}=∗
      (gproto Ω2 W2 Θ2) ∗ P)%I.
 
 Notation "'@={' Θ1 , Θ2 , i '}=↓' P" := (gprog Θ1 Θ2 i P) (at level 99, P at level 200, format "@={ Θ1 , Θ2 , i }=↓  P").
@@ -411,30 +410,30 @@ Section sfgupd.
   Proof. rewrite /Frame=><-. by rewrite sfgupd_frame_l. Qed.
 
   (** Update rules *)
-  Lemma gl_alloc_obl E i G q ξ N v P Q R :
+  Lemma gl_alloc_obl E i G q ℓ μ N v P Q R :
     th_obls i G q -∗
     (▷ P) -∗
     |={E}=>g ∃ k, (⌜ G !! k = None ⌝) ∗
                  th_obls i (<[k:=v]>G) q ∗
-                 gl_witfun k ξ ∗ gl k v ∗ gl_fuel k (Σ[ξ] v) ∗
+                 gl_layer k ℓ ∗ gl k v ∗ gl_fuel k ℓ μ ∗
                  gl_variant N k v P Q R ∗
-                 wit k v (gupd_η (Σ[ξ] v)) ∗
+                 wit_layer k v ℓ ∗
                  ([∗ set] u ∈ set_seq 0 v, gl_done k u).
   Proof.
     iIntros "Tb HP %%% $". iApply (gl_alloc_obl_0 _ Θ with "Tb HP").
   Qed.
 
-  Lemma gl_alloc_done E ξ N v P Q R :
+  Lemma gl_alloc_done E ℓ μ N v P Q R :
     (▷ Q) -∗
-    |={E}=>g ∃ k, gl_witfun k ξ ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k (Σ[ξ] v) ∗
+    |={E}=>g ∃ k, gl_layer k ℓ ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k ℓ μ ∗
                  gl_variant N k v P Q R ∗
-                 wit k v (gupd_η (Σ[ξ] v)) ∗
+                 wit_layer k v ℓ ∗
                  ([∗ set] u ∈ set_seq 0 (S v), gl_done k u).
   Proof.
     iIntros "HQ %%% $". iApply (gl_alloc_done_0 _ Θ with "HQ").
   Qed.
 
-  Lemma gl_lock E0 E i G q k ξ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
+  Lemma gl_lock E0 E i G q k ℓ μ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
     v1 < v2 →
     ↑N ⊆ E →
     gl_current k v1 -∗
@@ -443,20 +442,20 @@ Section sfgupd.
     |={E,E ∖ ↑N}=> (▷ (gl_current k v1 ∗ Q1)) ∗
                   (th_obls i G q -∗
                    gl_current k v1 -∗
-                   gl_witfun k ξ -∗
+                   gl_layer k ℓ -∗
                    (▷ R1) -∗
                    (▷ P2) -∗
                    |={E0}=>g |={E ∖ ↑N,E}=> 
                      (th_obls i (<[k:=v2]>G) q ∗
-                      gl k v2 ∗ gl_fuel k (Σ[ξ]{S v1, v2}) ∗
+                      gl k v2 ∗ gl_fuel k ℓ μ ∗
                       gl_variant N k v2 P2 Q2 R2 ∗
-                      wit k v2 (gupd_η (Σ[ξ] v2)) ∗
-                      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit k u (gupd_η (Σ[ξ] u))) ∗
+                      wit_layer k v2 ℓ ∗
+                      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u ℓ) ∗
                       ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u))).
   Proof.
     iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
     iIntros "!> Tb Gc Gw HR HP". iPoseProof ("H" with "Tb Gc Gw HR HP") as "H".
-    iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
+    iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. eauto.
   Qed.
 
   Lemma gl_unlock E0 E i G q N k v P Q R :
@@ -476,11 +475,11 @@ Section sfgupd.
     iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
   Qed.
 
-  Lemma gl_change_owner E i1 i2 G1 G2 q1 q2 k v :
+  Lemma gl_change_owner E i1 i2 G1 G2 q1 q2 k v ℓ0 :
     G1 !! k = Some v →
     th_obls i1 G1 q1 -∗
     th_obls i2 G2 q2 -∗
-    gl_fuel k Ord.one -∗
+    gl_fuel k ℓ0 1 -∗
     |={E}=>g th_obls i1 (delete k G1) q1 ∗ th_obls i2 (<[k:=v]>G2) q2 ∗ ⌜ G2 !! k = None ⌝.
   Proof.
     iIntros (LUG1) "Tb1 Tb2 Gf %%% $".
@@ -496,7 +495,7 @@ Section sfgupd.
 
   Lemma gl_check_witnesses E R :
     ([∗ map] r ↦ v ∈ R, gl r v) -∗
-    |={E}=>g ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.O ∨ gl_done r v).
+    |={E}=>g ([∗ map] r ↦ v ∈ R, wit r v Ord.O ∨ gl_done r v).
   Proof.
     iIntros "Rs %%% $". iMod (gl_check_witnesses_0 with "Rs") as "H". auto.
   Qed.

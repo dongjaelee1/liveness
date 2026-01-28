@@ -1405,7 +1405,7 @@ Section preds.
       iApply (gl_history_mon with "Gseq"). apply elem_of_set_seq in H. lia.
     Qed.
 
-    Lemma gl_lock_0 E i G q k ℓ μ N v1 v2 P1 Q1 R1 P2 Q2 R2 :
+    Lemma gl_lock_0 E i G q k ℓ μ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
       v1 < v2 →
       ↑N ⊆ E →
       gl_current k v1 -∗
