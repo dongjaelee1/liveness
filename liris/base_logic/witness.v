@@ -110,7 +110,7 @@ Section witnesses.
 
   (** Properties *)
   (** For the one step relation. *)
-  Lemma wits_one_dom W1 W2 : W1 ↪₁ W2 → dom W1 = dom W2.
+  Lemma wits_one_dom W1 W2 : W1 ↓₁ W2 → dom W1 = dom W2.
   Proof using.
     intros. destruct H as (?&?&?&?&?&?). subst. rewrite dom_insert_lookup_L; eauto.
   Qed.

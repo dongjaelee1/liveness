@@ -236,6 +236,77 @@ Section gupd.
     by rewrite -gupd_intro -or_intro_l.
   Qed.
 
+  Lemma gproto_glwit_inv Ω W Θ :
+    gproto Ω W Θ ⊢ ⌜ glwit_inv Ω W ⌝.
+  Proof. iIntros "(_&_&_&_&$)". Qed.
+
+  Lemma glwit_inv_exists_witnesses Ω1 Ω2 W1 :
+    Ω1 ↪∘ Ω2 →
+    glwit_inv Ω1 W1 →
+    ∃ W2, W1 ↓∘ W2 ∧ glwit_inv Ω2 W2.
+  Proof.
+    intros Step Inv. destruct Step.
+    { subst. exists W1. eauto. }
+    inv H.
+    - destruct H0 as (?&?&?&?&?&?). subst. inv H0.
+      + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2.
+        destruct y. destruct H2, w; last done. subst. symmetry in H1.
+        assert (Ord.O <= wit)%ord by (apply Ord.O_bot).
+        apply ClassicOrd.le_eq_or_lt in H0. destruct H0; cycle 1.
+        * exists W1. split; first auto. intros ?. destruct (decide (i = x)).
+          { subst. rewrite lookup_insert_eq H1. econstructor. split; auto. rewrite -H0. apply Ord.O_bot. }
+          { rewrite lookup_insert_ne; last auto. apply Inv. }
+          (* FIXME : fail typeclass inference *)
+        * exists (<[x:=(g, witness_locked (GL:=ord_ghost_lock_class) (Ord.O))]>W1). split.
+          { econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor. auto. }
+          { intros ?. destruct (decide (i = x)).
+            - subst. rewrite !lookup_insert_eq. econstructor. split; auto. apply Ord.O_bot.
+            - rewrite !lookup_insert_ne; eauto. }
+      + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2.
+        destruct y. destruct H2, w; last done. subst. symmetry in H1.
+        exists (<[x:=(g, witness_unlocked)]>W1). split.
+        * econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor.
+        * intros ?. destruct (decide (i = x)).
+          { subst. rewrite !lookup_insert_eq. econstructor. auto. }
+          { rewrite !lookup_insert_ne; eauto. }
+      + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2.
+        destruct y. destruct H2, w; first done. subst. symmetry in H1. clear H2.
+        exists (<[x:=(ver2, witness_locked (GL:=ord_ghost_lock_class) (η fuel))]>W1). split.
+        * econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor. auto.
+        * intros ?. destruct (decide (i = x)).
+          { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
+          { rewrite !lookup_insert_ne; eauto. }
+    - pose proof Inv as Dom. apply glwit_inv_dom in Dom. destruct H0 as (k& v& LUO& [? | ?]).
+      + destruct H as (a& t& ?). exists (<[k:=(v, witness_locked (GL:=ord_ghost_lock_class) (η a))]>W1). split.
+        * econstructor 2. econstructor 2. exists k, v. split.
+          { apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto. }
+          left. eauto.
+        * subst. intros ?. destruct (decide (i = k)).
+          { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
+          { rewrite !lookup_insert_ne; eauto. }
+      + exists (<[k:=(v, witness_unlocked)]>W1). split.
+        * econstructor 2. econstructor 2. exists k, v. split.
+          { apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto. }
+          right. eauto.
+        * subst. intros ?. destruct (decide (i = k)).
+          { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
+          { rewrite !lookup_insert_ne; eauto. }
+  Qed.
+
+  Lemma gproto_gupd_steps Ω W Θ P :
+    (|=[Θ]=>g P) -∗ gproto Ω W Θ ={∅}=∗ (P ∗ ∃ Ω' W', gproto Ω' W' Θ).
+  Proof.
+    iIntros "H". iRevert (Ω W). iRevert (P) "H".
+    iApply gupd_ind_strong.
+    { solve_proper. }
+    iIntros "!> %P IH % % H". iDestruct "IH" as "[IH | IH]".
+    { iMod "IH". by iFrame. }
+    iPoseProof (gproto_glwit_inv with "H") as "%".
+    iMod ("IH" with "H") as "(%&%& IH)".
+    pose proof (glwit_inv_exists_witnesses _ _ _ H0 H). destruct H1 as (W2& ?).
+    iMod ("IH" $! _ H1) as "[G [IH _]]". iApply ("IH" with "G").
+  Qed.
+
   (* The following instances make the Iris Proof Mode aware of the
      obligation update. They are derived from the simpler rules above. *)
   (* Global Instance elim_fupd_gupd (p : bool) Θ P Q : *)

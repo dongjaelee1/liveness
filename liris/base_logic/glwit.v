@@ -499,8 +499,6 @@ Section glwit.
     intros. eapply map_Forall2_dom_L; eauto.
   Qed.
 
-  TODO
-
   Lemma glwit_inv_cond_step_same_gls C Ω W1 W2 :
     glwit_inv Ω W1 →
     (W1 ↓ₛ W2 | C) →
@@ -519,6 +517,14 @@ Section glwit.
     destruct HC as [[HC Step] | [HC EQ]].
     - destruct g0, w, w0; inv Step; try done. eapply WFOCM.lt_le; auto.
     - inv EQ. destruct g0, w0; try done.
+  Qed.
+  Lemma glwit_inv_one_step_same_gls Ω W1 W2 :
+    glwit_inv Ω W1 →
+    W1 ↓₁ W2 →
+    glwit_inv Ω W2 →
+    wits_mon W1 W2.
+  Proof.
+    intros. apply wits_one_to_wits_cond in H0. destruct H0. eapply (glwit_inv_cond_step_same_gls _ Ω W1 W2); eauto.
   Qed.
 
   Lemma glwit_inv_alloc_same_gls_dom Ω1 Ω2 W1 W2 :
@@ -542,7 +548,7 @@ Section glwit.
     wits_mon W1 W2.
   Proof.
     intros. inv H0.
-    - eapply glwit_inv_cond_step_same_gls; eauto.
+    - eapply glwit_inv_one_step_same_gls; eauto.
     - exfalso. eapply (glwit_inv_alloc_same_gls_dom Ω Ω W1 W2); eauto.
   Qed.
   Lemma glwit_inv_rc_step_same_gls Ω W1 W2 :
@@ -618,6 +624,11 @@ Section glwit.
     inv H; cycle 1.
     { eapply (glwit_inv_alloc_same_gls_dom Ω (<[k:=(v, ghost_lock_unlocked)]> Ω)) in H4; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
+    apply wits_one_to_wits_cond in H4. destruct H4 as (?&H4). assert (x = k).
+    { specialize (H4 k). rewrite H0 H2 in H4. inv H4. destruct H6.
+      - destruct H; done.
+      - destruct H; done. }
+    subst x.
     intros i. specialize (H4 i). destruct (decide (i = k)).
     { subst. rewrite H2 lookup_insert_eq. econstructor. done. }
     rewrite lookup_insert_ne; auto.
@@ -631,7 +642,6 @@ Section glwit.
       rewrite H5 H7 in H4. inv H4. destruct H10 as [[HC WS] | [HC WS]]; cycle 1.
       { inv WS. econstructor. destruct w; done. }
       destruct g0, w, w2; try done; inv WS.
-      econstructor. split; auto. eapply WFOCM.lt_le. auto.
     - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
       symmetry in H.
       pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
@@ -659,6 +669,11 @@ Section glwit.
     inv H; cycle 1.
     { eapply (glwit_inv_alloc_same_gls_dom Ω (<[k:=(v2, ghost_lock_locked a t)]> Ω)) in H1; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
+    apply wits_one_to_wits_cond in H1. destruct H1 as (?&H1). assert (x = k).
+    { specialize (H1 k). rewrite H0 H2 in H1. inv H1. destruct H5.
+      - destruct H; done.
+      - destruct H; done. }
+    subst x.
     intros i. specialize (H1 i). destruct (decide (i = k)).
     { subst. rewrite H2 lookup_insert_eq. econstructor. split; eauto. }
     rewrite lookup_insert_ne; auto.
@@ -672,7 +687,6 @@ Section glwit.
       rewrite H4 H6 in H1. inv H1. destruct H9 as [[HC WS] | [HC WS]]; cycle 1.
       { inv WS. econstructor. destruct w; done. }
       destruct g0, w, w2; try done; inv WS.
-      econstructor. split; auto. eapply WFOCM.lt_le. auto.
     - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
       symmetry in H.
       pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
@@ -697,7 +711,7 @@ Section glwit.
     split.
     { apply not_elem_of_dom. auto. }
     inv WSStep. inv H0.
-    { apply wits_cond_rel_dom in H3. exfalso. apply elem_of_dom_2 in H1. apply not_elem_of_dom in H.
+    { apply wits_one_dom in H3. exfalso. apply elem_of_dom_2 in H1. apply not_elem_of_dom in H.
       rewrite H3 in H. set_solver. }
     destruct H3 as (?&?&?& [(?&?) | ?]).
     - subst. destruct (decide (k = x)).
@@ -726,7 +740,7 @@ Section glwit.
     split.
     { apply not_elem_of_dom. auto. }
     inv WSStep. inv H0.
-    { apply wits_cond_rel_dom in H3. exfalso. apply elem_of_dom_2 in H1. apply not_elem_of_dom in H.
+    { apply wits_one_dom in H3. exfalso. apply elem_of_dom_2 in H1. apply not_elem_of_dom in H.
       rewrite H3 in H. set_solver. }
     destruct H3 as (?&?&?& [(?&?) | ?]).
     - subst. destruct (decide (k = x)).
