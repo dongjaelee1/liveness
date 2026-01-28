@@ -99,8 +99,8 @@ Local Definition globlG_elem_auth_id `{SI : indexT} `{!globlGS Σ}
   (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> Tgls))).
 
 (* Global invariant for the thread obligations state. *)
-Definition globl `{SI : indexT} `{GL : ghost_lock_class} {Σ}
-  `{!@glsatGS.glsatGS _ GL Σ} `{!globlGS Σ}
+Definition globl `{SI : indexT} {Σ}
+  `{!@glsatGS.glsatGS _ Σ} `{!globlGS Σ}
   (TP : gset positive) : iProp Σ :=
   locked
     (∃ (Tgls : gmap positive (gmap gl_id ghost_lock_version)),
@@ -117,8 +117,8 @@ Definition globl `{SI : indexT} `{GL : ghost_lock_class} {Σ}
     )%I.
 
 (* Global invariant that relates obl_states to the thread pool. *)
-Definition glassigned `{SI : indexT} `{GL : ghost_lock_class} {Σ}
-  `{!@glsatGS.glsatGS _ GL Σ} `{!globlGS Σ}
+Definition glassigned `{SI : indexT} {Σ}
+  `{!@glsatGS.glsatGS _ Σ} `{!globlGS Σ}
   (Gls : gmap gl_id ghost_lock_version) : iProp Σ :=
   locked
     ([∗ map] k ↦ v ∈ Gls,
@@ -127,7 +127,7 @@ Definition glassigned `{SI : indexT} `{GL : ghost_lock_class} {Σ}
           (glG_unlocked k v)))%I.
 
 Section globl.
-  Context `{SI : indexT} `{GL : ghost_lock_class} `{GLSAT : !glsatGS.glsatGS Σ} `{!globlGS Σ}.
+  Context `{SI : indexT} `{GLSAT : !glsatGS.glsatGS Σ} `{!globlGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (* Owns *)
   Global Instance globlG_owns_timeless i k v q : Timeless (globlG_owns i k v q).
@@ -748,8 +748,8 @@ Section globl.
 End globl.
 
 (* Allocation of initial invariant. *)
-Lemma globl_alloc `{SI : indexT} `{GL : ghost_lock_class} {Σ}
-  `{!@glsatGS.glsatGS _ GL Σ} `{!globlGS Σ} :
+Lemma globl_alloc `{SI : indexT} {Σ}
+  `{!@glsatGS.glsatGS _ Σ} `{!globlGS Σ} :
   ⊢ |==> ∃ _ : globlGS Σ, globl ∅ ∗ glassigned ∅.
 Proof.
   iIntros.

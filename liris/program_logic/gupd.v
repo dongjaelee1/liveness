@@ -6,33 +6,26 @@ From liris.base_logic Require Export globl glwit.
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
 
-(* Global Instance ord_ghost_lock_class : ghost_lock_class := *)
-(*   Build_ghost_lock_class Ord.t ord_wfocm_pack. *)
-
-(* Class gupdGS `{SI : indexT} `{GL : ghost_lock_class} (Σ : gFunctors) := *)
 Class gupdGS `{SI : indexT} (Σ : gFunctors) :=
   GupdG {
       (** Invariants. *)
       #[global] gupd_invGS :: invGS Σ;
       (** Ghost locks. *)
-      #[global] gupd_glsatGS :: glsatGS.glsatGS (GL:=ord_ghost_lock_class) Σ;
+      #[global] gupd_glsatGS :: glsatGS.glsatGS Σ;
       (** Ghost lock obligations assigned to threads. *)
       #[global] gupd_globlGS :: globlGS.globlGS Σ;
       (** Ghost lock witnesses. *)
-      #[global] gupd_glwitGS :: glwitGS.glwitGS (GL:=ord_ghost_lock_class) Σ;
+      #[global] gupd_glwitGS :: glwitGS.glwitGS Σ;
       (** Fair scheduler function for witnesses. *)
-      gupd_η : ghost_lock_fuel → ghost_lock_fuel;
-      gupd_η_proper_lt : Proper (WFOCM.ltR ==> WFOCM.ltR) gupd_η;
-      gupd_η_proper_le : Proper (WFOCM.leR ==> WFOCM.leR) gupd_η;
+      #[global] fair_scheduler_fun :: ord_mono_fun_class;
     }.
 
 Global Opaque gupd_invGS gupd_glsatGS gupd_globlGS gupd_glwitGS.
-(* Global Arguments GupdG {SI GL Σ}. *)
 Global Arguments GupdG {SI Σ}.
 
 Definition gproto `{SI : indexT} `{!gupdGS Σ}
   (Ω : ghost_locks) (W : witnesses) Θ : iProp Σ :=
-  (glsat Ω ∗ globl Θ ∗ glassigned (fst <$> Ω) ∗ glwit W ∗ ⌜ glwit_inv gupd_η Ω W ⌝)%I.
+  (glsat Ω ∗ globl Θ ∗ glassigned (fst <$> Ω) ∗ glwit W ∗ ⌜ glwit_inv Ω W ⌝)%I.
 
 (* Simple check *)
 Global Instance gproto_timeless `{SI : indexT} `{!gupdGS Σ} Ω W Θ :
@@ -47,7 +40,7 @@ Definition gupd_pre `{SI : indexT} `{!gupdGS Σ}
        (∀ (Ω1 : ghost_locks) (W1 : witnesses),
           (gproto Ω1 W1 Θ) ={∅}=∗
           ∃ Ω2, (⌜ (Ω1 ↪∘ Ω2) ⌝) ∗
-                ∀ W2, (⌜ (W1 ↓∘ W2) ∧ glwit_inv gupd_η Ω2 W2 ⌝) ={∅}=∗
+                ∀ W2, (⌜ (W1 ↓∘ W2) ∧ glwit_inv Ω2 W2 ⌝) ={∅}=∗
                       (gproto Ω2 W2 Θ) ∗ gupd P))%I.
 
 Lemma gupd_pre_mono `{SI : indexT} `{!gupdGS Σ} Θ
@@ -77,7 +70,6 @@ Local Definition gupd_def `{SI : indexT} `{!gupdGS Σ} Θ : iProp Σ → iProp �
   λ P, ((bi_least_fixpoint (gupd_pre Θ)) P)%I.
 Local Definition gupd_aux : seal (@gupd_def). by eexists. Qed.
 Definition gupd := gupd_aux.(unseal).
-(* Arguments gupd {SI _ Σ _}. *)
 Arguments gupd {SI Σ _}.
 Local Definition gupd_unseal : @gupd = @gupd_def := gupd_aux.(seal_eq).
 Notation "'|=[' Θ ']=>g' P" := (gupd Θ P) (at level 99, P at level 200, format "|=[ Θ ]=>g  P").
@@ -151,7 +143,7 @@ Section gupd.
     iModIntro. iExists Ω1. iSplitR; first done.
     iIntros (? (Prog& OW2)).
     iModIntro. rewrite /gproto. iDestruct "I" as "($& $& $& N& %OW1)".
-    pose proof (glwit_inv_rc_step_same_gls _ _ _ _ OW1 Prog OW2).
+    pose proof (glwit_inv_rc_step_same_gls _ _ _ OW1 Prog OW2).
     iPoseProof (glwit_mon _ _ H with "N") as "$".
     iFrame. done.
   Qed.
@@ -590,6 +582,8 @@ Section fgupd.
   Proof. rewrite /Frame=><-. by rewrite fgupd_frame_l. Qed.
 
 End fgupd.
+
+TODO
 
 (** Ghost lock predicates. *)
 (* Ghost locks *)
