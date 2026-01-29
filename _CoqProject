@@ -33,10 +33,11 @@ liris/algebra/wfocm.v
 liris/algebra/ordinal_wfocm.v
 liris/algebra/nat_wfocm.v
 liris/algebra/measure.v
+liris/algebra/execution.v
 liris/algebra/bank.v
 liris/algebra/bcred.v
 liris/algebra/auth_mra.v
-liris/algebra/tree.v
+# liris/algebra/tree.v
 liris/algebra/ordinal_ucmra.v
 liris/algebra/ordinal_existential_properties.v
 
@@ -68,6 +69,7 @@ liris/program_logic/ectx_language.v
 liris/program_logic/ectx_lifting.v
 liris/program_logic/ectxi_language.v
 liris/program_logic/atomic.v
+liris/program_logic/total_weakestpre.v
 
 liris_heap_lang/locations.v
 liris_heap_lang/lang.v

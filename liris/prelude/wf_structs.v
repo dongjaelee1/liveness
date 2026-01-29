@@ -13,6 +13,36 @@ Class well_founded_class (L : Type) := {
 Lemma well_founded_irrefl A (R : A -> A -> Prop) (WF : well_founded R) : forall x, ~ R x x.
 Proof. intros x HR. specialize (WF x). induction WF; eauto. Qed.
 
+(** clos_trans *)
+Lemma clos_trans_well_founded
+  A (R : A -> A -> Prop) (WF : well_founded R)
+  :
+  well_founded (clos_trans_n1 _ R).
+Proof.
+  intro. pose proof (well_founded_induction WF (fun a1 => forall a0 (LT : clos_trans_n1 A R a0 a1 \/ a0 = a1), Acc (clos_trans_n1 A R) a0)).
+  eapply H.
+  { clear a H. intros a1 IH. intros. econstructor. intros. destruct LT.
+    - inversion H0.
+      + eapply IH; eauto.
+      + eapply IH; eauto. left.
+        eapply Operators_Properties.clos_trans_tn1. econstructor 2.
+        * eapply Operators_Properties.clos_tn1_trans; eauto.
+        * eapply Operators_Properties.clos_tn1_trans; eauto.
+    - subst. inversion H; eauto.
+  }
+  { right. reflexivity. }
+Qed.
+
+Lemma clos_trans_step A (R : A -> A -> Prop) x y : clos_trans_n1 _ R x y -> exists z, R z y /\ (x = z \/ clos_trans_n1 _ R x z).
+Proof. intros. destruct H; eauto. Qed.
+
+Global Instance clos_trans_n1_trans A (R : A -> A -> Prop) : Transitive (clos_trans_n1 _ R).
+Proof.
+  unfold Transitive. intros.
+  eapply clos_trans_tn1_iff.
+  econstructor 2; eapply clos_trans_tn1_iff; eauto.
+Qed.
+
 (** ord_tree: tree with join. *)
 (* Reference: Coq development of Fair Operational Semantics. *)
 Inductive ord_tree (A : Type) : Type :=
@@ -52,6 +82,37 @@ Proof.
   }
   specialize (H H0); clear H0. destruct H as [f H]. exists (ord_tree_cons f).
   intros. exists (f a). split; [eauto |]. econstructor; eauto.
+Qed.
+
+Definition ord_tree_lt_tc {A : Type} : ord_tree A -> ord_tree A -> Prop :=
+  clos_trans_n1 _ (ord_tree_lt (A:=A)).
+
+Lemma ord_tree_lt_tc_well_founded A :
+  well_founded (@ord_tree_lt_tc A).
+Proof. apply clos_trans_well_founded, ord_tree_lt_well_founded. Qed.
+
+Lemma ord_tree_join_tc A (P : A -> Prop) (R : A -> ord_tree A -> Prop)
+  (ORD : forall a (SAT : P a), exists o, R a o)
+  :
+  exists o1, forall (a : A) (SAT : P a),
+  exists o0, R a o0 /\ ord_tree_lt_tc o0 o1.
+Proof.
+  pose proof (ord_tree_join _ _ _ ORD) as (?& Hj).
+  exists x. intros. specialize (Hj _ SAT). destruct Hj as (?&?&?).
+  exists x0. split; [auto|]. econstructor. auto.
+Qed.
+
+Global Instance ord_tree_lt_tc_transitive A : Transitive (@ord_tree_lt_tc A).
+Proof. apply _. Qed.
+
+Lemma ord_tree_base_bot {A : Type} :
+  inhabited A ->
+  forall (t : ord_tree A), (t = ord_tree_base) \/ ord_tree_lt_tc ord_tree_base t.
+Proof.
+  intros. induction t; auto.
+  right. destruct H. destruct (H0 X).
+  - rewrite <-H. econstructor 1. econstructor.
+  - etransitivity; [eauto|]. econstructor 1. econstructor.
 Qed.
 
 (** succ *)
@@ -114,36 +175,6 @@ Proof.
   intros [a b] ?. simpl. eapply IND.
   { intros. eapply (H (a0, b)). econstructor 1. auto. }
   { intros. eapply (H (a, b0)). econstructor 2. auto. }
-Qed.
-
-(** clos *)
-Lemma clos_trans_well_founded
-  A (R : A -> A -> Prop) (WF : well_founded R)
-  :
-  well_founded (clos_trans_n1 _ R).
-Proof.
-  intro. pose proof (well_founded_induction WF (fun a1 => forall a0 (LT : clos_trans_n1 A R a0 a1 \/ a0 = a1), Acc (clos_trans_n1 A R) a0)).
-  eapply H.
-  { clear a H. intros a1 IH. intros. econstructor. intros. destruct LT.
-    - inversion H0.
-      + eapply IH; eauto.
-      + eapply IH; eauto. left.
-        eapply Operators_Properties.clos_trans_tn1. econstructor 2.
-        * eapply Operators_Properties.clos_tn1_trans; eauto.
-        * eapply Operators_Properties.clos_tn1_trans; eauto.
-    - subst. inversion H; eauto.
-  }
-  { right. reflexivity. }
-Qed.
-
-Lemma clos_trans_step A (R : A -> A -> Prop) x y : clos_trans_n1 _ R x y -> exists z, R z y /\ (x = z \/ clos_trans_n1 _ R x z).
-Proof. intros. destruct H; eauto. Qed.
-
-Global Instance clos_trans_n1_trans A (R : A -> A -> Prop) : Transitive (clos_trans_n1 _ R).
-Proof.
-  unfold Transitive. intros.
-  eapply clos_trans_tn1_iff.
-  econstructor 2; eapply clos_trans_tn1_iff; eauto.
 Qed.
 
 (** option *)

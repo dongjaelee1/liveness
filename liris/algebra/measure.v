@@ -195,40 +195,6 @@ Coercion ms_finite : nat >-> measurable_syntax.
 Infix "+" := ms_add : msyn_scope.
 Notation "'⟪' s '⟫'" := (ms_extend s%M) (at level 50, format "⟪ s ⟫") : msyn_scope.
 
-Section aux.
-
-  Definition ord_tree_lt_tc {A : Type} : ord_tree A -> ord_tree A -> Prop :=
-    clos_trans_n1 _ (ord_tree_lt (A:=A)).
-
-  Lemma ord_tree_lt_tc_well_founded A :
-    well_founded (@ord_tree_lt_tc A).
-  Proof. apply clos_trans_well_founded, ord_tree_lt_well_founded. Qed.
-
-  Lemma ord_tree_join_tc A (P : A -> Prop) (R : A -> ord_tree A -> Prop)
-    (ORD : forall a (SAT : P a), exists o, R a o)
-    :
-    exists o1, forall (a : A) (SAT : P a),
-    exists o0, R a o0 /\ ord_tree_lt_tc o0 o1.
-  Proof.
-    pose proof (ord_tree_join _ _ _ ORD) as (?& Hj).
-    exists x. intros. specialize (Hj _ SAT). destruct Hj as (?&?&?).
-    exists x0. split; first auto. econstructor. auto.
-  Qed.
-
-  Global Instance ord_tree_lt_tc_transitive A : Transitive (@ord_tree_lt_tc A).
-  Proof. apply _. Qed.
-
-  Lemma ord_tree_base_bot {A : Type} `{Inhabited A} :
-    ∀ (t : ord_tree A), (t = ord_tree_base) ∨ ord_tree_lt_tc ord_tree_base t.
-  Proof.
-    intro. induction t; auto.
-    right. destruct (H0 inhabitant).
-    - rewrite <-H1. econstructor 1. econstructor.
-    - etransitivity; first eauto. econstructor 1. econstructor.
-  Qed.
-
-End aux.
-
 Global Instance nat_inhabited : Inhabited nat := populate 0.
 
 Section layer.
@@ -246,7 +212,7 @@ Section layer.
     ord_tree_cons ls.
 
   Lemma layer_zero_bot : ∀ (l : layer), (l = layer_zero) ∨ (layer_lt layer_zero l).
-  Proof. eapply ord_tree_base_bot. Qed.
+  Proof. eapply ord_tree_base_bot. econstructor. exact 0. Qed.
 
   Lemma layer_join_upperbound ls :
     ∀ l n, l = ls n →
