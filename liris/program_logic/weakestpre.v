@@ -150,7 +150,7 @@ Section gprog.
   (** Step rule *)
   Lemma gprog_step Θ π i P :
     Θ ## π →
-    (|={∅}=> ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g layer_zero 1) ∗
+    (|={∅}=> ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
                  ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
                       ((th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) ∗ ([∗ set] j ∈ π, th_obls j ∅ 1))
                        ={∅}=∗ P))
@@ -158,7 +158,7 @@ Section gprog.
   Proof.
     unfold_defs. iIntros (DisjTP) "H". iMod "H" as "(%& (#Oe& Ox& Ob& OS)& GFs& %& #REs& H)".
     iAssert ([∗ map] g↦_ ∈ G, glG_elem g ∗ glG_fuel g Ord.one)%I with "[GFs]" as "GFs".
-    { iApply (big_sepM_impl with "GFs"). iIntros "!> %%% H". rewrite (glG_fuel_eq _ (measure layer_zero 1) Ord.one); auto.
+    { iApply (big_sepM_impl with "GFs"). iIntros "!> %%% H". rewrite (glG_fuel_eq _ (measure 0ₗ%L 1) Ord.one); auto.
       rewrite measure_finite Ord.from_nat_1. done. }
     iIntros "% % (S& O& A& W& %GWI1)".
     iAssert (⌜ dom G ⊆ dom Ω1 ⌝)%I as "%GOSub".

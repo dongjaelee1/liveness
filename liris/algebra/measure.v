@@ -170,13 +170,19 @@ Section measure.
     eapply Jacobsthal.le_mult_r. eauto.
   Qed.
 
-  Lemma measure_finite_add_comm l n1 n2 :
+  Lemma measure_finite_add l n1 n2 :
     (measure l (ms_finite (n1 + n2)) == (measure l (ms_finite n1) ⊕ measure l (ms_finite n2)))%ord.
   Proof using.
     revert n2. induction n1; intros; simpl.
     { rewrite measure_zero, Hessenberg.add_O_l. reflexivity. }
     rewrite !measure_add, !measure_one, (IHn1 n2).
     rewrite !Hessenberg.add_assoc. reflexivity.
+  Qed.
+
+  Lemma measure_finite_S (l : L) (n : nat) :
+    (measure l (ms_finite (S n)) == (measure l (ms_finite 1) ⊕ measure l (ms_finite n)))%ord.
+  Proof using.
+    rewrite <-measure_finite_add. reflexivity.
   Qed.
 
 End measure.
@@ -212,7 +218,18 @@ Section aux.
   Global Instance ord_tree_lt_tc_transitive A : Transitive (@ord_tree_lt_tc A).
   Proof. apply _. Qed.
 
+  Lemma ord_tree_base_bot {A : Type} `{Inhabited A} :
+    ∀ (t : ord_tree A), (t = ord_tree_base) ∨ ord_tree_lt_tc ord_tree_base t.
+  Proof.
+    intro. induction t; auto.
+    right. destruct (H0 inhabitant).
+    - rewrite <-H1. econstructor 1. econstructor.
+    - etransitivity; first eauto. econstructor 1. econstructor.
+  Qed.
+
 End aux.
+
+Global Instance nat_inhabited : Inhabited nat := populate 0.
 
 Section layer.
 
@@ -227,6 +244,9 @@ Section layer.
   Definition layer_zero : layer := ord_tree_base.
   Definition layer_join (ls : nat → layer) : layer :=
     ord_tree_cons ls.
+
+  Lemma layer_zero_bot : ∀ (l : layer), (l = layer_zero) ∨ (layer_lt layer_zero l).
+  Proof. eapply ord_tree_base_bot. Qed.
 
   Lemma layer_join_upperbound ls :
     ∀ l n, l = ls n →
@@ -378,6 +398,7 @@ Global Instance layer_well_founded_class : well_founded_class layer :=
 Declare Scope layer_scope.
 Delimit Scope layer_scope with L.
 
+Notation "'0ₗ'" := layer_zero : layer_scope.
 Infix "<" := layer_lt : layer_scope.
 Notation "b '⨣' n" := (layer_def b%L n) (at level 50, format "b  ⨣  n") : layer_scope.
 Notation "'⌈' l '⌉'" := (layer_next l%L) (at level 50, format "⌈ l ⌉") : layer_scope.

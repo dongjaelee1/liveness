@@ -20,11 +20,11 @@ Lemma lwp_lift_base_step {s i E Φ} e1 :
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
      (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 Θ ⌝) ∗
-     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗
+     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
      ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
      (∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
                    th_obls i G 1 -∗
-                   ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+                   ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
                    ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
                    ALC (|={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗
                                  lWP e2 @ s; i; E {{ Φ }} ∗
@@ -62,11 +62,11 @@ Lemma lwp_lift_atomic_base_step {s i E1 E2 Φ} e1 :
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 Θ ⌝) ∗
-     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗
+     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
      ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
      ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
        th_obls i G 1 -∗
-       ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+       ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
        ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
        ALC (|={E2,E1}=> state_interp σ2 (Θ ∪ dom efs) κs ∗
                        (from_option (λ v, |={E1}=>g (Φ v)) False (to_val e2)) ∗
@@ -83,11 +83,11 @@ Lemma lwp_lift_atomic_base_step_no_fork {s i E1 E2 Φ} e1 :
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 Θ ⌝) ∗
-     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗
+     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
      ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
      ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
        th_obls i G 1 -∗
-       ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+       ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
        ALC (|={E2,E1}=> ⌜efs = ∅⌝ ∗ state_interp σ2 Θ κs ∗
                        (from_option (λ v, |={E1}=>g (Φ v)) False (to_val e2))))
   ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
@@ -109,11 +109,11 @@ Lemma lwp_lift_pure_det_base_step_no_fork {s i E E' Φ C ς} e1 e2 :
   PureExecCond C ς i →
   (|={E,E'}=>
      ς ∗
-     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗
+     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
      ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
        (ς -∗
         th_obls i G 1 -∗
-        ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+        ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
         ALC (|={E',E}=> lWP e2 @ s; i; E {{ Φ }})))
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
 Proof using Hinh.
