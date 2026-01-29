@@ -59,10 +59,6 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
 Global Opaque liris_gupdGS.
 Global Arguments LirisG {SI Λ Σ}.
 
-(** Predicates we take the fixpoint of in order to define the lWP. *)
-(* Ω must make strict progress for every step (to bound step-index) *)
-(* W witnesses progress of obligations; it exploits fair scheduler in the adequacy proof *)
-
 (* Ensure progress of thread i's obligations and every live witnesses. *)
 Definition gprog `{SI : indexT} `{!lirisGS Λ Σ} Θ1 Θ2 i : iPropO Σ -d> iPropO Σ :=
   (λ P,
@@ -319,6 +315,9 @@ Section gprog.
 
 End gprog.
 
+(** Predicates we take the fixpoint of in order to define the lWP. *)
+(* Ω must make strict progress for every step (to bound step-index) *)
+(* W witnesses progress of obligations; it exploits fair scheduler in the adequacy proof *)
 Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
@@ -735,7 +734,7 @@ Proof.
 Qed.
 
 (* take the least fixpoint of the above definition, with partial sate information *)
-Local Definition lwp_def `{SI : indexT} `{!lirisGS Λ Σ} : lWp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
+Local Definition lwp_def `{SI : indexT} `{!lirisGS Λ Σ} : Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
   λ s i E e Φ, ((bi_least_fixpoint (lwp_pre' s)) (i,E,e,Φ))%I.
 Local Definition lwp_aux : seal (@lwp_def). by eexists. Qed.
 Definition lwp' := lwp_aux.(unseal).
