@@ -1128,7 +1128,9 @@ Section preds.
       (measure ℓ1 μ1 < measure ℓ2 μ2)%ord →
       gl_fuel k ℓ2 μ2 ⊢ |==> gl_fuel k ℓ1 μ1 ∗ gl_fuel k ℓ0 1.
     Proof.
-      unfold_gl_fuel. rewrite measure_finite Ord.from_nat_1. apply gl_fuel_val_lt.
+      unfold_gl_fuel. rewrite (gl_fuel_val_eq _ (measure ℓ0 1) Ord.one).
+      1: apply gl_fuel_val_lt.
+      rewrite measure_finite Ord.from_nat_1. done.
     Qed.
     Lemma gl_fuel_lt_list K ℓ0 ℓ1 ℓ2 μ1 μ2 :
       (measure ℓ1 μ1 < measure ℓ2 μ2)%ord →

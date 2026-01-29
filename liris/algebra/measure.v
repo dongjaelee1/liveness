@@ -8,7 +8,8 @@ Section measure.
       For example, Ψ = expr * state * ... and so on. *)
   Inductive measurable_syntax  : Type :=
   | ms_nondet {Ψ : Type} (t : ord_tree Ψ)
-  | ms_finite (n : nat)
+  | ms_zero
+  | ms_one
   | ms_add (s1 s2 : measurable_syntax)
   | ms_extend (s : measurable_syntax).
 
@@ -22,8 +23,10 @@ Section measure.
      match s with
      | ms_nondet t =>
          Ord.from_wf (ord_tree_lt_well_founded _) t
-     | ms_finite n =>
-         n
+     | ms_zero =>
+         0
+     | ms_one =>
+         1
      | ms_add s1 s2 =>
          (go s1 ⊕ go s2)%ord
      | ms_extend s1 =>
@@ -47,6 +50,7 @@ Section measure.
     intros. induction s.
     { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. auto. }
+    { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs. rewrite !IHs. f_equal.
       do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
@@ -58,8 +62,10 @@ Section measure.
     match s with
     | ms_nondet t =>
         Ord.from_wf (ord_tree_lt_well_founded _) t
-    | ms_finite n =>
-        n
+    | ms_zero =>
+        0
+    | ms_one =>
+        1
     | ms_add s1 s2 =>
         (measure l s1 ⊕ measure l s2)%ord
     | ms_extend s1 =>
@@ -82,10 +88,16 @@ Section measure.
     rewrite (measure_unfold _ (ms_nondet _)). auto.
   Qed.
 
-  Lemma measure_finite (l : L) n :
-    measure l (ms_finite n) = (n)%ord.
+  Lemma measure_zero (l : L) :
+    measure l (ms_zero) = (0)%ord.
   Proof using Type*.
-    rewrite (measure_unfold _ (ms_finite _)). auto.
+    rewrite (measure_unfold _ (ms_zero)). auto.
+  Qed.
+
+  Lemma measure_one (l : L) :
+    measure l (ms_one) = (1)%ord.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_one)). auto.
   Qed.
 
   Lemma measure_add (l : L) s1 s2 :
@@ -106,6 +118,22 @@ Section measure.
     etransitivity; cycle 1.
     { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
     simpl. apply Ord.join_upperbound.
+  Qed.
+
+  (** Finite measure of n *)
+  Fixpoint ms_finite (n : nat) : measurable_syntax :=
+    match n with
+    | O => ms_zero
+    | S m => (ms_add ms_one (ms_finite m))
+    end.
+
+  Lemma measure_finite (l : L) (n : nat) :
+    (measure l (ms_finite n) == n)%ord.
+  Proof using.
+    induction n; simpl.
+    { rewrite measure_zero. reflexivity. }
+    rewrite measure_add, measure_one, IHn, <-Hessenberg.add_from_nat.
+    reflexivity.
   Qed.
 
   (** Properties *)
@@ -142,8 +170,17 @@ Section measure.
     eapply Jacobsthal.le_mult_r. eauto.
   Qed.
 
+  Lemma measure_finite_add_comm l n1 n2 :
+    (measure l (ms_finite (n1 + n2)) == (measure l (ms_finite n1) ⊕ measure l (ms_finite n2)))%ord.
+  Proof using.
+    revert n2. induction n1; intros; simpl.
+    { rewrite measure_zero, Hessenberg.add_O_l. reflexivity. }
+    rewrite !measure_add, !measure_one, (IHn1 n2).
+    rewrite !Hessenberg.add_assoc. reflexivity.
+  Qed.
+
 End measure.
-Global Opaque measure_rec measure.
+Global Opaque measure_rec measure ms_finite.
 
 Declare Scope msyn_scope.
 Delimit Scope msyn_scope with M.
