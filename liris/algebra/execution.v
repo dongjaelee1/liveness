@@ -1,11 +1,10 @@
 From stdpp Require Import base relations.
 From liris.prelude Require Import axioms wf_structs.
-(* From liris.algebra Require Export measure. *)
 
 Section classical_proofs.
 
   (* This Lemma is proven in transfinite Iris. *)
-  Lemma sn_not_ex_loop {A} (R : relation A) x :
+  Lemma not_ex_loop_sn {A} (R : relation A) x :
     (¬ ex_loop R x) → sn R x.
   Proof.
     intros Hex. destruct (classic (sn R x)) as [|Hsn]; [done|].
@@ -18,17 +17,38 @@ Section classical_proofs.
 
   (** We show that any Acc has a measure (as long as universe is consistent). *)
   Inductive Acc_ord_tree {A} (R : relation A) x (μ : ord_tree A) : Prop :=
-  | Acc_ord_tree_intro :
-    (∀ y, R y x → ∃ μ', (ord_tree_lt_tc μ' μ) ∧ Acc_ord_tree R y μ') →
+  | Acc_ord_tree_intro μ' :
+    (ord_tree_lt_tc μ' μ) →
+    (∀ y, R y x → Acc_ord_tree R y μ') →
     Acc_ord_tree R x μ.
+  (* Inductive Acc_ord_tree {A} (R : relation A) x (μ : ord_tree A) : Prop := *)
+  (* | Acc_ord_tree_intro : *)
+  (*   (∀ y, R y x → ∃ μ', (ord_tree_lt_tc μ' μ) ∧ Acc_ord_tree R y μ') → *)
+  (*   Acc_ord_tree R x μ. *)
+
+  Lemma Acc_ord_tree_mon {A} (R : relation A) x (μ1 μ2 : ord_tree A) :
+    ord_tree_lt_tc μ1 μ2 →
+    Acc_ord_tree R x μ1 →
+    Acc_ord_tree R x μ2.
+  Proof.
+    intros LT AOT. inv AOT. econstructor.
+    { etransitivity; [eapply H | eapply LT]. }
+    auto.
+  Qed.
 
   Lemma Acc_Acc_ord_tree {A} (R : relation A) x :
     Acc R x → ∃ μ, Acc_ord_tree R x μ.
   Proof.
     intros. induction H.
-    eapply (ord_tree_join_tc) in H0. destruct H0 as (μ1& IH).
-    exists μ1. econstructor. intros y Hy.
-    destruct (IH _ Hy) as (μ0& HAcc& Hlt). eauto.
+    eapply (ord_tree_join_tc) in H0.
+    assert (∀ (z : A), (λ (a : A), True) z → ∃ o1, ∀ a, R a x → ∃ o0, Acc_ord_tree R a o0 ∧ ord_tree_lt_tc o0 o1).
+    { intros. auto. }
+    clear H0. eapply (ord_tree_join_tc) in H1. destruct H1 as (μ2& IH). specialize (IH x I).
+    destruct IH as (μ1& IH& LTμ2).
+    exists μ2. eapply (Acc_ord_tree_intro _ _ _ μ1).
+    1: auto.
+    intros y Hy. destruct (IH _ Hy) as (μ0& HA& LTμ1).
+    apply (Acc_ord_tree_mon _ _ _ _ LTμ1 HA).
   Qed.
 
 End classical_proofs.

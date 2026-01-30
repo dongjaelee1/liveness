@@ -70,6 +70,7 @@ liris/program_logic/ectx_lifting.v
 liris/program_logic/ectxi_language.v
 liris/program_logic/atomic.v
 liris/program_logic/total_weakestpre.v
+liris/program_logic/total_adequacy.v
 
 liris_heap_lang/locations.v
 liris_heap_lang/lang.v

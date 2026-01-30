@@ -1,5 +1,6 @@
 From stdpp Require Import base.
-From liris.prelude Require Import axioms wf_structs ordinal_facts.
+From liris.prelude Require Import axioms ordinal_facts.
+From liris.prelude Require Export wf_structs.
 
 Section measure.
   Context `{!well_founded_class L} `{!ord_mono_fun_class}.
@@ -22,7 +23,7 @@ Section measure.
   (fix go s {struct s} :=
      match s with
      | ms_nondet t =>
-         Ord.from_wf (ord_tree_lt_well_founded _) t
+         Ord.from_wf (ord_tree_lt_tc_well_founded _) t
      | ms_zero =>
          0
      | ms_one =>
@@ -61,7 +62,7 @@ Section measure.
     measure l s =
     match s with
     | ms_nondet t =>
-        Ord.from_wf (ord_tree_lt_well_founded _) t
+        Ord.from_wf (ord_tree_lt_tc_well_founded _) t
     | ms_zero =>
         0
     | ms_one =>
@@ -83,7 +84,7 @@ Section measure.
 
   (** Reduction rules *)
   Lemma measure_nondet {Ψ : Type} (l : L) (t : ord_tree Ψ) :
-    measure l (ms_nondet t) = Ord.from_wf (ord_tree_lt_well_founded _) t.
+    measure l (ms_nondet t) = Ord.from_wf (ord_tree_lt_tc_well_founded _) t.
   Proof using Type*.
     rewrite (measure_unfold _ (ms_nondet _)). auto.
   Qed.
@@ -138,7 +139,7 @@ Section measure.
 
   (** Properties *)
   Lemma measure_nondet_lt {Ψ : Type} l (t1 t2 : ord_tree Ψ) :
-    ord_tree_lt t1 t2 →
+    ord_tree_lt_tc t1 t2 →
     (measure l (ms_nondet t1) < measure l (ms_nondet t2))%ord.
   Proof using.
     intros. rewrite !measure_nondet. apply Ord.lt_from_wf. auto.

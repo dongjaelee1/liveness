@@ -337,7 +337,7 @@ Qed.
 
 Lemma twp_strong_mono_sfgupd s1 s2 i E1 E2 e Φ Ψ :
   s1 ⊑ s2 → E1 ⊆ E2 →
-  twp e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v -∗ |={E2}=>g Ψ v) -∗ twp e @ s2; i; E2 {{ Ψ }}.
+  tWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v -∗ |={E2}=>g Ψ v) -∗ tWP e @ s2; i; E2 {{ Ψ }}.
 Proof.
   iIntros (? HE) "H HΦ".
   iRevert "HΦ". iRevert (E2 HE). iRevert (i e E1 Φ) "H".
@@ -358,18 +358,18 @@ Proof.
   iMod "IH". iModIntro. iMod "IH" as "(%& IH)". iModIntro.
   iSplit; [by destruct s1, s2|clear H0].
   iIntros (????). iMod ("IH" with "[//]") as ">IH".
-  iMod "IH". iModIntro. iMod "IH" as "[$ IH]".
+  iModIntro. iMod "IH" as "[$ IH]".
   iMod "Hclose" as "_". iModIntro.
   iDestruct "IH" as "([IH _]& Efs)".
   iSplitR "Efs".
   + by iApply "IH".
   + iApply (big_sepM_impl with "Efs"); iIntros "!>" (k ef _).
-    iIntros "[_ H]". by iApply (twp_stuckness_mono with "H").
+    iApply lwp_stuckness_mono. auto.
 Qed.
 
 Lemma twp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
   s1 ⊑ s2 → E1 ⊆ E2 →
-  twp e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ twp e @ s2; i; E2 {{ Ψ }}.
+  tWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ tWP e @ s2; i; E2 {{ Ψ }}.
 Proof.
   iIntros (? HE) "H HΦ".
   iApply (twp_strong_mono_sfgupd with "H [HΦ]"). all: auto.
@@ -377,21 +377,21 @@ Proof.
 Qed.
 
 Lemma fupd_twp s i E e Φ :
-  (|={E}=> twp e @ s; i; E {{ Φ }}) ⊢ twp e @ s; i; E {{ Φ }}.
+  (|={E}=> tWP e @ s; i; E {{ Φ }}) ⊢ tWP e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply sfgupd_elim_twp. iMod "H". by iModIntro.
 Qed.
 Lemma twp_fupd s i E e Φ :
-  twp e @ s; i; E {{ v, |={E}=> Φ v }} ⊢ twp e @ s; i; E {{ Φ }}.
+  tWP e @ s; i; E {{ v, |={E}=> Φ v }} ⊢ tWP e @ s; i; E {{ Φ }}.
 Proof. iIntros "H". iApply (twp_strong_mono s s i E with "H"); auto. Qed.
 
 Lemma twp_sfgupd s i E e Φ :
-  twp e @ s; i; E {{ v, |={E}=>g Φ v }} ⊢ twp e @ s; i; E {{ Φ }}.
+  tWP e @ s; i; E {{ v, |={E}=>g Φ v }} ⊢ tWP e @ s; i; E {{ Φ }}.
 Proof. iIntros "H". iApply (twp_strong_mono_sfgupd s s i E with "H"); auto. Qed.
 
 Lemma twp_atomic s i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
-  (|={E1,E2}=> twp e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})
-  ⊢ twp e @ s; i; E1 {{ Φ }}.
+  (|={E1,E2}=> tWP e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})
+  ⊢ tWP e @ s; i; E1 {{ Φ }}.
 Proof.
   iIntros "H". rewrite !twp_unfold /twp_pre.
   destruct (to_val e) as [v|] eqn:He.
@@ -402,7 +402,7 @@ Proof.
   iIntros (????) "SI". iMod ("H" with "SI") as "H". iMod "H".
   iModIntro. iMod "H" as "[$ H]". iModIntro.
   iIntros (??? STEP). iMod ("H" with "[//]") as "H".
-  iMod "H". iMod "H" as ">(SI& H& Efs)".
+  iMod "H" as ">(SI& H& Efs)".
   destruct s.
   - rewrite !twp_unfold /twp_pre. destruct (to_val e2) as [v2|] eqn:He2.
     + iMod ("H" with "SI") as "H".
@@ -422,19 +422,19 @@ Qed.
 Lemma twp_step_fupd s i E1 E2 e P Φ :
   TCEq (to_val e) None → E2 ⊆ E1 →
   ((|={E1,E2}=> |={E2,E1}=> P) ∗
-   twp e @ s; i; E2 {{ v, P ={E1}=∗ Φ v }}) -∗
-  twp e @ s; i; E1 {{ Φ }}.
+   tWP e @ s; i; E2 {{ v, P ={E1}=∗ Φ v }}) -∗
+  tWP e @ s; i; E1 {{ Φ }}.
 Proof.
   iIntros (? ?) "[HP Hwp]". iApply (twp_strong_mono with "Hwp"); [done..|].
   iIntros (v) "H". iApply ("H" with "[>HP]"). by do 2 iMod "HP".
 Qed.
 
 Lemma twp_bind K `{!LanguageCtx K} s i E e Φ :
-  (twp e @ s; i; E {{ v, twp K (of_val v) @ s; i; E {{ Φ }} }})
-  ⊢ twp K e @ s; i; E {{ Φ }}.
+  (tWP e @ s; i; E {{ v, tWP K (of_val v) @ s; i; E {{ Φ }} }})
+  ⊢ tWP K e @ s; i; E {{ Φ }}.
 Proof.
   revert Φ.
-  cut (∀ Φ', twp e @ s; i; E {{ Φ' }} -∗ ∀ Φ, (∀ v, (Φ' v) -∗ (twp K (of_val v) @ s; i; E {{ Φ }})) -∗ twp K e @ s; i; E {{ Φ }}).
+  cut (∀ Φ', tWP e @ s; i; E {{ Φ' }} -∗ ∀ Φ, (∀ v, (Φ' v) -∗ (tWP K (of_val v) @ s; i; E {{ Φ }})) -∗ tWP K e @ s; i; E {{ Φ }}).
   { iIntros (help Φ) "H". iApply (help with "H"); auto. }
   iIntros (Φ') "H". iRevert (i e E Φ') "H".
   iApply twp_ind_strong; first solve_proper.
@@ -451,15 +451,13 @@ Proof.
   iIntros (e2 σ2 efs Hstep).
   destruct (fill_step_inv i e σ1 Θ κ e2 σ2 efs) as (e2'&->&?); auto.
   iDestruct ("IH" with "[//]") as ">IH".
-  iMod "IH" as ">IH". iModIntro. iMod "IH".
+  iMod "IH" as "IH". iModIntro. iMod "IH".
   iModIntro. iDestruct "IH" as "(SI& IH& Efs)".
-  iFrame. iSplitL "IH HΦ".
-  - iDestruct "IH" as "[IH _]". by iApply "IH".
-  - by setoid_rewrite bi.and_elim_r.
+  iFrame. iDestruct "IH" as "[IH _]". by iApply "IH".
 Qed.
 
 Lemma twp_bind_inv K `{!LanguageCtx K} s i E e Φ :
-  twp K e @ s; i; E {{ Φ }} ⊢ twp e @ s; i; E {{ v, twp K (of_val v) @ s; i; E {{ Φ }} }}.
+  tWP K e @ s; i; E {{ Φ }} ⊢ tWP e @ s; i; E {{ v, tWP K (of_val v) @ s; i; E {{ Φ }} }}.
 Proof.
   iIntros "H". remember (K e) as e' eqn:He'.
   iRevert (e He'). iRevert (i e' E Φ) "H". iApply twp_ind_strong; first solve_proper.
@@ -476,25 +474,23 @@ Proof.
   { destruct s; eauto using reducible_fill_inv. }
   iModIntro. iIntros (e2 σ2 efs Hstep). iDestruct ("IH" with "[]") as ">IH".
   { eauto using fill_step. }
-  iMod "IH" as ">IH". iModIntro. iMod "IH" as "(SI& IH& Efs)".
-  iModIntro. iFrame. iSplitR "Efs".
-  - iDestruct "IH" as "[IH _]". by iApply "IH".
-  - by setoid_rewrite bi.and_elim_r.
+  iMod "IH" as "IH". iModIntro. iMod "IH" as "(SI& IH& Efs)".
+  iModIntro. iFrame. iDestruct "IH" as "[IH _]". by iApply "IH".
 Qed.
 
 (** * Derived rules *)
-Lemma twp_mono s i E e Φ Ψ : (∀ v, Φ v ⊢ Ψ v) → twp e @ s; i; E {{ Φ }} ⊢ twp e @ s; i; E {{ Ψ }}.
+Lemma twp_mono s i E e Φ Ψ : (∀ v, Φ v ⊢ Ψ v) → tWP e @ s; i; E {{ Φ }} ⊢ tWP e @ s; i; E {{ Ψ }}.
 Proof.
   iIntros (HΦ) "H"; iApply (twp_strong_mono with "H"); auto.
   iIntros (v) "?". by iApply HΦ.
 Qed.
 Lemma twp_stuck_mono s1 s2 i E e Φ :
-  s1 ⊑ s2 → twp e @ s1; i; E {{ Φ }} ⊢ twp e @ s2; i; E {{ Φ }}.
+  s1 ⊑ s2 → tWP e @ s1; i; E {{ Φ }} ⊢ tWP e @ s2; i; E {{ Φ }}.
 Proof. iIntros (?) "H". iApply (twp_strong_mono with "H"); auto. Qed.
 Lemma twp_stuck_weaken s i E e Φ :
-  twp e @ s; i; E {{ Φ }} ⊢ twp e @ i; E ?{{ Φ }}.
+  tWP e @ s; i; E {{ Φ }} ⊢ tWP e @ i; E ?{{ Φ }}.
 Proof. apply twp_stuck_mono. by destruct s. Qed.
-Lemma twp_mask_mono s i E1 E2 e Φ : E1 ⊆ E2 → twp e @ s; i; E1 {{ Φ }} ⊢ twp e @ s; i; E2 {{ Φ }}.
+Lemma twp_mask_mono s i E1 E2 e Φ : E1 ⊆ E2 → tWP e @ s; i; E1 {{ Φ }} ⊢ tWP e @ s; i; E2 {{ Φ }}.
 Proof. iIntros (?) "H"; iApply (twp_strong_mono with "H"); auto. Qed.
 Global Instance twp_mono' s i E e :
   Proper (pointwise_relation _ (⊢) ==> (⊢)) (twp (PROP:=iProp Σ) s i E e).
@@ -505,34 +501,34 @@ Proof. by intros Φ Φ' ?; apply twp_mono. Qed.
 
 Lemma twp_value_sfgupd s i E Φ e v :
   IntoVal e v →
-  twp e @ s; i; E {{ Φ }} ⊣⊢ (|={E}=>g (Φ v)).
+  tWP e @ s; i; E {{ Φ }} ⊣⊢ (|={E}=>g (Φ v)).
 Proof. intros <-. by apply twp_value_fupd'. Qed.
-Lemma twp_value' s i E Φ v : (Φ v) ⊢ twp (of_val v) @ s; i; E {{ Φ }}.
+Lemma twp_value' s i E Φ v : (Φ v) ⊢ tWP (of_val v) @ s; i; E {{ Φ }}.
 Proof.
   rewrite twp_value_fupd'. iIntros "H". by iApply sfgupd_intro.
 Qed.
-Lemma twp_value s i E Φ e v : IntoVal e v → (Φ v) ⊢ twp e @ s; i; E {{ Φ }}.
+Lemma twp_value s i E Φ e v : IntoVal e v → (Φ v) ⊢ tWP e @ s; i; E {{ Φ }}.
 Proof. intros <-. apply twp_value'. Qed.
 
 Lemma twp_frame_l s i E e Φ R :
-  R ∗ twp e @ s; i; E {{ Φ }} ⊢ twp e @ s; i; E {{ v, R ∗ Φ v }}.
+  R ∗ tWP e @ s; i; E {{ Φ }} ⊢ tWP e @ s; i; E {{ v, R ∗ Φ v }}.
 Proof. iIntros "[? H]". iApply (twp_strong_mono with "H"); auto with iFrame. Qed.
 Lemma twp_frame_r s i E e Φ R :
-  twp e @ s; i; E {{ Φ }} ∗ R ⊢ twp e @ s; i; E {{ v, Φ v ∗ R }}.
+  tWP e @ s; i; E {{ Φ }} ∗ R ⊢ tWP e @ s; i; E {{ v, Φ v ∗ R }}.
 Proof. iIntros "[H ?]". iApply (twp_strong_mono with "H"); auto with iFrame. Qed.
 
 (** This lemma states that if we can prove that [n] laters are used in
    the current physical step, then one can perform an n-steps fancy
    update during that physical step. The resources needed to prove the
    bound on [n] are not used up: they can be reused in the proof of
-   the twp or in the proof of the n-steps fancy update. In order to
+   the tWP or in the proof of the n-steps fancy update. In order to
    describe this unusual resource flow, we use ordinary conjunction as
    a premise. *)
 Lemma twp_step_fupd_2 s i E1 E2 e P Φ :
   TCEq (to_val e) None → E2 ⊆ E1 →
   ((|={E1∖E2,∅}=> |={∅,E1∖E2}=> P) ∗
-   twp e @ s; i; E2 {{ v, P ={E1}=∗ Φ v }}) -∗
-  twp e @ s; i; E1 {{ Φ }}.
+   tWP e @ s; i; E2 {{ v, P ={E1}=∗ Φ v }}) -∗
+  tWP e @ s; i; E1 {{ Φ }}.
 Proof.
   iIntros (??) "H". iApply (twp_step_fupd with "[H]"); [done|].
   iApply (sep_mono_l with "H"). iIntros "HP".
@@ -545,41 +541,41 @@ Qed.
 
 Lemma twp_frame_step_l s i E1 E2 e Φ R :
   TCEq (to_val e) None → E2 ⊆ E1 →
-  (|={E1,E2}=> |={E2,E1}=> R) ∗ twp e @ s; i; E2 {{ Φ }} ⊢ twp e @ s; i; E1 {{ v, R ∗ Φ v }}.
+  (|={E1,E2}=> |={E2,E1}=> R) ∗ tWP e @ s; i; E2 {{ Φ }} ⊢ tWP e @ s; i; E1 {{ v, R ∗ Φ v }}.
 Proof.
   iIntros (??) "[Hu Hwp]". iApply twp_step_fupd; first done.
   iFrame "Hu". iApply (twp_mono with "Hwp"). by iIntros (?) "$$".
 Qed.
 Lemma twp_frame_step_r s i E1 E2 e Φ R :
   TCEq (to_val e) None → E2 ⊆ E1 →
-  twp e @ s; i; E2 {{ Φ }} ∗ (|={E1,E2}=> |={E2,E1}=> R) ⊢ twp e @ s; i; E1 {{ v, Φ v ∗ R }}.
+  tWP e @ s; i; E2 {{ Φ }} ∗ (|={E1,E2}=> |={E2,E1}=> R) ⊢ tWP e @ s; i; E1 {{ v, Φ v ∗ R }}.
 Proof.
-  rewrite [(twp _ @ _; _; _ {{ _ }} ∗ _)%I]comm; setoid_rewrite (comm _ _ R).
+  rewrite [(tWP _ @ _; _; _ {{ _ }} ∗ _)%I]comm; setoid_rewrite (comm _ _ R).
   apply twp_frame_step_l.
 Qed.
 Lemma twp_frame_step_l' s i E e Φ R :
   TCEq (to_val e) None →
-  R ∗ twp e @ s; i; E {{ Φ }} ⊢ twp e @ s; i; E {{ v, R ∗ Φ v }}.
+  R ∗ tWP e @ s; i; E {{ Φ }} ⊢ tWP e @ s; i; E {{ v, R ∗ Φ v }}.
 Proof. iIntros (?) "[??]". iApply (twp_frame_step_l s i E E); try iFrame; eauto. Qed.
 Lemma twp_frame_step_r' s i E e Φ R :
   TCEq (to_val e) None →
-  twp e @ s; i; E {{ Φ }} ∗ R ⊢ twp e @ s; i; E {{ v, Φ v ∗ R }}.
+  tWP e @ s; i; E {{ Φ }} ∗ R ⊢ tWP e @ s; i; E {{ v, Φ v ∗ R }}.
 Proof. iIntros (?) "[??]". iApply (twp_frame_step_r s i E E); try iFrame; eauto. Qed.
 
 Lemma twp_wand s i E e Φ Ψ :
-  twp e @ s; i; E {{ Φ }} -∗ (∀ v, Φ v -∗ Ψ v) -∗ twp e @ s; i; E {{ Ψ }}.
+  tWP e @ s; i; E {{ Φ }} -∗ (∀ v, Φ v -∗ Ψ v) -∗ tWP e @ s; i; E {{ Ψ }}.
 Proof.
   iIntros "Hwp H". iApply (twp_strong_mono with "Hwp"); auto.
   iIntros (?) "?". by iApply "H".
 Qed.
 Lemma twp_wand_l s i E e Φ Ψ :
-  (∀ v, Φ v -∗ Ψ v) ∗ twp e @ s; i; E {{ Φ }} ⊢ twp e @ s; i; E {{ Ψ }}.
+  (∀ v, Φ v -∗ Ψ v) ∗ tWP e @ s; i; E {{ Φ }} ⊢ tWP e @ s; i; E {{ Ψ }}.
 Proof. iIntros "[H Hwp]". iApply (twp_wand with "Hwp H"). Qed.
 Lemma twp_wand_r s i E e Φ Ψ :
-  twp e @ s; i; E {{ Φ }} ∗ (∀ v, Φ v -∗ Ψ v) ⊢ twp e @ s; i; E {{ Ψ }}.
+  tWP e @ s; i; E {{ Φ }} ∗ (∀ v, Φ v -∗ Ψ v) ⊢ tWP e @ s; i; E {{ Ψ }}.
 Proof. iIntros "[Hwp H]". iApply (twp_wand with "Hwp H"). Qed.
 Lemma twp_frame_wand s i E e Φ R :
-  R -∗ twp e @ s; i; E {{ v, R -∗ Φ v }} -∗ twp e @ s; i; E {{ Φ }}.
+  R -∗ tWP e @ s; i; E {{ v, R -∗ Φ v }} -∗ tWP e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "HR HWP". iApply (twp_wand with "HWP").
   iIntros (v) "HΦ". by iApply "HΦ".
@@ -598,30 +594,30 @@ Section proofmode_classes.
 
   Global Instance frame_twp p s i E e R Φ Ψ :
     (FrameInstantiateExistDisabled → ∀ v, Frame p R (Φ v) (Ψ v)) →
-    Frame p R (twp e @ s; i; E {{ Φ }}) (twp e @ s; i; E {{ Ψ }}) | 2.
+    Frame p R (tWP e @ s; i; E {{ Φ }}) (tWP e @ s; i; E {{ Ψ }}) | 2.
   Proof.
     rewrite /Frame=> HR. rewrite twp_frame_l. apply twp_mono, HR. constructor.
   Qed.
 
-  Global Instance is_except_0_twp s i E e Φ : IsExcept0 (twp e @ s; i; E {{ Φ }}).
+  Global Instance is_except_0_twp s i E e Φ : IsExcept0 (tWP e @ s; i; E {{ Φ }}).
   Proof. by rewrite /IsExcept0 -{2}fupd_twp -except_0_fupd -fupd_intro. Qed.
 
   Global Instance elim_modal_bupd_twp p s i E e P Φ :
-    ElimModal True p false (|==> P) P (twp e @ s; i; E {{ Φ }}) (twp e @ s; i; E {{ Φ }}).
+    ElimModal True p false (|==> P) P (tWP e @ s; i; E {{ Φ }}) (tWP e @ s; i; E {{ Φ }}).
   Proof.
     by rewrite /ElimModal intuitionistically_if_elim
       (bupd_fupd E) fupd_frame_r wand_elim_r fupd_twp.
   Qed.
 
   Global Instance elim_modal_fupd_twp p s i E e P Φ :
-    ElimModal True p false (|={E}=> P) P (twp e @ s; i; E {{ Φ }}) (twp e @ s; i; E {{ Φ }}).
+    ElimModal True p false (|={E}=> P) P (tWP e @ s; i; E {{ Φ }}) (tWP e @ s; i; E {{ Φ }}).
   Proof.
     by rewrite /ElimModal intuitionistically_if_elim
       fupd_frame_r wand_elim_r fupd_twp.
   Qed.
 
   Global Instance elim_modal_sfgupd_twp p s i E e P Φ :
-    ElimModal True p false (|={E}=>g P) P (twp e @ s; i; E {{ Φ }}) (twp e @ s; i; E {{ Φ }}).
+    ElimModal True p false (|={E}=>g P) P (tWP e @ s; i; E {{ Φ }}) (tWP e @ s; i; E {{ Φ }}).
   Proof.
     rewrite /ElimModal intuitionistically_if_elim.
     iIntros (_) "[P H]". iApply sfgupd_elim_twp. iMod "P".
@@ -637,13 +633,13 @@ Section proofmode_classes.
       (pm_error "Goal and eliminated modality must have the same mask.
 Use [iApply fupd_twp; iMod (fupd_mask_subseteq E2)] to adjust the mask of your goal to [E2]")
       p false
-      (|={E2}=> P) False (twp e @ s; i; E1 {{ Φ }}) False | 100.
+      (|={E2}=> P) False (tWP e @ s; i; E1 {{ Φ }}) False | 100.
   Proof. intros []. Qed.
 
   Global Instance elim_modal_fupd_twp_atomic p s i E1 E2 e P Φ :
     ElimModal (Atomic (stuckness_to_atomicity s) e) p false
             (|={E1,E2}=> P) P
-            (twp e @ s; i; E1 {{ Φ }}) (twp e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})%I | 100.
+            (tWP e @ s; i; E1 {{ Φ }}) (tWP e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})%I | 100.
   Proof.
     intros ?. by rewrite intuitionistically_if_elim
       fupd_frame_r wand_elim_r twp_atomic.
@@ -656,22 +652,22 @@ Use [iApply fupd_twp; iMod (fupd_mask_subseteq E2)] to adjust the mask of your g
 Use [iMod (fupd_mask_subseteq E2)] to adjust the mask of your goal to [E2]")
       p false
       (|={E2,E2'}=> P) False
-      (twp e @ s; i; E1 {{ Φ }}) False | 200.
+      (tWP e @ s; i; E1 {{ Φ }}) False | 200.
   Proof. intros []. Qed.
 
   Global Instance add_modal_fupd_twp s i E e P Φ :
-    AddModal (|={E}=> P) P (twp e @ s; i; E {{ Φ }}).
+    AddModal (|={E}=> P) P (tWP e @ s; i; E {{ Φ }}).
   Proof. by rewrite /AddModal fupd_frame_r wand_elim_r fupd_twp. Qed.
 
   Global Instance add_modal_ghost_step_twp s i E e P Φ :
-    AddModal (|={E}=>g P) P (twp e @ s; i; E {{ Φ }}).
+    AddModal (|={E}=>g P) P (tWP e @ s; i; E {{ Φ }}).
   Proof. rewrite /AddModal. iIntros "[H1 H2]". iMod "H1". by iApply "H2". Qed.
 
   Global Instance elim_acc_twp_atomic {X} i E1 E2 α β γ e s Φ :
     ElimAcc (X:=X) (Atomic (stuckness_to_atomicity s) e)
             (fupd E1 E2) (fupd E2 E1)
-            α β γ (twp e @ s; i; E1 {{ Φ }})
-            (λ x, twp e @ s; i; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I | 100.
+            α β γ (tWP e @ s; i; E1 {{ Φ }})
+            (λ x, tWP e @ s; i; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I | 100.
   Proof.
     iIntros (?) "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
     iApply (twp_wand with "(Hinner Hα)").
@@ -680,8 +676,8 @@ Use [iMod (fupd_mask_subseteq E2)] to adjust the mask of your goal to [E2]")
 
   Global Instance elim_acc_twp_nonatomic {X} i E α β γ e s Φ :
     ElimAcc (X:=X) True (fupd E E) (fupd E E)
-            α β γ (twp e @ s; i; E {{ Φ }})
-            (λ x, twp e @ s; i; E {{ v, |={E}=> β x ∗ (γ x -∗? Φ v) }})%I.
+            α β γ (tWP e @ s; i; E {{ Φ }})
+            (λ x, tWP e @ s; i; E {{ v, |={E}=> β x ∗ (γ x -∗? Φ v) }})%I.
   Proof.
     iIntros (_) "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
     iApply twp_fupd.

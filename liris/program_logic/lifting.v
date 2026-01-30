@@ -52,7 +52,8 @@ Section lifting.
       iIntros "H". iIntros (????) "SI".
       iMod ("H" with "SI") as "($& %& GOs& GFs& %& #REs& H)".
       iIntros "!> !> % % % %Step".
-      iApply gprog_step.
+      iApply (gprog_step Θ _ (dom efs)).
+      1: auto.
       { eapply fork_thread_ids; eauto. }
       iModIntro. iFrame "GOs GFs REs". iIntros "(GOs& Ws& Efs)".
       iMod ("H" with "[//] GOs Ws Efs") as "H". iModIntro.

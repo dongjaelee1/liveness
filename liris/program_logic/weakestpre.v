@@ -144,15 +144,16 @@ Section gprog.
     try rewrite !gupd.gl_unseal /gupd.gl_def.
 
   (** Step rule *)
-  Lemma gprog_step Θ π i P :
-    Θ ## π →
+  Lemma gprog_step Θ1 Θ2 π i P :
+    Θ2 = Θ1 ∪ π →
+    Θ1 ## π →
     (|={∅}=> ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
                  ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
                       ((th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) ∗ ([∗ set] j ∈ π, th_obls j ∅ 1))
                        ={∅}=∗ P))
-    ⊢ @={Θ,(Θ ∪ π),i}=↓ P.
+    ⊢ @={Θ1,Θ2,i}=↓ P.
   Proof.
-    unfold_defs. iIntros (DisjTP) "H". iMod "H" as "(%& (#Oe& Ox& Ob& OS)& GFs& %& #REs& H)".
+    intros ->. unfold_defs. iIntros (DisjTP) "H". iMod "H" as "(%& (#Oe& Ox& Ob& OS)& GFs& %& #REs& H)".
     iAssert ([∗ map] g↦_ ∈ G, glG_elem g ∗ glG_fuel g Ord.one)%I with "[GFs]" as "GFs".
     { iApply (big_sepM_impl with "GFs"). iIntros "!> %%% H". rewrite (glG_fuel_eq _ (measure 0ₗ%L 1) Ord.one); auto.
       rewrite measure_finite Ord.from_nat_1. done. }
