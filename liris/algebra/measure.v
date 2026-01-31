@@ -5,10 +5,9 @@ From liris.prelude Require Export wf_structs.
 Section measure.
   Context `{!well_founded_class L} `{!ord_mono_fun_class}.
 
-  (** The language's source of nondeterminism is limited to the type Ψ.
-      For example, Ψ = expr * state * ... and so on. *)
+  (** Any well-founded ordering of type A can be embedded as long as the universe is consistent. *)
   Inductive measurable_syntax  : Type :=
-  | ms_nondet {Ψ : Type} (t : ord_tree Ψ)
+  | ms_embed {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (a : A)
   | ms_zero
   | ms_one
   | ms_add (s1 s2 : measurable_syntax)
@@ -22,8 +21,8 @@ Section measure.
     ∀ (s : measurable_syntax), Ord.t :=
   (fix go s {struct s} :=
      match s with
-     | ms_nondet t =>
-         Ord.from_wf (ord_tree_lt_tc_well_founded _) t
+     | ms_embed wf_ltA a =>
+         Ord.from_wf wf_ltA a
      | ms_zero =>
          0
      | ms_one =>
@@ -61,8 +60,8 @@ Section measure.
   Lemma measure_unfold l s :
     measure l s =
     match s with
-    | ms_nondet t =>
-        Ord.from_wf (ord_tree_lt_tc_well_founded _) t
+    | ms_embed wf_ltA a =>
+        Ord.from_wf wf_ltA a
     | ms_zero =>
         0
     | ms_one =>
@@ -83,10 +82,10 @@ Section measure.
   Qed.
 
   (** Reduction rules *)
-  Lemma measure_nondet {Ψ : Type} (l : L) (t : ord_tree Ψ) :
-    measure l (ms_nondet t) = Ord.from_wf (ord_tree_lt_tc_well_founded _) t.
+  Lemma measure_embed {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (l : L) (a : A) :
+    measure l (ms_embed wf_ltA a) = Ord.from_wf wf_ltA a.
   Proof using Type*.
-    rewrite (measure_unfold _ (ms_nondet _)). auto.
+    rewrite (measure_unfold _ (ms_embed _ _)). auto.
   Qed.
 
   Lemma measure_zero (l : L) :
@@ -121,7 +120,7 @@ Section measure.
     simpl. apply Ord.join_upperbound.
   Qed.
 
-  (** Finite measure of n *)
+  (** Finite measure of size n *)
   Fixpoint ms_finite (n : nat) : measurable_syntax :=
     match n with
     | O => ms_zero
@@ -138,11 +137,11 @@ Section measure.
   Qed.
 
   (** Properties *)
-  Lemma measure_nondet_lt {Ψ : Type} l (t1 t2 : ord_tree Ψ) :
-    ord_tree_lt_tc t1 t2 →
-    (measure l (ms_nondet t1) < measure l (ms_nondet t2))%ord.
+  Lemma measure_embed_lt {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) l (a1 a2 : A) :
+    ltA a1 a2 →
+    (measure l (ms_embed wf_ltA a1) < measure l (ms_embed wf_ltA a2))%ord.
   Proof using.
-    intros. rewrite !measure_nondet. apply Ord.lt_from_wf. auto.
+    intros. rewrite !measure_embed. apply Ord.lt_from_wf. auto.
   Qed.
 
   Lemma measure_extend_le_const (l : L) (s : measurable_syntax) :
