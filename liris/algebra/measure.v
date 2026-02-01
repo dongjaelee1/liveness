@@ -7,100 +7,130 @@ Section measure.
 
   (** Any well-founded ordering of type A can be embedded as long as the universe is consistent. *)
   Inductive measurable_syntax  : Type :=
+  | ms_nat (n : nat)
+  | ms_omega
   | ms_embed {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (a : A)
-  | ms_zero
-  | ms_one
+  | ms_embed_set {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
+  | ms_large
   | ms_add (s1 s2 : measurable_syntax)
-  | ms_extend (s : measurable_syntax).
+  | ms_mult (s1 s2 : measurable_syntax)
+  | ms_expn (s1 s2 : measurable_syntax)
+  | ms_extend.
+  (* | ms_extend (s : measurable_syntax). *)
 
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
   Remark measure_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
   Proof using. intros. destruct m. auto. Qed.
 
-  Fixpoint measure_rec (α : Ord.t) (l : L) (ACC : Acc ltL l) {struct ACC} :
+  Fixpoint measure_rec (l : L) (ACC : Acc ltL l) {struct ACC} :
     ∀ (s : measurable_syntax), Ord.t :=
   (fix go s {struct s} :=
      match s with
+     | ms_nat n =>
+         n
+     | ms_omega =>
+         ω%ord
      | ms_embed wf_ltA a =>
          Ord.from_wf wf_ltA a
-     | ms_zero =>
-         0
-     | ms_one =>
-         1
+     | ms_embed_set wf_ltA =>
+         Ord.from_wf_set wf_ltA
+     | ms_large =>
+         Ord.large
      | ms_add s1 s2 =>
          (go s1 ⊕ go s2)%ord
-     | ms_extend s1 =>
-         ((go s1 × α) ⊕
-            (* This allows loop iteration on any well-founded relation on any smaller Type *)
-            (go s1 × Ord.large) ⊕
-            (go s1 ×
-               (η (Ord.join (λ (m : L_sub l),
-                               Ord.join (λ (t : measurable_syntax),
-                                           measure_rec α
-                                             (proj1_sig m) (Acc_inv ACC (measure_oblig l m))
-                                             t))))))%ord
+     | ms_mult s1 s2 =>
+         (go s1 × go s2)%ord
+     | ms_expn s1 s2 =>
+         (go s1 ↑ go s2)%ord
+     | ms_extend =>
+         (η (Ord.join (λ (m : L_sub l),
+                         Ord.join (λ (t : measurable_syntax),
+                                     measure_rec
+                                       (proj1_sig m) (Acc_inv ACC (measure_oblig l m))
+                                       t))))
      end).
 
   (* We assume that Jacobsthal.expn ω ω is large enough. *)
   Definition measure (l : L) (s : measurable_syntax) : Ord.t :=
-    measure_rec (ω ↑ ω)%ord l (wf_ltL l) s.
+    measure_rec l (wf_ltL l) s.
 
-  Lemma measure_rec_proof_irrelevance α l ACC1 ACC2 s :
-    measure_rec α l ACC1 s = measure_rec α l ACC2 s.
+  Lemma measure_rec_proof_irrelevance l ACC1 ACC2 s :
+    measure_rec l ACC1 s = measure_rec l ACC2 s.
   Proof using Type*.
     revert ACC1 ACC2 s. induction l as [l IH] using (well_founded_ind wf_ltL).
     intros. induction s.
     { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. auto. }
+    { destruct ACC1, ACC2. simpl. auto. }
+    { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
-    { destruct ACC1, ACC2. simpl. simpl in IHs. rewrite !IHs. f_equal.
-      do 4 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+    { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
+    { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
+    { destruct ACC1, ACC2. simpl. do 2 f_equal.
+      apply func_ext. intros. f_equal. apply func_ext. intros.
       apply IH. destruct x. auto. }
   Qed.
 
   Lemma measure_unfold l s :
     measure l s =
     match s with
+    | ms_nat n =>
+        n
+    | ms_omega =>
+        ω%ord
     | ms_embed wf_ltA a =>
         Ord.from_wf wf_ltA a
-    | ms_zero =>
-        0
-    | ms_one =>
-        1
+    | ms_embed_set wf_ltA =>
+        Ord.from_wf_set wf_ltA
+    | ms_large =>
+        Ord.large
     | ms_add s1 s2 =>
         (measure l s1 ⊕ measure l s2)%ord
-    | ms_extend s1 =>
-        ((measure l s1 × (ω ↑ ω)) ⊕
-           (measure l s1 × Ord.large) ⊕
-           (measure l s1 ×
-              η (Ord.join (λ (m : L_sub l),
-                             Ord.join (λ (t : measurable_syntax),
-                                         measure (proj1_sig m) t)))))%ord
+    | ms_mult s1 s2 =>
+        (measure l s1 × measure l s2)%ord
+    | ms_expn s1 s2 =>
+        (measure l s1 ↑ measure l s2)%ord
+    | ms_extend =>
+        (η (Ord.join (λ (m : L_sub l),
+                        Ord.join (λ (t : measurable_syntax),
+                                    measure (proj1_sig m) t))))
     end.
   Proof using Type*.
     unfold measure. destruct (wf_ltL l). destruct s; simpl; auto.
-    f_equal. do 4 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+    do 2 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
     apply measure_rec_proof_irrelevance.
   Qed.
 
   (** Reduction rules *)
+  Lemma measure_nat (l : L) n :
+    measure l (ms_nat n) = (n)%ord.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_nat _)). auto.
+  Qed.
+
+  Lemma measure_omega (l : L) :
+    measure l (ms_omega) = (ω)%ord.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_omega)). auto.
+  Qed.
+
   Lemma measure_embed {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (l : L) (a : A) :
     measure l (ms_embed wf_ltA a) = Ord.from_wf wf_ltA a.
   Proof using Type*.
     rewrite (measure_unfold _ (ms_embed _ _)). auto.
   Qed.
 
-  Lemma measure_zero (l : L) :
-    measure l (ms_zero) = (0)%ord.
+  Lemma measure_embed_set {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (l : L) :
+    measure l (ms_embed_set wf_ltA) = Ord.from_wf_set wf_ltA.
   Proof using Type*.
-    rewrite (measure_unfold _ (ms_zero)). auto.
+    rewrite (measure_unfold _ (ms_embed_set _)). auto.
   Qed.
 
-  Lemma measure_one (l : L) :
-    measure l (ms_one) = (1)%ord.
+  Lemma measure_large (l : L) :
+    measure l (ms_large) = Ord.large.
   Proof using Type*.
-    rewrite (measure_unfold _ (ms_one)). auto.
+    rewrite (measure_unfold _ (ms_large)). auto.
   Qed.
 
   Lemma measure_add (l : L) s1 s2 :
@@ -109,34 +139,27 @@ Section measure.
     rewrite (measure_unfold _ (ms_add _ _)). auto.
   Qed.
 
-  Lemma measure_extend_le (l1 l2 : L) (s : measurable_syntax) :
-    ltL l1 l2 →
-    ∀ (t : measurable_syntax),
-    (((measure l2 s × (ω ↑ ω)) ⊕ (measure l2 s × Ord.large) ⊕ (measure l2 s × η (measure l1 t)))
-     <= measure l2 (ms_extend s))%ord.
+  Lemma measure_mult (l : L) s1 s2 :
+    measure l (ms_mult s1 s2) = (measure l s1 × measure l s2)%ord.
   Proof using Type*.
-    intros Hlt d. rewrite (measure_unfold _ (ms_extend _)).
-    apply Hessenberg.le_add_r. apply Hessenberg.le_add_r. apply Jacobsthal.le_mult_r.
+    rewrite (measure_unfold _ (ms_mult _ _)). auto.
+  Qed.
+
+  Lemma measure_expn (l : L) s1 s2 :
+    measure l (ms_expn s1 s2) = (measure l s1 ↑ measure l s2)%ord.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_expn _ _)). auto.
+  Qed.
+
+  Lemma measure_extend_le (l1 l2 : L) :
+    ltL l1 l2 →
+    ∀ (t : measurable_syntax), (η (measure l1 t) <= measure l2 (ms_extend))%ord.
+  Proof using Type*.
+    intros Hlt d. rewrite (measure_unfold _ (ms_extend)).
     apply η_proper_le.
     etransitivity; cycle 1.
     { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
     simpl. apply Ord.join_upperbound.
-  Qed.
-
-  (** Finite measure of size n *)
-  Fixpoint ms_finite (n : nat) : measurable_syntax :=
-    match n with
-    | O => ms_zero
-    | S m => (ms_add ms_one (ms_finite m))
-    end.
-
-  Lemma measure_finite (l : L) (n : nat) :
-    (measure l (ms_finite n) == n)%ord.
-  Proof using.
-    induction n; simpl.
-    { rewrite measure_zero. reflexivity. }
-    rewrite measure_add, measure_one, IHn, <-Hessenberg.add_from_nat.
-    reflexivity.
   Qed.
 
   (** Properties *)
