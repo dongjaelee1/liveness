@@ -8,7 +8,6 @@ Section measure.
   Inductive measurable_syntax  : Type :=
   (* Any well-founded ordering of type A can be embedded as long as the universe is consistent. *)
   | ms_embed {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (a : A)
-  | ms_embed_set {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
   | ms_large
   | ms_add (s1 s2 : measurable_syntax)
   | ms_mult (s1 s2 : measurable_syntax)
@@ -19,8 +18,6 @@ Section measure.
   (* Useful instances. *)
   Definition ms_nat (n : nat) : measurable_syntax :=
     ms_embed PeanoNat.Nat.lt_wf_0 n.
-  Definition ms_omega : measurable_syntax :=
-    ms_embed_set PeanoNat.Nat.lt_wf_0.
 
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
   Remark measure_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
@@ -32,8 +29,6 @@ Section measure.
      match s with
      | ms_embed wf_ltA a =>
          Ord.from_wf wf_ltA a
-     | ms_embed_set wf_ltA =>
-         Ord.from_wf_set wf_ltA
      | ms_large =>
          Ord.large
      | ms_add s1 s2 =>
@@ -61,7 +56,6 @@ Section measure.
     intros. induction s.
     { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. auto. }
-    { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
@@ -75,8 +69,6 @@ Section measure.
     match s with
     | ms_embed wf_ltA a =>
         Ord.from_wf wf_ltA a
-    | ms_embed_set wf_ltA =>
-        Ord.from_wf_set wf_ltA
     | ms_large =>
         Ord.large
     | ms_add s1 s2 =>
@@ -101,12 +93,6 @@ Section measure.
     measure l (ms_embed wf_ltA a) = Ord.from_wf wf_ltA a.
   Proof using Type*.
     rewrite (measure_unfold _ (ms_embed _ _)). auto.
-  Qed.
-
-  Lemma measure_embed_set {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (l : L) :
-    measure l (ms_embed_set wf_ltA) = Ord.from_wf_set wf_ltA.
-  Proof using Type*.
-    rewrite (measure_unfold _ (ms_embed_set _)). auto.
   Qed.
 
   Lemma measure_large (l : L) :
@@ -150,13 +136,6 @@ Section measure.
   Proof using Type*.
     unfold ms_nat. rewrite (measure_unfold _ (ms_embed _ _)).
     symmetry. apply Ord.from_nat_from_peano_lt.
-  Qed.
-
-  Lemma measure_omega (l : L) :
-    (measure l (ms_omega) == ω)%ord.
-  Proof using Type*.
-    unfold ms_omega. rewrite (measure_unfold _ (ms_embed_set _)).
-    symmetry. apply Ord.omega_from_peano_lt_set.
   Qed.
 
   (** Properties *)
