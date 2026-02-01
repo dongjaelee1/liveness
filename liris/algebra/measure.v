@@ -31,6 +31,8 @@ Section measure.
          (go s1 ⊕ go s2)%ord
      | ms_extend s1 =>
          ((go s1 × α) ⊕
+            (* This allows loop iteration on any well-founded relation on any smaller Type *)
+            (go s1 × Ord.large) ⊕
             (go s1 ×
                (η (Ord.join (λ (m : L_sub l),
                                Ord.join (λ (t : measurable_syntax),
@@ -39,7 +41,7 @@ Section measure.
                                              t))))))%ord
      end).
 
-  (* Assumes Jacobsthal.expn ω ω is large enough for self-terminating codes. *)
+  (* We assume that Jacobsthal.expn ω ω is large enough. *)
   Definition measure (l : L) (s : measurable_syntax) : Ord.t :=
     measure_rec (ω ↑ ω)%ord l (wf_ltL l) s.
 
@@ -53,7 +55,7 @@ Section measure.
     { destruct ACC1, ACC2. simpl. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs1, IHs2. rewrite IHs1, IHs2. auto. }
     { destruct ACC1, ACC2. simpl. simpl in IHs. rewrite !IHs. f_equal.
-      do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+      do 4 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
       apply IH. destruct x. auto. }
   Qed.
 
@@ -70,6 +72,7 @@ Section measure.
         (measure l s1 ⊕ measure l s2)%ord
     | ms_extend s1 =>
         ((measure l s1 × (ω ↑ ω)) ⊕
+           (measure l s1 × Ord.large) ⊕
            (measure l s1 ×
               η (Ord.join (λ (m : L_sub l),
                              Ord.join (λ (t : measurable_syntax),
@@ -77,7 +80,7 @@ Section measure.
     end.
   Proof using Type*.
     unfold measure. destruct (wf_ltL l). destruct s; simpl; auto.
-    f_equal. do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
+    f_equal. do 4 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
     apply measure_rec_proof_irrelevance.
   Qed.
 
@@ -109,11 +112,11 @@ Section measure.
   Lemma measure_extend_le (l1 l2 : L) (s : measurable_syntax) :
     ltL l1 l2 →
     ∀ (t : measurable_syntax),
-    (((measure l2 s × (ω ↑ ω)) ⊕ (measure l2 s × η (measure l1 t)))
+    (((measure l2 s × (ω ↑ ω)) ⊕ (measure l2 s × Ord.large) ⊕ (measure l2 s × η (measure l1 t)))
      <= measure l2 (ms_extend s))%ord.
   Proof using Type*.
     intros Hlt d. rewrite (measure_unfold _ (ms_extend _)).
-    apply Hessenberg.le_add_r. apply Jacobsthal.le_mult_r.
+    apply Hessenberg.le_add_r. apply Hessenberg.le_add_r. apply Jacobsthal.le_mult_r.
     apply η_proper_le.
     etransitivity; cycle 1.
     { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
@@ -152,12 +155,36 @@ Section measure.
     reflexivity.
   Qed.
 
+  Lemma measure_extend_le_large (l : L) (s : measurable_syntax) :
+    ((measure l s × Ord.large) <= measure l (ms_extend s))%ord.
+  Proof using Type*.
+    rewrite (measure_unfold _ (ms_extend _)).
+    etransitivity; last eapply Hessenberg.add_base_r.
+    etransitivity; last eapply Hessenberg.add_base_l.
+    reflexivity.
+  Qed.
+  Lemma measure_extend_le_wf_set {A : Type} {ltA : A → A → Prop}
+    (wf_ltA : well_founded ltA) (l : L) (s : measurable_syntax) :
+    ((measure l s × (Ord.from_wf_set wf_ltA)) <= measure l (ms_extend s))%ord.
+  Proof using Type*.
+    etransitivity; last eapply measure_extend_le_large.
+    eapply Jacobsthal.le_mult_r. apply Ord.lt_le. apply Ord.large_lt_from_wf_set.
+  Qed.
+  Lemma measure_extend_le_wf {A : Type} {ltA : A → A → Prop}
+    (wf_ltA : well_founded ltA) (a : A) (l : L) (s : measurable_syntax) :
+    ((measure l s × (Ord.from_wf wf_ltA a)) <= measure l (ms_extend s))%ord.
+  Proof using Type*.
+    etransitivity; last eapply measure_extend_le_wf_set.
+    eapply Jacobsthal.le_mult_r. apply Ord.lt_le. apply Ord.from_wf_set_upperbound.
+  Qed.
+
   Lemma measure_extend_le_layer (l1 l2 : L) (s : measurable_syntax) :
     ltL l1 l2 →
     ∀ (t : measurable_syntax),
     ((measure l2 s × η (measure l1 t)) <= measure l2 (ms_extend s))%ord.
   Proof using Type*.
     intros Hlt d. etransitivity; last eapply (measure_extend_le l1 l2); eauto.
+    etransitivity; last eapply Hessenberg.add_base_r.
     eapply Hessenberg.add_base_r.
   Qed.
   Lemma measure_extend_le_layer_alt (l1 l2 : L) (o : Ord.t) (s : measurable_syntax) :
