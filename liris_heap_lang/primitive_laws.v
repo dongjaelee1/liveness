@@ -170,11 +170,11 @@ Lemma lwp_pure_step n o s i q E E' e1 e2 φ Φ :
   Nat.iter n
     (λ P,
        |={E,E'}=> thread_exec i q ∗
-                 ∃ G, th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+                 ∃ G, th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
                  ∃ R, ([∗ map] r↦v ∈ R, gl r v) ∗
                  (thread_exec i q -∗
                   th_obls i G 1 -∗
-                  ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+                  ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
                   ALC (£ o ={E',E}=∗ P)))
     (lWP e2 @ s; i; E {{ v, Φ v }})
   ⊢ lWP e1 @ s; i; E {{ Φ }}.
@@ -184,11 +184,11 @@ Qed.
 
 Lemma lwp_fork s q i E E' e Φ :
   (|={E,E'}=> thread_exec i q ∗
-             ∃ G, th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g Ord.one) ∗
+             ∃ G, th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
              ∃ R, ([∗ map] r↦v ∈ R, gl r v) ∗
              (∀ j, thread_exec i q -∗
                    th_obls i G 1 -∗
-                   ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+                   ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
                    thread_exec j 1 -∗
                    th_obls j ∅ 1 -∗
                    ALC (|={E',E}=>
@@ -411,10 +411,10 @@ Qed.
 
 Lemma lwp_allocN_seq G R o s q i E v n :
   (0 < n)%Z →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗
+          (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗
           [∗ list] i ∈ seq 0 (Z.to_nat n), (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
   iIntros (Hn Φ) "(T& Tb& Gfs& Rs) HP".
@@ -437,10 +437,10 @@ Proof.
 Qed.
 
 Lemma lwp_alloc G R o s q i E v :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) }}}
     Alloc (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗
+          (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗
           l ↦ v ∗ meta_token l ⊤ }}}.
 Proof.
   iIntros (Φ) "P HΦ".
@@ -449,10 +449,10 @@ Proof.
 Qed.
 
 Lemma lwp_free G R o s q i E l v :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ v }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ v }}}
     Free (Val $ LitV $ LitLoc l) @ s; i; E
   l{{{ RET LitV LitUnit;
-          (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) }}}.
+          (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) }}}.
 Proof.
   iIntros (Φ) "((T& Tb& Gfs& Rs)& Hl) HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -469,9 +469,9 @@ Proof.
 Qed.
 
 Lemma lwp_load G R o s q i E l dq v :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦{dq} v }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦{dq} v }}}
     Load (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET v; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦{dq} v }}}.
+  l{{{ RET v; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦{dq} v }}}.
 Proof.
   iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -487,9 +487,9 @@ Proof.
 Qed.
 
 Lemma lwp_store G R o s q i E l v' v :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ v' }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ v' }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET LitV LitUnit; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦ v }}}.
+  l{{{ RET LitV LitUnit; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -506,9 +506,9 @@ Proof.
 Qed.
 
 Lemma lwp_xchg G R o s q i E l v' v :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ v' }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ v' }}}
     Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET v'; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦ v }}}.
+  l{{{ RET v'; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -526,9 +526,9 @@ Qed.
 
 Lemma lwp_cmpxchg_fail G R o s q i E l dq v' v1 v2 :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦{dq} v' }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦{dq} v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦{dq} v' }}}.
+  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦{dq} v' }}}.
 Proof.
   iIntros (?? Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -546,9 +546,9 @@ Qed.
 
 Lemma lwp_cmpxchg_suc G R o s q i E l v1 v2 v' :
   v' = v1 → vals_compare_safe v' v1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ v' }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦ v2 }}}.
+  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦ v2 }}}.
 Proof.
   iIntros (?? Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -566,9 +566,9 @@ Proof.
 Qed.
 
 Lemma lwp_faa G R o s q i E l i1 i2 :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ LitV (LitInt i1) }}}
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)) ∗ l ↦ LitV (LitInt i1) }}}
     FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
-  l{{{ RET LitV (LitInt i1); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
+  l{{{ RET LitV (LitInt i1); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
   iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -585,9 +585,9 @@ Proof.
 Qed.
 
 Lemma lwp_new_proph G R o s q i E :
-  l{{{thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g Ord.one) ∗ ([∗ map] r ↦ v ∈ R, gl r v)}}}
+  l{{{thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, gl r v)}}}
     NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v)) ∗ proph p pvs }}}.
+  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ proph p pvs }}}.
 Proof.
   iIntros (Φ) "(T& Tb& Gfs& Rs) HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.

@@ -22,7 +22,7 @@ Class heapGS_no_lc `(HGS : heapGS Σ) := {
         (λ P,
            |={E,E'}=> thread_exec i q ∗
                      (thread_exec i q -∗
-                      ([∗ map] r↦v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗
+                      ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
                       (|={E',E}=> P)))
         (lWP e2 @ s; i; E {{ v, Φ v }})
       ⊢ lWP e1 @ s; i; E {{ Φ }};    
@@ -36,7 +36,7 @@ Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@heapGS_no_lc Σ _}
         ([∗ map] r↦v ∈ R, gl r v) ∗
         (Nat.iter n (λ P, |={E,E'}=>
                        thread_exec i q ∗
-                       (thread_exec i q -∗ ([∗ map] r ↦ v ∈ R, wit_credit r v Ord.one ∨ gl_done r v) -∗ (|={E',E}=> P)))
+                       (thread_exec i q -∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗ (|={E',E}=> P)))
            (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
 Proof.
@@ -193,20 +193,10 @@ Section proof.
   Context (N N_inv N1 : namespace).
   Hypothesis N_disj_1 : N ## N_inv.
 
-  Definition cnt_ξ : gl_witness := λ _, 100.
-  Definition cnt_ηξ : gl_witness := λ v, gupd_η (Σ[cnt_ξ] v).
-  (* Definition lf_cnt_ηξ : Ord.t → Ord.t := limit_fun (λ _ v, cnt_ηξ v). *)
-
-  (* Lemma lf_cnt_ηξ_lt o : ∀ v, (cnt_ηξ v <= lf_cnt_ηξ o)%ord. *)
-  (* Proof. *)
-  (*   intros. rewrite /lf_cnt_ηξ. etrans; last eapply (limit_fun_upperbound _ _ v). done. *)
-  (* Qed. *)
-
   Definition px_inv r i j k : iProp Σ :=
     ∃ n, cnt_auth r j n (1/2)%Qp ∗
          ([∗ list] a ∈ seq 0 (S n), (£ (1)%ord ∨ cnt_lb r i a) ∗
-         (* ([∗ list] a ∈ seq 0 (S n), (£ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∨ cnt_lb r i a) ∗ *)
-                                    gl k a ∗ wit k a (cnt_ηξ a) ∗
+                                    gl k a ∗ wit_layer k a 0 ∗
                                     gl_variant N_inv k a True (cnt_lb r j (a + 1)) (cnt_lb r j (a + 1))).
 
   Definition px r i j k : iProp Σ :=
@@ -217,34 +207,30 @@ Section proof.
   Proof. rewrite /px. apply _. Qed.
 
   (** Receives later credits via px_inv *)
-  Lemma px_loop1_spec i α r ci cj ck :
-    l{{{ thread_exec i 1 ∗ th_obls i (<[α:=0]>∅) 1 ∗
-         gl_variant N1 α 0 True False False ∗
+  Lemma px_loop1_spec i z r ci cj ck :
+    l{{{ thread_exec i 1 ∗ th_obls i (<[z:=0]>∅) 1 ∗
+         gl_variant N1 z 0 True False False ∗
          £ (1)%ord ∗ px r ci cj ck ∗
-         (* £ (1 ⊕ lf_cnt_ηξ Ord.O)%ord ∗ px r ci cj ck ∗ *)
          ∃ n, cnt_auth r ci n 1%Qp ∗
-              cnt_lb r cj n ∗ gl ck n ∗ wit ck n (cnt_ηξ n) ∗
+              cnt_lb r cj n ∗ gl ck n ∗ wit_layer ck n 0 ∗
               gl_variant N_inv ck n True (cnt_lb r cj (S n)) (cnt_lb r cj (S n)) }}}
       loop #() @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof using Type*.
-    iIntros (Φ) "(Tx& TG& #GVα& LC& (%x& #Gdx& #GVx)& %n& Cai& #Cljn& #Gckn& #Wckn& #GVckn) HΦ".
-    (* iApply fupd_lwp. *)
-    (* iMod (gl_variant_acc_done with "Gdx GVx") as "[[H | H] ACC]". 1: done. *)
-    (* 2:{ iMod "H" as "[_ %]". done. } *)
+    iIntros (Φ) "(Tx& TG& #GVz& LC& (%x& #Gdx& #GVx)& %n& Cai& #Cljn& #Gckn& #Wckn& #GVckn) HΦ".
     (** Lob induction *)
     iRevert (n) "Gckn Cljn Wckn GVckn Cai". iLöb as "IH".
     iIntros (n) "#Gckn #Cljn #Wckn #GVckn Cai".
     (** Witness induction *)
-    remember (cnt_ηξ n) as w.
+    iPoseProof (wit_fuels_init with "Wckn") as "(%& Wfs)".
     (* iPoseProof (tlc_split with "LC") as "[LC LCw]". *)
     (** TODO: make interface defs and lemmas for tlc *)
     (* iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ w with "LCw") as "LCw". *)
     (* { subst w. apply lf_cnt_ηξ_lt. } *)
     (* iModIntro. *)
-    clear Heqw. iRevert "Wckn".
-    iInduction w as [w IHw] using (well_founded_induction Ord.lt_well_founded).
-    iIntros "#Wckn".
+    iRevert "Wfs".
+    iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
+    iIntros "#Wfs".
     iEval (rewrite /loop).
     lwp_lam_no_lc. iExists _, ⊤, (<[ck:=n]>∅). iFrame "Tx". iSplitR.
     { rewrite big_sepM_singleton. auto. }
@@ -252,10 +238,10 @@ Section proof.
     iEval (rewrite -/loop).
     rewrite big_sepM_singleton. iDestruct "Wcs" as "[Wc | #Gdckn]".
     - (** Witness induction *)
-      iMod (wit_credit_spend_one with "Wckn Wc") as "(%& %LTw& #Wckn')".
+      iMod (wit_fuels_spend_one with "Wfs Wc") as "(%& %LTw& #Wfs'& _)".
       (* iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ a0 with "LCw") as "LCw". *)
       (* { apply Ord.lt_le; auto. }       *)
-      iPoseProof ("IHw" $! _ LTw with "Tx TG LC HΦ Cai [Wckn]") as "LWP".
+      iPoseProof ("IHα" $! _ LTw with "Tx TG LC HΦ Cai [Wfs']") as "LWP".
       { auto. }
       auto.
     - (** Version n is done; fetch next version and use Löb induction *)
@@ -294,7 +280,7 @@ Section proof.
   Lemma px_loop2_spec j n r ci cj ck :
     l{{{ thread_exec j 1 ∗ th_obls j (<[ck:=n]>∅) 1 ∗
          gl_variant N_inv ck n True (cnt_lb r cj (n + 1)) (cnt_lb r cj (n + 1)) ∗
-         gl_witfun ck cnt_ξ ∗ gl_fuel ck (Σ[cnt_ξ]{n, n}) ∗
+         gl_layer ck 0 ∗ gl_fuel ck 0 10 ∗
          px r ci cj ck ∗ cnt_auth r cj n (1/2)%Qp }}}
       loop #() @ j
     l{{{ RET #(); lift_term j fork_post #() }}}.
@@ -304,11 +290,12 @@ Section proof.
     iRevert (n) "GVck TG Gf Caj". iLöb as "IH".
     iIntros (n) "#GVck TG Gf Caj".
     iEval (rewrite /loop).
-    iMod (gl_fuel_mon _ 1 with "Gf") as "Gf".
-    { rewrite gl_witness_sum_gen_eq /cnt_ξ. apply OrdArith.le_from_nat. lia. }
+    rewrite (gl_fuel_eq ck 0 0 10 (9 ⊕ 1)%M); cycle 1.
+    { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
+    iPoseProof (gl_fuel_add with "Gf") as "[_ Gf1]".
     lwp_lam. iFrame "Tx TG". iExists ⊤, ∅, 2. iSplitR; first done.
-    iModIntro. iSplitL "Gf".
-    { iApply big_sepM_singleton. rewrite Ord.from_nat_1. eauto. }
+    iModIntro. iSplitL "Gf1".
+    { iApply big_sepM_singleton. eauto. }
     iIntros "Tx TG _ !> LC !>". lwp_finish.
     iEval (rewrite -/loop).
     iPoseProof (tlc_split_nat 1 1 with "LC") as "[LC LC1]".
@@ -329,13 +316,13 @@ Section proof.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     iMod ("ACC2" with "TG Glock Cljn1") as "ACC2".
     iApply fupd_sfgupd_elim. iMod "close" as "_". iMod "ACC2" as "(TG& Gcur& #Gdckn)".
-    iMod (gl_lock ∅ _ _ ∅ _ _ _ _ _ (n + 1) _ _ _ True (cnt_lb r cj (n + 2)) (cnt_lb r cj (n + 2))
+    iMod (gl_lock ∅ _ _ ∅ _ _ _ _ _ _ (n + 1) _ _ _ True (cnt_lb r cj (n + 2)) (cnt_lb r cj (n + 2))
            with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
     1: lia. 1: set_solver.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     iMod ("ACC2" with "[TG] Gcur Gw Cljn1 []") as "ACC2".
     { rewrite delete_insert_id. 1: iFrame. done. }
-    { done. }
+    1: done.
     iApply fupd_sfgupd_elim. iMod "close" as "_".
     iMod "ACC2" as "(TG& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)".
     iMod ("ACC" with "[LC Cs Caj2]") as "_".

@@ -22,11 +22,8 @@ Definition reader : val :=
 Section mp_proof.
   Context `{!heapGS Σ} (N : namespace).
 
-  Definition mp_ξ : gl_witness := λ _, ω%ord.
-  Definition mp_ηξ : gl_witness := λ v, gupd_η (Σ[mp_ξ] v).
-
   Definition mp_proto (k : gl_id) (v : ghost_lock_version) (l : loc) : iProp Σ :=
-    gl_witfun k mp_ξ ∗ gl k v ∗ wit k v (mp_ηξ v) ∗
+    gl_layer k 0 ∗ gl k v ∗ wit_layer k v 0 ∗
     gl_variant N k v (l ↦ #0) (l ↦ #1) (False).
 
   Definition mp (k : gl_id) (l : loc) : iProp Σ :=
@@ -41,7 +38,7 @@ Section mp_proof.
   Lemma mp_writer_spec i l :
     l{{{ ∃ k, mp k l ∗
               thread_exec i 1 ∗ th_obls i (<[k:=0]>∅) 1 ∗
-              gl_fuel k (Σ[mp_ξ] 0) }}}
+              gl_fuel k 0 10 }}}
       writer #l @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof.
@@ -49,16 +46,17 @@ Section mp_proof.
     (* iApply lwp_sfgupd. *)
     iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG& Gfk)".
     rewrite /writer /=.
-    iMod (gl_fuel_lt k 100 with "Gfk") as "[Gfk Gfk1]".
-    { apply Ord.omega_upperbound. }
+    iMod (gl_fuel_lt k 0 _ 9 with "Gfk") as "[Gfk Gfk1]".
+    { rewrite !measure_nat. apply OrdArith.lt_from_nat. lia. }
     (* Pure steps *)
     lwp_lam. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done.
     iSplitL "Gfk1".
     { iModIntro. rewrite big_sepM_singleton. iFrame. }
     iIntros "!> Tx TG _ !> _ !>".
     lwp_finish.
-    iMod (gl_fuel_mon_split k 99 1 with "Gfk") as "[Gfk Gfk1]".
-    { rewrite -Hessenberg.add_from_nat. reflexivity. }
+    rewrite (gl_fuel_eq k 0 0 9 (8 ⊕ 1)%M); cycle 1.
+    { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
+    iPoseProof (gl_fuel_add with "Gfk") as "[Gfk Gfk1]".
     lwp_bind (Store _ _).
     iMod (gl_unlock with "TG GVkv") as "[>(TG& Glk& VP) ACC]".
     { set_solver. }
@@ -93,9 +91,9 @@ Section mp_proof.
     iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG)".
     rewrite /reader /=.
     (* Liveness induction *)
-    remember (mp_ηξ 0) as a. clear Heqa.
-    iStopProof. induction a using WFOCM.ind. rename x into a, H into IHa.
-    iIntros "(#(Gwfk& Gk& Wkv& GVkv)& Tx& TG& HΦ)".
+    iPoseProof (wit_fuels_init with "Wkv") as "(%& Wkvfs)".
+    iStopProof. induction α using WFOCM.ind. rename x into α, H into IHα.
+    iIntros "(#(Gwfk& Gk& Wkv& GVkv& Wkvfs)& Tx& TG& HΦ)".
     (* Pure steps *)
     lwp_rec. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
     iSplitR; first done. iIntros "Tx TG _ !> _ !>".
@@ -120,8 +118,8 @@ Section mp_proof.
       iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       lwp_if. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
       iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      iMod (wit_credit_spend_one with "Wkv Wck") as "(%& %LTa& #Wkv')".
-      iApply (IHa a0 LTa). iFrame. auto.
+      iMod (wit_fuels_spend_one with "Wkvfs Wck") as "(%& %LTα& #Wkvfs'& _)".
+      iApply (IHα α0 LTα). iFrame. iModIntro. auto.
     - iDestruct "HQ" as "[#Gdk ptr]".
       iApply (lwp_load _ ∅ 0 with "[$ptr $Tx $TG]").
       { iSplit; done. }
@@ -145,11 +143,10 @@ Section mp_proof.
 
   Lemma mp_pre i l E G q :
     th_obls i G q ∗ l ↦ #0
-    ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_fuel k (Σ[mp_ξ] 0) ∗ mp k l.
+    ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_fuel k 0 10 ∗ mp k l.
   Proof.
     rewrite /mp /mp_proto. iIntros "[TG ptr]".
-    iMod (gl_alloc_obl _ _ _ _ mp_ξ N 0 (l ↦ #0) with "TG ptr")
-      as "(%& %& TG& #Gwf& #Gl& Gf& #GV& #Wit& _)".
+    iMod (gl_alloc_obl _ _ _ _ 0 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& #Gwf& #Gl& Gf& #GV& #Wit& _)".
     iFrame "Gwf Gl GV Wit". iFrame. auto.
   Qed.
 

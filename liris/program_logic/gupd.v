@@ -852,6 +852,8 @@ Section preds.
     Proof. unfold_defs. apply _. Qed.
     Global Instance wit_layer_persistent k v ℓ : Persistent (wit_layer k v ℓ).
     Proof. unfold_defs. apply _. Qed.
+    Global Instance wit_fuels_empty_persistent k v ℓ α : Persistent (wit_fuels k v ℓ α ∅).
+    Proof. unfold_defs. apply _. Qed.
 
     Global Instance gl_timeless k v : Timeless (gl k v).
     Proof. unfold_defs. apply _. Qed.
@@ -1395,6 +1397,15 @@ Section preds.
       wit_layer k v ℓ -∗ ∃ α, wit_fuels k v ℓ α ∅.
     Proof.
       unfold_defs. iIntros "(%& $& $)". iExists μ. iSplitR; done.
+    Qed.
+
+    Lemma wit_fuels_wit_layer k v ℓ α F :
+      wit_fuels k v ℓ α F ==∗ wit_layer k v ℓ.
+    Proof.
+      iIntros "Wl". rewrite !wit_fuels_unseal /wit_fuels_def.
+      iDestruct "Wl" as "(%& %& #Wb& _)".
+      rewrite !wit_layer_unseal /wit_layer_def.
+      iExists μ. iApply wit_bound_mon; eauto.
     Qed.
 
     Lemma wit_fuels_add k v ℓ1 α F f ℓ2 μ :
