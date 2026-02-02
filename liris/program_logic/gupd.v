@@ -1279,7 +1279,7 @@ Section preds.
       rewrite -big_sepS_bupd. intros. apply big_sepS_mono; intros. apply gl_fuel_expn; auto.
     Qed.
 
-    Lemma gl_fuel_extend k ℓ1 ℓ2 o :
+    Lemma gl_fuel_extend_val k ℓ1 ℓ2 o :
       (ℓ1 < ℓ2)%L →
       (∃ s, (o <= η (measure ℓ1 s))%ord) →
       gl_fuel k ℓ2 (▽)%M ⊢ |==> gl_fuel_val k o.
@@ -1287,17 +1287,38 @@ Section preds.
       iIntros (LT Hl1) "H". unfold_gl_fuel. iApply (gl_fuel_val_mon with "H").      
       eapply measure_extend_alt; eauto.
     Qed.
-    Lemma gl_fuel_extend_list K ℓ1 ℓ2 o :
+    Lemma gl_fuel_extend_val_list K ℓ1 ℓ2 o :
       (ℓ1 < ℓ2)%L →
       (∃ s, (o <= η (measure ℓ1 s))%ord) →
       ([∗ list] k ∈ K, gl_fuel k ℓ2 (▽)%M) ⊢ |==> ([∗ list] k ∈ K, gl_fuel_val k o).
     Proof.
-      intros. rewrite -big_sepL_bupd. iApply big_sepL_mono. intros. eapply gl_fuel_extend; eauto.
+      intros. rewrite -big_sepL_bupd. iApply big_sepL_mono. intros. eapply gl_fuel_extend_val; eauto.
     Qed.
-    Lemma gl_fuel_extend_set K ℓ1 ℓ2 o :
+    Lemma gl_fuel_extend_val_set K ℓ1 ℓ2 o :
       (ℓ1 < ℓ2)%L →
       (∃ s, (o <= η (measure ℓ1 s))%ord) →
       ([∗ set] k ∈ K, gl_fuel k ℓ2 (▽)%M) ⊢ |==> ([∗ set] k ∈ K, gl_fuel_val k o).
+    Proof.
+      intros. rewrite -big_sepS_bupd. iApply big_sepS_mono. intros. eapply gl_fuel_extend_val; eauto.
+    Qed.
+
+    Lemma gl_fuel_extend k ℓ1 ℓ2 μ :
+      (ℓ1 < ℓ2)%L →
+      gl_fuel k ℓ2 (▽)%M ⊢ |==> gl_fuel k ℓ1 μ.
+    Proof.
+      iIntros (LT) "H". iMod (gl_fuel_extend_val _ ℓ1 with "H") as "H"; last (unfold_gl_fuel; by iFrame).
+      1: auto.
+      exists μ. apply η_mono.
+    Qed.
+    Lemma gl_fuel_extend_list K ℓ1 ℓ2 μ :
+      (ℓ1 < ℓ2)%L →
+      ([∗ list] k ∈ K, gl_fuel k ℓ2 (▽)%M) ⊢ |==> ([∗ list] k ∈ K, gl_fuel k ℓ1 μ).
+    Proof.
+      intros. rewrite -big_sepL_bupd. iApply big_sepL_mono. intros. eapply gl_fuel_extend; eauto.
+    Qed.
+    Lemma gl_fuel_extend_set K ℓ1 ℓ2 μ :
+      (ℓ1 < ℓ2)%L →
+      ([∗ set] k ∈ K, gl_fuel k ℓ2 (▽)%M) ⊢ |==> ([∗ set] k ∈ K, gl_fuel k ℓ1 μ).
     Proof.
       intros. rewrite -big_sepS_bupd. iApply big_sepS_mono. intros. eapply gl_fuel_extend; eauto.
     Qed.
