@@ -40,7 +40,7 @@ Section lifting.
       (∀ Θ σ1 κ κs,
          state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
          (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-         ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
+         ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
          ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
            (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
               th_obls i G 1 -∗
@@ -68,7 +68,7 @@ Section lifting.
       (∀ Θ σ1 κ κs,
          state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
          (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-         ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
+         ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
          ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
            (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
               th_obls i G 1 -∗
@@ -125,7 +125,7 @@ Section lifting.
     PureExecCond C ς i →
     (|={E,E'}=>
        ς ∗
-       ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
+       ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
        ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
          (ς -∗
           th_obls i G 1 -∗
@@ -165,7 +165,7 @@ Section lifting.
       (∀ Θ σ1 κ κs,
          state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
          (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-         ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
+         ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
          ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
            (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
               th_obls i G 1 -∗
@@ -196,7 +196,7 @@ Section lifting.
     PureExecCond C ς i →
     (|={E,E'}=>
        ς ∗
-       ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
+       ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
        ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
          (ς -∗
           th_obls i G 1 -∗
@@ -217,7 +217,7 @@ Section lifting.
     PureExecCond C ς i →
     (Nat.iter n (λ P, |={E,E'}=>
                    ς ∗
-                   ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
+                   ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
                    ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
                    (ς -∗
                     th_obls i G 1 -∗
@@ -245,7 +245,7 @@ Section lifting.
     φ →
     PureExecCond C ς i →
     ([∗ map] r ↦ v ∈ R, gl r v) ∗
-    (Nat.iter n (λ P, |={E,E'}=> ς ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L 1) ∗
+    (Nat.iter n (λ P, |={E,E'}=> ς ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
                                 (ς -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗ ALC (£ o ={E',E}=∗ P))) (lWP e2 @ s; i; E {{ Φ }}))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
@@ -263,7 +263,7 @@ Section lifting.
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς i →
-    (ς ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0ₗ%L n) ∗ ([∗ map] r ↦ v ∈ R, gl r v) ∗
+    (ς ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 n) ∗ ([∗ map] r ↦ v ∈ R, gl r v) ∗
      (ς -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit r v n ∨ gl_done r v) -∗
       £ (o × n)%ord -∗ lWP e2 @ s; i ; E {{ Φ }}))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
@@ -278,10 +278,10 @@ Section lifting.
       iApply ("IH" with "Hc TG [Ws] Hz").
       rewrite Ord.from_nat_O. done. }
     iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
-    iAssert (([∗ map] g↦_ ∈ G, gl_fuel g 0ₗ%L n) ∗ ([∗ map] g↦_ ∈ G, gl_fuel g 0ₗ%L 1))%I with "[Gfs]" as "[Gfs Gf]".
-    { rewrite !big_sepM_dom. iApply (gl_fuel_split_set).
-      rewrite (gl_fuel_eq_set _ _ _ (n + 1)%M (S n)%M). 1: auto.
-      rewrite measure_finite_S measure_add. by rewrite Hessenberg.add_comm. }
+    iAssert (([∗ map] g↦_ ∈ G, gl_fuel g 0 n) ∗ ([∗ map] g↦_ ∈ G, gl_fuel g 0 1))%I with "[Gfs]" as "[Gfs Gf]".
+    { rewrite !big_sepM_dom. iApply (gl_fuel_add_set).
+      rewrite (gl_fuel_eq_set _ _ _ (n ⊕ 1)%M (S n)%M). 1: auto.
+      rewrite measure_nat_S measure_add. by rewrite Hessenberg.add_comm. }
     iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
     iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
     iIntros "Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").

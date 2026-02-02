@@ -2,8 +2,14 @@ From stdpp Require Import base.
 From liris.prelude Require Import axioms ordinal_facts.
 From liris.prelude Require Export wf_structs.
 
+(** This is only meant to be instantiated only in this file. *)
+Class layer_class (L : Type) := {
+    ltL : L -> L -> Prop;
+    wf_ltL : well_founded ltL;
+  }.
+
 Section measure.
-  Context `{!well_founded_class L} `{!ord_mono_fun_class}.
+  Context `{!layer_class L} `{!ord_mono_fun_class}.
 
   Inductive measurable_syntax  : Type :=
   (* Any well-founded ordering of type A can be embedded as long as the universe is consistent. *)
@@ -14,10 +20,6 @@ Section measure.
   | ms_expn (s1 s2 : measurable_syntax)
   | ms_extend.
   (* | ms_extend (s : measurable_syntax). *)
-
-  (* Useful instances. *)
-  Definition ms_nat (n : nat) : measurable_syntax :=
-    ms_embed PeanoNat.Nat.lt_wf_0 n.
 
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
   Remark measure_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
@@ -119,7 +121,7 @@ Section measure.
     rewrite (measure_unfold _ (ms_expn _ _)). auto.
   Qed.
 
-  Lemma measure_extend_le (l1 l2 : L) :
+  Lemma measure_extend (l1 l2 : L) :
     ltL l1 l2 →
     ∀ (t : measurable_syntax), (η (measure l1 t) <= measure l2 (ms_extend))%ord.
   Proof using Type*.
@@ -130,14 +132,6 @@ Section measure.
     simpl. apply Ord.join_upperbound.
   Qed.
 
-  (* Useful instances. *)
-  Lemma measure_nat (l : L) n :
-    (measure l (ms_nat n) == n)%ord.
-  Proof using Type*.
-    unfold ms_nat. rewrite (measure_unfold _ (ms_embed _ _)).
-    symmetry. apply Ord.from_nat_from_peano_lt.
-  Qed.
-
   (** Properties *)
   Lemma measure_embed_lt {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) l (a1 a2 : A) :
     ltA a1 a2 →
@@ -146,80 +140,56 @@ Section measure.
     intros. rewrite !measure_embed. apply Ord.lt_from_wf. auto.
   Qed.
 
-  Lemma measure_extend_le_const (l : L) (s : measurable_syntax) :
-    ((measure l s × (ω ↑ ω)) <= measure l (ms_extend s))%ord.
-  Proof using Type*.
-    rewrite (measure_unfold _ (ms_extend _)).
-    etransitivity; last eapply Hessenberg.add_base_l.
-    reflexivity.
+  Lemma measure_large_lt {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) l a :
+    (measure l (ms_embed wf_ltA a) < measure l ms_large)%ord.
+  Proof using.
+    rewrite measure_embed, measure_large. apply Ord.large_lt_from_wf.
   Qed.
 
-  Lemma measure_extend_le_large (l : L) (s : measurable_syntax) :
-    ((measure l s × Ord.large) <= measure l (ms_extend s))%ord.
-  Proof using Type*.
-    rewrite (measure_unfold _ (ms_extend _)).
-    etransitivity; last eapply Hessenberg.add_base_r.
-    etransitivity; last eapply Hessenberg.add_base_l.
-    reflexivity.
-  Qed.
-  Lemma measure_extend_le_wf_set {A : Type} {ltA : A → A → Prop}
-    (wf_ltA : well_founded ltA) (l : L) (s : measurable_syntax) :
-    ((measure l s × (Ord.from_wf_set wf_ltA)) <= measure l (ms_extend s))%ord.
-  Proof using Type*.
-    etransitivity; last eapply measure_extend_le_large.
-    eapply Jacobsthal.le_mult_r. apply Ord.lt_le. apply Ord.large_lt_from_wf_set.
-  Qed.
-  Lemma measure_extend_le_wf {A : Type} {ltA : A → A → Prop}
-    (wf_ltA : well_founded ltA) (a : A) (l : L) (s : measurable_syntax) :
-    ((measure l s × (Ord.from_wf wf_ltA a)) <= measure l (ms_extend s))%ord.
-  Proof using Type*.
-    etransitivity; last eapply measure_extend_le_wf_set.
-    eapply Jacobsthal.le_mult_r. apply Ord.lt_le. apply Ord.from_wf_set_upperbound.
-  Qed.
-
-  Lemma measure_extend_le_layer (l1 l2 : L) (s : measurable_syntax) :
-    ltL l1 l2 →
-    ∀ (t : measurable_syntax),
-    ((measure l2 s × η (measure l1 t)) <= measure l2 (ms_extend s))%ord.
-  Proof using Type*.
-    intros Hlt d. etransitivity; last eapply (measure_extend_le l1 l2); eauto.
-    etransitivity; last eapply Hessenberg.add_base_r.
-    eapply Hessenberg.add_base_r.
-  Qed.
-  Lemma measure_extend_le_layer_alt (l1 l2 : L) (o : Ord.t) (s : measurable_syntax) :
+  Lemma measure_extend_alt (l1 l2 : L) (o : Ord.t) :
     ltL l1 l2 →
     (∃ (t : measurable_syntax), (o <= η (measure l1 t))%ord) →
-    ((measure l2 s × o) <= measure l2 (ms_extend s))%ord.
+    (o <= measure l2 (ms_extend))%ord.
   Proof using Type*.
-    intros Hlt (t& ?).
-    etransitivity; last eapply (measure_extend_le_layer l1 l2); eauto.
-    eapply Jacobsthal.le_mult_r. eauto.
+    intros Hlt (t& ?). etransitivity; last eapply (measure_extend l1 l2); eauto.
   Qed.
 
-  Lemma measure_finite_add l n1 n2 :
-    (measure l (ms_finite (n1 + n2)) == (measure l (ms_finite n1) ⊕ measure l (ms_finite n2)))%ord.
-  Proof using.
-    revert n2. induction n1; intros; simpl.
-    { rewrite measure_zero, Hessenberg.add_O_l. reflexivity. }
-    rewrite !measure_add, !measure_one, (IHn1 n2).
-    rewrite !Hessenberg.add_assoc. reflexivity.
+  (** Useful instances. *)
+  Definition ms_nat (n : nat) : measurable_syntax :=
+    ms_embed PeanoNat.Nat.lt_wf_0 n.
+
+  Lemma measure_nat (l : L) n :
+    (measure l (ms_nat n) == n)%ord.
+  Proof using Type*.
+    unfold ms_nat. rewrite (measure_unfold _ (ms_embed _ _)).
+    symmetry. apply Ord.from_nat_from_peano_lt.
   Qed.
 
-  Lemma measure_finite_S (l : L) (n : nat) :
-    (measure l (ms_finite (S n)) == (measure l (ms_finite 1) ⊕ measure l (ms_finite n)))%ord.
+  Lemma measure_nat_add l n1 n2 :
+    (measure l (ms_nat (n1 + n2)) == (measure l (ms_nat n1) ⊕ measure l (ms_nat n2)))%ord.
   Proof using.
-    rewrite <-measure_finite_add. reflexivity.
+    rewrite !measure_nat. apply Hessenberg.add_from_nat.
+  Qed.
+
+  Lemma measure_nat_S (l : L) (n : nat) :
+    (measure l (ms_nat (S n)) == (measure l (ms_nat 1) ⊕ measure l (ms_nat n)))%ord.
+  Proof using.
+    rewrite <-measure_nat_add. reflexivity.
   Qed.
 
 End measure.
-Global Opaque measure_rec measure ms_finite.
+Global Opaque measure_rec measure ms_nat.
 
 Declare Scope msyn_scope.
 Delimit Scope msyn_scope with M.
 
-Coercion ms_finite : nat >-> measurable_syntax.
-Infix "+" := ms_add : msyn_scope.
-Notation "'⟪' s '⟫'" := (ms_extend s%M) (at level 50, format "⟪ s ⟫") : msyn_scope.
+Coercion ms_nat : nat >-> measurable_syntax.
+Notation "'⟪' R , a '⟫'" := (ms_embed R a) (at level 50, format "⟪ R ,  a ⟫") : msyn_scope.
+Notation "⫚" := (ms_large) : msyn_scope.
+Infix "⊕" := ms_add : msyn_scope.
+Infix "×" := ms_mult : msyn_scope.
+Infix "↑" := ms_expn : msyn_scope.
+Notation "▽" := (ms_extend) : msyn_scope.
 
 Global Instance nat_inhabited : Inhabited nat := populate 0.
 
@@ -252,7 +222,7 @@ Section layer.
     | S m => layer_join (λ _, layer_def b m)
     end.
 
-  Lemma layer_unfold b n :
+  Lemma layer_def_unfold b n :
     layer_def b n =
     match n with
     | O => b
@@ -260,7 +230,7 @@ Section layer.
     end.
   Proof. destruct n; auto. Qed.
 
-  Global Instance layer_proper_lt_nat b :
+  Global Instance layer_def_proper_lt_nat b :
     Proper (lt ==> layer_lt) (layer_def b).
   Proof.
     repeat intro. induction H.
@@ -268,28 +238,23 @@ Section layer.
     - etransitivity; first eauto. simpl. eapply layer_join_upperbound; auto.
   Qed.
 
-  Lemma layer_lt_base_S :
-    ∀ b n, layer_lt b (layer_def b (S n)).
-  Proof.
-    intros. induction n; simpl.
-    { apply layer_join_upperbound; auto. exact 0. }
-    etransitivity; first eauto. simpl.
-    eapply layer_join_upperbound; auto.
-  Qed.
-
-  Lemma layer_nat_cases :
+  Lemma layer_def_O :
+    ∀ b, layer_def b O = b.
+  Proof. intros. simpl. auto. Qed.
+  Lemma layer_def_cases :
     ∀ b n, (n = 0 ∧ b = layer_def b n) ∨ (0 < n ∧ layer_lt b (layer_def b n)).
   Proof.
     intros. destruct n.
-    - left. split; auto.
-    - right. split; first apply PeanoNat.Nat.lt_0_succ. apply layer_lt_base_S.
+    - left. rewrite layer_def_O. auto.
+    - right. split; first apply PeanoNat.Nat.lt_0_succ. rewrite <-(layer_def_O b) at 1.
+      apply layer_def_proper_lt_nat. apply PeanoNat.Nat.lt_0_succ.
   Qed.
 
   Lemma layer_lt_base_upperbound b1 b2 :
     (∀ n, layer_lt (layer_def b1 n) b2) →
     ∀ n m, layer_lt (layer_def b1 n) (layer_def b2 m).
   Proof.
-    intros. destruct (layer_nat_cases b2 m).
+    intros. destruct (layer_def_cases b2 m).
     - destruct H0; subst. rewrite <- H1. eauto.
     - destruct H0. etransitivity; eauto.
   Qed.
@@ -334,6 +299,17 @@ Section layer.
   Qed.
 
   (** Some useful instances *)
+  (* A nat *)
+  Definition layer_nat (n : nat) : layer := layer_def layer_zero n.
+  Definition layer_nat_omega : layer := layer_join layer_nat.
+
+  Lemma layer_nat_omega_upperbound :
+    ∀ n, layer_lt (layer_nat n) layer_nat_omega.
+  Proof. intros. eapply layer_join_upperbound. eauto. Qed.
+
+  Lemma layer_nat_zero : layer_nat 0 = layer_zero.
+  Proof. auto. Qed.
+
   (* A pair of nats with the lexicographical order *)
   Definition layer_pair (l n : nat) : layer :=
     layer_def (layer_next_iter layer_zero l) n.
@@ -348,7 +324,7 @@ Section layer.
   Lemma layer_pair_lt_snd l :
     Proper (lt ==> layer_lt) (layer_pair l).
   Proof.
-    repeat intro. unfold layer_pair. apply layer_proper_lt_nat. auto.
+    repeat intro. unfold layer_pair. apply layer_def_proper_lt_nat. auto.
   Qed.
 
   Definition layer_pair_omega (n : nat) : layer :=
@@ -358,7 +334,7 @@ Section layer.
     ∀ n m, layer_lt (layer_pair l n) (layer_pair_omega m).
   Proof.
     intros. unfold layer_pair_omega.
-    destruct (layer_nat_cases (layer_join (λ l0 : nat, layer_pair l0 0)) m).
+    destruct (layer_def_cases (layer_join (λ l0 : nat, layer_pair l0 0)) m).
     - destruct H; subst. rewrite <-H0. etransitivity.
       + eapply (layer_pair_lt_fst l (S l)). auto.
       + eapply layer_join_upperbound; eauto.
@@ -370,27 +346,19 @@ Section layer.
   Lemma layer_pair_omega_proper_lt_nat :
     Proper (lt ==> layer_lt) (layer_pair_omega).
   Proof.
-    repeat intro. apply layer_proper_lt_nat. auto.
+    repeat intro. apply layer_def_proper_lt_nat. auto.
   Qed.
 
-  (* A nat *)
-  Definition layer_nat (n : nat) : layer := layer_pair 0 n.
-  Definition layer_nat_omega : layer := layer_pair 1 0.
-
-  Lemma layer_omega_upperbound :
-    ∀ n, layer_lt (layer_nat n) layer_nat_omega.
-  Proof. intros. eapply layer_pair_lt_fst. auto. Qed.
-
 End layer.
-Global Opaque layer layer_def layer_next layer_next_iter.
-
-Global Instance layer_well_founded_class : well_founded_class layer :=
-  Build_well_founded_class _ _ layer_lt_well_founded.
+Global Opaque layer layer_def layer_next layer_next_iter layer_nat layer_nat_omega.
 
 Declare Scope layer_scope.
 Delimit Scope layer_scope with L.
 
-Notation "'0ₗ'" := layer_zero : layer_scope.
+Coercion layer_nat : nat >-> layer.
 Infix "<" := layer_lt : layer_scope.
 Notation "b '⨣' n" := (layer_def b%L n) (at level 50, format "b  ⨣  n") : layer_scope.
 Notation "'⌈' l '⌉'" := (layer_next l%L) (at level 50, format "⌈ l ⌉") : layer_scope.
+
+Global Instance layer_layer_class : layer_class layer :=
+  Build_layer_class _ _ layer_lt_well_founded.

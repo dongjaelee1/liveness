@@ -1401,13 +1401,14 @@ Section glsat.
     v1 < v2 →
     glsat Ω ∗
     glG_layer k ℓ ∗ glG_unlocked k v1 ∗ glG_version k v1 (1/2 + 1/2/2)%Qp
-    ⊢ |==> ∃ μ0, glsat (<[k:=(v2, ghost_lock_locked (measure ℓ (μ0 + μ)%M) t)]>Ω) ∗
-              glG_locked k v2 (1/2 + 1/2/2)%Qp ∗
-              glG_version k v2 (1/2 + 1/2/2)%Qp ∗
-              glG_fuel k (measure ℓ μ) ∗
-              glG_owner k t (1/2 + 1/2/2)%Qp ∗
-              ([∗ set] u ∈ (set_seq (S v1) (v2 - v1 - 1)), glG_version_lb k u ∗ glG_unlocked k u) ∗
-              (⌜ ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_locked (measure ℓ (μ0 + μ)%M) t) ⌝).
+    ⊢ |==> ∃ (μ0 : measurable_syntax),
+      glsat (<[k:=(v2, ghost_lock_locked (measure ℓ (μ0 ⊕ μ)%M) t)]>Ω) ∗
+      glG_locked k v2 (1/2 + 1/2/2)%Qp ∗
+      glG_version k v2 (1/2 + 1/2/2)%Qp ∗
+      glG_fuel k (measure ℓ μ) ∗
+      glG_owner k t (1/2 + 1/2/2)%Qp ∗
+      ([∗ set] u ∈ (set_seq (S v1) (v2 - v1 - 1)), glG_version_lb k u ∗ glG_unlocked k u) ∗
+      (⌜ ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_locked (measure ℓ (μ0 ⊕ μ)%M) t) ⌝).
   Proof.
     iIntros (LTv) "(Hsat& #Gy& #Gu& Gv)".
     iPoseProof (glG_layer_elem with "Gy") as "#Ge".
@@ -1468,7 +1469,7 @@ Section glsat.
     }
     iModIntro. iFrame "Gl Gv Gf Go".
     (* FIXME : fail typeclass inference *)
-    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v2, ghost_lock_locked (GL:=ord_ghost_lock_class) (measure ℓ (μ0 + μ)%M) t)) with "[HM VS VSa Gl2 Gvk Gok Gfs]") as "HM".
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v2, ghost_lock_locked (GL:=ord_ghost_lock_class) (measure ℓ (μ0 ⊕ μ)%M) t)) with "[HM VS VSa Gl2 Gvk Gok Gfs]") as "HM".
     { apply lookup_delete_eq. }
     { iFrame "HM". replace (S v1 + (v2 - v1)) with (S v2) by lia. iFrame. iFrame "Gvl2 Gy".
       iSplitL.
@@ -1480,7 +1481,7 @@ Section glsat.
         rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
         2,3: apply set_seq_S_end_disjoint.
         rewrite !big_sepS_singleton. iFrame. auto.
-      - iExists (μ0 + μ)%M. iPureIntro. split.
+      - iExists (μ0 ⊕ μ)%M. iPureIntro. split.
         + rewrite measure_add. apply Hessenberg.le_add_l. eauto.
         + rewrite measure_add. apply Hessenberg.le_add_l. eauto.
     }
@@ -1545,13 +1546,13 @@ Section glsat.
           ▷ ((glsat Ω ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ Q1) ∗
              ((glsat Ω ∗ glG_version k v1 (1/2 + 1/2/2)%Qp ∗ (▷ R1) ∗ (▷ P2))
               ={E ∖ ↑N,E}=∗
-              ∃ μ0, glsat (<[k:=(v2, ghost_lock_locked (measure ℓ (μ0 + μ)%M) t)]>Ω) ∗
+              ∃ μ0, glsat (<[k:=(v2, ghost_lock_locked (measure ℓ (μ0 ⊕ μ)%M) t)]>Ω) ∗
               glG_locked k v2 q1 ∗
               glG_version k v2 (1/2 + 1/2/2)%Qp ∗
               glG_fuel k (measure ℓ μ) ∗
               glG_owner k t (1/2 + 1/2/2)%Qp ∗
               ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), glG_version_lb k u ∗ glG_unlocked k u) ∗
-              (⌜ ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_locked (measure ℓ (μ0 + μ)%M) t) ⌝) ∗
+              (⌜ ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_locked (measure ℓ (μ0 ⊕ μ)%M) t) ⌝) ∗
               glG_variant N k v2 q0 P2 Q2 R2)).
   Proof.
     iIntros (Hq Hv HE) "(#Gvar& G& #Gwf& #Gu& Gv)".
