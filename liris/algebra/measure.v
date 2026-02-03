@@ -259,6 +259,21 @@ Section layer.
     - destruct H0. etransitivity; eauto.
   Qed.
 
+  Lemma layer_join_layer_def_comm b n :
+    layer_join (λ _, layer_def b n) = layer_def (layer_join (λ _, b)) n.
+  Proof.
+    revert b. induction n; simpl; intros; auto.
+    rewrite IHn. auto.
+  Qed.
+
+  Lemma layer_def_add b n m :
+    layer_def b (n + m) = layer_def (layer_def b n) m.
+  Proof.
+    revert b m. induction n; simpl; intros; auto.
+    rewrite IHn. destruct m; simpl; auto.
+    rewrite layer_join_layer_def_comm. auto.
+  Qed.
+
   (** An upperbound of any layer with base b. *)
   Definition layer_next (b : layer) : layer := layer_join (layer_def b).
 
