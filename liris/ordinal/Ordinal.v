@@ -1551,10 +1551,10 @@ Module ordinalScope.
 
   Coercion ord.from_nat: nat >-> ord.t.
 
-  Notation "o0 >= o1" := (ord.le o1 o0) : ordinal_scope.
-  Notation "o0 > o1" := (ord.lt o1 o0) : ordinal_scope.
-  Notation "o0 <= o1" := (ord.le o0 o1) : ordinal_scope.
-  Notation "o0 < o1" := (ord.lt o0 o1) : ordinal_scope.
+  Notation "o0 >= o1" := (ord.le o1 o0) (at level 70) : ordinal_scope.
+  Notation "o0 > o1" := (ord.lt o1 o0) (at level 70) : ordinal_scope.
+  Notation "o0 <= o1" := (ord.le o0 o1) (at level 70) : ordinal_scope.
+  Notation "o0 < o1" := (ord.lt o0 o1) (at level 70) : ordinal_scope.
   Notation "o0 == o1" := (ord.eq o0 o1) (at level 70, no associativity) : ordinal_scope.
   Notation "'ω'" := ord.omega : ordinal_scope.
 End ordinalScope.

@@ -190,8 +190,9 @@ Section proof.
 
   Typeclasses Opaque cnt_auth.
 
-  Context (N N_inv N1 : namespace).
-  Hypothesis N_disj_1 : N ## N_inv.
+  Let N := nroot .@ "paradox_inv".
+  Let N_inv := nroot .@ "paradox_cnt".
+  Let N1 := nroot .@ "paradox_false".
 
   Definition px_inv r i j k : iProp Σ :=
     ∃ n, cnt_auth r j n (1/2)%Qp ∗
@@ -310,6 +311,8 @@ Section proof.
     iCombine "Caj Caj2" as "Caj".
     iMod (cnt_auth_update _ _ _ (n + 1) with "Caj") as "[Caj Caj2]". 1: lia.
     iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
+    assert (NDisj : N ## N_inv).
+    { subst N N_inv. apply ndot_ne_disjoint. done. }
     iMod (gl_unlock with "TG GVck") as "[>(TG& Glock& _) ACC2]".
     { set_solver. }
     { rewrite lookup_insert_eq. done. }

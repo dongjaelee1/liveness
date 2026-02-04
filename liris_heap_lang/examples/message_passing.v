@@ -20,7 +20,8 @@ Definition reader : val :=
     else "reader" "l".
 
 Section mp_proof.
-  Context `{!heapGS Σ} (N : namespace).
+  Context `{!heapGS Σ}.
+  Let N := nroot .@ "message_passing".
 
   Definition mp_proto (k : gl_id) (v : ghost_lock_version) (l : loc) : iProp Σ :=
     gl_layer k 0 ∗ gl k v ∗ wit_layer k v 0 ∗
