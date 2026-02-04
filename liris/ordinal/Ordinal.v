@@ -1,11 +1,11 @@
-From liris.ordinal Require Import sflib Basics.
+From liris.ordinal Require Import sflib basics.
 
 From Coq Require Import Classes.RelationClasses Classes.Morphisms. (* TODO: Use Morphisms *)
 
 Set Implicit Arguments.
 Set Primitive Projections.
 
-Module Ord.
+Module ord.
   Section TYPE.
   Let MyT := Type.
   Let SmallT: MyT := Type.
@@ -1540,23 +1540,23 @@ Module Ord.
     eapply build_supremum. auto.
   Qed.
 End TYPE.
-End Ord.
+End ord.
 
 
-Global Opaque Ord.O Ord.S Ord.join Ord.union Ord.rec Ord.from_acc Ord.from_wf Ord.from_wf_set Ord.from_nat Ord.omega Ord.hartogs Ord.large.
+Global Opaque ord.O ord.S ord.join ord.union ord.rec ord.from_acc ord.from_wf ord.from_wf_set ord.from_nat ord.omega ord.hartogs ord.large.
 
-Module OrdinalScope.
+Module ordinalScope.
   Declare Scope ordinal_scope.
   Delimit Scope ordinal_scope with ordi.
 
-  Coercion Ord.from_nat: nat >-> Ord.t.
+  Coercion ord.from_nat: nat >-> ord.t.
 
-  Notation "o0 >= o1" := (Ord.le o1 o0) : ordinal_scope.
-  Notation "o0 > o1" := (Ord.lt o1 o0) : ordinal_scope.
-  Notation "o0 <= o1" := (Ord.le o0 o1) : ordinal_scope.
-  Notation "o0 < o1" := (Ord.lt o0 o1) : ordinal_scope.
-  Notation "o0 == o1" := (Ord.eq o0 o1) (at level 70, no associativity) : ordinal_scope.
-  Notation "'ω'" := Ord.omega : ordinal_scope.
-End OrdinalScope.
+  Notation "o0 >= o1" := (ord.le o1 o0) : ordinal_scope.
+  Notation "o0 > o1" := (ord.lt o1 o0) : ordinal_scope.
+  Notation "o0 <= o1" := (ord.le o0 o1) : ordinal_scope.
+  Notation "o0 < o1" := (ord.lt o0 o1) : ordinal_scope.
+  Notation "o0 == o1" := (ord.eq o0 o1) (at level 70, no associativity) : ordinal_scope.
+  Notation "'ω'" := ord.omega : ordinal_scope.
+End ordinalScope.
 
-Export OrdinalScope.
+Export ordinalScope.

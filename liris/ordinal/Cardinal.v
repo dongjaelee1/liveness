@@ -1,6 +1,6 @@
-From liris.ordinal Require Import sflib Basics.
-From liris.ordinal Require Import ClassicalOrdinal WfRel WellOrdering.
-From liris.ordinal Require Export Ordinal ToSet.
+From liris.ordinal Require Import sflib basics.
+From liris.ordinal Require Import classical_ordinal wf_rel well_ordering.
+From liris.ordinal Require Export ordinal to_set.
 
 From Coq Require Import Classes.RelationClasses.
 From Coq Require Import ClassicalChoice FunctionalExtensionality PropExtensionality.
@@ -9,8 +9,8 @@ From Coq Require Import Program.
 Set Implicit Arguments.
 Set Primitive Projections.
 
-Module Cardinal.
-  Section CARDINALITY.
+Module cardinal.
+  Section cardinalITY.
     Variant _cardinal_le (A B: Type): Prop :=
     | _cardinal_le_intro
         (f: A -> B)
@@ -41,34 +41,34 @@ Module Cardinal.
         des. apply INJ in H. subst. auto. }
     Qed.
 
-    Section CARDINAL.
+    Section cardinal.
       Variable A: Type.
 
-      Definition of_cardinal (c: Ord.t): Prop :=
-        ClassicOrd.is_meet (fun o =>
+      Definition of_cardinal (c: ord.t): Prop :=
+        classicOrd.is_meet (fun o =>
                               exists (R: A -> A -> Prop) (WF: well_founded R),
                                 (forall a0 a1, R a0 a1 \/ a0 = a1 \/ R a1 a0) /\
-                                Ord.eq (Ord.from_wf_set WF) o) c.
+                                ord.eq (ord.from_wf_set WF) o) c.
 
       Lemma of_cardinal_exists: exists c, of_cardinal c.
       Proof.
-        eapply ClassicOrd.meet_exists.
+        eapply classicOrd.meet_exists.
         hexploit (@well_ordering_theorem A); eauto. i. des.
-        exists (Ord.from_wf_set H), R, H. splits; auto. reflexivity.
+        exists (ord.from_wf_set H), R, H. splits; auto. reflexivity.
       Qed.
 
       Lemma of_cardinal_unique c0 c1 (CARD0: of_cardinal c0) (CARD1: of_cardinal c1):
-        Ord.eq c0 c1.
+        ord.eq c0 c1.
       Proof.
-        unfold of_cardinal, ClassicOrd.is_meet in *. des. split.
+        unfold of_cardinal, classicOrd.is_meet in *. des. split.
         - eapply CARD4; eauto.
         - eapply CARD2; eauto.
       Qed.
 
-      Lemma eq_of_cardinal c0 c1 (EQ: Ord.eq c0 c1) (CARD0: of_cardinal c0):
+      Lemma eq_of_cardinal c0 c1 (EQ: ord.eq c0 c1) (CARD0: of_cardinal c0):
         of_cardinal c1.
       Proof.
-        unfold of_cardinal, ClassicOrd.is_meet in *. des. split.
+        unfold of_cardinal, classicOrd.is_meet in *. des. split.
         - exists R, WF. splits; auto. transitivity c0; auto.
         - i. transitivity c0; auto. eapply EQ.
       Qed.
@@ -82,20 +82,20 @@ Module Cardinal.
              (forall (f: A -> sig (projT1 PR)),
                  exists a0 a1, f a0 = f a1 /\ a0 <> a1)).
 
-      Let Y (x: X): Ord.t :=
-        @Ord.from_wf_set (sig (projT1 (proj1_sig x))) _ (proj1 (proj2_sig x)).
+      Let Y (x: X): ord.t :=
+        @ord.from_wf_set (sig (projT1 (proj1_sig x))) _ (proj1 (proj2_sig x)).
 
-      Definition cardinal := @Ord.build X Y.
+      Definition cardinal := @ord.build X Y.
 
       Lemma cardinal_lowerbound (R: A -> A -> Prop) (WF: well_founded R)
             (TOTAL: forall a0 a1, R a0 a1 \/ a0 = a1 \/ R a1 a0):
-        Ord.le cardinal (Ord.from_wf_set WF).
+        ord.le cardinal (ord.from_wf_set WF).
       Proof.
-        eapply Ord.build_supremum. i. unfold Y.
+        eapply ord.build_supremum. i. unfold Y.
         destruct a as [[P0 R0] [WF0 [TOTAL0 SMALL]]]; ss.
-        eapply (@Ord.le_lt_lt (Ord.from_wf_set WF0)).
-        { eapply Ord.same_wf_set_le. }
-        destruct (ClassicOrd.total (Ord.from_wf_set WF) (Ord.from_wf_set WF0)); auto.
+        eapply (@ord.le_lt_lt (ord.from_wf_set WF0)).
+        { eapply ord.same_wf_set_le. }
+        destruct (classicOrd.total (ord.from_wf_set WF) (ord.from_wf_set WF0)); auto.
         exfalso. hexploit from_wf_set_embed; eauto. intros MON. des.
         hexploit (SMALL f); eauto. i. des.
         destruct (TOTAL a0 a1) as [|[]]; ss.
@@ -108,7 +108,7 @@ Module Cardinal.
       Lemma _cardinal_upperbound B (CARD: _cardinal_lt B A)
             (R: B -> B -> Prop) (WF: well_founded R)
         :
-          Ord.lt (Ord.from_wf_set WF) cardinal.
+          ord.lt (ord.from_wf_set WF) cardinal.
       Proof.
         inv CARD.
         assert (CLT: ~ _cardinal_le A B).
@@ -116,7 +116,7 @@ Module Cardinal.
         hexploit (from_wf_set_projected_rel_sig_eq WF _ INJ). i.
         hexploit (well_founded_order_extendable (projected_rel_sig_well_founded WF f INJ)). i. des.
         hexploit (from_wf_set_le H2 (projected_rel_sig_well_founded WF f INJ) H1). i.
-        eapply Ord.le_lt_lt.
+        eapply ord.le_lt_lt.
         { etransitivity.
           { eapply H. }
           { eapply H4. }
@@ -135,7 +135,7 @@ Module Cardinal.
           eapply H5; eauto. exists a0, a1. splits; auto.
           destruct (f0 a0), (f0 a1); auto. ss. subst. f_equal. eapply proof_irrelevance.
         }
-        hexploit (@Ord.build_upperbound
+        hexploit (@ord.build_upperbound
                     X Y
                     (@exist
                        (@sigT (A -> Prop) (fun s => sig s -> sig s-> Prop))
@@ -147,21 +147,21 @@ Module Cardinal.
                        (@existT (A -> Prop) (fun s => sig s -> sig s-> Prop) _ R1)
                        H5)).
         ss. unfold Y. ss. i.
-        eapply Ord.le_lt_lt; [|eapply H6].
-        eapply Ord.same_wf_set_le.
+        eapply ord.le_lt_lt; [|eapply H6].
+        eapply ord.same_wf_set_le.
       Qed.
 
       Lemma _cardinal_supremum c
             (UPPER: forall (B: Type) (CARD: _cardinal_lt B A)
                            (R: B -> B -> Prop) (WF: well_founded R),
-                Ord.lt (Ord.from_wf_set WF) c)
+                ord.lt (ord.from_wf_set WF) c)
         :
-          Ord.le cardinal c.
+          ord.le cardinal c.
       Proof.
-        eapply Ord.build_supremum. i.
+        eapply ord.build_supremum. i.
         destruct a as [[P0 R0] [WF0 [TOTAL SMALL]]]; ss. unfold Y. ss.
-        eapply (@Ord.le_lt_lt (Ord.from_wf_set WF0)).
-        { eapply Ord.same_wf_set_le. }
+        eapply (@ord.le_lt_lt (ord.from_wf_set WF0)).
+        { eapply ord.same_wf_set_le. }
         eapply UPPER.
         assert (NLE: ~ _cardinal_le A (sig P0)).
         { ii. inv H. hexploit (SMALL f); eauto. i. des.
@@ -173,39 +173,39 @@ Module Cardinal.
       Proof.
         split.
         - hexploit of_cardinal_exists. i. des.
-          unfold of_cardinal, ClassicOrd.is_meet in H. des.
+          unfold of_cardinal, classicOrd.is_meet in H. des.
           exists R, WF. splits; auto. split.
           2: { eapply cardinal_lowerbound; auto. }
-          hexploit (ToSet.to_total_exists cardinal); eauto. i. des.
+          hexploit (toSet.to_total_exists cardinal); eauto. i. des.
           hexploit (_cardinal_total_le A A0). i.
           destruct (classic (_cardinal_le A A0)).
-          { transitivity (Ord.from_wf_set WF0).
+          { transitivity (ord.from_wf_set WF0).
             2: { eapply H2. }
             transitivity c.
             { eapply H1. }
             inv H5.
             hexploit (projected_rel_rev_well_founded WF0 f); auto. i.
-            hexploit (H0 (Ord.from_wf_set H5)).
+            hexploit (H0 (ord.from_wf_set H5)).
             { eexists _, H5. splits; auto.
               - i. destruct (H3 (f a0) (f a1)) as [|[]]; auto.
               - reflexivity. }
-            i. transitivity (Ord.from_wf_set H5); auto.
+            i. transitivity (ord.from_wf_set H5); auto.
             eapply from_wf_set_inj; eauto.
           }
           { assert (CLT: _cardinal_lt A0 A).
             { des; ss. }
             hexploit (_cardinal_upperbound CLT WF0). i.
-            exfalso. eapply Ord.lt_not_le.
+            exfalso. eapply ord.lt_not_le.
             { eapply H6. }
             { eapply H2. }
           }
-        - i. des. eapply Ord.build_supremum. i. unfold Y.
+        - i. des. eapply ord.build_supremum. i. unfold Y.
           destruct a as [[P0 R0] [WF0 [TOTAL SMALL]]]; ss.
-        eapply (@Ord.le_lt_lt (Ord.from_wf_set WF0)).
-        { eapply Ord.same_wf_set_le. }
-          eapply Ord.lt_eq_lt.
+        eapply (@ord.le_lt_lt (ord.from_wf_set WF0)).
+        { eapply ord.same_wf_set_le. }
+          eapply ord.lt_eq_lt.
           { symmetry. eapply IN0. }
-          destruct (ClassicOrd.total (Ord.from_wf_set WF) (Ord.from_wf_set WF0)); auto.
+          destruct (classicOrd.total (ord.from_wf_set WF) (ord.from_wf_set WF0)); auto.
           exfalso. hexploit from_wf_set_embed; eauto. intros MON. des.
           hexploit (SMALL f); eauto. i. des.
           destruct (IN a0 a1) as [|[]]; ss.
@@ -214,16 +214,16 @@ Module Cardinal.
           { eapply MON in H2. rewrite H0 in *.
             eapply well_founded_irreflexive in H2; eauto. }
       Qed.
-    End CARDINAL.
+    End cardinal.
 
     Lemma _cardinal_le_iff A B:
-      _cardinal_le A B <-> Ord.le (cardinal A) (cardinal B).
+      _cardinal_le A B <-> ord.le (cardinal A) (cardinal B).
     Proof.
       split. i.
       - hexploit (cardinal_of_cardinal B). i. destruct H0. des.
-        transitivity (Ord.from_wf_set WF); auto.
+        transitivity (ord.from_wf_set WF); auto.
         2: { eapply H2. }
-        inv H. transitivity (Ord.from_wf_set (projected_rel_rev_well_founded WF f INJ)).
+        inv H. transitivity (ord.from_wf_set (projected_rel_rev_well_founded WF f INJ)).
         { eapply cardinal_of_cardinal.
           exists (projected_rel_rev R f), (projected_rel_rev_well_founded WF f INJ). splits; auto.
           - i. destruct (H0 (f a0) (f a1)) as [|[]]; auto.
@@ -234,12 +234,12 @@ Module Cardinal.
         i. eapply NNPP. ii. destruct (_cardinal_total_le A B); ss.
         hexploit (_cardinal_upperbound).
         { split; eauto. }
-        instantiate (1:=WF). i. eapply Ord.lt_not_le; eauto.
+        instantiate (1:=WF). i. eapply ord.lt_not_le; eauto.
         transitivity (cardinal B); auto. apply H2.
     Qed.
 
     Lemma _cardinal_eq_iff A B:
-      _cardinal_eq A B <-> Ord.eq (cardinal A) (cardinal B).
+      _cardinal_eq A B <-> ord.eq (cardinal A) (cardinal B).
     Proof.
       split. i.
       - split.
@@ -251,22 +251,22 @@ Module Cardinal.
     Qed.
 
     Lemma _cardinal_lt_iff A B:
-      _cardinal_lt A B <-> Ord.lt (cardinal A) (cardinal B).
+      _cardinal_lt A B <-> ord.lt (cardinal A) (cardinal B).
     Proof.
       split; i.
       - inv H. apply _cardinal_le_iff in H0.
-        eapply ClassicOrd.le_eq_or_lt in H0. des; auto.
+        eapply classicOrd.le_eq_or_lt in H0. des; auto.
         exfalso. eapply H1. eapply _cardinal_eq_iff; eauto.
       - split.
-        + apply _cardinal_le_iff. eapply Ord.lt_le; eauto.
+        + apply _cardinal_le_iff. eapply ord.lt_le; eauto.
         + ii. apply _cardinal_le_iff in H0.
-          eapply Ord.lt_not_le; eauto.
+          eapply ord.lt_not_le; eauto.
     Qed.
 
     Lemma cardinal_size_le A B (R: B -> B -> Prop) (WF: well_founded R)
           (TOTAL: forall b0 b1, R b0 b1 \/ b0 = b1 \/ R b1 b0)
-          (LE: Ord.le (cardinal A) (Ord.from_wf_set WF)):
-      Ord.le (cardinal A) (cardinal B).
+          (LE: ord.le (cardinal A) (ord.from_wf_set WF)):
+      ord.le (cardinal A) (cardinal B).
     Proof.
       hexploit (cardinal_of_cardinal A); auto. i. inv H. des.
       hexploit (@from_wf_set_embed _ _ _ _ WF0 WF); auto.
@@ -282,25 +282,25 @@ Module Cardinal.
 
     Lemma cardinal_size_eq A B (R: B -> B -> Prop) (WF: well_founded R)
           (TOTAL: forall b0 b1, R b0 b1 \/ b0 = b1 \/ R b1 b0)
-          (EQ: Ord.eq (cardinal A) (Ord.from_wf_set WF)):
-      Ord.eq (cardinal A) (cardinal B).
+          (EQ: ord.eq (cardinal A) (ord.from_wf_set WF)):
+      ord.eq (cardinal A) (cardinal B).
     Proof.
       split; i.
       - eapply cardinal_size_le; eauto. eapply EQ.
-      - transitivity (Ord.from_wf_set WF).
+      - transitivity (ord.from_wf_set WF).
         + eapply (cardinal_of_cardinal B). esplits; eauto. reflexivity.
         + eapply EQ.
     Qed.
 
     Lemma le_cardinal_le A B (RA: A -> A -> Prop) (RB: B -> B -> Prop) (WFA: well_founded RA) (WFB: well_founded RB)
           (TOTAL: forall a0 a1, RA a0 a1 \/ a0 = a1 \/ RA a1 a0)
-          (LE: Ord.le (Ord.from_wf_set WFA) (Ord.from_wf_set WFB))
+          (LE: ord.le (ord.from_wf_set WFA) (ord.from_wf_set WFB))
       :
-        Ord.le (cardinal A) (cardinal B).
+        ord.le (cardinal A) (cardinal B).
     Proof.
       hexploit (well_founded_order_extendable WFB); eauto. i. des.
       hexploit (@from_wf_set_embed _ _ _ _ WFA H); eauto.
-      { transitivity (Ord.from_wf_set WFB); auto.
+      { transitivity (ord.from_wf_set WFB); auto.
         eapply from_wf_set_le; eauto. }
       i. des. apply _cardinal_le_iff.
       eapply _cardinal_le_intro with (f:=f). i.
@@ -311,47 +311,47 @@ Module Cardinal.
         exfalso. eapply (well_founded_irreflexive H); eauto. }
     Qed.
 
-    Lemma to_total_le o0 o1 (LE: Ord.le o0 o1):
-      Ord.le (cardinal (ToSet.to_total_set o0)) (cardinal (ToSet.to_total_set o1)).
+    Lemma to_total_le o0 o1 (LE: ord.le o0 o1):
+      ord.le (cardinal (toSet.to_total_set o0)) (cardinal (toSet.to_total_set o1)).
     Proof.
       eapply le_cardinal_le.
-      { eapply ToSet.to_total_total. }
-      instantiate (1:=ToSet.to_total_well_founded o1).
-      instantiate (1:=ToSet.to_total_well_founded o0).
+      { eapply toSet.to_total_total. }
+      instantiate (1:=toSet.to_total_well_founded o1).
+      instantiate (1:=toSet.to_total_well_founded o0).
       transitivity o0.
-      { eapply ToSet.to_total_eq. }
+      { eapply toSet.to_total_eq. }
       transitivity o1; auto.
-      { eapply ToSet.to_total_eq. }
+      { eapply toSet.to_total_eq. }
     Qed.
 
     Lemma to_total_cardinal_le o:
-      Ord.le (cardinal (ToSet.to_total_set o)) o.
+      ord.le (cardinal (toSet.to_total_set o)) o.
     Proof.
-      transitivity (Ord.from_wf_set (ToSet.to_total_well_founded o)).
+      transitivity (ord.from_wf_set (toSet.to_total_well_founded o)).
       { eapply cardinal_of_cardinal.
-        exists (ToSet.to_total_rel o), (ToSet.to_total_well_founded o). split; auto.
-        - eapply ToSet.to_total_total.
+        exists (toSet.to_total_rel o), (toSet.to_total_well_founded o). split; auto.
+        - eapply toSet.to_total_total.
         - reflexivity.
       }
-      { eapply ToSet.to_total_eq. }
+      { eapply toSet.to_total_eq. }
     Qed.
 
     Lemma cardinal_to_total_bij1 A:
-      Ord.eq (cardinal A) (cardinal (ToSet.to_total_set (cardinal A))).
+      ord.eq (cardinal A) (cardinal (toSet.to_total_set (cardinal A))).
     Proof.
       eapply cardinal_size_eq.
-      { eapply ToSet.to_total_total. }
-      eapply ToSet.to_total_eq.
+      { eapply toSet.to_total_total. }
+      eapply toSet.to_total_eq.
     Qed.
 
     Lemma cardinal_to_total_bij2 A c (CARDINAL: of_cardinal A c):
-      Ord.eq c (cardinal (ToSet.to_total_set c)).
+      ord.eq c (cardinal (toSet.to_total_set c)).
     Proof.
       hexploit of_cardinal_unique.
       { eapply CARDINAL. }
       { eapply cardinal_of_cardinal. }
       i. transitivity (cardinal A); auto.
-      transitivity (cardinal (ToSet.to_total_set (cardinal A))).
+      transitivity (cardinal (toSet.to_total_set (cardinal A))).
       { eapply cardinal_to_total_bij1. }
       split.
       { eapply to_total_le. apply H. }
@@ -359,19 +359,19 @@ Module Cardinal.
     Qed.
 
     Lemma from_wf_set_to_total A (R: A -> A -> Prop) (WF: well_founded R):
-      Ord.le (cardinal (ToSet.to_total_set (Ord.from_wf_set WF))) (cardinal A).
+      ord.le (cardinal (toSet.to_total_set (ord.from_wf_set WF))) (cardinal A).
     Proof.
       hexploit (well_founded_order_extendable WF); eauto. i. des.
-      assert (Ord.le (Ord.from_wf_set (ToSet.to_total_well_founded (Ord.from_wf_set WF))) (Ord.from_wf_set H)).
-      { transitivity (Ord.from_wf_set WF).
-        { eapply ToSet.to_total_eq. }
+      assert (ord.le (ord.from_wf_set (toSet.to_total_well_founded (ord.from_wf_set WF))) (ord.from_wf_set H)).
+      { transitivity (ord.from_wf_set WF).
+        { eapply toSet.to_total_eq. }
         { eapply from_wf_set_le; auto. }
       }
       dup H2. eapply from_wf_set_embed in H2; auto. des.
-      hexploit (@from_wf_set_embed _ _ _ _ (ToSet.to_total_well_founded (Ord.from_wf_set WF)) H); auto.
+      hexploit (@from_wf_set_embed _ _ _ _ (toSet.to_total_well_founded (ord.from_wf_set WF)) H); auto.
       i. des. apply _cardinal_le_iff.
       eapply _cardinal_le_intro with (f:=f0).
-      i. destruct (ToSet.to_total_total a0 a1) as [|[]]; auto.
+      i. destruct (toSet.to_total_total a0 a1) as [|[]]; auto.
       { eapply H4 in H5. rewrite EQ in *. exfalso.
         eapply (well_founded_irreflexive H); eauto. }
       { eapply H4 in H5. rewrite EQ in *. exfalso.
@@ -382,20 +382,20 @@ Module Cardinal.
           (TOTAL: forall a0 a1, R a0 a1 \/ a0 = a1 \/ R a1 a0)
       :
         forall a0 a1,
-          a0 = a1 <-> Ord.eq (Ord.from_wf WF a0) (Ord.from_wf WF a1).
+          a0 = a1 <-> ord.eq (ord.from_wf WF a0) (ord.from_wf WF a1).
     Proof.
       i. split.
       { i. subst. reflexivity. }
       { i. destruct (TOTAL a0 a1) as [|[]]; auto.
-        { eapply (Ord.lt_from_wf WF) in H0. exfalso.
-          eapply Ord.lt_not_le; eauto. eapply H. }
-        { eapply (Ord.lt_from_wf WF) in H0. exfalso.
-          eapply Ord.lt_not_le; eauto. eapply H. }
+        { eapply (ord.lt_from_wf WF) in H0. exfalso.
+          eapply ord.lt_not_le; eauto. eapply H. }
+        { eapply (ord.lt_from_wf WF) in H0. exfalso.
+          eapply ord.lt_not_le; eauto. eapply H. }
       }
     Qed.
 
     Lemma same_cardinality_bijection A B
-          (CARDINAL: Ord.eq (cardinal A) (cardinal B))
+          (cardinal: ord.eq (cardinal A) (cardinal B))
       :
         exists (f: A -> B),
           (forall a0 a1 (EQ: f a0 = f a1), a0 = a1) /\
@@ -403,15 +403,15 @@ Module Cardinal.
     Proof.
       hexploit (cardinal_of_cardinal A). i. inv H. des.
       hexploit (cardinal_of_cardinal B). i. inv H. des.
-      hexploit (choice (fun a b => Ord.eq (Ord.from_wf WF a) (Ord.from_wf WF0 b))).
-      { i. hexploit (@ClassicOrd.from_wf_set_complete _ _ WF0 (Ord.from_wf WF x)).
-        { eapply Ord.lt_eq_lt.
+      hexploit (choice (fun a b => ord.eq (ord.from_wf WF a) (ord.from_wf WF0 b))).
+      { i. hexploit (@classicOrd.from_wf_set_complete _ _ WF0 (ord.from_wf WF x)).
+        { eapply ord.lt_eq_lt.
           { eapply H5. }
-          eapply Ord.lt_eq_lt.
-          { symmetry. eapply CARDINAL. }
-          eapply Ord.lt_eq_lt.
+          eapply ord.lt_eq_lt.
+          { symmetry. eapply cardinal. }
+          eapply ord.lt_eq_lt.
           { symmetry. eapply H2. }
-          eapply Ord.from_wf_set_upperbound.
+          eapply ord.from_wf_set_upperbound.
         }
         i. des. eauto.
       }
@@ -423,14 +423,14 @@ Module Cardinal.
         2: { symmetry. eapply H. }
         rewrite EQ. reflexivity.
       }
-      { i. hexploit (@ClassicOrd.from_wf_set_complete _ _ WF (Ord.from_wf WF0 b)).
-        { eapply Ord.lt_eq_lt.
+      { i. hexploit (@classicOrd.from_wf_set_complete _ _ WF (ord.from_wf WF0 b)).
+        { eapply ord.lt_eq_lt.
           { eapply H2. }
-          eapply Ord.lt_eq_lt.
-          { eapply CARDINAL. }
-          eapply Ord.lt_eq_lt.
+          eapply ord.lt_eq_lt.
+          { eapply cardinal. }
+          eapply ord.lt_eq_lt.
           { symmetry. eapply H5. }
-          eapply Ord.from_wf_set_upperbound.
+          eapply ord.from_wf_set_upperbound.
         }
         i. des. exists a. eapply (total_from_wf_inj WF0); auto.
         etransitivity.
@@ -440,70 +440,70 @@ Module Cardinal.
     Qed.
 
     Lemma sum_of_smaller o:
-      exists (os: ToSet.to_total_set o -> Ord.t),
-        Ord.eq o (Ord.build os).
+      exists (os: toSet.to_total_set o -> ord.t),
+        ord.eq o (ord.build os).
     Proof.
-      hexploit (ToSet.to_total_eq o). i.
-      exists (fun x => Ord.from_wf (ToSet.to_total_well_founded o) x).
+      hexploit (toSet.to_total_eq o). i.
+      exists (fun x => ord.from_wf (toSet.to_total_well_founded o) x).
       eapply H.
     Qed.
 
-    Lemma sum_of_smaller_same_cardinal o A (EQ: Ord.eq (cardinal A) (cardinal (ToSet.to_total_set o))):
-      exists (os: A -> Ord.t),
-        Ord.eq o (Ord.build os).
+    Lemma sum_of_smaller_same_cardinal o A (EQ: ord.eq (cardinal A) (cardinal (toSet.to_total_set o))):
+      exists (os: A -> ord.t),
+        ord.eq o (ord.build os).
     Proof.
       hexploit (sum_of_smaller o). i. des.
       eapply same_cardinality_bijection in EQ. des.
       exists (fun a => os (f a)). etransitivity.
       { eapply H. }
       split.
-      { eapply Ord.build_supremum. i. hexploit (EQ0 a). i. des.
-        subst. eapply (Ord.build_upperbound (fun a => os (f a)) a0). }
-      { eapply Ord.build_supremum. i.
-        eapply (Ord.build_upperbound os (f a)). }
+      { eapply ord.build_supremum. i. hexploit (EQ0 a). i. des.
+        subst. eapply (ord.build_upperbound (fun a => os (f a)) a0). }
+      { eapply ord.build_supremum. i.
+        eapply (ord.build_upperbound os (f a)). }
     Qed.
-  End CARDINALITY.
+  End cardinalITY.
 
   Section NEXT.
     Variable A: Type.
     Let X: Type := @sig (A -> A -> Prop) (@well_founded _).
 
-    Let Y (x: X): Ord.t := Ord.from_wf_set (proj2_sig x).
+    Let Y (x: X): ord.t := ord.from_wf_set (proj2_sig x).
 
-    Definition next_cardinal := Ord.hartogs.
+    Definition next_cardinal := ord.hartogs.
 
     Lemma next_cardinal_upperbound B (R: B -> B -> Prop) (WF: well_founded R)
-          (CARD: Ord.le (cardinal B) (cardinal A))
-      : Ord.lt (Ord.from_wf_set WF) (next_cardinal A).
+          (CARD: ord.le (cardinal B) (cardinal A))
+      : ord.lt (ord.from_wf_set WF) (next_cardinal A).
     Proof.
       eapply _cardinal_le_iff in CARD. inv CARD.
-      eapply (@Ord.le_lt_lt (Ord.from_wf_set (embed_projected_rel_well_founded WF f INJ))).
+      eapply (@ord.le_lt_lt (ord.from_wf_set (embed_projected_rel_well_founded WF f INJ))).
       { eapply from_wf_set_inj. instantiate (1:=f). i. econs; eauto. }
-      eapply (@Ord.build_upperbound X Y (exist _ _ (embed_projected_rel_well_founded WF f INJ))).
+      eapply (@ord.build_upperbound X Y (exist _ _ (embed_projected_rel_well_founded WF f INJ))).
     Qed.
 
     Lemma next_cardinal_incr
-      : Ord.lt (cardinal A) (next_cardinal A).
+      : ord.lt (cardinal A) (next_cardinal A).
     Proof.
       hexploit (cardinal_of_cardinal A). i. inv H. des.
-      eapply Ord.eq_lt_lt.
+      eapply ord.eq_lt_lt.
       { symmetry. eapply H2. }
       eapply next_cardinal_upperbound.
       reflexivity.
     Qed.
 
-    Lemma next_cardinal_supremum B (CARD: Ord.lt (cardinal A) (cardinal B)):
-      Ord.le (next_cardinal A) (cardinal B).
+    Lemma next_cardinal_supremum B (CARD: ord.lt (cardinal A) (cardinal B)):
+      ord.le (next_cardinal A) (cardinal B).
     Proof.
-      Local Transparent Ord.hartogs.
-      eapply Ord.build_supremum. i. destruct a as [R WF]. unfold Y. ss.
-      destruct (ClassicOrd.total (cardinal B) (Ord.from_wf_set WF)); auto.
+      Local Transparent ord.hartogs.
+      eapply ord.build_supremum. i. destruct a as [R WF]. unfold Y. ss.
+      destruct (classicOrd.total (cardinal B) (ord.from_wf_set WF)); auto.
       hexploit (cardinal_of_cardinal B); eauto. i. inv H0. des.
       hexploit (well_founded_order_extendable WF); eauto. i. des.
       hexploit (@from_wf_set_embed _ _ _ _ WF0 H3); auto.
       { transitivity (cardinal B); auto.
         { eapply H0. }
-        transitivity (Ord.from_wf_set WF); auto.
+        transitivity (ord.from_wf_set WF); auto.
         eapply from_wf_set_le; auto.
       }
       i. des. exfalso.
@@ -518,27 +518,27 @@ Module Cardinal.
     Qed.
 
     Lemma next_cardinal_of_cardinal:
-      of_cardinal (ToSet.to_total_set (next_cardinal A)) (next_cardinal A).
+      of_cardinal (toSet.to_total_set (next_cardinal A)) (next_cardinal A).
     Proof.
       split.
-      { exists (ToSet.to_total_rel (next_cardinal A)), (ToSet.to_total_well_founded (next_cardinal A)).
+      { exists (toSet.to_total_rel (next_cardinal A)), (toSet.to_total_well_founded (next_cardinal A)).
         splits; auto.
-        - eapply ToSet.to_total_total.
-        - symmetry. apply ToSet.to_total_eq.
+        - eapply toSet.to_total_total.
+        - symmetry. apply toSet.to_total_eq.
       }
-      i. des. eapply Ord.build_supremum. i. destruct a as [R0 WF0]. unfold Y. ss.
-      destruct (ClassicOrd.total o1 (Ord.from_wf_set WF0)); auto.
-      assert (LE: Ord.le (Ord.from_wf_set WF) (Ord.from_wf_set WF0)).
+      i. des. eapply ord.build_supremum. i. destruct a as [R0 WF0]. unfold Y. ss.
+      destruct (classicOrd.total o1 (ord.from_wf_set WF0)); auto.
+      assert (LE: ord.le (ord.from_wf_set WF) (ord.from_wf_set WF0)).
       { transitivity o1; auto. eapply IN0. }
       eapply le_cardinal_le in LE; auto. exfalso.
-      eapply (next_cardinal_upperbound (ToSet.to_total_well_founded (next_cardinal A))) in LE.
-      eapply Ord.lt_not_le.
+      eapply (next_cardinal_upperbound (toSet.to_total_well_founded (next_cardinal A))) in LE.
+      eapply ord.lt_not_le.
       { eapply LE. }
-      { eapply ToSet.to_total_eq. }
+      { eapply toSet.to_total_eq. }
     Qed.
 
     Lemma next_cardinal_le_power_set:
-      Ord.le (next_cardinal A) (cardinal (A -> Prop)).
+      ord.le (next_cardinal A) (cardinal (A -> Prop)).
     Proof.
       eapply next_cardinal_supremum.
       apply _cardinal_lt_iff.
@@ -561,54 +561,54 @@ Module Cardinal.
   End NEXT.
 
   Lemma next_cardinal_le A B
-        (CARDINAL: Ord.le (cardinal A) (cardinal B)):
-    Ord.le (next_cardinal A) (next_cardinal B).
+        (CARDINAL: ord.le (cardinal A) (cardinal B)):
+    ord.le (next_cardinal A) (next_cardinal B).
   Proof.
-    assert (EQ: Ord.eq (next_cardinal B) (cardinal (ToSet.to_total_set (next_cardinal B)))).
+    assert (EQ: ord.eq (next_cardinal B) (cardinal (toSet.to_total_set (next_cardinal B)))).
     { eapply of_cardinal_unique.
       { eapply next_cardinal_of_cardinal. }
       { eapply cardinal_of_cardinal. }
     }
-    transitivity (cardinal (ToSet.to_total_set (next_cardinal B))).
+    transitivity (cardinal (toSet.to_total_set (next_cardinal B))).
     2: { apply EQ. }
     eapply next_cardinal_supremum.
-    eapply Ord.lt_le_lt.
+    eapply ord.lt_le_lt.
     2: { eapply EQ. }
-    eapply Ord.le_lt_lt.
+    eapply ord.le_lt_lt.
     { eapply CARDINAL. }
     { eapply next_cardinal_incr. }
   Qed.
 
   Lemma next_cardinal_eq A B
-        (CARDINAL: Ord.eq (cardinal A) (cardinal B)):
-    Ord.eq (next_cardinal A) (next_cardinal B).
+        (cardinal: ord.eq (cardinal A) (cardinal B)):
+    ord.eq (next_cardinal A) (next_cardinal B).
   Proof.
     split.
-    - eapply next_cardinal_le. eapply CARDINAL.
-    - eapply next_cardinal_le. eapply CARDINAL.
+    - eapply next_cardinal_le. eapply cardinal.
+    - eapply next_cardinal_le. eapply cardinal.
   Qed.
 
   Lemma next_cardinal_lt A B
-        (CARDINAL: Ord.lt (cardinal A) (cardinal B)):
-    Ord.lt (next_cardinal A) (next_cardinal B).
+        (cardinal: ord.lt (cardinal A) (cardinal B)):
+    ord.lt (next_cardinal A) (next_cardinal B).
   Proof.
-    eapply next_cardinal_supremum in CARDINAL.
-    eapply Ord.le_lt_lt.
-    { eapply CARDINAL. }
+    eapply next_cardinal_supremum in cardinal.
+    eapply ord.le_lt_lt.
+    { eapply cardinal. }
     { eapply next_cardinal_incr. }
   Qed.
 
   Lemma next_cardinal_le_iff A B:
-    Ord.le (cardinal A) (cardinal B) <-> Ord.le (next_cardinal A) (next_cardinal B).
+    ord.le (cardinal A) (cardinal B) <-> ord.le (next_cardinal A) (next_cardinal B).
   Proof.
     split; i.
     { eapply next_cardinal_le; auto. }
-    { destruct (ClassicOrd.total (cardinal A) (cardinal B)); auto.
-      eapply next_cardinal_lt in H0. exfalso. eapply Ord.lt_not_le; eauto. }
+    { destruct (classicOrd.total (cardinal A) (cardinal B)); auto.
+      eapply next_cardinal_lt in H0. exfalso. eapply ord.lt_not_le; eauto. }
   Qed.
 
   Lemma next_cardinal_eq_iff A B:
-    Ord.eq (cardinal A) (cardinal B) <-> Ord.eq (next_cardinal A) (next_cardinal B).
+    ord.eq (cardinal A) (cardinal B) <-> ord.eq (next_cardinal A) (next_cardinal B).
   Proof.
     split; i.
     { split.
@@ -622,21 +622,21 @@ Module Cardinal.
   Qed.
 
   Lemma next_cardinal_lt_iff A B:
-    Ord.lt (cardinal A) (cardinal B) <-> Ord.lt (next_cardinal A) (next_cardinal B).
+    ord.lt (cardinal A) (cardinal B) <-> ord.lt (next_cardinal A) (next_cardinal B).
   Proof.
-    destruct (ClassicOrd.total (cardinal B) (cardinal A)).
+    destruct (classicOrd.total (cardinal B) (cardinal A)).
     { split.
-      { i. exfalso. eapply Ord.lt_not_le; eauto. }
+      { i. exfalso. eapply ord.lt_not_le; eauto. }
       { i. eapply next_cardinal_le_iff in H.
-        exfalso. eapply Ord.lt_not_le; eauto. }
+        exfalso. eapply ord.lt_not_le; eauto. }
     }
     { split; i; auto. eapply next_cardinal_lt; auto. }
   Qed.
 
-  Definition is_cardinal (c: Ord.t): Prop :=
-    of_cardinal (ToSet.to_total_set c) c.
+  Definition is_cardinal (c: ord.t): Prop :=
+    of_cardinal (toSet.to_total_set c) c.
 
-  Lemma same_cardinal_of_cardinal A B (EQ: Ord.eq (cardinal A) (cardinal B))
+  Lemma same_cardinal_of_cardinal A B (EQ: ord.eq (cardinal A) (cardinal B))
         c (CARDINAL: of_cardinal A c):
     of_cardinal B c.
   Proof.
@@ -648,38 +648,38 @@ Module Cardinal.
   Qed.
 
   Lemma cardinal_join_upperbound X (TS: X -> Type):
-    of_cardinal (ToSet.to_total_set (Ord.join (fun x => cardinal (TS x)))) (Ord.join (fun x => cardinal (TS x))).
+    of_cardinal (toSet.to_total_set (ord.join (fun x => cardinal (TS x)))) (ord.join (fun x => cardinal (TS x))).
   Proof.
     split.
-    { exists (ToSet.to_total_rel (Ord.join (fun x : X => cardinal (TS x)))), (ToSet.to_total_well_founded _). splits.
-      - eapply ToSet.to_total_total.
-      - symmetry. eapply ToSet.to_total_eq. }
-    { i. des. eapply Ord.join_supremum. i. etransitivity.
+    { exists (toSet.to_total_rel (ord.join (fun x : X => cardinal (TS x)))), (toSet.to_total_well_founded _). splits.
+      - eapply toSet.to_total_total.
+      - symmetry. eapply toSet.to_total_eq. }
+    { i. des. eapply ord.join_supremum. i. etransitivity.
       2: { eapply IN0. }
       etransitivity.
       2: { eapply cardinal_lowerbound; auto. }
-      transitivity (cardinal (ToSet.to_total_set (cardinal (TS a)))).
+      transitivity (cardinal (toSet.to_total_set (cardinal (TS a)))).
       { eapply cardinal_to_total_bij1. }
-      { eapply to_total_le. eapply (Ord.join_upperbound (fun x : X => cardinal (TS x))). }
+      { eapply to_total_le. eapply (ord.join_upperbound (fun x : X => cardinal (TS x))). }
     }
   Qed.
 
-  Lemma of_cardinal_join_upperbound A (os: A -> Ord.t)
-        (CARD: forall a, of_cardinal (ToSet.to_total_set (os a)) (os a)):
-    of_cardinal (ToSet.to_total_set (Ord.join os)) (Ord.join os).
+  Lemma of_cardinal_join_upperbound A (os: A -> ord.t)
+        (CARD: forall a, of_cardinal (toSet.to_total_set (os a)) (os a)):
+    of_cardinal (toSet.to_total_set (ord.join os)) (ord.join os).
   Proof.
-    assert (Ord.eq (Ord.join (fun x : A => cardinal (ToSet.to_total_set (os x)))) (Ord.join os)).
+    assert (ord.eq (ord.join (fun x : A => cardinal (toSet.to_total_set (os x)))) (ord.join os)).
     { split.
-      { eapply Ord.join_supremum. i. transitivity (os a).
+      { eapply ord.join_supremum. i. transitivity (os a).
         { eapply cardinal_to_total_bij2; eauto. }
-        { eapply Ord.join_upperbound. }
+        { eapply ord.join_upperbound. }
       }
-      { eapply Ord.join_supremum. i. transitivity (cardinal (ToSet.to_total_set (os a))).
+      { eapply ord.join_supremum. i. transitivity (cardinal (toSet.to_total_set (os a))).
         { eapply cardinal_to_total_bij2; eauto. }
-        { eapply (Ord.join_upperbound (fun x : A => cardinal (ToSet.to_total_set (os x)))). }
+        { eapply (ord.join_upperbound (fun x : A => cardinal (toSet.to_total_set (os x)))). }
       }
     }
-    hexploit (cardinal_join_upperbound (fun a => ToSet.to_total_set (os a))). i.
+    hexploit (cardinal_join_upperbound (fun a => toSet.to_total_set (os a))). i.
     eapply same_cardinal_of_cardinal in H0.
     { eapply eq_of_cardinal.
       2: { eapply H0. }
@@ -691,26 +691,26 @@ Module Cardinal.
     }
   Qed.
 
-  Lemma of_cardinal_size A c (CARDINAL: of_cardinal A c):
-    of_cardinal (ToSet.to_total_set c) c.
+  Lemma of_cardinal_size A c (cardinal: of_cardinal A c):
+    of_cardinal (toSet.to_total_set c) c.
   Proof.
     eapply same_cardinal_of_cardinal; eauto.
     etransitivity.
     { eapply cardinal_to_total_bij1. }
-    eapply of_cardinal_unique in CARDINAL.
+    eapply of_cardinal_unique in cardinal.
     2: { eapply cardinal_of_cardinal. }
     split.
-    { eapply to_total_le. eapply CARDINAL. }
-    { eapply to_total_le. eapply CARDINAL. }
+    { eapply to_total_le. eapply cardinal. }
+    { eapply to_total_le. eapply cardinal. }
   Qed.
 
-  Lemma of_cardinal_is_cardinal A c (CARDINAL: of_cardinal A c):
+  Lemma of_cardinal_is_cardinal A c (cardinal: of_cardinal A c):
     is_cardinal c.
   Proof.
     eapply of_cardinal_size; eauto.
   Qed.
 
-  Lemma eq_is_cardinal c0 c1 (EQ: Ord.eq c0 c1) (CARD0: is_cardinal c0):
+  Lemma eq_is_cardinal c0 c1 (EQ: ord.eq c0 c1) (CARD0: is_cardinal c0):
     is_cardinal c1.
   Proof.
     eapply of_cardinal_is_cardinal. eapply eq_of_cardinal; eauto.
@@ -719,14 +719,14 @@ Module Cardinal.
 
   Section ALEPH.
 
-    Lemma le_aleph_gen o0 o1 (LE: Ord.le o0 o1):
-      Ord.le (next_cardinal (ToSet.to_total_set o0)) (next_cardinal (ToSet.to_total_set o1)).
+    Lemma le_aleph_gen o0 o1 (LE: ord.le o0 o1):
+      ord.le (next_cardinal (toSet.to_total_set o0)) (next_cardinal (toSet.to_total_set o1)).
     Proof.
       i. eapply next_cardinal_le. eapply to_total_le. apply LE.
     Qed.
 
-    Lemma eq_aleph_gen o0 o1 (EQ: Ord.eq o0 o1):
-      Ord.eq (next_cardinal (ToSet.to_total_set o0)) (next_cardinal (ToSet.to_total_set o1)).
+    Lemma eq_aleph_gen o0 o1 (EQ: ord.eq o0 o1):
+      ord.eq (next_cardinal (toSet.to_total_set o0)) (next_cardinal (toSet.to_total_set o1)).
     Proof.
       split.
       - eapply le_aleph_gen. apply EQ.
@@ -734,38 +734,38 @@ Module Cardinal.
     Qed.
 
     Lemma aleph_gen_lt o:
-      Ord.lt o (next_cardinal (ToSet.to_total_set o)).
+      ord.lt o (next_cardinal (toSet.to_total_set o)).
     Proof.
-      eapply Ord.eq_lt_lt.
-      { eapply ToSet.to_total_eq. }
+      eapply ord.eq_lt_lt.
+      { eapply toSet.to_total_eq. }
       eapply next_cardinal_upperbound.
       reflexivity.
     Qed.
 
     Lemma aleph_gen_le o:
-      Ord.le o (next_cardinal (ToSet.to_total_set o)).
+      ord.le o (next_cardinal (toSet.to_total_set o)).
     Proof.
-      eapply Ord.lt_le. eapply aleph_gen_lt.
+      eapply ord.lt_le. eapply aleph_gen_lt.
     Qed.
 
-    Definition aleph_gen (o: Ord.t) := next_cardinal (ToSet.to_total_set o).
-    Definition aleph := Ord.orec Ord.omega aleph_gen.
+    Definition aleph_gen (o: ord.t) := next_cardinal (toSet.to_total_set o).
+    Definition aleph := ord.orec ord.omega aleph_gen.
 
-    Lemma le_aleph o0 o1 (LE: Ord.le o0 o1):
-      Ord.le (aleph o0) (aleph o1).
+    Lemma le_aleph o0 o1 (LE: ord.le o0 o1):
+      ord.le (aleph o0) (aleph o1).
     Proof.
-      eapply Ord.le_orec; auto.
+      eapply ord.le_orec; auto.
       eapply le_aleph_gen.
     Qed.
 
-    Lemma lt_aleph o0 o1 (LE: Ord.lt o0 o1):
-      Ord.lt (aleph o0) (aleph o1).
+    Lemma lt_aleph o0 o1 (LE: ord.lt o0 o1):
+      ord.lt (aleph o0) (aleph o1).
     Proof.
-      eapply Ord.S_supremum in LE.
-      eapply Ord.lt_le_lt.
+      eapply ord.S_supremum in LE.
+      eapply ord.lt_le_lt.
       2: { eapply le_aleph; eauto. }
-      eapply Ord.lt_eq_lt.
-      { eapply Ord.orec_S.
+      eapply ord.lt_eq_lt.
+      { eapply ord.orec_S.
         { eapply aleph_gen_le. }
         { eapply le_aleph_gen. }
       }
@@ -773,31 +773,31 @@ Module Cardinal.
     Qed.
 
     Lemma aleph_le_omega o:
-      Ord.le Ord.omega (aleph o).
+      ord.le ord.omega (aleph o).
     Proof.
-      eapply Ord.orec_le_base.
+      eapply ord.orec_le_base.
       eapply le_aleph_gen.
     Qed.
 
     Lemma aleph_expand:
-      forall o, Ord.le o (aleph o).
+      forall o, ord.le o (aleph o).
     Proof.
-      i. transitivity (Ord.orec Ord.O Ord.S o).
-      { eapply Ord.orec_of_S. }
-      eapply (@Ord.rec_mon _ Ord.le Ord.join Ord.O Ord.S Ord.omega aleph_gen).
-      { eapply Ord.O_bot. }
-      { i. eapply Ord.S_supremum. eapply Ord.le_lt_lt; eauto.
+      i. transitivity (ord.orec ord.O ord.S o).
+      { eapply ord.orec_of_S. }
+      eapply (@ord.rec_mon _ ord.le ord.join ord.O ord.S ord.omega aleph_gen).
+      { eapply ord.O_bot. }
+      { i. eapply ord.S_supremum. eapply ord.le_lt_lt; eauto.
         eapply aleph_gen_lt.
       }
-      { eapply Ord.le_PreOrder. }
-      { i. eapply Ord.join_upperbound. }
-      { i. eapply Ord.join_supremum. auto. }
+      { eapply ord.le_PreOrder. }
+      { i. eapply ord.join_upperbound. }
+      { i. eapply ord.join_supremum. auto. }
     Qed.
 
     (* Lemma aleph_is_cardinal: *)
     (*   forall o, is_cardinal (aleph o). *)
     (* Proof. *)
-    (*   eapply (rec_wf Ord.le join (fun o => of_cardinal (ToSet.to_total_set o) o) aleph_gen omega); eauto. *)
+    (*   eapply (rec_wf ord.le join (fun o => of_cardinal (toSet.to_total_set o) o) aleph_gen omega); eauto. *)
     (*   { i. reflexivity. } *)
     (*   { i. transitivity d1; auto. } *)
     (*   { i. eapply join_upperbound. } *)
@@ -812,19 +812,19 @@ Module Cardinal.
 
 
   Section BETH.
-    Definition beth_gen (o: Ord.t) := cardinal (ToSet.to_total_set o -> Prop).
-    Definition beth := Ord.orec Ord.omega beth_gen.
+    Definition beth_gen (o: ord.t) := cardinal (toSet.to_total_set o -> Prop).
+    Definition beth := ord.orec ord.omega beth_gen.
 
-    Lemma le_beth_gen o0 o1 (LE: Ord.le o0 o1):
-      Ord.le (beth_gen o0) (beth_gen o1).
+    Lemma le_beth_gen o0 o1 (LE: ord.le o0 o1):
+      ord.le (beth_gen o0) (beth_gen o1).
     Proof.
       eapply to_total_le in LE.
       apply _cardinal_le_iff in LE. apply _cardinal_le_iff.
       eapply _cardinal_le_power. auto.
     Qed.
 
-    Lemma eq_beth_gen o0 o1 (EQ: Ord.eq o0 o1):
-      Ord.eq (beth_gen o0) (beth_gen o1).
+    Lemma eq_beth_gen o0 o1 (EQ: ord.eq o0 o1):
+      ord.eq (beth_gen o0) (beth_gen o1).
     Proof.
       split.
       - eapply le_beth_gen. apply EQ.
@@ -832,42 +832,42 @@ Module Cardinal.
     Qed.
 
     Lemma beth_gen_lt o:
-      Ord.lt o (beth_gen o).
+      ord.lt o (beth_gen o).
     Proof.
-      eapply Ord.eq_lt_lt.
-      { eapply ToSet.to_total_eq. }
-      eapply Ord.lt_le_lt.
+      eapply ord.eq_lt_lt.
+      { eapply toSet.to_total_eq. }
+      eapply ord.lt_le_lt.
       2: { eapply next_cardinal_le_power_set. }
       eapply next_cardinal_upperbound. reflexivity.
     Qed.
 
     Lemma beth_gen_le o:
-      Ord.le o (beth_gen o).
+      ord.le o (beth_gen o).
     Proof.
-      eapply Ord.lt_le. eapply beth_gen_lt.
+      eapply ord.lt_le. eapply beth_gen_lt.
     Qed.
 
     Lemma aleph_gen_le_beth_gen o:
-      Ord.le (aleph_gen o) (beth_gen o).
+      ord.le (aleph_gen o) (beth_gen o).
     Proof.
       eapply next_cardinal_le_power_set.
     Qed.
 
-    Lemma le_beth o0 o1 (LE: Ord.le o0 o1):
-      Ord.le (beth o0) (beth o1).
+    Lemma le_beth o0 o1 (LE: ord.le o0 o1):
+      ord.le (beth o0) (beth o1).
     Proof.
-      eapply Ord.le_orec; auto.
+      eapply ord.le_orec; auto.
       eapply le_beth_gen.
     Qed.
 
-    Lemma lt_beth o0 o1 (LE: Ord.lt o0 o1):
-      Ord.lt (beth o0) (beth o1).
+    Lemma lt_beth o0 o1 (LE: ord.lt o0 o1):
+      ord.lt (beth o0) (beth o1).
     Proof.
-      eapply Ord.S_supremum in LE.
-      eapply Ord.lt_le_lt.
+      eapply ord.S_supremum in LE.
+      eapply ord.lt_le_lt.
       2: { eapply le_beth; eauto. }
-      eapply Ord.lt_eq_lt.
-      { eapply Ord.orec_S.
+      eapply ord.lt_eq_lt.
+      { eapply ord.orec_S.
         { eapply beth_gen_le. }
         { eapply le_beth_gen. }
       }
@@ -875,31 +875,31 @@ Module Cardinal.
     Qed.
 
     Lemma beth_le_omega o:
-      Ord.le Ord.omega (beth o).
+      ord.le ord.omega (beth o).
     Proof.
-      eapply Ord.orec_le_base.
+      eapply ord.orec_le_base.
       eapply le_beth_gen.
     Qed.
 
     Lemma beth_expand:
-      forall o, Ord.le o (beth o).
+      forall o, ord.le o (beth o).
     Proof.
-      i. transitivity (Ord.orec Ord.O Ord.S o).
-      { eapply Ord.orec_of_S. }
-      eapply (@Ord.rec_mon _ Ord.le Ord.join Ord.O Ord.S Ord.omega beth_gen).
-      { eapply Ord.O_bot. }
-      { i. eapply Ord.S_supremum. eapply Ord.le_lt_lt; eauto.
+      i. transitivity (ord.orec ord.O ord.S o).
+      { eapply ord.orec_of_S. }
+      eapply (@ord.rec_mon _ ord.le ord.join ord.O ord.S ord.omega beth_gen).
+      { eapply ord.O_bot. }
+      { i. eapply ord.S_supremum. eapply ord.le_lt_lt; eauto.
         eapply beth_gen_lt.
       }
-      { eapply Ord.le_PreOrder. }
-      { i. eapply Ord.join_upperbound. }
-      { i. eapply Ord.join_supremum. auto. }
+      { eapply ord.le_PreOrder. }
+      { i. eapply ord.join_upperbound. }
+      { i. eapply ord.join_supremum. auto. }
     Qed.
 
     Lemma aleph_le_beth o:
-      Ord.le (aleph o) (beth o).
+      ord.le (aleph o) (beth o).
     Proof.
-      eapply Ord.orec_mon.
+      eapply ord.orec_mon.
       { reflexivity. }
       { i. transitivity (aleph_gen o1).
         { eapply le_aleph_gen. auto. }
@@ -954,9 +954,9 @@ Module Cardinal.
     Lemma finite_from_acc_eq:
       forall n (x: finite n)
              (ACC0: Acc (finite_lt n) x) (ACC1: Acc (finite_lt (Datatypes.S n)) (Some x)),
-        Ord.eq (Ord.from_acc ACC0) (Ord.from_acc ACC1).
+        ord.eq (ord.from_acc ACC0) (ord.from_acc ACC1).
     Proof.
-      Local Transparent Ord.from_acc.
+      Local Transparent ord.from_acc.
       intros n x ACC. dup ACC.
       induction ACC0. i. destruct ACC, ACC1. ss. split.
       { econs. i. destruct a1. exists (exist _ (Some x0) (f)). ss. eapply H0. auto. }
@@ -965,23 +965,23 @@ Module Cardinal.
 
     Lemma finite_from_wf_eq:
       forall n (x: finite n),
-        Ord.eq (Ord.from_wf (finite_well_founded n) x) (Ord.from_wf (finite_well_founded (Datatypes.S n)) (Some x)).
+        ord.eq (ord.from_wf (finite_well_founded n) x) (ord.from_wf (finite_well_founded (Datatypes.S n)) (Some x)).
     Proof.
-      Local Transparent Ord.from_wf.
+      Local Transparent ord.from_wf.
       i. eapply finite_from_acc_eq.
     Qed.
 
     Lemma finite_from_wf_set_eq:
       forall n,
-        Ord.eq (Ord.from_wf_set (finite_well_founded n)) (Ord.from_wf (finite_well_founded (Datatypes.S n)) None).
+        ord.eq (ord.from_wf_set (finite_well_founded n)) (ord.from_wf (finite_well_founded (Datatypes.S n)) None).
     Proof.
-      Local Transparent Ord.from_wf_set.
+      Local Transparent ord.from_wf_set.
       i. split.
-      { eapply Ord.build_supremum. i. eapply Ord.le_lt_lt.
+      { eapply ord.build_supremum. i. eapply ord.le_lt_lt.
         { eapply finite_from_wf_eq. }
-        { eapply Ord.lt_from_wf. ss. }
+        { eapply ord.lt_from_wf. ss. }
       }
-      { unfold Ord.from_wf at 1. destruct (finite_well_founded (Datatypes.S n) None).
+      { unfold ord.from_wf at 1. destruct (finite_well_founded (Datatypes.S n) None).
         ss. econs. i. destruct a0. ss. destruct x; ss.
         exists f. eapply finite_from_acc_eq.
       }
@@ -989,31 +989,31 @@ Module Cardinal.
 
     Lemma finite_S:
       forall n,
-        Ord.eq (Ord.S (Ord.from_wf_set (finite_well_founded n))) (Ord.from_wf_set (finite_well_founded (Datatypes.S n))).
+        ord.eq (ord.S (ord.from_wf_set (finite_well_founded n))) (ord.from_wf_set (finite_well_founded (Datatypes.S n))).
     Proof.
-      Local Transparent Ord.from_wf_set Ord.S.
+      Local Transparent ord.from_wf_set ord.S.
       i. split.
-      - eapply Ord.S_supremum. eapply Ord.le_lt_lt.
+      - eapply ord.S_supremum. eapply ord.le_lt_lt.
         { eapply finite_from_wf_set_eq. }
-        { eapply Ord.from_wf_set_upperbound. }
+        { eapply ord.from_wf_set_upperbound. }
       - econs. i. exists tt. ss. etransitivity.
         2: { eapply finite_from_wf_set_eq. }
         destruct a0.
-        { eapply Ord.lt_le. eapply Ord.lt_from_wf. auto. }
+        { eapply ord.lt_le. eapply ord.lt_from_wf. auto. }
         { reflexivity. }
     Qed.
 
     Lemma finite_O:
-      Ord.eq (Ord.from_wf_set (finite_well_founded 0)) Ord.O.
+      ord.eq (ord.from_wf_set (finite_well_founded 0)) ord.O.
     Proof.
-      Local Transparent Ord.from_wf_set Ord.O.
+      Local Transparent ord.from_wf_set ord.O.
       split.
       { econs. i. ss. }
-      { eapply Ord.O_bot. }
+      { eapply ord.O_bot. }
     Qed.
 
     Lemma O_cardinal:
-      Cardinal.of_cardinal False Ord.O.
+      cardinal.of_cardinal False ord.O.
     Proof.
       split.
       { exists (fun _ _ => False).
@@ -1021,31 +1021,31 @@ Module Cardinal.
         { ii. ss. }
         exists WF. splits; auto. split.
         { econs. i. ss. }
-        { eapply Ord.O_bot. }
+        { eapply ord.O_bot. }
       }
-      { i. eapply Ord.O_bot. }
+      { i. eapply ord.O_bot. }
     Qed.
 
     Lemma O_is_cardinal:
-      Cardinal.is_cardinal Ord.O.
+      cardinal.is_cardinal ord.O.
     Proof.
-      eapply Cardinal.of_cardinal_is_cardinal. eapply O_cardinal.
+      eapply cardinal.of_cardinal_is_cardinal. eapply O_cardinal.
     Qed.
 
     Lemma finite_cardinal_O:
-      Cardinal.is_cardinal (Ord.from_wf_set (finite_well_founded 0)).
+      cardinal.is_cardinal (ord.from_wf_set (finite_well_founded 0)).
     Proof.
-      eapply Cardinal.of_cardinal_is_cardinal. eapply Cardinal.eq_of_cardinal.
+      eapply cardinal.of_cardinal_is_cardinal. eapply cardinal.eq_of_cardinal.
       2: { eapply O_cardinal. }
       symmetry. eapply finite_O.
     Qed.
 
-    (* Lemma finite_incr n: Ord.lt (cardinal (finite n)) (cardinal (finite (Datatypes.S n))). *)
+    (* Lemma finite_incr n: ord.lt (cardinal (finite n)) (cardinal (finite (Datatypes.S n))). *)
   End FINITE.
-End Cardinal.
+End cardinal.
 
 
-Module Cardinality.
+Module cardinality.
   Variant le (A B: Type): Prop :=
   | le_intro
       (f: A -> B)
@@ -1399,7 +1399,7 @@ Module Cardinality.
 
   Lemma total_le A B: le A B \/ le B A.
   Proof.
-    hexploit (WellOrdering.set_comparable A B). i. des.
+    hexploit (well_ordering.set_comparable A B). i. des.
     - left. econs; eauto.
     - right. econs; eauto.
   Qed.
@@ -1416,22 +1416,22 @@ Module Cardinality.
     destruct (total A B); auto. apply le_eq_or_lt in H. des; auto.
   Qed.
 
-  Section CARDINAL.
-    Let le_iff A B: le A B <-> Cardinal._cardinal_le A B.
+  Section cardinal.
+    Let le_iff A B: le A B <-> cardinal._cardinal_le A B.
     Proof.
       split; i.
       - inv H. econs; eauto.
       - inv H. econs; eauto.
     Qed.
 
-    Let eq_iff A B: eq A B <-> Cardinal._cardinal_le A B /\ Cardinal._cardinal_le B A.
+    Let eq_iff A B: eq A B <-> cardinal._cardinal_le A B /\ cardinal._cardinal_le B A.
     Proof.
       split; i.
       - inv H. split; apply le_iff; auto.
       - inv H. split; apply le_iff; auto.
     Qed.
 
-    Let lt_iff A B: lt A B <-> Cardinal._cardinal_le A B /\ ~ Cardinal._cardinal_le B A.
+    Let lt_iff A B: lt A B <-> cardinal._cardinal_le A B /\ ~ cardinal._cardinal_le B A.
     Proof.
       split; i.
       - inv H. split.
@@ -1445,71 +1445,71 @@ Module Cardinality.
     Lemma cardinal_upperbound A B (CARD: lt B A)
           (R: B -> B -> Prop) (WF: well_founded R)
       :
-        Ord.lt (Ord.from_wf_set WF) (Cardinal.cardinal A).
+        ord.lt (ord.from_wf_set WF) (cardinal.cardinal A).
     Proof.
-      eapply Cardinal._cardinal_upperbound. apply lt_iff; auto.
+      eapply cardinal._cardinal_upperbound. apply lt_iff; auto.
     Qed.
 
     Lemma cardinal_supremum A c
           (UPPER: forall B (CARD: lt B A)
                          (R: B -> B -> Prop) (WF: well_founded R),
-              Ord.lt (Ord.from_wf_set WF) c)
+              ord.lt (ord.from_wf_set WF) c)
       :
-        Ord.le (Cardinal.cardinal A) c.
+        ord.le (cardinal.cardinal A) c.
     Proof.
-      eapply Cardinal._cardinal_supremum. i. eapply UPPER. des. split.
+      eapply cardinal._cardinal_supremum. i. eapply UPPER. des. split.
       - inv CARD. econs; eauto.
       - ii. eapply CARD0. inv H. econs; eauto.
     Qed.
 
     Lemma cardinal_le_iff A B:
-      le A B <-> Ord.le (Cardinal.cardinal A) (Cardinal.cardinal B).
+      le A B <-> ord.le (cardinal.cardinal A) (cardinal.cardinal B).
     Proof.
-      rewrite <- Cardinal._cardinal_le_iff. auto.
+      rewrite <- cardinal._cardinal_le_iff. auto.
     Qed.
 
     Lemma cardinal_eq_iff A B:
-      eq A B <-> Ord.eq (Cardinal.cardinal A) (Cardinal.cardinal B).
+      eq A B <-> ord.eq (cardinal.cardinal A) (cardinal.cardinal B).
     Proof.
-      rewrite <- Cardinal._cardinal_eq_iff. auto.
+      rewrite <- cardinal._cardinal_eq_iff. auto.
     Qed.
 
     Lemma cardinal_lt_iff A B:
-      lt A B <-> Ord.lt (Cardinal.cardinal A) (Cardinal.cardinal B).
+      lt A B <-> ord.lt (cardinal.cardinal A) (cardinal.cardinal B).
     Proof.
-      rewrite <- Cardinal._cardinal_lt_iff. auto.
+      rewrite <- cardinal._cardinal_lt_iff. auto.
     Qed.
-  End CARDINAL.
+  End cardinal.
 
   Lemma cardinal_to_total_bij A:
-    eq A (ToSet.to_total_set (Cardinal.cardinal A)).
+    eq A (toSet.to_total_set (cardinal.cardinal A)).
   Proof.
     eapply cardinal_eq_iff.
-    eapply Cardinal.cardinal_to_total_bij1.
+    eapply cardinal.cardinal_to_total_bij1.
   Qed.
 
   Lemma lt_well_founded: well_founded lt.
   Proof.
-    assert (forall (o: Ord.t) A (EQ: Ord.eq o (Cardinal.cardinal A)), Acc lt A).
-    { eapply (well_founded_induction Ord.lt_well_founded (fun o => forall A (EQ: Ord.eq o (Cardinal.cardinal A)), Acc lt A)).
+    assert (forall (o: ord.t) A (EQ: ord.eq o (cardinal.cardinal A)), Acc lt A).
+    { eapply (well_founded_induction ord.lt_well_founded (fun o => forall A (EQ: ord.eq o (cardinal.cardinal A)), Acc lt A)).
       i. econs. i. apply cardinal_lt_iff in H0.
       eapply H.
-      { eapply Ord.lt_eq_lt.
+      { eapply ord.lt_eq_lt.
         { eapply EQ. }
         { eapply H0. }
       }
       { reflexivity. }
     }
-    ii. eapply (H (Cardinal.cardinal a)). reflexivity.
+    ii. eapply (H (cardinal.cardinal a)). reflexivity.
   Qed.
 
   Definition power A := A -> Prop.
   Lemma cantor A: lt A (power A).
   Proof.
     eapply cardinal_lt_iff.
-    eapply (@Ord.lt_le_lt (Cardinal.next_cardinal A)).
-    { eapply Cardinal.next_cardinal_incr. }
-    { eapply Cardinal.next_cardinal_le_power_set. }
+    eapply (@ord.lt_le_lt (cardinal.next_cardinal A)).
+    { eapply cardinal.next_cardinal_incr. }
+    { eapply cardinal.next_cardinal_le_power_set. }
   Qed.
 
   Lemma le_power A0 A1 (LE: le A0 A1):
@@ -1533,21 +1533,21 @@ Module Cardinality.
     i. ss.
   Qed.
 
-  Definition S A:= ToSet.to_total_set (Cardinal.next_cardinal A).
+  Definition S A:= toSet.to_total_set (cardinal.next_cardinal A).
   Lemma S_lt A: lt A (S A).
   Proof.
     eapply cardinal_lt_iff. unfold S.
-    eapply Ord.lt_eq_lt.
-    { symmetry. eapply Cardinal.cardinal_to_total_bij2.
-      eapply Cardinal.next_cardinal_of_cardinal. }
-    { eapply Cardinal.next_cardinal_incr. }
+    eapply ord.lt_eq_lt.
+    { symmetry. eapply cardinal.cardinal_to_total_bij2.
+      eapply cardinal.next_cardinal_of_cardinal. }
+    { eapply cardinal.next_cardinal_incr. }
   Qed.
   Lemma S_supremum A B (LT: lt A B): le (S A) B.
   Proof.
     apply cardinal_lt_iff in LT.
-    eapply Cardinal.next_cardinal_supremum in LT.
-    apply cardinal_le_iff. transitivity (Cardinal.next_cardinal A); auto.
-    unfold S. eapply Cardinal.to_total_cardinal_le.
+    eapply cardinal.next_cardinal_supremum in LT.
+    apply cardinal_le_iff. transitivity (cardinal.next_cardinal A); auto.
+    unfold S. eapply cardinal.to_total_cardinal_le.
   Qed.
 
   Lemma S_le_power A: le (S A) (power A).
@@ -1556,7 +1556,7 @@ Module Cardinality.
   Qed.
 
   Definition join X (TS: X -> Type):=
-    ToSet.to_total_set (@Ord.join X (fun x => Cardinal.cardinal (TS x))).
+    toSet.to_total_set (@ord.join X (fun x => cardinal.cardinal (TS x))).
 
   Definition continnum_hypothesis_on A: Prop := eq (S A) (power A).
-End Cardinality.
+End cardinality.

@@ -6,18 +6,28 @@ From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 
-TODO
+Module TicketLock.
+  (** https://en.wikipedia.org/wiki/Ticket_lock *)
 
-Definition writer : val :=
-  λ: "l", "l" <- #1;;
-          Exit #().
+  (* next = next_ticket, curr = now_serving *)
+  Definition init : val :=
+    λ: <>, (ref #0, ref #0).
 
-Definition reader : val := 
-  rec: "reader" "l" :=
-    let: "n" := !"l" in
-    if: "n" = #1
-    then Exit #()
-    else "reader" "l".
+  Definition acquire : val :=
+    λ: "next" "curr",
+      let: "my_ticket" := FAA "next" #1 in
+      let: "try_lock" :=
+        (rec: "while" <> := if: !"curr" = "my_ticket"
+                           then #()
+                           else "while"
+        ) in
+      "try_lock".
+
+  Definition release : val :=
+    λ: "curr",
+      "curr" <- !"curr" + #1.
+
+End TicketLock.
 
 Section mp_proof.
   Context `{!heapGS Σ} (N : namespace).

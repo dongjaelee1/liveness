@@ -1,5 +1,5 @@
-From liris.ordinal Require Import sflib Basics ClassicalOrdinal Fixedpoint.
-From liris.ordinal Require Export Ordinal.
+From liris.ordinal Require Import sflib basics classical_ordinal fixedpoint.
+From liris.ordinal Require Export ordinal.
 
 From Coq Require Import ClassicalChoice FunctionalExtensionality PropExtensionality.
 
@@ -8,24 +8,24 @@ Set Primitive Projections.
 
 Lemma from_wf_set_embed A B (RA: A -> A -> Prop) (RB: B -> B -> Prop)
       (WFA: well_founded RA) (WFB: well_founded RB)
-      (LE: Ord.le (Ord.from_wf_set WFA) (Ord.from_wf_set WFB))
+      (LE: ord.le (ord.from_wf_set WFA) (ord.from_wf_set WFB))
       (TOTALB: forall b0 b1, RB b0 b1 \/ b0 = b1 \/ RB b1 b0)
   :
     exists (f: A -> B), forall a0 a1 (LT: RA a0 a1), RB (f a0) (f a1).
 Proof.
-  hexploit (choice (fun a b => Ord.eq (Ord.from_wf WFA a) (Ord.from_wf WFB b))).
-  { intros a. eapply ClassicOrd.from_wf_set_complete.
-    eapply Ord.lt_le_lt; eauto. eapply Ord.from_wf_set_upperbound. }
-  intros EQ. des. exists f. i. eapply Ord.lt_from_wf with (WF:=WFA) in LT.
-  assert (Ord.lt (Ord.from_wf WFB (f a0)) (Ord.from_wf WFB (f a1))).
-  { eapply (@Ord.le_lt_lt (Ord.from_wf WFA a0)); eauto.
+  hexploit (choice (fun a b => ord.eq (ord.from_wf WFA a) (ord.from_wf WFB b))).
+  { intros a. eapply classicOrd.from_wf_set_complete.
+    eapply ord.lt_le_lt; eauto. eapply ord.from_wf_set_upperbound. }
+  intros EQ. des. exists f. i. eapply ord.lt_from_wf with (WF:=WFA) in LT.
+  assert (ord.lt (ord.from_wf WFB (f a0)) (ord.from_wf WFB (f a1))).
+  { eapply (@ord.le_lt_lt (ord.from_wf WFA a0)); eauto.
     - eapply EQ.
-    - eapply (@Ord.lt_le_lt (Ord.from_wf WFA a1)); auto. eapply EQ. }
+    - eapply (@ord.lt_le_lt (ord.from_wf WFA a1)); auto. eapply EQ. }
   destruct (TOTALB (f a0) (f a1)) as [|[]].
   - auto.
-  - rewrite H0 in *. eapply Ord.lt_not_le in H; ss. reflexivity.
-  - eapply Ord.lt_from_wf with (WF:=WFB) in H0; eauto.
-    exfalso. eapply Ord.lt_not_le in H; ss. eapply Ord.lt_le; auto.
+  - rewrite H0 in *. eapply ord.lt_not_le in H; ss. reflexivity.
+  - eapply ord.lt_from_wf with (WF:=WFB) in H0; eauto.
+    exfalso. eapply ord.lt_not_le in H; ss. eapply ord.lt_le; auto.
 Qed.
 
 Section WO.
@@ -205,12 +205,12 @@ Section WO.
 
     Let eventually_exhausted
       :
-        exists o, forall x, P (Ord.rec base next joinX o) x.
+        exists o, forall x, P (ord.rec base next joinX o) x.
     Proof.
       hexploit (fixpoint_theorem base next joinX leX wfX); auto. i.
-      exists (Ord.hartogs subX).
+      exists (ord.hartogs subX).
       hexploit next_exhausted.
-      { eapply (ClassicOrd.rec_wf base next joinX leX wfX); eauto. }
+      { eapply (classicOrd.rec_wf base next joinX leX wfX); eauto. }
       i. des; eauto. exfalso. eapply H2. eapply H. auto.
     Qed.
 
@@ -221,9 +221,9 @@ Section WO.
           (forall x0 x1, R x0 x1 \/ x0 = x1 \/ R x1 x0).
     Proof.
       hexploit eventually_exhausted. i. des.
-      assert (WF: wfX (Ord.rec base next joinX o)).
-      { hexploit (@ClassicOrd.rec_wf _ base next joinX leX wfX); eauto. }
-      exists (R (Ord.rec base next joinX o)). splits; auto.
+      assert (WF: wfX (ord.rec base next joinX o)).
+      { hexploit (@classicOrd.rec_wf _ base next joinX leX wfX); eauto. }
+      exists (R (ord.rec base next joinX o)). splits; auto.
     Qed.
   End NEXT.
 
@@ -293,14 +293,14 @@ Section EXTEND.
   Variable WF: well_founded R.
 
   Definition extended_order (a0 a1: A): Prop :=
-    Ord.lt (Ord.from_wf WF a0) (Ord.from_wf WF a1) \/
-    (Ord.eq (Ord.from_wf WF a0) (Ord.from_wf WF a1) /\ RT a0 a1)
+    ord.lt (ord.from_wf WF a0) (ord.from_wf WF a1) \/
+    (ord.eq (ord.from_wf WF a0) (ord.from_wf WF a1) /\ RT a0 a1)
   .
 
   Lemma extended_order_total:
     forall a0 a1, extended_order a0 a1 \/ a0 = a1 \/ extended_order a1 a0.
   Proof.
-    i. destruct (ClassicOrd.trichotomy (Ord.from_wf WF a0) (Ord.from_wf WF a1)) as [|[]].
+    i. destruct (classicOrd.trichotomy (ord.from_wf WF a0) (ord.from_wf WF a1)) as [|[]].
     - left. left. auto.
     - destruct (@TOTAL a0 a1) as [|[]]; auto.
       + left. right. auto.
@@ -311,32 +311,32 @@ Section EXTEND.
   Lemma extended_order_well_founded: well_founded extended_order.
   Proof.
     ii. hexploit (well_founded_induction
-                    Ord.lt_well_founded
-                    (fun o => forall a (LE: Ord.le (Ord.from_wf WF a) o), Acc extended_order a)); eauto.
+                    ord.lt_well_founded
+                    (fun o => forall a (LE: ord.le (ord.from_wf WF a) o), Acc extended_order a)); eauto.
     { clear a. intros o IH.
-      assert (LTS: forall a (LT: Ord.lt (Ord.from_wf WF a) o), Acc extended_order a).
+      assert (LTS: forall a (LT: ord.lt (ord.from_wf WF a) o), Acc extended_order a).
       { i. econs. i.
         hexploit (IH _ LT).
         { reflexivity. }
         i. inv H0. eauto.
       }
-      i. eapply ClassicOrd.le_eq_or_lt in LE. des; auto.
+      i. eapply classicOrd.le_eq_or_lt in LE. des; auto.
       eapply (well_founded_induction
-                WFT (fun a => Ord.eq (Ord.from_wf WF a) o -> Acc extended_order a)); eauto.
+                WFT (fun a => ord.eq (ord.from_wf WF a) o -> Acc extended_order a)); eauto.
       clear a LE. i. econs. i. inv H1.
-      { eapply (IH (Ord.from_wf WF y)).
-        { eapply Ord.lt_eq_lt; eauto. symmetry. auto. }
+      { eapply (IH (ord.from_wf WF y)).
+        { eapply ord.lt_eq_lt; eauto. symmetry. auto. }
         { reflexivity. }
       }
-      { des. eapply H; eauto. transitivity (Ord.from_wf WF x); auto. }
+      { des. eapply H; eauto. transitivity (ord.from_wf WF x); auto. }
     }
-    { eapply Ord.lt_le. eapply Ord.from_wf_set_upperbound. }
+    { eapply ord.lt_le. eapply ord.from_wf_set_upperbound. }
   Qed.
 
   Lemma extended_order_incl:
     forall a0 a1 (LT: R a0 a1), extended_order a0 a1.
   Proof.
-    i. left. eapply Ord.lt_from_wf; auto.
+    i. left. eapply ord.lt_from_wf; auto.
   Qed.
 End EXTEND.
 
@@ -362,7 +362,7 @@ Lemma wf_set_comparable A B (RA: A -> A -> Prop) (RB: B -> B -> Prop)
     (exists (f: A -> B), forall a0 a1 (LT: RA a0 a1), RB (f a0) (f a1)) \/
     (exists (f: B -> A), forall b0 b1 (LT: RB b0 b1), RA (f b0) (f b1)).
 Proof.
-  destruct (ClassicOrd.total_le (Ord.from_wf_set WFA) (Ord.from_wf_set WFB)).
+  destruct (classicOrd.total_le (ord.from_wf_set WFA) (ord.from_wf_set WFB)).
   - left. eapply from_wf_set_embed; eauto.
   - right. eapply from_wf_set_embed; eauto.
 Qed.

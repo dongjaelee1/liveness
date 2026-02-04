@@ -1,5 +1,5 @@
-From liris.ordinal Require Import sflib Basics ClassicalOrdinal.
-From liris.ordinal Require Export Ordinal.
+From liris.ordinal Require Import sflib basics classical_ordinal.
+From liris.ordinal Require Export ordinal.
 
 Set Implicit Arguments.
 Set Primitive Projections.
@@ -32,25 +32,25 @@ Section FIXPOINT.
   Hypothesis next_eq: forall d0 d1 (WF0: wf d0) (WF1: wf d1) (EQ: deq d0 d1), deq (next d0) (next d1).
 
   Lemma fixpoint_theorem_le:
-    dle (next (Ord.rec base next djoin (Ord.hartogs D))) (Ord.rec base next djoin (Ord.hartogs D)).
+    dle (next (ord.rec base next djoin (ord.hartogs D))) (ord.rec base next djoin (ord.hartogs D)).
   Proof.
-    eapply (ClassicOrd._fixpoint_theorem base next djoin dle wf); eauto.
+    eapply (classicOrd._fixpoint_theorem base next djoin dle wf); eauto.
   Qed.
 
   (* Bourbaki-Witt theorem *)
   Theorem fixpoint_theorem:
-    deq (next (Ord.rec base next djoin (Ord.hartogs D))) (Ord.rec base next djoin (Ord.hartogs D)).
+    deq (next (ord.rec base next djoin (ord.hartogs D))) (ord.rec base next djoin (ord.hartogs D)).
   Proof.
     split.
     { apply fixpoint_theorem_le. }
-    { apply next_le. eapply (ClassicOrd.rec_wf base next djoin dle wf); auto. }
+    { apply next_le. eapply (classicOrd.rec_wf base next djoin dle wf); auto. }
   Qed.
 End FIXPOINT.
 
 
 Section ALGEBRA.
   Variable A: Type.
-  Let kappa := Ord.hartogs (A -> Prop).
+  Let kappa := ord.hartogs (A -> Prop).
   Let le: (A -> Prop) -> (A -> Prop) -> Prop :=
     fun P0 P1 => forall a (IN0: P0 a), P1 a.
   Let ge: (A -> Prop) -> (A -> Prop) -> Prop :=
@@ -70,14 +70,14 @@ Section ALGEBRA.
     ii. eapply mon; eauto.
   Qed.
 
-  Definition mu := Ord.rec bot f join kappa.
-  Definition nu := Ord.rec top f meet kappa.
+  Definition mu := ord.rec bot f join kappa.
+  Definition nu := ord.rec top f meet kappa.
 
   Theorem mu_fixpoint:
     le mu (f mu) /\ le (f mu) mu.
   Proof.
     split.
-    { hexploit (Ord.rec_wf bot f join le (fun P => le P (f P))); eauto.
+    { hexploit (ord.rec_wf bot f join le (fun P => le P (f P))); eauto.
       { ii. eapply LE1; eauto. }
       { ii. exists a. auto. }
       { ii. inv IN0. eapply LE; eauto. }
@@ -99,7 +99,7 @@ Section ALGEBRA.
 
   Theorem mu_least P (LE: le (f P) P): le mu P.
   Proof.
-    eapply (Ord.rec_wf bot f join le (fun P0 => le P0 (f P0) /\ le P0 P)); eauto.
+    eapply (ord.rec_wf bot f join le (fun P0 => le P0 (f P0) /\ le P0 P)); eauto.
     { ii. eapply LE1; eauto. }
     { ii. exists a. auto. }
     { ii. inv IN0. eapply LE0; eauto. }
@@ -125,7 +125,7 @@ Section ALGEBRA.
       { ii. ss. }
       { ii. des. split; apply mon_rev; auto. }
     }
-    { hexploit (Ord.rec_wf top f meet ge (fun P => le (f P) P)); eauto.
+    { hexploit (ord.rec_wf top f meet ge (fun P => le (f P) P)); eauto.
       { ii. eapply LE0; eauto. }
       { ii. eapply IN0; eauto. }
       { ii. eapply LE. auto. }
@@ -137,7 +137,7 @@ Section ALGEBRA.
 
   Theorem nu_greatest P (LE: le P (f P)): le P nu.
   Proof.
-    eapply (Ord.rec_wf top f meet ge (fun P0 => le (f P0) P0 /\ le P P0)); eauto.
+    eapply (ord.rec_wf top f meet ge (fun P0 => le (f P0) P0 /\ le P P0)); eauto.
     { ii. eapply LE0; eauto. }
     { ii. eapply IN0; eauto. }
     { ii. eapply LE0. auto. }

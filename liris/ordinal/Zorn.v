@@ -1,5 +1,5 @@
-From liris.ordinal Require Import sflib Basics ClassicalOrdinal Fixedpoint.
-From liris.ordinal Require Export Ordinal.
+From liris.ordinal Require Import sflib basics classical_ordinal fixedpoint.
+From liris.ordinal Require Export ordinal.
 
 From Coq Require Import Classes.RelationClasses.
 From Coq Require Import ClassicalChoice FunctionalExtensionality PropExtensionality.
@@ -155,13 +155,13 @@ Section ZORNLT.
     Proof.
       hexploit (fixpoint_theorem_le base next chain_join chain_le wf); auto.
       i. inv H.
-      hexploit (H0 (f (Ord.rec base next chain_join (Ord.hartogs chain)))); auto.
+      hexploit (H0 (f (ord.rec base next chain_join (ord.hartogs chain)))); auto.
       { right. auto. }
-      i. eapply (@antisym (f (Ord.rec base next chain_join (Ord.hartogs chain))) (f (Ord.rec base next chain_join (Ord.hartogs chain)))).
+      i. eapply (@antisym (f (ord.rec base next chain_join (ord.hartogs chain))) (f (ord.rec base next chain_join (ord.hartogs chain)))).
       { eapply INCR; auto.
-        eapply (ClassicOrd.rec_wf base next chain_join chain_le wf); auto. }
+        eapply (classicOrd.rec_wf base next chain_join chain_le wf); auto. }
       { eapply INCR; auto.
-        eapply (ClassicOrd.rec_wf base next chain_join chain_le wf); auto. }
+        eapply (classicOrd.rec_wf base next chain_join chain_le wf); auto. }
     Qed.
   End INCR.
 

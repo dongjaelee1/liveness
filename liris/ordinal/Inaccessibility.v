@@ -1,5 +1,5 @@
-From liris.ordinal Require Import sflib Basics.
-From liris.ordinal Require Export Ordinal Arithmetic.
+From liris.ordinal Require Import sflib basics.
+From liris.ordinal Require Export ordinal arithmetic.
 
 From Coq Require Import ChoiceFacts.
 
@@ -9,44 +9,44 @@ Set Primitive Projections.
 Section INACCESSIBLE.
   Let flip A B C (f: A -> B -> C): B -> A -> C := fun b a => f a b.
 
-  Record inaccessible (X: Type) (base: Ord.t) (next: Ord.t -> Ord.t) (k: Ord.t): Prop :=
+  Record inaccessible (X: Type) (base: ord.t) (next: ord.t -> ord.t) (k: ord.t): Prop :=
     mk_inaccessible
-      { inaccessible_base: Ord.lt base k;
-        inaccessible_next: forall o (LT: Ord.lt o k), Ord.lt (next o) k;
-        inaccessible_join: forall (os: X -> Ord.t) (LT: forall a, Ord.lt (os a) k),
-            Ord.lt (Ord.join os) k;
-        inaccessible_union: forall o0 o1 (LT0: Ord.lt o0 k) (LT1: Ord.lt o1 k),
-            Ord.lt (Ord.union o0 o1) k;
+      { inaccessible_base: ord.lt base k;
+        inaccessible_next: forall o (LT: ord.lt o k), ord.lt (next o) k;
+        inaccessible_join: forall (os: X -> ord.t) (LT: forall a, ord.lt (os a) k),
+            ord.lt (ord.join os) k;
+        inaccessible_union: forall o0 o1 (LT0: ord.lt o0 k) (LT1: ord.lt o1 k),
+            ord.lt (ord.union o0 o1) k;
       }.
 
   Lemma inaccessible_mon X0 X1 base0 base1 next0 next1 k
         (SURJ: exists (f: X1 -> X0), forall x0, exists x1, f x1 = x0)
-        (BASE: Ord.lt base0 k)
-        (NEXT: forall o (LT: Ord.lt o k), Ord.le (next0 o) (next1 o))
+        (BASE: ord.lt base0 k)
+        (NEXT: forall o (LT: ord.lt o k), ord.le (next0 o) (next1 o))
         (INACCESSIBLE: inaccessible X1 base1 next1 k)
     :
       inaccessible X0 base0 next0 k.
   Proof.
     econs.
     { des; auto. }
-    { i. eapply Ord.le_lt_lt; eauto.
+    { i. eapply ord.le_lt_lt; eauto.
       eapply INACCESSIBLE.(inaccessible_next). auto. }
-    { i. des. eapply (@Ord.le_lt_lt (Ord.join (fun (x1: X1) => os (f x1)))).
-      { eapply Ord.le_join. i. specialize (SURJ a0).
+    { i. des. eapply (@ord.le_lt_lt (ord.join (fun (x1: X1) => os (f x1)))).
+      { eapply ord.le_join. i. specialize (SURJ a0).
         des. subst. eexists. reflexivity. }
       { eapply INACCESSIBLE.(inaccessible_join). auto. }
     }
     { eapply INACCESSIBLE. }
   Qed.
 
-  Record ginaccessible (X: Type) (base: Ord.t) (next: Ord.t -> Ord.t) (k: Ord.t): Prop :=
+  Record ginaccessible (X: Type) (base: ord.t) (next: ord.t -> ord.t) (k: ord.t): Prop :=
     mk_ginaccessible
-      { ginaccessible_base: Ord.lt base k;
-        ginaccessible_next: forall o (LT: Ord.lt o k), Ord.lt (next o) k;
-        ginaccessible_join: forall (P: X -> Prop) (os: sig P -> Ord.t) (LT: forall a, Ord.lt (os a) k),
-            Ord.lt (Ord.join os) k;
-        ginaccessible_union: forall o0 o1 (LT0: Ord.lt o0 k) (LT1: Ord.lt o1 k),
-            Ord.lt (Ord.union o0 o1) k;
+      { ginaccessible_base: ord.lt base k;
+        ginaccessible_next: forall o (LT: ord.lt o k), ord.lt (next o) k;
+        ginaccessible_join: forall (P: X -> Prop) (os: sig P -> ord.t) (LT: forall a, ord.lt (os a) k),
+            ord.lt (ord.join os) k;
+        ginaccessible_union: forall o0 o1 (LT0: ord.lt o0 k) (LT1: ord.lt o1 k),
+            ord.lt (ord.union o0 o1) k;
       }.
 
   Lemma ginaccessible_inaccessible X base next k
@@ -57,8 +57,8 @@ Section INACCESSIBLE.
     econs; try by apply INACCESSIBLE. i.
     hexploit INACCESSIBLE.(ginaccessible_join).
     { instantiate (1:=fun (p: sig (fun _ => True)) => os (proj1_sig p)). ss. }
-    i. eapply Ord.le_lt_lt; eauto.
-    eapply Ord.le_join. i. exists (exist _ a0 I). reflexivity.
+    i. eapply ord.le_lt_lt; eauto.
+    eapply ord.le_join. i. exists (exist _ a0 I). reflexivity.
   Qed.
 
   Section TREE.
@@ -88,160 +88,160 @@ Section INACCESSIBLE.
       { econs. i. ss. des; subst; auto. }
     Qed.
 
-    Lemma tree_O_O: Ord.eq (Ord.from_wf tree_lt_well_founded tree_O) Ord.O.
+    Lemma tree_O_O: ord.eq (ord.from_wf tree_lt_well_founded tree_O) ord.O.
     Proof.
-      Local Transparent Ord.from_wf Ord.from_acc Ord.O.
+      Local Transparent ord.from_wf ord.from_acc ord.O.
       split.
-      { unfold Ord.from_wf. destruct (tree_lt_well_founded tree_O).
+      { unfold ord.from_wf. destruct (tree_lt_well_founded tree_O).
         ss. econs. i. destruct a0. ss. }
-      { eapply Ord.O_bot. }
+      { eapply ord.O_bot. }
     Qed.
 
     Lemma tree_S_S tr:
-      Ord.eq (Ord.from_wf tree_lt_well_founded (tree_S tr)) (Ord.S (Ord.from_wf tree_lt_well_founded tr)).
+      ord.eq (ord.from_wf tree_lt_well_founded (tree_S tr)) (ord.S (ord.from_wf tree_lt_well_founded tr)).
     Proof.
-      Local Transparent Ord.from_wf Ord.from_acc Ord.O Ord.S.
+      Local Transparent ord.from_wf ord.from_acc ord.O ord.S.
       split.
-      { unfold Ord.from_wf at 1. destruct (tree_lt_well_founded (tree_S tr)).
+      { unfold ord.from_wf at 1. destruct (tree_lt_well_founded (tree_S tr)).
         ss. econs. i. destruct a0. ss. subst. exists tt.
-        ss. eapply Ord.same_acc_le.
+        ss. eapply ord.same_acc_le.
       }
-      { eapply Ord.S_supremum. eapply Ord.lt_from_wf. ss. }
+      { eapply ord.S_supremum. eapply ord.lt_from_wf. ss. }
     Qed.
 
     Lemma tree_join_build (trs: X -> tree):
-      Ord.eq (Ord.from_wf tree_lt_well_founded (tree_join trs)) (Ord.build (fun x => Ord.from_wf tree_lt_well_founded (trs x))).
+      ord.eq (ord.from_wf tree_lt_well_founded (tree_join trs)) (ord.build (fun x => ord.from_wf tree_lt_well_founded (trs x))).
     Proof.
       split.
-      { unfold Ord.from_wf at 1. destruct (tree_lt_well_founded (tree_join trs)).
+      { unfold ord.from_wf at 1. destruct (tree_lt_well_founded (tree_join trs)).
         ss. econs. i. destruct a0. des. ss. subst. exists x0.
-        ss. eapply Ord.same_acc_le.
+        ss. eapply ord.same_acc_le.
       }
-      { eapply Ord.build_supremum. i. eapply Ord.lt_from_wf. ss. eauto. }
+      { eapply ord.build_supremum. i. eapply ord.lt_from_wf. ss. eauto. }
     Qed.
 
     Lemma tree_union_union_le (tr0 tr1: tree):
-      Ord.le (Ord.from_wf tree_lt_well_founded (tree_union tr0 tr1)) (Ord.S (Ord.union (Ord.from_wf tree_lt_well_founded tr0) (Ord.from_wf tree_lt_well_founded tr1))).
+      ord.le (ord.from_wf tree_lt_well_founded (tree_union tr0 tr1)) (ord.S (ord.union (ord.from_wf tree_lt_well_founded tr0) (ord.from_wf tree_lt_well_founded tr1))).
     Proof.
-      unfold Ord.from_wf at 1. destruct (tree_lt_well_founded (tree_union tr0 tr1)).
+      unfold ord.from_wf at 1. destruct (tree_lt_well_founded (tree_union tr0 tr1)).
       ss. econs. i. destruct a0. ss. exists tt. ss. des; subst.
-      { transitivity (Ord.from_wf tree_lt_well_founded tr0).
-        { eapply Ord.same_acc_le. }
-        { eapply Ord.union_l. }
+      { transitivity (ord.from_wf tree_lt_well_founded tr0).
+        { eapply ord.same_acc_le. }
+        { eapply ord.union_l. }
       }
-      { transitivity (Ord.from_wf tree_lt_well_founded tr1).
-        { eapply Ord.same_acc_le. }
-        { eapply Ord.union_r. }
+      { transitivity (ord.from_wf tree_lt_well_founded tr1).
+        { eapply ord.same_acc_le. }
+        { eapply ord.union_r. }
       }
     Qed.
 
     Lemma tree_union_union_le_rev (tr0 tr1: tree):
-      Ord.le (Ord.union (Ord.from_wf tree_lt_well_founded tr0) (Ord.from_wf tree_lt_well_founded tr1)) (Ord.from_wf tree_lt_well_founded (tree_union tr0 tr1)).
+      ord.le (ord.union (ord.from_wf tree_lt_well_founded tr0) (ord.from_wf tree_lt_well_founded tr1)) (ord.from_wf tree_lt_well_founded (tree_union tr0 tr1)).
     Proof.
-      eapply Ord.union_spec.
-      { eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. auto. }
-      { eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. auto. }
+      eapply ord.union_spec.
+      { eapply ord.lt_le. eapply ord.lt_from_wf. ss. auto. }
+      { eapply ord.lt_le. eapply ord.lt_from_wf. ss. auto. }
     Qed.
 
-    Definition tree_top := Ord.from_wf_set tree_lt_well_founded.
+    Definition tree_top := ord.from_wf_set tree_lt_well_founded.
 
-    Lemma inaccessible_rec_inaccessible (base0: Ord.t) (next: Ord.t -> Ord.t)
-          (NEXTLE: forall o, Ord.le o (next o))
-          (NEXTMON: forall o0 o1 (LE: Ord.le o0 o1), Ord.le (next o0) (next o1))
+    Lemma inaccessible_rec_inaccessible (base0: ord.t) (next: ord.t -> ord.t)
+          (NEXTLE: forall o, ord.le o (next o))
+          (NEXTMON: forall o0 o1 (LE: ord.le o0 o1), ord.le (next o0) (next o1))
           (INACCESSIBLE: inaccessible X base0 next tree_top)
           base1
-          (BASE1: Ord.lt base1 tree_top)
+          (BASE1: ord.lt base1 tree_top)
       :
-        inaccessible X base0 (Ord.orec base1 next) tree_top.
+        inaccessible X base0 (ord.orec base1 next) tree_top.
     Proof.
-      Local Transparent Ord.from_wf Ord.from_acc Ord.O Ord.S Ord.rec Ord.from_wf_set.
+      Local Transparent ord.from_wf ord.from_acc ord.O ord.S ord.rec ord.from_wf_set.
       econs; eauto.
       { eapply INACCESSIBLE. }
       2: { eapply INACCESSIBLE. }
       2: { eapply INACCESSIBLE. }
-      assert (RECS: forall tr, Ord.lt (Ord.orec base1 next (Ord.from_wf tree_lt_well_founded tr)) tree_top).
+      assert (RECS: forall tr, ord.lt (ord.orec base1 next (ord.from_wf tree_lt_well_founded tr)) tree_top).
       { induction tr.
-        { eapply (@Ord.eq_lt_lt _ _ base1); auto.
-          transitivity (Ord.orec base1 next Ord.O).
-          { eapply Ord.eq_orec; auto. eapply tree_O_O. }
-          { eapply Ord.orec_O; auto. }
+        { eapply (@ord.eq_lt_lt _ _ base1); auto.
+          transitivity (ord.orec base1 next ord.O).
+          { eapply ord.eq_orec; auto. eapply tree_O_O. }
+          { eapply ord.orec_O; auto. }
         }
-        { eapply (@Ord.eq_lt_lt _ _ (next (Ord.orec base1 next (Ord.from_wf tree_lt_well_founded tr)))).
-          { transitivity (Ord.orec base1 next (Ord.S (Ord.from_wf tree_lt_well_founded tr))).
-            { eapply Ord.eq_orec; auto. eapply tree_S_S. }
-            { eapply Ord.orec_S; auto. }
+        { eapply (@ord.eq_lt_lt _ _ (next (ord.orec base1 next (ord.from_wf tree_lt_well_founded tr)))).
+          { transitivity (ord.orec base1 next (ord.S (ord.from_wf tree_lt_well_founded tr))).
+            { eapply ord.eq_orec; auto. eapply tree_S_S. }
+            { eapply ord.orec_S; auto. }
           }
           { eapply INACCESSIBLE. auto. }
         }
-        { eapply (@Ord.eq_lt_lt _ _ _).
+        { eapply (@ord.eq_lt_lt _ _ _).
           { etransitivity.
-            { eapply Ord.eq_orec; auto. eapply tree_join_build. }
-            { eapply Ord.orec_build. }
+            { eapply ord.eq_orec; auto. eapply tree_join_build. }
+            { eapply ord.orec_build. }
           }
           { eapply INACCESSIBLE; auto. eapply INACCESSIBLE. i.
             eapply INACCESSIBLE. auto. }
         }
-        { eapply Ord.le_lt_lt.
-          { eapply Ord.le_orec.
+        { eapply ord.le_lt_lt.
+          { eapply ord.le_orec.
             { auto. }
             { eapply tree_union_union_le. }
           }
-          eapply Ord.eq_lt_lt.
-          { eapply Ord.orec_S; auto. }
+          eapply ord.eq_lt_lt.
+          { eapply ord.orec_S; auto. }
           eapply INACCESSIBLE.
-          eapply Ord.eq_lt_lt.
-          { eapply Ord.orec_union; auto. }
+          eapply ord.eq_lt_lt.
+          { eapply ord.orec_union; auto. }
           { eapply INACCESSIBLE; auto. }
         }
       }
-      i. eapply Ord.lt_inv in LT. des. eapply (@Ord.le_lt_lt (Ord.orec base1 next (Ord.from_wf tree_lt_well_founded a))); auto.
-      eapply Ord.le_orec; auto.
+      i. eapply ord.lt_inv in LT. des. eapply (@ord.le_lt_lt (ord.orec base1 next (ord.from_wf tree_lt_well_founded a))); auto.
+      eapply ord.le_orec; auto.
     Qed.
 
     Lemma tree_top_O
       :
-        Ord.lt Ord.O tree_top.
+        ord.lt ord.O tree_top.
     Proof.
-      econs. instantiate (1:=tree_O). eapply Ord.O_bot.
+      econs. instantiate (1:=tree_O). eapply ord.O_bot.
     Qed.
 
-    Lemma tree_top_S o (LT: Ord.lt o tree_top)
+    Lemma tree_top_S o (LT: ord.lt o tree_top)
       :
-        Ord.lt (Ord.S o) tree_top.
+        ord.lt (ord.S o) tree_top.
     Proof.
-      i. eapply Ord.lt_inv in LT. des.
+      i. eapply ord.lt_inv in LT. des.
       econs. instantiate (1:=tree_S a).
-      eapply Ord.S_supremum. eapply Ord.le_lt_lt; eauto.
-      eapply Ord.lt_from_wf. ss.
+      eapply ord.S_supremum. eapply ord.le_lt_lt; eauto.
+      eapply ord.lt_from_wf. ss.
     Qed.
 
-    Lemma tree_top_union o0 o1 (LT0: Ord.lt o0 tree_top) (LT1: Ord.lt o1 tree_top)
+    Lemma tree_top_union o0 o1 (LT0: ord.lt o0 tree_top) (LT1: ord.lt o1 tree_top)
       :
-        Ord.lt (Ord.union o0 o1) tree_top.
+        ord.lt (ord.union o0 o1) tree_top.
     Proof.
-      eapply Ord.lt_inv in LT0. eapply Ord.lt_inv in LT1. des.
-      econs. instantiate (1:=tree_union a0 a). eapply Ord.union_spec.
-      { etransitivity; eauto. eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. auto. }
-      { etransitivity; eauto. eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. auto. }
+      eapply ord.lt_inv in LT0. eapply ord.lt_inv in LT1. des.
+      econs. instantiate (1:=tree_union a0 a). eapply ord.union_spec.
+      { etransitivity; eauto. eapply ord.lt_le. eapply ord.lt_from_wf. ss. auto. }
+      { etransitivity; eauto. eapply ord.lt_le. eapply ord.lt_from_wf. ss. auto. }
     Qed.
 
     Hypothesis CHOICE: FunctionalChoice_on X tree.
 
-    Lemma tree_top_join (os: X -> Ord.t) (LT: forall x, Ord.lt (os x) tree_top)
+    Lemma tree_top_join (os: X -> ord.t) (LT: forall x, ord.lt (os x) tree_top)
       :
-        Ord.lt (Ord.join os) tree_top.
+        ord.lt (ord.join os) tree_top.
     Proof.
-      i. hexploit (CHOICE (fun (x: X) (tr: tree) => Ord.le (os x) (Ord.from_wf tree_lt_well_founded tr))).
-      { i. specialize (LT x). eapply Ord.lt_inv in LT. eauto. }
+      i. hexploit (CHOICE (fun (x: X) (tr: tree) => ord.le (os x) (ord.from_wf tree_lt_well_founded tr))).
+      { i. specialize (LT x). eapply ord.lt_inv in LT. eauto. }
       i. des.
       econs. instantiate (1:=tree_join f).
-      eapply Ord.join_supremum. i. etransitivity; eauto.
-      eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. eauto.
+      eapply ord.join_supremum. i. etransitivity; eauto.
+      eapply ord.lt_le. eapply ord.lt_from_wf. ss. eauto.
     Qed.
 
     Lemma tree_top_S_inaccessible
       :
-        inaccessible X Ord.O Ord.S tree_top.
+        inaccessible X ord.O ord.S tree_top.
     Proof.
       econs.
       { eapply tree_top_O. }
@@ -251,99 +251,99 @@ Section INACCESSIBLE.
     Qed.
 
     Lemma tree_top_add_inaccessible
-          o (LT: Ord.lt o tree_top)
+          o (LT: ord.lt o tree_top)
       :
-        inaccessible X Ord.O (OrdArith.add o) tree_top.
+        inaccessible X ord.O (ordArith.add o) tree_top.
     Proof.
-      Local Transparent OrdArith.add.
+      Local Transparent ordArith.add.
       eapply inaccessible_rec_inaccessible; eauto.
-      { i. eapply Ord.S_le. }
-      { i. apply Ord.le_S. auto. }
+      { i. eapply ord.S_le. }
+      { i. apply ord.le_S. auto. }
       { eapply tree_top_S_inaccessible. }
     Qed.
 
-    Lemma tree_top_add o0 o1 (LT0: Ord.lt o0 tree_top) (LT1: Ord.lt o1 tree_top)
+    Lemma tree_top_add o0 o1 (LT0: ord.lt o0 tree_top) (LT1: ord.lt o1 tree_top)
       :
-        Ord.lt (OrdArith.add o0 o1) tree_top.
+        ord.lt (ordArith.add o0 o1) tree_top.
     Proof.
       eapply tree_top_add_inaccessible; auto.
     Qed.
 
     Lemma tree_top_flip_add_inaccessible
-          o (LT: Ord.lt o tree_top)
+          o (LT: ord.lt o tree_top)
       :
-        inaccessible X Ord.O (flip OrdArith.add o) tree_top.
+        inaccessible X ord.O (flip ordArith.add o) tree_top.
     Proof.
       hexploit tree_top_add_inaccessible; eauto. i.
       econs; auto.
-      { eapply Ord.le_lt_lt; eauto. eapply Ord.O_bot. }
+      { eapply ord.le_lt_lt; eauto. eapply ord.O_bot. }
       { i. eapply (@tree_top_add_inaccessible _ LT0).(inaccessible_next). auto. }
       { i. eapply H. auto. }
       { i. eapply H; auto. }
     Qed.
 
     Lemma tree_top_mult_inaccessible
-          o (LT: Ord.lt o tree_top)
+          o (LT: ord.lt o tree_top)
       :
-        inaccessible X Ord.O (OrdArith.mult o) tree_top.
+        inaccessible X ord.O (ordArith.mult o) tree_top.
     Proof.
-      Local Transparent OrdArith.mult.
+      Local Transparent ordArith.mult.
       eapply inaccessible_rec_inaccessible; eauto.
-      { i. eapply OrdArith.add_base_l. }
-      { i. eapply OrdArith.le_add_l; auto. }
+      { i. eapply ordArith.add_base_l. }
+      { i. eapply ordArith.le_add_l; auto. }
       { eapply tree_top_flip_add_inaccessible. auto. }
-      { eapply Ord.le_lt_lt; eauto. eapply Ord.O_bot. }
+      { eapply ord.le_lt_lt; eauto. eapply ord.O_bot. }
     Qed.
 
-    Lemma tree_top_mult o0 o1 (LT0: Ord.lt o0 tree_top) (LT1: Ord.lt o1 tree_top)
+    Lemma tree_top_mult o0 o1 (LT0: ord.lt o0 tree_top) (LT1: ord.lt o1 tree_top)
       :
-        Ord.lt (OrdArith.mult o0 o1) tree_top.
+        ord.lt (ordArith.mult o0 o1) tree_top.
     Proof.
       eapply tree_top_mult_inaccessible; auto.
     Qed.
 
     Lemma tree_top_flip_mult_inaccessible
-          o (LT: Ord.lt o tree_top)
+          o (LT: ord.lt o tree_top)
       :
-        inaccessible X Ord.O (flip OrdArith.mult o) tree_top.
+        inaccessible X ord.O (flip ordArith.mult o) tree_top.
     Proof.
       hexploit tree_top_mult_inaccessible; eauto. i.
       econs; auto.
-      { eapply Ord.le_lt_lt; eauto. eapply Ord.O_bot. }
+      { eapply ord.le_lt_lt; eauto. eapply ord.O_bot. }
       { i. eapply (@tree_top_mult_inaccessible _ LT0).(inaccessible_next). auto. }
       { i. eapply H. auto. }
       { i. eapply H; auto. }
     Qed.
 
     Lemma tree_top_expn_inaccessible
-          o (POS: Ord.lt Ord.O o) (LT: Ord.lt o tree_top)
+          o (POS: ord.lt ord.O o) (LT: ord.lt o tree_top)
       :
-        inaccessible X Ord.O (OrdArith.expn o) tree_top.
+        inaccessible X ord.O (ordArith.expn o) tree_top.
     Proof.
-      Local Transparent OrdArith.expn.
+      Local Transparent ordArith.expn.
       eapply inaccessible_rec_inaccessible; eauto.
-      { i. unfold flip. eapply OrdArith.mult_le_l. auto. }
-      { i. eapply OrdArith.le_mult_l. auto. }
+      { i. unfold flip. eapply ordArith.mult_le_l. auto. }
+      { i. eapply ordArith.le_mult_l. auto. }
       { eapply tree_top_flip_mult_inaccessible. auto. }
       { eapply tree_top_S. eapply tree_top_O. }
     Qed.
 
-    Lemma tree_top_expn o0 o1 (LT0: Ord.lt o0 tree_top) (LT1: Ord.lt o1 tree_top)
+    Lemma tree_top_expn o0 o1 (LT0: ord.lt o0 tree_top) (LT1: ord.lt o1 tree_top)
       :
-        Ord.lt (OrdArith.expn o0 o1) tree_top.
+        ord.lt (ordArith.expn o0 o1) tree_top.
     Proof.
-      eapply (@Ord.le_lt_lt (OrdArith.expn (Ord.S o0) o1)).
-      { eapply OrdArith.le_expn_l. eapply Ord.S_le. }
+      eapply (@ord.le_lt_lt (ordArith.expn (ord.S o0) o1)).
+      { eapply ordArith.le_expn_l. eapply ord.S_le. }
       { eapply tree_top_expn_inaccessible; auto.
-        { eapply Ord.S_pos. }
+        { eapply ord.S_pos. }
         { eapply tree_top_S. auto. }
       }
     Qed.
 
     Lemma tree_top_flip_expn_inaccessible
-          o (LT: Ord.lt o tree_top)
+          o (LT: ord.lt o tree_top)
       :
-        inaccessible X Ord.O (flip OrdArith.expn o) tree_top.
+        inaccessible X ord.O (flip ordArith.expn o) tree_top.
     Proof.
       econs.
       { eapply tree_top_O. }
@@ -380,159 +380,159 @@ Section INACCESSIBLE.
       { econs. i. ss. des; subst; auto. }
     Qed.
 
-    Lemma gtree_O_O: Ord.eq (Ord.from_wf gtree_lt_well_founded gtree_O) Ord.O.
+    Lemma gtree_O_O: ord.eq (ord.from_wf gtree_lt_well_founded gtree_O) ord.O.
     Proof.
-      Local Transparent Ord.from_wf Ord.from_acc Ord.O Ord.S Ord.rec Ord.from_wf_set.
+      Local Transparent ord.from_wf ord.from_acc ord.O ord.S ord.rec ord.from_wf_set.
       split.
-      { unfold Ord.from_wf. destruct (gtree_lt_well_founded gtree_O).
+      { unfold ord.from_wf. destruct (gtree_lt_well_founded gtree_O).
         ss. econs. i. destruct a0. ss. }
-      { eapply Ord.O_bot. }
+      { eapply ord.O_bot. }
     Qed.
 
     Lemma gtree_S_S tr:
-      Ord.eq (Ord.from_wf gtree_lt_well_founded (gtree_S tr)) (Ord.S (Ord.from_wf gtree_lt_well_founded tr)).
+      ord.eq (ord.from_wf gtree_lt_well_founded (gtree_S tr)) (ord.S (ord.from_wf gtree_lt_well_founded tr)).
     Proof.
       split.
-      { unfold Ord.from_wf at 1. destruct (gtree_lt_well_founded (gtree_S tr)).
+      { unfold ord.from_wf at 1. destruct (gtree_lt_well_founded (gtree_S tr)).
         ss. econs. i. destruct a0. ss. subst. exists tt.
-        ss. eapply Ord.same_acc_le.
+        ss. eapply ord.same_acc_le.
       }
-      { eapply Ord.S_supremum. eapply Ord.lt_from_wf. ss. }
+      { eapply ord.S_supremum. eapply ord.lt_from_wf. ss. }
     Qed.
 
     Lemma gtree_join_build P (trs: sig P -> gtree):
-      Ord.eq (Ord.from_wf gtree_lt_well_founded (gtree_join trs)) (Ord.build (fun x => Ord.from_wf gtree_lt_well_founded (trs x))).
+      ord.eq (ord.from_wf gtree_lt_well_founded (gtree_join trs)) (ord.build (fun x => ord.from_wf gtree_lt_well_founded (trs x))).
     Proof.
       split.
-      { unfold Ord.from_wf at 1. destruct (gtree_lt_well_founded (gtree_join trs)).
+      { unfold ord.from_wf at 1. destruct (gtree_lt_well_founded (gtree_join trs)).
         ss. econs. i. destruct a0. des. ss. subst. exists x0.
-        ss. eapply Ord.same_acc_le.
+        ss. eapply ord.same_acc_le.
       }
-      { eapply Ord.build_supremum. i. eapply Ord.lt_from_wf. ss. eauto. }
+      { eapply ord.build_supremum. i. eapply ord.lt_from_wf. ss. eauto. }
     Qed.
 
     Lemma gtree_union_union_le (tr0 tr1: gtree):
-      Ord.le (Ord.from_wf gtree_lt_well_founded (gtree_union tr0 tr1)) (Ord.S (Ord.union (Ord.from_wf gtree_lt_well_founded tr0) (Ord.from_wf gtree_lt_well_founded tr1))).
+      ord.le (ord.from_wf gtree_lt_well_founded (gtree_union tr0 tr1)) (ord.S (ord.union (ord.from_wf gtree_lt_well_founded tr0) (ord.from_wf gtree_lt_well_founded tr1))).
     Proof.
-      unfold Ord.from_wf at 1. destruct (gtree_lt_well_founded (gtree_union tr0 tr1)).
+      unfold ord.from_wf at 1. destruct (gtree_lt_well_founded (gtree_union tr0 tr1)).
       ss. econs. i. destruct a0. ss. exists tt. ss. des; subst.
-      { transitivity (Ord.from_wf gtree_lt_well_founded tr0).
-        { eapply Ord.same_acc_le. }
-        { eapply Ord.union_l. }
+      { transitivity (ord.from_wf gtree_lt_well_founded tr0).
+        { eapply ord.same_acc_le. }
+        { eapply ord.union_l. }
       }
-      { transitivity (Ord.from_wf gtree_lt_well_founded tr1).
-        { eapply Ord.same_acc_le. }
-        { eapply Ord.union_r. }
+      { transitivity (ord.from_wf gtree_lt_well_founded tr1).
+        { eapply ord.same_acc_le. }
+        { eapply ord.union_r. }
       }
     Qed.
 
     Lemma gtree_union_union_le_rev (tr0 tr1: gtree):
-      Ord.le (Ord.union (Ord.from_wf gtree_lt_well_founded tr0) (Ord.from_wf gtree_lt_well_founded tr1)) (Ord.from_wf gtree_lt_well_founded (gtree_union tr0 tr1)).
+      ord.le (ord.union (ord.from_wf gtree_lt_well_founded tr0) (ord.from_wf gtree_lt_well_founded tr1)) (ord.from_wf gtree_lt_well_founded (gtree_union tr0 tr1)).
     Proof.
-      eapply Ord.union_spec.
-      { eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. auto. }
-      { eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. auto. }
+      eapply ord.union_spec.
+      { eapply ord.lt_le. eapply ord.lt_from_wf. ss. auto. }
+      { eapply ord.lt_le. eapply ord.lt_from_wf. ss. auto. }
     Qed.
 
-    Definition gtree_top := Ord.from_wf_set gtree_lt_well_founded.
+    Definition gtree_top := ord.from_wf_set gtree_lt_well_founded.
 
-    Lemma ginaccessible_rec_ginaccessible (base0: Ord.t) (next: Ord.t -> Ord.t)
-          (NEXTLE: forall o, Ord.le o (next o))
-          (NEXTMON: forall o0 o1 (LE: Ord.le o0 o1), Ord.le (next o0) (next o1))
+    Lemma ginaccessible_rec_ginaccessible (base0: ord.t) (next: ord.t -> ord.t)
+          (NEXTLE: forall o, ord.le o (next o))
+          (NEXTMON: forall o0 o1 (LE: ord.le o0 o1), ord.le (next o0) (next o1))
           (INACCESSIBLE: ginaccessible X base0 next gtree_top)
           base1
-          (BASE1: Ord.lt base1 gtree_top)
+          (BASE1: ord.lt base1 gtree_top)
       :
-        ginaccessible X base0 (Ord.orec base1 next) gtree_top.
+        ginaccessible X base0 (ord.orec base1 next) gtree_top.
     Proof.
       econs; eauto.
       { eapply INACCESSIBLE. }
       2: { eapply INACCESSIBLE. }
       2: { eapply INACCESSIBLE. }
-      assert (RECS: forall tr, Ord.lt (Ord.orec base1 next (Ord.from_wf gtree_lt_well_founded tr)) gtree_top).
+      assert (RECS: forall tr, ord.lt (ord.orec base1 next (ord.from_wf gtree_lt_well_founded tr)) gtree_top).
       { induction tr.
-        { eapply (@Ord.eq_lt_lt _ _ base1); auto.
-          transitivity (Ord.orec base1 next Ord.O).
-          { eapply Ord.eq_orec; auto. eapply gtree_O_O. }
-          { eapply Ord.orec_O; auto. }
+        { eapply (@ord.eq_lt_lt _ _ base1); auto.
+          transitivity (ord.orec base1 next ord.O).
+          { eapply ord.eq_orec; auto. eapply gtree_O_O. }
+          { eapply ord.orec_O; auto. }
         }
-        { eapply (@Ord.eq_lt_lt _ _ (next (Ord.orec base1 next (Ord.from_wf gtree_lt_well_founded tr)))).
-          { transitivity (Ord.orec base1 next (Ord.S (Ord.from_wf gtree_lt_well_founded tr))).
-            { eapply Ord.eq_orec; auto. eapply gtree_S_S. }
-            { eapply Ord.orec_S; auto. }
+        { eapply (@ord.eq_lt_lt _ _ (next (ord.orec base1 next (ord.from_wf gtree_lt_well_founded tr)))).
+          { transitivity (ord.orec base1 next (ord.S (ord.from_wf gtree_lt_well_founded tr))).
+            { eapply ord.eq_orec; auto. eapply gtree_S_S. }
+            { eapply ord.orec_S; auto. }
           }
           { eapply INACCESSIBLE. auto. }
         }
-        { eapply (@Ord.eq_lt_lt _ _ _).
+        { eapply (@ord.eq_lt_lt _ _ _).
           { etransitivity.
-            { eapply Ord.eq_orec; auto. eapply gtree_join_build. }
-            { eapply Ord.orec_build. }
+            { eapply ord.eq_orec; auto. eapply gtree_join_build. }
+            { eapply ord.orec_build. }
           }
           { eapply INACCESSIBLE; auto. eapply INACCESSIBLE. i.
             eapply INACCESSIBLE. auto. }
         }
-        { eapply Ord.le_lt_lt.
-          { eapply Ord.le_orec.
+        { eapply ord.le_lt_lt.
+          { eapply ord.le_orec.
             { auto. }
             { eapply gtree_union_union_le. }
           }
-          eapply Ord.eq_lt_lt.
-          { eapply Ord.orec_S; auto. }
+          eapply ord.eq_lt_lt.
+          { eapply ord.orec_S; auto. }
           eapply INACCESSIBLE.
-          eapply Ord.eq_lt_lt.
-          { eapply Ord.orec_union; auto. }
+          eapply ord.eq_lt_lt.
+          { eapply ord.orec_union; auto. }
           { eapply INACCESSIBLE; auto. }
         }
       }
-      i. eapply Ord.lt_inv in LT. des. eapply (@Ord.le_lt_lt (Ord.orec base1 next (Ord.from_wf gtree_lt_well_founded a))); auto.
-      eapply Ord.le_orec; auto.
+      i. eapply ord.lt_inv in LT. des. eapply (@ord.le_lt_lt (ord.orec base1 next (ord.from_wf gtree_lt_well_founded a))); auto.
+      eapply ord.le_orec; auto.
     Qed.
 
     Lemma gtree_top_O
       :
-        Ord.lt Ord.O gtree_top.
+        ord.lt ord.O gtree_top.
     Proof.
-      econs. instantiate (1:=gtree_O). eapply Ord.O_bot.
+      econs. instantiate (1:=gtree_O). eapply ord.O_bot.
     Qed.
 
-    Lemma gtree_top_S o (LT: Ord.lt o gtree_top)
+    Lemma gtree_top_S o (LT: ord.lt o gtree_top)
       :
-        Ord.lt (Ord.S o) gtree_top.
+        ord.lt (ord.S o) gtree_top.
     Proof.
-      i. eapply Ord.lt_inv in LT. des.
+      i. eapply ord.lt_inv in LT. des.
       econs. instantiate (1:=gtree_S a).
-      eapply Ord.S_supremum. eapply Ord.le_lt_lt; eauto.
-      eapply Ord.lt_from_wf. ss.
+      eapply ord.S_supremum. eapply ord.le_lt_lt; eauto.
+      eapply ord.lt_from_wf. ss.
     Qed.
 
-    Lemma gtree_top_union o0 o1 (LT0: Ord.lt o0 gtree_top) (LT1: Ord.lt o1 gtree_top)
+    Lemma gtree_top_union o0 o1 (LT0: ord.lt o0 gtree_top) (LT1: ord.lt o1 gtree_top)
       :
-        Ord.lt (Ord.union o0 o1) gtree_top.
+        ord.lt (ord.union o0 o1) gtree_top.
     Proof.
-      eapply Ord.lt_inv in LT0. eapply Ord.lt_inv in LT1. des.
-      econs. instantiate (1:=gtree_union a0 a). eapply Ord.union_spec.
-      { etransitivity; eauto. eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. auto. }
-      { etransitivity; eauto. eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. auto. }
+      eapply ord.lt_inv in LT0. eapply ord.lt_inv in LT1. des.
+      econs. instantiate (1:=gtree_union a0 a). eapply ord.union_spec.
+      { etransitivity; eauto. eapply ord.lt_le. eapply ord.lt_from_wf. ss. auto. }
+      { etransitivity; eauto. eapply ord.lt_le. eapply ord.lt_from_wf. ss. auto. }
     Qed.
 
     Hypothesis CHOICE: forall (P: X -> Prop), FunctionalChoice_on (sig P) gtree.
 
-    Lemma gtree_top_join (P: X -> Prop) (os: sig P -> Ord.t)
-          (LT: forall x, Ord.lt (os x) gtree_top)
+    Lemma gtree_top_join (P: X -> Prop) (os: sig P -> ord.t)
+          (LT: forall x, ord.lt (os x) gtree_top)
       :
-        Ord.lt (Ord.join os) gtree_top.
+        ord.lt (ord.join os) gtree_top.
     Proof.
-      i. hexploit (CHOICE (fun (x: sig P) (tr: gtree) => Ord.le (os x) (Ord.from_wf gtree_lt_well_founded tr))).
-      { i. specialize (LT x). eapply Ord.lt_inv in LT. eauto. }
+      i. hexploit (CHOICE (fun (x: sig P) (tr: gtree) => ord.le (os x) (ord.from_wf gtree_lt_well_founded tr))).
+      { i. specialize (LT x). eapply ord.lt_inv in LT. eauto. }
       i. des.
       econs. instantiate (1:=gtree_join f).
-      eapply Ord.join_supremum. i. etransitivity; eauto.
-      eapply Ord.lt_le. eapply Ord.lt_from_wf. ss. eauto.
+      eapply ord.join_supremum. i. etransitivity; eauto.
+      eapply ord.lt_le. eapply ord.lt_from_wf. ss. eauto.
     Qed.
 
     Lemma gtree_top_S_ginaccessible
       :
-        ginaccessible X Ord.O Ord.S gtree_top.
+        ginaccessible X ord.O ord.S gtree_top.
     Proof.
       econs.
       { eapply gtree_top_O. }
@@ -542,99 +542,99 @@ Section INACCESSIBLE.
     Qed.
 
     Lemma gtree_top_add_ginaccessible
-          o (LT: Ord.lt o gtree_top)
+          o (LT: ord.lt o gtree_top)
       :
-        ginaccessible X Ord.O (OrdArith.add o) gtree_top.
+        ginaccessible X ord.O (ordArith.add o) gtree_top.
     Proof.
-      Local Transparent OrdArith.add.
+      Local Transparent ordArith.add.
       eapply ginaccessible_rec_ginaccessible; eauto.
-      { i. eapply Ord.S_le. }
-      { i. apply Ord.le_S. auto. }
+      { i. eapply ord.S_le. }
+      { i. apply ord.le_S. auto. }
       { eapply gtree_top_S_ginaccessible. }
     Qed.
 
-    Lemma gtree_top_add o0 o1 (LT0: Ord.lt o0 gtree_top) (LT1: Ord.lt o1 gtree_top)
+    Lemma gtree_top_add o0 o1 (LT0: ord.lt o0 gtree_top) (LT1: ord.lt o1 gtree_top)
       :
-        Ord.lt (OrdArith.add o0 o1) gtree_top.
+        ord.lt (ordArith.add o0 o1) gtree_top.
     Proof.
       eapply gtree_top_add_ginaccessible; auto.
     Qed.
 
     Lemma gtree_top_flip_add_ginaccessible
-          o (LT: Ord.lt o gtree_top)
+          o (LT: ord.lt o gtree_top)
       :
-        ginaccessible X Ord.O (flip OrdArith.add o) gtree_top.
+        ginaccessible X ord.O (flip ordArith.add o) gtree_top.
     Proof.
       hexploit gtree_top_add_ginaccessible; eauto. i.
       econs; auto.
-      { eapply Ord.le_lt_lt; eauto. eapply Ord.O_bot. }
+      { eapply ord.le_lt_lt; eauto. eapply ord.O_bot. }
       { i. eapply (@gtree_top_add_ginaccessible _ LT0).(ginaccessible_next). auto. }
       { i. eapply H. auto. }
       { i. eapply H; auto. }
     Qed.
 
     Lemma gtree_top_mult_ginaccessible
-          o (LT: Ord.lt o gtree_top)
+          o (LT: ord.lt o gtree_top)
       :
-        ginaccessible X Ord.O (OrdArith.mult o) gtree_top.
+        ginaccessible X ord.O (ordArith.mult o) gtree_top.
     Proof.
-      Local Transparent OrdArith.mult.
+      Local Transparent ordArith.mult.
       eapply ginaccessible_rec_ginaccessible; eauto.
-      { i. eapply OrdArith.add_base_l. }
-      { i. eapply OrdArith.le_add_l; auto. }
+      { i. eapply ordArith.add_base_l. }
+      { i. eapply ordArith.le_add_l; auto. }
       { eapply gtree_top_flip_add_ginaccessible. auto. }
-      { eapply Ord.le_lt_lt; eauto. eapply Ord.O_bot. }
+      { eapply ord.le_lt_lt; eauto. eapply ord.O_bot. }
     Qed.
 
-    Lemma gtree_top_mult o0 o1 (LT0: Ord.lt o0 gtree_top) (LT1: Ord.lt o1 gtree_top)
+    Lemma gtree_top_mult o0 o1 (LT0: ord.lt o0 gtree_top) (LT1: ord.lt o1 gtree_top)
       :
-        Ord.lt (OrdArith.mult o0 o1) gtree_top.
+        ord.lt (ordArith.mult o0 o1) gtree_top.
     Proof.
       eapply gtree_top_mult_ginaccessible; auto.
     Qed.
 
     Lemma gtree_top_flip_mult_ginaccessible
-          o (LT: Ord.lt o gtree_top)
+          o (LT: ord.lt o gtree_top)
       :
-        ginaccessible X Ord.O (flip OrdArith.mult o) gtree_top.
+        ginaccessible X ord.O (flip ordArith.mult o) gtree_top.
     Proof.
       hexploit gtree_top_mult_ginaccessible; eauto. i.
       econs; auto.
-      { eapply Ord.le_lt_lt; eauto. eapply Ord.O_bot. }
+      { eapply ord.le_lt_lt; eauto. eapply ord.O_bot. }
       { i. eapply (@gtree_top_mult_ginaccessible _ LT0).(ginaccessible_next). auto. }
       { i. eapply H. auto. }
       { i. eapply H; auto. }
     Qed.
 
     Lemma gtree_top_expn_ginaccessible
-          o (POS: Ord.lt Ord.O o) (LT: Ord.lt o gtree_top)
+          o (POS: ord.lt ord.O o) (LT: ord.lt o gtree_top)
       :
-        ginaccessible X Ord.O (OrdArith.expn o) gtree_top.
+        ginaccessible X ord.O (ordArith.expn o) gtree_top.
     Proof.
-      Local Transparent OrdArith.expn.
+      Local Transparent ordArith.expn.
       eapply ginaccessible_rec_ginaccessible; eauto.
-      { i. unfold flip. eapply OrdArith.mult_le_l. auto. }
-      { i. eapply OrdArith.le_mult_l. auto. }
+      { i. unfold flip. eapply ordArith.mult_le_l. auto. }
+      { i. eapply ordArith.le_mult_l. auto. }
       { eapply gtree_top_flip_mult_ginaccessible. auto. }
       { eapply gtree_top_S. eapply gtree_top_O. }
     Qed.
 
-    Lemma gtree_top_expn o0 o1 (LT0: Ord.lt o0 gtree_top) (LT1: Ord.lt o1 gtree_top)
+    Lemma gtree_top_expn o0 o1 (LT0: ord.lt o0 gtree_top) (LT1: ord.lt o1 gtree_top)
       :
-        Ord.lt (OrdArith.expn o0 o1) gtree_top.
+        ord.lt (ordArith.expn o0 o1) gtree_top.
     Proof.
-      eapply (@Ord.le_lt_lt (OrdArith.expn (Ord.S o0) o1)).
-      { eapply OrdArith.le_expn_l. eapply Ord.S_le. }
+      eapply (@ord.le_lt_lt (ordArith.expn (ord.S o0) o1)).
+      { eapply ordArith.le_expn_l. eapply ord.S_le. }
       { eapply gtree_top_expn_ginaccessible; auto.
-        { eapply Ord.S_pos. }
+        { eapply ord.S_pos. }
         { eapply gtree_top_S. auto. }
       }
     Qed.
 
     Lemma gtree_top_flip_expn_ginaccessible
-          o (LT: Ord.lt o gtree_top)
+          o (LT: ord.lt o gtree_top)
       :
-        ginaccessible X Ord.O (flip OrdArith.expn o) gtree_top.
+        ginaccessible X ord.O (flip ordArith.expn o) gtree_top.
     Proof.
       econs.
       { eapply gtree_top_O. }

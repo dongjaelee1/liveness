@@ -1,6 +1,6 @@
 From Stdlib Require Import Lia.
 From stdpp Require Import base tactics.
-From liris.ordinal Require Import Ordinal Arithmetic Hessenberg.
+From liris.ordinal Require Export ordinal_facts.
 From liris.algebra Require Export measure.
 
 (** We have three definitions of ordinal.
@@ -17,14 +17,14 @@ Ideally, we should make the library 2 universe polymorphic and remove 3.
 
 Section layer.
 
-  Definition layer : Type := Ord.t.
+  Definition layer : Type := ord.t.
 
 End layer.
 
 Global Instance layer_layer_class : layer_class layer :=
-  Build_layer_class _ _ Ord.lt_well_founded.
+  Build_layer_class _ _ ord.lt_well_founded.
 
 (** Notations and Coercions. *)
-Export OrdinalScope.
-Export ArithmeticScope.
-Export HessenbergScope.
+Export ordinalScope.
+Export arithmeticScope.
+Export hessenbergScope.

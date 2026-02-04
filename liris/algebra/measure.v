@@ -1,6 +1,6 @@
 From stdpp Require Import base.
-From liris.prelude Require Import axioms ordinal_facts.
-From liris.prelude Require Export wf_structs.
+From liris.prelude Require Import axioms.
+From liris.prelude Require Export wf_structs ordinal_facts.
 
 (** This is only meant to be instantiated only in this file. *)
 Class layer_class (L : Type) := {

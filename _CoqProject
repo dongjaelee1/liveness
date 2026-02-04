@@ -16,22 +16,23 @@
 -arg -w -arg -deprecated-dirpath-Coq
 
 # Copy of https://github.com/snu-sf/Ordinal/tree/main
-liris/ordinal/Arithmetic.v
-liris/ordinal/Basics.v
-liris/ordinal/Cardinal.v
-liris/ordinal/ClassicalHessenberg.v
-liris/ordinal/ClassicalOrdinal.v
-liris/ordinal/Fixedpoint.v
-liris/ordinal/Hessenberg.v
-liris/ordinal/Inaccessibility.v
-liris/ordinal/Inaccessible.v
-liris/ordinal/Ordinal.v
+liris/ordinal/arithmetic.v
+liris/ordinal/basics.v
+liris/ordinal/cardinal.v
+liris/ordinal/classical_hessenberg.v
+liris/ordinal/classical_ordinal.v
+liris/ordinal/fixedpoint.v
+liris/ordinal/hessenberg.v
+liris/ordinal/inaccessibility.v
+liris/ordinal/inaccessible.v
+liris/ordinal/ordinal.v
 liris/ordinal/sflib.v
-liris/ordinal/ToSet.v
-liris/ordinal/Totalness.v
-liris/ordinal/WellOrdering.v
-liris/ordinal/WfRel.v
-liris/ordinal/Zorn.v
+liris/ordinal/to_set.v
+liris/ordinal/totalness.v
+liris/ordinal/well_ordering.v
+liris/ordinal/wf_rel.v
+liris/ordinal/zorn.v
+liris/ordinal/ordinal_facts.v
 
 liris/prelude/axioms.v
 liris/prelude/wf_structs.v

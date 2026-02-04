@@ -1,5 +1,5 @@
-From liris.ordinal Require Import sflib Basics.
-From liris.ordinal Require Export Ordinal.
+From liris.ordinal Require Import sflib basics.
+From liris.ordinal Require Export ordinal.
 
 From Coq Require Import PropExtensionality.
 
@@ -9,9 +9,9 @@ Set Primitive Projections.
 Lemma from_acc_mon A (R0 R1: A -> A -> Prop) (INCL: forall a0 a1 (LE: R0 a0 a1), R1 a0 a1)
       a (ACC0: Acc R0 a) (ACC1: Acc R1 a)
   :
-    Ord.le (Ord.from_acc ACC0) (Ord.from_acc ACC1).
+    ord.le (ord.from_acc ACC0) (ord.from_acc ACC1).
 Proof.
-  Local Transparent Ord.from_acc.
+  Local Transparent ord.from_acc.
   dup ACC1. rename ACC2 into ACC. revert ACC0 ACC1. induction ACC.
   i. destruct ACC0, ACC1. ss. econs. i.
   destruct a1 as [a1 p1]. ss. exists (exist _ a1 (INCL _ _ p1)). ss.
@@ -21,18 +21,18 @@ Qed.
 Lemma from_wf_mon A (R0 R1: A -> A -> Prop) (INCL: forall a0 a1 (LE: R0 a0 a1), R1 a0 a1)
       (WF0: well_founded R0) (WF1: well_founded R1) a
   :
-    Ord.le (Ord.from_wf WF0 a) (Ord.from_wf WF1 a).
+    ord.le (ord.from_wf WF0 a) (ord.from_wf WF1 a).
 Proof.
-  Local Transparent Ord.from_wf.
-  unfold Ord.from_wf. eapply from_acc_mon; eauto.
+  Local Transparent ord.from_wf.
+  unfold ord.from_wf. eapply from_acc_mon; eauto.
 Qed.
 
 Lemma from_wf_set_le A (R0 R1: A -> A -> Prop) (INCL: forall a0 a1 (LE: R0 a0 a1), R1 a0 a1)
       (WF0: well_founded R0) (WF1: well_founded R1)
   :
-    Ord.le (Ord.from_wf_set WF0) (Ord.from_wf_set WF1).
+    ord.le (ord.from_wf_set WF0) (ord.from_wf_set WF1).
 Proof.
-  Local Transparent Ord.from_wf_set.
+  Local Transparent ord.from_wf_set.
   econs. i. exists a0. eapply from_wf_mon; auto.
 Qed.
 
@@ -41,11 +41,11 @@ Lemma from_wf_inj A B (RA: A -> A -> Prop) (RB: B -> B -> Prop)
       f
       (INJ: forall a0 a1 (LT: RA a0 a1), RB (f a0) (f a1))
   :
-    forall a, Ord.le (Ord.from_wf WFA a) (Ord.from_wf WFB (f a)).
+    forall a, ord.le (ord.from_wf WFA a) (ord.from_wf WFB (f a)).
 Proof.
-  eapply (well_founded_induction WFA). i. eapply Ord.from_wf_supremum.
-  i. dup LT. eapply H in LT. eapply Ord.le_lt_lt; eauto.
-  eapply Ord.lt_from_wf; eauto.
+  eapply (well_founded_induction WFA). i. eapply ord.from_wf_supremum.
+  i. dup LT. eapply H in LT. eapply ord.le_lt_lt; eauto.
+  eapply ord.lt_from_wf; eauto.
 Qed.
 
 Lemma from_wf_set_inj A B (RA: A -> A -> Prop) (RB: B -> B -> Prop)
@@ -53,11 +53,11 @@ Lemma from_wf_set_inj A B (RA: A -> A -> Prop) (RB: B -> B -> Prop)
       f
       (INJ: forall a0 a1 (LT: RA a0 a1), RB (f a0) (f a1))
   :
-    Ord.le (Ord.from_wf_set WFA) (Ord.from_wf_set WFB).
+    ord.le (ord.from_wf_set WFA) (ord.from_wf_set WFB).
 Proof.
-  eapply Ord.build_supremum. i. eapply Ord.le_lt_lt.
+  eapply ord.build_supremum. i. eapply ord.le_lt_lt.
   { eapply from_wf_inj; eauto. }
-  eapply Ord.from_wf_set_upperbound.
+  eapply ord.from_wf_set_upperbound.
 Qed.
 
 Definition projected_rel_rev A B (RB: B -> B -> Prop) (f: A -> B): A -> A -> Prop :=
@@ -122,16 +122,16 @@ Lemma from_wf_projected_rel_eq A B (RA: A -> A -> Prop)
       (f: A -> B)
       (INJ: forall a0 a1 (EQ: f a0 = f a1), a0 = a1)
   :
-    forall a, Ord.eq (Ord.from_wf WFA a) (Ord.from_wf (embed_projected_rel_well_founded WFA f INJ) (f a)).
+    forall a, ord.eq (ord.from_wf WFA a) (ord.from_wf (embed_projected_rel_well_founded WFA f INJ) (f a)).
 Proof.
   eapply (well_founded_induction WFA). i. split.
-  - eapply Ord.from_wf_supremum. i. exploit H; eauto. i.
-    eapply Ord.eq_lt_lt; eauto. eapply Ord.lt_from_wf.
+  - eapply ord.from_wf_supremum. i. exploit H; eauto. i.
+    eapply ord.eq_lt_lt; eauto. eapply ord.lt_from_wf.
     econs; eauto.
-  - eapply Ord.from_wf_supremum. i. inv LT.
+  - eapply ord.from_wf_supremum. i. inv LT.
     eapply INJ in H2. subst. exploit H; eauto. intros EQ.
-    symmetry in EQ. eapply Ord.eq_lt_lt; eauto.
-    eapply Ord.lt_from_wf; eauto.
+    symmetry in EQ. eapply ord.eq_lt_lt; eauto.
+    eapply ord.lt_from_wf; eauto.
 Qed.
 
 Lemma from_wf_set_projected_rel_le A B (RA: A -> A -> Prop)
@@ -139,11 +139,11 @@ Lemma from_wf_set_projected_rel_le A B (RA: A -> A -> Prop)
       (f: A -> B)
       (INJ: forall a0 a1 (EQ: f a0 = f a1), a0 = a1)
   :
-    Ord.le (Ord.from_wf_set WFA) (Ord.from_wf_set (embed_projected_rel_well_founded WFA f INJ)).
+    ord.le (ord.from_wf_set WFA) (ord.from_wf_set (embed_projected_rel_well_founded WFA f INJ)).
 Proof.
-  eapply Ord.build_supremum. i. eapply Ord.eq_lt_lt.
+  eapply ord.build_supremum. i. eapply ord.eq_lt_lt.
   { eapply from_wf_projected_rel_eq. }
-  eapply Ord.build_upperbound.
+  eapply ord.build_upperbound.
 Qed.
 
 Definition to_projected_sig A B (f: A -> B) (a: A):
@@ -179,16 +179,16 @@ Lemma from_wf_projected_rel_sig_eq A B (RA: A -> A -> Prop)
       (f: A -> B)
       (INJ: forall a0 a1 (EQ: f a0 = f a1), a0 = a1)
   :
-    forall a, Ord.eq (Ord.from_wf WFA a) (Ord.from_wf (projected_rel_sig_well_founded WFA f INJ) (to_projected_sig f a)).
+    forall a, ord.eq (ord.from_wf WFA a) (ord.from_wf (projected_rel_sig_well_founded WFA f INJ) (to_projected_sig f a)).
 Proof.
   eapply (well_founded_induction WFA). i. split.
-  - eapply Ord.from_wf_supremum. i. exploit H; eauto. i.
-    eapply Ord.eq_lt_lt; eauto. eapply Ord.lt_from_wf.
+  - eapply ord.from_wf_supremum. i. exploit H; eauto. i.
+    eapply ord.eq_lt_lt; eauto. eapply ord.lt_from_wf.
     econs; eauto.
-  - eapply Ord.from_wf_supremum. i. inv LT.
+  - eapply ord.from_wf_supremum. i. inv LT.
     eapply INJ in H2. subst. exploit H; eauto. intros EQ.
-    symmetry in EQ. eapply Ord.eq_lt_lt; eauto.
-    eapply Ord.lt_from_wf; eauto.
+    symmetry in EQ. eapply ord.eq_lt_lt; eauto.
+    eapply ord.lt_from_wf; eauto.
 Qed.
 
 Lemma from_wf_set_projected_rel_sig_le A B (RA: A -> A -> Prop)
@@ -196,11 +196,11 @@ Lemma from_wf_set_projected_rel_sig_le A B (RA: A -> A -> Prop)
       (f: A -> B)
       (INJ: forall a0 a1 (EQ: f a0 = f a1), a0 = a1)
   :
-    Ord.le (Ord.from_wf_set WFA) (Ord.from_wf_set (projected_rel_sig_well_founded WFA f INJ)).
+    ord.le (ord.from_wf_set WFA) (ord.from_wf_set (projected_rel_sig_well_founded WFA f INJ)).
 Proof.
-  eapply Ord.build_supremum. i. eapply Ord.eq_lt_lt.
+  eapply ord.build_supremum. i. eapply ord.eq_lt_lt.
   { eapply from_wf_projected_rel_sig_eq. }
-  eapply Ord.build_upperbound.
+  eapply ord.build_upperbound.
 Qed.
 
 Lemma from_wf_set_projected_rel_sig_eq A B (RA: A -> A -> Prop)
@@ -208,13 +208,13 @@ Lemma from_wf_set_projected_rel_sig_eq A B (RA: A -> A -> Prop)
       (f: A -> B)
       (INJ: forall a0 a1 (EQ: f a0 = f a1), a0 = a1)
   :
-    Ord.eq (Ord.from_wf_set WFA) (Ord.from_wf_set (projected_rel_sig_well_founded WFA f INJ)).
+    ord.eq (ord.from_wf_set WFA) (ord.from_wf_set (projected_rel_sig_well_founded WFA f INJ)).
 Proof.
   split.
   - eapply from_wf_set_projected_rel_sig_le.
-  - eapply Ord.build_supremum. i. destruct a. des. subst. eapply Ord.eq_lt_lt.
+  - eapply ord.build_supremum. i. destruct a. des. subst. eapply ord.eq_lt_lt.
     { symmetry. eapply from_wf_projected_rel_sig_eq. }
-    { eapply Ord.build_upperbound. }
+    { eapply ord.build_upperbound. }
 Qed.
 
 Definition cut_rel A (R: A -> A -> Prop) (a1: A):
@@ -239,13 +239,13 @@ Lemma from_wf_cut A (R: A -> A -> Prop) (WF: well_founded R)
       (TOTAL: forall a0 a1, R a0 a1 \/ a0 = a1 \/ R a1 a0)
       (a1: A):
   forall a0 (LT: R a0 a1),
-    Ord.eq (Ord.from_wf WF a0) (Ord.from_wf (cut_rel_well_founded WF a1) (exist _ a0 LT)).
+    ord.eq (ord.from_wf WF a0) (ord.from_wf (cut_rel_well_founded WF a1) (exist _ a0 LT)).
 Proof.
   eapply (well_founded_induction
             WF
-            (fun a0 => forall (LT: R a0 a1), Ord.eq (Ord.from_wf WF a0) (Ord.from_wf (cut_rel_well_founded WF a1) (exist _ a0 LT)))).
+            (fun a0 => forall (LT: R a0 a1), ord.eq (ord.from_wf WF a0) (ord.from_wf (cut_rel_well_founded WF a1) (exist _ a0 LT)))).
   intros a0 IH. i. split.
-  { eapply Ord.from_wf_supremum. i.
+  { eapply ord.from_wf_supremum. i.
     assert (LT1: R a2 a1).
     { destruct (TOTAL a2 a1) as [|[]]; auto.
       - subst. exfalso.
@@ -257,16 +257,16 @@ Proof.
         { eapply clos_trans_well_founded; eauto. }
         { econs 2; eauto. econs 2; eauto. econs 1; auto. }
     }
-    eapply (@Ord.le_lt_lt (Ord.from_wf (cut_rel_well_founded WF a1)
+    eapply (@ord.le_lt_lt (ord.from_wf (cut_rel_well_founded WF a1)
                                        (exist _ a2 LT1))).
     { eapply IH; auto. }
-    { eapply Ord.lt_from_wf. ss. }
+    { eapply ord.lt_from_wf. ss. }
   }
-  { eapply Ord.from_wf_supremum. i. destruct a2 as [a2 LT1].
+  { eapply ord.from_wf_supremum. i. destruct a2 as [a2 LT1].
     unfold cut_rel in LT0. ss.
-    eapply (@Ord.le_lt_lt (Ord.from_wf WF a2)).
+    eapply (@ord.le_lt_lt (ord.from_wf WF a2)).
     { eapply IH; auto. }
-    { eapply Ord.lt_from_wf. ss. }
+    { eapply ord.lt_from_wf. ss. }
   }
 Qed.
 
@@ -274,16 +274,16 @@ Qed.
 Lemma from_wf_set_cut A (R: A -> A -> Prop) (WF: well_founded R)
       (TOTAL: forall a0 a1, R a0 a1 \/ a0 = a1 \/ R a1 a0)
       (a1: A):
-  Ord.eq (Ord.from_wf WF a1) (Ord.from_wf_set (cut_rel_well_founded WF a1)).
+  ord.eq (ord.from_wf WF a1) (ord.from_wf_set (cut_rel_well_founded WF a1)).
 Proof.
   split.
-  { eapply Ord.from_wf_supremum. i.
-    eapply Ord.lt_intro with (a:=exist _ a0 LT).
+  { eapply ord.from_wf_supremum. i.
+    eapply ord.lt_intro with (a:=exist _ a0 LT).
     eapply from_wf_cut; eauto. }
-  { eapply Ord.build_supremum. intros [a0 r].
-    eapply (@Ord.le_lt_lt (Ord.from_wf WF a0)).
+  { eapply ord.build_supremum. intros [a0 r].
+    eapply (@ord.le_lt_lt (ord.from_wf WF a0)).
     { eapply from_wf_cut; eauto. }
-    { eapply Ord.lt_from_wf; eauto. }
+    { eapply ord.lt_from_wf; eauto. }
   }
 Qed.
 
