@@ -22,7 +22,7 @@ Section measure.
   (* | ms_extend (s : measurable_syntax). *)
 
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
-  Remark measure_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
+  Remark measure_rec_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
   Proof using. intros. destruct m. auto. Qed.
 
   Fixpoint measure_rec (l : L) (ACC : Acc ltL l) {struct ACC} :
@@ -43,11 +43,10 @@ Section measure.
          (η (Ord.join (λ (m : L_sub l),
                          Ord.join (λ (t : measurable_syntax),
                                      measure_rec
-                                       (proj1_sig m) (Acc_inv ACC (measure_oblig l m))
+                                       (proj1_sig m) (Acc_inv ACC (measure_rec_oblig l m))
                                        t))))
      end).
 
-  (* We assume that Jacobsthal.expn ω ω is large enough. *)
   Definition measure (l : L) (s : measurable_syntax) : Ord.t :=
     measure_rec l (wf_ltL l) s.
 
@@ -190,190 +189,3 @@ Infix "⊕" := ms_add : msyn_scope.
 Infix "×" := ms_mult : msyn_scope.
 Infix "↑" := ms_expn : msyn_scope.
 Notation "▽" := (ms_extend) : msyn_scope.
-
-Global Instance nat_inhabited : Inhabited nat := populate 0.
-
-Section layer.
-
-  Definition layer : Type := ord_tree nat.
-  Definition layer_lt : layer → layer → Prop := ord_tree_lt_tc.
-
-  Lemma layer_lt_well_founded : well_founded layer_lt.
-  Proof. apply ord_tree_lt_tc_well_founded. Qed.
-  Global Instance layer_lt_transitive : Transitive layer_lt.
-  Proof. apply _. Qed.
-
-  Definition layer_zero : layer := ord_tree_base.
-  Definition layer_join (ls : nat → layer) : layer :=
-    ord_tree_cons ls.
-
-  Lemma layer_zero_bot : ∀ (l : layer), (l = layer_zero) ∨ (layer_lt layer_zero l).
-  Proof. eapply ord_tree_base_bot. econstructor. exact 0. Qed.
-
-  Lemma layer_join_upperbound ls :
-    ∀ l n, l = ls n →
-           layer_lt l (layer_join ls).
-  Proof. intros. subst. econstructor 1. econstructor. Qed.
-
-  (** A layer has a base and has a nat-like ordering that starts from the base. *)
-  Fixpoint layer_def (b : layer) (n : nat) : layer :=
-    match n with
-    | O => b
-    | S m => layer_join (λ _, layer_def b m)
-    end.
-
-  Lemma layer_def_unfold b n :
-    layer_def b n =
-    match n with
-    | O => b
-    | S m => layer_join (λ _, layer_def b m)
-    end.
-  Proof. destruct n; auto. Qed.
-
-  Global Instance layer_def_proper_lt_nat b :
-    Proper (lt ==> layer_lt) (layer_def b).
-  Proof.
-    repeat intro. induction H.
-    - simpl. eapply layer_join_upperbound; auto.
-    - etransitivity; first eauto. simpl. eapply layer_join_upperbound; auto.
-  Qed.
-
-  Lemma layer_def_O :
-    ∀ b, layer_def b O = b.
-  Proof. intros. simpl. auto. Qed.
-  Lemma layer_def_cases :
-    ∀ b n, (n = 0 ∧ b = layer_def b n) ∨ (0 < n ∧ layer_lt b (layer_def b n)).
-  Proof.
-    intros. destruct n.
-    - left. rewrite layer_def_O. auto.
-    - right. split; first apply PeanoNat.Nat.lt_0_succ. rewrite <-(layer_def_O b) at 1.
-      apply layer_def_proper_lt_nat. apply PeanoNat.Nat.lt_0_succ.
-  Qed.
-
-  Lemma layer_lt_base_upperbound b1 b2 :
-    (∀ n, layer_lt (layer_def b1 n) b2) →
-    ∀ n m, layer_lt (layer_def b1 n) (layer_def b2 m).
-  Proof.
-    intros. destruct (layer_def_cases b2 m).
-    - destruct H0; subst. rewrite <- H1. eauto.
-    - destruct H0. etransitivity; eauto.
-  Qed.
-
-  Lemma layer_join_layer_def_comm b n :
-    layer_join (λ _, layer_def b n) = layer_def (layer_join (λ _, b)) n.
-  Proof.
-    revert b. induction n; simpl; intros; auto.
-    rewrite IHn. auto.
-  Qed.
-
-  Lemma layer_def_add b n m :
-    layer_def b (n + m) = layer_def (layer_def b n) m.
-  Proof.
-    revert b m. induction n; simpl; intros; auto.
-    rewrite IHn. destruct m; simpl; auto.
-    rewrite layer_join_layer_def_comm. auto.
-  Qed.
-
-  (** An upperbound of any layer with base b. *)
-  Definition layer_next (b : layer) : layer := layer_join (layer_def b).
-
-  Lemma layer_next_upperbound b :
-    ∀ l n, l = layer_def b n →
-           layer_lt l (layer_next b).
-  Proof. intros. eapply layer_join_upperbound; eauto. Qed.
-
-  Fixpoint layer_next_iter (b : layer) (l : nat) : layer :=
-    match l with
-    | O => b
-    | S l' => layer_next (layer_next_iter b l')
-    end.
-
-  Lemma layer_next_iter_unfold b l :
-    layer_next_iter b l =
-    match l with
-    | O => b
-    | S l' => layer_next (layer_next_iter b l')
-    end.
-  Proof. destruct l; auto. Qed.
-
-  Lemma layer_next_iter_proper_lt b :
-    Proper (lt ==> layer_lt) (layer_next_iter b).
-  Proof.
-    repeat intro. induction H.
-    - simpl. eapply (layer_next_upperbound _ _ 0). auto.
-    - etransitivity; first eauto. simpl. eapply (layer_next_upperbound _ _ 0). auto.
-  Qed.
-
-  Lemma layer_next_iter_upperbound b l1 l2 :
-    l1 < l2 →
-    ∀ n, layer_lt (layer_def (layer_next_iter b l1) n) (layer_next_iter b l2).
-  Proof.
-    intros LT. induction LT; intros.
-    - simpl. eapply layer_next_upperbound; eauto.
-    - etransitivity; first eauto. eapply layer_next_iter_proper_lt. eauto.
-  Qed.
-
-  (** Some useful instances *)
-  (* A nat *)
-  Definition layer_nat (n : nat) : layer := layer_def layer_zero n.
-  Definition layer_nat_omega : layer := layer_join layer_nat.
-
-  Lemma layer_nat_omega_upperbound :
-    ∀ n, layer_lt (layer_nat n) layer_nat_omega.
-  Proof. intros. eapply layer_join_upperbound. eauto. Qed.
-
-  Lemma layer_nat_zero : layer_nat 0 = layer_zero.
-  Proof. auto. Qed.
-
-  (* A pair of nats with the lexicographical order *)
-  Definition layer_pair (l n : nat) : layer :=
-    layer_def (layer_next_iter layer_zero l) n.
-
-  Lemma layer_pair_lt_fst l1 l2 :
-    l1 < l2 →
-    ∀ n m, layer_lt (layer_pair l1 n) (layer_pair l2 m).
-  Proof.
-    intros. unfold layer_pair. eapply layer_lt_base_upperbound.
-    intros. eapply layer_next_iter_upperbound; auto.
-  Qed.
-  Lemma layer_pair_lt_snd l :
-    Proper (lt ==> layer_lt) (layer_pair l).
-  Proof.
-    repeat intro. unfold layer_pair. apply layer_def_proper_lt_nat. auto.
-  Qed.
-
-  Definition layer_pair_omega (n : nat) : layer :=
-    layer_def (layer_join (λ l, layer_pair l 0)) n.
-
-  Lemma layer_pair_omega_upperbound l :
-    ∀ n m, layer_lt (layer_pair l n) (layer_pair_omega m).
-  Proof.
-    intros. unfold layer_pair_omega.
-    destruct (layer_def_cases (layer_join (λ l0 : nat, layer_pair l0 0)) m).
-    - destruct H; subst. rewrite <-H0. etransitivity.
-      + eapply (layer_pair_lt_fst l (S l)). auto.
-      + eapply layer_join_upperbound; eauto.
-    - destruct H. etransitivity; last eauto.
-      etransitivity.
-      + eapply (layer_pair_lt_fst l (S l)). auto.
-      + eapply layer_join_upperbound; eauto.
-  Qed.
-  Lemma layer_pair_omega_proper_lt_nat :
-    Proper (lt ==> layer_lt) (layer_pair_omega).
-  Proof.
-    repeat intro. apply layer_def_proper_lt_nat. auto.
-  Qed.
-
-End layer.
-Global Opaque layer layer_def layer_next layer_next_iter layer_nat layer_nat_omega.
-
-Declare Scope layer_scope.
-Delimit Scope layer_scope with L.
-
-Coercion layer_nat : nat >-> layer.
-Infix "<" := layer_lt : layer_scope.
-Notation "b '⨣' n" := (layer_def b%L n) (at level 50, format "b  ⨣  n") : layer_scope.
-Notation "'⌈' l '⌉'" := (layer_next l%L) (at level 50, format "⌈ l ⌉") : layer_scope.
-
-Global Instance layer_layer_class : layer_class layer :=
-  Build_layer_class _ _ layer_lt_well_founded.

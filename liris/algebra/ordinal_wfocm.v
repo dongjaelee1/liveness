@@ -1,5 +1,6 @@
 From stdpp Require Import base.
-From liris Require Export wfocm ordinal_facts.
+From liris.prelude Require Export ordinal_facts.
+From liris.algebra Require Export wfocm.
 
 Global Program Instance ord_OCM : OCM.t Ord.le Hessenberg.add :=
   OCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.

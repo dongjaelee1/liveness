@@ -157,7 +157,7 @@ Section gprog.
     intros ->. unfold_defs. iIntros (DisjTP) "H". iMod "H" as "(%& (#Oe& Ox& Ob& OS)& GFs& %& #REs& H)".
     iAssert ([∗ map] g↦_ ∈ G, glG_elem g ∗ glG_fuel g Ord.one)%I with "[GFs]" as "GFs".
     { iApply (big_sepM_impl with "GFs"). iIntros "!> %%% H".
-      rewrite (glG_fuel_eq _ (measure (layer_nat 0) 1) Ord.one); auto. rewrite measure_nat Ord.from_nat_1. done. }
+      rewrite (glG_fuel_eq _ (measure (0 : layer) 1) Ord.one); auto. rewrite measure_nat Ord.from_nat_1. done. }
     iIntros "% % (S& O& A& W& %GWI1)".
     iAssert (⌜ dom G ⊆ dom Ω1 ⌝)%I as "%GOSub".
     { rewrite elem_of_subseteq. iIntros (x INGx).

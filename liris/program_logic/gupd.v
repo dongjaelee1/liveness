@@ -1163,7 +1163,7 @@ Section preds.
       (measure ℓ1 μ1 < measure ℓ2 μ2)%ord →
       gl_fuel k ℓ2 μ2 ⊢ |==> gl_fuel k ℓ1 μ1 ∗ gl_fuel k 0 1.
     Proof.
-      unfold_gl_fuel. rewrite (gl_fuel_val_eq _ (measure (layer_nat 0) 1) Ord.one).
+      unfold_gl_fuel. rewrite (gl_fuel_val_eq _ (measure (0 : layer) 1) Ord.one).
       1: apply gl_fuel_val_lt.
       rewrite measure_nat Ord.from_nat_1. done.
     Qed.
@@ -1282,7 +1282,7 @@ Section preds.
     Qed.
 
     Lemma gl_fuel_extend_val k ℓ1 ℓ2 o :
-      (ℓ1 < ℓ2)%L →
+      (ℓ1 < ℓ2)%ordi →
       (∃ s, (o <= η (measure ℓ1 s))%ord) →
       gl_fuel k ℓ2 (▽)%M ⊢ |==> gl_fuel_val k o.
     Proof.
@@ -1290,14 +1290,14 @@ Section preds.
       eapply measure_extend_alt; eauto.
     Qed.
     Lemma gl_fuel_extend_val_list K ℓ1 ℓ2 o :
-      (ℓ1 < ℓ2)%L →
+      (ℓ1 < ℓ2)%ordi →
       (∃ s, (o <= η (measure ℓ1 s))%ord) →
       ([∗ list] k ∈ K, gl_fuel k ℓ2 (▽)%M) ⊢ |==> ([∗ list] k ∈ K, gl_fuel_val k o).
     Proof.
       intros. rewrite -big_sepL_bupd. iApply big_sepL_mono. intros. eapply gl_fuel_extend_val; eauto.
     Qed.
     Lemma gl_fuel_extend_val_set K ℓ1 ℓ2 o :
-      (ℓ1 < ℓ2)%L →
+      (ℓ1 < ℓ2)%ordi →
       (∃ s, (o <= η (measure ℓ1 s))%ord) →
       ([∗ set] k ∈ K, gl_fuel k ℓ2 (▽)%M) ⊢ |==> ([∗ set] k ∈ K, gl_fuel_val k o).
     Proof.
@@ -1305,7 +1305,7 @@ Section preds.
     Qed.
 
     Lemma gl_fuel_extend k ℓ1 ℓ2 μ :
-      (ℓ1 < ℓ2)%L →
+      (ℓ1 < ℓ2)%ordi →
       gl_fuel k ℓ2 (▽)%M ⊢ |==> gl_fuel k ℓ1 μ.
     Proof.
       iIntros (LT) "H". iMod (gl_fuel_extend_val _ ℓ1 with "H") as "H"; last (unfold_gl_fuel; by iFrame).
@@ -1313,13 +1313,13 @@ Section preds.
       exists μ. apply η_mono.
     Qed.
     Lemma gl_fuel_extend_list K ℓ1 ℓ2 μ :
-      (ℓ1 < ℓ2)%L →
+      (ℓ1 < ℓ2)%ordi →
       ([∗ list] k ∈ K, gl_fuel k ℓ2 (▽)%M) ⊢ |==> ([∗ list] k ∈ K, gl_fuel k ℓ1 μ).
     Proof.
       intros. rewrite -big_sepL_bupd. iApply big_sepL_mono. intros. eapply gl_fuel_extend; eauto.
     Qed.
     Lemma gl_fuel_extend_set K ℓ1 ℓ2 μ :
-      (ℓ1 < ℓ2)%L →
+      (ℓ1 < ℓ2)%ordi →
       ([∗ set] k ∈ K, gl_fuel k ℓ2 (▽)%M) ⊢ |==> ([∗ set] k ∈ K, gl_fuel k ℓ1 μ).
     Proof.
       intros. rewrite -big_sepS_bupd. iApply big_sepS_mono. intros. eapply gl_fuel_extend; eauto.
@@ -1409,7 +1409,7 @@ Section preds.
     Qed.
 
     Lemma wit_fuels_add k v ℓ1 α F f ℓ2 μ :
-      (ℓ1 < ℓ2)%L →
+      (ℓ1 < ℓ2)%ordi →
       wit_fuels k v ℓ1 α F -∗ gl_fuel f ℓ2 (μ × ▽)%M ==∗ wit_fuels k v ℓ1 α (<[f:=(ℓ2, μ)]>F).
     Proof.
       iIntros (LT) "Wfs Gf". rewrite !wit_fuels_unseal /wit_fuels_def.

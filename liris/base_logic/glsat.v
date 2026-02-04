@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liris.algebra Require Import auth_mra bank.
-From liris.algebra Require Export ordinal_wfocm measure.
+From liris.algebra Require Export ordinal_wfocm layer.
 From liris.base_logic Require Export invariants ghost_lock.
 
 Section aux.
