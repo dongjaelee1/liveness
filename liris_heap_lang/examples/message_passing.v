@@ -119,7 +119,7 @@ Section mp_proof.
       iSplitR; first done. iIntros "Tx TG _ !> _ !>".
       lwp_if. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
       iSplitR; first done. iIntros "Tx TG _ !> _ !>".
-      iMod (wit_fuels_spend_one with "Wkvfs Wck") as "(%& %LTα& #Wkvfs'& _)".
+      iMod (wit_fuels_decr with "Wkvfs Wck") as "(%& %LTα& #Wkvfs'& _)".
       iApply (IHα α0 LTα). iFrame. iModIntro. auto.
     - iDestruct "HQ" as "[#Gdk ptr]".
       iApply (lwp_load _ ∅ 0 with "[$ptr $Tx $TG]").

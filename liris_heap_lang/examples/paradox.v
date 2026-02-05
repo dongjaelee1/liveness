@@ -239,7 +239,7 @@ Section proof.
     iEval (rewrite -/loop).
     rewrite big_sepM_singleton. iDestruct "Wcs" as "[Wc | #Gdckn]".
     - (** Witness induction *)
-      iMod (wit_fuels_spend_one with "Wfs Wc") as "(%& %LTw& #Wfs'& _)".
+      iMod (wit_fuels_decr with "Wfs Wc") as "(%& %LTw& #Wfs'& _)".
       (* iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ a0 with "LCw") as "LCw". *)
       (* { apply Ord.lt_le; auto. }       *)
       iPoseProof ("IHα" $! _ LTw with "Tx TG LC HΦ Cai [Wfs']") as "LWP".

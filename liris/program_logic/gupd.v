@@ -799,10 +799,20 @@ Local Definition wit_unseal :
   @wit = @wit_def := wit_aux.(seal_eq).
 Global Arguments wit {SI Σ _}.
 
+(* Collection of fuels to support induction rules *)
+Local Definition gl_fuels_def `{SI : indexT} `{@gupdGS SI Σ}
+  α (F : gmap gl_id (layer * measurable_syntax)) : iProp Σ :=
+  ([∗ map] f ↦ '(l, m) ∈ F, gl_fuel_val f ((measure l m) × α)%ord).
+Local Definition gl_fuels_aux : seal (@gl_fuels_def). Proof. by eexists. Qed.
+Definition gl_fuels := gl_fuels_aux.(unseal).
+Local Definition gl_fuels_unseal :
+  @gl_fuels = @gl_fuels_def := gl_fuels_aux.(seal_eq).
+Global Arguments gl_fuels {SI Σ _}.
+
 Local Definition wit_fuels_def `{SI : indexT} `{@gupdGS SI Σ}
   k v ℓ α (F : gmap gl_id (layer * measurable_syntax)) : iProp Σ :=
   ∃ μ, ⌜ (α <= η (measure ℓ μ))%ord ⌝ ∗ wit_bound k v α ∗
-       ([∗ map] f ↦ '(l, m) ∈ F, gl_fuel_val f ((measure l m) × α)%ord).
+       gl_fuels α F.
 Local Definition wit_fuels_aux : seal (@wit_fuels_def). Proof. by eexists. Qed.
 Definition wit_fuels := wit_fuels_aux.(unseal).
 Local Definition wit_fuels_unseal :
@@ -814,6 +824,7 @@ Section preds.
 
   Local Ltac unfold_defs :=
     try rewrite !wit_fuels_unseal /wit_fuels_def;
+    try rewrite !gl_fuels_unseal /gl_fuels_def;
     try rewrite !wit_unseal /wit_def;
     try rewrite !wit_layer_unseal /wit_layer_def;
     try rewrite !wit_bound_unseal /wit_bound_def;
@@ -852,6 +863,8 @@ Section preds.
     Proof. unfold_defs. apply _. Qed.
     Global Instance wit_layer_persistent k v ℓ : Persistent (wit_layer k v ℓ).
     Proof. unfold_defs. apply _. Qed.
+    Global Instance gl_fuels_empty_persistent α : Persistent (gl_fuels α ∅).
+    Proof. unfold_defs. apply _. Qed.
     Global Instance wit_fuels_empty_persistent k v ℓ α : Persistent (wit_fuels k v ℓ α ∅).
     Proof. unfold_defs. apply _. Qed.
 
@@ -884,6 +897,8 @@ Section preds.
     Global Instance wit_layer_timeless k v ℓ : Timeless (wit_layer k v ℓ).
     Proof. unfold_defs. apply _. Qed.
     Global Instance wit_timeless k v a : Timeless (wit k v a).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance gl_fuels_timeless α F : Timeless (gl_fuels α F).
     Proof. unfold_defs. apply _. Qed.
     Global Instance wit_fuels_timeless k v ℓ α F : Timeless (wit_fuels k v ℓ α F).
     Proof. unfold_defs. apply _. Qed.
@@ -1392,6 +1407,54 @@ Section preds.
       apply ord_lt_one in H. iMod (witG_witness_mon_split with "C") as "[_ $]"; done.
     Qed.
 
+    (** gl_fuels rules *)
+    Lemma gl_fuels_init α :
+      ⊢ gl_fuels α ∅.
+    Proof.
+      unfold_defs. rewrite big_sepM_empty. done.
+    Qed.
+
+    Lemma gl_fuels_add α F f ℓ ν μ :
+      (α <= measure ℓ ν)%ord →
+      gl_fuels α F -∗ gl_fuel f ℓ (μ × ν)%M ==∗ gl_fuels α (<[f:=(ℓ, μ)]>F).
+    Proof.
+      iIntros (LT) "Wfs Gf". rewrite !gl_fuels_unseal /gl_fuels_def.
+      unfold_gl_fuel. iMod (gl_fuel_val_mon _ ((measure ℓ μ) × α)%ord with "Gf") as "Gf".
+      { rewrite measure_mult. apply Jacobsthal.le_mult_r. auto. }
+      iModIntro. iApply (big_sepM_insert_delete _ _ f).
+      iFrame "Gf". destruct (F !! f) eqn:LUF.
+      - iPoseProof (big_sepM_delete _ _ f with "Wfs") as "[_ $]". eauto.
+      - rewrite delete_id; auto.
+    Qed.
+
+    Lemma gl_fuels_add_map α F (G : gmap gl_id (layer * measurable_syntax)) ν :
+      gl_fuels α F -∗
+      ([∗ map] g ↦ '(l, m) ∈ G, ⌜ (α <= measure l ν)%ord ⌝ ∗ gl_fuel g l (m × ν)%M) ==∗
+      gl_fuels α (G ∪ F).
+    Proof.
+      revert α F. induction G using map_ind; intros; iIntros "Wfs Fs".
+      { rewrite left_id_L. by iFrame. }
+      rewrite big_sepM_insert; last auto.
+      rename m into G. destruct x as (l& m). iDestruct "Fs" as "((%Lt& Gf)& Fs)".
+      iMod (IHG with "Wfs Fs") as "Wfs".
+      replace (<[i:=(l, m)]> G ∪ F) with (<[i:=(l, m)]> (G ∪ F)).
+      { iApply (gl_fuels_add with "Wfs Gf"). auto. }
+      by rewrite insert_union_l.
+    Qed.
+
+    Lemma gl_fuels_decr α α0 F :
+      (α0 < α)%ord →
+      gl_fuels α F ==∗
+      (gl_fuels α0 F ∗ ([∗ map] f ↦ '(l, m) ∈ F, gl_fuel f l m)).
+    Proof.
+      rewrite gl_fuels_unseal /gl_fuels_def. iIntros (LT) "Fs".
+      rewrite -big_sepM_sep -big_sepM_bupd. iApply (big_sepM_impl with "Fs").
+      iIntros "!> % % % H". destruct x as (l& m).
+      rewrite gl_fuel_unseal /gl_fuel_def. rewrite -gl_fuel_val_add. iApply (gl_fuel_val_mon with "H").
+      rewrite Hessenberg.add_comm -Jacobsthal.mult_S.
+      apply Jacobsthal.le_mult_r. apply Ord.S_supremum; auto.
+    Qed.
+
     (** wit_fuels rules *)
     Lemma wit_fuels_init k v ℓ :
       wit_layer k v ℓ -∗ ∃ α, wit_fuels k v ℓ α ∅.
@@ -1414,15 +1477,24 @@ Section preds.
     Proof.
       iIntros (LT) "Wfs Gf". rewrite !wit_fuels_unseal /wit_fuels_def.
       iDestruct "Wfs" as "(%& %& $& M)".
-      unfold_gl_fuel. iMod (gl_fuel_val_mon _ ((measure ℓ2 μ) × α)%ord with "Gf") as "Gf".
-      { rewrite measure_mult. apply Jacobsthal.le_mult_r. etrans; first eauto. apply measure_extend; auto. }
-      iModIntro. iExists _. iSplitR; first eauto. iApply (big_sepM_insert_delete _ _ f).
-      iFrame "Gf". destruct (F !! f) eqn:LUF.
-      - iPoseProof (big_sepM_delete _ _ f with "M") as "[_ $]". eauto.
-      - rewrite delete_id; auto.
+      iExists _. iSplitR; first eauto.
+      iApply (gl_fuels_add with "M Gf").
+      etrans; first eauto. apply measure_extend; auto.
     Qed.
 
-    Lemma wit_fuels_spend_one k v ℓ α F :
+    Lemma wit_fuels_add_map k v ℓ α F (G : gmap gl_id (layer * measurable_syntax)) :
+      wit_fuels k v ℓ α F -∗
+      ([∗ map] g ↦ '(l, m) ∈ G, ⌜ (ℓ < l)%ordi ⌝ ∗ gl_fuel g l (m × ▽)%M) ==∗
+      wit_fuels k v ℓ α (G ∪ F).
+    Proof.
+      rewrite !wit_fuels_unseal /wit_fuels_def.
+      iIntros "(%& %& $& Fs) Gfs". iExists _. iSplitR; first eauto.
+      iApply (gl_fuels_add_map _ _ _ (▽)%M with "Fs [Gfs]").
+      iApply (big_sepM_impl with "Gfs"). iIntros "!> %%%". destruct x. iIntros "(%& $)".
+      iPureIntro. etrans; first eauto. apply measure_extend. done.
+    Qed.
+
+    Lemma wit_fuels_decr k v ℓ α F :
       wit_fuels k v ℓ α F -∗ wit k v Ord.one ==∗
       ∃ α0, ⌜ (α0 < α)%ord ⌝ ∗ wit_fuels k v ℓ α0 F ∗
             ([∗ map] f ↦ '(l, m) ∈ F, gl_fuel f l m).
@@ -1431,11 +1503,8 @@ Section preds.
       iMod (wit_bound_spend_one with "Wbk Wk") as "(%& %& #Wbk2)".
       iExists a0. iSplitR; first done. iFrame "Wbk2". assert (a0 <= η (measure ℓ μ)).
       { etransitivity; last eauto. apply WFOCM.lt_le. auto. }
-      iFrame (H1). rewrite -big_sepM_sep -big_sepM_bupd. iApply (big_sepM_impl with "Fs").
-      iIntros "!> % % % H". destruct x as (l& m).
-      rewrite gl_fuel_unseal /gl_fuel_def. rewrite -gl_fuel_val_add. iApply (gl_fuel_val_mon with "H").
-      rewrite Hessenberg.add_comm -Jacobsthal.mult_S.
-      apply Jacobsthal.le_mult_r. apply Ord.S_supremum; auto.
+      iFrame (H1).
+      iApply (gl_fuels_decr with "Fs"). auto.
     Qed.
 
     (** th_obls rules *)
