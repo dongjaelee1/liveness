@@ -6,6 +6,7 @@ From liris.prelude Require Export wf_structs ordinal_facts.
 Class layer_class (L : Type) := {
     ltL : L -> L -> Prop;
     wf_ltL : well_founded ltL;
+    #[global] ltL_transitive :: Transitive ltL;
   }.
 
 Section measure.
@@ -125,7 +126,7 @@ Section measure.
     ∀ (t : measurable_syntax), (η (measure l1 t) <= measure l2 (ms_extend))%ord.
   Proof using Type*.
     intros Hlt d. rewrite (measure_unfold _ (ms_extend)).
-    apply η_proper_le.
+    apply η_le_proper.
     etransitivity; cycle 1.
     { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
     simpl. apply Ord.join_upperbound.
@@ -189,3 +190,39 @@ Infix "⊕" := ms_add : msyn_scope.
 Infix "×" := ms_mult : msyn_scope.
 Infix "↑" := ms_expn : msyn_scope.
 Notation "▽" := (ms_extend) : msyn_scope.
+
+(** Additional definitions and properties. *)
+Section layer.
+  Context `{!layer_class L} `{!ord_mono_fun_class}.
+
+  Definition layer_leibniz_le : L → L → Prop :=
+    λ l1 l2, l1 = l2 ∨ (ltL l1 l2).
+
+  Global Instance layer_leibniz_le_reflexive : Reflexive layer_leibniz_le.
+  Proof using. repeat intro. left. auto. Qed.
+  Global Instance layer_leibniz_le_transitive : Transitive layer_leibniz_le.
+  Proof using.
+    repeat intro. destruct H0, H1; subst.
+    - reflexivity.
+    - right; auto.
+    - right; auto.
+    - right. etransitivity; eauto.
+  Qed.
+  Global Instance layer_leibniz_le_preorder : PreOrder layer_leibniz_le.
+  Proof using. econstructor; apply _. Qed.
+
+  Global Instance measure_layer_leibniz_le_proper μ : Proper (layer_leibniz_le ==> Ord.le) (λ ℓ, measure ℓ μ).
+  Proof using.
+    induction μ; repeat intro.
+    - rewrite !measure_embed. reflexivity.
+    - rewrite !measure_large. reflexivity.
+    - rewrite !measure_add. rewrite IHμ1, IHμ2; eauto. reflexivity.
+    - rewrite !measure_mult. rewrite IHμ1, IHμ2; eauto. reflexivity.
+    - rewrite !measure_expn. rewrite IHμ1, IHμ2; eauto. reflexivity.
+    - destruct H0.
+      + subst. reflexivity.
+      + etransitivity; last (eapply measure_extend; eauto).
+        eapply η_mono.
+  Qed.
+
+End layer.

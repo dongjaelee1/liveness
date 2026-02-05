@@ -194,6 +194,8 @@ Section proof.
   Let N_inv := nroot .@ "paradox_cnt".
   Let N1 := nroot .@ "paradox_false".
 
+  Let ℓs : layers := (λ _, 0).
+
   Definition px_inv r i j k : iProp Σ :=
     ∃ n, cnt_auth r j n (1/2)%Qp ∗
          ([∗ list] a ∈ seq 0 (S n), (£ (1)%ord ∨ cnt_lb r i a) ∗
@@ -281,7 +283,7 @@ Section proof.
   Lemma px_loop2_spec j n r ci cj ck :
     l{{{ thread_exec j 1 ∗ th_obls j (<[ck:=n]>∅) 1 ∗
          gl_variant N_inv ck n True (cnt_lb r cj (n + 1)) (cnt_lb r cj (n + 1)) ∗
-         gl_layer ck 0 ∗ gl_fuel ck 0 10 ∗
+         gl_layers ck ℓs ∗ gl_fuel ck 0 10 ∗
          px r ci cj ck ∗ cnt_auth r cj n (1/2)%Qp }}}
       loop #() @ j
     l{{{ RET #(); lift_term j fork_post #() }}}.

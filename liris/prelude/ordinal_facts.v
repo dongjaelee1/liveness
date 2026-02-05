@@ -4,8 +4,8 @@ From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
 Class ord_mono_fun_class := {
     η : Ord.t → Ord.t;
     η_mono : ∀ o, (o <= η o)%ord;
-    #[global] η_proper_lt :: Proper (Ord.lt ==> Ord.lt) η;
-    #[global] η_proper_le :: Proper (Ord.le ==> Ord.le) η;
+    #[global] η_lt_proper :: Proper (Ord.lt ==> Ord.lt) η;
+    #[global] η_le_proper :: Proper (Ord.le ==> Ord.le) η;
   }.
 
 Section limit.

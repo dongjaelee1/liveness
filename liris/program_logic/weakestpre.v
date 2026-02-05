@@ -128,6 +128,7 @@ Section gprog.
 
   Local Ltac unfold_defs :=
     try rewrite !gupd.wit_fuels_unseal /gupd.wit_fuels_def;
+    try rewrite !gupd.gl_fuels_unseal /gupd.gl_fuels_def;
     try rewrite !gupd.wit_unseal /gupd.wit_def;
     try rewrite !gupd.wit_layer_unseal /gupd.wit_layer_def;
     try rewrite !gupd.wit_bound_unseal /gupd.wit_bound_def;
@@ -141,7 +142,7 @@ Section gprog.
     try rewrite !gupd.gl_current_unseal /gupd.gl_current_def;
     try rewrite !gupd.gl_done_unseal /gupd.gl_done_def;
     try rewrite !gupd.gl_locked_unseal /gupd.gl_locked_def;
-    try rewrite !gupd.gl_layer_unseal /gupd.gl_layer_def;
+    try rewrite !gupd.gl_layers_unseal /gupd.gl_layers_def;
     try rewrite !gupd.gl_unseal /gupd.gl_def.
 
   (** Step rule *)
@@ -599,30 +600,32 @@ Section sfgupd.
   Proof. rewrite /Frame=><-. by rewrite sfgupd_frame_l. Qed.
 
   (** Update rules *)
-  Lemma gl_alloc_obl E i G q ℓ μ N v P Q R :
+  Lemma gl_alloc_obl E i G q ℓs μ N v P Q R :
+    Proper (le ==> layer_leibniz_le) ℓs →
     th_obls i G q -∗
     (▷ P) -∗
     |={E}=>g ∃ k, (⌜ G !! k = None ⌝) ∗
                  th_obls i (<[k:=v]>G) q ∗
-                 gl_layer k ℓ ∗ gl k v ∗ gl_fuel k ℓ μ ∗
+                 gl_layers k ℓs ∗ gl k v ∗ gl_fuel k (ℓs v) μ ∗
                  gl_variant N k v P Q R ∗
-                 wit_layer k v ℓ ∗
+                 wit_layer k v (ℓs v) ∗
                  ([∗ set] u ∈ set_seq 0 v, gl_done k u).
   Proof.
-    iIntros "Tb HP %%% $". iApply (gl_alloc_obl_0 _ Θ with "Tb HP").
+    iIntros (MONO) "Tb HP %%% $". iApply (gl_alloc_obl_0 _ Θ with "Tb HP").
   Qed.
 
-  Lemma gl_alloc_done E ℓ μ N v P Q R :
+  Lemma gl_alloc_done E ℓs μ N v P Q R :
+    Proper (le ==> layer_leibniz_le) ℓs →
     (▷ Q) -∗
-    |={E}=>g ∃ k, gl_layer k ℓ ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k ℓ μ ∗
+    |={E}=>g ∃ k, gl_layers k ℓs ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k (ℓs v) μ ∗
                  gl_variant N k v P Q R ∗
-                 wit_layer k v ℓ ∗
+                 wit_layer k v (ℓs v) ∗
                  ([∗ set] u ∈ set_seq 0 (S v), gl_done k u).
   Proof.
-    iIntros "HQ %%% $". iApply (gl_alloc_done_0 _ Θ with "HQ").
+    iIntros (MONO) "HQ %%% $". iApply (gl_alloc_done_0 _ Θ with "HQ").
   Qed.
 
-  Lemma gl_lock E0 E i G q k ℓ μ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
+  Lemma gl_lock E0 E i G q k ℓs μ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
     v1 < v2 →
     ↑N ⊆ E →
     gl_current k v1 -∗
@@ -631,15 +634,15 @@ Section sfgupd.
     |={E,E ∖ ↑N}=> (▷ (gl_current k v1 ∗ Q1)) ∗
                   (th_obls i G q -∗
                    gl_current k v1 -∗
-                   gl_layer k ℓ -∗
+                   gl_layers k ℓs -∗
                    (▷ R1) -∗
                    (▷ P2) -∗
                    |={E0}=>g |={E ∖ ↑N,E}=> 
                      (th_obls i (<[k:=v2]>G) q ∗
-                      gl k v2 ∗ gl_fuel k ℓ μ ∗
+                      gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
                       gl_variant N k v2 P2 Q2 R2 ∗
-                      wit_layer k v2 ℓ ∗
-                      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u ℓ) ∗
+                      wit_layer k v2 (ℓs v2) ∗
+                      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u (ℓs u)) ∗
                       ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u))).
   Proof.
     iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.

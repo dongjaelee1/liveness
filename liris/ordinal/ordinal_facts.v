@@ -4,8 +4,8 @@ From liris.ordinal Require Export ordinal hessenberg classical_hessenberg.
 Class ord_mono_fun_class := {
     η : ord.t → ord.t;
     η_mono : ∀ o, (o <= η o)%ordi;
-    #[global] η_proper_lt :: Proper (ord.lt ==> ord.lt) η;
-    #[global] η_proper_le :: Proper (ord.le ==> ord.le) η;
+    #[global] η_lt_proper :: Proper (ord.lt ==> ord.lt) η;
+    #[global] η_le_proper :: Proper (ord.le ==> ord.le) η;
   }.
 
 Section limit.

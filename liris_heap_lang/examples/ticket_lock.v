@@ -5,7 +5,7 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
-From transfinite.base_logic Require Import lib.token.
+From transfinite.base_logic.lib Require Import token ghost_map.
 
 Module TicketLock.
   (** https://en.wikipedia.org/wiki/Ticket_lock *)
@@ -31,9 +31,13 @@ Module TicketLock.
 End TicketLock.
 
 (** The CMRA we need. *)
-Class ticket_lockG Σ := TLockG { #[local] tlock_tokG :: tokenG Σ }.
+Class ticket_lockG Σ :=
+  TLockG {
+      #[local] tlock_tG :: tokenG Σ;
+      #[local] tlock_gmG :: ghost_mapG Σ Z bool;
+    }.
 
-Definition ticket_lockΣ : gFunctors := #[tokenΣ].
+Definition ticket_lockΣ : gFunctors := #[tokenΣ; (ghost_mapΣ Z bool)].
 
 Global Instance subG_ticket_lockΣ {Σ} : subG ticket_lockΣ Σ → ticket_lockG Σ.
 Proof. solve_inG. Qed.
@@ -43,7 +47,18 @@ Section proof.
 
   Let N := nroot .@ "ticket_lock".
 
-  Local Definition lock_inv (γ : gname) (l : loc) (R : iProp Σ) : iProp Σ :=
+  Local Definition lock_inv (γt γgm : gname) (next curr : loc) (R : iProp Σ) : iProp Σ :=
+    ∃ (n c : Z) (held : gmap Z bool),
+      next ↦ #n ∗ curr ↦ #c ∗
+      ghost_map_auth γgm 1 held ∗
+      (match held !! c with
+       | None => R
+       | Some false => R
+       | Some true => True
+       end) ∗
+      (⌜ ∀ (x : Z), (n <= x)%Z → held !! x = None ⌝) ∗
+      (⌜ (c <= n)%Z ⌝).
+
     ∃ b : bool, l ↦ #b ∗ if b then True else token γ ∗ R.
 
   (* lks = (next, curr) *)

@@ -22,7 +22,7 @@ Section layer.
 End layer.
 
 Global Instance layer_layer_class : layer_class layer :=
-  Build_layer_class _ _ ord.lt_well_founded.
+  Build_layer_class _ _ ord.lt_well_founded _.
 
 (** Notations and Coercions. *)
 Export ordinalScope.

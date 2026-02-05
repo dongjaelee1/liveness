@@ -657,14 +657,14 @@ End fgupd.
 (** Ghost lock predicates. *)
 (** All Local Definitions are only for internal uses and users should not need them. *)
 (* Ghost locks *)
-Local Definition gl_layer_def `{SI : indexT} `{@gupdGS SI Σ}
-  k ℓ : iProp Σ :=
-  glG_layer k ℓ.
-Local Definition gl_layer_aux : seal (@gl_layer_def). Proof. by eexists. Qed.
-Definition gl_layer := gl_layer_aux.(unseal).
-Local Definition gl_layer_unseal :
-  @gl_layer = @gl_layer_def := gl_layer_aux.(seal_eq).
-Global Arguments gl_layer {SI Σ _}.
+Local Definition gl_layers_def `{SI : indexT} `{@gupdGS SI Σ}
+  k ℓs : iProp Σ :=
+  glG_layers k ℓs.
+Local Definition gl_layers_aux : seal (@gl_layers_def). Proof. by eexists. Qed.
+Definition gl_layers := gl_layers_aux.(unseal).
+Local Definition gl_layers_unseal :
+  @gl_layers = @gl_layers_def := gl_layers_aux.(seal_eq).
+Global Arguments gl_layers {SI Σ _}.
 
 Local Definition gl_def `{SI : indexT} `{@gupdGS SI Σ}
   k v : iProp Σ :=
@@ -838,7 +838,7 @@ Section preds.
     try rewrite !gl_current_unseal /gl_current_def;
     try rewrite !gl_done_unseal /gl_done_def;
     try rewrite !gl_locked_unseal /gl_locked_def;
-    try rewrite !gl_layer_unseal /gl_layer_def;
+    try rewrite !gl_layers_unseal /gl_layers_def;
     try rewrite !gl_unseal /gl_def.
 
   Local Ltac unfold_gl_fuel :=
@@ -849,7 +849,7 @@ Section preds.
     (** Instances *)
     Global Instance gl_persistent k v : Persistent (gl k v).
     Proof. unfold_defs. apply _. Qed.
-    Global Instance gl_layer_persistent k ℓ : Persistent (gl_layer k ℓ).
+    Global Instance gl_layers_persistent k ℓ : Persistent (gl_layers k ℓ).
     Proof. unfold_defs. apply _. Qed.
     Global Instance gl_done_persistent k v : Persistent (gl_done k v).
     Proof. unfold_defs. apply _. Qed.
@@ -870,7 +870,7 @@ Section preds.
 
     Global Instance gl_timeless k v : Timeless (gl k v).
     Proof. unfold_defs. apply _. Qed.
-    Global Instance gl_layer_timeless k ℓ : Timeless (gl_layer k ℓ).
+    Global Instance gl_layers_timeless k ℓ : Timeless (gl_layers k ℓ).
     Proof. unfold_defs. apply _. Qed.
     Global Instance gl_locked_timeless k v : Timeless (gl_locked k v).
     Proof. unfold_defs. apply _. Qed.
@@ -1546,33 +1546,34 @@ Section preds.
 
   Section fgupd.
 
-    Lemma gl_alloc_obl_0 E Θ i G q ℓ μ N v P Q R :
+    Lemma gl_alloc_obl_0 E Θ i G q ℓs μ N v P Q R :
+      Proper (le ==> layer_leibniz_le) ℓs →
       th_obls i G q -∗
       (▷ P) -∗
       |={E:Θ}=>g ∃ k, (⌜ G !! k = None ⌝) ∗
                      th_obls i (<[k:=v]>G) q ∗
-                     gl_layer k ℓ ∗ gl k v ∗
-                     gl_fuel k ℓ μ ∗
+                     gl_layers k ℓs ∗ gl k v ∗
+                     gl_fuel k (ℓs v) μ ∗
                      gl_variant N k v P Q R ∗
-                     wit_layer k v ℓ ∗
+                     wit_layer k v (ℓs v) ∗
                      ([∗ set] u ∈ set_seq 0 v, gl_done k u).
     Proof.
-      unfold_defs. iIntros "(#Oe& Ox& Ob& OS) HP".
+      unfold_defs. iIntros (MONO) "(#Oe& Ox& Ob& OS) HP".
       iApply fupd_mask_intro. 1: set_solver. iIntros "Fupd".
       iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       assert (NEW : ∃ k, Ω1 !! k = None).
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
       assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-      iMod (glsat_alloc_ghost_lock_locked _ k v ℓ μ i with "S") as "(S& #Gwf& #Ge& Gl& Gv& Gf& Go& #Gseq& %OStep)".
+      iMod (glsat_alloc_ghost_lock_locked _ k v ℓs μ i with "S") as "(S& #Gwf& #Ge& Gl& Gv& Gf& Go& #Gseq& %OStep)".
       1: auto.
       iDestruct "Gl" as "[Gl0 [Gl1 Gl']]".
       iMod (globl_alloc_obl with "[$S $O $Ob $Ge $Gl' $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
       iPoseProof (glG_version_get_lb _ v v with "Gv") as "#Gvl". 1: done.
-      set (ηℓ := (λ v, η (measure ℓ μ)) : ghost_lock_version → _).
+      set (ηℓ := (λ x, η (measure (ℓs v) μ)) : ghost_lock_version → _).
       iMod (glwit_alloc_witness_locked _ k v ηℓ with "[$W $Gseq $Gvl]") as "(W& #Wseq)".
       { apply glwit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
-      iAssert (witG_bound k v (η (measure ℓ μ)))%I with "[Wseq]" as "#Ww".
+      iAssert (witG_bound k v (η (measure (ℓs v) μ)))%I with "[Wseq]" as "#Ww".
       { rewrite set_seq_S_end_union_L. rewrite big_sepS_union; cycle 1.
         { apply set_seq_S_end_disjoint. }
         iDestruct "Wseq" as "[Ww _]". rewrite big_sepS_singleton.
@@ -1583,7 +1584,8 @@ Section preds.
       iDestruct "Gl1" as "[Gl1 Gl']". iMod "Fupd" as "_".
       iMod (glG_variant_alloc_locked _ N _ _ _ P Q R with "[$Gl' $HP]") as "#GVar".
       iApply fupd_mask_intro. 1: set_solver. iIntros "Fupd".
-      iExists (<[k:=(v, ghost_lock_locked (GL:=ord_ghost_lock_class) (measure ℓ μ) i)]> Ω1). iSplitR.
+      iExists (<[k:=(v, ghost_lock_locked (GL:=ord_ghost_lock_class) (measure (ℓs v) μ) i)]> Ω1).
+      iSplitR.
       { iPureIntro. econstructor 2. econstructor 2. auto. }
       iIntros (? [WStep GWI2]) "!>".
       pose proof (glwit_inv_alloc_locked Ω1 k W1 NinOk1 GWI _ _ _ W2 WStep GWI2) as (NinWk1& WMon).
@@ -1600,31 +1602,32 @@ Section preds.
         iApply (gl_history_mon with "Gseq"). apply elem_of_set_seq in H. lia. }
     Qed.
 
-    Lemma gl_alloc_done_0 E Θ ℓ μ N v P Q R :
+    Lemma gl_alloc_done_0 E Θ ℓs μ N v P Q R :
+      Proper (le ==> layer_leibniz_le) ℓs →
       (▷ Q) -∗
-      |={E:Θ}=>g ∃ k, gl_layer k ℓ ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k ℓ μ ∗
+      |={E:Θ}=>g ∃ k, gl_layers k ℓs ∗ gl k v ∗ gl_current k v ∗ gl_done k v ∗ gl_fuel k (ℓs v) μ ∗
                      gl_variant N k v P Q R ∗
-                     wit_layer k v ℓ ∗
+                     wit_layer k v (ℓs v) ∗
                      ([∗ set] u ∈ set_seq 0 (S v), gl_done k u).
     Proof.
-      unfold_defs. iIntros "HQ".
+      unfold_defs. iIntros (MONO) "HQ".
       iApply fupd_mask_intro. 1: set_solver. iIntros "Fupd".
       iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       assert (NEW : ∃ k, Ω1 !! k = None).
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
       assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-      iMod (glsat_alloc_ghost_lock_unlocked _ k v ℓ μ with "S") as "(S& #Gwf& #Ge& #Gu& Gv& Gf& #Gseq& %OStep)".
+      iMod (glsat_alloc_ghost_lock_unlocked _ k v ℓs μ with "S") as "(S& #Gwf& #Ge& #Gu& Gv& Gf& #Gseq& %OStep)".
       { auto. }
       iPoseProof (glG_version_get_lb _ v v with "Gv") as "#Gvl". 1: done.
-      set (ηℓ := (λ v, η (measure ℓ μ)) : ghost_lock_version → _).
+      set (ηℓ := (λ x, η (measure (ℓs v) μ)) : ghost_lock_version → _).
       iAssert ([∗ set] u ∈ set_seq 0 (S v), glG_version_lb k u ∗ glG_unlocked k u)%I as "Gseq2".
       { rewrite set_seq_S_end_union_L big_sepS_union; cycle 1.
         { apply set_seq_S_end_disjoint. }
         rewrite big_sepS_singleton. eauto. }
       iMod (glwit_alloc_witness_unlocked _ k v ηℓ with "[$W $Gseq2]") as "(W& #Wseq)".
       { apply glwit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
-      iAssert (witG_bound k v (η (measure ℓ μ)))%I with "[Wseq]" as "#Ww".
+      iAssert (witG_bound k v (η (measure (ℓs v) μ)))%I with "[Wseq]" as "#Ww".
       { iClear "Gseq2". rewrite !set_seq_S_end_union_L !big_sepS_union; cycle 1.
         { apply set_seq_S_end_disjoint. }
         iDestruct "Wseq" as "[Ww _]". rewrite big_sepS_singleton.
@@ -1645,7 +1648,7 @@ Section preds.
       iApply (gl_history_mon with "Gseq"). apply elem_of_set_seq in H. lia.
     Qed.
 
-    Lemma gl_lock_0 E i G q k ℓ μ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
+    Lemma gl_lock_0 E i G q k ℓs μ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
       v1 < v2 →
       ↑N ⊆ E →
       gl_current k v1 -∗
@@ -1654,15 +1657,15 @@ Section preds.
       |={E,E ∖ ↑N}=> (▷ (gl_current k v1 ∗ Q1)) ∗
                     (th_obls i G q -∗
                      gl_current k v1 -∗
-                     gl_layer k ℓ -∗
+                     gl_layers k ℓs -∗
                      (▷ R1) -∗
                      (▷ P2) -∗
                      ∀ Θ, |=[Θ]=>g |={E ∖ ↑N,E}=> 
                        (th_obls i (<[k:=v2]>G) q ∗
-                        gl k v2 ∗ gl_fuel k ℓ μ ∗
+                        gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
                         gl_variant N k v2 P2 Q2 R2 ∗
-                        wit_layer k v2 ℓ ∗
-                        ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u ℓ) ∗
+                        wit_layer k v2 (ℓs v2) ∗
+                        ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u (ℓs u)) ∗
                         ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u))).
     Proof.
       unfold_defs. iIntros (LTv MASK) "((#Ge& #Gvl1)& Gv1) (_& #Gu1) (_& #Gvar1)".
@@ -1670,18 +1673,19 @@ Section preds.
       iModIntro. iSplitL "H".
       { iNext. iDestruct "H" as "($& _& _& $)". eauto. }
       iIntros "(#Oe& Ox& Ob& OS) (_& Gv1) #Gwf HR1 HP2 %".
+      iPoseProof (glG_layers_mono with "Gwf") as "%MONO".
       iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       iPoseProof (glsat_lookup_unlocked with "[$S $Ge $Gu1]") as "%LUO1u".
       iPoseProof (glsat_lookup_version with "[$S $Ge $Gv1]") as "%LUO1v".
       destruct LUO1v as (?&LUO1v). destruct LUO1u as [LUO1u | (?&?&?&LUO1u)]; cycle 1.
       { exfalso. rewrite LUO1u in LUO1v. inv LUO1v. lia. }
       rewrite LUO1u in LUO1v. inv LUO1v.
-      iMod (glsat_lock _ _ v1 v2 ℓ μ i with "[$S $Gwf $Gu1 $Gv1]") as "(%& S& Gl& Gv& Gf& Go& #Gseq& %Gstep)".
+      iMod (glsat_lock _ _ v1 v2 ℓs μ i with "[$S $Gwf $Gu1 $Gv1]") as "(%& S& Gl& Gv& Gf& Go& #Gseq& %Gstep)".
       1: auto.
       iDestruct "Gl" as "[Gl1 [Gl2 Gl']]".
       iMod (globl_alloc_obl with "[$S $O $Ob $Ge $Gl' $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
       iPoseProof (glG_version_get_lb _ v2 v2 with "Gv") as "#Gvl2". 1: done.
-      set (ηℓ := (λ v, η (measure ℓ (μ0 ⊕ μ)%M)) : ghost_lock_version → _).
+      set (ηℓ := (λ v, η (measure (ℓs v) (μ')%M)) : ghost_lock_version → _).
       iMod (glwit_lock _ _ v1 v2 ηℓ with "[$W $Gseq $Gvl2]") as "(W& #Ww& #Wseq)".
       1: auto.
       { specialize (GWI k). rewrite LUO1u in GWI. inv GWI.
@@ -1689,7 +1693,7 @@ Section preds.
       iDestruct "Go" as "[Go Go']". iDestruct "Oo" as "[Oo1 [Oo2 Oo']]".
       iPoseProof (glassigned_add_obl _ k v2 with "[$A $Ge Go' Oo']") as "A".
       { iLeft. iFrame. }
-      iModIntro. iExists (<[k:=(v2, ghost_lock_locked (GL:=ord_ghost_lock_class) (measure ℓ (μ0 ⊕ μ)%M) i)]> Ω1). iSplitR.
+      iModIntro. iExists (<[k:=(v2, ghost_lock_locked (GL:=ord_ghost_lock_class) (measure (ℓs v2) (μ')%M) i)]> Ω1). iSplitR.
       { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
       iIntros (? [WStep GWI2]).
       pose proof (glwit_inv_lock _ _ v1 v2 _ _ _ LUO1u GWI Gstep W2 WStep GWI2) as [LUW1 WMon].

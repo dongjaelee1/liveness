@@ -23,8 +23,10 @@ Section mp_proof.
   Context `{!heapGS Σ}.
   Let N := nroot .@ "message_passing".
 
+  Let ℓs : layers := (λ _, 0).
+
   Definition mp_proto (k : gl_id) (v : ghost_lock_version) (l : loc) : iProp Σ :=
-    gl_layer k 0 ∗ gl k v ∗ wit_layer k v 0 ∗
+    gl_layers k ℓs ∗ gl k v ∗ wit_layer k v 0 ∗
     gl_variant N k v (l ↦ #0) (l ↦ #1) (False).
 
   Definition mp (k : gl_id) (l : loc) : iProp Σ :=
@@ -147,7 +149,7 @@ Section mp_proof.
     ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_fuel k 0 10 ∗ mp k l.
   Proof.
     rewrite /mp /mp_proto. iIntros "[TG ptr]".
-    iMod (gl_alloc_obl _ _ _ _ 0 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& #Gwf& #Gl& Gf& #GV& #Wit& _)".
+    iMod (gl_alloc_obl _ _ _ _ ℓs 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& #Gwf& #Gl& Gf& #GV& #Wit& _)".
     iFrame "Gwf Gl GV Wit". iFrame. auto.
   Qed.
 

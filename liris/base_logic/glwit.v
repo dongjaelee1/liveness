@@ -600,7 +600,7 @@ Section glwit.
     intros i. specialize (INV2 i). destruct (decide (k = i)).
     - subst. rewrite lookup_insert_eq H2 in INV2. rewrite LUO H2.
       inv INV2. destruct H5; subst. econstructor. split; eauto.
-      apply η_proper_lt in LTfuel. etrans; first eauto. eapply WFOCM.lt_le; eauto.
+      apply η_lt_proper in LTfuel. etrans; first eauto. eapply WFOCM.lt_le; eauto.
     - rewrite lookup_insert_ne in INV2; auto.
   Qed.
 

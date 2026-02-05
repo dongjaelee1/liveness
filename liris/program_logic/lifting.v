@@ -17,6 +17,7 @@ Section lifting.
 
   Local Ltac unfold_defs :=
     try rewrite !gupd.wit_fuels_unseal /gupd.wit_fuels_def;
+    try rewrite !gupd.gl_fuels_unseal /gupd.gl_fuels_def;
     try rewrite !gupd.wit_unseal /gupd.wit_def;
     try rewrite !gupd.wit_layer_unseal /gupd.wit_layer_def;
     try rewrite !gupd.wit_bound_unseal /gupd.wit_bound_def;
@@ -30,7 +31,7 @@ Section lifting.
     try rewrite !gupd.gl_current_unseal /gupd.gl_current_def;
     try rewrite !gupd.gl_done_unseal /gupd.gl_done_def;
     try rewrite !gupd.gl_locked_unseal /gupd.gl_locked_def;
-    try rewrite !gupd.gl_layer_unseal /gupd.gl_layer_def;
+    try rewrite !gupd.gl_layers_unseal /gupd.gl_layers_def;
     try rewrite !gupd.gl_unseal /gupd.gl_def.
 
   Section lwp_step.
