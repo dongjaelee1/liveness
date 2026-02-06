@@ -30,14 +30,17 @@ Module TicketLock.
 
 End TicketLock.
 
+Local Definition tl_data : Type := (gl_id).
+
 (** The CMRA we need. *)
 Class ticket_lockG Σ :=
   TLockG {
-      #[local] tlock_tG :: tokenG Σ;
-      #[local] tlock_gmG :: ghost_mapG Σ Z bool;
+      #[local] tlock_heldG :: ghost_mapG Σ Z bool;
+      #[local] tlock_dataG :: ghost_mapG Σ Z tl_data;
     }.
 
-Definition ticket_lockΣ : gFunctors := #[tokenΣ; (ghost_mapΣ Z bool)].
+Definition ticket_lockΣ : gFunctors :=
+  #[(ghost_mapΣ Z bool); (ghost_mapΣ Z tl_data)].
 
 Global Instance subG_ticket_lockΣ {Σ} : subG ticket_lockΣ Σ → ticket_lockG Σ.
 Proof. solve_inG. Qed.
@@ -45,30 +48,60 @@ Proof. solve_inG. Qed.
 Section proof.
   Context `{!heapGS Σ, !ticket_lockG Σ}.
 
-  Let N := nroot .@ "ticket_lock".
+  Let N := nroot.@"ticket_lock".
+  Let N_inv := N.@"inv".
+  Let N_state := N.@"state".
+  Let N_held := N.@"held".
 
-  Local Definition lock_inv (γt γgm : gname) (next curr : loc) (R : iProp Σ) : iProp Σ :=
-    ∃ (n c : Z) (held : gmap Z bool),
-      next ↦ #n ∗ curr ↦ #c ∗
-      ghost_map_auth γgm 1 held ∗
+  Local Definition lock_state k ℓ (curr : loc) (c : Z) : iProp Σ :=
+    gl k (Z.to_nat c) ∗
+    wit_layer k (Z.to_nat c) (ℓ)%ordi ∗
+    gl_variant N_state k (Z.to_nat c) (curr ↦ #(c - 1)%Z) (curr ↦ #c) True.
+
+  Local Definition lock_eventually_held k γh ℓ (my : Z) : iProp Σ :=
+    gl k 0 ∗
+    wit_layer k 0 (ℓ ⊕ (Z.to_nat my))%ordi ∗
+    gl_variant N_held k 0 (my ↪[γh]{#(1/2)} false) (my ↪[γh]□ true) False.
+
+  Local Definition lock_inv (next curr : loc) (γh γd : gname) (κl : gl_id) (ℓ : layer) (R : iProp Σ) : iProp Σ :=
+    ∃ (n c : Z) (held : gmap Z bool) (data : gmap Z tl_data),
+      (⌜ (c <= n)%Z ⌝) ∗
+      (⌜ ∀ (x : Z), (n <= x)%Z ↔ held !! x = None ⌝) ∗
+      (⌜ ∀ (x : Z), (x < c)%Z → held !! x = Some true ⌝) ∗
+      (⌜ dom held = dom data ⌝) ∗
+      gl_layers κl (λ v, (ℓ)%ordi) ∗
+      next ↦ #n ∗
+      ghost_map_auth γh 1 held ∗
+      ghost_map_auth γd 1 data ∗
       (match held !! c with
-       | None => R
-       | Some false => R
-       | Some true => True
+       | None =>
+           gl_done κl (Z.to_nat c) ∗
+           gl_current κl (Z.to_nat c) ∗
+           lock_state κl ℓ curr c ∗
+           R
+       | Some false =>
+           gl_done κl (Z.to_nat c) ∗
+           gl_current κl (Z.to_nat c) ∗
+           lock_state κl ℓ curr c ∗
+           R
+       | Some true =>
+           lock_state κl ℓ curr (c + 1)
        end) ∗
-      (⌜ ∀ (x : Z), (n <= x)%Z → held !! x = None ⌝) ∗
-      (⌜ (c <= n)%Z ⌝).
+      ([∗ map] x ↦ h ∈ held,
+         ∃ κx, x ↪[γd]□ κx ∗
+               lock_eventually_held κx γh ℓ x ∗
+               match h with
+               | false => (x ↪[γh]{#(1/2)} false)
+               | true => (x ↪[γh]□ true)
+               end
+      ).
 
-    ∃ b : bool, l ↦ #b ∗ if b then True else token γ ∗ R.
+  Local Definition is_fair_lock (lnc : val) (γh γd : gname) (κl : gl_id) (ℓ : layer) (R : iProp Σ) : iProp Σ :=
+    ∃ (next curr : loc), ⌜lnc = (#next, #curr)%V⌝ ∧
+                         inv N_inv (lock_inv next curr γh γd κl ℓ R).
 
-  (* lks = (next, curr) *)
-  Local Definition is_lock (γ : gname) (lks : val) (R : iProp Σ) : iProp Σ :=
-    ∃ l: loc, ⌜lks = (#l, #l)%V⌝ ∧ inv N (lock_inv γ l R).
 
-  Local Definition locked (γ : gname) : iProp Σ := token γ.
-
-  Local Lemma locked_exclusive (γ : gname) : locked γ -∗ locked γ -∗ False.
-  Proof. iIntros "H1 H2". by iCombine "H1 H2" gives %?. Qed.
+  TODO: pers, timeless, etc..
 
   Local Lemma init_spec i q G (R : iProp Σ) :
     l{{{ thread_exec i q ∗
