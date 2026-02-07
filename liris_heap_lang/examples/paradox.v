@@ -298,7 +298,7 @@ Section proof.
     iPoseProof (gl_fuel_add with "Gf") as "[_ Gf1]".
     lwp_lam. iFrame "Tx TG". iExists ⊤, ∅, 2. iSplitR; first done.
     iModIntro. iSplitL "Gf1".
-    { iApply big_sepM_singleton. eauto. }
+    { rewrite insert_empty dom_singleton_L big_sepS_singleton. eauto. }
     iIntros "Tx TG _ !> LC !>". lwp_finish.
     iEval (rewrite -/loop).
     iPoseProof (tlc_split_nat 1 1 with "LC") as "[LC LC1]".

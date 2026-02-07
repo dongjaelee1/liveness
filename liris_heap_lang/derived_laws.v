@@ -100,7 +100,7 @@ Qed.
 
 Lemma lwp_allocN G R o s q i E v n :
   (0 < n)%Z →
-  l{{{ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
        ([∗ map] r↦v ∈ R, gl r v) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
@@ -117,7 +117,7 @@ Qed.
 
 Lemma lwp_allocN_vec G R o s q i E v n :
   (0 < n)%Z →
-  l{{{ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
        ([∗ map] r↦v ∈ R, gl r v) }}}
     AllocN #n v @ s; i; E
   l{{{ l, RET #l;
@@ -133,7 +133,7 @@ Qed.
 (** * Rules for accessing array elements *)
 Lemma lwp_load_offset G R o s q i E l dq off vs v :
   vs !! off = Some v →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗{dq} vs }}}
     ! #(l +ₗ off) @ s; i; E
   l{{{ RET v; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗{dq} vs }}}.
@@ -146,7 +146,7 @@ Proof.
 Qed.
 
 Lemma lwp_load_offset_vec G R o s q i E l dq sz (off : fin sz) (vs : vec val sz) :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗{dq} vs }}}
     ! #(l +ₗ off) @ s; i; E
   l{{{ RET vs !!! off; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗{dq} vs }}}.
@@ -154,7 +154,7 @@ Proof. apply lwp_load_offset. by apply vlookup_lookup. Qed.
 
 Lemma lwp_store_offset G R o s q i E l off (vs : list val) (v : val) :
   is_Some (vs !! off) →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
   l{{{ RET #(); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ (l ↦∗ (<[off:=v]> vs)) }}}.
@@ -166,7 +166,7 @@ Proof.
 Qed.
 
 Lemma lwp_store_offset_vec G R o s q i E l sz (off : fin sz) (vs : vec val sz) v :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
   l{{{ RET #(); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ vinsert off v vs }}}.
@@ -177,7 +177,7 @@ Qed.
 
 Lemma lwp_xchg_offset G R o s q i E l off (vs : list val) (v v' : val) :
   vs !! off = Some v →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v' @ s; i; E
   l{{{ RET v; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ <[off:=v']> vs }}}.
@@ -189,7 +189,7 @@ Proof.
 Qed.
 
 Lemma lwp_xchg_offset_vec G R o s q i E l sz (off : fin sz) (vs : vec val sz) v :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v @ s; i; E
   l{{{ RET (vs !!! off); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ vinsert off v vs }}}.
@@ -202,7 +202,7 @@ Lemma lwp_cmpxchg_suc_offset G R o s q i E l off vs (v' v1 v2 : val) :
   vs !! off = Some v' →
   v' = v1 →
   vals_compare_safe v' v1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (v', #true); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ <[off:=v2]> vs }}}.
@@ -216,7 +216,7 @@ Qed.
 Lemma lwp_cmpxchg_suc_offset_vec G R o s q i E l sz (off : fin sz) (vs : vec val sz) v1 v2 :
   vs !!! off = v1 →
   vals_compare_safe (vs !!! off) v1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (vs !!! off, #true); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ vinsert off v2 vs }}}.
@@ -230,7 +230,7 @@ Lemma lwp_cmpxchg_fail_offset G R o s q i E l dq off vs (v0 v1 v2 : val) :
   vs !! off = Some v0 →
   v0 ≠ v1 →
   vals_compare_safe v0 v1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗{dq} vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (v0, #false); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗{dq} vs }}}.
@@ -246,7 +246,7 @@ Qed.
 Lemma lwp_cmpxchg_fail_offset_vec G R o s q i E l dq sz (off : fin sz) (vs : vec val sz) (v1 v2 : val) :
   vs !!! off ≠ v1 →
   vals_compare_safe (vs !!! off) v1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗{dq} vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (vs !!! off, #false); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗{dq} vs }}}.
@@ -257,7 +257,7 @@ Qed.
 
 Lemma lwp_faa_offset G R o s q i E l off vs (i1 i2 : Z) :
   vs !! off = Some #i1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
        ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
   l{{{ RET LitV (LitInt i1); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
@@ -270,7 +270,7 @@ Qed.
 
 Lemma lwp_faa_offset_vec G R o s q i E l sz (off : fin sz) (vs : vec val sz) (i1 i2 : Z) :
   vs !!! off = #i1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
   l{{{ RET LitV (LitInt i1); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ l ↦∗ vinsert off #(i1 + i2) vs }}}.
@@ -283,7 +283,7 @@ Qed.
 
 (** Lemmas for some particular expression inside the [Resolve]. *)
 Lemma lwp_resolve_proph G R o s q i E (p : proph_id) (pvs : list (val * val)) v :
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ proph p pvs }}}
     ResolveProph (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E
   l{{{ pvs', RET (LitV LitUnit); (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ ⌜pvs = (LitV LitUnit, v)::pvs'⌝ ∗ proph p pvs' }}}.
@@ -297,7 +297,7 @@ Qed.
 
 Lemma lwp_resolve_cmpxchg_suc G R o s q i E l (p : proph_id) (pvs : list (val * val)) (v1 v2 v : val) :
   vals_compare_safe v1 v1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ proph p pvs ∗ ▷ l ↦ v1 }}}
     Resolve (CmpXchg #l v1 v2) #p v @ s; i; E
   l{{{ RET (v1, #true) ; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ ∃ pvs', ⌜pvs = ((v1, #true)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦ v2 }}}.
@@ -311,7 +311,7 @@ Qed.
 
 Lemma lwp_resolve_cmpxchg_fail G R o s q i E l (p : proph_id) (pvs : list (val * val)) dq (v' v1 v2 v : val) :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 1) ∗
+  l{{{ (thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
         ([∗ map] r↦v ∈ R, gl r v)) ∗ proph p pvs ∗ ▷ l ↦{dq} v' }}}
     Resolve (CmpXchg #l v1 v2) #p v @ s; i; E
   l{{{ RET (v', #false) ; (£ o ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v)) ∗ ∃ pvs', ⌜pvs = ((v', #false)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦{dq} v' }}}.

@@ -804,10 +804,20 @@ Local Definition gl_fuels_def `{SI : indexT} `{@gupdGS SI Σ}
   α (F : gmap gl_id (layer * measurable_syntax)) : iProp Σ :=
   ([∗ map] f ↦ '(l, m) ∈ F, gl_fuel_val f ((measure l m) × α)%ord).
 Local Definition gl_fuels_aux : seal (@gl_fuels_def). Proof. by eexists. Qed.
-Definition gl_fuels := gl_fuels_aux.(unseal).
+Local Definition gl_fuels := gl_fuels_aux.(unseal).
 Local Definition gl_fuels_unseal :
   @gl_fuels = @gl_fuels_def := gl_fuels_aux.(seal_eq).
 Global Arguments gl_fuels {SI Σ _}.
+
+Local Definition embed_fuels_def `{SI : indexT} `{@gupdGS SI Σ}
+  {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
+  (a : A) ℓ (F : gmap gl_id (layer * measurable_syntax)) : iProp Σ :=
+  gl_fuels (measure ℓ (⟪wf_ltA, a⟫)%M) F.
+Local Definition embed_fuels_aux : seal (@embed_fuels_def). Proof. by eexists. Qed.
+Definition embed_fuels := embed_fuels_aux.(unseal).
+Local Definition embed_fuels_unseal :
+  @embed_fuels = @embed_fuels_def := embed_fuels_aux.(seal_eq).
+Global Arguments embed_fuels {SI Σ _ A ltA}.
 
 Local Definition wit_fuels_def `{SI : indexT} `{@gupdGS SI Σ}
   k v ℓ α (F : gmap gl_id (layer * measurable_syntax)) : iProp Σ :=
@@ -824,6 +834,7 @@ Section preds.
 
   Local Ltac unfold_defs :=
     try rewrite !wit_fuels_unseal /wit_fuels_def;
+    try rewrite !embed_fuels_unseal /embed_fuels_def;
     try rewrite !gl_fuels_unseal /gl_fuels_def;
     try rewrite !wit_unseal /wit_def;
     try rewrite !wit_layer_unseal /wit_layer_def;
@@ -865,6 +876,9 @@ Section preds.
     Proof. unfold_defs. apply _. Qed.
     Global Instance gl_fuels_empty_persistent α : Persistent (gl_fuels α ∅).
     Proof. unfold_defs. apply _. Qed.
+    Global Instance embed_fuels_empty_persistent {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a ℓ :
+      Persistent (embed_fuels wf_ltA a ℓ ∅).
+    Proof. unfold_defs. apply _. Qed.
     Global Instance wit_fuels_empty_persistent k v ℓ α : Persistent (wit_fuels k v ℓ α ∅).
     Proof. unfold_defs. apply _. Qed.
 
@@ -899,6 +913,9 @@ Section preds.
     Global Instance wit_timeless k v a : Timeless (wit k v a).
     Proof. unfold_defs. apply _. Qed.
     Global Instance gl_fuels_timeless α F : Timeless (gl_fuels α F).
+    Proof. unfold_defs. apply _. Qed.
+    Global Instance embed_fuels_empty_timeless {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a ℓ :
+      Timeless (embed_fuels wf_ltA a ℓ ∅).
     Proof. unfold_defs. apply _. Qed.
     Global Instance wit_fuels_timeless k v ℓ α F : Timeless (wit_fuels k v ℓ α F).
     Proof. unfold_defs. apply _. Qed.
@@ -1453,6 +1470,42 @@ Section preds.
       rewrite gl_fuel_unseal /gl_fuel_def. rewrite -gl_fuel_val_add. iApply (gl_fuel_val_mon with "H").
       rewrite Hessenberg.add_comm -Jacobsthal.mult_S.
       apply Jacobsthal.le_mult_r. apply Ord.S_supremum; auto.
+    Qed.
+
+    (** embed_fuels rules *)
+    Lemma embed_fuels_init {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a ℓ :
+      ⊢ embed_fuels wf_ltA a ℓ ∅.
+    Proof.
+      rewrite !embed_fuels_unseal /embed_fuels_def. apply gl_fuels_init.
+    Qed.
+
+    Lemma embed_fuels_add {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a ℓ1 F f ℓ2 μ :
+      layer_leibniz_le ℓ1 ℓ2 →
+      embed_fuels wf_ltA a ℓ1 F -∗ gl_fuel f ℓ2 (μ × ⟪wf_ltA, a⟫)%M ==∗ embed_fuels wf_ltA a ℓ1 (<[f:=(ℓ2, μ)]>F).
+    Proof.
+      iIntros (LE) "Wfs Gf". rewrite !embed_fuels_unseal /embed_fuels_def.
+      iApply (gl_fuels_add with "Wfs Gf"). apply measure_layer_leibniz_le_proper. auto.
+    Qed.
+
+    Lemma embed_fuels_add_map {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
+      a ℓ F (G : gmap gl_id (layer * measurable_syntax)) :
+      embed_fuels wf_ltA a ℓ F -∗
+      ([∗ map] g ↦ '(l, m) ∈ G, ⌜ layer_leibniz_le ℓ l ⌝ ∗ gl_fuel g l (m × ⟪wf_ltA, a⟫)%M) ==∗
+      embed_fuels wf_ltA a ℓ (G ∪ F).
+    Proof.
+      rewrite !embed_fuels_unseal /embed_fuels_def.
+      iIntros "Gfs Fs". iApply (gl_fuels_add_map with "Gfs [Fs]").
+      iApply (big_sepM_impl with "Fs"). iIntros "!> %%%". destruct x. iIntros "(%& $)".
+      iPureIntro. apply measure_layer_leibniz_le_proper. auto.
+    Qed.
+
+    Lemma embed_fuels_decr {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a a' ℓ F :
+      ltA a' a →
+      embed_fuels wf_ltA a ℓ F ==∗
+      embed_fuels wf_ltA a' ℓ F ∗ ([∗ map] f ↦ '(l, m) ∈ F, gl_fuel f l m).
+    Proof.
+      rewrite embed_fuels_unseal /embed_fuels_def.
+      intros LT. apply (gl_fuels_decr). apply measure_embed_lt. auto.
     Qed.
 
     (** wit_fuels rules *)

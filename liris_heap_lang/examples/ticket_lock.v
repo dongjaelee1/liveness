@@ -53,6 +53,7 @@ Section proof.
   Let N_state := N.@"state".
   Let N_held := N.@"held".
 
+  (** Definitions *)
   Local Definition lock_state k ℓ (curr : loc) (c : Z) : iProp Σ :=
     gl k (Z.to_nat c) ∗
     wit_layer k (Z.to_nat c) (ℓ)%ordi ∗
@@ -100,17 +101,36 @@ Section proof.
     ∃ (next curr : loc), ⌜lnc = (#next, #curr)%V⌝ ∧
                          inv N_inv (lock_inv next curr γh γd κl ℓ R).
 
+  (** Properties *)
+  Global Instance lock_state_persistent k ℓ curr c : Persistent (lock_state k ℓ curr c).
+  Proof. rewrite /lock_state. apply _. Qed.
+  Global Instance lock_eventually_held_persistent k γh ℓ my : Persistent (lock_eventually_held k γh ℓ my).
+  Proof. rewrite /lock_eventually_held. apply _. Qed.
+  Global Instance is_fair_lock_persistent lnc γh γd κl ℓ R : Persistent (is_fair_lock lnc γh γd κl ℓ R).
+  Proof. rewrite /is_fair_lock. apply _. Qed.
 
-  TODO: pers, timeless, etc..
-
-  Local Lemma init_spec i q G (R : iProp Σ) :
+  (** Program proofs *)
+  Local Lemma init_spec i q G ℓ (R : iProp Σ) :
     l{{{ thread_exec i q ∗
          th_obls i G 1 ∗ ([∗ map] k ↦ v ∈ G, gl_fuel k 1 ▽%M) ∗
          R }}}
       TicketLock.init #() @ i
-    l{{{ lks γ, RET lks; thread_exec i q ∗ th_obls i G 1 ∗
-                       is_lock γ lks R }}}.
+    l{{{ lnc γh γd κl, RET lnc;
+         thread_exec i q ∗ th_obls i G 1 ∗
+         is_fair_lock lnc γh γd κl ℓ R }}}.
   Proof.
+    iIntros (Φ) "(Tx& TG& Fs& HR) HΦ".
+    rewrite /TicketLock.init.
+    iPoseProof (big_sepM_dom with "Fs") as "Fs".
+    iMod (gl_fuel_extend_set _ ord.O _ 10%M with "Fs") as "Fs".
+    { rewrite ord.from_nat_1. apply ord.S_lt. }
+    TODO
+    iPoseProof (gl_fuel_eq_set
+    iPoseProof (gl_fuel_add_set _ _ 9%M 1%M with "Fs") as "[Fs F]".
+    lwp_lam. simpl.
+    
+
+
   Abort.
 
   (** FIXME: ordi notation levels *)

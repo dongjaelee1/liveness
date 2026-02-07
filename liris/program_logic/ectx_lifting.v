@@ -20,7 +20,7 @@ Lemma lwp_lift_base_step {s i E Φ} e1 :
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
      (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 Θ ⌝) ∗
-     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
+     ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
      ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
      (∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
                    th_obls i G 1 -∗
@@ -62,7 +62,7 @@ Lemma lwp_lift_atomic_base_step {s i E1 E2 Φ} e1 :
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 Θ ⌝) ∗
-     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
+     ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
      ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
      ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
        th_obls i G 1 -∗
@@ -83,7 +83,7 @@ Lemma lwp_lift_atomic_base_step_no_fork {s i E1 E2 Φ} e1 :
   (∀ Θ σ1 κ κs,
      state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
      (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 Θ ⌝) ∗
-     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
+     ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
      ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
      ∀ e2 σ2 efs, (⌜base_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
        th_obls i G 1 -∗
@@ -109,7 +109,7 @@ Lemma lwp_lift_pure_det_base_step_no_fork {s i E E' Φ C ς} e1 e2 :
   PureExecCond C ς i →
   (|={E,E'}=>
      ς ∗
-     ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
+     ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
      ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
        (ς -∗
         th_obls i G 1 -∗

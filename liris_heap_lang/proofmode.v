@@ -27,8 +27,8 @@ Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_languag
   φ →
   envs_entails Δ (∃ q E' G R (o : Ord.t),
         ([∗ map] r↦v ∈ R, gl r v) ∗
-        (Nat.iter n (λ P, |={E,E'}=>
-                       thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
+        (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
+                       thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
                        (thread_exec i q -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗ ALC (£ o ={E',E}=∗ P)))
            (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
@@ -44,7 +44,7 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ G R o s q i E K e1 e2 φ n Φ :
   PureExec φ thread_cond n e1 e2 →
   φ →
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
-  envs_entails Δ ((thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] g↦v ∈ G, gl_fuel g 0 n) ∗ ([∗ map] r↦v0 ∈ R, gl r v0)) ∗
+  envs_entails Δ ((thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 n) ∗ ([∗ map] r↦v0 ∈ R, gl r v0)) ∗
                   ((£ (o × n)%ord ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v0 ∈ R, wit r v0 n ∨ gl_done r v0)) -∗ lWP (fill K e2) @ s; i; E {{ Φ }})) →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
 Proof.
