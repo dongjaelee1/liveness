@@ -67,8 +67,8 @@ Section proof.
   Local Definition lock_inv (next curr : loc) (γh γd : gname) (κl : gl_id) (ℓ : layer) (R : iProp Σ) : iProp Σ :=
     ∃ (n c : Z) (held : gmap Z bool) (data : gmap Z tl_data),
       (⌜ (c <= n)%Z ⌝) ∗
-      (⌜ ∀ (x : Z), (n <= x)%Z ↔ held !! x = None ⌝) ∗
-      (⌜ ∀ (x : Z), (x < c)%Z → held !! x = Some true ⌝) ∗
+      (⌜ ∀ (x : Z), (n <= x)%Z → (held !! x = None) ⌝) ∗
+      (⌜ ∀ (x : Z), (0 ≤ x)%Z → (x < c)%Z → held !! x = Some true ⌝) ∗
       (⌜ dom held = dom data ⌝) ∗
       gl_layers κl (λ v, (ℓ)%ordi) ∗
       next ↦ #n ∗
@@ -112,7 +112,7 @@ Section proof.
   (** Program proofs *)
   Local Lemma init_spec i q G ℓ (R : iProp Σ) :
     l{{{ thread_exec i q ∗
-         th_obls i G 1 ∗ ([∗ map] k ↦ v ∈ G, gl_fuel k 1 ▽%M) ∗
+         th_obls i G 1 ∗ ([∗ set] k ∈ dom G, gl_fuel k 1 ▽%M) ∗
          R }}}
       TicketLock.init #() @ i
     l{{{ lnc γh γd κl, RET lnc;
@@ -121,17 +121,44 @@ Section proof.
   Proof.
     iIntros (Φ) "(Tx& TG& Fs& HR) HΦ".
     rewrite /TicketLock.init.
-    iPoseProof (big_sepM_dom with "Fs") as "Fs".
-    iMod (gl_fuel_extend_set _ ord.O _ 10%M with "Fs") as "Fs".
-    { rewrite ord.from_nat_1. apply ord.S_lt. }
-    TODO
-    iPoseProof (gl_fuel_eq_set
-    iPoseProof (gl_fuel_add_set _ _ 9%M 1%M with "Fs") as "[Fs F]".
+    iMod (gl_fuel_extend_set _ 0 _ 4%M with "Fs") as "Fs".
+    { apply ordArith.lt_from_nat. lia. }
+    iPoseProof (gl_fuel_eq_set _ 0 _ (3 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
     lwp_lam. simpl.
-    
-
-
-  Abort.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    lwp_bind (AllocN _ _).
+    iPoseProof (gl_fuel_eq_set _ 0 _ (2 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    iApply (lwp_alloc _ ∅ 0 with "[$Tx $TG $F]"). 1: done.
+    iIntros (curr) "((_& Tx& TG& _)& Ptr_curr& _)".
+    lwp_bind (AllocN _ _).
+    iPoseProof (gl_fuel_eq_set _ 0 _ (1 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    iApply (lwp_alloc _ ∅ 0 with "[$Tx $TG $F]"). 1: done.
+    iIntros (next) "((_& Tx& TG& _)& Ptr_next& _)".
+    iPoseProof (gl_fuel_eq_set _ 0 _ (0 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_pair. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    lwp_finish.
+    iMod (gl_alloc_done _ (λ _, ℓ) 0 N_state (Z.to_nat 0) (curr ↦ #(0 - 1)) (curr ↦ #0) True with "Ptr_curr")
+      as "(%κl& Glkl& Gkl& Gckl& Gdkl& _& GVkl& Wlkl& _)".
+    iMod (ghost_map_alloc (∅ : gmap Z bool)) as "(%γh& GMAh& _)".
+    iMod (ghost_map_alloc (∅ : gmap Z tl_data)) as "(%γd& GMAd& _)".
+    iMod (inv_alloc N_inv _ (lock_inv next curr γh γd κl ℓ R) with "[- HΦ Tx TG]") as "INV".
+    { rewrite /lock_inv. iExists 0, 0, ∅, ∅. iSplitR; first done. iSplitR; first done. iSplitR.
+      { iPureIntro. intros. lia. }
+      iSplitR; first done. rewrite /lock_state.
+      iFrame "Glkl Ptr_next GMAh GMAd Gdkl Gckl Gkl Wlkl GVkl HR".
+      rewrite big_sepM_empty. done. }
+    iApply ("HΦ" $! _ γh γd κl with "[-]"). iFrame "Tx TG".
+    rewrite /is_fair_lock. iFrame. done.
+  Qed.
 
   (** FIXME: ordi notation levels *)
   Local Lemma acquire_spec i q G ℓ μ γ lk R :

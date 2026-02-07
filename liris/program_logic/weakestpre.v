@@ -514,6 +514,14 @@ Section sfgupd.
   Qed.
 
   (** Modality instances *)
+  Global Instance elim_bupd_sfgupd (p : bool) E P Q :
+    ElimModal True p false (|==> P) P (|={E}=>g Q) (|={E}=>g Q)%I.
+  Proof.
+    rewrite /ElimModal bi.intuitionistically_if_elim //=.
+    iIntros "_ [HP HPQ]". iApply fupd_sfgupd_elim.
+    iMod "HP". by iApply "HPQ".
+  Qed.
+
   Global Instance elim_fupd_sfgupd (p : bool) E P Q :
     ElimModal True p false (|={E}=> P) P (|={E}=>g Q) (|={E}=>g Q)%I.
   Proof.
