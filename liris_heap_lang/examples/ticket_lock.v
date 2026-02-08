@@ -15,7 +15,9 @@ Module TicketLock.
     λ: <>, (ref #0, ref #0).
 
   Definition acquire : val :=
-    λ: "next" "curr",
+    λ: "lnc",
+      let: "next" := Fst "lnc" in
+      let: "curr" := Snd "lnc" in
       let: "my_ticket" := FAA "next" #1 in
       let: "try_lock" :=
         (rec: "while" <> := if: !"curr" = "my_ticket"
@@ -70,10 +72,10 @@ Section proof.
       (⌜ ∀ (x : Z), (n <= x)%Z → (held !! x = None) ⌝) ∗
       (⌜ ∀ (x : Z), (0 ≤ x)%Z → (x < c)%Z → held !! x = Some true ⌝) ∗
       (⌜ dom held = dom data ⌝) ∗
-      gl_layers κl (λ v, (ℓ)%ordi) ∗
       next ↦ #n ∗
       ghost_map_auth γh 1 held ∗
       ghost_map_auth γd 1 data ∗
+      gl_layers κl (λ v, (ℓ)%ordi) ∗
       (match held !! c with
        | None =>
            gl_done κl (Z.to_nat c) ∗
@@ -161,16 +163,64 @@ Section proof.
   Qed.
 
   (** FIXME: ordi notation levels *)
-  Local Lemma acquire_spec i q G ℓ μ γ lk R :
+  Local Lemma acquire_spec i q G lnc γh γd κl ℓ R μ :
     l{{{ thread_exec i q ∗
-         th_obls i G 1 ∗ ([∗ map] k ↦ v ∈ G, ∃ l, ⌜ ((ℓ ⊕ ω) < l)%ordi ⌝ ∗ gl_fuel k l ▽%M) ∗
-         is_lock γ lk R }}}
-      TicketLock.acquire lk @ i
-    l{{{ κu ν, RET #(); thread_exec i q ∗
-                        th_obls i (<[κu:=ν]>G) 1 ∗ ⌜ G !! κu = None ⌝ ∗
-                        gl_fuel κu ℓ μ ∗
-                        locked γ ∗ R }}}.
+         th_obls i G 1 ∗ ([∗ set] k ∈ dom G, ∃ l, ⌜ ((ℓ ⊕ ω) < l)%ordi ⌝ ∗ gl_fuel k l ▽%M) ∗
+         is_fair_lock lnc γh γd κl ℓ R }}}
+      TicketLock.acquire lnc @ i
+    l{{{ ν, RET #();
+         thread_exec i q ∗ th_obls i (<[κl:=ν]>G) 1 ∗ ⌜ G !! κl = None ⌝ ∗
+         gl_fuel κl ℓ μ ∗ R }}}.
   Proof.
+    iIntros (Φ) "(Tx& TG& Fs& #IFL) HΦ".
+    rewrite /TicketLock.acquire.
+    iAssert (|==>[∗ set] k ∈ dom G, gl_fuel k (ℓ ⊕ ω)%ordi (100 ⊕ ▽)%M)%I with "[Fs]" as ">Fs".
+    { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% (%& %& GF)".
+      iApply (gl_fuel_extend with "GF"). auto. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs Fsloop]".
+    iPoseProof (gl_fuel_eq_set _ 0 _ (99 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    (* argument *)
+    lwp_lam. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 100. iSplitR; first done. iIntros "!> Tx TG _ !> LC !>".
+    (* get fst and snd of the argument *)
+    (* fst *)
+    iDestruct "IFL" as "(%&%&%& #INV)". subst lnc.
+    iPoseProof (gl_fuel_eq_set _ 0 _ (98 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_proj. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iPoseProof (gl_fuel_eq_set _ 0 _ (97 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_let. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iPoseProof (gl_fuel_eq_set _ 0 _ (96 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_lam. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    (* snd *)
+    iPoseProof (gl_fuel_eq_set _ 0 _ (95 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_proj. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iPoseProof (gl_fuel_eq_set _ 0 _ (94 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_let. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iPoseProof (gl_fuel_eq_set _ 0 _ (93 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_lam. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    (* FAA *)
+
+
   Abort.
 
   Local Lemma release_spec i q G κu ν γ lk R :
