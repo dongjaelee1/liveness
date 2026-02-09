@@ -19,12 +19,20 @@ Module TicketLock.
       let: "next" := Fst "lnc" in
       let: "curr" := Snd "lnc" in
       let: "my_ticket" := FAA "next" #1 in
-      let: "try_lock" :=
-        (rec: "while" <> := if: !"curr" = "my_ticket"
-                           then #()
-                           else "while"
-        ) in
-      "try_lock" #().
+      (rec: "while" <> := if: !"curr" = "my_ticket"
+                         then #()
+                         else "while" #()) #().
+  (* Definition acquire : val := *)
+  (*   λ: "lnc", *)
+  (*     let: "next" := Fst "lnc" in *)
+  (*     let: "curr" := Snd "lnc" in *)
+  (*     let: "my_ticket" := FAA "next" #1 in *)
+  (*     let: "try_lock" := *)
+  (*       (rec: "while" <> := if: !"curr" = "my_ticket" *)
+  (*                          then #() *)
+  (*                          else "while" #() *)
+  (*       ) in *)
+  (*     "try_lock" #(). *)
 
   Definition release : val :=
     λ: "curr",
@@ -162,6 +170,49 @@ Section proof.
       rewrite big_sepM_empty. done. }
     iApply ("HΦ" $! _ γh γd κl with "[-]"). iFrame "Tx TG".
     rewrite /is_fair_lock. iFrame. done.
+  Qed.
+
+  Local Lemma acquire_my_turn i q G κl ℓ R μ curr (c : Z) ν :
+    G !! κl = None →
+    l{{{ thread_exec i q ∗ th_obls i (<[κl:=ν]> G) 1 ∗
+         ([∗ set] k ∈ dom (<[κl:=ν]> G), gl_fuel k 0 10) ∗
+         gl_variant N_state κl ν (curr ↦ #c) (curr ↦ #(c + 1)%Z) True ∗
+         gl_fuel κl ℓ μ ∗ R }}}
+      (rec: "while" <> := if: ! #curr = #c then #() else "while" #())%V #() @ i
+    l{{{ RET #();
+         thread_exec i q ∗ th_obls i (<[κl:=ν]>G) 1 ∗ ⌜ G !! κl = None ⌝ ∗
+         gl_fuel κl ℓ μ ∗ R }}}.
+  Proof.
+    iIntros (NinGkl Φ) "(Tx& TG& Fs& #GVkl& Gfkl& HR) HΦ".
+    iPoseProof (gl_fuel_eq_set _ 0 _ (9 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_lam. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iPoseProof (gl_fuel_eq_set _ 0 _ (8 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_bind (Load _).
+    iMod (gl_variant_acc_own with "TG GVkl") as "[>(TG& GLkl& PtrCurr) ACC]".
+    1: set_solver.
+    { by rewrite lookup_insert_eq. }
+    iApply (lwp_load _ ∅ 0 with "[$Tx $TG $F $PtrCurr]"). 1: done.
+    iIntros "((_& Tx& TG& _)& PtrCurr)". iMod ("ACC" with "[GLkl PtrCurr]") as "_".
+    { rewrite gl_variant_cases_unfold. iNext. iLeft; iLeft. iFrame. }
+    iModIntro.
+    iPoseProof (gl_fuel_eq_set _ 0 _ (7 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_op. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    rewrite bool_decide_eq_true_2; last done.
+    iPoseProof (gl_fuel_eq_set _ 0 _ (6 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_if_true. simpl.
+    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    lwp_finish.
+    iApply ("HΦ" with "[$Tx $TG $Gfkl $HR]"). auto.
   Qed.
 
   (** FIXME: ordi notation levels *)
@@ -312,45 +363,11 @@ Section proof.
       iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
       lwp_closure. simpl.
       iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-      iPoseProof (gl_fuel_eq_set _ 0 _ (88 ⊕ 1)%M with "Fs") as "Fs".
-      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-      lwp_let. simpl.
-      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-      iPoseProof (gl_fuel_eq_set _ 0 _ (87 ⊕ 1)%M with "Fs") as "Fs".
-      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-      lwp_lam. simpl.
-      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-      iPoseProof (gl_fuel_eq_set _ 0 _ (86 ⊕ 1)%M with "Fs") as "Fs".
-      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-      lwp_rec. simpl.
-      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-      iPoseProof (gl_fuel_eq_set _ 0 _ (85 ⊕ 1)%M with "Fs") as "Fs".
-      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-      lwp_bind (Load _).
-      iMod (gl_variant_acc_own with "TG GVkl2") as "[>(TG& GLkl& PtrCurr) ACC]".
-      1: set_solver.
-      { by rewrite lookup_insert_eq. }
-      iApply (lwp_load _ ∅ 0 with "[$Tx $TG $F $PtrCurr]"). 1: done.
-      iIntros "((_& Tx& TG& _)& PtrCurr)". iMod ("ACC" with "[GLkl PtrCurr]") as "_".
-      { rewrite gl_variant_cases_unfold. iNext. iLeft; iLeft. iFrame. }
-      iModIntro.
-      iPoseProof (gl_fuel_eq_set _ 0 _ (84 ⊕ 1)%M with "Fs") as "Fs".
-      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-      lwp_op. simpl.
-      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-      rewrite bool_decide_eq_true_2; last done.
-      iPoseProof (gl_fuel_eq_set _ 0 _ (83 ⊕ 1)%M with "Fs") as "Fs".
-      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-      lwp_if_true. simpl.
-      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-      lwp_finish.
-      iApply ("HΦ" with "[$Tx $TG $Gfkl $HR]"). auto.
+      iMod (gl_fuel_mon_set _ 0 _ 10 with "Fs") as "Fs".
+      { rewrite !measure_nat. apply OrdArith.le_from_nat. lia. }
+      iApply (acquire_my_turn _ _ _ _ _ R with "[$Tx $TG $Fs $GVkl2 $Gfkl $HR]").
+      1: auto.
+      iApply "HΦ".
     - iIntros "!> !>". iSplitL "Hc HM PtrNext GMAh GMEh GMAd".
       { rewrite /lock_inv /lock_eventually_held.
         iExists (n + 1)%Z, c, (<[(n)%Z:=false]> held), (<[(n)%Z:=κh]> data).
