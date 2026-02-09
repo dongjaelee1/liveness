@@ -981,6 +981,18 @@ Section preds.
       iPoseProof (glG_version_expired_valid with "[$Gv $Gve]") as "%". lia.
     Qed.
 
+    Lemma gl_expired_get k v1 v2 :
+      (v1 < v2) →
+      gl k v2 ⊢ gl_expired k v1.
+    Proof.
+      unfold_defs. iIntros (LT) "(#Ge& #Gvl& #Seq)". iFrame "Ge".
+      iPoseProof (glG_version_get_expired _ v2 v1 with "Gvl") as "$". 1: auto.
+      iPoseProof (gl_history_mon _ v1 v2 with "Seq") as "#Seq2". 1: lia.
+      iFrame "Seq2".
+      iPoseProof (big_sepS_delete _ _ v1 with "Seq") as "[$ _]".
+      apply elem_of_set_seq. lia.
+    Qed.
+
     (* TODO : more lemmas? *)
 
     Local Open Scope ord.
@@ -1714,7 +1726,7 @@ Section preds.
                      (▷ R1) -∗
                      (▷ P2) -∗
                      ∀ Θ, |=[Θ]=>g |={E ∖ ↑N,E}=> 
-                       (th_obls i (<[k:=v2]>G) q ∗
+                       (th_obls i (<[k:=v2]>G) q ∗ ⌜ G !! k = None ⌝ ∗
                         gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
                         gl_variant N k v2 P2 Q2 R2 ∗
                         wit_layer k v2 (ℓs v2) ∗
@@ -1769,6 +1781,8 @@ Section preds.
       { iApply big_sepM_insert.
         { apply not_elem_of_dom; auto. }
         iFrame. iCombine "Gl1 Gl2" as "$". iCombine "Oo1 Oo2" as "$". auto. }
+      iSplitR.
+      { iPureIntro. apply not_elem_of_dom. auto. }
       iSplitL.
       { iApply (big_sepS_impl with "Wseq"). iIntros "!> %% $".
         iPoseProof (big_sepS_delete _ _ _ H with "Gseq") as "[[$ _] _]".
@@ -2017,8 +2031,8 @@ Section preds.
 
     (** Variant access rules *)
     Lemma gl_variant_cases_unfold k v P Q R :
-      gl_variant_cases k v P Q R ∗-∗
-      ((gl_locked k v ∗ P) ∨ (gl_done k v ∗ Q)) ∨ (gl_expired k v ∗ R).
+      gl_variant_cases k v P Q R
+      ⊣⊢ ((gl_locked k v ∗ P) ∨ (gl_done k v ∗ Q)) ∨ (gl_expired k v ∗ R).
     Proof.
       rewrite !gl_variant_cases_unseal /gl_variant_cases_def. auto.
     Qed.

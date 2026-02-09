@@ -646,7 +646,7 @@ Section sfgupd.
                    (▷ R1) -∗
                    (▷ P2) -∗
                    |={E0}=>g |={E ∖ ↑N,E}=> 
-                     (th_obls i (<[k:=v2]>G) q ∗
+                     (th_obls i (<[k:=v2]>G) q ∗ ⌜ G !! k = None ⌝ ∗
                       gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
                       gl_variant N k v2 P2 Q2 R2 ∗
                       wit_layer k v2 (ℓs v2) ∗

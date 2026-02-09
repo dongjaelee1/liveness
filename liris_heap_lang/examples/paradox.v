@@ -329,7 +329,7 @@ Section proof.
     { rewrite delete_insert_id. 1: iFrame. done. }
     1: done.
     iApply fupd_sfgupd_elim. iMod "close" as "_".
-    iMod "ACC2" as "(TG& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)".
+    iMod "ACC2" as "(TG& %& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)".
     iMod ("ACC" with "[LC Cs Caj2]") as "_".
     { iNext. iApply gl_variant_cases_unfold. iLeft. iRight. rewrite /px_inv.
       iFrame "Gdx Caj2". rewrite (seq_S (n + 1)). iApply big_sepL_app.
