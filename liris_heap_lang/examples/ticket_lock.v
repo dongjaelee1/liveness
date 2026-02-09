@@ -342,7 +342,7 @@ Section proof.
       }
       iClear "Glkl Glkh Gkh GVkh Wlkh GMEd Gdkl Gkl Wlkl GVkl GMEh Gdkh Fkh".
       clear dependent held data κh. clear HI1 HI2.
-      (* Update th_obls' fuel. *)
+      (* Update th_obls' fuels. *)
       iMod (gl_fuel_mon_split _ 0 ℓ _ 92 (μ)%M with "Gfkl") as "[F Gfkl]".
       { rewrite measure_add !measure_nat. apply Hessenberg.le_add_l. apply OrdArith.le_from_nat. lia. }
       iPoseProof (big_sepS_insert _ (dom G) κl with "[$Fs $F]") as "Fs".
@@ -368,39 +368,63 @@ Section proof.
       iApply (acquire_my_turn _ _ _ _ _ R with "[$Tx $TG $Fs $GVkl2 $Gfkl $HR]").
       1: auto.
       iApply "HΦ".
-    - iIntros "!> !>". iSplitL "Hc HM PtrNext GMAh GMEh GMAd".
+    - rename n0 into NotMyTurn.
+      TODO
+      iIntros "!> !>". iSplitL "Hc HM PtrNext GMAh GMEh GMAd".
       { rewrite /lock_inv /lock_eventually_held.
         iExists (n + 1)%Z, c, (<[(n)%Z:=false]> held), (<[(n)%Z:=κh]> data).
-        assert (c ≠ (n)%Z).
-        { intros ->. 
-          by lia. rewrite (lookup_insert_ne held _ c); last auto.
-          iFrame "Hc PtrNext GMAh GMAd".
-          iNext. iSplitR.
-          { iPureIntro. lia. }
-          iSplitR.
-          { iPureIntro. intros. destruct (decide (x = (n + 1)%Z)).
-            - subst. rewrite 
-    
-lock_inv =
-λ (next curr : loc) (γh γd : gname) (κl : gl_id) (ℓ : layer) (R : iProp Σ),
-  (∃ (n c : Z) (held : gmap Z bool) (data : gmap Z tl_data), ⌜(c ≤ n)%Z⌝ ∗ ⌜∀ x : Z, (n ≤ x)%Z → held !! x = None⌝ ∗
-     ⌜∀ x : Z, (0 ≤ x)%Z → (x < c)%Z → held !! x = Some true⌝ ∗ ⌜dom held = dom data⌝ ∗ next ↦ #n ∗ ghost_map_auth γh 1 held ∗
-     ghost_map_auth γd 1 data ∗ gl_layers κl (λ _ : ghost_lock_version, ℓ) ∗
-     match held !! c with
-     | Some true => lock_state κl ℓ curr (c + 1)
-     | _ => gl_done κl (Z.to_nat c) ∗ gl_current κl (Z.to_nat c) ∗ lock_state κl ℓ curr c ∗ R
-     end ∗
-     ([∗ map] x↦h ∈ held, ∃ κx : gl_id, x ↪[γd]□ κx ∗ lock_eventually_held κx γh ℓ x ∗
-                            (if h then x ↪[γh]□ true else x ↪[γh]{#1 / 2} false)))%I
-    
-    iSplitL "H PtrNext".
-    { rewrite /lock_inv. iNext. iFrame. iPureIntro. split_and !; eauto.
-      - lia.
-      - intros. eapply HI2. lia. }
-    clear dependent c held data.
-    lwp_let. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-    
+        iSplitR; first done. iSplitR; first (iPureIntro; lia). iSplitR.
+        { iPureIntro. intros. destruct (decide (n = x)).
+          - subst. lia.
+          - rewrite lookup_insert_ne; eauto. eapply HI3. lia. }
+        iSplitR.
+        { iPureIntro. intros. destruct (decide (n = x)).
+          - subst. lia.
+          - rewrite lookup_insert_ne; eauto. }
+        iSplitR.
+        { iPureIntro. rewrite !dom_insert_L HI5. set_solver. }
+        rewrite (lookup_insert_ne held n c); last auto.
+        iFrame "PtrNext GMAh GMAd Glkl Hc". iNext. iApply big_sepM_insert.
+        { apply HI3. lia. }
+        iFrame "HM". iFrame "GMEd GMEh". eauto.
+      }
+      iClear "Glkl Glkh Gkh GVkh Wlkh".
+      clear dependent held data c.
+      (* Update th_obls' fuels. *)
+      iPoseProof (gl_fuel_add with "Fkh") as "[Fkh1 Fkh2]".
+      iMod (gl_fuel_mon_set _ (ℓ ⊕ Z.to_nat n)%ordi _ ((10 × ▽) × Z.to_nat n)%M with "Fsloop") as "Fsloop".
+      { etrans; first eapply η_mono. apply measure_extend. apply hessenberg.lt_add_r. apply ord.omega_upperbound. }
+      iPoseProof (big_sepS_insert _ (dom G) κh with "[$Fsloop $Fkh2]") as "Fsloop".
+      { apply not_elem_of_dom; auto. }
+      rewrite -(dom_insert_L G κh 0).
+      iPoseProof (gl_fuel_eq_set _ _ 0 _ (82 ⊕ 10)%M with "Fs") as "Fs".
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. reflexivity. }
+      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs2 Fs]".
+      iPoseProof (big_sepS_insert _ (dom G) κh with "[$Fs Fkh1]") as "Fs".
+      { apply not_elem_of_dom; auto. }
+      { erewrite gl_fuel_eq. 1: eauto. rewrite !measure_nat. done. }
+      rewrite -(dom_insert_L G κh 0).
+      iPoseProof (gl_fuel_eq_set _ 0 _ (9 ⊕ 1)%M with "Fs") as "Fs".
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+      lwp_let. simpl.
+      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+      iPoseProof (gl_fuel_eq_set _ 0 _ (8 ⊕ 1)%M with "Fs") as "Fs".
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+      lwp_lam. simpl.
+      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+      iPoseProof (gl_fuel_eq_set _ 0 _ (7 ⊕ 1)%M with "Fs") as "Fs".
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+      lwp_closure. simpl.
+      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+      (* Witness induction. *)
+      iApply fupd_lwp. iInv "INV" as "H".
+      (* TODO: better lc interface *)
+      iPoseProof (tlc_split_nat 98 1 with "LC") as "[LC LC1]". iApply (lc_fupd_elim_later with "LC1"). iNext.
+      iDestruct "H" as "(%n'& %c& %& %& %HI1& %HI2& %HI3& %HI4& %HI5& PtrNext& GMAh& GMAd& #Glkl& Hc& HM)".
+      
 
   Abort.
 
