@@ -22,17 +22,6 @@ Module TicketLock.
       (rec: "while" <> := if: !"curr" = "my_ticket"
                          then #()
                          else "while" #()) #().
-  (* Definition acquire : val := *)
-  (*   λ: "lnc", *)
-  (*     let: "next" := Fst "lnc" in *)
-  (*     let: "curr" := Snd "lnc" in *)
-  (*     let: "my_ticket" := FAA "next" #1 in *)
-  (*     let: "try_lock" := *)
-  (*       (rec: "while" <> := if: !"curr" = "my_ticket" *)
-  (*                          then #() *)
-  (*                          else "while" #() *)
-  (*       ) in *)
-  (*     "try_lock" #(). *)
 
   Definition release : val :=
     λ: "curr",
@@ -64,47 +53,43 @@ Section proof.
   Let N_held := N.@"held".
 
   (** Definitions *)
-  Local Definition lock_state k ℓ (curr : loc) (c : Z) : iProp Σ :=
+  Local Definition lock_state k γh ℓ (curr : loc) (c : Z) : iProp Σ :=
     gl k (Z.to_nat c) ∗
     wit_layer k (Z.to_nat c) (ℓ)%ordi ∗
-    gl_variant N_state k (Z.to_nat c) (curr ↦ #(c - 1)%Z) (curr ↦ #c) True.
+    gl_variant N_state k (Z.to_nat c) (curr ↦ #(c - 1)%Z) (curr ↦ #c) (c ↪[γh]□ true).
 
-  Local Definition lock_eventually_held k γh ℓ (my : Z) : iProp Σ :=
-    gl k 0 ∗
-    wit_layer k 0 (ℓ ⊕ (Z.to_nat my))%ordi ∗
-    gl_variant N_held k 0 (my ↪[γh]{#(1/2)} false) (my ↪[γh]□ true) False.
+  Local Definition lock_eventually_held kh γh ℓ (my : Z) (curr : loc) : iProp Σ :=
+    gl kh 0 ∗
+    wit_layer kh 0 (ℓ ⊕ (Z.to_nat my))%ordi ∗
+    gl_variant N_held kh 0 (my ↪[γh]{#(1/2)} false) (my ↪[γh]□ true) False.
 
   Local Definition lock_inv (next curr : loc) (γh γd : gname) (κl : gl_id) (ℓ : layer) (R : iProp Σ) : iProp Σ :=
     ∃ (n c : Z) (held : gmap Z bool) (data : gmap Z tl_data),
-      (⌜ (0 <= c)%Z ⌝) ∗
-      (⌜ (c <= n)%Z ⌝) ∗
-      (⌜ ∀ (x : Z), (n <= x)%Z → (held !! x = None) ⌝) ∗
-      (⌜ ∀ (x : Z), (0 ≤ x)%Z → (x < c)%Z → held !! x = Some true ⌝) ∗
+      (⌜ (0 ≤ c ≤ n)%Z ⌝) ∗
+      (⌜ ∀ (x : Z), (n ≤ x)%Z → (held !! x = None) ⌝) ∗
+      (⌜ ∀ (x : Z), (held !! x = None) → ((x < 0)%Z ∨ (n ≤ x)%Z)⌝) ∗
+      (⌜ ∀ (x : Z), (0 ≤ x < c)%Z → held !! x = Some true ⌝) ∗
+      (⌜ ∀ (x : Z), (c < x < n)%Z → held !! x = Some false ⌝) ∗
       (⌜ dom held = dom data ⌝) ∗
       next ↦ #n ∗
       ghost_map_auth γh 1 held ∗
       ghost_map_auth γd 1 data ∗
       gl_layers κl (λ v, (ℓ)%ordi) ∗
       (match held !! c with
-       | None =>
-           gl_done κl (Z.to_nat c) ∗
-           gl_current κl (Z.to_nat c) ∗
-           lock_state κl ℓ curr c ∗
-           R
-       | Some false =>
-           gl_done κl (Z.to_nat c) ∗
-           gl_current κl (Z.to_nat c) ∗
-           lock_state κl ℓ curr c ∗
-           R
        | Some true =>
-           lock_state κl ℓ curr (c + 1)
+           lock_state κl γh ℓ curr (c + 1)
+       | _ =>
+           gl_done κl (Z.to_nat c) ∗
+           gl_current κl (Z.to_nat c) ∗
+           lock_state κl γh ℓ curr c ∗
+           R
        end) ∗
       ([∗ map] x ↦ h ∈ held,
          ∃ κx, x ↪[γd]□ κx ∗
-               lock_eventually_held κx γh ℓ x ∗
+               lock_eventually_held κx γh ℓ x curr ∗
                match h with
                | false => (x ↪[γh]{#(1/2)} false)
-               | true => (x ↪[γh]□ true)
+               | true => (x ↪[γh]□ true) ∗ lock_state κl γh ℓ curr (x + 1)
                end
       ).
 
@@ -113,9 +98,9 @@ Section proof.
                          inv N_inv (lock_inv next curr γh γd κl ℓ R).
 
   (** Properties *)
-  Global Instance lock_state_persistent k ℓ curr c : Persistent (lock_state k ℓ curr c).
+  Global Instance lock_state_persistent k γh ℓ curr c : Persistent (lock_state k γh ℓ curr c).
   Proof. rewrite /lock_state. apply _. Qed.
-  Global Instance lock_eventually_held_persistent k γh ℓ my : Persistent (lock_eventually_held k γh ℓ my).
+  Global Instance lock_eventually_held_persistent kh γh ℓ my curr : Persistent (lock_eventually_held kh γh ℓ my curr).
   Proof. rewrite /lock_eventually_held. apply _. Qed.
   Global Instance is_fair_lock_persistent lnc γh γd κl ℓ R : Persistent (is_fair_lock lnc γh γd κl ℓ R).
   Proof. rewrite /is_fair_lock. apply _. Qed.
@@ -157,13 +142,17 @@ Section proof.
     lwp_pair. simpl.
     iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
     lwp_finish.
-    iMod (gl_alloc_done _ (λ _, ℓ) 0 N_state (Z.to_nat 0) (curr ↦ #(0 - 1)) (curr ↦ #0) True with "Ptr_curr")
-      as "(%κl& Glkl& Gkl& Gckl& Gdkl& _& GVkl& Wlkl& _)".
     iMod (ghost_map_alloc (∅ : gmap Z bool)) as "(%γh& GMAh& _)".
     iMod (ghost_map_alloc (∅ : gmap Z tl_data)) as "(%γd& GMAd& _)".
+    iMod (gl_alloc_done _ (λ _, ℓ) 0 N_state (Z.to_nat 0%Z) (curr ↦ #(0 - 1)%Z) (curr ↦ #0%Z) (0%Z ↪[γh]□ true) with "Ptr_curr")
+      as "(%κl& Glkl& Gkl& Gckl& Gdkl& _& GVkl& Wlkl& _)".
     iMod (inv_alloc N_inv _ (lock_inv next curr γh γd κl ℓ R) with "[- HΦ Tx TG]") as "INV".
     { rewrite /lock_inv. iExists 0, 0, ∅, ∅.
-      iSplitR; first done. iSplitR; first done. iSplitR; first done. iSplitR.
+      iSplitR; first done. iSplitR; first done. iSplitR.
+      { iPureIntro. intros. lia. }
+      iSplitR.
+      { iPureIntro. intros. lia. }
+      iSplitR.
       { iPureIntro. intros. lia. }
       iSplitR; first done. rewrite /lock_state.
       iFrame "Glkl Ptr_next GMAh GMAd Gdkl Gckl Gkl Wlkl GVkl HR".
@@ -172,11 +161,11 @@ Section proof.
     rewrite /is_fair_lock. iFrame. done.
   Qed.
 
-  Local Lemma acquire_my_turn i q G κl ℓ R μ curr (c : Z) ν :
+  Local Lemma acquire_my_turn i q G κl γh ℓ R μ curr (c : Z) ν :
     G !! κl = None →
     l{{{ thread_exec i q ∗ th_obls i (<[κl:=ν]> G) 1 ∗
          ([∗ set] k ∈ dom (<[κl:=ν]> G), gl_fuel k 0 10) ∗
-         gl_variant N_state κl ν (curr ↦ #c) (curr ↦ #(c + 1)%Z) True ∗
+         gl_variant N_state κl ν (curr ↦ #c) (curr ↦ #(c + 1)%Z) ((c + 1)%Z ↪[γh]□ true) ∗
          gl_fuel κl ℓ μ ∗ R }}}
       (rec: "while" <> := if: ! #curr = #c then #() else "while" #())%V #() @ i
     l{{{ RET #();
@@ -221,9 +210,9 @@ Section proof.
          th_obls i G 1 ∗ ([∗ set] k ∈ dom G, ∃ l, ⌜ ((ℓ ⊕ ω) < l)%ordi ⌝ ∗ gl_fuel k l ▽%M) ∗
          is_fair_lock lnc γh γd κl ℓ R }}}
       TicketLock.acquire lnc @ i
-    l{{{ ν, RET #();
-         thread_exec i q ∗ th_obls i (<[κl:=ν]>G) 1 ∗ ⌜ G !! κl = None ⌝ ∗
-         gl_fuel κl ℓ μ ∗ R }}}.
+      l{{{ ν, RET #();
+           thread_exec i q ∗ th_obls i (<[κl:=ν]>G) 1 ∗ ⌜ G !! κl = None ⌝ ∗
+           gl_fuel κl ℓ μ ∗ R }}}.
   Proof.
     iIntros (Φ) "(Tx& TG& Fs& #IFL) HΦ".
     rewrite /TicketLock.acquire.
@@ -280,7 +269,7 @@ Section proof.
     (** TODO: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
     iApply (lifting.lwp_lc_later with "LC1"). iNext.
-    iDestruct "H" as "(%&%&%&%& %HI1& %HI2& %HI3& %HI4& %HI5& PtrNext& H)".
+    iDestruct "H" as "(%&%&%&%& %HI1& %HI2& %HI3& %HI4& %HI5& %HI6& PtrNext& H)".
     iApply lwp_sfgupd.
     iApply (lwp_faa _ ∅ 0 with "[$Tx $TG $F $PtrNext]").
     1: done.
@@ -288,18 +277,20 @@ Section proof.
     (* Alloc a new ghost lock *)
     iDestruct "H" as "(GMAh& GMAd& #Glkl& Hc& HM)".
     iMod (ghost_map_insert n%Z false with "GMAh") as "[GMAh GMEh]".
-    { eapply HI3. lia. }
+    { eapply HI2. lia. }
     iDestruct "GMEh" as "[GMEh0 GMEh]".
-    iMod (gl_alloc_obl _ _ _ _ (λ _, (ℓ ⊕ Z.to_nat (n)%Z)%ordi) (10 ⊕ ((10 × ▽) × Z.to_nat (n)%Z))%M N_held 0
-            ((n)%Z ↪[γh]{#(1/2)%Qp} false) ((n)%Z ↪[γh]□ true) False with "TG GMEh0")
+    iMod (gl_alloc_obl _ _ _ _ (λ _, (ℓ ⊕ Z.to_nat (n)%Z)%ordi) (10 ⊕ (10 × ▽) ⊕ (10 × ▽))%M N_held 0
+            ((n)%Z ↪[γh]{#(1/2)%Qp} false)
+            ((n)%Z ↪[γh]□ true)
+            False with "TG GMEh0")
       as "(%κh& %NinGkh& TG& #Glkh& #Gkh& Fkh& #GVkh& #Wlkh& _)".
     iMod (ghost_map_insert (n)%Z κh with "GMAd") as "[GMAd GMEd]".
-    { rewrite -not_elem_of_dom -HI5 not_elem_of_dom. eapply HI3. lia. }
+    { rewrite -not_elem_of_dom -HI6 not_elem_of_dom. eapply HI2. lia. }
     iMod (ghost_map_elem_persist with "GMEd") as "#GMEd".
     (* Two cases: n = c (acquire right away) or n ≠ c (need to loop). *)
     destruct (decide (n = c)).
     - subst n. assert (HcNone : held !! c = None).
-      { apply HI3. lia. }
+      { apply HI2. lia. }
       rewrite HcNone. iDestruct "Hc" as "(#Gdkl& Gckl& (#Gkl& #Wlkl& #GVkl)& HR)".
       (* Set hold = true. *)
       (** TODO: better interface for fupd-sfgupd-fupd? *)
@@ -315,7 +306,7 @@ Section proof.
       rewrite (insert_insert_eq held c).
       (* Lock the ghost lock κl. *)
       iModIntro. iApply (sfgupd_fupd_acc).
-      iMod (gl_lock _ _ _ _ _ _ _ (100 ⊕ μ)%M N_state _ (Z.to_nat (c + 1)%Z) _ _ _ (curr ↦ #c) (curr ↦ #(c + 1)%Z) True
+      iMod (gl_lock _ _ _ _ _ _ _ (100 ⊕ μ)%M N_state _ (Z.to_nat (c + 1)%Z) _ _ _ (curr ↦ #c) (curr ↦ #(c + 1)%Z) ((c + 1)%Z ↪[γh]□ true)
              with "Gckl Gdkl GVkl") as "(>H& ACC)".
       { apply Z2Nat.inj_lt; lia. }
       { assert (N_state ## N_inv); last set_solver. by apply ndot_ne_disjoint. }
@@ -326,22 +317,30 @@ Section proof.
       rewrite (delete_insert_id G κh) in NinGkl; last auto.
       iIntros "!> !>". iSplitL "HM PtrNext GMAd GMAh Gckh".
       { iEval (rewrite /lock_inv). iNext. iExists (c + 1)%Z, c, (<[c:=true]> held), (<[c:=κh]> data).
-        iSplitR; first eauto. iSplitR; first (iPureIntro; lia). iSplitR.
+        iSplitR. 1: iPureIntro; lia. iSplitR.
         { iPureIntro. intros. destruct (decide (c = x)).
           - subst. lia.
-          - rewrite lookup_insert_ne; eauto. eapply HI3. lia. }
+          - rewrite lookup_insert_ne; eauto. eapply HI2. lia. }
+        iSplitR.
+        { iPureIntro. intros. destruct (decide (c = x)).
+          - subst. rewrite lookup_insert_eq in H. done.
+          - rewrite lookup_insert_ne in H; eauto. apply HI3 in H. destruct H; auto. right. lia. }
         iSplitR.
         { iPureIntro. intros. destruct (decide (c = x)).
           - subst. lia.
           - rewrite lookup_insert_ne; eauto. }
         iSplitR.
-        { iPureIntro. rewrite !dom_insert_L HI5. set_solver. }
+        { iPureIntro. intros. lia. }
+        iSplitR.
+        { iPureIntro. rewrite !dom_insert_L HI6. set_solver. }
         iFrame "PtrNext GMAd GMAh Glkl". iSplitL "".
         { rewrite lookup_insert_eq /lock_state. replace (c + 1 - 1)%Z with c by lia. eauto. }
-        iApply (big_sepM_insert); first eauto. iFrame. iExists κh. rewrite /lock_eventually_held. eauto.
+        iApply (big_sepM_insert); first eauto. iFrame.
+        iExists κh. rewrite /lock_eventually_held /lock_state.
+        replace (c + 1 - 1)%Z with c by lia. iFrame "GMEd Gkh Wlkh GVkh GMEh Gkl2 Wlkl2 GVkl2".
       }
       iClear "Glkl Glkh Gkh GVkh Wlkh GMEd Gdkl Gkl Wlkl GVkl GMEh Gdkh Fkh".
-      clear dependent held data κh. clear HI1 HI2.
+      clear dependent held data κh. clear HI1.
       (* Update th_obls' fuels. *)
       iMod (gl_fuel_mon_split _ 0 ℓ _ 92 (μ)%M with "Gfkl") as "[F Gfkl]".
       { rewrite measure_add !measure_nat. apply Hessenberg.le_add_l. apply OrdArith.le_from_nat. lia. }
@@ -365,38 +364,53 @@ Section proof.
       iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
       iMod (gl_fuel_mon_set _ 0 _ 10 with "Fs") as "Fs".
       { rewrite !measure_nat. apply OrdArith.le_from_nat. lia. }
-      iApply (acquire_my_turn _ _ _ _ _ R with "[$Tx $TG $Fs $GVkl2 $Gfkl $HR]").
+      iApply (acquire_my_turn _ _ _ _ _ _ R with "[$Tx $TG $Fs $GVkl2 $Gfkl $HR]").
       1: auto.
       iApply "HΦ".
-    - rename n0 into NotMyTurn.
-      TODO
+    - rename n0 into NotMyTurn. assert (MyPos : (0 < n)%Z) by lia.
+      (* Get the promise of my previous owner. *)
+      assert (Prev : is_Some (held !! (n - 1)%Z)).
+      { destruct (held !! (n - 1)%Z) eqn:?; eauto. apply HI3 in Heqo. lia. }
+      destruct Prev as (b& Prev). iPoseProof (big_sepM_lookup_acc _ _ (n - 1)%Z with "HM") as "[Hm HM]".
+      1: eauto.
+      iDestruct "Hm" as "(%κp& #pGMEd& #pLEH& Hm)". iPoseProof ("HM" with "[Hm]") as "HM".
+      { iFrame. eauto. }
+      (* Close the invariant. *)
       iIntros "!> !>". iSplitL "Hc HM PtrNext GMAh GMEh GMAd".
       { rewrite /lock_inv /lock_eventually_held.
-        iExists (n + 1)%Z, c, (<[(n)%Z:=false]> held), (<[(n)%Z:=κh]> data).
-        iSplitR; first done. iSplitR; first (iPureIntro; lia). iSplitR.
+        iExists (n + 1)%Z, c, (<[(n)%Z:=false]> held), (<[(n)%Z:=κh]> data). iSplitR.
+        { iPureIntro; lia. }
+        iSplitR.
         { iPureIntro. intros. destruct (decide (n = x)).
           - subst. lia.
-          - rewrite lookup_insert_ne; eauto. eapply HI3. lia. }
+          - rewrite lookup_insert_ne; eauto. eapply HI2. lia. }
+        iSplitR.
+        { iPureIntro. intros. destruct (decide (n = x)).
+          - subst. rewrite lookup_insert_eq in H. done.
+          - rewrite lookup_insert_ne in H; auto. apply HI3 in H. destruct H; eauto. lia. }
         iSplitR.
         { iPureIntro. intros. destruct (decide (n = x)).
           - subst. lia.
           - rewrite lookup_insert_ne; eauto. }
         iSplitR.
-        { iPureIntro. rewrite !dom_insert_L HI5. set_solver. }
+        { iPureIntro. intros. destruct (decide (n = x)).
+          - subst. rewrite lookup_insert_eq. auto.
+          - rewrite lookup_insert_ne; eauto. eapply HI5. lia. }
+        iSplitR.
+        { iPureIntro. rewrite !dom_insert_L HI6. set_solver. }
         rewrite (lookup_insert_ne held n c); last auto.
         iFrame "PtrNext GMAh GMAd Glkl Hc". iNext. iApply big_sepM_insert.
-        { apply HI3. lia. }
+        { apply HI2. lia. }
         iFrame "HM". iFrame "GMEd GMEh". eauto.
       }
-      iClear "Glkl Glkh Gkh GVkh Wlkh".
-      clear dependent held data c.
+      iClear "Glkl Glkh Gkh GVkh Wlkh". clear dependent held data c b.
       (* Update th_obls' fuels. *)
       iPoseProof (gl_fuel_add with "Fkh") as "[Fkh1 Fkh2]".
-      iMod (gl_fuel_mon_set _ (ℓ ⊕ Z.to_nat n)%ordi _ ((10 × ▽) × Z.to_nat n)%M with "Fsloop") as "Fsloop".
+      iMod (gl_fuel_mon_set _ (ℓ ⊕ Z.to_nat n)%ordi _ ((10 × ▽) ⊕ (10 × ▽))%M with "Fsloop") as "Fsloop".
       { etrans; first eapply η_mono. apply measure_extend. apply hessenberg.lt_add_r. apply ord.omega_upperbound. }
       iPoseProof (big_sepS_insert _ (dom G) κh with "[$Fsloop $Fkh2]") as "Fsloop".
       { apply not_elem_of_dom; auto. }
-      rewrite -(dom_insert_L G κh 0).
+      rewrite -(dom_insert_L G κh 0). iPoseProof (gl_fuel_add_set with "Fsloop") as "[Fsloop1 Fsloop2]".
       iPoseProof (gl_fuel_eq_set _ _ 0 _ (82 ⊕ 10)%M with "Fs") as "Fs".
       { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. reflexivity. }
       iPoseProof (gl_fuel_add_set with "Fs") as "[Fs2 Fs]".
@@ -419,7 +433,22 @@ Section proof.
       iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
       lwp_closure. simpl.
       iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-      (* Witness induction. *)
+      (* First witness induction. *)
+      remember (<[κh:=0]> G) as G'. rewrite -!HeqG'.
+      iDestruct "pLEH" as "(#Gkp& #Wlkp& #GVkp)".
+      iPoseProof (wit_fuels_init with "Wlkp") as "(%& WFs0)".
+      iMod (wit_fuels_add_map _ _ _ _ _ ((λ _, ((ℓ ⊕ Z.to_nat n)%ordi, 10 : measurable_syntax)) <$> G')
+             with "WFs0 [Fsloop1]") as "WFs".
+      { rewrite big_sepM_fmap -big_sepM_dom. iApply (big_sepM_impl with "Fsloop1"). iIntros "!> %%% F".
+        iFrame. iPureIntro. apply hessenberg.lt_add_r. apply ordArith.lt_from_nat. lia. }
+      iClear "Wlkp WFs0 Fs". rewrite map_union_empty. iRevert "WFs".
+      iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
+      iIntros "WFs".
+
+      TODO
+      
+
+      
       iApply fupd_lwp. iInv "INV" as "H".
       (* TODO: better lc interface *)
       iPoseProof (tlc_split_nat 98 1 with "LC") as "[LC LC1]". iApply (lc_fupd_elim_later with "LC1"). iNext.
