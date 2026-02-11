@@ -763,8 +763,143 @@ Section proof.
             rewrite !measure_nat. apply OrdArith.le_from_nat. lia. }
           iApply ("IHα" $! α0 LTα with "HΦ GMEw Fs2 LC2 Fs Tx TG WFs").
         }
-        iClear "IHα WFs". clear dependent c α.
+        iClear "IHα WFs LC2". clear dependent c α.
+        iApply sfgupd_elim_lwp. iApply sfgupd_trans. iApply (sfgupd_fupd_acc).
+        iMod (inv_acc with "INV") as "[H ACC]". 1: set_solver.
+        iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
+        iApply (lc_fupd_add_later with "LC1"). iNext.
+        iDestruct "H" as "(%&%&%&%& %HI1& %HI2& %HI3& %HI4& %HI5& %HI6& PtrNext& PtrCurr& GMAh& GMAw& #Glkl& Hc& HM)".
+        iModIntro.
+        (* Find out that c = my. *)
+        iApply (sfgupd_fupd_acc).
+        iMod (gl_variant_acc_done with "Gdklp GVklp") as "[[H | H] ACC2]".
+        { apply N_subseteq_1. }
+        2:{ iDestruct "H" as ">(_& %& #GMEw2)". iCombine "GMEw GMEw2" as "GMEw" gives %?. destruct H. done. }
+        iMod "H". iPoseProof (pointsto_agree with "PtrCurr H") as "%Valc". inversion Valc. subst c. clear Valc.
+        iMod ("ACC2" with "[H]") as "_".
+        { iApply gl_variant_cases_unfold. iLeft. iRight. iNext. iFrame. auto. }
+        TODO
+        (* Lock the ghost lock κl. *)
         
+        iMod (gl_lock _ _ _ _ _ _ _ (100 ⊕ μ)%M N_state _ (Z.to_nat (my + 1)%Z) _ _ _
+                (curr ↦{#(1/2)} #c) (curr ↦{#(1/2)} #(c + 1)%Z) (∃ κx, (c + 1)%Z ↪[γw]□ (κx, true))
+               with "Gckl Gdkl GVkl") as "(>H& ACC)".
+        { apply Z2Nat.inj_lt; lia. }
+        { apply N_subseteq_1. }
+        iDestruct "H" as "(Gckl& PtrCurr0)".
+        iMod (ghost_map_update (κh, true) with "GMAw GMEw") as "[GMAw GMEw]".
+        iMod (ghost_map_elem_persist with "GMEw") as "#GMEw".
+        iModIntro. iMod ("ACC" with "TG Gckl Glkl [$GMEw] PtrCurr0") as "ACC".      
+        iModIntro. iMod ("ACC") as "(TG& %NinGkl& #Gkl2& Gfkl& #GVkl2& #Wlkl2& _)".
+        apply lookup_insert_None in NinGkl. destruct NinGkl as [NinGkl Nekhl].
+
+        iApply lwp_sfgupd.
+        iApply (lwp_faa _ ∅ 0 with "[$Tx $TG $F $PtrNext]").
+        1: done.
+        iIntros "((_& Tx& TG& _)& PtrNext)".
+        (* Alloc a new ghost lock for the eventual held *)
+        iDestruct "H" as "(PtrCurr& GMAh& GMAw& #Glkl& Hc& HM)".
+        iMod (ghost_map_insert n%Z false with "GMAh") as "[GMAh GMEh]".
+        { eapply HI2. lia. }
+        iDestruct "GMEh" as "[GMEh0 GMEh]".
+        iMod (gl_alloc_obl _ _ _ _ (λ _, (ℓ ⊕ Z.to_nat (n)%Z)%ordi) (50 ⊕ (50 × ▽) ⊕ (50 × ▽))%M N_held 0
+                ((n)%Z ↪[γh]{#(1/2)%Qp} false)
+                ((n)%Z ↪[γh]□ true ∗ lock_state κl γw ℓ curr (n + 1)%Z)
+                False with "TG GMEh0")
+          as "(%κh& %NinGkh& TG& #Glkh& #Gkh& Fkh& #GVkh& #Wlkh& _)".
+        assert (HDom : dom held = dom won).
+        { subst. rewrite dom_fmap_L. auto. }
+        iMod (ghost_map_insert (n)%Z (κh, false) with "GMAw") as "[GMAw GMEw]".
+        { rewrite -not_elem_of_dom -HDom not_elem_of_dom. eapply HI2. lia. }
+        (* Two cases: n = c (acquire right away) or n ≠ c (need to loop). *)
+        destruct (decide (n = c)).
+    - subst n. assert (HcNone : held !! c = None).
+      { apply HI2. lia. }
+      assert (MyPos : (0 ≤ c)%Z) by lia.
+      rewrite HcNone. iDestruct "Hc" as "(#Gdkl& Gckl& (#Gkl& #Wlkl& #GVkl)& HR)".
+      (** TODO: better interface for fupd-sfgupd-fupd? *)
+      iApply sfgupd_trans.
+      (* Lock the ghost lock κl. *)
+      iApply (sfgupd_fupd_acc).
+      iMod (gl_lock _ _ _ _ _ _ _ (100 ⊕ μ)%M N_state _ (Z.to_nat (c + 1)%Z) _ _ _
+              (curr ↦{#(1/2)} #c) (curr ↦{#(1/2)} #(c + 1)%Z) (∃ κx, (c + 1)%Z ↪[γw]□ (κx, true))
+             with "Gckl Gdkl GVkl") as "(>H& ACC)".
+      { apply Z2Nat.inj_lt; lia. }
+      { apply N_subseteq_1. }
+      iDestruct "H" as "(Gckl& PtrCurr0)".
+      iMod (ghost_map_update (κh, true) with "GMAw GMEw") as "[GMAw GMEw]".
+      iMod (ghost_map_elem_persist with "GMEw") as "#GMEw".
+      iModIntro. iMod ("ACC" with "TG Gckl Glkl [$GMEw] PtrCurr0") as "ACC".      
+      iModIntro. iMod ("ACC") as "(TG& %NinGkl& #Gkl2& Gfkl& #GVkl2& #Wlkl2& _)".
+      apply lookup_insert_None in NinGkl. destruct NinGkl as [NinGkl Nekhl].
+      (* Set hold = true. *)
+      iModIntro. iApply (sfgupd_fupd_acc).
+      iMod (gl_unlock with "TG GVkh") as "(>H& ACC)".
+      { apply N_subseteq_2. }
+      { rewrite lookup_insert_ne; auto. by rewrite lookup_insert_eq. }
+      iDestruct "H" as "(TG& GLkh& GMEh2)". iCombine "GMEh GMEh2" as "GMEh".
+      iMod (ghost_map_update true with "GMAh GMEh") as "[GMAh GMEh]".
+      iMod (ghost_map_elem_persist with "GMEh") as "#GMEh".
+      iModIntro. iMod ("ACC" with "TG GLkh [$GMEh]") as "ACC".
+      { iEval (rewrite /lock_state). replace (c + 1 - 1)%Z with c by lia. eauto. }
+      iModIntro. iMod "ACC" as "(TG& Gckh& #Gdkh)".
+      rewrite (delete_insert_ne _ κh κl); last eauto. rewrite (delete_insert_id G κh); last eauto.
+      rewrite (insert_insert_eq held c). rewrite (insert_insert_eq won c).
+      iIntros "!> !>". iSplitL "HM PtrNext PtrCurr GMAw GMAh Gckh".
+      { iEval (rewrite /lock_inv). iNext. iExists (c + 1)%Z, c, (<[c:=true]> held), (<[c:=(κh, true)]> won).
+        iSplitR. 1: iPureIntro; lia. iSplitR.
+        { iPureIntro. intros. destruct (decide (c = x)).
+          - subst. lia.
+          - rewrite lookup_insert_ne; eauto. eapply HI2. lia. }
+        iSplitR.
+        { iPureIntro. intros. destruct (decide (c = x)).
+          - subst. rewrite lookup_insert_eq in H. done.
+          - rewrite lookup_insert_ne in H; eauto. apply HI3 in H. destruct H; auto. right. lia. }
+        iSplitR.
+        { iPureIntro. intros. destruct (decide (c = x)).
+          - subst. lia.
+          - rewrite lookup_insert_ne; eauto. }
+        iSplitR.
+        { iPureIntro. intros. lia. }
+        iSplitR.
+        { iPureIntro. rewrite fmap_insert. simpl. rewrite HI6. done. }
+        iFrame "PtrNext PtrCurr GMAw GMAh Glkl". iSplitL "".
+        { rewrite lookup_insert_eq /lock_state. replace (c + 1 - 1)%Z with c by lia. eauto. }
+        iApply (big_sepM_insert).
+        { rewrite -not_elem_of_dom -HDom not_elem_of_dom. auto. }
+        iFrame. rewrite /lock_eventually_held. eauto.
+      }
+      iClear "Glkl Glkh Gkh GVkh Wlkh GMEw Gdkl Gkl Wlkl GVkl GMEh Gdkh Fkh".
+      clear dependent held won κh. clear HI1.
+      (* Update th_obls' fuels. *)
+      iMod (gl_fuel_mon_split _ 0 ℓ _ 92 (μ)%M with "Gfkl") as "[F Gfkl]".
+      { rewrite measure_add !measure_nat. apply Hessenberg.le_add_l. apply OrdArith.le_from_nat. lia. }
+      iPoseProof (big_sepS_insert _ (dom G) κl with "[$Fs $F]") as "Fs".
+      { apply not_elem_of_dom; auto. }
+      rewrite -(dom_insert_L G κl (Z.to_nat (c + 1))).
+      iPoseProof (gl_fuel_eq_set _ 0 _ (91 ⊕ 1)%M with "Fs") as "Fs".
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+      lwp_let. simpl.
+      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+      iPoseProof (gl_fuel_eq_set _ 0 _ (90 ⊕ 1)%M with "Fs") as "Fs".
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+      lwp_lam. simpl.
+      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+      iPoseProof (gl_fuel_eq_set _ 0 _ (89 ⊕ 1)%M with "Fs") as "Fs".
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+      iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
+      lwp_closure. simpl.
+      iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+      iMod (gl_fuel_mon_set _ 0 _ 10 with "Fs") as "Fs".
+      { rewrite !measure_nat. apply OrdArith.le_from_nat. lia. }
+      iApply (acquire_my_turn _ _ _ _ _ _ R with "[$Tx $TG $Fs $GVkl2 $Gfkl $HR]").
+      1: auto.
+      iIntros "(Tx& TG& %& GF& HR)". iApply "HΦ". iFrame. iSplitR; eauto.
+      iUnfold eventually_release. iExists _, _, _. iSplitR; first done. iSplitR.
+      { iPureIntro. split; first done. lia. }
+      iUnfold lock_state. replace (c + 1 - 1)%Z with c by lia. eauto.
         
         
         
