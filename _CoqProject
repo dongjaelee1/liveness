@@ -74,6 +74,7 @@ liris/base_logic/glsat.v
 liris/base_logic/glwit.v
 liris/base_logic/globl.v
 liris/base_logic/gupd.v
+liris/base_logic/temporal.v
 # liris/base_logic/othread.v
 # liris/base_logic/owitness.v
 # liris/base_logic/otree.v
