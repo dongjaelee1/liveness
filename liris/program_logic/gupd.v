@@ -1724,7 +1724,7 @@ Section preds.
                      gl_current k v1 -∗
                      gl_layers k ℓs -∗
                      (▷ P2) -∗
-                     ∀ Θ, |=[Θ]=>g |={E ∖ ↑N}=> 
+                     ∀ Θ, |=[Θ]=>g |={∅}=>
                        (th_obls i (<[k:=v2]>G) q ∗ ⌜ G !! k = None ⌝ ∗
                         gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
                         gl_variant N k v2 P2 Q2 R2 ∗
@@ -1765,7 +1765,8 @@ Section preds.
       iPoseProof (glwit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { iModIntro. rewrite fmap_insert. iFrame. eauto. }
-      iIntros "!> !>".
+      (* FIXME: iModIntro introduces too many modalities. *)
+      iApply fupd_intro. iModIntro.
       iDestruct "Gl2" as "[Gl2 Gl']".
       iMod (glG_variant_alloc_locked _ N k v2 _ P2 Q2 R2 with "[$Gl' $HP2]") as "#Gvar2".
       iModIntro. rewrite dom_insert_L. iFrame "Oe Ge Gvl2 Ox Ob Gf Gvar2 Ww".
@@ -1795,7 +1796,7 @@ Section preds.
       done.
     Qed.
 
-    Lemma gl_lock_1 E i G q k ℓs μ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
+    Lemma gl_lock_weak_0 E i G q k ℓs μ N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
       v1 < v2 →
       ↑N ⊆ E →
       gl_current k v1 -∗
@@ -1818,7 +1819,8 @@ Section preds.
       iIntros (LTv MASK) "Gc Gd GV". iMod (gl_lock_0 with "Gc Gd GV") as "[$ H]".
       1,2: eauto.
       iIntros "!> TG Gc Gl HR HP %". iPoseProof ("H" with "TG Gc Gl HP") as "H".
-      iMod ("H" $! Θ) as "H". iModIntro. iMod "H" as "[H ACC]". iMod ("ACC" with "HR") as "_".
+      iMod ("H" $! Θ) as "H". iModIntro. iMod (fupd_mask_subseteq ∅) as "close". 1: set_solver.
+      iMod "H" as "[H ACC]". iMod "close" as "_". iMod ("ACC" with "HR") as "_".
       by iFrame.
     Qed.
 

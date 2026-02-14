@@ -325,11 +325,11 @@ Section proof.
            with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
     1: lia. 1: set_solver.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    iMod ("ACC2" with "[TG] Gcur Gw Cljn1 []") as "ACC2".
+    iMod ("ACC2" with "[TG] Gcur Gw [//]") as "ACC2".
     { rewrite delete_insert_id. 1: iFrame. done. }
-    1: done.
+    iMod "ACC2" as "((TG& %& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)& ACC2)".
     iApply fupd_sfgupd_elim. iMod "close" as "_".
-    iMod "ACC2" as "(TG& %& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)".
+    iMod ("ACC2" with "Cljn1") as "_".
     iMod ("ACC" with "[LC Cs Caj2]") as "_".
     { iNext. iApply gl_variant_cases_unfold. iLeft. iRight. rewrite /px_inv.
       iFrame "Gdx Caj2". rewrite (seq_S (n + 1)). iApply big_sepL_app.

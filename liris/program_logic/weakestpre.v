@@ -643,18 +643,18 @@ Section sfgupd.
                   (th_obls i G q -∗
                    gl_current k v1 -∗
                    gl_layers k ℓs -∗
-                   (▷ R1) -∗
                    (▷ P2) -∗
-                   |={E0}=>g |={E ∖ ↑N,E}=> 
+                   |={E0}=>g |={∅}=>
                      (th_obls i (<[k:=v2]>G) q ∗ ⌜ G !! k = None ⌝ ∗
                       gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
                       gl_variant N k v2 P2 Q2 R2 ∗
                       wit_layer k v2 (ℓs v2) ∗
                       ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u (ℓs u)) ∗
-                      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u))).
+                      ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u)) ∗
+                     ((▷ R1) ={E ∖ ↑N,E}=∗ True)).
   Proof.
     iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
-    iIntros "!> Tb Gc Gw HR HP". iPoseProof ("H" with "Tb Gc Gw HR HP") as "H".
+    iIntros "!> Tb Gc Gw HP". iPoseProof ("H" with "Tb Gc Gw HP") as "H".
     iIntros "%%% $". iMod ("H" $! Θ) as "H". iModIntro. eauto.
   Qed.
 
