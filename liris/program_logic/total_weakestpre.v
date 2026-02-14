@@ -6,7 +6,7 @@ From iris.bi Require Export fixpoint.
 From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 From liris.base_logic Require Export fancy_updates.
-From liris.program_logic Require Export gupd weakestpre.
+From liris.program_logic Require Export weakestpre.
 From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
 Import uPred.
 

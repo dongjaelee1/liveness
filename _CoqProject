@@ -73,6 +73,7 @@ liris/base_logic/witness.v
 liris/base_logic/glsat.v
 liris/base_logic/glwit.v
 liris/base_logic/globl.v
+liris/base_logic/gupd.v
 # liris/base_logic/othread.v
 # liris/base_logic/owitness.v
 # liris/base_logic/otree.v
@@ -82,7 +83,6 @@ liris/base_logic/globl.v
 liris/program_logic/language.v
 # liris/program_logic/sched_fair_interp.v
 # liris/program_logic/thread_obligation.v
-liris/program_logic/gupd.v
 liris/program_logic/weakestpre.v
 liris/program_logic/lifting.v
 liris/program_logic/ectx_language.v
