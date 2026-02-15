@@ -4,9 +4,17 @@ From iris.prelude Require Import options.
 From liris.base_logic Require Export gupd.
 From transfinite.base_logic.lib Require Import ghost_map.
 
+(* Defined by the programming language. *)
+Class tf_atomic_class `{SI : indexT} (Σ : gFunctors) :=
+  { tfa_state : Type;
+    tfa_state_interp : tfa_state → iProp Σ;
+  }.
+
 (** Simple syntax for writing temporal formulae; cf., LTL, CTL*. *)
-Inductive tf `{SI : indexT} `{Σ : gFunctors} :=
-| tf_atomic (p : iProp Σ)
+Inductive tf `{SI : indexT} `{Σ : gFunctors} `{@tf_atomic_class SI Σ} :=
+| tf_atomic (s : tfa_state)
+| tf_pure (p : Prop)
+| tf_ghost (p : iProp Σ)
 | tf_and (P Q : tf)
 | tf_or (P Q : tf)
 | tf_impl (P Q : tf)
@@ -16,34 +24,40 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} :=
 | tf_wand (P Q : tf)
 | tf_variant (N : namespace) (k : gl_id) (v : ghost_lock_version) (P Q R : tf).
 
+Global Arguments tf {SI Σ _}.
+
 (** Interpretation. *)
-Fixpoint tf_interp `{SI : indexT} `{@gupdGS SI Σ} (Φ : tf) : iProp Σ :=
+Fixpoint tf_interp `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ} (Φ : tf) : iProp Σ :=
   match Φ with
-  | tf_atomic p => p
+  | tf_atomic s => tfa_state_interp s
+  | tf_pure p => (⌜p⌝)%I
+  | tf_ghost p => p
   | tf_and P Q => (tf_interp P ∧ tf_interp Q)%I
   | tf_or P Q => (tf_interp P ∨ tf_interp Q)%I
   | tf_impl P Q => (tf_interp P → tf_interp Q)%I
-  | @tf_forall _ _ A P => (∀ (a : A), tf_interp (P a))%I
-  | @tf_exist _ _ A P => (∃ (a : A), tf_interp (P a))%I
+  | tf_forall P => (∀ a, tf_interp (P a))%I
+  | tf_exist P => (∃ a, tf_interp (P a))%I
   | tf_sep P Q => (tf_interp P ∗ tf_interp Q)%I
   | tf_wand P Q => (tf_interp P -∗ tf_interp Q)%I
   | tf_variant N k v P Q R => gl_variant N k v (tf_interp P) (tf_interp Q) (tf_interp R)
   end.
 
+Global Arguments tf_interp {SI Σ _ _}.
+
 Section proof.
-  Context `{SI : indexT} `{!gupdGS Σ}.
+  Context `{SI : indexT} `{tf_atomic_class Σ} `{!gupdGS Σ}.
 
 End proof.
 
 (** Defines some useful patterns which corresponds to temporal properties. *)
 (* Always *)
-Local Definition tf_always_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition tf_always_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
   (N : namespace) (P : tf) : tf :=
   tf_exist (λ (k : gl_id),
               tf_exist (λ (v : ghost_lock_version),
                           tf_sep
-                            (tf_atomic (gl_done k v))
-                            (tf_variant N k v (tf_atomic False) P (tf_atomic False)))).
+                            (tf_ghost (gl_done k v))
+                            (tf_variant N k v (tf_pure False) P (tf_pure False)))).
 Local Definition tf_always_aux : seal (@tf_always_def). Proof. by eexists. Qed.
 Definition tf_always := tf_always_aux.(unseal).
 Local Definition tf_always_unseal :
@@ -62,10 +76,17 @@ Global Instance subG_testΣ `{SI : indexT} {Σ} : subG testΣ Σ → testG Σ.
 Proof. solve_inG. Qed.
 
 Section test.
-  Context `{SI : indexT} `{!gupdGS Σ, !testG Σ}.
+  Context `{SI : indexT} `{tf_atomic_class Σ} `{!gupdGS Σ, !testG Σ}.
 
   Definition tf_always_test N γ n b : tf (Σ:=Σ) :=
-    tf_always_def N (tf_atomic (ghost_map_elem γ n DfracDiscarded b)).
+    tf_always_def N (tf_ghost (ghost_map_elem γ n DfracDiscarded b)).
+
+  Lemma test_forall :
+    tf_interp (tf_forall (λ (P : iProp Σ), tf_ghost P)) = (∀ (P : iProp Σ), P)%I.
+  Proof. simpl. auto. Qed.
+  Lemma test_exist :
+    tf_interp (tf_exist (λ (P : iProp Σ), tf_ghost P)) = (∃ (P : iProp Σ), P)%I.
+  Proof. simpl. auto. Qed.
 
 End test.
 
