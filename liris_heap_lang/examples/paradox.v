@@ -318,16 +318,18 @@ Section proof.
     iMod (gl_unlock with "TG GVck") as "[>(TG& Glock& _) ACC2]".
     { set_solver. }
     { rewrite lookup_insert_eq. done. }
+    iPoseProof ("ACC2" with "TG Glock") as "ACC2".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    iMod ("ACC2" with "TG Glock Cljn1") as "ACC2".
-    iApply fupd_sfgupd_elim. iMod "close" as "_". iMod "ACC2" as "(TG& Gcur& #Gdckn)".
-    iMod (gl_lock ∅ _ _ ∅ _ _ _ _ _ _ (n + 1) _ _ _ True (cnt_lb r cj (n + 2)) (cnt_lb r cj (n + 2))
+    iMod ("ACC2" $! _) as "((TG& Gcur& #Gdckn)& ACC2)".
+    iApply fupd_sfgupd_elim. iMod "close" as "_".
+    iMod ("ACC2" with "Cljn1") as "_".
+    iMod (gl_lock _ _ ∅ _ _ _ _ _ _ (n + 1) _ _ _ True (cnt_lb r cj (n + 2)) (cnt_lb r cj (n + 2))
            with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
     1: lia. 1: set_solver.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    iMod ("ACC2" with "[TG] Gcur Gw [//]") as "ACC2".
+    iPoseProof ("ACC2" with "[TG] Gcur Gw [//]") as "ACC2".
     { rewrite delete_insert_id. 1: iFrame. done. }
-    iMod "ACC2" as "((TG& %& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)& ACC2)".
+    iMod ("ACC2" $! _) as "((TG& %& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)& ACC2)".
     iApply fupd_sfgupd_elim. iMod "close" as "_".
     iMod ("ACC2" with "Cljn1") as "_".
     iMod ("ACC" with "[LC Cs Caj2]") as "_".

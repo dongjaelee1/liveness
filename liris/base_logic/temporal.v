@@ -2,7 +2,7 @@ From iris.proofmode Require Import base proofmode classes.
 From iris.bi Require Export fixpoint.
 From iris.prelude Require Import options.
 From liris.base_logic Require Export gupd.
-From transfinite.base_logic.lib Require Import ghost_map.
+(* From transfinite.base_logic.lib Require Import ghost_map. *)
 
 (* Defined by the programming language. *)
 Class tf_atomic_class `{SI : indexT} (Σ : gFunctors) :=
@@ -18,8 +18,8 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} `{@tf_atomic_class SI Σ} :=
 | tf_and (P Q : tf)
 | tf_or (P Q : tf)
 | tf_impl (P Q : tf)
-| tf_forall {A : Type} (P : A → tf)
-| tf_exist {A : Type} (P : A → tf)
+| tf_forall (A : Type) (P : A → tf)
+| tf_exist (A : Type) (P : A → tf)
 | tf_sep (P Q : tf)
 | tf_wand (P Q : tf)
 | tf_variant (N : namespace) (k : gl_id) (v : ghost_lock_version) (P Q R : tf).
@@ -35,8 +35,8 @@ Fixpoint tf_interp `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ} (Φ
   | tf_and P Q => (tf_interp P ∧ tf_interp Q)%I
   | tf_or P Q => (tf_interp P ∨ tf_interp Q)%I
   | tf_impl P Q => (tf_interp P → tf_interp Q)%I
-  | tf_forall P => (∀ a, tf_interp (P a))%I
-  | tf_exist P => (∃ a, tf_interp (P a))%I
+  | tf_forall A P => (∀ (a : A), tf_interp (P a))%I
+  | tf_exist A P => (∃ (a : A), tf_interp (P a))%I
   | tf_sep P Q => (tf_interp P ∗ tf_interp Q)%I
   | tf_wand P Q => (tf_interp P -∗ tf_interp Q)%I
   | tf_variant N k v P Q R => gl_variant N k v (tf_interp P) (tf_interp Q) (tf_interp R)
@@ -44,12 +44,86 @@ Fixpoint tf_interp `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ} (Φ
 
 Global Arguments tf_interp {SI Σ _ _}.
 
-Section proof.
+(** Notations *)
+
+Declare Scope tf_scope.
+Delimit Scope tf_scope with Temp.
+Bind Scope tf_scope with tf.
+
+Local Open Scope tf_scope.
+
+Notation "'⌜' p '⌝'" := (tf_pure p) : tf_scope.
+Notation "'⟨' p '⟩'" := (tf_ghost p%I) : tf_scope.
+Infix "∧" := (tf_and) : tf_scope.
+Infix "∨" := (tf_or) : tf_scope.
+Infix "→" := (tf_impl) : tf_scope.
+Notation f_forall A := (tf_forall A).
+Notation "∀'" := (f_forall _) (only parsing) : tf_scope.
+Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%Temp)) ..)) : tf_scope.
+Notation f_exist A := (tf_exist A).
+Notation "∃'" := (f_exist _) (only parsing) : tf_scope.
+Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%Temp)) ..)) : tf_scope.
+Infix "∗" := (tf_sep) : tf_scope.
+Infix "-∗" := (tf_wand) : tf_scope.
+
+(* Notation "'⟨' A '⟩'" := (Syntax.atom A) : tf_scope. *)
+(* Notation "'➢' r" := (Syntax.ownM r) (at level 20) : tf_scope. *)
+(* Notation "⤉ P" := (Syntax.lift P) (at level 20) : tf_scope. *)
+
+(* Notation "'<pers>' P" := (Syntax.persistently P) : tf_scope. *)
+(* Notation "'<affine>' P" := (Syntax.affinely P) : tf_scope. *)
+(* Notation "□ P" := (<affine> <pers> P) : tf_scope. *)
+(* Notation "■ P" := (Syntax.plainly P) : tf_scope. *)
+(* Notation "|==> P" := (Syntax.upd P) : tf_scope. *)
+(* Notation "¬ P" := (P → False) : tf_scope. *)
+(* Notation "P ==∗ Q" := (P -∗ |==> Q) : tf_scope. *)
+(* Notation "'emp'" := (Syntax.empty) : tf_scope. *)
+
+Section reduction.
   Context `{SI : indexT} `{tf_atomic_class Σ} `{!gupdGS Σ}.
 
-End proof.
+End reduction.
+
+TODO
 
 (** Defines some useful patterns which corresponds to temporal properties. *)
+(* P Until Q *)
+Local Definition tf_until_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
+  (N : namespace) (k : gl_id) (P Q : tf) : tf :=
+  (tf_variant N k 0 P Q ⌜ False ⌝)%Temp.
+Local Definition tf_until_aux : seal (@tf_until_def). Proof. by eexists. Qed.
+Definition tf_until := tf_until_aux.(unseal).
+Local Definition tf_until_unseal :
+  @tf_until = @tf_until_def := tf_until_aux.(seal_eq).
+Global Arguments tf_until {SI Σ _ _}.
+
+(* P Weak until Q *)
+Local Definition tf_weakuntil_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
+  (N : namespace) (P Q : tf) : tf :=
+  (∃ k v, ⟨gl_done k 0⟩ ∗ tf_variant N k v ⌜ False ⌝ P Q)%Temp.
+Local Definition tf_weakuntil_aux : seal (@tf_weakuntil_def). Proof. by eexists. Qed.
+Definition tf_weakuntil := tf_weakuntil_aux.(unseal).
+Local Definition tf_weakuntil_unseal :
+  @tf_weakuntil = @tf_weakuntil_def := tf_weakuntil_aux.(seal_eq).
+Global Arguments tf_weakuntil {SI Σ _ _}.
+
+(* Always P *)
+Local Definition tf_always_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
+  (N : namespace) (P : tf) : tf :=
+  tf_exist _ (λ (k : gl_id),
+              tf_exist _ (λ (v : ghost_lock_version),
+                          tf_sep
+                            (tf_ghost (gl_done k v))
+                            (tf_variant N k v (tf_pure False) P (tf_pure False)))).
+Local Definition tf_always_aux : seal (@tf_always_def). Proof. by eexists. Qed.
+Definition tf_always := tf_always_aux.(unseal).
+Local Definition tf_always_unseal :
+  @tf_always = @tf_always_def := tf_always_aux.(seal_eq).
+Global Arguments tf_always {SI Σ _}.
+
+
+
+
 (* Always *)
 Local Definition tf_always_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
   (N : namespace) (P : tf) : tf :=

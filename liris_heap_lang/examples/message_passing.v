@@ -68,8 +68,9 @@ Section mp_proof.
     iApply (lwp_store _ ∅ 0 with "[$VP $Tx $TG Gfk1]").
     { rewrite insert_empty dom_singleton_L big_sepS_singleton. iFrame. done. }
     iIntros "[(_& Tx& TG& _) ptl]".
-    iPoseProof ("ACC" with "TG Glk ptl") as ">ACC".
-    iModIntro. iMod "ACC" as "(TG& Gc& #Gd)". iModIntro.
+    iPoseProof ("ACC" with "TG Glk") as "ACC".
+    iMod ("ACC" $! _) as "((TG& Gc& #Gd)& ACC)".
+    iModIntro. iMod ("ACC" with "ptl") as "_". iModIntro.
     (* simpl. *)
     lwp_pure.
     simpl. iFrame "Tx". iExists ⊤, ∅, ∅, 0. iSplitR; first done. iModIntro. iSplitL "TG".
