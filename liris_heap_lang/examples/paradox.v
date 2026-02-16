@@ -283,15 +283,16 @@ Section proof.
   Lemma px_loop2_spec j n r ci cj ck :
     l{{{ thread_exec j 1 ∗ th_obls j (<[ck:=n]>∅) 1 ∗
          gl_variant N_inv ck n True (cnt_lb r cj (n + 1)) (cnt_lb r cj (n + 1)) ∗
+         gl_current ck n (1/2)%Qp ∗
          gl_layers ck ℓs ∗ gl_fuel ck 0 10 ∗
          px r ci cj ck ∗ cnt_auth r cj n (1/2)%Qp }}}
       loop #() @ j
     l{{{ RET #(); lift_term j fork_post #() }}}.
   Proof using Type*.
-    iIntros (Φ) "(Tx& TG& #GVck& #Gw& Gf& (%x& #Gdx& #GVx)& Caj) HΦ".
+    iIntros (Φ) "(Tx& TG& #GVck& Gc& #Gw& Gf& (%x& #Gdx& #GVx)& Caj) HΦ".
     (** Lob induction *)
-    iRevert (n) "GVck TG Gf Caj". iLöb as "IH".
-    iIntros (n) "#GVck TG Gf Caj".
+    iRevert (n) "GVck TG Gc Gf Caj". iLöb as "IH".
+    iIntros (n) "#GVck TG Gc Gf Caj".
     iEval (rewrite /loop).
     rewrite (gl_fuel_eq ck 0 0 10 (9 ⊕ 1)%M); cycle 1.
     { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
@@ -323,13 +324,14 @@ Section proof.
     iMod ("ACC2" $! _) as "((TG& Gcur& #Gdckn)& ACC2)".
     iApply fupd_sfgupd_elim. iMod "close" as "_".
     iMod ("ACC2" with "Cljn1") as "_".
-    iMod (gl_lock _ _ ∅ _ _ _ _ _ _ (n + 1) _ _ _ True (cnt_lb r cj (n + 2)) (cnt_lb r cj (n + 2))
+    iCombine "Gc Gcur" as "Gcur".
+    iMod (gl_lock _ _ ∅ _ _ _ _ _ _ (n + 1) _ _ _ _ True (cnt_lb r cj (n + 2)) (cnt_lb r cj (n + 2))
            with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
     1: lia. 1: set_solver.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     iPoseProof ("ACC2" with "[TG] Gcur Gw") as "ACC2".
     { rewrite delete_insert_id. 1: iFrame. done. }
-    iMod ("ACC2" $! _) as "((TG& %& #Glckn1& Gf& #Wckn1& _& _)& GVckn1& ACC2)".
+    iMod ("ACC2" $! _) as "((TG& %& Gc& #Glckn1& Gf& #Wckn1& _& _)& GVckn1& ACC2)".
     iMod ("GVckn1" $! _ with "[//]") as "#GVckn1".
     iApply fupd_sfgupd_elim. iMod "close" as "_".
     iMod ("ACC2" with "Cljn1") as "_".
@@ -341,7 +343,7 @@ Section proof.
       iFrame "LC Glckn1 Wckn1 GVckn1".
     }
     iApply fupd_mask_intro. 1: set_solver. iIntros "close !>". iMod "close" as "_". iModIntro.
-    iApply ("IH" with "Tx HΦ [GVckn1] TG [Gf] Caj").
+    iApply ("IH" with "Tx HΦ [GVckn1] TG Gc [Gf] Caj").
     { replace (n + 1 + 1) with (n + 2) by lia. auto. }
     { replace (S n) with (n + 1) by lia. auto. }
   Qed.

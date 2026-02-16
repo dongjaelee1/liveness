@@ -147,10 +147,10 @@ Section mp_proof.
 
   Lemma mp_pre i l E G q :
     th_obls i G q ∗ l ↦ #0
-    ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_fuel k 0 10 ∗ mp k l.
+    ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_current k 0 (1/2)%Qp ∗ gl_fuel k 0 10 ∗ mp k l.
   Proof.
     rewrite /mp /mp_proto. iIntros "[TG ptr]".
-    iMod (gl_alloc_obl _ _ _ _ ℓs 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& #Gwf& #Gl& Gf& #GV& #Wit& _)".
+    iMod (gl_alloc_obl _ _ _ _ ℓs 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& Gc& #Gwf& #Gl& Gf& #GV& #Wit& _)".
     iFrame "Gwf Gl GV Wit". iFrame. auto.
   Qed.
 
