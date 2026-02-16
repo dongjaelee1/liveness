@@ -49,7 +49,7 @@ Global Arguments tf_interp {SI Σ _ _}.
 (** Notations *)
 
 Declare Scope tf_scope.
-Delimit Scope tf_scope with Temp.
+Delimit Scope tf_scope with TeF.
 Bind Scope tf_scope with tf.
 
 (* Local Open Scope tf_scope. *)
@@ -61,10 +61,10 @@ Infix "∨" := (tf_or) : tf_scope.
 Infix "→" := (tf_impl) : tf_scope.
 Notation f_forall A := (tf_forall A).
 Notation "∀'" := (f_forall _) (only parsing) : tf_scope.
-Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%Temp)) ..)) : tf_scope.
+Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%TeF)) ..)) : tf_scope.
 Notation f_exist A := (tf_exist A).
 Notation "∃'" := (f_exist _) (only parsing) : tf_scope.
-Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%Temp)) ..)) : tf_scope.
+Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%TeF)) ..)) : tf_scope.
 Infix "∗" := (tf_sep) : tf_scope.
 Infix "-∗" := (tf_wand) : tf_scope.
 
@@ -81,7 +81,7 @@ Infix "-∗" := (tf_wand) : tf_scope.
 (* Notation "P ==∗ Q" := (P -∗ |==> Q) : tf_scope. *)
 (* Notation "'emp'" := (Syntax.empty) : tf_scope. *)
 
-Notation "'⟦' Φ '⟧'" := (tf_interp Φ%Temp).
+Notation "'⟦' Φ '⟧'" := (tf_interp Φ%TeF).
 
 Section reduction.
   Context `{SI : indexT} `{tf_atomic_class Σ} `{!gupdGS Σ}.
@@ -142,42 +142,84 @@ Section aux.
 End aux.
 
 (** Ofe and Monoid structure. *)
+Global Instance tf_equiv `{SI : indexT} `{tf_atomic_class Σ} `{!gupdGS Σ} : Equiv tf :=
+  λ Φ1 Φ2, ⟦Φ1⟧ ≡ ⟦Φ2⟧.
+Global Instance tf_equiv_Equivalence `{SI : indexT} `{tf_atomic_class Σ} `{!gupdGS Σ} : Equivalence tf_equiv.
+Proof.
+  unfold tf_equiv. econstructor.
+  - repeat intro. done.
+  - repeat intro. rewrite H0. done.
+  - repeat intro. etrans; eauto.
+Qed.
+Canonical Structure tfO `{SI : indexT} `{tf_atomic_class Σ} `{!gupdGS Σ} : ofe :=
+  (Ofe tf (discrete_ofe_mixin tf_equiv_Equivalence)).
+
+Class tf_op_interp_comm `{SI : indexT} {Σ : gFunctors} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
+  (tf_o : tf → tf → tf) (iProp_o : iProp Σ → iProp Σ → iProp Σ) :=
+  tf_op_interp_comm_intro : ∀ (P Q : tf), ⟦tf_o P Q⟧ = (iProp_o ⟦P⟧ ⟦Q⟧)%I.
+
+Class tf_monoid_unit_interp_eq `{SI : indexT} {Σ : gFunctors} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
+  (tf_o : tf → tf → tf) `{!Monoid tf_o} (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o} :=
+  tf_monoid_unit_interp_eq_intro : ⟦ monoid_unit ⟧ = monoid_unit.
+
 Section instances.
-  Context `{SI : indexT} `{tf_atomic_class Σ} `{!gupdGS Σ}.
+  Context `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}.
 
-  Global Instance tf_equiv : Equiv tf :=
-    λ Φ1 Φ2, ⟦Φ1⟧ ≡ ⟦Φ2⟧.
-  Global Instance tf_equiv_Equivalence : Equivalence tf_equiv.
+  Global Instance tf_and_interp_comm : tf_op_interp_comm tf_and bi_and.
+  Proof. econstructor. Qed.
+  Global Instance tf_or_interp_comm : tf_op_interp_comm tf_or bi_or.
+  Proof. econstructor. Qed.
+  Global Instance tf_impl_interp_comm : tf_op_interp_comm tf_impl bi_impl.
+  Proof. econstructor. Qed.
+  Global Instance tf_sep_interp_comm : tf_op_interp_comm tf_sep bi_sep.
+  Proof. econstructor. Qed.
+  Global Instance tf_wand_interp_comm : tf_op_interp_comm tf_wand bi_wand.
+  Proof. econstructor. Qed.
+
+  Program Global Instance tf_and_monoid : Monoid tf_and := Build_Monoid _ _ _ tf_emp _ _ _ _.
+  Next Obligation. repeat intro. do 5 red. do 5 red in H1, H2. rewrite !tf_and_interp H1 H2. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_and_interp assoc. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_and_interp comm. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_and_interp tf_emp_interp left_id. done. Qed.
+
+  Program Global Instance tf_or_monoid : Monoid tf_or := Build_Monoid _ _ _ (⌜ False ⌝)%TeF _ _ _ _.
+  Next Obligation. repeat intro. do 5 red. do 5 red in H1, H2. rewrite !tf_or_interp H1 H2. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_or_interp assoc. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_or_interp comm. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_or_interp tf_pure_interp left_id. done. Qed.
+
+  Program Global Instance tf_sep_monoid : Monoid tf_sep := Build_Monoid _ _ _ tf_emp _ _ _ _.
+  Next Obligation. repeat intro. do 5 red. do 5 red in H1, H2. rewrite !tf_sep_interp H1 H2. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_sep_interp assoc. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_sep_interp comm. done. Qed.
+  Next Obligation. repeat intro. do 3 red. rewrite !tf_sep_interp tf_emp_interp left_id. done. Qed.
+
+  Global Instance tf_and_monoid_unit_interp_eq : tf_monoid_unit_interp_eq tf_and bi_and.
+  Proof. econstructor. Qed.
+  Global Instance tf_or_monoid_unit_interp_eq : tf_monoid_unit_interp_eq tf_or bi_or.
+  Proof. econstructor. Qed.
+  Global Instance tf_sep_monoid_unit_interp_eq : tf_monoid_unit_interp_eq tf_sep bi_sep.
+  Proof. econstructor. Qed.
+
+End instances.
+
+Section big_op.
+  Context `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}.
+
+  Lemma tf_big_opL_interp
+    (tf_o : tf → tf → tf) `{!Monoid tf_o}
+    (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o}
+    `{!tf_op_interp_comm tf_o iProp_o}
+    `{!tf_monoid_unit_interp_eq tf_o iProp_o}
+    A (P : nat → A → tf) (l : list A) :
+    ⟦[^tf_o list] n ↦ a ∈ l, P n a⟧ = ([^iProp_o list] n ↦ a ∈ l, (⟦P n a⟧))%I.
   Proof.
-    unfold tf_equiv. econstructor.
-    - repeat intro. done.
-    - repeat intro. rewrite H0. done.
-    - repeat intro. etrans; eauto.
-  Qed.
-  Canonical Structure tfO : ofe := (Ofe tf (discrete_ofe_mixin tf_equiv_Equivalence)).
-
-  Program Global Instance tf_monoid : Monoid tf_sep := Build_Monoid _ _ _ tf_emp _ _ _ _.
-  Next Obligation.
-    repeat intro. do 5 red. do 5 red in H0, H1. rewrite !tf_sep_interp. rewrite H0 H1. done.
-  Qed.
-  Next Obligation.
-    repeat intro. do 3 red. rewrite !tf_sep_interp assoc. done.
-  Qed.
-  Next Obligation.
-    repeat intro. do 3 red. rewrite !tf_sep_interp comm. done.
-  Qed.
-  Next Obligation.
-    repeat intro. do 3 red. rewrite !tf_sep_interp tf_emp_interp left_id. done.
-  Qed.
-
-  Lemma tf_big_sepL_interp A (P : nat → A → tf) (l : list A) :
-    ⟦[^tf_sep list] n ↦ a ∈ l, P n a⟧ = ([∗ list] n ↦ a ∈ l, (⟦P n a⟧))%I.
-  Proof.
-    cut (∀ m, ⟦[^tf_sep list] n ↦ a ∈ l, P (m + n) a⟧ = ([∗ list] n ↦ a ∈ l, (⟦P (m + n) a⟧))%I).
-    { intros. specialize (H0 0). simpl in H0. auto. }
-    induction l; intros; simpl; auto. f_equal.
-    erewrite (big_opL_proper_eq tf_sep).
-    - erewrite (IHl (S m)).  apply big_opL_proper_eq; auto.
+    cut (∀ m, ⟦[^tf_o list] n ↦ a ∈ l, P (m + n) a⟧ = ([^iProp_o list] n ↦ a ∈ l, (⟦P (m + n) a⟧))%I).
+    { intros. specialize (H1 0). simpl in H1. auto. }
+    induction l; intros; simpl; auto.
+    rewrite (tf_op_interp_comm0). f_equal.
+    erewrite (big_opL_proper_eq tf_o).
+    - erewrite (IHl (S m)). apply big_opL_proper_eq; auto.
       repeat intro. replace (S m + a0) with (m + S a0) by lia. auto.
     - repeat intro. replace (S m + a0) with (m + S a0) by lia. auto.
     - auto.
@@ -185,13 +227,13 @@ Section instances.
 
   TODO
 
-End instances.
+End big_op.
 
 (** Defines some useful patterns which corresponds to temporal properties. *)
 (* P Until Q *)
 Local Definition tf_until_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
   (N : namespace) (k : gl_id) (P Q : tf) : tf :=
-  (tf_variant N k 0 P Q ⌜ True ⌝)%Temp.
+  (tf_variant N k 0 P Q ⌜ True ⌝)%TeF.
 Local Definition tf_until_aux : seal (@tf_until_def). Proof. by eexists. Qed.
 Definition tf_until := tf_until_aux.(unseal).
 Local Definition tf_until_unseal :
@@ -201,7 +243,7 @@ Global Arguments tf_until {SI Σ _ _}.
 (* Always P *)
 Local Definition tf_always_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
   (N : namespace) (P : tf) : tf :=
-  (∃ k, ⟨gl_done k 0⟩ ∗ tf_until N k ⌜ False ⌝ P)%Temp.
+  (∃ k, ⟨gl_done k 0⟩ ∗ tf_until N k ⌜ False ⌝ P)%TeF.
 Local Definition tf_always_aux : seal (@tf_always_def). Proof. by eexists. Qed.
 Definition tf_always := tf_always_aux.(unseal).
 Local Definition tf_always_unseal :
@@ -211,7 +253,7 @@ Global Arguments tf_always {SI Σ _ _}.
 (* Eventually P *)
 Local Definition tf_eventually_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
   (N : namespace) (P : tf) : tf :=
-  (∃ k, tf_until N k ⌜ True ⌝ P)%Temp.
+  (∃ k, tf_until N k ⌜ True ⌝ P)%TeF.
 Local Definition tf_eventually_aux : seal (@tf_eventually_def). Proof. by eexists. Qed.
 Definition tf_eventually := tf_eventually_aux.(unseal).
 Local Definition tf_eventually_unseal :
@@ -221,7 +263,7 @@ Global Arguments tf_eventually {SI Σ _ _}.
 (* P Weak until Q *)
 Local Definition tf_weakuntil_def `{SI : indexT} `{@tf_atomic_class SI Σ} `{@gupdGS SI Σ}
   (N : namespace) (P Q : tf) : tf :=
-  (∃ k v, ⟨gl_done k 0⟩ ∗ tf_variant N k v ⌜ False ⌝ P Q)%Temp.
+  (∃ k v, ⟨gl_done k 0⟩ ∗ tf_variant N k v ⌜ False ⌝ P Q)%TeF.
 Local Definition tf_weakuntil_aux : seal (@tf_weakuntil_def). Proof. by eexists. Qed.
 Definition tf_weakuntil := tf_weakuntil_aux.(unseal).
 Local Definition tf_weakuntil_unseal :
