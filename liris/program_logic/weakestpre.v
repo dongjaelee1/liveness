@@ -663,18 +663,17 @@ Section sfgupd.
                   (th_obls i G q -∗
                    gl_current k v1 -∗
                    gl_layers k ℓs -∗
-                   (▷ P2) -∗
                    ∀ E0, |={E0}=>g (th_obls i (<[k:=v2]>G) q ∗ ⌜ G !! k = None ⌝ ∗
                                    gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
-                                   gl_variant N k v2 P2 Q2 R2 ∗
                                    wit_layer k v2 (ℓs v2) ∗
                                    ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u (ℓs u)) ∗
                                    ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u)) ∗
+                                (∀ E1, (▷ P2) ={E1}=∗ gl_variant N k v2 P2 Q2 R2) ∗
                                 ((▷ R1) ={E ∖ ↑N,E}=∗ True)).
   Proof.
     iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
-    iIntros "!> Tb Gc Gw HP". iPoseProof ("H" with "Tb Gc Gw HP") as "H".
-    iIntros "% %%% $". iMod ("H" $! Θ E0) as ">H". iModIntro. done.
+    iIntros "!> Tb Gc Gw". iPoseProof ("H" with "Tb Gc Gw") as "H".
+    iIntros "% %%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
   Qed.
 
   Lemma gl_unlock E i G q N k v P Q R :
@@ -690,7 +689,25 @@ Section sfgupd.
   Proof.
     iIntros (Mask LUGk) "Tb Gv". iMod (gl_unlock_0 with "Tb Gv") as "[$ H]". 1,2: eauto.
     iIntros "!> Tb Gl". iPoseProof ("H" with "Tb Gl") as "H".
-    iIntros "% %%% $". iMod ("H" $! Θ E0) as ">H". iModIntro. done.
+    iIntros "% %%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
+  Qed.
+
+  Lemma gl_new_version E k N v1 v2 (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
+    v1 < v2 →
+    ↑N ⊆ E →
+    gl_current k v1 -∗
+    gl_done k v1 -∗
+    gl_variant N k v1 P1 Q1 R1 -∗
+    |={E,E ∖ ↑N}=> (▷ (gl_current k v1 ∗ Q1)) ∗
+                  (gl_current k v1 -∗
+                   ∀ E0, |={E0}=>g (gl k v2 ∗ gl_done k v2 ∗ gl_current k v2 ∗
+                                 ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u)) ∗
+                              (∀ E0, (▷ Q2) ={E0}=∗ gl_variant N k v2 P2 Q2 R2) ∗
+                              ((▷ R1) ={E ∖ ↑N,E}=∗ True)).
+  Proof.
+    iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_new_version_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
+    iIntros "!> Gc". iPoseProof ("H" with "Gc") as "H".
+    iIntros "% %%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
   Qed.
 
   Lemma gl_change_owner E i1 i2 G1 G2 q1 q2 k v ℓ0 :

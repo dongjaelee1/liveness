@@ -327,9 +327,10 @@ Section proof.
            with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
     1: lia. 1: set_solver.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    iPoseProof ("ACC2" with "[TG] Gcur Gw [//]") as "ACC2".
+    iPoseProof ("ACC2" with "[TG] Gcur Gw") as "ACC2".
     { rewrite delete_insert_id. 1: iFrame. done. }
-    iMod ("ACC2" $! _) as "((TG& %& #Glckn1& Gf& #GVckn1& #Wckn1& _& _)& ACC2)".
+    iMod ("ACC2" $! _) as "((TG& %& #Glckn1& Gf& #Wckn1& _& _)& GVckn1& ACC2)".
+    iMod ("GVckn1" $! _ with "[//]") as "#GVckn1".
     iApply fupd_sfgupd_elim. iMod "close" as "_".
     iMod ("ACC2" with "Cljn1") as "_".
     iMod ("ACC" with "[LC Cs Caj2]") as "_".

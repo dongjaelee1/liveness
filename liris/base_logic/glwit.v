@@ -459,6 +459,58 @@ Section glwit.
       iPoseProof (big_sepS_sep with "Wks") as "[$ _]".
   Qed.
 
+  Lemma glwit_new_version W k v1 v2 (ηξ : ghost_lock_version → ghost_lock_fuel) :
+    v1 < v2 →
+    W !! k = Some (v1, witness_unlocked) →
+    glwit W ∗
+    ([∗ set] u ∈ set_seq (S v1) (v2 - v1), glG_version_lb k u ∗ glG_unlocked k u) ∗
+    glG_version_lb k v2
+    ⊢ |==> glwit (<[k:=(v2, witness_unlocked)]>W) ∗
+        witG_bound k v2 (ηξ v2) ∗
+        [∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), witG_bound k u (ηξ u).
+  Proof.
+    iIntros (LTv Luk) "(W& #Gus& #Gvl)".
+    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Mk WM]".
+    iDestruct "Mk" as "(VSa& #VS& #Gvlk& #Guk)".
+    iAssert (glG_version_lb k v2 ∗ glG_unlocked k v2)%I with "[]" as "(#Gvlk2& #Guk2)".
+    { iPoseProof (big_sepS_delete with "Gus") as "[$ _]". apply elem_of_set_seq. lia. }
+    iMod (witG_bound_alloc_seq _ _ _ (v2 - v1) ηξ with "VSa") as "[VSa Wks]".
+    assert (∃ δ, v2 - v1 = S δ).
+    { inv LTv.
+      - exists O. lia.
+      - exists (m - v1). lia.
+    }
+    destruct H as (δ& EQd).
+    iEval (rewrite EQd set_seq_S_end_union_L) in "Wks".
+    iPoseProof (big_sepS_union with "Wks") as "[Wk2 Wks]".
+    { apply set_seq_S_end_disjoint. }
+    rewrite big_sepS_singleton. iDestruct "Wk2" as "[#Wwk2 Wck2]".
+    iModIntro. rewrite !dom_insert_L. replace ({[k]} ∪ dom W) with (dom W); cycle 1.
+    { apply elem_of_dom_2 in Luk. set_solver. }
+    iFrame "Wti".
+    replace (S v1 + (v2 - v1)) with (S v2) by lia.
+    replace (0 + S v1 + δ) with v2 by lia.
+    iSplitR "Wks".
+    - rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
+      { apply lookup_delete_eq. }
+      iFrame. iFrame "Gvlk2 Guk2".
+      replace (set_seq 0 v2) with (set_seq 0 ((S v1) + (v2 - v1 - 1)) : gset ghost_lock_version); cycle 1.
+      { replace ((S v1) + (v2 - v1 - 1)) with v2 by lia. done. }
+      rewrite (set_seq_add_L _ (S v1)). iApply big_sepS_union.
+      { apply set_seq_add_disjoint. }
+      iSplitL.
+      + rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+        2: apply set_seq_S_end_disjoint.
+        rewrite !big_sepS_singleton. auto.
+      + replace (v2 - v1) with (S (v2 - v1 - 1)) by lia. rewrite (set_seq_S_end_union_L _ (v2 - v1 - 1)).
+        iPoseProof (big_sepS_union with "Gus") as "[_ H]".
+        { apply set_seq_S_end_disjoint. }
+        simpl. replace (v2 - v1 - 1 - 0) with (v2 - v1 - 1) by lia. eauto.
+    - iFrame "Wwk2". replace δ with (v2 - v1 - 1) by lia.
+      iPoseProof (big_sepS_sep with "Wks") as "[$ _]".
+  Qed.
+
   Lemma glwit_get_credit_zero W :
     glwit W
     ⊢ glwit W ∗
@@ -692,6 +744,52 @@ Section glwit.
       pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
       rewrite LUO2 in I4. inv I4.
       symmetry in H4. econstructor.
+  Qed.
+
+  Lemma glwit_inv_new_version Ω k v1 v2 W1 :
+    Ω !! k = Some (v1, ghost_lock_unlocked) →
+    glwit_inv Ω W1 →
+    ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_unlocked) →
+    ∀ W2,
+    W1 ↓∘ W2 →
+    glwit_inv (<[k:=(v2, ghost_lock_unlocked)]> Ω) W2 →
+    (W1 !! k = Some (v1, witness_unlocked) ∧ wits_mon (<[k:=(v2, witness_unlocked)]> W1) W2).
+  Proof.
+    intros LUO INV1 GStep W2 WSStep INV2.
+    inv GStep.
+    pose proof INV1 as I1. specialize (I1 k). rewrite LUO in I1. inv I1.
+    destruct y as (v'& w). destruct H1. subst v'. destruct w; first done. symmetry in H0.
+    pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
+    destruct y as (v', w). destruct H3. subst v'. destruct w; first done. symmetry in H2.
+    split; first eauto. clear H1 H3.
+    inv WSStep.
+    1: lia.
+    inv H; cycle 1.
+    { eapply (glwit_inv_alloc_same_gls_dom Ω (<[k:=(v2, ghost_lock_unlocked)]> Ω)) in H1; eauto; first done.
+      rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
+    apply wits_one_to_wits_cond in H1. destruct H1 as (?&H1). assert (x = k).
+    { specialize (H1 k). rewrite H0 H2 in H1. inv H1. destruct H4.
+      - destruct H; done.
+      - destruct H. inv H1. lia. }
+    subst x.
+    intros i. specialize (H1 i). destruct (decide (i = k)).
+    { subst. rewrite H2 lookup_insert_eq. econstructor. split; eauto. }
+    rewrite lookup_insert_ne; auto.
+    destruct (Ω !! i) eqn:LUO2.
+    - destruct g as (v0& g0).
+      pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
+      destruct y as (v'& w2). destruct H4. subst v'. symmetry in H3.
+      pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
+      rewrite LUO2 in I4. inv I4.
+      destruct y as (v', w). destruct H6. subst v'. symmetry in H5.
+      rewrite H3 H5 in H1. inv H1. destruct H8 as [[HC WS] | [HC WS]]; cycle 1.
+      { inv WS. econstructor. destruct w; done. }
+      destruct g0, w, w2; try done; inv WS.
+    - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
+      symmetry in H.
+      pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
+      rewrite LUO2 in I4. inv I4.
+      symmetry in H3. econstructor.
   Qed.
 
   Lemma glwit_inv_alloc_locked Ω k W1 :

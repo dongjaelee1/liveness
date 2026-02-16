@@ -42,6 +42,11 @@ Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock →
       (GTver : (ver1 < ver2)%nat)
     :
     ghost_lock_step (ver1, ghost_lock_unlocked) (ver2, ghost_lock_locked fuel owner)
+  | ghost_lock_new_version
+      ver1 ver2
+      (GTver : (ver1 < ver2)%nat)
+    :
+    ghost_lock_step (ver1, ghost_lock_unlocked) (ver2, ghost_lock_unlocked)
 .
 
 Definition ghost_lock_keep `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
@@ -71,8 +76,6 @@ Definition gls_alloc `{GL : ghost_lock_class} : ghost_locks → ghost_locks → 
 Infix "↪ₐ" := (gls_alloc) (at level 20).
 
 Variant gls_step `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
-  (* | gls_step_cond_step Ω1 Ω2 C : *)
-  (*   (Ω1 ↪ₛ Ω2 | C) → gls_step Ω1 Ω2 *)
   | gls_step_one Ω1 Ω2 :
     Ω1 ↪₁ Ω2 → gls_step Ω1 Ω2
   | gls_step_alloc Ω1 Ω2 :

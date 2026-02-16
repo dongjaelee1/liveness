@@ -326,9 +326,9 @@ Section proof.
       iDestruct "H" as "(Gckl& PtrCurr0)".
       iMod (ghost_map_update (κh, true) with "GMAw GMEw") as "[GMAw GMEw]".
       iMod (ghost_map_elem_persist with "GMEw") as "#GMEw".
-      iModIntro. iPoseProof ("ACC" with "TG Gckl Glkl PtrCurr0") as "ACC". iMod ("ACC" $! _) as "ACC".
-      (* iModIntro. iMod ("ACC" with "TG Gckl Glkl [$GMEw] PtrCurr0") as "ACC". *)
-      iModIntro. iDestruct ("ACC") as "((TG& %NinGkl& #Gkl2& Gfkl& #GVkl2& #Wlkl2& _)& ACC)".
+      iModIntro. iPoseProof ("ACC" with "TG Gckl Glkl") as "ACC". iMod ("ACC" $! _) as "ACC".
+      iModIntro. iDestruct ("ACC") as "((TG& %NinGkl& #Gkl2& Gfkl& #Wlkl2& _)& GVkl2& ACC)".
+      iMod ("GVkl2" $! _ with "PtrCurr0") as "#GVkl2".
       iMod ("ACC" with "[$GMEw]") as "_".
       apply lookup_insert_None in NinGkl. destruct NinGkl as [NinGkl Nekhl].
       (* Set hold = true. *)
@@ -503,9 +503,9 @@ Section proof.
         iDestruct "H" as ">(Gckl& PtrCurr0)".
         iMod (ghost_map_update (κh, true) with "GMAw GMEw") as "[GMAw GMEw]".
         iMod (ghost_map_elem_persist with "GMEw") as "#GMEw".
-        iPoseProof ("ACC" with "TG Gckl Glkl PtrCurr0") as "ACC".
-        iMod ("ACC" $! _) as "((TG& %NinGkl& #Gkl2& Fkl& #GVkl2& #Wlkl2& _)& ACC)".
-        iMod ("ACC" with "[$GMEw]") as "_".
+        iPoseProof ("ACC" with "TG Gckl Glkl") as "ACC".
+        iMod ("ACC" $! _) as "((TG& %NinGkl& #Gkl2& Fkl& #Wlkl2& _)& GVkl2& ACC)".
+        iMod ("GVkl2" $! _ with "PtrCurr0") as "#GVkl2". iMod ("ACC" with "[$GMEw]") as "_".
         subst G'. apply lookup_insert_None in NinGkl. destruct NinGkl as [NinGkl Nekhl].
         (* Set hold = true. *)
         iPoseProof (big_sepM_delete _ _ my with "HM") as "[Hm HM]".
@@ -662,9 +662,9 @@ Section proof.
         iDestruct "H" as ">(Gckl& PtrCurr0)".
         iMod (ghost_map_update (κh, true) with "GMAw GMEw") as "[GMAw GMEw]".
         iMod (ghost_map_elem_persist with "GMEw") as "#GMEw".
-        iPoseProof ("ACC" with "TG Gckl Glkl PtrCurr0") as "ACC".
-        iMod ("ACC" $! _) as "((TG& %NinGkl& #Gkl2& Fkl& #GVkl2& #Wlkl2& _)& ACC)".
-        iMod ("ACC" with "[$GMEw]") as "_".
+        iPoseProof ("ACC" with "TG Gckl Glkl") as "ACC".
+        iMod ("ACC" $! _) as "((TG& %NinGkl& #Gkl2& Fkl& #Wlkl2& _)& GVkl2& ACC)".
+        iMod ("GVkl2" $! _ with "PtrCurr0") as "#GVkl2". iMod ("ACC" with "[$GMEw]") as "_".
         subst G'. apply lookup_insert_None in NinGkl. destruct NinGkl as [NinGkl Nekhl].
         (* Set hold = true. *)
         iPoseProof (big_sepM_delete _ _ my with "HM") as "[Hm HM]".
@@ -802,9 +802,9 @@ Section proof.
         iMod (ghost_map_elem_persist with "GMEw") as "#GMEw".
         (* FIXME: Some fupd mask circus is going on here. *)
         iModIntro. iApply sfgupd_trans.
-        iPoseProof ("ACC2" with "TG Gckl Glkl PtrCurr0") as "ACC2".
-        (* iApply sfgupd_fupd_acc. iMod (fupd_mask_subseteq ∅) as "close". 1: set_solver. *)
-        iModIntro. iMod (("ACC2" $! _)) as "((TG& %NinGkl& #Gkl2& Gfkl& #GVkl2& #Wlkl2& _)& ACC2)".
+        iPoseProof ("ACC2" with "TG Gckl Glkl") as "ACC2".
+        iModIntro. iMod (("ACC2" $! _)) as "((TG& %NinGkl& #Gkl2& Gfkl& #Wlkl2& _)& GVkl2& ACC2)".
+        iMod ("GVkl2" $! _ with "PtrCurr0") as "#GVkl2".
         iApply sfgupd_fupd_acc. iMod ("ACC2" with "[$GMEw]") as "_". iModIntro.
         subst G'. apply lookup_insert_None in NinGkl. destruct NinGkl as [NinGkl Nekhl].
         (* Set hold = true. *)

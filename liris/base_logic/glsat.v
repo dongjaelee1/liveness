@@ -1506,6 +1506,94 @@ Section glsat.
     iPureIntro. econstructor. auto.
   Qed.
 
+  Lemma glsat_new_version Ω k v1 v2 :
+    v1 < v2 →
+    glsat Ω ∗
+    glG_elem k ∗ glG_unlocked k v1 ∗ glG_version k v1 (1/2 + 1/2/2)%Qp
+    ⊢ |==> glsat (<[k:=(v2, ghost_lock_unlocked)]>Ω) ∗
+        glG_unlocked k v2 ∗
+        glG_version k v2 (1/2 + 1/2/2)%Qp ∗
+        ([∗ set] u ∈ (set_seq (S v1) (v2 - v1)), glG_version_lb k u ∗ glG_unlocked k u) ∗
+        (⌜ ghost_lock_step (v1, ghost_lock_unlocked) (v2, ghost_lock_unlocked) ⌝).
+  Proof.
+    iIntros (LTv) "(Hsat& #Ge& #Gu& Gv)".
+    iPoseProof (glsat_lookup_unlocked with "[$Hsat $Ge $Gu]") as "%LU".
+    iPoseProof (glsat_lookup_version with "[$Hsat $Ge $Gv]") as "(%& %LU2)".
+    destruct LU as [LU | (?&?&?&?)]; cycle 1.
+    { rewrite H0 in LU2. inv LU2. lia. }
+    rewrite LU in LU2. inv LU2.    
+    rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HV& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
+    iDestruct "Hk" as "(Gvk& VSa& VS& #Gvl& %& #Gy& %& Gfs& %& %Bound& Mk)".
+    iDestruct "Mk" as "(_& Gok)".
+    iMod (glG_state_alloc_gen_seq _ _ _ (v2 - v1) (λ _, 0) with "VSa") as "[VSa Gls]".
+    assert (∃ δ, v2 - v1 = S δ).
+    { inv LTv.
+      - exists O. lia.
+      - exists (m - v1). lia.
+    }
+    destruct H as (δ& EQd).
+    iEval (rewrite EQd set_seq_S_end_union_L) in "Gls".
+    iPoseProof (big_sepS_union with "Gls") as "[Gl Gus]".
+    { apply set_seq_S_end_disjoint. }
+    rewrite big_sepS_singleton.
+    iAssert (glG_locked k v2 1)%I with "[Gl]" as "Gl".
+    { replace (0 + S v1 + δ) with v2 by lia. done. }
+    iAssert (|==> [∗ set] u ∈ (set_seq (S v1) (v2 - v1 - 1)), glG_unlocked k u)%I with "[Gus]" as ">#Gus".
+    { simpl. iClear "Gy Gu Ge Gvl". replace (v2 - v1 - 1) with δ by lia.
+      remember (S v1) as v. clear dependent v1.
+      iStopProof. revert v. induction δ; iIntros (?) "Gus".
+      { simpl. rewrite !big_sepS_empty. done. }
+      rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+      2,3: apply set_seq_S_end_disjoint.
+      rewrite !big_sepS_singleton. iDestruct "Gus" as "[Gu Gus]". iMod (IHδ with "Gus") as "$".
+      iAssert (glG_locked k (v + δ) 1)%I with "Gu" as "Gu". iDestruct "Gu" as "[Gu1 Gu2]".
+      iApply glG_locked_to_unlocked_2; last iFrame. apply Qp.div_2.
+    }
+    iDestruct "Gl" as "[Gl1 Gl2]". iMod (glG_locked_to_unlocked_2 with "[$Gl1 $Gl2]") as "#Gu2".
+    1: apply Qp.div_2.
+    iMod (glG_version_update_mon_2 _ _ v2 with "[$Gv $Gvk]") as "[Gv Gvk]".
+    { apply Qp_add_help_1. }
+    { lia. }
+    iPoseProof (glG_version_get_lb _ _ v2 with "Gv") as "#Gvl2"; first auto.
+    iAssert ([∗ set] u ∈ (set_seq (S v1) (v2 - v1 - 1)), glG_version_lb k u)%I with "[]" as "#Glvs".
+    { iClear "Gy Gu Ge Gvl Gus". replace (v2 - v1 - 1) with δ by lia.
+      remember (S v1) as v. assert (v + δ ≤ v2) by lia. clear dependent v1.
+      iStopProof. revert v H. induction δ; iIntros "% % (#Gu& #Glv)".
+      { done. }
+      rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+      2: apply set_seq_S_end_disjoint.
+      rewrite !big_sepS_singleton. assert (v + δ ≤ v2) by lia.
+      iPoseProof (glG_version_lb_mon _ _ (v + δ) with "Glv") as "#Glv2"; first auto.
+      iFrame "Glv2". iPoseProof (IHδ with "[$Gu $Glv]") as "$". auto.
+    }
+    iPoseProof (glG_layers_mono with "Gy") as "%MONO".
+    iModIntro.
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (v2, ghost_lock_unlocked)) with "[HM VSa VS Gu Gvk Gok Gfs]") as "HM".
+    { apply lookup_delete_eq. }
+    { iFrame "HM". replace (S v1 + (v2 - v1)) with (S v2) by lia. iFrame. iFrame "Gvl2 Gy Gu2".
+      iSplitL.
+      - replace (set_seq 0 v2) with (set_seq 0 ((S v1) + (v2 - v1 - 1)) : gset ghost_lock_version); cycle 1.
+        { replace ((S v1) + (v2 - v1 - 1)) with v2 by lia. done. }
+        rewrite (set_seq_add_L _ (S v1)). iApply big_sepS_union.
+        { apply set_seq_add_disjoint. }
+        rewrite !big_sepS_sep. iDestruct "VS" as "[VS1 VS2]". iFrame "Gus Glvs".
+        rewrite !set_seq_S_end_union_L. rewrite !big_sepS_union.
+        2,3: apply set_seq_S_end_disjoint.
+        rewrite !big_sepS_singleton. iFrame. auto.
+      - iExists (μ)%M. iPureIntro. etrans; first eauto.
+        apply measure_layer_leibniz_le_proper. apply MONO. lia.
+    }
+    rewrite dom_insert_lookup_L; last done. iFrame "HE HS HV HF HO".
+    rewrite insert_delete_eq. iFrame. iFrame "Gu2". iSplitL.
+    { replace (v2 - v1) with (S (v2 - v1 - 1)) by lia. rewrite set_seq_S_end_union_L.
+      iApply big_sepS_union.
+      1: apply set_seq_S_end_disjoint.
+      replace (S (v2 - v1 - 1) - 1) with (v2 - v1 - 1) by lia. rewrite big_sepS_singleton big_sepS_sep.
+      replace (S v1 + (v2 - v1 - 1)) with v2 by lia. eauto. }
+    iPureIntro. econstructor. auto.
+  Qed.
+
   (** Rules for glG_variant and glsat *)
   Lemma glsat_variant_acc_locked Ω k v q0 q1 E N P Q R :
     ↑N ⊆ E →

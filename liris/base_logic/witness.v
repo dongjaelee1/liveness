@@ -25,6 +25,11 @@ Variant witness_step `{GL : ghost_lock_class} : witness → witness → Prop :=
       (GTver : (ver1 < ver2)%nat)
     :
     witness_step (ver1, witness_unlocked) (ver2, witness_locked wit)
+  | witness_new_version
+      ver1 ver2
+      (GTver : (ver1 < ver2)%nat)
+    :
+    witness_step (ver1, witness_unlocked) (ver2, witness_unlocked)
 .
 
 Definition witness_keep `{GL : ghost_lock_class} : witness → witness → Prop :=
