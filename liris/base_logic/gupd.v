@@ -943,6 +943,26 @@ Section preds.
       solve_contractive.
     Qed.
 
+    Global Instance gl_variant_ne_1 N k v Q R : NonExpansive (λ P, gl_variant N k v P Q R).
+    Proof. apply _. Qed.
+    Global Instance gl_variant_ne_2 N k v P R : NonExpansive (λ Q, gl_variant N k v P Q R).
+    Proof. apply _. Qed.
+    Global Instance gl_variant_ne_3 N k v P Q : NonExpansive (λ R, gl_variant N k v P Q R).
+    Proof. apply _. Qed.
+
+    Global Instance gl_variant_proper_1 N k v Q R : Proper (equiv ==> equiv) (λ P, gl_variant N k v P Q R).
+    Proof.
+      unfold_defs. repeat intro. rewrite /glG_variant /glG_variant_internal H. done.
+    Qed.
+    Global Instance gl_variant_proper_2 N k v P R : Proper (equiv ==> equiv) (λ Q, gl_variant N k v P Q R).
+    Proof.
+      unfold_defs. repeat intro. rewrite /glG_variant /glG_variant_internal H. done.
+    Qed.
+    Global Instance gl_variant_proper_3 N k v P Q : Proper (equiv ==> equiv) (λ R, gl_variant N k v P Q R).
+    Proof.
+      unfold_defs. repeat intro. rewrite /glG_variant /glG_variant_internal H. done.
+    Qed.
+
     Global Instance gl_current_fractional k v :
       Fractional (gl_current k v).
     Proof.
@@ -2278,6 +2298,36 @@ Section preds.
       { iNext. iDestruct "H" as "[$ | (_& #Gxp& HR)]". iRight. iFrame. auto. }
       iIntros "H". iMod ("ACC" with "[H]") as "_"; last done.
       iNext. iApply gl_variant_cases_internal. unfold_defs. done.
+    Qed.
+
+    Lemma gl_variant_acc_current_timeless E N k v q P Q R :
+      Timeless R →
+      ↑N ⊆ E →
+      gl_current k v q -∗
+      gl_variant N k v P Q R ={E,E ∖ ↑N}=∗
+      (▷ (gl_current k v q ∗ (gl_locked k v ∗ P ∨ gl_done k v ∗ Q))) ∗
+      (▷ gl_variant_cases k v P Q R ={E ∖ ↑N,E}=∗ True).
+    Proof.
+      iIntros (TR MASK) "Gc #GV".
+      iMod (gl_variant_acc with "GV") as "[H ACC]". 1: auto.
+      iDestruct "H" as "[$ | H]".
+      - iFrame "Gc". eauto.
+      - iDestruct "H" as ">[#Gx _]". iPoseProof (gl_current_expired_false with "Gc Gx") as "%". done.
+    Qed.
+
+    Lemma gl_variant_acc_current_done_timeless E N k v q P Q R :
+      Timeless R →
+      ↑N ⊆ E →
+      gl_current k v q -∗
+      gl_done k v -∗
+      gl_variant N k v P Q R ={E,E ∖ ↑N}=∗
+      (▷ (gl_current k v q ∗ Q)) ∗
+      (▷ gl_variant_cases k v P Q R ={E ∖ ↑N,E}=∗ True).
+    Proof.
+      iIntros (TR MASK) "Gc #Gd #GV".
+      iMod (gl_variant_acc_done with "Gd GV") as "[[$ | >[Gx _]] ACC]". 1: auto.
+      - iFrame "Gc". eauto.
+      - iPoseProof (gl_current_expired_false with "Gc Gx") as "%". done.
     Qed.
 
   End fgupd.

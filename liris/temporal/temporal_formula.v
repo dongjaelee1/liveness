@@ -1,6 +1,6 @@
 From iris.proofmode Require Import base classes.
 From iris.prelude Require Import options.
-From transfinite.base_logic.lib Require Export iprop.
+From transfinite.base_logic.lib Require Import iprop.
 From stdpp Require Import namespaces.
 From liris.base_logic Require Import ghost_lock.
 
@@ -27,8 +27,6 @@ Declare Scope tf_scope.
 Delimit Scope tf_scope with F.
 Bind Scope tf_scope with tf.
 
-(* Local Open Scope tf_scope. *)
-
 Notation "'⌜' p '⌝'" := (tf_pure p) : tf_scope.
 Notation "'⟨' p '⟩'" := (tf_ghost p%I) : tf_scope.
 Infix "∧" := (tf_and) : tf_scope.
@@ -42,34 +40,6 @@ Notation "∃'" := (f_exist _) (only parsing) : tf_scope.
 Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%F)) ..)) : tf_scope.
 Infix "∗" := (tf_sep) : tf_scope.
 Infix "-∗" := (tf_wand) : tf_scope.
-
-(* Notation "'⟨' A '⟩'" := (Syntax.atom A) : tf_scope. *)
-(* Notation "'➢' r" := (Syntax.ownM r) (at level 20) : tf_scope. *)
-(* Notation "⤉ P" := (Syntax.lift P) (at level 20) : tf_scope. *)
-
-(* Notation "'<pers>' P" := (Syntax.persistently P) : tf_scope. *)
-(* Notation "'<affine>' P" := (Syntax.affinely P) : tf_scope. *)
-(* Notation "□ P" := (<affine> <pers> P) : tf_scope. *)
-(* Notation "■ P" := (Syntax.plainly P) : tf_scope. *)
-(* Notation "|==> P" := (Syntax.upd P) : tf_scope. *)
-(* Notation "¬ P" := (P → False) : tf_scope. *)
-(* Notation "P ==∗ Q" := (P -∗ |==> Q) : tf_scope. *)
-(* Notation "'emp'" := (Syntax.empty) : tf_scope. *)
-
-(* FIXME: more to somewhere else. *)
-Section aux.
-  Context `{SI : indexT}.
-
-  Global Instance big_opL_proper_eq {M : ofe} (o : M → M → M) `{!Monoid o} {A : Type} :
-    Proper (pointwise_relation nat (pointwise_relation A eq) ==> eq ==> eq) (big_opL o).
-  Proof.
-    repeat intro. subst y0. revert x y H. rename x0 into l. induction l; intros f1 f2 Hf; simpl; auto.
-    f_equal.
-    - rewrite Hf. auto.
-    - eapply IHl. repeat intro. rewrite Hf. auto.
-  Qed.
-
-End aux.
 
 (** Define some useful patterns corresponding to temporal properties. *)
 (* Always P *)
@@ -101,8 +71,8 @@ Global Arguments tf_eventually {SI Σ Π}.
 
 (* P Weak until Q *)
 Local Definition tf_weakuntil_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
-  (tf_until N k v P (Q ∨ ∃ k v, tf_always N k v P))%F.
-  (* (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
+  (tf_until N k v P (Q ∨ ∃ k' v', tf_always N k' v' P))%F.
+(*   (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
 Local Definition tf_weakuntil_aux : seal (@tf_weakuntil_def). Proof. by eexists. Qed.
 Definition tf_weakuntil := tf_weakuntil_aux.(unseal).
 Local Definition tf_weakuntil_unseal :
@@ -126,3 +96,40 @@ Definition tf_strongrelease := tf_strongrelease_aux.(unseal).
 Local Definition tf_strongrelease_unseal :
   @tf_strongrelease = @tf_strongrelease_def := tf_strongrelease_aux.(seal_eq).
 Global Arguments tf_strongrelease {SI Σ Π}.
+
+(* Notation "'⟨' A '⟩'" := (Syntax.atom A) : tf_scope. *)
+(* Notation "'➢' r" := (Syntax.ownM r) (at level 20) : tf_scope. *)
+(* Notation "⤉ P" := (Syntax.lift P) (at level 20) : tf_scope. *)
+
+(* Notation "'<pers>' P" := (Syntax.persistently P) : tf_scope. *)
+(* Notation "'<affine>' P" := (Syntax.affinely P) : tf_scope. *)
+(* Notation "□ P" := (<affine> <pers> P) : tf_scope. *)
+(* Notation "■ P" := (Syntax.plainly P) : tf_scope. *)
+(* Notation "|==> P" := (Syntax.upd P) : tf_scope. *)
+(* Notation "¬ P" := (P → False) : tf_scope. *)
+(* Notation "P ==∗ Q" := (P -∗ |==> Q) : tf_scope. *)
+(* Notation "'emp'" := (Syntax.empty) : tf_scope. *)
+
+Section reduction.
+  Context `{SI : indexT} `{Σ : gFunctors} `{Π : Type}.
+
+  Lemma tf_always_unfold N k v (P : @tf SI Σ Π) :
+    tf_always N k v P = (tf_variant N k v ⌜ False ⌝ P ⌜ False ⌝)%F.
+  Proof. rewrite tf_always_unseal. done. Qed.
+  Lemma tf_until_unfold N k v (P Q : @tf SI Σ Π) :
+    tf_until N k v P Q = (tf_variant N k v P Q ⌜ True ⌝)%F.
+  Proof. rewrite tf_until_unseal. done. Qed.
+  Lemma tf_eventually_unfold N k v (P : @tf SI Σ Π) :
+    tf_eventually N k v P = (tf_until N k v ⌜ True ⌝ P)%F.
+  Proof. rewrite tf_eventually_unseal. done. Qed.
+  Lemma tf_weakuntil_unfold N k v (P Q : @tf SI Σ Π) :
+    tf_weakuntil N k v P Q = (tf_until N k v P (Q ∨ ∃ k' v', tf_always N k' v' P))%F.
+  Proof. rewrite tf_weakuntil_unseal. done. Qed.
+  Lemma tf_release_unfold N k v (P Q : @tf SI Σ Π) :
+    tf_release N k v P Q = (tf_weakuntil N k v Q (Q ∗ P))%F.
+  Proof. rewrite tf_release_unseal. done. Qed.
+  Lemma tf_strongrelease_unfold N k v (P Q : @tf SI Σ Π) :
+    tf_strongrelease N k v P Q = (tf_until N k v Q (Q ∗ P))%F.
+  Proof. rewrite tf_strongrelease_unseal. done. Qed.
+
+End reduction.
