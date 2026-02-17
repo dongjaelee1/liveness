@@ -61,13 +61,17 @@ Local Definition tf_until_unseal :
 Global Arguments tf_until {SI Σ Π}.
 
 (* Eventually P *)
-Local Definition tf_eventually_def `{SI : indexT} Σ Π N k v (P : @tf SI Σ Π) : tf :=
+Definition tf_eventually `{SI : indexT} Σ Π N k v (P : @tf SI Σ Π) : tf :=
   (tf_until N k v ⌜ True ⌝ P)%F.
-Local Definition tf_eventually_aux : seal (@tf_eventually_def). Proof. by eexists. Qed.
-Definition tf_eventually := tf_eventually_aux.(unseal).
-Local Definition tf_eventually_unseal :
-  @tf_eventually = @tf_eventually_def := tf_eventually_aux.(seal_eq).
 Global Arguments tf_eventually {SI Σ Π}.
+
+(* Local Definition tf_eventually_def `{SI : indexT} Σ Π N k v (P : @tf SI Σ Π) : tf := *)
+(*   (tf_until N k v ⌜ True ⌝ P)%F. *)
+(* Local Definition tf_eventually_aux : seal (@tf_eventually_def). Proof. by eexists. Qed. *)
+(* Definition tf_eventually := tf_eventually_aux.(unseal). *)
+(* Local Definition tf_eventually_unseal : *)
+(*   @tf_eventually = @tf_eventually_def := tf_eventually_aux.(seal_eq). *)
+(* Global Arguments tf_eventually {SI Σ Π}. *)
 
 (* P Weak until Q *)
 Local Definition tf_weakuntil_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
@@ -80,35 +84,30 @@ Local Definition tf_weakuntil_unseal :
 Global Arguments tf_weakuntil {SI Σ Π}.
 
 (* P Release Q *)
-Local Definition tf_release_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
+Definition tf_release `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
   (tf_weakuntil N k v Q (Q ∗ P))%F.
-Local Definition tf_release_aux : seal (@tf_release_def). Proof. by eexists. Qed.
-Definition tf_release := tf_release_aux.(unseal).
-Local Definition tf_release_unseal :
-  @tf_release = @tf_release_def := tf_release_aux.(seal_eq).
 Global Arguments tf_release {SI Σ Π}.
 
+(* Local Definition tf_release_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf := *)
+(*   (tf_weakuntil N k v Q (Q ∗ P))%F. *)
+(* Local Definition tf_release_aux : seal (@tf_release_def). Proof. by eexists. Qed. *)
+(* Definition tf_release := tf_release_aux.(unseal). *)
+(* Local Definition tf_release_unseal : *)
+(*   @tf_release = @tf_release_def := tf_release_aux.(seal_eq). *)
+(* Global Arguments tf_release {SI Σ Π}. *)
+
 (* P Strong release Q *)
-Local Definition tf_strongrelease_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
+Definition tf_strongrelease `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
   (tf_until N k v Q (Q ∗ P))%F.
-Local Definition tf_strongrelease_aux : seal (@tf_strongrelease_def). Proof. by eexists. Qed.
-Definition tf_strongrelease := tf_strongrelease_aux.(unseal).
-Local Definition tf_strongrelease_unseal :
-  @tf_strongrelease = @tf_strongrelease_def := tf_strongrelease_aux.(seal_eq).
 Global Arguments tf_strongrelease {SI Σ Π}.
 
-(* Notation "'⟨' A '⟩'" := (Syntax.atom A) : tf_scope. *)
-(* Notation "'➢' r" := (Syntax.ownM r) (at level 20) : tf_scope. *)
-(* Notation "⤉ P" := (Syntax.lift P) (at level 20) : tf_scope. *)
-
-(* Notation "'<pers>' P" := (Syntax.persistently P) : tf_scope. *)
-(* Notation "'<affine>' P" := (Syntax.affinely P) : tf_scope. *)
-(* Notation "□ P" := (<affine> <pers> P) : tf_scope. *)
-(* Notation "■ P" := (Syntax.plainly P) : tf_scope. *)
-(* Notation "|==> P" := (Syntax.upd P) : tf_scope. *)
-(* Notation "¬ P" := (P → False) : tf_scope. *)
-(* Notation "P ==∗ Q" := (P -∗ |==> Q) : tf_scope. *)
-(* Notation "'emp'" := (Syntax.empty) : tf_scope. *)
+(* Local Definition tf_strongrelease_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf := *)
+(*   (tf_until N k v Q (Q ∗ P))%F. *)
+(* Local Definition tf_strongrelease_aux : seal (@tf_strongrelease_def). Proof. by eexists. Qed. *)
+(* Definition tf_strongrelease := tf_strongrelease_aux.(unseal). *)
+(* Local Definition tf_strongrelease_unseal : *)
+(*   @tf_strongrelease = @tf_strongrelease_def := tf_strongrelease_aux.(seal_eq). *)
+(* Global Arguments tf_strongrelease {SI Σ Π}. *)
 
 Section reduction.
   Context `{SI : indexT} `{Σ : gFunctors} `{Π : Type}.
@@ -121,15 +120,15 @@ Section reduction.
   Proof. rewrite tf_until_unseal. done. Qed.
   Lemma tf_eventually_unfold N k v (P : @tf SI Σ Π) :
     tf_eventually N k v P = (tf_until N k v ⌜ True ⌝ P)%F.
-  Proof. rewrite tf_eventually_unseal. done. Qed.
+  Proof. done. Qed.
   Lemma tf_weakuntil_unfold N k v (P Q : @tf SI Σ Π) :
     tf_weakuntil N k v P Q = (tf_until N k v P (Q ∨ ∃ k' v', tf_always N k' v' P))%F.
   Proof. rewrite tf_weakuntil_unseal. done. Qed.
   Lemma tf_release_unfold N k v (P Q : @tf SI Σ Π) :
     tf_release N k v P Q = (tf_weakuntil N k v Q (Q ∗ P))%F.
-  Proof. rewrite tf_release_unseal. done. Qed.
+  Proof. done. Qed.
   Lemma tf_strongrelease_unfold N k v (P Q : @tf SI Σ Π) :
     tf_strongrelease N k v P Q = (tf_until N k v Q (Q ∗ P))%F.
-  Proof. rewrite tf_strongrelease_unseal. done. Qed.
+  Proof. done. Qed.
 
 End reduction.
