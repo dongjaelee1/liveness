@@ -190,6 +190,37 @@ Section proof.
     iIntros (MASK) "Gc #Gd #GV". iMod (gl_variant_acc_current_done_timeless with "Gc Gd GV") as "[$ $]". all: auto.
   Qed.
 
+  Lemma gl_until_retrieve E N k v q P Q :
+    ↑N ⊆ E →
+    gl_current k v q -∗
+    gl_done k v -∗
+    gl_until N k v P Q ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k v q ∗ Q)) ∗
+    (gl_current k v 1 -∗
+     ∀ Θ, |=[Θ]=>g (gl k (S v) ∗ gl_done k (S v) ∗ gl_current k (S v) 1) ∗
+                (∀ E0, |={E0}=> gl_variant N k (S v) ⌜ False ⌝ ⌜ True ⌝ ⌜ False ⌝) ∗
+                (|={E ∖ ↑N,E}=> True)).
+  Proof.
+    TODO
+     
+    (▷ gl_variant_cases k v P Q (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
+  Proof.
+    unfold_temps.
+    iIntros (MASK) "Gc #Gd #GV". iMod (gl_variant_acc_current_done_timeless with "Gc Gd GV") as "[$ $]". all: auto.
+  Qed.
+gl_new_version_0
+     : ∀ (E : coPset) (k : gl_id) (qc : Qp) (v1 v2 : nat) (N : namespace) (P1 Q1 R1 P2 Q2 R2 : iProp Σ),
+         v1 < v2
+         → ↑N ⊆ E
+           → gl_current k v1 qc -∗
+             gl_done k v1 -∗
+             gl_variant N k v1 P1 Q1 R1 ={E,E ∖ ↑N}=∗
+             ▷ (gl_current k v1 qc ∗ Q1) ∗
+             (gl_current k v1 1 -∗
+              ∀ Θ : gset positive,
+                |=[Θ]=>g (gl k v2 ∗ gl_done k v2 ∗ gl_current k v2 1 ∗ ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u)) ∗
+                (∀ E0 : coPset, ▷ Q2 ={E0}=∗ gl_variant N k v2 P2 Q2 R2) ∗ (▷ R1 ={E ∖ ↑N,E}=∗ True))
+
   (* Eventually *)
   Global Instance gl_eventually_persistent N k v P : Persistent (gl_eventually N k v P).
   Proof. unfold_temps. apply _. Qed.
@@ -198,29 +229,42 @@ Section proof.
   Global Instance gl_eventually_ne N k v : NonExpansive (gl_eventually N k v).
   Proof. apply _. Qed.
 
-  Lemma gl_always_alloc_0 E Θ N v (P : iProp Σ) :
-    (▷ P) -∗ |={E:Θ}=>g ∃ k, gl_always N k v P.
+  Lemma gl_eventually_alloc_0 Θ i G q ℓ μ v :
+    th_obls i G q -∗
+    |=[Θ]=>g ∃ k, ⌜G !! k = None⌝ ∗ th_obls i (<[k:=v]> G) q ∗ gl_current k v (1 / 2) ∗ 
+                 gl_layers k (λ _, ℓ) ∗ gl k v ∗ gl_fuel k ℓ μ ∗ wit_layer k v ℓ ∗
+                 ([∗ set] u ∈ set_seq 0 v, gl_done k u) ∗
+                 ∀ E N (P : iProp Σ), |={E}=> gl_eventually N k v P.
   Proof.
     unfold_temps.
-    iIntros "HP". iMod (gl_alloc_done_0 _ (λ _, 0%ordi) 0%M v) as "(%& _& _& _& #Gd& _& _& _& H)".
-    iMod ("H" $! _ N (⌜ False ⌝)%I P (⌜ False ⌝)%I with "HP") as "H".
-    iModIntro. eauto.
+    iIntros "TG". iMod (gl_until_alloc_0 _ _ _ _ ℓ μ v with "TG") as "(%& $& $& $& $& $& $& $& $& H)".
+    iIntros "!> %%%". iApply "H". auto.
   Qed.
 
-  Lemma gl_always_acc E N k v P :
+  Lemma gl_eventually_acc_current E N k v q P :
     ↑N ⊆ E →
-    gl_always N k v P ={E,E ∖ ↑N}=∗ (▷ (gl_done k v ∗ P)) ∗ ((▷ (gl_done k v ∗ P)) ={E ∖ ↑N,E}=∗ True).
+    gl_current k v q -∗
+    gl_eventually N k v P ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k v q ∗ (gl_locked k v ∗ ⌜ True ⌝ ∨ gl_done k v ∗ P))) ∗
+    (▷ gl_variant_cases k v (⌜ True ⌝)%I P (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
   Proof.
     unfold_temps.
-    iIntros (MASK) "#GV". iMod (gl_variant_acc with "GV") as "[H ACC]". 1: auto.
-    iDestruct "H" as "[[>(_& %) | $] | >(_& %)]"; [done | | done].    
-    iIntros "!> HP". iApply "ACC". iNext. iApply gl_variant_cases_unfold. iLeft; iRight. eauto.
+    iIntros (MASK) "Gc #GV". iMod (gl_until_acc_current with "Gc GV") as "[$ $]". all: auto.
+  Qed.
+
+  Lemma gl_eventually_acc_current_done E N k v q P :
+    ↑N ⊆ E →
+    gl_current k v q -∗
+    gl_done k v -∗
+    gl_eventually N k v P ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k v q ∗ P)) ∗
+    (▷ gl_variant_cases k v (⌜ True ⌝)%I P (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
+  Proof.
+    unfold_temps.
+    iIntros (MASK) "Gc #Gd #GV". iMod (gl_until_acc_current_done with "Gc Gd GV") as "[$ $]". all: auto.
   Qed.
 
   TODO
-  Lemma gl_eventually_unfold N k v (P : iProp Σ) :
-    gl_eventually N k v P = (gl_until N k v ⌜ True ⌝ P)%F.
-  Proof. rewrite gl_eventually_unseal. done. Qed.
   Lemma gl_weakuntil_unfold N k v (P Q : iProp Σ) :
     gl_weakuntil N k v P Q = (gl_until N k v P (Q ∨ ∃ k' v', gl_always N k' v' P))%F.
   Proof. rewrite gl_weakuntil_unseal. done. Qed.

@@ -655,27 +655,28 @@ Section sfgupd.
     iIntros (MONO) "HQ %%% $". iApply (gl_alloc_done_1 with "HQ").
   Qed.
 
-  Lemma gl_lock E i G q qc k ℓs μ v1 v2 N (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
-    v1 < v2 →
+  Lemma gl_lock E qc k v1 N (P1 Q1 R1 : iProp Σ) :
     ↑N ⊆ E →
     gl_current k v1 qc -∗
     gl_done k v1 -∗
     gl_variant N k v1 P1 Q1 R1 -∗
     |={E,E ∖ ↑N}=> (▷ (gl_current k v1 qc ∗ Q1)) ∗
-                  (th_obls i G q -∗
-                   gl_current k v1 1 -∗
-                   gl_layers k ℓs -∗
-                   ∀ E0, |={E0}=>g (th_obls i (<[k:=v2]>G) q ∗ ⌜ G !! k = None ⌝ ∗
-                                   gl_current k v2 (1/2)%Qp ∗
-                                   gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
-                                   wit_layer k v2 (ℓs v2) ∗
-                                   ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u (ℓs u)) ∗
-                                   ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u)) ∗
-                                (∀ E1, (▷ P2) ={E1}=∗ gl_variant N k v2 P2 Q2 R2) ∗
-                                ((▷ R1) ={E ∖ ↑N,E}=∗ True)).
+                  (∀ i G q ℓs,
+                     th_obls i G q -∗
+                     gl_current k v1 1 -∗
+                     gl_layers k ℓs -∗
+                     ∀ v2 μ, (⌜ v1 < v2 ⌝) →
+                             ∀ E0, |={E0}=>g (th_obls i (<[k:=v2]>G) q ∗ ⌜ G !! k = None ⌝ ∗
+                                             gl_current k v2 (1/2)%Qp ∗
+                                             gl k v2 ∗ gl_fuel k (ℓs v2) μ ∗
+                                             wit_layer k v2 (ℓs v2) ∗
+                                             ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), wit_layer k u (ℓs u)) ∗
+                                             ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u)) ∗
+                                          (∀ E1 (P2 Q2 R2 : iProp Σ), (▷ P2) ={E1}=∗ gl_variant N k v2 P2 Q2 R2) ∗
+                                          ((▷ R1) ={E ∖ ↑N,E}=∗ True)).
   Proof.
-    iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
-    iIntros "!> Tb Gc Gw". iPoseProof ("H" with "Tb Gc Gw") as "H".
+    iIntros (Mask) "Gc Gd Gv". iMod (gl_lock_0 with "Gc Gd Gv") as "[$ H]". 1: eauto.
+    iIntros "!> %%%% Tb Gc Gw %%%". iPoseProof ("H" with "Tb Gc Gw [//]") as "H".
     iIntros "% %%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
   Qed.
 
@@ -695,21 +696,21 @@ Section sfgupd.
     iIntros "% %%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
   Qed.
 
-  Lemma gl_new_version E k qc v1 v2 N (P1 Q1 R1 P2 Q2 R2 : iProp Σ) :
-    v1 < v2 →
+  Lemma gl_new_version E k qc v1 N (P1 Q1 R1 : iProp Σ) :
     ↑N ⊆ E →
     gl_current k v1 qc -∗
     gl_done k v1 -∗
     gl_variant N k v1 P1 Q1 R1 -∗
     |={E,E ∖ ↑N}=> (▷ (gl_current k v1 qc ∗ Q1)) ∗
                   (gl_current k v1 1 -∗
-                   ∀ E0, |={E0}=>g (gl k v2 ∗ gl_done k v2 ∗ gl_current k v2 1 ∗
-                                 ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u)) ∗
-                              (∀ E0, (▷ Q2) ={E0}=∗ gl_variant N k v2 P2 Q2 R2) ∗
-                              ((▷ R1) ={E ∖ ↑N,E}=∗ True)).
+                   ∀ v2, (⌜ v1 < v2 ⌝) →
+                         ∀ E0, |={E0}=>g (gl k v2 ∗ gl_done k v2 ∗ gl_current k v2 1 ∗
+                                         ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), gl_done k u)) ∗
+                                      (∀ E0 (P2 Q2 R2 : iProp Σ), (▷ Q2) ={E0}=∗ gl_variant N k v2 P2 Q2 R2) ∗
+                                      ((▷ R1) ={E ∖ ↑N,E}=∗ True)).
   Proof.
-    iIntros (Hv Mask) "Gc Gd Gv". iMod (gl_new_version_0 with "Gc Gd Gv") as "[$ H]". 1,2: eauto.
-    iIntros "!> Gc". iPoseProof ("H" with "Gc") as "H".
+    iIntros (Mask) "Gc Gd Gv". iMod (gl_new_version_0 with "Gc Gd Gv") as "[$ H]". 1: eauto.
+    iIntros "!> Gc %%". iPoseProof ("H" with "Gc [//]") as "H".
     iIntros "% %%% $". iMod ("H" $! Θ) as "H". iModIntro. done.
   Qed.
 
