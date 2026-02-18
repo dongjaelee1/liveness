@@ -297,3 +297,5 @@ Section lifting.
   Qed.
 
 End lifting.
+
+Global Opaque sfgupd.
