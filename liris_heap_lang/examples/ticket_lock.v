@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From liris.base_logic Require Export invariants.
-From liris.program_logic Require Export weakestpre.
+From liris.program_logic Require Export temporal_rules.
 From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
@@ -30,96 +30,56 @@ Module TicketLock.
 
 End TicketLock.
 
-Local Definition heldT : Type := (bool).
-Local Definition wonT : Type := (gl_id * bool).
+(* Local Definition heldT : Type := (bool). *)
+(* Local Definition wonT : Type := (gl_id * bool). *)
 
-(** The CMRA we need. *)
-Class ticket_lockG Σ :=
-  TLockG {
-      #[local] tlock_heldG :: ghost_mapG Σ Z heldT;
-      #[local] tlock_wonG :: ghost_mapG Σ Z wonT;
-    }.
+(* (** The CMRA we need. *) *)
+(* Class ticket_lockG Σ := *)
+(*   TLockG { *)
+(*       #[local] tlock_heldG :: ghost_mapG Σ Z heldT; *)
+(*       #[local] tlock_wonG :: ghost_mapG Σ Z wonT; *)
+(*     }. *)
 
-Definition ticket_lockΣ : gFunctors :=
-  #[(ghost_mapΣ Z heldT); (ghost_mapΣ Z wonT)].
+(* Definition ticket_lockΣ : gFunctors := *)
+(*   #[(ghost_mapΣ Z heldT); (ghost_mapΣ Z wonT)]. *)
 
-Global Instance subG_ticket_lockΣ {Σ} : subG ticket_lockΣ Σ → ticket_lockG Σ.
-Proof. solve_inG. Qed.
+(* Global Instance subG_ticket_lockΣ {Σ} : subG ticket_lockΣ Σ → ticket_lockG Σ. *)
+(* Proof. solve_inG. Qed. *)
 
 Section proof.
-  Context `{!heapGS Σ, !ticket_lockG Σ}.
+  Context `{!heapGS Σ}.
+  (* Context `{!heapGS Σ, !ticket_lockG Σ}. *)
 
   Let N := nroot.@"ticket_lock".
   Let N_inv := N.@"inv".
-  Let N_state := N.@"state".
-  Let N_held := N.@"held".
+  Let N_eventually := N.@"eventually".
 
-  Remark N_disj_1 : N_state ## N_inv.
+  Remark N_disj_1 : N_eventually ## N_inv.
   Proof. by apply ndot_ne_disjoint. Qed.
-  Remark N_disj_2 : N_held ## N_inv.
-  Proof. by apply ndot_ne_disjoint. Qed.
-  Remark N_subseteq_1 : ↑N_state ⊆ (⊤ : coPset) ∖ ↑N_inv.
+  Remark N_subseteq_1 : ↑N_eventually ⊆ (⊤ : coPset) ∖ ↑N_inv.
   Proof. pose proof N_disj_1. set_solver. Qed.
-  Remark N_subseteq_2 : ↑N_held ⊆ (⊤ : coPset) ∖ ↑N_inv.
-  Proof. pose proof N_disj_2. set_solver. Qed.
 
   (** Definitions *)
-  Local Definition lock_state kl γw ℓ (curr : loc) (c : Z) : iProp Σ :=
-    gl kl (Z.to_nat c) ∗
-    wit_layer kl (Z.to_nat c) (ℓ)%ordi ∗
-    gl_variant N_state kl (Z.to_nat c) (curr ↦{#(1/2)} #(c - 1)%Z) (curr ↦{#(1/2)} #c) (∃ (κx : gl_id), c%Z ↪[γw]□ (κx, true)).
-
-  Definition eventually_release kl γw ℓ (lnc : val) (ν : nat) : iProp Σ :=
-    ∃ (next curr : loc) c κh, ⌜lnc = (#next, #curr)%V⌝ ∧ ⌜ (ν = Z.to_nat (c + 1)%Z) ⌝ ∗
-                              (c%Z ↪[γw]□ (κh, true)) ∗ lock_state kl γw ℓ curr (c + 1)%Z.
-
-  Local Definition lock_eventually_held kh kl γh γw ℓ (my : Z) (curr : loc) : iProp Σ :=
-    gl kh 0 ∗
-    wit_layer kh 0 (ℓ ⊕ (Z.to_nat my))%ordi ∗
-    gl_variant N_held kh 0 (my ↪[γh]{#(1/2)} (false)) (my ↪[γh]□ (true) ∗ lock_state kl γw ℓ curr (my + 1)%Z) False.
-
-  Local Definition lock_inv (next curr : loc) (γh γw : gname) (κl : gl_id) (ℓ : layer) (R : iProp Σ) : iProp Σ :=
-    ∃ (n c : Z) (held : gmap Z heldT) (won : gmap Z wonT),
-      (⌜ (0 ≤ c ≤ n)%Z ∧ (held !! c = Some true → (c < n)%Z) ⌝) ∗
-      (⌜ ∀ (x : Z), (n ≤ x)%Z → (held !! x = None) ⌝) ∗
-      (⌜ ∀ (x : Z), (held !! x = None) → ((x < 0)%Z ∨ (n ≤ x)%Z)⌝) ∗
-      (⌜ ∀ (x : Z), (0 ≤ x < c)%Z → held !! x = Some true ⌝) ∗
-      (⌜ ∀ (x : Z), (c < x < n)%Z → held !! x = Some false ⌝) ∗
-      (⌜ held = snd <$> won ⌝) ∗
+  Local Definition lock_proto (next curr : loc) (ℓ : layer) (R : iProp Σ) : iProp Σ :=
+    ∃ (n c : Z),
       next ↦ #n ∗
       curr ↦{#(1/2)} #c ∗
-      ghost_map_auth γh 1 held ∗
-      ghost_map_auth γw 1 won ∗
-      gl_layers κl (λ v, (ℓ)%ordi) ∗
-      (match held !! c with
-       | Some true =>
-           lock_state κl γw ℓ curr (c + 1)
-       | _ =>
-           gl_done κl (Z.to_nat c) ∗
-           gl_current κl (Z.to_nat c) ∗
-           lock_state κl γw ℓ curr c ∗
-           R
-       end) ∗
-      ([∗ map] x ↦ '(κh, b) ∈ won,
-         lock_eventually_held κh κl γh γw ℓ x curr ∗
-         match b with
-         | false => (x ↪[γh]{#(1/2)} (false))
-         | true => (x ↪[γh]□ (true)) ∗ x ↪[γw]□ (κh, true)
-         end
-      ).
+      ∃ κu (u : Z), gl κu 0 ∗
+                    gl_eventually N_eventually κu (curr ↦{#(1/2)} #(u + 1)%Z ∗ gl_current κu 0 (1/2)%Qp ∗ R) ∗
+                    gl_current κu 0 (1/2)%Qp ∗
+                    ((⌜(c < n)%Z⌝ ∧ wit_layer κu 0 (ℓ ⊕ (Z.to_nat u))%ordi) ∨ (⌜(c = n)%Z⌝ ∧ gl_done κu 0)).
 
-  Definition is_fair_lock (lnc : val) (γh γw : gname) (κl : gl_id) (ℓ : layer) (R : iProp Σ) : iProp Σ :=
-    ∃ (next curr : loc), ⌜lnc = (#next, #curr)%V⌝ ∧
-                         inv N_inv (lock_inv next curr γh γw κl ℓ R).
+  Definition lock_token (lnc : val) κu (R : iProp Σ) : iProp Σ :=
+    ∃ (next curr : loc) (u : Z),
+      (⌜lnc = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗
+      gl_eventually N_eventually κu (curr ↦{#(1/2)} #(u + 1)%Z ∗ gl_current κu 0 (1/2)%Qp ∗ R).
+
+  Definition is_fair_lock (lnc : val) (ℓ : layer) (R : iProp Σ) : iProp Σ :=
+    ∃ (next curr : loc), (⌜lnc = (#next, #curr)%V⌝) ∧
+                         ∃ κ, gl_done κ 0 ∗ gl_always N_inv κ (lock_proto next curr ℓ R).
 
   (** Properties *)
-  Global Instance lock_state_persistent kl γw ℓ curr c : Persistent (lock_state kl γw ℓ curr c).
-  Proof. rewrite /lock_state. apply _. Qed.
-  Global Instance eventually_release_persistent kl γw ℓ lnc ν : Persistent (eventually_release kl γw ℓ lnc ν).
-  Proof. rewrite /eventually_release. apply _. Qed.
-  Global Instance lock_eventually_held_persistent kh kl γh γw ℓ my curr : Persistent (lock_eventually_held kh kl γh γw ℓ my curr).
-  Proof. rewrite /lock_eventually_held. apply _. Qed.
-  Global Instance is_fair_lock_persistent lnc γh γw κl ℓ R : Persistent (is_fair_lock lnc γh γw κl ℓ R).
+  Global Instance is_fair_lock_persistent lnc ℓ R : Persistent (is_fair_lock lnc ℓ R).
   Proof. rewrite /is_fair_lock. apply _. Qed.
 
   (** Program proofs *)
@@ -128,9 +88,9 @@ Section proof.
          th_obls i G 1 ∗ ([∗ set] k ∈ dom G, gl_fuel k 1 ▽%M) ∗
          R }}}
       TicketLock.init #() @ i
-    l{{{ lnc γh γw κl, RET lnc;
+    l{{{ lnc, RET lnc;
          thread_exec i q ∗ th_obls i G 1 ∗ £ lc ∗
-         is_fair_lock lnc γh γw κl ℓ R }}}.
+         is_fair_lock lnc ℓ R }}}.
   Proof.
     iIntros (Φ) "(Tx& TG& Fs& HR) HΦ".
     rewrite /TicketLock.init.
@@ -159,86 +119,36 @@ Section proof.
     lwp_pair. simpl.
     iFrame "Tx TG F". iExists _, ∅, lc. iSplitR; first done. iIntros "!> Tx TG _ !> QLC !>".
     lwp_finish.
-    iMod (ghost_map_alloc (∅ : gmap Z wonT)) as "(%γw& GMAw& _)".
-    iMod (ghost_map_alloc (∅ : gmap Z heldT)) as "(%γh& GMAh& _)".
-    iDestruct "Ptr_curr" as "[Ptr_curr0 Ptr_curr]".
-    iMod (gl_alloc_done _ (λ _, ℓ) 0 N_state (Z.to_nat 0%Z)
-            (curr ↦{#(1/2)} #(0 - 1)%Z) (curr ↦{#(1/2)} #0%Z) (∃ κx, 0%Z ↪[γw]□ (κx, true))
-           with "Ptr_curr") as "(%κl& Glkl& Gkl& Gckl& Gdkl& _& GVkl& Wlkl& _)".
-    iMod (inv_alloc N_inv _ (lock_inv next curr γh γw κl ℓ R) with "[- HΦ Tx TG QLC]") as "INV".
-    { rewrite /lock_inv. iExists 0, 0, ∅, ∅.
-      iSplitR; first done. iSplitR; first done. iSplitR.
-      { iPureIntro. intros. lia. }
-      iSplitR.
-      { iPureIntro. intros. lia. }
-      iSplitR.
-      { iPureIntro. intros. lia. }
-      iSplitR; first done. rewrite /lock_state.
-      iFrame "Glkl Ptr_next Ptr_curr0 GMAh GMAw Gdkl Gckl Gkl Wlkl GVkl HR".
-      rewrite big_sepM_empty. done. }
-    iApply ("HΦ" $! _ γh γw κl with "[-]"). iFrame "Tx TG QLC".
-    rewrite /is_fair_lock. iFrame. done.
-  Qed.
-
-  Local Lemma acquire_my_turn i q G κl γw ℓ R μ curr (c : Z) ν :
-    G !! κl = None →
-    l{{{ thread_exec i q ∗ th_obls i (<[κl:=ν]> G) 1 ∗
-         ([∗ set] k ∈ dom (<[κl:=ν]> G), gl_fuel k 0 10) ∗
-         gl_variant N_state κl ν (curr ↦{#(1/2)} #c) (curr ↦{#(1/2)} #(c + 1)%Z) (∃ κx, (c + 1)%Z ↪[γw]□ (κx, true)) ∗
-         gl_fuel κl ℓ μ ∗ R }}}
-      (rec: "while" <> := if: ! #curr = #c then #() else "while" #())%V #() @ i
-    l{{{ RET #();
-         thread_exec i q ∗ th_obls i (<[κl:=ν]>G) 1 ∗ ⌜ G !! κl = None ⌝ ∗
-         gl_fuel κl ℓ μ ∗ R }}}.
-  Proof.
-    iIntros (NinGkl Φ) "(Tx& TG& Fs& #GVkl& Gfkl& HR) HΦ".
-    iPoseProof (gl_fuel_eq_set _ 0 _ (9 ⊕ 1)%M with "Fs") as "Fs".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-    lwp_lam. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-    iPoseProof (gl_fuel_eq_set _ 0 _ (8 ⊕ 1)%M with "Fs") as "Fs".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-    lwp_bind (Load _).
-    iMod (gl_variant_acc_own with "TG GVkl") as "[>(TG& GLkl& PtrCurr) ACC]".
-    1: set_solver.
-    { by rewrite lookup_insert_eq. }
-    iApply (lwp_load _ ∅ 0 with "[$Tx $TG $F $PtrCurr]"). 1: done.
-    iIntros "((_& Tx& TG& _)& PtrCurr)". iMod ("ACC" with "[GLkl PtrCurr]") as "_".
-    { rewrite gl_variant_cases_unfold. iNext. iLeft; iLeft. iFrame. }
-    iModIntro.
-    iPoseProof (gl_fuel_eq_set _ 0 _ (7 ⊕ 1)%M with "Fs") as "Fs".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-    lwp_op. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-    rewrite bool_decide_eq_true_2; last done.
-    iPoseProof (gl_fuel_eq_set _ 0 _ (6 ⊕ 1)%M with "Fs") as "Fs".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
-    lwp_if_true. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
-    lwp_finish.
-    iApply ("HΦ" with "[$Tx $TG $Gfkl $HR]"). auto.
+    iApply "HΦ". iFrame "Tx TG QLC".
+    rewrite /is_fair_lock. iExists next, curr. iSplitR; first done.
+    iMod (gl_until_done_alloc) as "(%κu& #Gk& [Gck1 Gck2]& #Gdk& ACC)".
+    iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
+    iMod (gl_always_alloc) as "(%κ& _& _& $& ACC2)".
+    iMod ("ACC" $! _ N_eventually True%I (curr ↦{#(1/2)} #(0)%Z ∗ gl_current κu 0 (1/2)%Qp ∗ R)%I
+           with "[$Ptr_curr0 $Gck2 $HR]") as "#GU".
+    iMod ("ACC2" $! _ _ _ with "[-]") as "$"; last done.
+    iNext. rewrite /lock_proto. iFrame "Ptr_next Ptr_curr Gk Gck1".
+    iExists (-1)%Z. replace (-1 + 1)%Z with 0%Z by lia. iFrame "GU".
+    iRight. eauto.
   Qed.
 
   (** FIXME: ordi notation levels *)
-  Local Lemma acquire_spec i q G lnc γh γw κl ℓ R μ lc :
+  Local Lemma acquire_spec i q G lnc ℓ R μ lc :
     l{{{ thread_exec i q ∗
-         th_obls i G 1 ∗ ([∗ set] k ∈ dom G, ∃ l, ⌜ ((ℓ ⊕ ω) < l)%ordi ⌝ ∗ gl_fuel k l ▽%M) ∗
-         is_fair_lock lnc γh γw κl ℓ R }}}
+         th_obls i G 1 ∗ ([∗ set] k ∈ dom G, gl_fuel k ((ℓ ⊕ (ω ⊕ 1)))%ordi ▽%M) ∗
+         is_fair_lock lnc ℓ R }}}
       TicketLock.acquire lnc @ i
-      l{{{ ν, RET #();
-           thread_exec i q ∗ th_obls i (<[κl:=ν]>G) 1 ∗ £ lc ∗
-           ⌜ G !! κl = None ⌝ ∗ eventually_release κl γw ℓ lnc ν ∗
-           gl_fuel κl ℓ μ ∗ R }}}.
+    l{{{ κu, RET #();
+         thread_exec i q ∗ th_obls i (<[κu:=0]>G) 1 ∗ £ lc ∗
+         (⌜ G !! κu = None ⌝) ∗ gl_fuel κu ℓ μ ∗
+         lock_token lnc κu R ∗ R }}}.
   Proof.
     iIntros (Φ) "(Tx& TG& Fs& #IFL) HΦ".
     rewrite /TicketLock.acquire.
     iAssert (|==>[∗ set] k ∈ dom G, gl_fuel k (ℓ ⊕ ω)%ordi (100 ⊕ ▽)%M)%I with "[Fs]" as ">Fs".
-    { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% (%& %& GF)".
-      iApply (gl_fuel_extend with "GF"). auto. }
+    { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% GF".
+      iApply (gl_fuel_extend with "GF"). rewrite -hessenberg.add_assoc. apply hessenberg.add_lt_l.
+      rewrite ord.from_nat_1. apply ord.S_pos. }
     iPoseProof (gl_fuel_add_set with "Fs") as "[Fs Fsloop]".
     iPoseProof (gl_fuel_eq_set _ 0 _ (99 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
@@ -248,7 +158,7 @@ Section proof.
     iFrame "Tx TG F". iExists _, ∅, 100. iSplitR; first done. iIntros "!> Tx TG _ !> LC !>".
     (* get fst and snd of the argument *)
     (* fst *)
-    iDestruct "IFL" as "(%&%&%& #INV)". subst lnc.
+    iDestruct "IFL" as "(%&%& %& %κa& #Gdka& #INV)". subst lnc.
     iPoseProof (gl_fuel_eq_set _ 0 _ (98 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
@@ -285,10 +195,14 @@ Section proof.
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (gl_fuel_add_set with "Fs") as "[Fs F]".
     lwp_bind (FAA _ _).
-    iInv "INV" as "H".
+    (** FIXME: Make IntoAcc instances for temporal acc rules? *)
+    (* iInv "INV" as "H". *)
+    iMod (gl_always_acc with "Gdka INV") as "[H ACC]". 1: set_solver.
     (** TODO: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
     iApply (lifting.lwp_lc_later with "LC1"). iNext.
+
+    TODO
     iDestruct "H" as "(%&%&%&%& %HI1& %HI2& %HI3& %HI4& %HI5& %HI6& PtrNext& H)".
     iApply lwp_sfgupd.
     iApply (lwp_faa _ ∅ 0 with "[$Tx $TG $F $PtrNext]").
