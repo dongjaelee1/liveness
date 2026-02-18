@@ -1,6 +1,6 @@
 (** Some derived lemmas for ectx-based languages *)
 From iris.proofmode Require Import proofmode.
-From liris.program_logic Require Export ectx_language weakestpre lifting.
+From liris.program_logic Require Export ectx_language lifting.
 From iris.prelude Require Import options.
 From liris Require Import ordinal_wfocm.
 

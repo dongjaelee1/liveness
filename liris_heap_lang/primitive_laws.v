@@ -7,8 +7,7 @@ From transfinite.base_logic.lib Require Import mono_nat.
 From transfinite.base_logic.lib Require Export gen_heap proph_map.
 (* From transfinite.base_logic.lib Require Export gen_heap proph_map gen_inv_heap. *)
 From liris.base_logic Require Export thread_map gen_inv_heap.
-(* From liris.program_logic Require Export weakestpre. *)
-From liris.program_logic Require Export atomic.
+From liris.program_logic Require Export atomic temporal_rules.
 From liris.program_logic Require Import ectx_lifting.
 From liris.heap_lang Require Export class_instances.
 From liris.heap_lang Require Import tactics notation.

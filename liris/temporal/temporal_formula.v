@@ -43,8 +43,8 @@ Infix "-∗" := (tf_wand) : tf_scope.
 
 (** Define some useful patterns corresponding to temporal properties. *)
 (* Always P *)
-Local Definition tf_always_def `{SI : indexT} Σ Π N k v (P : @tf SI Σ Π) : tf :=
-  (tf_variant N k v ⌜ False ⌝ P ⌜ False ⌝)%F.
+Local Definition tf_always_def `{SI : indexT} Σ Π N k (P : @tf SI Σ Π) : tf :=
+  (tf_variant N k 0 ⌜ False ⌝ P ⌜ False ⌝)%F.
 Local Definition tf_always_aux : seal (@tf_always_def). Proof. by eexists. Qed.
 Definition tf_always := tf_always_aux.(unseal).
 Local Definition tf_always_unseal :
@@ -52,8 +52,8 @@ Local Definition tf_always_unseal :
 Global Arguments tf_always {SI Σ Π}.
 
 (* P Until Q *)
-Local Definition tf_until_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
-  (tf_variant N k v P Q ⌜ True ⌝)%F.
+Local Definition tf_until_def `{SI : indexT} Σ Π N k (P Q : @tf SI Σ Π) : tf :=
+  (tf_variant N k 0 P Q ⌜ True ⌝)%F.
 Local Definition tf_until_aux : seal (@tf_until_def). Proof. by eexists. Qed.
 Definition tf_until := tf_until_aux.(unseal).
 Local Definition tf_until_unseal :
@@ -61,8 +61,8 @@ Local Definition tf_until_unseal :
 Global Arguments tf_until {SI Σ Π}.
 
 (* Eventually P *)
-Definition tf_eventually `{SI : indexT} Σ Π N k v (P : @tf SI Σ Π) : tf :=
-  (tf_until N k v ⌜ True ⌝ P)%F.
+Definition tf_eventually `{SI : indexT} Σ Π N k (P : @tf SI Σ Π) : tf :=
+  (tf_until N k ⌜ True ⌝ P)%F.
 Global Arguments tf_eventually {SI Σ Π}.
 
 (* Local Definition tf_eventually_def `{SI : indexT} Σ Π N k v (P : @tf SI Σ Π) : tf := *)
@@ -74,8 +74,8 @@ Global Arguments tf_eventually {SI Σ Π}.
 (* Global Arguments tf_eventually {SI Σ Π}. *)
 
 (* P Weak until Q *)
-Local Definition tf_weakuntil_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
-  (tf_until N k v P (Q ∨ ∃ k' v', tf_always N k' v' P))%F.
+Local Definition tf_weakuntil_def `{SI : indexT} Σ Π N k (P Q : @tf SI Σ Π) : tf :=
+  (tf_until N k P (Q ∨ ∃ k', tf_always N k' P))%F.
 (*   (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
 Local Definition tf_weakuntil_aux : seal (@tf_weakuntil_def). Proof. by eexists. Qed.
 Definition tf_weakuntil := tf_weakuntil_aux.(unseal).
@@ -84,8 +84,8 @@ Local Definition tf_weakuntil_unseal :
 Global Arguments tf_weakuntil {SI Σ Π}.
 
 (* P Release Q *)
-Definition tf_release `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
-  (tf_weakuntil N k v Q (Q ∗ P))%F.
+Definition tf_release `{SI : indexT} Σ Π N k (P Q : @tf SI Σ Π) : tf :=
+  (tf_weakuntil N k Q (Q ∗ P))%F.
 Global Arguments tf_release {SI Σ Π}.
 
 (* Local Definition tf_release_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf := *)
@@ -97,8 +97,8 @@ Global Arguments tf_release {SI Σ Π}.
 (* Global Arguments tf_release {SI Σ Π}. *)
 
 (* P Strong release Q *)
-Definition tf_strongrelease `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf :=
-  (tf_until N k v Q (Q ∗ P))%F.
+Definition tf_strongrelease `{SI : indexT} Σ Π N k (P Q : @tf SI Σ Π) : tf :=
+  (tf_until N k Q (Q ∗ P))%F.
 Global Arguments tf_strongrelease {SI Σ Π}.
 
 (* Local Definition tf_strongrelease_def `{SI : indexT} Σ Π N k v (P Q : @tf SI Σ Π) : tf := *)
@@ -112,23 +112,23 @@ Global Arguments tf_strongrelease {SI Σ Π}.
 Section reduction.
   Context `{SI : indexT} `{Σ : gFunctors} `{Π : Type}.
 
-  Lemma tf_always_unfold N k v (P : @tf SI Σ Π) :
-    tf_always N k v P = (tf_variant N k v ⌜ False ⌝ P ⌜ False ⌝)%F.
+  Lemma tf_always_unfold N k (P : @tf SI Σ Π) :
+    tf_always N k P = (tf_variant N k 0 ⌜ False ⌝ P ⌜ False ⌝)%F.
   Proof. rewrite tf_always_unseal. done. Qed.
-  Lemma tf_until_unfold N k v (P Q : @tf SI Σ Π) :
-    tf_until N k v P Q = (tf_variant N k v P Q ⌜ True ⌝)%F.
+  Lemma tf_until_unfold N k (P Q : @tf SI Σ Π) :
+    tf_until N k P Q = (tf_variant N k 0 P Q ⌜ True ⌝)%F.
   Proof. rewrite tf_until_unseal. done. Qed.
-  Lemma tf_eventually_unfold N k v (P : @tf SI Σ Π) :
-    tf_eventually N k v P = (tf_until N k v ⌜ True ⌝ P)%F.
+  Lemma tf_eventually_unfold N k (P : @tf SI Σ Π) :
+    tf_eventually N k P = (tf_until N k ⌜ True ⌝ P)%F.
   Proof. done. Qed.
-  Lemma tf_weakuntil_unfold N k v (P Q : @tf SI Σ Π) :
-    tf_weakuntil N k v P Q = (tf_until N k v P (Q ∨ ∃ k' v', tf_always N k' v' P))%F.
+  Lemma tf_weakuntil_unfold N k (P Q : @tf SI Σ Π) :
+    tf_weakuntil N k P Q = (tf_until N k P (Q ∨ ∃ k', tf_always N k' P))%F.
   Proof. rewrite tf_weakuntil_unseal. done. Qed.
-  Lemma tf_release_unfold N k v (P Q : @tf SI Σ Π) :
-    tf_release N k v P Q = (tf_weakuntil N k v Q (Q ∗ P))%F.
+  Lemma tf_release_unfold N k (P Q : @tf SI Σ Π) :
+    tf_release N k P Q = (tf_weakuntil N k Q (Q ∗ P))%F.
   Proof. done. Qed.
-  Lemma tf_strongrelease_unfold N k v (P Q : @tf SI Σ Π) :
-    tf_strongrelease N k v P Q = (tf_until N k v Q (Q ∗ P))%F.
+  Lemma tf_strongrelease_unfold N k (P Q : @tf SI Σ Π) :
+    tf_strongrelease N k P Q = (tf_until N k Q (Q ∗ P))%F.
   Proof. done. Qed.
 
 End reduction.

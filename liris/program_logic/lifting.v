@@ -2,7 +2,7 @@
 semantics to the program logic. *)
 
 From iris.proofmode Require Import proofmode.
-From liris.program_logic Require Export weakestpre.
+From liris.program_logic Require Export temporal_rules.
 (* From iris.prelude Require Import options. *)
 From liris.algebra Require Import ordinal_wfocm.
 

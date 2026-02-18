@@ -3,7 +3,7 @@ From iris.algebra Require Import gmap mono_nat.
 From iris.proofmode Require Import proofmode.
 (* From transfinite.base_logic Require Import lib.ghost_map. *)
 From liris.base_logic Require Export invariants.
-From liris.program_logic Require Export weakestpre.
+From liris.program_logic Require Export temporal_rules.
 From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
@@ -325,14 +325,15 @@ Section proof.
     iApply fupd_sfgupd_elim. iMod "close" as "_".
     iMod ("ACC2" with "Cljn1") as "_".
     iCombine "Gc Gcur" as "Gcur".
-    iMod (gl_lock _ _ ∅ _ _ _ _ _ _ (n + 1) _ _ _ _ True (cnt_lb r cj (n + 2)) (cnt_lb r cj (n + 2))
-           with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
-    1: lia. 1: set_solver.
+    iMod (gl_lock with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
+    1: set_solver.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     iPoseProof ("ACC2" with "[TG] Gcur Gw") as "ACC2".
     { rewrite delete_insert_id. 1: iFrame. done. }
+    iPoseProof ("ACC2" $! (n + 1) _) as "ACC2". iPoseProof ("ACC2" with "[]") as "ACC2".
+    1: iPureIntro; lia.
     iMod ("ACC2" $! _) as "((TG& %& Gc& #Glckn1& Gf& #Wckn1& _& _)& GVckn1& ACC2)".
-    iMod ("GVckn1" $! _ with "[//]") as "#GVckn1".
+    iMod ("GVckn1" $! _ True%I (cnt_lb r cj (n + 2))%I (cnt_lb r cj (n + 2))%I with "[//]") as "#GVckn1".
     iApply fupd_sfgupd_elim. iMod "close" as "_".
     iMod ("ACC2" with "Cljn1") as "_".
     iMod ("ACC" with "[LC Cs Caj2]") as "_".

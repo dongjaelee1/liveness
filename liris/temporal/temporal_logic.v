@@ -21,8 +21,8 @@ End aux.
 
 (** Part 1. Define some useful patterns corresponding to temporal properties. *)
 (* Always P *)
-Local Definition gl_always_def `{SI : indexT} `{@gupdGS SI Σ} N k v (P : iProp Σ) : iProp Σ :=
-  (gl_variant N k v ⌜ False ⌝ P ⌜ False ⌝)%I.
+Local Definition gl_always_def `{SI : indexT} `{@gupdGS SI Σ} N k (P : iProp Σ) : iProp Σ :=
+  (gl_variant N k 0 ⌜ False ⌝ P ⌜ False ⌝)%I.
 Local Definition gl_always_aux : seal (@gl_always_def). Proof. by eexists. Qed.
 Definition gl_always := gl_always_aux.(unseal).
 Local Definition gl_always_unseal :
@@ -30,8 +30,8 @@ Local Definition gl_always_unseal :
 Global Arguments gl_always {SI Σ _}.
 
 (* P Until Q *)
-Local Definition gl_until_def `{SI : indexT} `{@gupdGS SI Σ} N k v (P Q : iProp Σ) : iProp Σ :=
-  (gl_variant N k v P Q ⌜ True ⌝)%I.
+Local Definition gl_until_def `{SI : indexT} `{@gupdGS SI Σ} N k (P Q : iProp Σ) : iProp Σ :=
+  (gl_variant N k 0 P Q ⌜ True ⌝)%I.
 Local Definition gl_until_aux : seal (@gl_until_def). Proof. by eexists. Qed.
 Definition gl_until := gl_until_aux.(unseal).
 Local Definition gl_until_unseal :
@@ -39,8 +39,8 @@ Local Definition gl_until_unseal :
 Global Arguments gl_until {SI Σ _}.
 
 (* Eventually P *)
-Definition gl_eventually `{SI : indexT} `{@gupdGS SI Σ} N k v (P : iProp Σ) : iProp Σ :=
-  (gl_until N k v ⌜ True ⌝ P)%I.
+Definition gl_eventually `{SI : indexT} `{@gupdGS SI Σ} N k (P : iProp Σ) : iProp Σ :=
+  (gl_until N k ⌜ True ⌝ P)%I.
 Global Arguments gl_eventually {SI Σ _}.
 
 (* Local Definition gl_eventually_def `{SI : indexT} `{@gupdGS SI Σ} N k v (P : iProp Σ) : iProp Σ := *)
@@ -52,8 +52,8 @@ Global Arguments gl_eventually {SI Σ _}.
 (* Global Arguments gl_eventually {SI Σ _}. *)
 
 (* P Weak until Q *)
-Local Definition gl_weakuntil_def `{SI : indexT} `{@gupdGS SI Σ} N k v (P Q : iProp Σ) : iProp Σ :=
-  (gl_until N k v P (Q ∨ ∃ k' v', gl_always N k' v' P))%I.
+Local Definition gl_weakuntil_def `{SI : indexT} `{@gupdGS SI Σ} N k (P Q : iProp Σ) : iProp Σ :=
+  (gl_until N k P (Q ∨ ∃ k', gl_always N k' P))%I.
 Local Definition gl_weakuntil_aux : seal (@gl_weakuntil_def). Proof. by eexists. Qed.
 Definition gl_weakuntil := gl_weakuntil_aux.(unseal).
 Local Definition gl_weakuntil_unseal :
@@ -61,8 +61,8 @@ Local Definition gl_weakuntil_unseal :
 Global Arguments gl_weakuntil {SI Σ _}.
 
 (* P Release Q *)
-Definition gl_release `{SI : indexT} `{@gupdGS SI Σ} N k v (P Q : iProp Σ) : iProp Σ :=
-  (gl_weakuntil N k v Q (Q ∗ P))%I.
+Definition gl_release `{SI : indexT} `{@gupdGS SI Σ} N k (P Q : iProp Σ) : iProp Σ :=
+  (gl_weakuntil N k Q (Q ∗ P))%I.
 Global Arguments gl_release {SI Σ _}.
 
 (* Local Definition gl_release_def `{SI : indexT} `{@gupdGS SI Σ} N k v (P Q : iProp Σ) : iProp Σ := *)
@@ -74,8 +74,8 @@ Global Arguments gl_release {SI Σ _}.
 (* Global Arguments gl_release {SI Σ _}. *)
 
 (* P Strong release Q *)
-Definition gl_strongrelease `{SI : indexT} `{@gupdGS SI Σ} N k v (P Q : iProp Σ) : iProp Σ :=
-  (gl_until N k v Q (Q ∗ P))%I.
+Definition gl_strongrelease `{SI : indexT} `{@gupdGS SI Σ} N k (P Q : iProp Σ) : iProp Σ :=
+  (gl_until N k Q (Q ∗ P))%I.
 Global Arguments gl_strongrelease {SI Σ _}.
 
 (* Local Definition gl_strongrelease_def `{SI : indexT} `{@gupdGS SI Σ} N k v (P Q : iProp Σ) : iProp Σ := *)
@@ -97,46 +97,46 @@ Section proof.
     try rewrite /gl_release;
     try rewrite /gl_strongrelease.
 
-  Lemma gl_always_unfold N k v (P : iProp Σ) :
-    gl_always N k v P = (gl_variant N k v ⌜ False ⌝ P ⌜ False ⌝)%F.
+  Lemma gl_always_unfold N k (P : iProp Σ) :
+    gl_always N k P = (gl_variant N k 0 ⌜ False ⌝ P ⌜ False ⌝)%I.
   Proof. rewrite gl_always_unseal. done. Qed.
-  Lemma gl_until_unfold N k v (P Q : iProp Σ) :
-    gl_until N k v P Q = (gl_variant N k v P Q ⌜ True ⌝)%F.
+  Lemma gl_until_unfold N k (P Q : iProp Σ) :
+    gl_until N k P Q = (gl_variant N k 0 P Q ⌜ True ⌝)%I.
   Proof. rewrite gl_until_unseal. done. Qed.
-  Lemma gl_eventually_unfold N k v (P : iProp Σ) :
-    gl_eventually N k v P = (gl_until N k v ⌜ True ⌝ P)%F.
+  Lemma gl_eventually_unfold N k (P : iProp Σ) :
+    gl_eventually N k P = (gl_until N k ⌜ True ⌝ P)%I.
   Proof. done. Qed.
-  Lemma gl_weakuntil_unfold N k v (P Q : iProp Σ) :
-    gl_weakuntil N k v P Q = (gl_until N k v P (Q ∨ ∃ k' v', gl_always N k' v' P))%F.
+  Lemma gl_weakuntil_unfold N k (P Q : iProp Σ) :
+    gl_weakuntil N k P Q = (gl_until N k P (Q ∨ ∃ k', gl_always N k' P))%I.
   Proof. rewrite gl_weakuntil_unseal. done. Qed.
-  Lemma gl_release_unfold N k v (P Q : iProp Σ) :
-    gl_release N k v P Q = (gl_weakuntil N k v Q (Q ∗ P))%F.
+  Lemma gl_release_unfold N k (P Q : iProp Σ) :
+    gl_release N k P Q = (gl_weakuntil N k Q (Q ∗ P))%I.
   Proof. done. Qed.
-  Lemma gl_strongrelease_unfold N k v (P Q : iProp Σ) :
-    gl_strongrelease N k v P Q = (gl_until N k v Q (Q ∗ P))%F.
+  Lemma gl_strongrelease_unfold N k (P Q : iProp Σ) :
+    gl_strongrelease N k P Q = (gl_until N k Q (Q ∗ P))%I.
   Proof. done. Qed.
 
   (** Always *)
-  Global Instance gl_always_persistent N k v P : Persistent (gl_always N k v P).
+  Global Instance gl_always_persistent N k P : Persistent (gl_always N k P).
   Proof. unfold_temps. apply _. Qed.
-  Global Instance gl_always_contractive N k v : Contractive (gl_always N k v).
+  Global Instance gl_always_contractive N k : Contractive (gl_always N k).
   Proof. unfold_temps. apply _. Qed.
-  Global Instance gl_always_ne N k v : NonExpansive (gl_always N k v).
+  Global Instance gl_always_ne N k : NonExpansive (gl_always N k).
   Proof. apply _. Qed.
 
-  Lemma gl_always_alloc_0 Θ v :
-    ⊢ |=[Θ]=>g ∃ k, gl k v ∗ gl_current k v 1 ∗ gl_done k v ∗
-                   (∀ E N (P : iProp Σ), (▷ P) ={E}=∗ gl_always N k v P).
+  Lemma gl_always_alloc_0 Θ :
+    ⊢ |=[Θ]=>g ∃ k, gl k 0 ∗ gl_current k 0 1 ∗ gl_done k 0 ∗
+                   (∀ E N (P : iProp Σ), (▷ P) ={E}=∗ gl_always N k P).
   Proof.
     unfold_temps.
-    iMod (gl_alloc_done_0 _ (λ _, 0%ordi) 0%M v) as "(%& _& $& $& #Gd& _& _& _& H)".
+    iMod (gl_alloc_done_0 _ (λ _, 0%ordi) 0%M 0) as "(%& _& $& $& #Gd& _& _& _& H)".
     iModIntro. iFrame "Gd". iIntros (???). iApply "H".
   Qed.
 
-  Lemma gl_always_acc E N k v P :
+  Lemma gl_always_acc E N k P :
     ↑N ⊆ E →
-    gl_done k v -∗
-    gl_always N k v P ={E,E ∖ ↑N}=∗
+    gl_done k 0 -∗
+    gl_always N k P ={E,E ∖ ↑N}=∗
     (▷ (P)) ∗ ((▷ (P)) ={E ∖ ↑N,E}=∗ True).
   Proof.
     unfold_temps.
@@ -148,47 +148,47 @@ Section proof.
   Qed.
 
   (** Until *)
-  Global Instance gl_until_persistent N k v P Q : Persistent (gl_until N k v P Q).
+  Global Instance gl_until_persistent N k P Q : Persistent (gl_until N k P Q).
   Proof. unfold_temps. apply _. Qed.
-  Global Instance gl_until_contractive_1 N k v Q : Contractive (λ P, gl_until N k v P Q).
+  Global Instance gl_until_contractive_1 N k Q : Contractive (λ P, gl_until N k P Q).
   Proof. unfold_temps. apply _. Qed.
-  Global Instance gl_until_contractive_2 N k v P : Contractive (λ Q, gl_until N k v P Q).
+  Global Instance gl_until_contractive_2 N k P : Contractive (λ Q, gl_until N k P Q).
   Proof. unfold_temps. apply _. Qed.
-  Global Instance gl_until_ne_1 N k v Q : NonExpansive (λ P, gl_until N k v P Q).
+  Global Instance gl_until_ne_1 N k Q : NonExpansive (λ P, gl_until N k P Q).
   Proof. apply _. Qed.
-  Global Instance gl_until_ne_2 N k v P : NonExpansive (λ Q, gl_until N k v P Q).
+  Global Instance gl_until_ne_2 N k P : NonExpansive (λ Q, gl_until N k P Q).
   Proof. apply _. Qed.
 
-  Lemma gl_until_alloc_0 Θ i G q ℓ μ v :
+  Lemma gl_until_alloc_0 Θ i G q ℓ μ :
     th_obls i G q -∗
-    |=[Θ]=>g ∃ k, ⌜G !! k = None⌝ ∗ th_obls i (<[k:=v]> G) q ∗ gl_current k v (1 / 2) ∗ 
-                 gl_layers k (λ _, ℓ) ∗ gl k v ∗ gl_fuel k ℓ μ ∗ wit_layer k v ℓ ∗
-                 ([∗ set] u ∈ set_seq 0 v, gl_done k u) ∗
-                 ∀ E N (P Q : iProp Σ), ▷ P ={E}=∗ gl_until N k v P Q.
+    |=[Θ]=>g ∃ k, ⌜G !! k = None⌝ ∗ th_obls i (<[k:=0]> G) q ∗ gl_current k 0 (1 / 2) ∗ 
+                 gl_layers k (λ _, ℓ) ∗ gl k 0 ∗ gl_fuel k ℓ μ ∗ wit_layer k 0 ℓ ∗
+                 ([∗ set] u ∈ set_seq 0 0, gl_done k u) ∗
+                 ∀ E N (P Q : iProp Σ), ▷ P ={E}=∗ gl_until N k P Q.
   Proof.
     unfold_temps.
-    iIntros "TG". iMod (gl_alloc_obl_0 _ _ _ _ (λ _, ℓ) μ v with "TG") as "(%& $& $& $& $& $& $& $& $& H)".
+    iIntros "TG". iMod (gl_alloc_obl_0 _ _ _ _ (λ _, ℓ) μ 0 with "TG") as "(%& $& $& $& $& $& $& $& $& H)".
     iIntros "!> %%%%". iApply "H".
   Qed.
 
-  Lemma gl_until_done_alloc_0 Θ v :
-    ⊢ |=[Θ]=>g ∃ k, gl k v ∗ gl_current k v 1 ∗ gl_done k v ∗
-                   (∀ E N (P Q : iProp Σ), ▷ Q ={E}=∗ gl_until N k v P Q).
+  Lemma gl_until_done_alloc_0 Θ :
+    ⊢ |=[Θ]=>g ∃ k, gl k 0 ∗ gl_current k 0 1 ∗ gl_done k 0 ∗
+                   (∀ E N (P Q : iProp Σ), ▷ Q ={E}=∗ gl_until N k P Q).
   Proof.
     unfold_temps.
-    iMod (gl_alloc_done_0 _ (λ _, 0%ordi) 0%M v) as "(%& _& $& $& $& _& _& _& H)".
+    iMod (gl_alloc_done_0 _ (λ _, 0%ordi) 0%M 0) as "(%& _& $& $& $& _& _& _& H)".
     iIntros "!> %%%%". iApply "H".
   Qed.
 
-  Lemma gl_until_fulfill_0 E i G q N k v (P Q : iProp Σ) :
+  Lemma gl_until_fulfill_0 E i G q N k (P Q : iProp Σ) :
     ↑N ⊆ E →
-    G !! k = Some v →
+    G !! k = Some 0 →
     th_obls i G q -∗
-    gl_until N k v P Q ={E,E ∖ ↑N}=∗
-    (▷ (th_obls i G q ∗ gl_locked k v ∗ P)) ∗
+    gl_until N k P Q ={E,E ∖ ↑N}=∗
+    (▷ (th_obls i G q ∗ gl_locked k 0 ∗ P)) ∗
     (th_obls i G q -∗
-     gl_locked k v -∗
-     ∀ Θ, |=[Θ]=>g (th_obls i (delete k G) q ∗ gl_current k v (1 / 2) ∗ gl_done k v) ∗
+     gl_locked k 0 -∗
+     ∀ Θ, |=[Θ]=>g (th_obls i (delete k G) q ∗ gl_current k 0 (1 / 2) ∗ gl_done k 0) ∗
                 (▷ Q ={E ∖ ↑N,E}=∗ True)).
   Proof.
     unfold_temps.
@@ -196,128 +196,128 @@ Section proof.
     eauto.
   Qed.
 
-  Lemma gl_until_retrieve_0 E N k v q (P Q : iProp Σ) :
+  Lemma gl_until_retrieve_0 E N k q (P Q : iProp Σ) :
     ↑N ⊆ E →
-    gl_current k v q -∗
-    gl_done k v -∗
-    gl_until N k v P Q ={E,E ∖ ↑N}=∗
-    (▷ (gl_current k v q ∗ Q)) ∗
-    (gl_current k v 1 -∗
-     ∀ Θ, |=[Θ]=>g (gl k (S v) ∗ gl_done k (S v) ∗ gl_current k (S v) 1) ∗
-                (∀ E0, |={E0}=> gl_variant N k (S v) ⌜ False ⌝ ⌜ True ⌝ ⌜ False ⌝) ∗
+    gl_current k 0 q -∗
+    gl_done k 0 -∗
+    gl_until N k P Q ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k 0 q ∗ Q)) ∗
+    (gl_current k 0 1 -∗
+     ∀ Θ, |=[Θ]=>g (gl k (S 0) ∗ gl_done k (S 0) ∗ gl_current k (S 0) 1) ∗
+                (∀ E0, |={E0}=> gl_variant N k (S 0) ⌜ False ⌝ ⌜ True ⌝ ⌜ False ⌝) ∗
                 (|={E ∖ ↑N,E}=> True)).
   Proof.
     unfold_temps.
     iIntros (MASK) "Gc #Gd #GV". iMod (gl_new_version_0 with "Gc Gd GV") as "[$ H]". 1: eauto.
-    iIntros "!> Gc %". iPoseProof ("H" with "Gc") as "H". iPoseProof ("H" $! (S v) with "[]") as "H".
+    iIntros "!> Gc %". iPoseProof ("H" with "Gc") as "H". iPoseProof ("H" $! (S 0) with "[]") as "H".
     1: iPureIntro; lia.
     iMod ("H" $! _) as "(($& $& $& _)& A& B)". iModIntro. iSplitL "A".
     - iIntros (?). by iApply "A".
     - by iApply "B".
   Qed.
 
-  Lemma gl_until_acc_own E i G q N k v P Q :
+  Lemma gl_until_acc_own E i G q N k P Q :
     ↑N ⊆ E →
-    G !! k = Some v →
+    G !! k = Some 0 →
     th_obls i G q -∗
-    gl_until N k v P Q ={E,E ∖ ↑N}=∗
-    ▷ (th_obls i G q ∗ gl_locked k v ∗ P) ∗
-    (▷ gl_variant_cases k v P Q (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
+    gl_until N k P Q ={E,E ∖ ↑N}=∗
+    ▷ (th_obls i G q ∗ gl_locked k 0 ∗ P) ∗
+    (▷ gl_variant_cases k 0 P Q (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
   Proof.
     unfold_temps.
     iIntros (MASK Lu) "TG #GV". iMod (gl_variant_acc_own with "TG GV") as "[$ $]". all: auto.
   Qed.
 
-  Lemma gl_until_acc_current E N k v q P Q :
+  Lemma gl_until_acc_current E N k q P Q :
     ↑N ⊆ E →
-    gl_current k v q -∗
-    gl_until N k v P Q ={E,E ∖ ↑N}=∗
-    (▷ (gl_current k v q ∗ (gl_locked k v ∗ P ∨ gl_done k v ∗ Q))) ∗
-    (▷ gl_variant_cases k v P Q (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
+    gl_current k 0 q -∗
+    gl_until N k P Q ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k 0 q ∗ (gl_locked k 0 ∗ P ∨ gl_done k 0 ∗ Q))) ∗
+    (▷ gl_variant_cases k 0 P Q (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
   Proof.
     unfold_temps.
     iIntros (MASK) "Gc #GV". iMod (gl_variant_acc_current_timeless with "Gc GV") as "[$ $]". all: auto.
   Qed.
 
-  Lemma gl_until_acc_current_done E N k v q P Q :
+  Lemma gl_until_acc_current_done E N k q P Q :
     ↑N ⊆ E →
-    gl_current k v q -∗
-    gl_done k v -∗
-    gl_until N k v P Q ={E,E ∖ ↑N}=∗
-    (▷ (gl_current k v q ∗ Q)) ∗
-    (▷ gl_variant_cases k v P Q (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
+    gl_current k 0 q -∗
+    gl_done k 0 -∗
+    gl_until N k P Q ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k 0 q ∗ Q)) ∗
+    (▷ gl_variant_cases k 0 P Q (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
   Proof.
     unfold_temps.
     iIntros (MASK) "Gc #Gd #GV". iMod (gl_variant_acc_current_done_timeless with "Gc Gd GV") as "[$ $]". all: auto.
   Qed.
 
-  (* Weak Until *)
-  Global Instance gl_weakuntil_persistent N k v P Q : Persistent (gl_weakuntil N k v P Q).
+  (** Weak Until *)
+  Global Instance gl_weakuntil_persistent N k P Q : Persistent (gl_weakuntil N k P Q).
   Proof. unfold_temps. apply _. Qed.
-  Global Instance gl_weakuntil_contractive_1 N k v Q : Contractive (λ P, gl_weakuntil N k v P Q).
+  Global Instance gl_weakuntil_contractive_1 N k Q : Contractive (λ P, gl_weakuntil N k P Q).
   Proof.
     (* FIXME: better proof? *)
     unfold_temps. repeat intro. rewrite gl_until_contractive_1; last eauto.
     apply gl_until_contractive_2. econstructor. intros. inv H. specialize (dist_later_lt _ H0).
     solve_proper.
   Qed.
-  Global Instance gl_weakuntil_contractive_2 N k v P : Contractive (λ Q, gl_weakuntil N k v P Q).
+  Global Instance gl_weakuntil_contractive_2 N k P : Contractive (λ Q, gl_weakuntil N k P Q).
   Proof.
     (* FIXME: better proof? *)
     unfold_temps. repeat intro.
     apply gl_until_contractive_2. econstructor. intros. inv H. specialize (dist_later_lt _ H0).
     solve_proper.
   Qed.
-  Global Instance gl_weakuntil_ne_1 N k v Q : NonExpansive (λ P, gl_weakuntil N k v P Q).
+  Global Instance gl_weakuntil_ne_1 N k Q : NonExpansive (λ P, gl_weakuntil N k P Q).
   Proof. apply _. Qed.
-  Global Instance gl_weakuntil_ne_2 N k v P : NonExpansive (λ Q, gl_weakuntil N k v P Q).
+  Global Instance gl_weakuntil_ne_2 N k P : NonExpansive (λ Q, gl_weakuntil N k P Q).
   Proof. apply _. Qed.
 
-  Lemma gl_weakuntil_alloc_0 Θ i G q ℓ μ v :
+  Lemma gl_weakuntil_alloc_0 Θ i G q ℓ μ :
     th_obls i G q -∗
-    |=[Θ]=>g ∃ k, ⌜G !! k = None⌝ ∗ th_obls i (<[k:=v]> G) q ∗ gl_current k v (1 / 2) ∗ 
-                 gl_layers k (λ _, ℓ) ∗ gl k v ∗ gl_fuel k ℓ μ ∗ wit_layer k v ℓ ∗
-                 ([∗ set] u ∈ set_seq 0 v, gl_done k u) ∗
-                 (∀ E N (P Q : iProp Σ), ▷ P ={E}=∗ gl_weakuntil N k v P Q).
+    |=[Θ]=>g ∃ k, ⌜G !! k = None⌝ ∗ th_obls i (<[k:=0]> G) q ∗ gl_current k 0 (1 / 2) ∗ 
+                 gl_layers k (λ _, ℓ) ∗ gl k 0 ∗ gl_fuel k ℓ μ ∗ wit_layer k 0 ℓ ∗
+                 ([∗ set] u ∈ set_seq 0 0, gl_done k u) ∗
+                 (∀ E N (P Q : iProp Σ), ▷ P ={E}=∗ gl_weakuntil N k P Q).
   Proof.
     unfold_temps.
-    iIntros "TG". iMod (gl_until_alloc_0 _ _ _ _ ℓ μ v with "TG") as "(%& $& $& $& $& $& $& $& $& H)".
+    iIntros "TG". iMod (gl_until_alloc_0 _ _ _ _ ℓ μ with "TG") as "(%& $& $& $& $& $& $& $& $& H)".
     iIntros "!> %%%%". iApply "H".
   Qed.
 
-  Lemma gl_weakuntil_done_alloc_0 Θ v :
-    ⊢ |=[Θ]=>g ∃ k, gl k v ∗ gl_current k v 1 ∗ gl_done k v ∗
-                   (∀ E N (P Q : iProp Σ), ▷ (Q ∨ ∃ k' v', gl_always N k' v' P) ={E}=∗ gl_weakuntil N k v P Q).
+  Lemma gl_weakuntil_done_alloc_0 Θ :
+    ⊢ |=[Θ]=>g ∃ k, gl k 0 ∗ gl_current k 0 1 ∗ gl_done k 0 ∗
+                   (∀ E N (P Q : iProp Σ), ▷ (Q ∨ ∃ k', gl_always N k' P) ={E}=∗ gl_weakuntil N k P Q).
   Proof.
-    iMod (gl_until_done_alloc_0 _ v) as "(%& $& $& $& H)".
+    iMod (gl_until_done_alloc_0) as "(%& $& $& $& H)".
     iIntros "!> %%%%". rewrite gl_weakuntil_unfold. iApply "H".
   Qed.
 
-  Lemma gl_weakuntil_fulfill_0 E i G q N k v (P Q : iProp Σ) :
+  Lemma gl_weakuntil_fulfill_0 E i G q N k (P Q : iProp Σ) :
     ↑N ⊆ E →
-    G !! k = Some v →
+    G !! k = Some 0 →
     th_obls i G q -∗
-    gl_weakuntil N k v P Q ={E,E ∖ ↑N}=∗
-    (▷ (th_obls i G q ∗ gl_locked k v ∗ P)) ∗
+    gl_weakuntil N k P Q ={E,E ∖ ↑N}=∗
+    (▷ (th_obls i G q ∗ gl_locked k 0 ∗ P)) ∗
     (th_obls i G q -∗
-     gl_locked k v -∗
-     ∀ Θ, |=[Θ]=>g (th_obls i (delete k G) q ∗ gl_current k v (1 / 2) ∗ gl_done k v) ∗
-                (▷ (Q ∨ ∃ k' v', gl_always N k' v' P) ={E ∖ ↑N,E}=∗ True)).
+     gl_locked k 0 -∗
+     ∀ Θ, |=[Θ]=>g (th_obls i (delete k G) q ∗ gl_current k 0 (1 / 2) ∗ gl_done k 0) ∗
+                (▷ (Q ∨ ∃ k', gl_always N k' P) ={E ∖ ↑N,E}=∗ True)).
   Proof.
     rewrite gl_weakuntil_unfold.
     iIntros (MASK LU) "TG #GV". iMod (gl_until_fulfill_0 with "TG GV") as "[$ ACC]". 1,2: auto.
     eauto.
   Qed.
 
-  Lemma gl_weakuntil_retrieve_0 E N k v q (P Q : iProp Σ) :
+  Lemma gl_weakuntil_retrieve_0 E N k q (P Q : iProp Σ) :
     ↑N ⊆ E →
-    gl_current k v q -∗
-    gl_done k v -∗
-    gl_weakuntil N k v P Q ={E,E ∖ ↑N}=∗
-    (▷ (gl_current k v q ∗ (Q ∨ ∃ k' v', gl_always N k' v' P))) ∗
-    (gl_current k v 1 -∗
-     ∀ Θ, |=[Θ]=>g (gl k (S v) ∗ gl_done k (S v) ∗ gl_current k (S v) 1) ∗
-                (∀ E0, |={E0}=> gl_variant N k (S v) ⌜ False ⌝ ⌜ True ⌝ ⌜ False ⌝) ∗
+    gl_current k 0 q -∗
+    gl_done k 0 -∗
+    gl_weakuntil N k P Q ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k 0 q ∗ (Q ∨ ∃ k', gl_always N k' P))) ∗
+    (gl_current k 0 1 -∗
+     ∀ Θ, |=[Θ]=>g (gl k (S 0) ∗ gl_done k (S 0) ∗ gl_current k (S 0) 1) ∗
+                (∀ E0, |={E0}=> gl_variant N k (S 0) ⌜ False ⌝ ⌜ True ⌝ ⌜ False ⌝) ∗
                 (|={E ∖ ↑N,E}=> True)).
   Proof.
     rewrite gl_weakuntil_unfold.
@@ -325,36 +325,36 @@ Section proof.
     eauto.
   Qed.
 
-  Lemma gl_weakuntil_acc_own E i G q N k v P Q :
+  Lemma gl_weakuntil_acc_own E i G q N k P Q :
     ↑N ⊆ E →
-    G !! k = Some v →
+    G !! k = Some 0 →
     th_obls i G q -∗
-    gl_weakuntil N k v P Q ={E,E ∖ ↑N}=∗
-    ▷ (th_obls i G q ∗ gl_locked k v ∗ P) ∗
-    (▷ gl_variant_cases k v P (Q ∨ ∃ k' v', gl_always N k' v' P) (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
+    gl_weakuntil N k P Q ={E,E ∖ ↑N}=∗
+    ▷ (th_obls i G q ∗ gl_locked k 0 ∗ P) ∗
+    (▷ gl_variant_cases k 0 P (Q ∨ ∃ k', gl_always N k' P) (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
   Proof.
     rewrite gl_weakuntil_unfold.
     iIntros (MASK Lu) "TG #GV". iMod (gl_until_acc_own with "TG GV") as "[$ $]". all: auto.
   Qed.
 
-  Lemma gl_weakuntil_acc_current E N k v q P Q :
+  Lemma gl_weakuntil_acc_current E N k q P Q :
     ↑N ⊆ E →
-    gl_current k v q -∗
-    gl_weakuntil N k v P Q ={E,E ∖ ↑N}=∗
-    (▷ (gl_current k v q ∗ (gl_locked k v ∗ P ∨ gl_done k v ∗ (Q ∨ ∃ k' v', gl_always N k' v' P)))) ∗
-    (▷ gl_variant_cases k v P (Q ∨ ∃ k' v', gl_always N k' v' P) (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
+    gl_current k 0 q -∗
+    gl_weakuntil N k P Q ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k 0 q ∗ (gl_locked k 0 ∗ P ∨ gl_done k 0 ∗ (Q ∨ ∃ k', gl_always N k' P)))) ∗
+    (▷ gl_variant_cases k 0 P (Q ∨ ∃ k', gl_always N k' P) (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
   Proof.
     rewrite gl_weakuntil_unfold.
     iIntros (MASK) "Gc #GV". iMod (gl_until_acc_current with "Gc GV") as "[$ $]". all: auto.
   Qed.
 
-  Lemma gl_weakuntil_acc_current_done E N k v q P Q :
+  Lemma gl_weakuntil_acc_current_done E N k q P Q :
     ↑N ⊆ E →
-    gl_current k v q -∗
-    gl_done k v -∗
-    gl_weakuntil N k v P Q ={E,E ∖ ↑N}=∗
-    (▷ (gl_current k v q ∗ (Q ∨ ∃ k' v', gl_always N k' v' P))) ∗
-    (▷ gl_variant_cases k v P (Q ∨ ∃ k' v', gl_always N k' v' P) (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
+    gl_current k 0 q -∗
+    gl_done k 0 -∗
+    gl_weakuntil N k P Q ={E,E ∖ ↑N}=∗
+    (▷ (gl_current k 0 q ∗ (Q ∨ ∃ k', gl_always N k' P))) ∗
+    (▷ gl_variant_cases k 0 P (Q ∨ ∃ k', gl_always N k' P) (⌜ True ⌝)%I ={E ∖ ↑N,E}=∗ True).
   Proof.
     rewrite gl_weakuntil_unfold.
     iIntros (MASK) "Gc #Gd #GV". iMod (gl_until_acc_current_done with "Gc Gd GV") as "[$ $]". all: auto.
@@ -429,27 +429,27 @@ Section reduction.
     ⟦tf_variant N k v P Q R⟧ₗ = (gl_variant N k v ⟦P⟧ₗ ⟦Q⟧ₗ ⟦R⟧ₗ)%I.
   Proof. done. Qed.
 
-  Lemma tf_always_interp_logic N k v P :
-    ⟦tf_always N k v P⟧ₗ = gl_always N k v ⟦P⟧ₗ.
+  Lemma tf_always_interp_logic N k P :
+    ⟦tf_always N k P⟧ₗ = gl_always N k ⟦P⟧ₗ.
   Proof. rewrite tf_always_unfold gl_always_unfold. done. Qed.
-  Lemma tf_until_interp_logic N k v P Q :
-    ⟦tf_until N k v P Q⟧ₗ = gl_until N k v ⟦P⟧ₗ ⟦Q⟧ₗ.
+  Lemma tf_until_interp_logic N k P Q :
+    ⟦tf_until N k P Q⟧ₗ = gl_until N k ⟦P⟧ₗ ⟦Q⟧ₗ.
   Proof. rewrite tf_until_unfold gl_until_unfold. done. Qed.
-  Lemma tf_eventually_interp_logic N k v P :
-    ⟦tf_eventually N k v P⟧ₗ = gl_eventually N k v ⟦P⟧ₗ.
+  Lemma tf_eventually_interp_logic N k P :
+    ⟦tf_eventually N k P⟧ₗ = gl_eventually N k ⟦P⟧ₗ.
   Proof. rewrite tf_eventually_unfold gl_eventually_unfold tf_until_interp_logic. done. Qed.
-  Lemma tf_weakuntil_interp_logic N k v P Q :
-    ⟦tf_weakuntil N k v P Q⟧ₗ = gl_weakuntil N k v ⟦P⟧ₗ ⟦Q⟧ₗ.
+  Lemma tf_weakuntil_interp_logic N k P Q :
+    ⟦tf_weakuntil N k P Q⟧ₗ = gl_weakuntil N k ⟦P⟧ₗ ⟦Q⟧ₗ.
   Proof.
     rewrite tf_weakuntil_unfold gl_weakuntil_unfold tf_until_interp_logic. simpl.
     rewrite temporal_formula.tf_always_unseal /temporal_formula.tf_always_def.
     rewrite gl_always_unseal /gl_always_def. simpl. done.
   Qed.
-  Lemma tf_release_interp_logic N k v P Q :
-    ⟦tf_release N k v P Q⟧ₗ = gl_release N k v ⟦P⟧ₗ ⟦Q⟧ₗ.
+  Lemma tf_release_interp_logic N k P Q :
+    ⟦tf_release N k P Q⟧ₗ = gl_release N k ⟦P⟧ₗ ⟦Q⟧ₗ.
   Proof. rewrite tf_release_unfold gl_release_unfold tf_weakuntil_interp_logic. done. Qed.
-  Lemma tf_strongrelease_interp_logic N k v P Q :
-    ⟦tf_strongrelease N k v P Q⟧ₗ = gl_strongrelease N k v ⟦P⟧ₗ ⟦Q⟧ₗ.
+  Lemma tf_strongrelease_interp_logic N k P Q :
+    ⟦tf_strongrelease N k P Q⟧ₗ = gl_strongrelease N k ⟦P⟧ₗ ⟦Q⟧ₗ.
   Proof. rewrite tf_strongrelease_unfold gl_strongrelease_unfold tf_until_interp_logic. done. Qed.
 
 End reduction.

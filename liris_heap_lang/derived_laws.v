@@ -94,8 +94,10 @@ Proof.
   rewrite /array. iInduction n as [|n' IH] forall (l); simpl.
   { done. }
   iIntros "[$ Hl]". rewrite -fmap_S_seq big_sepL_fmap.
-  setoid_rewrite Nat2Z.inj_succ. setoid_rewrite <-Z.add_1_l.
-  setoid_rewrite <-Loc.add_assoc. iApply "IH". done.
+  iApply big_sepL_proper.
+  2:{ iApply "IH". iApply (big_sepL_impl with "Hl").
+      iIntros "!> %% %". rewrite Nat2Z.inj_succ -Z.add_1_l -Loc.add_assoc. iIntros "$". }
+  intros. rewrite Nat2Z.inj_succ -Z.add_1_l -Loc.add_assoc. done.
 Qed.
 
 Lemma lwp_allocN G R o s q i E v n :

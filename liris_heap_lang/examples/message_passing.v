@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From liris.base_logic Require Export invariants.
-From liris.program_logic Require Export weakestpre.
+From liris.program_logic Require Export temporal_rules.
 From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
