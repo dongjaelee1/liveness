@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 (* Only to import rc; FIXME : refactor *)
 From transfinite.stepindex Require Import utils.
-From liris.algebra Require Export wfocm auth_mra.
+From liris.algebra Require Export wfocm.
 
 (* FIXME : Move to somewhere else *)
 Lemma sn_tc {X} (R : X → X → Prop) (x : X): sn R x ↔ sn (tc R) x.
@@ -17,44 +17,42 @@ Class ghost_lock_class := {
     ghost_lock_fuel : Type;
     #[global] ghost_lock_fuel_wfocm :: WFOCM.pack ghost_lock_fuel;
   }.
-Definition ghost_lock_version := nat.
-(* We assume that thread id is positive *)
+(** We assume that the thread id is positive *)
 Definition ghost_lock_owner := positive.
 
-Variant ghost_lock_state `{GL : ghost_lock_class} : Type :=
+Variant ghost_lock `{GL : ghost_lock_class} : Type :=
   | ghost_lock_locked (fuel : ghost_lock_fuel) (owner : ghost_lock_owner)
   | ghost_lock_unlocked
+  | ghost_lock_retired
 .
-Definition ghost_lock `{GL : ghost_lock_class} : Type := ghost_lock_version * ghost_lock_state.
+
+(* Step relations. *)
+Variant ghost_lock_progress `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
+  | ghost_lock_progress_intro f1 f2 o1 o2 (LTf : f2 w< f1) :
+    ghost_lock_progress (ghost_lock_locked f1 o1) (ghost_lock_locked f2 o2).
+
+Variant ghost_lock_unlock `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
+  | ghost_lock_unlock_intro f o :
+    ghost_lock_unlock (ghost_lock_locked f o) (ghost_lock_unlocked).
+
+Variant ghost_lock_retire `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
+  | ghost_lock_retire_intro :
+    ghost_lock_retire (ghost_lock_unlocked) (ghost_lock_retired).
 
 Variant ghost_lock_step `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
-  | ghost_lock_progress
-      ver fuel1 fuel2 owner1 owner2
-      (LTfuel : fuel2 w< fuel1)
-    :
-    ghost_lock_step (ver, ghost_lock_locked fuel1 owner1) (ver, ghost_lock_locked fuel2 owner2)
-  | ghost_lock_unlock
-      ver fuel owner
-    :
-    ghost_lock_step (ver, ghost_lock_locked fuel owner) (ver, ghost_lock_unlocked)
-  | ghost_lock_lock
-      ver1 ver2 fuel owner
-      (GTver : (ver1 < ver2)%nat)
-    :
-    ghost_lock_step (ver1, ghost_lock_unlocked) (ver2, ghost_lock_locked fuel owner)
-  | ghost_lock_new_version
-      ver1 ver2
-      (GTver : (ver1 < ver2)%nat)
-    :
-    ghost_lock_step (ver1, ghost_lock_unlocked) (ver2, ghost_lock_unlocked)
-.
+  | ghost_lock_step_progress g1 g2 :
+    ghost_lock_progress g1 g2 → ghost_lock_step g1 g2
+  | ghost_lock_step_unlock g1 g2 :
+    ghost_lock_unlock g1 g2 → ghost_lock_step g1 g2
+  | ghost_lock_step_retire g1 g2 :
+    ghost_lock_retire g1 g2 → ghost_lock_step g1 g2.
 
 Definition ghost_lock_keep `{GL : ghost_lock_class} : ghost_lock → ghost_lock → Prop :=
-  λ '(v1, g1) '(v2, g2),
-    (v1 = v2) ∧
+  λ g1 g2,
     match g1, g2 with
     | (ghost_lock_locked _ _), (ghost_lock_locked _ _) => True
     | (ghost_lock_unlocked), (ghost_lock_unlocked) => True
+    | (ghost_lock_retired), (ghost_lock_retired) => True
     | _, _ => False
     end.
 
@@ -70,9 +68,7 @@ Definition gls_one `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Pr
 Infix "↪₁" := (gls_one) (at level 20).
 
 Definition gls_alloc `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
-  λ Ω1 Ω2, ∃ k v, (Ω1 !! k = None) ∧
-                  ((∃ a t, Ω2 = <[k:=(v, ghost_lock_locked a t)]> Ω1) ∨
-                     (Ω2 = <[k:=(v, ghost_lock_unlocked)]> Ω1)).
+  λ Ω1 Ω2, ∃ k, (Ω1 !! k = None) ∧ (∃ g, Ω2 = <[k:=g]> Ω1).
 Infix "↪ₐ" := (gls_alloc) (at level 20).
 
 Variant gls_step `{GL : ghost_lock_class} : ghost_locks → ghost_locks → Prop :=
@@ -97,9 +93,9 @@ Definition gl_rel_preserves_cond `{GL : ghost_lock_class} (C : gl_cond) (R : gho
 
 (* Some useful gl_conds *)
 Definition gl_cond_owner `{GL : ghost_lock_class} (i : ghost_lock_owner) : gl_cond :=
-  λ _ g, match g with | (_, ghost_lock_locked _ j) => (j = i) | _ => False end.
+  λ _ g, match g with | (ghost_lock_locked _ j) => (j = i) | _ => False end.
 Global Instance gl_cond_owner_dec `{GL : ghost_lock_class} : ∀ i k g, Decision (gl_cond_owner i k g).
-Proof using. intros. rewrite /gl_cond_owner. destruct g. destruct g0; solve_decision. Qed.
+Proof using. intros. rewrite /gl_cond_owner. destruct g; solve_decision. Qed.
 
 Definition gl_cond_one `{GL : ghost_lock_class} (v : gl_id) : gl_cond :=
   λ k _, k = v.
@@ -119,7 +115,7 @@ Definition gls_cond_progress `{GL : ghost_lock_class} (C : gl_cond) : ghost_lock
   λ Ω1 Ω2, (Ω1 ↪ₛ Ω2 | C) ∧ gls_keep Ω1 Ω2.
 Notation "A ↪ₚ B | C" := (gls_cond_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
 
-Section ghost_locks.
+Section proofs.
   Context `{GL : ghost_lock_class}.
 
   (** Properties *)
@@ -207,7 +203,7 @@ Section ghost_locks.
   (** For progress *)
   Global Instance ghost_lock_keep_transitive : Transitive ghost_lock_keep.
   Proof using.
-    repeat intro. destruct x, y, z. inv H. inv H0. destruct g0, g2, g4; simpl in *; subst; try done.
+    repeat intro. destruct x, y, z; inv H; inv H0. all: econstructor.
   Qed.
   Global Instance gls_keep_transitive : Transitive gls_keep.
   Proof using.
@@ -218,98 +214,11 @@ Section ghost_locks.
 
   Global Instance ghost_lock_keep_reflexive : Reflexive ghost_lock_keep.
   Proof using.
-    repeat intro. destruct x. destruct g0; simpl in *; subst; try done.
+    repeat intro. destruct x; simpl in *; subst; try done.
   Qed.
   Global Instance gls_keep_reflexive : Reflexive gls_keep.
   Proof using.
     repeat intro. destruct (x !! i) eqn:Hx; try done.
   Qed.
 
-End ghost_locks.
-
-(* (** Witness of each version *) *)
-(* Definition gl_witness `{GL : ghost_lock_class} : Type := ghost_lock_version → ghost_lock_fuel. *)
-
-(* Fixpoint gl_witness_sum_len `{GL : ghost_lock_class} (ξ : gl_witness) (v : ghost_lock_version) (n : nat) : ghost_lock_fuel := *)
-(*   match n with *)
-(*   | O => wzero *)
-(*   | S m => (ξ v) w+ (gl_witness_sum_len ξ (S v) m) *)
-(*   end. *)
-(* Notation "'Σ[' ξ ']' [ v , n ]" := (gl_witness_sum_len ξ v n) (at level 20, format "Σ[ ξ ] [ v ,  n ]"). *)
-
-(* Definition gl_witness_sum_gen `{GL : ghost_lock_class} (ξ : gl_witness) (v1 v2 : ghost_lock_version) : ghost_lock_fuel := *)
-(*   Σ[ξ][v1, S (v2 - v1)]. *)
-(* Notation "'Σ[' ξ ']' { v1 , v2 } " := (gl_witness_sum_gen ξ v1 v2) (at level 20, format "Σ[ ξ ] { v1 ,  v2 }"). *)
-
-(* Fixpoint gl_witness_sum `{GL : ghost_lock_class} (ξ : gl_witness) (v : ghost_lock_version) : ghost_lock_fuel := *)
-(*   match v with *)
-(*   | O => ξ v *)
-(*   | S u => (gl_witness_sum ξ u) w+ (ξ v) *)
-(*   end. *)
-(* Notation "'Σ[' ξ ']' v" := (gl_witness_sum ξ v) (at level 20, format "Σ[ ξ ]  v"). *)
-
-(* Definition gl_witness_constant `{GL : ghost_lock_class} (c : ghost_lock_fuel) : gl_witness := λ _, c. *)
-
-(* Section witfun. *)
-(*   Context `{GL : ghost_lock_class}. *)
-
-(*   Lemma gl_witness_sum_len_S ξ v n : Σ[ξ][v, S n] = ((ξ v) w+ Σ[ξ][S v, n]). *)
-(*   Proof using. done. Qed. *)
-
-(*   Lemma gl_witness_sum_len_start_end ξ v n : (Σ[ξ][v, n] w+ ξ (v + n)) w= (ξ v w+ Σ[ξ][S v, n]). *)
-(*   Proof using. *)
-(*     revert v. induction n; intros. *)
-(*     { simpl. replace (v + 0) with v by lia. rewrite comm. done. } *)
-(*     rewrite !gl_witness_sum_len_S. replace (v + S n) with ((S v) + n) by lia. *)
-(*     rewrite -assoc. rewrite (IHn (S v)). done. *)
-(*   Qed. *)
-
-(*   Lemma gl_witness_sum_gen_S ξ v1 v2 : *)
-(*     v1 ≤ v2 → *)
-(*     Σ[ξ]{v1, S v2} w= ((ξ (S v2)) w+ Σ[ξ]{v1, v2}). *)
-(*   Proof using. *)
-(*     intros LE. *)
-(*     rewrite /gl_witness_sum_gen gl_witness_sum_len_S. *)
-(*     replace (S v2 - v1) with (S (v2 - v1)) by lia. *)
-(*     rewrite -(gl_witness_sum_len_start_end _ v1 (S (v2 - v1))). *)
-(*     replace (v1 + S (v2 - v1)) with (S v2) by lia. *)
-(*     rewrite comm. done. *)
-(*   Qed. *)
-
-(*   Lemma gl_witness_sum_gen_eq ξ v : *)
-(*     Σ[ξ]{v, v} w= ξ v. *)
-(*   Proof using. *)
-(*     rewrite /gl_witness_sum_gen. replace (S (v - v)) with (S O) by lia. *)
-(*     simpl. rewrite right_id. done. *)
-(*   Qed. *)
-
-(*   Lemma gl_witness_sum_S ξ v *)
-(*     : Σ[ξ] (S v) = ((Σ[ξ] v) w+ (ξ (S v))). *)
-(*   Proof using. done. Qed. *)
-
-(*   Lemma gl_witness_sum_gen_sum_equiv ξ v : Σ[ξ] v w= Σ[ξ] {0, v}. *)
-(*   Proof using. *)
-(*     induction v; unfold gl_witness_sum_gen. *)
-(*     { simpl. rewrite right_id. done. } *)
-(*     rewrite gl_witness_sum_S IHv. rewrite gl_witness_sum_len_S. *)
-(*     unfold gl_witness_sum_gen. *)
-(*     replace (S (v - 0)) with (S v) by lia. replace (S v - 0) with (S v) by lia. *)
-(*     rewrite gl_witness_sum_len_start_end. done. *)
-(*   Qed. *)
-
-(*   Lemma gl_witness_sum_gen_sum_equiv_add ξ v1 v2 : *)
-(*     (v1 < v2) → *)
-(*     Σ[ξ] v2 w= (Σ[ξ] v1 w+ Σ[ξ] {S v1, v2}). *)
-(*   Proof using. *)
-(*     revert v1. induction v2; intros. *)
-(*     { lia. } *)
-(*     destruct (decide (v1 < v2)). *)
-(*     { clear H. specialize (IHv2 _ l). rewrite gl_witness_sum_S IHv2. *)
-(*       rewrite (gl_witness_sum_gen_S _ (S v1) v2); last lia. *)
-(*       rewrite (comm _ (ξ (S v2)) (Σ[ξ]{S v1, v2})) assoc. done. *)
-(*     } *)
-(*     assert (v1 = v2) by lia. subst. clear n H. rewrite gl_witness_sum_gen_eq. *)
-(*     rewrite gl_witness_sum_S. done. *)
-(*   Qed. *)
-
-(* End witfun. *)
+End proofs.

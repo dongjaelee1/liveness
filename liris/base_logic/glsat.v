@@ -7,8 +7,8 @@ From liris.algebra Require Import auth_mra bank.
 From liris.algebra Require Export ordinal_wfocm layer.
 From liris.base_logic Require Export invariants ghost_lock.
 
+(* FIXME: move to somewhere *)
 Section aux.
-  (* Maybe move to somewhere *)
   Context `{SI : indexT} {Σ : gFunctors} {A : cmra} {GA : inG Σ A} {GR : inG Σ (reservation_mapR A)}.
 
   Lemma reservation_map_token_alloc_singleton (name : gname) D k a :
@@ -41,9 +41,7 @@ End aux.
 Global Instance ord_ghost_lock_class : ghost_lock_class :=
   Build_ghost_lock_class Ord.t ord_wfocm_pack.
 
-(* Canonical Structure layersO `{SI : indexT} := leibnizO layer. *)
-Definition layers : Type := (ghost_lock_version → layer).
-Canonical Structure layersO `{SI : indexT} := leibnizO layers.
+Canonical Structure layersO `{SI : indexT} := leibnizO layer.
 
 (** The ghost state for ghost locks *)
 Module glsatGS.
