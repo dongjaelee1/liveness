@@ -1,8 +1,10 @@
-From iris.proofmode Require Import base classes.
+From iris.proofmode Require Import base classes proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import iprop.
-From stdpp Require Import namespaces.
-From liris.base_logic Require Import ghost_lock.
+(* From stdpp Require Import namespaces. *)
+(* From liris.base_logic Require Import ghost_lock. *)
+
+TODO
 
 (** Simple syntax for writing temporal formulae; cf., LTL, CTL*. *)
 Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
@@ -17,7 +19,43 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
 | tf_exist (A : Type) (P : A → tf)
 | tf_sep (P Q : tf)
 | tf_wand (P Q : tf)
-| tf_variant (N : namespace) (k : gl_id) (v : ghost_lock_version) (P Q R : tf).
+(* | tf_variant (N : namespace) (k : gl_id) (v : ghost_lock_version) (P Q R : tf) *)
+.
+
+Fixpoint tf_interp_logic `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : @tf SI Σ Π) : iProp Σ :=
+  match Φ with
+  | tf_emp => emp%I
+  | tf_atomic π => True%I
+  | tf_pure p => (⌜p⌝)%I
+  | tf_ghost p => True%I
+  | tf_and P Q => (tf_interp_logic P ∧ tf_interp_logic Q)%I
+  | tf_or P Q => (tf_interp_logic P ∨ tf_interp_logic Q)%I
+  | tf_impl P Q => (tf_interp_logic P → tf_interp_logic Q)%I
+  | tf_forall A P => (∀ (a : A), tf_interp_logic (P a))%I
+  | tf_exist A P => (∃ (a : A), tf_interp_logic (P a))%I
+  | tf_sep P Q => (tf_interp_logic P ∗ tf_interp_logic Q)%I
+  | tf_wand P Q => (tf_interp_logic P -∗ tf_interp_logic Q)%I
+  end.
+
+Global Instance tf_interp_logic_persistent `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : @tf SI Σ Π) : Persistent (tf_interp_logic Φ).
+Proof.
+  induction Φ; simpl. 1,2,3,4: apply _.
+  - apply bi.and_persistent; auto.
+  - apply bi.or_persistent; auto.
+  - admit.
+  - apply bi.forall_persistent. auto.
+  - apply _.
+    (* unfold Persistent. iIntros "(%&H)". iExists a. *)
+    (* unfold Persistent in H. iApply H. auto. *)
+  - apply _.
+  - 
+    
+
+    unfold Persistent. iIntros "H". 
+
+    Print Instances Plain.
+    apply bi.impl_persistent; auto.
+  
 
 Global Arguments tf {SI Σ Π}.
 
