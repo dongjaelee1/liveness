@@ -12,7 +12,7 @@ Module glwitGS.
 
   Class glwitGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     GlwitGpreS {
-        glwitGpreS_witness : inG Σ (reservation_mapUR (reservation_mapUR bcredUR));
+        glwitGpreS_witness : inG Σ (reservation_mapUR (bcredUR));
       }.
 
   Class glwitGS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -22,7 +22,7 @@ Module glwitGS.
       }.
 
   Definition glwitΣ `{SI : indexT} : gFunctors :=
-    #[GFunctor (reservation_mapUR (reservation_mapUR bcredUR))
+    #[GFunctor (reservation_mapUR (bcredUR))
       ].
 
   Global Instance subG_glwitΣ `{SI : indexT} {Σ} : subG (glwitΣ) Σ → (glwitGpreS Σ).
@@ -38,23 +38,20 @@ Local Existing Instances glwit_inG glwitGpreS_witness.
 
 (* Witness: manage credits for ghost lock's witness progresses *)
 Definition witG_bound `{SI : indexT} `{!glwitGS Σ}
-  (k : gl_id) (v : ghost_lock_version) (ℵ : ghost_lock_fuel) : iProp Σ :=
-  own witness_name (reservation_map_data k (reservation_map_data (A:=bcredUR) (encode v) (credit_bound ℵ))).
+  (k : gl_id) (ℵ : ghost_lock_fuel) : iProp Σ :=
+  own witness_name (reservation_map_data (A:=bcredUR) k (credit_bound ℵ)).
 Global Typeclasses Opaque witG_bound.
-Global Instance: Params (@witG_bound) 4 := {}.
+Global Instance: Params (@witG_bound) 3 := {}.
 
 Definition witG_witness `{SI : indexT} `{!glwitGS Σ}
-  (k : gl_id) (v : ghost_lock_version) (a : ghost_lock_fuel) : iProp Σ :=
-  own witness_name (reservation_map_data k (reservation_map_data (A:=bcredUR) (encode v) (credit a))).
+  (k : gl_id) (a : ghost_lock_fuel) : iProp Σ :=
+  own witness_name (reservation_map_data (A:=bcredUR) k (credit a)).
 Global Typeclasses Opaque witG_witness.
-Global Instance: Params (@witG_witness) 4 := {}.
+Global Instance: Params (@witG_witness) 3 := {}.
 
 Local Definition witG_bound_token_id `{SI : indexT} `{!glwitGS Σ}
   (E : coPset) : iProp Σ :=
-  own witness_name (reservation_map_token (A:=reservation_mapUR bcredUR) E).
-Local Definition witG_bound_token_version `{SI : indexT} `{!glwitGS Σ}
-  (k : gl_id) (E : coPset) : iProp Σ :=
-  own witness_name (reservation_map_data k (reservation_map_token (A:=bcredUR) E)).
+  own witness_name (reservation_map_token (A:=bcredUR) E).
 
 (* Global invariant for the witness ghost state *)
 Definition glwit `{SI : indexT} {Σ}
@@ -62,26 +59,25 @@ Definition glwit `{SI : indexT} {Σ}
   (W : witnesses) : iProp Σ :=
   locked
     (witG_bound_token_id (⊤ ∖ gset_to_coPset (dom W)) ∗
-     ([∗ map] k ↦ '(v, w) ∈ W,
-        witG_bound_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq 0 (S v) : gset ghost_lock_version))) ∗
-        ([∗ set] u ∈ (set_seq 0 v : gset ghost_lock_version), glG_version_lb k u ∗ glG_unlocked k u) ∗
-        glG_version_lb k v ∗
+     ([∗ map] k ↦ w ∈ W,
         match w with
         | witness_locked b =>
-            (∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_witness k v α)
+            (∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_witness k α)
         | witness_unlocked =>
-            (glG_unlocked k v)
+            (True)
+        | witness_retired =>
+            (glG_retired k)
         end)
     )%I.
 
 (* Global invariant that relates witnesses to obligations *)
 Definition glwit_inv `{!ord_mono_fun_class}
   (Ω : ghost_locks) (W : witnesses) : Prop :=
-  map_Forall2 (λ k '(v1, g) '(v2, w),
-                 (v1 = v2) ∧
+  map_Forall2 (λ k g w,
                  match g, w with
                  | (ghost_lock_locked a _), (witness_locked b) => (b w≤ η a)
                  | (ghost_lock_unlocked), (witness_unlocked) => True
+                 | (ghost_lock_retired), (witness_retired) => True
                  | _, _ => False
                  end
     ) Ω W.
@@ -91,167 +87,112 @@ Section glwit.
   Context `{SI : indexT} `{GLSAT : !glsatGS.glsatGS Σ} `{!glwitGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (* witness *)
-  Global Instance witG_bound_persistent k v ℵ : Persistent (witG_bound k v ℵ).
+  Global Instance witG_bound_persistent k ℵ : Persistent (witG_bound k ℵ).
   Proof. rewrite /witG_bound. apply _. Qed.
-  Global Instance witG_bound_timeless k v ℵ : Timeless (witG_bound k v ℵ).
+  Global Instance witG_bound_timeless k ℵ : Timeless (witG_bound k ℵ).
   Proof. rewrite /witG_bound. apply _. Qed.
 
-  Global Instance witG_witness_timeless k v a : Timeless (witG_witness k v a).
+  Global Instance witG_witness_timeless k a : Timeless (witG_witness k a).
   Proof. rewrite /witG_witness. apply _. Qed.
 
   Local Instance witG_bound_token_id_timeless E : Timeless (witG_bound_token_id E).
   Proof. rewrite /witG_bound_token_id. apply _. Qed.
-  Local Instance witG_bound_token_version_timeless k E : Timeless (witG_bound_token_version k E).
-  Proof. rewrite /witG_bound_token_version. apply _. Qed.
 
   (* wlsat *)
   Global Instance glwit_timeless W : Timeless (glwit W).
   Proof. rewrite /glwit -lock. apply _. Qed.
 
   (** Witness credit rules *)
-  Lemma witG_witness_eq k v a0 a1 :
+  Lemma witG_witness_eq k a0 a1 :
     a0 w= a1 →
-    witG_witness k v a0 = witG_witness k v a1.
+    witG_witness k a0 = witG_witness k a1.
   Proof. intros EQ. rewrite /witG_witness. by erewrite credit_eq. Qed.
 
-  Lemma witG_witness_mon k v a0 a1 :
+  Lemma witG_witness_mon k a0 a1 :
     a0 w≤ a1 →
-    witG_witness k v a1 ⊢ |==> witG_witness k v a0.
+    witG_witness k a1 ⊢ |==> witG_witness k a0.
   Proof.
     intros LE. rewrite /witG_witness. apply own_update.
-    by apply reservation_map_update, reservation_map_update, credit_update.
+    by apply reservation_map_update, credit_update.
   Qed.
 
-  Lemma witG_witness_split k v a0 a1 :
-    witG_witness k v (a0 w+ a1) ⊣⊢ witG_witness k v a0 ∗ witG_witness k v a1.
+  Lemma witG_witness_split k a0 a1 :
+    witG_witness k (a0 w+ a1) ⊣⊢ witG_witness k a0 ∗ witG_witness k a1.
   Proof.
     rewrite /witG_witness. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
     - iEval (rewrite credit_split) in "H". iDestruct "H" as "[H1 H2]". iFrame.
     - iEval (rewrite credit_split). iSplitL "H1"; iFrame.
   Qed.
 
-  Lemma witG_witness_mon_split k v a0 a1 a2 :
+  Lemma witG_witness_mon_split k a0 a1 a2 :
     a0 w+ a1 w≤ a2 →
-    witG_witness k v a2 ⊢ |==> witG_witness k v a0 ∗ witG_witness k v a1.
+    witG_witness k a2 ⊢ |==> witG_witness k a0 ∗ witG_witness k a1.
   Proof.
     intros LE. iIntros "H". iApply witG_witness_split. iApply witG_witness_mon; done.
   Qed.
 
-  Lemma witG_witness_lt k v a0 a1 :
+  Lemma witG_witness_lt k a0 a1 :
     a0 w< a1 →
-    witG_witness k v a1 ⊢ |==> witG_witness k v a0 ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ witG_witness k v c.
+    witG_witness k a1 ⊢ |==> witG_witness k a0 ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ witG_witness k c.
   Proof.
     intros LT. apply WFOCM.lt_exists_left in LT. destruct LT as (?& ?& ?).
-    iIntros "H". iMod (witG_witness_mon_split _ _ _ _ _ H0 with "H") as "[H1 H2]".
+    iIntros "H". iMod (witG_witness_mon_split _ _ _ _ H0 with "H") as "[H1 H2]".
     iModIntro. iSplitL "H1"; iFrame. done.
   Qed.
 
-  Lemma witG_bound_mon k v a0 a1 :
+  Lemma witG_bound_mon k a0 a1 :
     a0 w≤ a1 →
-    witG_bound k v a0 ⊢ |==> witG_bound k v a1.
+    witG_bound k a0 ⊢ |==> witG_bound k a1.
   Proof.
     intros LE. rewrite /witG_bound. apply own_update.
-    by apply reservation_map_update, reservation_map_update,
-      cmra_update_included, credit_bound_included.
+    by apply reservation_map_update, cmra_update_included, credit_bound_included.
   Qed.
 
-  Lemma witG_witness_spend_gen k v a0 a1 :
-    witG_bound k v a0 ∗ witG_witness k v a1
-    ⊢ |==> ∃ a2, ⌜(a1 w+ a2) w≤ a0⌝ ∗ witG_bound k v a2.
+  Lemma witG_witness_spend_gen k a0 a1 :
+    witG_bound k a0 ∗ witG_witness k a1
+    ⊢ |==> ∃ a2, ⌜(a1 w+ a2) w≤ a0⌝ ∗ witG_bound k a2.
   Proof.
     rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)".
     { rewrite -!reservation_map_data_op.
       eapply (reservation_map_updateP
-                (λ x, ∃ a2, (x = (reservation_map_data (encode v) (credit_bound a2))) ∧ (a1 w+ a2 w≤ a0))
-                (λ r, ∃ a2, (r = {[k := (reservation_map_data (encode v) (credit_bound a2))]}) ∧ (a1 w+ a2 w≤ a0))
+                (λ x, ∃ a2, (x = (credit_bound a2)) ∧ (a1 w+ a2 w≤ a0))
+                (λ r, ∃ a2, (r = {[k := (credit_bound a2)]}) ∧ (a1 w+ a2 w≤ a0))
              ).
-      { eapply (reservation_map_updateP
-                  (λ x, ∃ a2, (x = (credit_bound a2)) ∧ (a1 w+ a2 w≤ a0))
-                  (λ r, ∃ a2, (r = (reservation_map_data (encode v) (credit_bound a2))) ∧ (a1 w+ a2 w≤ a0))
-               ).
-        { eapply credit_spend. }
-        { intros. destruct H as (a2&A0&A1). eexists. by subst. }
-      }
+      { eapply credit_spend. }
       { intros. destruct H as (a2&A0&A1). eexists. by subst. }
     }
     iSimpl. iDestruct "H" as "((%a2 & %EQ & %LE) & H)".
     iExists a2. subst. iModIntro. iSplitR; done.
   Qed.
-  Lemma witG_witness_spend k v a0 a1 :
+  Lemma witG_witness_spend k a0 a1 :
     wzero w< a1 →
-    witG_bound k v a0 ∗ witG_witness k v a1 ⊢ |==> ∃ a2, ⌜a2 w< a0⌝ ∗ witG_bound k v a2.
+    witG_bound k a0 ∗ witG_witness k a1 ⊢ |==> ∃ a2, ⌜a2 w< a0⌝ ∗ witG_bound k a2.
   Proof.
     iIntros (LT) "[Ow Oc]". iMod (witG_witness_spend_gen with "[$]") as "(%&%&$)".
     iPureIntro. eapply WFOCM.lt_exists_right; eauto.
   Qed.
 
-  Lemma witG_compare k v a0 a1 :
-    witG_bound k v a0 ∗ witG_witness k v a1 ⊢ ⌜ a1 w≤ a0 ⌝.
+  Lemma witG_compare k a0 a1 :
+    witG_bound k a0 ∗ witG_witness k a1 ⊢ ⌜ a1 w≤ a0 ⌝.
   Proof.
     rewrite -own_op -!reservation_map_data_op. iIntros "H".
-    iPoseProof (own_valid with "H") as "%". do 2 apply reservation_map_data_valid in H.
+    iPoseProof (own_valid with "H") as "%". apply reservation_map_data_valid in H.
     apply credit_bound_credit_valid_compare in H. done.
   Qed.
 
-  Lemma witG_bound_id_alloc D k E :
+  Lemma witG_bound_id_alloc D k a :
     k ∉ D →
     witG_bound_token_id (⊤ ∖ gset_to_coPset D)
     ⊢ |==> witG_bound_token_id (⊤ ∖ gset_to_coPset ({[k]} ∪ D)) ∗
-        witG_bound_token_version k E.
+        witG_bound k a ∗ witG_witness k a.
   Proof.
     iIntros (Hk) "Htk".
-    iPoseProof (reservation_map_token_alloc_singleton _ _ k (reservation_map_token (A:=bcredUR) E) with "Htk") as "[Htk >H]"; auto.
-    { apply reservation_map_token_valid. }
-    rewrite /witG_bound_token_version. by iFrame.
-  Qed.
-
-  Lemma witG_bound_alloc k (D : gset ghost_lock_version) v a :
-    v ∉ D →
-    witG_bound_token_version k (⊤ ∖ gset_to_coPset (set_map encode D))
-    ⊢ |==> witG_bound_token_version k (⊤ ∖ gset_to_coPset (set_map encode ({[v]} ∪ D))) ∗
-        witG_bound k v a ∗ witG_witness k v a.
-  Proof.
-    iIntros (Hk) "Htk". rewrite /witG_bound_token_version.
-    rewrite (reservation_map_token_difference
-               (gset_to_coPset (set_map encode ({[v]} : gset nat)))
-               (⊤ ∖ gset_to_coPset (set_map encode D))); cycle 1.
-    { apply elem_of_subseteq. intros. rewrite elem_of_difference. split; first set_solver.
-      intro F. rewrite !elem_of_gset_to_coPset in H F. apply elem_of_map_1 in H, F.
-      destruct H as (?& ?& ?), F as (?& ?& ?). subst. apply encode_inj in H1. subst.
-      set_solver.
-    }
-    iDestruct "Htk" as "[Htk H]".
-    assert (⊤ ∖ gset_to_coPset (set_map encode D) ∖ gset_to_coPset (set_map encode ({[v]} : gset nat)) = ⊤ ∖ gset_to_coPset (set_map encode ({[v]} ∪ D))).
-    { apply leibniz_equiv. intros x. rewrite !elem_of_difference. split; intros.
-      - destruct H as ((_&?)&?). split; first set_solver.
-        intros F. rewrite set_map_union_L in F. apply elem_of_gset_to_coPset, elem_of_union in F.
-        destruct F; [apply H0 | apply H]; apply elem_of_gset_to_coPset; set_solver.
-      - destruct H as (_&?). split; first (split; first set_solver);
-          intros F; apply elem_of_gset_to_coPset in F; apply H, elem_of_gset_to_coPset; set_solver.
-    }
-    rewrite H. iFrame "H".
-    iMod (own_update with "Htk") as "H".
-    { eapply reservation_map_update. eapply (reservation_map_alloc _ (encode v) (credit_bound a ⋅ credit a)); auto.
-      - apply elem_of_gset_to_coPset; set_solver.
-      - apply credit_bound_credit_valid_eq.
-    }
+    iPoseProof (reservation_map_token_alloc_singleton _ _ k (credit_bound a ⋅ credit a) with "Htk") as "[Htk >H]"; auto.
+    { apply credit_bound_credit_valid_eq. }
     iDestruct "H" as "[H1 H2]". rewrite /witG_bound /witG_witness. by iFrame.
   Qed.
 
-  Lemma witG_bound_alloc_seq k s l n (ηξ : ghost_lock_version → ghost_lock_fuel) :
-    witG_bound_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq s l : gset ghost_lock_version)))
-    ⊢ |==> witG_bound_token_version k (⊤ ∖ gset_to_coPset (set_map encode (set_seq s (l + n) : gset ghost_lock_version))) ∗
-        [∗ set] u ∈ set_seq (s + l) n, witG_bound k u (ηξ u) ∗ witG_witness k u (ηξ u).
-  Proof.
-    revert s l. induction n; iIntros (??) "H".
-    { simpl. rewrite Nat.add_right_id big_sepS_empty. by iFrame. }
-    replace (l + S n) with (S (l + n)) by lia. rewrite !set_seq_S_end_union_L.
-    rewrite big_sepS_union; cycle 1.
-    { apply set_seq_S_end_disjoint. }
-    iMod (IHn with "H") as "[H $]". iMod (witG_bound_alloc _ _ (s + l + n) (ηξ (s + l + n)) with "H") as "(H& R)".
-    { intros F. apply elem_of_set_seq in F. lia. }
-    rewrite (assoc Nat.add) big_sepS_singleton. by iFrame.
-  Qed.
+  TODO
 
   (** glwit rules *)
   Lemma glwit_alloc_witness_locked W k v (ηξ : ghost_lock_version → ghost_lock_fuel) :
