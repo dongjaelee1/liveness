@@ -1,4 +1,4 @@
-From iris.algebra Require Import gmap_view gset coPset reservation_map dfrac_agree.
+From iris.algebra Require Import gmap_view gset coPset reservation_map dfrac_agree mono_nat.
 From iris.bi.lib Require Import cmra fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -51,7 +51,7 @@ Module glsatGS.
   Class glsatGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     GlsatGpreS {
         glsatGpreS_layer : inG Σ (gmap_viewR gl_id (agreeR (layerO)));
-        glsatGpreS_state : inG Σ (reservation_mapUR (dfrac_agreeR natO));
+        glsatGpreS_state : inG Σ (reservation_mapUR mono_natUR);
         glsatGpreS_fuel : inG Σ (reservation_mapUR bankUR);
         (* Keep track of the current owner of each lock, if an owner exists *)
         glsatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO ghost_lock_owner)));
@@ -68,7 +68,7 @@ Module glsatGS.
 
   Definition glsatΣ `{SI : indexT} : gFunctors :=
     #[GFunctor (gmap_viewR gl_id (agreeR (layerO)));
-      GFunctor (reservation_mapUR (dfrac_agreeR $ natO));
+      GFunctor (reservation_mapUR (mono_natUR));
       GFunctor (reservation_mapUR bankUR);
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO ghost_lock_owner)))
       ].
@@ -103,27 +103,46 @@ Local Definition glG_layer_auth_id `{SI : indexT} `{!glsatGS Σ}
   own layer_name (gmap_view_auth (V:=agreeR (layerO)) (DfracOwn 1) (to_agree <$> m)).
 
 (* State: locked or unlocked for each version *)
+Local Definition glG_state_gen `{SI : indexT} `{!glsatGS Σ}
+  (k : gl_id) (q : dfrac) (n : nat) : iProp Σ :=
+  own state_name (reservation_map_data k (●MN{q} n)).
+Local Definition glG_state_know_gen `{SI : indexT} `{!glsatGS Σ}
+  (k : gl_id) (n : nat) : iProp Σ :=
+  own state_name (reservation_map_data k (◯MN n)).
+
 Definition glG_locked `{SI : indexT} `{!glsatGS Σ}
   (k : gl_id) (q : Qp) : iProp Σ :=
-  own state_name (reservation_map_data k (to_frac_agree q 0)).
+  glG_state_gen k (DfracOwn q) 0.
 Global Typeclasses Opaque glG_locked.
 Global Instance: Params (@glG_locked) 3 := {}.
 
+Definition glG_locked_know `{SI : indexT} `{!glsatGS Σ}
+  (k : gl_id) : iProp Σ :=
+  glG_state_know_gen k 0.
+Global Typeclasses Opaque glG_locked_know.
+Global Instance: Params (@glG_locked_know) 3 := {}.
+
 Definition glG_unlocked `{SI : indexT} `{!glsatGS Σ}
   (k : gl_id) (q : Qp) : iProp Σ :=
-  own state_name (reservation_map_data k (to_frac_agree q 1)).
+  glG_state_gen k (DfracOwn q) 1.
 Global Typeclasses Opaque glG_unlocked.
 Global Instance: Params (@glG_unlocked) 3 := {}.
+
+Definition glG_unlocked_know `{SI : indexT} `{!glsatGS Σ}
+  (k : gl_id) : iProp Σ :=
+  glG_state_know_gen k 1.
+Global Typeclasses Opaque glG_unlocked_know.
+Global Instance: Params (@glG_unlocked_know) 3 := {}.
 
 Definition glG_retired `{SI : indexT} `{!glsatGS Σ}
   (k : gl_id) : iProp Σ :=
-  own state_name (reservation_map_data k (to_dfrac_agree DfracDiscarded 2)).
-Global Typeclasses Opaque glG_unlocked.
-Global Instance: Params (@glG_unlocked) 3 := {}.
+  glG_state_gen k (DfracDiscarded) 2.
+Global Typeclasses Opaque glG_retired.
+Global Instance: Params (@glG_retired) 3 := {}.
 
 Local Definition glG_state_token_id `{SI : indexT} `{!glsatGS Σ}
   (E : coPset) : iProp Σ :=
-  own state_name (reservation_map_token (A:=(dfrac_agreeR natO)) E).
+  own state_name (reservation_map_token (A:=(mono_natUR)) E).
 
 (* Fuel: manage credits for a lock's fuel *)
 Definition glG_fuel `{SI : indexT} `{!glsatGS Σ}
@@ -212,20 +231,28 @@ Section glsat.
   Proof. rewrite /glG_layer_auth_id. apply _. Qed.
 
   (* State *)
+  Global Instance glG_locked_know_persistent k : Persistent (glG_locked_know k).
+  Proof. rewrite /glG_locked_know. apply _. Qed.
+  Global Instance glG_unlocked_know_persistent k : Persistent (glG_unlocked_know k).
+  Proof. rewrite /glG_unlocked_know. apply _. Qed.
   Global Instance glG_retired_persistent k : Persistent (glG_retired k).
   Proof. rewrite /glG_retired. apply _. Qed.
 
   Global Instance glG_locked_timeless k q : Timeless (glG_locked k q).
   Proof. rewrite /glG_locked. apply _. Qed.
+  Global Instance glG_locked_know_timeless k : Timeless (glG_locked_know k).
+  Proof. rewrite /glG_locked_know. apply _. Qed.
   Global Instance glG_unlocked_timeless k q : Timeless (glG_unlocked k q).
   Proof. rewrite /glG_unlocked. apply _. Qed.
+  Global Instance glG_unlocked_know_timeless k : Timeless (glG_unlocked_know k).
+  Proof. rewrite /glG_unlocked_know. apply _. Qed.
   Global Instance glG_retired_timeless k : Timeless (glG_retired k).
   Proof. rewrite /glG_retired. apply _. Qed.
 
   Global Instance glG_locked_fractional k : Fractional (glG_locked k).
   Proof.
-    rewrite /glG_locked. intros p q.
-    by rewrite -own_op -!reservation_map_data_op -dfrac_agree_op.
+    rewrite /glG_locked /glG_state_gen. intros p q.
+    by rewrite -own_op -!reservation_map_data_op -mono_nat_auth_dfrac_op.
   Qed.
   Global Instance glG_locked_as_fractional k q :
     AsFractional (glG_locked k q) (glG_locked k) q.
@@ -233,8 +260,8 @@ Section glsat.
 
   Global Instance glG_unlocked_fractional k : Fractional (glG_unlocked k).
   Proof.
-    rewrite /glG_unlocked. intros p q.
-    by rewrite -own_op -!reservation_map_data_op -dfrac_agree_op.
+    rewrite /glG_unlocked /glG_state_gen. intros p q.
+    by rewrite -own_op -!reservation_map_data_op -mono_nat_auth_dfrac_op.
   Qed.
   Global Instance glG_unlocked_as_fractional k q :
     AsFractional (glG_unlocked k q) (glG_unlocked k) q.
@@ -333,30 +360,57 @@ Section glsat.
   Qed.
 
   (** State rules *)
-  Lemma glG_locked_to_unlocked_2 k q1 q2 :
-    (q1 + q2 = 1)%Qp →
-    glG_locked k q1 ∗ glG_locked k q2 ⊢ |==> glG_unlocked k q1 ∗ glG_unlocked k q2.
+  Local Lemma glG_state_gen_valid_2 k dq1 dq2 n1 n2 :
+    glG_state_gen k dq1 n1 ∗ glG_state_gen k dq2 n2
+    ⊢ ⌜ (n1 = n2) ∧ ✓ (dq1 ⋅ dq2) ⌝.
   Proof.
-    rewrite /glG_locked /glG_unlocked -!own_op -!reservation_map_data_op.
-    intros Heq. apply own_update, reservation_map_update.
-    etransitivity; first eapply frac_agree_update_2; auto. done.
+    iIntros "[H1 H2]". iCombine "H1 H2" as "H".
+    iPoseProof (own_valid with "H") as "%Hv".
+    apply reservation_map_data_valid, mono_nat_auth_dfrac_op_valid in Hv.
+    destruct Hv. subst. done.
   Qed.
-  Lemma glG_locked_to_unlocked k :
-    glG_locked k 1 ⊢ |==> glG_unlocked k 1.
+  Local Lemma glG_state_gen_valid_1 k dq n :
+    glG_state_gen k dq n ⊢ ⌜ ✓ dq ⌝.
   Proof.
-    iIntros "[H1 H2]". iMod (glG_locked_to_unlocked_2 with "[$H1 $H2]") as "[H1 H2]".
+    iIntros "H". iPoseProof (own_valid with "H") as "%Hv".
+    apply reservation_map_data_valid, mono_nat_auth_dfrac_valid in Hv. done.
+  Qed.
+
+  Local Lemma glG_state_gen_update_2 k q1 q2 n1 n2 m :
+    (n1 ≤ m) →
+    (q1 + q2 = 1)%Qp →
+    glG_state_gen k (DfracOwn q1) n1 ∗ glG_state_gen k (DfracOwn q2) n2
+    ⊢ |==> glG_state_gen k (DfracOwn q1) m ∗ glG_state_gen k (DfracOwn q2) m.
+  Proof.
+    iIntros (Hle Heq) "H". iPoseProof (glG_state_gen_valid_2 with "H") as "%". destruct H; subst.
+    rewrite /glG_state_gen -!own_op -!reservation_map_data_op.
+    iStopProof. apply own_update, reservation_map_update.
+    rewrite -!mono_nat_auth_dfrac_op !dfrac_op_own !Heq. apply mono_nat_update. auto.
+  Qed.
+  Lemma glG_state_gen_update_1 k n m :
+    (n ≤ m) →
+    glG_state_gen k (DfracOwn 1) n ⊢ |==> glG_state_gen k (DfracOwn 1) m.
+  Proof.
+    iIntros (Hle) "[H1 H2]". iMod (glG_state_gen_update_2 with "[$H1 $H2]") as "[H1 H2]".
+    1: eauto.
     { apply Qp.div_2. }
     by iCombine "H1 H2" as "H".
   Qed.
 
+  Lemma glG_locked_to_unlocked_2 k q1 q2 :
+    (q1 + q2 = 1)%Qp →
+    glG_locked k q1 ∗ glG_locked k q2 ⊢ |==> glG_unlocked k q1 ∗ glG_unlocked k q2.
+  Proof. apply glG_state_gen_update_2. lia. Qed.
+  Lemma glG_locked_to_unlocked k :
+    glG_locked k 1 ⊢ |==> glG_unlocked k 1.
+  Proof. apply glG_state_gen_update_1. lia. Qed.
   Lemma glG_unlocked_to_retired_2 k q1 q2 :
     (q1 + q2 = 1)%Qp →
     glG_unlocked k q1 ∗ glG_unlocked k q2 ⊢ |==> glG_retired k.
   Proof.
-    rewrite /glG_unlocked /glG_retired -!own_op -!reservation_map_data_op.
-    intros Heq. apply own_update, reservation_map_update.
-    etransitivity; first eapply frac_agree_update_2; auto.
-    etrans; last eapply dfrac_agree_persist. rewrite /to_frac_agree -dfrac_agree_op. done.
+    iIntros (Hq) "H". iMod (glG_state_gen_update_2 _ _ _ _ _ 2 with "H") as "[H1 H2]"; auto.
+    iCombine "H1 H2" as "H". rewrite Hq.
+    iStopProof. apply own_update, reservation_map_update, mono_nat_auth_persist.
   Qed.
   Lemma glG_unlocked_to_retired k :
     glG_unlocked k 1 ⊢ |==> glG_retired k.
@@ -368,53 +422,37 @@ Section glsat.
 
   Lemma glG_locked_frac_valid k q :
     glG_locked k q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
-  Proof.
-    rewrite /glG_locked. iIntros "H".
-    iPoseProof (own_valid with "H") as "%Hv". apply reservation_map_data_valid in Hv.
-    iApply frac_agree_validI. done.
-  Qed.
+  Proof. apply glG_state_gen_valid_1. Qed.
   Lemma glG_unlocked_frac_valid k q :
     glG_unlocked k q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
-  Proof.
-    rewrite /glG_unlocked. iIntros "H".
-    iPoseProof (own_valid with "H") as "%Hv". apply reservation_map_data_valid in Hv.
-    iApply frac_agree_validI. done.
-  Qed.
-
+  Proof. apply glG_state_gen_valid_1. Qed.
   Lemma glG_locked_unlocked_false k q1 q2 :
     glG_locked k q1 ∗ glG_unlocked k q2 ⊢ False.
   Proof.
-    rewrite /glG_locked /glG_unlocked. iIntros "[Hl Hd]".
-    iCombine "Hl Hd" as "V". iPoseProof (own_valid with "V") as "%V".
-    iPureIntro. apply reservation_map_data_valid in V.
-    apply dfrac_agree_op_valid in V. destruct V. done.
+    iIntros "H". iPoseProof (glG_state_gen_valid_2 with "H") as "%". by destruct H.
   Qed.
   Lemma glG_unlocked_retired_false k q :
     glG_unlocked k q ∗ glG_retired k ⊢ False.
   Proof.
-    rewrite /glG_unlocked /glG_retired. iIntros "[Hl Hd]".
-    iCombine "Hl Hd" as "V". iPoseProof (own_valid with "V") as "%V".
-    iPureIntro. apply reservation_map_data_valid in V.
-    apply dfrac_agree_op_valid in V. destruct V. done.
+    iIntros "H". iPoseProof (glG_state_gen_valid_2 with "H") as "%". by destruct H.
   Qed.
   Lemma glG_locked_retired_false k q :
     glG_locked k q ∗ glG_retired k ⊢ False.
   Proof.
-    rewrite /glG_locked /glG_retired. iIntros "[Hl Hd]".
-    iCombine "Hl Hd" as "V". iPoseProof (own_valid with "V") as "%V".
-    iPureIntro. apply reservation_map_data_valid in V.
-    apply dfrac_agree_op_valid in V. destruct V. done.
+    iIntros "H". iPoseProof (glG_state_gen_valid_2 with "H") as "%". by destruct H.
   Qed.
+
+  (* Rules for know (lower bounds). *)
 
   Lemma glG_state_alloc D k (s : nat) :
     k ∉ D →
     glG_state_token_id (⊤ ∖ gset_to_coPset D)
     ⊢ |==> glG_state_token_id (⊤ ∖ gset_to_coPset ({[k]} ∪ D)) ∗
-        own state_name (reservation_map_data (A:=(dfrac_agreeR natO)) k (to_frac_agree 1 s)).
+        glG_state_gen k (DfracOwn 1) s.
   Proof.
     iIntros (Hk) "Htk".
-    iPoseProof (reservation_map_token_alloc_singleton _ _ k (to_frac_agree 1 s) with "Htk") as "[Htk >H]"; auto.
-    { done. }
+    iPoseProof (reservation_map_token_alloc_singleton _ _ k (●MN{#1} s) with "Htk") as "[Htk >H]"; auto.
+    { apply mono_nat_auth_valid. }
     by iFrame.
   Qed.
 
@@ -1226,7 +1264,7 @@ Proof.
   iIntros.
   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR gl_id (agreeR (layerO)))) as (γE) "HE";
     first by apply gmap_view_auth_valid.
-  iMod (own_alloc (reservation_map_token (A:=(dfrac_agreeR natO)) ⊤)) as (γS) "HS";
+  iMod (own_alloc (reservation_map_token (A:=(mono_natUR)) ⊤)) as (γS) "HS";
     first by apply reservation_map_token_valid.
   iMod (own_alloc (reservation_map_token (A:=bankUR) ⊤)) as (γF) "HF";
     first by apply reservation_map_token_valid.
