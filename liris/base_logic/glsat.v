@@ -387,7 +387,7 @@ Section glsat.
     iStopProof. apply own_update, reservation_map_update.
     rewrite -!mono_nat_auth_dfrac_op !dfrac_op_own !Heq. apply mono_nat_update. auto.
   Qed.
-  Lemma glG_state_gen_update_1 k n m :
+  Local Lemma glG_state_gen_update_1 k n m :
     (n ≤ m) →
     glG_state_gen k (DfracOwn 1) n ⊢ |==> glG_state_gen k (DfracOwn 1) m.
   Proof.
@@ -443,6 +443,33 @@ Section glsat.
   Qed.
 
   (* Rules for know (lower bounds). *)
+  Local Lemma glG_state_gen_know_valid k dq n1 n2 :
+    glG_state_gen k dq n1 ∗ glG_state_know_gen k n2
+    ⊢ ⌜ (n2 ≤ n1) ∧ ✓ dq ⌝.
+  Proof.
+    iIntros "[H1 H2]". iCombine "H1 H2" as "H".
+    iPoseProof (own_valid with "H") as "%Hv".
+    apply reservation_map_data_valid, mono_nat_both_dfrac_valid in Hv.
+    destruct Hv. done.
+  Qed.
+  Lemma glG_locked_unlocked_know_false k q :
+    glG_locked k q ∗ glG_unlocked_know k ⊢ False.
+  Proof.
+    iIntros "H". iPoseProof (glG_state_gen_know_valid with "H") as "%". destruct H. lia.
+  Qed.
+
+  Local Lemma glG_state_gen_get_know k dq n :
+    glG_state_gen k dq n ⊢ glG_state_know_gen k n.
+  Proof.
+    rewrite /glG_state_gen /glG_state_know_gen. rewrite mono_nat_auth_lb_op.
+    iIntros "[H1 H2]". done.
+  Qed.
+  Lemma glG_locked_get_know k q :
+    glG_locked k q ⊢ glG_locked_know k.
+  Proof. apply glG_state_gen_get_know. Qed.
+  Lemma glG_unlocked_get_know k q :
+    glG_unlocked k q ⊢ glG_unlocked_know k.
+  Proof. apply glG_state_gen_get_know. Qed.
 
   Lemma glG_state_alloc D k (s : nat) :
     k ∉ D →
@@ -956,7 +983,8 @@ Section glsat.
     { apply not_elem_of_dom. rewrite -Dom. auto. }
     iMod (glG_state_alloc _ k 2 with "HS") as "[HS Gl]"; first auto.
     iAssert (|==> glG_retired k)%I with "[Gl]" as ">#Gl".
-    { rewrite /glG_retired. iClear "Gwf". iStopProof. apply own_update, reservation_map_update. apply dfrac_agree_persist. }
+    { rewrite /glG_retired. iClear "Gwf". iStopProof.
+      apply own_update, reservation_map_update, mono_nat_auth_persist. }
     iMod (glG_fuel_alloc _ k 0%ord with "HF") as "(HF& Gfsp& Gf)"; first set_solver.
     iMod (glG_owner_alloc _ k inhabitant with "HO") as "[HO Go]"; first auto.
     iPoseProof (glG_layer_elem with "Gwf") as "#Ge".

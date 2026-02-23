@@ -63,9 +63,9 @@ Definition glwit `{SI : indexT} {Σ}
      ([∗ map] k ↦ w ∈ W,
         match w with
         | witness_locked b =>
-            (∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_witness k α)
+            (glG_locked_know k ∗ ∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_witness k α)
         | witness_unlocked =>
-            (True)
+            (glG_unlocked_know k)
         | witness_retired =>
             (glG_retired k)
         end)
