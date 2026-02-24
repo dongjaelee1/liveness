@@ -471,6 +471,27 @@ Section glsat.
     glG_unlocked k q ⊢ glG_unlocked_know k.
   Proof. apply glG_state_gen_get_know. Qed.
 
+  Lemma glG_retired_get_locked_know k :
+    glG_retired k ⊢ glG_locked_know k.
+  Proof.
+    rewrite /glG_retired /glG_locked_know /glG_state_gen /glG_state_know_gen.
+    rewrite mono_nat_auth_lb_op. rewrite (mono_nat_lb_op_le_l 2 0). 2: lia.
+    iIntros "[H1 [$ H3]]".
+  Qed.
+  Lemma glG_retired_get_unlocked_know k :
+    glG_retired k ⊢ glG_unlocked_know k.
+  Proof.
+    rewrite /glG_retired /glG_unlocked_know /glG_state_gen /glG_state_know_gen.
+    rewrite mono_nat_auth_lb_op. rewrite (mono_nat_lb_op_le_l 2 1). 2: lia.
+    iIntros "[H1 [$ H3]]".
+  Qed.
+  Lemma glG_unlocked_know_get_locked_know k :
+    glG_unlocked_know k ⊢ glG_locked_know k.
+  Proof.
+    rewrite /glG_locked_know /glG_unlocked_know /glG_state_know_gen.
+    rewrite (mono_nat_lb_op_le_l 1 0). 2: lia. iIntros "[$ _]".
+  Qed.
+
   Lemma glG_state_alloc D k (s : nat) :
     k ∉ D →
     glG_state_token_id (⊤ ∖ gset_to_coPset D)
@@ -907,6 +928,21 @@ Section glsat.
       iPoseProof (glG_owner_agree with "[$Go $Go2]") as "(%&%)". apply Qp.not_add_le_r in H0. done.
     - iDestruct "Mk" as "(_& %& Go2)".
       iPoseProof (glG_owner_agree with "[$Go $Go2]") as "(%&%)". apply Qp.not_add_le_r in H0. done.
+  Qed.
+
+  Lemma glsat_lookup_unlocked_know Ω k :
+    glsat Ω ∗ glG_elem k ∗ glG_unlocked_know k
+    ⊢ (⌜ Ω !! k = Some (ghost_lock_unlocked) ⌝) ∨
+        (glG_retired k ∗ (⌜ Ω !! k = Some (ghost_lock_retired) ⌝)).
+  Proof.
+    iIntros "(Hsat & #Ge & #Gl)".
+    iPoseProof (glsat_elem with "[$]") as "%Hin".
+    apply elem_of_dom in Hin; destruct Hin as [o LU].
+    rewrite /glsat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
+    iDestruct "LU" as "(%& Gy& %& Gfs& %& %Bound& Mk)". destruct o; [| eauto |].
+    - iDestruct "Mk" as "(Gu& _)". iPoseProof (glG_locked_unlocked_know_false with "[$]") as "%". done.
+    - iDestruct "Mk" as "(Gr& _)". iRight. eauto.
   Qed.
 
   Lemma glsat_alloc_ghost_lock_locked Ω k ℓ (μ : measurable_syntax) t :
