@@ -51,7 +51,7 @@ Module glsatGS.
   Class glsatGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     GlsatGpreS {
         glsatGpreS_layer : inG Σ (gmap_viewR gl_id (agreeR (layerO)));
-        glsatGpreS_state : inG Σ (reservation_mapUR mono_natUR);
+        glsatGpreS_state : inG Σ (reservation_mapUR (prodUR mono_natUR mono_natUR));
         glsatGpreS_fuel : inG Σ (reservation_mapUR bankUR);
         (* Keep track of the current owner of each lock, if an owner exists *)
         glsatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO ghost_lock_owner)));
@@ -68,7 +68,7 @@ Module glsatGS.
 
   Definition glsatΣ `{SI : indexT} : gFunctors :=
     #[GFunctor (gmap_viewR gl_id (agreeR (layerO)));
-      GFunctor (reservation_mapUR (mono_natUR));
+      GFunctor (reservation_mapUR (prodUR mono_natUR mono_natUR));
       GFunctor (reservation_mapUR bankUR);
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO ghost_lock_owner)))
       ].
@@ -103,46 +103,48 @@ Local Definition glG_layer_auth_id `{SI : indexT} `{!glsatGS Σ}
   own layer_name (gmap_view_auth (V:=agreeR (layerO)) (DfracOwn 1) (to_agree <$> m)).
 
 (* State: locked or unlocked for each version *)
-Local Definition glG_state_gen `{SI : indexT} `{!glsatGS Σ}
-  (k : gl_id) (q : dfrac) (n : nat) : iProp Σ :=
-  own state_name (reservation_map_data k (●MN{q} n)).
-Local Definition glG_state_know_gen `{SI : indexT} `{!glsatGS Σ}
-  (k : gl_id) (n : nat) : iProp Σ :=
-  own state_name (reservation_map_data k (◯MN n)).
+(* Local Definition glG_state_gen `{SI : indexT} `{!glsatGS Σ} *)
+(*   (k : gl_id) (q : dfrac) (n : nat) : iProp Σ := *)
+(*   own state_name (reservation_map_data k (●MN{q} n)). *)
+(* Local Definition glG_state_know_gen `{SI : indexT} `{!glsatGS Σ} *)
+(*   (k : gl_id) (n : nat) : iProp Σ := *)
+(*   own state_name (reservation_map_data k (◯MN n)). *)
 
 Definition glG_locked `{SI : indexT} `{!glsatGS Σ}
   (k : gl_id) (q : Qp) : iProp Σ :=
-  glG_state_gen k (DfracOwn q) 0.
+  own state_name (reservation_map_data k (●MN{#q} 0, ε)).
 Global Typeclasses Opaque glG_locked.
 Global Instance: Params (@glG_locked) 3 := {}.
 
-Definition glG_locked_know `{SI : indexT} `{!glsatGS Σ}
-  (k : gl_id) : iProp Σ :=
-  glG_state_know_gen k 0.
-Global Typeclasses Opaque glG_locked_know.
-Global Instance: Params (@glG_locked_know) 3 := {}.
+(* Definition glG_locked_know `{SI : indexT} `{!glsatGS Σ} *)
+(*   (k : gl_id) : iProp Σ := *)
+(*   glG_state_know_gen k 0. *)
+(* Global Typeclasses Opaque glG_locked_know. *)
+(* Global Instance: Params (@glG_locked_know) 3 := {}. *)
 
 Definition glG_unlocked `{SI : indexT} `{!glsatGS Σ}
-  (k : gl_id) (q : Qp) : iProp Σ :=
-  glG_state_gen k (DfracOwn q) 1.
+  (k : gl_id) : iProp Σ :=
+  own state_name (reservation_map_data k (●MN□ 1, ε)).
 Global Typeclasses Opaque glG_unlocked.
 Global Instance: Params (@glG_unlocked) 3 := {}.
 
-Definition glG_unlocked_know `{SI : indexT} `{!glsatGS Σ}
-  (k : gl_id) : iProp Σ :=
-  glG_state_know_gen k 1.
-Global Typeclasses Opaque glG_unlocked_know.
-Global Instance: Params (@glG_unlocked_know) 3 := {}.
+Definition glG_current `{SI : indexT} `{!glsatGS Σ}
+  (k : gl_id) (q : Qp) : iProp Σ :=
+  own state_name (reservation_map_data k (ε, ●MN{#q} 0)).
+Global Typeclasses Opaque glG_current.
+Global Instance: Params (@glG_current) 3 := {}.
 
 Definition glG_retired `{SI : indexT} `{!glsatGS Σ}
   (k : gl_id) : iProp Σ :=
-  glG_state_gen k (DfracDiscarded) 2.
+  own state_name (reservation_map_data k (●MN□ 1, ●MN□ 1)).
 Global Typeclasses Opaque glG_retired.
 Global Instance: Params (@glG_retired) 3 := {}.
 
 Local Definition glG_state_token_id `{SI : indexT} `{!glsatGS Σ}
   (E : coPset) : iProp Σ :=
-  own state_name (reservation_map_token (A:=(mono_natUR)) E).
+  own state_name (reservation_map_token (A:=(prodUR mono_natUR mono_natUR)) E).
+
+TODO
 
 (* Fuel: manage credits for a lock's fuel *)
 Definition glG_fuel `{SI : indexT} `{!glsatGS Σ}
