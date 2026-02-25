@@ -3,8 +3,41 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import iprop.
 (* From stdpp Require Import namespaces. *)
 (* From liris.base_logic Require Import ghost_lock. *)
+P : tf
+      ([P]ₗ : iProp( → ([P]ₜ : Prop)
+                         induction P
+                         P → Q
+                               IH  :
+      ([P]ₗ : iProp) → ([P]ₜ : Prop)
+                         ([Q]ₗ : iProp) → ([Q]ₜ : Prop)
+                      ========================
+                      ([P]ₗ → Qₗ [Q]ₗ : iProp)
+                      state_interp \sig
+                      [P]ₜ
+                      -----------------------
+      ([Q]ₜ : trace → Prop)
+                         
 
 TODO
+
+Inductive tf_no_temp `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
+| tf_emp
+| tf_atomic (π : Π)
+| tf_pure (p : Prop)
+| tf_ghost (p : iProp Σ)
+| tf_and (P Q : tf)
+| tf_or (P Q : tf)
+| tf_impl (P Q : tf)
+| tf_forall (A : Type) (P : A → tf)
+| tf_exist (A : Type) (P : A → tf)
+| tf_sep (P Q : tf)
+| tf_wand (P Q : tf)
+.
+
+Inductive tf := | tf_tf_no_temp
+           | always
+           | until
+               | impl (P : tf_no_temp) (Q : tf)
 
 (** Simple syntax for writing temporal formulae; cf., LTL, CTL*. *)
 Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
@@ -15,6 +48,10 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
 | tf_and (P Q : tf)
 | tf_or (P Q : tf)
 | tf_impl (P Q : tf)
+          
+          always (R → P)
+          (always P) → Q
+          (atomic = impl, sep, atomic, but no temp (always, until)) → yes temp
 | tf_forall (A : Type) (P : A → tf)
 | tf_exist (A : Type) (P : A → tf)
 | tf_sep (P Q : tf)

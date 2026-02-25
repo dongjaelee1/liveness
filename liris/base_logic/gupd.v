@@ -30,28 +30,18 @@ Definition ginterp `{SI : indexT} `{!gupdGS Σ} `{!ord_mono_fun_class}
   (Ω : ghost_locks) (W : witnesses) (Θ : gset positive) : iProp Σ :=
   (glsat Ω ∗ globl Θ ∗ glassigned (dom Ω) ∗ glwit W ∗ ⌜ glwit_inv Ω W ⌝)%I.
 
-(** Modality for updating ghost locks. *)
-Definition gupd_pre `{SI : indexT}`{!state_interp_class Σ A B} `{!gupdGS Σ} `{!ord_mono_fun_class}
-  (gupd : coPset → coPset → iPropO Σ -d> iPropO Σ) : coPset -d> coPset -d> iProp Σ -d> iPropO Σ :=
-  λ E1 E2 P,
-    ((|={E1,E2}=> P) ∨
-       (∀ (σ : A) (κ : B) (Ω1 : ghost_locks) (W1 : witnesses) (Θ : gset positive),
-          (state_interp σ Θ κ ∗ ginterp Ω1 W1 Θ) ={E1,∅}=∗
-          ∃ Ω2, (⌜ (Ω1 ↪∘ Ω2) ⌝) ∗
-                ∀ W2, (⌜ (W1 ↓∘ W2) ∧ glwit_inv Ω2 W2 ⌝) ={∅,E2}=∗
-                      (state_interp σ Θ κ ∗ ginterp Ω2 W2 Θ) ∗ gupd E1 E2 P))%I.
-
 TODO
 
+(** Modality for updating ghost locks. *)
 Definition gupd_pre `{SI : indexT}`{!state_interp_class Σ A B} `{!gupdGS Σ} `{!ord_mono_fun_class}
-  Θ (gupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
+  (gupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
     ((|={∅}=> P) ∨
-       (∀ (Ω1 : ghost_locks) (W1 : witnesses),
-          (gproto Ω1 W1 Θ) ={∅}=∗
+       (∀ (σ : A) (κ : B) (Ω1 : ghost_locks) (W1 : witnesses) (Θ : gset positive),
+          (state_interp σ Θ κ ∗ ginterp Ω1 W1 Θ) ={∅}=∗
           ∃ Ω2, (⌜ (Ω1 ↪∘ Ω2) ⌝) ∗
                 ∀ W2, (⌜ (W1 ↓∘ W2) ∧ glwit_inv Ω2 W2 ⌝) ={∅}=∗
-                      (gproto Ω2 W2 Θ) ∗ gupd P))%I.
+                      (state_interp σ Θ κ ∗ ginterp Ω2 W2 Θ) ∗ gupd P))%I.
 
 Lemma gupd_pre_mono `{SI : indexT} `{!gupdGS Σ} Θ
   (gupd1 gupd2 : iPropO Σ -d> iPropO Σ) :
