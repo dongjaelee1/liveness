@@ -2,9 +2,13 @@ From iris.proofmode Require Import base proofmode classes.
 From iris.bi Require Export fixpoint.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From liris.base_logic Require Export globl glwit.
+From liris.base_logic Require Export globl glwit invariants.
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
+
+(** State interpretation; provided by the language. *)
+Class state_interp_class `{SI : indexT} (Σ : gFunctors) (A B : Type) :=
+  { state_interp : A → gset positive → B → iProp Σ; }.
 
 Class gupdGS `{SI : indexT} (Σ : gFunctors) :=
   GupdG {
@@ -16,24 +20,30 @@ Class gupdGS `{SI : indexT} (Σ : gFunctors) :=
       #[global] gupd_globlGS :: globlGS.globlGS Σ;
       (** Ghost lock witnesses. *)
       #[global] gupd_glwitGS :: glwitGS.glwitGS Σ;
-      (** Fair scheduler function for witnesses. *)
-      #[global] fair_scheduler_fun :: ord_mono_fun_class;
+      (* (** Fair scheduler function for witnesses. *) *)
+      (* #[global] fair_scheduler_fun :: ord_mono_fun_class; *)
     }.
-
 Global Opaque gupd_invGS gupd_glsatGS gupd_globlGS gupd_glwitGS.
 Global Arguments GupdG {SI Σ}.
 
-Definition gproto `{SI : indexT} `{!gupdGS Σ}
-  (Ω : ghost_locks) (W : witnesses) Θ : iProp Σ :=
-  (glsat Ω ∗ globl Θ ∗ glassigned (fst <$> Ω) ∗ glwit W ∗ ⌜ glwit_inv Ω W ⌝)%I.
-
-(* Simple check *)
-Global Instance gproto_timeless `{SI : indexT} `{!gupdGS Σ} Ω W Θ :
-  Timeless (gproto Ω W Θ).
-Proof. rewrite /gproto. apply _. Qed.
+Definition ginterp `{SI : indexT} `{!gupdGS Σ} `{!ord_mono_fun_class}
+  (Ω : ghost_locks) (W : witnesses) (Θ : gset positive) : iProp Σ :=
+  (glsat Ω ∗ globl Θ ∗ glassigned (dom Ω) ∗ glwit W ∗ ⌜ glwit_inv Ω W ⌝)%I.
 
 (** Modality for updating ghost locks. *)
-Definition gupd_pre `{SI : indexT} `{!gupdGS Σ}
+Definition gupd_pre `{SI : indexT}`{!state_interp_class Σ A B} `{!gupdGS Σ} `{!ord_mono_fun_class}
+  (gupd : coPset → coPset → iPropO Σ -d> iPropO Σ) : coPset -d> coPset -d> iProp Σ -d> iPropO Σ :=
+  λ E1 E2 P,
+    ((|={E1,E2}=> P) ∨
+       (∀ (σ : A) (κ : B) (Ω1 : ghost_locks) (W1 : witnesses) (Θ : gset positive),
+          (state_interp σ Θ κ ∗ ginterp Ω1 W1 Θ) ={E1,∅}=∗
+          ∃ Ω2, (⌜ (Ω1 ↪∘ Ω2) ⌝) ∗
+                ∀ W2, (⌜ (W1 ↓∘ W2) ∧ glwit_inv Ω2 W2 ⌝) ={∅,E2}=∗
+                      (state_interp σ Θ κ ∗ ginterp Ω2 W2 Θ) ∗ gupd E1 E2 P))%I.
+
+TODO
+
+Definition gupd_pre `{SI : indexT}`{!state_interp_class Σ A B} `{!gupdGS Σ} `{!ord_mono_fun_class}
   Θ (gupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
     ((|={∅}=> P) ∨
