@@ -68,14 +68,12 @@ liris/base_logic/satisfiable.v
 liris/base_logic/invariants.v
 liris/base_logic/gen_inv_heap.v
 liris/base_logic/thread_map.v
-liris/base_logic/ghost_lock.v
+liris/base_logic/obligation.v
 liris/base_logic/witness.v
-liris/base_logic/glsat.v
-liris/base_logic/glwit.v
-liris/base_logic/globl.v
-liris/base_logic/gupd.v
-# liris/base_logic/othread.v
-# liris/base_logic/owitness.v
+liris/base_logic/osat.v
+liris/base_logic/owit.v
+liris/base_logic/othread.v
+liris/base_logic/mupd.v
 # liris/base_logic/otree.v
 # liris/base_logic/thread_view_obls.v
 # liris/base_logic/digraph.v

@@ -2,9 +2,11 @@ From iris.proofmode Require Import base proofmode classes.
 From iris.bi Require Export fixpoint.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From liris.base_logic Require Export globl glwit invariants.
+From liris.base_logic Require Export owit othread invariants.
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
+
+TODO
 
 (** State interpretation; provided by the language. *)
 Class state_interp_class `{SI : indexT} (Σ : gFunctors) (A B : Type) :=

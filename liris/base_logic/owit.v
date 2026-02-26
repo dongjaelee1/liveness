@@ -6,86 +6,86 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liris.algebra Require Export wfocm.
 From liris.algebra Require Import bcred.
-From liris.base_logic Require Export witness glsat.
+From liris.base_logic Require Export witness osat.
 
 (** The ghost state for liveness obligations *)
-Module glwitGS.
+Module owitGS.
 
-  Class glwitGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
-    GlwitGpreS {
-        glwitGpreS_witness : inG Σ (reservation_mapUR (bcredUR));
+  Class owitGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+    OwitGpreS {
+        owitGpreS_witness : inG Σ (reservation_mapUR (bcredUR));
       }.
 
-  Class glwitGS `{SI : indexT} (Σ : gFunctors) : Set :=
-    GlwitG {
-        glwit_inG : glwitGpreS Σ;
+  Class owitGS `{SI : indexT} (Σ : gFunctors) : Set :=
+    OwitG {
+        owit_inG : owitGpreS Σ;
         witness_name : gname;
       }.
 
-  Definition glwitΣ `{SI : indexT} : gFunctors :=
+  Definition owitΣ `{SI : indexT} : gFunctors :=
     #[GFunctor (reservation_mapUR (bcredUR))
       ].
 
-  Global Instance subG_glwitΣ `{SI : indexT} {Σ} : subG (glwitΣ) Σ → (glwitGpreS Σ).
+  Global Instance subG_owitΣ `{SI : indexT} {Σ} : subG (owitΣ) Σ → (owitGpreS Σ).
   Proof. solve_inG. Qed.
 
-End glwitGS.
-Import glwitGS.
+End owitGS.
+Import owitGS.
 
 (** User interface *)
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
-Local Existing Instances glwit_inG glwitGpreS_witness.
+Local Existing Instances owit_inG owitGpreS_witness.
 
-(* Witness: manage credits for ghost lock's witness progresses *)
-Definition witG_bound `{SI : indexT} `{!glwitGS Σ}
-  (k : gl_id) (ℵ : ghost_lock_fuel) : iProp Σ :=
+(* Witness: manage credits for an obligation's witness progress *)
+Definition witG_bound `{SI : indexT} `{!owitGS Σ}
+  (k : oid) (ℵ : obligation_fuel) : iProp Σ :=
   own witness_name (reservation_map_data (A:=bcredUR) k (credit_bound ℵ)).
 Global Typeclasses Opaque witG_bound.
 Global Instance: Params (@witG_bound) 3 := {}.
 
-Definition witG_witness `{SI : indexT} `{!glwitGS Σ}
-  (k : gl_id) (a : ghost_lock_fuel) : iProp Σ :=
+Definition witG_witness `{SI : indexT} `{!owitGS Σ}
+  (k : oid) (a : obligation_fuel) : iProp Σ :=
   own witness_name (reservation_map_data (A:=bcredUR) k (credit a)).
 Global Typeclasses Opaque witG_witness.
 Global Instance: Params (@witG_witness) 3 := {}.
 
-Local Definition witG_bound_token_id `{SI : indexT} `{!glwitGS Σ}
+Local Definition witG_bound_token_id `{SI : indexT} `{!owitGS Σ}
   (E : coPset) : iProp Σ :=
   own witness_name (reservation_map_token (A:=bcredUR) E).
 
 (* Global invariant for the witness ghost state *)
-Definition glwit `{SI : indexT} {Σ}
-  `{!@glsatGS.glsatGS _ Σ} `{!glwitGS Σ}
+Definition owit `{SI : indexT} {Σ}
+  `{!@osatGS.osatGS _ Σ} `{!owitGS Σ}
   (W : witnesses) : iProp Σ :=
   locked
     (witG_bound_token_id (⊤ ∖ gset_to_coPset (dom W)) ∗
      ([∗ map] k ↦ w ∈ W,
         match w with
-        | witness_locked b =>
-            (glG_locked_know k ∗ ∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_witness k α)
-        | witness_unlocked =>
-            (glG_unlocked_know k)
-        | witness_retired =>
-            (glG_retired k)
+        | witness_assigned b =>
+            (∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_witness k α)
+        | witness_fulfilled =>
+            (oblG_fulfilled k)
+        | witness_expired =>
+            (oblG_expired k)
         end)
     )%I.
 
 (* Global invariant that relates witnesses to obligations *)
-Definition glwit_inv `{!ord_mono_fun_class}
-  (Ω : ghost_locks) (W : witnesses) : Prop :=
+Definition owit_inv `{!ord_mono_fun_class}
+  (Ω : obligations) (W : witnesses) : Prop :=
   map_Forall2 (λ k g w,
                  match g, w with
-                 | (ghost_lock_locked a _), (witness_locked b) => (b w≤ η a)
-                 | (ghost_lock_unlocked), (witness_unlocked) => True
-                 | (ghost_lock_retired), (witness_retired) => True
+                 | (obligation_assigned a _), (witness_assigned b) => (b w≤ η a)
+                 | (obligation_fulfilled), (witness_fulfilled) => True
+                 | (obligation_expired), (witness_expired) => True
                  | _, _ => False
                  end
     ) Ω W.
 
 (** Properties *)
-Section glwit.
-  Context `{SI : indexT} `{GLSAT : !glsatGS.glsatGS Σ} `{!glwitGS Σ} `{OMF : !ord_mono_fun_class}.
+Section owit.
+  Context `{SI : indexT} `{OSAT : !osatGS.osatGS Σ} `{!owitGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (* witness *)
   Global Instance witG_bound_persistent k ℵ : Persistent (witG_bound k ℵ).
@@ -100,8 +100,8 @@ Section glwit.
   Proof. rewrite /witG_bound_token_id. apply _. Qed.
 
   (* wlsat *)
-  Global Instance glwit_timeless W : Timeless (glwit W).
-  Proof. rewrite /glwit -lock. apply _. Qed.
+  Global Instance owit_timeless W : Timeless (owit W).
+  Proof. rewrite /owit -lock. apply _. Qed.
 
   (** Witness credit rules *)
   Lemma witG_witness_eq k a0 a1 :
@@ -193,29 +193,29 @@ Section glwit.
     iDestruct "H" as "[H1 H2]". rewrite /witG_bound /witG_witness. by iFrame.
   Qed.
 
-  (** glwit rules *)
-  Lemma glwit_alloc_witness_locked W k a :
+  (** owit rules *)
+  Lemma owit_alloc_witness_assigned W k a :
     k ∉ dom W →
-    glwit W ∗ glG_locked_know k
-    ⊢ |==> glwit (<[k:=(witness_locked a)]>W) ∗ witG_bound k a.
+    owit W
+    ⊢ |==> owit (<[k:=(witness_assigned a)]>W) ∗ witG_bound k a.
   Proof.
-    iIntros (Nink) "(W& #Gvl)".
-    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    iIntros (Nink) "W".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
     iMod (witG_bound_id_alloc _ _ a Nink with "Wti") as "(Wti& #Wb& Ww)".
     iModIntro. iFrame "Wb".
     rewrite dom_insert_L. iFrame "Wti".
     iApply big_sepM_insert.
     { apply not_elem_of_dom. auto. }
-    iFrame. iFrame "Gvl". done.
+    iFrame. done.
   Qed.
 
-  Lemma glwit_alloc_witness_unlocked W k a :
+  Lemma owit_alloc_witness_fulfilled W k a :
     k ∉ dom W →
-    glwit W ∗ glG_unlocked_know k
-    ⊢ |==> glwit (<[k:=(witness_unlocked)]>W) ∗ witG_bound k a.
+    owit W ∗ oblG_fulfilled k
+    ⊢ |==> owit (<[k:=(witness_fulfilled)]>W) ∗ witG_bound k a.
   Proof.
     iIntros (Nink) "(W& #Gu)".
-    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
     iMod (witG_bound_id_alloc _ _ a Nink with "Wti") as "(Wti& #Wb& Ww)".
     iModIntro. iFrame "Wb".
     rewrite dom_insert_L. iFrame "Wti".
@@ -224,13 +224,28 @@ Section glwit.
     iFrame. eauto.
   Qed.
 
-  Lemma glwit_mon W1 W2 :
+  Lemma owit_alloc_witness_expired W k a :
+    k ∉ dom W →
+    owit W ∗ oblG_expired k
+    ⊢ |==> owit (<[k:=(witness_expired)]>W) ∗ witG_bound k a.
+  Proof.
+    iIntros (Nink) "(W& #Gu)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
+    iMod (witG_bound_id_alloc _ _ a Nink with "Wti") as "(Wti& #Wb& Ww)".
+    iModIntro. iFrame "Wb".
+    rewrite dom_insert_L. iFrame "Wti".
+    iApply big_sepM_insert.
+    { apply not_elem_of_dom. auto. }
+    iFrame. eauto.
+  Qed.
+
+  Lemma owit_mon W1 W2 :
     wits_mon W1 W2 →
-    glwit W1 ⊢ glwit W2.
+    owit W1 ⊢ owit W2.
   Proof.
     iIntros (Step) "W".
     assert (Dom : dom W1 = dom W2) by (eapply map_Forall2_dom_L; eauto).
-    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
     rewrite -Dom. iFrame "Wti".
     iStopProof. clear Dom.
     revert W2 Step. induction W1 using map_ind; iIntros (W2 Step) "WM".
@@ -240,25 +255,25 @@ Section glwit.
     rename x into w1. iDestruct "WM" as "(WH1& WM)".
     iPoseProof (IHW1 _ Step with "WM") as "WM". clear IHW1. iFrame "WM".
     destruct w1, w2; try done.
-    iDestruct "WH1" as "($& %& %& $)". iPureIntro. etransitivity; eauto.
+    iDestruct "WH1" as "(%& %& $)". iPureIntro. etransitivity; eauto.
   Qed.
 
-  (* witness_step rules: progress, unlock, lock, inc/pin *)
-  Lemma glwit_progress_one W k w1 w2 :
-    W !! k = Some (witness_locked w1) →
-    witness_step (witness_locked w1) (witness_locked w2) →
-    glwit W
-    ⊢ |==> glwit (<[k:=(witness_locked w2)]>W) ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ witG_witness k c.
+  (* witness_step rules: progress, fulfill, expire *)
+  Lemma owit_progress_one W k w1 w2 :
+    W !! k = Some (witness_assigned w1) →
+    witness_step (witness_assigned w1) (witness_assigned w2) →
+    owit W
+    ⊢ |==> owit (<[k:=(witness_assigned w2)]>W) ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ witG_witness k c.
   Proof.
     iIntros (Luk Prog) "W".
-    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
     assert (Ink : k ∈ dom W).
     { apply elem_of_dom. eauto. }
     assert (DomEq : {[k]} ∪ dom W = dom W).
     { set_solver + Ink. }
     rewrite !dom_insert_L !DomEq. iFrame "Wti". inv Prog. 2,3: inv H. inv H.
     iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Mk WM]".
-    iDestruct "Mk" as "(#Gvlk& %& %& Wck)".
+    iDestruct "Mk" as "(%& %& Wck)".
     assert (Lt : w2 w< α).
     { eapply WFOCM.lt_le_lt; eauto. }
     apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
@@ -269,23 +284,23 @@ Section glwit.
     iFrame. auto.
   Qed.
 
-  Lemma glwit_progress W1 W2 :
-    (W1 ↓ₚ W2 | wit_cond_locked) →
-    glwit W1
-    ⊢ |==> glwit W2 ∗
+  Lemma owit_progress W1 W2 :
+    (W1 ↓ₚ W2 | wit_cond_assigned) →
+    owit W1
+    ⊢ |==> owit W2 ∗
         ([∗ map] k ↦ w ∈ W1,
            match w with
-           | witness_locked _ =>
-               (glG_locked_know k ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ witG_witness k c)
-           | witness_unlocked =>
-               (glG_unlocked_know k)
-           | witness_retired =>
-               (glG_retired k)
+           | witness_assigned _ =>
+               (∃ c, ⌜ wzero w< c ⌝ ∗ witG_witness k c)
+           | witness_fulfilled =>
+               (oblG_fulfilled k)
+           | witness_expired =>
+               (oblG_expired k)
            end).
   Proof.
     iIntros ([Step Keep]) "W".
     assert (Dom : dom W1 = dom W2) by (eapply wits_cond_rel_dom; eauto).
-    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
     rewrite -Dom. iFrame "Wti".
     iStopProof. clear Dom.
     revert W2 Step Keep. induction W1 using map_ind; iIntros (W2 Step Keep) "WM".
@@ -298,32 +313,32 @@ Section glwit.
     iMod (IHW1 _ Step Keep with "M") as "[M Rs]". clear IHW1.
     iFrame "M Rs". destruct HC as [[HC Stepi] | [HC Eqi]].
     - destruct w1. 2,3: done. destruct w2. 2,3: done. inv Stepi. 2,3: inv H0. inv H0.
-      iDestruct "Mi" as "(#Glk& %& %& Mci)". assert (Lt : wit0 w< α).
+      iDestruct "Mi" as "(%& %& Mci)". assert (Lt : wit0 w< α).
       { eapply WFOCM.lt_le_lt; eauto. }
       apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
       iMod (witG_witness_mon_split _ _ _ _ Le with "Mci") as "[Mci Mci0]".
       iModIntro. iSplitL "Mci".
-      + iFrame. iFrame "Glk". done.
-      + iFrame. iFrame "Glk". done.
+      + iFrame. done.
+      + iFrame. done.
     - subst. destruct w2. 2,3: eauto. done.
   Qed.
 
-  Lemma glwit_progress_any C W1 W2 :
+  Lemma owit_progress_any C W1 W2 :
     (W1 ↓ₚ W2 | C) →
-    glwit W1 ⊢ glwit W2.
+    owit W1 ⊢ owit W2.
   Proof.
     iIntros (Prog) "W".
-    iApply (glwit_mon with "W").
+    iApply (owit_mon with "W").
     eapply wits_cond_progress_mon; eauto.
   Qed.
 
-  Lemma glwit_unlock W k a :
-    W !! k = Some (witness_locked a) →
-    glwit W ∗ glG_unlocked_know k
-    ⊢ glwit (<[k:=(witness_unlocked)]>W).
+  Lemma owit_fulfill W k a :
+    W !! k = Some (witness_assigned a) →
+    owit W ∗ oblG_fulfilled k
+    ⊢ owit (<[k:=(witness_fulfilled)]>W).
   Proof.
     iIntros (Luk) "[W #Guk]".
-    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
     iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Wk WM]".
     rewrite !dom_insert_L. replace ({[k]} ∪ dom W) with (dom W); cycle 1.
     { apply elem_of_dom_2 in Luk. set_solver. }
@@ -332,13 +347,13 @@ Section glwit.
     iFrame. eauto.
   Qed.
 
-  Lemma glwit_retire W k :
-    W !! k = Some (witness_unlocked) →
-    glwit W ∗ glG_retired k
-    ⊢ glwit (<[k:=(witness_retired)]>W).
+  Lemma owit_expire W k :
+    W !! k = Some (witness_fulfilled) →
+    owit W ∗ oblG_expired k
+    ⊢ owit (<[k:=(witness_expired)]>W).
   Proof.
     iIntros (Luk) "[W #Guk]".
-    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
     iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Wk WM]".
     rewrite !dom_insert_L. replace ({[k]} ∪ dom W) with (dom W); cycle 1.
     { apply elem_of_dom_2 in Luk. set_solver. }
@@ -347,21 +362,21 @@ Section glwit.
     iFrame. eauto.
   Qed.
 
-  Lemma glwit_get_credit_zero W :
-    glwit W
-    ⊢ glwit W ∗
+  Lemma owit_get_credit_zero W :
+    owit W
+    ⊢ owit W ∗
     ([∗ map] k ↦ w ∈ W,
        match w with
-       | witness_locked _ =>
-           (glG_locked_know k ∗ witG_witness k wzero)
-       | witness_unlocked =>
-           (glG_unlocked_know k)
-       | witness_retired =>
-           (glG_retired k)
+       | witness_assigned _ =>
+           (witG_witness k wzero)
+       | witness_fulfilled =>
+           (oblG_fulfilled k)
+       | witness_expired =>
+           (oblG_expired k)
        end).
   Proof.
     iIntros "W".
-    rewrite /glwit -!lock. iDestruct "W" as "(Wti& WM)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
     iFrame "Wti".
     iStopProof. induction W using map_ind; iIntros "WM".
     { iFrame. done. }
@@ -369,26 +384,26 @@ Section glwit.
     rename  x into w1. iDestruct "WM" as "(Mi& M)".
     iPoseProof (IHW with "M") as "[M Rs]". clear IHW.
     iFrame "M Rs". destruct w1.
-    - iDestruct "Mi" as "(#Glk& %& %& Wc)". rewrite (witG_witness_eq _ α (α w+ wzero)); cycle 1.
+    - iDestruct "Mi" as "(%& %& Wc)". rewrite (witG_witness_eq _ α (α w+ wzero)); cycle 1.
       { rewrite right_id. done. }
       iPoseProof (witG_witness_split with "Wc") as "[Wc Wcz]". iSplitR "Wcz"; iFrame; eauto.
     - iPoseProof "Mi" as "#Mi". auto.
     - iPoseProof "Mi" as "#Mi". auto.
   Qed.
 
-  (** glwit_inv rules *)
-  Lemma glwit_inv_empty :
-    glwit_inv ∅ ∅.
+  (** owit_inv rules *)
+  Lemma owit_inv_empty :
+    owit_inv ∅ ∅.
   Proof. apply map_Forall2_empty. Qed.
 
-  Lemma glwit_inv_dom Ω W :
-    glwit_inv Ω W → dom Ω = dom W.
+  Lemma owit_inv_dom Ω W :
+    owit_inv Ω W → dom Ω = dom W.
   Proof. intros. eapply map_Forall2_dom_L; eauto. Qed.
 
-  Lemma glwit_inv_cond_step_same_gls C Ω W1 W2 :
-    glwit_inv Ω W1 →
+  Lemma owit_inv_cond_step_same_gls C Ω W1 W2 :
+    owit_inv Ω W1 →
     (W1 ↓ₛ W2 | C) →
-    glwit_inv Ω W2 →
+    owit_inv Ω W2 →
     wits_mon W1 W2.
   Proof.
     revert Ω W2. induction W1 using map_ind; intros.
@@ -404,73 +419,73 @@ Section glwit.
     - destruct g, w1, w2; inv Step; inv H0; try done. eapply WFOCM.lt_le; auto.
     - subst. destruct g, w2; try done.
   Qed.
-  Lemma glwit_inv_one_step_same_gls Ω W1 W2 :
-    glwit_inv Ω W1 →
+  Lemma owit_inv_one_step_same_gls Ω W1 W2 :
+    owit_inv Ω W1 →
     W1 ↓₁ W2 →
-    glwit_inv Ω W2 →
+    owit_inv Ω W2 →
     wits_mon W1 W2.
   Proof.
-    intros. apply wits_one_to_wits_cond in H0. destruct H0. eapply (glwit_inv_cond_step_same_gls _ Ω W1 W2); eauto.
+    intros. apply wits_one_to_wits_cond in H0. destruct H0. eapply (owit_inv_cond_step_same_gls _ Ω W1 W2); eauto.
   Qed.
 
-  Lemma glwit_inv_alloc_same_gls_dom Ω1 Ω2 W1 W2 :
+  Lemma owit_inv_alloc_same_gls_dom Ω1 Ω2 W1 W2 :
     dom Ω1 = dom Ω2 →
-    glwit_inv Ω1 W1 →
+    owit_inv Ω1 W1 →
     (W1 ↓ₐ W2) →
-    glwit_inv Ω2 W2 →
+    owit_inv Ω2 W2 →
     False.
   Proof.
     intros. destruct H1 as (k& LU& g& HE); subst.
-    apply glwit_inv_dom in H0, H2. rewrite -H H0 dom_insert_L in H2.
+    apply owit_inv_dom in H0, H2. rewrite -H H0 dom_insert_L in H2.
     apply not_elem_of_dom in LU. set_solver.
   Qed.
 
-  Lemma glwit_inv_step_same_gls Ω W1 W2 :
-    glwit_inv Ω W1 →
+  Lemma owit_inv_step_same_gls Ω W1 W2 :
+    owit_inv Ω W1 →
     (W1 ↓ W2) →
-    glwit_inv Ω W2 →
+    owit_inv Ω W2 →
     wits_mon W1 W2.
   Proof.
     intros. inv H0.
-    - eapply glwit_inv_one_step_same_gls; eauto.
-    - exfalso. eapply (glwit_inv_alloc_same_gls_dom Ω Ω W1 W2); eauto.
+    - eapply owit_inv_one_step_same_gls; eauto.
+    - exfalso. eapply (owit_inv_alloc_same_gls_dom Ω Ω W1 W2); eauto.
   Qed.
-  Lemma glwit_inv_rc_step_same_gls Ω W1 W2 :
-    glwit_inv Ω W1 →
+  Lemma owit_inv_rc_step_same_gls Ω W1 W2 :
+    owit_inv Ω W1 →
     (W1 ↓∘ W2) →
-    glwit_inv Ω W2 →
+    owit_inv Ω W2 →
     wits_mon W1 W2.
   Proof.
     intros. inv H0.
     - done.
-    - eapply glwit_inv_step_same_gls; eauto.
+    - eapply owit_inv_step_same_gls; eauto.
   Qed.
 
-  Lemma glwit_inv_alloc_same_wits_dom Ω1 Ω2 W1 W2 :
+  Lemma owit_inv_alloc_same_wits_dom Ω1 Ω2 W1 W2 :
     dom W1 = dom W2 →
-    glwit_inv Ω1 W1 →
+    owit_inv Ω1 W1 →
     (Ω1 ↪ₐ Ω2) →
-    glwit_inv Ω2 W2 →
+    owit_inv Ω2 W2 →
     False.
   Proof.
     intros. destruct H1 as (k& LU& ?& HE); subst.
-    apply glwit_inv_dom in H0, H2. rewrite -H -H0 dom_insert_L in H2.
+    apply owit_inv_dom in H0, H2. rewrite -H -H0 dom_insert_L in H2.
     apply not_elem_of_dom in LU. set_solver.
   Qed.
 
-  Lemma glwit_inv_progress_owner Ω k a t1 W1 :
-    Ω !! k = Some (ghost_lock_locked a t1) →
-    glwit_inv Ω W1 →
+  Lemma owit_inv_progress_owner Ω k a t1 W1 :
+    Ω !! k = Some (obligation_assigned a t1) →
+    owit_inv Ω W1 →
     ∀ a' t2,
-    ghost_lock_step (ghost_lock_locked a t1) (ghost_lock_locked a' t2) →
+    obligation_step (obligation_assigned a t1) (obligation_assigned a' t2) →
     ∀ W2,
     W1 ↓∘ W2 →
-    glwit_inv (<[k:=(ghost_lock_locked a' t2)]> Ω) W2 →
+    owit_inv (<[k:=(obligation_assigned a' t2)]> Ω) W2 →
     wits_mon W1 W2.
   (* Below is not necessarily true - Wits can take refelexive step *)
-    (* ∃ w1 w2, W1 !! k = Some (v, witness_locked w1) ∧ *)
-    (*          witness_step (v, witness_locked w1) (v, witness_locked w2) ∧ *)
-    (*          wits_mon (<[k:=(v, witness_locked w2)]> W1) W2. *)
+    (* ∃ w1 w2, W1 !! k = Some (v, witness_assigned w1) ∧ *)
+    (*          witness_step (v, witness_assigned w1) (v, witness_assigned w2) ∧ *)
+    (*          wits_mon (<[k:=(v, witness_assigned w2)]> W1) W2. *)
   Proof.
     intros LUO INV1 a' t2 GStep W2 WSStep INV2.
     inv GStep; inv H.
@@ -478,7 +493,7 @@ Section glwit.
     destruct y; try done. symmetry in H0.
     pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
     destruct y; try done. symmetry in H2.
-    eapply (glwit_inv_rc_step_same_gls Ω). 1: eapply INV1. 1: eauto.
+    eapply (owit_inv_rc_step_same_gls Ω). 1: eapply INV1. 1: eauto.
     intros i. specialize (INV2 i). destruct (decide (k = i)).
     - subst. rewrite lookup_insert_eq H2 in INV2. rewrite LUO H2.
       inv INV2. econstructor.
@@ -486,14 +501,14 @@ Section glwit.
     - rewrite lookup_insert_ne in INV2; auto.
   Qed.
 
-  Lemma glwit_inv_unlock Ω k a t W1 :
-    Ω !! k = Some (ghost_lock_locked a t) →
-    glwit_inv Ω W1 →
-    ghost_lock_step (ghost_lock_locked a t) (ghost_lock_unlocked) →
+  Lemma owit_inv_fulfill Ω k a t W1 :
+    Ω !! k = Some (obligation_assigned a t) →
+    owit_inv Ω W1 →
+    obligation_step (obligation_assigned a t) (obligation_fulfilled) →
     ∀ W2,
     W1 ↓∘ W2 →
-    glwit_inv (<[k:=(ghost_lock_unlocked)]> Ω) W2 →
-    (∃ b, W1 !! k = Some (witness_locked b) ∧ wits_mon (<[k:=(witness_unlocked)]> W1) W2).
+    owit_inv (<[k:=(obligation_fulfilled)]> Ω) W2 →
+    (∃ b, W1 !! k = Some (witness_assigned b) ∧ wits_mon (<[k:=(witness_fulfilled)]> W1) W2).
   Proof.
     intros LUO INV1 GStep W2 WSStep INV2.
     inv GStep; inv H.
@@ -503,7 +518,7 @@ Section glwit.
     destruct y; try done. symmetry in H2.
     eexists. split; first eauto.
     inv WSStep. inv H; cycle 1.
-    { eapply (glwit_inv_alloc_same_gls_dom Ω (<[k:=(ghost_lock_unlocked)]> Ω)) in H4; eauto; first done.
+    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obligation_fulfilled)]> Ω)) in H4; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
     apply wits_one_to_wits_cond in H4. destruct H4 as (?&H4). assert (x = k).
     { specialize (H4 k). rewrite H0 H2 in H4. inv H4. destruct H6.
@@ -519,7 +534,7 @@ Section glwit.
       rewrite LUO2 in I4. inv I4. symmetry in H5, H7.
       rewrite H5 H7 in H4. inv H4. econstructor.
       destruct H10 as [[HC WS] | [HC WS]]; cycle 1.
-      { inv WS. destruct g, y0; try done. }
+      { inv WS. destruct o, y0; try done. }
       inv WS.
     - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
       symmetry in H.
@@ -528,14 +543,14 @@ Section glwit.
       symmetry in H5. econstructor.
   Qed.
 
-  Lemma glwit_inv_retire Ω k W1 :
-    Ω !! k = Some (ghost_lock_unlocked) →
-    glwit_inv Ω W1 →
-    ghost_lock_step (ghost_lock_unlocked) (ghost_lock_retired) →
+  Lemma owit_inv_expire Ω k W1 :
+    Ω !! k = Some (obligation_fulfilled) →
+    owit_inv Ω W1 →
+    obligation_step (obligation_fulfilled) (obligation_expired) →
     ∀ W2,
     W1 ↓∘ W2 →
-    glwit_inv (<[k:=(ghost_lock_retired)]> Ω) W2 →
-    (W1 !! k = Some (witness_unlocked) ∧ wits_mon (<[k:=(witness_retired)]> W1) W2).
+    owit_inv (<[k:=(obligation_expired)]> Ω) W2 →
+    (W1 !! k = Some (witness_fulfilled) ∧ wits_mon (<[k:=(witness_expired)]> W1) W2).
   Proof.
     intros LUO INV1 GStep W2 WSStep INV2.
     inv GStep; inv H.
@@ -545,7 +560,7 @@ Section glwit.
     destruct y; try done. symmetry in H2.
     split; first eauto.
     inv WSStep. inv H; cycle 1.
-    { eapply (glwit_inv_alloc_same_gls_dom Ω (<[k:=(ghost_lock_retired)]> Ω)) in H4; eauto; first done.
+    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obligation_expired)]> Ω)) in H4; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
     apply wits_one_to_wits_cond in H4. destruct H4 as (?&H4). assert (x = k).
     { specialize (H4 k). rewrite H0 H2 in H4. inv H4. destruct H6.
@@ -561,7 +576,7 @@ Section glwit.
       rewrite LUO2 in I4. inv I4. symmetry in H5, H7.
       rewrite H5 H7 in H4. inv H4. econstructor.
       destruct H10 as [[HC WS] | [HC WS]]; cycle 1.
-      { inv WS. destruct g, y0; try done. }
+      { inv WS. destruct o, y0; try done. }
       inv WS.
     - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
       symmetry in H.
@@ -570,13 +585,13 @@ Section glwit.
       symmetry in H5. econstructor.
   Qed.
 
-  Lemma glwit_inv_alloc_locked Ω k W1 :
+  Lemma owit_inv_alloc_assigned Ω k W1 :
     k ∉ dom Ω →
-    glwit_inv Ω W1 →
+    owit_inv Ω W1 →
     ∀ a t W2,
     W1 ↓∘ W2 →
-    glwit_inv (<[k:=(ghost_lock_locked a t)]> Ω) W2 →
-    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_locked (η a))]> W1) W2).
+    owit_inv (<[k:=(obligation_assigned a t)]> Ω) W2 →
+    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_assigned (η a))]> W1) W2).
   Proof.
     intros LUO INV1 a t W2 WSStep INV2.
     apply not_elem_of_dom in LUO.
@@ -596,13 +611,13 @@ Section glwit.
     - rewrite lookup_insert_ne in H1; auto. rewrite H in H1. inv H1.
   Qed.
 
-  Lemma glwit_inv_alloc_unlocked Ω k W1 :
+  Lemma owit_inv_alloc_fulfilled Ω k W1 :
     k ∉ dom Ω →
-    glwit_inv Ω W1 →
+    owit_inv Ω W1 →
     ∀ W2,
     W1 ↓∘ W2 →
-    glwit_inv (<[k:=(ghost_lock_unlocked)]> Ω) W2 →
-    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_unlocked)]> W1) W2).
+    owit_inv (<[k:=(obligation_fulfilled)]> Ω) W2 →
+    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_fulfilled)]> W1) W2).
   Proof.
     intros LUO INV1 W2 WSStep INV2.
     apply not_elem_of_dom in LUO.
@@ -621,18 +636,18 @@ Section glwit.
     - rewrite lookup_insert_ne in H1; auto. rewrite H in H1. inv H1.
   Qed.
 
-End glwit.
+End owit.
 
 (* Allocation of the initial witness protocol. *)
-Lemma glwit_alloc `{SI : indexT} {Σ}
-  `{!@glsatGS.glsatGS _ Σ} `{!glwitGS Σ} :
-  ⊢ |==> ∃ _ : glwitGS Σ, glwit ∅.
+Lemma owit_alloc `{SI : indexT} {Σ}
+  `{!@osatGS.osatGS _ Σ} `{!owitGS Σ} :
+  ⊢ |==> ∃ _ : owitGS Σ, owit ∅.
 Proof.
   iIntros.
   iMod (own_alloc (reservation_map_token (A:=bcredUR) ⊤)) as (γC) "HC";
     first by apply reservation_map_token_valid.
-  iModIntro; iExists (GlwitG SI _ _ γC).
-  rewrite /glwit -lock.
+  iModIntro; iExists (OwitG SI _ _ γC).
+  rewrite /owit -lock.
   replace (⊤ ∖ gset_to_coPset (dom (∅ : witnesses))) with (⊤ : coPset); [iFrame; done|].
   set_solver.
 Qed.
