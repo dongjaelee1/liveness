@@ -2,164 +2,171 @@ From iris.proofmode Require Import base proofmode classes.
 From iris.bi Require Export fixpoint.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From liris.base_logic Require Export owit othread invariants.
+From liris.base_logic Require Export owit othread history_interp invariants.
 From liris.algebra Require Import ordinal_wfocm.
 Import uPred.
 
+Class mupdGS `{SI : indexT} (Σ : gFunctors) :=
+  MupdG {
+      (** Invariants. *)
+      #[global] mupd_invGS :: invGS Σ;
+      (** Ghost locks. *)
+      #[global] mupd_osatGS :: osatGS.osatGS Σ;
+      (** Ghost lock obligations assigned to threads. *)
+      #[global] mupd_othreadGS :: othreadGS.othreadGS Σ;
+      (** Ghost lock witnesses. *)
+      #[global] mupd_owitGS :: owitGS.owitGS Σ;
+    }.
+Global Opaque mupd_invGS mupd_osatGS mupd_othreadGS mupd_owitGS.
+Global Arguments MupdG {SI Σ}.
+
 TODO
 
-(** State interpretation; provided by the language. *)
-Class state_interp_class `{SI : indexT} (Σ : gFunctors) (A B : Type) :=
-  { state_interp : A → gset positive → B → iProp Σ; }.
+history_interp =
+λ (SI : indexT) (Σ : gFunctors) (St : Type) (H : histGS.histGS Σ St) (Π : Type) (H0 : state_interp_class Σ St Π) 
+  (H1 : osatGS.osatGS Σ) (H2 : ord_mono_fun_class) (h : list (event St)) (t : nat) (σ : St) (Θ : gset positive) 
+  (Ω : obligations), (⌜history_wf h⌝ ∧ ⌜last h = Some (t, σ, Ω)⌝ ∧ hG_history_auth h ∗ state_interp σ Θ ∗ osat Ω)%I
+     : ∀ {SI : indexT} {Σ : gFunctors} {St : Type},
+         histGS.histGS Σ St
+         → ∀ {Π : Type},
+             state_interp_class Σ St Π
+             → osatGS.osatGS Σ → ord_mono_fun_class → list (event St) → nat → St → gset positive → obligations → iProp Σ
 
-Class gupdGS `{SI : indexT} (Σ : gFunctors) :=
-  GupdG {
-      (** Invariants. *)
-      #[global] gupd_invGS :: invGS Σ;
-      (** Ghost locks. *)
-      #[global] gupd_glsatGS :: glsatGS.glsatGS Σ;
-      (** Ghost lock obligations assigned to threads. *)
-      #[global] gupd_globlGS :: globlGS.globlGS Σ;
-      (** Ghost lock witnesses. *)
-      #[global] gupd_glwitGS :: glwitGS.glwitGS Σ;
-      (* (** Fair scheduler function for witnesses. *) *)
-      (* #[global] fair_scheduler_fun :: ord_mono_fun_class; *)
-    }.
-Global Opaque gupd_invGS gupd_glsatGS gupd_globlGS gupd_glwitGS.
-Global Arguments GupdG {SI Σ}.
-
-Definition ginterp `{SI : indexT} `{!gupdGS Σ} `{!ord_mono_fun_class}
+Definition model_interp `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   (Ω : ghost_locks) (W : witnesses) (Θ : gset positive) : iProp Σ :=
-  (glsat Ω ∗ globl Θ ∗ glassigned (dom Ω) ∗ glwit W ∗ ⌜ glwit_inv Ω W ⌝)%I.
+  (osat Ω ∗ othread Θ ∗ glassigned (dom Ω) ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
+
+`{@histGS SI Σ St} `{@state_interp_class SI Σ St Π}
+
 
 TODO
 
 (** Modality for updating ghost locks. *)
-Definition gupd_pre `{SI : indexT}`{!state_interp_class Σ A B} `{!gupdGS Σ} `{!ord_mono_fun_class}
-  (gupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
+Definition mupd_pre `{SI : indexT}`{!state_interp_class Σ A B} `{!mupdGS Σ} `{!ord_mono_fun_class}
+  (mupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
     ((|={∅}=> P) ∨
        (∀ (σ : A) (κ : B) (Ω1 : ghost_locks) (W1 : witnesses) (Θ : gset positive),
-          (state_interp σ Θ κ ∗ ginterp Ω1 W1 Θ) ={∅}=∗
+          (state_interp σ Θ κ ∗ model_interp Ω1 W1 Θ) ={∅}=∗
           ∃ Ω2, (⌜ (Ω1 ↪∘ Ω2) ⌝) ∗
-                ∀ W2, (⌜ (W1 ↓∘ W2) ∧ glwit_inv Ω2 W2 ⌝) ={∅}=∗
-                      (state_interp σ Θ κ ∗ ginterp Ω2 W2 Θ) ∗ gupd P))%I.
+                ∀ W2, (⌜ (W1 ↓∘ W2) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗
+                      (state_interp σ Θ κ ∗ model_interp Ω2 W2 Θ) ∗ mupd P))%I.
 
-Lemma gupd_pre_mono `{SI : indexT} `{!gupdGS Σ} Θ
-  (gupd1 gupd2 : iPropO Σ -d> iPropO Σ) :
-  ⊢ ((□ ∀ P, gupd1 P -∗ gupd2 P) →
-     ∀ P, gupd_pre Θ gupd1 P -∗ gupd_pre Θ gupd2 P)%I.
+Lemma mupd_pre_mono `{SI : indexT} `{!mupdGS Σ} Θ
+  (mupd1 mupd2 : iPropO Σ -d> iPropO Σ) :
+  ⊢ ((□ ∀ P, mupd1 P -∗ mupd2 P) →
+     ∀ P, mupd_pre Θ mupd1 P -∗ mupd_pre Θ mupd2 P)%I.
 Proof.
-  iIntros "#Hmono"; iIntros (P) "Hgupd". rewrite /gupd_pre.
-  iDestruct "Hgupd" as "[H | Hgupd]".
+  iIntros "#Hmono"; iIntros (P) "Hmupd". rewrite /mupd_pre.
+  iDestruct "Hmupd" as "[H | Hmupd]".
   { iLeft. done. }
-  iRight. iIntros (??) "I". iMod ("Hgupd" with "[$I]") as "(%& %& H)".
+  iRight. iIntros (??) "I". iMod ("Hmupd" with "[$I]") as "(%& %& H)".
   iModIntro. iExists _. iSplitR; first done. iIntros (??).
   iMod ("H" with "[//]") as "[$ H]". by iApply "Hmono".
 Qed.
 
-Local Instance gupd_pre_mono' `{SI : indexT} `{!gupdGS Σ} Θ :
-  BiMonoPred (gupd_pre Θ).
+Local Instance mupd_pre_mono' `{SI : indexT} `{!mupdGS Σ} Θ :
+  BiMonoPred (mupd_pre Θ).
 Proof.
   constructor.
-  - iIntros (gupd1 gupd2 NE1 NE2) "#H". iApply gupd_pre_mono. iModIntro. iApply "H".
-  - intros gupd Hgupd n P1 P2 ?. rewrite /gupd_pre.
+  - iIntros (mupd1 mupd2 NE1 NE2) "#H". iApply mupd_pre_mono. iModIntro. iApply "H".
+  - intros mupd Hmupd n P1 P2 ?. rewrite /mupd_pre.
     do 20 (f_equiv || done).
 Qed.
 
 (* take the least fixpoint of the above definition, with partial sate information *)
-Local Definition gupd_def `{SI : indexT} `{!gupdGS Σ} Θ : iProp Σ → iProp Σ :=
-  λ P, ((bi_least_fixpoint (gupd_pre Θ)) P)%I.
-Local Definition gupd_aux : seal (@gupd_def). by eexists. Qed.
-Definition gupd := gupd_aux.(unseal).
-Arguments gupd {SI Σ _}.
-Local Definition gupd_unseal : @gupd = @gupd_def := gupd_aux.(seal_eq).
-Notation "'|=[' Θ ']=>g' P" := (gupd Θ P) (at level 99, P at level 200, format "|=[ Θ ]=>g  P").
+Local Definition mupd_def `{SI : indexT} `{!mupdGS Σ} Θ : iProp Σ → iProp Σ :=
+  λ P, ((bi_least_fixpoint (mupd_pre Θ)) P)%I.
+Local Definition mupd_aux : seal (@mupd_def). by eexists. Qed.
+Definition mupd := mupd_aux.(unseal).
+Arguments mupd {SI Σ _}.
+Local Definition mupd_unseal : @mupd = @mupd_def := mupd_aux.(seal_eq).
+Notation "'|=[' Θ ']=>g' P" := (mupd Θ P) (at level 99, P at level 200, format "|=[ Θ ]=>g  P").
 
-Section gupd.
-  Context `{SI : indexT} `{!gupdGS Σ}.
+Section mupd.
+  Context `{SI : indexT} `{!mupdGS Σ}.
   Implicit Type Θ : (gset positive).
 
-  Lemma gupd_unfold Θ P :
-    (|=[Θ]=>g P) ⊣⊢ (gupd_pre Θ (gupd Θ) P).
+  Lemma mupd_unfold Θ P :
+    (|=[Θ]=>g P) ⊣⊢ (mupd_pre Θ (mupd Θ) P).
   Proof.
-    rewrite gupd_unseal. rewrite /gupd_def.
-    rewrite (least_fixpoint_unfold (gupd_pre Θ)). done.
+    rewrite mupd_unseal. rewrite /mupd_def.
+    rewrite (least_fixpoint_unfold (mupd_pre Θ)). done.
   Qed.
 
-  Global Instance gupd_ne Θ :
-    NonExpansive (gupd Θ).
+  Global Instance mupd_ne Θ :
+    NonExpansive (mupd Θ).
   Proof.
-    intros n P1 P2 HP. rewrite !gupd_unseal /gupd_def. f_equiv. done.
+    intros n P1 P2 HP. rewrite !mupd_unseal /mupd_def. f_equiv. done.
   Qed.
-  Global Instance gupd_proper Θ :
-    Proper ((≡) ==> (≡)) (gupd Θ).
+  Global Instance mupd_proper Θ :
+    Proper ((≡) ==> (≡)) (mupd Θ).
   Proof.
-    intros P P' ?. apply equiv_dist=>n. apply gupd_ne. apply equiv_dist. done.
+    intros P P' ?. apply equiv_dist=>n. apply mupd_ne. apply equiv_dist. done.
   Qed.
 
-  Lemma gupd_ind_strong (Ψ : iProp Σ → iProp Σ) Θ :
+  Lemma mupd_ind_strong (Ψ : iProp Σ → iProp Σ) Θ :
     (∀ n, Proper (dist n ==> dist n) Ψ) →
-    ⊢ (□ (∀ P, gupd_pre Θ (λ P, Ψ P ∧ |=[Θ]=>g P) P -∗ Ψ P)
+    ⊢ (□ (∀ P, mupd_pre Θ (λ P, Ψ P ∧ |=[Θ]=>g P) P -∗ Ψ P)
        → ∀ P, (|=[Θ]=>g P) -∗ Ψ P)%I.
   Proof.
-    iIntros (HΨ). iIntros "#IH" (P) "H". rewrite gupd_unseal.
+    iIntros (HΨ). iIntros "#IH" (P) "H". rewrite mupd_unseal.
     iApply (least_fixpoint_ind _ Ψ with "[] H").
     iIntros "!#" (?) "H". iApply "IH".
     iApply (bi_mono_pred with "[] H").
     { repeat intro. do 3 (f_equiv || done). }
-    { repeat intro. rewrite -!gupd_unseal. f_equiv; f_equiv; done. }
+    { repeat intro. rewrite -!mupd_unseal. f_equiv; f_equiv; done. }
     iIntros "!>" (?) "H". iSplit.
     - iDestruct "H" as "[H _]". done.
     - iDestruct "H" as "[_ H]". done.
   Qed.
 
-  Lemma gupd_ind Θ Ψ :
+  Lemma mupd_ind Θ Ψ :
     (∀ n, Proper (dist n ==> dist n) Ψ)
-    → ⊢ (□ (∀ P, gupd_pre Θ (λ P, Ψ P) P -∗ Ψ P)
+    → ⊢ (□ (∀ P, mupd_pre Θ (λ P, Ψ P) P -∗ Ψ P)
          → ∀ P, (|=[Θ]=>g P) -∗ Ψ P)%I.
   Proof.
-    iIntros (HΨ) "#H". iApply gupd_ind_strong. iIntros "!>" (P) "Hgupd".
-    iApply "H". iApply (gupd_pre_mono with "[] Hgupd").
+    iIntros (HΨ) "#H". iApply mupd_ind_strong. iIntros "!>" (P) "Hmupd".
+    iApply "H". iApply (mupd_pre_mono with "[] Hmupd").
     iIntros "!>" (?) "[$ _]".
   Qed.
 
   (** A fancy update can be turned into an obligation update. *)
-  Lemma fupd_gupd Θ P : (|={∅}=> P) ⊢ (|=[Θ]=>g P).
+  Lemma fupd_mupd Θ P : (|={∅}=> P) ⊢ (|=[Θ]=>g P).
   Proof.
-    rewrite gupd_unfold. iIntros "Hupd". iLeft. done.
+    rewrite mupd_unfold. iIntros "Hupd". iLeft. done.
   Qed.
 
   (** We can always introduce a obligation update. *)
-  Lemma gupd_intro Θ P : P ⊢ |=[Θ]=>g P.
+  Lemma mupd_intro Θ P : P ⊢ |=[Θ]=>g P.
   Proof.
-    rewrite gupd_unfold. iIntros "HP". iLeft. iModIntro. done.
+    rewrite mupd_unfold. iIntros "HP". iLeft. iModIntro. done.
   Qed.
 
   (** We can always eliminate a fancy update. *)
-  Lemma fupd_gupd_elim Θ P :
+  Lemma fupd_mupd_elim Θ P :
     (|={∅}=> |=[Θ]=>g P) ⊢ |=[Θ]=>g P.
   Proof.
-    iIntros "H". iApply gupd_unfold.
+    iIntros "H". iApply mupd_unfold.
     iRight. iIntros (??) "I". iMod "H".
     iModIntro. iExists Ω1. iSplitR; first done.
     iIntros (? (Prog& OW2)).
     iModIntro. rewrite /gproto. iDestruct "I" as "($& $& $& N& %OW1)".
-    pose proof (glwit_inv_rc_step_same_gls _ _ _ OW1 Prog OW2).
-    iPoseProof (glwit_mon _ _ H with "N") as "$".
+    pose proof (owit_inv_rc_step_same_gls _ _ _ OW1 Prog OW2).
+    iPoseProof (owit_mon _ _ H with "N") as "$".
     iFrame. done.
   Qed.
 
   (** We can combine two obligation updates into one. *)
-  Lemma gupd_bind Θ P Q :
+  Lemma mupd_bind Θ P Q :
     (P -∗ |=[Θ]=>g Q) ⊢ (|=[Θ]=>g P) -∗ (|=[Θ]=>g Q).
   Proof.
     iIntros "H HP". iRevert (Q) "H". iRevert (P) "HP".
-    iApply gupd_ind_strong.
+    iApply mupd_ind_strong.
     { solve_proper. }
     iIntros "!> %P IH %Q H". iDestruct "IH" as "[IH | IH]".
-    - iApply fupd_gupd_elim. iMod "IH". iModIntro. iApply ("H" with "IH").
-    - iApply gupd_unfold. iRight. iIntros (??) "I".
+    - iApply fupd_mupd_elim. iMod "IH". iModIntro. iApply ("H" with "IH").
+    - iApply mupd_unfold. iRight. iIntros (??) "I".
       iMod ("IH" with "I") as "(%&%& IH)".
       iModIntro. iExists _. iSplitR; first done.
       iIntros (??). iMod ("IH" with "[//]") as "[$ IH]".
@@ -168,84 +175,84 @@ Section gupd.
   Qed.
 
   (* derived lemmas *)
-  Lemma gupd_mono Θ P Q : (P ⊢ Q) → (|=[Θ]=>g P) ⊢ (|=[Θ]=>g Q).
+  Lemma mupd_mono Θ P Q : (P ⊢ Q) → (|=[Θ]=>g P) ⊢ (|=[Θ]=>g Q).
   Proof.
-    intros Hent. iApply gupd_bind.
-    iIntros "P"; iApply gupd_intro; by iApply Hent.
+    intros Hent. iApply mupd_bind.
+    iIntros "P"; iApply mupd_intro; by iApply Hent.
   Qed.
-  Lemma gupd_trans Θ P :  (|=[Θ]=>g |=[Θ]=>g P) ⊢ |=[Θ]=>g P.
+  Lemma mupd_trans Θ P :  (|=[Θ]=>g |=[Θ]=>g P) ⊢ |=[Θ]=>g P.
   Proof.
-    iIntros "HP". iApply gupd_bind; eauto.
+    iIntros "HP". iApply mupd_bind; eauto.
   Qed.
-  Lemma gupd_frame_r Θ P R : (|=[Θ]=>g P) ∗ R ⊢ |=[Θ]=>g P ∗ R.
+  Lemma mupd_frame_r Θ P R : (|=[Θ]=>g P) ∗ R ⊢ |=[Θ]=>g P ∗ R.
   Proof.
-    iIntros "[Hupd R]". iApply (gupd_bind with "[R]"); last done.
-    iIntros "P". iApply gupd_intro. by iFrame.
+    iIntros "[Hupd R]". iApply (mupd_bind with "[R]"); last done.
+    iIntros "P". iApply mupd_intro. by iFrame.
   Qed.
 
-  Global Instance gupd_ent_proper Θ : Proper ((⊢) ==> (⊢)) (gupd Θ).
-  Proof. intros P Q PQ. by apply gupd_mono. Qed.
-  Global Instance gupd_flip_ent_proper Θ : Proper (flip (⊢) ==> flip (⊢)) (gupd Θ).
-  Proof. intros P Q PQ; by apply gupd_mono. Qed.
-  Global Instance gupd_equiv_proper Θ : Proper ((≡) ==> (≡)) (gupd Θ) := ne_proper _.
+  Global Instance mupd_ent_proper Θ : Proper ((⊢) ==> (⊢)) (mupd Θ).
+  Proof. intros P Q PQ. by apply mupd_mono. Qed.
+  Global Instance mupd_flip_ent_proper Θ : Proper (flip (⊢) ==> flip (⊢)) (mupd Θ).
+  Proof. intros P Q PQ; by apply mupd_mono. Qed.
+  Global Instance mupd_equiv_proper Θ : Proper ((≡) ==> (≡)) (mupd Θ) := ne_proper _.
 
-  Lemma gupd_fupd_l Θ P :
+  Lemma mupd_fupd_l Θ P :
     (|={∅}=> |=[Θ]=>g P) ⊢ (|=[Θ]=>g P).
   Proof.
-    by erewrite fupd_gupd, gupd_trans.
+    by erewrite fupd_mupd, mupd_trans.
   Qed.
-  Lemma gupd_fupd_r Θ P :
+  Lemma mupd_fupd_r Θ P :
     (|=[Θ]=>g |={∅}=> P) ⊢ (|=[Θ]=>g P).
   Proof.
-    by erewrite fupd_gupd, gupd_trans.
+    by erewrite fupd_mupd, mupd_trans.
   Qed.
 
-  Lemma gupd_frame_l Θ R Q : (R ∗ |=[Θ]=>g Q) ⊢ |=[Θ]=>g R ∗ Q.
-  Proof. rewrite !(comm _ R); apply gupd_frame_r. Qed.
-  Lemma gupd_wand_l Θ P Q : (P -∗ Q) ∗ (|=[Θ]=>g P) ⊢ |=[Θ]=>g Q.
-  Proof. by rewrite gupd_frame_l wand_elim_l. Qed.
-  Lemma gupd_wand_r Θ P Q : (|=[Θ]=>g P) ∗ (P -∗ Q) ⊢ |=[Θ]=>g Q.
-  Proof. by rewrite gupd_frame_r wand_elim_r. Qed.
-  Lemma gupd_sep Θ P Q : (|=[Θ]=>g P) ∗ (|=[Θ]=>g Q) ⊢ |=[Θ]=>g P ∗ Q.
-  Proof. by rewrite gupd_frame_r gupd_frame_l gupd_trans. Qed.
-  Lemma gupd_idemp Θ P : (|=[Θ]=>g |=[Θ]=>g P) ⊣⊢ |=[Θ]=>g P.
+  Lemma mupd_frame_l Θ R Q : (R ∗ |=[Θ]=>g Q) ⊢ |=[Θ]=>g R ∗ Q.
+  Proof. rewrite !(comm _ R); apply mupd_frame_r. Qed.
+  Lemma mupd_wand_l Θ P Q : (P -∗ Q) ∗ (|=[Θ]=>g P) ⊢ |=[Θ]=>g Q.
+  Proof. by rewrite mupd_frame_l wand_elim_l. Qed.
+  Lemma mupd_wand_r Θ P Q : (|=[Θ]=>g P) ∗ (P -∗ Q) ⊢ |=[Θ]=>g Q.
+  Proof. by rewrite mupd_frame_r wand_elim_r. Qed.
+  Lemma mupd_sep Θ P Q : (|=[Θ]=>g P) ∗ (|=[Θ]=>g Q) ⊢ |=[Θ]=>g P ∗ Q.
+  Proof. by rewrite mupd_frame_r mupd_frame_l mupd_trans. Qed.
+  Lemma mupd_idemp Θ P : (|=[Θ]=>g |=[Θ]=>g P) ⊣⊢ |=[Θ]=>g P.
   Proof.
     apply: anti_symm.
-    - apply gupd_trans.
-    - apply gupd_intro.
+    - apply mupd_trans.
+    - apply mupd_intro.
   Qed.
 
-  Global Instance gupd_homomorphism Θ :
-    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (gupd Θ).
-  Proof. split; [split|]; try apply _; [apply gupd_sep | apply gupd_intro]. Qed.
+  Global Instance mupd_homomorphism Θ :
+    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (mupd Θ).
+  Proof. split; [split|]; try apply _; [apply mupd_sep | apply mupd_intro]. Qed.
 
-  Lemma big_sepL_gupd {A} (Φ : nat → A → iProp Σ) Θ l :
+  Lemma big_sepL_mupd {A} (Φ : nat → A → iProp Σ) Θ l :
     ([∗ list] k↦x ∈ l, |=[Θ]=>g Φ k x) ⊢ |=[Θ]=>g [∗ list] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opL_commute _). Qed.
-  Lemma big_sepM_gupd {A} `{Countable K} (Φ : K → A → iProp Σ) Θ l :
+  Lemma big_sepM_mupd {A} `{Countable K} (Φ : K → A → iProp Σ) Θ l :
     ([∗ map] k↦x ∈ l, |=[Θ]=>g Φ k x) ⊢ |=[Θ]=>g [∗ map] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opM_commute _). Qed.
-  Lemma big_sepS_gupd `{Countable A} (Φ : A → iProp Σ) Θ l :
+  Lemma big_sepS_mupd `{Countable A} (Φ : A → iProp Σ) Θ l :
     ([∗ set]  x ∈ l, |=[Θ]=>g Φ x) ⊢ |=[Θ]=>g [∗ set] x ∈ l, Φ x.
   Proof. by rewrite (big_opS_commute _). Qed.
-  Lemma big_sepMS_gupd `{Countable A} (Φ : A → iProp Σ) Θ l :
+  Lemma big_sepMS_mupd `{Countable A} (Φ : A → iProp Σ) Θ l :
     ([∗ mset] x ∈ l, |=[Θ]=>g Φ x) ⊢ |=[Θ]=>g [∗ mset] x ∈ l, Φ x.
   Proof. by rewrite (big_opMS_commute _). Qed.
 
-  Lemma except_0_gupd Θ P : ◇ (|=[Θ]=>g P) ⊢ (|=[Θ]=>g ◇ P).
+  Lemma except_0_mupd Θ P : ◇ (|=[Θ]=>g P) ⊢ (|=[Θ]=>g ◇ P).
   Proof.
-    rewrite /bi_except_0. apply or_elim; eauto using gupd_mono, or_intro_r.
-    by rewrite -gupd_intro -or_intro_l.
+    rewrite /bi_except_0. apply or_elim; eauto using mupd_mono, or_intro_r.
+    by rewrite -mupd_intro -or_intro_l.
   Qed.
 
-  Lemma gproto_glwit_inv Ω W Θ :
-    gproto Ω W Θ ⊢ ⌜ glwit_inv Ω W ⌝.
+  Lemma gproto_owit_inv Ω W Θ :
+    gproto Ω W Θ ⊢ ⌜ owit_inv Ω W ⌝.
   Proof. iIntros "(_&_&_&_&$)". Qed.
 
-  Lemma glwit_inv_exists_witnesses Ω1 Ω2 W1 :
+  Lemma owit_inv_exists_witnesses Ω1 Ω2 W1 :
     Ω1 ↪∘ Ω2 →
-    glwit_inv Ω1 W1 →
-    ∃ W2, W1 ↓∘ W2 ∧ glwit_inv Ω2 W2.
+    owit_inv Ω1 W1 →
+    ∃ W2, W1 ↓∘ W2 ∧ owit_inv Ω2 W2.
   Proof.
     intros Step Inv. destruct Step.
     { subst. exists W1. eauto. }
@@ -285,7 +292,7 @@ Section gupd.
         * intros ?. destruct (decide (i = x)).
           { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
           { rewrite !lookup_insert_ne; eauto. }
-    - pose proof Inv as Dom. apply glwit_inv_dom in Dom. destruct H0 as (k& v& LUO& [? | ?]).
+    - pose proof Inv as Dom. apply owit_inv_dom in Dom. destruct H0 as (k& v& LUO& [? | ?]).
       + destruct H as (a& t& ?). exists (<[k:=(v, witness_locked (GL:=ord_ghost_lock_class) (η a))]>W1). split.
         * econstructor 2. econstructor 2. exists k, v. split.
           { apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto. }
@@ -302,166 +309,166 @@ Section gupd.
           { rewrite !lookup_insert_ne; eauto. }
   Qed.
 
-  Lemma gproto_gupd_steps Ω W Θ P :
+  Lemma gproto_mupd_steps Ω W Θ P :
     (|=[Θ]=>g P) -∗ gproto Ω W Θ ={∅}=∗ (P ∗ ∃ Ω' W', gproto Ω' W' Θ).
   Proof.
     iIntros "H". iRevert (Ω W). iRevert (P) "H".
-    iApply gupd_ind_strong.
+    iApply mupd_ind_strong.
     { solve_proper. }
     iIntros "!> %P IH % % H". iDestruct "IH" as "[IH | IH]".
     { iMod "IH". by iFrame. }
-    iPoseProof (gproto_glwit_inv with "H") as "%".
+    iPoseProof (gproto_owit_inv with "H") as "%".
     iMod ("IH" with "H") as "(%&%& IH)".
-    pose proof (glwit_inv_exists_witnesses _ _ _ H0 H). destruct H1 as (W2& ?).
+    pose proof (owit_inv_exists_witnesses _ _ _ H0 H). destruct H1 as (W2& ?).
     iMod ("IH" $! _ H1) as "[G [IH _]]". iApply ("IH" with "G").
   Qed.
 
   (* The following instances make the Iris Proof Mode aware of the
      obligation update. They are derived from the simpler rules above. *)
-  (* Global Instance elim_fupd_gupd (p : bool) Θ P Q : *)
+  (* Global Instance elim_fupd_mupd (p : bool) Θ P Q : *)
   (*   ElimModal True p false (|={∅}=> P) P (|=[Θ]=>g Q) (|=[Θ]=>g Q)%I. *)
   (* Proof. *)
   (*   rewrite /ElimModal bi.intuitionistically_if_elim //=. *)
-  (*   rewrite fupd_gupd. *)
-  (*   iIntros "_ [HP HPQ]". iApply (gupd_bind with "HPQ HP"). *)
+  (*   rewrite fupd_mupd. *)
+  (*   iIntros "_ [HP HPQ]". iApply (mupd_bind with "HPQ HP"). *)
   (* Qed. *)
 
-  Global Instance elim_fupd_gupd (p : bool) E Θ P Q :
+  Global Instance elim_fupd_mupd (p : bool) E Θ P Q :
     ElimModal True p false (|={∅,E}=> P) P (|=[Θ]=>g Q) (|={E,∅}=> |=[Θ]=>g Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply fupd_gupd_elim. iMod "HP".
+    iIntros "_ [HP HPQ]". iApply fupd_mupd_elim. iMod "HP".
     by iApply "HPQ".
   Qed.
 
-  Global Instance add_modal_fupd_gupd Θ P Q :
+  Global Instance add_modal_fupd_mupd Θ P Q :
     AddModal (|={∅}=> P) P (|=[Θ]=>g Q).
   Proof.
-    rewrite /AddModal; rewrite fupd_gupd; iIntros "[HP HPQ]".
-    iApply (gupd_bind with "HPQ HP").
+    rewrite /AddModal; rewrite fupd_mupd; iIntros "[HP HPQ]".
+    iApply (mupd_bind with "HPQ HP").
   Qed.
 
-  Global Instance from_assumption_gupd p Θ P Q :
+  Global Instance from_assumption_mupd p Θ P Q :
     FromAssumption p P Q → KnownRFromAssumption p P (|=[Θ]=>g Q).
-  Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply gupd_intro. Qed.
+  Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply mupd_intro. Qed.
 
-  Global Instance from_pure_gupd a Θ P φ :
+  Global Instance from_pure_mupd a Θ P φ :
     FromPure a P φ → FromPure a (|=[Θ]=>g P) φ.
-  Proof. rewrite /FromPure=> <-. apply gupd_intro. Qed.
+  Proof. rewrite /FromPure=> <-. apply mupd_intro. Qed.
 
-  Global Instance into_wand_gupd p q Θ R P Q :
+  Global Instance into_wand_mupd p q Θ R P Q :
     IntoWand false false R P Q → IntoWand p q (|=[Θ]=>g R) (|=[Θ]=>g P) (|=[Θ]=>g Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite !intuitionistically_if_elim HR.
-    apply wand_intro_l. by rewrite gupd_sep wand_elim_r.
+    apply wand_intro_l. by rewrite mupd_sep wand_elim_r.
   Qed.
 
-  Global Instance into_wand_gupd_persistent p q Θ R P Q :
+  Global Instance into_wand_mupd_persistent p q Θ R P Q :
     IntoWand false q R P Q → IntoWand p q (|=[Θ]=>g R) P (|=[Θ]=>g Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite intuitionistically_if_elim HR.
-    apply wand_intro_l. by rewrite gupd_frame_l wand_elim_r.
+    apply wand_intro_l. by rewrite mupd_frame_l wand_elim_r.
   Qed.
 
-  Global Instance into_wand_gupd_args p q Θ R P Q :
+  Global Instance into_wand_mupd_args p q Θ R P Q :
     IntoWand p false R P Q → IntoWand' p q R (|=[Θ]=>g P) (|=[Θ]=>g Q).
   Proof.
     rewrite /IntoWand' /IntoWand /= => ->.
-    apply wand_intro_l. by rewrite intuitionistically_if_elim gupd_wand_r.
+    apply wand_intro_l. by rewrite intuitionistically_if_elim mupd_wand_r.
   Qed.
 
-  Global Instance from_sep_gupd Θ P Q1 Q2 :
+  Global Instance from_sep_mupd Θ P Q1 Q2 :
     FromSep P Q1 Q2 → FromSep (|=[Θ]=>g P) (|=[Θ]=>g Q1) (|=[Θ]=>g Q2).
-  Proof. rewrite /FromSep=><-. apply gupd_sep. Qed.
+  Proof. rewrite /FromSep=><-. apply mupd_sep. Qed.
 
-  Global Instance from_or_gupd Θ P Q1 Q2 :
+  Global Instance from_or_mupd Θ P Q1 Q2 :
     FromOr P Q1 Q2 → FromOr (|=[Θ]=>g P) (|=[Θ]=>g Q1) (|=[Θ]=>g Q2).
   Proof.
     rewrite /FromOr=><-.
-    apply or_elim; apply gupd_mono; auto using or_intro_l, or_intro_r.
+    apply or_elim; apply mupd_mono; auto using or_intro_l, or_intro_r.
   Qed.
 
-  Global Instance from_exist_gupd {A} Θ P (Φ : A → iProp Σ) :
+  Global Instance from_exist_mupd {A} Θ P (Φ : A → iProp Σ) :
     FromExist P Φ → FromExist (|=[Θ]=>g P) (λ a, |=[Θ]=>g Φ a)%I.
   Proof.
     rewrite /FromExist=><-. apply exist_elim=> a. by rewrite -(exist_intro a).
   Qed.
 
-  Global Instance is_except_0_gupd Θ P : IsExcept0 P → IsExcept0 (|=[Θ]=>g P).
+  Global Instance is_except_0_mupd Θ P : IsExcept0 P → IsExcept0 (|=[Θ]=>g P).
   Proof.
     rewrite /IsExcept0=> HP.
-    by rewrite -{2}HP -(except_0_idemp P) -except_0_gupd -(except_0_intro P).
+    by rewrite -{2}HP -(except_0_idemp P) -except_0_mupd -(except_0_intro P).
   Qed.
 
-  Global Instance from_modal_gupd Θ P :
+  Global Instance from_modal_mupd Θ P :
     FromModal True modality_id (|=[Θ]=>g P) (|=[Θ]=>g P) P.
-  Proof. by rewrite /FromModal /= -gupd_intro. Qed.
+  Proof. by rewrite /FromModal /= -mupd_intro. Qed.
 
-  Global Instance elim_modal_gupd p Θ P Q :
+  Global Instance elim_modal_mupd p Θ P Q :
     ElimModal True p false (|=[Θ]=>g P) P (|=[Θ]=>g Q) (|=[Θ]=>g Q).
   Proof.
     by rewrite /ElimModal
-      intuitionistically_if_elim gupd_frame_r wand_elim_r gupd_trans.
+      intuitionistically_if_elim mupd_frame_r wand_elim_r mupd_trans.
   Qed.
 
-  Global Instance add_modal_gupd Θ P Q : AddModal (|=[Θ]=>g P) P (|=[Θ]=>g Q).
-  Proof. by rewrite /AddModal gupd_frame_r wand_elim_r gupd_trans. Qed.
+  Global Instance add_modal_mupd Θ P Q : AddModal (|=[Θ]=>g P) P (|=[Θ]=>g Q).
+  Proof. by rewrite /AddModal mupd_frame_r wand_elim_r mupd_trans. Qed.
 
-  Global Instance frame_gupd p Θ R P Q :
+  Global Instance frame_mupd p Θ R P Q :
     Frame p R P Q → Frame p R (|=[Θ]=>g P) (|=[Θ]=>g Q).
-  Proof. rewrite /Frame=><-. by rewrite gupd_frame_l. Qed.
+  Proof. rewrite /Frame=><-. by rewrite mupd_frame_l. Qed.
 
-End gupd.
+End mupd.
 
 (* Wrapper to use fupd. *)
-Definition fgupd `{SI : indexT} `{!gupdGS Σ} E Θ : iPropO Σ -d> iPropO Σ :=
+Definition fmupd `{SI : indexT} `{!mupdGS Σ} E Θ : iPropO Σ -d> iPropO Σ :=
   (λ P, |={E,∅}=> |=[Θ]=>g |={∅,E}=> P)%I.
-Notation "'|={' E : Θ '}=>g' P" := (fgupd E Θ P) (at level 99, P at level 200, format "|={ E : Θ }=>g  P").
+Notation "'|={' E : Θ '}=>g' P" := (fmupd E Θ P) (at level 99, P at level 200, format "|={ E : Θ }=>g  P").
 
-Section fgupd.
-  Context `{SI : indexT} `{!gupdGS Σ}.
+Section fmupd.
+  Context `{SI : indexT} `{!mupdGS Σ}.
   Implicit Type Θ : (gset positive).
 
-  Global Instance fgupd_ne E Θ :
-    NonExpansive (fgupd E Θ).
+  Global Instance fmupd_ne E Θ :
+    NonExpansive (fmupd E Θ).
   Proof.
-    intros n P1 P2 HP. rewrite /fgupd. do 12 (f_equiv || done).
+    intros n P1 P2 HP. rewrite /fmupd. do 12 (f_equiv || done).
   Qed.
-  Global Instance fgupd_proper E Θ :
-    Proper ((≡) ==> (≡)) (fgupd E Θ).
+  Global Instance fmupd_proper E Θ :
+    Proper ((≡) ==> (≡)) (fmupd E Θ).
   Proof.
-    intros P P' ?. apply equiv_dist=>n. apply fgupd_ne. apply equiv_dist. done.
+    intros P P' ?. apply equiv_dist=>n. apply fmupd_ne. apply equiv_dist. done.
   Qed.
 
-  Lemma fupd_fgupd E Θ P : (|={E}=> P) ⊢ (|={E:Θ}=>g P).
+  Lemma fupd_fmupd E Θ P : (|={E}=> P) ⊢ (|={E:Θ}=>g P).
   Proof.
-    rewrite /fgupd. iIntros ">Hupd".
+    rewrite /fmupd. iIntros ">Hupd".
     iApply fupd_mask_intro. 1: set_solver.
     iIntros "Hclose !>". iMod "Hclose" as "_".
     iModIntro. iFrame.
   Qed.
 
-  Lemma gupd_fgupd E Θ P : (|=[Θ]=>g P) ⊢ (|={E:Θ}=>g P).
+  Lemma mupd_fmupd E Θ P : (|=[Θ]=>g P) ⊢ (|={E:Θ}=>g P).
   Proof.
-    rewrite /fgupd. iIntros "Hupd".
+    rewrite /fmupd. iIntros "Hupd".
     iApply fupd_mask_intro. 1: set_solver.
     iIntros "Hclose". iMod "Hupd".
     iModIntro. iMod "Hclose". by iFrame.
   Qed.
 
-  Lemma fgupd_intro E Θ P : P ⊢ |={E:Θ}=>g P.
+  Lemma fmupd_intro E Θ P : P ⊢ |={E:Θ}=>g P.
   Proof.
     iIntros "$". iMod (fupd_mask_subseteq ∅) as "Hclose". 1: set_solver.
     iIntros "!> !>". iMod "Hclose". done.
   Qed.
 
-  Lemma fupd_fgupd_elim E Θ P :
+  Lemma fupd_fmupd_elim E Θ P :
     (|={E}=> |={E:Θ}=>g P) ⊢ |={E:Θ}=>g P.
   Proof.
     iIntros "H". iMod "H". iApply "H".
   Qed.
 
-  Lemma gupd_fgupd_elim E Θ P :
+  Lemma mupd_fmupd_elim E Θ P :
     (|=[Θ]=>g |={E:Θ}=>g P) ⊢ |={E:Θ}=>g P.
   Proof.
     iIntros "H". iApply fupd_mask_intro. 1: set_solver.
@@ -469,7 +476,7 @@ Section fgupd.
   Qed.
 
   (** Change to a larger mask. *)
-  Lemma fgupd_mask_mono E1 E2 Θ P :
+  Lemma fmupd_mask_mono E1 E2 Θ P :
     E1 ⊆ E2 →
     (|={E1:Θ}=>g P) ⊢ |={E2:Θ}=>g P.
   Proof.
@@ -482,7 +489,7 @@ Section fgupd.
   Qed.
 
   (** We can combine two obligation updates into one. *)
-  Lemma fgupd_bind E Θ P Q :
+  Lemma fmupd_bind E Θ P Q :
     (P -∗ |={E:Θ}=>g Q) ⊢ (|={E:Θ}=>g P) -∗ (|={E:Θ}=>g Q).
   Proof.
     iIntros "H >HP".
@@ -491,182 +498,182 @@ Section fgupd.
   Qed.
 
   (* derived lemmas *)
-  Lemma fgupd_mono E Θ P Q : (P ⊢ Q) → (|={E:Θ}=>g P) ⊢ (|={E:Θ}=>g Q).
+  Lemma fmupd_mono E Θ P Q : (P ⊢ Q) → (|={E:Θ}=>g P) ⊢ (|={E:Θ}=>g Q).
   Proof.
-    intros Hent. iApply fgupd_bind.
-    iIntros "P"; iApply fgupd_intro; by iApply Hent.
+    intros Hent. iApply fmupd_bind.
+    iIntros "P"; iApply fmupd_intro; by iApply Hent.
   Qed.
-  Lemma fgupd_trans E Θ P :  (|={E:Θ}=>g |={E:Θ}=>g P) ⊢ |={E:Θ}=>g P.
+  Lemma fmupd_trans E Θ P :  (|={E:Θ}=>g |={E:Θ}=>g P) ⊢ |={E:Θ}=>g P.
   Proof.
-    iIntros "HP". iApply fgupd_bind; eauto.
+    iIntros "HP". iApply fmupd_bind; eauto.
   Qed.
-  Lemma fgupd_frame_r E Θ P R : (|={E:Θ}=>g P) ∗ R ⊢ |={E:Θ}=>g P ∗ R.
+  Lemma fmupd_frame_r E Θ P R : (|={E:Θ}=>g P) ∗ R ⊢ |={E:Θ}=>g P ∗ R.
   Proof.
-    iIntros "[Hupd R]". iApply (fgupd_bind with "[R]"); last done.
-    iIntros "P". iApply fgupd_intro. by iFrame.
+    iIntros "[Hupd R]". iApply (fmupd_bind with "[R]"); last done.
+    iIntros "P". iApply fmupd_intro. by iFrame.
   Qed.
 
-  Global Instance fgupd_ent_proper E Θ : Proper ((⊢) ==> (⊢)) (fgupd E Θ).
-  Proof. intros P Q PQ. by apply fgupd_mono. Qed.
-  Global Instance fgupd_flip_ent_proper E Θ : Proper (flip (⊢) ==> flip (⊢)) (fgupd E Θ).
-  Proof. intros P Q PQ; by apply fgupd_mono. Qed.
-  Global Instance fgupd_equiv_proper E Θ : Proper ((≡) ==> (≡)) (fgupd E Θ) := ne_proper _.
+  Global Instance fmupd_ent_proper E Θ : Proper ((⊢) ==> (⊢)) (fmupd E Θ).
+  Proof. intros P Q PQ. by apply fmupd_mono. Qed.
+  Global Instance fmupd_flip_ent_proper E Θ : Proper (flip (⊢) ==> flip (⊢)) (fmupd E Θ).
+  Proof. intros P Q PQ; by apply fmupd_mono. Qed.
+  Global Instance fmupd_equiv_proper E Θ : Proper ((≡) ==> (≡)) (fmupd E Θ) := ne_proper _.
 
-  Lemma fgupd_fupd_l E Θ P :
+  Lemma fmupd_fupd_l E Θ P :
     (|={E}=> |={E:Θ}=>g P) ⊢ (|={E:Θ}=>g P).
   Proof.
-    by erewrite fupd_fgupd, fgupd_trans.
+    by erewrite fupd_fmupd, fmupd_trans.
   Qed.
-  Lemma fgupd_fupd_r E Θ P :
+  Lemma fmupd_fupd_r E Θ P :
     (|={E:Θ}=>g |={E}=> P) ⊢ (|={E:Θ}=>g P).
   Proof.
-    by erewrite fupd_fgupd, fgupd_trans.
+    by erewrite fupd_fmupd, fmupd_trans.
   Qed.
 
-  Lemma fgupd_frame_l E Θ R Q : (R ∗ |={E:Θ}=>g Q) ⊢ |={E:Θ}=>g R ∗ Q.
-  Proof. rewrite !(comm _ R); apply fgupd_frame_r. Qed.
-  Lemma fgupd_wand_l E Θ P Q : (P -∗ Q) ∗ (|={E:Θ}=>g P) ⊢ |={E:Θ}=>g Q.
-  Proof. by rewrite fgupd_frame_l wand_elim_l. Qed.
-  Lemma fgupd_wand_r E Θ P Q : (|={E:Θ}=>g P) ∗ (P -∗ Q) ⊢ |={E:Θ}=>g Q.
-  Proof. by rewrite fgupd_frame_r wand_elim_r. Qed.
-  Lemma fgupd_sep E Θ P Q : (|={E:Θ}=>g P) ∗ (|={E:Θ}=>g Q) ⊢ |={E:Θ}=>g P ∗ Q.
-  Proof. by rewrite fgupd_frame_r fgupd_frame_l fgupd_trans. Qed.
-  Lemma fgupd_idemp E Θ P : (|={E:Θ}=>g |={E:Θ}=>g P) ⊣⊢ |={E:Θ}=>g P.
+  Lemma fmupd_frame_l E Θ R Q : (R ∗ |={E:Θ}=>g Q) ⊢ |={E:Θ}=>g R ∗ Q.
+  Proof. rewrite !(comm _ R); apply fmupd_frame_r. Qed.
+  Lemma fmupd_wand_l E Θ P Q : (P -∗ Q) ∗ (|={E:Θ}=>g P) ⊢ |={E:Θ}=>g Q.
+  Proof. by rewrite fmupd_frame_l wand_elim_l. Qed.
+  Lemma fmupd_wand_r E Θ P Q : (|={E:Θ}=>g P) ∗ (P -∗ Q) ⊢ |={E:Θ}=>g Q.
+  Proof. by rewrite fmupd_frame_r wand_elim_r. Qed.
+  Lemma fmupd_sep E Θ P Q : (|={E:Θ}=>g P) ∗ (|={E:Θ}=>g Q) ⊢ |={E:Θ}=>g P ∗ Q.
+  Proof. by rewrite fmupd_frame_r fmupd_frame_l fmupd_trans. Qed.
+  Lemma fmupd_idemp E Θ P : (|={E:Θ}=>g |={E:Θ}=>g P) ⊣⊢ |={E:Θ}=>g P.
   Proof.
     apply: anti_symm.
-    - apply fgupd_trans.
-    - apply fgupd_intro.
+    - apply fmupd_trans.
+    - apply fmupd_intro.
   Qed.
 
-  Global Instance fgupd_homomorphism E Θ :
-    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (fgupd E Θ).
-  Proof. split; [split|]; try apply _; [apply fgupd_sep | apply fgupd_intro]. Qed.
+  Global Instance fmupd_homomorphism E Θ :
+    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (fmupd E Θ).
+  Proof. split; [split|]; try apply _; [apply fmupd_sep | apply fmupd_intro]. Qed.
 
-  Lemma big_sepL_fgupd {A} (Φ : nat → A → iProp Σ) E Θ l :
+  Lemma big_sepL_fmupd {A} (Φ : nat → A → iProp Σ) E Θ l :
     ([∗ list] k↦x ∈ l, |={E:Θ}=>g Φ k x) ⊢ |={E:Θ}=>g [∗ list] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opL_commute _). Qed.
-  Lemma big_sepM_fgupd {A} `{Countable K} (Φ : K → A → iProp Σ) E Θ l :
+  Lemma big_sepM_fmupd {A} `{Countable K} (Φ : K → A → iProp Σ) E Θ l :
     ([∗ map] k↦x ∈ l, |={E:Θ}=>g Φ k x) ⊢ |={E:Θ}=>g [∗ map] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opM_commute _). Qed.
-  Lemma big_sepS_fgupd `{Countable A} (Φ : A → iProp Σ) E Θ l :
+  Lemma big_sepS_fmupd `{Countable A} (Φ : A → iProp Σ) E Θ l :
     ([∗ set]  x ∈ l, |={E:Θ}=>g Φ x) ⊢ |={E:Θ}=>g [∗ set] x ∈ l, Φ x.
   Proof. by rewrite (big_opS_commute _). Qed.
-  Lemma big_sepMS_fgupd `{Countable A} (Φ : A → iProp Σ) E Θ l :
+  Lemma big_sepMS_fmupd `{Countable A} (Φ : A → iProp Σ) E Θ l :
     ([∗ mset] x ∈ l, |={E:Θ}=>g Φ x) ⊢ |={E:Θ}=>g [∗ mset] x ∈ l, Φ x.
   Proof. by rewrite (big_opMS_commute _). Qed.
 
-  Lemma except_0_fgupd E Θ P : ◇ (|={E:Θ}=>g P) ⊢ (|={E:Θ}=>g ◇ P).
+  Lemma except_0_fmupd E Θ P : ◇ (|={E:Θ}=>g P) ⊢ (|={E:Θ}=>g ◇ P).
   Proof.
-    rewrite /bi_except_0. apply or_elim; eauto using fgupd_mono, or_intro_r.
-    by rewrite -fgupd_intro -or_intro_l.
+    rewrite /bi_except_0. apply or_elim; eauto using fmupd_mono, or_intro_r.
+    by rewrite -fmupd_intro -or_intro_l.
   Qed.
 
-  Global Instance elim_fupd_fgupd (p : bool) E Θ P Q :
+  Global Instance elim_fupd_fmupd (p : bool) E Θ P Q :
     ElimModal True p false (|={E}=> P) P (|={E:Θ}=>g Q) (|={E:Θ}=>g Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply fupd_fgupd_elim.
+    iIntros "_ [HP HPQ]". iApply fupd_fmupd_elim.
     iMod "HP". by iApply "HPQ".
   Qed.
 
-  Global Instance elim_gupd_fgupd (p : bool) E Θ P Q :
+  Global Instance elim_mupd_fmupd (p : bool) E Θ P Q :
     ElimModal True p false (|=[Θ]=>g P) P (|={E:Θ}=>g Q) (|={E:Θ}=>g Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply gupd_fgupd_elim.
+    iIntros "_ [HP HPQ]". iApply mupd_fmupd_elim.
     iMod "HP". by iApply "HPQ".
   Qed.
 
-  Global Instance add_modal_fupd_fgupd E Θ P Q :
+  Global Instance add_modal_fupd_fmupd E Θ P Q :
     AddModal (|={E}=> P) P (|={E:Θ}=>g Q).
   Proof.
-    rewrite /AddModal; rewrite fupd_fgupd; iIntros "[HP HPQ]".
-    iApply (fgupd_bind with "HPQ HP").
+    rewrite /AddModal; rewrite fupd_fmupd; iIntros "[HP HPQ]".
+    iApply (fmupd_bind with "HPQ HP").
   Qed.
 
-  Global Instance add_modal_gupd_fgupd E Θ P Q :
+  Global Instance add_modal_mupd_fmupd E Θ P Q :
     AddModal (|=[Θ]=>g P) P (|={E:Θ}=>g Q).
   Proof.
-    rewrite /AddModal; rewrite gupd_fgupd; iIntros "[HP HPQ]".
-    iApply (fgupd_bind with "HPQ HP").
+    rewrite /AddModal; rewrite mupd_fmupd; iIntros "[HP HPQ]".
+    iApply (fmupd_bind with "HPQ HP").
   Qed.
 
-  Global Instance from_assumption_fgupd p E Θ P Q :
+  Global Instance from_assumption_fmupd p E Θ P Q :
     FromAssumption p P Q → KnownRFromAssumption p P (|={E:Θ}=>g Q).
-  Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply fgupd_intro. Qed.
+  Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply fmupd_intro. Qed.
 
-  Global Instance from_pure_fgupd a E Θ P φ :
+  Global Instance from_pure_fmupd a E Θ P φ :
     FromPure a P φ → FromPure a (|={E:Θ}=>g P) φ.
-  Proof. rewrite /FromPure=> <-. apply fgupd_intro. Qed.
+  Proof. rewrite /FromPure=> <-. apply fmupd_intro. Qed.
 
-  Global Instance into_wand_fgupd p q E Θ R P Q :
+  Global Instance into_wand_fmupd p q E Θ R P Q :
     IntoWand false false R P Q → IntoWand p q (|={E:Θ}=>g R) (|={E:Θ}=>g P) (|={E:Θ}=>g Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite !intuitionistically_if_elim HR.
-    apply wand_intro_l. by rewrite fgupd_sep wand_elim_r.
+    apply wand_intro_l. by rewrite fmupd_sep wand_elim_r.
   Qed.
 
-  Global Instance into_wand_fgupd_persistent p q E Θ R P Q :
+  Global Instance into_wand_fmupd_persistent p q E Θ R P Q :
     IntoWand false q R P Q → IntoWand p q (|={E:Θ}=>g R) P (|={E:Θ}=>g Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite intuitionistically_if_elim HR.
-    apply wand_intro_l. by rewrite fgupd_frame_l wand_elim_r.
+    apply wand_intro_l. by rewrite fmupd_frame_l wand_elim_r.
   Qed.
 
-  Global Instance into_wand_fgupd_args p q E Θ R P Q :
+  Global Instance into_wand_fmupd_args p q E Θ R P Q :
     IntoWand p false R P Q → IntoWand' p q R (|={E:Θ}=>g P) (|={E:Θ}=>g Q).
   Proof.
     rewrite /IntoWand' /IntoWand /= => ->.
-    apply wand_intro_l. by rewrite intuitionistically_if_elim fgupd_wand_r.
+    apply wand_intro_l. by rewrite intuitionistically_if_elim fmupd_wand_r.
   Qed.
 
-  Global Instance from_sep_fgupd E Θ P Q1 Q2 :
+  Global Instance from_sep_fmupd E Θ P Q1 Q2 :
     FromSep P Q1 Q2 → FromSep (|={E:Θ}=>g P) (|={E:Θ}=>g Q1) (|={E:Θ}=>g Q2).
-  Proof. rewrite /FromSep=><-. apply fgupd_sep. Qed.
+  Proof. rewrite /FromSep=><-. apply fmupd_sep. Qed.
 
-  Global Instance from_or_fgupd E Θ P Q1 Q2 :
+  Global Instance from_or_fmupd E Θ P Q1 Q2 :
     FromOr P Q1 Q2 → FromOr (|={E:Θ}=>g P) (|={E:Θ}=>g Q1) (|={E:Θ}=>g Q2).
   Proof.
     rewrite /FromOr=><-.
-    apply or_elim; apply fgupd_mono; auto using or_intro_l, or_intro_r.
+    apply or_elim; apply fmupd_mono; auto using or_intro_l, or_intro_r.
   Qed.
 
-  Global Instance from_exist_fgupd {A} E Θ P (Φ : A → iProp Σ) :
+  Global Instance from_exist_fmupd {A} E Θ P (Φ : A → iProp Σ) :
     FromExist P Φ → FromExist (|={E:Θ}=>g P) (λ a, |={E:Θ}=>g Φ a)%I.
   Proof.
     rewrite /FromExist=><-. apply exist_elim=> a. by rewrite -(exist_intro a).
   Qed.
 
-  Global Instance is_except_0_fgupd E Θ P : IsExcept0 P → IsExcept0 (|={E:Θ}=>g P).
+  Global Instance is_except_0_fmupd E Θ P : IsExcept0 P → IsExcept0 (|={E:Θ}=>g P).
   Proof.
     rewrite /IsExcept0=> HP.
-    by rewrite -{2}HP -(except_0_idemp P) -except_0_fgupd -(except_0_intro P).
+    by rewrite -{2}HP -(except_0_idemp P) -except_0_fmupd -(except_0_intro P).
   Qed.
 
-  Global Instance from_modal_fgupd E Θ P :
+  Global Instance from_modal_fmupd E Θ P :
     FromModal True modality_id (|={E:Θ}=>g P) (|={E:Θ}=>g P) P.
-  Proof. by rewrite /FromModal /= -fgupd_intro. Qed.
+  Proof. by rewrite /FromModal /= -fmupd_intro. Qed.
 
-  Global Instance elim_modal_fgupd p E Θ P Q :
+  Global Instance elim_modal_fmupd p E Θ P Q :
     ElimModal True p false (|={E:Θ}=>g P) P (|={E:Θ}=>g Q) (|={E:Θ}=>g Q).
   Proof.
     by rewrite /ElimModal
-      intuitionistically_if_elim fgupd_frame_r wand_elim_r fgupd_trans.
+      intuitionistically_if_elim fmupd_frame_r wand_elim_r fmupd_trans.
   Qed.
 
-  Global Instance add_modal_fgupd E Θ P Q : AddModal (|={E:Θ}=>g P) P (|={E:Θ}=>g Q).
-  Proof. by rewrite /AddModal fgupd_frame_r wand_elim_r fgupd_trans. Qed.
+  Global Instance add_modal_fmupd E Θ P Q : AddModal (|={E:Θ}=>g P) P (|={E:Θ}=>g Q).
+  Proof. by rewrite /AddModal fmupd_frame_r wand_elim_r fmupd_trans. Qed.
 
-  Global Instance frame_fgupd p E Θ R P Q :
+  Global Instance frame_fmupd p E Θ R P Q :
     Frame p R P Q → Frame p R (|={E:Θ}=>g P) (|={E:Θ}=>g Q).
-  Proof. rewrite /Frame=><-. by rewrite fgupd_frame_l. Qed.
+  Proof. rewrite /Frame=><-. by rewrite fmupd_frame_l. Qed.
 
-End fgupd.
+End fmupd.
 
 (** Ghost lock predicates. *)
 (** All Local Definitions are only for internal uses and users should not need them. *)
 (* Ghost locks *)
-Local Definition gl_layers_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_layers_def `{SI : indexT} `{@mupdGS SI Σ}
   k ℓs : iProp Σ :=
   glG_layers k ℓs.
 Local Definition gl_layers_aux : seal (@gl_layers_def). Proof. by eexists. Qed.
@@ -675,7 +682,7 @@ Local Definition gl_layers_unseal :
   @gl_layers = @gl_layers_def := gl_layers_aux.(seal_eq).
 Global Arguments gl_layers {SI Σ _}.
 
-Local Definition gl_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_def `{SI : indexT} `{@mupdGS SI Σ}
   k v : iProp Σ :=
   glG_elem k ∗ glG_version_lb k v ∗
   ([∗ set] u ∈ set_seq 0 v, glG_version_lb k u ∗ glG_unlocked k u).
@@ -685,7 +692,7 @@ Local Definition gl_unseal :
   @gl = @gl_def := gl_aux.(seal_eq).
 Global Arguments gl {SI Σ _}.
 
-Local Definition gl_locked_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_locked_def `{SI : indexT} `{@mupdGS SI Σ}
   k v : iProp Σ :=
   gl k v ∗ glG_locked k v (1 / 2 / 2 / 2 / 2).
 Local Definition gl_locked_aux : seal (@gl_locked_def). Proof. by eexists. Qed.
@@ -694,7 +701,7 @@ Local Definition gl_locked_unseal :
   @gl_locked = @gl_locked_def := gl_locked_aux.(seal_eq).
 Global Arguments gl_locked {SI Σ _}.
 
-Local Definition gl_done_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_done_def `{SI : indexT} `{@mupdGS SI Σ}
   k v : iProp Σ :=
   gl k v ∗ glG_unlocked k v.
 Local Definition gl_done_aux : seal (@gl_done_def). Proof. by eexists. Qed.
@@ -703,7 +710,7 @@ Local Definition gl_done_unseal :
   @gl_done = @gl_done_def := gl_done_aux.(seal_eq).
 Global Arguments gl_done {SI Σ _}.
 
-Local Definition gl_current_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_current_def `{SI : indexT} `{@mupdGS SI Σ}
   k v q : iProp Σ :=
   gl k v ∗ glG_version k v (q/2 + q/2/2)%Qp.
 Local Definition gl_current_aux : seal (@gl_current_def). Proof. by eexists. Qed.
@@ -712,7 +719,7 @@ Local Definition gl_current_unseal :
   @gl_current = @gl_current_def := gl_current_aux.(seal_eq).
 Global Arguments gl_current {SI Σ _}.
 
-Local Definition gl_expired_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_expired_def `{SI : indexT} `{@mupdGS SI Σ}
   k v : iProp Σ :=
   gl_done k v ∗ glG_version_expired k v.
 Local Definition gl_expired_aux : seal (@gl_expired_def). Proof. by eexists. Qed.
@@ -721,7 +728,7 @@ Local Definition gl_expired_unseal :
   @gl_expired = @gl_expired_def := gl_expired_aux.(seal_eq).
 Global Arguments gl_expired {SI Σ _}.
 
-Local Definition gl_fuel_val_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_fuel_val_def `{SI : indexT} `{@mupdGS SI Σ}
   k α : iProp Σ :=
   glG_elem k ∗ glG_fuel k α.
 Local Definition gl_fuel_val_aux : seal (@gl_fuel_val_def). Proof. by eexists. Qed.
@@ -730,7 +737,7 @@ Local Definition gl_fuel_val_unseal :
   @gl_fuel_val = @gl_fuel_val_def := gl_fuel_val_aux.(seal_eq).
 Global Arguments gl_fuel_val {SI Σ _}.
 
-Local Definition gl_fuel_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_fuel_def `{SI : indexT} `{@mupdGS SI Σ}
   k ℓ μ : iProp Σ :=
   gl_fuel_val k (measure ℓ μ).
 Local Definition gl_fuel_aux : seal (@gl_fuel_def). Proof. by eexists. Qed.
@@ -739,7 +746,7 @@ Local Definition gl_fuel_unseal :
   @gl_fuel = @gl_fuel_def := gl_fuel_aux.(seal_eq).
 Global Arguments gl_fuel {SI Σ _}.
 
-Local Definition gl_variant_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_variant_def `{SI : indexT} `{@mupdGS SI Σ}
   N k v (P Q R : iProp Σ) : iProp Σ :=
   gl k v ∗ glG_variant N k v (1/2/2/2/2)%Qp P Q R.
 Local Definition gl_variant_aux : seal (@gl_variant_def). Proof. by eexists. Qed.
@@ -748,7 +755,7 @@ Local Definition gl_variant_unseal :
   @gl_variant = @gl_variant_def := gl_variant_aux.(seal_eq).
 Global Arguments gl_variant {SI Σ _}.
 
-Local Definition gl_variant_cases_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_variant_cases_def `{SI : indexT} `{@mupdGS SI Σ}
   k v (P Q R : iProp Σ) : iProp Σ :=
   ((gl_locked k v ∗ P) ∨ (gl_done k v ∗ Q)) ∨ (gl_expired k v ∗ R).
 Local Definition gl_variant_cases_aux : seal (@gl_variant_cases_def). Proof. by eexists. Qed.
@@ -758,22 +765,22 @@ Local Definition gl_variant_cases_unseal :
 Global Arguments gl_variant_cases {SI Σ _}.
 
 (* Ghost lock obligations *)
-Local Definition th_obls_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition th_obls_def `{SI : indexT} `{@mupdGS SI Σ}
   i (G : gmap gl_id ghost_lock_version) q : iProp Σ :=
-  globlG_elem i ∗ globlG_exec i (q/2 + q/2/2)%Qp ∗ globlG_obls i (dom G) q ∗
+  othreadG_elem i ∗ othreadG_exec i (q/2 + q/2/2)%Qp ∗ othreadG_obls i (dom G) q ∗
   ([∗ map] k ↦ v ∈ G,
      gl k v ∗ glG_locked k v (1/2 + 1/2/2/2/2)%Qp ∗
      gl_current k v (1/2)%Qp ∗
-     glG_owner k i (1/2 + 1/2/2/2)%Qp ∗ globlG_owns i k v (1/2 + 1/2/2)%Qp).
+     glG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k v (1/2 + 1/2/2)%Qp).
 Local Definition th_obls_aux : seal (@th_obls_def). Proof. by eexists. Qed.
 Definition th_obls := th_obls_aux.(unseal).
 Local Definition th_obls_unseal :
   @th_obls = @th_obls_def := th_obls_aux.(seal_eq).
 Global Arguments th_obls {SI Σ _}.
 
-Local Definition th_term_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition th_term_def `{SI : indexT} `{@mupdGS SI Σ}
   i : iProp Σ :=
-  globlG_elem i ∗ globlG_term i.
+  othreadG_elem i ∗ othreadG_term i.
 Local Definition th_term_aux : seal (@th_term_def). Proof. by eexists. Qed.
 Definition th_term := th_term_aux.(unseal).
 Local Definition th_term_unseal :
@@ -781,7 +788,7 @@ Local Definition th_term_unseal :
 Global Arguments th_term {SI Σ _}.
 
 (* Ghost lock witnesses *)
-Local Definition wit_bound_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition wit_bound_def `{SI : indexT} `{@mupdGS SI Σ}
   k v α : iProp Σ :=
   gl k v ∗ witG_bound k v α.
 Local Definition wit_bound_aux : seal (@wit_bound_def). Proof. by eexists. Qed.
@@ -790,7 +797,7 @@ Local Definition wit_bound_unseal :
   @wit_bound = @wit_bound_def := wit_bound_aux.(seal_eq).
 Global Arguments wit_bound {SI Σ _}.
 
-Local Definition wit_layer_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition wit_layer_def `{SI : indexT} `{@mupdGS SI Σ}
   k v ℓ : iProp Σ :=
   ∃ μ, wit_bound k v (η (measure ℓ μ)).
 Local Definition wit_layer_aux : seal (@wit_layer_def). Proof. by eexists. Qed.
@@ -799,7 +806,7 @@ Local Definition wit_layer_unseal :
   @wit_layer = @wit_layer_def := wit_layer_aux.(seal_eq).
 Global Arguments wit_layer {SI Σ _}.
 
-Local Definition wit_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition wit_def `{SI : indexT} `{@mupdGS SI Σ}
   k v a : iProp Σ :=
   gl k v ∗ witG_witness k v a.
 Local Definition wit_aux : seal (@wit_def). Proof. by eexists. Qed.
@@ -809,7 +816,7 @@ Local Definition wit_unseal :
 Global Arguments wit {SI Σ _}.
 
 (* Collection of fuels to support induction rules *)
-Local Definition gl_fuels_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition gl_fuels_def `{SI : indexT} `{@mupdGS SI Σ}
   α (F : gmap gl_id (layer * measurable_syntax)) : iProp Σ :=
   ([∗ map] f ↦ '(l, m) ∈ F, gl_fuel_val f ((measure l m) × α)%ord).
 Local Definition gl_fuels_aux : seal (@gl_fuels_def). Proof. by eexists. Qed.
@@ -818,7 +825,7 @@ Local Definition gl_fuels_unseal :
   @gl_fuels = @gl_fuels_def := gl_fuels_aux.(seal_eq).
 Global Arguments gl_fuels {SI Σ _}.
 
-Local Definition embed_fuels_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition embed_fuels_def `{SI : indexT} `{@mupdGS SI Σ}
   {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
   (a : A) ℓ (F : gmap gl_id (layer * measurable_syntax)) : iProp Σ :=
   gl_fuels (measure ℓ (⟪wf_ltA, a⟫)%M) F.
@@ -828,7 +835,7 @@ Local Definition embed_fuels_unseal :
   @embed_fuels = @embed_fuels_def := embed_fuels_aux.(seal_eq).
 Global Arguments embed_fuels {SI Σ _ A ltA}.
 
-Local Definition wit_fuels_def `{SI : indexT} `{@gupdGS SI Σ}
+Local Definition wit_fuels_def `{SI : indexT} `{@mupdGS SI Σ}
   k v ℓ α (F : gmap gl_id (layer * measurable_syntax)) : iProp Σ :=
   ∃ μ, ⌜ (α <= η (measure ℓ μ))%ord ⌝ ∗ wit_bound k v α ∗
        gl_fuels α F.
@@ -839,7 +846,7 @@ Local Definition wit_fuels_unseal :
 Global Arguments wit_fuels {SI Σ _}.
 
 Section preds.
-  Context `{SI : indexT} `{!gupdGS Σ}.
+  Context `{SI : indexT} `{!mupdGS Σ}.
 
   Local Ltac unfold_defs :=
     try rewrite !wit_fuels_unseal /wit_fuels_def;
@@ -1620,7 +1627,7 @@ Section preds.
       th_obls i G1 q1 -∗ th_obls i G2 q2 -∗ (⌜ G1 ##ₘ G2 ⌝).
     Proof.
       unfold_defs. iIntros "(#Ge1& Gx1& T1& Es1) (#Ge2& Gx2& T2& Es2)".
-      iPoseProof (globlG_obls_valid_2 with "[$T1 $T2]") as "%". destruct H.
+      iPoseProof (othreadG_obls_valid_2 with "[$T1 $T2]") as "%". destruct H.
       apply map_disjoint_dom in H0. done.
     Qed.
 
@@ -1628,8 +1635,8 @@ Section preds.
       th_obls i G1 q1 -∗ th_obls i G2 q2 -∗ th_obls i (G1 ∪ G2) (q1 + q2).
     Proof.
       unfold_defs. iIntros "(#Ge1& Gx1& T1& Es1) (#Ge2& Gx2& T2& Es2)".
-      iPoseProof (globlG_obls_valid_2 with "[$T1 $T2]") as "%". destruct H.
-      iPoseProof (globlG_obls_op_1 with "[$T1 $T2]") as "T".
+      iPoseProof (othreadG_obls_valid_2 with "[$T1 $T2]") as "%". destruct H.
+      iPoseProof (othreadG_obls_op_1 with "[$T1 $T2]") as "T".
       iDestruct "Gx1" as "[Gx1 Gx1']". iDestruct "Gx2" as "[Gx2 Gx2']".
       iCombine "Gx1 Gx2" as "Gx". iCombine "Gx1' Gx2'" as "Gx'".
       iPoseProof (big_sepM_union with "[$Es1 $Es2]") as "$". 1: by apply map_disjoint_dom.
@@ -1642,7 +1649,7 @@ Section preds.
       th_obls i (G1 ∪ G2) (q1 + q2) -∗ (th_obls i G1 q1 ∗ th_obls i G2 q2).
     Proof.
       unfold_defs. iIntros (Hd) "(#Ge& Gx& T& Es)".
-      rewrite dom_union_L. iPoseProof (globlG_obls_op_2 with "T") as "[$ $]"; first auto.
+      rewrite dom_union_L. iPoseProof (othreadG_obls_op_2 with "T") as "[$ $]"; first auto.
       iDestruct "Gx" as "[Gx Gx']". rewrite !Qp.div_add_distr.
       iDestruct "Gx" as "[Gx1 Gx2]". iDestruct "Gx'" as "[Gx1' Gx2']".
       iCombine "Gx1 Gx1'" as "$". iCombine "Gx2 Gx2'" as "$".
@@ -1652,7 +1659,7 @@ Section preds.
 
   End liveness_preds.
 
-  Section fgupd.
+  Section fmupd.
 
     Lemma gl_alloc_obl_0 Θ i G q ℓs μ v :
       Proper (le ==> layer_leibniz_le) ℓs →
@@ -1667,19 +1674,19 @@ Section preds.
                    (∀ E N (P Q R : iProp Σ), (▷ P) ={E}=∗ gl_variant N k v P Q R).
     Proof.
       unfold_defs. iIntros (MONO) "(#Oe& Ox& Ob& OS)".
-      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iApply mupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       assert (NEW : ∃ k, Ω1 !! k = None).
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
       assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-      iMod (glsat_alloc_ghost_lock_locked _ k v ℓs μ i with "S") as "(S& #Gwf& #Ge& Gl& Gv& Gf& Go& #Gseq& %OStep)".
+      iMod (osat_alloc_ghost_lock_locked _ k v ℓs μ i with "S") as "(S& #Gwf& #Ge& Gl& Gv& Gf& Go& #Gseq& %OStep)".
       1: auto.
       iDestruct "Gl" as "[Gl0 [Gl1 Gl']]".
-      iMod (globl_alloc_obl with "[$S $O $Ob $Ge $Gl' $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
+      iMod (othread_alloc_obl with "[$S $O $Ob $Ge $Gl' $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
       iPoseProof (glG_version_get_lb _ v v with "Gv") as "#Gvl". 1: done.
       set (ηℓ := (λ x, η (measure (ℓs v) μ)) : ghost_lock_version → _).
-      iMod (glwit_alloc_witness_locked _ k v ηℓ with "[$W $Gseq $Gvl]") as "(W& #Wseq)".
-      { apply glwit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
+      iMod (owit_alloc_witness_locked _ k v ηℓ with "[$W $Gseq $Gvl]") as "(W& #Wseq)".
+      { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
       iAssert (witG_bound k v (η (measure (ℓs v) μ)))%I with "[Wseq]" as "#Ww".
       { rewrite set_seq_S_end_union_L. rewrite big_sepS_union; cycle 1.
         { apply set_seq_S_end_disjoint. }
@@ -1693,8 +1700,8 @@ Section preds.
       iSplitR.
       { iPureIntro. econstructor 2. econstructor 2. auto. }
       iIntros (? [WStep GWI2]) "!>".
-      pose proof (glwit_inv_alloc_locked Ω1 k W1 NinOk1 GWI _ _ _ W2 WStep GWI2) as (NinWk1& WMon).
-      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      pose proof (owit_inv_alloc_locked Ω1 k W1 NinOk1 GWI _ _ _ W2 WStep GWI2) as (NinWk1& WMon).
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { rewrite fmap_insert. simpl. iFrame. eauto. }
       iDestruct "Gv" as "[[Gv1 Gv1'] [Gv2 Gv2']]". iCombine "Gv1 Gv2" as "Gv". iCombine "Gv1' Gv2'" as "Gv'".
@@ -1736,12 +1743,12 @@ Section preds.
                      (∀ E N (P Q R : iProp Σ), (▷ Q) ={E}=∗ gl_variant N k v P Q R).
     Proof.
       unfold_defs. iIntros (MONO).
-      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iApply mupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       assert (NEW : ∃ k, Ω1 !! k = None).
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
       assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-      iMod (glsat_alloc_ghost_lock_unlocked _ k v ℓs μ with "S") as "(S& #Gwf& #Ge& #Gu& Gv& Gf& #Gseq& %OStep)".
+      iMod (osat_alloc_ghost_lock_unlocked _ k v ℓs μ with "S") as "(S& #Gwf& #Ge& #Gu& Gv& Gf& #Gseq& %OStep)".
       { auto. }
       iPoseProof (glG_version_get_lb _ v v with "Gv") as "#Gvl". 1: done.
       set (ηℓ := (λ x, η (measure (ℓs v) μ)) : ghost_lock_version → _).
@@ -1749,8 +1756,8 @@ Section preds.
       { rewrite set_seq_S_end_union_L big_sepS_union; cycle 1.
         { apply set_seq_S_end_disjoint. }
         rewrite big_sepS_singleton. eauto. }
-      iMod (glwit_alloc_witness_unlocked _ k v ηℓ with "[$W $Gseq2]") as "(W& #Wseq)".
-      { apply glwit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
+      iMod (owit_alloc_witness_unlocked _ k v ηℓ with "[$W $Gseq2]") as "(W& #Wseq)".
+      { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
       iAssert (witG_bound k v (η (measure (ℓs v) μ)))%I with "[Wseq]" as "#Ww".
       { iClear "Gseq2". rewrite !set_seq_S_end_union_L !big_sepS_union; cycle 1.
         { apply set_seq_S_end_disjoint. }
@@ -1761,8 +1768,8 @@ Section preds.
       iModIntro. iExists (<[k:=(v, ghost_lock_unlocked)]> Ω1). iSplitR.
       { iPureIntro. econstructor 2. econstructor 2. auto. }
       iIntros (? [WStep GWI2]) "!>".
-      pose proof (glwit_inv_alloc_unlocked Ω1 k W1 NinOk1 GWI _ W2 WStep GWI2) as (NinWk1& WMon).
-      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      pose proof (owit_inv_alloc_unlocked Ω1 k W1 NinOk1 GWI _ W2 WStep GWI2) as (NinWk1& WMon).
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { rewrite fmap_insert. simpl. iFrame. eauto. }
       iModIntro. iExists k. iFrame "Gwf Ge Gvl Ww Gf Gv Gu Gseq".
@@ -1812,19 +1819,19 @@ Section preds.
       { iNext. iDestruct "H" as "($& _& _& $)". eauto. }
       iIntros (i G q ℓs) "(#Oe& Ox& Ob& OS) (_& Gv1) #Gwf % % %Ltv %".
       iPoseProof (glG_layers_mono with "Gwf") as "%MONO".
-      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
-      iPoseProof (glsat_lookup_unlocked with "[$S $Ge $Gu1]") as "%LUO1u".
-      iPoseProof (glsat_lookup_version with "[$S $Ge $Gv1]") as "%LUO1v".
+      iApply mupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iPoseProof (osat_lookup_unlocked with "[$S $Ge $Gu1]") as "%LUO1u".
+      iPoseProof (osat_lookup_version with "[$S $Ge $Gv1]") as "%LUO1v".
       destruct LUO1v as (?&LUO1v). destruct LUO1u as [LUO1u | (?&?&?&LUO1u)]; cycle 1.
       { exfalso. rewrite LUO1u in LUO1v. inv LUO1v. lia. }
       rewrite LUO1u in LUO1v. inv LUO1v.
-      iMod (glsat_lock _ _ v1 v2 ℓs μ i with "[$S $Gwf $Gu1 $Gv1]") as "(%& S& Gl& Gv& Gf& Go& #Gseq& %Gstep)".
+      iMod (osat_lock _ _ v1 v2 ℓs μ i with "[$S $Gwf $Gu1 $Gv1]") as "(%& S& Gl& Gv& Gf& Go& #Gseq& %Gstep)".
       1: auto.
       iDestruct "Gl" as "[Gl1 [Gl2 Gl']]".
-      iMod (globl_alloc_obl with "[$S $O $Ob $Ge $Gl' $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
+      iMod (othread_alloc_obl with "[$S $O $Ob $Ge $Gl' $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
       iPoseProof (glG_version_get_lb _ v2 v2 with "Gv") as "#Gvl2". 1: done.
       set (ηℓ := (λ v, η (measure (ℓs v) (μ')%M)) : ghost_lock_version → _).
-      iMod (glwit_lock _ _ v1 v2 ηℓ with "[$W $Gseq $Gvl2]") as "(W& #Ww& #Wseq)".
+      iMod (owit_lock _ _ v1 v2 ηℓ with "[$W $Gseq $Gvl2]") as "(W& #Ww& #Wseq)".
       1: auto.
       { specialize (GWI k). rewrite LUO1u in GWI. inv GWI.
         destruct y. destruct H1. subst. by destruct w. }
@@ -1835,8 +1842,8 @@ Section preds.
       iModIntro. iExists (<[k:=(v2, ghost_lock_locked (GL:=ord_ghost_lock_class) (measure (ℓs v2) (μ')%M) i)]> Ω1). iSplitR.
       { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
       iIntros (? [WStep GWI2]).
-      pose proof (glwit_inv_lock _ _ v1 v2 _ _ _ LUO1u GWI Gstep W2 WStep GWI2) as [LUW1 WMon].
-      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      pose proof (owit_inv_lock _ _ v1 v2 _ _ _ LUO1u GWI Gstep W2 WStep GWI2) as [LUW1 WMon].
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { iModIntro. rewrite fmap_insert. iFrame. eauto. }
       (* FIXME: iModIntro introduces too many modalities. *)
@@ -1888,10 +1895,10 @@ Section preds.
       { iNext. iFrame "Oe Ox Ob". iDestruct "H" as "(Gv& Gl& $& $)".
         rewrite (big_sepM_delete _ _ _ _ LUGk). iFrame. iFrame "Ge Gvl". }
       iIntros "(_& Ox& Ob& OS) (_& Gl1) %".
-      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iApply mupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       iPoseProof (big_sepM_delete _ _ _ _ LUGk with "OS") as "[(_& Gl& Gv& Go& Oo) OS]".
-      iPoseProof (glsat_lookup_locked with "[$S $Ge $Gl]") as "%LUO1l".
-      iPoseProof (glsat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
+      iPoseProof (osat_lookup_locked with "[$S $Ge $Gl]") as "%LUO1l".
+      iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
       destruct LUO1l as (?&?&LUO1l). destruct LUO1o as (?&?&LUO1o).
       rewrite LUO1l in LUO1o. inv LUO1o. rename x1 into v, x2 into a.
       iPoseProof (glassigned_delete_obl _ k v with "A") as "(A& _& [(%& Go1& Oo1) | #Gu])".
@@ -1899,26 +1906,26 @@ Section preds.
       2:{ iExFalso. iPoseProof (glG_locked_unlocked_false with "[$Gl $Gu]") as "%". done. }
       iPoseProof (glG_owner_agree _ i i0 with "[$Go $Go1]") as "%". destruct H as [<- _].
       iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
-      iMod (globl_delete_obl_frac with "[$O $Ob $Oo]") as "(O& Ob& Gl2& Go2)".
+      iMod (othread_delete_obl_frac with "[$O $Ob $Oo]") as "(O& Ob& Gl2& Go2)".
       { apply elem_of_dom. eauto. }
       iDestruct "Gl" as "[Gl Gl']". iCombine "Gl' Gl1" as "Gl'". iCombine "Gl' Gl2" as "Gl'".
       iCombine "Gl Gl'" as "Gl".
       iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'".
       iCombine "Go Go'" as "Go".
-      iMod (glsat_unlock with "[$S $Ge $Gl $Go]") as "(S& #Gu& %Gstep)".
+      iMod (osat_unlock with "[$S $Ge $Gl $Go]") as "(S& #Gu& %Gstep)".
       assert (LUW : ∃ b, W1 !! k = Some (v, witness_locked b) ∧ (b <= η a)%ord).
       { specialize (GWI k). rewrite LUO1l in GWI. inv GWI. destruct y. destruct H1. subst.
         destruct w; eauto. done. }
       destruct LUW as (b&LUW1& LEab).
-      iPoseProof (glwit_unlock with "[$W $Gu]") as "W". 1: eauto.
+      iPoseProof (owit_unlock with "[$W $Gu]") as "W". 1: eauto.
       iPoseProof (glassigned_add_obl _ k v with "[$A $Ge]") as "A".
       { iRight. eauto. }
       iModIntro. iExists (<[k:=(v, ghost_lock_unlocked)]> Ω1). iSplitR.
       { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
       iIntros (? [WStep GWI2]). specialize (Gstep a).
-      pose proof (glwit_inv_unlock _ _ v _ _ _ LUO1l GWI Gstep W2 WStep GWI2) as (?& LUW& WMon).
+      pose proof (owit_inv_unlock _ _ v _ _ _ LUO1l GWI Gstep W2 WStep GWI2) as (?& LUW& WMon).
       rewrite LUW1 in LUW. inv LUW.
-      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { iModIntro. rewrite insert_delete_eq. rewrite fmap_insert. iFrame. eauto. }
       iApply fupd_intro. iIntros "!>". iDestruct "Gv" as "[_ Gv]". iFrame "Oe Ge Gvl Gu Ox Gv".
@@ -1949,17 +1956,17 @@ Section preds.
       iModIntro. iSplitL "H".
       { iNext. iDestruct "H" as "($& _& _& $)". eauto. }
       iIntros "(_& Gv1) % %LTv %".
-      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
-      iPoseProof (glsat_lookup_unlocked with "[$S $Ge $Gu1]") as "%LUO1u".
-      iPoseProof (glsat_lookup_version with "[$S $Ge $Gv1]") as "%LUO1v".
+      iApply mupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iPoseProof (osat_lookup_unlocked with "[$S $Ge $Gu1]") as "%LUO1u".
+      iPoseProof (osat_lookup_version with "[$S $Ge $Gv1]") as "%LUO1v".
       destruct LUO1v as (?&LUO1v). destruct LUO1u as [LUO1u | (?&?&?&LUO1u)]; cycle 1.
       { exfalso. rewrite LUO1u in LUO1v. inv LUO1v. lia. }
       rewrite LUO1u in LUO1v. inv LUO1v.
-      iMod (glsat_new_version _ _ v1 v2 with "[$S $Ge $Gu1 $Gv1]") as "(S& #Gu2& Gv2& #Gseq& %Gstep)".
+      iMod (osat_new_version _ _ v1 v2 with "[$S $Ge $Gu1 $Gv1]") as "(S& #Gu2& Gv2& #Gseq& %Gstep)".
       1: auto.
       iPoseProof (glG_version_get_lb _ v2 v2 with "Gv2") as "#Gvl2". 1: done.
       set (ηℓ := (λ v, η (Ord.O)) : ghost_lock_version → _).
-      iMod (glwit_new_version _ _ v1 v2 ηℓ with "[$W $Gseq $Gvl2]") as "(W& #Ww& #Wseq)".
+      iMod (owit_new_version _ _ v1 v2 ηℓ with "[$W $Gseq $Gvl2]") as "(W& #Ww& #Wseq)".
       1: auto.
       { specialize (GWI k). rewrite LUO1u in GWI. inv GWI.
         destruct y, H1. subst. destruct w; done. }
@@ -1968,8 +1975,8 @@ Section preds.
       iModIntro. iExists (<[k:=(v2, ghost_lock_unlocked)]> Ω1). iSplitR.
       { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
       iIntros (? [WStep GWI2]).
-      pose proof (glwit_inv_new_version _ _ v1 v2 _ LUO1u GWI Gstep W2 WStep GWI2) as [LUW1 WMon].
-      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      pose proof (owit_inv_new_version _ _ v1 v2 _ LUO1u GWI Gstep W2 WStep GWI2) as [LUW1 WMon].
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { iModIntro. rewrite fmap_insert. iFrame. eauto. }
       (* FIXME: iModIntro introduces too many modalities. *)
@@ -2007,10 +2014,10 @@ Section preds.
       unfold_defs. iIntros (LUGk) "(#Oe1& Ox1& Ob1& OS1) (#Oe2& Ox2& Ob2& OS2) (#Ge& Gf)".
       rewrite (glG_fuel_eq _ _ Ord.one); cycle 1.
       { rewrite measure_nat Ord.from_nat_1. done. }
-      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iApply mupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
       iPoseProof (big_sepM_delete _ _ _ _ LUGk with "OS1") as "[(_& Gl& [#Gseq Gv]& Go& Oo) OS1]".
-      iPoseProof (glsat_lookup_locked with "[$S $Ge $Gl]") as "%LUO1l".
-      iPoseProof (glsat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
+      iPoseProof (osat_lookup_locked with "[$S $Ge $Gl]") as "%LUO1l".
+      iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
       destruct LUO1l as (?&?&LUO1l). destruct LUO1o as (?&?&LUO1o).
       rewrite LUO1l in LUO1o. inv LUO1o. rename x1 into v, x2 into a.
       iPoseProof (glassigned_delete_obl _ k v with "A") as "(A& _& [(%& Go1& Oo1) | #Gu])".
@@ -2018,22 +2025,22 @@ Section preds.
       2:{ iExFalso. iPoseProof (glG_locked_unlocked_false with "[$Gl $Gu]") as "%". done. }
       iPoseProof (glG_owner_agree _ i i1 with "[$Go $Go1]") as "%". destruct H as [-> _].
       iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
-      iMod (globl_delete_obl_frac with "[$O $Ob1 $Oo]") as "(O& Ob1& Gl2& Go2)".
+      iMod (othread_delete_obl_frac with "[$O $Ob1 $Oo]") as "(O& Ob1& Gl2& Go2)".
       { apply elem_of_dom. eauto. }
       iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'".
       iCombine "Go Go'" as "Go".
-      iMod (glsat_progress_one_owner _ _ _ _ _ i2 with "[$S $Go $Gf]") as "(%& S& Go& %Gstep)".
+      iMod (osat_progress_one_owner _ _ _ _ _ i2 with "[$S $Go $Gf]") as "(%& S& Go& %Gstep)".
       1: eauto.
       1: apply Ord.S_lt.
-      iMod (globl_alloc_obl with "[$S $O $Ob2 $Ge $Gl2 $Go]") as "(S& O& %NinkG2& Ob2& Oo& Go)".
+      iMod (othread_alloc_obl with "[$S $O $Ob2 $Ge $Gl2 $Go]") as "(S& O& %NinkG2& Ob2& Oo& Go)".
       iDestruct "Go" as "[Go Go']". iDestruct "Oo" as "[Oo [Oo1 Oo']]".
       iPoseProof (glassigned_add_obl with "[$A $Ge Go' Oo']") as "A".
       { iLeft. iFrame. }
       iModIntro. iExists (<[k:=(v, ghost_lock_locked a' i2)]> Ω1). iSplitR.
       { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
       iIntros (? [WStep GWI2]).
-      pose proof (glwit_inv_progress_owner _ k v _ _ _ LUO1l GWI _ _ Gstep W2 WStep GWI2) as WMon.
-      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      pose proof (owit_inv_progress_owner _ k v _ _ _ LUO1l GWI _ _ Gstep W2 WStep GWI2) as WMon.
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W". iSplitL "A".
       { iModIntro. rewrite insert_delete_eq. rewrite fmap_insert. iFrame. eauto. }
       iIntros "!> !>". iFrame "Oe1 Oe2 Ox1 Ox2 OS1". rewrite dom_delete_L dom_insert_L.
@@ -2046,12 +2053,12 @@ Section preds.
       th_obls i ∅ 1 -∗ |=[Θ]=>g th_term i.
     Proof.
       unfold_defs. iIntros "(#Oe& Ox& Ob& OS)".
-      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
-      iMod (globl_exec_to_term with "[$O $Ox $Ob]") as "[O #Ot]".
+      iApply mupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI)".
+      iMod (othread_exec_to_term with "[$O $Ox $Ob]") as "[O #Ot]".
       iModIntro. iExists Ω1. iSplitR; first done.
       iIntros (? [WStep GWI2]).
-      pose proof (glwit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
-      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W A". iSplitR.
       { eauto. }
       iIntros "!> !>". auto.
@@ -2062,14 +2069,14 @@ Section preds.
       |=[Θ]=>g ([∗ map] r ↦ v ∈ R, wit r v Ord.O ∨ gl_done r v).
     Proof.
       unfold_defs. iIntros "#REs".
-      iApply gupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI1)".
-      iPoseProof (glwit_get_credit_zero with "W") as "[W Ws]".
-      assert (DomOW : dom Ω1 = dom W1) by (eapply glwit_inv_dom; eauto).
+      iApply mupd_unfold. iRight. iIntros (??) "(S& O& A& W& %GWI1)".
+      iPoseProof (owit_get_credit_zero with "W") as "[W Ws]".
+      assert (DomOW : dom Ω1 = dom W1) by (eapply owit_inv_dom; eauto).
       iAssert (⌜ dom R ⊆ dom W1 ⌝)%I as "%RWSub".
       { rewrite -DomOW. rewrite elem_of_subseteq. iIntros (x INRx).
         pose proof INRx. apply elem_of_dom in H. destruct H.
         iPoseProof (big_sepM_delete _ _ _ _ H with "REs") as "[[#Beg _] _]".
-        iPoseProof (glsat_elem with "[$S $Beg]") as "%". done.
+        iPoseProof (osat_elem with "[$S $Beg]") as "%". done.
       }
       iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
       assert (HW1 : ∃ WR WR', WR ##ₘ WR' ∧ W1 = WR ∪ WR' ∧ dom R = dom WR).
@@ -2107,7 +2114,7 @@ Section preds.
       }
       iAssert (⌜ ∀ k v, R !! k = Some v → ∃ w, WR !! k = Some w ∧ v ≤ w.1 ⌝)%I as "%Rver".
       { iIntros (k v LUR). iPoseProof (big_sepM_delete _ _ _ _ LUR with "REs") as "[(#Ge& #Gvl& #His) _]".
-        iPoseProof (glsat_lookup_version_lb with "[$S $Ge $Gvl]")as "(%&%&%&%)".
+        iPoseProof (osat_lookup_version_lb with "[$S $Ge $Gvl]")as "(%&%&%&%)".
         rewrite map_eq_iff in EQfst. specialize (EQfst k). rewrite !lookup_fmap H in EQfst.
         assert (is_Some (WR !! k)).
         { apply elem_of_dom. rewrite -DomWR. apply elem_of_dom; eauto. }
@@ -2168,8 +2175,8 @@ Section preds.
         - iLeft. iFrame. auto.
         - iRight. auto.
       }
-      pose proof (glwit_inv_rc_step_same_gls _ _ _ GWI1 WStep GWI2) as WMon.
-      iPoseProof (glwit_mon _ _ WMon with "W") as "W".
+      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI1 WStep GWI2) as WMon.
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /gproto. iFrame "S O W A". iSplitR.
       { eauto. }
       iIntros "!> !>". auto.
@@ -2287,6 +2294,6 @@ Section preds.
       - iPoseProof (gl_current_expired_false with "Gc Gx") as "%". done.
     Qed.
 
-  End fgupd.
+  End fmupd.
 
 End preds.

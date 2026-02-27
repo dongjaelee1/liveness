@@ -73,14 +73,16 @@ Class state_interp_class `{SI : indexT} (Σ : gFunctors) (St Π : Type) :=
 
 Definition event_fulfilled_state `{SI : indexT} `{@histGS SI Σ St} `{@state_interp_class SI Σ St Π}
   (k : oid) (π : Π) : iProp Σ :=
-  (∃ (e : event St), hG_event e ∗ ⌜ e.2 !! k = Some (obligation_fulfilled) ⌝ ∧ ⌜ state_sat e.1.2 π ⌝)%I.
+  (∃ (e : event St), hG_event e ∗ ⌜ e.2 !! k = Some (obligation_fulfilled) ⌝ ∧
+                     ⌜ state_sat e.1.2 π ⌝)%I.
 Global Typeclasses Opaque event_fulfilled_state.
 Global Instance: Params (@event_fulfilled_state) 6 := {}.
 
 Definition event_fulfilled_alive `{SI : indexT} `{@histGS SI Σ St}
   (k κ : oid) : iProp Σ :=
   (∃ (e : event St), hG_event e ∗ ⌜ e.2 !! k = Some (obligation_fulfilled) ⌝ ∧
-                     ⌜ (∃ f o, e.2 !! κ = Some (obligation_assigned f o)) ∨ (e.2 !! κ = Some (obligation_fulfilled)) ⌝)%I.
+                     ⌜ (e.2 !! κ ≠ Some (obligation_expired)) ⌝)%I.
+                     (* ⌜ (∃ f o, e.2 !! κ = Some (obligation_assigned f o)) ∨ (e.2 !! κ = Some (obligation_fulfilled)) ⌝)%I. *)
 Global Typeclasses Opaque event_fulfilled_alive.
 Global Instance: Params (@event_fulfilled_alive) 4 := {}.
 
