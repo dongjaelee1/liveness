@@ -43,7 +43,7 @@ Global Instance ord_obligation_class : obligation_class :=
 
 Canonical Structure layerO `{SI : indexT} := leibnizO layer.
 
-(** The ghost state for ghost locks *)
+(** The ghost state for obligations *)
 Module osatGS.
 
   Class osatGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -51,7 +51,7 @@ Module osatGS.
         osatGpreS_layer : inG Σ (gmap_viewR oid (agreeR (layerO)));
         osatGpreS_state : inG Σ (reservation_mapUR (prodUR mono_natUR mono_natUR));
         osatGpreS_fuel : inG Σ (reservation_mapUR bankUR);
-        (* Keep track of the current owner of each lock, if an owner exists *)
+        (* Keep track of the current owner of each obligation, if an owner exists *)
         osatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO obligation_owner)));
       }.
 
@@ -83,7 +83,7 @@ Import osatGS.
 Local Existing Instances osat_inG
   osatGpreS_layer osatGpreS_state osatGpreS_fuel osatGpreS_owner.
 
-(* Layer: layer of a ghost lock; layer can monotonically grow as version increases. *)
+(* Layer: layer of an obligation; layer can monotonically grow as version increases. *)
 Definition oblG_layer `{SI : indexT} `{!osatGS Σ}
   (k : oid) (ℓ : layer) : iProp Σ :=
   own layer_name (gmap_view_frag k DfracDiscarded (to_agree (ℓ : layerO))).
@@ -142,7 +142,7 @@ Local Definition oblG_state_token_id `{SI : indexT} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own state_name (reservation_map_token (A:=(prodUR mono_natUR mono_natUR)) E).
 
-(* Fuel: manage credits for a lock's fuel *)
+(* Fuel: manage credits for an obligation's fuel *)
 Definition oblG_fuel `{SI : indexT} `{!osatGS Σ}
   (k : oid) (a : obligation_fuel) : iProp Σ :=
   own fuel_name (reservation_map_data (A:=bankUR) k (cash a)).
@@ -159,7 +159,7 @@ Local Definition oblG_fuel_token_id `{SI : indexT} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own fuel_name (reservation_map_token (A:=bankUR) E).
 
-(* Owner: tracks the owner thread of a lock *)
+(* Owner: tracks the owner thread of an obligation *)
 Definition oblG_owner `{SI : indexT} `{!osatGS Σ}
   (k : oid) (t : obligation_owner) (q : Qp) : iProp Σ :=
   own owner_name (reservation_map_data k (to_frac_agree q (t : leibnizO obligation_owner))).
@@ -184,7 +184,7 @@ Local Definition oblG_owner_token_id `{SI : indexT} `{!osatGS Σ}
 (*   (N : namespace) (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ := *)
 (*   inv N (oblG_variant_internal k q P Q R). *)
 
-(* Global protocol to manage ghost locks. *)
+(* Global protocol to manage obligations. *)
 Definition osat `{SI : indexT} `{!osatGS Σ} `{!ord_mono_fun_class}
   (Ω : obligations) : iProp Σ :=
   locked

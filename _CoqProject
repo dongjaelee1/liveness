@@ -73,6 +73,7 @@ liris/base_logic/witness.v
 liris/base_logic/osat.v
 liris/base_logic/owit.v
 liris/base_logic/othread.v
+liris/base_logic/history_interp.v
 liris/base_logic/mupd.v
 # liris/base_logic/otree.v
 # liris/base_logic/thread_view_obls.v

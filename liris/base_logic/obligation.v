@@ -115,6 +115,17 @@ Definition obls_cond_progress `{OC : obligation_class} (C : obl_cond) : obligati
   λ Ω1 Ω2, (Ω1 ↪ₛ Ω2 | C) ∧ obls_keep Ω1 Ω2.
 Notation "A ↪ₚ B | C" := (obls_cond_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
 
+Definition obls_advance `{OC : obligation_class} : obligations → obligations → Prop :=
+  λ Ω1 Ω2, (map_Forall2 (λ _ o1 o2,
+                           match o1, o2 with
+                           | obligation_assigned _ _, obligation_assigned _ _ => True
+                           | obligation_assigned _ _, obligation_fulfilled => True
+                           | obligation_fulfilled, obligation_fulfilled => True
+                           | obligation_fulfilled, obligation_expired => True
+                           | obligation_expired, obligation_expired => True
+                           | _, _ => False
+                           end) Ω1 Ω2) ∨ Ω1 ↪ₐ Ω2.
+
 Section proofs.
   Context `{OC : obligation_class}.
 
@@ -219,6 +230,28 @@ Section proofs.
   Global Instance obls_keep_reflexive : Reflexive obls_keep.
   Proof using.
     repeat intro. destruct (x !! i) eqn:Hx; try done.
+  Qed.
+
+  (** Advance. *)
+  Lemma obls_step_rc_advance Ω1 Ω2 : Ω1 ↪∘ Ω2 → obls_advance Ω1 Ω2.
+  Proof using.
+    intros. destruct H.
+    - subst. left. repeat intro. destruct (Ω2 !! i); econstructor; try done. destruct o; try done.
+    - inv H.
+      + destruct H0 as (k&o1&o2&?&?&?). subst. left. repeat intro. destruct (decide (k = i)).
+        * subst. rewrite H lookup_insert_eq. econstructor. inv H0.
+          all: inv H1; auto.
+        * rewrite lookup_insert_ne; auto. destruct (Ω1 !! i); econstructor. destruct o; auto.
+      + right. auto.
+  Qed.
+
+  Lemma obls_cond_progress_advance Ω1 Ω2 C : Ω1 ↪ₚ Ω2 | C → obls_advance Ω1 Ω2.
+  Proof using.
+    intros. destruct H. left. repeat intro. specialize (H i). destruct (Ω1 !! i) eqn:LU1.
+    - inv H. econstructor. destruct H3.
+      + destruct H. inv H1. all: inv H3; auto.
+      + destruct H. subst. destruct y; auto.
+    - inv H. econstructor.
   Qed.
 
 End proofs.
