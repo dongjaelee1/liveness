@@ -56,6 +56,16 @@ Definition obligation_keep `{OC : obligation_class} : obligation → obligation 
     | _, _ => False
     end.
 
+Definition obligation_le `{OC : obligation_class} : obligation → obligation → Prop :=
+  λ g1 g2,
+    match g1, g2 with
+    | (obligation_assigned _ _), _ => True
+    | (obligation_fulfilled), (obligation_fulfilled) => True
+    | (obligation_fulfilled), (obligation_expired) => True
+    | (obligation_expired), (obligation_expired) => True
+    | _, _ => False
+    end.
+
 (** To a map *)
 Definition oid := positive.
 
@@ -115,16 +125,8 @@ Definition obls_cond_progress `{OC : obligation_class} (C : obl_cond) : obligati
   λ Ω1 Ω2, (Ω1 ↪ₛ Ω2 | C) ∧ obls_keep Ω1 Ω2.
 Notation "A ↪ₚ B | C" := (obls_cond_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
 
-Definition obls_advance `{OC : obligation_class} : obligations → obligations → Prop :=
-  λ Ω1 Ω2, (map_Forall2 (λ _ o1 o2,
-                           match o1, o2 with
-                           | obligation_assigned _ _, obligation_assigned _ _ => True
-                           | obligation_assigned _ _, obligation_fulfilled => True
-                           | obligation_fulfilled, obligation_fulfilled => True
-                           | obligation_fulfilled, obligation_expired => True
-                           | obligation_expired, obligation_expired => True
-                           | _, _ => False
-                           end) Ω1 Ω2) ∨ Ω1 ↪ₐ Ω2.
+Definition obls_le `{OC : obligation_class} : obligations → obligations → Prop :=
+  λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obligation_le o1 o2).
 
 Section proofs.
   Context `{OC : obligation_class}.
@@ -212,6 +214,15 @@ Section proofs.
   Proof using. intros. eapply obls_cond_rel_iff_lookup; eauto. Qed.
 
   (** For progress *)
+  Global Instance obligation_keep_reflexive : Reflexive obligation_keep.
+  Proof using.
+    repeat intro. destruct x; simpl in *; subst; try done.
+  Qed.
+  Global Instance obls_keep_reflexive : Reflexive obls_keep.
+  Proof using.
+    repeat intro. destruct (x !! i) eqn:Hx; try done.
+  Qed.
+
   Global Instance obligation_keep_transitive : Transitive obligation_keep.
   Proof using.
     repeat intro. destruct x, y, z; inv H; inv H0. all: econstructor.
@@ -223,35 +234,73 @@ Section proofs.
     all: econstructor; eauto. etransitivity; eauto.
   Qed.
 
-  Global Instance obligation_keep_reflexive : Reflexive obligation_keep.
+  Global Instance obligation_keep_symmetric : Symmetric obligation_keep.
   Proof using.
-    repeat intro. destruct x; simpl in *; subst; try done.
+    repeat intro. destruct x, y; inv H. all: econstructor.
   Qed.
-  Global Instance obls_keep_reflexive : Reflexive obls_keep.
+  Global Instance obls_keep_symmetric : Symmetric obls_keep.
   Proof using.
-    repeat intro. destruct (x !! i) eqn:Hx; try done.
+    repeat intro. specialize (H i). destruct (x !! i) eqn:Hx, (y !! i) eqn:Hy; inv H; try done.
+    econstructor. destruct o, o0; try done.
   Qed.
 
-  (** Advance. *)
-  Lemma obls_step_rc_advance Ω1 Ω2 : Ω1 ↪∘ Ω2 → obls_advance Ω1 Ω2.
+  Global Instance obligation_keep_equivalence : Equivalence obligation_keep.
+  Proof using. econstructor; apply _. Qed.
+  Global Instance obls_keep_equivalence : Equivalence obls_keep.
+  Proof using. econstructor; apply _. Qed.
+
+  (** Le. *)
+  Global Instance obligation_le_reflexive : Reflexive obligation_le.
+  Proof using. repeat intro. destruct x; done. Qed.
+  Global Instance obligation_le_transitive : Transitive obligation_le.
+  Proof using. repeat intro. destruct x, y, z; done. Qed.
+  Global Instance obligation_le_antisymmetric : Antisymmetric _ obligation_keep obligation_le.
+  Proof using. repeat intro. destruct x, y, H, H0; auto; econstructor. Qed.
+
+  Global Instance obls_le_reflexive : Reflexive obls_le.
+  Proof using. repeat intro. split; first done. intros. rewrite H in H0. inv H0. done. Qed.
+  Global Instance obls_le_transitive : Transitive obls_le.
+  Proof using.
+    repeat intro. destruct H, H0. split.
+    - set_solver.
+    - intros. destruct (y !! k) eqn:LUy; cycle 1.
+      { apply elem_of_dom_2 in H3. apply not_elem_of_dom in LUy. set_solver. }
+      specialize (H1 _ _ _ H3 LUy). specialize (H2 _ _ _ LUy H4). etrans; eauto.
+  Qed.
+  Global Instance obls_le_antisymmetric : Antisymmetric _ obls_keep obls_le.
+  Proof using.
+    repeat intro. destruct H, H0. assert (dom x = dom y) by set_solver. clear H H0.
+    destruct (x !! i) eqn:LUx, (y !! i) eqn:LUy.
+    - econstructor. eapply obligation_le_antisymmetric; eauto.
+    - apply elem_of_dom_2 in LUx. apply not_elem_of_dom in LUy. set_solver.
+    - apply elem_of_dom_2 in LUy. apply not_elem_of_dom in LUx. set_solver.
+    - econstructor.
+  Qed.
+
+  Lemma obligation_step_le o1 o2 :
+    obligation_step o1 o2 → obligation_le o1 o2.
+  Proof using. intros. inv H; inv H0; econstructor. Qed.
+
+  Lemma obls_step_rc_advance Ω1 Ω2 : Ω1 ↪∘ Ω2 → obls_le Ω1 Ω2.
   Proof using.
     intros. destruct H.
-    - subst. left. repeat intro. destruct (Ω2 !! i); econstructor; try done. destruct o; try done.
-    - inv H.
-      + destruct H0 as (k&o1&o2&?&?&?). subst. left. repeat intro. destruct (decide (k = i)).
-        * subst. rewrite H lookup_insert_eq. econstructor. inv H0.
-          all: inv H1; auto.
-        * rewrite lookup_insert_ne; auto. destruct (Ω1 !! i); econstructor. destruct o; auto.
-      + right. auto.
+    { subst. done. }
+    inv H.
+    - pose proof (obls_one_dom _ _ H0). split; first set_solver.
+      intros. destruct H0 as (k0&o3&o4&?&?&?). subst. destruct (decide (k0 = k)).
+      + subst. rewrite lookup_insert_eq in H2. inv H2. apply obligation_step_le; auto.
+      + rewrite lookup_insert_ne in H2; auto. rewrite H1 in H2. inv H2. done.
+    - destruct H0 as (?&?&?&?). subst. split.
+      + rewrite dom_insert. set_solver.
+      + intros. destruct (decide (x = k)).
+        * subst. rewrite lookup_insert_eq in H1. inv H1.
+        * rewrite lookup_insert_ne in H1; auto. rewrite H0 in H1. inv H1. done.
   Qed.
 
-  Lemma obls_cond_progress_advance Ω1 Ω2 C : Ω1 ↪ₚ Ω2 | C → obls_advance Ω1 Ω2.
+  Lemma obls_cond_progress_advance Ω1 Ω2 C : Ω1 ↪ₚ Ω2 | C → obls_le Ω1 Ω2.
   Proof using.
-    intros. destruct H. left. repeat intro. specialize (H i). destruct (Ω1 !! i) eqn:LU1.
-    - inv H. econstructor. destruct H3.
-      + destruct H. inv H1. all: inv H3; auto.
-      + destruct H. subst. destruct y; auto.
-    - inv H. econstructor.
+    intros. destruct H. pose proof (obls_cond_rel_dom _ _ _ _ H). split; first set_solver.
+    intros. specialize (H0 k). rewrite H2 H3 in H0. inv H0. destruct o1, o2; done.
   Qed.
 
 End proofs.
