@@ -100,25 +100,11 @@ Local Definition oblG_layer_auth_id `{SI : indexT} `{!osatGS Σ}
   (m : gmap oid layer) : iProp Σ :=
   own layer_name (gmap_view_auth (V:=agreeR (layerO)) (DfracOwn 1) (to_agree <$> m)).
 
-(* State: locked or unlocked for each version *)
-(* Local Definition oblG_state_gen `{SI : indexT} `{!osatGS Σ} *)
-(*   (k : oid) (q : dfrac) (n : nat) : iProp Σ := *)
-(*   own state_name (reservation_map_data k (●MN{q} n)). *)
-(* Local Definition oblG_state_know_gen `{SI : indexT} `{!osatGS Σ} *)
-(*   (k : oid) (n : nat) : iProp Σ := *)
-(*   own state_name (reservation_map_data k (◯MN n)). *)
-
 Definition oblG_assigned `{SI : indexT} `{!osatGS Σ}
   (k : oid) (q : Qp) : iProp Σ :=
   own state_name (reservation_map_data k (●MN{#q} 0, ε)).
 Global Typeclasses Opaque oblG_assigned.
 Global Instance: Params (@oblG_assigned) 3 := {}.
-
-(* Definition oblG_assigned_know `{SI : indexT} `{!osatGS Σ} *)
-(*   (k : oid) : iProp Σ := *)
-(*   oblG_state_know_gen k 0. *)
-(* Global Typeclasses Opaque oblG_assigned_know. *)
-(* Global Instance: Params (@oblG_assigned_know) 3 := {}. *)
 
 Definition oblG_fulfilled `{SI : indexT} `{!osatGS Σ}
   (k : oid) : iProp Σ :=
@@ -169,20 +155,6 @@ Global Instance: Params (@oblG_owner) 3 := {}.
 Local Definition oblG_owner_token_id `{SI : indexT} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO obligation_owner)) E).
-
-(* TODO *)
-(* (* Variant: P until Q and then always R. For each version, three cases: *) *)
-(* (*    1. locked at version v with P *) *)
-(* (*    2. unlocked at version v with Q *) *)
-(* (*    3. version v expired (moved on to a bigger version) with R *) *)
-(* (*    WP ensures that when unlocking, oblG_fulfilled with version v is visited at least once *) *)
-(* Definition oblG_variant_internal `{SI : indexT} `{!osatGS Σ} *)
-(*   (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ := *)
-(*   (((oblG_assigned k q ∗ P) ∨ (oblG_fulfilled k q ∗ Q)) ∨ (oblG_expired k ∗ R)). *)
-
-(* Definition oblG_variant `{SI : indexT} `{!osatGS Σ} `{!invGS Σ} *)
-(*   (N : namespace) (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ := *)
-(*   inv N (oblG_variant_internal k q P Q R). *)
 
 (* Global protocol to manage obligations. *)
 Definition osat `{SI : indexT} `{!osatGS Σ} `{!ord_mono_fun_class}
@@ -298,17 +270,6 @@ Section osat.
 
   Local Instance oblG_owner_token_id_timeless E : Timeless (oblG_owner_token_id E).
   Proof. rewrite /oblG_owner_token_id. apply _. Qed.
-
-  (* (* Variant *) *)
-  (* Global Instance oblG_variant_contractive_1 N k v q Q R : Contractive (λ P, @oblG_variant SI Σ _ _ N k v q P Q R). *)
-  (* Proof. rewrite /oblG_variant /oblG_variant_internal. solve_contractive. Qed. *)
-  (* Global Instance oblG_variant_contractive_2 N k v q P R : Contractive (λ Q, @oblG_variant SI Σ _ _ N k v q P Q R). *)
-  (* Proof. rewrite /oblG_variant /oblG_variant_internal. solve_contractive. Qed. *)
-  (* Global Instance oblG_variant_contractive_3 N k v q P Q : Contractive (λ R, @oblG_variant SI Σ _ _ N k v q P Q R). *)
-  (* Proof. rewrite /oblG_variant /oblG_variant_internal. solve_contractive. Qed. *)
-
-  (* Global Instance oblG_variant_persistent N k v q P Q R : Persistent (oblG_variant N k v q P Q R). *)
-  (* Proof. apply _. Qed. *)
 
   (* Sat *)
   Global Instance osat_timeless Ω : Timeless (osat Ω).
@@ -693,116 +654,6 @@ Section osat.
     rewrite /oblG_owner. by iFrame.
   Qed.
 
-  (* (** oblG_variant rules *) *)
-  (* Lemma oblG_variant_acc E N k v q P Q R : *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q P Q R ={E,E ∖ ↑N}=∗ *)
-  (*   ▷ oblG_variant_internal k v q P Q R ∗ *)
-  (*   (▷ oblG_variant_internal k v q P Q R ={E ∖ ↑N,E}=∗ True). *)
-  (* Proof. *)
-  (*   iIntros (HE) "#GU". iPoseProof (inv_acc with "GU") as "$"; eauto. *)
-  (* Qed. *)
-
-  (* Lemma oblG_variant_acc_version E N k v q1 q2 P Q R : *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q1 P Q R -∗ oblG_version k v q2 ={E,E ∖ ↑N}=∗ *)
-  (*   (▷ (oblG_version k v q2 ∗ *)
-  (*       ((oblG_assigned k v q1 ∗ P) ∨ *)
-  (*          (oblG_fulfilled k v ∗ Q)))) ∗ *)
-  (*   (▷ oblG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True). *)
-  (* Proof. *)
-  (*   iIntros (HE) "#GU GV". iMod (oblG_variant_acc with "GU") as "[[H | H] ACC]"; first auto. *)
-  (*   - iModIntro. iSplitR "ACC". *)
-  (*     + iNext. iDestruct "H" as "[H | H]"; iFrame. *)
-  (*     + iIntros "H". iApply "ACC". done. *)
-  (*   - iModIntro. iSplitR "ACC"; last iFrame. *)
-  (*     iNext. iDestruct "H" as "(_& Gvd& _)". *)
-  (*     iPoseProof (oblG_version_expired_valid with "[$GV $Gvd]") as "%". lia. *)
-  (* Qed. *)
-
-  (* Lemma oblG_variant_acc_assigned E N k v q1 q2 P Q R : *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q1 P Q R -∗ oblG_assigned k v q2 *)
-  (*   ={E,E ∖ ↑N}=∗ *)
-  (*   (▷ (oblG_assigned k v q2 ∗ *)
-  (*       ((oblG_assigned k v q1 ∗ P) ∨ *)
-  (*          (oblG_fulfilled k v ∗ oblG_version_expired k v ∗ R)))) ∗ *)
-  (*   (▷ oblG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True). *)
-  (* Proof. *)
-  (*   iIntros (HE) "#GU GV". iMod (oblG_variant_acc with "GU") as "[[H | H] ACC]"; first auto. *)
-  (*   - iModIntro. iSplitR "ACC". *)
-  (*     + iNext. iDestruct "H" as "[H | H]"; first iFrame. *)
-  (*       iDestruct "H" as "[H _]". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done. *)
-  (*     + done. *)
-  (*   - iModIntro. iSplitR "ACC"; iFrame. *)
-  (* Qed. *)
-
-  (* Lemma oblG_variant_acc_fulfilled E N k v q1 P Q R : *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q1 P Q R -∗ oblG_fulfilled k v *)
-  (*   ={E,E ∖ ↑N}=∗ *)
-  (*   (▷ (Q ∨ (oblG_fulfilled k v ∗ oblG_version_expired k v ∗ R))) ∗ *)
-  (*   (▷ oblG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True). *)
-  (* Proof. *)
-  (*   iIntros (HE) "#GU GV". iMod (oblG_variant_acc with "GU") as "[[H | H] ACC]"; first auto. *)
-  (*   - iModIntro. iSplitR "ACC"; last done. *)
-  (*     iNext. iDestruct "H" as "[H | [_ $]]". *)
-  (*     iDestruct "H" as "[H _]". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done. *)
-  (*   - iModIntro. iSplitR "ACC"; iFrame. *)
-  (* Qed. *)
-  (* Lemma oblG_variant_acc_fulfilled_pin E N k v q1 P Q R : *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q1 P Q R -∗ oblG_fulfilled k v -∗ oblG_version_pin k v *)
-  (*   ={E,E ∖ ↑N}=∗ *)
-  (*   (▷ Q) ∗ *)
-  (*   (▷ oblG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True). *)
-  (* Proof. *)
-  (*   iIntros (HE) "#GU GV Gvp". iMod (oblG_variant_acc with "GU") as "[[H | H] ACC]"; first auto. *)
-  (*   - iModIntro. iSplitR "ACC"; last done. *)
-  (*     iNext. iDestruct "H" as "[H | [_ $]]". *)
-  (*     iDestruct "H" as "[H _]". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done. *)
-  (*   - iModIntro. iSplitR "ACC"; last iFrame. *)
-  (*     iNext. iDestruct "H" as "(_& #Gvd& _)". *)
-  (*     iPoseProof (oblG_version_pin_expired_valid with "[$Gvp $Gvd]") as "%". lia. *)
-  (* Qed. *)
-
-  (* Lemma oblG_variant_acc_version_assigned E N k v q1 q2 q3 P Q R : *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q1 P Q R -∗ oblG_version k v q2 -∗ oblG_assigned k v q3 ={E,E ∖ ↑N}=∗ *)
-  (*   ▷ (oblG_version k v q2 ∗ oblG_assigned k v q3 ∗ (oblG_assigned k v q1 ∗ P)) ∗ *)
-  (*   (▷ oblG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True). *)
-  (* Proof. *)
-  (*   iIntros (HE) "#GU GV OC". iMod (oblG_variant_acc_version with "GU GV") as "[H ACC]"; first auto. *)
-  (*   iModIntro. iSplitR "ACC". *)
-  (*   - iNext. iDestruct "H" as "(Gv& [H | H])"; first iFrame. *)
-  (*     iDestruct "H" as "[H _]". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done. *)
-  (*   - done. *)
-  (* Qed. *)
-
-  (* Lemma oblG_variant_acc_version_fulfilled E N k v q1 q2 P Q R : *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q1 P Q R -∗ oblG_version k v q2 -∗ oblG_fulfilled k v ={E,E ∖ ↑N}=∗ *)
-  (*   ▷ (oblG_version k v q2 ∗ oblG_fulfilled k v ∗ (oblG_fulfilled k v ∗ Q)) ∗ *)
-  (*   (▷ oblG_variant_internal k v q1 P Q R ={E ∖ ↑N,E}=∗ True). *)
-  (* Proof. *)
-  (*   iIntros (HE) "#GU GV OC". iMod (oblG_variant_acc_version with "GU GV") as "[H ACC]"; first auto. *)
-  (*   iModIntro. iSplitR "ACC". *)
-  (*   - iNext. iDestruct "H" as "(Gv& [H | H])"; last iFrame. *)
-  (*     iDestruct "H" as "[H _]". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done. *)
-  (*   - done. *)
-  (* Qed. *)
-
-  (* (* Allocates *) *)
-  (* Lemma oblG_variant_alloc_assigned E N k v q P Q R : *)
-  (*   (▷ (oblG_assigned k v q ∗ P)) ={E}=∗ oblG_variant N k v q P Q R. *)
-  (* Proof. iIntros "H". iApply inv_alloc. iFrame. Qed. *)
-  (* Lemma oblG_variant_alloc_fulfilled E N k v q P Q R : *)
-  (*   (▷ (oblG_fulfilled k v ∗ Q)) ={E}=∗ oblG_variant N k v q P Q R. *)
-  (* Proof. iIntros "H". iApply inv_alloc. iFrame. Qed. *)
-  (* Lemma oblG_variant_alloc_expired E N k v q P Q R : *)
-  (*   (▷ (oblG_fulfilled k v ∗ oblG_version_expired k v ∗ R)) ={E}=∗ oblG_variant N k v q P Q R. *)
-  (* Proof. iIntros "H". iApply inv_alloc. iFrame. Qed. *)
-
   (** osat rules *)
   Lemma osat_elem Ω k :
     osat Ω ∗ oblG_elem k ⊢ ⌜k ∈ dom Ω⌝.
@@ -1180,86 +1031,6 @@ Section osat.
     rewrite insert_delete_eq. iFrame. iFrame "Gr".
     iPureIntro. econstructor.
   Qed.
-
-  (* (** Rules for oblG_variant and osat *) *)
-  (* Lemma osat_variant_acc_assigned Ω k v q0 q1 E N P Q R : *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q0 P Q R ∗ *)
-  (*   osat Ω ∗ oblG_elem k ∗ oblG_assigned k v q1 *)
-  (*   ⊢ |={E,E ∖ ↑N}=> *)
-  (*         ▷ (osat Ω ∗ oblG_assigned k v q1 ∗ (oblG_assigned k v q0 ∗ P)) ∗ *)
-  (*         (▷ oblG_variant_internal k v q0 P Q R ={E ∖ ↑N,E}=∗ True). *)
-  (* Proof. *)
-  (*   iIntros (HE) "(#Gvar& G& #Ge& Gl)". *)
-  (*   iMod (oblG_variant_acc with "Gvar") as "[[H | H] ACC]"; first auto. *)
-  (*   - iModIntro. iSplitR "ACC". *)
-  (*     + iNext. iDestruct "H" as "[H | H]"; first iFrame. *)
-  (*       iDestruct "H" as "[H _]". iPoseProof (oblG_assigned_fulfilled_false with "[$Gl $H]") as "%". done. *)
-  (*     + done. *)
-  (*   - iModIntro. iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "(_& #Gvd& _)". *)
-  (*     iPoseProof (osat_lookup_version_expired with "[$G $Ge $Gvd]") as "%". destruct H as (?&?&?&?). *)
-  (*     iPoseProof (osat_lookup_assigned with "[$G $Ge $Gl]") as "%". destruct H1 as (?&?&?). *)
-  (*     rewrite H in H1. inv H1. lia. *)
-  (* Qed. *)
-
-  (* Lemma osat_variant_unlock Ω k v t q0 q1 E N P Q R : *)
-  (*   (q0 + q1 = 1/2 + 1/2/2)%Qp → *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v q0 P Q R ∗ *)
-  (*   osat Ω ∗ *)
-  (*   oblG_elem k ∗ oblG_assigned k v q1 ∗ oblG_owner k t (1/2 + 1/2/2)%Qp *)
-  (*   ⊢ |={E,E ∖ ↑N}=> *)
-  (*         ▷ ((osat Ω ∗ oblG_assigned k v (1/2 + 1/2/2)%Qp ∗ oblG_owner k t (1/2 + 1/2/2)%Qp ∗ P) ∗ *)
-  (*            ((osat Ω ∗ oblG_assigned k v (1/2 + 1/2/2)%Qp ∗ oblG_owner k t (1/2 + 1/2/2)%Qp ∗ ▷ Q) *)
-  (*             ={E ∖ ↑N,E}=∗ *)
-  (*             osat (<[k:=(v, obligation_fulfilled)]>Ω) ∗ *)
-  (*             oblG_fulfilled k v ∗ *)
-  (*             (⌜ ∀ a, obligation_step (v, obligation_assigned a t) (v, obligation_fulfilled) ⌝))). *)
-  (* Proof. *)
-  (*   iIntros (Hq HE) "(#Gvar& G& #Ge& Gl& Go)". *)
-  (*   iMod (osat_variant_acc_assigned with "[$Gvar $G $Ge $Gl]") as "[H ACC]"; first auto. *)
-  (*   iModIntro. iNext. iDestruct "H" as "($& Gl1& Gl2& $)". *)
-  (*   iCombine "Gl2 Gl1" as "Gl". rewrite Hq. iFrame "Gl Go". *)
-  (*   iIntros "(G& Gl& Go& HQ)". *)
-  (*   iMod (osat_unlock with "[$G $Ge $Gl $Go]") as "($& #Gu& $)". iFrame "Gu". *)
-  (*   iApply "ACC". iNext. iLeft. iRight. iFrame. eauto. *)
-  (* Qed. *)
-
-  (* Lemma osat_variant_lock Ω k v1 v2 ℓ μ t q0 q1 E N (P1 Q1 R1 P2 Q2 R2 : iProp Σ) : *)
-  (*   (q0 + q1 = 1/2 + 1/2/2)%Qp → *)
-  (*   v1 < v2 → *)
-  (*   ↑N ⊆ E → *)
-  (*   oblG_variant N k v1 q0 P1 Q1 R1 ∗ *)
-  (*   osat Ω ∗ *)
-  (*   oblG_layer k ℓ ∗ oblG_fulfilled k v1 ∗ oblG_version k v1 (1/2 + 1/2/2)%Qp *)
-  (*   ⊢ |={E,E ∖ ↑N}=> *)
-  (*         ▷ ((osat Ω ∗ oblG_version k v1 (1/2 + 1/2/2)%Qp ∗ Q1) ∗ *)
-  (*            ((osat Ω ∗ oblG_version k v1 (1/2 + 1/2/2)%Qp ∗ (▷ R1) ∗ (▷ P2)) *)
-  (*             ={E ∖ ↑N,E}=∗ *)
-  (*             ∃ μ', osat (<[k:=(v2, obligation_assigned (measure (ℓ v2) (μ')%M) t)]>Ω) ∗ *)
-  (*             oblG_assigned k v2 q1 ∗ *)
-  (*             oblG_version k v2 (1/2 + 1/2/2)%Qp ∗ *)
-  (*             oblG_fuel k (measure (ℓ v2) μ) ∗ *)
-  (*             oblG_owner k t (1/2 + 1/2/2)%Qp ∗ *)
-  (*             ([∗ set] u ∈ set_seq (S v1) (v2 - v1 - 1), oblG_version_lb k u ∗ oblG_fulfilled k u) ∗ *)
-  (*             (⌜ obligation_step (v1, obligation_fulfilled) (v2, obligation_assigned (measure (ℓ v2) (μ')%M) t) ⌝) ∗ *)
-  (*             oblG_variant N k v2 q0 P2 Q2 R2)). *)
-  (* Proof. *)
-  (*   iIntros (Hq Hv HE) "(#Gvar& G& #Gwf& #Gu& Gv)". *)
-  (*   iPoseProof (oblG_layer_elem with "Gwf") as "#Ge". *)
-  (*   iMod (oblG_variant_acc_fulfilled with "Gvar Gu") as "[H ACC]"; first auto. *)
-  (*   iModIntro. iNext. iDestruct "H" as "[$ | (_& #Gvd& _)]"; cycle 1. *)
-  (*   { iPoseProof (oblG_version_expired_valid with "[$Gv $Gvd]") as "%". lia. } *)
-  (*   iFrame "G Gv". iIntros "(G& Gv& HR& HP)". *)
-  (*   iMod (osat_lock _ _ v1 v2 ℓ μ t with "[$G $Gwf $Gu $Gv]") as "(%& $& Gl& Gv& $& $& #Gus& $)"; first auto. *)
-  (*   iPoseProof (oblG_version_get_lb _ _ v2 with "Gv") as "#Gvl"; first lia. *)
-  (*   iPoseProof (oblG_version_get_expired _ _ v1 with "Gvl") as "#Gvd"; first lia. *)
-  (*   iFrame "Gv". *)
-  (*   rewrite -!Hq. iDestruct "Gl" as "[Gl1 Gl2]". iFrame "Gl2 Gus". *)
-  (*   iMod ("ACC" with "[HR]") as "_". *)
-  (*   { iNext. iRight. iFrame. auto. } *)
-  (*   iApply oblG_variant_alloc_assigned. iFrame. *)
-  (* Qed. *)
 
   Lemma osat_open_owner Ω k t q :
     osat Ω ∗ oblG_elem k ∗ oblG_owner k t q
