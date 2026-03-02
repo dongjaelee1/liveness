@@ -2,8 +2,9 @@ From iris.proofmode Require Import base proofmode classes.
 From iris.bi Require Export fixpoint.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From liris.base_logic Require Export owit othread history_interp invariants.
 From liris.algebra Require Import ordinal_wfocm.
+From liris.base_logic Require Export owit othread model_interp.
+From liris.base_logic Require Export history_interp invariants.
 Import uPred.
 
 Class mupdGS `{SI : indexT} (Σ : gFunctors) :=

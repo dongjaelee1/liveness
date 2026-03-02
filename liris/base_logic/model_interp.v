@@ -3,29 +3,29 @@ From iris.bi.lib Require Import cmra fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From liris.base_logic Require Export owit othread.
+From liris.base_logic Require Export obligation.
 
-Canonical Structure obligationO `{SI : indexT} := leibnizO obligation.
+Canonical Structure obligationO `{SI : indexT} `{OC : obligation_class} := leibnizO obligation.
 
 (** The ghost state for model history. *)
 Module mhistGS.
 
-  Class mhistGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class mhistGpreS `{SI : indexT} (Σ : gFunctors) `{OC : obligation_class} : Set :=
     MhistGpreS {
         mhistGpreS_hist : inG Σ (mono_listUR (prod nat obligations));
       }.
 
-  Class mhistGS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class mhistGS `{SI : indexT} (Σ : gFunctors) `{OC : obligation_class} : Set :=
     MhistG {
         mhist_inG : mhistGpreS Σ;
         hist_name : gname;
       }.
 
-  Definition mhistΣ `{SI : indexT} : gFunctors :=
+  Definition mhistΣ `{SI : indexT} `{OC : obligation_class} : gFunctors :=
     #[GFunctor (mono_listUR (prod nat obligations))
       ].
 
-  Global Instance subG_mhistΣ `{SI : indexT} {Σ} : subG (mhistΣ) Σ → (mhistGpreS Σ).
+  Global Instance subG_mhistΣ `{SI : indexT} {Σ} `{OC : obligation_class} : subG (mhistΣ) Σ → (mhistGpreS Σ).
   Proof. solve_inG. Qed.
 
 End mhistGS.
@@ -36,15 +36,16 @@ Import mhistGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances mhist_inG mhistGpreS_hist.
 
-Definition event_le : (nat * obligations) → (nat * obligations) → Prop :=
+Definition event_le `{OC : obligation_class} : (nat * obligations) → (nat * obligations) → Prop :=
   λ e1 e2, (e1.1 ≤ e2.1 ∧ obls_le e1.2 e2.2).
 
-Definition model_history_wf (h : list (nat * obligations)) : Prop :=
+Definition model_history_wf `{OC : obligation_class} (h : list (nat * obligations)) : Prop :=
   ∀ i (e1 e2 : nat * obligations),
   (h !! i = Some e1) → (h !! (S i) = Some e2) → event_le e1 e2.
 
 (** Properties of wf. *)
 Section proof.
+  Context `{OC : obligation_class}.
 
   Global Instance event_le_reflexive : Reflexive event_le.
   Proof. repeat intro. destruct x; done. Qed.
@@ -118,16 +119,16 @@ Section proof.
 
 End proof.
 
-Local Definition mhG_history_auth_def `{SI : indexT} `{@mhistGS SI Σ}
+Local Definition mhG_history_auth_def `{SI : indexT} `{OC : obligation_class} `{@mhistGS SI Σ OC}
   (h : list (nat * obligations)) : iProp Σ :=
   (⌜ model_history_wf h ⌝ ∗ own hist_name (●ML h))%I.
 Local Definition mhG_history_auth_aux : seal (@mhG_history_auth_def). Proof. by eexists. Qed.
 Definition mhG_history_auth := mhG_history_auth_aux.(unseal).
 Local Definition mhG_history_auth_unseal :
   @mhG_history_auth = @mhG_history_auth_def := mhG_history_auth_aux.(seal_eq).
-Global Arguments mhG_history_auth {SI Σ _}.
+Global Arguments mhG_history_auth {SI OC Σ _}.
 
-Local Definition mhG_event_def `{SI : indexT} `{@mhistGS SI Σ}
+Local Definition mhG_event_def `{SI : indexT} `{OC : obligation_class} `{@mhistGS SI Σ OC}
   (i n : nat) (e : obligations)  : iProp Σ :=
   (∃ (h : list (nat * obligations)),
       (⌜ length h = (S i) ∧ last h = Some (n, e) ∧ model_history_wf h ⌝) ∧ own hist_name (◯ML h))%I.
@@ -135,11 +136,11 @@ Local Definition mhG_event_aux : seal (@mhG_event_def). Proof. by eexists. Qed.
 Definition mhG_event := mhG_event_aux.(unseal).
 Local Definition mhG_event_unseal :
   @mhG_event = @mhG_event_def := mhG_event_aux.(seal_eq).
-Global Arguments mhG_event {SI Σ _}.
+Global Arguments mhG_event {SI OC Σ _}.
 
 (** Properties *)
 Section proof.
-  Context `{SI : indexT} `{HIST : !mhistGS Σ}.
+  Context `{SI : indexT} `{OC : obligation_class} `{HIST : !mhistGS Σ}.
 
   Global Instance mhG_history_auth_timeless h : Timeless (mhG_history_auth h).
   Proof. rewrite mhG_history_auth_unseal /mhG_history_auth_def. apply _. Qed.
@@ -206,29 +207,29 @@ Section proof.
 
 End proof.
 
-Definition model_history_interp `{SI : indexT} `{@mhistGS SI Σ}
+Definition model_history_interp `{SI : indexT} `{OC : obligation_class} `{@mhistGS SI Σ OC}
   (h : list (prod nat obligations)) (i n : nat) (Ω : obligations) : iProp Σ :=
   locked (⌜ length h = (S i) ∧ last h = Some (n, Ω) ⌝ ∗ mhG_history_auth h)%I.
 Global Typeclasses Opaque model_history_interp.
-Global Instance: Params (@model_history_interp) 3 := {}.
+Global Instance: Params (@model_history_interp) 4 := {}.
 
-Local Definition event_obl_def `{SI : indexT} `{@mhistGS SI Σ}
+Local Definition event_obl_def `{SI : indexT} `{OC : obligation_class} `{@mhistGS SI Σ OC}
   (i n : nat) (k : oid) (o : obligation) : iProp Σ :=
   (∃ e, mhG_event i n e ∗ ⌜ e !! k = Some o ⌝)%I.
 Local Definition event_obl_aux : seal (@event_obl_def). Proof. by eexists. Qed.
 Definition event_obl := event_obl_aux.(unseal).
 Local Definition event_obl_unseal :
   @event_obl = @event_obl_def := event_obl_aux.(seal_eq).
-Global Arguments event_obl {SI Σ _}.
+Global Arguments event_obl {SI OC Σ _}.
 
 (* We use this to record that Until was alive at this point of execution. *)
-Definition event_alive_def `{SI : indexT} `{@mhistGS SI Σ}
+Definition event_alive_def `{SI : indexT} `{OC : obligation_class} `{@mhistGS SI Σ OC}
   (i n : nat) (k : oid) : iProp Σ :=
   (∃ o, event_obl i n k o ∧ ⌜ obligation_le o obligation_fulfilled ⌝).
 
 (** Properties *)
 Section hist.
-  Context `{SI : indexT} `{HIST : !mhistGS Σ}.
+  Context `{SI : indexT} `{OC : obligation_class} `{HIST : !mhistGS Σ}.
 
   Global Instance model_history_interp_timeless h i n Ω : Timeless (model_history_interp h i n Ω).
   Proof. rewrite /model_history_interp -lock. apply _. Qed.
@@ -308,12 +309,12 @@ Section hist.
 End hist.
 
 (* Allocation of a history interpretation. *)
-Lemma model_history_interp_init `{SI : indexT} `{HIST : !mhistGS Σ} n Ω :
+Lemma model_history_interp_init `{SI : indexT} `{OC : obligation_class} `{HIST : !mhistGS Σ} n Ω :
   ⊢ |==> ∃ _ : mhistGS Σ, model_history_interp [(n, Ω)] 0 n Ω.
 Proof.
   iMod (own_alloc (●ML ([(n, Ω)]) : mono_listUR (prod nat obligations))) as (γH) "HH";
     first by apply mono_list_auth_valid.
-  iModIntro; iExists (MhistG SI _ _ γH).
+  iModIntro; iExists (MhistG SI _ _ _ γH).
   rewrite /model_history_interp -lock mhG_history_auth_unseal /mhG_history_auth_def.
   iFrame. iPureIntro. simpl. done.
 Qed.
