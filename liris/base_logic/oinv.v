@@ -66,6 +66,16 @@ Section oinv.
     - iModIntro. iSplitR "ACC"; iFrame. iNext. iDestruct "H" as "[_ $]".
   Qed.
 
+  Lemma oblG_inv_acc_fulfilled_persistent E N k q P Q R :
+    Persistent R →
+    ↑N ⊆ E →
+    oblG_inv N k q P Q R -∗ oblG_fulfilled k ={E}[E ∖ ↑N]▷=∗ R.
+  Proof.
+    iIntros (PR HE) "#GU #Gf". iMod (oblG_inv_acc_fulfilled with "GU Gf") as "[H ACC]". 1: auto.
+    iModIntro. iNext. iDestruct "H" as "[H #HR]". iFrame "HR". iApply "ACC".
+    iRight. eauto.
+  Qed.
+
   Lemma oblG_inv_acc_alive E N k q1 q2 P Q R :
     ↑N ⊆ E →
     oblG_inv N k q1 P Q R -∗ oblG_alive k q2
