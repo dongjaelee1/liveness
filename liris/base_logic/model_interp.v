@@ -280,7 +280,7 @@ Section hist.
     iFrame "He". auto.
   Qed.
 
-  Lemma model_history_interp_event_pred_now k o h i n Ω :
+  Lemma model_history_interp_event_obl_now k o h i n Ω :
     (Ω !! k = Some o) →
     model_history_interp h i n Ω ⊢ event_obl i n k o.
   Proof.
@@ -288,7 +288,7 @@ Section hist.
     iPoseProof (model_history_interp_event_obl_any with "HI") as "#He"; eauto.
   Qed.
 
-  Lemma event_pred_model_history_interp_lookup h i n Ω j m k o :
+  Lemma event_obl_model_history_interp_lookup h i n Ω j m k o :
     model_history_interp h i n Ω ∗ event_obl j m k o ⊢ ∃ e, ⌜ h !! j = Some e ∧ e.1 = m ∧ e.2 !! k = Some o ⌝.
   Proof.
     rewrite /model_history_interp -lock event_obl_unseal /event_obl_def. iIntros "((%& Ha)& (%& #He& %))".

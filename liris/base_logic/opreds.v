@@ -143,14 +143,9 @@ Local Definition witP_cred_unseal :
 Global Arguments witP_cred {SI Σ _}.
 
 (* Collection of fuels to support induction rules *)
-Local Definition obl_fuels_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition obl_fuels `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   α (F : gmap oid (layer * measurable_syntax)) : iProp Σ :=
   ([∗ map] f ↦ '(l, m) ∈ F, oblP_fuel_val f ((measure l m) × α)%ord).
-Local Definition obl_fuels_aux : seal (@obl_fuels_def). Proof. by eexists. Qed.
-Definition obl_fuels := obl_fuels_aux.(unseal).
-Local Definition obl_fuels_unseal :
-  @obl_fuels = @obl_fuels_def := obl_fuels_aux.(seal_eq).
-Global Arguments obl_fuels {SI Σ _ _}.
 
 Local Definition embed_fuels_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
@@ -178,7 +173,7 @@ Section preds.
   Local Ltac unfold_defs :=
     try rewrite !wit_fuels_unseal /wit_fuels_def;
     try rewrite !embed_fuels_unseal /embed_fuels_def;
-    try rewrite !obl_fuels_unseal /obl_fuels_def;
+    try rewrite /obl_fuels;
     try rewrite !witP_cred_unseal /witP_cred_def;
     try rewrite !witP_layer_unseal /witP_layer_def;
     try rewrite !witP_bound_unseal /witP_bound_def;
@@ -781,7 +776,7 @@ Section preds.
       (α <= measure ℓ ν)%ord →
       obl_fuels α F -∗ oblP_fuel f ℓ (μ × ν)%M ==∗ obl_fuels α (<[f:=(ℓ, μ)]>F).
     Proof.
-      iIntros (LT) "Wfs Gf". rewrite !obl_fuels_unseal /obl_fuels_def.
+      iIntros (LT) "Wfs Gf". rewrite /obl_fuels.
       unfold_oblP_fuel. iMod (oblP_fuel_val_mon _ ((measure ℓ μ) × α)%ord with "Gf") as "Gf".
       { rewrite measure_mult. apply Jacobsthal.le_mult_r. auto. }
       iModIntro. iApply (big_sepM_insert_delete _ _ f).
@@ -810,7 +805,7 @@ Section preds.
       obl_fuels α F ==∗
       (obl_fuels α0 F ∗ ([∗ map] f ↦ '(l, m) ∈ F, oblP_fuel f l m)).
     Proof.
-      rewrite obl_fuels_unseal /obl_fuels_def. iIntros (LT) "Fs".
+      rewrite /obl_fuels. iIntros (LT) "Fs".
       rewrite -big_sepM_sep -big_sepM_bupd. iApply (big_sepM_impl with "Fs").
       iIntros "!> % % % H". destruct x as (l& m).
       rewrite oblP_fuel_unseal /oblP_fuel_def. rewrite -oblP_fuel_val_add. iApply (oblP_fuel_val_mon with "H").
@@ -1230,7 +1225,7 @@ Section preds.
       iIntros "!> !>". auto.
     Qed.
 
-    Lemma obl_check_witnesses n Θ (R : oids) :
+    Lemma obl_check_witnesses_mupd n Θ (R : oids) :
       ([∗ set] r ∈ R, oblP_id r) -∗
       |=[n,Θ]=>m ([∗ set] r ∈ R, witP_cred r Ord.O ∨ oblP_fulfilled r).
     Proof.
