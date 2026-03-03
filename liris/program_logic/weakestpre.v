@@ -48,8 +48,8 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
           between each step of reduction.
           Here [state] is the global state, [thread_ids] is the allocated thread ids,
           and [list (observation Λ)] are the remaining observations. *)
-      state_pred : Type;
-      #[global] liris_state_interp_class :: state_interp_class Σ (state Λ * list (observation Λ)) state_pred;
+      state_pred_type : Type;
+      #[global] liris_state_interp_class :: state_interp_class Σ (state Λ * list (observation Λ)) state_pred_type;
       #[global] liris_histGS :: histGS.histGS Σ ((state Λ * list (observation Λ)) * (gset positive));
       (* state_interp : state Λ → thread_ids → list (observation Λ) → iProp Σ; *)
 
@@ -75,68 +75,54 @@ Definition oprog `{SI : indexT} `{!lirisGS Λ Σ} n Θ i : iPropO Σ -d> iPropO 
      ∀ W2, (⌜(W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗
            (model_interp (h ++ [(n, Ω2)]) (S a) Ω2 W2 n Θ) ∗ P)%I.
 
-(* Update physical states. *)
-Definition ophys `{SI : indexT} `{!lirisGS Λ Σ} n1 n2 Θ1 Θ2 : iPropO Σ -d> iPropO Σ :=
-  (λ P,
-     ∀ h a Ω W,
-     (model_interp h a Ω W n1 Θ1) ={∅}=∗
-     (model_interp (h ++ [(n2, Ω)]) (S a) Ω W n2 Θ2) ∗ P)%I.
+(* Notation "'@={' Θ1 , Θ2 , i '}=↓' P" := (oprog n Θ i P) (at level 99, P at level 200, format "@={ Θ1 , Θ2 , i }=↓  P"). *)
 
-TODO
-(* Notation "'@={' Θ1 , Θ2 , i '}=↓' P" := (gprog Θ1 Θ2 i P) (at level 99, P at level 200, format "@={ Θ1 , Θ2 , i }=↓  P"). *)
-
-Section gprog.
+Section oprog.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
 
-  Global Instance gprog_ne Θ1 Θ2 i :
-    NonExpansive (gprog Θ1 Θ2 i).
-  Proof.
-    intros n P1 P2 HP. rewrite /gprog. do 15 (f_equiv || done).
-  Qed.
-  Global Instance gprog_proper Θ1 Θ2 i :
-    Proper ((≡) ==> (≡)) (gprog Θ1 Θ2 i).
-  Proof.
-    intros P P' ?. apply equiv_dist=>n. apply gprog_ne. apply equiv_dist. done.
-  Qed.
+  Global Instance oprog_ne n Θ i : NonExpansive (oprog n Θ i).
+  Proof. intros ? P1 P2 HP. rewrite /oprog. do 20 (f_equiv || done). Qed.
+  Global Instance oprog_proper n Θ i : Proper ((≡) ==> (≡)) (oprog n Θ i).
+  Proof. intros P P' ?. apply equiv_dist=>?. apply oprog_ne. apply equiv_dist. done. Qed.
 
-  Lemma gprog_mono Θ1 Θ2 i P Q : (P ⊢ Q) → (@={Θ1,Θ2,i}=↓ P) ⊢ (@={Θ1,Θ2,i}=↓ Q).
+  Lemma oprog_mono n Θ i P Q : (P ⊢ Q) → (oprog n Θ i P) ⊢ (oprog n Θ i Q).
   Proof.
-    intros Hent. rewrite /gprog. iIntros "P % % I".
+    intros Hent. rewrite /oprog. iIntros "P %%%% I".
     iMod ("P" with "I") as "(%& $& P)". iModIntro.
     iIntros (??). iMod ("P" with "[//]") as "[$ P]".
     by iApply Hent.
   Qed.
-  Lemma gprog_wand_l Θ1 Θ2 i P Q : (P -∗ Q) ∗ (@={Θ1,Θ2,i}=↓ P) ⊢ (@={Θ1,Θ2,i}=↓ Q).
+  Lemma oprog_wand_l n Θ i P Q : (P -∗ Q) ∗ (oprog n Θ i P) ⊢ (oprog n Θ i Q).
   Proof.
     iIntros "[PQ P]".
-    rewrite /gprog. iIntros "% % I".
+    rewrite /oprog. iIntros "%%%% I".
     iMod ("P" with "I") as "(%& $& P)". iModIntro.
     iIntros (??). iMod ("P" with "[//]") as "[$ P]".
     by iApply "PQ".
   Qed.
 
-  Global Instance gprog_ent_proper Θ1 Θ2 i : Proper ((⊢) ==> (⊢)) (gprog Θ1 Θ2 i).
-  Proof. intros P Q PQ. by apply gprog_mono. Qed.
-  Global Instance gprog_flip_ent_proper Θ1 Θ2 i : Proper (flip (⊢) ==> flip (⊢)) (gprog Θ1 Θ2 i).
-  Proof. intros P Q PQ; by apply gprog_mono. Qed.
-  Global Instance gprog_equiv_proper Θ1 Θ2 i : Proper ((≡) ==> (≡)) (gprog Θ1 Θ2 i) := ne_proper _.
+  Global Instance oprog_ent_proper n Θ i : Proper ((⊢) ==> (⊢)) (oprog n Θ i).
+  Proof. intros P Q PQ. by apply oprog_mono. Qed.
+  Global Instance oprog_flip_ent_proper n Θ i : Proper (flip (⊢) ==> flip (⊢)) (oprog n Θ i).
+  Proof. intros P Q PQ; by apply oprog_mono. Qed.
+  Global Instance oprog_equiv_proper n Θ i : Proper ((≡) ==> (≡)) (oprog n Θ i) := ne_proper _.
 
-  Global Instance elim_gprog (p : bool) Θ1 Θ2 i P Q :
-    ElimModal True p false (@={Θ1,Θ2,i}=↓ P) P (@={Θ1,Θ2,i}=↓ Q) Q.
+  Global Instance elim_oprog (p : bool) n Θ i P Q :
+    ElimModal True p false (oprog n Θ i P) P (oprog n Θ i Q) Q.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply (gprog_wand_l with "[$HPQ $HP]").
+    iIntros "_ [HP HPQ]". iApply (oprog_wand_l with "[$HPQ $HP]").
   Qed.
 
-  Lemma fupd_gprog Θ1 Θ2 i P : (|={∅}=> @={Θ1,Θ2,i}=↓ P) ⊢ @={Θ1,Θ2,i}=↓ P.
+  Lemma fupd_oprog n Θ i P : (|={∅}=> oprog n Θ i P) ⊢ oprog n Θ i P.
   Proof.
-    rewrite /gprog. iIntros "H % % IP". iMod ("H" with "IP") as "H". done.
+    rewrite /oprog. iIntros "H %%%% IP". iMod ("H" with "IP") as "H". done.
   Qed.
-  Global Instance elim_fupd_gprog (p : bool) Θ1 Θ2 i P Q :
-    ElimModal True p false (|={∅}=> P) P (@={Θ1,Θ2,i}=↓ Q) (@={Θ1,Θ2,i}=↓ Q).
+  Global Instance elim_fupd_oprog (p : bool) n Θ i P Q :
+    ElimModal True p false (|={∅}=> P) P (oprog n Θ i Q) (oprog n Θ i Q).
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply fupd_gprog. iMod "HP".
+    iIntros "_ [HP HPQ]". iApply fupd_oprog. iMod "HP".
     iModIntro. iApply ("HPQ" with "HP").
   Qed.
 
@@ -160,14 +146,14 @@ Section gprog.
     try rewrite !mupd.gl_unseal /mupd.gl_def.
 
   (** Step rule *)
-  Lemma gprog_step Θ1 Θ2 π i P :
+  Lemma oprog_step n Θ π i P :
     Θ2 = Θ1 ∪ π →
     Θ1 ## π →
     (|={∅}=> ∃ G, th_obls i G 1 ∗ ([∗ map] g ↦ v ∈ G, gl_fuel g 0 1) ∗
                  ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
                       ((th_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) ∗ ([∗ set] j ∈ π, th_obls j ∅ 1))
                        ={∅}=∗ P))
-    ⊢ @={Θ1,Θ2,i}=↓ P.
+    ⊢ oprog n Θ i P.
   Proof.
     intros ->. unfold_defs. iIntros (DisjTP) "H". iMod "H" as "(%& (#Oe& Ox& Ob& OS)& GFs& %& #REs& H)".
     iAssert ([∗ map] g↦_ ∈ G, glG_elem g ∗ glG_fuel g Ord.one)%I with "[GFs]" as "GFs".
@@ -330,7 +316,14 @@ Section gprog.
     iModIntro. rewrite DomO /gproto. iFrame. done.
   Qed.
 
-End gprog.
+End oprog.
+
+(* Update physical states. *)
+Definition ophys `{SI : indexT} `{!lirisGS Λ Σ} n1 n2 n Θ : iPropO Σ -d> iPropO Σ :=
+  (λ P,
+     ∀ h a Ω W,
+     (model_interp h a Ω W n1 Θ1) ={∅}=∗
+     (model_interp (h ++ [(n2, Ω)]) (S a) Ω W n2 Θ2) ∗ P)%I.
 
 (** Predicates we take the fixpoint of in order to define the lWP. *)
 (* Ω must make strict progress for every step (to bound step-index) *)

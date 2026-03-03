@@ -90,6 +90,7 @@ liris/program_logic/language.v
 # liris/program_logic/thread_obligation.v
 liris/program_logic/history_interp.v
 liris/program_logic/sfmupd.v
+liris/program_logic/model_physical_updates.v
 liris/program_logic/weakestpre.v
 # liris/program_logic/temporal_rules.v
 liris/program_logic/lifting.v
