@@ -13,56 +13,56 @@ Proof.
   - induction 1 as [z _ IH]; constructor; intros ??; apply IH; simpl in *; eauto using tc_once.
 Qed.
 
-Class obligation_class := {
-    obligation_fuel : Type;
-    #[global] obligation_fuel_wfocm :: WFOCM.pack obligation_fuel;
+Class obl_class := {
+    obl_fuel : Type;
+    #[global] obl_fuel_wfocm :: WFOCM.pack obl_fuel;
   }.
 (** We assume that the thread id is positive *)
-Definition obligation_owner := positive.
+Definition obl_owner := positive.
 
-Variant obligation `{OC : obligation_class} : Type :=
-  | obligation_assigned (fuel : obligation_fuel) (owner : obligation_owner)
-  | obligation_fulfilled
-  | obligation_expired
+Variant obl `{OC : obl_class} : Type :=
+  | obl_assigned (fuel : obl_fuel) (owner : obl_owner)
+  | obl_fulfilled
+  | obl_expired
 .
 
 (* Step relations. *)
-Variant obligation_progress `{OC : obligation_class} : obligation → obligation → Prop :=
-  | obligation_progress_intro f1 f2 o1 o2 (LTf : f2 w< f1) :
-    obligation_progress (obligation_assigned f1 o1) (obligation_assigned f2 o2).
+Variant obl_progress `{OC : obl_class} : obl → obl → Prop :=
+  | obl_progress_intro f1 f2 o1 o2 (LTf : f2 w< f1) :
+    obl_progress (obl_assigned f1 o1) (obl_assigned f2 o2).
 
-Variant obligation_fulfill `{OC : obligation_class} : obligation → obligation → Prop :=
-  | obligation_fulfill_intro f o :
-    obligation_fulfill (obligation_assigned f o) (obligation_fulfilled).
+Variant obl_fulfill `{OC : obl_class} : obl → obl → Prop :=
+  | obl_fulfill_intro f o :
+    obl_fulfill (obl_assigned f o) (obl_fulfilled).
 
-Variant obligation_expire `{OC : obligation_class} : obligation → obligation → Prop :=
-  | obligation_expire_intro :
-    obligation_expire (obligation_fulfilled) (obligation_expired).
+Variant obl_expire `{OC : obl_class} : obl → obl → Prop :=
+  | obl_expire_intro :
+    obl_expire (obl_fulfilled) (obl_expired).
 
-Variant obligation_step `{OC : obligation_class} : obligation → obligation → Prop :=
-  | obligation_step_progress g1 g2 :
-    obligation_progress g1 g2 → obligation_step g1 g2
-  | obligation_step_fulfill g1 g2 :
-    obligation_fulfill g1 g2 → obligation_step g1 g2
-  | obligation_step_expire g1 g2 :
-    obligation_expire g1 g2 → obligation_step g1 g2.
+Variant obl_step `{OC : obl_class} : obl → obl → Prop :=
+  | obl_step_progress g1 g2 :
+    obl_progress g1 g2 → obl_step g1 g2
+  | obl_step_fulfill g1 g2 :
+    obl_fulfill g1 g2 → obl_step g1 g2
+  | obl_step_expire g1 g2 :
+    obl_expire g1 g2 → obl_step g1 g2.
 
-Definition obligation_keep `{OC : obligation_class} : obligation → obligation → Prop :=
+Definition obl_keep `{OC : obl_class} : obl → obl → Prop :=
   λ g1 g2,
     match g1, g2 with
-    | (obligation_assigned _ _), (obligation_assigned _ _) => True
-    | (obligation_fulfilled), (obligation_fulfilled) => True
-    | (obligation_expired), (obligation_expired) => True
+    | (obl_assigned _ _), (obl_assigned _ _) => True
+    | (obl_fulfilled), (obl_fulfilled) => True
+    | (obl_expired), (obl_expired) => True
     | _, _ => False
     end.
 
-Definition obligation_le `{OC : obligation_class} : obligation → obligation → Prop :=
+Definition obl_le `{OC : obl_class} : obl → obl → Prop :=
   λ g1 g2,
     match g1, g2 with
-    | (obligation_assigned _ _), _ => True
-    | (obligation_fulfilled), (obligation_fulfilled) => True
-    | (obligation_fulfilled), (obligation_expired) => True
-    | (obligation_expired), (obligation_expired) => True
+    | (obl_assigned _ _), _ => True
+    | (obl_fulfilled), (obl_fulfilled) => True
+    | (obl_fulfilled), (obl_expired) => True
+    | (obl_expired), (obl_expired) => True
     | _, _ => False
     end.
 
@@ -70,18 +70,18 @@ Definition obligation_le `{OC : obligation_class} : obligation → obligation �
 Definition oid := positive.
 
 Notation oids := (gset oid).
-Notation obligations := (gmap oid obligation).
+Notation obls := (gmap oid obl).
 
-(** For obligations, take one step at a time. *)
-Definition obls_one `{OC : obligation_class} : obligations → obligations → Prop :=
-  λ Ω1 Ω2, ∃ k g1 g2, (Ω1 !! k = Some g1) ∧ (obligation_step g1 g2) ∧ (Ω2 = <[k:=g2]>Ω1).
+(** For obls, take one step at a time. *)
+Definition obls_one `{OC : obl_class} : obls → obls → Prop :=
+  λ Ω1 Ω2, ∃ k g1 g2, (Ω1 !! k = Some g1) ∧ (obl_step g1 g2) ∧ (Ω2 = <[k:=g2]>Ω1).
 Infix "↪₁" := (obls_one) (at level 20).
 
-Definition obls_alloc `{OC : obligation_class} : obligations → obligations → Prop :=
+Definition obls_alloc `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, ∃ k, (Ω1 !! k = None) ∧ (∃ g, Ω2 = <[k:=g]> Ω1).
 Infix "↪ₐ" := (obls_alloc) (at level 20).
 
-Variant obls_step `{OC : obligation_class} : obligations → obligations → Prop :=
+Variant obls_step `{OC : obl_class} : obls → obls → Prop :=
   | obls_step_one Ω1 Ω2 :
     Ω1 ↪₁ Ω2 → obls_step Ω1 Ω2
   | obls_step_alloc Ω1 Ω2 :
@@ -92,44 +92,44 @@ Notation "A ↪∘ B" := (rc (obls_step) A B) (at level 20, format "A  ↪∘  B
 Notation "A ↪⁺ B" := (tc (obls_step) A B) (at level 20, format "A  ↪⁺  B").
 Notation "A ↪⋆ B" := (rtc (obls_step) A B) (at level 20, format "A  ↪⋆  B").
 
-(** Definitions for strict progress of obligations. *)
+(** Definitions for strict progress of obls. *)
 (* Only ghost locks that satisfy obl_cond makes R *)
-Definition obl_cond `{OC : obligation_class} := (oid → obligation → Prop).
-Definition obls_cond_rel `{OC : obligation_class} (C : obl_cond) (R : obligation → obligation → Prop) : obligations → obligations → Prop :=
+Definition obl_cond `{OC : obl_class} := (oid → obl → Prop).
+Definition obls_cond_rel `{OC : obl_class} (C : obl_cond) (R : obl → obl → Prop) : obls → obls → Prop :=
   λ Ω1 Ω2, map_Forall2 (λ k g1 g2, (C k g1 ∧ R g1 g2) ∨ ((¬ C k g1) ∧ g1 = g2)) Ω1 Ω2.
 
-Definition gl_rel_preserves_cond `{OC : obligation_class} (C : obl_cond) (R : obligation → obligation → Prop) : Prop :=
+Definition gl_rel_preserves_cond `{OC : obl_class} (C : obl_cond) (R : obl → obl → Prop) : Prop :=
   ∀ k g1 g2, C k g1 → R g1 g2 → C k g2.
 
 (* Some useful obl_conds *)
-Definition obl_cond_owner `{OC : obligation_class} (i : obligation_owner) : obl_cond :=
-  λ _ g, match g with | (obligation_assigned _ j) => (j = i) | _ => False end.
-Global Instance obl_cond_owner_dec `{OC : obligation_class} : ∀ i k g, Decision (obl_cond_owner i k g).
+Definition obl_cond_owner `{OC : obl_class} (i : obl_owner) : obl_cond :=
+  λ _ g, match g with | (obl_assigned _ j) => (j = i) | _ => False end.
+Global Instance obl_cond_owner_dec `{OC : obl_class} : ∀ i k g, Decision (obl_cond_owner i k g).
 Proof using. intros. rewrite /obl_cond_owner. destruct g; solve_decision. Qed.
 
-Definition obl_cond_one `{OC : obligation_class} (v : oid) : obl_cond :=
+Definition obl_cond_one `{OC : obl_class} (v : oid) : obl_cond :=
   λ k _, k = v.
-Global Instance obl_cond_one_dec `{OC : obligation_class} : ∀ v k g, Decision (obl_cond_one v k g).
+Global Instance obl_cond_one_dec `{OC : obl_class} : ∀ v k g, Decision (obl_cond_one v k g).
 Proof using. intros. rewrite /obl_cond_one. solve_decision. Qed.
 
 (* Ghost locks conditional step relation *)
-Definition obls_cond_step `{OC : obligation_class} (C : obl_cond) : obligations → obligations → Prop :=
-  obls_cond_rel C obligation_step.
+Definition obls_cond_step `{OC : obl_class} (C : obl_cond) : obls → obls → Prop :=
+  obls_cond_rel C obl_step.
 Notation "A ↪ₛ B | C" := (obls_cond_step C A B) (at level 20, format "A  ↪ₛ  B  |  C").
 
 (* Ghost locks making strict progresses *)
-Definition obls_keep `{OC : obligation_class} : obligations → obligations → Prop :=
-  λ Ω1 Ω2, map_Forall2 (λ k g1 g2, obligation_keep g1 g2) Ω1 Ω2.
+Definition obls_keep `{OC : obl_class} : obls → obls → Prop :=
+  λ Ω1 Ω2, map_Forall2 (λ k g1 g2, obl_keep g1 g2) Ω1 Ω2.
 
-Definition obls_cond_progress `{OC : obligation_class} (C : obl_cond) : obligations → obligations → Prop :=
+Definition obls_cond_progress `{OC : obl_class} (C : obl_cond) : obls → obls → Prop :=
   λ Ω1 Ω2, (Ω1 ↪ₛ Ω2 | C) ∧ obls_keep Ω1 Ω2.
 Notation "A ↪ₚ B | C" := (obls_cond_progress C A B) (at level 20, format "A  ↪ₚ  B  |  C").
 
-Definition obls_le `{OC : obligation_class} : obligations → obligations → Prop :=
-  λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obligation_le o1 o2).
+Definition obls_le `{OC : obl_class} : obls → obls → Prop :=
+  λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obl_le o1 o2).
 
 Section proofs.
-  Context `{OC : obligation_class}.
+  Context `{OC : obl_class}.
 
   (** Properties *)
   (** For the one step relation. *)
@@ -214,7 +214,7 @@ Section proofs.
   Proof using. intros. eapply obls_cond_rel_iff_lookup; eauto. Qed.
 
   (** For progress *)
-  Global Instance obligation_keep_reflexive : Reflexive obligation_keep.
+  Global Instance obl_keep_reflexive : Reflexive obl_keep.
   Proof using.
     repeat intro. destruct x; simpl in *; subst; try done.
   Qed.
@@ -223,7 +223,7 @@ Section proofs.
     repeat intro. destruct (x !! i) eqn:Hx; try done.
   Qed.
 
-  Global Instance obligation_keep_transitive : Transitive obligation_keep.
+  Global Instance obl_keep_transitive : Transitive obl_keep.
   Proof using.
     repeat intro. destruct x, y, z; inv H; inv H0. all: econstructor.
   Qed.
@@ -234,7 +234,7 @@ Section proofs.
     all: econstructor; eauto. etransitivity; eauto.
   Qed.
 
-  Global Instance obligation_keep_symmetric : Symmetric obligation_keep.
+  Global Instance obl_keep_symmetric : Symmetric obl_keep.
   Proof using.
     repeat intro. destruct x, y; inv H. all: econstructor.
   Qed.
@@ -244,17 +244,17 @@ Section proofs.
     econstructor. destruct o, o0; try done.
   Qed.
 
-  Global Instance obligation_keep_equivalence : Equivalence obligation_keep.
+  Global Instance obl_keep_equivalence : Equivalence obl_keep.
   Proof using. econstructor; apply _. Qed.
   Global Instance obls_keep_equivalence : Equivalence obls_keep.
   Proof using. econstructor; apply _. Qed.
 
   (** Le. *)
-  Global Instance obligation_le_reflexive : Reflexive obligation_le.
+  Global Instance obl_le_reflexive : Reflexive obl_le.
   Proof using. repeat intro. destruct x; done. Qed.
-  Global Instance obligation_le_transitive : Transitive obligation_le.
+  Global Instance obl_le_transitive : Transitive obl_le.
   Proof using. repeat intro. destruct x, y, z; done. Qed.
-  Global Instance obligation_le_antisymmetric : Antisymmetric _ obligation_keep obligation_le.
+  Global Instance obl_le_antisymmetric : Antisymmetric _ obl_keep obl_le.
   Proof using. repeat intro. destruct x, y, H, H0; auto; econstructor. Qed.
 
   Global Instance obls_le_reflexive : Reflexive obls_le.
@@ -271,24 +271,24 @@ Section proofs.
   Proof using.
     repeat intro. destruct H, H0. assert (dom x = dom y) by set_solver. clear H H0.
     destruct (x !! i) eqn:LUx, (y !! i) eqn:LUy.
-    - econstructor. eapply obligation_le_antisymmetric; eauto.
+    - econstructor. eapply obl_le_antisymmetric; eauto.
     - apply elem_of_dom_2 in LUx. apply not_elem_of_dom in LUy. set_solver.
     - apply elem_of_dom_2 in LUy. apply not_elem_of_dom in LUx. set_solver.
     - econstructor.
   Qed.
 
-  Lemma obligation_step_le o1 o2 :
-    obligation_step o1 o2 → obligation_le o1 o2.
+  Lemma obl_step_le o1 o2 :
+    obl_step o1 o2 → obl_le o1 o2.
   Proof using. intros. inv H; inv H0; econstructor. Qed.
 
-  Lemma obls_step_rc_advance Ω1 Ω2 : Ω1 ↪∘ Ω2 → obls_le Ω1 Ω2.
+  Lemma obls_step_rc_obls_le Ω1 Ω2 : Ω1 ↪∘ Ω2 → obls_le Ω1 Ω2.
   Proof using.
     intros. destruct H.
     { subst. done. }
     inv H.
     - pose proof (obls_one_dom _ _ H0). split; first set_solver.
       intros. destruct H0 as (k0&o3&o4&?&?&?). subst. destruct (decide (k0 = k)).
-      + subst. rewrite lookup_insert_eq in H2. inv H2. apply obligation_step_le; auto.
+      + subst. rewrite lookup_insert_eq in H2. inv H2. apply obl_step_le; auto.
       + rewrite lookup_insert_ne in H2; auto. rewrite H1 in H2. inv H2. done.
     - destruct H0 as (?&?&?&?). subst. split.
       + rewrite dom_insert. set_solver.
@@ -297,7 +297,7 @@ Section proofs.
         * rewrite lookup_insert_ne in H1; auto. rewrite H0 in H1. inv H1. done.
   Qed.
 
-  Lemma obls_cond_progress_advance Ω1 Ω2 C : Ω1 ↪ₚ Ω2 | C → obls_le Ω1 Ω2.
+  Lemma obls_cond_progress_obls_le Ω1 Ω2 C : Ω1 ↪ₚ Ω2 | C → obls_le Ω1 Ω2.
   Proof using.
     intros. destruct H. pose proof (obls_cond_rel_dom _ _ _ _ H). split; first set_solver.
     intros. specialize (H0 k). rewrite H2 H3 in H0. inv H0. destruct o1, o2; done.

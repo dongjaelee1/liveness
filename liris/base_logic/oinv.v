@@ -7,7 +7,7 @@ From liris.algebra Require Import bank.
 From liris.algebra Require Export ordinal_wfocm layer.
 From liris.base_logic Require Export osat invariants.
 
-(* Each obligation has this variant as an invariant: P until (Q and always R). *)
+(* Each obl has this variant as an invariant: P until (Q and always R). *)
 Definition oblG_variant `{SI : indexT} `{!osatGS.osatGS Σ}
   (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
   (oblG_assigned k q ∗ P) ∨ (oblG_fulfilled k ∗ (Q ∨ oblG_expired k) ∗ R).
@@ -121,7 +121,7 @@ Section oinv.
     ⊢ |={E,E ∖ ↑N}=>
           (▷ (oblG_assigned k (1/2 + 1/2/2)%Qp ∗ P)) ∗
           (∀ Ω t, (osat Ω ∗ oblG_elem k ∗ oblG_assigned k (1/2 + 1/2/2)%Qp ∗ oblG_owner k t (1/2 + 1/2/2)%Qp) ==∗
-                osat (<[k:=(obligation_fulfilled)]>Ω) ∗ oblG_fulfilled k) ∗
+                osat (<[k:=(obl_fulfilled)]>Ω) ∗ oblG_fulfilled k) ∗
           ((▷ (oblG_fulfilled k ∗ Q ∗ R)) ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (Hq HE) "(#Gvar& Ga)".
@@ -139,7 +139,7 @@ Section oinv.
     ⊢ |={E,E ∖ ↑N}=>
           (▷ (oblG_alive k (1/2 + 1/2/2)%Qp ∗ Q ∗ R)) ∗
           (∀ Ω, (osat Ω ∗ oblG_elem k ∗ oblG_alive k (1/2 + 1/2/2)%Qp) ==∗
-                osat (<[k:=(obligation_expired)]>Ω) ∗ oblG_expired k) ∗
+                osat (<[k:=(obl_expired)]>Ω) ∗ oblG_expired k) ∗
           ((▷ (oblG_expired k ∗ R)) ={E ∖ ↑N,E}=∗ True).
   Proof.
     iIntros (HE) "(#Gvar& #Gf& Ga)".

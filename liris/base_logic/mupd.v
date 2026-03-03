@@ -11,9 +11,9 @@ Class mupdGS `{SI : indexT} (Σ : gFunctors) :=
   MupdG {
       (** Invariants. *)
       #[global] mupd_invGS :: invGS Σ;
-      (** Obligations. *)
+      (** Obls. *)
       #[global] mupd_osatGS :: osatGS.osatGS Σ;
-      (** Obligations assigned to threads. *)
+      (** Obls assigned to threads. *)
       #[global] mupd_othreadGS :: othreadGS.othreadGS Σ;
       (** Witnesses. *)
       #[global] mupd_owitGS :: owitGS.owitGS Σ;
@@ -25,9 +25,9 @@ Global Arguments MupdG {SI Σ}.
 
 Definition model_interp `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   h i Ω W n Θ : iProp Σ :=
-  (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ glassigned (dom Ω) ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
+  (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
 
-(** Modality for updating obligations. *)
+(** Modality for updating obls. *)
 Definition mupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (mupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
@@ -113,11 +113,11 @@ Section mupd.
     iIntros "!>" (?) "[$ _]".
   Qed.
 
-  (** An empty fancy update can be turned into an obligation update. *)
+  (** An empty fancy update can be turned into an obl update. *)
   Lemma fupd_mupd n Θ P : (|={∅}=> P) ⊢ (|=[n,Θ]=>m P).
   Proof. rewrite mupd_unfold. iIntros "Hupd". iLeft. done. Qed.
 
-  (** We can always introduce a obligation update. *)
+  (** We can always introduce a obl update. *)
   Lemma mupd_intro n Θ P : P ⊢ |=[n,Θ]=>m P.
   Proof. rewrite mupd_unfold. iIntros "HP". iLeft. iModIntro. done. Qed.
 
@@ -135,7 +135,7 @@ Section mupd.
     iPoseProof (owit_mon _ _ H with "N") as "$". iFrame. done.
   Qed.
 
-  (** We can combine two obligation updates into one. *)
+  (** We can combine two obl updates into one. *)
   Lemma mupd_bind n Θ P Q :
     (P -∗ |=[n,Θ]=>m Q) ⊢ (|=[n,Θ]=>m P) -∗ (|=[n,Θ]=>m Q).
   Proof.
@@ -244,7 +244,7 @@ Section mupd.
           { subst. rewrite lookup_insert_eq H2. econstructor. rewrite -H0. apply Ord.O_bot. }
           { rewrite lookup_insert_ne; last auto. apply Inv. }
           (* FIXME : fail typeclass inference *)
-        * exists (<[x:=(witness_assigned (OC:=ord_obligation_class) (Ord.O))]>W1). split.
+        * exists (<[x:=(witness_assigned (OC:=ord_obl_class) (Ord.O))]>W1). split.
           { econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor. econstructor. auto. }
           { intros ?. destruct (decide (i = x)).
             - subst. rewrite !lookup_insert_eq. econstructor. apply Ord.O_bot.
@@ -258,13 +258,13 @@ Section mupd.
           { rewrite !lookup_insert_ne; eauto. }
       + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2.
         inv H1. destruct y; try done. symmetry in H2. clear H3.
-        exists (<[x:=(witness_expired (OC:=ord_obligation_class))]>W1). split.
+        exists (<[x:=(witness_expired (OC:=ord_obl_class))]>W1). split.
         * econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor 3. econstructor.
         * intros ?. destruct (decide (i = x)).
           { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
           { rewrite !lookup_insert_ne; eauto. }
     - pose proof Inv as Dom. apply owit_inv_dom in Dom. destruct H0 as (k& LUO& ?& ?). destruct x.
-      + exists (<[k:=(witness_assigned (OC:=ord_obligation_class) (η fuel))]>W1). split.
+      + exists (<[k:=(witness_assigned (OC:=ord_obl_class) (η fuel))]>W1). split.
         * econstructor 2. econstructor 2. exists k. split; eauto.
           apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto.
         * subst. intros ?. destruct (decide (i = k)).
@@ -304,7 +304,7 @@ Section mupd.
   Qed.
 
   (* The following instances make the Iris Proof Mode aware of the
-     obligation update. They are derived from the simpler rules above. *)
+     obl update. They are derived from the simpler rules above. *)
   (* Global Instance elim_fupd_mupd (p : bool) n Θ P Q : *)
   (*   ElimModal True p false (|={∅}=> P) P (|=[n,Θ]=>m Q) (|=[n,Θ]=>m Q)%I. *)
   (* Proof. *)
@@ -462,7 +462,7 @@ Section fmupd.
     iIntros "!> !>". iMod "close" as "_". by iApply "H".
   Qed.
 
-  (** We can combine two obligation updates into one. *)
+  (** We can combine two obl updates into one. *)
   Lemma fmupd_bind E n Θ P Q :
     (P -∗ |={E:n,Θ}=>m Q) ⊢ (|={E:n,Θ}=>m P) -∗ (|={E:n,Θ}=>m Q).
   Proof.

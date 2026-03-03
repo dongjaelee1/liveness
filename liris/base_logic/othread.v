@@ -4,7 +4,7 @@ From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From liris.base_logic Require Export osat.
 
-(** The ghost state for thread obligations *)
+(** The ghost state for thread obls *)
 Module othreadGS.
 
   (* Assumes thread ids are positive *)
@@ -57,7 +57,7 @@ Local Definition othreadG_owns_auth_obls `{SI : indexT} `{!othreadGS Σ}
   i (TObls : gmap oid unit) : iProp Σ :=
   (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (TObls)))).
 
-(* Thread: live obligations that this thread knows, also fix to empty when thread terminates *)
+(* Thread: live obls that this thread knows, also fix to empty when thread terminates *)
 Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : gset oid) (q : Qp) : iProp Σ :=
   own obls_name (gmap_view_frag i (DfracOwn q) (GSet G)).
 Global Typeclasses Opaque othreadG_obls.
@@ -96,7 +96,7 @@ Local Definition othreadG_elem_auth_id `{SI : indexT} `{!othreadGS Σ}
   (Tgls : gmap positive (gmap oid unit)) : iProp Σ :=
   (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> Tgls))).
 
-(* Global invariant for the thread obligations state. *)
+(* Global invariant for the thread obls state. *)
 Definition othread `{SI : indexT} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (TP : gset positive) : iProp Σ :=
@@ -115,7 +115,7 @@ Definition othread `{SI : indexT} {Σ}
     )%I.
 
 (* Global invariant that relates obl_states to the thread pool. *)
-Definition glassigned `{SI : indexT} {Σ}
+Definition oassigned `{SI : indexT} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (Gls : gset oid) : iProp Σ :=
   locked
@@ -191,8 +191,8 @@ Section othread.
   Global Instance othread_timeless TP : Timeless (othread TP).
   Proof. rewrite /othread -lock. apply _. Qed.
 
-  Global Instance glassigned_timeless Gls : Timeless (glassigned Gls).
-  Proof. rewrite /glassigned -lock. apply _. Qed.
+  Global Instance oassigned_timeless Gls : Timeless (oassigned Gls).
+  Proof. rewrite /oassigned -lock. apply _. Qed.
 
   (** Elem rules *)
   Lemma othreadG_elem_alloc (Tgls : gmap positive (gmap oid unit)) i M :
@@ -679,13 +679,13 @@ Section othread.
     iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
   Qed.
 
-  (** glassigned rules *)
-  Lemma glassigned_add_obl Gls k :
-    glassigned Gls ∗
+  (** oassigned rules *)
+  Lemma oassigned_add_obl Gls k :
+    oassigned Gls ∗
     (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2)) ∨ oblG_fulfilled k))
-    ⊢ glassigned ({[k]} ∪ Gls).
+    ⊢ oassigned ({[k]} ∪ Gls).
   Proof.
-    iIntros "(A& H)". rewrite /glassigned -!lock. destruct (decide (k ∈ Gls)).
+    iIntros "(A& H)". rewrite /oassigned -!lock. destruct (decide (k ∈ Gls)).
     - iPoseProof (big_sepS_delete _ _ _ e with "A") as "[_ A]".
       replace ({[k]} ∪ Gls) with ({[k]} ∪ (Gls ∖ {[k]})).
       2:{ rewrite -union_difference_L; set_solver. }
@@ -695,22 +695,22 @@ Section othread.
     - iApply big_sepS_insert; first auto. iFrame.
   Qed.
 
-  Lemma glassigned_delete_obl Gls k :
+  Lemma oassigned_delete_obl Gls k :
     k ∈ Gls →
-    glassigned Gls
-    ⊢ glassigned (Gls ∖ {[k]}) ∗
+    oassigned Gls
+    ⊢ oassigned (Gls ∖ {[k]}) ∗
     (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2)) ∨ oblG_fulfilled k)).
   Proof.
-    rewrite /glassigned -!lock. iIntros (INk) "A".
+    rewrite /oassigned -!lock. iIntros (INk) "A".
     iPoseProof (big_sepS_delete with "A") as "[$ $]". auto.
   Qed.
 
   Lemma othread_assigned_obls_lookup Ω TP k a i G :
-    Ω !! k = Some (obligation_assigned a i) →
-    osat Ω ∗ othread TP ∗ glassigned (dom Ω) ∗ othreadG_obls i G 1
+    Ω !! k = Some (obl_assigned a i) →
+    osat Ω ∗ othread TP ∗ oassigned (dom Ω) ∗ othreadG_obls i G 1
     ⊢ ⌜ k ∈ G ⌝.
   Proof.
-    rewrite /glassigned -lock. iIntros (LUOk) "(S& O& A& Tbs)".
+    rewrite /oassigned -lock. iIntros (LUOk) "(S& O& A& Tbs)".
     iPoseProof (big_sepS_delete _ _ k with "A") as "[A _]".
     { apply elem_of_dom_2 in LUOk. auto. }
     iDestruct "A" as "(#Gek& [(%& Gok& Ook) | #Guk])".
@@ -724,7 +724,7 @@ Section othread.
   Lemma othread_obls_lookup Ω TP k i G q :
     k ∈ G →
     osat Ω ∗ othread TP ∗ othreadG_elem i ∗ othreadG_obls i G q ∗ oblG_elem k
-    ⊢ ∃ a, ⌜ Ω !! k = Some (obligation_assigned a i) ⌝.
+    ⊢ ∃ a, ⌜ Ω !! k = Some (obl_assigned a i) ⌝.
   Proof.
     iIntros (Ink) "(S& O& #Oei& Tbs& #Gek)".
     iPoseProof (othread_obls_open with "[$O $Oei $Tbs]") as "(Tbs& (Gl& Go)& Acc)". 1: eauto.
@@ -736,7 +736,7 @@ End othread.
 (* Allocation of initial invariant. *)
 Lemma othread_alloc `{SI : indexT} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ} :
-  ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ glassigned ∅.
+  ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ oassigned ∅.
 Proof.
   iIntros.
   iMod (own_alloc (reservation_map_token (A:=(gmap_viewR oid (unitUR))) ⊤)) as (γS) "HS";
@@ -748,7 +748,7 @@ Proof.
   iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive unitUR)) as (γE) "HE";
     first by apply gmap_view_auth_valid.
   iModIntro; iExists (OthreadG SI _ _ γS γO γX γE).
-  rewrite /othread /glassigned -!lock. iSplitL; last done.
+  rewrite /othread /oassigned -!lock. iSplitL; last done.
   iExists ∅. iSplitR; first done.
   replace (⊤ : coPset) with (⊤ ∖ gset_to_coPset ∅); [iFrame; done|].
   set_solver.

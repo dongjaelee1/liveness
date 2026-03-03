@@ -8,7 +8,7 @@ From liris.algebra Require Export wfocm.
 From liris.algebra Require Import bcred.
 From liris.base_logic Require Export witness osat.
 
-(** The ghost state for liveness obligations *)
+(** The ghost state for liveness obls *)
 Module owitGS.
 
   Class owitGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -37,15 +37,15 @@ Import owitGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances owit_inG owitGpreS_witness.
 
-(* Witness: manage credits for an obligation's witness progress *)
+(* Witness: manage credits for an obl's witness progress *)
 Definition witG_bound `{SI : indexT} `{!owitGS Σ}
-  (k : oid) (ℵ : obligation_fuel) : iProp Σ :=
+  (k : oid) (ℵ : obl_fuel) : iProp Σ :=
   own witness_name (reservation_map_data (A:=bcredUR) k (credit_bound ℵ)).
 Global Typeclasses Opaque witG_bound.
 Global Instance: Params (@witG_bound) 3 := {}.
 
 Definition witG_witness `{SI : indexT} `{!owitGS Σ}
-  (k : oid) (a : obligation_fuel) : iProp Σ :=
+  (k : oid) (a : obl_fuel) : iProp Σ :=
   own witness_name (reservation_map_data (A:=bcredUR) k (credit a)).
 Global Typeclasses Opaque witG_witness.
 Global Instance: Params (@witG_witness) 3 := {}.
@@ -71,14 +71,14 @@ Definition owit `{SI : indexT} {Σ}
         end)
     )%I.
 
-(* Global invariant that relates witnesses to obligations *)
+(* Global invariant that relates witnesses to obls *)
 Definition owit_inv `{!ord_mono_fun_class}
-  (Ω : obligations) (W : witnesses) : Prop :=
+  (Ω : obls) (W : witnesses) : Prop :=
   map_Forall2 (λ k g w,
                  match g, w with
-                 | (obligation_assigned a _), (witness_assigned b) => (b w≤ η a)
-                 | (obligation_fulfilled), (witness_fulfilled) => True
-                 | (obligation_expired), (witness_expired) => True
+                 | (obl_assigned a _), (witness_assigned b) => (b w≤ η a)
+                 | (obl_fulfilled), (witness_fulfilled) => True
+                 | (obl_expired), (witness_expired) => True
                  | _, _ => False
                  end
     ) Ω W.
@@ -474,13 +474,13 @@ Section owit.
   Qed.
 
   Lemma owit_inv_progress_owner Ω k a t1 W1 :
-    Ω !! k = Some (obligation_assigned a t1) →
+    Ω !! k = Some (obl_assigned a t1) →
     owit_inv Ω W1 →
     ∀ a' t2,
-    obligation_step (obligation_assigned a t1) (obligation_assigned a' t2) →
+    obl_step (obl_assigned a t1) (obl_assigned a' t2) →
     ∀ W2,
     W1 ↓∘ W2 →
-    owit_inv (<[k:=(obligation_assigned a' t2)]> Ω) W2 →
+    owit_inv (<[k:=(obl_assigned a' t2)]> Ω) W2 →
     wits_mon W1 W2.
   (* Below is not necessarily true - Wits can take refelexive step *)
     (* ∃ w1 w2, W1 !! k = Some (v, witness_assigned w1) ∧ *)
@@ -502,12 +502,12 @@ Section owit.
   Qed.
 
   Lemma owit_inv_fulfill Ω k a t W1 :
-    Ω !! k = Some (obligation_assigned a t) →
+    Ω !! k = Some (obl_assigned a t) →
     owit_inv Ω W1 →
-    obligation_step (obligation_assigned a t) (obligation_fulfilled) →
+    obl_step (obl_assigned a t) (obl_fulfilled) →
     ∀ W2,
     W1 ↓∘ W2 →
-    owit_inv (<[k:=(obligation_fulfilled)]> Ω) W2 →
+    owit_inv (<[k:=(obl_fulfilled)]> Ω) W2 →
     (∃ b, W1 !! k = Some (witness_assigned b) ∧ wits_mon (<[k:=(witness_fulfilled)]> W1) W2).
   Proof.
     intros LUO INV1 GStep W2 WSStep INV2.
@@ -518,7 +518,7 @@ Section owit.
     destruct y; try done. symmetry in H2.
     eexists. split; first eauto.
     inv WSStep. inv H; cycle 1.
-    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obligation_fulfilled)]> Ω)) in H4; eauto; first done.
+    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obl_fulfilled)]> Ω)) in H4; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
     apply wits_one_to_wits_cond in H4. destruct H4 as (?&H4). assert (x = k).
     { specialize (H4 k). rewrite H0 H2 in H4. inv H4. destruct H6.
@@ -544,12 +544,12 @@ Section owit.
   Qed.
 
   Lemma owit_inv_expire Ω k W1 :
-    Ω !! k = Some (obligation_fulfilled) →
+    Ω !! k = Some (obl_fulfilled) →
     owit_inv Ω W1 →
-    obligation_step (obligation_fulfilled) (obligation_expired) →
+    obl_step (obl_fulfilled) (obl_expired) →
     ∀ W2,
     W1 ↓∘ W2 →
-    owit_inv (<[k:=(obligation_expired)]> Ω) W2 →
+    owit_inv (<[k:=(obl_expired)]> Ω) W2 →
     (W1 !! k = Some (witness_fulfilled) ∧ wits_mon (<[k:=(witness_expired)]> W1) W2).
   Proof.
     intros LUO INV1 GStep W2 WSStep INV2.
@@ -560,7 +560,7 @@ Section owit.
     destruct y; try done. symmetry in H2.
     split; first eauto.
     inv WSStep. inv H; cycle 1.
-    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obligation_expired)]> Ω)) in H4; eauto; first done.
+    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obl_expired)]> Ω)) in H4; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
     apply wits_one_to_wits_cond in H4. destruct H4 as (?&H4). assert (x = k).
     { specialize (H4 k). rewrite H0 H2 in H4. inv H4. destruct H6.
@@ -590,7 +590,7 @@ Section owit.
     owit_inv Ω W1 →
     ∀ a t W2,
     W1 ↓∘ W2 →
-    owit_inv (<[k:=(obligation_assigned a t)]> Ω) W2 →
+    owit_inv (<[k:=(obl_assigned a t)]> Ω) W2 →
     (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_assigned (η a))]> W1) W2).
   Proof.
     intros LUO INV1 a t W2 WSStep INV2.
@@ -616,8 +616,33 @@ Section owit.
     owit_inv Ω W1 →
     ∀ W2,
     W1 ↓∘ W2 →
-    owit_inv (<[k:=(obligation_fulfilled)]> Ω) W2 →
+    owit_inv (<[k:=(obl_fulfilled)]> Ω) W2 →
     (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_fulfilled)]> W1) W2).
+  Proof.
+    intros LUO INV1 W2 WSStep INV2.
+    apply not_elem_of_dom in LUO.
+    pose proof INV1 as I1. specialize (I1 k). rewrite LUO in I1. inv I1.
+    symmetry in H.
+    pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
+    rename y into w. destruct w; try done. symmetry in H1.
+    split.
+    { apply not_elem_of_dom. auto. }
+    inv WSStep. inv H0.
+    { apply wits_one_dom in H3. exfalso. apply elem_of_dom_2 in H1. apply not_elem_of_dom in H.
+      rewrite H3 in H. set_solver. }
+    destruct H3 as (?&?&?&?).
+    subst. destruct (decide (k = x)).
+    - subst x. rewrite lookup_insert_eq in H1. inv H1. done.
+    - rewrite lookup_insert_ne in H1; auto. rewrite H in H1. inv H1.
+  Qed.
+
+  Lemma owit_inv_alloc_expired Ω k W1 :
+    k ∉ dom Ω →
+    owit_inv Ω W1 →
+    ∀ W2,
+    W1 ↓∘ W2 →
+    owit_inv (<[k:=(obl_expired)]> Ω) W2 →
+    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_expired)]> W1) W2).
   Proof.
     intros LUO INV1 W2 WSStep INV2.
     apply not_elem_of_dom in LUO.
