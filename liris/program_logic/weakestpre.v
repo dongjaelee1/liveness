@@ -82,6 +82,7 @@ Definition ophys `{SI : indexT} `{!lirisGS Λ Σ} n1 n2 Θ1 Θ2 : iPropO Σ -d> 
      (model_interp h a Ω W n1 Θ1) ={∅}=∗
      (model_interp (h ++ [(n2, Ω)]) (S a) Ω W n2 Θ2) ∗ P)%I.
 
+TODO
 (* Notation "'@={' Θ1 , Θ2 , i '}=↓' P" := (gprog Θ1 Θ2 i P) (at level 99, P at level 200, format "@={ Θ1 , Θ2 , i }=↓  P"). *)
 
 Section gprog.
