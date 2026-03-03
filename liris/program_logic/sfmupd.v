@@ -2,7 +2,6 @@ From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
 From liris.base_logic Require Export opreds.
 From liris.program_logic Require Export history_interp.
-(* From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg. *)
 Import uPred.
 
 Definition sfmupd `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}

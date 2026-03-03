@@ -5,8 +5,7 @@ From liris Require Export language.
 From iris.bi Require Export fixpoint.
 From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
-From liris.base_logic Require Export fancy_updates gupd.
-From Ordinal Require Export Ordinal Hessenberg ClassicalHessenberg.
+From liris.program_logic Require Export sfmupd.
 Import uPred.
 
 (* TODO: move to somewhere else *)
@@ -40,35 +39,50 @@ Section curry5.
   Proof. intros. apply uncurry5_proper. Qed.
 End curry5.
 
-Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) := LirisG {
-  (** Ghost lock protocol including invariants. *)
-  #[global] liris_gupdGS :: gupdGS Σ;
+Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
+  LirisG {
+      (** Obligation model protocol, including invariants. *)
+      #[global] liris_mupdGS :: mupdGS Σ;
 
-  (** The state interpretation is an invariant that should hold in
-  between each step of reduction.
-  Here [state] is the global state, [thread_ids] is the allocated thread ids,
-  and [list (observation Λ)] are the remaining observations. *)
-  state_interp : state Λ → thread_ids → list (observation Λ) → iProp Σ;
+      (** The state (and history) interpretation is an invariant that should hold in
+          between each step of reduction.
+          Here [state] is the global state, [thread_ids] is the allocated thread ids,
+          and [list (observation Λ)] are the remaining observations. *)
+      state_pred : Type;
+      #[global] liris_state_interp_class :: state_interp_class Σ (state Λ * list (observation Λ)) state_pred;
+      #[global] liris_histGS :: histGS.histGS Σ ((state Λ * list (observation Λ)) * (gset positive));
+      (* state_interp : state Λ → thread_ids → list (observation Λ) → iProp Σ; *)
 
-  (** A fixed postcondition for any forked-off thread. For most languages, e.g.
-  heap_lang, this will simply be [True]. However, it is useful if one wants to
-  keep track of resources precisely, as in e.g. Iron. *)
-  fork_post : thread_id → val Λ → iProp Σ;
-}.
+      (** Fair scheduler function. *)
+      #[global] liris_fair_scheduler :: ord_mono_fun_class;
 
-Global Opaque liris_gupdGS.
+      (** A fixed postcondition for any forked-off thread. For most languages, e.g.
+          heap_lang, this will simply be [True]. However, it is useful if one wants to
+          keep track of resources precisely, as in e.g. Iron. *)
+      fork_post : thread_id → val Λ → iProp Σ;
+    }.
+
+Global Opaque liris_mupdGS liris_histGS.
 Global Arguments LirisG {SI Λ Σ}.
 
+(** We first define lwp_step, and take its fixpoint as the lwp. *)
 (* Ensure progress of thread i's obligations and every live witnesses. *)
-Definition gprog `{SI : indexT} `{!lirisGS Λ Σ} Θ1 Θ2 i : iPropO Σ -d> iPropO Σ :=
+Definition oprog `{SI : indexT} `{!lirisGS Λ Σ} n Θ i : iPropO Σ -d> iPropO Σ :=
   (λ P,
-     ∀ (Ω1 : ghost_locks) (W1 : witnesses),
-     (gproto Ω1 W1 Θ1) ={∅}=∗
-     ∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | gl_cond_owner i)⌝) ∗
-     ∀ W2, (⌜(W1 ↓ₚ W2 | wit_cond_locked) ∧ glwit_inv Ω2 W2 ⌝) ={∅}=∗
-     (gproto Ω2 W2 Θ2) ∗ P)%I.
+     ∀ h a Ω1 W1,
+     (model_interp h a Ω1 W1 n Θ) ={∅}=∗
+     ∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | obl_cond_owner i)⌝) ∗
+     ∀ W2, (⌜(W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗
+           (model_interp (h ++ [(n, Ω2)]) (S a) Ω2 W2 n Θ) ∗ P)%I.
 
-Notation "'@={' Θ1 , Θ2 , i '}=↓' P" := (gprog Θ1 Θ2 i P) (at level 99, P at level 200, format "@={ Θ1 , Θ2 , i }=↓  P").
+(* Update physical states. *)
+Definition ophys `{SI : indexT} `{!lirisGS Λ Σ} n1 n2 Θ1 Θ2 : iPropO Σ -d> iPropO Σ :=
+  (λ P,
+     ∀ h a Ω W,
+     (model_interp h a Ω W n1 Θ1) ={∅}=∗
+     (model_interp (h ++ [(n2, Ω)]) (S a) Ω W n2 Θ2) ∗ P)%I.
+
+(* Notation "'@={' Θ1 , Θ2 , i '}=↓' P" := (gprog Θ1 Θ2 i P) (at level 99, P at level 200, format "@={ Θ1 , Θ2 , i }=↓  P"). *)
 
 Section gprog.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
@@ -126,23 +140,23 @@ Section gprog.
   Qed.
 
   Local Ltac unfold_defs :=
-    try rewrite !gupd.wit_fuels_unseal /gupd.wit_fuels_def;
-    try rewrite !gupd.gl_fuels_unseal /gupd.gl_fuels_def;
-    try rewrite !gupd.wit_unseal /gupd.wit_def;
-    try rewrite !gupd.wit_layer_unseal /gupd.wit_layer_def;
-    try rewrite !gupd.wit_bound_unseal /gupd.wit_bound_def;
-    try rewrite !gupd.th_term_unseal /gupd.th_term_def;
-    try rewrite !gupd.th_obls_unseal /gupd.th_obls_def;
-    try rewrite !gupd.gl_variant_cases_unseal /gupd.gl_variant_cases_def;
-    try rewrite !gupd.gl_variant_unseal /gupd.gl_variant_def;
-    try rewrite !gupd.gl_fuel_unseal /gupd.gl_fuel_def;
-    try rewrite !gupd.gl_fuel_val_unseal /gupd.gl_fuel_val_def;
-    try rewrite !gupd.gl_expired_unseal /gupd.gl_expired_def;
-    try rewrite !gupd.gl_current_unseal /gupd.gl_current_def;
-    try rewrite !gupd.gl_done_unseal /gupd.gl_done_def;
-    try rewrite !gupd.gl_locked_unseal /gupd.gl_locked_def;
-    try rewrite !gupd.gl_layers_unseal /gupd.gl_layers_def;
-    try rewrite !gupd.gl_unseal /gupd.gl_def.
+    try rewrite !mupd.wit_fuels_unseal /mupd.wit_fuels_def;
+    try rewrite !mupd.gl_fuels_unseal /mupd.gl_fuels_def;
+    try rewrite !mupd.wit_unseal /mupd.wit_def;
+    try rewrite !mupd.wit_layer_unseal /mupd.wit_layer_def;
+    try rewrite !mupd.wit_bound_unseal /mupd.wit_bound_def;
+    try rewrite !mupd.th_term_unseal /mupd.th_term_def;
+    try rewrite !mupd.th_obls_unseal /mupd.th_obls_def;
+    try rewrite !mupd.gl_variant_cases_unseal /mupd.gl_variant_cases_def;
+    try rewrite !mupd.gl_variant_unseal /mupd.gl_variant_def;
+    try rewrite !mupd.gl_fuel_unseal /mupd.gl_fuel_def;
+    try rewrite !mupd.gl_fuel_val_unseal /mupd.gl_fuel_val_def;
+    try rewrite !mupd.gl_expired_unseal /mupd.gl_expired_def;
+    try rewrite !mupd.gl_current_unseal /mupd.gl_current_def;
+    try rewrite !mupd.gl_done_unseal /mupd.gl_done_def;
+    try rewrite !mupd.gl_locked_unseal /mupd.gl_locked_def;
+    try rewrite !mupd.gl_layers_unseal /mupd.gl_layers_def;
+    try rewrite !mupd.gl_unseal /mupd.gl_def.
 
   (** Step rule *)
   Lemma gprog_step Θ1 Θ2 π i P :
@@ -372,47 +386,47 @@ Section lwp_step.
 End lwp_step.
 
 (* Wrapper. *)
-Definition sfgupd `{SI : indexT} `{!lirisGS Λ Σ} E : iPropO Σ -d> iPropO Σ :=
+Definition sfmupd `{SI : indexT} `{!lirisGS Λ Σ} E : iPropO Σ -d> iPropO Σ :=
   (λ P, ∀ σ Θ κs, (state_interp σ Θ κs) -∗ |={E:Θ}=>g (state_interp σ Θ κs) ∗ P)%I.
 
-Notation "'|={' E '}=>g' P" := (sfgupd E P) (at level 99, P at level 200, format "|={ E }=>g  P").
+Notation "'|={' E '}=>g' P" := (sfmupd E P) (at level 99, P at level 200, format "|={ E }=>g  P").
 
-Section sfgupd.
+Section sfmupd.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
 
-  Global Instance sfgupd_ne E :
-    NonExpansive (sfgupd E).
+  Global Instance sfmupd_ne E :
+    NonExpansive (sfmupd E).
   Proof.
-    intros n P1 P2 HP. rewrite /sfgupd. do 12 (f_equiv || done).
+    intros n P1 P2 HP. rewrite /sfmupd. do 12 (f_equiv || done).
   Qed.
-  Global Instance sfgupd_proper E :
-    Proper ((≡) ==> (≡)) (sfgupd E).
+  Global Instance sfmupd_proper E :
+    Proper ((≡) ==> (≡)) (sfmupd E).
   Proof.
-    intros P P' ?. apply equiv_dist=>n. apply sfgupd_ne. apply equiv_dist. done.
+    intros P P' ?. apply equiv_dist=>n. apply sfmupd_ne. apply equiv_dist. done.
   Qed.
 
-  Lemma fupd_sfgupd E P : (|={E}=> P) ⊢ (|={E}=>g P).
+  Lemma fupd_sfmupd E P : (|={E}=> P) ⊢ (|={E}=>g P).
   Proof.
-    rewrite /sfgupd. iIntros ">Hupd %%% SI".
+    rewrite /sfmupd. iIntros ">Hupd %%% SI".
     iApply fupd_mask_intro. 1: set_solver.
     iIntros "Hclose !>". iMod "Hclose" as "_".
     iModIntro. iFrame.
   Qed.
 
-  Lemma sfgupd_intro E P : P ⊢ |={E}=>g P.
+  Lemma sfmupd_intro E P : P ⊢ |={E}=>g P.
   Proof.
     iIntros "$ %%% $". iMod (fupd_mask_subseteq ∅) as "Hclose". 1: set_solver.
     iIntros "!> !>". iMod "Hclose". done.
   Qed.
 
-  Lemma fupd_sfgupd_elim E P :
+  Lemma fupd_sfmupd_elim E P :
     (|={E}=> |={E}=>g P) ⊢ |={E}=>g P.
   Proof.
     iIntros "H". iIntros (???) "SI". iMod "H". iApply "H". done.
   Qed.
 
   (** Change to a larger mask. *)
-  Lemma sfgupd_mask_mono E1 E2 P :
+  Lemma sfmupd_mask_mono E1 E2 P :
     E1 ⊆ E2 →
     (|={E1}=>g P) ⊢ |={E2}=>g P.
   Proof.
@@ -425,7 +439,7 @@ Section sfgupd.
   Qed.
 
   (** We can combine two obligation updates into one. *)
-  Lemma sfgupd_bind E P Q :
+  Lemma sfmupd_bind E P Q :
     (P -∗ |={E}=>g Q) ⊢ (|={E}=>g P) -∗ (|={E}=>g Q).
   Proof.
     iIntros "H HP". iIntros "%%% SI".
@@ -434,77 +448,77 @@ Section sfgupd.
   Qed.
 
   (* derived lemmas *)
-  Lemma sfgupd_mono E P Q : (P ⊢ Q) → (|={E}=>g P) ⊢ (|={E}=>g Q).
+  Lemma sfmupd_mono E P Q : (P ⊢ Q) → (|={E}=>g P) ⊢ (|={E}=>g Q).
   Proof.
-    intros Hent. iApply sfgupd_bind.
-    iIntros "P"; iApply sfgupd_intro; by iApply Hent.
+    intros Hent. iApply sfmupd_bind.
+    iIntros "P"; iApply sfmupd_intro; by iApply Hent.
   Qed.
-  Lemma sfgupd_trans E P :  (|={E}=>g |={E}=>g P) ⊢ |={E}=>g P.
+  Lemma sfmupd_trans E P :  (|={E}=>g |={E}=>g P) ⊢ |={E}=>g P.
   Proof.
-    iIntros "HP". iApply sfgupd_bind; eauto.
+    iIntros "HP". iApply sfmupd_bind; eauto.
   Qed.
-  Lemma sfgupd_frame_r E P R : (|={E}=>g P) ∗ R ⊢ |={E}=>g P ∗ R.
+  Lemma sfmupd_frame_r E P R : (|={E}=>g P) ∗ R ⊢ |={E}=>g P ∗ R.
   Proof.
-    iIntros "[Hupd R]". iApply (sfgupd_bind with "[R]"); last done.
-    iIntros "P". iApply sfgupd_intro. by iFrame.
+    iIntros "[Hupd R]". iApply (sfmupd_bind with "[R]"); last done.
+    iIntros "P". iApply sfmupd_intro. by iFrame.
   Qed.
 
-  Global Instance sfgupd_ent_proper E : Proper ((⊢) ==> (⊢)) (sfgupd E).
-  Proof. intros P Q PQ. by apply sfgupd_mono. Qed.
-  Global Instance sfgupd_flip_ent_proper E : Proper (flip (⊢) ==> flip (⊢)) (sfgupd E).
-  Proof. intros P Q PQ; by apply sfgupd_mono. Qed.
-  Global Instance sfgupd_equiv_proper E : Proper ((≡) ==> (≡)) (sfgupd E) := ne_proper _.
+  Global Instance sfmupd_ent_proper E : Proper ((⊢) ==> (⊢)) (sfmupd E).
+  Proof. intros P Q PQ. by apply sfmupd_mono. Qed.
+  Global Instance sfmupd_flip_ent_proper E : Proper (flip (⊢) ==> flip (⊢)) (sfmupd E).
+  Proof. intros P Q PQ; by apply sfmupd_mono. Qed.
+  Global Instance sfmupd_equiv_proper E : Proper ((≡) ==> (≡)) (sfmupd E) := ne_proper _.
 
-  Lemma sfgupd_fupd_l E P :
+  Lemma sfmupd_fupd_l E P :
     (|={E}=> |={E}=>g P) ⊢ (|={E}=>g P).
   Proof.
-    by erewrite fupd_sfgupd, sfgupd_trans.
+    by erewrite fupd_sfmupd, sfmupd_trans.
   Qed.
-  Lemma sfgupd_fupd_r E P :
+  Lemma sfmupd_fupd_r E P :
     (|={E}=>g |={E}=> P) ⊢ (|={E}=>g P).
   Proof.
-    by erewrite fupd_sfgupd, sfgupd_trans.
+    by erewrite fupd_sfmupd, sfmupd_trans.
   Qed.
 
-  Lemma sfgupd_frame_l E R Q : (R ∗ |={E}=>g Q) ⊢ |={E}=>g R ∗ Q.
-  Proof. rewrite !(comm _ R); apply sfgupd_frame_r. Qed.
-  Lemma sfgupd_wand_l E P Q : (P -∗ Q) ∗ (|={E}=>g P) ⊢ |={E}=>g Q.
-  Proof. by rewrite sfgupd_frame_l wand_elim_l. Qed.
-  Lemma sfgupd_wand_r E P Q : (|={E}=>g P) ∗ (P -∗ Q) ⊢ |={E}=>g Q.
-  Proof. by rewrite sfgupd_frame_r wand_elim_r. Qed.
-  Lemma sfgupd_sep E P Q : (|={E}=>g P) ∗ (|={E}=>g Q) ⊢ |={E}=>g P ∗ Q.
-  Proof. by rewrite sfgupd_frame_r sfgupd_frame_l sfgupd_trans. Qed.
-  Lemma sfgupd_idemp E P : (|={E}=>g |={E}=>g P) ⊣⊢ |={E}=>g P.
+  Lemma sfmupd_frame_l E R Q : (R ∗ |={E}=>g Q) ⊢ |={E}=>g R ∗ Q.
+  Proof. rewrite !(comm _ R); apply sfmupd_frame_r. Qed.
+  Lemma sfmupd_wand_l E P Q : (P -∗ Q) ∗ (|={E}=>g P) ⊢ |={E}=>g Q.
+  Proof. by rewrite sfmupd_frame_l wand_elim_l. Qed.
+  Lemma sfmupd_wand_r E P Q : (|={E}=>g P) ∗ (P -∗ Q) ⊢ |={E}=>g Q.
+  Proof. by rewrite sfmupd_frame_r wand_elim_r. Qed.
+  Lemma sfmupd_sep E P Q : (|={E}=>g P) ∗ (|={E}=>g Q) ⊢ |={E}=>g P ∗ Q.
+  Proof. by rewrite sfmupd_frame_r sfmupd_frame_l sfmupd_trans. Qed.
+  Lemma sfmupd_idemp E P : (|={E}=>g |={E}=>g P) ⊣⊢ |={E}=>g P.
   Proof.
     apply: anti_symm.
-    - apply sfgupd_trans.
-    - apply sfgupd_intro.
+    - apply sfmupd_trans.
+    - apply sfmupd_intro.
   Qed.
 
-  Global Instance sfgupd_homomorphism E :
-    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (sfgupd E).
-  Proof. split; [split|]; try apply _; [apply sfgupd_sep | apply sfgupd_intro]. Qed.
+  Global Instance sfmupd_homomorphism E :
+    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (sfmupd E).
+  Proof. split; [split|]; try apply _; [apply sfmupd_sep | apply sfmupd_intro]. Qed.
 
-  Lemma big_sepL_sfgupd {A} (Φ : nat → A → iProp Σ) E l :
+  Lemma big_sepL_sfmupd {A} (Φ : nat → A → iProp Σ) E l :
     ([∗ list] k↦x ∈ l, |={E}=>g Φ k x) ⊢ |={E}=>g [∗ list] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opL_commute _). Qed.
-  Lemma big_sepM_sfgupd {A} `{Countable K} (Φ : K → A → iProp Σ) E l :
+  Lemma big_sepM_sfmupd {A} `{Countable K} (Φ : K → A → iProp Σ) E l :
     ([∗ map] k↦x ∈ l, |={E}=>g Φ k x) ⊢ |={E}=>g [∗ map] k↦x ∈ l, Φ k x.
   Proof. by rewrite (big_opM_commute _). Qed.
-  Lemma big_sepS_sfgupd `{Countable A} (Φ : A → iProp Σ) E l :
+  Lemma big_sepS_sfmupd `{Countable A} (Φ : A → iProp Σ) E l :
     ([∗ set]  x ∈ l, |={E}=>g Φ x) ⊢ |={E}=>g [∗ set] x ∈ l, Φ x.
   Proof. by rewrite (big_opS_commute _). Qed.
-  Lemma big_sepMS_sfgupd `{Countable A} (Φ : A → iProp Σ) E l :
+  Lemma big_sepMS_sfmupd `{Countable A} (Φ : A → iProp Σ) E l :
     ([∗ mset] x ∈ l, |={E}=>g Φ x) ⊢ |={E}=>g [∗ mset] x ∈ l, Φ x.
   Proof. by rewrite (big_opMS_commute _). Qed.
 
-  Lemma except_0_sfgupd E P : ◇ (|={E}=>g P) ⊢ (|={E}=>g ◇ P).
+  Lemma except_0_sfmupd E P : ◇ (|={E}=>g P) ⊢ (|={E}=>g ◇ P).
   Proof.
-    rewrite /bi_except_0. apply or_elim; eauto using sfgupd_mono, or_intro_r.
-    by rewrite -sfgupd_intro -or_intro_l.
+    rewrite /bi_except_0. apply or_elim; eauto using sfmupd_mono, or_intro_r.
+    by rewrite -sfmupd_intro -or_intro_l.
   Qed.
 
-  Lemma sfgupd_fupd_acc E1 E2 P :
+  Lemma sfmupd_fupd_acc E1 E2 P :
     (|={E1,E2}=> |={E2}=>g |={E2,E1}=> P) ⊢ (|={E1}=>g P).
   Proof.
     iIntros "H %%% I". iMod "H". iPoseProof ("H" with "I") as "H".
@@ -513,100 +527,100 @@ Section sfgupd.
   Qed.
 
   (** Modality instances *)
-  Global Instance elim_bupd_sfgupd (p : bool) E P Q :
+  Global Instance elim_bupd_sfmupd (p : bool) E P Q :
     ElimModal True p false (|==> P) P (|={E}=>g Q) (|={E}=>g Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply fupd_sfgupd_elim.
+    iIntros "_ [HP HPQ]". iApply fupd_sfmupd_elim.
     iMod "HP". by iApply "HPQ".
   Qed.
 
-  Global Instance elim_fupd_sfgupd (p : bool) E P Q :
+  Global Instance elim_fupd_sfmupd (p : bool) E P Q :
     ElimModal True p false (|={E}=> P) P (|={E}=>g Q) (|={E}=>g Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply fupd_sfgupd_elim.
+    iIntros "_ [HP HPQ]". iApply fupd_sfmupd_elim.
     iMod "HP". by iApply "HPQ".
   Qed.
 
-  Global Instance add_modal_fupd_sfgupd E P Q :
+  Global Instance add_modal_fupd_sfmupd E P Q :
     AddModal (|={E}=> P) P (|={E}=>g Q).
   Proof.
-    rewrite /AddModal; rewrite fupd_sfgupd; iIntros "[HP HPQ]".
-    iApply (sfgupd_bind with "HPQ HP").
+    rewrite /AddModal; rewrite fupd_sfmupd; iIntros "[HP HPQ]".
+    iApply (sfmupd_bind with "HPQ HP").
   Qed.
 
-  Global Instance from_assumption_sfgupd p E P Q :
+  Global Instance from_assumption_sfmupd p E P Q :
     FromAssumption p P Q → KnownRFromAssumption p P (|={E}=>g Q).
-  Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply sfgupd_intro. Qed.
+  Proof. rewrite /KnownRFromAssumption /FromAssumption=>->. apply sfmupd_intro. Qed.
 
-  Global Instance from_pure_sfgupd a E P φ :
+  Global Instance from_pure_sfmupd a E P φ :
     FromPure a P φ → FromPure a (|={E}=>g P) φ.
-  Proof. rewrite /FromPure=> <-. apply sfgupd_intro. Qed.
+  Proof. rewrite /FromPure=> <-. apply sfmupd_intro. Qed.
 
-  Global Instance into_wand_sfgupd p q E R P Q :
+  Global Instance into_wand_sfmupd p q E R P Q :
     IntoWand false false R P Q → IntoWand p q (|={E}=>g R) (|={E}=>g P) (|={E}=>g Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite !intuitionistically_if_elim HR.
-    apply wand_intro_l. by rewrite sfgupd_sep wand_elim_r.
+    apply wand_intro_l. by rewrite sfmupd_sep wand_elim_r.
   Qed.
 
-  Global Instance into_wand_sfgupd_persistent p q E R P Q :
+  Global Instance into_wand_sfmupd_persistent p q E R P Q :
     IntoWand false q R P Q → IntoWand p q (|={E}=>g R) P (|={E}=>g Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite intuitionistically_if_elim HR.
-    apply wand_intro_l. by rewrite sfgupd_frame_l wand_elim_r.
+    apply wand_intro_l. by rewrite sfmupd_frame_l wand_elim_r.
   Qed.
 
-  Global Instance into_wand_sfgupd_args p q E R P Q :
+  Global Instance into_wand_sfmupd_args p q E R P Q :
     IntoWand p false R P Q → IntoWand' p q R (|={E}=>g P) (|={E}=>g Q).
   Proof.
     rewrite /IntoWand' /IntoWand /= => ->.
-    apply wand_intro_l. by rewrite intuitionistically_if_elim sfgupd_wand_r.
+    apply wand_intro_l. by rewrite intuitionistically_if_elim sfmupd_wand_r.
   Qed.
 
-  Global Instance from_sep_sfgupd E P Q1 Q2 :
+  Global Instance from_sep_sfmupd E P Q1 Q2 :
     FromSep P Q1 Q2 → FromSep (|={E}=>g P) (|={E}=>g Q1) (|={E}=>g Q2).
-  Proof. rewrite /FromSep=><-. apply sfgupd_sep. Qed.
+  Proof. rewrite /FromSep=><-. apply sfmupd_sep. Qed.
 
-  Global Instance from_or_sfgupd E P Q1 Q2 :
+  Global Instance from_or_sfmupd E P Q1 Q2 :
     FromOr P Q1 Q2 → FromOr (|={E}=>g P) (|={E}=>g Q1) (|={E}=>g Q2).
   Proof.
     rewrite /FromOr=><-.
-    apply or_elim; apply sfgupd_mono; auto using or_intro_l, or_intro_r.
+    apply or_elim; apply sfmupd_mono; auto using or_intro_l, or_intro_r.
   Qed.
 
-  Global Instance from_exist_sfgupd {A} E P (Φ : A → iProp Σ) :
+  Global Instance from_exist_sfmupd {A} E P (Φ : A → iProp Σ) :
     FromExist P Φ → FromExist (|={E}=>g P) (λ a, |={E}=>g Φ a)%I.
   Proof.
     rewrite /FromExist=><-. apply exist_elim=> a. by rewrite -(exist_intro a).
   Qed.
 
-  Global Instance is_except_0_sfgupd E P : IsExcept0 P → IsExcept0 (|={E}=>g P).
+  Global Instance is_except_0_sfmupd E P : IsExcept0 P → IsExcept0 (|={E}=>g P).
   Proof.
     rewrite /IsExcept0=> HP.
-    by rewrite -{2}HP -(except_0_idemp P) -except_0_sfgupd -(except_0_intro P).
+    by rewrite -{2}HP -(except_0_idemp P) -except_0_sfmupd -(except_0_intro P).
   Qed.
 
-  Global Instance from_modal_sfgupd E P :
+  Global Instance from_modal_sfmupd E P :
     FromModal True modality_id (|={E}=>g P) (|={E}=>g P) P.
-  Proof. by rewrite /FromModal /= -sfgupd_intro. Qed.
+  Proof. by rewrite /FromModal /= -sfmupd_intro. Qed.
 
-  Global Instance elim_modal_sfgupd p E P Q :
+  Global Instance elim_modal_sfmupd p E P Q :
     ElimModal True p false (|={E}=>g P) P (|={E}=>g Q) (|={E}=>g Q).
   Proof.
     by rewrite /ElimModal
-      intuitionistically_if_elim sfgupd_frame_r wand_elim_r sfgupd_trans.
+      intuitionistically_if_elim sfmupd_frame_r wand_elim_r sfmupd_trans.
   Qed.
 
-  Global Instance add_modal_sfgupd E P Q : AddModal (|={E}=>g P) P (|={E}=>g Q).
-  Proof. by rewrite /AddModal sfgupd_frame_r wand_elim_r sfgupd_trans. Qed.
+  Global Instance add_modal_sfmupd E P Q : AddModal (|={E}=>g P) P (|={E}=>g Q).
+  Proof. by rewrite /AddModal sfmupd_frame_r wand_elim_r sfmupd_trans. Qed.
 
-  Global Instance frame_sfgupd p E R P Q :
+  Global Instance frame_sfmupd p E R P Q :
     Frame p R P Q → Frame p R (|={E}=>g P) (|={E}=>g Q).
-  Proof. rewrite /Frame=><-. by rewrite sfgupd_frame_l. Qed.
+  Proof. rewrite /Frame=><-. by rewrite sfmupd_frame_l. Qed.
 
-End sfgupd.
+End sfmupd.
 
 Definition lift_term `{SI : indexT} `{!lirisGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
   λ v, (th_term i ∗ Φ i v)%I.
@@ -769,7 +783,7 @@ Qed.
 (*   intros ???. apply equiv_dist=>n. apply lwp_ne_2. by apply equiv_dist. *)
 (* Qed. *)
 
-Lemma sfgupd_elim_lwp s i E e Φ :
+Lemma sfmupd_elim_lwp s i E e Φ :
   (|={E}=>g lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_unfold. rewrite /lwp_pre /lwp_step.
@@ -811,7 +825,7 @@ Proof.
   iApply (big_sepM_impl with "Efs"). iIntros "!>" (k ef _). iIntros "[H _]". done.
 Qed.
 
-Lemma lwp_strong_mono_sfgupd s1 s2 i E1 E2 e Φ Ψ :
+Lemma lwp_strong_mono_sfmupd s1 s2 i E1 E2 e Φ Ψ :
   s1 ⊑ s2 → E1 ⊆ E2 →
   lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v -∗ |={E2}=>g Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
 Proof.
@@ -848,22 +862,22 @@ Lemma lwp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
   lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
 Proof.
   iIntros (? HE) "H HΦ".
-  iApply (lwp_strong_mono_sfgupd with "H [HΦ]"). all: auto.
+  iApply (lwp_strong_mono_sfmupd with "H [HΦ]"). all: auto.
   iIntros "% H". iMod ("HΦ" with "H") as "$". done.
 Qed.
 
 Lemma fupd_lwp s i E e Φ :
   (|={E}=> lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
 Proof.
-  iIntros "H". iApply sfgupd_elim_lwp. iMod "H". by iModIntro.
+  iIntros "H". iApply sfmupd_elim_lwp. iMod "H". by iModIntro.
 Qed.
 Lemma lwp_fupd s i E e Φ :
   lWP e @ s; i; E {{ v, |={E}=> Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
 Proof. iIntros "H". iApply (lwp_strong_mono s s i E with "H"); auto. Qed.
 
-Lemma lwp_sfgupd s i E e Φ :
+Lemma lwp_sfmupd s i E e Φ :
   lWP e @ s; i; E {{ v, |={E}=>g Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
-Proof. iIntros "H". iApply (lwp_strong_mono_sfgupd s s i E with "H"); auto. Qed.
+Proof. iIntros "H". iApply (lwp_strong_mono_sfmupd s s i E with "H"); auto. Qed.
 
 Lemma lwp_atomic s i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
   (|={E1,E2}=> lWP e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})
@@ -916,7 +930,7 @@ Proof.
   iApply lwp_ind_strong; first solve_proper.
   iIntros "!#" (i e E1 Φ') "IH". iIntros (Φ) "HΦ".
   rewrite /lwp_pre /lwp_step. destruct (to_val e) as [v|] eqn:He.
-  { apply of_to_val in He as <-. iApply sfgupd_elim_lwp.
+  { apply of_to_val in He as <-. iApply sfmupd_elim_lwp.
     iIntros (???) "SI". iMod ("IH" with "SI") as "[SI IH]".
     iModIntro. iFrame. by iApply "HΦ".
   }
@@ -979,13 +993,13 @@ Global Instance lwp_flip_mono' s i E e :
   Proper (pointwise_relation _ (flip (⊢)) ==> (flip (⊢))) (lwp (PROP:=iProp Σ) s i E e).
 Proof. by intros Φ Φ' ?; apply lwp_mono. Qed.
 
-Lemma lwp_value_sfgupd s i E Φ e v :
+Lemma lwp_value_sfmupd s i E Φ e v :
   IntoVal e v →
   lWP e @ s; i; E {{ Φ }} ⊣⊢ (|={E}=>g (Φ v)).
 Proof. intros <-. by apply lwp_value_fupd'. Qed.
 Lemma lwp_value' s i E Φ v : (Φ v) ⊢ lWP (of_val v) @ s; i; E {{ Φ }}.
 Proof.
-  rewrite lwp_value_fupd'. iIntros "H". by iApply sfgupd_intro.
+  rewrite lwp_value_fupd'. iIntros "H". by iApply sfmupd_intro.
 Qed.
 Lemma lwp_value s i E Φ e v : IntoVal e v → (Φ v) ⊢ lWP e @ s; i; E {{ Φ }}.
 Proof. intros <-. apply lwp_value'. Qed.
@@ -1096,11 +1110,11 @@ Section proofmode_classes.
       fupd_frame_r wand_elim_r fupd_lwp.
   Qed.
 
-  Global Instance elim_modal_sfgupd_lwp p s i E e P Φ :
+  Global Instance elim_modal_sfmupd_lwp p s i E e P Φ :
     ElimModal True p false (|={E}=>g P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}).
   Proof.
     rewrite /ElimModal intuitionistically_if_elim.
-    iIntros (_) "[P H]". iApply sfgupd_elim_lwp. iMod "P".
+    iIntros (_) "[P H]". iApply sfmupd_elim_lwp. iMod "P".
     iModIntro. by iApply ("H" with "P").
   Qed.
 
