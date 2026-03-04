@@ -81,10 +81,6 @@ liris/base_logic/opreds.v
 # liris/base_logic/thread_view_obls.v
 # liris/base_logic/digraph.v
 
-liris/temporal/temporal_formula.v
-liris/temporal/temporal_logic.v
-liris/temporal/temporal_property.v
-
 liris/program_logic/language.v
 # liris/program_logic/sched_fair_interp.v
 # liris/program_logic/thread_obligation.v
@@ -100,6 +96,9 @@ liris/program_logic/ectxi_language.v
 liris/program_logic/atomic.v
 # liris/program_logic/total_weakestpre.v
 # liris/program_logic/total_adequacy.v
+liris/program_logic/temporal_formula.v
+liris/program_logic/temporal_logic.v
+liris/program_logic/temporal_property.v
 
 liris_heap_lang/locations.v
 liris_heap_lang/lang.v
