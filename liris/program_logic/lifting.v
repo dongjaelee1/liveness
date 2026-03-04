@@ -2,8 +2,7 @@
 semantics to the program logic. *)
 
 From iris.proofmode Require Import proofmode.
-From liris.program_logic Require Export temporal_rules.
-(* From iris.prelude Require Import options. *)
+From liris.program_logic Require Export weakestpre.
 From liris.algebra Require Import ordinal_wfocm.
 
 Section lifting.
@@ -15,80 +14,52 @@ Section lifting.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
 
-  Local Ltac unfold_defs :=
-    try rewrite !gupd.wit_fuels_unseal /gupd.wit_fuels_def;
-    try rewrite !gupd.gl_fuels_unseal /gupd.gl_fuels_def;
-    try rewrite !gupd.wit_unseal /gupd.wit_def;
-    try rewrite !gupd.wit_layer_unseal /gupd.wit_layer_def;
-    try rewrite !gupd.wit_bound_unseal /gupd.wit_bound_def;
-    try rewrite !gupd.th_term_unseal /gupd.th_term_def;
-    try rewrite !gupd.th_obls_unseal /gupd.th_obls_def;
-    try rewrite !gupd.gl_variant_cases_unseal /gupd.gl_variant_cases_def;
-    try rewrite !gupd.gl_variant_unseal /gupd.gl_variant_def;
-    try rewrite !gupd.gl_fuel_unseal /gupd.gl_fuel_def;
-    try rewrite !gupd.gl_fuel_val_unseal /gupd.gl_fuel_val_def;
-    try rewrite !gupd.gl_expired_unseal /gupd.gl_expired_def;
-    try rewrite !gupd.gl_current_unseal /gupd.gl_current_def;
-    try rewrite !gupd.gl_done_unseal /gupd.gl_done_def;
-    try rewrite !gupd.gl_locked_unseal /gupd.gl_locked_def;
-    try rewrite !gupd.gl_layers_unseal /gupd.gl_layers_def;
-    try rewrite !gupd.gl_unseal /gupd.gl_def.
+  (* For lwp_step, enable progress and fork. *)
+  Lemma lwp_step_step s i E e1 ν :
+    (∀ h n σ1 κ κs Θ,
+       history_interp h n (σ1, κ ++ κs) Θ ={E,∅}=∗
+       (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
+       ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+            ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
+                               thP_obls i G 1 -∗
+                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                               ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
+                               ALC (|={∅,E}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
+                                             ν e2 efs)))
+    ⊢ lwp_step s i E e1 ν.
+  Proof.
+    iIntros "H". iIntros (??????) "SI".
+    iMod ("H" with "SI") as "($& %& GOs& GFs& %& #REs& H)".
+    iIntros "!> !> % % % %Step".
+    iApply (mprog_step). iModIntro. iFrame "GOs GFs REs". iIntros "(GOs& Ws)".
+    iApply (mphys_step _ (S n) _ _ (dom efs)). 1,2: eauto.
+    { eapply fork_thread_ids; eauto. }
+    iIntros "!> !> Efs".
+    iMod ("H" with "[//] GOs Ws Efs") as "H". iModIntro.
+    iMod "H". iModIntro. eauto.
+  Qed.
 
-  Section lwp_step.
-
-    (* For lwp_step, enable progress and fork. *)
-    Lemma lwp_step_step s i E e1 ν :
-      (∀ Θ σ1 κ κs,
-         state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-         (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-         ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
-         ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
-           (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
-              th_obls i G 1 -∗
-              ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
-              ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
-              ALC (|={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗ ν e2 efs)))
-      ⊢ lwp_step s i E e1 ν.
-    Proof.
-      iIntros "H". iIntros (????) "SI".
-      iMod ("H" with "SI") as "($& %& GOs& GFs& %& #REs& H)".
-      iIntros "!> !> % % % %Step".
-      iApply (gprog_step Θ _ (dom efs)).
-      1: auto.
-      { eapply fork_thread_ids; eauto. }
-      iModIntro. iPoseProof (big_sepM_dom with "GFs") as "GFs".
-      iFrame "GOs GFs REs". iIntros "(GOs& Ws& Efs)".
-      iMod ("H" with "[//] GOs Ws Efs") as "H". iModIntro.
-      iMod "H". iModIntro. eauto.
-    Qed.
-
-  End lwp_step.
-
-  Section lwp.
-
-    Lemma lwp_lift_step s i E e1 Φ :
-      (∀ Θ σ1 κ κs,
-         state_interp σ1 Θ (κ ++ κs) ={E,∅}=∗
-         (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-         ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
-         ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
-           (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
-              th_obls i G 1 -∗
-              ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
-              ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
-              ALC (|={∅,E}=> state_interp σ2 (Θ ∪ dom efs) κs ∗
-                            lWP e2 @ s; i; E {{ Φ }} ∗
-                            [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
-      ⊢ lWP e1 @ s; i; E {{ Φ }}.
-    Proof.
-      iIntros "H". rewrite lwp_unfold /lwp_pre. destruct (to_val e1) eqn:He.
-      { iIntros "%%% I". iMod ("H" $! _ _ [] with "I") as "((%&%)& _)". done. }
-      iApply lwp_step_step.
-      iIntros (????) "I". iMod ("H" with "I") as "(%& H)". destruct H as [_ H].
-      iModIntro. iSplitR; first done. auto.
-    Qed.
-
-  End lwp.
+  Lemma lwp_lift_step s i E e1 Φ :
+    (∀ h n σ1 κ κs Θ,
+       history_interp h n (σ1, κ ++ κs) Θ ={E,∅}=∗
+       (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
+       ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+            ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
+                               thP_obls i G 1 -∗
+                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                               ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
+                               ALC (|={∅,E}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
+                                             lWP e2 @ s; i; E {{ Φ }} ∗
+                                             [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "H". rewrite lwp_unfold /lwp_pre. destruct (to_val e1) eqn:He.
+    { iIntros "%%%% I". destruct σ. iMod ("H" $! _ _ _ [] with "I") as "((%&%)& _)". done. }
+    iApply lwp_step_step. iIntros (??????) "I". iMod ("H" with "I") as "(%& H)". destruct H as [_ H].
+    iModIntro. iSplitR; first done. auto.
+  Qed.
 
   Local Hint Resolve reducible_no_obs_reducible : core.
 
@@ -108,10 +79,10 @@ Section lifting.
 
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
-    (∀ Θ σ κs, state_interp σ Θ κs ={E,∅}=∗ |=[Θ]=>g ⌜ stuck i e σ Θ ⌝)
+    (∀ h n σ κ Θ, history_interp h n (σ, κ) Θ ={E,∅}=∗ |=[n,Θ]=>m ⌜ stuck i e σ Θ ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
-    rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (Θ σ κ κs) "Hσ".
+    rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (h n σ κ κs Θ) "Hσ".
     iMod ("H" with "Hσ") as "H". iModIntro. iMod "H" as %[? Hirr].
     iModIntro. iSplit; first done.
     iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
@@ -119,7 +90,7 @@ Section lifting.
 
   (** Derived lifting lemmas. *)
   Class PureExecCond (C : thread_id → state Λ → Prop) ς (i : thread_id) :=
-    pure_exec_cond : ∀ σ Θ κ, ς -∗ state_interp σ Θ κ -∗ ⌜C i σ⌝.
+    pure_exec_cond : ∀ h n σ κ Θ, ς -∗ history_interp h n (σ, κ) Θ -∗ ⌜C i σ⌝.
 
   Lemma lwp_lift_pure_step_no_fork s i E E' e1 Φ C ς :
     (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
@@ -127,18 +98,18 @@ Section lifting.
     PureExecCond C ς i →
     (|={E,E'}=>
        ς ∗
-       ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
-       ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
+       ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+       ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
          (ς -∗
-          th_obls i G 1 -∗
-          ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
+          thP_obls i G 1 -∗
+          ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
           ALC (|={E',E}=>
                  ∀ σ Θ κ e2 efs, (⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝) -∗
                                  lWP e2 @ s; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hsafe Hstep HCC) "H".
-    iApply lwp_lift_step. iIntros (Θ σ1 κ κs) "Hσ".
+    iApply lwp_lift_step. iIntros (h n σ1 κ κs Θ) "Hσ".
     iMod "H" as "[Hc (%& Tb& Gfs& %& #Rs& H)]". iPoseProof (HCC with "Hc Hσ") as "%HC".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
     iSplit.
@@ -150,7 +121,10 @@ Section lifting.
     destruct (Hstep κ σ1 Θ e2 σ2 efs HC) as (-> & <- & ->); auto.
     replace (Θ ∪ dom ∅) with Θ by set_solver.
     iMod ("H" with "Hc Tb Wcs [//]") as "H".
-    iMod "Hclose" as "_". iMod "H". iModIntro. rewrite big_sepM_empty. iFrame.
+    iMod "Hclose" as "_". iMod "H".
+    rewrite app_nil_l. iPoseProof (history_interp_step _ _ _ (σ2, κs) with "Hσ") as "[SI ACC]".
+    iMod ("ACC" with "SI") as "$".
+    iModIntro. rewrite big_sepM_empty. iFrame.
   Qed.
 
   Lemma lwp_lift_pure_stuck `{!Inhabited (state Λ)} i E Φ e :
@@ -160,27 +134,27 @@ Section lifting.
     iIntros (Hstuck) "_". iApply lwp_lift_stuck.
     - destruct(to_val e) as [v|] eqn:He; last done.
       rewrite -He. by case (Hstuck inhabitant ∅).
-    - iIntros (???) "_". iApply fupd_mask_intro; auto with set_solver.
+    - iIntros (?????) "_". iApply fupd_mask_intro; auto with set_solver.
   Qed.
 
   Lemma lwp_lift_atomic_step {s i E1 E2 Φ} e1 :
-      (∀ Θ σ1 κ κs,
-         state_interp σ1 Θ (κ ++ κs) ={E1,E2}=∗
+      (∀ h n σ1 κ κs Θ,
+         history_interp h n (σ1, κ ++ κs) Θ ={E1,E2}=∗
          (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
-         ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
-         ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
+         ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+         ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
            (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
-              th_obls i G 1 -∗
-              ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
-              ([∗ set] j ∈ dom efs, th_obls j ∅ 1) -∗
-              ALC (|={E2,E1}=> state_interp σ2 (Θ ∪ dom efs) κs ∗
-                            (from_option (λ v, |={E1}=>g (Φ v)) False (to_val e2)) ∗
+              thP_obls i G 1 -∗
+              ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+              ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
+              ALC (|={E2,E1}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
+                            (from_option (λ v, |={E1}=>m (Φ v)) False (to_val e2)) ∗
                             [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
       ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H".
     iApply (lwp_lift_step s i E1 e1).
-    iIntros (Θ σ1 κ κs) "Hσ1". iMod ("H" with "Hσ1") as "(%& H)".
+    iIntros (h n σ1 κ κs Θ) "Hσ1". iMod ("H" with "Hσ1") as "(%& H)".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
     iSplit; first auto.
     iDestruct "H" as "(%& Tb& Gfs& %& #Rs& H)".
@@ -189,7 +163,7 @@ Section lifting.
     iIntros "!> Tb Wcs Efs". iMod ("H" with "Tb Wcs Efs") as "H".
     iMod "Hclose" as "_". iMod "H" as "($&Hq&$)".
     iModIntro. destruct (to_val e2) eqn:?; last by iExFalso.
-    iApply lwp_value_sfgupd; last eauto. by apply of_to_val.
+    iApply lwp_value_sfmupd; last eauto. by apply of_to_val.
   Qed.
 
   Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s i E E' Φ C ς} e1 e2 :
@@ -198,11 +172,11 @@ Section lifting.
     PureExecCond C ς i →
     (|={E,E'}=>
        ς ∗
-       ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
-       ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
+       ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+       ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
          (ς -∗
-          th_obls i G 1 -∗
-          ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
+          thP_obls i G 1 -∗
+          ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
           ALC (|={E',E}=> lWP e2 @ s; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
@@ -219,11 +193,11 @@ Section lifting.
     PureExecCond C ς i →
     (Nat.iter n (λ P, |={E,E'}=>
                    ς ∗
-                   ∃ G, th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
-                   ∃ R, ([∗ map] r ↦ v ∈ R, gl r v) ∗
+                   ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+                   ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                    (ς -∗
-                    th_obls i G 1 -∗
-                    ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
+                    thP_obls i G 1 -∗
+                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                     ALC (£ o ={E',E}=∗ P)))
        (lWP e2 @ s; i; E {{ Φ }}))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
@@ -246,9 +220,9 @@ Section lifting.
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς i →
-    ([∗ map] r ↦ v ∈ R, gl r v) ∗
-    (Nat.iter n (λ P, |={E,E'}=> ς ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
-                                (ς -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗ ALC (£ o ={E',E}=∗ P))) (lWP e2 @ s; i; E {{ Φ }}))
+    ([∗ set] r ∈ R, oblP_id r) ∗
+    (Nat.iter n (λ P, |={E,E'}=> ς ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+                                (ς -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ ALC (£ o ={E',E}=∗ P))) (lWP e2 @ s; i; E {{ Φ }}))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hexec HΦ HCC) "(#Rs& LWP)".
@@ -265,8 +239,8 @@ Section lifting.
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς i →
-    (ς ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 n) ∗ ([∗ map] r ↦ v ∈ R, gl r v) ∗
-     (ς -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit r v n ∨ gl_done r v) -∗
+    (ς ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r) ∗
+     (ς -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
       £ (o × n)%ord -∗ lWP e2 @ s; i ; E {{ Φ }}))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
@@ -276,20 +250,20 @@ Section lifting.
     { iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
       iMod tlc_zero as "Hz". iPoseProof (tlc_equiv Ord.O (o × 0)%ord with "Hz") as "Hz".
       { by rewrite Jacobsthal.mult_O_r. }
-      iMod (gl_check_witnesses with "Rs") as "Ws".
+      iMod (obl_check_witnesses with "Rs") as "Ws".
       iApply ("IH" with "Hc TG [Ws] Hz").
       rewrite Ord.from_nat_O. done. }
     iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
-    iAssert (([∗ set] g ∈ dom G, gl_fuel g 0 n) ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1))%I with "[Gfs]" as "[Gfs Gf]".
-    { iApply (gl_fuel_add_set). rewrite (gl_fuel_eq_set _ _ _ (n ⊕ 1)%M (S n)%M). 1: auto.
+    iAssert (([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1))%I with "[Gfs]" as "[Gfs Gf]".
+    { iApply (oblP_fuel_add_set). rewrite (oblP_fuel_eq_set _ _ _ (n ⊕ 1)%M (S n)%M). 1: auto.
       rewrite measure_nat_S measure_add. by rewrite Hessenberg.add_comm. }
     iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
     iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
     iIntros "Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").
-    { iCombine "Ws RWs" as "Ws". rewrite -big_sepM_sep. iApply (big_sepM_impl with "Ws").
-      iIntros "!> %%% [[Wc1 | #Gd1] [Wc2 | #Gd2]]"; auto.
-      iLeft. rewrite (wit_eq _ _ (n ⊕ Ord.one)%ord (S n)).
-      - iApply wit_split. iFrame.
+    { iCombine "Ws RWs" as "Ws". rewrite -big_sepS_sep. iApply (big_sepS_impl with "Ws").
+      iIntros "!> %% [[Wc1 | #Gd1] [Wc2 | #Gd2]]"; auto.
+      iLeft. rewrite (witP_cred_eq _ (n ⊕ Ord.one)%ord (S n)).
+      - iApply witP_cred_split. iFrame.
       - rewrite -Ord.from_nat_1 -Hessenberg.add_from_nat comm. done. }
     { rewrite (tlc_equiv (o × S n)%ord ((o × n) ⊕ o)%ord).
       - rewrite tlc_split. iFrame.
@@ -298,4 +272,4 @@ Section lifting.
 
 End lifting.
 
-Global Opaque sfgupd.
+Global Opaque sfmupd.
