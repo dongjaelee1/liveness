@@ -223,7 +223,7 @@ Local Definition event_obl_unseal :
 Global Arguments event_obl {SI OC Σ _}.
 
 (* We use this to record that Until was alive at this point of execution. *)
-Definition event_alive_def `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
+Definition event_obl_alive `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
   (i n : nat) (k : oid) : iProp Σ :=
   (∃ o, event_obl i n k o ∧ ⌜ obl_le o obl_fulfilled ⌝).
 
