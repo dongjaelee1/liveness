@@ -12,6 +12,8 @@ Definition mprog `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ i : iP
      ∀ W2, (⌜(W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗
            (model_interp (h ++ [(n, Ω2)]) (S a) Ω2 W2 n Θ) ∗ P)%I.
 
+Notation "'@={' n , Θ , i '}=↓' P" := (mprog n Θ i P) (at level 99, P at level 200, format "@={ n , Θ , i }=↓  P").
+
 Section mprog.
   Context `{SI : indexT} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
 
@@ -171,6 +173,8 @@ Definition mphys `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n1 n2 Θ1 �
      ∀ h a Ω W,
      (model_interp h a Ω W n1 Θ1) ={∅}=∗
      (model_interp (h ++ [(n2, Ω)]) (S a) Ω W n2 Θ2) ∗ P)%I.
+
+Notation "'@={' n1 , n2 , Θ1 , Θ2 '}=>' P" := (mphys n1 n2 Θ1 Θ2 P) (at level 99, P at level 200, format "@={ n1 , n2 , Θ1 , Θ2 }=>  P").
 
 Section mphys.
   Context `{SI : indexT} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
