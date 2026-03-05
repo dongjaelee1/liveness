@@ -112,8 +112,8 @@ Global Typeclasses Opaque history_interp.
 Global Instance: Params (@history_interp) 6 := {}.
 
 Local Definition event_pred_def `{SI : indexT} `{@histGS SI Σ (prod St (gset positive))} `{@state_interp_class SI Σ St Π}
-  (n : nat) (π : Π) : iProp Σ :=
-  (∃ e, hG_event n e ∗ ⌜ state_sat e.1 e.2 π ⌝)%I.
+  (n : nat) (e : St * (gset positive)) (π : Π) : iProp Σ :=
+  (hG_event n e ∗ ⌜ state_sat e.1 e.2 π ⌝)%I.
 Local Definition event_pred_aux : seal (@event_pred_def). Proof. by eexists. Qed.
 Definition event_pred := event_pred_aux.(unseal).
 Local Definition event_pred_unseal :
@@ -124,9 +124,9 @@ Global Arguments event_pred {SI Σ St _ Π _}.
 Section hist.
   Context `{SI : indexT} `{HIST : !histGS Σ (prod St (gset positive))} `{SIC : !state_interp_class Σ St Π}.
 
-  Global Instance event_pred_persistent n π : Persistent (event_pred n π).
+  Global Instance event_pred_persistent n e π : Persistent (event_pred n e π).
   Proof. rewrite event_pred_unseal /event_pred_def. apply _. Qed.
-  Global Instance event_pred_timeless n π : Timeless (event_pred n π).
+  Global Instance event_pred_timeless n e π : Timeless (event_pred n e π).
   Proof. rewrite event_pred_unseal /event_pred_def. apply _. Qed.
 
   Lemma history_interp_wf h n σ Θ :
@@ -153,7 +153,7 @@ Section hist.
   Lemma history_interp_event_pred_any m e π h n σ Θ :
     (h !! m = Some e) →
     (state_sat e.1 e.2 π) →
-    history_interp h n σ Θ ⊢ event_pred m π.
+    history_interp h n σ Θ ⊢ event_pred m e π.
   Proof.
     rewrite /history_interp -lock event_pred_unseal /event_pred_def. iIntros (LU Sat) "(%& Ha& SI)".
     destruct H. iPoseProof (hG_history_event _ _ _ LU with "Ha") as "#He".
@@ -162,16 +162,16 @@ Section hist.
 
   Lemma history_interp_event_pred_now π h n σ Θ :
     (state_sat σ Θ π) →
-    history_interp h n σ Θ ⊢ event_pred n π.
+    history_interp h n σ Θ ⊢ event_pred n (σ, Θ) π.
   Proof.
     iIntros (Sat) "HI". iPoseProof (history_interp_lookup with "HI") as "%".
     iApply (history_interp_event_pred_any with "HI"); eauto.
   Qed.
 
-  Lemma event_pred_history_interp_lookup h n σ Θ m π :
-    history_interp h n σ Θ ∗ event_pred m π ⊢ ∃ e, ⌜ h !! m = Some e ∧ state_sat e.1 e.2 π ⌝.
+  Lemma event_pred_history_interp_lookup h n σ Θ m e π :
+    history_interp h n σ Θ ∗ event_pred m e π ⊢ ⌜ h !! m = Some e ∧ state_sat e.1 e.2 π ⌝.
   Proof.
-    rewrite /history_interp -lock event_pred_unseal /event_pred_def. iIntros "((%& Ha& SI)& (%& #He& %))".
+    rewrite /history_interp -lock event_pred_unseal /event_pred_def. iIntros "((%& Ha& SI)& (#He& %))".
     destruct H. iPoseProof (hG_event_history_lookup with "[$Ha $He]") as "%". eauto.
   Qed.
 

@@ -17,6 +17,57 @@ Section aux.
 
 End aux.
 
+Fixpoint tf_logic `{SI : indexT} `{!mupdGS Σ} `{!histGS.histGS Σ (St * gset positive)} `{!state_interp_class Σ St Π}
+  (Φ : @tf SI Σ Π) : iProp Σ :=
+  match Φ with
+  | tf_emp => emp%I
+  | tf_atomic π => (state_pred π)%I
+  | tf_pure p => (⌜p⌝)%I
+  | tf_ghost p => p%I
+  | tf_and P Q => (tf_logic P ∧ tf_logic Q)%I
+  | tf_or P Q => (tf_logic P ∨ tf_logic Q)%I
+  | tf_impl P Q => (tf_logic P → tf_logic Q)%I
+  | tf_forall A P => (∀ (a : A), tf_logic (P a))%I
+  | tf_exist A P => (∃ (a : A), tf_logic (P a))%I
+  | tf_sep P Q => (tf_logic P ∗ tf_logic Q)%I
+  | tf_wand P Q => (tf_logic P -∗ tf_logic Q)%I
+  | tf_pers P => (□ (tf_logic P))%I
+  | tf_always N k P =>
+      (oblP_expired k ∗ oblP_inv N k False%I False%I (tf_logic P)%I)%I
+  | tf_until N k P Q =>
+      (oblP_alive k (1/2)%Qp ∗
+       oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ i n, event_obl i n k obl_fulfilled ∗ tf_intuit i n Q)%I)%I
+  end
+with tf_intuit `{SI : indexT} `{!mupdGS Σ} `{!histGS.histGS Σ (St * gset positive)} `{!state_interp_class Σ St Π}
+       i n (Φ : @tf SI Σ Π) : iProp Σ :=
+       match Φ with
+       | tf_emp => emp%I
+       | tf_atomic π => (event_pred n π)%I
+       | tf_pure p => (⌜p⌝)%I
+       | tf_ghost p => True%I
+       | tf_and P Q => (tf_intuit i n P ∧ tf_intuit i n Q)%I
+       | tf_or P Q => (tf_intuit i n P ∨ tf_intuit i n Q)%I
+       (* Not persistent in general *)
+       | tf_impl P Q => True%I
+       (* | tf_impl P Q => (tf_intuit i n P → tf_intuit i n Q)%I *)
+       | tf_forall A P => (∀ (a : A), tf_intuit i n (P a))%I
+       | tf_exist A P => (∃ (a : A), tf_intuit i n (P a))%I
+       | tf_sep P Q => (tf_intuit i n P ∗ tf_intuit i n Q)%I
+       (* Not persistent in general *)
+       | tf_wand P Q => True%I
+       (* | tf_wand P Q => (tf_intuit i n P -∗ tf_intuit i n Q)%I *)
+       | tf_pers P => (□ (tf_logic P))%I
+       | tf_always N k P =>
+           (oblP_expired k ∗ oblP_inv N k False%I False%I (tf_logic P)%I)%I
+       | tf_until N k P Q =>
+           (oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ i n, event_obl i n k obl_fulfilled ∗ tf_intuit i n Q)%I)%I
+       end.
+
+Global Arguments tf_logic {SI Σ _ St _ Π _}.
+Global Arguments tf_intuit {SI Σ _ St _ Π _}.
+
+TODO
+
 (** Interpretation of tf to the full state (program and obligation state) predicate. *)
 Fixpoint tf_full_state `{SI : indexT} `{!state_interp_class Σ St Π}
   (Φ : @tf SI Σ Π) (σ : St) (Θ : (gset positive)) (n : nat) (Ω : obls) : Prop :=
@@ -74,6 +125,7 @@ Global Arguments tf_intuit {SI Σ _ St _ Π _}.
 
 (** (tf_logic P ∗ full_history_interp h i n) -∗ tf_intuit i n P
     tf_intuit i n P ∗ full_history_interp h j m → ∃ (e : full state), h !! i = Some e ∧ tf_full_state P e
+    h !! i = Some e ∧ tf_full_state P e ∗ ... → tf_trace_might_expired P tr
     Need to prove tf_trace_might_expired P tr first, and use it in the inductive case.
     Namely, tr_trace_might_expired P tr ∧ tf_intuit i n (where i n are current) → tf_trace P tr.
     Of course, tf_logic P ∗ full_history_interp h i n ⊢ tf_intuit i n should hold,

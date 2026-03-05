@@ -129,9 +129,9 @@ Local Definition mhG_history_auth_unseal :
 Global Arguments mhG_history_auth {SI OC Σ _}.
 
 Local Definition mhG_event_def `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
-  (i n : nat) (e : obls)  : iProp Σ :=
+  (i : nat) (e : nat * obls)  : iProp Σ :=
   (∃ (h : list (nat * obls)),
-      (⌜ length h = (S i) ∧ last h = Some (n, e) ∧ model_history_wf h ⌝) ∧ own hist_name (◯ML h))%I.
+      (⌜ length h = (S i) ∧ last h = Some e ∧ model_history_wf h ⌝) ∧ own hist_name (◯ML h))%I.
 Local Definition mhG_event_aux : seal (@mhG_event_def). Proof. by eexists. Qed.
 Definition mhG_event := mhG_event_aux.(unseal).
 Local Definition mhG_event_unseal :
@@ -145,9 +145,9 @@ Section proof.
   Global Instance mhG_history_auth_timeless h : Timeless (mhG_history_auth h).
   Proof. rewrite mhG_history_auth_unseal /mhG_history_auth_def. apply _. Qed.
 
-  Global Instance mhG_event_persistent i n e : Persistent (mhG_event i n e).
+  Global Instance mhG_event_persistent i e : Persistent (mhG_event i e).
   Proof. rewrite mhG_event_unseal /mhG_event_def. apply _. Qed.
-  Global Instance mhG_event_timeless i n e : Timeless (mhG_event i n e).
+  Global Instance mhG_event_timeless i e : Timeless (mhG_event i e).
   Proof. rewrite mhG_event_unseal /mhG_event_def. apply _. Qed.
 
   Lemma mhG_history_auth_wf h :
@@ -167,7 +167,7 @@ Section proof.
 
   Lemma mhG_history_event h i e :
     (h !! i = Some e) →
-    mhG_history_auth h ⊢ mhG_event i e.1 e.2.
+    mhG_history_auth h ⊢ mhG_event i e.
   Proof.
     rewrite mhG_history_auth_unseal /mhG_history_auth_def. rewrite mhG_event_unseal /mhG_event_def.
     iIntros (LU) "[% H]". apply list_elem_of_split_length in LU. destruct LU as (l1&l2&?&?).
@@ -180,8 +180,8 @@ Section proof.
     exists l2. subst. rewrite cons_middle app_assoc. auto.
   Qed.
 
-  Lemma mhG_event_history_lookup h i n e :
-    mhG_history_auth h ∗ mhG_event i n e ⊢ ⌜ h !! i = Some (n, e) ⌝.
+  Lemma mhG_event_history_lookup h i e :
+    mhG_history_auth h ∗ mhG_event i e ⊢ ⌜ h !! i = Some e ⌝.
   Proof.
     rewrite mhG_history_auth_unseal /mhG_history_auth_def. rewrite mhG_event_unseal /mhG_event_def.
     iIntros "((%MHw& H)& (%&%& E))". iCombine "H E" gives %V. apply mono_list_both_valid in V. destruct V.
@@ -189,9 +189,9 @@ Section proof.
     rewrite last_lookup H in H1. simpl in H1. rewrite lookup_app_l; auto. rewrite H. lia.
   Qed.
 
-  Lemma mhG_event_compare i j n1 n2 e1 e2 :
+  Lemma mhG_event_compare i j e1 e2 :
     i ≤ j →
-    mhG_event i n1 e1 ∗ mhG_event j n2 e2 ⊢ ⌜ (n1 ≤ n2 ∧ obls_le e1 e2) ⌝.
+    mhG_event i e1 ∗ mhG_event j e2 ⊢ ⌜ (e1.1 ≤ e2.1 ∧ obls_le e1.2 e2.2) ⌝.
   Proof.
     rewrite mhG_event_unseal /mhG_event_def.
     iIntros (LE) "((%h1& %& He1)& (%h2& %& He2))".
@@ -200,7 +200,7 @@ Section proof.
     { destruct H5. subst. destruct x.
       - rewrite app_nil_r in H2, H1, H. rewrite H3 in H1. inv H1. done.
       - rewrite length_app H0 in H. simpl in H. lia. }
-    destruct H5. apply (model_history_wf_lookup_1 h2 i j (n1, e1) (n2, e2) H4); auto.
+    destruct H5. apply (model_history_wf_lookup_1 h2 i j (e1) (e2) H4); auto.
     - subst. rewrite last_lookup H in H1. rewrite lookup_app H1. auto.
     - rewrite last_lookup H0 in H3. done.
   Qed.
@@ -214,8 +214,8 @@ Global Typeclasses Opaque model_history_interp.
 Global Instance: Params (@model_history_interp) 4 := {}.
 
 Local Definition event_obl_def `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
-  (i n : nat) (k : oid) (o : obl) : iProp Σ :=
-  (∃ e, mhG_event i n e ∗ ⌜ e !! k = Some o ⌝)%I.
+  (i : nat) (e : nat * obls) (k : oid) (o : obl) : iProp Σ :=
+  (mhG_event i e ∗ ⌜ e.2 !! k = Some o ⌝)%I.
 Local Definition event_obl_aux : seal (@event_obl_def). Proof. by eexists. Qed.
 Definition event_obl := event_obl_aux.(unseal).
 Local Definition event_obl_unseal :
@@ -224,8 +224,8 @@ Global Arguments event_obl {SI OC Σ _}.
 
 (* We use this to record that Until was alive at this point of execution. *)
 Definition event_obl_alive `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
-  (i n : nat) (k : oid) : iProp Σ :=
-  (∃ o, event_obl i n k o ∧ ⌜ obl_le o obl_fulfilled ⌝).
+  (i : nat) (e : nat * obls) (k : oid) : iProp Σ :=
+  (∃ o, event_obl i e k o ∧ ⌜ obl_le o obl_fulfilled ⌝).
 
 (** Properties *)
 Section hist.
@@ -273,7 +273,7 @@ Section hist.
   Lemma model_history_interp_event_obl_any j e k o h i n Ω :
     (h !! j = Some e) →
     (e.2 !! k = Some o) →
-    model_history_interp h i n Ω ⊢ event_obl j e.1 k o.
+    model_history_interp h i n Ω ⊢ event_obl j e k o.
   Proof.
     rewrite /model_history_interp -lock event_obl_unseal /event_obl_def. iIntros (LU Sat) "(%& Ha)".
     destruct H. iPoseProof (mhG_history_event _ _ _ LU with "Ha") as "#He".
@@ -282,27 +282,27 @@ Section hist.
 
   Lemma model_history_interp_event_obl_now k o h i n Ω :
     (Ω !! k = Some o) →
-    model_history_interp h i n Ω ⊢ event_obl i n k o.
+    model_history_interp h i n Ω ⊢ event_obl i (n, Ω) k o.
   Proof.
     iIntros (Sat) "HI". iPoseProof (model_history_interp_lookup with "HI") as "%".
     iPoseProof (model_history_interp_event_obl_any with "HI") as "#He"; eauto.
   Qed.
 
-  Lemma event_obl_model_history_interp_lookup h i n Ω j m k o :
-    model_history_interp h i n Ω ∗ event_obl j m k o ⊢ ∃ e, ⌜ h !! j = Some e ∧ e.1 = m ∧ e.2 !! k = Some o ⌝.
+  Lemma event_obl_model_history_interp_lookup h i n Ω j e k o :
+    model_history_interp h i n Ω ∗ event_obl j e k o ⊢ ⌜ h !! j = Some e ∧ e.2 !! k = Some o ⌝.
   Proof.
-    rewrite /model_history_interp -lock event_obl_unseal /event_obl_def. iIntros "((%& Ha)& (%& #He& %))".
+    rewrite /model_history_interp -lock event_obl_unseal /event_obl_def. iIntros "((%& Ha)& (#He& %))".
     destruct H. iPoseProof (mhG_event_history_lookup with "[$Ha $He]") as "%". eauto.
   Qed.
 
-  Lemma event_obl_compare i j n1 n2 k o1 o2 :
+  Lemma event_obl_compare i j e1 e2 k o1 o2 :
     i ≤ j →
-    event_obl i n1 k o1 ∗ event_obl j n2 k o2 ⊢ ⌜ (n1 ≤ n2 ∧ obl_le o1 o2) ⌝.
+    event_obl i e1 k o1 ∗ event_obl j e2 k o2 ⊢ ⌜ (e1.1 ≤ e2.1 ∧ obls_le e1.2 e2.2 ∧ obl_le o1 o2) ⌝.
   Proof.
     rewrite event_obl_unseal /event_obl_def.
-    iIntros (LE) "((%Ω1& #He1& %)& (%Ω2& #He2& %))".
+    iIntros (LE) "((#He1& %)& (#He2& %))".
     iPoseProof (mhG_event_compare i j with "[$He1 $He2]") as "%"; first auto. destruct H1.
-    iPureIntro. split; first auto.
+    iPureIntro. split_and !; auto.
     destruct H2. eapply H3; eauto.
   Qed.
 
