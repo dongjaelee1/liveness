@@ -27,8 +27,8 @@ Section wp.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={∅,E}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
-                                             lWP e2 @ s; i; E {{ Φ }} ∗
-                                             [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+                                             (|={E}=>m lWP e2 @ s; i; E {{ Φ }}) ∗
+                                             [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros "H". iApply (lwp_lift_step s i E e1 Φ). iIntros (h n σ1 κ κs Θ) "Hσ".
@@ -40,12 +40,12 @@ Section wp.
   Lemma lwp_lift_base_stuck i E Φ e :
     to_val e = None →
     sub_redexes_are_values e →
-    (∀ h n σ κs Θ, history_interp h n (σ, κs) Θ ={E,∅}=∗ |=[n,Θ]=>m ⌜ base_stuck i e σ Θ ⌝)
+    (∀ h n σ κs Θ, history_interp h n (σ, κs) Θ ={E,∅}=∗ ⌜ base_stuck i e σ Θ ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
     iIntros (??) "H". iApply lwp_lift_stuck; first done.
     iIntros (?????) "Hσ". iMod ("H" with "Hσ") as "H".
-    iModIntro. iMod "H" as "%". iModIntro. by auto.
+    iDestruct "H" as "%". iModIntro. by auto.
   Qed.
 
   Lemma lwp_lift_pure_base_stuck i E Φ e :
@@ -70,7 +70,7 @@ Section wp.
                               ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                               ALC (|={E2,E1}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
                                               (from_option (λ v, |={E1}=>m (Φ v)) False (to_val e2)) ∗
-                                              [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+                                              [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H". iApply lwp_lift_atomic_step.
@@ -115,7 +115,7 @@ Section wp.
                  (ς -∗
                   thP_obls i G 1 -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                  ALC (|={E',E}=> lWP e2 @ s; i; E {{ Φ }})))
+                  ALC (|={E',E}=> |={E}=>m lWP e2 @ s; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof using Hinh.
     intros. rewrite -(lwp_lift_pure_det_step_no_fork e1 e2); eauto.

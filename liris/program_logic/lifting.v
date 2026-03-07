@@ -26,18 +26,18 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={∅,E}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
-                                             ν e2 efs)))
+                                             (|={E}=>m ν e2 efs))))
     ⊢ lwp_step s i E e1 ν.
   Proof.
     iIntros "H". iIntros (??????) "SI".
     iMod ("H" with "SI") as "($& %& GOs& GFs& %& #REs& H)".
-    iIntros "!> !> % % % %Step".
+    iIntros "!> % % % %Step".
     iApply (mprog_step). iModIntro. iFrame "GOs GFs REs". iIntros "(GOs& Ws)".
     iApply (mphys_step _ (S n) _ _ (dom efs)). 1,2: eauto.
     { eapply fork_thread_ids; eauto. }
     iIntros "!> !> Efs".
     iMod ("H" with "[//] GOs Ws Efs") as "H". iModIntro.
-    iMod "H". iModIntro. eauto.
+    iMod "H". iMod "H" as "[HI H]". iMod ("H" with "HI") as "[HI H]". by iFrame.
   Qed.
 
   Lemma lwp_lift_step s i E e1 Φ :
@@ -51,14 +51,17 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={∅,E}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
-                                             lWP e2 @ s; i; E {{ Φ }} ∗
-                                             [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+                                             (|={E}=>m lWP e2 @ s; i; E {{ Φ }}) ∗
+                                             [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros "H". rewrite lwp_unfold /lwp_pre. destruct (to_val e1) eqn:He.
     { iIntros "%%%% I". destruct σ. iMod ("H" $! _ _ _ [] with "I") as "((%&%)& _)". done. }
     iApply lwp_step_step. iIntros (??????) "I". iMod ("H" with "I") as "(%& H)". destruct H as [_ H].
-    iModIntro. iSplitR; first done. auto.
+    iModIntro. iSplitR; first done. iDestruct "H" as "(%& $& $& %& $& H)".
+    iIntros (????). iMod ("H" with "[//]") as "H". iIntros "!> TG RWs Efs".
+    iMod ("H" with "TG RWs Efs") as "H". iMod "H" as "[$ [H Efs]]". iModIntro.
+    iMod "H". by iFrame.
   Qed.
 
   Local Hint Resolve reducible_no_obs_reducible : core.
@@ -79,11 +82,11 @@ Section lifting.
 
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
-    (∀ h n σ κ Θ, history_interp h n (σ, κ) Θ ={E,∅}=∗ |=[n,Θ]=>m ⌜ stuck i e σ Θ ⌝)
+    (∀ h n σ κ Θ, history_interp h n (σ, κ) Θ ={E,∅}=∗ ⌜ stuck i e σ Θ ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
     rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (h n σ κ κs Θ) "Hσ".
-    iMod ("H" with "Hσ") as "H". iModIntro. iMod "H" as %[? Hirr].
+    iMod ("H" with "Hσ") as "[% %Hirr]".
     iModIntro. iSplit; first done.
     iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
   Qed.
@@ -105,7 +108,7 @@ Section lifting.
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
           ALC (|={E',E}=>
                  ∀ σ Θ κ e2 efs, (⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝) -∗
-                                 lWP e2 @ s; i; E {{ Φ }})))
+                                 |={E}=>m lWP e2 @ s; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hsafe Hstep HCC) "H".
@@ -149,7 +152,7 @@ Section lifting.
               ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
               ALC (|={E2,E1}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
                             (from_option (λ v, |={E1}=>m (Φ v)) False (to_val e2)) ∗
-                            [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+                            [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
       ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H".
@@ -163,7 +166,7 @@ Section lifting.
     iIntros "!> Tb Wcs Efs". iMod ("H" with "Tb Wcs Efs") as "H".
     iMod "Hclose" as "_". iMod "H" as "($&Hq&$)".
     iModIntro. destruct (to_val e2) eqn:?; last by iExFalso.
-    iApply lwp_value_sfmupd; last eauto. by apply of_to_val.
+    iModIntro. iApply lwp_value_sfmupd; last eauto. by apply of_to_val.
   Qed.
 
   Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s i E E' Φ C ς} e1 e2 :
@@ -177,7 +180,7 @@ Section lifting.
          (ς -∗
           thP_obls i G 1 -∗
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-          ALC (|={E',E}=> lWP e2 @ s; i; E {{ Φ }})))
+          ALC (|={E',E}=> |={E}=>m lWP e2 @ s; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (? Hpuredet HCC) "H". iApply (lwp_lift_pure_step_no_fork s i E E'); eauto.
@@ -198,7 +201,7 @@ Section lifting.
                    (ς -∗
                     thP_obls i G 1 -∗
                     ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                    ALC (£ o ={E',E}=∗ P)))
+                    ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (lWP e2 @ s; i; E {{ Φ }}))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
@@ -222,7 +225,7 @@ Section lifting.
     PureExecCond C ς i →
     ([∗ set] r ∈ R, oblP_id r) ∗
     (Nat.iter n (λ P, |={E,E'}=> ς ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
-                                (ς -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ ALC (£ o ={E',E}=∗ P))) (lWP e2 @ s; i; E {{ Φ }}))
+                                (ς -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ ALC (£ o ={E',E}=∗ |={E}=>m P))) (lWP e2 @ s; i; E {{ Φ }}))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hexec HΦ HCC) "(#Rs& LWP)".
@@ -241,8 +244,8 @@ Section lifting.
     PureExecCond C ς i →
     (ς ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r) ∗
      (ς -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
-      £ (o × n)%ord -∗ lWP e2 @ s; i ; E {{ Φ }}))
-    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+      £ (o × n)%ord -∗ |={E}=>m lWP e2 @ s; i ; E {{ Φ }}))
+    ⊢ |={E}=>m lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hexec HΦ HCC) "(Hc& TG& Gfs& #Rs& Hlwp)".
     iApply (lwp_pure_step n o _ _ E E). 1: auto.
@@ -257,7 +260,7 @@ Section lifting.
     iAssert (([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1))%I with "[Gfs]" as "[Gfs Gf]".
     { iApply (oblP_fuel_add_set). rewrite (oblP_fuel_eq_set _ _ _ (n ⊕ 1)%M (S n)%M). 1: auto.
       rewrite measure_nat_S measure_add. by rewrite Hessenberg.add_comm. }
-    iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
+    iModIntro. iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
     iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
     iIntros "Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").
     { iCombine "Ws RWs" as "Ws". rewrite -big_sepS_sep. iApply (big_sepS_impl with "Ws").

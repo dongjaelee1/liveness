@@ -126,7 +126,8 @@ Definition lwp_pre `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness)
   λ i E e1 Φ,
     (match to_val e1 with
      | Some v => (|={E}=>m Φ v)
-     | None => (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, lwp j ⊤ ef (lift_term j fork_post)))
+     | None => (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lwp j ⊤ ef (lift_term j fork_post)))
+     (* | None => (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, lwp j ⊤ ef (lift_term j fork_post))) *)
      end)%I.
 
 Lemma lwp_pre_mono `{SI : indexT} `{!lirisGS Λ Σ} s
@@ -329,7 +330,7 @@ Section lwp.
     iMod "IH" as "IH". iModIntro.
     iMod "IH" as "($& [IH Efs])". iDestruct "IH" as "[IH _]".
     iModIntro. iFrame.
-    iApply (big_sepM_impl with "Efs"). iIntros "!>" (k ef _). iIntros "[H _]". done.
+    iApply (big_sepM_impl with "Efs"). iIntros "!>" (k ef _). iIntros ">[H _]". done.
   Qed.
 
   Lemma lwp_strong_mono_sfmupd s1 s2 i E1 E2 e Φ Ψ :
@@ -361,7 +362,7 @@ Section lwp.
     iSplitR "Efs".
     + by iApply "IH".
     + iApply (big_sepM_impl with "Efs"); iIntros "!>" (k ef _).
-      iIntros "[_ H]". by iApply (lwp_stuckness_mono with "H").
+      iIntros ">[_ H]". by iApply (lwp_stuckness_mono with "H").
   Qed.
 
   Lemma lwp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
@@ -449,7 +450,7 @@ Section lwp.
     iDestruct ("IH" with "[//]") as ">IH".
     iMod "IH" as ">>IH". iMod "IH". iDestruct "IH" as "(SI& IH& Efs)".
     rewrite (bi.sep_assoc). iSplitR "Efs"; cycle 1.
-    { iModIntro. by setoid_rewrite bi.and_elim_r. }
+    { iModIntro. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done. }
     iDestruct "IH" as "[IH _]". iApply ("IH" with "HΦ SI").
   Qed.
 
@@ -472,7 +473,7 @@ Section lwp.
     iMod "IH" as ">>IH". iModIntro. iMod "IH" as "(SI& IH& Efs)".
     iModIntro. iFrame. iSplitR "Efs".
     - iDestruct "IH" as "[IH _]". by iApply "IH".
-    - by setoid_rewrite bi.and_elim_r.
+    - iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done.
   Qed.
 
   (** * Derived rules *)
