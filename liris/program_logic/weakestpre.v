@@ -80,20 +80,20 @@ Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
            (history_interp (h ++ [((σ2, κs), (Θ ∪ dom efs))]) (S n) (σ2, κs) (Θ ∪ dom efs)) ∗ ν e2 efs))))%I.
 
 Section lwp_step.
+  Context `{SI : indexT} `{!lirisGS Λ Σ}.
 
-  Global Instance lwp_step_ne `{SI : indexT} `{!lirisGS Λ Σ} s i E e n :
+  Global Instance lwp_step_ne s i E e n :
     Proper (pointwise_relation _ (dist n) ==> dist n) (lwp_step s i E e).
   Proof.
     intros Φ Ψ HΦ. rewrite /lwp_step. do 30 (f_equiv || done).
   Qed.
-  Global Instance lwp_step_proper `{SI : indexT} `{!lirisGS Λ Σ} s i E e :
+  Global Instance lwp_step_proper s i E e :
     Proper (pointwise_relation _ (≡) ==> (≡)) (lwp_step s i E e).
   Proof.
     by intros Φ Φ' ?; apply equiv_dist=>n; apply lwp_step_ne=>v; apply equiv_dist.
   Qed.
 
-  Lemma lwp_step_mono `{SI : indexT} `{!lirisGS Λ Σ} s
-    (ν1 ν2 : expr Λ -d> thread_pool Λ -d> iPropO Σ) :
+  Lemma lwp_step_mono s (ν1 ν2 : expr Λ -d> thread_pool Λ -d> iPropO Σ) :
     ⊢ ((□ ∀ e efs, ν1 e efs -∗ ν2 e efs) →
        ∀ i E e, lwp_step s i E e ν1 -∗ lwp_step s i E e ν2)%I.
   Proof.
@@ -106,10 +106,22 @@ Section lwp_step.
     by iApply "Hmono".
   Qed.
 
-  Lemma fupd_lwp_step `{SI : indexT} `{!lirisGS Λ Σ} s i E e lwp :
+  Lemma fupd_lwp_step s i E e lwp :
     (|={E}=> lwp_step s i E e lwp) ⊢ lwp_step s i E e lwp.
   Proof.
     iIntros "Hf". rewrite /lwp_step. iMod "Hf" as "Hf". done.
+  Qed.
+
+  Lemma lwp_step_sfmupd s i E e ν :
+    lwp_step s i E e ν ⊣⊢ lwp_step s i E e (λ e' efs, |={E}=>m ν e' efs).
+  Proof.
+    iSplit; iIntros "H".
+    - iIntros "%%%%%% HI". iMod ("H" with "HI") as "[$ H]".
+      iIntros "!> %%% Hs". iMod ("H" with "Hs") as ">>>H".
+      iDestruct "H" as ">(HI& H)". iModIntro. iFrame. done.
+    - iIntros "%%%%%% HI". iMod ("H" with "HI") as "[$ H]".
+      iIntros "!> %%% Hs". iMod ("H" with "Hs") as ">>>H".
+      iDestruct "H" as ">(HI& H)". iMod ("H" with "HI") as "[$ $]". done.
   Qed.
 
 End lwp_step.
@@ -196,6 +208,20 @@ Section lwp.
       { repeat intro. destruct x as [[[? ?] ? ] ?], y as [[[? ?] ? ] ?].
         f_equiv. done. }
       iIntros "!>" (?) "H". destruct x as [[[? ?] ? ] ?]. done.
+  Qed.
+
+  Lemma lwp_pre_sfmupd s i E e Φ Ψ :
+    lwp_pre s (λ i E e Φ, Ψ i E e Φ) i E e Φ ⊣⊢ lwp_pre s (λ i E e Φ, |={E}=>m Ψ i E e Φ) i E e Φ.
+  Proof.
+    rewrite /lwp_pre. destruct (to_val e) eqn:He; first auto.
+    iSplit; iIntros "H".
+    - iApply (lwp_step_mono with "[] H"); iIntros "!> %% H".
+      iDestruct "H" as "[H1 H2]". iSplitL "H1"; first eauto.
+      iApply (big_sepM_impl with "H2"). iIntros "!> %%% H". iModIntro. auto.
+    - iApply lwp_step_sfmupd.
+      iApply (lwp_step_mono with "[] H"); iIntros "!> %% H".
+      iDestruct "H" as "[>$ H2]". iModIntro.
+      iApply (big_sepM_impl with "H2"). iIntros "!> %%% >H". auto.
   Qed.
 
   (* Lemma lwp_cond s i E e Φ : *)
