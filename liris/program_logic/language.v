@@ -75,6 +75,19 @@ Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
 Global Instance language_ctx_id Λ : LanguageCtx (@id (expr Λ)).
 Proof. constructor; naive_solver. Qed.
 
+Global Instance language_ctx_compose Λ (K1 K2 : expr Λ → expr Λ) :
+  LanguageCtx K1 → LanguageCtx K2 → LanguageCtx (K2 ∘ K1).
+Proof.
+  intros. constructor.
+  - simpl. intros. do 2 apply fill_not_val. auto.
+  - simpl. intros. apply (fill_step _ (K1 e1)). apply fill_step. auto.
+  - simpl. intros. apply fill_step_inv in H2.
+    2:{ apply fill_not_val. auto. }
+    destruct H2 as (?&?&?). apply (fill_step_inv) in H3.
+    2:{ auto. }
+    subst. destruct H3 as (?&?&?). subst. eexists. split; eauto.
+Qed.
+
 Inductive atomicity := StronglyAtomic | WeaklyAtomic.
 
 Definition stuckness_to_atomicity (s : stuckness) : atomicity :=

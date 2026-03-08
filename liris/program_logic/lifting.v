@@ -16,48 +16,54 @@ Section lifting.
 
   (* For lwp_step, enable progress and fork. *)
   Lemma lwp_step_step s i E e1 ν :
-    (∀ h n σ1 κ κs Θ,
-       history_interp h n (σ1, κ ++ κs) Θ ={E,∅}=∗
-       (⌜ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
+    (∀ K h n σ1 κ κs Θ,
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
+                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_obls i G 1 -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
-                               ALC (|={∅,E}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
-                                             (|={E}=>m ν e2 efs))))
+                               ALC (|={∅,E}=>
+                                      history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (|={E}=>m ν e2 efs))))
     ⊢ lwp_step s i E e1 ν.
   Proof.
-    iIntros "H". iIntros (??????) "SI".
-    iMod ("H" with "SI") as "($& %& GOs& GFs& %& #REs& H)".
+    iIntros "H". iIntros (??????? ??) "SI".
+    iMod ("H" with "[//] [//] SI") as "($& %& GOs& GFs& %& #REs& H)".
     iIntros "!> % % % %Step".
     iApply (mprog_step). iModIntro. iFrame "GOs GFs REs". iIntros "(GOs& Ws)".
-    iApply (mphys_step _ (S n) _ _ (dom efs)). 1,2: eauto.
+    iApply (mphys_step _ (S n) _ _ (dom efs)). 1: eauto.
+    { rewrite dom_insert_lookup_L; auto. }
     { eapply fork_thread_ids; eauto. }
     iIntros "!> !> Efs".
     iMod ("H" with "[//] GOs Ws Efs") as "H". iModIntro.
-    iMod "H". iMod "H" as "[HI H]". iMod ("H" with "HI") as "[HI H]". by iFrame.
+    iMod "H". iMod "H" as "[HI H]". rewrite -dom_union_L. iMod ("H" with "HI") as "[HI H]". by iFrame.
   Qed.
 
   Lemma lwp_lift_step s i E e1 Φ :
-    (∀ h n σ1 κ κs Θ,
-       history_interp h n (σ1, κ ++ κs) Θ ={E,∅}=∗
-       (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 Θ else True ⌝) ∗
+    TCEq (to_val e1) None →
+    (∀ K h n σ1 κ κs Θ,
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 Θ κ e2 σ2 efs⌝) ={∅}=∗
+                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_obls i G 1 -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
-                               ALC (|={∅,E}=> history_interp (h ++ [(σ2, κs, Θ ∪ dom efs)]) (S n) (σ2, κs) (Θ ∪ dom efs) ∗
-                                             (|={E}=>m lWP e2 @ s; i; E {{ Φ }}) ∗
-                                             [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+                               ALC (|={∅,E}=>
+                                      history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (|={E}=>m lWP e2 @ s; i; E {{ Φ }}) ∗
+                                      [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
-    iIntros "H". rewrite lwp_unfold /lwp_pre. destruct (to_val e1) eqn:He.
-    { iIntros "%%%% I". destruct σ. iMod ("H" $! _ _ _ [] with "I") as "((%&%)& _)". done. }
-    iApply lwp_step_step. iIntros (??????) "I". iMod ("H" with "I") as "(%& H)". destruct H as [_ H].
+    iIntros (EQ) "H". rewrite lwp_unfold /lwp_pre. rewrite EQ.
+    (* destruct (to_val e1) eqn:He. *)
+    (* { iIntros "%%%%% I". iMod ("H" $! id _ _ _ [] with "[] [//] I") as "((%&%)& _)". done. } *)
+    iApply lwp_step_step. iIntros (??????? ??) "I".
+    iMod ("H" with "[//] [//] I") as "(%& H)". destruct H1 as [_ H1].
     iModIntro. iSplitR; first done. iDestruct "H" as "(%& $& $& %& $& H)".
     iIntros (????). iMod ("H" with "[//]") as "H". iIntros "!> TG RWs Efs".
     iMod ("H" with "TG RWs Efs") as "H". iMod "H" as "[$ [H Efs]]". iModIntro.
@@ -82,18 +88,20 @@ Section lifting.
 
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
-    (∀ h n σ κ Θ, history_interp h n (σ, κ) Θ ={E,∅}=∗ ⌜ stuck i e σ Θ ⌝)
+    (∀ h n σ κ Θ, history_interp h n σ Θ κ ={E,∅}=∗ ⌜ stuck i e σ (dom Θ) ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
-    rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (h n σ κ κs Θ) "Hσ".
+    rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (K h n σ κ κs Θ ??) "Hσ".
     iMod ("H" with "Hσ") as "[% %Hirr]".
     iModIntro. iSplit; first done.
     iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
   Qed.
 
+  TODO
+
   (** Derived lifting lemmas. *)
   Class PureExecCond (C : thread_id → state Λ → Prop) ς (i : thread_id) :=
-    pure_exec_cond : ∀ h n σ κ Θ, ς -∗ history_interp h n (σ, κ) Θ -∗ ⌜C i σ⌝.
+    pure_exec_cond : ∀ h n σ κ Θ, ς -∗ history_interp h n σ Θ κ -∗ ⌜C i σ⌝.
 
   Lemma lwp_lift_pure_step_no_fork s i E E' e1 Φ C ς :
     (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →

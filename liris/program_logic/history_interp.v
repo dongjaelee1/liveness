@@ -3,6 +3,7 @@ From iris.bi.lib Require Import cmra fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
+From liris.program_logic Require Export language.
 
 (** The ghost state for history. *)
 Module histGS.
@@ -97,79 +98,82 @@ End proof.
 
 (** State interpretation and predicates defined by the language,
     with the thread ids to connect to the obligation model. *)
-Class state_interp_class `{SI : indexT} (Σ : gFunctors) (St Π : Type) :=
-  { state_interp : St → gset positive → iProp Σ;
-    state_pred : Π → iProp Σ;
-    state_sat : St → gset positive → Π → Prop;
+Class state_interp_class `{SI : indexT} (Λ : language) (Σ : gFunctors) (state_pred : Type) :=
+  { state_interp : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
+    state_pred_interp : state_pred → iProp Σ;
+    state_sat : state Λ → thread_pool Λ → list (observation Λ) → state_pred → Prop;
     state_interp_wf :
-    (∀ (σ : St) Θ (π : Π), (state_interp σ Θ ∗ state_pred π) ⊢ ⌜ state_sat σ Θ π ⌝);
+    (∀ σ Θ κs π, (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ κs π ⌝);
   }.
 
-Definition history_interp `{SI : indexT} `{@histGS SI Σ (prod St (gset positive))} `{@state_interp_class SI Σ St Π}
-  (h : list (prod St (gset positive))) (n : nat) (σ : St) (Θ : gset positive) : iProp Σ :=
-  locked (⌜ length h = (S n) ∧ last h = Some (σ, Θ) ⌝ ∗ hG_history_auth h ∗ state_interp σ Θ)%I.
+Definition history_interp `{SI : indexT} `{@state_interp_class SI Λ Σ state_pred}
+  `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
+  (h : list ((state Λ) * (thread_pool Λ) * (list (observation Λ))))
+  (n : nat) σ Θ κs : iProp Σ :=
+  locked (⌜ length h = (S n) ∧ last h = Some ((σ, Θ), κs) ⌝ ∗ hG_history_auth h ∗ state_interp σ Θ κs)%I.
 Global Typeclasses Opaque history_interp.
 Global Instance: Params (@history_interp) 6 := {}.
 
-Local Definition event_pred_def `{SI : indexT} `{@histGS SI Σ (prod St (gset positive))} `{@state_interp_class SI Σ St Π}
-  (n : nat) (e : St * (gset positive)) (π : Π) : iProp Σ :=
-  (hG_event n e ∗ ⌜ state_sat e.1 e.2 π ⌝)%I.
+Local Definition event_pred_def `{SI : indexT} `{@state_interp_class SI Λ Σ state_pred}
+  `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
+  (n : nat) σ Θ κs (π : state_pred) : iProp Σ :=
+  (hG_event n (σ, Θ, κs) ∗ ⌜ state_sat σ Θ κs π ⌝)%I.
 Local Definition event_pred_aux : seal (@event_pred_def). Proof. by eexists. Qed.
 Definition event_pred := event_pred_aux.(unseal).
 Local Definition event_pred_unseal :
   @event_pred = @event_pred_def := event_pred_aux.(seal_eq).
-Global Arguments event_pred {SI Σ St _ Π _}.
+Global Arguments event_pred {SI Λ Σ state_pred _ _}.
 
 (** Properties *)
 Section hist.
-  Context `{SI : indexT} `{HIST : !histGS Σ (prod St (gset positive))} `{SIC : !state_interp_class Σ St Π}.
+  Context `{SI : indexT} `{SIC : @state_interp_class SI Λ Σ state_pred} `{HIST : @histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}.
 
-  Global Instance event_pred_persistent n e π : Persistent (event_pred n e π).
+  Global Instance event_pred_persistent n σ Θ κs π : Persistent (event_pred n σ Θ κs π).
   Proof. rewrite event_pred_unseal /event_pred_def. apply _. Qed.
-  Global Instance event_pred_timeless n e π : Timeless (event_pred n e π).
+  Global Instance event_pred_timeless n σ Θ κs π : Timeless (event_pred n σ Θ κs π).
   Proof. rewrite event_pred_unseal /event_pred_def. apply _. Qed.
 
-  Lemma history_interp_wf h n σ Θ :
-    history_interp h n σ Θ ⊢ ⌜ length h = (S n) ∧ last h = Some (σ, Θ) ⌝.
+  Lemma history_interp_wf h n σ Θ κs :
+    history_interp h n σ Θ κs ⊢ ⌜ length h = (S n) ∧ last h = Some (σ, Θ, κs) ⌝.
   Proof. rewrite /history_interp -lock. iIntros "[$ _]". Qed.
 
-  Lemma history_interp_lookup h n σ Θ :
-    history_interp h n σ Θ ⊢ ⌜ h !! n = Some (σ, Θ) ⌝.
+  Lemma history_interp_lookup h n σ Θ κs :
+    history_interp h n σ Θ κs ⊢ ⌜ h !! n = Some (σ, Θ, κs) ⌝.
   Proof.
     iIntros "HI". iPoseProof (history_interp_wf with "HI") as "%". destruct H.
     rewrite last_lookup H in H0. auto.
   Qed.
 
-  Lemma history_interp_step h n σ1 σ2 Θ1 Θ2 :
-    (history_interp h n σ1 Θ1)
-    ⊢ (state_interp σ1 Θ1) ∗
-    (state_interp σ2 Θ2 ==∗ history_interp (h ++ [(σ2, Θ2)]) (S n) σ2 Θ2).
+  Lemma history_interp_step h n σ1 σ2 Θ1 Θ2 κs1 κs2 :
+    (history_interp h n σ1 Θ1 κs1)
+    ⊢ (state_interp σ1 Θ1 κs1) ∗
+    (state_interp σ2 Θ2 κs2 ==∗ history_interp (h ++ [(σ2, Θ2, κs2)]) (S n) σ2 Θ2 κs2).
   Proof.
     rewrite /history_interp -!lock. iIntros "(%& Ha& $)". iIntros "SI".
-    iMod (hG_history_auth_app _ [(σ2, Θ2)] with "Ha") as "Ha". iFrame. iPureIntro.
+    iMod (hG_history_auth_app _ [(σ2, Θ2, κs2)] with "Ha") as "Ha". iFrame. iPureIntro.
     destruct H. rewrite length_app H last_app. simpl. split; auto. lia.
   Qed.
 
-  Lemma history_interp_event_pred_any m e π h n σ Θ :
-    (h !! m = Some e) →
-    (state_sat e.1 e.2 π) →
-    history_interp h n σ Θ ⊢ event_pred m e π.
+  Lemma history_interp_event_pred_any n σ Θ κs π h n' σ' Θ' κs' :
+    (h !! n = Some (σ, Θ, κs)) →
+    (state_sat σ Θ κs π) →
+    history_interp h n' σ' Θ' κs' ⊢ event_pred n σ Θ κs π.
   Proof.
-    rewrite /history_interp -lock event_pred_unseal /event_pred_def. iIntros (LU Sat) "(%& Ha& SI)".
-    destruct H. iPoseProof (hG_history_event _ _ _ LU with "Ha") as "#He".
+    rewrite /history_interp -lock event_pred_unseal /event_pred_def.
+    iIntros (LU Sat) "(%& Ha& SI)". destruct H. iPoseProof (hG_history_event _ _ _ LU with "Ha") as "#He".
     iFrame "He". auto.
   Qed.
 
-  Lemma history_interp_event_pred_now π h n σ Θ :
-    (state_sat σ Θ π) →
-    history_interp h n σ Θ ⊢ event_pred n (σ, Θ) π.
+  Lemma history_interp_event_pred_now π h n σ Θ κs :
+    (state_sat σ Θ κs π) →
+    history_interp h n σ Θ κs ⊢ event_pred n σ Θ κs π.
   Proof.
     iIntros (Sat) "HI". iPoseProof (history_interp_lookup with "HI") as "%".
     iApply (history_interp_event_pred_any with "HI"); eauto.
   Qed.
 
-  Lemma event_pred_history_interp_lookup h n σ Θ m e π :
-    history_interp h n σ Θ ∗ event_pred m e π ⊢ ⌜ h !! m = Some e ∧ state_sat e.1 e.2 π ⌝.
+  Lemma event_pred_history_interp_lookup n σ Θ κs π h n' σ' Θ' κs' :
+    history_interp h n' σ' Θ' κs' ∗ event_pred n σ Θ κs π ⊢ ⌜ h !! n = Some (σ, Θ, κs) ∧ state_sat σ Θ κs π ⌝.
   Proof.
     rewrite /history_interp -lock event_pred_unseal /event_pred_def. iIntros "((%& Ha& SI)& (#He& %))".
     destruct H. iPoseProof (hG_event_history_lookup with "[$Ha $He]") as "%". eauto.
@@ -178,14 +182,15 @@ Section hist.
 End hist.
 
 (* Allocation of a history interpretation. *)
-Lemma history_interp_init `{SI : indexT} `{HIST : !histGS Σ (prod St (gset positive))} `{SIC : !state_interp_class Σ St Π}
-  σ Θ :
-  state_interp σ Θ ⊢ |==> ∃ _ : histGS Σ (prod St (gset positive)), history_interp [(σ, Θ)] 0 σ Θ.
+Lemma history_interp_init `{SI : indexT} `{SIC : !state_interp_class Λ Σ state_pred} `{HIST : !histGS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
+  σ Θ κs :
+  state_interp σ Θ κs
+  ⊢ |==> ∃ _ : histGS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ))), history_interp [(σ, Θ, κs)] 0 σ Θ κs.
 Proof.
   iIntros "SI".
-  iMod (own_alloc (●ML ([(σ, Θ)] : list (leibnizO _)) : mono_listUR (leibnizO _))) as (γH) "HH";
+  iMod (own_alloc (●ML ([(σ, Θ, κs)] : list (leibnizO _)) : mono_listUR (leibnizO _))) as (γH) "HH";
     first by apply mono_list_auth_valid.
-  iModIntro; iExists (HistG SI _ (prod St (gset positive)) _ γH).
+  iModIntro; iExists (HistG SI _ _ _ γH).
   rewrite /history_interp -lock hG_history_auth_unseal /hG_history_auth_def. iFrame.
   iPureIntro. simpl. done.
 Qed.
