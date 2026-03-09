@@ -61,11 +61,53 @@ with tf_intuit `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_cl
             oblP_inv N k False%I False%I (tf_logic P)%I)%I
        | tf_until N k P Q =>
            (event_obl_alive i (n, Ω) k ∗
-            oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ i n Ω, event_obl i (n, Ω) k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q)%I)%I
+            oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ n σ Θ κs i Ω, event_obl i (n, Ω) k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q)%I)%I
        end.
 
 Global Arguments tf_logic {SI Λ Σ Π _ _ _ _}.
 Global Arguments tf_intuit {SI Λ Σ Π _ _ _ _}.
+
+Section proof.
+  Context `{SI : indexT} `{SIC : !state_interp_class Λ Σ Π} `{OCM : !ord_mono_fun_class}.
+  Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}.
+
+  Global Instance tf_intuit_persistent n σ Θ κs i Ω Φ : Persistent (tf_intuit n σ Θ κs i Ω Φ).
+  Proof.
+    induction Φ; simpl; apply _.
+  Qed.
+
+  Lemma tf_logic_tf_intuit Φ h n σ Θ κs m i Ω W :
+    (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ) ⊢ tf_intuit n σ Θ κs i Ω Φ.
+  Proof.
+    revert h n σ Θ κs m i Ω W. induction Φ; iIntros (?????????) "(HI& MI& TL)"; simpl; auto.
+    - rewrite /history_interp -lock. iDestruct "HI" as "(HI1& HI2& SI)".
+      iPoseProof (state_interp_wf with "[$SI $TL]") as "%".
+      iApply (history_interp_event_pred_now with "[HI1 HI2 SI]"). 1: auto.
+      rewrite /history_interp -lock. iFrame.
+    - iSplit.
+      + iDestruct "TL" as "[TL _]". iApply IHΦ1. iFrame.
+      + iDestruct "TL" as "[_ TL]". iApply IHΦ2. iFrame.
+    - iDestruct "TL" as "[TL | TL]".
+      + iLeft. iApply IHΦ1. iFrame.
+      + iRight. iApply IHΦ2. iFrame.
+    - iIntros (?). iPoseProof ("TL" with "[//]") as "TL". iApply IHΦ. iFrame.
+    - iIntros (?). iPoseProof ("TL" $! a) as "TL". iApply H0. iFrame.
+    - iDestruct "TL" as "(%& TL)". iExists a. iApply H0. iFrame.
+    - iDestruct "TL" as "[TL1 TL2]".
+      iPoseProof (IHΦ1 with "[$HI $MI $TL1]") as "#TI1". iPoseProof (IHΦ2 with "[$HI $MI $TL2]") as "#TI2".
+      eauto.
+    - iIntros (?). iPoseProof ("TL" with "[//]") as "TL". iApply IHΦ. iFrame.
+    - iDestruct "TL" as "[OA #TL]". iFrame "TL". iDestruct "MI" as "(MI& S& MI2)".
+      iEval (unfold_opreds) in "OA". iDestruct "OA" as "(#OE& OA)".
+      iPoseProof (osat_lookup_alive with "[$S $OE $OA]") as "%". destruct H0 as [(?&?&?) | ?].
+      + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
+        rewrite /event_obl_alive. eauto.
+      + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
+        rewrite /event_obl_alive. eauto.
+  Qed.
+
+End proof.
+
 
 TODO
 
