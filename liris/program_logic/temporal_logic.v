@@ -17,54 +17,55 @@ Section aux.
 
 End aux.
 
-Fixpoint tf_logic `{SI : indexT} `{!mupdGS Σ} `{!histGS.histGS Σ (St * gset positive)} `{!state_interp_class Σ St Π}
+Fixpoint tf_logic `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class}
+  `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   (Φ : @tf SI Σ Π) : iProp Σ :=
   match Φ with
   | tf_emp => emp%I
-  | tf_atomic π => (state_pred π)%I
+  | tf_atomic π => (state_pred_interp π)%I
   | tf_pure p => (⌜p⌝)%I
   | tf_ghost p => p%I
   | tf_and P Q => (tf_logic P ∧ tf_logic Q)%I
   | tf_or P Q => (tf_logic P ∨ tf_logic Q)%I
-  | tf_impl P Q => (tf_logic P → tf_logic Q)%I
+  | tf_impl P Q => (⌜P⌝ → tf_logic Q)%I
   | tf_forall A P => (∀ (a : A), tf_logic (P a))%I
   | tf_exist A P => (∃ (a : A), tf_logic (P a))%I
   | tf_sep P Q => (tf_logic P ∗ tf_logic Q)%I
-  | tf_wand P Q => (tf_logic P -∗ tf_logic Q)%I
+  | tf_wand P Q => (⌜P⌝ -∗ tf_logic Q)%I
   | tf_pers P => (□ (tf_logic P))%I
   | tf_always N k P =>
-      (oblP_expired k ∗ oblP_inv N k False%I False%I (tf_logic P)%I)%I
+      (oblP_expired k ∗
+       oblP_inv N k False%I False%I (tf_logic P)%I)%I
   | tf_until N k P Q =>
       (oblP_alive k (1/2)%Qp ∗
-       oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ i n, event_obl i n k obl_fulfilled ∗ tf_intuit i n Q)%I)%I
+       oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ n σ Θ κs i Ω, event_obl i (n, Ω) k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q)%I)%I
   end
-with tf_intuit `{SI : indexT} `{!mupdGS Σ} `{!histGS.histGS Σ (St * gset positive)} `{!state_interp_class Σ St Π}
-       i n (Φ : @tf SI Σ Π) : iProp Σ :=
+with tf_intuit `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class}
+       `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
+       n σ Θ κs i Ω (Φ : @tf SI Σ Π) : iProp Σ :=
        match Φ with
        | tf_emp => emp%I
-       | tf_atomic π => (event_pred n π)%I
+       | tf_atomic π => (event_pred n σ Θ κs π)%I
        | tf_pure p => (⌜p⌝)%I
        | tf_ghost p => True%I
-       | tf_and P Q => (tf_intuit i n P ∧ tf_intuit i n Q)%I
-       | tf_or P Q => (tf_intuit i n P ∨ tf_intuit i n Q)%I
-       (* Not persistent in general *)
-       | tf_impl P Q => True%I
-       (* | tf_impl P Q => (tf_intuit i n P → tf_intuit i n Q)%I *)
-       | tf_forall A P => (∀ (a : A), tf_intuit i n (P a))%I
-       | tf_exist A P => (∃ (a : A), tf_intuit i n (P a))%I
-       | tf_sep P Q => (tf_intuit i n P ∗ tf_intuit i n Q)%I
-       (* Not persistent in general *)
-       | tf_wand P Q => True%I
-       (* | tf_wand P Q => (tf_intuit i n P -∗ tf_intuit i n Q)%I *)
+       | tf_and P Q => (tf_intuit n σ Θ κs i Ω P ∧ tf_intuit n σ Θ κs i Ω Q)%I
+       | tf_or P Q => (tf_intuit n σ Θ κs i Ω P ∨ tf_intuit n σ Θ κs i Ω Q)%I
+       | tf_impl P Q => (⌜P⌝ → tf_intuit n σ Θ κs i Ω Q)%I
+       | tf_forall A P => (∀ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
+       | tf_exist A P => (∃ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
+       | tf_sep P Q => (tf_intuit n σ Θ κs i Ω P ∗ tf_intuit n σ Θ κs i Ω Q)%I
+       | tf_wand P Q => (⌜P⌝ -∗ tf_intuit n σ Θ κs i Ω Q)%I
        | tf_pers P => (□ (tf_logic P))%I
        | tf_always N k P =>
-           (oblP_expired k ∗ oblP_inv N k False%I False%I (tf_logic P)%I)%I
+           (oblP_expired k ∗
+            oblP_inv N k False%I False%I (tf_logic P)%I)%I
        | tf_until N k P Q =>
-           (oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ i n, event_obl i n k obl_fulfilled ∗ tf_intuit i n Q)%I)%I
+           (event_obl_alive i (n, Ω) k ∗
+            oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ i n Ω, event_obl i (n, Ω) k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q)%I)%I
        end.
 
-Global Arguments tf_logic {SI Σ _ St _ Π _}.
-Global Arguments tf_intuit {SI Σ _ St _ Π _}.
+Global Arguments tf_logic {SI Λ Σ Π _ _ _ _}.
+Global Arguments tf_intuit {SI Λ Σ Π _ _ _ _}.
 
 TODO
 
@@ -92,7 +93,7 @@ Fixpoint tf_full_state `{SI : indexT} `{!state_interp_class Σ St Π}
          ( Ω !! k = Some obl_fulfilled ∧ tf_full_state Q σ Θ n Ω))
   end.
 
-(* When k fulfills Q, obl_inv k keeps ∃ i n, event_obl i n k obl_fulfilled ∗ tf_intuit i n Q.
+(* When k fulfills Q, obl_inv k keeps ∃ i n, event_obl i n k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q.
    With this and full history interp, we retrieve the prefix of history-predicate that says Q is fulfilled. *)
 (** Interpretation of tf to intuitionistical predicates. *)
 Fixpoint tf_intuit `{SI : indexT} `{!mupdGS Σ} `{!histGS.histGS Σ (St * gset positive)} `{!state_interp_class Σ St Π}
@@ -102,33 +103,33 @@ Fixpoint tf_intuit `{SI : indexT} `{!mupdGS Σ} `{!histGS.histGS Σ (St * gset p
   | tf_atomic π => (event_pred n π)%I
   | tf_pure p => (⌜p⌝)%I
   | tf_ghost p => True%I
-  | tf_and P Q => (tf_intuit i n P ∧ tf_intuit i n Q)%I
-  | tf_or P Q => (tf_intuit i n P ∨ tf_intuit i n Q)%I
-  | tf_impl P Q => (tf_intuit i n P → tf_intuit i n Q)%I
-  | tf_forall A P => (∀ (a : A), tf_intuit i n (P a))%I
-  | tf_exist A P => (∃ (a : A), tf_intuit i n (P a))%I
-  | tf_sep P Q => (tf_intuit i n P ∗ tf_intuit i n Q)%I
-  | tf_wand P Q => (tf_intuit i n P -∗ tf_intuit i n Q)%I
-  | tf_pers P => (□ (tf_intuit i n P))%I (** Should just be P if want to use this in logic... *)
+  | tf_and P Q => (tf_intuit n σ Θ κs i Ω P ∧ tf_intuit n σ Θ κs i Ω Q)%I
+  | tf_or P Q => (tf_intuit n σ Θ κs i Ω P ∨ tf_intuit n σ Θ κs i Ω Q)%I
+  | tf_impl P Q => (tf_intuit n σ Θ κs i Ω P → tf_intuit n σ Θ κs i Ω Q)%I
+  | tf_forall A P => (∀ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
+  | tf_exist A P => (∃ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
+  | tf_sep P Q => (tf_intuit n σ Θ κs i Ω P ∗ tf_intuit n σ Θ κs i Ω Q)%I
+  | tf_wand P Q => (tf_intuit n σ Θ κs i Ω P -∗ tf_intuit n σ Θ κs i Ω Q)%I
+  | tf_pers P => (□ (tf_intuit n σ Θ κs i Ω P))%I (** Should just be P if want to use this in logic... *)
   | tf_always N k P =>
-      (oblP_expired k ∗ (tf_intuit i n P))%I (** P should always be P, not like this... *)
-  (* (oblP_expired k ∗ oblP_inv N k ⌜ False ⌝ ⌜ False ⌝ (tf_intuit i n P))%I (** P should always be P, not like this... *) *)
+      (oblP_expired k ∗ (tf_intuit n σ Θ κs i Ω P))%I (** P should always be P, not like this... *)
+  (* (oblP_expired k ∗ oblP_inv N k ⌜ False ⌝ ⌜ False ⌝ (tf_intuit n σ Θ κs i Ω P))%I (** P should always be P, not like this... *) *)
   | tf_until N k P Q =>
-      ((∃ f o, event_obl i n k (obl_assigned f o) ∗ tf_intuit i n P) ∨
-         (event_obl i n k (obl_fulfilled) ∗ tf_intuit i n Q))
+      ((∃ f o, event_obl i n k (obl_assigned f o) ∗ tf_intuit n σ Θ κs i Ω P) ∨
+         (event_obl i n k (obl_fulfilled) ∗ tf_intuit n σ Θ κs i Ω Q))
         (* ((∃ f o, event_obl i n k (obl_assigned f o) ∗ *)
-        (*          oblP_inv N k (tf_intuit i n P) (∃ j m, tf_intuit j m Q) (∃ j m, event_obl j m k obl_fulfilled ∗ tf_intuit j m Q)) ∨ *)
+        (*          oblP_inv N k (tf_intuit n σ Θ κs i Ω P) (∃ j m, tf_intuit j m Q) (∃ j m, event_obl j m k obl_fulfilled ∗ tf_intuit j m Q)) ∨ *)
         (*    (event_obl i n k (obl_fulfilled) ∗ *)
-        (*     oblP_inv N k (∃ j m, tf_intuit j m P) (tf_intuit i n Q) (event_obl i n k obl_fulfilled ∗ tf_intuit i n Q))) *)
+        (*     oblP_inv N k (∃ j m, tf_intuit j m P) (tf_intuit n σ Θ κs i Ω Q) (event_obl i n k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q))) *)
   end.
 Global Arguments tf_intuit {SI Σ _ St _ Π _}.
 
-(** (tf_logic P ∗ full_history_interp h i n) -∗ tf_intuit i n P
-    tf_intuit i n P ∗ full_history_interp h j m → ∃ (e : full state), h !! i = Some e ∧ tf_full_state P e
+(** (tf_logic P ∗ full_history_interp h i n) -∗ tf_intuit n σ Θ κs i Ω P
+    tf_intuit n σ Θ κs i Ω P ∗ full_history_interp h j m → ∃ (e : full state), h !! i = Some e ∧ tf_full_state P e
     h !! i = Some e ∧ tf_full_state P e ∗ ... → tf_trace_might_expired P tr
     Need to prove tf_trace_might_expired P tr first, and use it in the inductive case.
-    Namely, tr_trace_might_expired P tr ∧ tf_intuit i n (where i n are current) → tf_trace P tr.
-    Of course, tf_logic P ∗ full_history_interp h i n ⊢ tf_intuit i n should hold,
+    Namely, tr_trace_might_expired P tr ∧ tf_intuit n σ Θ κs i Ω (where i n are current) → tf_trace P tr.
+    Of course, tf_logic P ∗ full_history_interp h i n ⊢ tf_intuit n σ Θ κs i Ω should hold,
     so we get tf_intuit for the current state at the initial state of the program.
  *)
 
