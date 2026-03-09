@@ -27,7 +27,7 @@ Section lifting.
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={∅,E}=>
                                       history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
-                                      (|={E}=>m ν e2 efs))))
+                                      (ν e2 efs))))
     ⊢ lwp_step s i E e1 ν.
   Proof.
     iIntros "H". iIntros (??????? ??) "SI".
@@ -39,7 +39,7 @@ Section lifting.
     { eapply fork_thread_ids; eauto. }
     iIntros "!> !> Efs".
     iMod ("H" with "[//] GOs Ws Efs") as "H". iModIntro.
-    iMod "H". iMod "H" as "[HI H]". rewrite -dom_union_L. iMod ("H" with "HI") as "[HI H]". by iFrame.
+    iMod "H". iMod "H" as "[HI H]". by iFrame.
   Qed.
 
   Lemma lwp_lift_step s i E e1 Φ :
@@ -55,19 +55,17 @@ Section lifting.
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={∅,E}=>
                                       history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
-                                      (|={E}=>m lWP e2 @ s; i; E {{ Φ }}) ∗
-                                      [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+                                      (lWP e2 @ s; i; E {{ Φ }}) ∗
+                                      [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
-    iIntros (EQ) "H". rewrite lwp_unfold /lwp_pre. rewrite EQ.
-    (* destruct (to_val e1) eqn:He. *)
-    (* { iIntros "%%%%% I". iMod ("H" $! id _ _ _ [] with "[] [//] I") as "((%&%)& _)". done. } *)
+    iIntros (EQ) "H". rewrite lwp_unfold_fix lwp_fix_unfold /lwp_pre. iModIntro. rewrite EQ.
     iApply lwp_step_step. iIntros (??????? ??) "I".
-    iMod ("H" with "[//] [//] I") as "(%& H)". destruct H1 as [_ H1].
+    iMod ("H" $! K with "[//] [//] I") as "(%& H)". destruct H1 as [_ H1].
     iModIntro. iSplitR; first done. iDestruct "H" as "(%& $& $& %& $& H)".
     iIntros (????). iMod ("H" with "[//]") as "H". iIntros "!> TG RWs Efs".
-    iMod ("H" with "TG RWs Efs") as "H". iMod "H" as "[$ [H Efs]]". iModIntro.
-    iMod "H". by iFrame.
+    iMod ("H" with "TG RWs Efs") as "H". iMod "H" as "[$ [H Efs]]". iModIntro. iFrame.
+    iApply (big_sepM_impl with "Efs"). iIntros "!> %%% H". by iModIntro.
   Qed.
 
   Local Hint Resolve reducible_no_obs_reducible : core.
@@ -88,11 +86,12 @@ Section lifting.
 
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
-    (∀ h n σ κ Θ, history_interp h n σ Θ κ ={E,∅}=∗ ⌜ stuck i e σ (dom Θ) ⌝)
+    (∀ K h n σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →
+                    history_interp h n σ Θ κ ={E,∅}=∗ ⌜ stuck i e σ (dom Θ) ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
-    rewrite lwp_unfold /lwp_pre /lwp_step =>->. iIntros "H" (K h n σ κ κs Θ ??) "Hσ".
-    iMod ("H" with "Hσ") as "[% %Hirr]".
+    rewrite lwp_unfold /lwp_pre /lwp_step =>->.
+    iIntros "H !>" (K h n σ Θ κ κs ??) "Hσ". iMod ("H" $! K with "[//] [//] Hσ") as "[% %Hirr]".
     iModIntro. iSplit; first done.
     iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
   Qed.

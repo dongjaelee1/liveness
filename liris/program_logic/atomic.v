@@ -54,7 +54,7 @@ example where we want it to be anything else.
 For the non-atomic post-condition, we use an [option PROP], combined with a
 [-∗?]. This is to avoid introducing spurious [True -∗] into proofs that do not
 need a non-atomic post-condition (which is most of them). *)
-Definition atomic_wp `{SI : indexT} `{!lirisGS Λ Σ} {TA TB TP : tele}
+Definition atomic_lwp `{SI : indexT} `{!lirisGS Λ Σ} {TA TB TP : tele}
   (i : thread_id)
   (e : expr Λ) (* expression *)
   (E : coPset) (* *implementation* mask *)
@@ -74,7 +74,7 @@ Definition atomic_wp `{SI : indexT} `{!lirisGS Λ Σ} {TA TB TP : tele}
 Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' z1 .. zn , 'RET' v ; POST '}>>'" :=
 (* The way to read the [tele_app foo] here is that they convert the n-ary
 function [foo] into a unary function taking a telescope as the argument. *)
-  (atomic_wp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+  (atomic_lwp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
              (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
              (TP:=TeleS (λ z1, .. (TeleS (λ zn, TeleO)) .. ))
              i
@@ -111,7 +111,7 @@ else is missing. Below we declare the 8 notations that involve no RET binders.
 
 (* No RET binders *)
 Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' 'RET' v ; POST '}>>'" :=
-  (atomic_wp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+  (atomic_lwp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
              (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
              (TP:=TeleO)
              i
@@ -134,7 +134,7 @@ Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β 
 
 (* No ∃∃ binders, no RET binders *)
 Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' β '|' 'RET' v ; POST '}>>'" :=
-  (atomic_wp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+  (atomic_lwp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
              (TB:=TeleO)
              (TP:=TeleO)
              i
@@ -155,7 +155,7 @@ Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' β '|' 'RET' v ; POST
 
 (* No ∀∀ binders, no RET binders *)
 Notation "'<<{' α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' 'RET' v ; POST '}>>'" :=
-  (atomic_wp (TA:=TeleO)
+  (atomic_lwp (TA:=TeleO)
              (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
              (TP:=TeleO)
              i
@@ -172,7 +172,7 @@ Notation "'<<{' α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' 'RET' v ; POST
 
 (* No ∀∀ binders, no ∃∃ binders, no RET binders *)
 Notation "'<<{' α '}>>' e @ i ; E '<<{' β '|' 'RET' v ; POST '}>>'" :=
-  (atomic_wp (TA:=TeleO)
+  (atomic_lwp (TA:=TeleO)
              (TB:=TeleO)
              (TP:=TeleO)
              i
@@ -189,7 +189,7 @@ Notation "'<<{' α '}>>' e @ i ; E '<<{' β '|' 'RET' v ; POST '}>>'" :=
 
 (* No RET binders, no POST *)
 Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' 'RET' v '}>>'" :=
-  (atomic_wp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+  (atomic_lwp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
              (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
              (TP:=TeleO)
              i
@@ -212,7 +212,7 @@ Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β 
 
 (* No ∃∃ binders, no RET binders, no POST *)
 Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' β '|' 'RET' v '}>>'" :=
-  (atomic_wp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
+  (atomic_lwp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
              (TB:=TeleO)
              (TP:=TeleO)
              i
@@ -229,7 +229,7 @@ Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' β '|' 'RET' v '}>>'"
 
 (* No ∀∀ binders, no RET binders, no POST *)
 Notation "'<<{' α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' 'RET' v '}>>'" :=
-  (atomic_wp (TA:=TeleO)
+  (atomic_lwp (TA:=TeleO)
              (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
              (TP:=TeleO)
              i
@@ -246,7 +246,7 @@ Notation "'<<{' α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' 'RET' v '}>>'"
 
 (* No ∀∀ binders, no ∃∃ binders, no RET binders, no POST *)
 Notation "'<<{' α '}>>' e @ i ; E '<<{' β '|' 'RET' v '}>>'" :=
-  (atomic_wp (TA:=TeleO)
+  (atomic_lwp (TA:=TeleO)
              (TB:=TeleO)
              (TP:=TeleO)
              i
@@ -268,8 +268,8 @@ Section lemmas.
   Implicit Types (α : TA → iProp) (β : TA → TB → iProp) (POST : TA → TB → TP → option iProp) (f : TA → TB → TP → val Λ).
 
   (* Atomic triples imply sequential triples. *)
-  Lemma atomic_wp_seq i e E α β POST f :
-    atomic_wp i e E α β POST f -∗
+  Lemma atomic_lwp_seq i e E α β POST f :
+    atomic_lwp i e E α β POST f -∗
     ∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ lWP e @ i {{ Φ }}.
   Proof.
     iIntros "Hwp" (Φ x) "Hα HΦ".
@@ -279,24 +279,34 @@ Section lemmas.
     rewrite ->!tele_app_bind. iIntros (z) "Hpost HΦ". iApply ("HΦ" with "Hβ Hpost").
   Qed.
 
-  (* Sequential triples with the empty mask for a physically atomic [e] are atomic. *)
-  Lemma atomic_seq_wp_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} :
-    (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ lWP e @ i; ∅ {{ Φ }}) -∗
-    atomic_wp i e E α β POST f.
+  (* Sequential (fix) triples with the empty mask for a physically atomic [e] are atomic. *)
+  Lemma atomic_seq_lwp_fix_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} :
+    (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ (lwp_fix NotStuck i ∅ e Φ)) -∗
+    atomic_lwp i e E α β POST f.
   Proof.
-    iIntros "Hwp" (Φ) "AU". iMod "AU" as (x) "[Hα [_ Hclose]]".
-    iApply ("Hwp" with "Hα"). iIntros "%y Hβ %z Hpost".
+    iIntros "Hwp" (Φ) "AU". rewrite lwp_unfold_fix. iModIntro.
+    iMod "AU" as (x) "[Hα [_ Hclose]]". iApply ("Hwp" with "Hα"). iIntros "%y Hβ %z Hpost".
     iMod ("Hclose" with "Hβ") as "HΦ".
     rewrite ->!tele_app_bind. iApply "HΦ". done.
   Qed.
 
+  (* Lemma atomic_seq_wp_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} : *)
+  (*   (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ lWP e @ i; ∅ {{ Φ }}) -∗ *)
+  (*   atomic_lwp i e E α β POST f. *)
+  (* Proof. *)
+  (*   iIntros "Hwp" (Φ) "AU". iMod "AU" as (x) "[Hα [_ Hclose]]". *)
+  (*   iApply ("Hwp" with "Hα"). iIntros "%y Hβ %z Hpost". *)
+  (*   iMod ("Hclose" with "Hβ") as "HΦ". *)
+  (*   rewrite ->!tele_app_bind. iApply "HΦ". done. *)
+  (* Qed. *)
+
   (** Sequential triples with a persistent precondition and no initial quantifier
   are atomic. *)
-  Lemma persistent_seq_wp_atomic i e E (α : [tele] → iProp) (β : [tele] → TB → iProp)
+  Lemma persistent_seq_lwp_atomic i e E (α : [tele] → iProp) (β : [tele] → TB → iProp)
       (POST : [tele] → TB → TP → option iProp) (f : [tele] → TB → TP → val Λ)
       {HP : Persistent (α [tele_arg])} :
     (∀ Φ, α [tele_arg] -∗ (∀.. y, β [tele_arg] y -∗ ∀.. z, POST [tele_arg] y z -∗? Φ (f [tele_arg] y z)) -∗ lWP e @ i {{ Φ }}) -∗
-    atomic_wp i e E α β POST f.
+    atomic_lwp i e E α β POST f.
   Proof.
     simpl in HP. iIntros "Hwp" (Φ) "HΦ". iApply fupd_lwp.
     iMod ("HΦ") as "[#Hα [Hclose _]]". iMod ("Hclose" with "Hα") as "HΦ".
@@ -306,8 +316,8 @@ Section lemmas.
     rewrite ->!tele_app_bind. iApply "HΦ". done.
   Qed.
 
-  Lemma atomic_wp_mask_weaken i e E1 E2 α β POST f :
-    E1 ⊆ E2 → atomic_wp i e E1 α β POST f -∗ atomic_wp i e E2 α β POST f.
+  Lemma atomic_lwp_mask_weaken i e E1 E2 α β POST f :
+    E1 ⊆ E2 → atomic_lwp i e E1 α β POST f -∗ atomic_lwp i e E2 α β POST f.
   Proof.
     iIntros (HE) "Hwp". iIntros (Φ) "AU". iApply "Hwp".
     iApply atomic_update_mask_weaken; last done. set_solver.
@@ -315,10 +325,10 @@ Section lemmas.
 
   (** We can open invariants around atomic triples.
       (Just for demonstration purposes; we always use [iInv] in proofs.) *)
-  Lemma atomic_wp_inv i e E α β POST f N I :
+  Lemma atomic_lwp_inv i e E α β POST f N I :
     ↑N ⊆ E →
-    atomic_wp i e (E ∖ ↑N) (λ.. x, ▷ I ∗ α x) (λ.. x y, ▷ I ∗ β x y) POST f -∗
-    inv N I -∗ atomic_wp i e E α β POST f.
+    atomic_lwp i e (E ∖ ↑N) (λ.. x, ▷ I ∗ α x) (λ.. x y, ▷ I ∗ β x y) POST f -∗
+    inv N I -∗ atomic_lwp i e E α β POST f.
   Proof.
     intros ?. iIntros "Hwp #Hinv" (Φ) "AU". iApply "Hwp". iAuIntro.
     iInv N as "HI". iApply (aacc_aupd with "AU"); first solve_ndisj.
