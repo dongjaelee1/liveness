@@ -959,13 +959,21 @@ Section proofmode_classes.
       fupd_frame_r wand_elim_r fupd_lwp.
   Qed.
 
-  (* Global Instance elim_modal_sfmupd_lwp p s i E e P Φ : *)
-  (*   ElimModal True p false (|={E}=>m P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
-  (* Proof. *)
-  (*   rewrite /ElimModal intuitionistically_if_elim. *)
-  (*   iIntros (_) "[P H]". iApply sfmupd_elim_lwp. iMod "P". *)
-  (*   iModIntro. by iApply ("H" with "P"). *)
-  (* Qed. *)
+  Global Instance elim_modal_sfmupd_lwp p s i E e P Φ :
+    ElimModal True p false (|={E}=>m P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}).
+  Proof.
+    rewrite /ElimModal intuitionistically_if_elim.
+    iIntros (_) "[P H]". iApply sfmupd_elim_lwp. iMod "P".
+    iModIntro. by iApply ("H" with "P").
+  Qed.
+
+  Global Instance elim_modal_lwpupd_lwp p s i E e P Φ :
+    ElimModal True p false (lwpupd i E e P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}).
+  Proof.
+    rewrite /ElimModal intuitionistically_if_elim.
+    iIntros (_) "[P H]". iApply lwpupd_elim_lwp. iMod "P".
+    iModIntro. by iApply ("H" with "P").
+  Qed.
 
   (** Error message instance for non-mask-changing view shifts.
   Also uses a slightly different error: we cannot apply [fupd_mask_subseteq]
