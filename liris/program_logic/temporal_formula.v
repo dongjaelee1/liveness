@@ -3,6 +3,7 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import iprop.
 From stdpp Require Import namespaces.
 From liris.base_logic Require Import obligation.
+From liris.prelude Require Import ordinal_facts.
 
 (** Syntax for writing temporal formulae; cf., LTL, CTL*. *)
 Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
@@ -70,26 +71,27 @@ Definition tf_strongrelease `{SI : indexT} {Σ} {Π} N k b (P Q : @tf SI Σ Π) 
   (tf_until N k b Q (Q ∗ P))%F.
 Global Arguments tf_strongrelease {SI Σ Π}.
 
-(* Fixpoint tf_depth `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : tf) : nat := *)
-(*   match Φ with *)
-(*   | tf_emp => 1 *)
-(*   | tf_atomic π => 1 *)
-(*   | tf_pure p => 1 *)
-(*   | tf_ghost p => 1 *)
-(*   | tf_and P Q => (tf_depth P + tf_depth Q) *)
-(*   | tf_or P Q => (tf_depth P + tf_depth Q) *)
-(*   | tf_impl P Q => (1 + tf_depth Q) *)
-(*   | tf_forall A P => (tf_depth (P a)) *)
-(*   | tf_exist A P => (∃ (a : A), tf_depth (P a))%I *)
-(*   | tf_sep P Q => (tf_depth P ∗ tf_depth Q)%I *)
-(*   | tf_wand P Q => (⌜P⌝ -∗ tf_depth Q)%I *)
-(*   | tf_pers P => (□ (tf_depth P))%I *)
-(*   | tf_always N k P => *)
-(*       (oblP_expired k ∗ *)
-(*        oblP_inv N k False%I False%I (tf_depth P)%I)%I *)
-(*   | tf_until N k P Q => *)
-(*       (oblP_assigned k (1/2)%Qp ∗ *)
-(*        oblP_inv N k (tf_depth P)%I (tf_depth Q)%I *)
-(*          (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ *)
-(*                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I *)
-(*   end *)
+Fixpoint tf_depth `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : @tf SI Σ Π) : Ord.t :=
+  match Φ with
+  | tf_emp => Ord.one
+  | tf_atomic π => Ord.one
+  | tf_pure p => Ord.one
+  | tf_ghost p => Ord.one
+  | tf_and P Q => (tf_depth P ⊕ tf_depth Q)%ord
+  | tf_or P Q => (tf_depth P ⊕ tf_depth Q)%ord
+  | tf_impl P Q => (Ord.S (tf_depth Q))%ord
+  | tf_forall A P => (Ord.build (λ (a: A), tf_depth (P a)))%ord
+  | tf_exist A P => (Ord.build (λ (a: A), tf_depth (P a)))%ord
+  | tf_sep P Q => (tf_depth P ⊕ tf_depth Q)%ord
+  | tf_wand P Q => (Ord.S (tf_depth Q))%ord
+  | tf_pers P => (Ord.S (tf_depth P))%ord
+  | tf_always N k P => (Ord.S (tf_depth P))%ord
+  | tf_until N k b P Q => (tf_depth P ⊕ tf_depth Q)%ord
+  end.
+
+Section proof.
+  Local Open Scope ord.
+
+(* Ord.build_upperbound: ∀ [A : Type] (os : A → Ord.t) (a : A), (os a < Ord.build os)%ord *)
+
+End proof.
