@@ -233,18 +233,19 @@ Section sfmupd.
   Proof. rewrite /Frame=><-. by rewrite sfmupd_frame_l. Qed.
 
   (** Update rules *)
-  Lemma obl_alloc_assigned E i G q ℓ μ :
+  Lemma obl_alloc_assigned E i G q b ℓ μ :
     thP_obls i G q -∗
     |={E}=>m ∃ k, (⌜ k ∉ G ⌝) ∗
                  thP_obls i ({[k]} ∪ G) q ∗
+                 oblP_assigned k b (1/2)%Qp ∗
                  oblP_alive k 1 ∗
                  oblP_layer k ℓ ∗
                  oblP_id k ∗
                  oblP_fuel k ℓ μ ∗
                  witP_layer k ℓ ∗
-                 (∀ E' N (P Q R : iProp Σ), (▷ P) ={E'}=∗ oblP_inv N k P Q R).
+                 (∀ E' N (P Q R : iProp Σ), (▷ (if b then Q ∗ R else P)) ={E'}=∗ oblP_inv N k P Q R).
   Proof.
-    iIntros "Tb %%%%% $". iMod (obl_alloc_assigned_mupd with "Tb") as "(%& $& $& $& $& $& $& $& H)". by iModIntro.
+    iIntros "Tb %%%%% $". iMod (obl_alloc_assigned_mupd with "Tb") as "(%& $& $& $& $& $& $& $& $& H)". by iModIntro.
   Qed.
 
   Lemma obl_alloc_fulfilled E ℓ μ :
@@ -263,34 +264,50 @@ Section sfmupd.
     iIntros "%%%%% $". iMod (obl_alloc_expired_mupd) as "(%& $& $& $& $& $& $)". by iModIntro.
   Qed.
 
-  Lemma obl_fulfill E i G q N k P Q R :
+  Lemma obl_assigned_to_true E N k P Q R :
     ↑N ⊆ E →
-    k ∈ G →
-    thP_obls i G q -∗
     oblP_inv N k P Q R -∗
-    |={E,E ∖ ↑N}=> (▷ (thP_obls i G q ∗ oblP_assigned k ∗ P)) ∗
-                  (thP_obls i G q -∗
-                   oblP_assigned k -∗
-                   ∀ E', |={E'}=>m (thP_obls i (G ∖ {[k]}) q ∗ oblP_fulfilled k) ∗
-                                ((▷ (Q ∗ R)) ={E ∖ ↑N,E}=∗ True)).
+    |={E,E ∖ ↑N}=> oblP_assigned k false (1/2)%Qp -∗
+                  ((▷ (oblP_assigned k false 1 ∗ P)) ∗
+                   (∀ b, oblP_assigned k b 1 -∗
+                         ∀ E', |={E'}=>m (oblP_assigned k true (1/2)%Qp) ∗
+                                      ((▷ (Q ∗ R)) ={E ∖ ↑N,E}=∗ True))).
   Proof.
-    iIntros (Mask LUGk) "Tb Gv". iMod (obl_fulfill_mupd with "Tb Gv") as "[$ H]". 1,2: eauto.
-    iIntros "!> Tb Gl". iPoseProof ("H" with "Tb Gl") as "H".
+    iIntros (MASK) "#Gv". iMod (obl_assigned_to_true_mupd with "Gv") as "H". 1: auto.
+    iIntros "!> Ga". iPoseProof ("H" with "Ga") as "[$ ACC]". iIntros "% Ga". iPoseProof ("ACC" with "Ga") as "H".
     iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
 
-  Lemma obl_expire E k qc N (P Q R : iProp Σ) :
+  Lemma obl_fulfill E N k P Q R :
     ↑N ⊆ E →
-    oblP_fulfilled k -∗
-    oblP_alive k qc -∗
     oblP_inv N k P Q R -∗
-    |={E,E ∖ ↑N}=> (▷ (oblP_alive k qc ∗ Q ∗ R)) ∗
-                  (oblP_alive k 1 -∗
-                   ∀ E', |={E'}=>m (oblP_expired k) ∗
-                                ((▷ R) ={E ∖ ↑N,E}=∗ True)).
+    |={E,E ∖ ↑N}=> ∀ i G q1 q2,
+    (⌜k ∈ G⌝) → thP_obls i G q1 -∗ oblP_assigned k true q2 -∗
+    ((▷ (thP_obls i G q1 ∗ oblP_assigned k true q2 ∗ oblP_assigned k true (1/2) ∗ Q ∗ R)) ∗
+     (thP_obls i G q1 -∗
+      oblP_assigned k true 1 -∗
+      ∀ E', |={E'}=>m (thP_obls i (G ∖ {[k]}) q1 ∗ oblP_fulfilled k) ∗
+                   ((▷ (Q ∗ R)) ={E ∖ ↑N,E}=∗ True))).
   Proof.
-    iIntros (Mask) "#Gf Ga #GV". iMod (obl_expire_mupd with "Gf Ga GV") as "[$ H]". 1: eauto.
-    iIntros "!> Ga". iPoseProof ("H" with "Ga") as "H".
+    iIntros (MASK) "#Gv". iMod (obl_fulfill_mupd with "Gv") as "H". 1: auto.
+    iIntros "!> %%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
+    iPoseProof ("ACC" with "TG Ga") as "H".
+    iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
+  Qed.
+
+  Lemma obl_expire E k N (P Q R : iProp Σ) :
+    ↑N ⊆ E →
+    oblP_inv N k P Q R -∗
+    |={E,E ∖ ↑N}=> ∀ qc,
+    oblP_fulfilled k -∗ oblP_alive k qc -∗
+    ((▷ (oblP_alive k qc ∗ Q ∗ R)) ∗
+     (oblP_alive k 1 -∗
+      ∀ E', |={E'}=>m (oblP_expired k) ∗
+                   ((▷ R) ={E ∖ ↑N,E}=∗ True))).
+  Proof.
+    iIntros (MASK) "#Gv". iMod (obl_expire_mupd with "Gv") as "H". 1: auto.
+    iIntros "!> % #Gf Ga". iPoseProof ("H" with "Gf Ga") as "[$ ACC]". iIntros "Ga".
+    iPoseProof ("ACC" with "Ga") as "H".
     iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
 

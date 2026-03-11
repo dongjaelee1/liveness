@@ -22,7 +22,7 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
 | tf_pers (P : tf)
 | tf_always (N : namespace) (k : oid) (P : tf)
 (** P until Q, using namespace N and oid k. *)
-| tf_until (N : namespace) (k : oid) (P Q : tf)
+| tf_until (N : namespace) (k : oid) (b : bool) (P Q : tf)
 .
 
 Global Arguments tf {SI Σ Π}.
@@ -50,22 +50,46 @@ Notation "□ P" := (tf_pers P%F) : tf_scope.
 
 (** Define patterns corresponding to LTL temporal properties. *)
 (* Eventually P *)
-Definition tf_eventually `{SI : indexT} {Σ} {Π} N k (P : @tf SI Σ Π) : tf :=
-  (tf_until N k ⌜ True ⌝ P)%F.
+Definition tf_eventually `{SI : indexT} {Σ} {Π} N k b (P : @tf SI Σ Π) : tf :=
+  (tf_until N k b ⌜ True ⌝ P)%F.
 Global Arguments tf_eventually {SI Σ Π}.
 
 (* P Weak until Q *)
-Definition tf_weakuntil `{SI : indexT} {Σ} {Π} N k (P Q : @tf SI Σ Π) : tf :=
-  (tf_until N k P (Q ∨ ∃ k', tf_always N k' P))%F.
+Definition tf_weakuntil `{SI : indexT} {Σ} {Π} N k b (P Q : @tf SI Σ Π) : tf :=
+  (tf_until N k b P (Q ∨ ∃ k', tf_always N k' P))%F.
 (*   (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
 Global Arguments tf_weakuntil {SI Σ Π}.
 
 (* P Release Q *)
-Definition tf_release `{SI : indexT} {Σ} {Π} N k (P Q : @tf SI Σ Π) : tf :=
-  (tf_weakuntil N k Q (Q ∗ P))%F.
+Definition tf_release `{SI : indexT} {Σ} {Π} N k b (P Q : @tf SI Σ Π) : tf :=
+  (tf_weakuntil N k b Q (Q ∗ P))%F.
 Global Arguments tf_release {SI Σ Π}.
 
 (* P Strong release Q *)
-Definition tf_strongrelease `{SI : indexT} {Σ} {Π} N k (P Q : @tf SI Σ Π) : tf :=
-  (tf_until N k Q (Q ∗ P))%F.
+Definition tf_strongrelease `{SI : indexT} {Σ} {Π} N k b (P Q : @tf SI Σ Π) : tf :=
+  (tf_until N k b Q (Q ∗ P))%F.
 Global Arguments tf_strongrelease {SI Σ Π}.
+
+(* Fixpoint tf_depth `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : tf) : nat := *)
+(*   match Φ with *)
+(*   | tf_emp => 1 *)
+(*   | tf_atomic π => 1 *)
+(*   | tf_pure p => 1 *)
+(*   | tf_ghost p => 1 *)
+(*   | tf_and P Q => (tf_depth P + tf_depth Q) *)
+(*   | tf_or P Q => (tf_depth P + tf_depth Q) *)
+(*   | tf_impl P Q => (1 + tf_depth Q) *)
+(*   | tf_forall A P => (tf_depth (P a)) *)
+(*   | tf_exist A P => (∃ (a : A), tf_depth (P a))%I *)
+(*   | tf_sep P Q => (tf_depth P ∗ tf_depth Q)%I *)
+(*   | tf_wand P Q => (⌜P⌝ -∗ tf_depth Q)%I *)
+(*   | tf_pers P => (□ (tf_depth P))%I *)
+(*   | tf_always N k P => *)
+(*       (oblP_expired k ∗ *)
+(*        oblP_inv N k False%I False%I (tf_depth P)%I)%I *)
+(*   | tf_until N k P Q => *)
+(*       (oblP_assigned k (1/2)%Qp ∗ *)
+(*        oblP_inv N k (tf_depth P)%I (tf_depth Q)%I *)
+(*          (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ *)
+(*                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I *)
+(*   end *)
