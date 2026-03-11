@@ -473,6 +473,14 @@ Section lwp.
   Lemma lwp_pre_lwp_pre' s _lwp i E e Φ :
     lwp_pre s _lwp i E e Φ = lwp_pre' s (λ '(i,E,e,Φ), _lwp i E e Φ) (i,E,e,Φ).
   Proof. rewrite /lwp_pre' /curry /uncurry4. simpl. rewrite /curry4. f_equal. Qed.
+  Lemma lwp_fix_unfold_fix s i E e Φ :
+    lwp_fix s i E e Φ ⊣⊢ (lwp_pre s (lwp_fix s) i E e Φ).
+  Proof.
+    rewrite /lwp_fix. rewrite lwp_pre_lwp_pre'.
+    rewrite (least_fixpoint_unfold (lwp_pre' s)). iSplit; iIntros "H".
+    - done.
+    - done.
+  Qed.
   Lemma lwp_fix_unfold s i E e Φ :
     lwp_fix s i E e Φ ⊣⊢ (lwp_pre s (lwp (PROP:=iProp Σ) s) i E e Φ).
   Proof.

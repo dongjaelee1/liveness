@@ -21,6 +21,7 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
 | tf_wand (P : Prop) (Q : tf)
 | tf_pers (P : tf)
 | tf_always (N : namespace) (k : oid) (P : tf)
+(** P until Q, using namespace N and oid k. *)
 | tf_until (N : namespace) (k : oid) (P Q : tf)
 .
 

@@ -38,7 +38,9 @@ Fixpoint tf_logic `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun
        oblP_inv N k False%I False%I (tf_logic P)%I)%I
   | tf_until N k P Q =>
       (oblP_alive k (1/2)%Qp ∗
-       oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ n σ Θ κs i Ω, event_obl i (n, Ω) k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q)%I)%I
+       oblP_inv N k (tf_logic P)%I (tf_logic Q)%I
+         (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
+                                tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I
   end
 with tf_intuit `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class}
        `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
@@ -58,11 +60,150 @@ with tf_intuit `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_cl
        | tf_pers P => (□ (tf_logic P))%I
        | tf_always N k P =>
            (oblP_expired k ∗
-            oblP_inv N k False%I False%I (tf_logic P)%I)%I
+            oblP_inv N k False%I False%I (tf_logic P))%I
        | tf_until N k P Q =>
            (event_obl_alive i (n, Ω) k ∗
-            oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (∃ n σ Θ κs i Ω, event_obl i (n, Ω) k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q)%I)%I
+            oblP_inv N k (tf_logic P)%I (tf_logic Q)%I
+              (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
+                                     tf_intuit n' σ' Θ' κs' i' Ω' Q)%I ∗
+            ((∃ f o, event_obl i (n, Ω) k (obl_assigned f o)) ∨
+               (event_obl i (n, Ω) k obl_fulfilled ∗ ∃ i' Ω' f o, event_obl i' (n, Ω') k (obl_assigned f o))))%I
        end.
+
+Fixpoint tf_checkpoint `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class}
+  `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
+  (n : nat) (Φ : @tf SI Σ Π) : iProp Σ :=
+  match Φ with
+  | tf_emp => emp%I
+  | tf_atomic π => True
+  | tf_pure p => True
+  | tf_ghost p => True
+  | tf_and P Q => (tf_checkpoint n P ∗ tf_checkpoint n Q)%I
+  | tf_or P Q => (tf_checkpoint n P ∗ tf_checkpoint n Q)%I
+  | tf_impl P Q => (tf_checkpoint n Q)%I
+  | tf_forall A P => (∀ (a : A), tf_checkpoint n (P a))%I
+  | tf_exist A P => (∀ (a : A), tf_checkpoint n (P a))%I
+  | tf_sep P Q => (tf_checkpoint n P ∗ tf_checkpoint n Q)%I
+  | tf_wand P Q => (tf_checkpoint n Q)%I
+  | tf_pers P => True
+  | tf_always N k P => True
+  | tf_until N k P Q => (∃ i' Ω' f o, event_obl i' (n, Ω') k (obl_assigned f o))
+  end.
+
+(* Definition tf_remains `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
+(*   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
+(*   k (Q : tf) : iProp Σ := *)
+(*   (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ tf_intuit n' σ' Θ' κs' i' Ω' Q)%I. *)
+
+(* Fixpoint tf_logic_open `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
+(*   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
+(*   (Φ : @tf SI Σ Π) : iProp Σ := *)
+(*   match Φ with *)
+(*   | tf_emp => emp%I *)
+(*   | tf_atomic π => (state_pred_interp π)%I *)
+(*   | tf_pure p => (⌜p⌝)%I *)
+(*   | tf_ghost p => p%I *)
+(*   | tf_and P Q => (tf_logic_open P ∧ tf_logic_open Q)%I *)
+(*   | tf_or P Q => (tf_logic_open P ∨ tf_logic_open Q)%I *)
+(*   | tf_impl P Q => (⌜P⌝ → tf_logic_open Q)%I *)
+(*   | tf_forall A P => (∀ (a : A), tf_logic_open (P a))%I *)
+(*   | tf_exist A P => (∃ (a : A), tf_logic_open (P a))%I *)
+(*   | tf_sep P Q => (tf_logic_open P ∗ tf_logic_open Q)%I *)
+(*   | tf_wand P Q => (⌜P⌝ -∗ tf_logic_open Q)%I *)
+(*   | tf_pers P => (□ (tf_logic P))%I *)
+(*   | tf_always N k P => *)
+(*       (oblP_expired k ∗ *)
+(*        oblP_inv N k False%I False%I (tf_logic P)%I)%I *)
+(*   | tf_until N k P Q => *)
+(*       (oblP_alive k (1/2)%Qp ∗ *)
+(*        oblP_inv N k (tf_logic P)%I (tf_logic Q)%I (tf_remains k Q)%I ∗ *)
+(*        (oblP_assigned k ∗ (tf_logic P) ∨ oblP_fulfilled k ∗ (tf_logic Q) ∗ (tf_remains k Q)))%I *)
+(*   end. *)
+
+(* Fixpoint tf_logic_sub_mask `{SI : indexT} {Σ} {Π} (Φ : @tf SI Σ Π) (E : coPset) : Prop := *)
+(*   match Φ with *)
+(*   | tf_emp => True *)
+(*   | tf_atomic π => True *)
+(*   | tf_pure p => True *)
+(*   | tf_ghost p => True *)
+(*   | tf_and P Q => (∃ E', tf_logic_sub_mask P E' ∧ tf_logic_sub_mask Q (E ∖ E')) *)
+(*   | tf_or P Q => (∃ E', tf_logic_sub_mask P E' ∧ tf_logic_sub_mask Q (E ∖ E')) *)
+(*   | tf_impl P Q => (tf_logic_sub_mask Q E) *)
+(*   | tf_forall A P => (∀ (a : A), tf_logic_sub_mask (P a) E) *)
+(*   | tf_exist A P => (∀ (a : A), tf_logic_sub_mask (P a) E) *)
+(*   | tf_sep P Q => (∃ E', tf_logic_sub_mask P E' ∧ tf_logic_sub_mask Q (E ∖ E')) *)
+(*   | tf_wand P Q => (tf_logic_sub_mask Q E) *)
+(*   | tf_pers P => True *)
+(*   (* | tf_pers P => (tf_logic_sub_mask P E) *) *)
+(*   (* We don't need to open always here. *) *)
+(*   | tf_always N k P => True *)
+(*   | tf_until N k P Q => (↑N ⊆ E) *)
+(*   end. *)
+
+(* Fixpoint tf_logic `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
+(*   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
+(*   (Φ : @tf SI Σ Π) : iProp Σ := *)
+(*   match Φ with *)
+(*   | tf_emp => emp%I *)
+(*   | tf_atomic π => (state_pred_interp π)%I *)
+(*   | tf_pure p => (⌜p⌝)%I *)
+(*   | tf_ghost p => p%I *)
+(*   | tf_and P Q => (tf_logic P ∧ tf_logic Q)%I *)
+(*   | tf_or P Q => (tf_logic P ∨ tf_logic Q)%I *)
+(*   | tf_impl P Q => (⌜P⌝ → tf_logic Q)%I *)
+(*   | tf_forall A P => (∀ (a : A), tf_logic (P a))%I *)
+(*   | tf_exist A P => (∃ (a : A), tf_logic (P a))%I *)
+(*   | tf_sep P Q => (tf_logic P ∗ tf_logic Q)%I *)
+(*   | tf_wand P Q => (⌜P⌝ -∗ tf_logic Q)%I *)
+(*   | tf_pers P => (□ (tf_logic P))%I *)
+(*   | tf_always N k P => *)
+(*       (oblP_expired k ∗ *)
+(*        oblP_inv N k False%I False%I (tf_logic P)%I)%I *)
+(*   | tf_until N k P Q => *)
+(*       (oblP_alive k (1/2)%Qp ∗ *)
+(*        ∃ n, *)
+(*        oblP_inv N k (tf_logic P)%I (tf_logic Q)%I *)
+(*          (∃ n' σ' Θ' κs' i' Ω', ⌜n ≤ n'⌝ ∗ event_obl i' (n', Ω') k obl_fulfilled ∗ *)
+(*                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I *)
+(*   end *)
+(* with tf_intuit `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
+(*        `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
+(*        n σ Θ κs i Ω (Φ : @tf SI Σ Π) : iProp Σ := *)
+(*        match Φ with *)
+(*        | tf_emp => emp%I *)
+(*        | tf_atomic π => (event_pred n σ Θ κs π)%I *)
+(*        | tf_pure p => (⌜p⌝)%I *)
+(*        | tf_ghost p => True%I *)
+(*        | tf_and P Q => (tf_intuit n σ Θ κs i Ω P ∧ tf_intuit n σ Θ κs i Ω Q)%I *)
+(*        | tf_or P Q => (tf_intuit n σ Θ κs i Ω P ∨ tf_intuit n σ Θ κs i Ω Q)%I *)
+(*        | tf_impl P Q => (⌜P⌝ → tf_intuit n σ Θ κs i Ω Q)%I *)
+(*        | tf_forall A P => (∀ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I *)
+(*        | tf_exist A P => (∃ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I *)
+(*        | tf_sep P Q => (tf_intuit n σ Θ κs i Ω P ∗ tf_intuit n σ Θ κs i Ω Q)%I *)
+(*        | tf_wand P Q => (⌜P⌝ -∗ tf_intuit n σ Θ κs i Ω Q)%I *)
+(*        | tf_pers P => (□ (tf_logic P))%I *)
+(*        | tf_always N k P => *)
+(*            (oblP_expired k ∗ oblP_inv N k False%I False%I (tf_logic P) ∗ tf_intuit n σ Θ κs i Ω P)%I *)
+(*        (* (oblP_expired k ∗ *) *)
+(*        (*  oblP_inv N k False%I False%I (tf_logic P)%I)%I *) *)
+(*        | tf_until N k P Q => *)
+(*            (event_obl_alive i (n, Ω) k ∗ *)
+(*             oblP_inv N k (tf_logic P)%I (tf_logic Q)%I *)
+(*               (∃ n' σ' Θ' κs' i' Ω', ⌜n ≤ n'⌝ ∗ event_obl i' (n', Ω') k obl_fulfilled ∗ *)
+(*                                      tf_intuit n' σ' Θ' κs' i' Ω' Q)%I ∗ *)
+(*             ((∃ a o, event_obl i (n, Ω) k (obl_assigned a o) ∗ tf_intuit n σ Θ κs i Ω P) ∨ *)
+(*                (event_obl i (n, Ω) k (obl_fulfilled) ∗ tf_intuit n σ Θ κs i Ω Q))) *)
+
+(*             (*  (event_obl_alive i (n, Ω) k ∗ *) *)
+(*             (* oblP_inv N k (tf_logic P)%I (tf_logic Q)%I *) *)
+(*             (*   (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ *) *)
+(*             (*                          tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I *) *)
+(*        (* | tf_until N k P Q => *) *)
+(*        (*     (event_obl_alive i (n, Ω) k ∗ *) *)
+(*        (*      oblP_inv N k (tf_logic P)%I (tf_logic Q)%I *) *)
+(*        (*        (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ *) *)
+(*        (*                               tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I *) *)
+(*        end. *)
 
 Global Arguments tf_logic {SI Λ Σ Π _ _ _ _}.
 Global Arguments tf_intuit {SI Λ Σ Π _ _ _ _}.
@@ -76,8 +217,15 @@ Section proof.
     induction Φ; simpl; apply _.
   Qed.
 
+  Global Instance tf_checkpoint_persistent n Φ : Persistent (tf_checkpoint n Φ).
+  Proof.
+    induction Φ; simpl; apply _.
+  Qed.
+
   Lemma tf_logic_tf_intuit Φ h n σ Θ κs m i Ω W :
-    (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ) ⊢ tf_intuit n σ Θ κs i Ω Φ.
+    (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ ∗
+     ∃ i' Ω' f o, event_obl j (n, Ω') k (obl_assigned f o))
+    ⊢ tf_intuit n σ Θ κs i Ω Φ.
   Proof.
     revert h n σ Θ κs m i Ω W. induction Φ; iIntros (?????????) "(HI& MI& TL)"; simpl; auto.
     - rewrite /history_interp -lock. iDestruct "HI" as "(HI1& HI2& SI)".
@@ -104,7 +252,152 @@ Section proof.
         rewrite /event_obl_alive. eauto.
       + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
         rewrite /event_obl_alive. eauto.
+    (* - iDestruct "TL" as "[OA #TL]". iFrame "TL". iDestruct "MI" as "(MI& S& MI2)". *)
+    (*   iEval (unfold_opreds) in "OA". iDestruct "OA" as "(#OE& OA)". *)
+    (*   iPoseProof (osat_lookup_alive with "[$S $OE $OA]") as "%". destruct H0 as [(?&?&?) | ?]. *)
+    (*   + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto. *)
+    (*     rewrite /event_obl_alive. eauto. *)
+    (*   + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto. *)
+    (*     rewrite /event_obl_alive. eauto. *)
   Qed.
+
+  Lemma tf_logic_tf_intuit Φ h n σ Θ κs m i Ω W :
+    (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ)
+    ⊢ tf_intuit n σ Θ κs i Ω Φ.
+  Proof.
+    revert h n σ Θ κs m i Ω W. induction Φ; iIntros (?????????) "(HI& MI& TL)"; simpl; auto.
+    - rewrite /history_interp -lock. iDestruct "HI" as "(HI1& HI2& SI)".
+      iPoseProof (state_interp_wf with "[$SI $TL]") as "%".
+      iApply (history_interp_event_pred_now with "[HI1 HI2 SI]"). 1: auto.
+      rewrite /history_interp -lock. iFrame.
+    - iSplit.
+      + iDestruct "TL" as "[TL _]". iApply IHΦ1. iFrame.
+      + iDestruct "TL" as "[_ TL]". iApply IHΦ2. iFrame.
+    - iDestruct "TL" as "[TL | TL]".
+      + iLeft. iApply IHΦ1. iFrame.
+      + iRight. iApply IHΦ2. iFrame.
+    - iIntros (?). iPoseProof ("TL" with "[//]") as "TL". iApply IHΦ. iFrame.
+    - iIntros (?). iPoseProof ("TL" $! a) as "TL". iApply H0. iFrame.
+    - iDestruct "TL" as "(%& TL)". iExists a. iApply H0. iFrame.
+    - iDestruct "TL" as "[TL1 TL2]".
+      iPoseProof (IHΦ1 with "[$HI $MI $TL1]") as "#TI1". iPoseProof (IHΦ2 with "[$HI $MI $TL2]") as "#TI2".
+      eauto.
+    - iIntros (?). iPoseProof ("TL" with "[//]") as "TL". iApply IHΦ. iFrame.
+    - iDestruct "TL" as "(OA& #TL)". iFrame "TL". iDestruct "MI" as "(MI& S& MI2)".
+      iEval (unfold_opreds) in "OA". iDestruct "OA" as "(#OE& OA)".
+      iPoseProof (osat_lookup_alive with "[$S $OE $OA]") as "%". destruct H0 as [(?&?&?) | ?].
+      + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
+        rewrite /event_obl_alive. iSplitR; first eauto. iLeft. eauto.
+      + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
+        rewrite /event_obl_alive. iSplitR; first eauto. iRight. iSplitR; first eauto.
+        iAssert (osat Ω -∗ (oblP_assigned k ∨ oblP_expired k) -∗ False)%I as "NOT".
+        { iIntros "S [OA | OX]".
+          - iEval (unfold_opreds) in "OA". iDestruct "OA" as "(_& OA)".
+            iPoseProof (osat_lookup_assigned with "[$S $OE $OA]") as "%".
+            destruct H1 as (?&?&?). rewrite H0 in H1. done.
+          - iEval (unfold_opreds) in "OX". iDestruct "OX" as "(_& OX)".
+            iPoseProof (osat_lookup_expired with "[$S $OE $OX]") as "%".
+            rewrite H0 in H1. done. }
+        iPoseProof ("NOT" with "S") as "NOT2".
+        
+        
+oblP_inv_acc:
+  ∀ {SI : indexT} {Σ : gFunctors} {mupdGS0 : mupdGS Σ} (E : coPset) (N : namespace) (k : oid) (P Q R : iProp Σ),
+    ↑N ⊆ E
+    → oblP_inv N k P Q R ={E,E ∖ ↑N}=∗
+      ▷ (oblP_assigned k ∗ P ∨ oblP_fulfilled k ∗ (Q ∨ oblP_expired k) ∗ R) ∗ (▷ oblP_variant k P Q R ={E ∖ ↑N,E}=∗ True)
+
+        
+        iModIntro. iMod "TL".
+  Qed.
+
+  Lemma tf_logic_tf_intuit E Φ h n σ Θ κs m i Ω W :
+    tf_logic_sub_mask Φ E →
+    (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ)
+    ⊢ |={E}=> history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ ∗ tf_intuit n σ Θ κs i Ω Φ.
+  Proof.
+    revert E h n σ Θ κs m i Ω W. induction Φ; iIntros (?????????? HM) "(HI& MI& TL)"; simpl.
+    - by iFrame.
+    - rewrite /history_interp -lock. iDestruct "HI" as "(HI1& HI2& SI)".
+      iPoseProof (state_interp_wf with "[$SI $TL]") as "%".
+      iPoseProof (history_interp_event_pred_now with "[HI1 HI2 SI]") as "#HE".
+      1: eauto.
+      1: rewrite /history_interp -lock; iFrame.
+      iFrame. eauto.
+    - iPoseProof ("TL") as "%". iFrame. auto.
+    - by iFrame.
+    - iDestruct "TL" as "[H1 H2]".
+      
+      
+      
+    - iSplit.
+      + iDestruct "TL" as "[TL _]". iApply IHΦ1. iFrame.
+      + iDestruct "TL" as "[_ TL]". iApply IHΦ2. iFrame.
+    - iDestruct "TL" as "[TL | TL]".
+      + iLeft. iApply IHΦ1. iFrame.
+      + iRight. iApply IHΦ2. iFrame.
+    - iIntros (?). iPoseProof ("TL" with "[//]") as "TL". iApply IHΦ. iFrame.
+    - iIntros (?). iPoseProof ("TL" $! a) as "TL". iApply H0. iFrame.
+    - iDestruct "TL" as "(%& TL)". iExists a. iApply H0. iFrame.
+    - iDestruct "TL" as "[TL1 TL2]".
+      iPoseProof (IHΦ1 with "[$HI $MI $TL1]") as "#TI1". iPoseProof (IHΦ2 with "[$HI $MI $TL2]") as "#TI2".
+      eauto.
+    - iIntros (?). iPoseProof ("TL" with "[//]") as "TL". iApply IHΦ. iFrame.
+    - iDestruct "TL" as "[OA #TL]". iFrame "TL". iDestruct "MI" as "(MI& S& MI2)".
+      iEval (unfold_opreds) in "OA". iDestruct "OA" as "(#OE& OA)".
+      iPoseProof (osat_lookup_alive with "[$S $OE $OA]") as "%". destruct H0 as [(?&?&?) | ?].
+      + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
+        rewrite /event_obl_alive. eauto.
+      + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
+        rewrite /event_obl_alive. eauto.
+    (* - iDestruct "TL" as "[OA #TL]". iFrame "TL". iDestruct "MI" as "(MI& S& MI2)". *)
+    (*   iEval (unfold_opreds) in "OA". iDestruct "OA" as "(#OE& OA)". *)
+    (*   iPoseProof (osat_lookup_alive with "[$S $OE $OA]") as "%". destruct H0 as [(?&?&?) | ?]. *)
+    (*   + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto. *)
+    (*     rewrite /event_obl_alive. eauto. *)
+    (*   + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto. *)
+    (*     rewrite /event_obl_alive. eauto. *)
+  Qed.
+
+  Lemma tf_logic_tf_intuit Φ h n σ Θ κs m i Ω W :
+    (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ)
+    ⊢ tf_intuit n σ Θ κs i Ω Φ.
+  Proof.
+    revert h n σ Θ κs m i Ω W. induction Φ; iIntros (?????????) "(HI& MI& TL)"; simpl; auto.
+    - rewrite /history_interp -lock. iDestruct "HI" as "(HI1& HI2& SI)".
+      iPoseProof (state_interp_wf with "[$SI $TL]") as "%".
+      iApply (history_interp_event_pred_now with "[HI1 HI2 SI]"). 1: auto.
+      rewrite /history_interp -lock. iFrame.
+    - iSplit.
+      + iDestruct "TL" as "[TL _]". iApply IHΦ1. iFrame.
+      + iDestruct "TL" as "[_ TL]". iApply IHΦ2. iFrame.
+    - iDestruct "TL" as "[TL | TL]".
+      + iLeft. iApply IHΦ1. iFrame.
+      + iRight. iApply IHΦ2. iFrame.
+    - iIntros (?). iPoseProof ("TL" with "[//]") as "TL". iApply IHΦ. iFrame.
+    - iIntros (?). iPoseProof ("TL" $! a) as "TL". iApply H0. iFrame.
+    - iDestruct "TL" as "(%& TL)". iExists a. iApply H0. iFrame.
+    - iDestruct "TL" as "[TL1 TL2]".
+      iPoseProof (IHΦ1 with "[$HI $MI $TL1]") as "#TI1". iPoseProof (IHΦ2 with "[$HI $MI $TL2]") as "#TI2".
+      eauto.
+    - iIntros (?). iPoseProof ("TL" with "[//]") as "TL". iApply IHΦ. iFrame.
+    - iDestruct "TL" as "[OA #TL]". iFrame "TL". iDestruct "MI" as "(MI& S& MI2)".
+      iEval (unfold_opreds) in "OA". iDestruct "OA" as "(#OE& OA)".
+      iPoseProof (osat_lookup_alive with "[$S $OE $OA]") as "%". destruct H0 as [(?&?&?) | ?].
+      + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
+        rewrite /event_obl_alive. eauto.
+      + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto.
+        rewrite /event_obl_alive. eauto.
+    (* - iDestruct "TL" as "[OA #TL]". iFrame "TL". iDestruct "MI" as "(MI& S& MI2)". *)
+    (*   iEval (unfold_opreds) in "OA". iDestruct "OA" as "(#OE& OA)". *)
+    (*   iPoseProof (osat_lookup_alive with "[$S $OE $OA]") as "%". destruct H0 as [(?&?&?) | ?]. *)
+    (*   + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto. *)
+    (*     rewrite /event_obl_alive. eauto. *)
+    (*   + iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto. *)
+    (*     rewrite /event_obl_alive. eauto. *)
+  Qed.
+
+  TODO
 
 End proof.
 
