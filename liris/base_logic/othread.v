@@ -110,7 +110,7 @@ Definition othread `{SI : indexT} {Σ}
         ([∗ map] i ↦ TObls ∈ Tgls,
            (othreadG_exec i (1/2/2)%Qp ∨ (othreadG_term_auth i ∗ othreadG_obls i ∅ 1)) ∗
            othreadG_owns_auth_obls i TObls ∗
-           ([∗ map] k ↦ _ ∈ TObls, oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp)
+           ([∗ map] k ↦ _ ∈ TObls, ∃ b, oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp)
         )
     )%I.
 
@@ -465,10 +465,10 @@ Section othread.
     iFrame. iApply big_sepS_union; first set_solver. rewrite big_sepS_singleton. iFrame.
   Qed.
 
-  Local Lemma othread_alloc_obl_1 j TP i G q k :
+  Local Lemma othread_alloc_obl_1 j TP i G q k b :
     oblG_owner k j (1/2 + 1/2/2/2 + 1/2/2 + 1/2/2/2/2)%Qp ∗
     othread TP ∗ othreadG_obls i G q ∗
-    oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp
+    oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp
     ⊢ |==> ⌜k ∉ G⌝ ∗ oblG_owner k j (1/2 + 1/2/2/2 + 1/2/2 + 1/2/2/2/2)%Qp ∗
         othread TP ∗ othreadG_obls i ({[k]} ∪ G) q ∗ othreadG_owns i k 1.
   Proof.
@@ -485,7 +485,7 @@ Section othread.
       iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi _]".
       iDestruct "Hi" as "(Hix & His & Him)".
       iDestruct (big_sepM_delete _ _ k _ LU with "Him") as "[Hk Him]".
-      iDestruct "Hk" as "(Gl1 & Go1)".
+      iDestruct "Hk" as "(%& Gl1 & Go1)".
       iDestruct "Go0" as "(((Go0& Go2)& Go3)& Go4)".
       iCombine "Go1 Go" as "Go". iCombine "Go2 Go" as "Go". iCombine "Go3 Go" as "Go".
       iCombine "Go0 Go" as "Go". iCombine "Go Go4" as "Go".
@@ -510,17 +510,17 @@ Section othread.
     { apply lookup_delete_eq. }
     iFrame "Hm Hix His". iApply (big_sepM_insert _ _ k); first done. iFrame.
   Qed.
-  Lemma othread_alloc_obl Ω TP i G q k :
+  Lemma othread_alloc_obl Ω TP i G q k b :
     osat Ω ∗ othread TP ∗
     othreadG_obls i G q ∗
-    oblG_elem k ∗ oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2 + 1/2/2)%Qp
+    oblG_elem k ∗ oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2 + 1/2/2)%Qp
     ⊢ |==> osat Ω ∗ othread TP ∗
         ⌜k ∉ G⌝ ∗ othreadG_obls i ({[k]} ∪ G) q ∗
         othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
   Proof.
     iIntros "(S& O& Obs& #Ge& Gl& Go)".
     iDestruct "Go" as "(Go& (Go1& Go2))". iDestruct "Go2" as "(Go2& Go3)".
-    iPoseProof (osat_open_owner with "[$S $Ge $Go]") as "(Go& (Gl'& Ga& Go')& ACC)".
+    iPoseProof (osat_open_owner with "[$S $Ge $Go]") as "(Go& (%& Gl'& Ga& Go')& ACC)".
     iCombine "Go Go1 Go' Go2" as "Go". rewrite !Qp.add_assoc.
     iMod (othread_alloc_obl_1 with "[$Go $O $Obs $Gl $Go3]") as "(%Nin& Go& O& Obs& Oo)".
     iDestruct "Go" as "((Go& Go')& Go0)". iPoseProof ("ACC" with "[$Gl' $Ga $Go']") as "S".
@@ -547,7 +547,7 @@ Section othread.
     k ∈ G →
     othread TP ∗ othreadG_obls i G q ∗ othreadG_owns i k 1
     ⊢ |==> othread TP ∗ othreadG_obls i (G ∖ {[k]}) q ∗
-        oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp.
+        ∃ b, oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp.
   Proof.
     iIntros (Hink) "(O& Ho& Hw)".
     rewrite /othread -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
@@ -573,7 +573,7 @@ Section othread.
     }
     iFrame "Ho".
     iDestruct (big_sepM_delete _ _ k _ Hluk with "Him") as "[Hik Him]".
-    iDestruct "Hik" as "[$ $]".
+    iDestruct "Hik" as "(%& $& $)".
     iModIntro. iExists (<[i:=(delete k TObls)]>Tgls). iSplitR.
     { rewrite dom_insert_lookup_L; done. }
     iFrame "HO HX HB". iSplitL "HE".
@@ -586,7 +586,7 @@ Section othread.
   Lemma othread_delete_obl TP i G k :
     othread TP ∗ othreadG_obls i G 1 ∗ othreadG_owns i k 1
     ⊢ |==> othread TP ∗ othreadG_obls i (G ∖ {[k]}) 1 ∗
-        oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp.
+        ∃ b, oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp.
   Proof using Type*.
     iIntros "(O & Ho & Hw)". iPoseProof (othread_obls_owns_elem with "[$]") as "%Hkin".
     iApply (othread_delete_obl_frac with "[$]"). auto.
@@ -634,8 +634,8 @@ Section othread.
   Lemma othread_owns_open TP i k q :
     othread TP ∗ othreadG_elem i ∗ othreadG_owns i k q
     ⊢ othreadG_owns i k q ∗
-    (oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp) ∗
-    ((oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp) -∗ othread TP).
+    (∃ b, oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp) ∗
+    ((∃ b, oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp) -∗ othread TP).
   Proof.
     iIntros "(O & #He & Hw)".
     iPoseProof (othread_elem with "[$O $He]") as "%Hin".
@@ -656,8 +656,8 @@ Section othread.
     k ∈ G →
     othread TP ∗ othreadG_elem i ∗ othreadG_obls i G q
     ⊢ othreadG_obls i G q ∗
-    (oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp) ∗
-    ((oblG_assigned k (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp) -∗ othread TP).
+    (∃ b, oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp) ∗
+    ((∃ b, oblG_assigned k b (1/2/2/2)%Qp ∗ oblG_owner k i (1/2/2/2/2)%Qp) -∗ othread TP).
   Proof.
     iIntros (Ink) "(O& #He& Hobls)". 
     iPoseProof (othread_elem with "[$O $He]") as "%Hin".
@@ -673,7 +673,7 @@ Section othread.
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "(Hix & His & Him)".
     iPoseProof (big_sepM_delete _ _ _ _ Hluk with "Him") as "[Hk Him]".
-    iDestruct "Hk" as "[Bl Hk]". iFrame "Bl Hk Hobls". iIntros "Bl".
+    iDestruct "Hk" as "(%& Bl& Hk)". iFrame "Bl Hk Hobls". iIntros "Bl".
     iExists Tgls. iFrame. iSplitR; first done.
     iApply (big_sepM_delete _ _ _ _ Hlui). iFrame.
     iApply (big_sepM_delete _ _ _ _ Hluk). iFrame.
@@ -727,7 +727,7 @@ Section othread.
     ⊢ ∃ a, ⌜ Ω !! k = Some (obl_assigned a i) ⌝.
   Proof.
     iIntros (Ink) "(S& O& #Oei& Tbs& #Gek)".
-    iPoseProof (othread_obls_open with "[$O $Oei $Tbs]") as "(Tbs& (Gl& Go)& Acc)". 1: eauto.
+    iPoseProof (othread_obls_open with "[$O $Oei $Tbs]") as "(Tbs& (%& Gl& Go)& Acc)". 1: eauto.
     iPoseProof (osat_lookup_owner with "[$S $Gek $Go]") as "(%& %)". eauto.
   Qed.
 
