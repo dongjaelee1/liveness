@@ -675,6 +675,21 @@ Section lwp.
     + iApply (big_sepM_impl with "Efs"); iIntros "!>" (k ef _).
       iIntros ">[_ H]". by iApply (lwp_stuckness_mono with "H").
   Qed.
+  Lemma lwp_fix_strong_mono_sfmupd s1 s2 i E1 E2 e Φ Ψ :
+    s1 ⊑ s2 → E1 ⊆ E2 →
+    (lwp_fix s1 i E1 e Φ) -∗ (∀ v, Φ v -∗ |={E2}=>m Ψ v) -∗ (lwp_fix s2 i E2 e Ψ).
+  Proof.
+    iIntros (??) "WP H". iApply (lwp_fix_strong_mono_lwpupd with "WP [H]"). 1,2: auto.
+    iIntros (??) "HQ". iMod ("H" with "HQ") as "$". done.
+  Qed.
+  Lemma lwp_fix_strong_mono s1 s2 i E1 E2 e Φ Ψ :
+    s1 ⊑ s2 → E1 ⊆ E2 →
+    (lwp_fix s1 i E1 e Φ) -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ (lwp_fix s2 i E2 e Ψ).
+  Proof.
+    iIntros (? HE) "H HΦ".
+    iApply (lwp_fix_strong_mono_sfmupd with "H [HΦ]"). all: auto.
+    iIntros "% H". iMod ("HΦ" with "H") as "$". done.
+  Qed.
 
   Lemma lwp_strong_mono_lwpupd s1 s2 i E1 E2 e Φ Ψ :
     s1 ⊑ s2 → E1 ⊆ E2 →
@@ -685,7 +700,6 @@ Section lwp.
     iApply lwpupd_mask_mono. 1: eauto. iMod "H". iModIntro.
     rewrite lwp_unfold_fix. iModIntro. iApply (lwp_fix_strong_mono_lwpupd with "H HΦ"); auto.
   Qed.
-
   Lemma lwp_strong_mono_sfmupd s1 s2 i E1 E2 e Φ Ψ :
     s1 ⊑ s2 → E1 ⊆ E2 →
     lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v -∗ |={E2}=>m Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
@@ -693,7 +707,6 @@ Section lwp.
     iIntros (??) "WP H". iApply (lwp_strong_mono_lwpupd with "WP [H]"). 1,2: auto.
     iIntros (??) "HQ". iMod ("H" with "HQ") as "$". done.
   Qed.
-
   Lemma lwp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
     s1 ⊑ s2 → E1 ⊆ E2 →
     lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
@@ -703,23 +716,37 @@ Section lwp.
     iIntros "% H". iMod ("HΦ" with "H") as "$". done.
   Qed.
 
+  Lemma fupd_lwp_fix s i E e Φ :
+    (|={E}=> lwp_fix s i E e Φ) ⊢ (lwp_fix s i E e Φ).
+  Proof. iIntros "H". iApply fupd_elim_lwp_fix. iMod "H". by iModIntro. Qed.
+  Lemma lwp_fix_fupd s i E e Φ :
+    (lwp_fix s i E e (λ v, |={E}=> Φ v)) ⊢ (lwp_fix s i E e Φ).
+  Proof. iIntros "H". iApply (lwp_fix_strong_mono s s i E with "H"); auto. Qed.
+  Lemma lwp_fix_sfmupd s i E e Φ :
+    (lwp_fix s i E e (λ v, |={E}=>m Φ v)) ⊢ (lwp_fix s i E e Φ).
+  Proof. iIntros "H". iApply (lwp_fix_strong_mono_sfmupd s s i E with "H"); auto. Qed.
+  Lemma lwp_fix_lwpupd s i E e Φ :
+    (lwp_fix s i E e (λ v, ∀ e', lwpupd i E e' (Φ v))) ⊢ (lwp_fix s i E e Φ).
+  Proof. iIntros "H". iApply (lwp_fix_strong_mono_lwpupd s s i E with "H"); auto. Qed.
+
   Lemma fupd_lwp s i E e Φ :
     (|={E}=> lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply fupd_elim_lwp. iMod "H". by iModIntro. Qed.
   Lemma lwp_fupd s i E e Φ :
     lWP e @ s; i; E {{ v, |={E}=> Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply (lwp_strong_mono s s i E with "H"); auto. Qed.
-
   Lemma sfmupd_lwp s i E e Φ :
     (|={E}=>m lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply sfmupd_elim_lwp. done. Qed.
   Lemma lwp_sfmupd s i E e Φ :
     lWP e @ s; i; E {{ v, |={E}=>m Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply (lwp_strong_mono_sfmupd s s i E with "H"); auto. Qed.
-
   Lemma lwpupd_lwp s i E e Φ :
     (lwpupd i E e (lWP e @ s; i; E {{ Φ }})) ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply lwpupd_elim_lwp. done. Qed.
+  Lemma lwp_lwpupd s i E e Φ :
+    lWP e @ s; i; E {{ v, ∀ e', lwpupd i E e' (Φ v) }} ⊢ lWP e @ s; i; E {{ Φ }}.
+  Proof. iIntros "H". iApply (lwp_strong_mono_lwpupd s s i E with "H"); auto. Qed.
 
   Lemma lwp_fix_atomic s i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
     (|={E1,E2}=> lwp_fix s i E2 e (λ v, |={E2,E1}=> Φ v))

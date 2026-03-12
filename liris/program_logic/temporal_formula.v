@@ -3,7 +3,8 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import iprop.
 From stdpp Require Import namespaces.
 From liris.base_logic Require Import obligation.
-From liris.prelude Require Import ordinal_facts.
+(* From liris.prelude Require Import ordinal_facts. *)
+From transfinite.stepindex Require Import ordinal_arith.
 
 (** Syntax for writing temporal formulae; cf., LTL, CTL*. *)
 Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
@@ -23,7 +24,7 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
 | tf_pers (P : tf)
 | tf_always (N : namespace) (k : oid) (P : tf)
 (** P until Q, using namespace N and oid k. *)
-| tf_until (N : namespace) (k : oid) (b : bool) (P Q : tf)
+| tf_until (N : namespace) (k : oid) (b : bool) (q : Qp) (P Q : tf)
 .
 
 Global Arguments tf {SI Σ Π}.
@@ -51,47 +52,50 @@ Notation "□ P" := (tf_pers P%F) : tf_scope.
 
 (** Define patterns corresponding to LTL temporal properties. *)
 (* Eventually P *)
-Definition tf_eventually `{SI : indexT} {Σ} {Π} N k b (P : @tf SI Σ Π) : tf :=
-  (tf_until N k b ⌜ True ⌝ P)%F.
+Definition tf_eventually `{SI : indexT} {Σ} {Π} N k b q (P : @tf SI Σ Π) : tf :=
+  (tf_until N k b q ⌜ True ⌝ P)%F.
 Global Arguments tf_eventually {SI Σ Π}.
 
 (* P Weak until Q *)
-Definition tf_weakuntil `{SI : indexT} {Σ} {Π} N k b (P Q : @tf SI Σ Π) : tf :=
-  (tf_until N k b P (Q ∨ ∃ k', tf_always N k' P))%F.
+Definition tf_weakuntil `{SI : indexT} {Σ} {Π} N k b q (P Q : @tf SI Σ Π) : tf :=
+  (tf_until N k b q P (Q ∨ ∃ k', tf_always N k' P))%F.
 (*   (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
 Global Arguments tf_weakuntil {SI Σ Π}.
 
 (* P Release Q *)
-Definition tf_release `{SI : indexT} {Σ} {Π} N k b (P Q : @tf SI Σ Π) : tf :=
-  (tf_weakuntil N k b Q (Q ∗ P))%F.
+Definition tf_release `{SI : indexT} {Σ} {Π} N k b q (P Q : @tf SI Σ Π) : tf :=
+  (tf_weakuntil N k b q Q (Q ∗ P))%F.
 Global Arguments tf_release {SI Σ Π}.
 
 (* P Strong release Q *)
-Definition tf_strongrelease `{SI : indexT} {Σ} {Π} N k b (P Q : @tf SI Σ Π) : tf :=
-  (tf_until N k b Q (Q ∗ P))%F.
+Definition tf_strongrelease `{SI : indexT} {Σ} {Π} N k b q (P Q : @tf SI Σ Π) : tf :=
+  (tf_until N k b q Q (Q ∗ P))%F.
 Global Arguments tf_strongrelease {SI Σ Π}.
 
-Fixpoint tf_depth `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : @tf SI Σ Π) : Ord.t :=
-  match Φ with
-  | tf_emp => Ord.one
-  | tf_atomic π => Ord.one
-  | tf_pure p => Ord.one
-  | tf_ghost p => Ord.one
-  | tf_and P Q => (tf_depth P ⊕ tf_depth Q)%ord
-  | tf_or P Q => (tf_depth P ⊕ tf_depth Q)%ord
-  | tf_impl P Q => (Ord.S (tf_depth Q))%ord
-  | tf_forall A P => (Ord.build (λ (a: A), tf_depth (P a)))%ord
-  | tf_exist A P => (Ord.build (λ (a: A), tf_depth (P a)))%ord
-  | tf_sep P Q => (tf_depth P ⊕ tf_depth Q)%ord
-  | tf_wand P Q => (Ord.S (tf_depth Q))%ord
-  | tf_pers P => (Ord.S (tf_depth P))%ord
-  | tf_always N k P => (Ord.S (tf_depth P))%ord
-  | tf_until N k b P Q => (tf_depth P ⊕ tf_depth Q)%ord
-  end.
+Section depth.
 
-Section proof.
-  Local Open Scope ord.
+  Universe temporal_formula_depth.
 
-(* Ord.build_upperbound: ∀ [A : Type] (os : A → Ord.t) (a : A), (os a < Ord.build os)%ord *)
+  Local Open Scope ordinals.
 
-End proof.
+  Fixpoint tf_depth `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : @tf SI Σ Π) : ord :=
+    match Φ with
+    | tf_emp => one
+    | tf_atomic π => one
+    | tf_pure p => one
+    | tf_ghost p => one
+    | tf_and P Q => (tf_depth P ⊕ tf_depth Q)
+    | tf_or P Q => (tf_depth P ⊕ tf_depth Q)
+    | tf_impl P Q => (succ (tf_depth Q))
+    | tf_forall A P => (limit (λ (a: A), tf_depth (P a)))
+    | tf_exist A P => (limit (λ (a: A), tf_depth (P a)))
+    | tf_sep P Q => (tf_depth P ⊕ tf_depth Q)
+    | tf_wand P Q => (succ (tf_depth Q))
+    | tf_pers P => (succ (tf_depth P))
+    | tf_always N k P => (succ (tf_depth P))
+    | tf_until N k b q P Q => (tf_depth P ⊕ tf_depth Q)
+    end.
+
+  (* Ord.build_upperbound: ∀ [A : Type] (os : A → Ord.t) (a : A), (os a < Ord.build os)%ord *)
+
+End depth.
