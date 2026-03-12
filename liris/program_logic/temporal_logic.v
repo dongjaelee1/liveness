@@ -267,7 +267,24 @@ Section test.
     iProp_sat (∃ (o : Ord.t), ⌜Ord.lt ((tf_depth ((∃ (p : tf), p ∗ ∀ N k (q : tf), tf_always N k (q)) : @tf _ Σ Π)) : Ord.t) o⌝)%I →
     True.
 
-  Lemma test' :
+  Lemma test3 :
+    tf_logic (tf_ghost (∃ (P : iProp Σ), ∀ (Q : iProp Σ), P ∗ Q))
+    ⊢ (∃ (P : iProp Σ), ∀ (Q : iProp Σ), P ∗ Q).
+  Proof. simpl. done. Qed.
+
+  Lemma test4 (P Q : iProp Σ) :
+    iProp_sat (∃ (o : ord) (X : iProp Σ),
+          ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N k, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N k (tf_ghost q)))) : @tf _ Σ Π)) : ord) o⌝ ∗
+          tf_logic (∃ N k, tf_always N k (tf_ghost X)))%I →
+    ∃ (o : ord), iProp_sat (∃ (X : iProp Σ),
+                       ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N k, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N k (tf_ghost q)))) : @tf _ Σ Π)) : ord) o⌝ ∗
+                       tf_logic (∃ N k, tf_always N k (tf_ghost X)))%I.
+  Proof.
+    intros. apply sat_exists in H0. auto.
+  Qed.
+
+  (** Fail: iProp quantification in tf_exist, probably requiring cmra < tf. *)
+  Fail Lemma test3' :
     tf_logic (∃ (P Q : iProp Σ), tf_ghost (P ∗ Q)) ⊢ True.
 
   (* Print Universes. *)
@@ -280,7 +297,7 @@ Section test.
 
   (** Fail: Probably, tf (tf.u2) ≤ Ord.t (Ord.TYPE.u0) < iProp Σ (cmra.u0),
       and this needs cmra.u0 < tf *)
-  Lemma test3 (P Q : iProp Σ) :
+  Fail Lemma test4' (P Q : iProp Σ) :
     iProp_sat (∃ (o : ord), ⌜ord_lt ((tf_depth ((∃ (p : iProp Σ), (tf_ghost p) ∗ ∀ N k (q : iProp Σ), tf_always N k (tf_ghost q)) : @tf _ Σ Π)) : ord) o⌝)%I →
     True.
 
