@@ -256,13 +256,6 @@ Section mupd.
         * intros ?. destruct (decide (i = x)).
           { subst. rewrite !lookup_insert_eq. econstructor. auto. }
           { rewrite !lookup_insert_ne; eauto. }
-      + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2.
-        inv H1. destruct y; try done. symmetry in H2. clear H3.
-        exists (<[x:=(witness_expired (OC:=ord_obl_class))]>W1). split.
-        * econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor 3. econstructor.
-        * intros ?. destruct (decide (i = x)).
-          { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
-          { rewrite !lookup_insert_ne; eauto. }
     - pose proof Inv as Dom. apply owit_inv_dom in Dom. destruct H0 as (k& LUO& ?& ?). destruct x.
       + exists (<[k:=(witness_assigned (OC:=ord_obl_class) (η fuel))]>W1). split.
         * econstructor 2. econstructor 2. exists k. split; eauto.
@@ -271,12 +264,6 @@ Section mupd.
           { subst. rewrite !lookup_insert_eq. econstructor. done. }
           { rewrite !lookup_insert_ne; eauto. }
       + exists (<[k:=(witness_fulfilled)]>W1). split.
-        * econstructor 2. econstructor 2. exists k. split; eauto.
-          apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto.
-        * subst. intros ?. destruct (decide (i = k)).
-          { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
-          { rewrite !lookup_insert_ne; eauto. }
-      + exists (<[k:=(witness_expired)]>W1). split.
         * econstructor 2. econstructor 2. exists k. split; eauto.
           apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto.
         * subst. intros ?. destruct (decide (i = k)).

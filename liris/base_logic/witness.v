@@ -6,7 +6,6 @@ From transfinite.stepindex Require Import utils.
 Variant witness `{OC : obl_class} : Type :=
   | witness_assigned (wit : obl_fuel)
   | witness_fulfilled
-  | witness_expired
 .
 
 (* Step relations. *)
@@ -18,24 +17,17 @@ Variant witness_fulfill `{OC : obl_class} : witness → witness → Prop :=
   | witness_fulfill_intro f :
     witness_fulfill (witness_assigned f) (witness_fulfilled).
 
-Variant witness_expire `{OC : obl_class} : witness → witness → Prop :=
-  | witness_expire_intro :
-    witness_expire (witness_fulfilled) (witness_expired).
-
 Variant witness_step `{OC : obl_class} : witness → witness → Prop :=
   | witness_step_progress g1 g2 :
     witness_progress g1 g2 → witness_step g1 g2
   | witness_step_fulfill g1 g2 :
-    witness_fulfill g1 g2 → witness_step g1 g2
-  | witness_step_expire g1 g2 :
-    witness_expire g1 g2 → witness_step g1 g2.
+    witness_fulfill g1 g2 → witness_step g1 g2.
 
 Definition witness_keep `{OC : obl_class} : witness → witness → Prop :=
   λ w1 w2,
     match w1, w2 with
     | (witness_assigned _), (witness_assigned _) => True
     | (witness_fulfilled), (witness_fulfilled) => True
-    | (witness_expired), (witness_expired) => True
     | _, _ => False
     end.
 
@@ -100,7 +92,6 @@ Definition wits_mon `{OC : obl_class} : witnesses → witnesses → Prop :=
                           match w1, w2 with
                           | witness_assigned a1, witness_assigned a2 => a2 w≤ a1
                           | witness_fulfilled, witness_fulfilled => True
-                          | witness_expired, witness_expired => True
                           | _, _ => False
                           end) W1 W2.
 
@@ -243,7 +234,6 @@ Section witnesses.
     destruct HC as [[HC Stepi] | [HC Eqi]].
     - inv Stepi.
       + inv H0. eapply WFOCM.lt_le; eauto.
-      + inv H0; done.
       + inv H0; done.
     - subst. destruct w2; try done.
   Qed.
