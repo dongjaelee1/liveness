@@ -14,13 +14,13 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
 | tf_ghost (p : iProp Σ)
 | tf_and (P Q : tf)
 | tf_or (P Q : tf)
-(** For impl and wand, we only allow pure Prop in the left side. *)
+(** For impl and wnad, we only allow pure Prop in the left side.
+    This makes the wand just an impl, so we omit the wand. *)
 | tf_impl (P : Prop) (Q : tf)
+(* | tf_wand (P : Prop) (Q : tf) *)
 | tf_forall (A : Type) (P : A → tf)
 | tf_exist (A : Type) (P : A → tf)
 | tf_sep (P Q : tf)
-(** For impl and wand, we only allow pure Prop in the left side. *)
-| tf_wand (P : Prop) (Q : tf)
 | tf_pers (P : tf)
 | tf_always (N : namespace) (P : tf)
 (** P until Q, using namespace N and oid k. *)
@@ -47,7 +47,7 @@ Notation f_exist A := (tf_exist A).
 Notation "∃'" := (f_exist _) (only parsing) : tf_scope.
 Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%F)) ..)) : tf_scope.
 Infix "∗" := (tf_sep) : tf_scope.
-Infix "-∗" := (tf_wand) : tf_scope.
+(* Infix "-∗" := (tf_wand) : tf_scope. *)
 Notation "□ P" := (tf_pers P%F) : tf_scope.
 
 (** Define patterns corresponding to LTL temporal properties. *)
@@ -90,7 +90,7 @@ Section depth.
     | tf_forall A P => (limit (λ (a: A), tf_depth (P a)))
     | tf_exist A P => (limit (λ (a: A), tf_depth (P a)))
     | tf_sep P Q => (tf_depth P ⊕ tf_depth Q)
-    | tf_wand P Q => (succ (tf_depth Q))
+    (* | tf_wand P Q => (succ (tf_depth Q)) *)
     | tf_pers P => (succ (tf_depth P))
     | tf_always N P => (succ (tf_depth P))
     | tf_until N k b q P Q => (tf_depth P ⊕ tf_depth Q)
