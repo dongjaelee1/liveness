@@ -33,9 +33,7 @@ Fixpoint tf_logic `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun
   | tf_sep P Q => (tf_logic P ∗ tf_logic Q)%I
   | tf_wand P Q => (⌜P⌝ -∗ tf_logic Q)%I
   | tf_pers P => (□ (tf_logic P))%I
-  | tf_always N k P =>
-      (oblP_expired k ∗
-       oblP_inv N k False%I False%I (tf_logic P)%I)%I
+  | tf_always N P => (inv N (tf_logic P))%I
   | tf_until N k b q P Q =>
       (oblP_assigned k b (q/2)%Qp ∗
        oblP_inv N k (tf_logic P)%I (tf_logic Q)%I

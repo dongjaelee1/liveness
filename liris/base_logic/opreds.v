@@ -43,24 +43,6 @@ Local Definition oblP_fulfilled_unseal :
   @oblP_fulfilled = @oblP_fulfilled_def := oblP_fulfilled_aux.(seal_eq).
 Global Arguments oblP_fulfilled {SI Σ _}.
 
-Local Definition oblP_alive_def `{SI : indexT} `{@mupdGS SI Σ}
-  k q : iProp Σ :=
-  oblP_id k ∗ oblG_alive k (q/2 + q/2/2)%Qp.
-Local Definition oblP_alive_aux : seal (@oblP_alive_def). Proof. by eexists. Qed.
-Definition oblP_alive := oblP_alive_aux.(unseal).
-Local Definition oblP_alive_unseal :
-  @oblP_alive = @oblP_alive_def := oblP_alive_aux.(seal_eq).
-Global Arguments oblP_alive {SI Σ _}.
-
-Local Definition oblP_expired_def `{SI : indexT} `{@mupdGS SI Σ}
-  k : iProp Σ :=
-  oblP_fulfilled k ∗ oblG_expired k.
-Local Definition oblP_expired_aux : seal (@oblP_expired_def). Proof. by eexists. Qed.
-Definition oblP_expired := oblP_expired_aux.(unseal).
-Local Definition oblP_expired_unseal :
-  @oblP_expired = @oblP_expired_def := oblP_expired_aux.(seal_eq).
-Global Arguments oblP_expired {SI Σ _}.
-
 Local Definition oblP_fuel_val `{SI : indexT} `{@mupdGS SI Σ}
   k α : iProp Σ :=
   oblP_id k ∗ oblG_fuel k α.
@@ -75,9 +57,9 @@ Local Definition oblP_fuel_unseal :
 Global Arguments oblP_fuel {SI Σ _ _}.
 
 Local Definition oblP_variant_def `{SI : indexT} `{@mupdGS SI Σ}
-  k (P Q R : iProp Σ) : iProp Σ :=
+  k (P Q : iProp Σ) : iProp Σ :=
   ((oblP_assigned k false (1/2)%Qp ∗ P) ∨
-     ((oblP_assigned k true (1/2)%Qp ∨ oblP_fulfilled k) ∗ (Q ∨ oblP_expired k) ∗ R))%I.
+     ((oblP_assigned k true (1/2)%Qp ∨ oblP_fulfilled k) ∗ Q))%I.
 Local Definition oblP_variant_aux : seal (@oblP_variant_def). Proof. by eexists. Qed.
 Definition oblP_variant := oblP_variant_aux.(unseal).
 Local Definition oblP_variant_unseal :
@@ -85,8 +67,8 @@ Local Definition oblP_variant_unseal :
 Global Arguments oblP_variant {SI Σ _}.
 
 Local Definition oblP_inv_def `{SI : indexT} `{@mupdGS SI Σ}
-  N k (P Q R : iProp Σ) : iProp Σ :=
-  oblP_id k ∗ oblG_inv N k ((1/2)/2 + (1/2)/2/2)%Qp P Q R.
+  N k (P Q : iProp Σ) : iProp Σ :=
+  oblP_id k ∗ oblG_inv N k ((1/2)/2 + (1/2)/2/2)%Qp P Q.
 Local Definition oblP_inv_aux : seal (@oblP_inv_def). Proof. by eexists. Qed.
 Definition oblP_inv := oblP_inv_aux.(unseal).
 Local Definition oblP_inv_unseal :
@@ -183,8 +165,6 @@ Ltac unfold_opreds :=
   try rewrite !oblP_fuel_unseal /oblP_fuel_def;
   (* try rewrite !oblP_fuel_val_unseal /oblP_fuel_val_def; *)
   try rewrite /oblP_fuel_val;
-  try rewrite !oblP_expired_unseal /oblP_expired_def;
-  try rewrite !oblP_alive_unseal /oblP_alive_def;
   try rewrite !oblP_fulfilled_unseal /oblP_fulfilled_def;
   try rewrite !oblP_assigned_unseal /oblP_assigned_def;
   try rewrite !oblP_layer_unseal /oblP_layer_def;
@@ -205,9 +185,7 @@ Section preds.
     Proof. unfold_opreds. apply _. Qed.
     Global Instance oblP_fulfilled_persistent k : Persistent (oblP_fulfilled k).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance oblP_expired_persistent k : Persistent (oblP_expired k).
-    Proof. unfold_opreds. apply _. Qed.
-    Global Instance oblP_inv_persistent N k P Q R : Persistent (oblP_inv N k P Q R).
+    Global Instance oblP_inv_persistent N k P Q : Persistent (oblP_inv N k P Q).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance thP_term_persistent i : Persistent (thP_term i).
     Proof. unfold_opreds. apply _. Qed.
@@ -231,17 +209,13 @@ Section preds.
     Proof. unfold_opreds. apply _. Qed.
     Global Instance oblP_fulfilled_timeless k : Timeless (oblP_fulfilled k).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance oblP_alive_timeless k q : Timeless (oblP_alive k q).
-    Proof. unfold_opreds. apply _. Qed.
-    Global Instance oblP_expired_timeless k : Timeless (oblP_expired k).
-    Proof. unfold_opreds. apply _. Qed.
     Global Instance oblP_fuel_val_timeless k α : Timeless (oblP_fuel_val k α).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance oblP_fuel_timeless k ℓ μ : Timeless (oblP_fuel k ℓ μ).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance oblP_variant_timeless k P Q R :
-      Timeless P → Timeless Q → Timeless R →
-      Timeless (oblP_variant k P Q R).
+    Global Instance oblP_variant_timeless k P Q :
+      Timeless P → Timeless Q →
+      Timeless (oblP_variant k P Q).
     Proof. intros. unfold_opreds. apply _. Qed.
     Global Instance thP_obls_timeless i G q : Timeless (thP_obls i G q).
     Proof. unfold_opreds. apply _. Qed.
@@ -261,35 +235,25 @@ Section preds.
     Global Instance wit_fuels_timeless k ℓ α F : Timeless (wit_fuels k ℓ α F).
     Proof. unfold_opreds. apply _. Qed.
 
-    Global Instance oblP_inv_contractive_1 N k Q R : Contractive (λ P, oblP_inv N k P Q R).
+    Global Instance oblP_inv_contractive_1 N k Q : Contractive (λ P, oblP_inv N k P Q).
     Proof.
       unfold_opreds. rewrite /oblG_elem /oblG_inv /oblG_variant. solve_contractive.
     Qed.
-    Global Instance oblP_inv_contractive_2 N k P R : Contractive (λ Q, oblP_inv N k P Q R).
-    Proof.
-      unfold_opreds. rewrite /oblG_elem /oblG_inv /oblG_variant. solve_contractive.
-    Qed.
-    Global Instance oblP_inv_contractive_3 N k P Q : Contractive (λ R, oblP_inv N k P Q R).
+    Global Instance oblP_inv_contractive_2 N k P : Contractive (λ Q, oblP_inv N k P Q).
     Proof.
       unfold_opreds. rewrite /oblG_elem /oblG_inv /oblG_variant. solve_contractive.
     Qed.
 
-    Global Instance oblP_inv_ne_1 N k Q R : NonExpansive (λ P, oblP_inv N k P Q R).
+    Global Instance oblP_inv_ne_1 N k Q : NonExpansive (λ P, oblP_inv N k P Q).
     Proof. apply _. Qed.
-    Global Instance oblP_inv_ne_2 N k P R : NonExpansive (λ Q, oblP_inv N k P Q R).
-    Proof. apply _. Qed.
-    Global Instance oblP_inv_ne_3 N k P Q : NonExpansive (λ R, oblP_inv N k P Q R).
+    Global Instance oblP_inv_ne_2 N k P : NonExpansive (λ Q, oblP_inv N k P Q).
     Proof. apply _. Qed.
 
-    Global Instance oblP_inv_proper_1 N k Q R : Proper (equiv ==> equiv) (λ P, oblP_inv N k P Q R).
+    Global Instance oblP_inv_proper_1 N k Q : Proper (equiv ==> equiv) (λ P, oblP_inv N k P Q).
     Proof.
       unfold_opreds. repeat intro. rewrite /oblG_inv /oblG_variant H. done.
     Qed.
-    Global Instance oblP_inv_proper_2 N k P R : Proper (equiv ==> equiv) (λ Q, oblP_inv N k P Q R).
-    Proof.
-      unfold_opreds. repeat intro. rewrite /oblG_inv /oblG_variant H. done.
-    Qed.
-    Global Instance oblP_inv_proper_3 N k P Q : Proper (equiv ==> equiv) (λ R, oblP_inv N k P Q R).
+    Global Instance oblP_inv_proper_2 N k P : Proper (equiv ==> equiv) (λ Q, oblP_inv N k P Q).
     Proof.
       unfold_opreds. repeat intro. rewrite /oblG_inv /oblG_variant H. done.
     Qed.
@@ -304,18 +268,6 @@ Section preds.
         iCombine "Gv1 Gv3" as "Gv1". iSplitL "Gv1"; iFrame. iSplitR "Gv4"; iFrame.
     Qed.
     Global Instance oblP_assigned_as_fractional k b q : AsFractional (oblP_assigned k b q) (oblP_assigned k b) q.
-    Proof. split; [auto|apply _]. Qed.
-
-    Global Instance oblP_alive_fractional k : Fractional (oblP_alive k).
-    Proof.
-      rewrite !oblP_alive_unseal /oblP_alive_def. intros p q. iSplit.
-      - iIntros "(#$& [Gv1 Gv2])". rewrite !Qp.div_add_distr.
-        iDestruct "Gv1" as "[Gv1 Gv1']". iDestruct "Gv2" as "[Gv2 Gv2']".
-        iCombine "Gv1 Gv2" as "$". iCombine "Gv1' Gv2'" as "$".
-      - iIntros "((#$& [Gv1 Gv2])& _& [Gv3 Gv4])". rewrite !Qp.div_add_distr.
-        iCombine "Gv1 Gv3" as "Gv1". iSplitL "Gv1"; iFrame. iSplitR "Gv4"; iFrame.
-    Qed.
-    Global Instance oblP_alive_as_fractional k q : AsFractional (oblP_alive k q) (oblP_alive k) q.
     Proof. split; [auto|apply _]. Qed.
 
     (** oblP_assigned and oblP_fulfilled rules *)
@@ -333,28 +285,9 @@ Section preds.
       iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.
     Qed.
 
-    Lemma oblP_assigned_expired_false k b q :
-      oblP_assigned k b q -∗ oblP_expired k -∗ False.
-    Proof.
-      unfold_opreds. iIntros "(#Ge& Gl) (_& #Gu)".
-      iPoseProof (oblG_assigned_expired_false with "[$]") as "%". done.
-    Qed.
-
-    (** oblP_alive and oblP_expired rules *)
-    Lemma oblP_alive_expired_false k q :
-      oblP_alive k q -∗ oblP_expired k -∗ False.
-    Proof.
-      unfold_opreds. iIntros "(#Ge& Gv) (_& #Gve)".
-      iPoseProof (oblG_alive_expired_false with "[$]") as "%". done.
-    Qed.
-
-    Lemma oblP_expired_fulfilled k :
-      oblP_expired k -∗ oblP_fulfilled k.
-    Proof. unfold_opreds. iIntros "[$ _]". Qed.
-
+    (** oblP_fuel_val rules *)
     Local Open Scope ord.
 
-    (** oblP_fuel_val rules *)
     Lemma oblP_fuel_val_eq k a0 a1 :
       (a0 == a1) → oblP_fuel_val k a0 = oblP_fuel_val k a1.
     Proof.
@@ -972,12 +905,11 @@ Section preds.
       |=[n,Θ]=>m ∃ k, (⌜ k ∉ G ⌝) ∗
                      thP_obls i ({[k]} ∪ G) q ∗
                      oblP_assigned k b (1/2)%Qp ∗
-                     oblP_alive k 1 ∗
                      oblP_layer k ℓ ∗
                      oblP_id k ∗
                      oblP_fuel k ℓ μ ∗
                      witP_layer k ℓ ∗
-                     (∀ E N (P Q R : iProp Σ), (▷ (if b then (Q ∗ R) else P)) ={E}=∗ oblP_inv N k P Q R).
+                     (∀ E N (P Q : iProp Σ), (▷ (if b then Q else P)) ={E}=∗ oblP_inv N k P Q).
     Proof.
       unfold_opreds. iIntros "(#Oe& Ox& Ob& OS)".
       iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
@@ -985,7 +917,7 @@ Section preds.
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
       assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-      iMod (osat_alloc_obl_assigned _ k b ℓ μ i with "S") as "(S& #Gwf& #Ge& Gl& Gv& Gf& Go& %OStep)".
+      iMod (osat_alloc_obl_assigned _ k b ℓ μ i with "S") as "(S& #Gwf& #Ge& Gl& Gf& Go& %OStep)".
       1: auto.
       iDestruct "Gl" as "[Gl0 Gl1]".
       iMod (othread_alloc_obl with "[$S $O $Ob $Ge $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
@@ -1006,19 +938,19 @@ Section preds.
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S O W". iSplitL "A".
       { subst Ω2. rewrite dom_insert_L. iFrame. eauto. }
-      iModIntro. iExists k. iFrame "Oe Gwf Ge Ww Gf Ox Gl' Gv". iSplitR. 1: auto.
+      iModIntro. iExists k. iFrame "Oe Gwf Ge Ww Gf Ox Gl'". iSplitR. 1: auto.
       iSplitL "Ob OS Go Oo0 Oo1".
       { iFrame "Ob". iApply big_sepS_union. 1: set_solver.
         rewrite big_sepS_singleton. iFrame "OS Ge Go". iCombine "Oo0 Oo1" as "$". }
-      iIntros (E N P Q R) "HP". destruct b.
-      - iMod (oblG_inv_alloc_assigned_true _ N _ _ P Q R with "[$Gl $HP]") as "#GVar". by iModIntro.
-      - iMod (oblG_inv_alloc_assigned_false _ N _ _ P Q R with "[$Gl $HP]") as "#GVar". by iModIntro.
+      iIntros (E N P Q) "HP". destruct b.
+      - iMod (oblG_inv_alloc_assigned_true _ N _ _ P Q with "[$Gl $HP]") as "#GVar". by iModIntro.
+      - iMod (oblG_inv_alloc_assigned_false _ N _ _ P Q with "[$Gl $HP]") as "#GVar". by iModIntro.
     Qed.
 
     Lemma obl_alloc_fulfilled_mupd n Θ ℓ μ :
-      ⊢ |=[n,Θ]=>m ∃ k, oblP_fulfilled k ∗ oblP_alive k 1 ∗ oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗
+      ⊢ |=[n,Θ]=>m ∃ k, oblP_fulfilled k ∗ oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗
                        witP_layer k ℓ ∗
-                       (∀ E N (P Q R : iProp Σ), (▷ (Q ∗ R)) ={E}=∗ oblP_inv N k P Q R).
+                       (∀ E N (P Q : iProp Σ), (▷ Q) ={E}=∗ oblP_inv N k P Q).
     Proof.
       unfold_opreds.
       iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
@@ -1026,7 +958,7 @@ Section preds.
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
       assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-      iMod (osat_alloc_obl_fulfilled _ k ℓ μ with "S") as "(S& #Gwf& #Ge& #Gu& Gv& Gf& %OStep)".
+      iMod (osat_alloc_obl_fulfilled _ k ℓ μ with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)".
       { auto. }
       iMod (owit_alloc_witness_fulfilled _ k (η (measure ℓ μ)) with "[$W $Gu]") as "(W& #Ww)".
       { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
@@ -1042,54 +974,20 @@ Section preds.
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S O W". iSplitL "A".
       { subst Ω2. rewrite dom_insert_L. iFrame. eauto. }
-      iModIntro. iExists k. iFrame "Gwf Ge Ww Gf Gv Gu".
-      iIntros (E N P Q R) "HQ".
-      iMod (oblG_inv_alloc_fulfilled _ N _ _ P Q R with "[$Gu $HQ]") as "#GVar".
+      iModIntro. iExists k. iFrame "Gwf Ge Ww Gf Gu".
+      iIntros (E N P Q) "HQ".
+      iMod (oblG_inv_alloc_fulfilled _ N _ _ P Q with "[$Gu $HQ]") as "#GVar".
       iModIntro. eauto.
     Qed.
 
-    Lemma obl_alloc_expired_mupd n Θ ℓ μ :
-      ⊢ |=[n,Θ]=>m ∃ k, oblP_expired k ∗ oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗
-                       witP_layer k ℓ ∗
-                       (∀ E N (P Q R : iProp Σ), (▷ (R)) ={E}=∗ oblP_inv N k P Q R).
-    Proof.
-      unfold_opreds.
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
-      assert (NEW : ∃ k, Ω1 !! k = None).
-      { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
-      destruct NEW as (k& NEWk).
-      assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-      iMod (osat_alloc_obl_expired _ k ℓ μ with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)".
-      { auto. }
-      iMod (owit_alloc_witness_expired _ k (η (measure ℓ μ)) with "[$W $Gu]") as "(W& #Ww)".
-      { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
-      iPoseProof (oblG_expired_fulfilled with "Gu") as "#Gfu".
-      iPoseProof (oassigned_add_obl with "[$A $Ge Gfu]") as "A".
-      { iRight. iFrame "Gfu". }
-      set (Ω2:=(<[k:=(obl_expired)]> Ω1)).
-      iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
-      { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 2. eauto. }
-      iModIntro. iExists Ω2. iSplitR.
-      { iPureIntro. econstructor 2. econstructor 2. auto. }
-      iIntros (? [WStep GWI2]) "!>".
-      pose proof (owit_inv_alloc_expired Ω1 k W1 NinOk1 GWI W2 WStep GWI2) as (NinWk1& WMon).
-      iPoseProof (owit_mon _ _ WMon with "W") as "W".
-      rewrite /model_interp. iFrame "HI S O W". iSplitL "A".
-      { subst Ω2. rewrite dom_insert_L. iFrame. eauto. }
-      iModIntro. iExists k. iFrame "Gwf Ge Ww Gf Gu Gfu".
-      iIntros (E N P Q R) "HQ".
-      iMod (oblG_inv_alloc_expired _ N _ _ P Q R with "[$Gu $HQ]") as "#GVar".
-      iModIntro. eauto.
-    Qed.
-
-    Lemma obl_assigned_to_true_mupd E N k P Q R :
+    Lemma obl_assigned_to_true_mupd E N k P Q :
       ↑N ⊆ E →
-      oblP_inv N k P Q R -∗
+      oblP_inv N k P Q -∗
       |={E,E ∖ ↑N}=> oblP_assigned k false (1/2)%Qp -∗
                     ((▷ (oblP_assigned k false 1 ∗ P)) ∗
                      (∀ b, oblP_assigned k b 1 -∗
                            ∀ n Θ, |=[n,Θ]=>m (oblP_assigned k true (1/2)%Qp) ∗
-                                          ((▷ (Q ∗ R)) ={E ∖ ↑N,E}=∗ True))).
+                                          ((▷ Q) ={E ∖ ↑N,E}=∗ True))).
     Proof.
       unfold_opreds. iIntros (MASK) "(#Ge& #Gvar)".
       iMod (oblG_inv_acc_assigned with "Gvar") as "H". 1: auto.
@@ -1105,26 +1003,26 @@ Section preds.
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S O W A". iSplitR; eauto.
       iDestruct "Ga" as "[[Ga1 Ga2] [Ga1' Ga2']]". iCombine "Ga1 Ga1'" as "Ga1". iCombine "Ga2 Ga2'" as "Ga2".
-      iFrame "Ge Ga1". iIntros "!> !> HQR". iApply "ACC". iNext. iDestruct "HQR" as "[HQ HR]". iRight. iFrame.
+      iFrame "Ge Ga1". iIntros "!> !> HQR". iApply "ACC". iNext. iRight. iFrame.
     Qed.
 
-    Lemma obl_fulfill_mupd E N k P Q R :
+    Lemma obl_fulfill_mupd E N k P Q :
       ↑N ⊆ E →
-      oblP_inv N k P Q R -∗
+      oblP_inv N k P Q -∗
       |={E,E ∖ ↑N}=> ∀ i G q1 q2,
       (⌜k ∈ G⌝) → thP_obls i G q1 -∗ oblP_assigned k true q2 -∗
-      ((▷ (thP_obls i G q1 ∗ oblP_assigned k true q2 ∗ oblP_assigned k true (1/2) ∗ Q ∗ R)) ∗
+      ((▷ (thP_obls i G q1 ∗ oblP_assigned k true q2 ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
        (thP_obls i G q1 -∗
         oblP_assigned k true 1 -∗
         ∀ n Θ, |=[n,Θ]=>m (thP_obls i (G ∖ {[k]}) q1 ∗ oblP_fulfilled k) ∗
-                       ((▷ (Q ∗ R)) ={E ∖ ↑N,E}=∗ True))).
+                       ((▷ (Q)) ={E ∖ ↑N,E}=∗ True))).
     Proof.
       unfold_opreds. iIntros (MASK) "(#Ge& #Gvar)".
       iMod (oblG_inv_acc_assigned with "Gvar") as "H". 1: auto.
       iIntros "!> %%%% %LUGk (#Oe& Ox& Ob& OS) (_& Ga)". iPoseProof ("H" with "Ga") as "[H ACC]".
       iPoseProof (big_sepS_delete _ _ _ LUGk with "OS") as "[(_& Go& Oo) OS]".
       iSplitL "Ox Ob Go Oo OS H".
-      { iNext. iFrame "Oe Ox Ob". iDestruct "H" as "(Gv& Gl& $& $)".
+      { iNext. iFrame "Oe Ox Ob". iDestruct "H" as "(Gl& $& $)".
         rewrite (big_sepS_delete _ _ _ LUGk). iFrame. iFrame "Ge". }
       iIntros "(_& Ox& Ob& OS) (_& Gl) %%".
       iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
@@ -1168,50 +1066,7 @@ Section preds.
       iSplitR "ACC".
       { iFrame. }
       iIntros "HQ". iMod ("ACC" with "[HQ]") as "_".
-      { iNext. iRight. iDestruct "HQ" as "[$ $]". eauto. }
-      done.
-    Qed.
-
-    Lemma obl_expire_mupd E k N (P Q R : iProp Σ) :
-      ↑N ⊆ E →
-      oblP_inv N k P Q R -∗
-      |={E,E ∖ ↑N}=> ∀ qc,
-      oblP_fulfilled k -∗ oblP_alive k qc -∗
-      ((▷ (oblP_alive k qc ∗ Q ∗ R)) ∗
-       (oblP_alive k 1 -∗
-        ∀ n Θ, |=[n,Θ]=>m (oblP_expired k) ∗
-                       ((▷ R) ={E ∖ ↑N,E}=∗ True))).
-    Proof.
-      unfold_opreds. iIntros (MASK) "(#Ge& #Gvar1)".
-      iMod (oblG_inv_acc_fulfilled_alive with "Gvar1") as "H". 1: auto.
-      iIntros "!> % [_ #Gu1] [_ Gv1]". iPoseProof ("H" with "Gu1 Gv1") as "[H ACC]".
-      iSplitL "H".
-      { iNext. iDestruct "H" as "($& $& $)". eauto. }
-      iIntros "(_& Gv1) %%".
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
-      iPoseProof (osat_lookup_fulfilled with "[$S $Ge $Gu1]") as "%LUO1u".
-      iPoseProof (osat_lookup_alive with "[$S $Ge $Gv1]") as "%LUO1v".
-      destruct LUO1u as [LUO1u | LUO1u], LUO1v as [(?&?&LUOv1) | LUOv1].
-      1,3,4: rewrite LUO1u in LUOv1; done.
-      iMod (osat_expire with "[$S $Ge $Gu1 $Gv1]") as "(S& #Gx& %Gstep)".
-      iPoseProof (owit_expire with "[$W $Gx]") as "W".
-      { specialize (GWI k). rewrite LUO1u in GWI. inv GWI. destruct y; try done. }
-      iPoseProof (oassigned_add_obl _ k with "[$A $Ge]") as "A".
-      { iRight. eauto. }
-      set (Ω2:=(<[k:=(obl_expired)]> Ω1)).
-      assert (Gstep' : obl_step obl_fulfilled obl_expired) by (by econstructor 3).
-      iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
-      { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }      
-      iModIntro. iExists Ω2. iSplitR.
-      { iPureIntro. subst Ω2. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
-      iIntros (? [WStep GWI2]).
-      pose proof (owit_inv_expire _ _ _ LUO1u GWI Gstep' W2 WStep GWI2) as [LUW1 WMon].
-      iPoseProof (owit_mon _ _ WMon with "W") as "W".
-      rewrite /model_interp. iFrame "HI S O W". iSplitL "A".
-      { iModIntro. subst Ω2. rewrite dom_insert_L. iFrame. eauto. }
-      iIntros "!> !>". iSplitR; first eauto.
-      iIntros "HR1". iMod ("ACC" with "[HR1]") as "_".
-      { iNext. iRight. iFrame. iFrame "Gu1 Gx". }
+      { iNext. iRight. iFrame. eauto. }
       done.
     Qed.
 
@@ -1231,8 +1086,7 @@ Section preds.
       destruct LUO1o as (?&LUO1o). rename x into a.
       iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1) | #Gu])".
       { apply elem_of_dom. eauto. }
-      2:{ iExFalso. iPoseProof (osat_lookup_fulfilled with "[$S $Ge $Gu]") as "%".
-          destruct H as [LU | LU]; rewrite LU in LUO1o; done. }
+      2:{ iExFalso. iPoseProof (osat_lookup_fulfilled with "[$S $Ge $Gu]") as "%". rewrite H in LUO1o; done. }
       iPoseProof (oblG_owner_agree _ i0 i1 with "[$Go $Go1]") as "%". destruct H as [-> _].
       iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
       iMod (othread_delete_obl_frac with "[$O $Ob1 $Oo]") as "(O& Ob1& Go2)".
@@ -1326,8 +1180,7 @@ Section preds.
       iAssert (|==> [∗ set] r ∈ R, (witG_witness r Ord.O) ∨ (oblG_fulfilled r))%I with "[Ws]" as ">Rs".
       { subst W1. iPoseProof (big_sepM_union with "Ws") as "[Ws1 _]"; first auto. iClear "REs".
         subst R. rewrite -big_sepS_bupd -big_sepM_dom. iApply (big_sepM_impl with "Ws1").
-        iIntros "!> %%% H".  destruct x; eauto.
-        iPoseProof (oblG_expired_fulfilled with "H") as "$". done. }
+        iIntros "!> %%% H".  destruct x; eauto. }
       iCombine "REs Rs" as "Rs". iPoseProof (big_sepS_sep with "Rs") as "Rs".
       pose proof (owit_inv_rc_step_same_gls _ _ _ GWI1 WStep GWI2) as WMon.
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
@@ -1338,26 +1191,26 @@ Section preds.
     Qed.
 
     (** Variant access rules *)
-    Lemma oblP_variant_unfold k P Q R :
-      oblP_variant k P Q R
+    Lemma oblP_variant_unfold k P Q :
+      oblP_variant k P Q
       ⊣⊢ ((oblP_assigned k false (1/2)%Qp ∗ P) ∨
-            ((oblP_assigned k true (1 / 2) ∨ oblP_fulfilled k) ∗ (Q ∨ oblP_expired k) ∗ R)).
+            ((oblP_assigned k true (1 / 2) ∨ oblP_fulfilled k) ∗ Q)).
     Proof. rewrite !oblP_variant_unseal /oblP_variant_def. auto. Qed.
 
-    Local Lemma oblP_variant_oblG_variant k P Q R :
-      oblP_variant k P Q R -∗
-      oblG_variant k ((1/2)/2 + (1/2)/2/2)%Qp P Q R.
+    Local Lemma oblP_variant_oblG_variant k P Q :
+      oblP_variant k P Q -∗
+      oblG_variant k ((1/2)/2 + (1/2)/2/2)%Qp P Q.
     Proof.
       unfold_opreds. iIntros "[H | H]".
       - iLeft. iDestruct "H" as "((_& $)& $)".
-      - iRight. iDestruct "H" as "(V& H& $)".
+      - iRight. iDestruct "H" as "(V& $)".
         iDestruct "V" as "[[_ $] | [_ $]]"; iDestruct "H" as "[$ | (_& $)]".
     Qed.
 
-    Lemma oblP_inv_acc_cases E N k P Q R :
+    Lemma oblP_inv_acc_cases E N k P Q :
       ↑N ⊆ E →
-      oblP_inv N k P Q R ={E,E ∖ ↑N}=∗
-      (▷ oblP_variant k P Q R) ∗ (▷ oblP_variant k P Q R ={E ∖ ↑N,E}=∗ True).
+      oblP_inv N k P Q ={E,E ∖ ↑N}=∗
+      (▷ oblP_variant k P Q) ∗ (▷ oblP_variant k P Q ={E ∖ ↑N,E}=∗ True).
     Proof.
       unfold_opreds. iIntros (MASK) "(#Ge& #Gvar)".
       iMod (oblG_inv_acc with "Gvar") as "[[H | H] ACC]". 1: auto.
@@ -1366,96 +1219,63 @@ Section preds.
         + iIntros "H". iMod ("ACC" with "[H]") as "_"; last done.
           iNext. iApply oblP_variant_oblG_variant. unfold_opreds. done.
       - iModIntro. iSplitL "H".
-        + iNext. iRight. iDestruct "H" as "(V& H& $)". iFrame "Ge". iFrame.
-          iDestruct "H" as "[$ | H]". iRight.
-          iPoseProof (oblG_expired_fulfilled with "H") as "#Gf". eauto.
+        + iNext. iRight. iDestruct "H" as "(V& $)". iFrame "Ge". iFrame.
         + iIntros "H". iMod ("ACC" with "[H]") as "_"; last done.
           iNext. iApply oblP_variant_oblG_variant. unfold_opreds. done.
     Qed.
 
-    Lemma oblP_inv_acc E N k P Q R :
+    Lemma oblP_inv_acc E N k P Q :
       ↑N ⊆ E →
-      oblP_inv N k P Q R ={E,E ∖ ↑N}=∗
-      (▷ ((oblP_assigned k false (1/2) ∗ P) ∨ ((oblP_assigned k true (1/2) ∨ oblP_fulfilled k) ∗ (Q ∨ oblP_expired k) ∗ R))) ∗
-      (▷ oblP_variant k P Q R ={E ∖ ↑N,E}=∗ True).
+      oblP_inv N k P Q ={E,E ∖ ↑N}=∗
+      (▷ ((oblP_assigned k false (1/2) ∗ P) ∨ ((oblP_assigned k true (1/2) ∨ oblP_fulfilled k) ∗ Q))) ∗
+      (▷ oblP_variant k P Q ={E ∖ ↑N,E}=∗ True).
     Proof.
       iIntros (H) "Gv". iMod (oblP_inv_acc_cases with "Gv") as "[H $]". 1: auto.
       iModIntro. iNext. by iApply oblP_variant_unfold.
     Qed.
 
-    Lemma oblP_inv_acc_assigned E N k P Q R :
+    Lemma oblP_inv_acc_assigned E N k P Q :
       ↑N ⊆ E →
-      oblP_inv N k P Q R
+      oblP_inv N k P Q
       ={E,E ∖ ↑N}=∗ ∀ b q,
       oblP_assigned k b q -∗
-      (▷ (oblP_assigned k b q ∗ (if b then (oblP_assigned k true (1/2) ∗ Q ∗ R) else (oblP_assigned k false (1/2) ∗ P)))) ∗
-      (▷ oblP_variant k P Q R ={E ∖ ↑N,E}=∗ True).
+      (▷ (oblP_assigned k b q ∗ (if b then (oblP_assigned k true (1/2) ∗ Q) else (oblP_assigned k false (1/2) ∗ P)))) ∗
+      (▷ oblP_variant k P Q ={E ∖ ↑N,E}=∗ True).
     Proof.
       unfold_opreds. iIntros (MASK) "(#Ge& #Gvar)".
       iMod (oblG_inv_acc_assigned with "Gvar") as "H". 1: auto.
       iIntros "!> %% (_& Ga)". iPoseProof ("H" with "Ga") as "[H ACC]". iFrame "Ge". iSplitL "H".
       { iNext. destruct b.
-        - iDestruct "H" as "($& $& $& $)". auto.
+        - iDestruct "H" as "($& $& $)". auto.
         - iDestruct "H" as "($& $& $)". auto. }
       iIntros "H". iApply "ACC". iNext. iApply oblP_variant_oblG_variant. unfold_opreds. done.
     Qed.
 
-    Lemma oblP_inv_acc_fulfilled E N k P Q R :
+    Lemma oblP_inv_acc_fulfilled E N k P Q :
       ↑N ⊆ E →
-      oblP_inv N k P Q R
+      oblP_inv N k P Q
       ={E,E ∖ ↑N}=∗
       oblP_fulfilled k -∗
-      ((▷ ((Q ∨ oblP_expired k) ∗ R)) ∗
-       (▷ oblP_variant k P Q R ={E ∖ ↑N,E}=∗ True)).
+      ((▷ (Q)) ∗
+       (▷ oblP_variant k P Q ={E ∖ ↑N,E}=∗ True)).
     Proof.
       unfold_opreds. iIntros (MASK) "(#Ge& #Gvar)".
       iMod (oblG_inv_acc_fulfilled with "Gvar") as "H". 1: auto.
       iIntros "!> [_ #Gu]". iPoseProof ("H" with "Gu") as "[H ACC]".
       iSplitL "H".
-      { iNext. iDestruct "H" as "[[HQ | #Gx] $]".
-        - by iLeft.
-        - iRight. eauto. }
+      { iNext. iFrame. }
       iIntros "H". iApply "ACC". iNext. iApply oblP_variant_oblG_variant. unfold_opreds. done.
     Qed.
 
-    Lemma oblP_inv_acc_fulfilled_persistent E N k P Q R :
-      Persistent R →
+    Lemma oblP_inv_acc_fulfilled_persistent E N k P Q :
+      Persistent Q →
       ↑N ⊆ E →
-      oblP_inv N k P Q R -∗
-      oblP_fulfilled k ={E}[E ∖ ↑N]▷=∗ R.
+      oblP_inv N k P Q -∗
+      oblP_fulfilled k ={E}[E ∖ ↑N]▷=∗ Q.
     Proof.
       iIntros (PR HE) "#GU #Gf". iMod (oblP_inv_acc_fulfilled with "GU Gf") as "[H ACC]". 1: auto.
-      iModIntro. iNext. iDestruct "H" as "[H #HR]". iFrame "HR". iApply "ACC".
-      rewrite oblP_variant_unfold. iRight. iFrame "Gf HR". eauto.
-    Qed.
-
-    Lemma oblP_inv_acc_alive E N k P Q R :
-      ↑N ⊆ E →
-      oblP_inv N k P Q R
-      ={E,E ∖ ↑N}=∗ ∀ q,
-      oblP_alive k q -∗
-      ((▷ (oblP_alive k q ∗ ((oblP_assigned k false (1/2) ∗ P) ∨ ((oblP_assigned k true (1/2) ∨ oblP_fulfilled k) ∗ Q ∗ R)))) ∗
-       (▷ oblP_variant k P Q R ={E ∖ ↑N,E}=∗ True)).
-    Proof.
-      iIntros (HE) "#GU". iMod (oblP_inv_acc with "GU") as "[[H | H] ACC]"; first auto.
-      - iIntros "!> % Ga". iFrame.
-      - iIntros "!> % Ga". iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "(H1& [HQ | #Gx]& HR)".
-        { iFrame. iRight. iFrame. }
-        { iPoseProof (oblP_alive_expired_false with "Ga Gx") as "%". done. }
-    Qed.
-
-    Lemma oblP_inv_acc_fulfilled_alive E N k P Q R :
-      ↑N ⊆ E →
-      oblP_inv N k P Q R
-      ={E,E ∖ ↑N}=∗ ∀ q,
-      oblP_fulfilled k -∗ oblP_alive k q -∗
-      ((▷ (oblP_alive k q ∗ (Q ∗ R))) ∗
-       (▷ oblP_variant k P Q R ={E ∖ ↑N,E}=∗ True)).
-    Proof.
-      iIntros (HE) "#GU". iMod (oblP_inv_acc_fulfilled with "GU") as "H"; first auto.
-      iIntros "!> % #Gf Ga". iPoseProof ("H" with "Gf") as "[H ACC]".
-      iSplitR "ACC"; last done. iNext. iDestruct "H" as "[[$ | #Gx] $]"; first eauto.
-      iPoseProof (oblP_alive_expired_false with "Ga Gx") as "%". done.
+      iModIntro. iNext. iDestruct "H" as "#H". iFrame "H". iApply "ACC".
+      rewrite oblP_variant_unfold. iRight. eauto.
     Qed.
 
   End fmupd.
