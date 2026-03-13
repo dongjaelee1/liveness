@@ -22,7 +22,7 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
 | tf_exist (A : Type) (P : A → tf)
 | tf_sep (P Q : tf)
 | tf_pers (P : tf)
-| tf_always (N : namespace) (P : tf)
+| tf_always (N : namespace) (k : oid) (P : tf)
 (** P until Q, using namespace N and oid k. *)
 | tf_until (N : namespace) (k : oid) (b : bool) (q : Qp) (P Q : tf)
 .
@@ -58,7 +58,7 @@ Global Arguments tf_eventually {SI Σ Π}.
 
 (* P Weak until Q *)
 Definition tf_weakuntil `{SI : indexT} {Σ} {Π} N k b q (P Q : @tf SI Σ Π) : tf :=
-  (tf_until N k b q P (Q ∨ tf_always N P))%F.
+  (tf_until N k b q P (Q ∨ ∃ k', tf_always N k' P))%F.
 (*   (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
 Global Arguments tf_weakuntil {SI Σ Π}.
 
@@ -92,8 +92,10 @@ Section depth.
     | tf_sep P Q => (tf_depth P ⊕ tf_depth Q)
     (* | tf_wand P Q => (succ (tf_depth Q)) *)
     | tf_pers P => (succ (tf_depth P))
-    | tf_always N P => (succ (tf_depth P))
+    | tf_always N k P => (succ (tf_depth P))
     | tf_until N k b q P Q => (tf_depth P ⊕ tf_depth Q)
     end.
+
+  (* Ord.build_upperbound: ∀ [A : Type] (os : A → Ord.t) (a : A), (os a < Ord.build os)%ord *)
 
 End depth.

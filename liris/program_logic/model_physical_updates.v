@@ -156,7 +156,8 @@ Section mprog.
       subst R. rewrite -big_sepS_bupd -big_sepM_dom. iApply (big_sepM_impl with "Ws1").
       iIntros "!> %%% H".  destruct x; eauto.
       - iDestruct "H" as "(%&%& Wc)". iLeft. iApply (witG_witness_mon with "Wc").
-        apply Ord.S_supremum. eauto. }
+        apply Ord.S_supremum. eauto.
+      - iPoseProof (oblG_expired_fulfilled with "H") as "$". done. }
     iCombine "REs Rs" as "Rs". iPoseProof (big_sepS_sep with "Rs") as "Rs".
     iMod ("H" with "[$Ob $Ox $Oe $OS Rs]") as "H".
     { iApply (big_sepS_impl with "Rs"). iIntros "!> %% (#Ge& [Ww | Gf])"; eauto. }

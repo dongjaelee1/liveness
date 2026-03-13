@@ -66,6 +66,8 @@ Definition owit `{SI : indexT} {Σ}
             (∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_witness k α)
         | witness_fulfilled =>
             (oblG_fulfilled k)
+        | witness_expired =>
+            (oblG_expired k)
         end)
     )%I.
 
@@ -76,6 +78,7 @@ Definition owit_inv `{!ord_mono_fun_class}
                  match g, w with
                  | (obl_assigned a _), (witness_assigned b) => (b w≤ η a)
                  | (obl_fulfilled), (witness_fulfilled) => True
+                 | (obl_expired), (witness_expired) => True
                  | _, _ => False
                  end
     ) Ω W.
@@ -221,6 +224,21 @@ Section owit.
     iFrame. eauto.
   Qed.
 
+  Lemma owit_alloc_witness_expired W k a :
+    k ∉ dom W →
+    owit W ∗ oblG_expired k
+    ⊢ |==> owit (<[k:=(witness_expired)]>W) ∗ witG_bound k a.
+  Proof.
+    iIntros (Nink) "(W& #Gu)".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
+    iMod (witG_bound_id_alloc _ _ a Nink with "Wti") as "(Wti& #Wb& Ww)".
+    iModIntro. iFrame "Wb".
+    rewrite dom_insert_L. iFrame "Wti".
+    iApply big_sepM_insert.
+    { apply not_elem_of_dom. auto. }
+    iFrame. eauto.
+  Qed.
+
   Lemma owit_mon W1 W2 :
     wits_mon W1 W2 →
     owit W1 ⊢ owit W2.
@@ -253,7 +271,7 @@ Section owit.
     { apply elem_of_dom. eauto. }
     assert (DomEq : {[k]} ∪ dom W = dom W).
     { set_solver + Ink. }
-    rewrite !dom_insert_L !DomEq. iFrame "Wti". inv Prog. 2: inv H. inv H.
+    rewrite !dom_insert_L !DomEq. iFrame "Wti". inv Prog. 2,3: inv H. inv H.
     iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Mk WM]".
     iDestruct "Mk" as "(%& %& Wck)".
     assert (Lt : w2 w< α).
@@ -276,6 +294,8 @@ Section owit.
                (∃ c, ⌜ wzero w< c ⌝ ∗ witG_witness k c)
            | witness_fulfilled =>
                (oblG_fulfilled k)
+           | witness_expired =>
+               (oblG_expired k)
            end).
   Proof.
     iIntros ([Step Keep]) "W".
@@ -292,7 +312,7 @@ Section owit.
     destruct Step as [HC Step].
     iMod (IHW1 _ Step Keep with "M") as "[M Rs]". clear IHW1.
     iFrame "M Rs". destruct HC as [[HC Stepi] | [HC Eqi]].
-    - destruct w1. 2: done. destruct w2. 2: done. inv Stepi. 2: inv H0. inv H0.
+    - destruct w1. 2,3: done. destruct w2. 2,3: done. inv Stepi. 2,3: inv H0. inv H0.
       iDestruct "Mi" as "(%& %& Mci)". assert (Lt : wit0 w< α).
       { eapply WFOCM.lt_le_lt; eauto. }
       apply WFOCM.lt_exists_left in Lt. destruct Lt as (?& Lt& Le).
@@ -300,7 +320,7 @@ Section owit.
       iModIntro. iSplitL "Mci".
       + iFrame. done.
       + iFrame. done.
-    - subst. destruct w2. 2: eauto. done.
+    - subst. destruct w2. 2,3: eauto. done.
   Qed.
 
   Lemma owit_progress_any C W1 W2 :
@@ -327,6 +347,21 @@ Section owit.
     iFrame. eauto.
   Qed.
 
+  Lemma owit_expire W k :
+    W !! k = Some (witness_fulfilled) →
+    owit W ∗ oblG_expired k
+    ⊢ owit (<[k:=(witness_expired)]>W).
+  Proof.
+    iIntros (Luk) "[W #Guk]".
+    rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
+    iPoseProof (big_sepM_delete _ _ _ _ Luk with "WM") as "[Wk WM]".
+    rewrite !dom_insert_L. replace ({[k]} ∪ dom W) with (dom W); cycle 1.
+    { apply elem_of_dom_2 in Luk. set_solver. }
+    iFrame. rewrite -(insert_delete_eq W k). iApply big_sepM_insert.
+    { apply lookup_delete_eq. }
+    iFrame. eauto.
+  Qed.
+
   Lemma owit_get_credit_zero W :
     owit W
     ⊢ owit W ∗
@@ -336,6 +371,8 @@ Section owit.
            (witG_witness k wzero)
        | witness_fulfilled =>
            (oblG_fulfilled k)
+       | witness_expired =>
+           (oblG_expired k)
        end).
   Proof.
     iIntros "W".
@@ -350,6 +387,7 @@ Section owit.
     - iDestruct "Mi" as "(%& %& Wc)". rewrite (witG_witness_eq _ α (α w+ wzero)); cycle 1.
       { rewrite right_id. done. }
       iPoseProof (witG_witness_split with "Wc") as "[Wc Wcz]". iSplitR "Wcz"; iFrame; eauto.
+    - iPoseProof "Mi" as "#Mi". auto.
     - iPoseProof "Mi" as "#Mi". auto.
   Qed.
 
@@ -505,6 +543,48 @@ Section owit.
       symmetry in H5. econstructor.
   Qed.
 
+  Lemma owit_inv_expire Ω k W1 :
+    Ω !! k = Some (obl_fulfilled) →
+    owit_inv Ω W1 →
+    obl_step (obl_fulfilled) (obl_expired) →
+    ∀ W2,
+    W1 ↓∘ W2 →
+    owit_inv (<[k:=(obl_expired)]> Ω) W2 →
+    (W1 !! k = Some (witness_fulfilled) ∧ wits_mon (<[k:=(witness_expired)]> W1) W2).
+  Proof.
+    intros LUO INV1 GStep W2 WSStep INV2.
+    inv GStep; inv H.
+    pose proof INV1 as I1. specialize (I1 k). rewrite LUO in I1. inv I1.
+    destruct y; try done. symmetry in H0.
+    pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
+    destruct y; try done. symmetry in H2.
+    split; first eauto.
+    inv WSStep. inv H; cycle 1.
+    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obl_expired)]> Ω)) in H4; eauto; first done.
+      rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
+    apply wits_one_to_wits_cond in H4. destruct H4 as (?&H4). assert (x = k).
+    { specialize (H4 k). rewrite H0 H2 in H4. inv H4. destruct H6.
+      - destruct H; done.
+      - destruct H; done. }
+    subst x.
+    intros i. specialize (H4 i). destruct (decide (i = k)).
+    { subst. rewrite H2 lookup_insert_eq. econstructor. done. }
+    rewrite lookup_insert_ne; auto.
+    destruct (Ω !! i) eqn:LUO2.
+    - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
+      pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
+      rewrite LUO2 in I4. inv I4. symmetry in H5, H7.
+      rewrite H5 H7 in H4. inv H4. econstructor.
+      destruct H10 as [[HC WS] | [HC WS]]; cycle 1.
+      { inv WS. destruct o, y0; try done. }
+      inv WS.
+    - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
+      symmetry in H.
+      pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
+      rewrite LUO2 in I4. inv I4.
+      symmetry in H5. econstructor.
+  Qed.
+
   Lemma owit_inv_alloc_assigned Ω k W1 :
     k ∉ dom Ω →
     owit_inv Ω W1 →
@@ -538,6 +618,31 @@ Section owit.
     W1 ↓∘ W2 →
     owit_inv (<[k:=(obl_fulfilled)]> Ω) W2 →
     (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_fulfilled)]> W1) W2).
+  Proof.
+    intros LUO INV1 W2 WSStep INV2.
+    apply not_elem_of_dom in LUO.
+    pose proof INV1 as I1. specialize (I1 k). rewrite LUO in I1. inv I1.
+    symmetry in H.
+    pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
+    rename y into w. destruct w; try done. symmetry in H1.
+    split.
+    { apply not_elem_of_dom. auto. }
+    inv WSStep. inv H0.
+    { apply wits_one_dom in H3. exfalso. apply elem_of_dom_2 in H1. apply not_elem_of_dom in H.
+      rewrite H3 in H. set_solver. }
+    destruct H3 as (?&?&?&?).
+    subst. destruct (decide (k = x)).
+    - subst x. rewrite lookup_insert_eq in H1. inv H1. done.
+    - rewrite lookup_insert_ne in H1; auto. rewrite H in H1. inv H1.
+  Qed.
+
+  Lemma owit_inv_alloc_expired Ω k W1 :
+    k ∉ dom Ω →
+    owit_inv Ω W1 →
+    ∀ W2,
+    W1 ↓∘ W2 →
+    owit_inv (<[k:=(obl_expired)]> Ω) W2 →
+    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_expired)]> W1) W2).
   Proof.
     intros LUO INV1 W2 WSStep INV2.
     apply not_elem_of_dom in LUO.

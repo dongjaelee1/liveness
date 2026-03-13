@@ -22,7 +22,9 @@ Definition obl_owner := positive.
 
 Variant obl `{OC : obl_class} : Type :=
   | obl_assigned (fuel : obl_fuel) (owner : obl_owner)
-  | obl_fulfilled.
+  | obl_fulfilled
+  | obl_expired
+.
 
 (* Step relations. *)
 Variant obl_progress `{OC : obl_class} : obl → obl → Prop :=
@@ -33,17 +35,24 @@ Variant obl_fulfill `{OC : obl_class} : obl → obl → Prop :=
   | obl_fulfill_intro f o :
     obl_fulfill (obl_assigned f o) (obl_fulfilled).
 
+Variant obl_expire `{OC : obl_class} : obl → obl → Prop :=
+  | obl_expire_intro :
+    obl_expire (obl_fulfilled) (obl_expired).
+
 Variant obl_step `{OC : obl_class} : obl → obl → Prop :=
   | obl_step_progress g1 g2 :
     obl_progress g1 g2 → obl_step g1 g2
   | obl_step_fulfill g1 g2 :
-    obl_fulfill g1 g2 → obl_step g1 g2.
+    obl_fulfill g1 g2 → obl_step g1 g2
+  | obl_step_expire g1 g2 :
+    obl_expire g1 g2 → obl_step g1 g2.
 
 Definition obl_keep `{OC : obl_class} : obl → obl → Prop :=
   λ g1 g2,
     match g1, g2 with
     | (obl_assigned _ _), (obl_assigned _ _) => True
     | (obl_fulfilled), (obl_fulfilled) => True
+    | (obl_expired), (obl_expired) => True
     | _, _ => False
     end.
 
@@ -52,6 +61,8 @@ Definition obl_le `{OC : obl_class} : obl → obl → Prop :=
     match g1, g2 with
     | (obl_assigned _ _), _ => True
     | (obl_fulfilled), (obl_fulfilled) => True
+    | (obl_fulfilled), (obl_expired) => True
+    | (obl_expired), (obl_expired) => True
     | _, _ => False
     end.
 

@@ -519,10 +519,10 @@ Section othread.
   Proof.
     iIntros "(S& O& Obs& #Ge& Go)".
     iDestruct "Go" as "(Go& (Go1& Go2))". iDestruct "Go2" as "(Go2& Go3)".
-    iPoseProof (osat_open_owner with "[$S $Ge $Go]") as "(Go& (%& Gl'& Go')& ACC)".
+    iPoseProof (osat_open_owner with "[$S $Ge $Go]") as "(Go& (%& Gl'& Ga& Go')& ACC)".
     iCombine "Go Go1 Go' Go2" as "Go". rewrite !Qp.add_assoc.
     iMod (othread_alloc_obl_1 with "[$Go $O $Obs $Go3]") as "(%Nin& Go& O& Obs& Oo)".
-    iDestruct "Go" as "((Go& Go')& Go0)". iPoseProof ("ACC" with "[$Gl' $Go']") as "S".
+    iDestruct "Go" as "((Go& Go')& Go0)". iPoseProof ("ACC" with "[$Gl' $Ga $Go']") as "S".
     iCombine "Go Go0" as "Go". iFrame. done.
   Qed.
 
@@ -713,8 +713,9 @@ Section othread.
     iDestruct "A" as "(#Gek& [(%& Gok& Ook) | #Guk])".
     - iPoseProof (osat_lookup_owner with "[$S $Gek $Gok]") as "(%&%)".
       rewrite LUOk in H. inv H. iApply (othread_obls_owns_elem with "[$O $Tbs $Ook]").
-    - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "%H".
-      rewrite LUOk in H. inv H.
+    - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "[%H | %H]".
+      + rewrite LUOk in H. inv H.
+      + rewrite LUOk in H. inv H.
   Qed.
 
   Lemma othread_obls_lookup Ω TP k i G q :
