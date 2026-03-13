@@ -34,12 +34,10 @@ Fixpoint tf_logic `{SI : indexT} `{!lirisGS Λ Σ}
   | tf_sep P Q => (tf_logic P ∗ tf_logic Q)%I
   (* | tf_wand P Q => (⌜P⌝ -∗ tf_logic Q)%I *)
   | tf_pers P => (□ (tf_logic P))%I
-  | tf_always N k P =>
-      (oblP_expired k ∗
-       oblP_inv N k False%I False%I (tf_logic P)%I)%I
+  | tf_always N P => (inv N (tf_logic P))%I
   | tf_until N k b q P Q =>
       (oblP_assigned k b (q/2)%Qp ∗
-       oblP_inv N k (tf_logic P)%I
+       oblP_inv N k (tf_logic P)%I (tf_logic Q)%I
          (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I
   end
@@ -63,7 +61,7 @@ with tf_intuit `{SI : indexT} `{!lirisGS Λ Σ}
        | tf_always N P => (inv N (tf_logic P))%I
        | tf_until N k b q P Q =>
            ((∃ f o, event_obl i (n, Ω) k (obl_assigned f o)) ∗
-            oblP_inv N k (tf_logic P)%I
+            oblP_inv N k (tf_logic P)%I (tf_logic Q)
               (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
                                      tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)
        end.
@@ -117,7 +115,11 @@ Section proof.
 
   TODO
 
-  Lemma tf_logic_tf_intuit_sfmupd 
+  (* Lemma tf_logic_tf_intuit_sfmupd E Φ : *)
+  (*   tf_logic Φ *)
+  (*   ⊢ |={E}=>m ∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ tf_intuit SI Λ Σ lirisGS0 n' σ' Θ' κs' i' Ω' Q))%I *)
+
+  (*                          tf_intuit *)
 
 End proof.
 
@@ -167,7 +169,7 @@ Section reduction.
     ⟦tf_always N P⟧ₗ = (inv N ⟦P⟧ₗ)%I.
   Proof. done. Qed.
   Lemma tf_until_logic N k b q P Q :
-    ⟦tf_until N k b q P Q⟧ₗ = (oblP_assigned k b (q/2)%Qp ∗ oblP_inv N k (⟦P⟧ₗ) (tf_fulfilled k Q))%I.
+    ⟦tf_until N k b q P Q⟧ₗ = (oblP_assigned k b (q/2)%Qp ∗ oblP_inv N k (⟦P⟧ₗ) (⟦Q⟧ₗ) (tf_fulfilled k Q))%I.
   Proof. done. Qed.
 
 End reduction.
@@ -332,24 +334,23 @@ Section proof.
   Lemma tf_until_alloc E i G q (b : bool) ℓ μ :
     thP_obls i G q -∗
     |={E}=>m ∃ k, ⌜k ∉ G⌝ ∗ thP_obls i ({[k]} ∪ G) q ∗
-                 oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+                 oblP_alive k 1 ∗ oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                  ∀ E' N (P Q : tf), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) -∗
                                     |={E'}=>m (⟦tf_until N k b 1 P Q⟧ₗ ∗ (if b then ⟦Q⟧ₗ else True)).
   Proof.
-    iIntros "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& $& $& ACC)".
+    iIntros "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& $& $& $& ACC)".
     iIntros "!> %%%% H". rewrite tf_until_logic.
 
     TODO
     iMod ("ACC" with "H") as "#ACC".
     iFrame 
     
-
 obl_alloc_assigned
      : ∀ (E : coPset) (i : positive) (G : oids) (q : Qp) (b : bool) (ℓ : layer) (μ : measurable_syntax),
          thP_obls i G q -∗
-         |={E}=>m ∃ k : oid, ⌜k ∉ G⌝ ∗ thP_obls i ({[k]} ∪ G) q ∗ oblP_assigned k b (1 / 2) ∗ oblP_layer k ℓ ∗ 
-                    oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                    ∀ (E' : coPset) (N : namespace) (P Q : iProp Σ), ▷ (if b then Q else P) ={E'}=∗ oblP_inv N k P Q
+         |={E}=>m ∃ k : oid, ⌜k ∉ G⌝ ∗ thP_obls i ({[k]} ∪ G) q ∗ oblP_assigned k b (1 / 2) ∗ oblP_alive k 1 ∗ 
+                    oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+                    ∀ (E' : coPset) (N : namespace) (P Q R : iProp Σ), ▷ (if b then Q ∗ R else P) ={E'}=∗ oblP_inv N k P Q R
 
   Lemma tf_until_to_true N k b1 b2 P Q :
     oblP_assigned

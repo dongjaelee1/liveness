@@ -11,7 +11,9 @@ From liris.base_logic Require Export osat invariants.
 Definition oblG_variant `{SI : indexT} `{!osatGS.osatGS Σ}
   (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
   (oblG_assigned k false q ∗ P) ∨
-    ((oblG_assigned k true q ∨ oblG_fulfilled k) ∗ (Q ∨ oblG_expired k) ∗ R).
+    (oblG_assigned k true q ∗ Q) ∨
+    (oblG_fulfilled k ∗ Q ∗ R) ∨
+    (oblG_expired k ∗ R).
 
 Definition oblG_inv `{SI : indexT} `{!osatGS.osatGS Σ} `{!invGS Σ}
   (N : namespace) (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
@@ -40,6 +42,8 @@ Section oinv.
     ▷ oblG_variant k q P Q R ∗
     (▷ oblG_variant k q P Q R ={E ∖ ↑N,E}=∗ True).
   Proof. iIntros (HE) "#GU". iPoseProof (inv_acc with "GU") as "$"; eauto. Qed.
+
+  TODO
 
   Lemma oblG_inv_acc_assigned E N k q1 P Q R :
     ↑N ⊆ E →
