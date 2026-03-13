@@ -43,15 +43,13 @@ Section oinv.
     (▷ oblG_variant k q P Q R ={E ∖ ↑N,E}=∗ True).
   Proof. iIntros (HE) "#GU". iPoseProof (inv_acc with "GU") as "$"; eauto. Qed.
 
-  TODO
-
   Lemma oblG_inv_acc_assigned E N k q1 P Q R :
     ↑N ⊆ E →
     oblG_inv N k q1 P Q R
     ={E,E ∖ ↑N}=∗ ∀ b q2,
     oblG_assigned k b q2 -∗
     ((▷ (oblG_assigned k b q2 ∗
-         if b then (oblG_assigned k true q1 ∗ Q ∗ R) else (oblG_assigned k false q1 ∗ P))) ∗
+         if b then (oblG_assigned k true q1 ∗ Q) else (oblG_assigned k false q1 ∗ P))) ∗
      (▷ oblG_variant k q1 P Q R ={E ∖ ↑N,E}=∗ True)).
   Proof.
     iIntros (HE) "#GU". iMod (oblG_inv_acc with "GU") as "[[H | H] ACC]"; first auto.
@@ -59,13 +57,13 @@ Section oinv.
       + iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "[Ga' _]".
         iPoseProof (oblG_assigned_agree with "[$]") as "%". by destruct H0.
       + iFrame.
-    - iModIntro. iIntros (b ?) "Ga". destruct b.
-      + iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "([Ga2 | #Gf]& HQ& HR)".
-        * iDestruct "HQ" as "[HQ | #GX]"; first iFrame. iPoseProof (oblG_assigned_expired_false with "[$]") as "%". done.
-        * iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.        
-      + iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "[[Ga2 | #Gf] _]".
-        * iPoseProof (oblG_assigned_agree with "[$]") as "%". by destruct H0.
+    - iModIntro. iIntros (b ?) "Ga". iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "[H | H]".
+      + destruct b.
+        * iDestruct "H" as "(Ga2& HQ)". iFrame.
+        * iDestruct "H" as "(Ga2& HQ)". iPoseProof (oblG_assigned_agree with "[$]") as "%". by destruct H0.
+      + iDestruct "H" as "[[H _] | [H _]]".
         * iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.
+        * iPoseProof (oblG_assigned_expired_false with "[$]") as "%". done.
   Qed.
 
   Lemma oblG_inv_acc_fulfilled E N k q P Q R :
