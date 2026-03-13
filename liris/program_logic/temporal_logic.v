@@ -422,7 +422,7 @@ Section test.
 
   (** Fail: Probably, tf (tf.u2) ≤ Ord.t (Ord.TYPE.u0) < iProp Σ (cmra.u0),
       and this needs cmra.u0 < tf *)
-  Fail Lemma test4' (P Q : iProp Σ) :
+  Lemma test3 (P Q : iProp Σ) :
     iProp_sat (∃ (o : ord), ⌜ord_lt ((tf_depth ((∃ (p : iProp Σ), (tf_ghost p) ∗ ∀ N k (q : iProp Σ), tf_always N k (tf_ghost q)) : @tf _ Σ Π)) : ord) o⌝)%I →
     True.
 
