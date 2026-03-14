@@ -113,14 +113,6 @@ Section proof.
       iPoseProof (model_history_interp_event_obl_now with "MI") as "#ME". 1: eauto. eauto.
   Qed.
 
-  TODO
-
-  (* Lemma tf_logic_tf_intuit_sfmupd E Φ : *)
-  (*   tf_logic Φ *)
-  (*   ⊢ |={E}=>m ∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ tf_intuit SI Λ Σ lirisGS0 n' σ' Θ' κs' i' Ω' Q))%I *)
-
-  (*                          tf_intuit *)
-
 End proof.
 
 (** Notations *)
@@ -330,6 +322,8 @@ Section proof.
     iPoseProof (oblP_assigned_agree with "Oa1 Oa2") as "%". subst.
     by iCombine "Oa1 Oa2" as "Oa".
   Qed.
+
+  TODO
 
   Lemma tf_until_alloc E i G q (b : bool) ℓ μ :
     thP_obls i G q -∗

@@ -242,22 +242,22 @@ Section sfmupd.
                  oblP_id k ∗
                  oblP_fuel k ℓ μ ∗
                  witP_layer k ℓ ∗
-                 (∀ E' N (P Q : iProp Σ), (▷ (if b then Q else P)) ={E'}=∗ oblP_inv N k P Q).
+                 (∀ E' N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E'}=∗ oblP_inv N k P Q R).
   Proof.
     iIntros "Tb %%%%% $". iMod (obl_alloc_assigned_mupd with "Tb") as "(%& $& $& $& $& $& $& $& H)". by iModIntro.
   Qed.
 
   Lemma obl_alloc_fulfilled E ℓ μ :
     ⊢ |={E}=>m ∃ k, oblP_fulfilled k ∗ oblP_id k ∗
-                   (∀ E' N (P Q : iProp Σ), (▷ Q) ={E'}=∗ oblP_inv N k P Q) ∗
+                   (∀ E' N (P Q R : iProp Σ), (▷ R) ={E'}=∗ oblP_inv N k P Q R) ∗
                    oblP_layer k ℓ ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "%%%%% $". iMod (obl_alloc_fulfilled_mupd) as "(%& $& $& $& $& $& $)". by iModIntro.
   Qed.
 
-  Lemma obl_assigned_to_true E N k P Q :
+  Lemma obl_assigned_to_true E N k P Q R :
     ↑N ⊆ E →
-    oblP_inv N k P Q -∗
+    oblP_inv N k P Q R -∗
     |={E,E ∖ ↑N}=> oblP_assigned k false (1/2)%Qp -∗
                   ((▷ (oblP_assigned k false 1 ∗ P)) ∗
                    (∀ b, oblP_assigned k b 1 -∗
@@ -269,16 +269,16 @@ Section sfmupd.
     iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
 
-  Lemma obl_fulfill E N k P Q :
+  Lemma obl_true_to_fulfill E N k P Q R :
     ↑N ⊆ E →
-    oblP_inv N k P Q -∗
+    oblP_inv N k P Q R -∗
     |={E,E ∖ ↑N}=> ∀ i G q1 q2,
     (⌜k ∈ G⌝) → thP_obls i G q1 -∗ oblP_assigned k true q2 -∗
     ((▷ (thP_obls i G q1 ∗ oblP_assigned k true q2 ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
      (thP_obls i G q1 -∗
       oblP_assigned k true 1 -∗
       ∀ E', |={E'}=>m (thP_obls i (G ∖ {[k]}) q1 ∗ oblP_fulfilled k) ∗
-                   ((▷ (Q)) ={E ∖ ↑N,E}=∗ True))).
+                   ((▷ (R)) ={E ∖ ↑N,E}=∗ True))).
   Proof.
     iIntros (MASK) "#Gv". iMod (obl_fulfill_mupd with "Gv") as "H". 1: auto.
     iIntros "!> %%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
