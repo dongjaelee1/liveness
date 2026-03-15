@@ -85,7 +85,11 @@ Section proof.
   Global Instance tf_fulfilled_persistent k Q : Persistent (tf_fulfilled k Q).
   Proof. rewrite /tf_fulfilled. apply _. Qed.
 
-  Lemma tf_logic_tf_intuit_states Φ h n σ Θ κs m i Ω W :
+  Lemma tf_fulfilled_unfold k Q :
+    tf_fulfilled k Q = (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
+  Proof. done. Qed.
+
+  Lemma tf_logic_tf_intuit Φ h n σ Θ κs m i Ω W :
     (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ)
     ⊢ tf_intuit n σ Θ κs i Ω Φ.
   Proof.
@@ -116,7 +120,7 @@ Section proof.
 End proof.
 
 (** Notations *)
-Notation "'⟦' Φ '⟧ₗ'" := (tf_logic Φ%F).
+Notation "'⟦' Φ '⟧ₗ'" := (tf_logic Φ%F) (format "'⟦' Φ '⟧ₗ'").
 
 Section reduction.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
@@ -323,39 +327,135 @@ Section proof.
     by iCombine "Oa1 Oa2" as "Oa".
   Qed.
 
-  TODO
-
   Lemma tf_until_alloc E i G q (b : bool) ℓ μ :
     thP_obls i G q -∗
     |={E}=>m ∃ k, ⌜k ∉ G⌝ ∗ thP_obls i ({[k]} ∪ G) q ∗
-                 oblP_alive k 1 ∗ oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                 ∀ E' N (P Q : tf), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) -∗
-                                    |={E'}=>m (⟦tf_until N k b 1 P Q⟧ₗ ∗ (if b then ⟦Q⟧ₗ else True)).
+                 oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+                 ∀ E' N (P Q : tf), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ)
+                                    ={E'}=∗ (⟦tf_until N k b 1 P Q⟧ₗ).
   Proof.
-    iIntros "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& $& $& $& ACC)".
-    iIntros "!> %%%% H". rewrite tf_until_logic.
+    iIntros "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& $& $& ACC)".
+    iIntros "!> %%%% H". rewrite tf_until_logic. iMod ("ACC" with "H") as "ACC". iFrame. done.
+  Qed.
 
-    TODO
-    iMod ("ACC" with "H") as "#ACC".
-    iFrame 
-    
-obl_alloc_assigned
-     : ∀ (E : coPset) (i : positive) (G : oids) (q : Qp) (b : bool) (ℓ : layer) (μ : measurable_syntax),
-         thP_obls i G q -∗
-         |={E}=>m ∃ k : oid, ⌜k ∉ G⌝ ∗ thP_obls i ({[k]} ∪ G) q ∗ oblP_assigned k b (1 / 2) ∗ oblP_alive k 1 ∗ 
-                    oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                    ∀ (E' : coPset) (N : namespace) (P Q R : iProp Σ), ▷ (if b then Q ∗ R else P) ={E'}=∗ oblP_inv N k P Q R
+  Lemma tf_fulfilled_alloc E ℓ μ (Q : tf) :
+    ⟦Q⟧ₗ -∗
+    |={E}=>m ⟦Q⟧ₗ ∗ ∃ k, oblP_fulfilled k ∗ oblP_id k ∗
+                        (∀ E' N (P : tf), |={E'}=> oblP_inv N k ⟦P⟧ₗ ⟦Q⟧ₗ (tf_fulfilled k Q)) ∗ 
+                        oblP_layer k ℓ ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
+  Proof.
+    iIntros "HQ".
+    rewrite /sfmupd /fmupd. iIntros (?????) "SI".
+    iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+    (* FIXME: proof without unfold everything? *)
+    unfold_opreds. iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
+    assert (NEW : ∃ k, Ω1 !! k = None).
+    { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
+    destruct NEW as (k& NEWk).
+    assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
+    iMod (osat_alloc_obl_fulfilled _ k ℓ μ with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)".
+    { auto. }
+    iMod (owit_alloc_witness_fulfilled _ k (η (measure ℓ μ)) with "[$W $Gu]") as "(W& #Ww)".
+    { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
+    iPoseProof (oassigned_add_obl with "[$A $Ge Gu]") as "A".
+    { iRight. iFrame "Gu". }
+    set (Ω2:=(<[k:=(obl_fulfilled)]> Ω1)).
+    iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
+    { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 2. eauto. }
+    iPoseProof (model_history_interp_event_obl_now k with "HI") as "#Eo".
+    { subst Ω2. apply lookup_insert_eq. }
+    iModIntro. iExists Ω2. iSplitR.
+    { iPureIntro. econstructor 2. econstructor 2. auto. }
+    iIntros (? [WStep GWI2]) "!>".
+    pose proof (owit_inv_alloc_fulfilled Ω1 k W1 NinOk1 GWI W2 WStep GWI2) as (NinWk1& WMon).
+    iPoseProof (owit_mon _ _ WMon with "W") as "W".
+    iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
+    { subst Ω2. rewrite dom_insert_L. iFrame. }
+    iPoseProof (tf_logic_tf_intuit with "[$SI $HI $S $O $A $W $HQ]") as "#HQi". 1: eauto.    
+    rewrite /model_interp. iFrame "HI S O A W". iSplitR; first eauto.
+    iModIntro. iMod "close" as "_". iModIntro. iFrame "SI HQ". iExists k. iFrame "Gwf Ge Ww Gf Gu".
+    iIntros (E' N P).
+    rewrite tf_fulfilled_unfold.
+    iMod (oblG_inv_alloc_fulfilled _ N _ _ ⟦P⟧ₗ ⟦Q⟧ₗ with "[$Gu]") as "#GVar"; cycle 1.
+    { iFrame "GVar". done. }
+    iFrame "Eo HQi".
+  Qed.
 
-  Lemma tf_until_to_true N k b1 b2 P Q :
-    oblP_assigned
+  (** TODO: Timeless version *)
+  Lemma tf_until_to_true E N k (P Q : tf) :
+    ↑N ⊆ E →
+    ⟦tf_until N k false 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
+    ▷ (⟦P⟧ₗ ∗ ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N,E}=∗ ⟦tf_until N k true 1 P Q⟧ₗ)).
+  Proof.
+    rewrite !tf_until_logic. iIntros (HM) "(Oa& #Oi)".
+    iMod (obl_assigned_to_true with "Oi Oa") as "[H ACC]". 1: auto.
+    iModIntro. iNext. iDestruct "H" as "[Oa $]".
+    iIntros "%". iPoseProof ("ACC" with "Oa") as "ACC". iMod ("ACC" $! E') as "[Oa ACC]".
+    iIntros "!> HQ". iMod ("ACC" with "HQ") as "_". iFrame. eauto.
+  Qed.
+
+  (** TODO: Timeless version *)
+  Lemma tf_until_fulfill E N k (P Q : tf) :
+    ↑N ⊆ E →
+    ⟦tf_until N k true 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
+    ∀ i G q,
+    (⌜k ∈ G⌝) → thP_obls i G q -∗
+    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (thP_obls i (G ∖ {[k]}) q ∗ oblP_fulfilled k)).
+  Proof.
+    rewrite tf_until_logic. iIntros (HMask) "(Oa& #OI)".
+    iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
+    iIntros "!> %%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
+    iNext. iDestruct "H" as "(Oa1& Oa2& HQ)". iCombine "Oa1 Oa2" as "Oa".
+    rewrite /sfmupd /fmupd. iIntros (?????) "SI".
+    iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+    (* FIXME: it would be better if we don't need to unfold everything and re-do the proof here... *)
+    unfold_opreds. iDestruct "TG" as "(#Oe& Ox& Ob& OS)". iDestruct "OI" as "(#Ge& Gvar)". iDestruct "Oa" as "(_& Gl)".
+    iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
+    iPoseProof (big_sepS_delete _ _ _ LUGk with "OS") as "[(_& Go& Oo) OS]".
+    iPoseProof (osat_lookup_assigned with "[$S $Ge $Gl]") as "%LUO1l".
+    iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
+    destruct LUO1l as (?&?&LUO1l). destruct LUO1o as (?&LUO1o).
+    rewrite LUO1l in LUO1o. inv LUO1o. rename x1 into a.
+    iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1) | #Gu])".
+    { apply elem_of_dom. eauto. }
+    2:{ iExFalso. iPoseProof (oblG_assigned_fulfilled_false with "[$Gl $Gu]") as "%". done. }
+    iPoseProof (oblG_owner_agree _ i i1 with "[$Go $Go1]") as "%". destruct H as [<- _].
+    iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
+    iMod (othread_delete_obl_frac with "[$O $Ob $Oo]") as "(O& Ob& Go2)".
+    { auto. }
+    iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'".
+    iCombine "Go Go'" as "Go".
+    iMod (osat_fulfill with "[$S $Ge $Gl $Go]") as "(S& #Gu& %Gstep)".
+    assert (LUW : ∃ b, W1 !! k = Some (witness_assigned b) ∧ (b <= η a)%ord).
+    { specialize (GWI k). rewrite LUO1l in GWI. inv GWI. destruct y; try done. eauto. }
+    destruct LUW as (b&LUW1& LEab).
+    iPoseProof (owit_fulfill with "[$W $Gu]") as "W". 1: eauto.
+    iPoseProof (oassigned_add_obl _ k with "[$A $Ge]") as "A".
+    { iRight. eauto. }
+    set (Ω2:=(<[k:=(obl_fulfilled)]> Ω1)).
+    assert (Gstep' : obl_step (obl_assigned a i) obl_fulfilled) by (by econstructor 2).
+    iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
+    { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
+    iPoseProof (model_history_interp_event_obl_now k with "HI") as "#Eo".
+    { subst Ω2. apply lookup_insert_eq. }
+    iModIntro. iExists Ω2. iSplitR.
+    { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
+    iIntros (? [WStep GWI2]).
+    pose proof (owit_inv_fulfill _ _ _ _ _ LUO1l GWI Gstep' W2 WStep GWI2) as (?& LUW& WMon).
+    rewrite LUW1 in LUW. inv LUW.
+    iPoseProof (owit_mon _ _ WMon with "W") as "W".
+    iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
+    { subst Ω2. rewrite dom_insert_L. replace ({[k]} ∪ dom Ω1 ∖ {[k]}) with (({[k]} ∪ dom Ω1)). 1: iFrame.
+      apply elem_of_dom_2 in LUO1l. rewrite -union_difference_L; set_solver. }
+    iPoseProof (tf_logic_tf_intuit with "[$SI $HI $S $O $A $W $HQ]") as "#HQi". 1: eauto.
+    rewrite /model_interp. iFrame "HI S O W A".
+    iApply fupd_intro. iSplitR; first eauto. iIntros "!>". iFrame "Oe Ge Gu Ox SI".
+    iMod "close" as "_". iModIntro. iMod ("ACC" with "[]") as "_".
+    { iNext. iRight. iRight. rewrite tf_fulfilled_unfold. iFrame "Ge Gu Eo HQi". }
+    iModIntro. iFrame.
+  Qed.
 
 End proof.
-
-
-
-
-
-
 
 
 
@@ -370,21 +470,22 @@ From liris.algebra Require Import ordinal_existential_properties.
 Global Instance ordSI : indexT := ordI.
 
 Section test.
-  Context `{SIC : !state_interp_class Λ Σ Π} `{OCM : !ord_mono_fun_class}.
-  Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}.
+  Context `{!lirisGS Λ Σ}.
+  (* Context `{SIC : !state_interp_class Λ Σ Π} `{OCM : !ord_mono_fun_class}. *)
+  (* Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}. *)
 
   (* Print Universes. *)
 
   Lemma test (P Q : iProp Σ) :
-    iProp_sat (∃ (o : ord) (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ Σ Π)) : ord) o⌝ ∗ X)%I →
-    ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ Σ Π)) : ord) o⌝ ∗ X)%I.
+    iProp_sat (∃ (o : ord) (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ state_pred)) : ord) o⌝ ∗ X)%I →
+    ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ state_pred)) : ord) o⌝ ∗ X)%I.
   Proof.
-    intros. apply sat_exists in H0. auto.
+    intros. apply sat_exists in H. auto.
   Qed.
 
   (** Fail: tf is inside tf. *)
   Fail Lemma test2 (P Q : iProp Σ) :
-    iProp_sat (∃ (o : Ord.t), ⌜Ord.lt ((tf_depth ((∃ (p : tf), p ∗ ∀ N k (q : tf), tf_always N k (q)) : @tf _ Σ Π)) : Ord.t) o⌝)%I →
+    iProp_sat (∃ (o : Ord.t), ⌜Ord.lt ((tf_depth ((∃ (p : tf), p ∗ ∀ N k (q : tf), tf_always N k (q)) : @tf _ Σ state_pred)) : Ord.t) o⌝)%I →
     True.
 
   Lemma test3 :
@@ -394,13 +495,13 @@ Section test.
 
   Lemma test4 :
     iProp_sat (∃ (o : ord) (X : iProp Σ),
-          ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ Π)) : ord) o⌝ ∗
+          ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ state_pred)) : ord) o⌝ ∗
           tf_logic (∃ N, tf_always N (tf_ghost X)))%I →
     ∃ (o : ord), iProp_sat (∃ (X : iProp Σ),
-                       ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ Π)) : ord) o⌝ ∗
+                       ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ state_pred)) : ord) o⌝ ∗
                        tf_logic (∃ N, tf_always N (tf_ghost X)))%I.
   Proof.
-    intros. apply sat_exists in H0. auto.
+    intros. apply sat_exists in H. auto.
   Qed.
 
   (* Print Universes. *)
@@ -419,8 +520,8 @@ Section test.
 
   (** Fail: Probably, tf (tf.u2) ≤ Ord.t (Ord.TYPE.u0) < iProp Σ (cmra.u0),
       and this needs cmra.u0 < tf *)
-  Lemma test3 (P Q : iProp Σ) :
-    iProp_sat (∃ (o : ord), ⌜ord_lt ((tf_depth ((∃ (p : iProp Σ), (tf_ghost p) ∗ ∀ N k (q : iProp Σ), tf_always N k (tf_ghost q)) : @tf _ Σ Π)) : ord) o⌝)%I →
+  Fail Lemma test5 (P Q : iProp Σ) :
+    iProp_sat (∃ (o : ord), ⌜ord_lt ((tf_depth ((∃ (p : iProp Σ), (tf_ghost p) ∗ ∀ N k (q : iProp Σ), tf_always N k (tf_ghost q)) : @tf _ Σ state_pred)) : ord) o⌝)%I →
     True.
 
 (* Notation OrdinalExistential := (TypeExistentialProperty Ord.t) *)
@@ -432,98 +533,3 @@ Section test.
 (*     SatisfiableExists X sat → ∀ Φ : X → PROP, sat (∃ x : X, Φ x)%I → ∃ x : X, sat (Φ x) *)
 
 End test.
-
-
-
-
-TODO
-
-(** Interpretation of tf to the full state (program and obligation state) predicate. *)
-Fixpoint tf_full_state `{SI : indexT} `{!state_interp_class Σ St Π}
-  (Φ : @tf SI Σ Π) (σ : St) (Θ : (gset positive)) (n : nat) (Ω : obls) : Prop :=
-  match Φ with
-  | tf_emp => True
-  | tf_atomic π =>
-      (state_sat σ Θ π)
-  | tf_pure p => p
-  | tf_ghost p => True
-  | tf_and P Q => (tf_full_state P σ Θ n Ω ∧ tf_full_state Q σ Θ n Ω)
-  | tf_or P Q => (tf_full_state P σ Θ n Ω ∨ tf_full_state Q σ Θ n Ω)
-  | tf_impl P Q => (tf_full_state P σ Θ n Ω → tf_full_state Q σ Θ n Ω)
-  | tf_forall A P => (∀ (a : A), tf_full_state (P a) σ Θ n Ω)
-  | tf_exist A P => (∃ (a : A), tf_full_state (P a) σ Θ n Ω)
-  | tf_sep P Q => (tf_full_state P σ Θ n Ω ∧ tf_full_state Q σ Θ n Ω)
-  | tf_wand P Q => (tf_full_state P σ Θ n Ω → tf_full_state Q σ Θ n Ω)
-  | tf_pers P => (tf_full_state P σ Θ n Ω)
-  | tf_always N k P =>
-      ((Ω !! k = Some obl_expired) ∧ tf_full_state P σ Θ n Ω)
-  | tf_until N k P Q =>
-      ((∃ f o, Ω !! k = Some (obl_assigned f o) ∧ tf_full_state P σ Θ n Ω) ∨
-         ( Ω !! k = Some obl_fulfilled ∧ tf_full_state Q σ Θ n Ω))
-  end.
-
-(* When k fulfills Q, obl_inv k keeps ∃ i n, event_obl i n k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q.
-   With this and full history interp, we retrieve the prefix of history-predicate that says Q is fulfilled. *)
-(** Interpretation of tf to intuitionistical predicates. *)
-Fixpoint tf_intuit `{SI : indexT} `{!mupdGS Σ} `{!histGS.histGS Σ (St * gset positive)} `{!state_interp_class Σ St Π}
-  i n (Φ : @tf SI Σ Π) : iProp Σ :=
-  match Φ with
-  | tf_emp => emp%I
-  | tf_atomic π => (event_pred n π)%I
-  | tf_pure p => (⌜p⌝)%I
-  | tf_ghost p => True%I
-  | tf_and P Q => (tf_intuit n σ Θ κs i Ω P ∧ tf_intuit n σ Θ κs i Ω Q)%I
-  | tf_or P Q => (tf_intuit n σ Θ κs i Ω P ∨ tf_intuit n σ Θ κs i Ω Q)%I
-  | tf_impl P Q => (tf_intuit n σ Θ κs i Ω P → tf_intuit n σ Θ κs i Ω Q)%I
-  | tf_forall A P => (∀ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
-  | tf_exist A P => (∃ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
-  | tf_sep P Q => (tf_intuit n σ Θ κs i Ω P ∗ tf_intuit n σ Θ κs i Ω Q)%I
-  | tf_wand P Q => (tf_intuit n σ Θ κs i Ω P -∗ tf_intuit n σ Θ κs i Ω Q)%I
-  | tf_pers P => (□ (tf_intuit n σ Θ κs i Ω P))%I (** Should just be P if want to use this in logic... *)
-  | tf_always N k P =>
-      (oblP_expired k ∗ (tf_intuit n σ Θ κs i Ω P))%I (** P should always be P, not like this... *)
-  (* (oblP_expired k ∗ oblP_inv N k ⌜ False ⌝ ⌜ False ⌝ (tf_intuit n σ Θ κs i Ω P))%I (** P should always be P, not like this... *) *)
-  | tf_until N k P Q =>
-      ((∃ f o, event_obl i n k (obl_assigned f o) ∗ tf_intuit n σ Θ κs i Ω P) ∨
-         (event_obl i n k (obl_fulfilled) ∗ tf_intuit n σ Θ κs i Ω Q))
-        (* ((∃ f o, event_obl i n k (obl_assigned f o) ∗ *)
-        (*          oblP_inv N k (tf_intuit n σ Θ κs i Ω P) (∃ j m, tf_intuit j m Q) (∃ j m, event_obl j m k obl_fulfilled ∗ tf_intuit j m Q)) ∨ *)
-        (*    (event_obl i n k (obl_fulfilled) ∗ *)
-        (*     oblP_inv N k (∃ j m, tf_intuit j m P) (tf_intuit n σ Θ κs i Ω Q) (event_obl i n k obl_fulfilled ∗ tf_intuit n σ Θ κs i Ω Q))) *)
-  end.
-Global Arguments tf_intuit {SI Σ _ St _ Π _}.
-
-(** (tf_logic P ∗ full_history_interp h i n) -∗ tf_intuit n σ Θ κs i Ω P
-    tf_intuit n σ Θ κs i Ω P ∗ full_history_interp h j m → ∃ (e : full state), h !! i = Some e ∧ tf_full_state P e
-    h !! i = Some e ∧ tf_full_state P e ∗ ... → tf_trace_might_expired P tr
-    Need to prove tf_trace_might_expired P tr first, and use it in the inductive case.
-    Namely, tr_trace_might_expired P tr ∧ tf_intuit n σ Θ κs i Ω (where i n are current) → tf_trace P tr.
-    Of course, tf_logic P ∗ full_history_interp h i n ⊢ tf_intuit n σ Θ κs i Ω should hold,
-    so we get tf_intuit for the current state at the initial state of the program.
- *)
-
-
-(** Part 2. Interpretation of tf to iProp. *)
-(* Defined by the programming language. *)
-Class tf_atomic_logic_class `{SI : indexT} (Σ : gFunctors) (Π : Type) :=
-  tfa_atomic_logic : Π → iProp Σ.
-
-(** Interpretation of tf to iProp. *)
-Fixpoint tf_logic `{SI : indexT} `{@tf_atomic_logic_class SI Σ Π} `{@mupdGS SI Σ} (Φ : tf) : iProp Σ :=
-  match Φ with
-  | tf_emp => emp%I
-  | tf_atomic π => tfa_atomic_logic π
-  | tf_pure p => (⌜p⌝)%I
-  | tf_ghost p => p
-  | tf_and P Q => (tf_logic P ∧ tf_logic Q)%I
-  | tf_or P Q => (tf_logic P ∨ tf_logic Q)%I
-  | tf_impl P Q => (tf_logic P → tf_logic Q)%I
-  | tf_forall A P => (∀ (a : A), tf_logic (P a))%I
-  | tf_exist A P => (∃ (a : A), tf_logic (P a))%I
-  | tf_sep P Q => (tf_logic P ∗ tf_logic Q)%I
-  | tf_wand P Q => (tf_logic P -∗ tf_logic Q)%I
-  | tf_variant N k v P Q R => oblP_inv N k v (tf_logic P) (tf_logic Q) (tf_logic R)
-  end.
-
-Global Arguments tf_logic {SI Σ Π _ _}.
-
