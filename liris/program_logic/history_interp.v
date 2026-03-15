@@ -98,35 +98,35 @@ End proof.
 
 (** State interpretation and predicates defined by the language,
     with the thread ids to connect to the obligation model. *)
-Class state_interp_class `{SI : indexT} (Λ : language) (Σ : gFunctors) (state_pred : Type) :=
+Class state_interp_class `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
   { state_interp : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
-    state_pred_interp : state_pred → iProp Σ;
-    state_sat : state Λ → thread_pool Λ → list (observation Λ) → state_pred → Prop;
+    state_pred_interp : state_pred Λ → iProp Σ;
     state_interp_wf :
-    (∀ σ Θ κs π, (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ κs π ⌝);
+    (∀ σ Θ κs π, (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ π ⌝);
   }.
 
-Definition history_interp `{SI : indexT} `{@state_interp_class SI Λ Σ state_pred}
+Definition history_interp `{SI : indexT} `{@state_interp_class SI Λ Σ}
   `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   (h : list ((state Λ) * (thread_pool Λ) * (list (observation Λ))))
   (n : nat) σ Θ κs : iProp Σ :=
   locked (⌜ length h = (S n) ∧ last h = Some ((σ, Θ), κs) ⌝ ∗ hG_history_auth h ∗ state_interp σ Θ κs)%I.
 Global Typeclasses Opaque history_interp.
-Global Instance: Params (@history_interp) 6 := {}.
+Global Instance: Params (@history_interp) 5 := {}.
 
-Local Definition event_pred_def `{SI : indexT} `{@state_interp_class SI Λ Σ state_pred}
+Local Definition event_pred_def `{SI : indexT} `{@state_interp_class SI Λ Σ}
   `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
-  (n : nat) σ Θ κs (π : state_pred) : iProp Σ :=
-  (hG_event n (σ, Θ, κs) ∗ ⌜ state_sat σ Θ κs π ⌝)%I.
+  (n : nat) σ Θ κs (π : state_pred Λ) : iProp Σ :=
+  (hG_event n (σ, Θ, κs) ∗ ⌜ state_sat σ Θ π ⌝)%I.
 Local Definition event_pred_aux : seal (@event_pred_def). Proof. by eexists. Qed.
 Definition event_pred := event_pred_aux.(unseal).
 Local Definition event_pred_unseal :
   @event_pred = @event_pred_def := event_pred_aux.(seal_eq).
-Global Arguments event_pred {SI Λ Σ state_pred _ _}.
+Global Arguments event_pred {SI Λ Σ _ _}.
 
 (** Properties *)
 Section hist.
-  Context `{SI : indexT} `{SIC : @state_interp_class SI Λ Σ state_pred} `{HIST : @histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}.
+  Context `{SI : indexT} `{SIC : @state_interp_class SI Λ Σ}.
+  Context `{HIST : @histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}.
 
   Global Instance event_pred_persistent n σ Θ κs π : Persistent (event_pred n σ Θ κs π).
   Proof. rewrite event_pred_unseal /event_pred_def. apply _. Qed.
@@ -156,7 +156,7 @@ Section hist.
 
   Lemma history_interp_event_pred_any n σ Θ κs π h n' σ' Θ' κs' :
     (h !! n = Some (σ, Θ, κs)) →
-    (state_sat σ Θ κs π) →
+    (state_sat σ Θ π) →
     history_interp h n' σ' Θ' κs' ⊢ event_pred n σ Θ κs π.
   Proof.
     rewrite /history_interp -lock event_pred_unseal /event_pred_def.
@@ -165,7 +165,7 @@ Section hist.
   Qed.
 
   Lemma history_interp_event_pred_now π h n σ Θ κs :
-    (state_sat σ Θ κs π) →
+    (state_sat σ Θ π) →
     history_interp h n σ Θ κs ⊢ event_pred n σ Θ κs π.
   Proof.
     iIntros (Sat) "HI". iPoseProof (history_interp_lookup with "HI") as "%".
@@ -173,7 +173,7 @@ Section hist.
   Qed.
 
   Lemma event_pred_history_interp_lookup n σ Θ κs π h n' σ' Θ' κs' :
-    history_interp h n' σ' Θ' κs' ∗ event_pred n σ Θ κs π ⊢ ⌜ h !! n = Some (σ, Θ, κs) ∧ state_sat σ Θ κs π ⌝.
+    history_interp h n' σ' Θ' κs' ∗ event_pred n σ Θ κs π ⊢ ⌜ h !! n = Some (σ, Θ, κs) ∧ state_sat σ Θ π ⌝.
   Proof.
     rewrite /history_interp -lock event_pred_unseal /event_pred_def. iIntros "((%& Ha& SI)& (#He& %))".
     destruct H. iPoseProof (hG_event_history_lookup with "[$Ha $He]") as "%". eauto.
@@ -182,7 +182,8 @@ Section hist.
 End hist.
 
 (* Allocation of a history interpretation. *)
-Lemma history_interp_init `{SI : indexT} `{SIC : !state_interp_class Λ Σ state_pred} `{HIST : !histGS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
+Lemma history_interp_init `{SI : indexT} `{SIC : !state_interp_class Λ Σ}
+  `{HIST : !histGS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   σ Θ κs :
   state_interp σ Θ κs
   ⊢ |==> ∃ _ : histGS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ))), history_interp [(σ, Θ, κs)] 0 σ Θ κs.

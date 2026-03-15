@@ -20,7 +20,7 @@ End aux.
 Fixpoint tf_logic `{SI : indexT} `{!lirisGS Λ Σ}
   (* `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
   (* `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
-  (Φ : @tf SI Σ state_pred) : iProp Σ :=
+  (Φ : @tf SI Σ (state_pred Λ)) : iProp Σ :=
   match Φ with
   | tf_emp => emp%I
   | tf_atomic π => (state_pred_interp π)%I
@@ -44,7 +44,7 @@ Fixpoint tf_logic `{SI : indexT} `{!lirisGS Λ Σ}
 with tf_intuit `{SI : indexT} `{!lirisGS Λ Σ}
        (* `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
        (* `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
-       n σ Θ κs i Ω (Φ : @tf SI Σ state_pred) : iProp Σ :=
+       n σ Θ κs i Ω (Φ : @tf SI Σ (state_pred Λ)) : iProp Σ :=
        match Φ with
        | tf_emp => emp%I
        | tf_atomic π => (event_pred n σ Θ κs π)%I
@@ -477,8 +477,8 @@ Section test.
   (* Print Universes. *)
 
   Lemma test (P Q : iProp Σ) :
-    iProp_sat (∃ (o : ord) (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ state_pred)) : ord) o⌝ ∗ X)%I →
-    ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ state_pred)) : ord) o⌝ ∗ X)%I.
+    iProp_sat (∃ (o : ord) (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ (state_pred Λ))) : ord) o⌝ ∗ X)%I →
+    ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ (state_pred Λ))) : ord) o⌝ ∗ X)%I.
   Proof.
     intros. apply sat_exists in H. auto.
   Qed.
@@ -495,10 +495,10 @@ Section test.
 
   Lemma test4 :
     iProp_sat (∃ (o : ord) (X : iProp Σ),
-          ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ state_pred)) : ord) o⌝ ∗
+          ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ (state_pred Λ))) : ord) o⌝ ∗
           tf_logic (∃ N, tf_always N (tf_ghost X)))%I →
     ∃ (o : ord), iProp_sat (∃ (X : iProp Σ),
-                       ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ state_pred)) : ord) o⌝ ∗
+                       ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ (state_pred Λ))) : ord) o⌝ ∗
                        tf_logic (∃ N, tf_always N (tf_ghost X)))%I.
   Proof.
     intros. apply sat_exists in H. auto.

@@ -48,8 +48,7 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
           between each step of reduction.
           Here [state] is the global state, [thread_ids] is the allocated thread ids,
           and [list (observation Λ)] are the remaining observations. *)
-      state_pred : Type;
-      #[global] liris_state_interp_class :: state_interp_class Λ Σ state_pred;
+      #[global] liris_state_interp_class :: state_interp_class Λ Σ;
       #[global] liris_histGS :: histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ));
       (* state_interp : state Λ → thread_ids → list (observation Λ) → iProp Σ; *)
 

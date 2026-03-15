@@ -4,7 +4,7 @@ From liris.base_logic Require Export opreds.
 From liris.program_logic Require Export history_interp.
 Import uPred.
 
-Definition sfmupd `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class}
+Definition sfmupd `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   E : iPropO Σ -d> iPropO Σ :=
   (λ P, ∀ h n σ Θ κs, (history_interp h n σ Θ κs) -∗ |={E:n,dom Θ}=>m (history_interp h n σ Θ κs) ∗ P)%I.
@@ -12,7 +12,7 @@ Definition sfmupd `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun
 Notation "'|={' E '}=>m' P" := (sfmupd E P) (at level 99, P at level 200, format "|={ E }=>m  P").
 
 Section sfmupd.
-  Context `{SI : indexT} `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class}.
+  Context `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
   Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}.
 
   Global Instance sfmupd_ne E : NonExpansive (sfmupd E).

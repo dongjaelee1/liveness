@@ -11,7 +11,7 @@ Canonical Structure thread_idO `{SI : indexT} := leibnizO thread_id.
 Notation thread_ids := (gset thread_id).
 
 Section language_mixin.
-  Context {expr val state observation : Type}.
+  Context {expr val state observation state_pred : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
   (** We annotate the reduction relation with observations [κ], which we will
@@ -21,6 +21,7 @@ Section language_mixin.
      and gmap thread_id expr are forked threads. *)
   Context (prim_step : thread_id → expr → state → thread_ids → list observation →
                        expr → state → gmap thread_id expr → Prop).
+  Context (state_sat : state → gmap thread_id expr → state_pred → Prop).
 
   Record LanguageMixin := {
     mixin_to_of_val v : to_val (of_val v) = Some v;
@@ -37,20 +38,23 @@ Structure language :=
       val : Type;
       state : Type;
       observation : Type;
+      state_pred : Type;
       of_val : val → expr;
       to_val : expr → option val;
       prim_step : thread_id → expr → state → thread_ids → list observation →
                   expr → state → gmap thread_id expr → Prop;
+      state_sat : state → gmap thread_id expr → state_pred → Prop;
       language_mixin : LanguageMixin of_val to_val prim_step
     }.
 
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments Language {_ _ _ _ _ _ _} _.
+Global Arguments Language {_ _ _ _ _ _ _ _ _} _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
 Global Arguments prim_step {_} _ _ _ _ _ _ _ _.
+Global Arguments state_sat {_} _ _ _.
 
 Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
 Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
@@ -143,10 +147,10 @@ Section language.
   Inductive thread_step (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
   | thread_step_atomic e1 σ1 e2 σ2 efs Θ :
     ρ1 = (Θ, σ1) →
-    ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
     Θ !! i = Some e1 →
     (* atomic execution *)
     prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs →
+    ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
     (* ((is_Some (to_val e1) ∧ e1 = e2 ∧ σ1 = σ2 ∧ efs = ∅) *)
     (*  ∨ prim_step e1 σ1 (dom ths) κ e2 σ2 efs) → *)
     thread_step i ρ1 κ ρ2.
@@ -333,7 +337,7 @@ Section language.
       t2 = <[i:=e']>t1 ∪ efs ∧
       prim_step i e σ1 (dom t1) κ e' σ2 efs).
   Proof.
-    intros [κ [e σ e' σ' efs ths t11 t12 Hi Hstep]] HC Hps; simplify_eq/=.
+    intros [κ [e σ e' σ' efs ths t11 Hi t12 Hstep]] HC Hps; simplify_eq/=.
     assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None).
     { exists (delete i ths). split; [rewrite insert_delete_id | apply lookup_delete_eq]; auto. }
     destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi.
@@ -371,3 +375,15 @@ End language.
 Global Hint Mode PureExec + - - - ! - : typeclass_instances.
 Global Arguments thread_step_atomic {Λ i ρ1 κ ρ2}.
 Notation pure_steps_tp C := (map_Forall2 (λ _, rtc (pure_step C))).
+
+(** Trace and behavior. *)
+Definition trace (Λ : language) : Type :=
+  nat * (nat → (cfg Λ * thread_id * list (observation Λ))).
+
+CoInductive behavior {Λ : language} : trace Λ → Prop :=
+| behavior_step n τ ρ1 ρ2 i1 i2 κ κs :
+  τ n = (ρ1, i1, (κ ++ κs)) →
+  thread_step i1 ρ1 κ ρ2 →
+  τ (S n) = (ρ2, i2, κs) →
+  behavior (S n, τ) →
+  behavior (n, τ).
