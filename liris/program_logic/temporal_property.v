@@ -30,25 +30,35 @@ Definition tr_always {Λ : language} : trProp Λ → trProp Λ :=
 Definition tr_until {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
   λ P Q, (λ τ, let '(i, τf) := τ in ∃ j, (i ≤ j) ∧ (Q (j, τf)) ∧ (∀ k, (i ≤ k < j) → (P (k, τf)))).
 
-TODO
-
 (** Notations *)
 
-Declare Scope tf_scope.
-Delimit Scope tf_scope with F.
-Bind Scope tf_scope with tf.
+Declare Scope tr_scope.
+Delimit Scope tr_scope with R.
 
-Notation "'⌜' p '⌝'" := (tf_pure p) : tf_scope.
-Notation "'⟨' p '⟩'" := (tf_ghost p%I) : tf_scope.
-Infix "∧" := (tf_and) : tf_scope.
-Infix "∨" := (tf_or) : tf_scope.
-Infix "→" := (tf_impl) : tf_scope.
-Notation f_forall A := (tf_forall A).
-Notation "∀'" := (f_forall _) (only parsing) : tf_scope.
-Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%F)) ..)) : tf_scope.
-Notation f_exist A := (tf_exist A).
-Notation "∃'" := (f_exist _) (only parsing) : tf_scope.
-Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%F)) ..)) : tf_scope.
-Infix "∗" := (tf_sep) : tf_scope.
-(* Infix "-∗" := (tf_wand) : tf_scope. *)
-Notation "□ P" := (tf_pers P%F) : tf_scope.
+Notation "'⌜' p '⌝'" := (tr_pure p) : tr_scope.
+Infix "∧" := (tr_and) : tr_scope.
+Infix "∨" := (tr_or) : tr_scope.
+Infix "→" := (tr_impl) : tr_scope.
+Notation r_forall A := (tr_forall A).
+Notation "∀'" := (r_forall _) (only parsing) : tr_scope.
+Notation "∀ a .. z , P" := (r_forall _ (λ a, .. (r_forall _ (λ z, P%R)) ..)) : tr_scope.
+Notation r_exist A := (tr_exist A).
+Notation "∃'" := (r_exist _) (only parsing) : tr_scope.
+Notation "∃ a .. z , P" := (r_exist _ (λ a, .. (r_exist _ (λ z, P%R)) ..)) : tr_scope.
+
+Fixpoint tf_trace `{SI : indexT} `{!lirisGS Λ Σ}
+  (Φ : @tf SI Σ (state_pred Λ)) : trProp Λ :=
+  match Φ with
+  | tf_emp => (⌜ True ⌝)%R
+  | tf_atomic π => tr_atomic π
+  | tf_pure p => (⌜p⌝)%R
+  | tf_ghost p => (⌜ True ⌝)%R
+  | tf_and P Q => (tf_trace P ∧ tf_trace Q)%R
+  | tf_or P Q => (tf_trace P ∨ tf_trace Q)%R
+  | tf_impl P Q => (P → tf_trace Q)%R
+  | tf_forall A P => (∀ (a : A), tf_trace (P a))%R
+  | tf_exist A P => (∃ (a : A), tf_trace (P a))%R
+  | tf_sep P Q => (tf_trace P ∧ tf_trace Q)%R
+  | tf_always N P => tr_always (tf_trace P)
+  | tf_until N k b q P Q => tr_until (tf_trace P) (tf_trace Q)
+  end.

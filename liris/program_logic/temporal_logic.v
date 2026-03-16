@@ -33,7 +33,7 @@ Fixpoint tf_logic `{SI : indexT} `{!lirisGS Λ Σ}
   | tf_exist A P => (∃ (a : A), tf_logic (P a))%I
   | tf_sep P Q => (tf_logic P ∗ tf_logic Q)%I
   (* | tf_wand P Q => (⌜P⌝ -∗ tf_logic Q)%I *)
-  | tf_pers P => (□ (tf_logic P))%I
+  (* | tf_pers P => (□ (tf_logic P))%I *)
   | tf_always N P => (inv N (tf_logic P))%I
   | tf_until N k b q P Q =>
       (oblP_assigned k b (q/2)%Qp ∗
@@ -57,7 +57,7 @@ with tf_intuit `{SI : indexT} `{!lirisGS Λ Σ}
        | tf_exist A P => (∃ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
        | tf_sep P Q => (tf_intuit n σ Θ κs i Ω P ∗ tf_intuit n σ Θ κs i Ω Q)%I
        (* | tf_wand P Q => (⌜P⌝ -∗ tf_intuit n σ Θ κs i Ω Q)%I *)
-       | tf_pers P => (□ (tf_logic P))%I
+       (* | tf_pers P => (□ (tf_logic P))%I *)
        | tf_always N P => (inv N (tf_logic P))%I
        | tf_until N k b q P Q =>
            ((∃ f o, event_obl i (n, Ω) k (obl_assigned f o)) ∗
@@ -158,9 +158,9 @@ Section reduction.
   (* Lemma tf_wand_logic P Q : *)
   (*   ⟦P -∗ Q⟧ₗ = (⟦P⟧ₗ -∗ ⟦Q⟧ₗ)%I. *)
   (* Proof. done. Qed. *)
-  Lemma tf_pers_logic P :
-    ⟦□ P⟧ₗ = (□ ⟦P⟧ₗ)%I.
-  Proof. done. Qed.
+  (* Lemma tf_pers_logic P : *)
+  (*   ⟦□ P⟧ₗ = (□ ⟦P⟧ₗ)%I. *)
+  (* Proof. done. Qed. *)
   Lemma tf_always_logic N P :
     ⟦tf_always N P⟧ₗ = (inv N ⟦P⟧ₗ)%I.
   Proof. done. Qed.
@@ -180,7 +180,7 @@ Ltac tf_red :=
    try rewrite tf_atomic_logic;
    try rewrite tf_pure_logic;
    try rewrite tf_ghost_logic;
-   try rewrite tf_pers_logic;
+   (* try rewrite tf_pers_logic; *)
    try rewrite tf_always_logic
   ).
 
