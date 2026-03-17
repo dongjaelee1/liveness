@@ -38,7 +38,7 @@ Definition ti_exist `{SI : indexT} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ 
 Definition ti_always_pre `{SI : indexT} `{!lirisGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
-  λ P τ, (|={E,∅}=> ▷ |={∅,E}=> (P τ) ∗ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ)))%I.
+  λ P τ, (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∗ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ))))%I.
   (* λ P τ, (|={E,∅}=> (▷ (P τ)) ∗ ((▷ (P τ)) ={∅}=∗ ALC (|={∅,E}=> ti_always P (trace_next τ))))%I. *)
 
 Local Instance ti_always_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E : Contractive (ti_always_pre E).
@@ -66,7 +66,7 @@ Definition ti_until_pre `{SI : indexT} `{!lirisGS Λ Σ} E
   A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
   λ a P Q τ,
     ((|={E,∅}=> ▷ |={∅,E}=> (Q τ)) ∨
-       (|={E,∅}=> ▷ |={∅,E}=> (P τ) ∗ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∗ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ))))%I.
+       (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∗ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∗ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I.
 
 Local Instance ti_until_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E
   {A : Type} {ltA : A → A → Prop} {wf_ltA : well_founded ltA}
@@ -209,9 +209,10 @@ Qed.
 (* subtype of "Type@{uPred_primitive.uPred_sat_exists .u0}"). *)
 
 
-Section proof.
+Section proof1.
   Context `{!lirisGS Λ Σ}.
   Context {A : Type} {ltA : A → A → Prop} {wf_ltA : well_founded ltA}.
+  Implicit Type F : iProp Σ.
 
   (* Lemma test1 (Ω1 : obls) i : *)
   (*   iProp_sat (Σ:=Σ) (∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | obl_cond_owner i)⌝)) *)
@@ -227,7 +228,7 @@ Section proof.
   (*   intros. do 4 (apply sat_exists in H; destruct H). eauto. *)
   (* Qed. *)
 
-  Lemma ti_always_trace_next (F : iProp Σ) Φ τ :
+  Lemma ti_always_trace_next F Φ τ :
     iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) τ) →
     iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) (trace_next τ)).
   Proof.
@@ -235,7 +236,6 @@ Section proof.
     apply sat_fupd, sat_later, sat_fupd in H. apply sat_sep in H. destruct H.
     apply sat_fupd, sat_ALC, sat_fupd in H0. auto.
   Qed.
-
   Lemma ti_always_trace_later F Φ n x τf :
     n ≤ x →
     iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) (n, τf)) →
@@ -257,6 +257,30 @@ Section proof.
     eapply ti_always_trace_later in H. 2: eauto.
     eapply IH. rewrite ti_always_unfold /ti_always_pre in H.
     apply sat_fupd, sat_later, sat_fupd in H. apply sat_sep in H. destruct H. auto.
+  Qed.
+
+  Lemma ti_until_tr_until F Φ1 Φ2 :
+    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic wf_ltA Φ1 τ) → tf_trace Φ1 τ) →
+    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic wf_ltA Φ2 τ) → tf_trace Φ2 τ) →
+    ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_exist A (λ a, ti_until wf_ltA a (ti_logic wf_ltA Φ1) (ti_logic wf_ltA Φ2)) τ) →
+         tr_until (tf_trace Φ1) (tf_trace Φ2) τ.
+  Proof.
+    intros IH1 IH2 τ H. unfold tr_until. destruct τ as (n&τf).
+    unfold ti_exist in H. apply sat_exists in H. destruct H.
+    revert n τf H. induction x as [a IHa] using (well_founded_ind wf_ltA). intros.
+    rewrite ti_until_unfold /ti_until_pre in H. apply sat_or in H. destruct H.
+    { apply sat_fupd, sat_later, sat_fupd in H. apply IH2 in H.
+      exists n. split_and !; eauto. intros. lia. }
+    apply sat_fupd, sat_later, sat_fupd in H. apply sat_sep in H. destruct H as [HP H].
+    apply sat_fupd, sat_exists in H. destruct H as [b H].
+    apply sat_sep in H. destruct H as [Hlt H]. apply sat_elim in Hlt.
+    apply sat_ALC, sat_fupd in H.
+    specialize (IHa _ Hlt _ _ H). simpl in IHa. destruct IHa as (m'& Hm'& Htr& Hp).
+    destruct Hm'.
+    { exists (S n). split_and !; eauto. intros. destruct H0. destruct H0; eauto. apply Hp. lia. }
+    exists (S m). split_and !; eauto.
+    { lia. }
+    intros. destruct H0. destruct H0; eauto. apply Hp. lia.
   Qed.
 
   Lemma ti_logic_tf_trace (F : iProp Σ) (Φ : tf) (τ : trace Λ) :
@@ -281,6 +305,7 @@ Section proof.
       apply IHΦ1 in H. apply IHΦ2 in H0. split; auto.
     - done.
     - eapply ti_always_tr_always; eauto.
-    - TODO
+    - eapply ti_until_tr_until; eauto.
+  Qed.
 
-End proof.
+End proof1.
