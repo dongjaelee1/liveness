@@ -152,6 +152,22 @@ End aux.
 
 Global Instance ordSI : indexT := ordI.
 
+(** This cast using 'change' avoids universe inconsistency. *)
+Global Instance iProp_sat_lc_SatisfiableExists {Σ}: SatisfiableExists ordinal_ucmra.OrdUR (@iProp_sat _ Σ).
+Proof.
+  change (ordinal_ucmra.OrdUR: Type) with Ord.t. apply iProp_sat_exists_instance.
+Qed.
+
+(* Global Instance iProp_sat_lc_at_SatisfiableAtFupd {Σ} `{!invGS Σ} : SatisfiableAtFupd (iProp_sat_lc_at). *)
+(* Proof. *)
+(*   apply sat_at_satisfiable_at_fupd. *)
+(* Qed. *)
+
+(* Global Instance iProp_sat_lc_at_frame_SatisfiableAtFupd {Σ} `{!invGS Σ} (F : iProp Σ) : SatisfiableAtFupd (iProp_sat_lc_at_frame F). *)
+(* Proof. *)
+(*   apply sat_at_frame_satisfiable_at_fupd. *)
+(* Qed. *)
+
 (* Print Universes. *)
 
 (* uPred_primitive.uPred_sat_exists.u0 = temporal_logic.ordSI.u0 *)
@@ -168,8 +184,6 @@ Global Instance ordSI : indexT := ordI.
 (* universes.Logic = cmra.u0 *)
 
 (* TODO *)
-(* Global Instance iProp_sat_lc_satisfiableExists {Σ : gFunctor}: SatisfiableExists ordinal_ucmra.OrdUR (@iProp_sat _ Σ). *)
-(* Proof. apply iProp_sat_exists_instance. Qed. *)
 
 (* Unable to unify "?X" with "ucmra_car ordinal_ucmra.OrdUR" *)
 (* (unable to find a well-typed instantiation for "?X": cannot ensure that "Type@{ucmra.u0}" is a *)
@@ -213,7 +227,7 @@ Section proof.
   (*   intros. do 4 (apply sat_exists in H; destruct H). eauto. *)
   (* Qed. *)
 
-  Lemma ti_always_trace_next F Φ τ :
+  Lemma ti_always_trace_next (F : iProp Σ) Φ τ :
     iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) τ) →
     iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) (trace_next τ)).
   Proof.
