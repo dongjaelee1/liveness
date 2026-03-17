@@ -309,3 +309,10 @@ Section proof1.
   Qed.
 
 End proof1.
+
+Section proof2.
+  Context `{!lirisGS Λ Σ}.
+
+  TODO
+
+End proof2.

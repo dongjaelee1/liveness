@@ -63,3 +63,21 @@ Fixpoint tf_trace `{SI : indexT} `{!lirisGS Λ Σ}
   | tf_always N P => tr_always (tf_trace P)
   | tf_until N k b q P Q => tr_until (tf_trace P) (tf_trace Q)
   end.
+
+(** Define fair scheduling as a property of a trace. *)
+Definition tr_eventually {Λ : language} : trProp Λ → trProp Λ :=
+  λ Q, tr_until (⌜ True ⌝)%R Q.
+
+(* These might be expressible using tr_atomic, with some appropriate state_sat.
+   But this definition is only used in the adequacy, so we leave it specific for now. *)
+Definition thread_alive {Λ : language} (i : thread_id) : trProp Λ :=
+  λ τ, let '((Θ, σ), _, _) := (τ.2 τ.1) in ∃ e, Θ !! i = Some e ∧ to_val e = None.
+
+Definition thread_done {Λ : language} (i : thread_id) : trProp Λ :=
+  λ τ, let '((Θ, σ), _, _) := (τ.2 τ.1) in (Θ !! i = None ∨ ∃ v, Θ !! i = Some (of_val v)).
+
+Definition thread_turn {Λ : language} (i : thread_id) : trProp Λ :=
+  λ τ, let '(_, j, _) := (τ.2 τ.1) in i = j.
+
+Definition fair_scheduling {Λ : language} : trProp Λ :=
+  tr_always (∀ i, (thread_done i) ∨ (thread_alive i ∧ tr_eventually (thread_turn i)))%R.
