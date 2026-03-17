@@ -24,7 +24,7 @@ Class SatisfiableAt `{SI : indexT} {Σ : gFunctors} `{!invGS Σ} (sat_at : coPse
 }.
 
 (* Notation SatisfiableAtExists X sat_at := (∀ E, SatisfiableExists X (sat_at E)). *)
-
+Notation iProp_sat_lc := (sat_lc iProp_sat).
 
 (* there is a canonical satisfiability instance for every notion of satisfiable *)
 Section canonical_sat_at.
@@ -61,7 +61,7 @@ Section canonical_sat_at.
 
 End canonical_sat_at.
 
-Notation iProp_sat_at := (sat_at (sat := iProp_sat)).
+Notation iProp_sat_lc_at := (sat_at (sat := iProp_sat_lc)).
 
 (* framing preserves SatisfiableAtFUpd *)
 Section sat_at_frame.
@@ -83,3 +83,5 @@ Section sat_at_frame.
   Qed.
 
 End sat_at_frame.
+
+Notation iProp_sat_lc_at_frame := (sat_at_frame (sat_at := iProp_sat_lc_at)).

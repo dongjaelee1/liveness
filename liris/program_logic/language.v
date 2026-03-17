@@ -380,10 +380,13 @@ Notation pure_steps_tp C := (map_Forall2 (λ _, rtc (pure_step C))).
 Definition trace (Λ : language) : Type :=
   nat * (nat → (cfg Λ * thread_id * list (observation Λ))).
 
+Definition trace_next {Λ} : trace Λ → trace Λ :=
+  λ τ, (S τ.1, τ.2).
+
 CoInductive behavior {Λ : language} : trace Λ → Prop :=
-| behavior_step n τ ρ1 ρ2 i1 i2 κ κs :
-  τ n = (ρ1, i1, (κ ++ κs)) →
+| behavior_step n τf ρ1 ρ2 i1 i2 κ κs :
+  τf n = (ρ1, i1, (κ ++ κs)) →
   thread_step i1 ρ1 κ ρ2 →
-  τ (S n) = (ρ2, i2, κs) →
-  behavior (S n, τ) →
-  behavior (n, τ).
+  τf (S n) = (ρ2, i2, κs) →
+  behavior (S n, τf) →
+  behavior (n, τf).

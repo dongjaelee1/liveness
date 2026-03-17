@@ -72,28 +72,28 @@ Definition tf_strongrelease `{SI : indexT} {Σ} {Π} N k b q (P Q : @tf SI Σ Π
   (tf_until N k b q Q (Q ∗ P))%F.
 Global Arguments tf_strongrelease {SI Σ Π}.
 
-Section depth.
+(* Section depth. *)
 
-  Universe temporal_formula_depth.
+(*   Universe temporal_formula_depth. *)
 
-  Local Open Scope ordinals.
+(*   Local Open Scope ordinals. *)
 
-  Fixpoint tf_depth `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : @tf SI Σ Π) : ord :=
-    match Φ with
-    | tf_emp => one
-    | tf_atomic π => one
-    | tf_pure p => one
-    | tf_ghost p => one
-    | tf_and P Q => (tf_depth P ⊕ tf_depth Q)
-    | tf_or P Q => (tf_depth P ⊕ tf_depth Q)
-    | tf_impl P Q => (succ (tf_depth Q))
-    | tf_forall A P => (limit (λ (a: A), tf_depth (P a)))
-    | tf_exist A P => (limit (λ (a: A), tf_depth (P a)))
-    | tf_sep P Q => (tf_depth P ⊕ tf_depth Q)
-    (* | tf_wand P Q => (succ (tf_depth Q)) *)
-    (* | tf_pers P => (succ (tf_depth P)) *)
-    | tf_always N P => (succ (tf_depth P))
-    | tf_until N k b q P Q => (tf_depth P ⊕ tf_depth Q)
-    end.
+(*   Fixpoint tf_depth `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : @tf SI Σ Π) : ord := *)
+(*     match Φ with *)
+(*     | tf_emp => one *)
+(*     | tf_atomic π => one *)
+(*     | tf_pure p => one *)
+(*     | tf_ghost p => one *)
+(*     | tf_and P Q => (tf_depth P ⊕ tf_depth Q) *)
+(*     | tf_or P Q => (tf_depth P ⊕ tf_depth Q) *)
+(*     | tf_impl P Q => (succ (tf_depth Q)) *)
+(*     | tf_forall A P => (limit (λ (a: A), tf_depth (P a))) *)
+(*     | tf_exist A P => (limit (λ (a: A), tf_depth (P a))) *)
+(*     | tf_sep P Q => (tf_depth P ⊕ tf_depth Q) *)
+(*     (* | tf_wand P Q => (succ (tf_depth Q)) *) *)
+(*     (* | tf_pers P => (succ (tf_depth P)) *) *)
+(*     | tf_always N P => (succ (tf_depth P)) *)
+(*     | tf_until N k b q P Q => (tf_depth P ⊕ tf_depth Q) *)
+(*     end. *)
 
-End depth.
+(* End depth. *)

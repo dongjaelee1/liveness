@@ -461,75 +461,75 @@ End proof.
 
 
 
-(** Random tests to check universe consistency. *)
+(* (** Random tests to check universe consistency. *) *)
 
-From transfinite.stepindex Require Import ordinals.
-From transfinite.base_logic Require Import satisfiable.
-From liris.algebra Require Import ordinal_existential_properties.
+(* From transfinite.stepindex Require Import ordinals. *)
+(* From transfinite.base_logic Require Import satisfiable. *)
+(* From liris.algebra Require Import ordinal_existential_properties. *)
 
-Global Instance ordSI : indexT := ordI.
+(* Global Instance ordSI : indexT := ordI. *)
 
-Section test.
-  Context `{!lirisGS Λ Σ}.
-  (* Context `{SIC : !state_interp_class Λ Σ Π} `{OCM : !ord_mono_fun_class}. *)
-  (* Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}. *)
+(* Section test. *)
+(*   Context `{!lirisGS Λ Σ}. *)
+(*   (* Context `{SIC : !state_interp_class Λ Σ Π} `{OCM : !ord_mono_fun_class}. *) *)
+(*   (* Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}. *) *)
 
-  (* Print Universes. *)
+(*   (* Print Universes. *) *)
 
-  Lemma test (P Q : iProp Σ) :
-    iProp_sat (∃ (o : ord) (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ (state_pred Λ))) : ord) o⌝ ∗ X)%I →
-    ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ (state_pred Λ))) : ord) o⌝ ∗ X)%I.
-  Proof.
-    intros. apply sat_exists in H. auto.
-  Qed.
+(*   Lemma test (P Q : iProp Σ) : *)
+(*     iProp_sat (∃ (o : ord) (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ (state_pred Λ))) : ord) o⌝ ∗ X)%I → *)
+(*     ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ (state_pred Λ))) : ord) o⌝ ∗ X)%I. *)
+(*   Proof. *)
+(*     intros. apply sat_exists in H. auto. *)
+(*   Qed. *)
 
-  (** Fail: tf is inside tf. *)
-  Fail Lemma test2 (P Q : iProp Σ) :
-    iProp_sat (∃ (o : Ord.t), ⌜Ord.lt ((tf_depth ((∃ (p : tf), p ∗ ∀ N k (q : tf), tf_always N k (q)) : @tf _ Σ state_pred)) : Ord.t) o⌝)%I →
-    True.
+(*   (** Fail: tf is inside tf. *) *)
+(*   Fail Lemma test2 (P Q : iProp Σ) : *)
+(*     iProp_sat (∃ (o : Ord.t), ⌜Ord.lt ((tf_depth ((∃ (p : tf), p ∗ ∀ N k (q : tf), tf_always N k (q)) : @tf _ Σ state_pred)) : Ord.t) o⌝)%I → *)
+(*     True. *)
 
-  Lemma test3 :
-    tf_logic (tf_ghost (∃ (P : iProp Σ), ∀ (Q : iProp Σ), P ∗ Q))
-    ⊢ (∃ (P : iProp Σ), ∀ (Q : iProp Σ), P ∗ Q).
-  Proof. simpl. done. Qed.
+(*   Lemma test3 : *)
+(*     tf_logic (tf_ghost (∃ (P : iProp Σ), ∀ (Q : iProp Σ), P ∗ Q)) *)
+(*     ⊢ (∃ (P : iProp Σ), ∀ (Q : iProp Σ), P ∗ Q). *)
+(*   Proof. simpl. done. Qed. *)
 
-  Lemma test4 :
-    iProp_sat (∃ (o : ord) (X : iProp Σ),
-          ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ (state_pred Λ))) : ord) o⌝ ∗
-          tf_logic (∃ N, tf_always N (tf_ghost X)))%I →
-    ∃ (o : ord), iProp_sat (∃ (X : iProp Σ),
-                       ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ (state_pred Λ))) : ord) o⌝ ∗
-                       tf_logic (∃ N, tf_always N (tf_ghost X)))%I.
-  Proof.
-    intros. apply sat_exists in H. auto.
-  Qed.
+(*   Lemma test4 : *)
+(*     iProp_sat (∃ (o : ord) (X : iProp Σ), *)
+(*           ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ (state_pred Λ))) : ord) o⌝ ∗ *)
+(*           tf_logic (∃ N, tf_always N (tf_ghost X)))%I → *)
+(*     ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), *)
+(*                        ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ (state_pred Λ))) : ord) o⌝ ∗ *)
+(*                        tf_logic (∃ N, tf_always N (tf_ghost X)))%I. *)
+(*   Proof. *)
+(*     intros. apply sat_exists in H. auto. *)
+(*   Qed. *)
 
-  (* Print Universes. *)
+(*   (* Print Universes. *) *)
 
-  (** Fail: iProp quantification in tf_exist, probably requiring cmra < tf. *)
-  Fail Lemma test3' :
-    tf_logic (∃ (P Q : iProp Σ), tf_ghost (P ∗ Q)) ⊢ True.
+(*   (** Fail: iProp quantification in tf_exist, probably requiring cmra < tf. *) *)
+(*   Fail Lemma test3' : *)
+(*     tf_logic (∃ (P Q : iProp Σ), tf_ghost (P ∗ Q)) ⊢ True. *)
 
-  (* Print Universes. *)
-(* Error: Found type "iProp Σ" where "?A" was expected *)
-(* (unable to find a well-typed instantiation for "?A": cannot ensure that *)
-(* "Type@{max(Set+1,indexT.u0,ucmra.u0)}" is a subtype of "Type@{tf.u2}"). *)
+(*   (* Print Universes. *) *)
+(* (* Error: Found type "iProp Σ" where "?A" was expected *) *)
+(* (* (unable to find a well-typed instantiation for "?A": cannot ensure that *) *)
+(* (* "Type@{max(Set+1,indexT.u0,ucmra.u0)}" is a subtype of "Type@{tf.u2}"). *) *)
 
-(* Ord.TYPE.u0 < cmra.u0 *)
-  (* tf.u2 <= Ord.TYPE.u0 *)
+(* (* Ord.TYPE.u0 < cmra.u0 *) *)
+(*   (* tf.u2 <= Ord.TYPE.u0 *) *)
 
-  (** Fail: Probably, tf (tf.u2) ≤ Ord.t (Ord.TYPE.u0) < iProp Σ (cmra.u0),
-      and this needs cmra.u0 < tf *)
-  Fail Lemma test5 (P Q : iProp Σ) :
-    iProp_sat (∃ (o : ord), ⌜ord_lt ((tf_depth ((∃ (p : iProp Σ), (tf_ghost p) ∗ ∀ N k (q : iProp Σ), tf_always N k (tf_ghost q)) : @tf _ Σ state_pred)) : ord) o⌝)%I →
-    True.
+(*   (** Fail: Probably, tf (tf.u2) ≤ Ord.t (Ord.TYPE.u0) < iProp Σ (cmra.u0), *)
+(*       and this needs cmra.u0 < tf *) *)
+(*   Fail Lemma test5 (P Q : iProp Σ) : *)
+(*     iProp_sat (∃ (o : ord), ⌜ord_lt ((tf_depth ((∃ (p : iProp Σ), (tf_ghost p) ∗ ∀ N k (q : iProp Σ), tf_always N k (tf_ghost q)) : @tf _ Σ state_pred)) : ord) o⌝)%I → *)
+(*     True. *)
 
-(* Notation OrdinalExistential := (TypeExistentialProperty Ord.t) *)
-(* iProp_sat_exists_instance: *)
-(*   ∀ {SI : indexT} {Σ : gFunctors} {X : Type}, *)
-(*     TypeExistentialProperty X SI → SatisfiableExists X iProp_sat *)
-(* sat_exists: *)
-(*   ∀ {SI : indexT} {PROP : bi} {X : Type} {sat : PROP → Prop}, *)
-(*     SatisfiableExists X sat → ∀ Φ : X → PROP, sat (∃ x : X, Φ x)%I → ∃ x : X, sat (Φ x) *)
+(* (* Notation OrdinalExistential := (TypeExistentialProperty Ord.t) *) *)
+(* (* iProp_sat_exists_instance: *) *)
+(* (*   ∀ {SI : indexT} {Σ : gFunctors} {X : Type}, *) *)
+(* (*     TypeExistentialProperty X SI → SatisfiableExists X iProp_sat *) *)
+(* (* sat_exists: *) *)
+(* (*   ∀ {SI : indexT} {PROP : bi} {X : Type} {sat : PROP → Prop}, *) *)
+(* (*     SatisfiableExists X sat → ∀ Φ : X → PROP, sat (∃ x : X, Φ x)%I → ∃ x : X, sat (Φ x) *) *)
 
-End test.
+(* End test. *)

@@ -3,6 +3,8 @@
 From stdpp Require Export coPset.
 From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.proofmode Require Import proofmode.
+(* From transfinite.stepindex Require Import ordinal_arith. *)
+(* From transfinite.algebra Require Import ordinals. *)
 From transfinite.base_logic.lib Require Export own.
 From transfinite.base_logic.lib Require Import wsat.
 From liris.algebra Require Import ordinal_ucmra.
@@ -69,7 +71,7 @@ Proof. rewrite /BiBUpdFUpd uPred_fupd_unseal. by iIntros (E P) ">? [$ $] !> !>".
 
 (** Additional lemmas *)
 Lemma fupd_step `{SI : indexT} {Σ : gFunctors} `{!invGS Σ} P E1 E2:
-  (∀ x, ●£ x -∗ |==> (∃ y, ⌜(y < x)%ord⌝ ∗ ●£ y ∗ ▷ |={E1, E2}=> P)) -∗ |={E1, E2}=> P.
+  (∀ (x : Ord.t), ●£ x -∗ |==> (∃ y, ⌜(y < x)%ord⌝ ∗ ●£ y ∗ ▷ |={E1, E2}=> P)) -∗ |={E1, E2}=> P.
 Proof.
   rewrite uPred_fupd_unseal /uPred_fupd_def. iIntros "Hupd Hwsat".
   rewrite /bupd /bi_bupd_bupd; simpl.
@@ -98,13 +100,14 @@ Qed.
   where ["Hcredit"] is a credit available in the context and ["HP"] is the
   assumption from which a later should be stripped. *)
 Lemma lc_fupd_elim_later_ord `{SI : indexT} `{!invGS Σ} E P :
-   £ Ord.one -∗ (▷ P) -∗ |={E}=> P.
+   £ 1%ord -∗ (▷ P) -∗ |={E}=> P.
 Proof.
   iIntros "Hf Hupd".
   rewrite uPred_fupd_unseal /uPred_fupd_def.
-  iIntros "[$ $]". iApply (tlc_later with "[Hf Hupd]").
-  iFrame "Hf". iNext. by iModIntro.
+  iIntros "[$ $]". iApply (tlc_later with "[$Hf Hupd]").
+  iNext. by iModIntro.
 Qed.
+
 Lemma lc_fupd_elim_later `{SI : indexT} `{!invGS Σ} E P :
    £n 1 -∗ (▷ P) -∗ |={E}=> P.
 Proof. rewrite tlc_one_nat. apply lc_fupd_elim_later_ord. Qed.
@@ -114,11 +117,12 @@ Proof. rewrite tlc_one_nat. apply lc_fupd_elim_later_ord. Qed.
   This is typically used as [iApply (lc_fupd_add_later with "Hcredit")],
   where ["Hcredit"] is a credit available in the context. *)
 Lemma lc_fupd_add_later_ord `{SI : indexT} `{!invGS Σ} E1 E2 P :
-  £ Ord.one -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
+  £ 1%ord -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
 Proof.
   iIntros "Hf Hupd". iApply (fupd_trans E1 E1).
-  iApply (lc_fupd_elim_later with "Hf Hupd").
+  iApply (lc_fupd_elim_later_ord with "Hf Hupd").
 Qed.
+
 Lemma lc_fupd_add_later `{SI : indexT} `{!invGS Σ} E1 E2 P :
   £n 1 -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
 Proof. rewrite tlc_one_nat. apply lc_fupd_add_later_ord. Qed.

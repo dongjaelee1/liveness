@@ -25,10 +25,10 @@ Definition tr_exist {Λ : language} : ∀ (A : Type), (A → trProp Λ) → trPr
   λ A P, (λ τ, ∃ (a : A), (P a τ)).
 
 Definition tr_always {Λ : language} : trProp Λ → trProp Λ :=
-  λ P, (λ τ, let '(i, τf) := τ in ∀ j, (i ≤ j) → (P (j, τf))).
+  λ P, (λ τ, let '(n, τf) := τ in ∀ m, (n ≤ m) → (P (m, τf))).
 
 Definition tr_until {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
-  λ P Q, (λ τ, let '(i, τf) := τ in ∃ j, (i ≤ j) ∧ (Q (j, τf)) ∧ (∀ k, (i ≤ k < j) → (P (k, τf)))).
+  λ P Q, (λ τ, let '(n, τf) := τ in ∃ m, (n ≤ m) ∧ (Q (m, τf)) ∧ (∀ l, (n ≤ l < m) → (P (l, τf)))).
 
 (** Notations *)
 

@@ -9,6 +9,8 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Export own.
 From transfinite.stepindex Require Export utils.
+(* From transfinite.stepindex Require Import ordinal_arith. *)
+(* From transfinite.algebra Require Import ordinals. *)
 From liris.algebra Require Import ordinal_ucmra.
 From liris.base_logic Require Export relational_updates.
 
@@ -467,9 +469,10 @@ Qed.
 (*   by iIntros "($ & $ & $)". *)
 (* Qed. *)
 
+
 (** ** Transfinite Later Credits *)
-(** We now instantiate the generic definition from above with ordinals to
-   obtain a transfinite version of later credits £ (α: ord). *)
+(** We now instantiate the generic definition from above with ordinals to *)
+(*    obtain a transfinite version of later credits £ (α: ord). *)
 Notation tlcGS Σ := (auth_rupdGS Σ OrdUR).
 Notation tlcGpreS Σ := (auth_rupd_GpreS Σ OrdUR).
 Notation tlcΣ := (auth_rupdΣ OrdUR).
@@ -484,8 +487,7 @@ Section transfinite_lc.
   Lemma ord_auth_step_frame (a a' f : OrdR) :
     a' < a → (a' ⋅ f) < (a ⋅ f).
   Proof.
-    intros Hαβ.
-    by eapply Hessenberg.lt_add_l.
+    intros Hαβ. by eapply Hessenberg.lt_add_l.
   Qed.
 
   Lemma ord_auth_op_cancel (a f f' : OrdR) :
@@ -589,3 +591,102 @@ Section transfinite_lc.
   Proof. rewrite Ord.from_nat_S. apply tlc_succ. Qed.
 
 End transfinite_lc.
+
+(** Use one of two. *)
+(* (** ** Transfinite Later Credits *) *)
+(* (** We now instantiate the generic definition from above with ordinals to *)
+(*    obtain a transfinite version of later credits £ (α: ord). *) *)
+(* Notation tlcGS Σ := (auth_rupdGS Σ ordUR). *)
+(* Notation tlcGpreS Σ := (auth_rupd_GpreS Σ ordUR). *)
+(* Notation tlcΣ := (auth_rupdΣ ordUR). *)
+
+(* (* Notation "'£ω'" := (£ ω%O) (at level 60). *) *)
+(* (* Notation "'£n' a" := (£ (n2o a)) (at level 60). *) *)
+
+(* Section transfinite_lc. *)
+(*   Context `{SI : indexT} `{!tlcGS Σ}. *)
+(*   Local Open Scope O. *)
+
+(*   Lemma ord_auth_step_frame (a a' f : ordR): *)
+(*     a' ≺ a → (a' ⋅ f) ≺ (a ⋅ f). *)
+(*   Proof. *)
+(*     intros Hαβ. *)
+(*     by eapply natural_addition_strict_compat. *)
+(*   Qed. *)
+
+(*   Lemma ord_auth_op_cancel (a f f' : ordR): *)
+(*     a ⋅ f = a ⋅ f' → f = f'. *)
+(*   Proof using SI. *)
+(*     rewrite comm_L [a ⋅ f']comm_L. *)
+(*     by apply natural_addition_cancel. *)
+(*   Qed. *)
+
+(*   Lemma ord_valid_trivial (a: ordR): ✓ a. *)
+(*   Proof. done. Qed. *)
+
+(*   (* we define an auth rupd instance for ordinals *) *)
+(*   Global Instance ord_auth_rupd : auth_rupd (ordUR) := {| *)
+(*     auth_rupd_discrete := _; *)
+(*     auth_rupd_rel := ord_lt; *)
+(*     auth_rupd_next := succ_def; *)
+(*     auth_rupd_rel_wf := wf_ord_lt; *)
+(*     auth_rupd_rel_proper := _; *)
+(*     auth_rupd_rel_frame := ord_auth_step_frame; *)
+(*     auth_rupd_op_cancel := ord_auth_op_cancel; *)
+(*     auth_rupd_next_step := succ_greater; *)
+(*     auth_valid_trivial := ord_valid_trivial *)
+(*   |}. *)
+
+(*   Lemma tlc_split `{!tlcGS Σ} (α β: ord): *)
+(*     £ (α ⊕ β) ⊣⊢ £ α ∗ £ β. *)
+(*   Proof. apply rupdF_split. Qed. *)
+
+(*   Lemma tlc_succ `{!tlcGS Σ} (α: ord): *)
+(*     £ (succ α) ⊣⊢ £ (succ zero) ∗ £ α. *)
+(*   Proof. *)
+(*     by rewrite -tlc_split natural_addition_succ natural_addition_zero_left_id. *)
+(*   Qed. *)
+
+(*   Lemma tlc_later_strong `{!tlcGS Σ} α β P: *)
+(*     β ≺ α → *)
+(*     £ α -∗ (£ β -∗ ▷ |==>r P) -∗ |==>r P. *)
+(*   Proof. *)
+(*     intros Hlt. iIntros "H1 H2". iApply (auth_rupd_step with "[$H1 $H2]"). done. *)
+(*   Qed. *)
+
+(*   Lemma tlc_later `{!tlcGS Σ} P: *)
+(*     £ (succ zero) -∗ (▷ |==>r P) -∗ |==>r P. *)
+(*   Proof. *)
+(*     iIntros "Hf Hupd". iApply (tlc_later_strong (succ zero) zero with "Hf [Hupd]"). *)
+(*     - apply succ_greater. *)
+(*     - by iIntros "_". *)
+(*   Qed. *)
+
+(*   Lemma tlc_laterN `{!tlcGS Σ} P n : *)
+(*     £(Nat.iter n succ_def zero) -∗ (▷^n |==>r P) -∗ |==>r P. *)
+(*   Proof. *)
+(*     iIntros "Hc Hu". iInduction n as [ | n ] "IH"; first done. *)
+(*     simpl. rewrite tlc_succ. iDestruct "Hc" as "[Hc0 Hc]". *)
+(*     iApply (tlc_later with "Hc0"). *)
+(*     iNext. iApply ("IH" with "Hc Hu"). *)
+(*   Qed. *)
+
+(*   Lemma tlc_weaken `{!tlcGS Σ} (α β: ord): *)
+(*     β ⪯ α → (£ α -∗ |==>r £ β). *)
+(*   Proof. *)
+(*     intros Hle. iIntros "H". iApply (auth_rupd_weaken with "H"). done. *)
+(*   Qed. *)
+
+(*   Lemma tlc_zero `{!tlcGS Σ}: ⊢ |==> £ zero. *)
+(*   Proof. *)
+(*     iApply own_unit. *)
+(*   Qed. *)
+
+
+(*   Lemma tlc_loeb `{!tlcGS Σ} P `{!CreditExchange Σ (ordUR) P}: *)
+(*     □ ((£(succ zero) -∗ P) → P) ⊢ P. *)
+(*   Proof. *)
+(*     exact (credit_ind Σ (ordUR) P). *)
+(*   Qed. *)
+
+(* End transfinite_lc. *)
