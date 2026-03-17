@@ -180,11 +180,11 @@ Global Instance ordSI : indexT := ordI.
 
 (* TODO *)
 
-Global Instance iProp_sat_lc_satisfiable_rupd {Σ : gFunctors} `{!invGS Σ} :
-  SatisfiableRUpd (iProp_sat_lc).
-Proof.
-  apply sat_lc_satisfiable_rupd; try apply _.
-  apply iProp_sat_exists_instance.
+(* Global Instance iProp_sat_lc_satisfiable_rupd {Σ : gFunctors} `{!invGS Σ} : *)
+(*   SatisfiableRUpd (iProp_sat_lc). *)
+(* Proof. *)
+(*   apply sat_lc_satisfiable_rupd; try apply _. *)
+(*   apply iProp_sat_exists_instance. *)
 
 (*     econstructor. intros.  apply sat_exists in H. *)
 
@@ -199,19 +199,19 @@ Section proof.
   Context `{!lirisGS Λ Σ}.
   Context {A : Type} {ltA : A → A → Prop} {wf_ltA : well_founded ltA}.
 
-  Lemma test1 (Ω1 : obls) i :
-    iProp_sat (Σ:=Σ) (∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | obl_cond_owner i)⌝))
-    → (∃ Ω2, (Ω1 ↪ₚ Ω2 | obl_cond_owner i)).
-  Proof.
-    intros. apply sat_exists in H. destruct H. apply sat_elim in H. eauto.
-  Qed.
+  (* Lemma test1 (Ω1 : obls) i : *)
+  (*   iProp_sat (Σ:=Σ) (∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | obl_cond_owner i)⌝)) *)
+  (*   → (∃ Ω2, (Ω1 ↪ₚ Ω2 | obl_cond_owner i)). *)
+  (* Proof. *)
+  (*   intros. apply sat_exists in H. destruct H. apply sat_elim in H. eauto. *)
+  (* Qed. *)
 
-  Lemma test2 :
-    iProp_sat (∃ (o : obl_fuel) k ℓ μ, oblP_fuel k ℓ μ ∗ witP_cred k o)
-    → ∃ (o : obl_fuel) k ℓ μ, iProp_sat (oblP_fuel k ℓ μ ∗ witP_cred k o).
-  Proof.
-    intros. do 4 (apply sat_exists in H; destruct H). eauto.
-  Qed.
+  (* Lemma test2 : *)
+  (*   iProp_sat (∃ (o : obl_fuel) k ℓ μ, oblP_fuel k ℓ μ ∗ witP_cred k o) *)
+  (*   → ∃ (o : obl_fuel) k ℓ μ, iProp_sat (oblP_fuel k ℓ μ ∗ witP_cred k o). *)
+  (* Proof. *)
+  (*   intros. do 4 (apply sat_exists in H; destruct H). eauto. *)
+  (* Qed. *)
 
   Lemma ti_always_tr_always F Φ :
     (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic wf_ltA Φ τ) → tf_trace Φ τ) →
@@ -223,7 +223,8 @@ Section proof.
     intros ?. destruct H0. apply Classical_Prop.imply_to_and in H0. destruct H0.
     apply H1. clear H1. revert H. induction H0; intros.
     { rewrite ti_always_unfold /ti_always_pre in H.
-      apply sat_fupd in H.
+      apply sat_fupd in H. apply sat_sep in H. destruct H.
+      apply sat_later in H. 
       TODO
 
   Lemma ti_logic_tf_trace (F : iProp Σ) (Φ : tf) (τ : trace Λ) :
