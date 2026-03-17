@@ -59,6 +59,7 @@ Fixpoint tf_trace `{SI : indexT} `{!lirisGS Λ Σ}
   | tf_forall A P => (∀ (a : A), tf_trace (P a))%R
   | tf_exist A P => (∃ (a : A), tf_trace (P a))%R
   | tf_sep P Q => (tf_trace P ∧ tf_trace Q)%R
+  | tf_pers P => (⌜ True ⌝)%R
   | tf_always N P => tr_always (tf_trace P)
   | tf_until N k b q P Q => tr_until (tf_trace P) (tf_trace Q)
   end.

@@ -38,11 +38,12 @@ Definition ti_exist `{SI : indexT} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ 
 Definition ti_always_pre `{SI : indexT} `{!lirisGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
-  λ P τ, (|={E,∅}=> (▷ (P τ)) ∗ ((▷ (P τ)) ={∅}=∗ ALC (|={∅,E}=> ti_always P (trace_next τ))))%I.
+  λ P τ, (|={E,∅}=> ▷ |={∅,E}=> (P τ) ∗ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ)))%I.
+  (* λ P τ, (|={E,∅}=> (▷ (P τ)) ∗ ((▷ (P τ)) ={∅}=∗ ALC (|={∅,E}=> ti_always P (trace_next τ))))%I. *)
 
 Local Instance ti_always_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E : Contractive (ti_always_pre E).
 Proof.
-  rewrite /ti_always_pre. repeat intro. do 4 (f_equiv).
+  rewrite /ti_always_pre. repeat intro. do 5 (f_equiv).
   f_contractive. do 2 (f_equiv).
 Qed.
 
@@ -64,16 +65,14 @@ Definition ti_until_pre `{SI : indexT} `{!lirisGS Λ Σ} E
   (ti_until : A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
   λ a P Q τ,
-    ((|={E}=> (Q τ)) ∨
-       (|={E,∅}=> (▷ (P τ)) ∗
-                 ((▷ (P τ)) ={∅}=∗
-                  ∃ a', (⌜ltA a' a⌝) ∗ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I.
+    ((|={E,∅}=> ▷ |={∅,E}=> (Q τ)) ∨
+       (|={E,∅}=> ▷ |={∅,E}=> (P τ) ∗ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∗ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ))))%I.
 
 Local Instance ti_until_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E
   {A : Type} {ltA : A → A → Prop} {wf_ltA : well_founded ltA}
   : Contractive (ti_until_pre E wf_ltA).
 Proof.
-  rewrite /ti_until_pre. repeat intro. do 8 (f_equiv).
+  rewrite /ti_until_pre. repeat intro. do 9 (f_equiv).
   (* FIXME: f_equiv not working. *)
   f_contractive. do 1 (f_equiv). eapply dist_ne.
   { eapply H. }
@@ -113,6 +112,7 @@ Fixpoint ti_logic `{SI : indexT} `{!lirisGS Λ Σ}
   | tf_forall A P => (ti_forall A (λ (a : A), ti_logic wf_ltA (P a)))
   | tf_exist A P => (ti_exist A (λ (a : A), ti_logic wf_ltA (P a)))
   | tf_sep P Q => (ti_and (ti_logic wf_ltA P) (ti_logic wf_ltA Q))
+  | tf_pers P => (ti_pure True)
   | tf_always N P => (ti_always (ti_logic wf_ltA P))
   | tf_until N k b q P Q =>
       (ti_exist A (λ a, ti_until wf_ltA a (ti_logic wf_ltA P) (ti_logic wf_ltA Q)))
@@ -213,6 +213,24 @@ Section proof.
   (*   intros. do 4 (apply sat_exists in H; destruct H). eauto. *)
   (* Qed. *)
 
+  Lemma ti_always_trace_next F Φ τ :
+    iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) τ) →
+    iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) (trace_next τ)).
+  Proof.
+    intros. rewrite ti_always_unfold /ti_always_pre in H.
+    apply sat_fupd, sat_later, sat_fupd in H. apply sat_sep in H. destruct H.
+    apply sat_fupd, sat_ALC, sat_fupd in H0. auto.
+  Qed.
+
+  Lemma ti_always_trace_later F Φ n x τf :
+    n ≤ x →
+    iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) (n, τf)) →
+    iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) (x, τf)).
+  Proof.
+    intro LE. induction LE; intros; first auto.
+    apply IHLE in H. apply ti_always_trace_next in H. done.
+  Qed.
+
   Lemma ti_always_tr_always F Φ :
     (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic wf_ltA Φ τ) → tf_trace Φ τ) →
     ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) τ) → tr_always (tf_trace Φ) τ.
@@ -221,11 +239,11 @@ Section proof.
     (** Use classical logic. *)
     intro m. pattern m. revert m. apply Classical_Pred_Type.not_ex_not_all.
     intros ?. destruct H0. apply Classical_Prop.imply_to_and in H0. destruct H0.
-    apply H1. clear H1. revert H. induction H0; intros.
-    { rewrite ti_always_unfold /ti_always_pre in H.
-      apply sat_fupd in H. apply sat_sep in H. destruct H.
-      apply sat_later in H. 
-      TODO
+    apply H1. clear H1.
+    eapply ti_always_trace_later in H. 2: eauto.
+    eapply IH. rewrite ti_always_unfold /ti_always_pre in H.
+    apply sat_fupd, sat_later, sat_fupd in H. apply sat_sep in H. destruct H. auto.
+  Qed.
 
   Lemma ti_logic_tf_trace (F : iProp Σ) (Φ : tf) (τ : trace Λ) :
     iProp_sat_lc_at_frame F ⊤ (ti_logic wf_ltA Φ τ) → tf_trace Φ τ.
@@ -247,14 +265,8 @@ Section proof.
     - unfold tr_exist. unfold ti_exist in H0. apply (sat_exists) in H0. destruct H0. eauto.
     - unfold ti_and in H. apply iProp_sat_lc_at_frame_and in H. destruct H.
       apply IHΦ1 in H. apply IHΦ2 in H0. split; auto.
-    - 
-
-      unfold tr_always.
-
-      
-
-      rewrite ti_always_unseal /ti_always_def in H.
-      
-
+    - done.
+    - eapply ti_always_tr_always; eauto.
+    - TODO
 
 End proof.
