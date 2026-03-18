@@ -55,66 +55,67 @@ Section fair_sched.
   Lemma fair_scheduling_fscnt (τ : trace Λ) :
     fair_scheduling τ → ∃ (γ : fscnt), beh_fscnt τ γ.
   Proof.
-    intros FS. unfold beh_fscnt. apply choice. intros i.
-    pose proof FS as FSn. destruct τ as (n& τf). specialize (FSn n).
-    unshelve edestruct FSn. 1: exact i. 1: done.
-    - clear FSn. rename H into TNA.
-      (* First thread is not active/allocated.
-         It can be allocated after, where we need another coinduction. *)
-      exists 0. revert n FS TNA. cofix CIH. intros.
-      destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
+    intros FS. unfold beh_fscnt. apply choice. intros i. destruct τ as (n&τf).
+    assert (∀ (s : nat), ((thread_na i (n, τf)) ∨ (thread_active i (n, τf) ∧ thread_turn i (s + n, τf)))
+                       → beh_fscnt_th (n, τf) i s); cycle 1.
+    { destruct (thread_active_or_not i (n, τf)) as [TH | TH].
+      - exists 0. specialize (H 0). apply H. left. auto.
+      - specialize (FS n). unshelve edestruct FS. 1: exact i. 1: lia.
+        { exfalso. eapply (thread_active_and_not_false _ ((n, τf))); eauto. }
+        destruct H0 as [TA TEV]. unfold tr_eventually, tr_until in TEV. destruct TEV as (m& LEm& TTurn& _).
+        remember (m - n) as s. assert (m = s + n) by lia. subst m. clear Heqs LEm.
+        exists s. apply H. right. auto. }
+    revert n FS. cofix CIH; intros. destruct H as [TH | TH].
+    - rename TH into TNA. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
       destruct (thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
       + econstructor. 1: eauto. 1: auto.
-        eapply CIH; auto. apply fair_scheduling_next. auto.
+        unshelve eapply (CIH _ _ 0); auto. apply fair_scheduling_next. auto.
       + pose proof FS as FSn'. specialize (FSn' (S n)).
         unshelve edestruct FSn'. 1: exact i. 1: lia.
         { exfalso. eapply (thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
-        unfold tr_and in H. destruct H as [TA TEV].
-        unfold tr_eventually, tr_until in TEV. destruct TEV as (m& LEm& TTurn& _).
-        remember (m - (S n)) as s. assert (m = s + S n) by lia. subst m. clear Heqs LEm.
-        eapply (beh_fscnt_th_step _ _ _ _ _ _ s). 1: eauto. 1: auto.
-        unfold trace_next. simpl.
-        apply fair_scheduling_next in FS. unfold trace_next in FS. unfold fst, snd in FS.
-        remember (S n) as n'. clear dependent n. rename n' into n.
-        (* Second Coinduction. *)
-        clear dependent Θ σ j κs. revert s n FS TA TTurn. cofix CIH2; intros.
-
-        TODO
-        * simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
-          unfold thread_turn in TTurn. simpl in TTurn. rewrite Htrn in TTurn. subst j.
-          
-
-        simpl in FS.
-        
-        
-        
-        Guarded.
-          
-
-          TODO
-
-          
-          
-          econstructor.
-
-        1: auto. 1: auto.
-        
-        { 
-        
-
-      
-      unfold thread_na in TNA.
-      simpl in TNA. rewrite Htrn in TNA. econstructor. 1: eauto.
-      { destruct TNA.
-        - rewrite e. auto.
-        - destruct e. rewrite e.
-      
-    
-
-choice
-     : ∀ (A B : Type) (R : A → B → Prop), (∀ x : A, ∃ y : B, R x y) → ∃ f : A → B, ∀ x : A, R x (f x)
-Definition fair_scheduling {Λ : language} : trProp Λ :=
-  tr_always (∀ i, (thread_na i) ∨ (thread_active i ∧ tr_eventually (thread_turn i)))%R.
+        destruct H as [TA TEV]. unfold tr_eventually, tr_until in TEV. destruct TEV as (m& LEm& TTurn& _).
+        remember (m - (S n)) as s'. assert (m = s' + S n) by lia. subst m. clear Heqs' LEm.
+        eapply (beh_fscnt_th_step _ _ _ _ _ _ s'). 1: eauto. 1: auto.
+        eapply CIH.
+        * apply fair_scheduling_next; auto.
+        * right. eauto.
+    - destruct TH as [TA TTurn]. destruct s.
+      (* Induction on s breask Guarded check? *)
+      { simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
+        unfold thread_turn in TTurn. simpl in TTurn. rewrite Htrn in TTurn. subst j.
+        destruct (thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
+        - econstructor. 1: eauto.
+          { right. split; auto. rewrite decide_True; auto. }
+          unshelve eapply (CIH _ _ 0); eauto. eapply fair_scheduling_next; eauto.
+        - pose proof FS as FSn'. specialize (FSn' (S n)).
+          unshelve edestruct FSn'. 1: exact i. 1: lia.
+          { exfalso. eapply (thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
+          destruct H as [TA2 TEV2]. unfold tr_eventually, tr_until in TEV2. destruct TEV2 as (m& LEm& TTurn2& _).
+          remember (m - (S n)) as s. assert (m = s + S n) by lia. subst m. clear Heqs LEm.
+          eapply (beh_fscnt_th_step _ _ _ _ _ _ s). 1: eauto.
+          { right. split; auto. rewrite decide_True; auto. }
+          apply CIH; auto. apply fair_scheduling_next; auto. }
+      { simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
+        destruct (decide (j = i)).
+        - subst j. destruct (thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
+          + econstructor. 1: eauto.
+            { right. split; auto. rewrite decide_True; auto. }
+            unshelve eapply (CIH _ _ 0); eauto. eapply fair_scheduling_next; eauto.
+          + pose proof FS as FSn'. specialize (FSn' (S n)).
+            unshelve edestruct FSn'. 1: exact i. 1: lia.
+            { exfalso. eapply (thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
+            destruct H as [TA2 TEV2]. unfold tr_eventually, tr_until in TEV2. destruct TEV2 as (m& LEm& TTurn2& _).
+            remember (m - (S n)) as s'. assert (m = s' + S n) by lia. subst m. clear Heqs' LEm.
+            eapply (beh_fscnt_th_step _ _ _ _ _ _ s'). 1: eauto.
+            { right. split; auto. rewrite decide_True; auto. }
+            apply CIH; auto. apply fair_scheduling_next; auto.
+        - eapply (beh_fscnt_th_step _ _ _ _ _ _ s). 1: eauto.
+          { right. split; auto. rewrite decide_False; auto. }
+          apply CIH; auto.
+          + apply fair_scheduling_next; auto.
+          + simpl. destruct (thread_active_or_not i (S n, τf)) as [? | TA2]; first auto.
+            right. replace (s + S n) with (S (s + n)) by lia. split; auto. }
+  Qed.
 
 End fair_sched.
 
@@ -440,7 +441,6 @@ Section proof2.
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     v1 ≤ v2 →
     obls_le Ω1 Ω2 →
-    (map_Forall (λ i e, Θ !! i = Some e) Θ) →
     Θ = fst <$> TQ →
     history_interp h n σ Θ κs ∗ model_interp g v2 Ω2 W n (dom Θ) ∗
     ([∗ map] i ↦ '(e, Q) ∈ TQ, lwp_fix s i ⊤ e Q) ∗
@@ -448,7 +448,7 @@ Section proof2.
     ⊢ ti_logic wf_ltD Φ (n, τf).
   Proof.
     revert h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf.
-    induction Φ; iIntros (h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf BEH FS HIST LEv LEO THs EQTQ) "(HI& MI& WPs& #TF)"; simpl.
+    induction Φ; iIntros (h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf BEH FS HIST LEv LEO EQTQ) "(HI& MI& WPs& #TF)"; simpl.
     - done.
     - unfold ti_atomic. iPoseProof (event_pred_history_interp_lookup with "[$HI $TF]") as "%". destruct H.
       simpl. apply HIST in H. destruct H. rewrite H. auto.
@@ -471,8 +471,8 @@ Section proof2.
       + iApply (IHΦ2 with "[$HI $MI $WPs $TF2]"); auto.
     - done.
     - clear dependent v1 Ω1. rename v2 into v, Ω2 into Ω.
-      iRevert (h n σ Θ TQ κs g v Ω W BEH FS HIST THs EQTQ) "TF HI MI WPs".
-      iLöb as "IH". iIntros (h n σ Θ TQ κs g v Ω W BEH FS HIST THs EQTQ) "#TF HI MI WPs".
+      iRevert (h n σ Θ TQ κs g v Ω W BEH FS HIST EQTQ) "TF HI MI WPs".
+      iLöb as "IH". iIntros (h n σ Θ TQ κs g v Ω W BEH FS HIST EQTQ) "#TF HI MI WPs".
       rewrite ti_always_unfold /ti_always_pre.
       iMod (inv_acc with "TF") as "[HP ACC]". 1: set_solver.
       iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
@@ -484,7 +484,12 @@ Section proof2.
       iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
       rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
       rename κs0 into κs, H1 into TRn, H3 into TRn1, H4 into BEH.
-      inversion H2. clear H2. inversion H. clear H. subst Θ0 σ ρ2.
+
+      TODO
+      
+      inversion H2.
+      2:{ 
+      + clear H2. inversion H. clear H. subst Θ0 σ ρ2.
       assert (NVe1 : to_val e1 = None) by (eapply val_stuck; eauto).
 
       (** FIX behavior? Now it MUST take a step, but what if every thread is done? *)

@@ -400,7 +400,7 @@ Section proof.
     ⟦tf_until N k true 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ∀ i G q,
     (⌜k ∈ G⌝) → thP_obls i G q -∗
-    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (thP_obls i (G ∖ {[k]}) q ∗ oblP_fulfilled k)).
+    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ thP_obls i (G ∖ {[k]}) q ∗ oblP_fulfilled k)).
   Proof.
     rewrite tf_until_logic. iIntros (HMask) "(Oa& #OI)".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
