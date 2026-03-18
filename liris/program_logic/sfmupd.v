@@ -232,6 +232,14 @@ Section sfmupd.
     Frame p R P Q → Frame p R (|={E}=>m P) (|={E}=>m Q).
   Proof. rewrite /Frame=><-. by rewrite sfmupd_frame_l. Qed.
 
+  Lemma all_interp_sfmupd_steps E h n σ Θ κs g v Ω W (P : iProp Σ) :
+    (|={E}=>m P) -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
+    (P ∗ history_interp h n σ Θ κs ∗ ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
+  Proof.
+    iIntros "HP HI MI". iPoseProof ("HP" with "HI") as ">HP".
+    iMod (model_interp_mupd_steps with "HP MI") as "(>($& $)& $)". done.
+  Qed.
+
   (** Update rules *)
   Lemma obl_alloc_assigned E i G q b ℓ μ :
     thP_obls i G q -∗

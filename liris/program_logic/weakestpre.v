@@ -311,6 +311,38 @@ Section lwpupd.
     Frame p R P Q → Frame p R (lwpupd i E e P) (lwpupd i E e Q).
   Proof. rewrite /Frame=><-. by rewrite lwpupd_frame_l. Qed.
 
+  (** Elim rule. *)
+  Lemma all_interp_lwpupd_steps i E e h n σ Θ κs g v Ω W (P : iProp Σ) :
+    (Θ !! i = Some e) →
+    (lwpupd i E e P) -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
+    (P ∗ history_interp h n σ Θ κs ∗ ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
+  Proof.
+    iIntros (HTh) "HP HI MI". iPoseProof ("HP" $! id with "[] [//] HI") as ">HP".
+    { iPureIntro. apply _. }
+    iMod (model_interp_mupd_steps with "HP MI") as "(>($& $)& $)". done.
+  Qed.
+
+  Lemma all_interp_lwpupd_steps_gmap E h n σ Θ κs g v Ω W
+    (A : Type) (TQ : gmap thread_id ((expr Λ) * A)) (P : thread_id → (expr Λ) → A → iProp Σ) :
+    (map_Forall (λ i e, Θ !! i = Some e) Θ) →
+    (fst <$> TQ) ⊆ Θ →
+    ([∗ map] i ↦ '(e, a) ∈ TQ, lwpupd i E e (P i e a)) -∗
+    history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
+    (([∗ map] i ↦ '(e, a) ∈ TQ, (P i e a)) ∗
+     history_interp h n σ Θ κs ∗ ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
+  Proof.
+    revert h n σ Θ κs g v Ω W. induction TQ using map_ind; iIntros (h n σ Θ κs g v Ω W EQTH EQTQ) "PS HI MI".
+    { iModIntro. iSplitR; first done. iFrame. iExists [], 0, _, _. rewrite app_nil_r Nat.add_0_r. iFrame. done. }
+    iPoseProof (big_sepM_insert with "PS") as "[HP PS]". 1: auto.
+    destruct x as (e& a). iMod (IHTQ with "PS HI MI") as "(PS& HI& %&%&%&%&%& MI)". 1: auto.
+    { rewrite fmap_insert in EQTQ. simpl in EQTQ. etrans; last eauto. apply insert_subseteq.
+      rewrite lookup_fmap H. done. }
+    iMod (all_interp_lwpupd_steps with "HP HI MI") as "(HP& HI& %&%&%&%&%& MI)".
+    { rewrite fmap_insert in EQTQ. simpl in EQTQ. eapply lookup_weaken; last eauto. apply lookup_insert_eq. }
+    iModIntro. rewrite big_sepM_insert; last auto. iFrame. iExists (g' ++ g'0), (v' + v'0), _, _.
+    rewrite app_assoc Nat.add_assoc. iFrame. iPureIntro. etrans; eauto.
+  Qed.
+
 End lwpupd.
 
 (** Predicates we take the fixpoint of in order to define the lWP. *)

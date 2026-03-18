@@ -273,21 +273,22 @@ Section mupd.
 
   Lemma model_interp_mupd_steps h i Ω W n Θ P :
     (|=[n,Θ]=>m P) -∗ model_interp h i Ω W n Θ ={∅}=∗
-    (P ∗ ∃ h' i' Ω' W', model_interp (h ++ h') (i + i') Ω' W' n Θ).
+    (P ∗ ∃ h' i' Ω' W', ⌜ obls_le Ω Ω' ⌝ ∗ model_interp (h ++ h') (i + i') Ω' W' n Θ).
   Proof.
     iIntros "H". iRevert (h i Ω W). iRevert (P) "H".
     iApply mupd_ind_strong.
     { solve_proper. }
     iIntros "!> %P IH %%%% H". iDestruct "IH" as "[IH | IH]".
-    { iMod "IH". iModIntro. iFrame. iExists [], 0, _, _. rewrite app_nil_r Nat.add_0_r. iFrame. }
+    { iMod "IH". iModIntro. iFrame. iExists [], 0, _, _. rewrite app_nil_r Nat.add_0_r. iFrame. done. }
     iPoseProof (model_interp_owit_inv with "H") as "%".
     iMod ("IH" with "H") as "(%&%& IH)".
     pose proof (owit_inv_exists_witnesses _ _ _ H0 H). destruct H1 as (W2& ?).
-    iMod ("IH" $! _ H1) as "[G [IH _]]". iMod ("IH" with "G") as "[$ (%&%&%&%& MI)]".
+    iMod ("IH" $! _ H1) as "[G [IH _]]". iMod ("IH" with "G") as "[$ (%&%&%&%& %LEO& MI)]".
     iModIntro. iExists ([(n, Ω2)] ++ h'), (S i'), _, _.
     replace (h ++ [(n, Ω2)] ++ h') with ((h ++ [(n, Ω2)]) ++ h'); cycle 1.
     { by rewrite app_assoc. }
     replace (i + S i') with (S i + i') by lia. iFrame.
+    iPureIntro. etrans; last eapply LEO. apply obls_step_rc_obls_le; auto.
   Qed.
 
   (* The following instances make the Iris Proof Mode aware of the

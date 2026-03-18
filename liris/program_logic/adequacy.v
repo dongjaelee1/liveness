@@ -35,10 +35,12 @@ Definition ti_exist `{SI : indexT} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ 
   λ A P, (λ τ, ∃ (a : A), (P a τ))%I.
 
 (** 'Always' is a co-inductive fixpoint. *)
+(* We need to use ∧ here for the proof. *)
 Definition ti_always_pre `{SI : indexT} `{!lirisGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
-  λ P τ, (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∗ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ))))%I.
+  λ P τ, (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∧ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ))))%I.
+  (* λ P τ, (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∗ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ))))%I. *)
   (* λ P τ, (|={E,∅}=> (▷ (P τ)) ∗ ((▷ (P τ)) ={∅}=∗ ALC (|={∅,E}=> ti_always P (trace_next τ))))%I. *)
 
 Local Instance ti_always_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E : Contractive (ti_always_pre E).
@@ -66,7 +68,9 @@ Definition ti_until_pre `{SI : indexT} `{!lirisGS Λ Σ} E
   A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
   λ a P Q τ,
     ((|={E,∅}=> ▷ |={∅,E}=> (Q τ)) ∨
-       (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∗ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∗ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I.
+       (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∧ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∧ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I.
+    (* ((|={E,∅}=> ▷ |={∅,E}=> (Q τ)) ∨ *)
+    (*    (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∗ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∗ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I. *)
 
 Local Instance ti_until_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E
   {A : Type} {ltA : A → A → Prop} {wf_ltA : well_founded ltA}
@@ -233,7 +237,7 @@ Section proof1.
     iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic wf_ltA Φ) (trace_next τ)).
   Proof.
     intros. rewrite ti_always_unfold /ti_always_pre in H.
-    apply sat_fupd, sat_later, sat_fupd in H. apply sat_sep in H. destruct H.
+    apply sat_fupd, sat_later, sat_fupd in H. apply iProp_sat_lc_at_frame_and in H. destruct H.
     apply sat_fupd, sat_ALC, sat_fupd in H0. auto.
   Qed.
   Lemma ti_always_trace_later F Φ n x τf :
@@ -256,7 +260,8 @@ Section proof1.
     apply H1. clear H1.
     eapply ti_always_trace_later in H. 2: eauto.
     eapply IH. rewrite ti_always_unfold /ti_always_pre in H.
-    apply sat_fupd, sat_later, sat_fupd in H. apply sat_sep in H. destruct H. auto.
+    apply sat_fupd, sat_later, sat_fupd in H.
+    apply iProp_sat_lc_at_frame_and in H. destruct H. auto.
   Qed.
 
   Lemma ti_until_tr_until F Φ1 Φ2 :
@@ -271,9 +276,10 @@ Section proof1.
     rewrite ti_until_unfold /ti_until_pre in H. apply sat_or in H. destruct H.
     { apply sat_fupd, sat_later, sat_fupd in H. apply IH2 in H.
       exists n. split_and !; eauto. intros. lia. }
-    apply sat_fupd, sat_later, sat_fupd in H. apply sat_sep in H. destruct H as [HP H].
+    apply sat_fupd, sat_later, sat_fupd in H.
+    apply iProp_sat_lc_at_frame_and in H. destruct H as [HP H].
     apply sat_fupd, sat_exists in H. destruct H as [b H].
-    apply sat_sep in H. destruct H as [Hlt H]. apply sat_elim in Hlt.
+    apply iProp_sat_lc_at_frame_and in H. destruct H as [Hlt H]. apply sat_elim in Hlt.
     apply sat_ALC, sat_fupd in H.
     specialize (IHa _ Hlt _ _ H). simpl in IHa. destruct IHa as (m'& Hm'& Htr& Hp).
     destruct Hm'.
@@ -313,6 +319,111 @@ End proof1.
 Section proof2.
   Context `{!lirisGS Λ Σ}.
 
-  TODO
+  Local Definition D : Type := (prod obl_fuel nat).
+  Local Definition ltD : D → D → Prop := (prod_lt WFOCM.ltR lt).
+  Local Definition wf_ltD : well_founded ltD := (prod_lt_well_founded _ _ _ _ WFOCM.lt_wf Nat.lt_wf_0).
+
+  Local Transparent tf_intuit.
+
+  Lemma lwp_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf Φ :
+    behavior (n, τf) →
+    fair_scheduling (Λ:=Λ) (n, τf) →
+    (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
+    v1 ≤ v2 →
+    obls_le Ω1 Ω2 →
+    (map_Forall (λ i e, Θ !! i = Some e) Θ) →
+    Θ = fst <$> TQ →
+    history_interp h n σ Θ κs ∗ model_interp g v2 Ω2 W n (dom Θ) ∗
+    ([∗ map] i ↦ '(e, Q) ∈ TQ, lwp_fix s i ⊤ e Q) ∗
+    tf_intuit n σ Θ κs v1 Ω1 Φ
+    ⊢ ti_logic wf_ltD Φ (n, τf).
+  Proof.
+    revert h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf.
+    induction Φ; iIntros (h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf BEH FS HIST LEv LEO THs EQTQ) "(HI& MI& WPs& #TF)"; simpl.
+    - done.
+    - unfold ti_atomic. iPoseProof (event_pred_history_interp_lookup with "[$HI $TF]") as "%". destruct H.
+      simpl. apply HIST in H. destruct H. rewrite H. auto.
+    - unfold ti_pure. done.
+    - done.
+    - unfold ti_and. iSplit.
+      + iDestruct "TF" as "[TF _]". iApply (IHΦ1 with "[$HI $MI $WPs $TF]"); auto.
+      + iDestruct "TF" as "[_ TF]". iApply (IHΦ2 with "[$HI $MI $WPs $TF]"); auto.
+    - unfold ti_or. iDestruct "TF" as "[TF | TF]".
+      + iLeft. iApply (IHΦ1 with "[$HI $MI $WPs $TF]"); auto.
+      + iRight. iApply (IHΦ2 with "[$HI $MI $WPs $TF]"); auto.
+    - unfold ti_impl. iIntros "HP". iPoseProof ("TF" with "HP") as "#TF'".
+      iApply (IHΦ with "[$HI $MI $WPs $TF']"); auto.
+    - unfold ti_forall. iIntros (?). iSpecialize ("TF" $! a).
+      iApply (H with "[$HI $MI $WPs $TF]"); auto.
+    - unfold ti_exist. iDestruct "TF" as "(%& TF)". iExists a.
+      iApply (H with "[$HI $MI $WPs $TF]"); auto.
+    - unfold ti_and. iDestruct "TF" as "[TF1 TF2]". iSplit.
+      + iApply (IHΦ1 with "[$HI $MI $WPs $TF1]"); auto.
+      + iApply (IHΦ2 with "[$HI $MI $WPs $TF2]"); auto.
+    - done.
+    - clear dependent v1 Ω1. rename v2 into v, Ω2 into Ω.
+      iRevert (h n σ Θ TQ κs g v Ω W BEH FS HIST THs EQTQ) "TF HI MI WPs".
+      iLöb as "IH". iIntros (h n σ Θ TQ κs g v Ω W BEH FS HIST THs EQTQ) "#TF HI MI WPs".
+      rewrite ti_always_unfold /ti_always_pre.
+      iMod (inv_acc with "TF") as "[HP ACC]". 1: set_solver.
+      iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
+      iPoseProof (tf_logic_tf_intuit with "[$HI $MI $HP]") as "#TFP".
+      iMod "close" as "_". iMod ("ACC" with "HP") as "_". iModIntro. iSplit.
+      { iApply (IHΦ with "[$HI $MI $WPs $TFP]"); auto. done. }
+      (** Fetch the scheduled thread and take a step. *)
+      inversion BEH. clear BEH. subst n0 τf0.
+      iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
+      rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
+      rename κs0 into κs, H1 into TRn, H3 into TRn1, H4 into BEH.
+      inversion H2. clear H2. inversion H. clear H. subst Θ0 σ ρ2.
+      assert (NVe1 : to_val e1 = None) by (eapply val_stuck; eauto).
+
+      (** FIX behavior? Now it MUST take a step, but what if every thread is done? *)
+      (** And what happens when every thread is done? Should lwp_pre take a step, increasing n? *)
+
+
+      
+      
+
+    TODO
+
+lwp_step =
+  (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ) 
+  (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ),
+  (∀ (K : expr Λ → expr Λ) (h : list
+                                  (state Λ * thread_pool Λ *
+                                   list (observation Λ))) 
+     (n : nat) (σ1 : state Λ) (Θ : thread_pool Λ) 
+     (κ κs : list (observation Λ)),
+     ⌜LanguageCtx K⌝
+     → ⌜Θ !! i = Some (K e1)⌝
+       → history_interp h n σ1 Θ (κ ++ κs) ={E,∅}=∗
+         ⌜match s with
+          | NotStuck => reducible i e1 σ1 (dom Θ)
+          | MaybeStuck => True
+          end⌝ ∗
+         ∀ (e2 : expr Λ) (σ2 : state Λ) (efs : thread_pool Λ),
+           ⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝ -∗
+           @={n,dom Θ,i}=↓ @={n,S n,dom Θ,dom (<[i:=K e2]> Θ) ∪ dom efs}=> 
+           ALC
+             (|=[S n,dom (<[i:=K e2]> Θ) ∪ dom efs]=>m 
+              |={∅,E}=>
+                history_interp (h ++ [(σ2, <[i:=K e2]> Θ ∪ efs, κs)]) 
+                  (S n) σ2 (<[i:=K e2]> Θ ∪ efs) κs ∗
+                ν e2 efs))%I
+model_interp_mupd_steps:
+    (h : list (nat * obls)) (i : nat) (Ω : obls) (W : witnesses) (n : nat) 
+    (Θ : gset positive) (P : iProp Σ),
+    (|=[n,Θ]=>m P) -∗
+    model_interp h i Ω W n Θ ={∅}=∗
+    P ∗
+    ∃ (h' : list (nat * obls)) (i' : nat) (Ω' : obls) (W' : witnesses),
+      model_interp (h ++ h') (i + i') Ω' W' n Θ
+tf_logic_tf_intuit:
+    (Φ : tf) (h : list (state Λ * thread_pool Λ * list (observation Λ))) 
+    (n : nat) (σ : state Λ) (Θ : thread_pool Λ) (κs : list (observation Λ)) 
+    (m : list (nat * obls)) (i : nat) (Ω : obls) (W : witnesses),
+    history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ ⟦Φ⟧ₗ
+    ⊢ tf_intuit n σ Θ κs i Ω Φ
 
 End proof2.
