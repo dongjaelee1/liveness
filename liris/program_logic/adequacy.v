@@ -13,32 +13,6 @@ From liris.prelude Require Import axioms.
 Section fair_sched.
   Context {Λ : language}.
 
-  Lemma fair_scheduling_next (τ : trace Λ) :
-    fair_scheduling τ → fair_scheduling (trace_next τ).
-  Proof.
-    unfold fair_scheduling, tr_always. destruct τ as (n& τf). simpl. intros.
-    specialize (H m). apply H. lia.
-  Qed.
-
-  Lemma thread_active_or_not i (τ : trace Λ) : thread_na i τ ∨ thread_active i τ.
-  Proof.
-    destruct τ as (n&τf). unfold thread_na, thread_active.
-    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. simpl. rewrite Htrn.
-    destruct (Θ !! i) eqn:LUi; eauto.
-    destruct (to_val e) eqn: EQe; eauto.
-  Qed.
-
-  Lemma thread_active_and_not_false i (τ : trace Λ) : thread_na i τ → thread_active i τ → False.
-  Proof.
-    destruct τ as (n&τf). unfold thread_na, thread_active.
-    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. simpl. rewrite Htrn.
-    intros. destruct (Θ !! i) eqn:LUi.
-    + destruct (to_val e) eqn: EQe.
-      * destruct H; [done |]. destruct H0 as (?&?&?). inv H0.
-      * destruct H; [done |]. destruct H as (?&?&?). inv H. rewrite EQe in H1. done.
-    + destruct H0 as (?&?&?). done.
-  Qed.
-
   Definition fscnt : Type := thread_id → nat.
 
   CoInductive beh_fscnt_th (τ : trace Λ) (i : thread_id) (c : nat) : Prop :=
@@ -427,15 +401,14 @@ Section proof1.
 End proof1.
 
 Section proof2.
+  Local Transparent tf_intuit.
   Context `{!lirisGS Λ Σ}.
 
   Local Definition D : Type := (prod obl_fuel nat).
   Local Definition ltD : D → D → Prop := (prod_lt WFOCM.ltR lt).
   Local Definition wf_ltD : well_founded ltD := (prod_lt_well_founded _ _ _ _ WFOCM.lt_wf Nat.lt_wf_0).
 
-  Local Transparent tf_intuit.
-
-  Lemma lwp_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf Φ :
+  Lemma lwp_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf Φ :
     behavior (n, τf) →
     fair_scheduling (Λ:=Λ) (n, τf) →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
@@ -443,7 +416,7 @@ Section proof2.
     obls_le Ω1 Ω2 →
     Θ = fst <$> TQ →
     history_interp h n σ Θ κs ∗ model_interp g v2 Ω2 W n (dom Θ) ∗
-    ([∗ map] i ↦ '(e, Q) ∈ TQ, lwp_fix s i ⊤ e Q) ∗
+    ([∗ map] i ↦ '(e, Q) ∈ TQ, lwp_fix s i ⊤ e (lift_term i Q)) ∗
     tf_intuit n σ Θ κs v1 Ω1 Φ
     ⊢ ti_logic wf_ltD Φ (n, τf).
   Proof.
@@ -536,4 +509,5 @@ tf_logic_tf_intuit:
     history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ ⟦Φ⟧ₗ
     ⊢ tf_intuit n σ Θ κs i Ω Φ
 
+  Local Opaque tf_intuit.
 End proof2.

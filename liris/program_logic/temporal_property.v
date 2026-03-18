@@ -81,3 +81,54 @@ Definition thread_turn {Λ : language} (i : thread_id) : trProp Λ :=
 
 Definition fair_scheduling {Λ : language} : trProp Λ :=
   tr_always (∀ i, (thread_na i) ∨ (thread_active i ∧ tr_eventually (thread_turn i)))%R.
+
+Section proof.
+  Context {Λ : language}.
+
+  Lemma fair_scheduling_next (τ : trace Λ) :
+    fair_scheduling τ → fair_scheduling (trace_next τ).
+  Proof.
+    unfold fair_scheduling, tr_always. destruct τ as (n& τf). simpl. intros.
+    specialize (H m). apply H. lia.
+  Qed.
+
+  Global Instance thread_na_decide i (τ : trace Λ) : Decision (thread_na i τ).
+  Proof.
+    unfold thread_na. destruct τ as (n& τf). simpl.
+    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. destruct (Θ !! i) eqn:Hi.
+    - destruct (to_val e) eqn:He.
+      + left. right. eauto.
+      + right. intros F. destruct F; first done. destruct H as (?&?&?). inv H. rewrite He in H0. done.
+    - left. auto.
+  Qed.
+
+  Global Instance thread_active_decide i (τ : trace Λ) : Decision (thread_active i τ).
+  Proof.
+    unfold thread_active. destruct τ as (n& τf). simpl.
+    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. destruct (Θ !! i) eqn:Hi.
+    - destruct (to_val e) eqn:He.
+      + right. intros F. destruct F as (?&?&?). inv H.
+      + left. eauto.
+    - right. intros F. destruct F as (?&?&?). inv H.
+  Qed.
+
+  Lemma thread_active_and_not_false i (τ : trace Λ) : thread_na i τ → thread_active i τ → False.
+  Proof.
+    destruct τ as (n&τf). unfold thread_na, thread_active.
+    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. simpl. rewrite Htrn.
+    intros. destruct (Θ !! i) eqn:LUi.
+    + destruct (to_val e) eqn: EQe.
+      * destruct H; [done |]. destruct H0 as (?&?&?). inv H0.
+      * destruct H; [done |]. destruct H as (?&?&?). inv H. rewrite EQe in H1. done.
+    + destruct H0 as (?&?&?). done.
+  Qed.
+
+  Lemma thread_active_or_not i (τ : trace Λ) : thread_na i τ ∨ thread_active i τ.
+  Proof.
+    destruct τ as (n&τf). unfold thread_na, thread_active.
+    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. simpl. rewrite Htrn.
+    destruct (Θ !! i) eqn:LUi; eauto.
+    destruct (to_val e) eqn: EQe; eauto.
+  Qed.
+
+End proof.
