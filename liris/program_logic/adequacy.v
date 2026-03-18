@@ -22,6 +22,17 @@ Section fair_sched.
     beh_fscnt_th (trace_next τ) i c' →
     beh_fscnt_th τ i c.
 
+  Lemma beh_fscnt_th_upto_le (τ : trace Λ) (i : thread_id) (c1 c2 : nat) :
+    beh_fscnt_th τ i c1 →
+    c1 ≤ c2 →
+    beh_fscnt_th τ i c2.
+  Proof.
+    intros BEH LEc. inv BEH.
+    eapply (beh_fscnt_th_step _ _ _ _ _ _ c'). 1: eauto. 2: auto.
+    destruct H0; auto. right. destruct H0. split; auto.
+    destruct (decide (i = j)); auto. eapply Nat.lt_le_trans; eauto.
+  Qed.
+
   Definition beh_fscnt (τ : trace Λ) (γ : fscnt) : Prop :=
     ∀ (i : thread_id), beh_fscnt_th τ i (γ i).
 
@@ -90,6 +101,12 @@ Section fair_sched.
           + simpl. destruct (thread_active_or_not i (S n, τf)) as [? | TA2]; first auto.
             right. replace (s + S n) with (S (s + n)) by lia. split; auto. }
   Qed.
+
+(* TODO:
+beh_fscnt τ γ → beh_fscnt (trace_next τ) (fscnt_next τ γ)
+Here, fscnt_next is a function from fscnt to fscnt
+that looks at the current state and puts Nat.pred if not scheduled.
+ *)
 
 End fair_sched.
 
