@@ -10,6 +10,115 @@ From liris.algebra Require Import ordinal_existential_properties.
 
 From liris.prelude Require Import axioms.
 
+Section fair_sched.
+  Context {Λ : language}.
+
+  Lemma fair_scheduling_next (τ : trace Λ) :
+    fair_scheduling τ → fair_scheduling (trace_next τ).
+  Proof.
+    unfold fair_scheduling, tr_always. destruct τ as (n& τf). simpl. intros.
+    specialize (H m). apply H. lia.
+  Qed.
+
+  Lemma thread_active_or_not i (τ : trace Λ) : thread_na i τ ∨ thread_active i τ.
+  Proof.
+    destruct τ as (n&τf). unfold thread_na, thread_active.
+    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. simpl. rewrite Htrn.
+    destruct (Θ !! i) eqn:LUi; eauto.
+    destruct (to_val e) eqn: EQe; eauto.
+  Qed.
+
+  Lemma thread_active_and_not_false i (τ : trace Λ) : thread_na i τ → thread_active i τ → False.
+  Proof.
+    destruct τ as (n&τf). unfold thread_na, thread_active.
+    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. simpl. rewrite Htrn.
+    intros. destruct (Θ !! i) eqn:LUi.
+    + destruct (to_val e) eqn: EQe.
+      * destruct H; [done |]. destruct H0 as (?&?&?). inv H0.
+      * destruct H; [done |]. destruct H as (?&?&?). inv H. rewrite EQe in H1. done.
+    + destruct H0 as (?&?&?). done.
+  Qed.
+
+  Definition fscnt : Type := thread_id → nat.
+
+  CoInductive beh_fscnt_th (τ : trace Λ) (i : thread_id) (c : nat) : Prop :=
+  | beh_fscnt_th_step ρ j κs c' :
+    (τ.2 τ.1) = (ρ, j, κs) →
+    ((thread_na i τ) ∨ (thread_active i τ ∧ (if (decide (i = j)) then True else c' < c))) →
+    beh_fscnt_th (trace_next τ) i c' →
+    beh_fscnt_th τ i c.
+
+  Definition beh_fscnt (τ : trace Λ) (γ : fscnt) : Prop :=
+    ∀ (i : thread_id), beh_fscnt_th τ i (γ i).
+
+  (** We use choice here. *)
+  Lemma fair_scheduling_fscnt (τ : trace Λ) :
+    fair_scheduling τ → ∃ (γ : fscnt), beh_fscnt τ γ.
+  Proof.
+    intros FS. unfold beh_fscnt. apply choice. intros i.
+    pose proof FS as FSn. destruct τ as (n& τf). specialize (FSn n).
+    unshelve edestruct FSn. 1: exact i. 1: done.
+    - clear FSn. rename H into TNA.
+      (* First thread is not active/allocated.
+         It can be allocated after, where we need another coinduction. *)
+      exists 0. revert n FS TNA. cofix CIH. intros.
+      destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
+      destruct (thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
+      + econstructor. 1: eauto. 1: auto.
+        eapply CIH; auto. apply fair_scheduling_next. auto.
+      + pose proof FS as FSn'. specialize (FSn' (S n)).
+        unshelve edestruct FSn'. 1: exact i. 1: lia.
+        { exfalso. eapply (thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
+        unfold tr_and in H. destruct H as [TA TEV].
+        unfold tr_eventually, tr_until in TEV. destruct TEV as (m& LEm& TTurn& _).
+        remember (m - (S n)) as s. assert (m = s + S n) by lia. subst m. clear Heqs LEm.
+        eapply (beh_fscnt_th_step _ _ _ _ _ _ s). 1: eauto. 1: auto.
+        unfold trace_next. simpl.
+        apply fair_scheduling_next in FS. unfold trace_next in FS. unfold fst, snd in FS.
+        remember (S n) as n'. clear dependent n. rename n' into n.
+        (* Second Coinduction. *)
+        clear dependent Θ σ j κs. revert s n FS TA TTurn. cofix CIH2; intros.
+
+        TODO
+        * simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
+          unfold thread_turn in TTurn. simpl in TTurn. rewrite Htrn in TTurn. subst j.
+          
+
+        simpl in FS.
+        
+        
+        
+        Guarded.
+          
+
+          TODO
+
+          
+          
+          econstructor.
+
+        1: auto. 1: auto.
+        
+        { 
+        
+
+      
+      unfold thread_na in TNA.
+      simpl in TNA. rewrite Htrn in TNA. econstructor. 1: eauto.
+      { destruct TNA.
+        - rewrite e. auto.
+        - destruct e. rewrite e.
+      
+    
+
+choice
+     : ∀ (A B : Type) (R : A → B → Prop), (∀ x : A, ∃ y : B, R x y) → ∃ f : A → B, ∀ x : A, R x (f x)
+Definition fair_scheduling {Λ : language} : trProp Λ :=
+  tr_always (∀ i, (thread_na i) ∨ (thread_active i ∧ tr_eventually (thread_turn i)))%R.
+
+End fair_sched.
+
+
 (** Trace properties in iProp. *)
 Notation tiProp Λ Σ := (trace Λ → iProp Σ).
 
@@ -380,10 +489,6 @@ Section proof2.
 
       (** FIX behavior? Now it MUST take a step, but what if every thread is done? *)
       (** And what happens when every thread is done? Should lwp_pre take a step, increasing n? *)
-
-
-      
-      
 
     TODO
 

@@ -383,10 +383,18 @@ Definition trace (Λ : language) : Type :=
 Definition trace_next {Λ} : trace Λ → trace Λ :=
   λ τ, (S τ.1, τ.2).
 
+Inductive thread_done {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
+| thread_done_intro e1 σ1 e2 σ2 efs Θ :
+  ρ1 = (Θ, σ1) →
+  Θ !! i = Some e1 →
+  (is_Some (to_val e1) ∧ e1 = e2 ∧ σ1 = σ2 ∧ efs = ∅ ∧ κ = []) →
+  ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
+  thread_done i ρ1 κ ρ2.
+
 CoInductive behavior {Λ : language} : trace Λ → Prop :=
 | behavior_step n τf ρ1 ρ2 i1 i2 κ κs :
   τf n = (ρ1, i1, (κ ++ κs)) →
-  thread_step i1 ρ1 κ ρ2 →
+  (thread_step i1 ρ1 κ ρ2 ∨ thread_done i1 ρ1 κ ρ2) →
   τf (S n) = (ρ2, i2, κs) →
   behavior (S n, τf) →
   behavior (n, τf).
