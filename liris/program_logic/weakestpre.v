@@ -50,10 +50,6 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
           and [list (observation Λ)] are the remaining observations. *)
       #[global] liris_state_interp_class :: state_interp_class Λ Σ;
       #[global] liris_histGS :: histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ));
-      (* state_interp : state Λ → thread_ids → list (observation Λ) → iProp Σ; *)
-
-      (** Fair scheduler function. *)
-      #[global] liris_fair_scheduler :: ord_mono_fun_class;
 
       (** A fixed postcondition for any forked-off thread. For most languages, e.g.
           heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -312,35 +308,43 @@ Section lwpupd.
   Proof. rewrite /Frame=><-. by rewrite lwpupd_frame_l. Qed.
 
   (** Elim rule. *)
-  Lemma all_interp_lwpupd_steps i E e h n σ Θ κs g v Ω W (P : iProp Σ) :
+  Lemma all_interp_lwpupd_steps (γ : thread_id → nat) i E e h n σ Θ κs g v Ω W (P : iProp Σ) :
     (Θ !! i = Some e) →
+    (owit_inv_lb (fair_sched_fun γ) Ω W) →
     (lwpupd i E e P) -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
-    (P ∗ history_interp h n σ Θ κs ∗ ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
+    (P ∗ history_interp h n σ Θ κs ∗
+     ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
-    iIntros (HTh) "HP HI MI". iPoseProof ("HP" $! id with "[] [//] HI") as ">HP".
+    iIntros (HTh LB) "HP HI MI". iPoseProof ("HP" $! id with "[] [//] HI") as ">HP".
     { iPureIntro. apply _. }
-    iMod (model_interp_mupd_steps with "HP MI") as "(>($& $)& $)". done.
+    iMod (model_interp_mupd_steps with "HP MI") as "(>($& $)& $)"; auto.
+    split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub].
   Qed.
 
-  Lemma all_interp_lwpupd_steps_gmap E h n σ Θ κs g v Ω W
+  Lemma all_interp_lwpupd_steps_gmap (γ : thread_id → nat) E h n σ Θ κs g v Ω W
     (A : Type) (TQ : gmap thread_id ((expr Λ) * A)) (P : thread_id → (expr Λ) → A → iProp Σ) :
     (map_Forall (λ i e, Θ !! i = Some e) Θ) →
     (fst <$> TQ) ⊆ Θ →
+    (owit_inv_lb (fair_sched_fun γ) Ω W) →
     ([∗ map] i ↦ '(e, a) ∈ TQ, lwpupd i E e (P i e a)) -∗
     history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
     (([∗ map] i ↦ '(e, a) ∈ TQ, (P i e a)) ∗
-     history_interp h n σ Θ κs ∗ ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
+     history_interp h n σ Θ κs ∗
+     ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
-    revert h n σ Θ κs g v Ω W. induction TQ using map_ind; iIntros (h n σ Θ κs g v Ω W EQTH EQTQ) "PS HI MI".
+    revert h n σ Θ κs g v Ω W. induction TQ using map_ind; iIntros (h n σ Θ κs g v Ω W EQTH EQTQ LB) "PS HI MI".
     { iModIntro. iSplitR; first done. iFrame. iExists [], 0, _, _. rewrite app_nil_r Nat.add_0_r. iFrame. done. }
     iPoseProof (big_sepM_insert with "PS") as "[HP PS]". 1: auto.
     destruct x as (e& a). iMod (IHTQ with "PS HI MI") as "(PS& HI& %&%&%&%&%& MI)". 1: auto.
     { rewrite fmap_insert in EQTQ. simpl in EQTQ. etrans; last eauto. apply insert_subseteq.
       rewrite lookup_fmap H. done. }
+    1: auto.
+    destruct H0 as (OLE2& LB2).
     iMod (all_interp_lwpupd_steps with "HP HI MI") as "(HP& HI& %&%&%&%&%& MI)".
     { rewrite fmap_insert in EQTQ. simpl in EQTQ. eapply lookup_weaken; last eauto. apply lookup_insert_eq. }
+    1: eapply LB2.
     iModIntro. rewrite big_sepM_insert; last auto. iFrame. iExists (g' ++ g'0), (v' + v'0), _, _.
-    rewrite app_assoc Nat.add_assoc. iFrame. iPureIntro. etrans; eauto.
+    rewrite app_assoc Nat.add_assoc. iFrame. iPureIntro. destruct H0. split; auto. etrans; eauto.
   Qed.
 
 End lwpupd.

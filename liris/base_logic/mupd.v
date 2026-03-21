@@ -227,69 +227,167 @@ Section mupd.
     model_interp h i Ω W n Θ ⊢ ⌜ owit_inv Ω W ⌝.
   Proof. iIntros "(_&_&_&_&_&$)". Qed.
 
-  Lemma owit_inv_exists_witnesses Ω1 Ω2 W1 :
+  Definition owit_inv_lb (γ : obl_owner → obl_fuel → obl_fuel) (Ω : obls) (W : witnesses) : Prop :=
+    map_Forall2
+      (λ (_ : oid) (g : obl) (w : witness),
+         match g with
+         | obl_assigned a i => match w with
+                              | witness_assigned b => (γ i a) w≤ b
+                              | witness_fulfilled => False
+                              end
+         | obl_fulfilled => match w with
+                           | witness_assigned _ => False
+                           | witness_fulfilled => True
+                           end
+         end)
+      Ω W.
+
+  Definition owit_inv_lb_mon (γ : obl_owner → obl_fuel → obl_fuel) : Prop :=
+    (∀ a b i j, (a w< b) → (γ i a w< γ j b)) ∧ (∀ i a, γ i a w≤ η a).
+
+  Lemma owit_inv_exists_witnesses γ Ω1 Ω2 W1 :
+    owit_inv_lb_mon γ →
     Ω1 ↪∘ Ω2 →
     owit_inv Ω1 W1 →
-    ∃ W2, W1 ↓∘ W2 ∧ owit_inv Ω2 W2.
+    owit_inv_lb γ Ω1 W1 →
+    ∃ W2, W1 ↓∘ W2 ∧ owit_inv Ω2 W2 ∧ owit_inv_lb γ Ω2 W2.
   Proof.
-    intros Step Inv. destruct Step.
+    intros [GMon GSched] Step Inv LB. destruct Step.
     { subst. exists W1. eauto. }
     inv H.
     - destruct H0 as (?&?&?&?&?&?). subst. inv H0.
       + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2.
         inv H1. destruct y; try done. symmetry in H2.
-        assert (Ord.O <= wit)%ord by (apply Ord.O_bot).
-        apply ClassicOrd.le_eq_or_lt in H0. destruct H0; cycle 1.
-        * exists W1. split; first auto. intros ?. destruct (decide (i = x)).
-          { subst. rewrite lookup_insert_eq H2. econstructor. rewrite -H0. apply Ord.O_bot. }
-          { rewrite lookup_insert_ne; last auto. apply Inv. }
-          (* FIXME : fail typeclass inference *)
-        * exists (<[x:=(witness_assigned (OC:=ord_obl_class) (Ord.O))]>W1). split.
-          { econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor. econstructor. auto. }
-          { intros ?. destruct (decide (i = x)).
-            - subst. rewrite !lookup_insert_eq. econstructor. apply Ord.O_bot.
-            - rewrite !lookup_insert_ne; eauto. }
+        pose proof LB as LB2. specialize (LB2 x). rewrite H H2 in LB2. inv LB2.
+        exists (<[x:=(witness_assigned (OC:=ord_obl_class) (γ o2 f2))]>W1). split_and !.
+        { econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor. econstructor.
+          eapply WFOCM.lt_le_lt. 2: eauto. apply GMon. auto. }
+        { intros ?. destruct (decide (i = x)).
+          - subst. rewrite !lookup_insert_eq. econstructor. apply GSched.
+          - rewrite !lookup_insert_ne; eauto. }
+        { intros ?. destruct (decide (i = x)).
+          - subst. rewrite !lookup_insert_eq. econstructor. done.
+          - rewrite !lookup_insert_ne; eauto. }
       + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2.
         inv H1. destruct y; try done. symmetry in H2.
-        exists (<[x:=(witness_fulfilled)]>W1). split.
+        exists (<[x:=(witness_fulfilled)]>W1). split_and !.
         * econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor 2. econstructor.
         * intros ?. destruct (decide (i = x)).
           { subst. rewrite !lookup_insert_eq. econstructor. auto. }
           { rewrite !lookup_insert_ne; eauto. }
+        * intros ?. destruct (decide (i = x)).
+          { subst. rewrite !lookup_insert_eq. econstructor. auto. }
+          { rewrite !lookup_insert_ne; eauto. }
     - pose proof Inv as Dom. apply owit_inv_dom in Dom. destruct H0 as (k& LUO& ?& ?). destruct x.
-      + exists (<[k:=(witness_assigned (OC:=ord_obl_class) (η fuel))]>W1). split.
+      + exists (<[k:=(witness_assigned (OC:=ord_obl_class) (η fuel))]>W1). split_and !.
         * econstructor 2. econstructor 2. exists k. split; eauto.
           apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto.
         * subst. intros ?. destruct (decide (i = k)).
           { subst. rewrite !lookup_insert_eq. econstructor. done. }
           { rewrite !lookup_insert_ne; eauto. }
-      + exists (<[k:=(witness_fulfilled)]>W1). split.
+        * subst. intros ?. destruct (decide (i = k)).
+          { subst. rewrite !lookup_insert_eq. econstructor. eapply GSched. }
+          { rewrite !lookup_insert_ne; eauto. }
+      + exists (<[k:=(witness_fulfilled)]>W1). split_and !.
         * econstructor 2. econstructor 2. exists k. split; eauto.
           apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto.
         * subst. intros ?. destruct (decide (i = k)).
           { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
           { rewrite !lookup_insert_ne; eauto. }
+        * subst. intros ?. destruct (decide (i = k)).
+          { subst. rewrite !lookup_insert_eq. econstructor. split; done. }
+          { rewrite !lookup_insert_ne; eauto. }
   Qed.
 
-  Lemma model_interp_mupd_steps h i Ω W n Θ P :
+  (* Lemma owit_inv_exists_witnesses Ω1 Ω2 W1 : *)
+  (*   Ω1 ↪∘ Ω2 → *)
+  (*   owit_inv Ω1 W1 → *)
+  (*   ∃ W2, W1 ↓∘ W2 ∧ owit_inv Ω2 W2. *)
+  (* Proof. *)
+  (*   intros Step Inv. destruct Step. *)
+  (*   { subst. exists W1. eauto. } *)
+  (*   inv H. *)
+  (*   - destruct H0 as (?&?&?&?&?&?). subst. inv H0. *)
+  (*     + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2. *)
+  (*       inv H1. destruct y; try done. symmetry in H2. *)
+  (*       assert (Ord.O <= wit)%ord by (apply Ord.O_bot). *)
+  (*       apply ClassicOrd.le_eq_or_lt in H0. destruct H0; cycle 1. *)
+  (*       * exists W1. split; first auto. intros ?. destruct (decide (i = x)). *)
+  (*         { subst. rewrite lookup_insert_eq H2. econstructor. rewrite -H0. apply Ord.O_bot. } *)
+  (*         { rewrite lookup_insert_ne; last auto. apply Inv. } *)
+  (*         (* FIXME : fail typeclass inference *) *)
+  (*       * exists (<[x:=(witness_assigned (OC:=ord_obl_class) (Ord.O))]>W1). split. *)
+  (*         { econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor. econstructor. auto. } *)
+  (*         { intros ?. destruct (decide (i = x)). *)
+  (*           - subst. rewrite !lookup_insert_eq. econstructor. apply Ord.O_bot. *)
+  (*           - rewrite !lookup_insert_ne; eauto. } *)
+  (*     + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2. *)
+  (*       inv H1. destruct y; try done. symmetry in H2. *)
+  (*       exists (<[x:=(witness_fulfilled)]>W1). split. *)
+  (*       * econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor 2. econstructor. *)
+  (*       * intros ?. destruct (decide (i = x)). *)
+  (*         { subst. rewrite !lookup_insert_eq. econstructor. auto. } *)
+  (*         { rewrite !lookup_insert_ne; eauto. } *)
+  (*   - pose proof Inv as Dom. apply owit_inv_dom in Dom. destruct H0 as (k& LUO& ?& ?). destruct x. *)
+  (*     + exists (<[k:=(witness_assigned (OC:=ord_obl_class) (η fuel))]>W1). split. *)
+  (*       * econstructor 2. econstructor 2. exists k. split; eauto. *)
+  (*         apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto. *)
+  (*       * subst. intros ?. destruct (decide (i = k)). *)
+  (*         { subst. rewrite !lookup_insert_eq. econstructor. done. } *)
+  (*         { rewrite !lookup_insert_ne; eauto. } *)
+  (*     + exists (<[k:=(witness_fulfilled)]>W1). split. *)
+  (*       * econstructor 2. econstructor 2. exists k. split; eauto. *)
+  (*         apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto. *)
+  (*       * subst. intros ?. destruct (decide (i = k)). *)
+  (*         { subst. rewrite !lookup_insert_eq. econstructor. split; done. } *)
+  (*         { rewrite !lookup_insert_ne; eauto. } *)
+  (* Qed. *)
+
+  Lemma model_interp_mupd_steps (γ : obl_owner → obl_fuel → obl_fuel) h i Ω W n Θ P :
+    owit_inv_lb_mon γ →
+    (owit_inv_lb γ Ω W) →
     (|=[n,Θ]=>m P) -∗ model_interp h i Ω W n Θ ={∅}=∗
-    (P ∗ ∃ h' i' Ω' W', ⌜ obls_le Ω Ω' ⌝ ∗ model_interp (h ++ h') (i + i') Ω' W' n Θ).
+    (P ∗ ∃ h' i' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb γ Ω' W' ⌝ ∗ model_interp (h ++ h') (i + i') Ω' W' n Θ).
   Proof.
-    iIntros "H". iRevert (h i Ω W). iRevert (P) "H".
+    iIntros ([GMon GSched] LB) "H". iRevert (h i Ω W LB). iRevert (P) "H".
     iApply mupd_ind_strong.
     { solve_proper. }
-    iIntros "!> %P IH %%%% H". iDestruct "IH" as "[IH | IH]".
+    iIntros "!> %P IH %%%% %LB H". iDestruct "IH" as "[IH | IH]".
     { iMod "IH". iModIntro. iFrame. iExists [], 0, _, _. rewrite app_nil_r Nat.add_0_r. iFrame. done. }
     iPoseProof (model_interp_owit_inv with "H") as "%".
     iMod ("IH" with "H") as "(%&%& IH)".
-    pose proof (owit_inv_exists_witnesses _ _ _ H0 H). destruct H1 as (W2& ?).
-    iMod ("IH" $! _ H1) as "[G [IH _]]". iMod ("IH" with "G") as "[$ (%&%&%&%& %LEO& MI)]".
+    unshelve epose proof (owit_inv_exists_witnesses γ _ _ _ _ H0 H LB).
+    1: split; auto.
+    destruct H1 as (W2& WProg& Inv2& LB2).
+    iMod ("IH" $! W2 with "[//]") as "[G [IH _]]". iMod ("IH" with "[] G") as "[$ (%&%&%&%& %LEO& MI)]".
+    1: eauto.
     iModIntro. iExists ([(n, Ω2)] ++ h'), (S i'), _, _.
     replace (h ++ [(n, Ω2)] ++ h') with ((h ++ [(n, Ω2)]) ++ h'); cycle 1.
     { by rewrite app_assoc. }
     replace (i + S i') with (S i + i') by lia. iFrame.
-    iPureIntro. etrans; last eapply LEO. apply obls_step_rc_obls_le; auto.
+    iPureIntro. destruct LEO as [LEO ?]. split; auto.
+    etrans; last eapply LEO. apply obls_step_rc_obls_le; auto.
   Qed.
+
+  (* Lemma model_interp_mupd_steps h i Ω W n Θ P : *)
+  (*   (|=[n,Θ]=>m P) -∗ model_interp h i Ω W n Θ ={∅}=∗ *)
+  (*   (P ∗ ∃ h' i' Ω' W', ⌜ obls_le Ω Ω' ⌝ ∗ model_interp (h ++ h') (i + i') Ω' W' n Θ). *)
+  (* Proof. *)
+  (*   iIntros "H". iRevert (h i Ω W). iRevert (P) "H". *)
+  (*   iApply mupd_ind_strong. *)
+  (*   { solve_proper. } *)
+  (*   iIntros "!> %P IH %%%% H". iDestruct "IH" as "[IH | IH]". *)
+  (*   { iMod "IH". iModIntro. iFrame. iExists [], 0, _, _. rewrite app_nil_r Nat.add_0_r. iFrame. done. } *)
+  (*   iPoseProof (model_interp_owit_inv with "H") as "%". *)
+  (*   iMod ("IH" with "H") as "(%&%& IH)". *)
+  (*   pose proof (owit_inv_exists_witnesses _ _ _ H0 H). destruct H1 as (W2& ?). *)
+  (*   iMod ("IH" $! _ H1) as "[G [IH _]]". iMod ("IH" with "G") as "[$ (%&%&%&%& %LEO& MI)]". *)
+  (*   iModIntro. iExists ([(n, Ω2)] ++ h'), (S i'), _, _. *)
+  (*   replace (h ++ [(n, Ω2)] ++ h') with ((h ++ [(n, Ω2)]) ++ h'); cycle 1. *)
+  (*   { by rewrite app_assoc. } *)
+  (*   replace (i + S i') with (S i + i') by lia. iFrame. *)
+  (*   iPureIntro. etrans; last eapply LEO. apply obls_step_rc_obls_le; auto. *)
+  (* Qed. *)
 
   (* The following instances make the Iris Proof Mode aware of the
      obl update. They are derived from the simpler rules above. *)

@@ -3,6 +3,7 @@ From iris.algebra Require Export ofe.
 From liris.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 From liris Require Export wfocm.
+From liris.prelude Require Export ordinal_facts.
 
 Definition thread_id := positive.
 Global Instance thread_id_inhabited : Inhabited thread_id := Pos.inhabited.
@@ -398,3 +399,56 @@ CoInductive behavior {Λ : language} : trace Λ → Prop :=
   τf (S n) = (ρ2, i2, κs) →
   behavior (S n, τf) →
   behavior (n, τf).
+
+Definition behavior_cfg {Λ : language} (ρ : cfg Λ) (τ : trace Λ) : Prop :=
+  ∃ i κs, (τ.2 0) = (ρ, i, κs) ∧ behavior τ.
+Definition behavior_tp {Λ : language} (Θ : thread_pool Λ) (τ : trace Λ) : Prop :=
+  ∃ σ, behavior_cfg (Θ, σ) τ.
+
+(** We fix a (somewhat general) fair scheduler, only for convenience. *)
+Definition fair_sched_ub : Ord.t → Ord.t := (λ a, ((ω × a) ⊕ ω)%ord).
+
+Lemma fair_sched_ub_mono : ∀ o, (o <= fair_sched_ub o)%ord.
+Proof.
+  intros. etrans. 2: apply Hessenberg.add_base_l. etrans.
+  { apply (Jacobsthal.mult_1_l o). }
+  apply Jacobsthal.mult_le_proper; last done.
+  apply Ord.lt_le, omega_lt_one.
+Qed.
+
+Global Instance fair_sched_ub_lt_proper : Proper (Ord.lt ==> Ord.lt) fair_sched_ub.
+Proof.
+  repeat intro. apply Hessenberg.lt_add_l.
+  apply Jacobsthal.lt_mult_r; auto. apply omega_lt_zero.
+Qed.
+
+Global Instance fair_sched_ub_le_proper : Proper (Ord.le ==> Ord.le) fair_sched_ub.
+Proof.
+  repeat intro. apply Hessenberg.le_add_l.
+  apply Jacobsthal.le_mult_r; auto.
+Qed.
+
+Global Instance fair_sched_ub_ord_mono_fun_class : ord_mono_fun_class :=
+  Build_ord_mono_fun_class fair_sched_ub fair_sched_ub_mono _ _.
+
+Definition fair_sched_fun (γ : thread_id → nat) : thread_id → Ord.t → Ord.t :=
+  (λ i a, ((ω × a) ⊕ Ord.from_nat (γ i))%ord).
+
+Lemma fair_sched_fun_mon (γ : thread_id → nat) :
+  (∀ a b i j, (a < b)%ord → (fair_sched_fun γ i a < fair_sched_fun γ j b)%ord).
+Proof.
+  intros. unfold fair_sched_fun. apply ord_lt_exists_left in H. destruct H as (u& GTu& LEu).
+  unshelve eapply Ord.lt_le_lt. 1: exact ((ω × (a ⊕ u)) ⊕ γ j)%ord.
+  2:{ apply Hessenberg.le_add_l. apply Jacobsthal.le_mult_r. auto. }
+  rewrite ClassicJacobsthal.mult_dist Hessenberg.add_assoc.
+  apply Hessenberg.lt_add_r. unshelve eapply Ord.lt_le_lt. 1: exact ((ω × Ord.one) ⊕ (γ j))%ord.
+  { rewrite Jacobsthal.mult_1_r. eapply Ord.lt_le_lt, Hessenberg.add_base_l. apply Ord.omega_upperbound. }
+  apply Hessenberg.le_add_l, Jacobsthal.le_mult_r. apply Ord.S_supremum. auto.
+Qed.
+
+Lemma fair_sched_fun_ub (γ : thread_id → nat) :
+  (∀ i a, (fair_sched_fun γ i a <= fair_sched_ub a)%ord).
+Proof.
+  intros. unfold fair_sched_fun, fair_sched_ub. apply Hessenberg.le_add_r.
+  apply Ord.lt_le, Ord.omega_upperbound.
+Qed.
