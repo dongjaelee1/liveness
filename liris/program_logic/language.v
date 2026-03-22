@@ -381,8 +381,9 @@ Notation pure_steps_tp C := (map_Forall2 (λ _, rtc (pure_step C))).
 Definition trace (Λ : language) : Type :=
   nat * (nat → (cfg Λ * thread_id * list (observation Λ))).
 
-Definition trace_next {Λ} : trace Λ → trace Λ :=
-  λ τ, (S τ.1, τ.2).
+Definition trace_next {Λ} : trace Λ → trace Λ := λ τ, (S τ.1, τ.2).
+Definition trace_state {Λ} : trace Λ → (cfg Λ * thread_id * list (observation Λ)) := λ τ, (τ.2 τ.1).
+Definition trace_thread {Λ} : trace Λ → (thread_id) := λ τ, (trace_state τ).1.2.
 
 Inductive thread_done {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
 | thread_done_intro e1 σ1 e2 σ2 efs Θ :

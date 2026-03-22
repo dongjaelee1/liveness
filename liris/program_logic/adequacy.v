@@ -21,8 +21,10 @@ Section fair_sched.
     ((thread_na i τ) ∨ (thread_active i τ ∧ (if (decide (i = j)) then True else c' < c))) →
     beh_fscnt_th (trace_next τ) i c' →
     beh_fscnt_th τ i c.
+  Definition beh_fscnt (τ : trace Λ) (γ : fscnt) : Prop :=
+    ∀ (i : thread_id), beh_fscnt_th τ i (γ i).
 
-  Lemma beh_fscnt_th_upto_le (τ : trace Λ) (i : thread_id) (c1 c2 : nat) :
+  Lemma beh_fscnt_th_upto_le (τ : trace Λ) i (c1 c2 : nat) :
     beh_fscnt_th τ i c1 →
     c1 ≤ c2 →
     beh_fscnt_th τ i c2.
@@ -32,9 +34,6 @@ Section fair_sched.
     destruct H0; auto. right. destruct H0. split; auto.
     destruct (decide (i = j)); auto. eapply Nat.lt_le_trans; eauto.
   Qed.
-
-  Definition beh_fscnt (τ : trace Λ) (γ : fscnt) : Prop :=
-    ∀ (i : thread_id), beh_fscnt_th τ i (γ i).
 
   (** We use choice here. *)
   Lemma fair_scheduling_fscnt (τ : trace Λ) :
@@ -102,16 +101,33 @@ Section fair_sched.
             right. replace (s + S n) with (S (s + n)) by lia. split; auto. }
   Qed.
 
-(* TODO:
-beh_fscnt τ γ → beh_fscnt (trace_next τ) (fscnt_next τ γ)
-Here, fscnt_next is a function from fscnt to fscnt
-that looks at the current state and puts Nat.pred if not scheduled.
- *)
+  Definition fscnt_next_rel_th (τ : trace Λ) i (c1 c2 : nat) : Prop :=
+    if (decide (i = trace_thread τ)) then True
+    else if (decide (thread_na i τ)) then True
+         else (c2 < c1).
+  Definition fscnt_next_rel (τ : trace Λ) (γ1 γ2 : fscnt) : Prop :=
+    ∀ i, fscnt_next_rel_th τ i (γ1 i) (γ2 i).
+
+  (** We again use choice here. *)
+  Lemma exists_fscnt_next (τ : trace Λ) (γ : fscnt) :
+    beh_fscnt τ γ →
+    ∃ γ', beh_fscnt (trace_next τ) γ' ∧ fscnt_next_rel τ γ γ'.
+  Proof.
+    intros Beh. unfold beh_fscnt, fscnt_next_rel.
+    cut (∃ γ', ∀ i, (λ i c, beh_fscnt_th (trace_next τ) i c ∧ fscnt_next_rel_th τ i (γ i) c) i (γ' i)).
+    { intros. destruct H. exists x. split; intros; firstorder. }
+    apply choice. intros i. specialize (Beh i). inv Beh.
+    exists c'. split; auto. unfold fscnt_next_rel_th.
+    destruct τ as (n&τf). unfold trace_thread, trace_state. simpl in *.
+    rewrite H. simpl. destruct (decide (i = j)); auto. destruct H0.
+    { rewrite decide_True; auto. }
+    destruct H0. rewrite decide_False; auto.
+    intros F. eapply thread_active_and_not_false; eauto.
+  Qed.
 
 End fair_sched.
 
-
-(** Trace properties in iProp. *)
+(** Trace properties in iProp, intermediate representation for the adequacy proof. *)
 Notation tiProp Λ Σ := (trace Λ → iProp Σ).
 
 Definition ti_atomic `{SI : indexT} {Λ} {Σ} (π : state_pred Λ) : tiProp Λ Σ :=
@@ -141,8 +157,6 @@ Definition ti_always_pre `{SI : indexT} `{!lirisGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
   λ P τ, (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∧ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ))))%I.
-  (* λ P τ, (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∗ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ))))%I. *)
-  (* λ P τ, (|={E,∅}=> (▷ (P τ)) ∗ ((▷ (P τ)) ={∅}=∗ ALC (|={∅,E}=> ti_always P (trace_next τ))))%I. *)
 
 Local Instance ti_always_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E : Contractive (ti_always_pre E).
 Proof.
@@ -170,8 +184,6 @@ Definition ti_until_pre `{SI : indexT} `{!lirisGS Λ Σ} E
   λ a P Q τ,
     ((|={E,∅}=> ▷ |={∅,E}=> (Q τ)) ∨
        (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∧ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∧ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I.
-    (* ((|={E,∅}=> ▷ |={∅,E}=> (Q τ)) ∨ *)
-    (*    (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∗ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∗ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I. *)
 
 Local Instance ti_until_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E
   {A : Type} {ltA : A → A → Prop} {wf_ltA : well_founded ltA}
@@ -421,9 +433,11 @@ Section proof2.
   Local Transparent tf_intuit.
   Context `{!lirisGS Λ Σ}.
 
-  Local Definition D : Type := (prod obl_fuel nat).
-  Local Definition ltD : D → D → Prop := (prod_lt WFOCM.ltR lt).
-  Local Definition wf_ltD : well_founded ltD := (prod_lt_well_founded _ _ _ _ WFOCM.lt_wf Nat.lt_wf_0).
+  (* Local Definition D : Type := (prod obl_fuel nat). *)
+  (* Local Definition ltD : D → D → Prop := (prod_lt WFOCM.ltR lt). *)
+  (* Local Definition wf_ltD : well_founded ltD := (prod_lt_well_founded _ _ _ _ WFOCM.lt_wf Nat.lt_wf_0). *)
+
+  TODO: add fair_sched_fun and wit W related conditions.
 
   Lemma lwp_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf Φ :
     behavior (n, τf) →
@@ -435,7 +449,8 @@ Section proof2.
     history_interp h n σ Θ κs ∗ model_interp g v2 Ω2 W n (dom Θ) ∗
     ([∗ map] i ↦ '(e, Q) ∈ TQ, lwp_fix s i ⊤ e (lift_term i Q)) ∗
     tf_intuit n σ Θ κs v1 Ω1 Φ
-    ⊢ ti_logic wf_ltD Φ (n, τf).
+    ⊢ ti_logic Ord.lt_well_founded Φ (n, τf).
+    (* ⊢ ti_logic wf_ltD Φ (n, τf). *)
   Proof.
     revert h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf.
     induction Φ; iIntros (h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf BEH FS HIST LEv LEO EQTQ) "(HI& MI& WPs& #TF)"; simpl.
