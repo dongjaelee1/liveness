@@ -323,7 +323,6 @@ Section lwpupd.
 
   Lemma all_interp_lwpupd_steps_gmap (γ : thread_id → nat) E h n σ Θ κs g v Ω W
     (A : Type) (TQ : gmap thread_id ((expr Λ) * A)) (P : thread_id → (expr Λ) → A → iProp Σ) :
-    (map_Forall (λ i e, Θ !! i = Some e) Θ) →
     (fst <$> TQ) ⊆ Θ →
     (owit_inv_lb (fair_sched_fun γ) Ω W) →
     ([∗ map] i ↦ '(e, a) ∈ TQ, lwpupd i E e (P i e a)) -∗
@@ -332,7 +331,7 @@ Section lwpupd.
      history_interp h n σ Θ κs ∗
      ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
-    revert h n σ Θ κs g v Ω W. induction TQ using map_ind; iIntros (h n σ Θ κs g v Ω W EQTH EQTQ LB) "PS HI MI".
+    revert h n σ Θ κs g v Ω W. induction TQ using map_ind; iIntros (h n σ Θ κs g v Ω W EQTQ LB) "PS HI MI".
     { iModIntro. iSplitR; first done. iFrame. iExists [], 0, _, _. rewrite app_nil_r Nat.add_0_r. iFrame. done. }
     iPoseProof (big_sepM_insert with "PS") as "[HP PS]". 1: auto.
     destruct x as (e& a). iMod (IHTQ with "PS HI MI") as "(PS& HI& %&%&%&%&%& MI)". 1: auto.

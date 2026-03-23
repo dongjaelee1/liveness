@@ -558,6 +558,21 @@ Section proof2.
     - iPureIntro. exists e. split; auto. subst. rewrite lookup_fmap LUth. done.
   Qed.
 
+  Lemma owit_inv_lb_step_na_turn τ Ω W γ1 γ2 :
+    thread_na (trace_thread τ) τ →
+    obls_thread_active Ω τ →
+    owit_inv_lb (fair_sched_fun γ1) Ω W →
+    fscnt_next_rel τ γ1 γ2 →
+    owit_inv_lb (fair_sched_fun γ2) Ω W.
+  Proof.
+    intros. intro k. specialize (H0 k). specialize (H1 k). inv H1. 2: econstructor.
+    symmetry in H3, H4. specialize (H0 _ H3). simpl in H0. econstructor. destruct x, y; try done.
+    etrans; last eauto. apply Hessenberg.le_add_r, OrdArith.le_from_nat.
+    specialize (H2 owner). unfold fscnt_next_rel_th in H2. rewrite decide_False in H2; cycle 1.
+    { intros ->. eapply thread_active_and_not_false; eauto. }
+    rewrite decide_False in H2; first lia. intros F. eapply thread_active_and_not_false; eauto.
+  Qed.
+
   Lemma lwp_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf γ Φ :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
@@ -598,37 +613,136 @@ Section proof2.
       + iApply (IHΦ1 with "[$HI $MI $WPs $TF1]"); eauto.
       + iApply (IHΦ2 with "[$HI $MI $WPs $TF2]"); eauto.
     - done.
-    - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
-      
-
-      TODO
-
-      clear dependent v1 Ω1. rename v2 into v, Ω2 into Ω.
-      iRevert (h n σ Θ TQ κs g v Ω W BEH FS HIST EQTQ) "TF HI MI WPs".
-      iLöb as "IH". iIntros (h n σ Θ TQ κs g v Ω W BEH FS HIST EQTQ) "#TF HI MI WPs".
+    - clear dependent v1 Ω1. rename v2 into v, Ω2 into Ω.
+      iRevert (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ) "TF HI MI WPs".
+      iLöb as "IH". iIntros (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ) "#TF HI MI WPs".
       rewrite ti_always_unfold /ti_always_pre.
       iMod (inv_acc with "TF") as "[HP ACC]". 1: set_solver.
       iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
       iPoseProof (tf_logic_tf_intuit with "[$HI $MI $HP]") as "#TFP".
       iMod "close" as "_". iMod ("ACC" with "HP") as "_". iModIntro. iSplit.
-      { iApply (IHΦ with "[$HI $MI $WPs $TFP]"); auto. done. }
+      { iApply (IHΦ with "[$HI $MI $WPs $TFP]"); eauto. done. }
       (** Fetch the scheduled thread and take a step. *)
       inversion BEH. clear BEH. subst n0 τf0.
       iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
       rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
       rename κs0 into κs, H1 into TRn, H3 into TRn1, H4 into BEH.
+      destruct H2 as [TStep | TDone].
+      + iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
+        inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
+        assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
+        { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
+        destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_delete _ _ _ _ LUTQi1 with "WPs") as "[WP WPs]".
+        pose proof (val_stuck _ _ _ _ _ _ _ _ PStep) as He1. rewrite He1.
+        iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
+        iMod ("WP" $! id with "[] [//] HI") as "[%NStuck WP]".
+        { iPureIntro. apply _. }
+        iPoseProof ("WP" with "[//]") as "WP". rewrite /mprog.
+        iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
+        iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
+        unshelve epose proof (mprog_exists_step i1 Ω Ω2 W (n, τf) γ _ OTA OWinv LB FS ProgO).
+        { unfold trace_thread, trace_state. simpl. rewrite TRn. done. }
+        destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
+        iMod ("WP" $! W2 with "[]") as "[MI WP]".
+        { iPureIntro. split; auto. }
+        rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro. iMod "WP". simpl.
+        iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g'& %v'& %Ω3& %W3& %& MI)".
+        2: eapply LB2.
+        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+        destruct H as [LEO LB3]. iMod "WP" as "(HI& WP& Efs)".
+        unfold trace_next in *. simpl in *. assert (TDisj : Θ ##ₘ efs).
+        { eapply map_disjoint_dom_2, fork_thread_ids; eauto. }
+        remember ((<[i1:=e2]> Θ) ∪ efs) as Θ2.
+        replace (dom (<[i1:=e2]> Θ) ∪ dom efs) with (dom Θ2); cycle 1.
+        { subst Θ2. rewrite dom_union_L. auto. }
+        remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
+        iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, lwpupd j ⊤ e (match to_val e with
+                                                            | Some v => lift_term j Q v
+                                                            | None => lwp_fix s j ⊤ e (lift_term j Q)
+                                                            end))%I with "[Efs]" as "Efs".
+        { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
+          destruct (to_val x) eqn:EQx.
+          - rewrite lwp_fix_unfold_fix /lwp_pre EQx lwpupd_trans. iApply "WP".
+          - iApply "WP". }
+        iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
+        { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
+          apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom.
+          apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+        1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2.
+        * rewrite lwp_fix_unfold_fix /lwp_pre He2.
+          iMod (all_interp_lwpupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)".
+          { subst Θ2. rewrite lookup_union_l.
+            - apply lookup_insert_eq.
+            - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+          1: eapply LB4. destruct H as [LEO3 LB5].
+          iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
+                     (match to_val e with
+                      | Some v => lift_term j Q v
+                      | None => lwp_fix s j ⊤ e (lift_term j Q)
+                      end))%I with "[WPs WP Efs]" as "WPs".
+          { iApply big_sepM_union.
+            { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
+              apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
+            iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
+          iPoseProof (history_interp_wf with "HI") as "%HistWF".
+          iPoseProof ("IH" with "[] [] [] [] [] TF HI MI WPs") as "H".
+          1: eauto. 1: eauto. 1: eauto.
+          { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
+            - inv H. eapply HIST in LUh. eauto.
+            - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
+              inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
+              destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
+              rewrite H1 TRn1. eauto. }
+          { iPureIntro. subst. rewrite map_fmap_union fmap_insert -map_fmap_compose /compose map_fmap_id. done. }
+          iModIntro. iFrame.
+        * iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
+                     (match to_val e with
+                      | Some v => lift_term j Q v
+                      | None => lwp_fix s j ⊤ e (lift_term j Q)
+                      end))%I with "[WPs WP Efs]" as "WPs".
+          { iApply big_sepM_union.
+            { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
+              apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
+            iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
+          iPoseProof (history_interp_wf with "HI") as "%HistWF".
+          iPoseProof ("IH" with "[] [] [] [] [] TF HI MI WPs") as "H".
+          1: eauto. 1: eauto. 1: eauto.
+          { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
+            - inv H. eapply HIST in LUh. eauto.
+            - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
+              inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
+              destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
+              rewrite H1 TRn1. eauto. }
+          { iPureIntro. subst. rewrite map_fmap_union fmap_insert -map_fmap_compose /compose map_fmap_id. done. }
+          iModIntro. iFrame.
+      + iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
+        inversion TDone. clear TDone. inversion H. clear H. subst Θ0 σ1 ρ2.
+        destruct H1 as (He1&<-&<-&->&->). destruct He1 as [v1 He1]. simpl in *.
+        rewrite map_union_empty insert_id in TRn1. 2: auto.
+        iPoseProof (history_interp_step with "HI") as "[SI ACC]". iMod ("ACC" with "SI") as "HI".
+        pose proof (exists_fscnt_next _ _ FS). destruct H as (γ2& FS2& FSrel).
+        unfold trace_next in *. simpl in *.
+        assert (TNow : trace_thread (n, τf) = i1).
+        { unfold trace_thread, trace_state. simpl. rewrite TRn. done. }
+        assert (TNA : thread_na i1 (n, τf)).
+        { unfold thread_na. simpl. rewrite TRn. right. eauto. }
+        rewrite -TNow in TNA. pose proof (owit_inv_lb_step_na_turn _ _ _ _ _ TNA OTA LB FSrel) as LB2.
+        iDestruct "MI" as "[MHI MI]". iMod (model_history_interp_step _ _ _ (S n) with "MHI") as "MHI".
+        1: lia. 1: reflexivity.
+        iPoseProof (history_interp_wf with "HI") as "%HistWF".
+        iPoseProof ("IH" with "[] [] [] [] [] TF HI [$MHI $MI] WPs") as "H".
+        1: eauto. 1: eauto. 1: eauto.
+        { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
+          - inv H. eapply HIST in LUh. eauto.
+          - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
+            inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
+            destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
+            rewrite H2 TRn1. eauto. }
+        1: eauto.
+        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iModIntro. iMod "close" as "_". iModIntro. iFrame.
+    -
 
-      TODO
-      
-      inversion H2.
-      2:{ 
-      + clear H2. inversion H. clear H. subst Θ0 σ ρ2.
-      assert (NVe1 : to_val e1 = None) by (eapply val_stuck; eauto).
-
-      (** FIX behavior? Now it MUST take a step, but what if every thread is done? *)
-      (** And what happens when every thread is done? Should lwp_pre take a step, increasing n? *)
-
-    TODO
+        TODO
 
 lwp_step =
   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ) 
