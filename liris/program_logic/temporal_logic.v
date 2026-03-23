@@ -416,7 +416,7 @@ Section proof.
     iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
     destruct LUO1l as (?&?&LUO1l). destruct LUO1o as (?&LUO1o).
     rewrite LUO1l in LUO1o. inv LUO1o. rename x1 into a.
-    iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1) | #Gu])".
+    iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1& _) | #Gu])".
     { apply elem_of_dom. eauto. }
     2:{ iExFalso. iPoseProof (oblG_assigned_fulfilled_false with "[$Gl $Gu]") as "%". done. }
     iPoseProof (oblG_owner_agree _ i i1 with "[$Go $Go1]") as "%". destruct H as [<- _].

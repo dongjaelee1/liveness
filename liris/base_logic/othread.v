@@ -121,7 +121,7 @@ Definition oassigned `{SI : indexT} {Σ}
   locked
     ([∗ set] k ∈ Gls,
        oblG_elem k ∗
-       ((∃ i, oblG_owner k i (1/2/2/2/2)%Qp ∗ othreadG_owns i k (1/2/2)%Qp) ∨
+       ((∃ i, oblG_owner k i (1/2/2/2/2)%Qp ∗ othreadG_owns i k (1/2/2)%Qp ∗ othreadG_elem i) ∨
           (oblG_fulfilled k)))%I.
 
 Section othread.
@@ -679,7 +679,7 @@ Section othread.
   (** oassigned rules *)
   Lemma oassigned_add_obl Gls k :
     oassigned Gls ∗
-    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2)) ∨ oblG_fulfilled k))
+    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i) ∨ oblG_fulfilled k))
     ⊢ oassigned ({[k]} ∪ Gls).
   Proof.
     iIntros "(A& H)". rewrite /oassigned -!lock. destruct (decide (k ∈ Gls)).
@@ -696,7 +696,7 @@ Section othread.
     k ∈ Gls →
     oassigned Gls
     ⊢ oassigned (Gls ∖ {[k]}) ∗
-    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2)) ∨ oblG_fulfilled k)).
+    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i) ∨ oblG_fulfilled k)).
   Proof.
     rewrite /oassigned -!lock. iIntros (INk) "A".
     iPoseProof (big_sepS_delete with "A") as "[$ $]". auto.
@@ -710,7 +710,7 @@ Section othread.
     rewrite /oassigned -lock. iIntros (LUOk) "(S& O& A& Tbs)".
     iPoseProof (big_sepS_delete _ _ k with "A") as "[A _]".
     { apply elem_of_dom_2 in LUOk. auto. }
-    iDestruct "A" as "(#Gek& [(%& Gok& Ook) | #Guk])".
+    iDestruct "A" as "(#Gek& [(%& Gok& Ook& #Tei) | #Guk])".
     - iPoseProof (osat_lookup_owner with "[$S $Gek $Gok]") as "(%&%)".
       rewrite LUOk in H. inv H. iApply (othread_obls_owns_elem with "[$O $Tbs $Ook]").
     - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "%H".
@@ -725,6 +725,45 @@ Section othread.
     iIntros (Ink) "(S& O& #Oei& Tbs& #Gek)".
     iPoseProof (othread_obls_open with "[$O $Oei $Tbs]") as "(Tbs& Go& Acc)". 1: eauto.
     iPoseProof (osat_lookup_owner with "[$S $Gek $Go]") as "(%& %)". eauto.
+  Qed.
+
+  Lemma othread_assigned_thread_elem Ω TP k a i :
+    Ω !! k = Some (obl_assigned a i) →
+    osat Ω ∗ othread TP ∗ oassigned (dom Ω)
+    ⊢ ⌜i ∈ TP⌝.
+  Proof.
+    rewrite /oassigned -lock. iIntros (LUOk) "(S& O& A)".
+    iPoseProof (big_sepS_delete _ _ k with "A") as "[A _]".
+    { apply elem_of_dom_2 in LUOk. auto. }
+    iDestruct "A" as "(#Gek& [(%& Gok& Ook& #Tei) | #Guk])".
+    - iPoseProof (osat_lookup_owner with "[$S $Gek $Gok]") as "%". destruct H. rewrite LUOk in H. inv H.
+      iPoseProof (othread_elem with "[$O $Tei]") as "%".  auto.
+    - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "%". rewrite LUOk in H. inv H.
+  Qed.
+
+  Lemma othread_assigned_term_false Ω TP k a i :
+    Ω !! k = Some (obl_assigned a i) →
+    osat Ω ∗ othread TP ∗ oassigned (dom Ω) ∗ othreadG_elem i ∗ othreadG_term i ⊢ False.
+  Proof.
+    iIntros (LUk) "(S& O& A& #He & #Hx)".
+    rewrite /othread -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
+    iPoseProof (othreadG_elem_elem with "[$HE $He]") as "%Hini".
+    assert (Hlui : ∃ m, Tgls !! i = Some m).
+    { rewrite elem_of_dom in Hini. eauto. }
+    destruct Hlui as (TObls&Hlui).
+    iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
+    iDestruct "Hi" as "([Hix | [Hix Ho]] & His & Him)".
+    { iExFalso. iPoseProof (othreadG_exec_term_false with "[$Hix $Hx]") as "%F". done. }
+    iPoseProof (othreadG_obls_lookup with "[$HB $Ho]") as "%LUempty".
+    rewrite /oassigned -lock. iPoseProof (big_sepS_delete _ _ k with "A") as "[A _]".
+    { apply elem_of_dom_2 in LUk. auto. }
+    iDestruct "A" as "(#Gek& [(%& Gok& Ook& #Tei) | #Guk])".
+    - iPoseProof (osat_lookup_owner with "[$S $Gek $Gok]") as "(%&%)". rewrite LUk in H. inv H.
+      iPoseProof (othreadG_owns_lookup with "[$His $Ook]") as "%".
+      rewrite lookup_fmap_Some in LUempty. destruct LUempty as (?&?&?). apply dom_empty_inv_L in H0. subst x.
+      rewrite Hlui in H1. inv H1.
+    - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "%H".
+      rewrite LUk in H. inv H.
   Qed.
 
 End othread.

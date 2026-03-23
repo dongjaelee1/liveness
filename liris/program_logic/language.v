@@ -435,16 +435,22 @@ Global Instance fair_sched_ub_ord_mono_fun_class : ord_mono_fun_class :=
 Definition fair_sched_fun (γ : thread_id → nat) : thread_id → Ord.t → Ord.t :=
   (λ i a, ((ω × a) ⊕ Ord.from_nat (γ i))%ord).
 
+Lemma fair_sched_fun_mon_gen (γ1 γ2 : thread_id → nat) :
+  (∀ a b i j, (a < b)%ord → (fair_sched_fun γ1 i a < fair_sched_fun γ2 j b)%ord).
+Proof.
+  intros. unfold fair_sched_fun. apply ord_lt_exists_left in H. destruct H as (u& GTu& LEu).
+  unshelve eapply Ord.lt_le_lt. 1: exact ((ω × (a ⊕ u)) ⊕ γ2 j)%ord.
+  2:{ apply Hessenberg.le_add_l. apply Jacobsthal.le_mult_r. auto. }
+  rewrite ClassicJacobsthal.mult_dist Hessenberg.add_assoc.
+  apply Hessenberg.lt_add_r. unshelve eapply Ord.lt_le_lt. 1: exact ((ω × Ord.one) ⊕ (γ2 j))%ord.
+  { rewrite Jacobsthal.mult_1_r. eapply Ord.lt_le_lt, Hessenberg.add_base_l. apply Ord.omega_upperbound. }
+  apply Hessenberg.le_add_l, Jacobsthal.le_mult_r. apply Ord.S_supremum. auto.
+Qed.
+
 Lemma fair_sched_fun_mon (γ : thread_id → nat) :
   (∀ a b i j, (a < b)%ord → (fair_sched_fun γ i a < fair_sched_fun γ j b)%ord).
 Proof.
-  intros. unfold fair_sched_fun. apply ord_lt_exists_left in H. destruct H as (u& GTu& LEu).
-  unshelve eapply Ord.lt_le_lt. 1: exact ((ω × (a ⊕ u)) ⊕ γ j)%ord.
-  2:{ apply Hessenberg.le_add_l. apply Jacobsthal.le_mult_r. auto. }
-  rewrite ClassicJacobsthal.mult_dist Hessenberg.add_assoc.
-  apply Hessenberg.lt_add_r. unshelve eapply Ord.lt_le_lt. 1: exact ((ω × Ord.one) ⊕ (γ j))%ord.
-  { rewrite Jacobsthal.mult_1_r. eapply Ord.lt_le_lt, Hessenberg.add_base_l. apply Ord.omega_upperbound. }
-  apply Hessenberg.le_add_l, Jacobsthal.le_mult_r. apply Ord.S_supremum. auto.
+  intros. eapply fair_sched_fun_mon_gen; eauto.
 Qed.
 
 Lemma fair_sched_fun_ub (γ : thread_id → nat) :

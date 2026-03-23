@@ -300,7 +300,6 @@ Qed.
 (* ofe.u0 = cmra.u0 *)
 (* universes.Logic = cmra.u0 *)
 
-(* TODO *)
 
 (* Unable to unify "?X" with "ucmra_car ordinal_ucmra.OrdUR" *)
 (* (unable to find a well-typed instantiation for "?X": cannot ensure that "Type@{ucmra.u0}" is a *)
@@ -309,7 +308,6 @@ Qed.
 (* Global Instance ord_satisfiable_exists {Σ : gFunctors} : SatisfiableExists Ord.t (iProp_sat (Σ:=Σ)). *)
 (* Proof. apply iProp_sat_exists_instance. Qed. *)
 
-(* TODO *)
 
 (* Global Instance iProp_sat_lc_satisfiable_rupd {Σ : gFunctors} `{!invGS Σ} : *)
 (*   SatisfiableRUpd (iProp_sat_lc). *)
@@ -437,45 +435,175 @@ Section proof2.
   (* Local Definition ltD : D → D → Prop := (prod_lt WFOCM.ltR lt). *)
   (* Local Definition wf_ltD : well_founded ltD := (prod_lt_well_founded _ _ _ _ WFOCM.lt_wf Nat.lt_wf_0). *)
 
-  TODO: add fair_sched_fun and wit W related conditions.
+  Definition obls_thread_active (Ω : obls) (τ : trace Λ) :=
+    map_Forall (λ _ o, match o with
+                       | obl_assigned _ i => thread_active i τ
+                       | _ => True
+                       end
+      ) Ω.
 
-  Lemma lwp_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf Φ :
-    behavior (n, τf) →
-    fair_scheduling (Λ:=Λ) (n, τf) →
+  Lemma mprog_exists_step i Ω1 Ω2 W1 (τ : trace Λ) γ1 :
+    i = trace_thread τ →
+    obls_thread_active Ω1 τ →
+    owit_inv Ω1 W1 →
+    owit_inv_lb (fair_sched_fun γ1) Ω1 W1 →
+    beh_fscnt τ γ1 →
+    (Ω1 ↪ₚ Ω2 | obl_cond_owner i) →
+    ∃ W2 γ2, (W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ∧
+             owit_inv_lb (fair_sched_fun γ2) Ω2 W2 ∧ beh_fscnt (trace_next τ) γ2 ∧ fscnt_next_rel τ γ1 γ2.
+  Proof.
+    intros EQi OTA Inv LB Beh Prog. subst i. destruct (exists_fscnt_next _ _ Beh) as (γ2&Beh2&GNext).
+    cut (∃ W2, (W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ∧ owit_inv_lb (fair_sched_fun γ2) Ω2 W2).
+    { intros (?&?&?&?). exists x, γ2. split_and !; auto. }
+    revert Ω1 Ω2 τ γ1 γ2 OTA Inv LB Beh Prog Beh2 GNext.
+    induction W1 using map_ind; intros Ω1 Ω2 τ γ1 γ2 OTA Inv LB Beh Prog Beh2 GNext.
+    { apply map_Forall2_empty_inv_r in Inv. subst. destruct Prog. apply map_Forall2_empty_inv_l in H0. subst.
+      exists ∅. split_and !; auto.
+      - split; apply map_Forall2_empty.
+      - apply map_Forall2_empty.
+      - apply map_Forall2_empty. }
+    destruct Prog as (Step& Keep). rename i into k, x into w, m into W1, H into LUW1, Ω1 into Ω1', Ω2 into Ω2'.
+    apply map_Forall2_insert_inv_r in Inv; auto. destruct Inv as (o1&Ω1&EQO1&LUO1&Invk&Inv').
+    assert (Inv : owit_inv Ω1 W1) by auto. clear Inv'. subst Ω1'.
+    apply map_Forall2_insert in LB; auto. destruct LB as (LBk& LB').
+    assert (LB : owit_inv_lb (fair_sched_fun γ1) Ω1 W1) by auto. clear LB'.
+    apply map_Forall2_insert_inv_l in Keep; auto. destruct Keep as (o2&Ω2&EQO2&LUO2&Keepk&Keep').
+    assert (Keep : obls_keep Ω1 Ω2) by auto. clear Keep'. subst Ω2'.
+    apply map_Forall2_insert in Step; auto. destruct Step as (Stepk&Step').
+    assert (Step : Ω1 ↪ₛ Ω2 | obl_cond_owner (trace_thread τ)) by auto. clear Step'.
+    apply map_Forall_insert in OTA; auto. destruct OTA as (OTAk&OTA').
+    assert (OTA : obls_thread_active Ω1 τ) by auto. clear OTA'.
+    unshelve epose proof (IHW1 Ω1 Ω2 τ γ1 γ2 OTA Inv LB Beh _ Beh2 GNext) as IH.
+    { split; auto. }
+    clear IHW1. destruct IH as (W2& ProgW& Inv2& LB2).
+    destruct ProgW as [StepW KeepW]. assert (LUW2 : W2 !! k = None).
+    { apply owit_inv_dom in Inv2. apply not_elem_of_dom. rewrite -Inv2. apply not_elem_of_dom. auto. }
+    cut (∃ (w' : witness),
+            ((wit_cond_assigned k w ∧ witness_step w w') ∨ (¬ wit_cond_assigned k w ∧ w = w')) ∧
+            (witness_keep w w') ∧
+            (match o2 with
+             | obl_assigned a _ => match w' with
+                                  | witness_assigned b => b w≤ η a
+                                  | witness_fulfilled => False
+                                  end
+             | obl_fulfilled => match w' with
+                               | witness_assigned _ => False
+                               | witness_fulfilled => True
+                               end
+             end) ∧
+            (match o2 with
+             | obl_assigned a i => match w' with
+                                  | witness_assigned b => (fair_sched_fun γ2 i a) w≤ b
+                                  | witness_fulfilled => False
+                                  end
+             | obl_fulfilled => match w' with
+                               | witness_assigned _ => False
+                               | witness_fulfilled => True
+                               end
+             end)).
+    { intros (w'& Hw1& Hw2& Hw3& Hw4). exists (<[k:=w']>W2). split_and !.
+      - split; apply map_Forall2_insert; auto.
+      - apply map_Forall2_insert; auto.
+      - apply map_Forall2_insert; auto.
+    }
+    clear dependent W1 W2 Ω1 Ω2. destruct o1, w; try done.
+    - simpl in Stepk. destruct Stepk as [Turn | NoTurn].
+      + destruct Turn as [-> Stepk]. simpl in Keepk. destruct o2; last done. clear Keepk.
+        inv Stepk; cycle 1. 1: inv H.
+        (* FIXME: type checking fails without OC. *)
+        inv H. simpl in *. exists (witness_assigned (OC:=ord_obl_class) (fair_sched_fun γ2 owner fuel0)).
+        split_and !; auto.
+        * left. split; auto. econstructor. econstructor. eapply (Ord.lt_le_lt); last eapply LBk.
+          apply fair_sched_fun_mon_gen. auto.
+        * apply fair_sched_fun_ub.
+        * done.
+      + destruct NoTurn as [NoTurn <-]. simpl in Keepk. clear Keepk. simpl in *.
+        exists (witness_assigned (OC:=ord_obl_class) (fair_sched_fun γ2 owner fuel)).
+        split_and !; auto.
+        * left. split; auto. econstructor. econstructor. eapply (Ord.lt_le_lt); last eapply LBk.
+          unfold fair_sched_fun. apply Hessenberg.lt_add_r. specialize (GNext owner).
+          unfold fscnt_next_rel_th in GNext. rewrite decide_False in GNext; auto. rewrite decide_False in GNext; auto.
+          { apply OrdArith.lt_from_nat; auto. }
+          { intros F. eapply thread_active_and_not_false; eauto. }
+        * apply fair_sched_fun_ub.
+        * done.
+    - simpl in Stepk. destruct Stepk as [Turn | NoTurn].
+      + destruct Turn as [F Stepk]. done.
+      + destruct NoTurn as [_ <-]. simpl in Keepk. clear Keepk. simpl in *.
+        exists (witness_fulfilled). split_and !; auto.
+  Qed.
+
+  Lemma get_obls_thread_active s h n σ Θ TQ κs g v Ω W τf :
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
+    Θ = fst <$> TQ →
+    history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗
+    ([∗ map] i ↦ '(e, Q) ∈ TQ, match to_val e with
+                               | Some v => (lift_term i Q) v
+                               | None => lwp_fix s i ⊤ e (lift_term i Q)
+                               end)
+    ⊢ ⌜obls_thread_active Ω (n, τf)⌝.
+  Proof.
+    iIntros (HIST EQTQ) "(HI& MI& WPs)". iIntros (k o LUk). destruct o; last eauto.
+    unfold thread_active. simpl. iPoseProof (history_interp_lookup with "HI") as "%Hlu".
+    apply HIST in Hlu. destruct Hlu as (j& Now). rewrite Now.
+    iDestruct "MI" as "(MHI& S& T& A& W& %Inv)".
+    iPoseProof (othread_assigned_thread_elem with "[$S $T $A]") as "%Tin". 1: eapply LUk.
+    apply elem_of_dom in Tin. destruct Tin as (e&LUth).
+    rewrite EQTQ lookup_fmap_Some in LUth. destruct LUth as (?& EQe& LUth).
+    destruct x as (?&Q). simpl in EQe. subst e0.
+    iPoseProof (big_sepM_delete _ _ _ _ LUth with "WPs") as "[WP WPs]".
+    destruct (to_val e) eqn:TVe.
+    - iDestruct "WP" as "(#Term& HQ)". iPoseProof (othread_assigned_term_false with "[$S $T $A]") as "%"; eauto.
+      unfold_opreds. auto.
+    - iPureIntro. exists e. split; auto. subst. rewrite lookup_fmap LUth. done.
+  Qed.
+
+  Lemma lwp_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf γ Φ :
+    behavior (n, τf) →
+    beh_fscnt (n, τf) γ →
     v1 ≤ v2 →
     obls_le Ω1 Ω2 →
+    (* obls_thread_active Ω2 (n, τf) → *)
+    owit_inv_lb (fair_sched_fun γ) Ω2 W →
+    (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     Θ = fst <$> TQ →
     history_interp h n σ Θ κs ∗ model_interp g v2 Ω2 W n (dom Θ) ∗
-    ([∗ map] i ↦ '(e, Q) ∈ TQ, lwp_fix s i ⊤ e (lift_term i Q)) ∗
+    ([∗ map] i ↦ '(e, Q) ∈ TQ, match to_val e with
+                               | Some v => (lift_term i Q) v
+                               | None => lwp_fix s i ⊤ e (lift_term i Q)
+                               end) ∗
     tf_intuit n σ Θ κs v1 Ω1 Φ
     ⊢ ti_logic Ord.lt_well_founded Φ (n, τf).
-    (* ⊢ ti_logic wf_ltD Φ (n, τf). *)
   Proof.
-    revert h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf.
-    induction Φ; iIntros (h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf BEH FS HIST LEv LEO EQTQ) "(HI& MI& WPs& #TF)"; simpl.
+    revert h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ.
+    induction Φ; iIntros (h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "(HI& MI& WPs& #TF)"; simpl.
     - done.
     - unfold ti_atomic. iPoseProof (event_pred_history_interp_lookup with "[$HI $TF]") as "%". destruct H.
       simpl. apply HIST in H. destruct H. rewrite H. auto.
     - unfold ti_pure. done.
     - done.
     - unfold ti_and. iSplit.
-      + iDestruct "TF" as "[TF _]". iApply (IHΦ1 with "[$HI $MI $WPs $TF]"); auto.
-      + iDestruct "TF" as "[_ TF]". iApply (IHΦ2 with "[$HI $MI $WPs $TF]"); auto.
+      + iDestruct "TF" as "[TF _]". iApply (IHΦ1 with "[$HI $MI $WPs $TF]"); eauto.
+      + iDestruct "TF" as "[_ TF]". iApply (IHΦ2 with "[$HI $MI $WPs $TF]"); eauto.
     - unfold ti_or. iDestruct "TF" as "[TF | TF]".
-      + iLeft. iApply (IHΦ1 with "[$HI $MI $WPs $TF]"); auto.
-      + iRight. iApply (IHΦ2 with "[$HI $MI $WPs $TF]"); auto.
+      + iLeft. iApply (IHΦ1 with "[$HI $MI $WPs $TF]"); eauto.
+      + iRight. iApply (IHΦ2 with "[$HI $MI $WPs $TF]"); eauto.
     - unfold ti_impl. iIntros "HP". iPoseProof ("TF" with "HP") as "#TF'".
-      iApply (IHΦ with "[$HI $MI $WPs $TF']"); auto.
+      iApply (IHΦ with "[$HI $MI $WPs $TF']"); eauto.
     - unfold ti_forall. iIntros (?). iSpecialize ("TF" $! a).
-      iApply (H with "[$HI $MI $WPs $TF]"); auto.
+      iApply (H with "[$HI $MI $WPs $TF]"); eauto.
     - unfold ti_exist. iDestruct "TF" as "(%& TF)". iExists a.
-      iApply (H with "[$HI $MI $WPs $TF]"); auto.
+      iApply (H with "[$HI $MI $WPs $TF]"); eauto.
     - unfold ti_and. iDestruct "TF" as "[TF1 TF2]". iSplit.
-      + iApply (IHΦ1 with "[$HI $MI $WPs $TF1]"); auto.
-      + iApply (IHΦ2 with "[$HI $MI $WPs $TF2]"); auto.
+      + iApply (IHΦ1 with "[$HI $MI $WPs $TF1]"); eauto.
+      + iApply (IHΦ2 with "[$HI $MI $WPs $TF2]"); eauto.
     - done.
-    - clear dependent v1 Ω1. rename v2 into v, Ω2 into Ω.
+    - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
+      
+
+      TODO
+
+      clear dependent v1 Ω1. rename v2 into v, Ω2 into Ω.
       iRevert (h n σ Θ TQ κs g v Ω W BEH FS HIST EQTQ) "TF HI MI WPs".
       iLöb as "IH". iIntros (h n σ Θ TQ κs g v Ω W BEH FS HIST EQTQ) "#TF HI MI WPs".
       rewrite ti_always_unfold /ti_always_pre.

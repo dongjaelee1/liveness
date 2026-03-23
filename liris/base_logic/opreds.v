@@ -907,6 +907,10 @@ Section preds.
       iFrame "Ge". iFrame.
     Qed.
 
+    Lemma thP_term_obls_empty TP i :
+      othread TP ∗ thP_term i ⊢ othreadG_obls i ∅ 1 ∗ (othreadG_obls i ∅ 1 -∗ othread TP).
+    Proof. unfold_opreds. apply othread_term_open. Qed.
+
   End liveness_preds.
 
   Section fmupd.
@@ -936,7 +940,7 @@ Section preds.
       { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
       iDestruct "Go" as "[Go Go']". iDestruct "Oo" as "[Oo0 [Oo1 Oo']]".
       iPoseProof (oassigned_add_obl with "[$A $Ge Go' Oo']") as "A".
-      { iLeft. iFrame. }
+      { iLeft. iFrame. auto. }
       iDestruct "Gl0" as "[Gl0 Gl0']". iDestruct "Gl1" as "[Gl1 Gl1']".
       iCombine "Gl0 Gl1" as "Gl". iCombine "Gl0' Gl1'" as "Gl'".
       set (Ω2:=(<[k:=(obl_assigned (OC:=ord_obl_class) (measure ℓ μ) i)]> Ω1)).
@@ -1042,7 +1046,7 @@ Section preds.
       iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
       destruct LUO1l as (?&?&LUO1l). destruct LUO1o as (?&LUO1o).
       rewrite LUO1l in LUO1o. inv LUO1o. rename x1 into a.
-      iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1) | #Gu])".
+      iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1& _) | #Gu])".
       { apply elem_of_dom. eauto. }
       2:{ iExFalso. iPoseProof (oblG_assigned_fulfilled_false with "[$Gl $Gu]") as "%". done. }
       iPoseProof (oblG_owner_agree _ i i1 with "[$Go $Go1]") as "%". destruct H as [<- _].
@@ -1095,7 +1099,7 @@ Section preds.
       iPoseProof (big_sepS_delete _ _ _ LUGk with "OS1") as "[(_& Go& Oo) OS1]".
       iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
       destruct LUO1o as (?&LUO1o). rename x into a.
-      iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1) | #Gu])".
+      iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1& _) | #Gu])".
       { apply elem_of_dom. eauto. }
       2:{ iExFalso. iPoseProof (osat_lookup_fulfilled with "[$S $Ge $Gu]") as "%". rewrite H in LUO1o; done. }
       iPoseProof (oblG_owner_agree _ i0 i1 with "[$Go $Go1]") as "%". destruct H as [-> _].
@@ -1110,7 +1114,7 @@ Section preds.
       iMod (othread_alloc_obl with "[$S $O $Ob2 $Ge $Go]") as "(S& O& %NinkG2& Ob2& Oo& Go)".
       iDestruct "Go" as "[Go Go']". iDestruct "Oo" as "[Oo [Oo1 Oo']]".
       iPoseProof (oassigned_add_obl with "[$A $Ge Go' Oo']") as "A".
-      { iLeft. iFrame. }
+      { iLeft. iFrame. auto. }
       set (Ω2:=(<[k:=(obl_assigned a' i2)]> Ω1)).
       assert (Gstep' : obl_step (obl_assigned a i1) (obl_assigned a' i2)) by (by econstructor 1).
       iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
