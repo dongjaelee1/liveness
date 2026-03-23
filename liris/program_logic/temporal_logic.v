@@ -39,6 +39,7 @@ Fixpoint tf_logic `{SI : indexT} `{!lirisGS Λ Σ}
       (oblP_assigned k b (q/2)%Qp ∗
        oblP_inv N k (tf_logic P)%I (tf_logic Q)%I
          (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
+                                hG_event n' (σ', Θ', κs') ∗
                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I
   end
 with tf_intuit `{SI : indexT} `{!lirisGS Λ Σ}
@@ -63,6 +64,7 @@ with tf_intuit `{SI : indexT} `{!lirisGS Λ Σ}
            ((∃ f o, event_obl i (n, Ω) k (obl_assigned f o)) ∗
             oblP_inv N k (tf_logic P)%I (tf_logic Q)
               (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
+                                     hG_event n' (σ', Θ', κs') ∗
                                      tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)
        end.
 
@@ -72,6 +74,7 @@ Global Arguments tf_intuit {SI Λ Σ _}.
 Definition tf_fulfilled `{SI : indexT} `{!lirisGS Λ Σ}
   k (Q : tf) : iProp Σ :=
   (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
+                         hG_event n' (σ', Θ', κs') ∗
                          tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
 
 Section proof.
@@ -86,7 +89,7 @@ Section proof.
   Proof. rewrite /tf_fulfilled. apply _. Qed.
 
   Lemma tf_fulfilled_unfold k Q :
-    tf_fulfilled k Q = (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
+    tf_fulfilled k Q = (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ hG_event n' (σ', Θ', κs') ∗ tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
   Proof. done. Qed.
 
   Lemma tf_logic_tf_intuit Φ h n σ Θ κs m i Ω W :
@@ -364,6 +367,7 @@ Section proof.
     { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 2. eauto. }
     iPoseProof (model_history_interp_event_obl_now k with "HI") as "#Eo".
     { subst Ω2. apply lookup_insert_eq. }
+    iPoseProof (history_interp_hG_event_now with "SI") as "#HE".
     iModIntro. iExists Ω2. iSplitR.
     { iPureIntro. econstructor 2. econstructor 2. auto. }
     iIntros (? [WStep GWI2]) "!>".
@@ -378,7 +382,7 @@ Section proof.
     rewrite tf_fulfilled_unfold.
     iMod (oblG_inv_alloc_fulfilled _ N _ _ ⟦P⟧ₗ ⟦Q⟧ₗ with "[$Gu]") as "#GVar"; cycle 1.
     { iFrame "GVar". done. }
-    iFrame "Eo HQi".
+    iFrame "Eo HE HQi".
   Qed.
 
   (** TODO: Timeless version *)
@@ -438,6 +442,7 @@ Section proof.
     { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
     iPoseProof (model_history_interp_event_obl_now k with "HI") as "#Eo".
     { subst Ω2. apply lookup_insert_eq. }
+    iPoseProof (history_interp_hG_event_now with "SI") as "#HE".
     iModIntro. iExists Ω2. iSplitR.
     { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
     iIntros (? [WStep GWI2]).
@@ -451,7 +456,7 @@ Section proof.
     rewrite /model_interp. iFrame "HI S O W A".
     iApply fupd_intro. iSplitR; first eauto. iIntros "!>". iFrame "Oe Ge Gu Ox SI".
     iMod "close" as "_". iModIntro. iMod ("ACC" with "[]") as "_".
-    { iNext. iRight. iRight. rewrite tf_fulfilled_unfold. iFrame "Ge Gu Eo HQi". }
+    { iNext. iRight. iRight. rewrite tf_fulfilled_unfold. iFrame "Ge Gu Eo HE HQi". }
     iModIntro. iFrame.
   Qed.
 

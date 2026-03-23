@@ -179,6 +179,21 @@ Section hist.
     destruct H. iPoseProof (hG_event_history_lookup with "[$Ha $He]") as "%". eauto.
   Qed.
 
+  Lemma history_interp_hG_event_now h n σ Θ κs :
+    history_interp h n σ Θ κs ⊢ hG_event n (σ, Θ, κs).
+  Proof.
+    rewrite /history_interp -lock.
+    iIntros "(%& Ha& SI)". destruct H. rewrite last_lookup H in H0. simpl in H0.
+    iPoseProof (hG_history_event _ _ _ H0 with "Ha") as "#He". iFrame "He".
+  Qed.
+
+  Lemma history_interp_hG_event_lookup h n σ Θ κs m e :
+    history_interp h n σ Θ κs ∗ hG_event m e ⊢ ⌜h !! m = Some e⌝.
+  Proof.
+    rewrite /history_interp -lock.
+    iIntros "[(%& Ha& SI) #HE]". destruct H. iPoseProof (hG_event_history_lookup with "[$]") as "%". auto.
+  Qed.
+
 End hist.
 
 (* Allocation of a history interpretation. *)

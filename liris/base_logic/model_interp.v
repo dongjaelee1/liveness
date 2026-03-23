@@ -289,10 +289,16 @@ Section hist.
   Qed.
 
   Lemma event_obl_model_history_interp_lookup h i n Ω j e k o :
-    model_history_interp h i n Ω ∗ event_obl j e k o ⊢ ⌜ h !! j = Some e ∧ e.2 !! k = Some o ⌝.
+    model_history_interp h i n Ω ∗ event_obl j e k o
+    ⊢ ⌜ h !! j = Some e ∧ e.2 !! k = Some o ∧ (j ≤ i) ∧ (e.1 ≤ n) ∧ (obls_le e.2 Ω) ⌝.
   Proof.
     rewrite /model_history_interp -lock event_obl_unseal /event_obl_def. iIntros "((%& Ha)& (#He& %))".
-    destruct H. iPoseProof (mhG_event_history_lookup with "[$Ha $He]") as "%". eauto.
+    destruct H. iPoseProof (mhG_event_history_lookup with "[$Ha $He]") as "%".
+    iPoseProof (mhG_history_auth_wf with "Ha") as "%WF".
+    rewrite last_lookup H in H1. simpl in H1. assert (j < S i).
+    { rewrite -H. apply lookup_lt_is_Some. eauto. }
+    unshelve epose proof (model_history_wf_lookup_1 _ _ _ _ _ WF H2 H1 _). 1: lia.
+    destruct H4. simpl in *. iPureIntro. split_and !; eauto. lia.
   Qed.
 
   Lemma event_obl_compare i j e1 e2 k o1 o2 :
