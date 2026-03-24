@@ -1143,3 +1143,5 @@ Proof.
   1,2: eauto. 1: apply map_Forall2_empty.
   intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto.
 Qed.
+
+(* Print Assumptions lwp_adequacy. *)

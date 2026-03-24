@@ -1,11 +1,8 @@
-From Coq Require ClassicalFacts.
-From Coq Require FunctionalExtensionality.
-From Coq Require Logic.Epsilon.
-From Coq Require Logic.Classical_Pred_Type.
-From Coq Require Import Logic.ProofIrrelevance.
-From Coq Require Import Logic.ClassicalEpsilon.
-From Coq Require Import Logic.IndefiniteDescription.
-From Coq Require Import Logic.PropExtensionality.
+From Stdlib.Logic Require ClassicalFacts.
+From Stdlib.Logic Require Import ProofIrrelevance.
+From Stdlib.Logic Require Import PropExtensionality.
+From Stdlib.Logic Require Import ClassicalChoice.
+From Stdlib.Logic Require Import FunctionalExtensionality.
 
 Set Implicit Arguments.
 
@@ -22,12 +19,12 @@ Qed.
 Definition classic := Classical_Prop.classic.
 Definition inj_pair2 := Classical_Prop.EqdepTheory.inj_pair2.
 
-Definition epsilon_on := ChoiceFacts.EpsilonStatement_on.
-Definition epsilon := Epsilon.epsilon.
-Lemma epsilon_spec: forall (A : Type) (i : inhabited A) (P : A -> Prop), (exists x : A, P x) -> P (epsilon i P).
-Proof.
-  apply Epsilon.epsilon_spec.
-Qed.
+(* Definition epsilon_on := ChoiceFacts.EpsilonStatement_on. *)
+(* Definition epsilon := Epsilon.epsilon. *)
+(* Lemma epsilon_spec: forall (A : Type) (i : inhabited A) (P : A -> Prop), (exists x : A, P x) -> P (epsilon i P). *)
+(* Proof. *)
+(*   apply Epsilon.epsilon_spec. *)
+(* Qed. *)
 
 Lemma not_ex_all_not_help
       A (P: A -> Prop)
@@ -41,16 +38,16 @@ Qed.
 Ltac nean H := eapply not_ex_all_not_help in H; red in H.
 
 Definition proof_irrelevance := proof_irrelevance.
-Definition excluded_middle_informative := excluded_middle_informative.
+(* Definition excluded_middle_informative := excluded_middle_informative. *)
 Definition choice := choice.
 
-Lemma dependent_functional_choice (A : Type) (B : A -> Type) :
-  forall R : forall x : A, B x -> Prop,
-    (forall x : A, exists y : B x, R x y) ->
-    (exists f : (forall x : A, B x), forall x : A, R x (f x)).
-Proof.
-  eapply ChoiceFacts.non_dep_dep_functional_choice.
-  clear. exact functional_choice.
-Qed.
+(* Lemma dependent_functional_choice (A : Type) (B : A -> Type) : *)
+(*   forall R : forall x : A, B x -> Prop, *)
+(*     (forall x : A, exists y : B x, R x y) -> *)
+(*     (exists f : (forall x : A, B x), forall x : A, R x (f x)). *)
+(* Proof. *)
+(*   eapply ChoiceFacts.non_dep_dep_functional_choice. *)
+(*   clear. exact functional_choice. *)
+(* Qed. *)
 
 Definition propositional_extensionality := propositional_extensionality.
