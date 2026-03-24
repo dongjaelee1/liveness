@@ -34,6 +34,15 @@ Definition invΣ `{SI : indexT} : gFunctors :=
 Global Instance subG_invΣ `{SI : indexT} {Σ} : subG invΣ Σ → invGpreS Σ.
 Proof. solve_inG. Qed.
 
+(* Allocation of invGS. *)
+Lemma invGS_alloc `{SI : indexT} `{!invGpreS Σ} :
+  ⊢ |==> ∃ _ : invGS Σ, (∃ x : Ord.t, rupd_pred x) ∗ wsat ∗ ownE ⊤.
+Proof.
+  iIntros. iMod (wsat_alloc) as "(%& W& O)".
+  iMod (auth_rupd_alloc OrdUR Ord.O) as "(%& R& _)".
+  iExists (InvG _ _ H H0). iFrame. done.
+Qed.
+
 Local Definition uPred_fupd_def `{SI : indexT} `{!invGS Σ} (E1 E2 : coPset) (P : iProp Σ) : iProp Σ :=
   (wsat ∗ ownE E1 -∗ |==>r ◇ (wsat ∗ ownE E2 ∗ P))%I.
 Local Definition uPred_fupd_aux : seal (@uPred_fupd_def). Proof. by eexists. Qed.

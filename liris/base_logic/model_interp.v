@@ -315,7 +315,7 @@ Section hist.
 End hist.
 
 (* Allocation of a history interpretation. *)
-Lemma model_history_interp_init `{SI : indexT} `{OC : obl_class} `{HIST : !mhistGS Σ} n Ω :
+Lemma model_history_interp_init `{SI : indexT} `{OC : obl_class} `{!mhistGpreS Σ} n Ω :
   ⊢ |==> ∃ _ : mhistGS Σ, model_history_interp [(n, Ω)] 0 n Ω.
 Proof.
   iMod (own_alloc (●ML ([(n, Ω)]) : mono_listUR (prod nat obls))) as (γH) "HH";

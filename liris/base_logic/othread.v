@@ -770,7 +770,7 @@ End othread.
 
 (* Allocation of initial invariant. *)
 Lemma othread_alloc `{SI : indexT} {Σ}
-  `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ} :
+  `{!@osatGS.osatGS _ Σ} `{!othreadGpreS Σ} :
   ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ oassigned ∅.
 Proof.
   iIntros.

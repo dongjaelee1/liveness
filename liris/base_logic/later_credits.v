@@ -456,19 +456,15 @@ Proof.
   - rewrite -{2}Heq; eapply auth_rupd_next_step.
 Qed.
 
-
-(* (* global resource lemma *) *)
-(* Lemma auth_rupd_global `{SI : indexT} {Σ : gFunctors} M `{!auth_rupd M} `{!auth_rupd_GpreS Σ M} k : *)
-(*   ∀ P, global P → ∃ _: auth_rupdGS Σ M, global (P ∗ (●£ k ∗ £ k)). *)
-(* Proof. *)
-(*   intros P HP. *)
-(*   eapply (global_fresh_res (● k ⋅ ◯ k)) in HP as [γ HP]; *)
-(*     last apply auth_both_valid_2; eauto using auth_valid_trivial. *)
-(*   exists (Auth_rupdG _ _ _ _ γ). *)
-(*   eapply global_mono, HP. *)
-(*   by iIntros "($ & $ & $)". *)
-(* Qed. *)
-
+(* Initial allocation *)
+Lemma auth_rupd_alloc `{SI : indexT} {Σ : gFunctors} M `{!auth_rupd M} `{!auth_rupd_GpreS Σ M} k :
+  ⊢ |==> ∃ _ : auth_rupdGS Σ M, (●£ k ∗ £ k).
+Proof.
+  iIntros.
+  iMod (own_alloc ((● k ⋅ ◯ k) : authR M)) as (γA) "HA".
+  { apply auth_both_valid_2; eauto using auth_valid_trivial. }
+  iExists (Auth_rupdG _ Σ M _ γA). iDestruct "HA" as "($& $)". done.
+Qed.
 
 (** ** Transfinite Later Credits *)
 (** We now instantiate the generic definition from above with ordinals to *)

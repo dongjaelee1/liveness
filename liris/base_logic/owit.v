@@ -560,7 +560,7 @@ End owit.
 
 (* Allocation of the initial witness protocol. *)
 Lemma owit_alloc `{SI : indexT} {Σ}
-  `{!@osatGS.osatGS _ Σ} `{!owitGS Σ} :
+  `{!@osatGS.osatGS _ Σ} `{!owitGpreS Σ} :
   ⊢ |==> ∃ _ : owitGS Σ, owit ∅.
 Proof.
   iIntros.

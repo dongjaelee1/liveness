@@ -911,6 +911,14 @@ Section preds.
       othread TP ∗ thP_term i ⊢ othreadG_obls i ∅ 1 ∗ (othreadG_obls i ∅ 1 -∗ othread TP).
     Proof. unfold_opreds. apply othread_term_open. Qed.
 
+    Lemma thP_obls_alloc_threads Θ TP :
+      Θ ## TP →
+      othread TP ⊢ |==> othread (TP ∪ Θ) ∗ [∗ set] i ∈ Θ, thP_obls i ∅ 1.
+    Proof.
+      iIntros (Disj) "T". iMod (othread_alloc_threads with "T") as "[$ Ts]". 1: auto.
+      unfold_opreds. iModIntro. iApply (big_sepS_impl with "Ts"). iIntros "!> %% ($& $& $)". done.
+    Qed.
+
   End liveness_preds.
 
   Section fmupd.

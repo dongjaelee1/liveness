@@ -17,9 +17,7 @@ Section aux.
 
 End aux.
 
-Fixpoint tf_logic `{SI : indexT} `{!lirisGS Λ Σ}
-  (* `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
-  (* `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
+Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ}
   (Φ : @tf SI Σ (state_pred Λ)) : iProp Σ :=
   match Φ with
   | tf_emp => emp%I
@@ -42,7 +40,7 @@ Fixpoint tf_logic `{SI : indexT} `{!lirisGS Λ Σ}
                                 hG_event n' (σ', Θ', κs') ∗
                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I
   end
-with tf_intuit `{SI : indexT} `{!lirisGS Λ Σ}
+with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ}
        (* `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
        (* `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
        n σ Θ κs i Ω (Φ : @tf SI Σ (state_pred Λ)) : iProp Σ :=
@@ -71,14 +69,14 @@ with tf_intuit `{SI : indexT} `{!lirisGS Λ Σ}
 Global Arguments tf_logic {SI Λ Σ _}.
 Global Arguments tf_intuit {SI Λ Σ _}.
 
-Definition tf_fulfilled `{SI : indexT} `{!lirisGS Λ Σ}
+Definition tf_fulfilled `{SI : indexT} `{!temporalGS Λ Σ}
   k (Q : tf) : iProp Σ :=
   (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
                          hG_event n' (σ', Θ', κs') ∗
                          tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
 
 Section proof.
-  Context `{SI : indexT} `{!lirisGS Λ Σ}.
+  Context `{SI : indexT} `{!temporalGS Λ Σ}.
 
   Global Instance tf_intuit_persistent n σ Θ κs i Ω Φ : Persistent (tf_intuit n σ Θ κs i Ω Φ).
   Proof.
@@ -126,7 +124,7 @@ End proof.
 Notation "'⟦' Φ '⟧ₗ'" := (tf_logic Φ%F) (format "'⟦' Φ '⟧ₗ'").
 
 Section reduction.
-  Context `{SI : indexT} `{!lirisGS Λ Σ}.
+  Context `{SI : indexT} `{!temporalGS Λ Σ}.
 
   Lemma tf_emp_logic :
     ⟦tf_emp⟧ₗ = emp%I.
@@ -191,28 +189,28 @@ Ltac tf_red :=
 Global Opaque tf_logic tf_intuit tf_fulfilled.
 
 (** Ofe and Monoid structure. *)
-Global Instance tf_equiv `{SI : indexT} `{!lirisGS Λ Σ} : Equiv tf :=
+Global Instance tf_equiv `{SI : indexT} `{!temporalGS Λ Σ} : Equiv tf :=
   λ Φ1 Φ2, ⟦Φ1⟧ₗ ≡ ⟦Φ2⟧ₗ.
-Global Instance tf_equiv_Equivalence `{SI : indexT} `{!lirisGS Λ Σ} : Equivalence tf_equiv.
+Global Instance tf_equiv_Equivalence `{SI : indexT} `{!temporalGS Λ Σ} : Equivalence tf_equiv.
 Proof.
   unfold tf_equiv. econstructor.
   - repeat intro. done.
   - repeat intro. rewrite H. done.
   - repeat intro. etrans; eauto.
 Qed.
-Canonical Structure tfO `{SI : indexT} `{!lirisGS Λ Σ} : ofe :=
+Canonical Structure tfO `{SI : indexT} `{!temporalGS Λ Σ} : ofe :=
   (Ofe tf (discrete_ofe_mixin tf_equiv_Equivalence)).
 
-Class tf_op_interp_comm `{SI : indexT} `{!lirisGS Λ Σ}
+Class tf_op_interp_comm `{SI : indexT} `{!temporalGS Λ Σ}
   (tf_o : tf → tf → tf) (iProp_o : iProp Σ → iProp Σ → iProp Σ) :=
   tf_op_interp_comm_intro : ∀ (P Q : tf), ⟦tf_o P Q⟧ₗ = (iProp_o ⟦P⟧ₗ ⟦Q⟧ₗ)%I.
 
-Class tf_monoid_unit_interp_eq `{SI : indexT} `{!lirisGS Λ Σ}
+Class tf_monoid_unit_interp_eq `{SI : indexT} `{!temporalGS Λ Σ}
   (tf_o : tf → tf → tf) `{!Monoid tf_o} (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o} :=
   tf_monoid_unit_interp_eq_intro : ⟦ monoid_unit ⟧ₗ = monoid_unit.
 
 Section instances.
-  Context `{SI : indexT} `{!lirisGS Λ Σ}.
+  Context `{SI : indexT} `{!temporalGS Λ Σ}.
 
   Global Instance tf_and_interp_comm : tf_op_interp_comm tf_and bi_and.
   Proof. econstructor. Qed.
@@ -249,7 +247,7 @@ Section instances.
 End instances.
 
 Section big_op.
-  Context `{SI : indexT} `{!lirisGS Λ Σ}.
+  Context `{SI : indexT} `{!temporalGS Λ Σ}.
 
   Lemma tf_big_opL_interp
     (tf_o : tf → tf → tf) `{!Monoid tf_o}
@@ -307,7 +305,7 @@ Section big_op.
 End big_op.
 
 Section proof.
-  Context `{SI : indexT} `{!lirisGS Λ Σ}.
+  Context `{SI : indexT} `{!temporalGS Λ Σ}.
 
   (** Always *)
   Global Instance tf_always_persistent N P : Persistent (⟦tf_always N P⟧ₗ).
@@ -475,7 +473,7 @@ End proof.
 (* Global Instance ordSI : indexT := ordI. *)
 
 (* Section test. *)
-(*   Context `{!lirisGS Λ Σ}. *)
+(*   Context `{!temporalGS Λ Σ}. *)
 (*   (* Context `{SIC : !state_interp_class Λ Σ Π} `{OCM : !ord_mono_fun_class}. *) *)
 (*   (* Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}. *) *)
 

@@ -153,40 +153,38 @@ Definition ti_exist `{SI : indexT} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ 
 
 (** 'Always' is a co-inductive fixpoint. *)
 (* We need to use ∧ here for the proof. *)
-Definition ti_always_pre `{SI : indexT} `{!lirisGS Λ Σ} E
+Definition ti_always_pre `{SI : indexT} `{!temporalGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
   λ P τ, (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∧ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ))))%I.
 
-Local Instance ti_always_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E : Contractive (ti_always_pre E).
+Local Instance ti_always_pre_contractive `{SI : indexT} `{!temporalGS Λ Σ} E : Contractive (ti_always_pre E).
 Proof.
   rewrite /ti_always_pre. repeat intro. do 5 (f_equiv).
   f_contractive. do 2 (f_equiv).
 Qed.
 
-Local Definition ti_always_def `{SI : indexT} `{!lirisGS Λ Σ} : tiProp Λ Σ → tiProp Λ Σ :=
+Local Definition ti_always_def `{SI : indexT} `{!temporalGS Λ Σ} : tiProp Λ Σ → tiProp Λ Σ :=
   fixpoint (ti_always_pre ⊤).
 Local Definition ti_always_aux : seal (@ti_always_def). Proof. by eexists. Qed.
 Definition ti_always := ti_always_aux.(unseal).
 Global Arguments ti_always {SI Λ Σ _}.
-Local Lemma ti_always_unseal `{SI : indexT} `{!lirisGS Λ Σ} : ti_always = @ti_always_def SI Λ Σ _.
+Local Lemma ti_always_unseal `{SI : indexT} `{!temporalGS Λ Σ} : ti_always = @ti_always_def SI Λ Σ _.
 Proof. rewrite -ti_always_aux.(seal_eq) //. Qed.
 
-Lemma ti_always_unfold `{SI : indexT} `{!lirisGS Λ Σ} (P : tiProp Λ Σ) (τ : trace Λ) :
+Lemma ti_always_unfold `{SI : indexT} `{!temporalGS Λ Σ} (P : tiProp Λ Σ) (τ : trace Λ) :
   ti_always P τ ⊣⊢ ti_always_pre ⊤ (ti_always) P τ.
 Proof. rewrite ti_always_unseal. apply (fixpoint_unfold (ti_always_pre ⊤)). Qed.
 
 (** 'Until' is an inductive fixpoint, decreasing argument of Type A. *)
-Definition ti_until_pre `{SI : indexT} `{!lirisGS Λ Σ} E
+Definition ti_until_pre `{SI : indexT} `{!temporalGS Λ Σ} E
   {A : Type} (ltA : A → A → Prop)
   (ti_until : A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
   λ a P Q τ,
     (|={E,∅}=> ▷ |={∅,E}=> ((Q τ) ∨ ((P τ) ∧ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∧ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I.
-    (* ((|={E,∅}=> ▷ |={∅,E}=> (Q τ)) ∨ *)
-    (*    (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∧ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∧ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I. *)
 
-Local Instance ti_until_pre_contractive `{SI : indexT} `{!lirisGS Λ Σ} E
+Local Instance ti_until_pre_contractive `{SI : indexT} `{!temporalGS Λ Σ} E
   {A : Type} {ltA : A → A → Prop}
   : Contractive (ti_until_pre E ltA).
 Proof.
@@ -197,26 +195,26 @@ Proof.
   1,2: reflexivity.
 Qed.
 
-Local Definition ti_until_def `{SI : indexT} `{!lirisGS Λ Σ}
+Local Definition ti_until_def `{SI : indexT} `{!temporalGS Λ Σ}
   {A : Type} (ltA : A → A → Prop)
   : A → tiProp Λ Σ → tiProp Λ Σ → tiProp Λ Σ :=
   fixpoint (ti_until_pre ⊤ ltA).
 Local Definition ti_until_aux : seal (@ti_until_def). Proof. by eexists. Qed.
 Definition ti_until := ti_until_aux.(unseal).
 Global Arguments ti_until {SI Λ Σ _ _}.
-Local Lemma ti_until_unseal `{SI : indexT} `{!lirisGS Λ Σ}
+Local Lemma ti_until_unseal `{SI : indexT} `{!temporalGS Λ Σ}
   {A : Type} {ltA : A → A → Prop} :
   @ti_until SI Λ Σ _ _ ltA = @ti_until_def SI Λ Σ _ _ ltA.
 Proof. rewrite -ti_until_aux.(seal_eq) //. Qed.
 
-Lemma ti_until_unfold `{SI : indexT} `{!lirisGS Λ Σ}
+Lemma ti_until_unfold `{SI : indexT} `{!temporalGS Λ Σ}
   {A : Type} {ltA : A → A → Prop}
   (a : A) (P Q : tiProp Λ Σ) (τ : trace Λ) :
   ti_until ltA a P Q τ ⊣⊢ ti_until_pre ⊤ ltA (ti_until ltA) a P Q τ.
 Proof. rewrite ti_until_unseal. apply (fixpoint_unfold (ti_until_pre ⊤ ltA)). Qed.
 
 (** Intermediate interpretation. *)
-Fixpoint ti_logic `{SI : indexT} `{!lirisGS Λ Σ}
+Fixpoint ti_logic `{SI : indexT} `{!temporalGS Λ Σ}
   {A : Type} (ltA : A → A → Prop)
   (Φ : @tf SI Σ (state_pred Λ)) : tiProp Λ Σ :=
   match Φ with
@@ -326,7 +324,7 @@ Qed.
 
 
 Section proof1.
-  Context `{!lirisGS Λ Σ}.
+  Context `{!temporalGS Λ Σ}.
   Context {A : Type} {ltA : A → A → Prop}.
   Implicit Type F : iProp Σ.
 
@@ -573,12 +571,11 @@ Section proof2.
     rewrite decide_False in H2; first lia. intros F. eapply thread_active_and_not_false; eauto.
   Qed.
 
-  Lemma lwp_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf γ Φ :
+  Lemma lwp_fix_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf γ Φ :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
     v1 ≤ v2 →
     obls_le Ω1 Ω2 →
-    (* obls_thread_active Ω2 (n, τf) → *)
     owit_inv_lb (fair_sched_fun γ) Ω2 W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     Θ = fst <$> TQ →
@@ -1044,5 +1041,105 @@ Section proof2.
         iFrame.
   Qed.
 
+  Lemma lwp_ti_logic s h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ Φ :
+    behavior (n, τf) →
+    beh_fscnt (n, τf) γ →
+    owit_inv_lb (fair_sched_fun γ) Ω W →
+    (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
+    ⊢ history_interp h n σ Θ κs -∗
+    model_interp g v Ω W n (dom Θ) -∗
+    (⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }}) -∗
+    (|={⊤}=>m ⟦Φ⟧ₗ) ={⊤}=∗
+    ti_logic Ord.lt Φ (n, τf).
+  Proof.
+    iIntros (BEH FS LB HIST) "HI MI WPs P".
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "P HI MI") as "(P& HI& %&%&%&%& %& MI)".
+    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    1: auto.
+    destruct H as [LEO1 LB1].
+    iPoseProof (tf_logic_tf_intuit with "[$HI $MI $P]") as "#TF".
+    iPoseProof ("WPs" with "P") as "WPs". iPoseProof (big_sepM2_alt with "WPs") as "[%Dom WPs]".
+    remember (map_zip Θ Ψs) as TQ. assert (EQTQ : Θ = fst <$> TQ).
+    { subst. rewrite fst_map_zip; auto. intro k. rewrite -!elem_of_dom Dom. auto. }
+    iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
+               lwpupd i ⊤ e (match to_val e with
+                             | Some v => (lift_term i Q) v
+                             | None => lwp_fix s i ⊤ e (lift_term i Q)
+                             end))%I with "[WPs]" as "WPs".
+    { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
+      rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
+      simpl. destruct (to_val e) eqn:He.
+      - rewrite lwpupd_trans. iFrame.
+      - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
+    iMod (all_interp_lwpupd_steps_gmap γ with "WPs HI MI") as "(WPs& HI& %&%&%&%& %& MI)".
+    { subst Θ. done. }
+    { auto. }
+    destruct H as [LEO2 LB2].
+    iPoseProof (lwp_fix_ti_logic with "[$HI $MI $WPs $TF]") as "$".
+    1,2: eauto. 1: lia. all: eauto.
+  Qed.
+
   Local Opaque tf_intuit.
 End proof2.
+
+Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
+  `{!state_interp_class Λ Σ}
+  `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
+  s σ Θ i κs (Φ : tf) :
+  ∀ (τ : trace Λ), behavior τ →
+                   fair_scheduling τ →
+                   (τ.1 = 0) →
+                   (τ.2 0 = (Θ, σ, i, κs)) →
+                   (∀ `{Htemporal : !temporalGS Λ Σ},
+                      ⊢ |={⊤}=> ∃ (fork_post : thread_id → val Λ → iProp Σ)
+                                 (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
+                      let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
+                      state_interp σ Θ κs ∗
+                      (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+                       ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }}) ∗
+                      (|={⊤}=>m ⟦Φ⟧ₗ)) →
+                   tf_trace Φ τ.
+Proof.
+  intros τ BEH FS INIT1 INIT2 Hwp.
+  assert (iProp_sat
+            (|==> ∃ (Hmupd : mupdGS Σ) (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))),
+                let _ : temporalGS Λ Σ := TemporalG Hmupd state_interp_class0 Hhist in
+                (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
+                wsat.wsat ∗ wsat.ownE ⊤ ∗
+                |={⊤}=> ti_logic Ord.lt Φ τ)); cycle 1.
+  { apply sat_bupd, sat_exists in H0. destruct H0 as (Hmupd& ?). apply sat_exists in H0. destruct H0 as (Hhist& ?).
+    set (Htemp := TemporalG Hmupd state_interp_class0 Hhist : temporalGS Λ Σ).
+    apply (ti_logic_tf_trace Ord.lt_well_founded emp). apply (sat_fupd ⊤).
+    unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
+    eapply sat_mono. 2: eapply H0. simpl. iIntros "($& $& $& $)". }
+  assert (Hwp' : ⊢ ∀ Htemporal : temporalGS Λ Σ,
+            |={⊤}=> ∃ (fork_post : thread_id → val Λ → iProp Σ)
+                     (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
+            let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
+            state_interp σ Θ κs ∗
+            (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+             ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }}) ∗
+            (|={⊤}=>m ⟦Φ⟧ₗ)).
+  { iIntros (Htemp). iApply (Hwp Htemp). }
+  eapply sat_wand; cycle 1.
+  { eapply Hwp'. }
+  apply (sat_mono True); cycle 1.
+  { apply iProp_sat_intro. }
+  iIntros "_ H".
+  iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& MI)".
+  iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
+  iExists Hmupd, Hhist. iFrame "R W WOE".
+  set (Htemp := TemporalG Hmupd state_interp_class0 Hhist : temporalGS Λ Σ).
+  iModIntro. iMod ("H" $! Htemp) as "(%fork_post& %Ψs& SI& WPs& HP)".
+  iMod ("HI" with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& MI)".
+  iMod (thP_obls_alloc_threads (dom Θ) with "T") as "[T Ths]".
+  { set_solver. }
+  iPoseProof ("WPs" with "Ths") as "WPs". rewrite union_empty_l_L.
+  destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
+  apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
+  set (Hliris := LirisG Htemp fork_post : lirisGS Λ Σ).
+  (* FIXME: just HI not working. *)
+  iApply (lwp_ti_logic with "[$HI] [$MHI $S $T $MI] WPs HP").
+  1,2: eauto. 1: apply map_Forall2_empty.
+  intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto.
+Qed.

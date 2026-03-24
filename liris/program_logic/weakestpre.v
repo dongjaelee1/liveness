@@ -39,17 +39,23 @@ Section curry5.
   Proof. intros. apply uncurry5_proper. Qed.
 End curry5.
 
-Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
-  LirisG {
+Class temporalGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
+  TemporalG {
       (** Obligation model protocol, including invariants. *)
-      #[global] liris_mupdGS :: mupdGS Σ;
+      #[global] temporal_mupdGS :: mupdGS Σ;
 
       (** The state (and history) interpretation is an invariant that should hold in
           between each step of reduction.
           Here [state] is the global state, [thread_ids] is the allocated thread ids,
           and [list (observation Λ)] are the remaining observations. *)
-      #[global] liris_state_interp_class :: state_interp_class Λ Σ;
-      #[global] liris_histGS :: histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ));
+      #[global] temporal_state_interp_class :: state_interp_class Λ Σ;
+      #[global] temporal_histGS :: histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ));
+    }.
+
+Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
+  LirisG {
+      (** Ghost states for temporal properties. *)
+      #[global] liris_temporalGS :: temporalGS Λ Σ;
 
       (** A fixed postcondition for any forked-off thread. For most languages, e.g.
           heap_lang, this will simply be [True]. However, it is useful if one wants to
@@ -57,7 +63,9 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
       fork_post : thread_id → val Λ → iProp Σ;
     }.
 
-Global Opaque liris_mupdGS liris_histGS.
+Global Opaque temporal_mupdGS temporal_histGS.
+Global Arguments TemporalG {SI Λ Σ}.
+Global Opaque liris_temporalGS.
 Global Arguments LirisG {SI Λ Σ}.
 
 Definition lwpupd `{SI : indexT} `{!lirisGS Λ Σ}
