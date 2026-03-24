@@ -50,7 +50,8 @@ Definition obl_keep `{OC : obl_class} : obl → obl → Prop :=
 Definition obl_le `{OC : obl_class} : obl → obl → Prop :=
   λ g1 g2,
     match g1, g2 with
-    | (obl_assigned _ _), _ => True
+    | (obl_assigned f1 o1), (obl_assigned f2 o2) => (f2 w≤ f1 ∧ o1 = o2) ∨ (f2 w< f1)
+    | (obl_assigned _ _), obl_fulfilled => True
     | (obl_fulfilled), (obl_fulfilled) => True
     | _, _ => False
     end.
@@ -240,9 +241,17 @@ Section proofs.
 
   (** Le. *)
   Global Instance obl_le_reflexive : Reflexive obl_le.
-  Proof using. repeat intro. destruct x; done. Qed.
+  Proof using.
+    repeat intro. destruct x; try done. left. done.
+  Qed.
   Global Instance obl_le_transitive : Transitive obl_le.
-  Proof using. repeat intro. destruct x, y, z; done. Qed.
+  Proof using.
+    repeat intro. destruct x, y, z; try done. destruct H, H0.
+    - destruct H, H0. subst. left. split; auto. etrans; eauto.
+    - destruct H. subst. right. eapply WFOCM.lt_le_lt; eauto.
+    - destruct H0. subst. right. eapply WFOCM.le_lt_lt; eauto.
+    - right. etrans; eauto.
+  Qed.
   Global Instance obl_le_antisymmetric : Antisymmetric _ obl_keep obl_le.
   Proof using. repeat intro. destruct x, y, H, H0; auto; econstructor. Qed.
 
@@ -268,7 +277,7 @@ Section proofs.
 
   Lemma obl_step_le o1 o2 :
     obl_step o1 o2 → obl_le o1 o2.
-  Proof using. intros. inv H; inv H0; econstructor. Qed.
+  Proof using. intros. inv H; inv H0. 2: econstructor. right. auto. Qed.
 
   Lemma obls_step_rc_obls_le Ω1 Ω2 : Ω1 ↪∘ Ω2 → obls_le Ω1 Ω2.
   Proof using.
@@ -289,7 +298,12 @@ Section proofs.
   Lemma obls_cond_progress_obls_le Ω1 Ω2 C : Ω1 ↪ₚ Ω2 | C → obls_le Ω1 Ω2.
   Proof using.
     intros. destruct H. pose proof (obls_cond_rel_dom _ _ _ _ H). split; first set_solver.
-    intros. specialize (H0 k). rewrite H2 H3 in H0. inv H0. destruct o1, o2; done.
+    intros. specialize (H0 k). rewrite H2 H3 in H0. inv H0. destruct o1, o2; try done.
+    specialize (H k). rewrite H2 H3 in H. inv H. destruct H5.
+    - destruct H. inv H0.
+      + inv H4. right. auto.
+      + inv H4.
+    - destruct H. inv H0. done.
   Qed.
 
 End proofs.
