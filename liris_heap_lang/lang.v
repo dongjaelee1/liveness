@@ -1,6 +1,6 @@
 From stdpp Require Export binders strings.
 From stdpp Require Import gmap.
-From iris.algebra Require Export ofe.
+From iris.algebra Require Export ofe dfrac.
 From liris.program_logic Require Export language ectx_language ectxi_language.
 From liris.heap_lang Require Export locations.
 From iris.prelude Require Import options.
@@ -117,8 +117,6 @@ Inductive expr :=
   | FAA (e1 : expr) (e2 : expr) (* Fetch-and-add *)
   (* Concurrency *)
   | Fork (e : expr)
-  (* Termination *)
-  | Exit (e : expr)
   (* Prophecy *)
   | NewProph
   | Resolve (e0 : expr) (e1 : expr) (e2 : expr) (* wrapped expr, proph, val *)
@@ -201,15 +199,29 @@ Definition vals_compare_safe (vl v1 : val) : Prop :=
 Global Arguments vals_compare_safe !_ !_ /.
 
 (** The state:
-    thread_map of [option val]s, with [None] representing executing thread_map,
-    [Some v] representing thread_map that terminated with val [v].
     heaps of [option val]s, with [None] representing deallocated locations.
  *)
 Record state : Type := {
-  thread_map: gmap thread_id (option val);
   heap: gmap loc (option val);
   used_proph_id: gset proph_id;
-}.
+  }.
+
+(** State predicates. *)
+Variant state_pred : Type :=
+  | pred_pointsto (l : loc) (dq : dfrac) (v : val)
+  | pred_inv_pointsto (l : loc) (v : option val) (I : val → Prop)
+  | pred_thread (i : thread_id) (e : expr).
+
+Definition state_sat : state → gmap thread_id expr → state_pred → Prop :=
+  λ σ Θ π, match π with
+           | pred_pointsto l dq v =>
+               (heap σ) !! l = Some (Some v)
+           | pred_inv_pointsto l v P =>
+               (heap σ) !! l = Some v ∧
+               match v with | Some v' => P v' | None => True end
+           | pred_thread i e =>
+               Θ !! i = Some e
+           end.
 
 (** Equality and other typeclass stuff *)
 Lemma to_of_val v : to_val (of_val v) = Some v.
@@ -264,7 +276,6 @@ Proof.
      | FAA e1 e2, FAA e1' e2' =>
         cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
      | Fork e, Fork e' => cast_if (decide (e = e'))
-     | Exit e, Exit e' => cast_if (decide (e = e'))
      | NewProph, NewProph => left _
      | Resolve e0 e1 e2, Resolve e0' e1' e2' =>
         cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
@@ -340,16 +351,15 @@ Proof.
      | InjR e => GenNode 10 [go e]
      | Case e0 e1 e2 => GenNode 11 [go e0; go e1; go e2]
      | Fork e => GenNode 12 [go e]
-     | Exit e => GenNode 13 [go e]
-     | AllocN e1 e2 => GenNode 14 [go e1; go e2]
-     | Free e => GenNode 15 [go e]
-     | Load e => GenNode 16 [go e]
-     | Store e1 e2 => GenNode 17 [go e1; go e2]
-     | CmpXchg e0 e1 e2 => GenNode 18 [go e0; go e1; go e2]
-     | Xchg e0 e1 => GenNode 19 [go e0; go e1]
-     | FAA e1 e2 => GenNode 20 [go e1; go e2]
-     | NewProph => GenNode 21 []
-     | Resolve e0 e1 e2 => GenNode 22 [go e0; go e1; go e2]
+     | AllocN e1 e2 => GenNode 13 [go e1; go e2]
+     | Free e => GenNode 14 [go e]
+     | Load e => GenNode 15 [go e]
+     | Store e1 e2 => GenNode 16 [go e1; go e2]
+     | CmpXchg e0 e1 e2 => GenNode 17 [go e0; go e1; go e2]
+     | Xchg e0 e1 => GenNode 18 [go e0; go e1]
+     | FAA e1 e2 => GenNode 19 [go e1; go e2]
+     | NewProph => GenNode 20 []
+     | Resolve e0 e1 e2 => GenNode 21 [go e0; go e1; go e2]
      end
    with gov v :=
      match v with
@@ -378,16 +388,15 @@ Proof.
      | GenNode 10 [e] => InjR (go e)
      | GenNode 11 [e0; e1; e2] => Case (go e0) (go e1) (go e2)
      | GenNode 12 [e] => Fork (go e)
-     | GenNode 13 [e] => Exit (go e)
-     | GenNode 14 [e1; e2] => AllocN (go e1) (go e2)
-     | GenNode 15 [e] => Free (go e)
-     | GenNode 16 [e] => Load (go e)
-     | GenNode 17 [e1; e2] => Store (go e1) (go e2)
-     | GenNode 18 [e0; e1; e2] => CmpXchg (go e0) (go e1) (go e2)
-     | GenNode 19 [e0; e1] => Xchg (go e0) (go e1)
-     | GenNode 20 [e1; e2] => FAA (go e1) (go e2)
-     | GenNode 21 [] => NewProph
-     | GenNode 22 [e0; e1; e2] => Resolve (go e0) (go e1) (go e2)
+     | GenNode 13 [e1; e2] => AllocN (go e1) (go e2)
+     | GenNode 14 [e] => Free (go e)
+     | GenNode 15 [e] => Load (go e)
+     | GenNode 16 [e1; e2] => Store (go e1) (go e2)
+     | GenNode 17 [e0; e1; e2] => CmpXchg (go e0) (go e1) (go e2)
+     | GenNode 18 [e0; e1] => Xchg (go e0) (go e1)
+     | GenNode 19 [e1; e2] => FAA (go e1) (go e2)
+     | GenNode 20 [] => NewProph
+     | GenNode 21 [e0; e1; e2] => Resolve (go e0) (go e1) (go e2)
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -402,7 +411,7 @@ Proof.
    for go).
  refine (inj_countable' enc dec _).
  refine (fix go (e : expr) {struct e} := _ with gov (v : val) {struct v} := _ for go).
- - destruct e as [v| | | | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
+ - destruct e as [v| | | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
      [exact (gov v)|done..].
  - destruct v; by f_equal.
 Qed.
@@ -410,7 +419,7 @@ Global Instance val_countable : Countable val.
 Proof. refine (inj_countable of_val to_val _); auto using to_of_val. Qed.
 
 Global Instance state_inhabited : Inhabited state :=
-  populate {| thread_map := inhabitant; heap := inhabitant; used_proph_id := inhabitant |}.
+  populate {| heap := inhabitant; used_proph_id := inhabitant |}.
 Global Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
 Global Instance expr_inhabited : Inhabited expr := populate (Val inhabitant).
 
@@ -521,7 +530,6 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | CmpXchg e0 e1 e2 => CmpXchg (subst x v e0) (subst x v e1) (subst x v e2)
   | FAA e1 e2 => FAA (subst x v e1) (subst x v e2)
   | Fork e => Fork (subst x v e)
-  | Exit e => Exit (subst x v e)
   | NewProph => NewProph
   | Resolve ex e1 e2 => Resolve (subst x v ex) (subst x v e1) (subst x v e2)
   end.
@@ -591,16 +599,12 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
     | _, _ => None
     end.
 
-Definition state_upd_thread_map (f: gmap thread_id (option val) → gmap thread_id (option val)) (σ: state) : state :=
-  {| thread_map := f σ.(thread_map); heap := σ.(heap); used_proph_id := σ.(used_proph_id) |}.
-Global Arguments state_upd_thread_map _ !_ /.
-
 Definition state_upd_heap (f: gmap loc (option val) → gmap loc (option val)) (σ: state) : state :=
-  {| thread_map := σ.(thread_map); heap := f σ.(heap); used_proph_id := σ.(used_proph_id) |}.
+  {| heap := f σ.(heap); used_proph_id := σ.(used_proph_id) |}.
 Global Arguments state_upd_heap _ !_ /.
 
 Definition state_upd_used_proph_id (f: gset proph_id → gset proph_id) (σ: state) : state :=
-  {| thread_map := σ.(thread_map); heap := σ.(heap); used_proph_id := f σ.(used_proph_id) |}.
+  {| heap := σ.(heap); used_proph_id := f σ.(used_proph_id) |}.
 Global Arguments state_upd_used_proph_id _ !_ /.
 
 Fixpoint heap_array (l : loc) (vs : list val) : gmap loc (option val) :=
@@ -655,49 +659,35 @@ Qed.
 
 Inductive base_step (i : thread_id) : expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop :=
   | RecS f x e σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (Rec f x e) σ Θ [] (Val $ RecV f x e) σ ∅
   | PairS v1 v2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (Pair (Val v1) (Val v2)) σ Θ [] (Val $ PairV v1 v2) σ ∅
   | InjLS v σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (InjL $ Val v) σ Θ [] (Val $ InjLV v) σ ∅
   | InjRS v σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (InjR $ Val v) σ Θ [] (Val $ InjRV v) σ ∅
   | BetaS f x e1 v2 e' σ Θ :
-     σ.(thread_map) !! i = Some None →
      e' = subst' x v2 (subst' f (RecV f x e1) e1) →
      base_step i (App (Val $ RecV f x e1) (Val v2)) σ Θ [] e' σ ∅
   | UnOpS op v v' σ Θ :
-     σ.(thread_map) !! i = Some None →
      un_op_eval op v = Some v' →
      base_step i (UnOp op (Val v)) σ Θ [] (Val v') σ ∅
   | BinOpS op v1 v2 v' σ Θ :
-     σ.(thread_map) !! i = Some None →
      bin_op_eval op v1 v2 = Some v' →
      base_step i (BinOp op (Val v1) (Val v2)) σ Θ [] (Val v') σ ∅
   | IfTrueS e1 e2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (If (Val $ LitV $ LitBool true) e1 e2) σ Θ [] e1 σ ∅
   | IfFalseS e1 e2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (If (Val $ LitV $ LitBool false) e1 e2) σ Θ [] e2 σ ∅
   | FstS v1 v2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (Fst (Val $ PairV v1 v2)) σ Θ [] (Val v1) σ ∅
   | SndS v1 v2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (Snd (Val $ PairV v1 v2)) σ Θ [] (Val v2) σ ∅
   | CaseLS v e1 e2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (Case (Val $ InjLV v) e1 e2) σ Θ [] (App e1 (Val v)) σ ∅
   | CaseRS v e1 e2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      base_step i (Case (Val $ InjRV v) e1 e2) σ Θ [] (App e2 (Val v)) σ ∅
   | AllocNS n v σ Θ l :
-     σ.(thread_map) !! i = Some None →
      (0 < n)%Z →
      (∀ i, (0 ≤ i)%Z → (i < n)%Z → σ.(heap) !! (l +ₗ i) = None) →
      base_step i (AllocN (Val $ LitV $ LitInt n) (Val v)) σ Θ
@@ -705,32 +695,27 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
                (Val $ LitV $ LitLoc l) (state_init_heap l n v σ)
                ∅
   | FreeS l v σ Θ :
-     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some v →
      base_step i (Free (Val $ LitV $ LitLoc l)) σ Θ
                []
                (Val $ LitV LitUnit) (state_upd_heap <[l:=None]> σ)
                ∅
   | LoadS l v σ Θ :
-     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some v →
      base_step i (Load (Val $ LitV $ LitLoc l)) σ Θ [] (of_val v) σ ∅
   | StoreS l v w σ Θ :
-     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some v →
      base_step i (Store (Val $ LitV $ LitLoc l) (Val w)) σ Θ
                []
                (Val $ LitV LitUnit) (state_upd_heap <[l:=Some w]> σ)
                ∅
   | XchgS l v1 v2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some v1 →
      base_step i (Xchg (Val $ LitV $ LitLoc l) (Val v2)) σ Θ
                []
                (Val v1) (state_upd_heap <[l:=Some v2]> σ)
                ∅
   | CmpXchgS l v1 v2 vl σ Θ b :
-     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some vl →
      (* Crucially, this compares the same way as [EqOp]! *)
      vals_compare_safe vl v1 →
@@ -740,36 +725,24 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
                (Val $ PairV vl (LitV $ LitBool b)) (if b then state_upd_heap <[l:=Some v2]> σ else σ)
                ∅
   | FaaS l i1 i2 σ Θ :
-     σ.(thread_map) !! i = Some None →
      σ.(heap) !! l = Some $ Some (LitV (LitInt i1)) →
      base_step i (FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2)) σ Θ
                []
                (Val $ LitV $ LitInt i1) (state_upd_heap <[l:=Some $ LitV (LitInt (i1 + i2))]>σ)
                ∅
-
   | ForkS e σ Θ j :
-     σ.(thread_map) !! i = Some None →
      j ∉ Θ →
      base_step i (Fork e) σ Θ
                []
-               (Val $ LitV LitUnit) (state_upd_thread_map <[j:=None]> σ)
+               (Val $ LitV LitUnit) σ
                {[j := e]}
-  | ExitS v σ Θ :
-     σ.(thread_map) !! i = Some None →
-     base_step i (Exit (Val v)) σ Θ
-               []
-               (Val v) (state_upd_thread_map <[i:=Some v]> σ)
-               ∅
-
   | NewProphS σ Θ p :
-     σ.(thread_map) !! i = Some None →
      p ∉ σ.(used_proph_id) →
      base_step i NewProph σ Θ
                []
                (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ)
                ∅
   | ResolveS p v e σ Θ w σ' κs ts :
-     σ.(thread_map) !! i = Some None →
      base_step i e σ Θ κs (Val v) σ' ts →
      base_step i (Resolve e (Val $ LitV $ LitProphecy p) (Val w)) σ Θ
                (κs ++ [(p, (v, w))]) (Val v) σ' ts.
@@ -798,7 +771,6 @@ Qed.
 
 Lemma alloc_fresh i v n σ Θ :
   let l := Loc.fresh (dom σ.(heap)) in
-  σ.(thread_map) !! i = Some None →
   (0 < n)%Z →
   base_step i (AllocN ((Val $ LitV $ LitInt $ n)) (Val v)) σ Θ []
     (Val $ LitV $ LitLoc l) (state_init_heap l n v σ) ∅.
@@ -811,14 +783,12 @@ Qed.
 
 Lemma new_proph_id_fresh i σ Θ :
   let p := fresh σ.(used_proph_id) in
-  σ.(thread_map) !! i = Some None →
   base_step i NewProph σ Θ [] (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ) ∅.
 Proof. constructor; auto. apply is_fresh. Qed.
 
 Lemma new_thread_id_fresh i e σ Θ :
   let j := fresh Θ in
-  σ.(thread_map) !! i = Some None →
-  base_step i (Fork e) σ Θ [] (Val (LitV LitUnit)) (state_upd_thread_map <[j:=None]> σ) {[j := e]}.
+  base_step i (Fork e) σ Θ [] (Val (LitV LitUnit)) (σ) {[j := e]}.
 Proof. constructor; auto. apply is_fresh. Qed.
 
 Lemma fork_thread_ids_disjoint i e1 σ1 Θ κ e2 σ2 efs :
@@ -833,7 +803,7 @@ Qed.
 End heap_lang.
 
 (** Language *)
-Canonical Structure heap_ectxi_lang := EctxiLanguage heap_lang.heap_lang_mixin.
+Canonical Structure heap_ectxi_lang := EctxiLanguage (state_sat:=heap_lang.state_sat) heap_lang.heap_lang_mixin.
 Canonical Structure heap_ectx_lang := EctxLanguageOfEctxi heap_ectxi_lang.
 Canonical Structure heap_lang := LanguageOfEctx heap_ectx_lang.
 
