@@ -209,18 +209,15 @@ Record state : Type := {
 (** State predicates. *)
 Variant state_pred : Type :=
   | pred_pointsto (l : loc) (dq : dfrac) (v : val)
-  | pred_inv_pointsto (l : loc) (v : option val) (I : val → Prop)
-  | pred_thread (i : thread_id) (e : expr).
+  | pred_thread (i : thread_id) (e : expr) (b : bool).
 
 Definition state_sat : state → gmap thread_id expr → state_pred → Prop :=
   λ σ Θ π, match π with
            | pred_pointsto l dq v =>
                (heap σ) !! l = Some (Some v)
-           | pred_inv_pointsto l v P =>
-               (heap σ) !! l = Some v ∧
-               match v with | Some v' => P v' | None => True end
-           | pred_thread i e =>
-               Θ !! i = Some e
+           | pred_thread i e b =>
+               Θ !! i = Some e ∧
+               if b then is_Some (to_val e) else (to_val e = None)
            end.
 
 (** Equality and other typeclass stuff *)

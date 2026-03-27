@@ -41,8 +41,6 @@ Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ}
                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I
   end
 with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ}
-       (* `{!state_interp_class Λ Σ Π} `{!ord_mono_fun_class} *)
-       (* `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} *)
        n σ Θ κs i Ω (Φ : @tf SI Σ (state_pred Λ)) : iProp Σ :=
        match Φ with
        | tf_emp => emp%I
@@ -474,8 +472,6 @@ End proof.
 
 (* Section test. *)
 (*   Context `{!temporalGS Λ Σ}. *)
-(*   (* Context `{SIC : !state_interp_class Λ Σ Π} `{OCM : !ord_mono_fun_class}. *) *)
-(*   (* Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}. *) *)
 
 (*   (* Print Universes. *) *)
 

@@ -5,13 +5,12 @@ From iris.proofmode Require Import proofmode.
 From liris.program_logic Require Export weakestpre.
 From liris.algebra Require Import ordinal_wfocm.
 
-Class PureExecCond `{SI : indexT} `{!lirisGS Λ Σ} (C : thread_id → state Λ → Prop) ς (i : thread_id) :=
-  pure_exec_cond : ∀ h n σ κ Θ, ς -∗ history_interp h n σ Θ κ -∗ ⌜C i σ⌝.
+TODO
 
-Class PureExecSI `{SI : indexT} `{!lirisGS Λ Σ} ς i :=
-  pure_exec_si : ∀ K e1 e2 σ Θ κ,
+Class ExecCond `{SI : indexT} `{!lirisGS Λ Σ} (ς : thread_id → expr Λ → iProp Σ) i :=
+  exec_cond : ∀ K e1 e2 σ Θ κ,
   LanguageCtx K → Θ !! i = Some (K e1) → prim_step i e1 σ (dom Θ) [] e2 σ ∅ →
-  ((ς ∗ state_interp σ Θ κ) ⊢ |==> (ς ∗ state_interp σ (<[i:=K e2]>Θ) κ)).
+  ∀ e', ((ς i e' ∗ state_interp σ Θ κ) ⊢ |==> (ς i (K e2) ∗ state_interp σ (<[i:=K e2]>Θ) κ)).
 
 Section lifting.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
@@ -104,27 +103,26 @@ Section lifting.
     iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
   Qed.
 
+  TODO
   (** Derived lifting lemmas. *)
-  Lemma lwp_lift_pure_step_no_fork s i E E' e1 Φ C ς1 ς2 :
-    (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
-    (∀ κ σ1 Θ e2 σ2 efs, C i σ1 → prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
-    PureExecCond C ς1 i →
-    PureExecSI ς2 i →
+  Lemma lwp_lift_pure_step_no_fork s i E E' e1 Φ ς e' :
+    (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
+    (∀ κ σ1 Θ e2 σ2 efs, prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
+    ExecCond ς i →
     (|={E,E'}=>
-       ς1 ∗ ς2 ∗
+       ς i e' ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
        ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-         (ς1 -∗ ς2 -∗
+       (∀ σ Θ κ e2 efs, (⌜prim_step i e1 σ Θ κ e2 σ efs⌝) ={∅}=∗
+          ς i (K e2) -∗
           thP_obls i G 1 -∗
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-          ALC (|={E',E}=>
-                 ∀ σ Θ κ e2 efs, (⌜C i σ ∧ prim_step i e1 σ Θ κ e2 σ efs⌝) -∗
-                                 lWP e2 @ s; i; E {{ Φ }})))
+          ALC (|={E',E}=> lWP e2 @ s; i; E {{ Φ }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
-    iIntros (Hsafe Hstep HCC HCS) "H".
+    iIntros (Hsafe Hstep EC HK0) "H".
     iApply lwp_lift_step. iIntros (K h n σ1 κ κs Θ HK HΘ) "Hσ".
-    iMod "H" as "(Hc1& Hc2& (%& Tb& Gfs& %& #Rs& H))". iPoseProof (HCC with "Hc1 Hσ") as "%HC".
+    iMod ("H" $! K with "[//]") as "(Hc& (%& Tb& Gfs& %& #Rs& H))". iPoseProof (HCC with "Hc1 Hσ") as "%HC".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit.
     { iPureIntro. split.
       - specialize (Hsafe σ1 ∅ HC). destruct s; eauto using reducible_not_val.
@@ -134,7 +132,7 @@ Section lifting.
     destruct (Hstep κ σ1 (dom Θ) e2 σ2 efs HC) as (-> & <- & ->); auto.
     rewrite !map_union_empty. rewrite app_nil_l.
     iPoseProof (history_interp_step _ _ _ σ2 _ (<[i:=K e2]> Θ) with "Hσ") as "[SI ACC]".
-    iMod (pure_exec_si _ _ _ _ _ _ HK HΘ H with "[$Hc2 $SI]") as "[Hc2 SI]".
+    iMod (exec_cond _ _ _ _ _ _ HK HΘ H with "[$Hc2 $SI]") as "[Hc2 SI]".
     iMod ("ACC" with "SI") as "$".
     iIntros "!> Tb Wcs Efs". iMod ("H" with "Hc1 Hc2 Tb Wcs [//]") as "H".
     iMod "Hclose" as "_". iMod "H". iModIntro. rewrite big_sepM_empty. iFrame.
@@ -183,7 +181,7 @@ Section lifting.
     (∀ σ1 Θ, C i σ1 → if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
     (∀ σ1 κ Θ e2' σ2 efs', C i σ1 → prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
     PureExecCond C ς1 i →
-    PureExecSI ς2 i →
+    ExecCond ς2 i →
     (|={E,E'}=>
        ς1 ∗ ς2 ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
@@ -205,7 +203,7 @@ Section lifting.
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς1 i →
-    PureExecSI ς2 i →
+    ExecCond ς2 i →
     (Nat.iter n (λ P, |={E,E'}=>
                    ς1 ∗ ς2 ∗
                    ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
@@ -235,7 +233,7 @@ Section lifting.
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς1 i →
-    PureExecSI ς2 i →
+    ExecCond ς2 i →
     ([∗ set] r ∈ R, oblP_id r) ∗
     (Nat.iter n (λ P, |={E,E'}=> ς1 ∗ ς2 ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
                                 (ς1 -∗ ς2 -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ ALC (£ o ={E',E}=∗ |={E}=>m P))) (lWP e2 @ s; i; E {{ Φ }}))
@@ -255,7 +253,7 @@ Section lifting.
     PureExec φ C n e1 e2 →
     φ →
     PureExecCond C ς1 i →
-    PureExecSI ς2 i →
+    ExecCond ς2 i →
     (ς1 ∗ ς2 ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r) ∗
      (ς1 -∗ ς2 -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
       £ (o × n)%ord -∗ |={E}=>m lWP e2 @ s; i ; E {{ Φ }}))
