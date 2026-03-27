@@ -7,6 +7,8 @@ From liris.algebra Require Import ordinal_wfocm.
 
 TODO
 
+(* Just include thread_map here or in weakestpre, which records both expr AND Ctx? *)
+
 Class ExecCond `{SI : indexT} `{!lirisGS Λ Σ} (ς : thread_id → expr Λ → iProp Σ) i :=
   exec_cond : ∀ K e1 e2 σ Θ κ,
   LanguageCtx K → Θ !! i = Some (K e1) → prim_step i e1 σ (dom Θ) [] e2 σ ∅ →

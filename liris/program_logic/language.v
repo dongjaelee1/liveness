@@ -66,7 +66,9 @@ Notation thread_pool Λ := (gmap thread_id (expr Λ)).
 Definition cfg (Λ : language) :=
   (thread_pool Λ * state Λ)%type.
 
-Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
+Definition ctx (Λ : language) := expr Λ → expr Λ.
+
+Class LanguageCtx {Λ : language} (K : ctx Λ) := {
   fill_not_val e :
     to_val e = None → to_val (K e) = None;
   fill_step i e1 σ1 Θ1 κ e2 σ2 efs :
@@ -80,7 +82,7 @@ Class LanguageCtx {Λ : language} (K : expr Λ → expr Λ) := {
 Global Instance language_ctx_id Λ : LanguageCtx (@id (expr Λ)).
 Proof. constructor; naive_solver. Qed.
 
-Global Instance language_ctx_compose Λ (K1 K2 : expr Λ → expr Λ) :
+Global Instance language_ctx_compose Λ (K1 K2 : ctx Λ) :
   LanguageCtx K1 → LanguageCtx K2 → LanguageCtx (K2 ∘ K1).
 Proof.
   intros. constructor.
