@@ -61,11 +61,6 @@ Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
 Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
 Canonical Structure exprO `{SI : indexT} Λ := leibnizO (expr Λ).
 
-Notation thread_pool Λ := (gmap thread_id (expr Λ)).
-
-Definition cfg (Λ : language) :=
-  (thread_pool Λ * state Λ)%type.
-
 Definition ctx (Λ : language) := expr Λ → expr Λ.
 
 Class LanguageCtx {Λ : language} (K : ctx Λ) := {
@@ -94,6 +89,11 @@ Proof.
     2:{ auto. }
     subst. destruct H3 as (?&?&?). subst. eexists. split; eauto.
 Qed.
+
+Notation thread_pool Λ := (gmap thread_id (expr Λ)).
+
+Definition cfg (Λ : language) :=
+  (thread_pool Λ * state Λ)%type.
 
 Inductive atomicity := StronglyAtomic | WeaklyAtomic.
 
@@ -250,45 +250,44 @@ Section language.
   Proof. rewrite -!not_not_stuck. eauto using not_stuck_fill_inv. Qed.
 
   (** Generalized pure_step that can condition on the state *)
-  Record pure_step (C : thread_id → state Λ → Prop) (e1 e2 : expr Λ) := {
-    pure_step_safe i σ1 Θ : C i σ1 → reducible_no_obs i e1 σ1 Θ;
+  Record pure_step (e1 e2 : expr Λ) := {
+    pure_step_safe i σ1 Θ : reducible_no_obs i e1 σ1 Θ;
     pure_step_det i σ1 κ Θ e2' σ2 efs :
-      C i σ1 →
       prim_step i e1 σ1 Θ κ e2' σ2 efs → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs = ∅
   }.
 
-  Notation pure_steps_tp C := (map_Forall2 (λ _, rtc (pure_step C))).
+  Notation pure_steps_tp := (map_Forall2 (λ _, rtc (pure_step))).
 
   (* TODO: Exclude the case of [n=0], either here, or in [wp_pure] to avoid it
   succeeding when it did not actually do anything. *)
-  Class PureExec (φ : Prop) (C : thread_id → state Λ → Prop) (n : nat) (e1 e2 : expr Λ) :=
-    pure_exec : φ → relations.nsteps (pure_step C) n e1 e2.
+  Class PureExec (φ : Prop) (n : nat) (e1 e2 : expr Λ) :=
+    pure_exec : φ → relations.nsteps (pure_step) n e1 e2.
 
-  Lemma pure_step_ctx K `{!@LanguageCtx Λ K} C e1 e2 :
-    pure_step C e1 e2 →
-    pure_step C (K e1) (K e2).
+  Lemma pure_step_ctx K `{!@LanguageCtx Λ K} e1 e2 :
+    pure_step e1 e2 →
+    pure_step (K e1) (K e2).
   Proof.
     intros [Hred Hstep]. split.
     - unfold reducible_no_obs in *. naive_solver eauto using fill_step.
-    - intros i σ1 κ Θ e2' σ2 efs HC Hpstep.
+    - intros i σ1 κ Θ e2' σ2 efs Hpstep.
       destruct (fill_step_inv i e1 σ1 Θ κ e2' σ2 efs) as (e2'' & -> & ?); [|exact Hpstep|].
       + destruct (Hred i σ1 Θ) as (? & ? & ? & ?); eauto using val_stuck.
       + edestruct (Hstep i σ1 κ Θ e2'' σ2 efs) as (? & -> & -> & ->); auto.
   Qed.
 
-  Lemma pure_step_nsteps_ctx K `{!@LanguageCtx Λ K} C n e1 e2 :
-    relations.nsteps (pure_step C) n e1 e2 →
-    relations.nsteps (pure_step C) n (K e1) (K e2).
+  Lemma pure_step_nsteps_ctx K `{!@LanguageCtx Λ K} n e1 e2 :
+    relations.nsteps (pure_step) n e1 e2 →
+    relations.nsteps (pure_step) n (K e1) (K e2).
   Proof. eauto using nsteps_congruence, pure_step_ctx. Qed.
 
-  Lemma rtc_pure_step_ctx K `{!@LanguageCtx Λ K} C e1 e2 :
-    rtc (pure_step C) e1 e2 → rtc (pure_step C) (K e1) (K e2).
+  Lemma rtc_pure_step_ctx K `{!@LanguageCtx Λ K} e1 e2 :
+    rtc (pure_step) e1 e2 → rtc (pure_step) (K e1) (K e2).
   Proof. eauto using rtc_congruence, pure_step_ctx. Qed.
 
   (* We do not make this an instance because it is awfully general. *)
-  Lemma pure_exec_ctx K `{!@LanguageCtx Λ K} φ C n e1 e2 :
-    PureExec φ C n e1 e2 →
-    PureExec φ C n (K e1) (K e2).
+  Lemma pure_exec_ctx K `{!@LanguageCtx Λ K} φ n e1 e2 :
+    PureExec φ n e1 e2 →
+    PureExec φ n (K e1) (K e2).
   Proof. rewrite /PureExec; eauto using pure_step_nsteps_ctx. Qed.
 
   (* This is a family of frequent assumptions for PureExec *)
@@ -313,7 +312,7 @@ Section language.
   Proof. rewrite /not_stuck /reducible. eauto 10. Qed.
 
   Lemma rtc_pure_step_val `{!Inhabited (state Λ)} v e :
-    rtc (pure_step (λ _ _, True)) (of_val v) e → to_val e = Some v.
+    rtc (pure_step) (of_val v) e → to_val e = Some v.
   Proof.
     intros ?; rewrite <- to_of_val.
     f_equal; symmetry; eapply rtc_nf; first done.
@@ -330,17 +329,16 @@ Section language.
    or, there is an [i] such that [i]th thread does not participate in the
    pure steps between [t1] and [t3] and [t2] corresponds to taking a step in
    the [i]th thread starting from [t1]. *)
-  Lemma erased_thread_step_pure_step_tp C i t1 σ1 t2 σ2 t3 :
+  Lemma erased_thread_step_pure_step_tp i t1 σ1 t2 σ2 t3 :
     erased_thread_step i (t1, σ1) (t2, σ2) →
-    C i σ1 →
-    pure_steps_tp C t1 t3 →
-    (σ1 = σ2 ∧ pure_steps_tp C t2 t3) ∨
+    pure_steps_tp t1 t3 →
+    (σ1 = σ2 ∧ pure_steps_tp t2 t3) ∨
     (∃ i e efs e' κ,
       t1 !! i = Some e ∧ t3 !! i = Some e ∧
       t2 = <[i:=e']>t1 ∪ efs ∧
       prim_step i e σ1 (dom t1) κ e' σ2 efs).
   Proof.
-    intros [κ [e σ e' σ' efs ths t11 Hi t12 Hstep]] HC Hps; simplify_eq/=.
+    intros [κ [e σ e' σ' efs ths t11 Hi t12 Hstep]] Hps; simplify_eq/=.
     assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None).
     { exists (delete i ths). split; [rewrite insert_delete_id | apply lookup_delete_eq]; auto. }
     destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi.
@@ -375,9 +373,9 @@ Section language.
 
 End language.
 
-Global Hint Mode PureExec + - - - ! - : typeclass_instances.
+Global Hint Mode PureExec + - - ! - : typeclass_instances.
 Global Arguments thread_step_atomic {Λ i ρ1 κ ρ2}.
-Notation pure_steps_tp C := (map_Forall2 (λ _, rtc (pure_step C))).
+Notation pure_steps_tp := (map_Forall2 (λ _, rtc (pure_step))).
 
 (** Trace and behavior. *)
 Definition trace (Λ : language) : Type :=

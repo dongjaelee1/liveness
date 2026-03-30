@@ -93,9 +93,9 @@ Section proof.
     ⊢ tf_intuit n σ Θ κs i Ω Φ.
   Proof.
     revert h n σ Θ κs m i Ω W. induction Φ; iIntros (?????????) "(HI& MI& TL)"; simpl; auto.
-    - rewrite /history_interp -lock. iDestruct "HI" as "(HI1& HI2& SI)".
+    - rewrite /history_interp -lock. iDestruct "HI" as "(HI1& HI2& SI& SIa)".
       iPoseProof (state_interp_wf with "[$SI $TL]") as "%".
-      iApply (history_interp_event_pred_now with "[HI1 HI2 SI]"). 1: auto.
+      iApply (history_interp_event_pred_now with "[HI1 HI2 SI SIa]"). 1: auto.
       rewrite /history_interp -lock. iFrame.
     - iSplit.
       + iDestruct "TL" as "[TL _]". iApply IHΦ1. iFrame.

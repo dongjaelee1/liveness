@@ -104,19 +104,17 @@ Section wp.
     subst. rewrite !map_union_empty. iFrame. iModIntro. done.
   Qed.
 
-  Lemma lwp_lift_pure_det_base_step_no_fork {s i E E' Φ C ς1 ς2} e1 e2 :
+  Lemma lwp_lift_pure_det_base_step_no_fork {s i E E' Φ ς} e1 e2 :
     to_val e1 = None →
-    (∀ σ1 τ, C i σ1 → base_reducible i e1 σ1 τ) →
+    (∀ σ1 τ, base_reducible i e1 σ1 τ) →
     (∀ σ1 κ τ e2' σ2 efs',
-       C i σ1 →
        base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
-    PureExecCond C ς1 i →
-    PureExecSI ς2 i →
+    PureExecSI ς i →
     (|={E,E'}=>
-       ς1 ∗ ς2 ∗
+       ς i ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                 (ς1 -∗ ς2 -∗
+                 (ς i -∗
                   thP_obls i G 1 -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                   ALC (|={E',E}=> lWP e2 @ s; i; E {{ Φ }})))

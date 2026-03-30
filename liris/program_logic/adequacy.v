@@ -1094,7 +1094,7 @@ Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
                       ⊢ |={⊤}=> ∃ (fork_post : thread_id → val Λ → iProp Σ)
                                  (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
                       let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
-                      state_interp σ Θ κs ∗
+                      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
                       (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
                        ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }}) ∗
                       (|={⊤}=>m ⟦Φ⟧ₗ)) →
@@ -1116,7 +1116,7 @@ Proof.
             |={⊤}=> ∃ (fork_post : thread_id → val Λ → iProp Σ)
                      (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
             let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
-            state_interp σ Θ κs ∗
+            state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
              ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }}) ∗
             (|={⊤}=>m ⟦Φ⟧ₗ)).
@@ -1130,8 +1130,8 @@ Proof.
   iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
   iExists Hmupd, Hhist. iFrame "R W WOE".
   set (Htemp := TemporalG Hmupd state_interp_class0 Hhist : temporalGS Λ Σ).
-  iModIntro. iMod ("H" $! Htemp) as "(%fork_post& %Ψs& SI& WPs& HP)".
-  iMod ("HI" with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& MI)".
+  iModIntro. iMod ("H" $! Htemp) as "(%fork_post& %Ψs& SI& SIa& WPs& HP)".
+  iMod ("HI" with "[$SI $SIa]") as "HI". iDestruct "MI" as "(MHI& S& T& MI)".
   iMod (thP_obls_alloc_threads (dom Θ) with "T") as "[T Ths]".
   { set_solver. }
   iPoseProof ("WPs" with "Ths") as "WPs". rewrite union_empty_l_L.

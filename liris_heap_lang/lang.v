@@ -120,6 +120,8 @@ Inductive expr :=
   (* Prophecy *)
   | NewProph
   | Resolve (e0 : expr) (e1 : expr) (e2 : expr) (* wrapped expr, proph, val *)
+  (* Label *)
+  | Label (t : string) (e : expr)
 with val :=
   | LitV (l : base_lit)
   | RecV (f x : binder) (e : expr)
@@ -200,24 +202,27 @@ Global Arguments vals_compare_safe !_ !_ /.
 
 (** The state:
     heaps of [option val]s, with [None] representing deallocated locations.
+    (* history of labels from some thread_id. *)
  *)
 Record state : Type := {
-  heap: gmap loc (option val);
-  used_proph_id: gset proph_id;
+    heap : gmap loc (option val);
+    used_proph_id : gset proph_id;
+    (* labels : list (thread_id * string * val); *)
   }.
 
 (** State predicates. *)
 Variant state_pred : Type :=
   | pred_pointsto (l : loc) (dq : dfrac) (v : val)
-  | pred_thread (i : thread_id) (e : expr) (b : bool).
+  | pred_label (i : thread_id) (x : string) (v : val)
+.
 
 Definition state_sat : state → gmap thread_id expr → state_pred → Prop :=
   λ σ Θ π, match π with
            | pred_pointsto l dq v =>
                (heap σ) !! l = Some (Some v)
-           | pred_thread i e b =>
-               Θ !! i = Some e ∧
-               if b then is_Some (to_val e) else (to_val e = None)
+           | pred_label i t v =>
+               ∃ (K : expr → expr), Θ !! i = Some (K (Label t (of_val v)))
+               (* (labels σ) !! n = Some (i, l, v) *)
            end.
 
 (** Equality and other typeclass stuff *)
@@ -276,6 +281,7 @@ Proof.
      | NewProph, NewProph => left _
      | Resolve e0 e1 e2, Resolve e0' e1' e2' =>
         cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
+     | Label t e, Label t' e' => cast_if_and (decide (t = t')) (decide (e = e'))
      | _, _ => right _
      end
    with gov (v1 v2 : val) {struct v1} : Decision (v1 = v2) :=
@@ -357,6 +363,7 @@ Proof.
      | FAA e1 e2 => GenNode 19 [go e1; go e2]
      | NewProph => GenNode 20 []
      | Resolve e0 e1 e2 => GenNode 21 [go e0; go e1; go e2]
+     | Label t e => GenNode 22 [GenLeaf (inl (inl t)); go e]
      end
    with gov v :=
      match v with
@@ -394,6 +401,7 @@ Proof.
      | GenNode 19 [e1; e2] => FAA (go e1) (go e2)
      | GenNode 20 [] => NewProph
      | GenNode 21 [e0; e1; e2] => Resolve (go e0) (go e1) (go e2)
+     | GenNode 22 [GenLeaf (inl (inl t)); e] => Label t (go e)
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -408,7 +416,7 @@ Proof.
    for go).
  refine (inj_countable' enc dec _).
  refine (fix go (e : expr) {struct e} := _ with gov (v : val) {struct v} := _ for go).
- - destruct e as [v| | | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
+ - destruct e as [v| | | | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
      [exact (gov v)|done..].
  - destruct v; by f_equal.
 Qed.
@@ -417,6 +425,7 @@ Proof. refine (inj_countable of_val to_val _); auto using to_of_val. Qed.
 
 Global Instance state_inhabited : Inhabited state :=
   populate {| heap := inhabitant; used_proph_id := inhabitant |}.
+  (* populate {| heap := inhabitant; used_proph_id := inhabitant; labels := [] |}. *)
 Global Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
 Global Instance expr_inhabited : Inhabited expr := populate (Val inhabitant).
 
@@ -460,7 +469,9 @@ Inductive ectx_item :=
   | FaaRCtx (e1 : expr)
   | ResolveLCtx (ctx : ectx_item) (v1 : val) (v2 : val)
   | ResolveMCtx (e0 : expr) (v2 : val)
-  | ResolveRCtx (e0 : expr) (e1 : expr).
+  | ResolveRCtx (e0 : expr) (e1 : expr)
+  | LabelCtx (t : string)
+.
 
 (** Contextual closure will only reduce [e] in [Resolve e (Val _) (Val _)] if
 the local context of [e] is non-empty. As a consequence, the first argument of
@@ -500,6 +511,7 @@ Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
   | ResolveLCtx K v1 v2 => Resolve (fill_item K e) (Val v1) (Val v2)
   | ResolveMCtx ex v2 => Resolve ex e (Val v2)
   | ResolveRCtx ex e1 => Resolve ex e1 e
+  | LabelCtx t => Label t e
   end.
 
 (** Substitution *)
@@ -529,6 +541,7 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | Fork e => Fork (subst x v e)
   | NewProph => NewProph
   | Resolve ex e1 e2 => Resolve (subst x v ex) (subst x v e1) (subst x v e2)
+  | Label t e => Label t (subst x v e)
   end.
 
 Definition subst' (mx : binder) (v : val) : expr → expr :=
@@ -598,11 +611,17 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
 
 Definition state_upd_heap (f: gmap loc (option val) → gmap loc (option val)) (σ: state) : state :=
   {| heap := f σ.(heap); used_proph_id := σ.(used_proph_id) |}.
+  (* {| heap := f σ.(heap); used_proph_id := σ.(used_proph_id); labels := σ.(labels) |}. *)
 Global Arguments state_upd_heap _ !_ /.
 
 Definition state_upd_used_proph_id (f: gset proph_id → gset proph_id) (σ: state) : state :=
-  {| heap := σ.(heap); used_proph_id := f σ.(used_proph_id) |}.
+  {| heap := σ.(heap); used_proph_id := f σ.(used_proph_id); |}.
+  (* {| heap := σ.(heap); used_proph_id := f σ.(used_proph_id); labels := σ.(labels) |}. *)
 Global Arguments state_upd_used_proph_id _ !_ /.
+
+(* Definition state_upd_labels (f: list (thread_id * string * val) → list (thread_id * string * val)) (σ: state) : state := *)
+(*   {| heap := σ.(heap); used_proph_id := σ.(used_proph_id); labels := f σ.(labels) |}. *)
+(* Global Arguments state_upd_labels _ !_ /. *)
 
 Fixpoint heap_array (l : loc) (vs : list val) : gmap loc (option val) :=
   match vs with
@@ -742,7 +761,14 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
   | ResolveS p v e σ Θ w σ' κs ts :
      base_step i e σ Θ κs (Val v) σ' ts →
      base_step i (Resolve e (Val $ LitV $ LitProphecy p) (Val w)) σ Θ
-               (κs ++ [(p, (v, w))]) (Val v) σ' ts.
+               (κs ++ [(p, (v, w))]) (Val v) σ' ts
+  | LabelS t v σ Θ :
+    base_step i (Label t (Val v)) σ Θ
+              []
+              (of_val v) σ
+              (* (of_val v) (state_upd_labels (λ ls, ls ++ [(i, l, v)]) σ) *)
+              ∅
+.
 
 (** Basic properties about the language *)
 Global Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).

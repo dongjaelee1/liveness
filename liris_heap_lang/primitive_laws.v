@@ -40,40 +40,45 @@ Local Definition pointsto_unseal :
 Global Arguments pointsto {Σ _}.
 
 Notation "l ↦ dq v" := (pointsto l dq v)
-  (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
+                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
 
-(** Wrappers for othread and thread tokens *)
-Local Definition thread_exec_def `{heapGS Σ}
-  (i : thread_id) (e : expr) : iProp Σ :=
-  (⌜to_val e = None⌝ ∧ thread i true e 1%Qp)%I.
-Local Definition thread_exec_aux : seal (@thread_exec_def). Proof. by eexists. Qed.
-Definition thread_exec := thread_exec_aux.(unseal).
-Local Definition thread_exec_unseal :
-  @thread_exec = @thread_exec_def := thread_exec_aux.(seal_eq).
-Global Arguments thread_exec {Σ _}.
+(** Predicates for label invocations. *)
+Definition thread_expr `{heapGS Σ} (i : thread_id) (e : expr) : iProp Σ :=
+  (thread i true e 1).
 
-Local Definition thread_term_def `{heapGS Σ}
-  (i : thread_id) (e : expr) : iProp Σ :=
-  (⌜is_Some (to_val e)⌝ ∧ thread i false e 1)%I.
-Local Definition thread_term_aux : seal (@thread_term_def). Proof. by eexists. Qed.
-Definition thread_term := thread_term_aux.(unseal).
-Local Definition thread_term_unseal :
-  @thread_term = @thread_term_def := thread_term_aux.(seal_eq).
-Global Arguments thread_term {Σ _}.
+Local Definition label_def `{heapGS Σ}
+  (i : thread_id) (x : string) (v : val) : iProp Σ :=
+  (∃ (K : ctx heap_lang), ⌜ LanguageCtx K ⌝ ∧ thread_expr i (K (Label x (of_val v)))).
+Local Definition label_aux : seal (@label_def). Proof. by eexists. Qed.
+Definition label := label_aux.(unseal).
+Local Definition label_unseal :
+  @label = @label_def := label_aux.(seal_eq).
+Global Arguments label {Σ _}.
 
 Definition state_interp `{!heapGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
    thread_map_interp (dom Θ) Θ ∗
    proph_map_interp κs σ.(used_proph_id))%I.
 
+Definition state_interp_aux `{!heapGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
+  ([∗ map] i ↦ e ∈ Θ, thread_expr i e)%I.
+
 (** State predicate. *)
 Definition state_pred_interp `{!heapGS Σ} (π : state_pred) : iProp Σ :=
   match π with
   | pred_pointsto l df v =>
       pointsto l df v
-  | pred_thread i e b =>
-      if b then thread_term i e else thread_exec i e
+  | pred_label i x v =>
+      label i x v
   end.
+
+Lemma thread_expr_read `{!heapGS Σ} :
+  ∀ (Θ : thread_pool heap_lang) i e,
+  thread_map_interp (dom Θ) Θ -∗ thread_expr i e -∗ ⌜Θ !! i = Some e⌝.
+Proof.
+  iIntros (???) "TI Ti".
+  iPoseProof (thread_map_thread_read with "TI Ti") as "%". eauto.
+Qed.
 
 Lemma state_interp_wf `{!heapGS Σ} :
   ∀ (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) (π : state_pred),
@@ -81,13 +86,13 @@ Lemma state_interp_wf `{!heapGS Σ} :
 Proof.
   iIntros (????) "[(HI& TI& PI) SP]". destruct π; simpl.
   - rewrite pointsto_unseal /pointsto_def. iPoseProof (gen_heap_valid with "HI SP") as "%". eauto.
-  - rewrite thread_term_unseal /thread_term_def thread_exec_unseal /thread_exec_def. destruct b.
-    + iDestruct "SP" as "(%& SP)". iPoseProof (thread_map_thread_read with "TI SP") as "%". eauto.
-    + iDestruct "SP" as "(%& SP)". iPoseProof (thread_map_thread_read with "TI SP") as "%". eauto.
+  - rewrite label_unseal /label_def. iDestruct "SP" as "(%&%& Ti)".
+    iPoseProof (thread_expr_read with "TI Ti") as "%". eauto.
 Qed.
 
 Global Instance heapGS_state_interp_class `{!heapGS Σ} : state_interp_class heap_lang Σ := {
     state_interp := state_interp;
+    state_interp_aux := state_interp_aux;
     state_pred_interp := state_pred_interp;
     state_interp_wf := state_interp_wf;
   }.
@@ -100,7 +105,8 @@ Global Instance heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ := {
 
 Global Instance heapGS_lirisGS `{!heapGS Σ} : lirisGS heap_lang Σ := {
     liris_temporalGS := heapGS_temporalGS;
-    fork_post i v := (thread_term i (of_val v))%I;
+    fork_post i v := (True)%I;
+    (* fork_post i v := (thread_term i (of_val v))%I; *)
   }.
 
 (** [gen_inv_heap]: Similar to pointsto,
@@ -137,23 +143,13 @@ Implicit Types e : expr.
 Implicit Types v : val.
 
 Local Ltac unfold_defs :=
-  try rewrite thread_term_unseal /thread_term_def;
-  try rewrite thread_exec_unseal /thread_exec_def.
+  (* try rewrite thread_term_unseal /thread_term_def; *)
+  try rewrite label_unseal /label_def.
 
-Global Instance thread_term_persistent i v : Persistent (thread_term i v).
-Proof. rewrite thread_term_unseal /thread_term_def. apply _. Qed.
-Global Instance thread_term_timeless i v : Timeless (thread_term i v).
-Proof. rewrite thread_term_unseal /thread_term_def. apply _. Qed.
-Global Instance thread_exec_timeless i q : Timeless (thread_exec i q).
-Proof. rewrite thread_exec_unseal /thread_exec_def. apply _. Qed.
-
-Lemma thread_term_unfold i e : thread_term i e = (⌜is_Some (to_val e)⌝ ∧ thread i false e 1)%I.
-Proof. unfold_defs. done. Qed.
-
-Lemma thread_term_agree i e1 e2 : thread_term i e1 -∗ thread_term i e2 -∗ ⌜e1 = e2⌝.
-Proof.
-  unfold_defs. iIntros "[% H1] [% H2]". iPoseProof (thread_agree with "H1 H2") as "%". by inv H.
-Qed.
+Global Instance thread_expr_timeless i e : Timeless (thread_expr i e).
+Proof. apply _. Qed.
+Global Instance label_timeless i t v : Timeless (label i t v).
+Proof. rewrite label_unseal /label_def. apply _. Qed.
 
 Lemma iter_modal_mono_modal M1 M2 P n :
   (∀ A B, (A -∗ B) -∗ (M1 A -∗ M1 B)) →
@@ -164,32 +160,22 @@ Proof.
   iIntros "H". iApply H0. iApply (H with "[] H"). iApply IHn.
 Qed.
 
-Global Instance trivial_pure_exec_cond i : PureExecCond trivial_cond True i.
-Proof. iIntros (?????) "A B". done. Qed.
+Definition trivial_cond : thread_id → iProp Σ := λ _, True%I.
 
-
-TODO
-Global Instance trivial_pure_exec_si i : PureExecSI (thread_exec i e) i.
+Global Instance trivial_pure_exec_si i : PureExecSI (trivial_cond) i.
 Proof.
-  repeat intro. iIntros "[_ SI]".
-  iDestruct "SI" as "(HI& TI& Tis& PI)".
-  iPoseProof (big_sepM_delete _ _ _ _ H0 with "Tis") as "[Ti Tis]".
-  pose proof H1. apply (val_stuck) in H1. simpl in *.
-  apply (language.fill_not_val) in H1. rewrite H1.
-  iEval (unfold_defs) in "Ti". iDestruct "Ti" as "(%& Ti)".
+  repeat intro. iIntros "(_& SI& SIa)".
+  iDestruct "SI" as "(HI& TI& PI)".
+  iPoseProof (big_sepM_delete _ _ _ _ H0 with "SIa") as "[Ti SIa]".
   iMod (thread_map_thread_update _ _ (K e2) with "[$TI $Ti]") as "[TI Ti]".
-  destruct (to_val (K e2)) eqn:EQe2.
-  - iMod (thread_true_to_false _ _ _ 1 with "Ti") as "Ti". iFrame "HI PI".
-    rewrite dom_insert_lookup_L; last eauto. iFrame "TI". iModIntro.
-    iApply (big_sepM_insert_delete). rewrite EQe2. iFrame. unfold_defs. iFrame. eauto.
-  - iFrame "HI PI".
-    rewrite dom_insert_lookup_L; last eauto. iFrame "TI". iModIntro.
-    iApply (big_sepM_insert_delete). rewrite EQe2. iFrame. unfold_defs. iFrame. eauto.
+  iFrame "HI PI".
+  rewrite dom_insert_lookup_L; last eauto. iFrame "TI". iModIntro.
+  iApply (big_sepM_insert_delete). iFrame.
 Qed.
 
-(** "pure" steps *)
+(** pure steps *)
 Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ :
-  PureExec φ trivial_cond n e1 e2 →
+  PureExec φ n e1 e2 →
   φ →
   Nat.iter n
     (λ P,
@@ -206,55 +192,163 @@ Proof.
   - simpl. iIntros "%% HAB >H". iDestruct "H" as "(%& $& $& %& $& H)".
     iIntros "!> TG Crs". iMod ("H" with "TG Crs") as "H".
     iIntros "LC". iMod ("H" with "LC") as "H". by iApply "HAB".
-  - simpl. iIntros "% >H". iModIntro. iSplitR; first done. iSplitR; first done.
-    iDestruct "H" as "(%& $& $& %& $& H)". iIntros "_ _ TG Crs".
+  - simpl. iIntros "% >H". iModIntro. iSplitR; first done.
+    iDestruct "H" as "(%& $& $& %& $& H)". iIntros "_ TG Crs".
     iMod ("H" with "TG Crs") as "H". iIntros "LC". iMod ("H" with "LC") as "$". done.
 Qed.
 
-Lemma lwp_fork s q i E E' e Φ :
-  (|={E,E'}=> thread_exec i q ∗
-             ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+Lemma lwp_fork s i E E' e Φ :
+  (|={E,E'}=> ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
              ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-             (∀ j, thread_exec i q -∗
-                   thP_obls i G 1 -∗
+             (∀ j, thP_obls i G 1 -∗
                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                   thread_exec j 1 -∗
                    thP_obls j ∅ 1 -∗
                    ALC (|={E',E}=>
-                   (|={E}=>g Φ (LitV LitUnit)) ∗
-                   lWP e @ s; j; ⊤ {{ lift_term j thread_term }}))) -∗
+                   (|={E}=>m Φ (LitV LitUnit)) ∗
+                   lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))) -∗
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step.
-  iIntros (Θ σ1 κ κs) "I". iMod "H" as "(Tx& %&$&$& %&$& H)".
-  iPoseProof (thread_exec_thread_cond_1 with "Tx I") as "%Ci".
+  iIntros (K h n σ1 κ κs Θ HK HT) "I". iMod "H" as "(%&$&$& %&$& H)".
   iModIntro. iSplit; first eauto with base_step.
   iIntros (v2 σ2 efs Hstep); inv_base_step.
-  iDestruct "I" as "[It I]". iMod (thread_map_new_thread with "It") as "[It Tj]"; first eapply H1.
-  iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tx Tb Wcs [Tj] [Efs]") as "H".
-  { unfold_defs. eauto. }
-  { rewrite dom_singleton_L big_sepS_singleton. iFrame. }
-  iMod "H" as "(H& E)". rewrite dom_singleton_L. iFrame.
-  rewrite big_sepM_singleton. iModIntro.
-  iApply (lwp_mono with "E"). unfold_defs. rewrite /lift_term. iIntros (?) "($&$)".
+  iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "(%HI& Ha& (Ih& It& Ip)& Ia)".
+  iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
+  iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tb Wcs [Efs]") as "H".
+  { rewrite dom_singleton_L big_sepS_singleton. eauto. }
+  iMod "H" as "(H& E)".
+  iMod (hG_history_auth_app with "Ha") as "Ha".
+  rewrite /history_interp -lock big_sepM_singleton. iFrame.
+  replace (dom (<[i:=K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
+  { rewrite dom_union_L dom_insert_lookup_L; eauto. rewrite dom_singleton_L. auto. }
+  iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
+  iMod (thread_map_thread_update _ _ (K #()) with "[$It $Ti]") as "[It Ti]".
+  replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
+  { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
+  iFrame. iModIntro. iSplitR "H"; cycle 1.
+  (* iMod "H". Not working, probably because of the type of expr? *)
+  { iApply sfmupd_lwpupd_elim. iMod "H". by iFrame. }
+  iSplitR.
+  { iPureIntro. destruct HI. split.
+    - rewrite length_app H. simpl. lia.
+    - rewrite last_app. simpl. auto. }
+  iApply (big_sepM_union).
+  { apply map_disjoint_singleton_r_2, not_elem_of_dom. rewrite dom_insert_lookup; eauto. }
+  rewrite big_sepM_singleton. iFrame "Tj".
+  iApply (big_sepM_insert_delete). iFrame.
 Qed.
 
 (* (* Wrong spec *) *)
 (* Lemma lwp_fork_lat i e : *)
-(*   ⊢ <<{ ∀∀ q, thread_exec i q }>> Fork e @ i; ∅ *)
-(*     <<{ ∃∃ j, thread_exec i q ∗ thread_exec j 1 | RET (LitV LitUnit); lWP e @ j; ⊤ {{ thread_term j }} }>>. *)
+(*   ⊢ <<{ ∀∀ q, label i q }>> Fork e @ i; ∅ *)
+(*     <<{ ∃∃ j, label i q ∗ label j 1 | RET (LitV LitUnit); lWP e @ j; ⊤ {{ thread_term j }} }>>. *)
 (* Proof. *)
 (*   iIntros (Φ) "AU". iApply lwp_fork_fupd. *)
 (*   iMod "AU" as (Δ q) "[H↦ [_ Hclose]]". *)
 (*   iModIntro. iFrame. *)
 (* Qed. *)
 
-(** Exit *)
+(** Label *)
+Lemma lwp_label s i E t e v Φ :
+  TCEq (to_val e) (Some v) →
+  (∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+             (thP_obls i G 1 -∗
+              ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+              label i t v -∗
+              ALC (|={E}=>m (label i t v ∗ Φ v)))) -∗
+  lWP Label t e @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (He) "(%& TG& Fs& %& Rs& H)". iApply lwp_lift_atomic_base_step_no_fork.
+
+  TODO
+  iIntros (K h n σ1 κ κs Θ HK HT) "I". iModIntro. iSplit.
+  { destruct e; inv He. eauto with base_step. }
+  iFrame "TG Fs Rs". iIntros (v2 σ2 efs Hstep); inv_base_step. inv He.
+  iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "(%HI& Ha& (Ih& It& Ip)& Ia)".
+  iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
+  iIntros "!> TG Rcs". iMod ("H" with "TG Rcs [Ti]") as "H".
+  { unfold_defs. iFrame. eauto. }
+  iMod (thread_map_thread_update _ _ (K (of_val v)) with "[$It $Ti]") as "[It Ti]".
+  
+  iMod (hG_history_auth_app with "Ha") as "Ha".
+  rewrite /history_interp -lock big_sepM_singleton. iFrame.
+  replace (dom (<[i:=K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
+  { rewrite dom_union_L dom_insert_lookup_L; eauto. rewrite dom_singleton_L. auto. }
+  replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
+  { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
+  
+
+  iDestruct "I" as "[It I]".
+
+
+  iSplit; first eauto with base_step.
+
+  TODO
+  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "(%HI& Ha& (Ih& It& Ip)& Ia)".
+  iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
+  iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tb Wcs [Efs]") as "H".
+  { rewrite dom_singleton_L big_sepS_singleton. eauto. }
+  iMod "H" as "(H& E)".
+  iFrame. iModIntro. iSplitR "H"; cycle 1.
+  (* iMod "H". Not working, probably because of the type of expr? *)
+  { iApply sfmupd_lwpupd_elim. iMod "H". by iFrame. }
+  iSplitR.
+  { iPureIntro. destruct HI. split.
+    - rewrite length_app H. simpl. lia.
+    - rewrite last_app. simpl. auto. }
+  iApply (big_sepM_union).
+  { apply map_disjoint_singleton_r_2, not_elem_of_dom. rewrite dom_insert_lookup; eauto. }
+  rewrite big_sepM_singleton. iFrame "Tj".
+  iApply (big_sepM_insert_delete). iFrame.
+Qed.
+lwp_lift_atomic_base_step_no_fork:
+  ∀ {Λ : ectxLanguage} {SI : indexT} {Σ : gFunctors} {lirisGS0 : lirisGS Λ Σ} {s : stuckness} {i : thread_id} 
+    {E1 E2 : coPset} {Φ : language.val Λ → iProp Σ} (e1 : language.expr Λ),
+    (∀ (K : ctx Λ) (h : list (language.state Λ * thread_pool Λ * list (language.observation Λ))) (n : nat) 
+       (σ1 : language.state Λ) (κ κs : list (language.observation Λ)) (Θ : thread_pool Λ),
+       ⌜LanguageCtx K⌝
+       → ⌜Θ !! i = Some (K e1)⌝
+         → history_interp h n σ1 Θ (κ ++ κs) ={E1,E2}=∗
+           ⌜language.to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ)⌝ ∗
+           ∃ G : oids, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+             ∃ R : oids, ([∗ set] r ∈ R, oblP_id r) ∗
+               ∀ (e2 : language.expr Λ) (σ2 : ectx_language.state Λ) (efs : gmap thread_id (ectx_language.expr Λ)),
+                 ⌜ectx_language.base_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝ ={∅}=∗
+                 thP_obls i G 1 -∗
+                 ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                 ALC
+                   (|={E2,E1}=> ⌜efs = ∅⌝ ∗
+                      history_interp (h ++ [(σ2, <[i:=K e2]> Θ ∪ efs, κs)]) (S n) σ2 (<[i:=K e2]> Θ ∪ efs) κs ∗
+                      from_option (λ v : language.val Λ, lwpupd i E1 e2 (Φ v)) False (language.to_val e2)))
+    ⊢ lWP e1 @ s; i; E1 {{ v, Φ v }}
+
+
+
+Lemma lwp_label G R o s q i E l dq v :
+  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦{dq} v }}}
+    Load (Val $ LitV $ LitLoc l) @ s; i; E
+  l{{{ RET v; (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v }}}.
+Proof.
+  iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
+  iApply lwp_lift_atomic_base_step_no_fork.
+  iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
+  rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
+  iSplit; first by eauto with base_step.
+  iFrame "Tb Gfs Rs".
+  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
+  iModIntro. iSplit; first done. iFrame "Ht Hs Hk".
+  iModIntro. iApply "HΦ". iFrame.
+Qed.
+
 Lemma lwp_exit s i E e v Φ :
   TCEq (to_val e) (Some v) →
   thP_obls i ∅ 1 -∗
-  thread_exec i 1 -∗
-  (ALC (th_term i -∗ thread_term i v -∗ |={E}=>g Φ v)) -∗
+  label i 1 -∗
+  (ALC (th_term i -∗ thread_term i v -∗ |={E}=>m Φ v)) -∗
   lWP Exit e @ s; i; E {{ Φ }}.
 Proof.
   unfold_defs. iIntros (He) "Tb Tx H".
@@ -279,8 +373,8 @@ Lemma lwp_exit_fupd s i E E' e v Φ :
   TCEq (to_val e) (Some v) →
   (|={E,E'}=>
      thP_obls i ∅ 1 ∗
-     thread_exec i 1 ∗
-     (ALC (th_term i -∗ thread_term i v -∗ |={E'}=>g |={E',E}=> Φ v))) -∗
+     label i 1 ∗
+     (ALC (th_term i -∗ thread_term i v -∗ |={E'}=>m |={E',E}=> Φ v))) -∗
   lWP Exit e @ s; i; E {{ Φ }}.
 Proof.
   iIntros (He) "H". iMod "H" as "(Tb& Te& H)". iApply (lwp_exit with "Tb Te"). iFrame.
@@ -440,16 +534,16 @@ Qed.
 
 Lemma lwp_allocN_seq G R o s q i E v n :
   (0 < n)%Z →
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗
+          (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗
           [∗ list] i ∈ seq 0 (Z.to_nat n), (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
   iIntros (Hn Φ) "(T& Tb& Gfs& Rs) HP".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   iSplit.
   { iPureIntro. split; first done. destruct n; auto with lia base_step. }
   iFrame "Tb Gfs Rs".
@@ -466,10 +560,10 @@ Proof.
 Qed.
 
 Lemma lwp_alloc G R o s q i E v :
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) }}}
     Alloc (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗
+          (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗
           l ↦ v ∗ meta_token l ⊤ }}}.
 Proof.
   iIntros (Φ) "P HΦ".
@@ -478,15 +572,15 @@ Proof.
 Qed.
 
 Lemma lwp_free G R o s q i E l v :
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) ∗ l ↦ v }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v }}}
     Free (Val $ LitV $ LitLoc l) @ s; i; E
   l{{{ RET LitV LitUnit;
-          (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) }}}.
+          (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) }}}.
 Proof.
   iIntros (Φ) "((T& Tb& Gfs& Rs)& Hl) HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -498,14 +592,14 @@ Proof.
 Qed.
 
 Lemma lwp_load G R o s q i E l dq v :
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) ∗ l ↦{dq} v }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦{dq} v }}}
     Load (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET v; (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v }}}.
+  l{{{ RET v; (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v }}}.
 Proof.
   iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -516,14 +610,14 @@ Proof.
 Qed.
 
 Lemma lwp_store G R o s q i E l v' v :
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) ∗ l ↦ v' }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET LitV LitUnit; (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v }}}.
+  l{{{ RET LitV LitUnit; (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -535,14 +629,14 @@ Proof.
 Qed.
 
 Lemma lwp_xchg G R o s q i E l v' v :
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) ∗ l ↦ v' }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
     Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET v'; (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v }}}.
+  l{{{ RET v'; (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -555,14 +649,14 @@ Qed.
 
 Lemma lwp_cmpxchg_fail G R o s q i E l dq v' v1 v2 :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) ∗ l ↦{dq} v' }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦{dq} v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v' }}}.
+  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v' }}}.
 Proof.
   iIntros (?? Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -575,14 +669,14 @@ Qed.
 
 Lemma lwp_cmpxchg_suc G R o s q i E l v1 v2 v' :
   v' = v1 → vals_compare_safe v' v1 →
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) ∗ l ↦ v' }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v2 }}}.
+  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v2 }}}.
 Proof.
   iIntros (?? Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -595,14 +689,14 @@ Proof.
 Qed.
 
 Lemma lwp_faa G R o s q i E l i1 i2 :
-  l{{{ (thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)) ∗ l ↦ LitV (LitInt i1) }}}
+  l{{{ (label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ LitV (LitInt i1) }}}
     FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
-  l{{{ RET LitV (LitInt i1); (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
+  l{{{ RET LitV (LitInt i1); (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
   iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -614,14 +708,14 @@ Proof.
 Qed.
 
 Lemma lwp_new_proph G R o s q i E :
-  l{{{thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ map] r ↦ v ∈ R, oblP_id r)}}}
+  l{{{label i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)}}}
     NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r ↦ v ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ proph p pvs }}}.
+  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ proph p pvs }}}.
 Proof.
   iIntros (Φ) "(T& Tb& Gfs& Rs) HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
   iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
   iIntros (v2 σ2 efs Hstep); inv_base_step.
@@ -679,15 +773,15 @@ Lemma lwp_resolve s q i E e Φ (p : proph_id) v (pvs : list (val * val)) :
   Atomic StronglyAtomic e →
   to_val e = None →
   proph p pvs -∗
-  thread_exec i q -∗
-  (thread_exec i q -∗ lWP e @ s; i; E {{ r, ∀ pvs', ⌜pvs = (r, v)::pvs'⌝ -∗ proph p pvs' -∗ Φ r }}) -∗
+  label i q -∗
+  (label i q -∗ lWP e @ s; i; E {{ r, ∀ pvs', ⌜pvs = (r, v)::pvs'⌝ -∗ proph p pvs' -∗ Φ r }}) -∗
   lWP Resolve e (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E {{ Φ }}.
 Proof.
   (* TODO we should try to use a generic lifting lemma (and avoid [lwp_unfold])
      here, since this breaks the lWP abstraction. *)
   iIntros (A He) "Hp T lWPe". rewrite !lwp_unfold /lwp_pre /= He. simpl in *.
   iIntros (Θ σ1 κ κs) "(Ht & Hσ & Hκ)".
-  iPoseProof (thread_exec_thread_cond_0 with "T Ht") as "%Ci".
+  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
   destruct κ as [|[p' [w' v']] κ' _] using rev_ind.
   - iSpecialize ("lWPe" with "T").
     iMod ("lWPe" $! Θ σ1 [] κs with "[$Ht $Hσ $Hκ]") as "H".

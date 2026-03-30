@@ -294,19 +294,18 @@ Section ectx_language.
       econstructor; eauto.
   Qed.
 
-  Record pure_base_step (C : thread_id → state Λ → Prop) (e1 e2 : expr Λ) := {
-    pure_base_step_safe i σ1 Θ : C i σ1 → base_reducible_no_obs i e1 σ1 Θ;
+  Record pure_base_step (e1 e2 : expr Λ) := {
+    pure_base_step_safe i σ1 Θ : base_reducible_no_obs i e1 σ1 Θ;
     pure_base_step_det i σ1 Θ κ e2' σ2 efs :
-      C i σ1 →
       base_step i e1 σ1 Θ κ e2' σ2 efs → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs = ∅
   }.
 
-  Lemma pure_base_step_pure_step C e1 e2 : pure_base_step C e1 e2 → pure_step C e1 e2.
+  Lemma pure_base_step_pure_step e1 e2 : pure_base_step e1 e2 → pure_step e1 e2.
   Proof.
     intros [Hp1 Hp2]. split.
-    - intros i σ1 Θ HC. destruct (Hp1 i σ1 Θ HC) as (e2' & σ2 & efs & ?).
+    - intros i σ1 Θ. destruct (Hp1 i σ1 Θ) as (e2' & σ2 & efs & ?).
       eexists e2', σ2, efs. by apply base_prim_step.
-    - intros i σ1 κ Θ e2' σ2 efs HC ?%base_reducible_prim_step; eauto using base_reducible_no_obs_reducible.
+    - intros i σ1 κ Θ e2' σ2 efs ?%base_reducible_prim_step; eauto using base_reducible_no_obs_reducible.
   Qed.
 
   (** This is not an instance because HeapLang's [wp_pure] tactic already takes
@@ -314,9 +313,9 @@ Section ectx_language.
       If you are defining your own language and your [wp_pure] works
       differently, you might want to specialize this lemma to your language and
       register that as an instance. *)
-  Lemma pure_exec_fill K φ C n e1 e2 :
-    PureExec φ C n e1 e2 →
-    PureExec φ C n (fill K e1) (fill K e2).
+  Lemma pure_exec_fill K φ n e1 e2 :
+    PureExec φ n e1 e2 →
+    PureExec φ n (fill K e1) (fill K e2).
   Proof. apply: pure_exec_ctx. Qed.
 End ectx_language.
 
