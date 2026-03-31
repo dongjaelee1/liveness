@@ -249,100 +249,31 @@ Qed.
 (* Qed. *)
 
 (** Label *)
-Lemma lwp_label s i E t e v Φ :
+(** We don't need to take an actual step.
+    "label i t v" only means that thread i executes "Label t v" in some context,
+    and "Label t v" is a pure step.
+ *)
+Lemma lwp_label i E t e v (P : iProp Σ) :
   TCEq (to_val e) (Some v) →
-  (∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
-             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-             (thP_obls i G 1 -∗
-              ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-              label i t v -∗
-              ALC (|={E}=>m (label i t v ∗ Φ v)))) -∗
-  lWP Label t e @ s; i; E {{ Φ }}.
+  (∀ K n Θ, ⌜LanguageCtx K⌝ -∗ ⌜Θ !! i = Some (K (Label t (of_val v)))⌝ -∗
+            label i t v -∗ |={E:n,dom Θ}=>m (label i t v ∗ P)) -∗
+  lwpupd i E (Label t e) P.
 Proof.
-  iIntros (He) "(%& TG& Fs& %& Rs& H)". iApply lwp_lift_atomic_base_step_no_fork.
-
-  TODO
-  iIntros (K h n σ1 κ κs Θ HK HT) "I". iModIntro. iSplit.
-  { destruct e; inv He. eauto with base_step. }
-  iFrame "TG Fs Rs". iIntros (v2 σ2 efs Hstep); inv_base_step. inv He.
+  Local Transparent lwpupd.
+  rewrite /lwpupd. iIntros (He) "H %%%%%% %HK %HT I".
+  Local Opaque lwpupd.
   iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "(%HI& Ha& (Ih& It& Ip)& Ia)".
   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
-  iIntros "!> TG Rcs". iMod ("H" with "TG Rcs [Ti]") as "H".
-  { unfold_defs. iFrame. eauto. }
-  iMod (thread_map_thread_update _ _ (K (of_val v)) with "[$It $Ti]") as "[It Ti]".
-  
-  iMod (hG_history_auth_app with "Ha") as "Ha".
-  rewrite /history_interp -lock big_sepM_singleton. iFrame.
-  replace (dom (<[i:=K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
-  { rewrite dom_union_L dom_insert_lookup_L; eauto. rewrite dom_singleton_L. auto. }
-  replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
-  { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
-  
-
-  iDestruct "I" as "[It I]".
-
-
-  iSplit; first eauto with base_step.
-
-  TODO
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
-  iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "(%HI& Ha& (Ih& It& Ip)& Ia)".
-  iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
-  iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tb Wcs [Efs]") as "H".
-  { rewrite dom_singleton_L big_sepS_singleton. eauto. }
-  iMod "H" as "(H& E)".
-  iFrame. iModIntro. iSplitR "H"; cycle 1.
-  (* iMod "H". Not working, probably because of the type of expr? *)
-  { iApply sfmupd_lwpupd_elim. iMod "H". by iFrame. }
-  iSplitR.
-  { iPureIntro. destruct HI. split.
-    - rewrite length_app H. simpl. lia.
-    - rewrite last_app. simpl. auto. }
-  iApply (big_sepM_union).
-  { apply map_disjoint_singleton_r_2, not_elem_of_dom. rewrite dom_insert_lookup; eauto. }
-  rewrite big_sepM_singleton. iFrame "Tj".
-  iApply (big_sepM_insert_delete). iFrame.
+  inv He. apply of_to_val in H0. subst e.
+  iMod ("H" $! K n Θ with "[//] [//] [Ti]") as "[Ti $]".
+  { rewrite label_unseal /label_def. iFrame. eauto. }
+  rewrite label_unseal /label_def. iDestruct "Ti" as "(%&%& Ti)".
+  clear dependent K. iPoseProof (thread_expr_read with "It Ti") as "%HT".
+  iModIntro. rewrite /history_interp -lock. iFrame. iSplitR; first eauto.
+  iApply (big_sepM_delete _ _ _ _ HT). iFrame.
 Qed.
-lwp_lift_atomic_base_step_no_fork:
-  ∀ {Λ : ectxLanguage} {SI : indexT} {Σ : gFunctors} {lirisGS0 : lirisGS Λ Σ} {s : stuckness} {i : thread_id} 
-    {E1 E2 : coPset} {Φ : language.val Λ → iProp Σ} (e1 : language.expr Λ),
-    (∀ (K : ctx Λ) (h : list (language.state Λ * thread_pool Λ * list (language.observation Λ))) (n : nat) 
-       (σ1 : language.state Λ) (κ κs : list (language.observation Λ)) (Θ : thread_pool Λ),
-       ⌜LanguageCtx K⌝
-       → ⌜Θ !! i = Some (K e1)⌝
-         → history_interp h n σ1 Θ (κ ++ κs) ={E1,E2}=∗
-           ⌜language.to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ)⌝ ∗
-           ∃ G : oids, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
-             ∃ R : oids, ([∗ set] r ∈ R, oblP_id r) ∗
-               ∀ (e2 : language.expr Λ) (σ2 : ectx_language.state Λ) (efs : gmap thread_id (ectx_language.expr Λ)),
-                 ⌜ectx_language.base_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝ ={∅}=∗
-                 thP_obls i G 1 -∗
-                 ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                 ALC
-                   (|={E2,E1}=> ⌜efs = ∅⌝ ∗
-                      history_interp (h ++ [(σ2, <[i:=K e2]> Θ ∪ efs, κs)]) (S n) σ2 (<[i:=K e2]> Θ ∪ efs) κs ∗
-                      from_option (λ v : language.val Λ, lwpupd i E1 e2 (Φ v)) False (language.to_val e2)))
-    ⊢ lWP e1 @ s; i; E1 {{ v, Φ v }}
 
-
-
-Lemma lwp_label G R o s q i E l dq v :
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦{dq} v }}}
-    Load (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET v; (£ o ∗ label i q ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v }}}.
-Proof.
-  iIntros (Φ) "[(T& Tb& Gfs& Rs) Hl] HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (Θ σ1 κ κs) "(Ht & Hs & Hk) !>".
-  iPoseProof (label_thread_cond_0 with "T Ht") as "%Ci".
-  rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
-  iSplit; first by eauto with base_step.
-  iFrame "Tb Gfs Rs".
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
-  iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame "Ht Hs Hk".
-  iModIntro. iApply "HΦ". iFrame.
-Qed.
+TODO
 
 Lemma lwp_exit s i E e v Φ :
   TCEq (to_val e) (Some v) →
