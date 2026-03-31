@@ -253,10 +253,11 @@ Qed.
     "label i t v" only means that thread i executes "Label t v" in some context,
     and "Label t v" is a pure step.
  *)
-Lemma lwp_label i E t e v (P : iProp Σ) :
+Lemma lwpupd_label i E t e v (P : iProp Σ) :
   TCEq (to_val e) (Some v) →
-  (∀ K n Θ, ⌜LanguageCtx K⌝ -∗ ⌜Θ !! i = Some (K (Label t (of_val v)))⌝ -∗
-            label i t v -∗ |={E:n,dom Θ}=>m (label i t v ∗ P)) -∗
+  (* (∀ K n Θ, ⌜LanguageCtx K⌝ -∗ ⌜Θ !! i = Some (K (Label t (of_val v)))⌝ -∗ *)
+  (*           label i t v -∗ |={E:n,dom Θ}=>m (label i t v ∗ P)) -∗ *)
+  (∀ n D, label i t v -∗ |={E:n,D}=>m (label i t v ∗ P)) -∗
   lwpupd i E (Label t e) P.
 Proof.
   Local Transparent lwpupd.
@@ -265,12 +266,21 @@ Proof.
   iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "(%HI& Ha& (Ih& It& Ip)& Ia)".
   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
   inv He. apply of_to_val in H0. subst e.
-  iMod ("H" $! K n Θ with "[//] [//] [Ti]") as "[Ti $]".
+  iMod ("H" $! n (dom Θ) with "[Ti]") as "[Ti $]".
   { rewrite label_unseal /label_def. iFrame. eauto. }
   rewrite label_unseal /label_def. iDestruct "Ti" as "(%&%& Ti)".
   clear dependent K. iPoseProof (thread_expr_read with "It Ti") as "%HT".
   iModIntro. rewrite /history_interp -lock. iFrame. iSplitR; first eauto.
   iApply (big_sepM_delete _ _ _ _ HT). iFrame.
+Qed.
+
+(* Label itself is pure, so a pure step rule can take care of the actual step. *)
+Lemma lwp_label s i E t e v Φ :
+  TCEq (to_val e) (Some v) →
+  (∀ n D, label i t v -∗ |={E:n,D}=>m (label i t v ∗ lWP Label t e @ s; i; E {{ Φ }})) -∗
+  lWP Label t e @ s; i; E {{ Φ }}.
+Proof.
+  iIntros (He) "H". iMod (lwpupd_label with "H") as "H". eauto.
 Qed.
 
 TODO
