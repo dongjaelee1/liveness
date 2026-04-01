@@ -23,29 +23,35 @@ Tactic Notation "lwp_expr_eval" tactic3(t) :=
 Ltac lwp_expr_simpl := lwp_expr_eval simpl.
 
 Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
-  PureExec φ thread_cond n e1 e2 →
+  PureExec φ n e1 e2 →
   φ →
-  envs_entails Δ (∃ q E' G R (o : Ord.t),
-        ([∗ map] r↦v ∈ R, gl r v) ∗
+  envs_entails Δ (∃ E' G R (o : Ord.t),
+        ([∗ set] r ∈ R, oblP_id r) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
-                       thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 1) ∗
-                       (thread_exec i q -∗ th_obls i G 1 -∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗ ALC (£ o ={E',E}=∗ P)))
+                       thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+                       (thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ ALC (£ o ={E',E}=∗ P)))
            (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "(%&%&%&%&%& #Rs& Iter)". iApply lifting.lwp_pure_step_alt. 1: auto.
-  iFrame "Rs Iter".
+  iIntros "(%&%&%&%& #Rs& Iter)". iApply lifting.lwp_pure_step_alt. 1: auto.
+  iFrame "Rs". iApply (iter_modal_mono_modal with "Iter").
+  { iIntros (??) "Hab >($& $& H)". iIntros "!> TG Rs". iMod ("H" with "TG Rs") as "H".
+    iIntros "LC". iMod ("H" with "LC") as "H". iModIntro. by iApply "Hab". }
+  { iIntros (?) ">($& $& H)". iIntros "!> _ TG Rs". iMod ("H" with "TG Rs") as "H".
+    iIntros "LC". iMod ("H" with "LC") as "H". iModIntro. by iApply "H". }
 Qed.
+
+TODO
 
 Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ G R o s q i E K e1 e2 φ n Φ :
   PureExec φ thread_cond n e1 e2 →
   φ →
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
-  envs_entails Δ ((thread_exec i q ∗ th_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 n) ∗ ([∗ map] r↦v0 ∈ R, gl r v0)) ∗
-                  ((£ (o × n)%ord ∗ thread_exec i q ∗ th_obls i G 1 ∗ ([∗ map] r↦v0 ∈ R, wit r v0 n ∨ gl_done r v0)) -∗ lWP (fill K e2) @ s; i; E {{ Φ }})) →
+  envs_entails Δ ((thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 n) ∗ ([∗ map] r↦v0 ∈ R, gl r v0)) ∗
+                  ((£ (o × n)%ord ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r↦v0 ∈ R, wit r v0 n ∨ gl_done r v0)) -∗ lWP (fill K e2) @ s; i; E {{ Φ }})) →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ?? ->.

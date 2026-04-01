@@ -17,7 +17,7 @@ Section wp.
   Local Hint Resolve base_stuck_stuck : core.
 
   Lemma lwp_lift_base_step {s i E Φ} e1 :
-    (∀ K h n σ1 κ κs Θ,
+    (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
@@ -34,7 +34,7 @@ Section wp.
                                       [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
-    iIntros "H". iApply (lwp_lift_step s i E e1 Φ). iIntros (K h n σ1 κ κs Θ HK HΘ) "Hσ".
+    iIntros "H". iApply (lwp_lift_step s i E e1 Φ). iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
     iMod ("H" $! K with "[//] [//] Hσ") as "(%& %& $& $& %& $& H)"; iModIntro.
     destruct H. iSplit; first by destruct s; eauto.
     iIntros (e2 σ2 efs ?). iApply "H"; eauto.
@@ -63,7 +63,7 @@ Section wp.
   Qed.
 
   Lemma lwp_lift_atomic_base_step {s i E1 E2 Φ} e1 :
-    (∀ K h n σ1 κ κs Θ,
+    (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
@@ -87,7 +87,7 @@ Section wp.
   Qed.
 
   Lemma lwp_lift_atomic_base_step_no_fork {s i E1 E2 Φ} e1 :
-    (∀ K h n σ1 κ κs Θ,
+    (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗

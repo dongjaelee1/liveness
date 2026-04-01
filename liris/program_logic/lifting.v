@@ -22,7 +22,7 @@ Section lifting.
 
   (* For lwp_step, enable progress and fork. *)
   Lemma lwp_step_step s i E e1 ν :
-    (∀ K h n σ1 κ κs Θ,
+    (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
@@ -52,7 +52,7 @@ Section lifting.
   Qed.
 
   Lemma lwp_lift_step s i E e1 Φ :
-    (∀ K h n σ1 κ κs Θ,
+    (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
@@ -70,7 +70,7 @@ Section lifting.
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros "H". rewrite lwp_unfold_fix lwp_fix_unfold /lwp_pre. destruct (to_val e1) eqn:He.
-    { iIntros (?????? ??) "SI". iMod ("H" $! K _ _ _ [] with "[//] [//] SI") as "[[% %] _]". done. }
+    { iIntros (?????? ??) "SI". iMod ("H" $! K _ _ _ _ [] with "[//] [//] SI") as "[[% %] _]". done. }
     iModIntro. iApply lwp_step_step. iIntros (??????? ??) "I".
     iMod ("H" $! K with "[//] [//] I") as "(%& H)". destruct H1 as [_ H1].
     iModIntro. iSplitR; first done. iDestruct "H" as "(%& $& $& %& $& H)".
@@ -126,7 +126,7 @@ Section lifting.
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hsafe Hstep HCS) "H".
-    iApply lwp_lift_step. iIntros (K h n σ1 κ κs Θ HK HΘ) "Hσ".
+    iApply lwp_lift_step. iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
     iMod "H" as "(Hc& (%& Tb& Gfs& %& #Rs& H))".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit.
     { iPureIntro. split.
@@ -155,7 +155,7 @@ Section lifting.
   Qed.
 
   Lemma lwp_lift_atomic_step {s i E1 E2 Φ} e1 :
-    (∀ K h n σ1 κ κs Θ,
+    (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
@@ -173,7 +173,7 @@ Section lifting.
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H". iApply (lwp_lift_step s i E1 e1).
-    iIntros (K h n σ1 κ κs Θ HK HΘ) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "(%& H)".
+    iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "(%& H)".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
     iSplit; first auto.
     iDestruct "H" as "(%& Tb& Gfs& %& #Rs& H)".
