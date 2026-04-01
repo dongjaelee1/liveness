@@ -300,6 +300,15 @@ Section lwpupd.
       intuitionistically_if_elim lwpupd_frame_r wand_elim_r lwpupd_trans.
   Qed.
 
+  (* This instance makes iMod unstable. *)
+  (* Global Instance elim_lwpupd_lwpupd_ctx (p : bool) i E K e P Q : *)
+  (*   ElimModal (LanguageCtx K) p false (lwpupd i E e P) P (lwpupd i E (K e) Q) (lwpupd i E (K e) Q)%I. *)
+  (* Proof. *)
+  (*   rewrite /ElimModal bi.intuitionistically_if_elim //=. *)
+  (*   iIntros "%HK [HP HPQ]". iPoseProof (lwpupd_ctx _ _ _ K with "HP") as "HP". *)
+  (*   iMod "HP". by iApply "HPQ". *)
+  (* Qed. *)
+
   Global Instance elim_modal_fupd_lwpupd_acc p i E1 E2 e P Q :
     ElimModal True p false
       (|={E1,E2}=> P) P
