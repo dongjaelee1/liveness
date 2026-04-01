@@ -23,7 +23,8 @@ Section lifting.
   (* For lwp_step, enable progress and fork. *)
   Lemma lwp_step_step s i E e1 ν :
     (∀ K h n σ1 κ κs Θ,
-       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
+       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
@@ -32,7 +33,8 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={∅,E}=>
-                                    history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                     (ν e2 efs))))
     ⊢ lwp_step s i E e1 ν.
   Proof.
@@ -51,7 +53,8 @@ Section lifting.
 
   Lemma lwp_lift_step s i E e1 Φ :
     (∀ K h n σ1 κ κs Θ,
-       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
+       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
@@ -60,7 +63,8 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={∅,E}=>
-                                    history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                     (lWP e2 @ s; i; E {{ Φ }}) ∗
                                     [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
@@ -95,7 +99,7 @@ Section lifting.
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
     (∀ K h n σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →
-                    history_interp h n σ Θ κ ={E,∅}=∗ ⌜ stuck i e σ (dom Θ) ⌝)
+                    (history_interp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗ ⌜ stuck i e σ (dom Θ) ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
     rewrite lwp_unfold /lwp_pre /lwp_step =>->.
@@ -132,9 +136,10 @@ Section lifting.
     iIntros (e2 σ2 efs ?).
     destruct (Hstep κ σ1 (dom Θ) e2 σ2 efs) as (-> & <- & ->); auto.
     rewrite !map_union_empty. rewrite app_nil_l.
-    iPoseProof (history_interp_step _ _ _ σ2 _ (<[i:=K e2]> Θ) with "Hσ") as "((SI& SIa)& ACC)".
+    iDestruct "Hσ" as "[HI SIa]".
+    iPoseProof (history_interp_step _ _ _ σ2 _ (<[i:=K e2]> Θ) with "HI") as "(SI& ACC)".
     iMod (pure_exec_si _ _ _ _ _ _ HK HΘ H with "[$Hc $SI $SIa]") as "(Hc& SI& SIa)".
-    iMod ("ACC" with "[$SI $SIa]") as "$".
+    iMod ("ACC" with "[$SI]") as "$".
     iIntros "!> Tb Wcs Efs". iMod ("H" with "Hc Tb Wcs [//]") as "H".
     iMod "Hclose" as "_". iMod "H". iModIntro. rewrite big_sepM_empty. iFrame.
   Qed.
@@ -151,7 +156,8 @@ Section lifting.
 
   Lemma lwp_lift_atomic_step {s i E1 E2 Φ} e1 :
     (∀ K h n σ1 κ κs Θ,
-       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E1,E2}=∗
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
+       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
@@ -160,7 +166,8 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={E2,E1}=>
-                                      history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
                                       [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.

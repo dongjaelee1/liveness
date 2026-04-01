@@ -71,8 +71,9 @@ Global Arguments LirisG {SI Λ Σ}.
 Definition lwpupd `{SI : indexT} `{!lirisGS Λ Σ}
   i E e : iPropO Σ -d> iPropO Σ :=
   (λ P, ∀ K h n σ Θ κs,
-     (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e))⌝) → history_interp h n σ Θ κs -∗
-     |={E:n,dom Θ}=>m (history_interp h n σ Θ κs) ∗ P)%I.
+     (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e))⌝) →
+     (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗
+     |={E:n,dom Θ}=>m (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ P)%I.
 
 Section lwpupd.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
@@ -84,7 +85,7 @@ Section lwpupd.
 
   Lemma sfmupd_lwpupd i E e P : (|={E}=>m P) ⊢ (lwpupd i E e P).
   Proof.
-    rewrite /lwpupd. iIntros "Hupd %%%%%% %% SI". iMod ("Hupd" with "SI") as "$". done.
+    rewrite /lwpupd. iIntros "Hupd %%%%%% %% [SI $]". iMod ("Hupd" with "SI") as "$". done.
   Qed.
   Lemma fupd_lwpupd i E e P : (|={E}=> P) ⊢ (lwpupd i E e P).
   Proof. iIntros "H". iApply sfmupd_lwpupd. iMod "H". done. Qed.
@@ -94,8 +95,8 @@ Section lwpupd.
 
   Lemma sfmupd_lwpupd_elim i E e P : (|={E}=>m lwpupd i E e P) ⊢ lwpupd i E e P.
   Proof.
-    iIntros "H". iIntros (?????? ??) "SI". iMod ("H" with "SI") as "[SI H]".
-    rewrite /lwpupd. iApply "H"; eauto.
+    iIntros "H". iIntros (?????? ??) "[SI SIa]". iMod ("H" with "SI") as "[SI H]".
+    rewrite /lwpupd. iApply "H"; eauto. iFrame.
   Qed.
 
   (** Change to a larger mask. *)
@@ -319,8 +320,8 @@ Section lwpupd.
   Lemma all_interp_lwpupd_steps (γ : thread_id → nat) i E e h n σ Θ κs g v Ω W (P : iProp Σ) :
     (Θ !! i = Some e) →
     (owit_inv_lb (fair_sched_fun γ) Ω W) →
-    (lwpupd i E e P) -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
-    (P ∗ history_interp h n σ Θ κs ∗
+    (lwpupd i E e P) -∗ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
+    (P ∗ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
      ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
     iIntros (HTh LB) "HP HI MI". iPoseProof ("HP" $! id with "[] [//] HI") as ">HP".
@@ -334,9 +335,9 @@ Section lwpupd.
     (fst <$> TQ) ⊆ Θ →
     (owit_inv_lb (fair_sched_fun γ) Ω W) →
     ([∗ map] i ↦ '(e, a) ∈ TQ, lwpupd i E e (P i e a)) -∗
-    history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
+    (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
     (([∗ map] i ↦ '(e, a) ∈ TQ, (P i e a)) ∗
-     history_interp h n σ Θ κs ∗
+     (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
      ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
     revert h n σ Θ κs g v Ω W. induction TQ using map_ind; iIntros (h n σ Θ κs g v Ω W EQTQ LB) "PS HI MI".
@@ -363,12 +364,15 @@ Definition lwp_step `{SI : indexT} `{!lirisGS Λ Σ}
   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ K h n σ1 Θ κ κs,
-      (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E,∅}=∗
+     (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
+     (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
       (⌜if s is NotStuck then reducible i e1 σ1 (dom Θ) else True⌝) ∗
       ∀ e2 σ2 (efs : thread_pool Λ), (⌜ prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
       @={n,(dom Θ),i}=↓ (@={n,(S n),(dom Θ),(dom (<[i:=K e2]>Θ) ∪ dom efs)}=>
       (ALC (|=[(S n),(dom (<[i:=K e2]>Θ) ∪ dom efs)]=>m |={∅,E}=>
-           (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗ ν e2 efs))))%I.
+              ((history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
+               state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
+              ν e2 efs))))%I.
 
 Section lwp_step.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
@@ -431,10 +435,8 @@ Definition lwp_pre `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness)
   λ i E e1 Φ,
     (match to_val e1 with
      | Some v => lwpupd i E e1 (Φ v)
-     (* | Some v => (|={E}=>m Φ v) *)
      | None =>
          (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lwp j ⊤ ef (lift_term j fork_post))))
-     (* | None => (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, |={⊤}=>m lwp j ⊤ ef (lift_term j fork_post))) *)
      end)%I.
 
 Lemma lwp_pre_mono `{SI : indexT} `{!lirisGS Λ Σ} s
@@ -473,8 +475,6 @@ Definition lwp_fix `{SI : indexT} `{!lirisGS Λ Σ} : stuckness -> thread_id -> 
 (* take the least fixpoint of the above definition, with partial sate information *)
 Local Definition lwp_def `{SI : indexT} `{!lirisGS Λ Σ} : Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
   λ s i E e Φ, (lwpupd i E e (lwp_fix s i E e Φ))%I.
-  (* λ s i E e Φ, (lwpupd i E e ((bi_least_fixpoint (lwp_pre' s)) (i,E,e,Φ)))%I. *)
-  (* λ s i E e Φ, ((bi_least_fixpoint (lwp_pre' s)) (i,E,e,Φ))%I. *)
 Local Definition lwp_aux : seal (@lwp_def). by eexists. Qed.
 Definition lwp' := lwp_aux.(unseal).
 Global Arguments lwp' {SI Λ Σ _}.
@@ -541,24 +541,6 @@ Section lwp.
     lWP e @ s; i; E {{ Φ }} ⊣⊢ (lwpupd i E e (lwp_fix s i E e Φ)).
   Proof. rewrite lwp_unfold lwp_fix_unfold. done. Qed.
 
-  (* Lemma lwp_cond s i E e Φ : *)
-  (*   lWP e @ s; i; E {{ Φ }} ⊣⊢ (ς -∗ lWP e @ s; emp; i; E {{ Φ }}). *)
-  (* Proof. *)
-  (*   rewrite !lwp_unfold. iSplit; iIntros "H Hc". *)
-  (*   - iIntros "_". by iApply "H". *)
-  (*   - by iApply ("H" with "Hc"). *)
-  (* Qed. *)
-  (* Lemma lwp_cond_intro s i E e Φ : *)
-  (*   (ς -∗ lWP e @ s; emp; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}. *)
-  (* Proof. *)
-  (*   rewrite (lwp_cond _ ς). iIntros "H Hc". by iApply "H". *)
-  (* Qed. *)
-  (* Lemma lwp_cond_elim s i E e Φ : *)
-  (*   lWP e @ s; i; E {{ Φ }} -∗ ς -∗ lWP e @ s; emp; i; E {{ Φ }}. *)
-  (* Proof. *)
-  (*   rewrite (lwp_cond _ ς). iIntros "H Hc". by iApply "H". *)
-  (* Qed. *)
-
   Lemma lwp_ind_strong s Ψ :
     (∀ n i E e, Proper (pointwise_relation _ (dist n) ==> dist n) (Ψ i E e))
     → ⊢ (□ (∀ i e E Φ, lwp_pre s (λ i E e Φ, Ψ i E e Φ ∧ lWP e @ s; i; E {{ Φ }}) i E e Φ -∗ Ψ i E e Φ)
@@ -608,17 +590,6 @@ Section lwp.
   Proof.
     by intros Φ Φ' ?; apply equiv_dist=>n; apply lwp_ne=>v; apply equiv_dist.
   Qed.
-
-  (* Global Instance lwp_ne_2 s i E e Φ n : *)
-  (*   Proper ((dist n) ==> dist n) (λ ς, lwp (PROP:=iProp Σ) s i E e Φ). *)
-  (* Proof. *)
-  (*   intros ?? HΦ. rewrite !lwp_unseal /lwp_def. f_equiv. done. *)
-  (* Qed. *)
-  (* Global Instance lwp_proper_2 s i E e Φ : *)
-  (*   Proper ((≡) ==> (≡)) (λ ς, lwp (PROP:=iProp Σ) s i E e Φ). *)
-  (* Proof. *)
-  (*   intros ???. apply equiv_dist=>n. apply lwp_ne_2. by apply equiv_dist. *)
-  (* Qed. *)
 
   Lemma lwpupd_elim_lwp s i E e Φ :
     (lwpupd i E e (lWP e @ s; i; E {{ Φ }})) ⊢ lWP e @ s; i; E {{ Φ }}.

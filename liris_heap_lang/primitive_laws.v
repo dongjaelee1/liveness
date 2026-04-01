@@ -212,7 +212,7 @@ Proof.
   iIntros (K h n σ1 κ κs Θ HK HT) "I". iMod "H" as "(%&$&$& %&$& H)".
   iModIntro. iSplit; first eauto with base_step.
   iIntros (v2 σ2 efs Hstep); inv_base_step.
-  iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "(%HI& Ha& (Ih& It& Ip)& Ia)".
+  iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
   iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
   iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tb Wcs [Efs]") as "H".
   { rewrite dom_singleton_L big_sepS_singleton. eauto. }
@@ -255,29 +255,29 @@ Qed.
  *)
 Lemma lwpupd_label i E t e v (P : iProp Σ) :
   TCEq (to_val e) (Some v) →
-  (* (∀ K n Θ, ⌜LanguageCtx K⌝ -∗ ⌜Θ !! i = Some (K (Label t (of_val v)))⌝ -∗ *)
-  (*           label i t v -∗ |={E:n,dom Θ}=>m (label i t v ∗ P)) -∗ *)
-  (∀ n D, label i t v -∗ |={E:n,D}=>m (label i t v ∗ P)) -∗
+  (label i t v -∗ |={E}=>m (label i t v ∗ P)) -∗
   lwpupd i E (Label t e) P.
 Proof.
-  Local Transparent lwpupd.
+  Local Transparent lwpupd sfmupd.
   rewrite /lwpupd. iIntros (He) "H %%%%%% %HK %HT I".
-  Local Opaque lwpupd.
-  iEval (rewrite /history_interp -lock) in "I". iDestruct "I" as "(%HI& Ha& (Ih& It& Ip)& Ia)".
+  iDestruct "I" as "[HI Ia]".
   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
   inv He. apply of_to_val in H0. subst e.
-  iMod ("H" $! n (dom Θ) with "[Ti]") as "[Ti $]".
+  iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& $)".
   { rewrite label_unseal /label_def. iFrame. eauto. }
   rewrite label_unseal /label_def. iDestruct "Ti" as "(%&%& Ti)".
-  clear dependent K. iPoseProof (thread_expr_read with "It Ti") as "%HT".
+  clear dependent K.
+  iEval (rewrite /history_interp -lock) in "HI". iDestruct "HI" as "(%HI& Ha& (Ih& It& Ip))".
+  iPoseProof (thread_expr_read with "It Ti") as "%HT".
   iModIntro. rewrite /history_interp -lock. iFrame. iSplitR; first eauto.
   iApply (big_sepM_delete _ _ _ _ HT). iFrame.
+  Local Opaque lwpupd sfmupd.
 Qed.
 
 (* Label itself is pure, so a pure step rule can take care of the actual step. *)
 Lemma lwp_label s i E t e v Φ :
   TCEq (to_val e) (Some v) →
-  (∀ n D, label i t v -∗ |={E:n,D}=>m (label i t v ∗ lWP Label t e @ s; i; E {{ Φ }})) -∗
+  (label i t v -∗ |={E}=>m (label i t v ∗ lWP Label t e @ s; i; E {{ Φ }})) -∗
   lWP Label t e @ s; i; E {{ Φ }}.
 Proof.
   iIntros (He) "H". iMod (lwpupd_label with "H") as "H". eauto.

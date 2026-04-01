@@ -18,7 +18,8 @@ Section wp.
 
   Lemma lwp_lift_base_step {s i E Φ} e1 :
     (∀ K h n σ1 κ κs Θ,
-       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E,∅}=∗
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
+       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
@@ -27,7 +28,8 @@ Section wp.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                                ALC (|={∅,E}=>
-                                      history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       (lWP e2 @ s; i; E {{ Φ }}) ∗
                                       [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
@@ -42,7 +44,7 @@ Section wp.
     to_val e = None →
     sub_redexes_are_values e →
     (∀ K h n σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →
-                    history_interp h n σ Θ κ ={E,∅}=∗ ⌜ base_stuck i e σ (dom Θ) ⌝)
+                    (history_interp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗ ⌜ base_stuck i e σ (dom Θ) ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
     iIntros (??) "H". iApply lwp_lift_stuck; first done.
@@ -62,7 +64,8 @@ Section wp.
 
   Lemma lwp_lift_atomic_base_step {s i E1 E2 Φ} e1 :
     (∀ K h n σ1 κ κs Θ,
-       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E1,E2}=∗
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
+       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
@@ -71,7 +74,8 @@ Section wp.
                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                               ([∗ set] j ∈ dom efs, thP_obls j ∅ 1) -∗
                               ALC (|={E2,E1}=>
-                                     history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                     (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                      (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
                                      [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
@@ -84,7 +88,8 @@ Section wp.
 
   Lemma lwp_lift_atomic_base_step_no_fork {s i E1 E2 Φ} e1 :
     (∀ K h n σ1 κ κs Θ,
-       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) → history_interp h n σ1 Θ (κ ++ κs) ={E1,E2}=∗
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
+       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
        ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
@@ -93,7 +98,8 @@ Section wp.
                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                               ALC (|={E2,E1}=>
                                      ⌜efs = ∅⌝ ∗
-                                     history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                     (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                      (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2))))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.

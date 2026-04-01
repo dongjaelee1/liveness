@@ -100,8 +100,8 @@ End proof.
     with the thread ids to connect to the obligation model. *)
 Class state_interp_class `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
   { state_interp : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
-    (* Auxiliary data for convenience.
-       For example, we might want to hold some of state_pred_interp inside the lwp. *)
+    (** Auxiliary data about the state.
+        For example, we might want to hold some of state_pred_interp inside the lwp. *)
     state_interp_aux : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
     state_pred_interp : state_pred Λ → iProp Σ;
     state_interp_wf : (∀ σ Θ κs π, (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ π ⌝);
@@ -112,7 +112,7 @@ Definition history_interp `{SI : indexT} `{@state_interp_class SI Λ Σ}
   (h : list ((state Λ) * (thread_pool Λ) * (list (observation Λ))))
   (n : nat) σ Θ κs : iProp Σ :=
   locked (⌜ length h = (S n) ∧ last h = Some ((σ, Θ), κs) ⌝ ∗
-          hG_history_auth h ∗ state_interp σ Θ κs ∗ state_interp_aux σ Θ κs)%I.
+          hG_history_auth h ∗ state_interp σ Θ κs)%I.
 Global Typeclasses Opaque history_interp.
 Global Instance: Params (@history_interp) 5 := {}.
 
@@ -149,11 +149,11 @@ Section hist.
 
   Lemma history_interp_step h n σ1 σ2 Θ1 Θ2 κs1 κs2 :
     (history_interp h n σ1 Θ1 κs1)
-    ⊢ (state_interp σ1 Θ1 κs1 ∗ state_interp_aux σ1 Θ1 κs1) ∗
-    ((state_interp σ2 Θ2 κs2 ∗ state_interp_aux σ2 Θ2 κs2) ==∗
+    ⊢ (state_interp σ1 Θ1 κs1) ∗
+    ((state_interp σ2 Θ2 κs2) ==∗
      history_interp (h ++ [(σ2, Θ2, κs2)]) (S n) σ2 Θ2 κs2).
   Proof.
-    rewrite /history_interp -!lock. iIntros "(%& Ha& $& $)". iIntros "[SI SIa]".
+    rewrite /history_interp -!lock. iIntros "(%& Ha& $)". iIntros "SI".
     iMod (hG_history_auth_app _ [(σ2, Θ2, κs2)] with "Ha") as "Ha". iFrame. iPureIntro.
     destruct H. rewrite length_app H last_app. simpl. split; auto. lia.
   Qed.
@@ -205,7 +205,7 @@ Lemma history_interp_init `{SI : indexT} `{SIC : !state_interp_class Λ Σ}
   `{HIST : !histGpreS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   σ Θ κs :
   ⊢ |==> ∃ _ : histGS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ))),
-    ((state_interp σ Θ κs ∗ state_interp_aux σ Θ κs) ==∗ history_interp [(σ, Θ, κs)] 0 σ Θ κs).
+    ((state_interp σ Θ κs) ==∗ history_interp [(σ, Θ, κs)] 0 σ Θ κs).
 Proof.
   iMod (own_alloc (●ML ([(σ, Θ, κs)] : list (leibnizO _)) : mono_listUR (leibnizO _))) as (γH) "HH";
     first by apply mono_list_auth_valid.
