@@ -15,22 +15,19 @@ From liris.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 From liris.algebra Require Export ordinal_wfocm.
 
-Class heapGS Σ :=
-  HeapGS {
-      heapGS_mupdGS : mupdGS Σ;
-      heapGS_histGS : histGS.histGS Σ (state * thread_pool heap_lang * list (observation));
-
-      #[global] heapGS_gen_heapGS :: gen_heapGS loc (option val) Σ;
-      #[global] heapGS_inv_heapGS :: inv_heapGS loc (option val) Σ;
-      #[global] heapGS_proph_mapGS :: proph_mapGS proph_id (val * val) Σ;
-      #[global] heapGS_thread_mapGS :: thread_mapGS thread_id (expr) Σ;
+Class heap_stateGS Σ :=
+  HeapStateGS {
+      #[global] heap_stateGS_gen_heap_stateGS :: gen_heapGS loc (option val) Σ;
+      #[global] heap_stateGS_inv_heap_stateGS :: inv_heapGS loc (option val) Σ;
+      #[global] heap_stateGS_proph_mapGS :: proph_mapGS proph_id (val * val) Σ;
+      #[global] heap_stateGS_thread_mapGS :: thread_mapGS thread_id (expr) Σ;
     }.
 
 (** Since we use an [option val] instance of [gen_heap], we need to add a
 [Some]. We also seal the definition to avoid confusion between the version from
 [gen_heap], and our version with [Some]. That also helps for scopes and
 coercions. *)
-Local Definition pointsto_def `{heapGS Σ}
+Local Definition pointsto_def `{heap_stateGS Σ}
     (l : loc) (dq : dfrac) (v : val) : iProp Σ :=
   pointsto l dq (Some v).
 Local Definition pointsto_aux : seal (@pointsto_def). Proof. by eexists. Qed.
@@ -43,10 +40,10 @@ Notation "l ↦ dq v" := (pointsto l dq v)
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
 
 (** Predicates for label invocations. *)
-Definition thread_expr `{heapGS Σ} (i : thread_id) (e : expr) : iProp Σ :=
+Definition thread_expr `{heap_stateGS Σ} (i : thread_id) (e : expr) : iProp Σ :=
   (thread i true e 1).
 
-Local Definition label_def `{heapGS Σ}
+Local Definition label_def `{heap_stateGS Σ}
   (i : thread_id) (x : string) (v : val) : iProp Σ :=
   (∃ (K : ctx heap_lang), ⌜ LanguageCtx K ⌝ ∧ thread_expr i (K (Label x (of_val v)))).
 Local Definition label_aux : seal (@label_def). Proof. by eexists. Qed.
@@ -55,16 +52,16 @@ Local Definition label_unseal :
   @label = @label_def := label_aux.(seal_eq).
 Global Arguments label {Σ _}.
 
-Definition state_interp `{!heapGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
+Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
    thread_map_interp (dom Θ) Θ ∗
    proph_map_interp κs σ.(used_proph_id))%I.
 
-Definition state_interp_aux `{!heapGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
+Definition state_interp_aux `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   ([∗ map] i ↦ e ∈ Θ, thread_expr i e)%I.
 
 (** State predicate. *)
-Definition state_pred_interp `{!heapGS Σ} (π : state_pred) : iProp Σ :=
+Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
   match π with
   | pred_pointsto l df v =>
       pointsto l df v
@@ -72,7 +69,7 @@ Definition state_pred_interp `{!heapGS Σ} (π : state_pred) : iProp Σ :=
       label i x v
   end.
 
-Lemma thread_expr_read `{!heapGS Σ} :
+Lemma thread_expr_read `{!heap_stateGS Σ} :
   ∀ (Θ : thread_pool heap_lang) i e,
   thread_map_interp (dom Θ) Θ -∗ thread_expr i e -∗ ⌜Θ !! i = Some e⌝.
 Proof.
@@ -80,7 +77,7 @@ Proof.
   iPoseProof (thread_map_thread_read with "TI Ti") as "%". eauto.
 Qed.
 
-Lemma state_interp_wf `{!heapGS Σ} :
+Lemma state_interp_wf `{!heap_stateGS Σ} :
   ∀ (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) (π : state_pred),
   state_interp σ Θ κs ∗ state_pred_interp π ⊢ ⌜state_sat σ Θ π⌝.
 Proof.
@@ -90,23 +87,30 @@ Proof.
     iPoseProof (thread_expr_read with "TI Ti") as "%". eauto.
 Qed.
 
-Global Instance heapGS_state_interp_class `{!heapGS Σ} : state_interp_class heap_lang Σ := {
+Global Instance heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ := {
     state_interp := state_interp;
     state_interp_aux := state_interp_aux;
     state_pred_interp := state_pred_interp;
     state_interp_wf := state_interp_wf;
   }.
 
+Class heapGS Σ :=
+  HeapGS {
+      heapGS_mupdGS : mupdGS Σ;
+      heapGS_histGS : histGS.histGS Σ (state * thread_pool heap_lang * list (observation));
+      #[global] heapGS_heap_stateGS :: heap_stateGS Σ;
+    }.
+
 Global Instance heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ := {
     temporal_mupdGS := heapGS_mupdGS;
-    temporal_state_interp_class := heapGS_state_interp_class;
+    temporal_state_interp_class := heap_state_interp_class;
     temporal_histGS := heapGS_histGS;
   }.
 
 Global Instance heapGS_lirisGS `{!heapGS Σ} : lirisGS heap_lang Σ := {
-    liris_temporalGS := heapGS_temporalGS;
+    liris_temporalGS := _;
+    (* liris_temporalGS := heapGS_temporalGS; *)
     fork_post i v := (True)%I;
-    (* fork_post i v := (thread_term i (of_val v))%I; *)
   }.
 
 (** [gen_inv_heap]: Similar to pointsto,
@@ -207,6 +211,28 @@ Proof.
     iMod ("H" with "TG Crs") as "H". iIntros "LC". iMod ("H" with "LC") as "$". done.
 Qed.
 
+Lemma test i E e P :
+  (* (|={E}=>m P) ⊢ lwpupd i E e P. *)
+  (lwpupd i E e P) ⊢ lwpupd i E e P.
+Proof.
+  Fail iIntros ">H".
+  replace (@heapGS_temporalGS Σ heapGS0) with (liris_temporalGS).
+  2:{ done. }
+  iIntros ">H".
+
+  TODO
+  (* FIXME: typeclass design is not good. *)
+  
+Error: Tactic failure: iMod: cannot eliminate modality (@lwpupd ordSI heap_lang Σ (@heapGS_temporalGS Σ heapGS0) i E e P) in
+(@lwpupd ordSI heap_lang Σ (@heapGS_temporalGS Σ heapGS0) i E e P).
+
+@elim_modal_lwpupd ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)
+     : forall (p : bool) (i : thread_id) (E : coPset) (e : language.expr heap_lang) (P Q : @uPred ordSI (@iResUR ordSI Σ)),
+       @ElimModal ordSI (@uPredI ordSI (@iResUR ordSI Σ)) True p false
+         (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e P) P
+         (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e Q)
+         (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e Q)
+
 Lemma lwp_fork s i E E' e Φ :
   (|={E,E'}=> ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
              ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
@@ -236,8 +262,31 @@ Proof.
   replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
   { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
   iFrame. iModIntro. iSplitR "H"; cycle 1.
-  (* iMod "H". Not working, probably because of the type of expr? *)
-  { iApply sfmupd_lwpupd_elim. iMod "H". by iFrame. }
+  { TODO Set Printing All. iMod "H".
+Error: Tactic failure: iMod: cannot eliminate modality
+(@sfmupd ordSI heap_lang Σ (@heap_state_interp_class Σ (@heapGS_heap_stateGS Σ heapGS0)) fair_sched_ub_ord_mono_fun_class
+   (@temporal_mupdGS ordSI heap_lang Σ (@heapGS_temporalGS Σ heapGS0))
+   (@temporal_histGS ordSI heap_lang Σ (@heapGS_temporalGS Σ heapGS0)) E (Φ (LitV LitUnit)))
+in
+(@lwpupd ordSI (ectx_lang heap_ectx_lang) Σ (@liris_temporalGS ordSI (ectx_lang heap_ectx_lang) Σ (@heapGS_lirisGS Σ heapGS0)) i E
+   (Val (LitV LitUnit)) (Φ (LitV LitUnit))).
+@elim_sfmupd_lwpupd ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)
+     : forall (p : bool) (i : thread_id) (E : coPset) (e : language.expr heap_lang) (P Q : @uPred ordSI (@iResUR ordSI Σ)),
+       @ElimModal ordSI (@uPredI ordSI (@iResUR ordSI Σ)) True p false
+         (@sfmupd ordSI heap_lang Σ
+            (@temporal_state_interp_class ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)))
+            fair_sched_ub_ord_mono_fun_class
+            (@temporal_mupdGS ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)))
+            (@temporal_histGS ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0))) E P)
+         P (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e Q)
+         (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e Q)
+
+    elim_sfmupd_lwpupd:
+  ∀ {SI : indexT} {Λ : language} {Σ : gFunctors} {lirisGS0 : lirisGS Λ Σ} (p : bool) (i : thread_id) (E : coPset) 
+    (e : language.expr Λ) (P Q : iProp Σ), ElimModal True p false (|={E}=>m P) P (lwpupd i E e Q) (lwpupd i E e Q)
+
+
+    iApply sfmupd_lwpupd_elim. iMod "H". by iFrame. }
   iSplitR.
   { iPureIntro. destruct HI. split.
     - rewrite length_app H. simpl. lia.
@@ -268,12 +317,11 @@ Lemma lwpupd_label i E t e v (P : iProp Σ) :
   (label i t v -∗ |={E}=>m (label i t v ∗ P)) -∗
   lwpupd i E (Label t e) P.
 Proof.
-  Local Transparent lwpupd sfmupd.
-  rewrite /lwpupd. iIntros (He) "H %%%%%% %HK %HT I".
+  unfold_lwpupd. iIntros (He) "H %%%%%% %HK %HT I".
   iDestruct "I" as "[HI Ia]".
   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
   inv He. apply of_to_val in H0. subst e.
-  iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& $)".
+  iEval (unfold_sfmupd) in "H". iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& $)".
   { rewrite label_unseal /label_def. iFrame. eauto. }
   rewrite label_unseal /label_def. iDestruct "Ti" as "(%&%& Ti)".
   clear dependent K.
@@ -281,8 +329,43 @@ Proof.
   iPoseProof (thread_expr_read with "It Ti") as "%HT".
   iModIntro. iFrame. iSplitR; first eauto.
   iApply (big_sepM_delete _ _ _ _ HT). iFrame.
-  Local Opaque lwpupd sfmupd.
 Qed.
+
+(* Section modal. *)
+(*   (** FIXME: ElimModal instances in weakestpre.v don't work, probably due to typeclass issues. *) *)
+(*   Import uPred. *)
+
+(*   Global Instance elim_modal_bupd_lwp' p s i E e P Φ : *)
+(*     ElimModal True p false (|==> P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
+(*   Proof. *)
+(*     rewrite /ElimModal intuitionistically_if_elim (bupd_fupd E) fupd_frame_r wand_elim_r. *)
+(*     iIntros (?) "H". iApply fupd_lwp. iFrame. *)
+(*   Qed. *)
+
+(*   Global Instance elim_modal_fupd_lwp' p s i E e P Φ : *)
+(*     ElimModal True p false (|={E}=> P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
+(*   Proof. *)
+(*     rewrite /ElimModal intuitionistically_if_elim fupd_frame_r wand_elim_r. *)
+(*     iIntros (?) "H". iApply fupd_lwp. iFrame. *)
+(*   Qed. *)
+
+(*   Global Instance elim_modal_sfmupd_lwp' p s i E e P Φ : *)
+(*     ElimModal True p false (|={E}=>m P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
+(*   Proof. *)
+(*     rewrite /ElimModal intuitionistically_if_elim. *)
+(*     iIntros (_) "[P H]". iApply sfmupd_elim_lwp. iMod "P". *)
+(*     iModIntro. by iApply ("H" with "P"). *)
+(*   Qed. *)
+
+(*   Global Instance elim_modal_lwpupd_lwp' p s i E e P Φ : *)
+(*     ElimModal True p false (lwpupd i E e P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
+(*   Proof. *)
+(*     rewrite /ElimModal intuitionistically_if_elim. *)
+(*     iIntros (_) "[P H]". iApply lwpupd_elim_lwp. iMod "P". *)
+(*     iModIntro. by iApply ("H" with "P"). *)
+(*   Qed. *)
+
+(* End modal. *)
 
 (* Label itself is a pure computation, so a pure step rule can take care of the actual step. *)
 Lemma lwp_label s i E t e v Φ :

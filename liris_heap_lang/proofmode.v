@@ -44,22 +44,21 @@ Proof.
     iIntros "LC". iMod ("H" with "LC") as "H". iModIntro. by iApply "H". }
 Qed.
 
-TODO
-
-Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ G R o s q i E K e1 e2 φ n Φ :
-  PureExec φ thread_cond n e1 e2 →
+Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ G R o s i E K e1 e2 φ n Φ :
+  PureExec φ n e1 e2 →
   φ →
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
-  envs_entails Δ ((thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ dom G, gl_fuel g 0 n) ∗ ([∗ map] r↦v0 ∈ R, gl r v0)) ∗
-                  ((£ (o × n)%ord ∗ thread_exec i q ∗ thP_obls i G 1 ∗ ([∗ map] r↦v0 ∈ R, wit r v0 n ∨ gl_done r v0)) -∗ lWP (fill K e2) @ s; i; E {{ Φ }})) →
+  envs_entails Δ ((thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗
+                  ((£ (o × n)%ord ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r)) -∗
+                   lWP (fill K e2) @ s; i; E {{ Φ }})) →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
   iIntros "[T H]". iApply lifting.lwp_pure_step_simple. 1: auto.
-  iDestruct "T" as "(Tx& TG& Gfs& Rs)". iFrame.
-  iIntros "Tx TG Ws LC". iApply "H". iFrame.
+  iDestruct "T" as "($& $& $)".
+  iIntros "_ TG Ws LC". iApply "H". by iFrame.
 Qed.
 
 Lemma tac_lwp_value_nofupd `{!heapGS Σ} Δ s i E Φ v :
@@ -67,8 +66,63 @@ Lemma tac_lwp_value_nofupd `{!heapGS Σ} Δ s i E Φ v :
 Proof. rewrite envs_entails_unseal=> ->. by apply lwp_value. Qed.
 
 Lemma tac_lwp_value `{!heapGS Σ} Δ s i E (Φ : val → iPropI Σ) v :
-  envs_entails Δ (|={E}=>g Φ v) → envs_entails Δ (lWP (Val v) @ s; i; E {{ Φ }}).
-Proof. rewrite envs_entails_unseal=> ->. by rewrite lwp_value_sfgupd. Qed.
+  envs_entails Δ (|={E}=>m Φ v) → envs_entails Δ (lWP (Val v) @ s; i; E {{ Φ }}).
+Proof. rewrite envs_entails_unseal=> ->.
+
+       TODO
+       Set Printing All.
+       iIntros ">H".
+Error: Tactic failure: iMod: cannot eliminate modality
+(@sfmupd ordSI heap_lang Σ (@heap_state_interp_class Σ (@heapGS_heap_stateGS Σ heapGS0)) fair_sched_ub_ord_mono_fun_class
+   (@temporal_mupdGS ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)))
+   (@temporal_histGS ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0))) E 
+   (Φ v))
+in
+(@lwp (@bi_car _ (@uPredI ordSI (@iResUR ordSI Σ))) expr val stuckness thread_id
+   (@lwp' ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) s i E (Val v) Φ).
+
+@elim_modal_sfmupd_lwp ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)
+     : forall (p : bool) (s : stuckness) (i : thread_id) (E : coPset) (e : language.expr heap_lang)
+         (P : @uPred ordSI (@iResUR ordSI Σ)) (Φ : forall _ : language.val heap_lang, @uPred ordSI (@iResUR ordSI Σ)),
+       @ElimModal ordSI (@uPredI ordSI (@iResUR ordSI Σ)) True p false
+         (@sfmupd ordSI heap_lang Σ
+            (@temporal_state_interp_class ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)))
+            fair_sched_ub_ord_mono_fun_class
+            (@temporal_mupdGS ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)))
+            (@temporal_histGS ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0))) E P)
+         P
+         (@lwp (@uPred ordSI (@iResUR ordSI Σ)) (language.expr heap_lang) (language.val heap_lang) stuckness thread_id
+            (@lwp' ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) s i E e Φ)
+         (@lwp (@uPred ordSI (@iResUR ordSI Σ)) (language.expr heap_lang) (language.val heap_lang) stuckness thread_id
+            (@lwp' ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) s i E e Φ)
+
+
+elim_modal_sfmupd_lwp:
+  ∀ {SI : indexT} {Λ : language} {Σ : gFunctors} {lirisGS0 : lirisGS Λ Σ} (p : bool) (s : stuckness) (i : thread_id) 
+    (E : coPset) (e : language.expr Λ) (P : iProp Σ) (Φ : language.val Λ → iProp Σ),
+    ElimModal True p false (|={E}=>m P) P (lWP e @ s; i; E {{ v, Φ v }}) (lWP e @ s; i; E {{ v, Φ v }})
+
+
+iAssert (|={E}=> (Φ v))%I as "A".
+       2:{ iClear "H". iMod "A".
+       iIntros ">H".
+
+       rewrite lwp_value_lwpupd.
+       iIntros "H". iApply (elim_sfmupd_lwpupd false). 1: auto.
+       iSplitL "H". 1: iFrame.
+       
+       
+       replace (Val v) with (Val v : language.expr heap_lang).
+       1: iIntros ">H".
+  Global Instance elim_sfmupd_lwpupd (p : bool) i E e P Q :
+    ElimModal True p false (|={E}=>m P) P (lwpupd i E e Q) (lwpupd i E e Q)%I.
+
+       TODO
+       Set Printing All.
+
+       TODO
+
+       iIntros ">H". Qed.
 
 (** Simplify the goal if it is [WP] of a value.
   If the postcondition already allows a fupd, do not add a second one.

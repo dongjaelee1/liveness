@@ -343,7 +343,7 @@ Section proof.
                         oblP_layer k ℓ ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "HQ".
-    rewrite /sfmupd /fmupd. iIntros (?????) "SI".
+    unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     (* FIXME: proof without unfold everything? *)
     unfold_opreds. iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
@@ -405,7 +405,7 @@ Section proof.
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
     iIntros "!> %%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
     iNext. iDestruct "H" as "(Oa1& Oa2& HQ)". iCombine "Oa1 Oa2" as "Oa".
-    rewrite /sfmupd /fmupd. iIntros (?????) "SI".
+    unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     (* FIXME: it would be better if we don't need to unfold everything and re-do the proof here... *)
     unfold_opreds. iDestruct "TG" as "(#Oe& Ox& Ob& OS)". iDestruct "OI" as "(#Ge& Gvar)". iDestruct "Oa" as "(_& Gl)".

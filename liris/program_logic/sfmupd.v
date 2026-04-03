@@ -4,10 +4,19 @@ From liris.base_logic Require Export opreds.
 From liris.program_logic Require Export history_interp.
 Import uPred.
 
-Definition sfmupd `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
+Local Definition sfmupd_def `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   E : iPropO Σ -d> iPropO Σ :=
   (λ P, ∀ h n σ Θ κs, (history_interp h n σ Θ κs) -∗ |={E:n,dom Θ}=>m (history_interp h n σ Θ κs) ∗ P)%I.
+Local Definition sfmupd_aux : seal (@sfmupd_def). Proof. by eexists. Qed.
+Definition sfmupd := sfmupd_aux.(unseal).
+Global Arguments sfmupd {SI Λ Σ _ _ _ _}.
+Local Lemma sfmupd_unseal `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
+  `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} :
+  sfmupd = @sfmupd_def SI Λ Σ _ _ _ _.
+Proof. rewrite -sfmupd_aux.(seal_eq) //. Qed.
+
+Ltac unfold_sfmupd := rewrite sfmupd_unseal /sfmupd_def.
 
 Notation "'|={' E '}=>m' P" := (sfmupd E P) (at level 99, P at level 200, format "|={ E }=>m  P").
 
@@ -16,26 +25,26 @@ Section sfmupd.
   Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}.
 
   Global Instance sfmupd_ne E : NonExpansive (sfmupd E).
-  Proof. intros n P1 P2 HP. rewrite /sfmupd. do 14 (f_equiv || done). Qed.
+  Proof. intros n P1 P2 HP. rewrite sfmupd_unseal /sfmupd_def. do 14 (f_equiv || done). Qed.
   Global Instance sfmupd_proper E : Proper ((≡) ==> (≡)) (sfmupd E).
   Proof. intros P P' ?. apply equiv_dist=>n. apply sfmupd_ne. apply equiv_dist. done. Qed.
 
   Lemma fupd_sfmupd E P : (|={E}=> P) ⊢ (|={E}=>m P).
   Proof.
-    rewrite /sfmupd. iIntros ">Hupd %%%%% SI".
+    unfold_sfmupd. iIntros ">Hupd %%%%% SI".
     iApply fupd_mask_intro. 1: set_solver.
     iIntros "Hclose !>". iMod "Hclose" as "_". iModIntro. iFrame.
   Qed.
 
   Lemma sfmupd_intro E P : P ⊢ |={E}=>m P.
   Proof.
-    iIntros "$ %%%%% $". iMod (fupd_mask_subseteq ∅) as "Hclose". 1: set_solver.
+    unfold_sfmupd. iIntros "$ %%%%% $". iMod (fupd_mask_subseteq ∅) as "Hclose". 1: set_solver.
     iIntros "!> !>". iMod "Hclose". done.
   Qed.
 
   Lemma fupd_sfmupd_elim E P : (|={E}=> |={E}=>m P) ⊢ |={E}=>m P.
   Proof.
-    iIntros "H". iIntros (?????) "SI". iMod "H". iApply "H". done.
+    iIntros "H". unfold_sfmupd. iIntros (?????) "SI". iMod "H". iApply "H". done.
   Qed.
 
   (** Change to a larger mask. *)
@@ -43,7 +52,7 @@ Section sfmupd.
     E1 ⊆ E2 →
     (|={E1}=>m P) ⊢ |={E2}=>m P.
   Proof.
-    iIntros (Sub) "H %%%%% SI".
+    unfold_sfmupd. iIntros (Sub) "H %%%%% SI".
     iMod (fupd_mask_subseteq E1) as "close". 1: done.
     iMod ("H" with "SI") as "H". iModIntro. iMod "H" as ">H".
     iMod "close" as "_".
@@ -55,7 +64,7 @@ Section sfmupd.
   Lemma sfmupd_bind E P Q :
     (P -∗ |={E}=>m Q) ⊢ (|={E}=>m P) -∗ (|={E}=>m Q).
   Proof.
-    iIntros "H HP". iIntros "%%%%% SI".
+    iIntros "H HP". unfold_sfmupd. iIntros "%%%%% SI".
     iMod ("HP" with "SI") as "[SI HP]".
     iPoseProof ("H" with "HP SI") as "H". done.
   Qed.
@@ -134,7 +143,7 @@ Section sfmupd.
   Lemma sfmupd_fupd_acc E1 E2 P :
     (|={E1,E2}=> |={E2}=>m |={E2,E1}=> P) ⊢ (|={E1}=>m P).
   Proof.
-    iIntros "H %%%%% I". iMod "H". iPoseProof ("H" with "I") as "H".
+    unfold_sfmupd. iIntros "H %%%%% I". iMod "H". iPoseProof ("H" with "I") as "H".
     iMod "H". iModIntro. iMod "H". iModIntro. iMod "H" as "[$ H]". auto.
   Qed.
 
@@ -239,7 +248,7 @@ Section sfmupd.
     (P ∗ history_interp h n σ Θ κs ∗
      ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb γ Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
-    iIntros (MON LB) "HP HI MI". iPoseProof ("HP" with "HI") as ">HP".
+    iIntros (MON LB) "HP HI MI". unfold_sfmupd. iPoseProof ("HP" with "HI") as ">HP".
     iMod (model_interp_mupd_steps γ with "HP MI") as "(>($& $)& $)"; done.
   Qed.
 
@@ -255,7 +264,8 @@ Section sfmupd.
                  witP_layer k ℓ ∗
                  (∀ E' N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E'}=∗ oblP_inv N k P Q R).
   Proof.
-    iIntros "Tb %%%%% $". iMod (obl_alloc_assigned_mupd with "Tb") as "(%& $& $& $& $& $& $& $& H)". by iModIntro.
+    unfold_sfmupd. iIntros "Tb %%%%% $".
+    iMod (obl_alloc_assigned_mupd with "Tb") as "(%& $& $& $& $& $& $& $& H)". by iModIntro.
   Qed.
 
   Lemma obl_alloc_fulfilled E ℓ μ :
@@ -263,7 +273,7 @@ Section sfmupd.
                    (∀ E' N (P Q R : iProp Σ), (▷ R) ={E'}=∗ oblP_inv N k P Q R) ∗
                    oblP_layer k ℓ ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
-    iIntros "%%%%% $". iMod (obl_alloc_fulfilled_mupd) as "(%& $& $& $& $& $& $)". by iModIntro.
+    unfold_sfmupd. iIntros "%%%%% $". iMod (obl_alloc_fulfilled_mupd) as "(%& $& $& $& $& $& $)". by iModIntro.
   Qed.
 
   Lemma obl_assigned_to_true E N k P Q R :
@@ -277,7 +287,7 @@ Section sfmupd.
   Proof.
     iIntros (MASK) "#Gv". iMod (obl_assigned_to_true_mupd with "Gv") as "H". 1: auto.
     iIntros "!> Ga". iPoseProof ("H" with "Ga") as "[$ ACC]". iIntros "% Ga". iPoseProof ("ACC" with "Ga") as "H".
-    iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
+    unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
 
   Lemma obl_true_to_fulfill E N k P Q R :
@@ -294,7 +304,7 @@ Section sfmupd.
     iIntros (MASK) "#Gv". iMod (obl_fulfill_mupd with "Gv") as "H". 1: auto.
     iIntros "!> %%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
     iPoseProof ("ACC" with "TG Ga") as "H".
-    iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
+    unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
 
   Lemma obl_change_owner E i1 i2 G1 G2 q1 q2 k ℓ0 :
@@ -304,7 +314,7 @@ Section sfmupd.
     oblP_fuel k ℓ0 1 -∗
     |={E}=>m thP_obls i1 (G1 ∖ {[k]}) q1 ∗ thP_obls i2 ({[k]} ∪ G2) q2 ∗ ⌜ k ∉ G2 ⌝.
   Proof.
-    iIntros (LUG1) "Tb1 Tb2 Gf %%%%% $".
+    unfold_sfmupd. iIntros (LUG1) "Tb1 Tb2 Gf %%%%% $".
     iMod (obl_change_owner_mupd with "Tb1 Tb2 Gf") as "H". 1: eauto.
     by iModIntro.
   Qed.
@@ -312,14 +322,14 @@ Section sfmupd.
   Lemma obl_terminate E i :
     thP_obls i ∅ 1 -∗ |={E}=>m thP_term i.
   Proof.
-    iIntros "Tb %%%%% $". iMod (obl_terminate_mupd with "Tb") as "#Tt". auto.
+    unfold_sfmupd. iIntros "Tb %%%%% $". iMod (obl_terminate_mupd with "Tb") as "#Tt". auto.
   Qed.
 
   Lemma obl_check_witnesses E (R : oids) :
     ([∗ set] r ∈ R, oblP_id r) -∗
     |={E}=>m ([∗ set] r ∈ R, witP_cred r Ord.O ∨ oblP_fulfilled r).
   Proof.
-    iIntros "Rs %%%%% $". iMod (obl_check_witnesses_mupd with "Rs") as "H". auto.
+    unfold_sfmupd. iIntros "Rs %%%%% $". iMod (obl_check_witnesses_mupd with "Rs") as "H". auto.
   Qed.
 
 End sfmupd.

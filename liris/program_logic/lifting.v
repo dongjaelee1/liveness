@@ -70,7 +70,7 @@ Section lifting.
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros "H". rewrite lwp_unfold_fix lwp_fix_unfold /lwp_pre. destruct (to_val e1) eqn:He.
-    { iIntros (?????? ??) "SI". iMod ("H" $! K _ _ _ _ [] with "[//] [//] SI") as "[[% %] _]". done. }
+    { unfold_lwpupd. iIntros (?????? ??) "SI". iMod ("H" $! K _ _ _ _ [] with "[//] [//] SI") as "[[% %] _]". done. }
     iModIntro. iApply lwp_step_step. iIntros (??????? ??) "I".
     iMod ("H" $! K with "[//] [//] I") as "(%& H)". destruct H1 as [_ H1].
     iModIntro. iSplitR; first done. iDestruct "H" as "(%& $& $& %& $& H)".
@@ -263,8 +263,8 @@ Section lifting.
     PureExecSI ς i →
     (ς i ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r) ∗
      (ς i -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
-      £ (o × n)%ord -∗ |={E}=>m lWP e2 @ s; i ; E {{ Φ }}))
-    ⊢ |={E}=>m lWP e1 @ s; i; E {{ Φ }}.
+      £ (o × n)%ord -∗ lWP e2 @ s; i ; E {{ Φ }}))
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hexec HΦ HCS) "(Hc& TG& Gfs& #Rs& Hlwp)".
     iApply (lwp_pure_step n o _ _ E E). 1: auto.
@@ -279,9 +279,9 @@ Section lifting.
     iAssert (([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1))%I with "[Gfs]" as "[Gfs Gf]".
     { iApply (oblP_fuel_add_set). rewrite (oblP_fuel_eq_set _ _ _ (n ⊕ 1)%M (S n)%M). 1: auto.
       rewrite measure_nat_S measure_add. by rewrite Hessenberg.add_comm. }
-    iModIntro. iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
+    iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
     iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
-    iIntros "Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").
+    iIntros "!> Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").
     { iCombine "Ws RWs" as "Ws". rewrite -big_sepS_sep. iApply (big_sepS_impl with "Ws").
       iIntros "!> %% [[Wc1 | #Gd1] [Wc2 | #Gd2]]"; auto.
       iLeft. rewrite (witP_cred_eq _ (n ⊕ Ord.one)%ord (S n)).
@@ -294,4 +294,4 @@ Section lifting.
 
 End lifting.
 
-Global Opaque sfmupd lwpupd.
+(* Global Opaque sfmupd lwpupd. *)
