@@ -87,12 +87,16 @@ Proof.
     iPoseProof (thread_expr_read with "TI Ti") as "%". eauto.
 Qed.
 
-Global Instance heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ := {
-    state_interp := state_interp;
-    state_interp_aux := state_interp_aux;
-    state_pred_interp := state_pred_interp;
-    state_interp_wf := state_interp_wf;
-  }.
+(** We don't want this to be an instance, which can break iMod. *)
+Definition heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ :=
+  Build_state_interp_class _ _ _ state_interp state_interp_aux state_pred_interp state_interp_wf.
+
+(* Global Instance heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ := { *)
+(*     state_interp := state_interp; *)
+(*     state_interp_aux := state_interp_aux; *)
+(*     state_pred_interp := state_pred_interp; *)
+(*     state_interp_wf := state_interp_wf; *)
+(*   }. *)
 
 Class heapGS Σ :=
   HeapGS {
@@ -101,14 +105,19 @@ Class heapGS Σ :=
       #[global] heapGS_heap_stateGS :: heap_stateGS Σ;
     }.
 
-Global Instance heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ := {
-    temporal_mupdGS := heapGS_mupdGS;
-    temporal_state_interp_class := heap_state_interp_class;
-    temporal_histGS := heapGS_histGS;
-  }.
+(** We don't want this to be an instance, which can break iMod. *)
+Definition heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ :=
+  TemporalG heapGS_mupdGS heap_state_interp_class heapGS_histGS.
+
+(* Global Instance heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ := { *)
+(*     temporal_mupdGS := heapGS_mupdGS; *)
+(*     temporal_state_interp_class := heap_state_interp_class; *)
+(*     temporal_histGS := heapGS_histGS; *)
+(*   }. *)
 
 Global Instance heapGS_lirisGS `{!heapGS Σ} : lirisGS heap_lang Σ := {
-    liris_temporalGS := _;
+    liris_temporalGS := heapGS_temporalGS;
+    (* liris_temporalGS := TemporalG heapGS_mupdGS heap_state_interp_class heapGS_histGS; *)
     (* liris_temporalGS := heapGS_temporalGS; *)
     fork_post i v := (True)%I;
   }.
@@ -211,27 +220,18 @@ Proof.
     iMod ("H" with "TG Crs") as "H". iIntros "LC". iMod ("H" with "LC") as "$". done.
 Qed.
 
-Lemma test i E e P :
-  (* (|={E}=>m P) ⊢ lwpupd i E e P. *)
-  (lwpupd i E e P) ⊢ lwpupd i E e P.
-Proof.
-  Fail iIntros ">H".
-  replace (@heapGS_temporalGS Σ heapGS0) with (liris_temporalGS).
-  2:{ done. }
-  iIntros ">H".
-
-  TODO
-  (* FIXME: typeclass design is not good. *)
-  
-Error: Tactic failure: iMod: cannot eliminate modality (@lwpupd ordSI heap_lang Σ (@heapGS_temporalGS Σ heapGS0) i E e P) in
-(@lwpupd ordSI heap_lang Σ (@heapGS_temporalGS Σ heapGS0) i E e P).
-
-@elim_modal_lwpupd ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)
-     : forall (p : bool) (i : thread_id) (E : coPset) (e : language.expr heap_lang) (P Q : @uPred ordSI (@iResUR ordSI Σ)),
-       @ElimModal ordSI (@uPredI ordSI (@iResUR ordSI Σ)) True p false
-         (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e P) P
-         (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e Q)
-         (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e Q)
+(* Lemma test i E e P : *)
+(*   (* (|={E}=>m P) ⊢ lwpupd i E e P. *) *)
+(*   (lwpupd i E e P) ⊢ lwpupd i E e P. *)
+(* Proof. *)
+(*   Fail iIntros ">H". *)
+(*   replace (@heapGS_temporalGS Σ heapGS0) with (liris_temporalGS). *)
+(*   2:{ done. } *)
+(*   TODO *)
+(*   (* FIXME: typeclass design is not good. *) *)
+(*   iIntros ">H". *)
+(*   done. *)
+(* Qed. *)
 
 Lemma lwp_fork s i E E' e Φ :
   (|={E,E'}=> ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
@@ -262,31 +262,7 @@ Proof.
   replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
   { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
   iFrame. iModIntro. iSplitR "H"; cycle 1.
-  { TODO Set Printing All. iMod "H".
-Error: Tactic failure: iMod: cannot eliminate modality
-(@sfmupd ordSI heap_lang Σ (@heap_state_interp_class Σ (@heapGS_heap_stateGS Σ heapGS0)) fair_sched_ub_ord_mono_fun_class
-   (@temporal_mupdGS ordSI heap_lang Σ (@heapGS_temporalGS Σ heapGS0))
-   (@temporal_histGS ordSI heap_lang Σ (@heapGS_temporalGS Σ heapGS0)) E (Φ (LitV LitUnit)))
-in
-(@lwpupd ordSI (ectx_lang heap_ectx_lang) Σ (@liris_temporalGS ordSI (ectx_lang heap_ectx_lang) Σ (@heapGS_lirisGS Σ heapGS0)) i E
-   (Val (LitV LitUnit)) (Φ (LitV LitUnit))).
-@elim_sfmupd_lwpupd ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)
-     : forall (p : bool) (i : thread_id) (E : coPset) (e : language.expr heap_lang) (P Q : @uPred ordSI (@iResUR ordSI Σ)),
-       @ElimModal ordSI (@uPredI ordSI (@iResUR ordSI Σ)) True p false
-         (@sfmupd ordSI heap_lang Σ
-            (@temporal_state_interp_class ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)))
-            fair_sched_ub_ord_mono_fun_class
-            (@temporal_mupdGS ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)))
-            (@temporal_histGS ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0))) E P)
-         P (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e Q)
-         (@lwpupd ordSI heap_lang Σ (@liris_temporalGS ordSI heap_lang Σ (@heapGS_lirisGS Σ heapGS0)) i E e Q)
-
-    elim_sfmupd_lwpupd:
-  ∀ {SI : indexT} {Λ : language} {Σ : gFunctors} {lirisGS0 : lirisGS Λ Σ} (p : bool) (i : thread_id) (E : coPset) 
-    (e : language.expr Λ) (P Q : iProp Σ), ElimModal True p false (|={E}=>m P) P (lwpupd i E e Q) (lwpupd i E e Q)
-
-
-    iApply sfmupd_lwpupd_elim. iMod "H". by iFrame. }
+  { iMod "H". by iFrame. }
   iSplitR.
   { iPureIntro. destruct HI. split.
     - rewrite length_app H. simpl. lia.
