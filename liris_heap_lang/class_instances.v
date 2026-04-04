@@ -108,7 +108,8 @@ Section pure_exec.
   Local Ltac solve_exec_safe := intros; subst; do 3 eexists; econstructor; eauto.
   Local Ltac solve_exec_puredet := simpl; intros; by inv_base_step.
   Local Ltac solve_pure_exec :=
-    subst; intros ?; apply nsteps_once, pure_base_step_pure_step; constructor; [solve_exec_safe | solve_exec_puredet].
+    subst; intros ?;
+             split; [lia | apply nsteps_once, pure_base_step_pure_step; constructor; [solve_exec_safe | solve_exec_puredet]].
 
   (** This heap lang tracks termination status of a thread using a state,
       checking the state on every step.

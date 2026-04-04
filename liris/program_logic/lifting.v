@@ -224,20 +224,31 @@ Section lifting.
                     ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                     ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
-    ⊢ lwpupd i E e1 (lWP e1 @ s; i; E {{ Φ }}).
+    ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
-    iIntros (Hexec Hφ HCS) "Hlwp". specialize (Hexec Hφ).
+    iIntros (Hexec Hφ HCS) "Hlwp". specialize (Hexec Hφ). destruct Hexec as [Hn Hexec].
     iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
-    { auto. }
+    { lia. }
+    destruct (gt_dec n 0); cycle 1.
+    { assert (n = 0) by lia. subst n. clear n0 Hn.
+      simpl in *. inv Hexec. iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
+      - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
+      - eauto.
+      - iDestruct "Hlwp" as ">($& %& $& $& %& $& H)".
+        iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Hc Gb Wcs") as "H".
+        iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
+        iPoseProof (tlc_split with "LC") as "[LC LC2]".
+        iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H".
+        iMod "H". iModIntro. iMod "H". auto. }
     iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
     - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
     - eauto.
-    - iModIntro. iDestruct "Hlwp" as ">($& %& $& $& %& $& H)".
+    - iDestruct "Hlwp" as ">($& %& $& $& %& $& H)".
       iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Hc Gb Wcs") as "H".
       iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
       iPoseProof (tlc_split with "LC") as "[LC LC2]".
       iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H".
-      iMod "H". iModIntro. iMod "H". iApply "IH". auto.
+      iMod "H". iModIntro. iMod "H". iApply "IH"; auto.
   Qed.
 
   Lemma lwp_pure_step_alt `{!Inhabited (state Λ)} (n : nat) G R (o : Ord.t) s i E E' e1 e2 φ Φ ς :
@@ -249,7 +260,7 @@ Section lifting.
                                 (ς i -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                  ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
-    ⊢ lwpupd i E e1 (lWP e1 @ s; i; E {{ Φ }}).
+    ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
     iIntros (Hexec HΦ HCS) "(#Rs& LWP)".
     iApply (lwp_pure_step n o _ _ E E'). 1: auto.
@@ -269,7 +280,7 @@ Section lifting.
     (ς i ∗ thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r) ∗
      (ς i -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
       £ (o × n)%ord -∗ lwpupd i E e2 (lWP e2 @ s; i ; E {{ Φ }})))
-    ⊢ lwpupd i E e1 (lWP e1 @ s; i; E {{ Φ }}).
+    ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
     iIntros (Hexec HΦ HCS) "(Hc& TG& Gfs& #Rs& Hlwp)".
     iApply (lwp_pure_step n o _ _ E E). 1: auto.

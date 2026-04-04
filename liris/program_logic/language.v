@@ -258,10 +258,8 @@ Section language.
 
   Notation pure_steps_tp := (map_Forall2 (λ _, rtc (pure_step))).
 
-  (* TODO: Exclude the case of [n=0], either here, or in [wp_pure] to avoid it
-  succeeding when it did not actually do anything. *)
   Class PureExec (φ : Prop) (n : nat) (e1 e2 : expr Λ) :=
-    pure_exec : φ → relations.nsteps (pure_step) n e1 e2.
+    pure_exec : φ → (n > 0 ∧ relations.nsteps (pure_step) n e1 e2).
 
   Lemma pure_step_ctx K `{!@LanguageCtx Λ K} e1 e2 :
     pure_step e1 e2 →
@@ -288,7 +286,7 @@ Section language.
   Lemma pure_exec_ctx K `{!@LanguageCtx Λ K} φ n e1 e2 :
     PureExec φ n e1 e2 →
     PureExec φ n (K e1) (K e2).
-  Proof. rewrite /PureExec; eauto using pure_step_nsteps_ctx. Qed.
+  Proof. rewrite /PureExec. intros. destruct (H0 H1). split; eauto using pure_step_nsteps_ctx. Qed.
 
   (* This is a family of frequent assumptions for PureExec *)
   Class IntoVal (e : expr Λ) (v : val Λ) :=

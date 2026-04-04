@@ -30,8 +30,8 @@ Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_languag
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
                        thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
                        (thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ ALC (£ o ={E',E}=∗ P)))
-           (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
-  envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
+           (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
+  envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
@@ -50,8 +50,8 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ G R o s i E K e1 e2 φ n Φ :
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
   envs_entails Δ ((thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗
                   ((£ (o × n)%ord ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r)) -∗
-                   lWP (fill K e2) @ s; i; E {{ Φ }})) →
-  envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
+                   lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
+  envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
@@ -67,9 +67,7 @@ Proof. rewrite envs_entails_unseal=> ->. by apply lwp_value. Qed.
 
 Lemma tac_lwp_value `{!heapGS Σ} Δ s i E (Φ : val → iPropI Σ) v :
   envs_entails Δ (|={E}=>m Φ v) → envs_entails Δ (lWP (Val v) @ s; i; E {{ Φ }}).
-Proof. rewrite envs_entails_unseal=> ->. iIntros ">H". by iApply lwp_value. Qed.
-
-TODO
+Proof. rewrite envs_entails_unseal=> ->. iIntros "H". iApply lwp_value_lwpupd. by iMod "H". Qed.
 
 (** Simplify the goal if it is [WP] of a value.
   If the postcondition already allows a fupd, do not add a second one.
@@ -162,6 +160,7 @@ Tactic Notation "lwp_case" := lwp_pure (Case _ _ _).
 Tactic Notation "lwp_inj" := lwp_pure (InjL _) || lwp_pure (InjR _).
 Tactic Notation "lwp_pair" := lwp_pure (Pair _ _).
 Tactic Notation "lwp_closure" := lwp_pure (Rec _ _ _).
+Tactic Notation "lwp_label" := lwp_pure (Label _ _).
 
 (* Tactic Notation "lwp_if" := lwp_pure (If _ _ _). *)
 (* Tactic Notation "lwp_if_true" := lwp_pure (If (LitV (LitBool true)) _ _). *)
@@ -181,8 +180,8 @@ Tactic Notation "lwp_closure" := lwp_pure (Rec _ _ _).
 
 Lemma tac_lwp_bind `{!heapGS Σ} K Δ s i E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (lWP e @ s; i; E {{ v, lWP f (Val v) @ s; i; E {{ Φ }} }})%I →
-  envs_entails Δ (lWP fill K e @ s; i; E {{ Φ }}).
+  envs_entails Δ (lwpupd i E e (lWP e @ s; i; E {{ v, lWP f (Val v) @ s; i; E {{ Φ }} }}))%I →
+  envs_entails Δ (lwpupd i E (fill K e) (lWP fill K e @ s; i; E {{ Φ }}))%I.
 Proof. rewrite envs_entails_unseal=> -> ->. by apply: lwp_bind. Qed.
 
 Ltac lwp_bind_core K :=
@@ -194,13 +193,13 @@ Ltac lwp_bind_core K :=
 Tactic Notation "lwp_bind" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
+  | |- envs_entails _ (lwpupd ?i ?E ?e (lwp ?s ?i ?E ?e ?Q)) =>
     first [ reshape_expr e ltac:(fun K e' => unify e' efoc; lwp_bind_core K)
           | fail 1 "lwp_bind: cannot find" efoc "in" e ]
   | _ => fail "lwp_bind: not a 'lwp'"
   end.
 
-(* TODO *)
+(* FIXME: TODO *)
 
 (* (** Heap tactics *) *)
 (* Section heap. *)

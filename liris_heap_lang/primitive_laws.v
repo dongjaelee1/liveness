@@ -207,8 +207,8 @@ Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ :
                  (thP_obls i G 1 -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                   ALC (£ o ={E',E}=∗ P)))
-    (lWP e2 @ s; i; E {{ v, Φ v }})
-  ⊢ lWP e1 @ s; i; E {{ Φ }}.
+    (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
+  ⊢ (lWP e1 @ s; i; E {{ Φ }}).
 Proof.
   iIntros (Hexec Hp) "H". iApply (lwp_pure_step); eauto.
   iApply iter_modal_mono_modal. 3: iApply "H".
@@ -220,19 +220,6 @@ Proof.
     iMod ("H" with "TG Crs") as "H". iIntros "LC". iMod ("H" with "LC") as "$". done.
 Qed.
 
-(* Lemma test i E e P : *)
-(*   (* (|={E}=>m P) ⊢ lwpupd i E e P. *) *)
-(*   (lwpupd i E e P) ⊢ lwpupd i E e P. *)
-(* Proof. *)
-(*   Fail iIntros ">H". *)
-(*   replace (@heapGS_temporalGS Σ heapGS0) with (liris_temporalGS). *)
-(*   2:{ done. } *)
-(*   TODO *)
-(*   (* FIXME: typeclass design is not good. *) *)
-(*   iIntros ">H". *)
-(*   done. *)
-(* Qed. *)
-
 Lemma lwp_fork s i E E' e Φ :
   (|={E,E'}=> ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
              ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
@@ -241,7 +228,7 @@ Lemma lwp_fork s i E E' e Φ :
                    thP_obls j ∅ 1 -∗
                    ALC (|={E',E}=>
                    (|={E}=>m Φ (LitV LitUnit)) ∗
-                   lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))) -∗
+                   (lwpupd j ⊤ e (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))))) -∗
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step.
@@ -273,16 +260,6 @@ Proof.
   iApply (big_sepM_insert_delete). iFrame.
 Qed.
 
-(* (* Wrong spec *) *)
-(* Lemma lwp_fork_lat i e : *)
-(*   ⊢ <<{ ∀∀ q, label i q }>> Fork e @ i; ∅ *)
-(*     <<{ ∃∃ j, label i q ∗ label j 1 | RET (LitV LitUnit); lWP e @ j; ⊤ {{ thread_term j }} }>>. *)
-(* Proof. *)
-(*   iIntros (Φ) "AU". iApply lwp_fork_fupd. *)
-(*   iMod "AU" as (Δ q) "[H↦ [_ Hclose]]". *)
-(*   iModIntro. iFrame. *)
-(* Qed. *)
-
 (** Label *)
 (** We don't need to take an actual step.
     "label i t v" only means that thread i executes "Label t v" in some context,
@@ -290,66 +267,22 @@ Qed.
  *)
 Lemma lwpupd_label i E t e v (P : iProp Σ) :
   TCEq (to_val e) (Some v) →
-  (label i t v -∗ |={E}=>m (label i t v ∗ P)) -∗
+  (label i t v -∗ |={E}=>m (label i t v ∗ lwpupd i E (Label t e) P)) -∗
   lwpupd i E (Label t e) P.
 Proof.
   unfold_lwpupd. iIntros (He) "H %%%%%% %HK %HT I".
   iDestruct "I" as "[HI Ia]".
   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
   inv He. apply of_to_val in H0. subst e.
-  iEval (unfold_sfmupd) in "H". iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& $)".
+  iEval (unfold_sfmupd) in "H". iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& H)".
   { rewrite label_unseal /label_def. iFrame. eauto. }
   rewrite label_unseal /label_def. iDestruct "Ti" as "(%&%& Ti)".
   clear dependent K.
   iDestruct "HI" as "(%HI& Ha& (Ih& It& Ip))".
   iPoseProof (thread_expr_read with "It Ti") as "%HT".
-  iModIntro. iFrame. iSplitR; first eauto.
-  iApply (big_sepM_delete _ _ _ _ HT). iFrame.
-Qed.
-
-(* Section modal. *)
-(*   (** FIXME: ElimModal instances in weakestpre.v don't work, probably due to typeclass issues. *) *)
-(*   Import uPred. *)
-
-(*   Global Instance elim_modal_bupd_lwp' p s i E e P Φ : *)
-(*     ElimModal True p false (|==> P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
-(*   Proof. *)
-(*     rewrite /ElimModal intuitionistically_if_elim (bupd_fupd E) fupd_frame_r wand_elim_r. *)
-(*     iIntros (?) "H". iApply fupd_lwp. iFrame. *)
-(*   Qed. *)
-
-(*   Global Instance elim_modal_fupd_lwp' p s i E e P Φ : *)
-(*     ElimModal True p false (|={E}=> P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
-(*   Proof. *)
-(*     rewrite /ElimModal intuitionistically_if_elim fupd_frame_r wand_elim_r. *)
-(*     iIntros (?) "H". iApply fupd_lwp. iFrame. *)
-(*   Qed. *)
-
-(*   Global Instance elim_modal_sfmupd_lwp' p s i E e P Φ : *)
-(*     ElimModal True p false (|={E}=>m P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
-(*   Proof. *)
-(*     rewrite /ElimModal intuitionistically_if_elim. *)
-(*     iIntros (_) "[P H]". iApply sfmupd_elim_lwp. iMod "P". *)
-(*     iModIntro. by iApply ("H" with "P"). *)
-(*   Qed. *)
-
-(*   Global Instance elim_modal_lwpupd_lwp' p s i E e P Φ : *)
-(*     ElimModal True p false (lwpupd i E e P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
-(*   Proof. *)
-(*     rewrite /ElimModal intuitionistically_if_elim. *)
-(*     iIntros (_) "[P H]". iApply lwpupd_elim_lwp. iMod "P". *)
-(*     iModIntro. by iApply ("H" with "P"). *)
-(*   Qed. *)
-
-(* End modal. *)
-
-(* Label itself is a pure computation, so a pure step rule can take care of the actual step. *)
-Lemma lwp_label s i E t e v Φ :
-  TCEq (to_val e) (Some v) →
-  (label i t v -∗ |={E}=>m (label i t v ∗ lWP Label t e @ s; i; E {{ Φ }})) -∗
-  lWP Label t e @ s; i; E {{ Φ }}.
-Proof.
-  iIntros (He) "H". iMod (lwpupd_label with "H") as "H". eauto.
+  iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H".
+  { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. }
+  by iFrame.
 Qed.
 
 (** Heap *)
