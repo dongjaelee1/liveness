@@ -1052,7 +1052,7 @@ Section proof2.
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     ⊢ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗
     model_interp g v Ω W n (dom Θ) -∗
-    (⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }}) -∗
+    (⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) -∗
     (|={⊤}=>m ⟦Φ⟧ₗ) ={⊤}=∗
     ti_logic Ord.lt Φ (n, τf).
   Proof.
@@ -1100,7 +1100,7 @@ Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
                       let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
                       state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
                       (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-                       ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }}) ∗
+                       ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) ∗
                       (|={⊤}=>m ⟦Φ⟧ₗ)) →
                    tf_trace Φ τ.
 Proof.
@@ -1122,7 +1122,7 @@ Proof.
             let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-             ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }}) ∗
+             ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) ∗
             (|={⊤}=>m ⟦Φ⟧ₗ)).
   { iIntros (Htemp). iApply (Hwp Htemp). }
   eapply sat_wand; cycle 1.

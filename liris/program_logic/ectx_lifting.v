@@ -30,8 +30,9 @@ Section wp.
                                ALC (|={∅,E}=>
                                       (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                      (lWP e2 @ s; i; E {{ Φ }}) ∗
-                                      [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+                                      lwpupd i E e2 ((lWP e2 @ s; i; E {{ Φ }}) ∗
+                                                     ([∗ map] j ↦ ef ∈ efs,
+                                                        lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros "H". iApply (lwp_lift_step s i E e1 Φ). iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
@@ -77,7 +78,7 @@ Section wp.
                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                      (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
-                                     [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
+                                     [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H". iApply lwp_lift_atomic_step.
@@ -123,7 +124,7 @@ Section wp.
                  (ς i -∗
                   thP_obls i G 1 -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                  ALC (|={E',E}=> lWP e2 @ s; i; E {{ Φ }})))
+                  ALC (|={E',E}=> lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof using Hinh.
     intros. rewrite -(lwp_lift_pure_det_step_no_fork e1 e2); eauto.

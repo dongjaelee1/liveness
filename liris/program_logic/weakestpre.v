@@ -332,66 +332,6 @@ Section lwp_step.
 
 End lwp_step.
 
-(** Wrapper for the termination condition for soundness. *)
-Definition lift_term `{SI : indexT} `{!lirisGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
-  λ v, (thP_term i ∗ Φ i v)%I.
-
-(* pre-definition of lwp of which we take a least fixpoint *)
-(* For soundness of Liris, postcondition of a thread i must include othreadG_term i. *)
-Definition lwp_pre `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness)
-  (lwp : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
-  thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=
-  λ i E e1 Φ,
-    (match to_val e1 with
-     | Some v => lwpupd i E e1 (Φ v)
-     | None =>
-         (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lwp j ⊤ ef (lift_term j fork_post))))
-     end)%I.
-
-Lemma lwp_pre_mono `{SI : indexT} `{!lirisGS Λ Σ} s
-  (lwp1 lwp2 : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
-  ⊢ ((□ ∀ i E e Φ, lwp1 i E e Φ -∗ lwp2 i E e Φ) →
-     ∀ i E e Φ, lwp_pre s lwp1 i E e Φ -∗ lwp_pre s lwp2 i E e Φ)%I.
-Proof.
-  iIntros "#Hmono"; iIntros (i E e1 Φ) "Hlwp". rewrite /lwp_pre.
-  destruct (to_val e1) as [v|]; first done.
-  iApply (lwp_step_mono with "[] Hlwp"). iModIntro.
-  iIntros (e efs) "[Hlwp Hefs]". iSplitR "Hefs"; first by iApply "Hmono".
-  iApply (@big_sepM_impl with "Hefs"); iIntros "!#" (k e' _) "Hlwp".
-  iApply (lwpupd_wand_l with "[$Hlwp]"). iApply "Hmono".
-Qed.
-
-(* Uncurry [lwp_pre] and equip its type with an OFE structure *)
-Definition lwp_pre' `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness) :
-  (prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ) →
-  (prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ)
-  := uncurry4 ∘ lwp_pre s ∘ curry4.
-
-Local Instance lwp_pre_mono' `{SI : indexT} `{!lirisGS Λ Σ} s :
-  BiMonoPred (lwp_pre' s).
-Proof.
-  constructor.
-  - iIntros (lwp1 lwp2 NE1 NE2) "#H". iIntros ((((i&E)&e)&Φ)). iRevert (i E e Φ).
-    simpl. iApply lwp_pre_mono. iIntros "!#" (i E e Φ). iApply ("H" $! (i,E,e,Φ)).
-  - intros lwp Hlwp n (((i1&E1)&e1)&Φ1) (((i2&E2)&e2)&Φ2)
-      (((?%leibniz_equiv & ?%leibniz_equiv) & ?%leibniz_equiv) & ?); simplify_eq/=.
-    rewrite /curry4 /lwp_pre /lwp_step.
-    do 35 (f_equiv || done). by apply pair_ne.
-Qed.
-
-Definition lwp_fix `{SI : indexT} `{!lirisGS Λ Σ} : stuckness -> thread_id -> coPset -> expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
-  λ s i E e Φ, ((bi_least_fixpoint (lwp_pre' s)) (i,E,e,Φ))%I.
-
-(* take the least fixpoint of the above definition, with partial sate information *)
-Local Definition lwp_def `{SI : indexT} `{!lirisGS Λ Σ} : Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
-  λ s i E e Φ, (lwpupd i E e (lwp_fix s i E e Φ))%I.
-Local Definition lwp_aux : seal (@lwp_def). by eexists. Qed.
-Definition lwp' := lwp_aux.(unseal).
-Global Arguments lwp' {SI Λ Σ _}.
-Global Existing Instance lwp'.
-Local Lemma lwp_unseal `{SI : indexT} `{!lirisGS Λ Σ} : lwp = @lwp_def SI Λ Σ _.
-Proof. rewrite -lwp_aux.(seal_eq) //. Qed.
-
 (** Proofmode class instances *)
 Section proofmode_classes.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
@@ -523,6 +463,68 @@ Section proofmode_classes.
 
 End proofmode_classes.
 
+(** Wrapper for the termination condition for soundness. *)
+Definition lift_term `{SI : indexT} `{!lirisGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
+  λ v, (thP_term i ∗ Φ i v)%I.
+
+(* pre-definition of lwp of which we take a least fixpoint *)
+(* For soundness of Liris, postcondition of a thread i must include othreadG_term i. *)
+Definition lwp_pre `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness)
+  (lwp : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
+  thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=
+  λ i E e1 Φ,
+    (match to_val e1 with
+     | Some v => lwpupd i E e1 (Φ v)
+     | None =>
+         (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lwp j ⊤ ef (lift_term j fork_post))))
+     end)%I.
+
+Lemma lwp_pre_mono `{SI : indexT} `{!lirisGS Λ Σ} s
+  (lwp1 lwp2 : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
+  ⊢ ((□ ∀ i E e Φ, lwp1 i E e Φ -∗ lwp2 i E e Φ) →
+     ∀ i E e Φ, lwp_pre s lwp1 i E e Φ -∗ lwp_pre s lwp2 i E e Φ)%I.
+Proof.
+  iIntros "#Hmono"; iIntros (i E e1 Φ) "Hlwp". rewrite /lwp_pre.
+  destruct (to_val e1) as [v|]; first done.
+  iApply (lwp_step_mono with "[] Hlwp"). iModIntro.
+  iIntros (e efs) "[Hlwp Hefs]". iSplitR "Hefs"; first by iApply "Hmono".
+  iApply (@big_sepM_impl with "Hefs"); iIntros "!#" (k e' _) "Hlwp".
+  iApply (lwpupd_wand_l with "[$Hlwp]"). iApply "Hmono".
+Qed.
+
+(* Uncurry [lwp_pre] and equip its type with an OFE structure *)
+Definition lwp_pre' `{SI : indexT} `{!lirisGS Λ Σ} (s : stuckness) :
+  (prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ) →
+  (prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ)
+  := uncurry4 ∘ lwp_pre s ∘ curry4.
+
+Local Instance lwp_pre_mono' `{SI : indexT} `{!lirisGS Λ Σ} s :
+  BiMonoPred (lwp_pre' s).
+Proof.
+  constructor.
+  - iIntros (lwp1 lwp2 NE1 NE2) "#H". iIntros ((((i&E)&e)&Φ)). iRevert (i E e Φ).
+    simpl. iApply lwp_pre_mono. iIntros "!#" (i E e Φ). iApply ("H" $! (i,E,e,Φ)).
+  - intros lwp Hlwp n (((i1&E1)&e1)&Φ1) (((i2&E2)&e2)&Φ2)
+      (((?%leibniz_equiv & ?%leibniz_equiv) & ?%leibniz_equiv) & ?); simplify_eq/=.
+    rewrite /curry4 /lwp_pre /lwp_step.
+    do 35 (f_equiv || done). by apply pair_ne.
+Qed.
+
+(* take the least fixpoint of the above definition; we can also just take fixpoint. *)
+Definition lwp_fix `{SI : indexT} `{!lirisGS Λ Σ} : stuckness -> thread_id -> coPset -> expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+  λ s i E e Φ, ((bi_least_fixpoint (lwp_pre' s)) (i,E,e,Φ))%I.
+
+(* Local Definition lwp_def `{SI : indexT} `{!lirisGS Λ Σ} : Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id := *)
+(*   λ s i E e Φ, (lwpupd i E e (lwp_fix s i E e Φ))%I. *)
+Local Definition lwp_def `{SI : indexT} `{!lirisGS Λ Σ} : Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
+  λ s i E e Φ, (lwp_fix s i E e Φ)%I.
+Local Definition lwp_aux : seal (@lwp_def). by eexists. Qed.
+Definition lwp' := lwp_aux.(unseal).
+Global Arguments lwp' {SI Λ Σ _}.
+Global Existing Instance lwp'.
+Local Lemma lwp_unseal `{SI : indexT} `{!lirisGS Λ Σ} : lwp = @lwp_def SI Λ Σ _.
+Proof. rewrite -lwp_aux.(seal_eq) //. Qed.
+
 Section lwp.
   Context `{SI : indexT} `{!lirisGS Λ Σ}.
   Implicit Types s : stuckness.
@@ -556,6 +558,7 @@ Section lwp.
   Lemma lwp_pre_lwp_pre' s _lwp i E e Φ :
     lwp_pre s _lwp i E e Φ = lwp_pre' s (λ '(i,E,e,Φ), _lwp i E e Φ) (i,E,e,Φ).
   Proof. rewrite /lwp_pre' /curry /uncurry4. simpl. rewrite /curry4. f_equal. Qed.
+
   Lemma lwp_fix_unfold_fix s i E e Φ :
     lwp_fix s i E e Φ ⊣⊢ (lwp_pre s (lwp_fix s) i E e Φ).
   Proof.
@@ -569,23 +572,28 @@ Section lwp.
   Proof.
     rewrite /lwp_fix lwp_unseal. rewrite lwp_pre_lwp_pre' /lwp_def.
     rewrite (least_fixpoint_unfold (lwp_pre' s)). iSplit; iIntros "H".
-    - iAssert (lwp_pre' s (λ '(i0, E0, e0, Φ0), (bi_least_fixpoint (lwp_pre' s) (i0, E0, e0, Φ0))) (i, E, e, Φ))%I with "H" as "H".
-      rewrite -!lwp_pre_lwp_pre' -lwp_pre_lwpupd. done.
-    - rewrite -lwp_pre_lwp_pre' -lwp_pre_lwpupd lwp_pre_lwp_pre'. done.
+    - done.
+    - done.
   Qed.
+
   Lemma lwp_unfold s i E e Φ :
-    lWP e @ s; i; E {{ Φ }} ⊣⊢ (lwpupd i E e (lwp_pre s (lwp (PROP:=iProp Σ) s) i E e Φ)).
+    lWP e @ s; i; E {{ Φ }} ⊣⊢ (lwp_pre s (lwp (PROP:=iProp Σ) s) i E e Φ).
   Proof.
     rewrite lwp_unseal /lwp_def. rewrite lwp_fix_unfold lwp_unseal /lwp_def. auto.
   Qed.
+  Lemma lwp_unfold_upd s i E e Φ :
+    lWP e @ s; i; E {{ Φ }} ⊣⊢ (lwp_pre s (λ i E e Φ, lwpupd i E e (lwp (PROP:=iProp Σ) s i E e Φ)) i E e Φ).
+  Proof.
+    rewrite lwp_unfold lwp_pre_lwpupd. done.
+  Qed.
   Lemma lwp_unfold_fix s i E e Φ :
-    lWP e @ s; i; E {{ Φ }} ⊣⊢ (lwpupd i E e (lwp_fix s i E e Φ)).
+    lWP e @ s; i; E {{ Φ }} ⊣⊢ (lwp_fix s i E e Φ).
   Proof. rewrite lwp_unfold lwp_fix_unfold. done. Qed.
 
   Lemma lwp_ind_strong s Ψ :
     (∀ n i E e, Proper (pointwise_relation _ (dist n) ==> dist n) (Ψ i E e))
     → ⊢ (□ (∀ i e E Φ, lwp_pre s (λ i E e Φ, Ψ i E e Φ ∧ lWP e @ s; i; E {{ Φ }}) i E e Φ -∗ Ψ i E e Φ)
-         → ∀ i e E Φ, lwp_fix s i E e Φ -∗ Ψ i E e Φ)%I.
+         → ∀ i e E Φ, lWP e @ s; i; E {{ Φ }} -∗ Ψ i E e Φ)%I.
   Proof.
     iIntros (HΨ). iIntros "#IH" (i e E Φ) "H". rewrite lwp_unseal.
     set (Ψ' := uncurry4 Ψ :
@@ -613,7 +621,7 @@ Section lwp.
   Lemma lwp_ind s Ψ :
     (∀ n i E e, Proper (pointwise_relation _ (dist n) ==> dist n) (Ψ i E e))
     → ⊢ (□ (∀ i e E Φ, lwp_pre s (λ i E e Φ, Ψ i E e Φ) i E e Φ -∗ Ψ i E e Φ)
-         → ∀ i e E Φ, lwp_fix s i E e Φ -∗ Ψ i E e Φ)%I.
+         → ∀ i e E Φ, lWP e @ s; i; E {{ Φ }} -∗ Ψ i E e Φ)%I.
   Proof.
     iIntros (HΨ) "#H". iApply lwp_ind_strong. iIntros "!>" (i e E Φ) "Hrwp".
     iApply "H". iApply (lwp_pre_mono with "[] Hrwp"). clear.
@@ -624,7 +632,7 @@ Section lwp.
     Proper (pointwise_relation _ (dist n) ==> dist n) (lwp (PROP:=iProp Σ) s i E e).
   Proof.
     intros Φ1 Φ2 HΦ. rewrite !lwp_unseal /lwp_def.
-    by apply lwpupd_ne, (least_fixpoint_ne _), pair_ne, HΦ.
+    by apply (least_fixpoint_ne _), pair_ne, HΦ.
   Qed.
   Global Instance lwp_proper s i E e :
     Proper (pointwise_relation _ (≡) ==> (≡)) (lwp (PROP:=iProp Σ) s i E e).
@@ -632,28 +640,28 @@ Section lwp.
     by intros Φ Φ' ?; apply equiv_dist=>n; apply lwp_ne=>v; apply equiv_dist.
   Qed.
 
-  Lemma lwpupd_elim_lwp s i E e Φ :
-    (lwpupd i E e (lWP e @ s; i; E {{ Φ }})) ⊢ lWP e @ s; i; E {{ Φ }}.
-  Proof. iIntros "H". iApply lwp_unfold. iMod "H". rewrite lwp_unfold. done. Qed.
-  Lemma sfmupd_elim_lwp s i E e Φ :
-    (|={E}=>m lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
-  Proof. iIntros "H". iApply lwp_unfold. iMod "H". rewrite lwp_unfold. done. Qed.
   Lemma fupd_elim_lwp s i E e Φ :
     (|={E}=> lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
-  Proof. iIntros "H". iApply lwp_unfold. iMod "H". rewrite lwp_unfold. done. Qed.
-
-  Lemma fupd_elim_lwp_fix s i E e Φ :
-    (|={E}=> lwp_fix s i E e Φ) ⊢ lwp_fix s i E e Φ.
   Proof.
-    iIntros "H". iApply lwp_fix_unfold. rewrite /lwp_pre /lwp_step.
+    iIntros "H". iApply lwp_unfold. rewrite /lwp_pre /lwp_step.
     destruct (to_val e) as [v|] eqn:?.
     { unfold_lwpupd. iIntros (?????? ??) "SI". iMod "H".
-      rewrite lwp_fix_unfold /lwp_pre /lwp_step. rewrite Heqo.
+      rewrite lwp_unfold /lwp_pre /lwp_step. rewrite Heqo.
       unfold_lwpupd. iMod ("H" $! K with "[//] [//] SI") as "H". iModIntro. done. }
     iIntros (?????????) "SI". iMod "H".
-    rewrite lwp_fix_unfold /lwp_pre /lwp_step. rewrite Heqo.
+    rewrite lwp_unfold /lwp_pre /lwp_step. rewrite Heqo.
     iMod ("H" $! K with "[//] [//] SI") as "H". iModIntro. iPoseProof "H" as "[$ h]". done.
   Qed.
+
+  (* Lemma lwpupd_elim_lwp s i E e Φ : *)
+  (*   (lwpupd i E e (lWP e @ s; i; E {{ Φ }})) ⊢ lWP e @ s; i; E {{ Φ }}. *)
+  (* Proof. iIntros "H". iApply lwp_unfold. iMod "H". rewrite lwp_unfold. done. Qed. *)
+  (* Lemma sfmupd_elim_lwp s i E e Φ : *)
+  (*   (|={E}=>m lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}. *)
+  (* Proof. iIntros "H". iApply lwp_unfold. iMod "H". rewrite lwp_unfold. done. Qed. *)
+  (* Lemma fupd_elim_lwp s i E e Φ : *)
+  (*   (|={E}=> lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}. *)
+  (* Proof. iIntros "H". iApply lwp_unfold. iMod "H". rewrite lwp_unfold. done. Qed. *)
 
   (* Lemma sfmupd_elim_lwp s i E e Φ : *)
   (*   (|={E}=>m lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}. *)
@@ -684,9 +692,8 @@ Section lwp.
     lWP e @ s1; i; E {{ Φ }} -∗ lWP e @ s2; i; E {{ Φ }}.
   Proof.
     iIntros (?) "H".
-    iPoseProof (lwp_unfold_fix with "H") as "H". iApply lwpupd_elim_lwp. iMod "H". iModIntro.
     iRevert (i e E Φ) "H". iApply lwp_ind_strong. iModIntro. iIntros (i e E Φ) "IH".
-    rewrite !lwp_unfold /lwp_pre /=. iModIntro.
+    rewrite !lwp_unfold /lwp_pre /=.
     destruct (to_val e) as [v|] eqn:?; first done.
     iIntros (??????? ??) "H". iMod ("IH" $! K with "[//] [//] [$]") as "H".
     iModIntro. iPoseProof "H" as "[% IH]".
@@ -698,15 +705,15 @@ Section lwp.
     iApply (big_sepM_impl with "Efs"). iIntros "!>" (k ef _). iIntros ">[H _]". done.
   Qed.
 
-  Lemma lwp_fix_strong_mono_lwpupd s1 s2 i E1 E2 e Φ Ψ :
+  Lemma lwp_strong_mono_lwpupd s1 s2 i E1 E2 e Φ Ψ :
     s1 ⊑ s2 → E1 ⊆ E2 →
-    (lwp_fix s1 i E1 e Φ) -∗ (∀ e' v, Φ v -∗ lwpupd i E2 e' (Ψ v)) -∗ (lwp_fix s2 i E2 e Ψ).
+    (lWP e @ s1; i; E1 {{ Φ }}) -∗ (∀ e' v, Φ v -∗ lwpupd i E2 e' (Ψ v)) -∗ (lWP e @ s2; i; E2 {{ Ψ }}).
   Proof.
     iIntros (? HE) "H HΦ".
     iRevert "HΦ". iRevert (E2 HE). iRevert (i e E1 Φ) "H".
     iApply lwp_ind_strong; [solve_proper| ].
     iIntros "!>" (i e E1 Φ) "IH % %HE HΦ".
-    rewrite !lwp_fix_unfold /lwp_pre /=.
+    rewrite lwp_unfold /lwp_pre /=.
     destruct (to_val e) as [v|] eqn:?.
     { unfold_lwpupd. iIntros (?????? ??) "SI".
       iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
@@ -725,63 +732,25 @@ Section lwp.
     iMod "Hclose" as "_". iModIntro.
     iDestruct "IH" as "([IH _]& Efs)".
     iSplitR "Efs".
-    + rewrite lwp_unfold_fix. iModIntro. by iApply "IH".
+    + by iApply "IH".
     + iApply (big_sepM_impl with "Efs"); iIntros "!>" (k ef _).
       iIntros ">[_ H]". by iApply (lwp_stuckness_mono with "H").
   Qed.
-  Lemma lwp_fix_strong_mono_sfmupd s1 s2 i E1 E2 e Φ Ψ :
-    s1 ⊑ s2 → E1 ⊆ E2 →
-    (lwp_fix s1 i E1 e Φ) -∗ (∀ v, Φ v -∗ |={E2}=>m Ψ v) -∗ (lwp_fix s2 i E2 e Ψ).
-  Proof.
-    iIntros (??) "WP H". iApply (lwp_fix_strong_mono_lwpupd with "WP [H]"). 1,2: auto.
-    iIntros (??) "HQ". iMod ("H" with "HQ") as "$". done.
-  Qed.
-  Lemma lwp_fix_strong_mono s1 s2 i E1 E2 e Φ Ψ :
-    s1 ⊑ s2 → E1 ⊆ E2 →
-    (lwp_fix s1 i E1 e Φ) -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ (lwp_fix s2 i E2 e Ψ).
-  Proof.
-    iIntros (? HE) "H HΦ".
-    iApply (lwp_fix_strong_mono_sfmupd with "H [HΦ]"). all: auto.
-    iIntros "% H". iMod ("HΦ" with "H") as "$". done.
-  Qed.
-
-  Lemma lwp_strong_mono_lwpupd s1 s2 i E1 E2 e Φ Ψ :
-    s1 ⊑ s2 → E1 ⊆ E2 →
-    lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ e' v, Φ v -∗ lwpupd i E2 e' (Ψ v)) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
-  Proof.
-    iIntros (? HE) "H HΦ".
-    iPoseProof (lwp_unfold_fix with "H") as "H". iApply lwpupd_elim_lwp.
-    iApply lwpupd_mask_mono. 1: eauto. iMod "H". iModIntro.
-    rewrite lwp_unfold_fix. iModIntro. iApply (lwp_fix_strong_mono_lwpupd with "H HΦ"); auto.
-  Qed.
   Lemma lwp_strong_mono_sfmupd s1 s2 i E1 E2 e Φ Ψ :
     s1 ⊑ s2 → E1 ⊆ E2 →
-    lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v -∗ |={E2}=>m Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
+    (lWP e @ s1; i; E1 {{ Φ }}) -∗ (∀ v, Φ v -∗ |={E2}=>m Ψ v) -∗ (lWP e @ s2; i; E2 {{ Ψ }}).
   Proof.
     iIntros (??) "WP H". iApply (lwp_strong_mono_lwpupd with "WP [H]"). 1,2: auto.
     iIntros (??) "HQ". iMod ("H" with "HQ") as "$". done.
   Qed.
   Lemma lwp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
     s1 ⊑ s2 → E1 ⊆ E2 →
-    lWP e @ s1; i; E1 {{ Φ }} -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ lWP e @ s2; i; E2 {{ Ψ }}.
+    (lWP e @ s1; i; E1 {{ Φ }}) -∗ (∀ v, Φ v ={E2}=∗ Ψ v) -∗ (lWP e @ s2; i; E2 {{ Ψ }}).
   Proof.
     iIntros (? HE) "H HΦ".
     iApply (lwp_strong_mono_sfmupd with "H [HΦ]"). all: auto.
     iIntros "% H". iMod ("HΦ" with "H") as "$". done.
   Qed.
-
-  Lemma fupd_lwp_fix s i E e Φ :
-    (|={E}=> lwp_fix s i E e Φ) ⊢ (lwp_fix s i E e Φ).
-  Proof. iIntros "H". iApply fupd_elim_lwp_fix. iMod "H". by iModIntro. Qed.
-  Lemma lwp_fix_fupd s i E e Φ :
-    (lwp_fix s i E e (λ v, |={E}=> Φ v)) ⊢ (lwp_fix s i E e Φ).
-  Proof. iIntros "H". iApply (lwp_fix_strong_mono s s i E with "H"); auto. Qed.
-  Lemma lwp_fix_sfmupd s i E e Φ :
-    (lwp_fix s i E e (λ v, |={E}=>m Φ v)) ⊢ (lwp_fix s i E e Φ).
-  Proof. iIntros "H". iApply (lwp_fix_strong_mono_sfmupd s s i E with "H"); auto. Qed.
-  Lemma lwp_fix_lwpupd s i E e Φ :
-    (lwp_fix s i E e (λ v, ∀ e', lwpupd i E e' (Φ v))) ⊢ (lwp_fix s i E e Φ).
-  Proof. iIntros "H". iApply (lwp_fix_strong_mono_lwpupd s s i E with "H"); auto. Qed.
 
   Lemma fupd_lwp s i E e Φ :
     (|={E}=> lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
@@ -789,24 +758,25 @@ Section lwp.
   Lemma lwp_fupd s i E e Φ :
     lWP e @ s; i; E {{ v, |={E}=> Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply (lwp_strong_mono s s i E with "H"); auto. Qed.
-  Lemma sfmupd_lwp s i E e Φ :
-    (|={E}=>m lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}.
-  Proof. iIntros "H". iApply sfmupd_elim_lwp. done. Qed.
   Lemma lwp_sfmupd s i E e Φ :
     lWP e @ s; i; E {{ v, |={E}=>m Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply (lwp_strong_mono_sfmupd s s i E with "H"); auto. Qed.
-  Lemma lwpupd_lwp s i E e Φ :
-    (lwpupd i E e (lWP e @ s; i; E {{ Φ }})) ⊢ lWP e @ s; i; E {{ Φ }}.
-  Proof. iIntros "H". iApply lwpupd_elim_lwp. done. Qed.
   Lemma lwp_lwpupd s i E e Φ :
     lWP e @ s; i; E {{ v, ∀ e', lwpupd i E e' (Φ v) }} ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply (lwp_strong_mono_lwpupd s s i E with "H"); auto. Qed.
 
-  Lemma lwp_fix_atomic s i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
-    (|={E1,E2}=> lwp_fix s i E2 e (λ v, |={E2,E1}=> Φ v))
-    ⊢ lwp_fix s i E1 e Φ.
+  (* Lemma sfmupd_lwp s i E e Φ : *)
+  (*   (|={E}=>m lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}. *)
+  (* Proof. iIntros "H". iApply sfmupd_elim_lwp. done. Qed. *)
+  (* Lemma lwpupd_lwp s i E e Φ : *)
+  (*   (lwpupd i E e (lWP e @ s; i; E {{ Φ }})) ⊢ lWP e @ s; i; E {{ Φ }}. *)
+  (* Proof. iIntros "H". iApply lwpupd_elim_lwp. done. Qed. *)
+
+  Lemma lwp_atomic s i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
+    (|={E1,E2}=> lWP e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})
+    ⊢ lWP e @ s; i; E1 {{ Φ }}.
   Proof.
-    iIntros "H". rewrite !lwp_fix_unfold /lwp_pre.
+    iIntros "H". rewrite !lwp_unfold /lwp_pre.
     destruct (to_val e) as [v|] eqn:He.
     { unfold_lwpupd. iIntros (?????? ??) "SI". iMod ("H" $! K with "[//] [//] SI") as ">H".
       iModIntro. iMod "H". iModIntro. iMod "H" as "[$ H]". done. }
@@ -820,10 +790,8 @@ Section lwp.
         iMod ("H" $! K with "[//] [] SI") as "H".
         { iPureIntro. rewrite -insert_union_l lookup_insert_eq. auto. }
         iModIntro. rewrite dom_union_L. iMod "H" as ">(SI& H)". iFrame "Efs SI".
-        iMod "H". iIntros "!> !> !>". auto.
-      + unfold_lwpupd. iMod ("H" $! K with "[//] [] SI") as "H".
-        { iPureIntro. rewrite -insert_union_l lookup_insert_eq. auto. }
-        iModIntro. rewrite dom_union_L. iMod "H" as ">(SI& H)".
+        iMod "H". by iFrame.
+      + unfold_lwpupd.
         iMod ("H" $! K _ _ _ _ [] with "[//] [] SI") as "H".
         { iPureIntro. rewrite -insert_union_l lookup_insert_eq; auto. }
         iModIntro. iPoseProof "H" as "[Red H]".
@@ -839,13 +807,6 @@ Section lwp.
       iApply lwp_value_lwpupd'. iModIntro. done.
   Qed.
 
-  Lemma lwp_atomic s i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
-    (lwpupd i E1 e (|={E1,E2}=> lwp_fix s i E2 e (λ v, |={E2,E1}=> Φ v)))
-    ⊢ lWP e @ s; i; E1 {{ Φ }}.
-  Proof.
-    iIntros "H". rewrite lwp_unfold_fix. iMod "H". iModIntro. iApply (lwp_fix_atomic with "H").
-  Qed.
-
   Lemma lwp_step_fupd s i E1 E2 e P Φ :
     TCEq (to_val e) None → E2 ⊆ E1 →
     ((|={E1,E2}=> |={E2,E1}=> P) ∗
@@ -857,22 +818,22 @@ Section lwp.
   Qed.
 
   Lemma lwp_bind K `{!LanguageCtx K} s i E e Φ :
-    (lWP e @ s; i; E {{ v, lWP K (of_val v) @ s; i; E {{ Φ }} }})
-    ⊢ lWP K e @ s; i; E {{ Φ }}.
+    (lwpupd i E e (lWP e @ s; i; E {{ v, lWP K (of_val v) @ s; i; E {{ Φ }} }}))
+    ⊢ lwpupd i E (K e) (lWP K e @ s; i; E {{ Φ }}).
   Proof.
     revert Φ.
-    cut (∀ Φ', (lWP e @ s; i; E {{ Φ' }}) -∗ ∀ Φ, (∀ v, (Φ' v) -∗ (lWP K (of_val v) @ s; i; E {{ Φ }})) -∗ lWP K e @ s; i; E {{ Φ }}).
-    { iIntros (help Φ) "H". iApply (help with "H"); auto. }
+    cut (∀ Φ', (lWP e @ s; i; E {{ Φ' }}) -∗ ∀ Φ, (∀ v, (Φ' v) -∗ (lWP K (of_val v) @ s; i; E {{ Φ }})) -∗ lwpupd i E (K e) (lWP K e @ s; i; E {{ Φ }})).
+    { iIntros (help Φ) "H". iPoseProof (lwpupd_ctx with "H") as "H". iMod "H". iApply (help with "H"); auto. }
     iIntros (Φ') "H". iIntros (Φ) "H2".
-    iPoseProof (lwp_unfold_fix with "H") as "H". iApply lwpupd_elim_lwp.
-    iApply lwpupd_ctx. iMod "H". iModIntro. iRevert (Φ) "H2".
+    (* iPoseProof (lwp_unfold with "H") as "H". iModIntro. *)
+    iRevert (Φ) "H2".
     iRevert (i e E Φ') "H". iApply lwp_ind_strong; first solve_proper.
     iIntros "!#" (i e E1 Φ') "IH". iIntros (Φ) "HΦ".
-    rewrite /lwp_pre /lwp_step. destruct (to_val e) as [v|] eqn:He.
-    { apply of_to_val in He as <-.
-      iApply lwpupd_elim_lwp. iApply lwpupd_ctx. iMod "IH".  iModIntro.
-      iApply ("HΦ" with "IH"). }
-    rewrite lwp_unfold /lwp_pre /lwp_step fill_not_val; last auto.
+    rewrite lwp_unfold /lwp_pre /lwp_step. destruct (to_val e) as [v|] eqn:He.
+    { iPoseProof (lwpupd_ctx with "IH") as "IH". iMod "IH".
+      iPoseProof ("HΦ" with "IH") as "H". rewrite lwp_unfold /lwp_pre /lwp_step.
+      apply of_to_val in He as <-. iFrame. auto. }
+    rewrite fill_not_val; last auto.
     iModIntro.
     iIntros (K1 ?????? HK1 LU1) "SI". iMod ("IH" $! (K1 ∘ K) with "[] [//] SI") as "IH".
     { iPureIntro. apply _. }
@@ -885,7 +846,12 @@ Section lwp.
     rewrite (bi.sep_assoc). iSplitR "Efs"; cycle 1.
     { iModIntro. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done. }
     iDestruct "IH" as "[IH _]". iPoseProof ("IH" with "HΦ") as "IH".
-    iFrame. done.
+    unfold_lwpupd. iPoseProof ("IH" $! (K1) with "[] [] SI") as "IH".
+    { iPureIntro. apply _. }
+    { iPureIntro. rewrite lookup_union_l.
+      - rewrite lookup_insert_eq. done.
+      - apply fork_thread_ids in Hstep. apply not_elem_of_dom. apply elem_of_dom_2 in LU1. set_solver. }
+    { simpl. rewrite dom_union_L. iFrame. }
   Qed.
 
   (** FIXME: does this hold when we have ∀ K in lwp? Just remove this if this is not used anywhere else. *)
@@ -1007,13 +973,6 @@ Section lwp.
     iIntros (v) "HΦ". by iApply "HΦ".
   Qed.
 
-  Lemma lwp_fix_wand s i E e Φ Ψ :
-    (lwp_fix s i E e Φ) -∗ (∀ v, Φ v -∗ Ψ v) -∗ (lwp_fix s i E e Ψ).
-  Proof.
-    iIntros "Hwp H". iApply (lwp_fix_strong_mono_lwpupd with "Hwp"); auto.
-    iIntros (??) "?". iApply lwpupd_intro. by iApply "H".
-  Qed.
-
 End lwp.
 
 (** Proofmode class instances *)
@@ -1050,21 +1009,21 @@ Section proofmode_classes.
       fupd_frame_r wand_elim_r fupd_lwp.
   Qed.
 
-  Global Instance elim_modal_sfmupd_lwp p s i E e P Φ :
-    ElimModal True p false (|={E}=>m P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}).
-  Proof.
-    rewrite /ElimModal intuitionistically_if_elim.
-    iIntros (_) "[P H]". iApply sfmupd_elim_lwp. iMod "P".
-    iModIntro. by iApply ("H" with "P").
-  Qed.
+  (* Global Instance elim_modal_sfmupd_lwp p s i E e P Φ : *)
+  (*   ElimModal True p false (|={E}=>m P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
+  (* Proof. *)
+  (*   rewrite /ElimModal intuitionistically_if_elim. *)
+  (*   iIntros (_) "[P H]". iApply sfmupd_elim_lwp. iMod "P". *)
+  (*   iModIntro. by iApply ("H" with "P"). *)
+  (* Qed. *)
 
-  Global Instance elim_modal_lwpupd_lwp p s i E e P Φ :
-    ElimModal True p false (lwpupd i E e P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}).
-  Proof.
-    rewrite /ElimModal intuitionistically_if_elim.
-    iIntros (_) "[P H]". iApply lwpupd_elim_lwp. iMod "P".
-    iModIntro. by iApply ("H" with "P").
-  Qed.
+  (* Global Instance elim_modal_lwpupd_lwp p s i E e P Φ : *)
+  (*   ElimModal True p false (lwpupd i E e P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
+  (* Proof. *)
+  (*   rewrite /ElimModal intuitionistically_if_elim. *)
+  (*   iIntros (_) "[P H]". iApply lwpupd_elim_lwp. iMod "P". *)
+  (*   iModIntro. by iApply ("H" with "P"). *)
+  (* Qed. *)
 
   (** Error message instance for non-mask-changing view shifts.
   Also uses a slightly different error: we cannot apply [fupd_mask_subseteq]
@@ -1078,21 +1037,13 @@ Use [iApply fupd_lwp; iMod (fupd_mask_subseteq E2)] to adjust the mask of your g
       (|={E2}=> P) False (lWP e @ s; i; E1 {{ Φ }}) False | 100.
   Proof. intros []. Qed.
 
-  Global Instance elim_modal_fupd_lwp_fix_atomic p s i E1 E2 e P Φ :
+  Global Instance elim_modal_fupd_lwp_atomic p s i E1 E2 e P Φ :
     ElimModal (Atomic (stuckness_to_atomicity s) e) p false
-      (|={E1,E2}=> P) P
-      (lwp_fix s i E1 e Φ) (lwp_fix s i E2 e (λ v, |={E2,E1}=> Φ v))%I | 100.
+            (|={E1,E2}=> P) P
+            (lWP e @ s; i; E1 {{ Φ }}) (lWP e @ s; i; E2 {{ v, |={E2,E1}=> Φ v }})%I | 100.
   Proof.
-    intros ?. by rewrite intuitionistically_if_elim fupd_frame_r wand_elim_r lwp_fix_atomic.
-  Qed.
-
-  Global Instance elim_modal_fupd_lwp_acc p s i E1 E2 e P Φ :
-    ElimModal True p false
-      (|={E1,E2}=> P) P
-      (lWP e @ s; i; E1 {{ Φ }}) (lwpupd i E2 e (|={E2,E1}=> lWP e @ s; i; E1 {{ Φ }}))%I | 100.
-  Proof.
-    intros ?. rewrite intuitionistically_if_elim fupd_frame_r wand_elim_r.
-    iIntros "H". iApply lwpupd_elim_lwp. iMod "H". auto.
+    intros ?. by rewrite intuitionistically_if_elim
+      fupd_frame_r wand_elim_r lwp_atomic.
   Qed.
 
   (** Error message instance for mask-changing view shifts. *)
@@ -1113,14 +1064,14 @@ Use [iMod (fupd_mask_subseteq E2)] to adjust the mask of your goal to [E2]")
   (*   AddModal (|={E}=>m P) P (lWP e @ s; i; E {{ Φ }}). *)
   (* Proof. rewrite /AddModal. iIntros "[H1 H2]". iMod "H1". by iApply "H2". Qed. *)
 
-  Global Instance elim_acc_lwp_fix_atomic {X} i E1 E2 α β γ e s Φ :
+  Global Instance elim_acc_lwp_atomic {X} i E1 E2 α β γ e s Φ :
     ElimAcc (X:=X) (Atomic (stuckness_to_atomicity s) e)
       (fupd E1 E2) (fupd E2 E1)
-      α β γ (lwp_fix s i E1 e Φ)
-      (λ x, lwp_fix s i E2 e (λ v, |={E2}=> β x ∗ (γ x -∗? Φ v)))%I | 100.
+      α β γ (lWP e @ s; i; E1 {{ Φ }})
+      (λ x, lWP e @ s; i; E2 {{ v, |={E2}=> β x ∗ (γ x -∗? Φ v) }})%I | 100.
   Proof.
     iIntros (?) "Hinner >Hacc". iDestruct "Hacc" as (x) "[Hα Hclose]".
-    iApply (lwp_fix_wand with "(Hinner Hα)").
+    iApply (lwp_wand with "(Hinner Hα)").
     iIntros (v) ">[Hβ HΦ]". iApply "HΦ". by iApply "Hclose".
   Qed.
 

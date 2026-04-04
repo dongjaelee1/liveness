@@ -280,11 +280,11 @@ Section lemmas.
   Qed.
 
   (* Sequential (fix) triples with the empty mask for a physically atomic [e] are atomic. *)
-  Lemma atomic_seq_lwp_fix_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} :
-    (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ (lwp_fix NotStuck i ∅ e Φ)) -∗
+  Lemma atomic_seq_lwp_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} :
+    (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ (lwp NotStuck i ∅ e Φ)) -∗
     atomic_lwp i e E α β POST f.
   Proof.
-    iIntros "Hwp" (Φ) "AU". rewrite lwp_unfold_fix. iModIntro.
+    iIntros "Hwp" (Φ) "AU".
     iMod "AU" as (x) "[Hα [_ Hclose]]". iApply ("Hwp" with "Hα"). iIntros "%y Hβ %z Hpost".
     iMod ("Hclose" with "Hβ") as "HΦ".
     rewrite ->!tele_app_bind. iApply "HΦ". done.
