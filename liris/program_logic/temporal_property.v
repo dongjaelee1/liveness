@@ -47,7 +47,7 @@ Notation "∃'" := (r_exist _) (only parsing) : tr_scope.
 Notation "∃ a .. z , P" := (r_exist _ (λ a, .. (r_exist _ (λ z, P%R)) ..)) : tr_scope.
 
 Fixpoint tf_trace `{SI : indexT} {Σ} {Λ : language}
-  (Φ : @tf SI Σ (state_pred Λ)) : trProp Λ :=
+  (Φ : @tf SI (state_pred Λ) Σ) : trProp Λ :=
   match Φ with
   | tf_emp => (⌜ True ⌝)%R
   | tf_atomic π => tr_atomic π

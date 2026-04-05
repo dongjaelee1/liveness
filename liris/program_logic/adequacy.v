@@ -216,7 +216,7 @@ Proof. rewrite ti_until_unseal. apply (fixpoint_unfold (ti_until_pre ⊤ ltA)). 
 (** Intermediate interpretation. *)
 Fixpoint ti_logic `{SI : indexT} `{!temporalGS Λ Σ}
   {A : Type} (ltA : A → A → Prop)
-  (Φ : @tf SI Σ (state_pred Λ)) : tiProp Λ Σ :=
+  (Φ : @tf SI (state_pred Λ) Σ) : tiProp Λ Σ :=
   match Φ with
   | tf_emp => ti_pure True
   | tf_atomic π => (ti_atomic π)%I
@@ -398,7 +398,7 @@ Section proof1.
     intros. destruct H0. destruct H0; eauto. apply Hp. lia.
   Qed.
 
-  Lemma ti_logic_tf_trace (wf_ltA : well_founded ltA) (F : iProp Σ) (Φ : tf) (τ : trace Λ) :
+  Lemma ti_logic_tf_trace (wf_ltA : well_founded ltA) (F : iProp Σ) (Φ : tf Σ) (τ : trace Λ) :
     iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ τ) → tf_trace Φ τ.
   Proof.
     revert τ. induction Φ; simpl; intros.
@@ -1052,7 +1052,7 @@ Section proof2.
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     ⊢ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗
     model_interp g v Ω W n (dom Θ) -∗
-    (⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) -∗
+    (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) -∗
     (|={⊤}=>m ⟦Φ⟧ₗ) ={⊤}=∗
     ti_logic Ord.lt Φ (n, τf).
   Proof.
@@ -1062,7 +1062,12 @@ Section proof2.
     1: auto.
     destruct H as [LEO1 LB1].
     iPoseProof (tf_logic_tf_intuit with "[$HI $MI $P]") as "#TF".
-    iPoseProof ("WPs" with "P") as "WPs". iPoseProof (big_sepM2_alt with "WPs") as "[%Dom WPs]".
+    iPoseProof ("WPs" with "P") as "WPs".
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "(WPs& HI& %&%&%&%& %& MI)".
+    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    1: auto.
+    destruct H as [LEO2 LB2].
+    iPoseProof (big_sepM2_alt with "WPs") as "[%Dom WPs]".
     remember (map_zip Θ Ψs) as TQ. assert (EQTQ : Θ = fst <$> TQ).
     { subst. rewrite fst_map_zip; auto. intro k. rewrite -!elem_of_dom Dom. auto. }
     iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
@@ -1078,9 +1083,9 @@ Section proof2.
     iMod (all_interp_lwpupd_steps_gmap γ with "WPs [$HI $SIa] MI") as "(WPs& HI& %&%&%&%& %& MI)".
     { subst Θ. done. }
     { auto. }
-    destruct H as [LEO2 LB2].
+    destruct H as [LEO3 LB3].
     iPoseProof (lwp_fix_ti_logic with "[$HI $MI $WPs $TF]") as "$".
-    1,2: eauto. 1: lia. all: eauto.
+    1,2: eauto. 1: lia. all: eauto. etrans; eauto.
   Qed.
 
   Local Opaque tf_intuit.
@@ -1089,7 +1094,7 @@ End proof2.
 Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
   `{!state_interp_class Λ Σ}
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
-  s σ Θ i κs (Φ : tf) :
+  s σ Θ i κs (Φ : tf Σ) :
   ∀ (τ : trace Λ), behavior τ →
                    fair_scheduling τ →
                    (τ.1 = 0) →
@@ -1100,7 +1105,7 @@ Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
                       let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
                       state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
                       (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-                       ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) ∗
+                       ⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) ∗
                       (|={⊤}=>m ⟦Φ⟧ₗ)) →
                    tf_trace Φ τ.
 Proof.
@@ -1122,7 +1127,7 @@ Proof.
             let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-             ⟦Φ⟧ₗ -∗ [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) ∗
+             ⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})) ∗
             (|={⊤}=>m ⟦Φ⟧ₗ)).
   { iIntros (Htemp). iApply (Hwp Htemp). }
   eapply sat_wand; cycle 1.

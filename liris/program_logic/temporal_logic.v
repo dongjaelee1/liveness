@@ -18,7 +18,7 @@ Section aux.
 End aux.
 
 Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ}
-  (Φ : @tf SI Σ (state_pred Λ)) : iProp Σ :=
+  (Φ : @tf SI (state_pred Λ) Σ) : iProp Σ :=
   match Φ with
   | tf_emp => emp%I
   | tf_atomic π => (state_pred_interp π)%I
@@ -41,7 +41,7 @@ Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ}
                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I
   end
 with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ}
-       n σ Θ κs i Ω (Φ : @tf SI Σ (state_pred Λ)) : iProp Σ :=
+       n σ Θ κs i Ω (Φ : @tf SI (state_pred Λ) Σ) : iProp Σ :=
        match Φ with
        | tf_emp => emp%I
        | tf_atomic π => (event_pred n σ Θ κs π)%I
@@ -68,7 +68,7 @@ Global Arguments tf_logic {SI Λ Σ _}.
 Global Arguments tf_intuit {SI Λ Σ _}.
 
 Definition tf_fulfilled `{SI : indexT} `{!temporalGS Λ Σ}
-  k (Q : tf) : iProp Σ :=
+  k (Q : tf Σ) : iProp Σ :=
   (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
                          hG_event n' (σ', Θ', κs') ∗
                          tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
@@ -144,10 +144,10 @@ Section reduction.
   Lemma tf_impl_logic P Q :
     ⟦P → Q⟧ₗ = (⌜P⌝ → ⟦Q⟧ₗ)%I.
   Proof. done. Qed.
-  Lemma tf_forall_logic A (P : A → tf) :
+  Lemma tf_forall_logic A (P : A → tf Σ) :
     ⟦∀ a, P a⟧ₗ = (∀ a, ⟦P a⟧ₗ)%I.
   Proof. done. Qed.
-  Lemma tf_exist_logic A (P : A → tf) :
+  Lemma tf_exist_logic A (P : A → tf Σ) :
     ⟦∃ a, P a⟧ₗ = (∃ a, ⟦P a⟧ₗ)%I.
   Proof. done. Qed.
   Lemma tf_sep_logic P Q :
@@ -186,7 +186,7 @@ Ltac tf_red :=
 Global Opaque tf_logic tf_intuit tf_fulfilled.
 
 (** Ofe and Monoid structure. *)
-Global Instance tf_equiv `{SI : indexT} `{!temporalGS Λ Σ} : Equiv tf :=
+Global Instance tf_equiv `{SI : indexT} `{!temporalGS Λ Σ} : Equiv (tf Σ) :=
   λ Φ1 Φ2, ⟦Φ1⟧ₗ ≡ ⟦Φ2⟧ₗ.
 Global Instance tf_equiv_Equivalence `{SI : indexT} `{!temporalGS Λ Σ} : Equivalence tf_equiv.
 Proof.
@@ -196,14 +196,14 @@ Proof.
   - repeat intro. etrans; eauto.
 Qed.
 Canonical Structure tfO `{SI : indexT} `{!temporalGS Λ Σ} : ofe :=
-  (Ofe tf (discrete_ofe_mixin tf_equiv_Equivalence)).
+  (Ofe (tf Σ) (discrete_ofe_mixin tf_equiv_Equivalence)).
 
 Class tf_op_interp_comm `{SI : indexT} `{!temporalGS Λ Σ}
-  (tf_o : tf → tf → tf) (iProp_o : iProp Σ → iProp Σ → iProp Σ) :=
-  tf_op_interp_comm_intro : ∀ (P Q : tf), ⟦tf_o P Q⟧ₗ = (iProp_o ⟦P⟧ₗ ⟦Q⟧ₗ)%I.
+  (tf_o : tf Σ → tf Σ → tf Σ) (iProp_o : iProp Σ → iProp Σ → iProp Σ) :=
+  tf_op_interp_comm_intro : ∀ (P Q : tf Σ), ⟦tf_o P Q⟧ₗ = (iProp_o ⟦P⟧ₗ ⟦Q⟧ₗ)%I.
 
 Class tf_monoid_unit_interp_eq `{SI : indexT} `{!temporalGS Λ Σ}
-  (tf_o : tf → tf → tf) `{!Monoid tf_o} (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o} :=
+  (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o} (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o} :=
   tf_monoid_unit_interp_eq_intro : ⟦ monoid_unit ⟧ₗ = monoid_unit.
 
 Section instances.
@@ -247,11 +247,11 @@ Section big_op.
   Context `{SI : indexT} `{!temporalGS Λ Σ}.
 
   Lemma tf_big_opL_interp
-    (tf_o : tf → tf → tf) `{!Monoid tf_o}
+    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o}
     (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o}
     `{!tf_op_interp_comm tf_o iProp_o}
     `{!tf_monoid_unit_interp_eq tf_o iProp_o}
-    A (P : nat → A → tf) (l : list A) :
+    A (P : nat → A → tf Σ) (l : list A) :
     ⟦[^tf_o list] n ↦ a ∈ l, P n a⟧ₗ = ([^iProp_o list] n ↦ a ∈ l, (⟦P n a⟧ₗ))%I.
   Proof.
     cut (∀ m, ⟦[^tf_o list] n ↦ a ∈ l, P (m + n) a⟧ₗ = ([^iProp_o list] n ↦ a ∈ l, (⟦P (m + n) a⟧ₗ))%I).
@@ -266,12 +266,12 @@ Section big_op.
   Qed.
 
   Lemma tf_big_opM_interp
-    (tf_o : tf → tf → tf) `{!Monoid tf_o}
+    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o}
     (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o}
     `{!tf_op_interp_comm tf_o iProp_o}
     `{!tf_monoid_unit_interp_eq tf_o iProp_o}
     K `{!EqDecision K} `{!Countable K} A
-    (P : K → A → tf) (m : gmap K A) :
+    (P : K → A → tf Σ) (m : gmap K A) :
     ⟦[^tf_o map] k ↦ a ∈ m, P k a⟧ₗ = ([^iProp_o map] k ↦ a ∈ m, (⟦P k a⟧ₗ))%I.
   Proof.
     rewrite !big_op.big_opM_unseal /big_op.big_opM_def.
@@ -283,12 +283,12 @@ Section big_op.
   Qed.
 
   Lemma tf_big_opS_interp
-    (tf_o : tf → tf → tf) `{!Monoid tf_o}
+    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o}
     (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o}
     `{!tf_op_interp_comm tf_o iProp_o}
     `{!tf_monoid_unit_interp_eq tf_o iProp_o}
     A `{!EqDecision A} `{!Countable A}
-    (P : A → tf) (s : gset A) :
+    (P : A → tf Σ) (s : gset A) :
     ⟦[^tf_o set] a ∈ s, P a⟧ₗ = ([^iProp_o set] a ∈ s, (⟦P a⟧ₗ))%I.
   Proof.
     rewrite !big_op.big_opS_unseal /big_op.big_opS_def.
@@ -329,17 +329,17 @@ Section proof.
     thP_obls i G q -∗
     |={E}=>m ∃ k, ⌜k ∉ G⌝ ∗ thP_obls i ({[k]} ∪ G) q ∗
                  oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                 ∀ E' N (P Q : tf), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ)
+                 ∀ E' N (P Q : tf Σ), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ)
                                     ={E'}=∗ (⟦tf_until N k b 1 P Q⟧ₗ).
   Proof.
     iIntros "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& $& $& ACC)".
     iIntros "!> %%%% H". rewrite tf_until_logic. iMod ("ACC" with "H") as "ACC". iFrame. done.
   Qed.
 
-  Lemma tf_fulfilled_alloc E ℓ μ (Q : tf) :
+  Lemma tf_fulfilled_alloc E ℓ μ (Q : tf Σ) :
     ⟦Q⟧ₗ -∗
     |={E}=>m ⟦Q⟧ₗ ∗ ∃ k, oblP_fulfilled k ∗ oblP_id k ∗
-                        (∀ E' N (P : tf), |={E'}=> oblP_inv N k ⟦P⟧ₗ ⟦Q⟧ₗ (tf_fulfilled k Q)) ∗ 
+                        (∀ E' N (P : tf Σ), |={E'}=> oblP_inv N k ⟦P⟧ₗ ⟦Q⟧ₗ (tf_fulfilled k Q)) ∗ 
                         oblP_layer k ℓ ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "HQ".
@@ -381,7 +381,7 @@ Section proof.
   Qed.
 
   (** TODO: Timeless version *)
-  Lemma tf_until_to_true E N k (P Q : tf) :
+  Lemma tf_until_to_true E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦tf_until N k false 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ▷ (⟦P⟧ₗ ∗ ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N,E}=∗ ⟦tf_until N k true 1 P Q⟧ₗ)).
@@ -394,7 +394,7 @@ Section proof.
   Qed.
 
   (** TODO: Timeless version *)
-  Lemma tf_until_fulfill E N k (P Q : tf) :
+  Lemma tf_until_fulfill E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦tf_until N k true 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ∀ i G q,

@@ -52,6 +52,9 @@ Local Definition label_unseal :
   @label = @label_def := label_aux.(seal_eq).
 Global Arguments label {Σ _}.
 
+Notation "i ⤉ t , v " := (label i t v)
+                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : bi_scope.
+
 Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
    thread_map_interp (dom Θ) Θ ∗
@@ -63,11 +66,16 @@ Definition state_interp_aux `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool h
 (** State predicate. *)
 Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
   match π with
-  | pred_pointsto l df v =>
-      pointsto l df v
-  | pred_label i x v =>
-      label i x v
+  | pred_pointsto l dq v =>
+      pointsto l dq v
+  | pred_label i t v =>
+      label i t v
   end.
+
+Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%F
+                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tf_scope.
+Notation "i ⤉ t , v " := (➢ (pred_label i t v))%F
+                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : tf_scope.
 
 Lemma thread_expr_read `{!heap_stateGS Σ} :
   ∀ (Θ : thread_pool heap_lang) i e,

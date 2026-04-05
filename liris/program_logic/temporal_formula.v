@@ -7,7 +7,7 @@ From liris.base_logic Require Import obligation.
 From transfinite.stepindex Require Import ordinal_arith.
 
 (** Syntax for writing temporal formulae; cf., LTL, CTL*. *)
-Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
+Inductive tf `{SI : indexT} {Π : Type} `{Σ : gFunctors} :=
 | tf_emp
 | tf_atomic (π : Π)
 | tf_pure (p : Prop)
@@ -27,7 +27,8 @@ Inductive tf `{SI : indexT} `{Σ : gFunctors} {Π : Type} :=
 | tf_until (N : namespace) (k : oid) (b : bool) (q : Qp) (P Q : tf)
 .
 
-Global Arguments tf {SI Σ Π}.
+Global Arguments tf : clear implicits.
+Global Arguments tf {SI Π}.
 
 (** Notations *)
 
@@ -35,6 +36,7 @@ Declare Scope tf_scope.
 Delimit Scope tf_scope with F.
 Bind Scope tf_scope with tf.
 
+Notation "➢ π" := (tf_atomic π) (at level 50, π at level 1) : tf_scope.
 Notation "'⌜' p '⌝'" := (tf_pure p) : tf_scope.
 Notation "'⟨' p '⟩'" := (tf_ghost p%I) : tf_scope.
 Infix "∧" := (tf_and) : tf_scope.
@@ -52,48 +54,22 @@ Infix "∗" := (tf_sep) : tf_scope.
 
 (** Define patterns corresponding to LTL temporal properties. *)
 (* Eventually P *)
-Definition tf_eventually `{SI : indexT} {Σ} {Π} N k b q (P : @tf SI Σ Π) : tf :=
+Definition tf_eventually `{SI : indexT} {Π} {Σ} N k b q (P : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q ⌜ True ⌝ P)%F.
-Global Arguments tf_eventually {SI Σ Π}.
+Global Arguments tf_eventually {SI Π Σ}.
 
 (* P Weak until Q *)
-Definition tf_weakuntil `{SI : indexT} {Σ} {Π} N k b q (P Q : @tf SI Σ Π) : tf :=
+Definition tf_weakuntil `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q P (Q ∨ tf_always N P))%F.
 (*   (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
-Global Arguments tf_weakuntil {SI Σ Π}.
+Global Arguments tf_weakuntil {SI Π Σ}.
 
 (* P Release Q *)
-Definition tf_release `{SI : indexT} {Σ} {Π} N k b q (P Q : @tf SI Σ Π) : tf :=
+Definition tf_release `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
   (tf_weakuntil N k b q Q (Q ∗ P))%F.
-Global Arguments tf_release {SI Σ Π}.
+Global Arguments tf_release {SI Π Σ}.
 
 (* P Strong release Q *)
-Definition tf_strongrelease `{SI : indexT} {Σ} {Π} N k b q (P Q : @tf SI Σ Π) : tf :=
+Definition tf_strongrelease `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q Q (Q ∗ P))%F.
-Global Arguments tf_strongrelease {SI Σ Π}.
-
-Section depth.
-
-  Universe temporal_formula_depth.
-
-  Local Open Scope ordinals.
-
-  Fixpoint tf_depth `{SI : indexT} `{Σ : gFunctors} {Π : Type} (Φ : @tf SI Σ Π) : ord :=
-    match Φ with
-    | tf_emp => one
-    | tf_atomic π => one
-    | tf_pure p => one
-    | tf_ghost p => one
-    | tf_and P Q => (tf_depth P ⊕ tf_depth Q)
-    | tf_or P Q => (tf_depth P ⊕ tf_depth Q)
-    | tf_impl P Q => (succ (tf_depth Q))
-    | tf_forall A P => (limit (λ (a: A), tf_depth (P a)))
-    | tf_exist A P => (limit (λ (a: A), tf_depth (P a)))
-    | tf_sep P Q => (tf_depth P ⊕ tf_depth Q)
-    (* | tf_wand P Q => (succ (tf_depth Q)) *)
-    | tf_pers P => (succ (tf_depth P))
-    | tf_always N P => (succ (tf_depth P))
-    | tf_until N k b q P Q => (tf_depth P ⊕ tf_depth Q)
-    end.
-
-End depth.
+Global Arguments tf_strongrelease {SI Π Σ}.

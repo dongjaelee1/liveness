@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From liris.base_logic Require Export invariants.
-From liris.program_logic Require Export temporal_rules.
+From liris.program_logic Require Export temporal_logic.
 From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
@@ -10,33 +10,37 @@ From iris.prelude Require Import options.
 
 Definition writer : val :=
   λ: "l", "l" <- #1;;
-          Exit #().
+          Label "exit" #().
 
 Definition reader : val := 
   rec: "reader" "l" :=
     let: "n" := !"l" in
     if: "n" = #1
-    then Exit #()
+    then Label "exit" #()
     else "reader" "l".
 
 Section mp_proof.
   Context `{!heapGS Σ}.
-  Let N := nroot .@ "message_passing".
+  Let N := nroot.@ "message_passing".
+  Let Np := N.@ "pointsto".
+  Let Nl1 := N.@ "label1".
+  Let Nl2 := N.@ "label2".
 
-  Let ℓs : layers := (λ _, 0).
+  Definition mp_tf (i1 i2 : thread_id) (k kl1 kl2 : oid) (l : loc) : tf Σ :=
+    ⟨oblP_layer k 0 ∗ oblP_id k ∗ witP_layer k 0⟩ ∗
+    tf_always N (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1))) ∗
+                 ((tf_eventually Nl1 kl1 false (1/2) (i1 ⤉ "exit", #())) ∨ (⟨oblP_fulfilled kl1⟩)) ∗
+                 ((tf_eventually Nl2 k false (1/2) (i2 ⤉ "exit", #())) ∨ (⟨oblP_fulfilled kl2⟩))
+      ).
 
-  Definition mp_proto (k : gl_id) (v : ghost_lock_version) (l : loc) : iProp Σ :=
-    gl_layers k ℓs ∗ gl k v ∗ wit_layer k v 0 ∗
-    gl_variant N k v (l ↦ #0) (l ↦ #1) (False).
-
-  Definition mp (k : gl_id) (l : loc) : iProp Σ :=
-    mp_proto k 0 l.
+  Definition mp (i1 i2 : thread_id) (k kl1 kl2 : oid) (l : loc) : iProp Σ :=
+    ⟦mp_tf i1 i2 k kl1 kl2 l⟧ₗ.
 
   (** The main proofs. *)
-  Global Instance mp_proto_persistent k v l : Persistent (mp_proto k v l).
-  Proof. apply _. Qed.
-  Global Instance mp_persistent k l : Persistent (mp k l).
-  Proof. apply _. Qed.
+  Global Instance mp_persistent i1 i2 k kl1 kl2 l : Persistent (mp i1 i2 k kl1 kl2 l).
+  Proof. rewrite /mp /mp_tf. tf_red. apply _. Qed.
+
+  TODO
 
   Lemma mp_writer_spec i l :
     l{{{ ∃ k, mp k l ∗
@@ -149,7 +153,7 @@ Section mp_proof.
     th_obls i G q ∗ l ↦ #0
     ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_current k 0 (1/2)%Qp ∗ gl_fuel k 0 10 ∗ mp k l.
   Proof.
-    rewrite /mp /mp_proto. iIntros "[TG ptr]".
+    rewrite /mp /mp. iIntros "[TG ptr]".
     iMod (gl_alloc_obl _ _ _ _ ℓs 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& Gc& #Gwf& #Gl& Gf& #GV& #Wit& _)".
     iFrame "Gwf Gl GV Wit". iFrame. auto.
   Qed.
