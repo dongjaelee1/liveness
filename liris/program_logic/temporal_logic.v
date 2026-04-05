@@ -67,11 +67,17 @@ with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ}
 Global Arguments tf_logic {SI Λ Σ _}.
 Global Arguments tf_intuit {SI Λ Σ _}.
 
-Definition tf_fulfilled `{SI : indexT} `{!temporalGS Λ Σ}
+Local Definition tf_fulfilled_def `{SI : indexT} `{!temporalGS Λ Σ}
   k (Q : tf Σ) : iProp Σ :=
   (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
                          hG_event n' (σ', Θ', κs') ∗
                          tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
+Local Definition tf_fulfilled_aux : seal (@tf_fulfilled_def). Proof. by eexists. Qed.
+Definition tf_fulfilled := tf_fulfilled_aux.(unseal).
+Global Arguments tf_fulfilled {SI Λ Σ _}.
+Local Lemma tf_fulfilled_unseal `{SI : indexT} `{!temporalGS Λ Σ} :
+  tf_fulfilled = @tf_fulfilled_def SI Λ Σ _.
+Proof. rewrite -tf_fulfilled_aux.(seal_eq) //. Qed.
 
 Section proof.
   Context `{SI : indexT} `{!temporalGS Λ Σ}.
@@ -82,11 +88,11 @@ Section proof.
   Qed.
 
   Global Instance tf_fulfilled_persistent k Q : Persistent (tf_fulfilled k Q).
-  Proof. rewrite /tf_fulfilled. apply _. Qed.
+  Proof. rewrite tf_fulfilled_unseal /tf_fulfilled_def. apply _. Qed.
 
   Lemma tf_fulfilled_unfold k Q :
     tf_fulfilled k Q = (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ hG_event n' (σ', Θ', κs') ∗ tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
-  Proof. done. Qed.
+  Proof. rewrite tf_fulfilled_unseal /tf_fulfilled_def. done. Qed.
 
   Lemma tf_logic_tf_intuit Φ h n σ Θ κs m i Ω W :
     (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ)
@@ -164,26 +170,24 @@ Section reduction.
   Proof. done. Qed.
   Lemma tf_until_logic N k b q P Q :
     ⟦tf_until N k b q P Q⟧ₗ = (oblP_assigned k b (q/2)%Qp ∗ oblP_inv N k (⟦P⟧ₗ) (⟦Q⟧ₗ) (tf_fulfilled k Q))%I.
-  Proof. done. Qed.
+  Proof. rewrite tf_fulfilled_unfold. done. Qed.
 
 End reduction.
 
 Ltac tf_red :=
-  (try rewrite tf_and_logic;
-   try rewrite tf_or_logic;
-   try rewrite tf_impl_logic;
-   try rewrite tf_forall_logic;
-   try rewrite tf_exist_logic;
-   try rewrite tf_sep_logic;
-   try rewrite tf_atomic_logic;
-   try rewrite tf_pure_logic;
-   try rewrite tf_ghost_logic;
-   (* try rewrite tf_pers_logic; *)
-   try rewrite tf_always_logic
+  (try rewrite !tf_and_logic;
+   try rewrite !tf_or_logic;
+   try rewrite !tf_impl_logic;
+   try rewrite !tf_forall_logic;
+   try rewrite !tf_exist_logic;
+   try rewrite !tf_sep_logic;
+   try rewrite !tf_pure_logic;
+   try rewrite !tf_ghost_logic;
+   try rewrite !tf_always_logic
   ).
 
 (* Making this opaque is reasonable only if we have a better reduction tactic than simpl. *)
-Global Opaque tf_logic tf_intuit tf_fulfilled.
+Global Opaque tf_logic tf_intuit.
 
 (** Ofe and Monoid structure. *)
 Global Instance tf_equiv `{SI : indexT} `{!temporalGS Λ Σ} : Equiv (tf Σ) :=

@@ -23,37 +23,38 @@ Section mp_proof.
   Context `{!heapGS Σ}.
   Let N := nroot.@ "message_passing".
   Let Np := N.@ "pointsto".
-  Let Nl1 := N.@ "label1".
-  Let Nl2 := N.@ "label2".
+  Let Nl := N.@ "label".
 
-  Definition mp_tf (i1 i2 : thread_id) (k kl1 kl2 : oid) (l : loc) : tf Σ :=
+  Definition mp_tf (k : oid) (l : loc) : tf Σ :=
     ⟨oblP_layer k 0 ∗ oblP_id k ∗ witP_layer k 0⟩ ∗
-    tf_always N (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1))) ∗
-                 ((tf_eventually Nl1 kl1 false (1/2) (i1 ⤉ "exit", #())) ∨ (⟨oblP_fulfilled kl1⟩)) ∗
-                 ((tf_eventually Nl2 k false (1/2) (i2 ⤉ "exit", #())) ∨ (⟨oblP_fulfilled kl2⟩))
-      ).
+    tf_always N (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1)))).
 
-  Definition mp (i1 i2 : thread_id) (k kl1 kl2 : oid) (l : loc) : iProp Σ :=
-    ⟦mp_tf i1 i2 k kl1 kl2 l⟧ₗ.
+  Definition mp (k : oid) (l : loc) : iProp Σ :=
+    ⟦mp_tf k l⟧ₗ.
 
   (** The main proofs. *)
-  Global Instance mp_persistent i1 i2 k kl1 kl2 l : Persistent (mp i1 i2 k kl1 kl2 l).
+  Global Instance mp_persistent k l : Persistent (mp k l).
   Proof. rewrite /mp /mp_tf. tf_red. apply _. Qed.
 
-  TODO
-
   Lemma mp_writer_spec i l :
-    l{{{ ∃ k, mp k l ∗
-              thread_exec i 1 ∗ th_obls i (<[k:=0]>∅) 1 ∗
-              gl_fuel k 0 10 }}}
+    l{{{ ∃ k kl, mp k l ∗
+                 ⟦tf_eventually Nl kl false 1 (i ⤉ "exit", #())⟧ₗ ∗
+                 thP_obls i ({[k]} ∪ {[kl]}) 1 ∗
+                 oblP_fuel k 0 10 ∗ oblP_fuel kl 0 10 }}}
       writer #l @ i
-    l{{{ RET #(); lift_term i fork_post #() }}}.
+      l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof.
     iIntros (Φ) "HP HΦ".
-    (* iApply lwp_sfgupd. *)
+    iDestruct "HP" as "(%&%& #Hmp& Hel& TG& Ofk& Ofkl)".
+    rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Olk& #Ok& #Wlk)& #Hmp)".
+    rewrite /tf_eventually !tf_until_logic. tf_red.
+    iDestruct "Hel" as "(Oakl& #OIkl)".
+
+    TODO
+    
     iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG& Gfk)".
     rewrite /writer /=.
-    iMod (gl_fuel_lt k 0 _ 9 with "Gfk") as "[Gfk Gfk1]".
+    iMod (oblP_fuel_lt k 0 _ 9 with "Gfk") as "[Gfk Gfk1]".
     { rewrite !measure_nat. apply OrdArith.lt_from_nat. lia. }
     (* Pure steps *)
     lwp_lam. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done.
@@ -61,9 +62,9 @@ Section mp_proof.
     { iModIntro. rewrite insert_empty dom_singleton_L big_sepS_singleton. iFrame. }
     iIntros "!> Tx TG _ !> _ !>".
     lwp_finish.
-    rewrite (gl_fuel_eq k 0 0 9 (8 ⊕ 1)%M); cycle 1.
+    rewrite (oblP_fuel_eq k 0 0 9 (8 ⊕ 1)%M); cycle 1.
     { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
-    iPoseProof (gl_fuel_add with "Gfk") as "[Gfk Gfk1]".
+    iPoseProof (oblP_fuel_add with "Gfk") as "[Gfk Gfk1]".
     lwp_bind (Store _ _).
     iMod (gl_unlock with "TG GVkv") as "[>(TG& Glk& VP) ACC]".
     { set_solver. }
@@ -151,7 +152,7 @@ Section mp_proof.
 
   Lemma mp_pre i l E G q :
     th_obls i G q ∗ l ↦ #0
-    ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_current k 0 (1/2)%Qp ∗ gl_fuel k 0 10 ∗ mp k l.
+    ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_current k 0 (1/2)%Qp ∗ oblP_fuel k 0 10 ∗ mp k l.
   Proof.
     rewrite /mp /mp. iIntros "[TG ptr]".
     iMod (gl_alloc_obl _ _ _ _ ℓs 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& Gc& #Gwf& #Gl& Gf& #GV& #Wit& _)".
