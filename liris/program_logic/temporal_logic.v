@@ -83,6 +83,9 @@ Proof. rewrite -tf_fulfilled_aux.(seal_eq) //. Qed.
 Section proof.
   Context `{SI : indexT} `{!temporalGS Λ Σ}.
 
+  Global Instance tf_atomic_timeless π : Timeless (state_pred_interp π) → Timeless (tf_logic (tf_atomic π)).
+  Proof. intros. simpl. auto. Qed.
+
   Global Instance tf_intuit_persistent n σ Θ κs i Ω Φ : Persistent (tf_intuit n σ Θ κs i Ω Φ).
   Proof.
     induction Φ; simpl; apply _.

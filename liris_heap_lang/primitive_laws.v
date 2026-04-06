@@ -445,6 +445,9 @@ Proof.
   iDestruct "Hvs" as "[$ Hvs]". by iApply "IH".
 Qed.
 
+Global Instance state_pred_interp_timesless π : Timeless (state_pred_interp π).
+Proof. destruct π; simpl; apply _. Qed.
+
 Lemma lwp_allocN_seq G R o s i E v n :
   (0 < n)%Z →
   l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) }}}
