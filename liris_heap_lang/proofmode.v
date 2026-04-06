@@ -180,7 +180,7 @@ Tactic Notation "lwp_label" := lwp_pure (Label _ _).
 
 Lemma tac_lwp_bind `{!heapGS Σ} K Δ s i E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (lwpupd i E e (lWP e @ s; i; E {{ v, lWP f (Val v) @ s; i; E {{ Φ }} }}))%I →
+  envs_entails Δ (lwpupd i E e (lWP e @ s; i; E {{ v, lwpupd i E (f (Val v)) (lWP f (Val v) @ s; i; E {{ Φ }}) }}))%I →
   envs_entails Δ (lwpupd i E (fill K e) (lWP fill K e @ s; i; E {{ Φ }}))%I.
 Proof. rewrite envs_entails_unseal=> -> ->. by apply: lwp_bind. Qed.
 
@@ -198,6 +198,28 @@ Tactic Notation "lwp_bind" open_constr(efoc) :=
           | fail 1 "lwp_bind: cannot find" efoc "in" e ]
   | _ => fail "lwp_bind: not a 'lwp'"
   end.
+
+(** Tactics for lwpupd lwp form. *)
+Lemma tac_lwp_expr_eval_upd `{!heapGS Σ} Δ s i E Φ e e' :
+  (∀ (e'':=e'), e = e'') →
+  environments.envs_entails Δ (lwpupd i E e' (lWP e' @ s; i; E {{ Φ }}))%I →
+  environments.envs_entails Δ (lwpupd i E e (lWP e @ s; i; E {{ Φ }}))%I.
+Proof. by intros ->. Qed.
+
+Tactic Notation "lwp_expr_eval_upd" tactic3(t) :=
+  iStartProof;
+  lazymatch goal with
+  | |- environments.envs_entails _ (lwpupd ?i ?E ?e (lwp ?s ?i ?E ?e ?Q)) =>
+      notypeclasses refine (tac_lwp_expr_eval_upd _ _ _ _ _ e _ _ _);
+      [let x := fresh in intros x; t; unfold x; notypeclasses refine eq_refl|]
+  | _ => fail "lwp_expr_eval_upd: not a 'lwpupd lwp'"
+  end.
+Ltac lwp_expr_simpl_upd := lwp_expr_eval_upd simpl.
+
+(* simplify occurrences of subst/fill *)
+Ltac lwp_finish_upd :=
+  lwp_expr_simpl_upd.
+
 
 (* FIXME: TODO *)
 

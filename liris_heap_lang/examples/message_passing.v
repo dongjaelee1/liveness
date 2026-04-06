@@ -22,12 +22,18 @@ Definition reader : val :=
 Section mp_proof.
   Context `{!heapGS Σ}.
   Let N := nroot.@ "message_passing".
+  Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
   Let Nl := N.@ "label".
 
+  Remark N_disj_1 : Na ## Np.
+  Proof. by apply ndot_ne_disjoint. Qed.
+  Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
+  Proof. pose proof N_disj_1. set_solver. Qed.
+
   Definition mp_tf (k : oid) (l : loc) : tf Σ :=
     ⟨oblP_layer k 0 ∗ oblP_id k ∗ witP_layer k 0⟩ ∗
-    tf_always N (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1)))).
+    tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1)))).
 
   Definition mp (k : oid) (l : loc) : iProp Σ :=
     ⟦mp_tf k l⟧ₗ.
@@ -37,57 +43,110 @@ Section mp_proof.
   Proof. rewrite /mp /mp_tf. tf_red. apply _. Qed.
 
   Lemma mp_writer_spec i l :
-    l{{{ ∃ k kl, mp k l ∗
-                 ⟦tf_eventually Nl kl false 1 (i ⤉ "exit", #())⟧ₗ ∗
-                 thP_obls i ({[k]} ∪ {[kl]}) 1 ∗
+    l{{{ ∃ k kl, ⌜k ≠ kl⌝ ∗
+                 mp k l ∗
+                 (* Start with the other half of the until ownership for the pointsto. *)
+                 ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
+                 ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
+                 thP_obls i ({[k; kl]}) 1 ∗
                  oblP_fuel k 0 10 ∗ oblP_fuel kl 0 10 }}}
       writer #l @ i
       l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof.
     iIntros (Φ) "HP HΦ".
-    iDestruct "HP" as "(%&%& #Hmp& Hel& TG& Ofk& Ofkl)".
+    iDestruct "HP" as "(%&%& %Nek& #Hmp& Hup& Hul& TG& Ofk& Ofkl)".
     rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Olk& #Ok& #Wlk)& #Hmp)".
-    rewrite /tf_eventually !tf_until_logic. tf_red.
-    iDestruct "Hel" as "(Oakl& #OIkl)".
-
-    TODO
-    
-    iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG& Gfk)".
     rewrite /writer /=.
-    iMod (oblP_fuel_lt k 0 _ 9 with "Gfk") as "[Gfk Gfk1]".
+    iMod (oblP_fuel_lt_set ({[k; kl]}) 0 0 9 10 with "[Ofk Ofkl]") as "[Of Of1]".
     { rewrite !measure_nat. apply OrdArith.lt_from_nat. lia. }
+    { destruct (decide (({[k]} : gset _) ## {[kl]})); cycle 1.
+      { destruct (decide (k = kl)).
+        - subst. rewrite union_idemp_L. iApply big_sepS_singleton. eauto.
+        - exfalso. set_solver. }
+      iApply big_sepS_union; first auto. rewrite !big_sepS_singleton. iFrame. }
     (* Pure steps *)
-    lwp_lam. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done.
-    iSplitL "Gfk1".
-    { iModIntro. rewrite insert_empty dom_singleton_L big_sepS_singleton. iFrame. }
-    iIntros "!> Tx TG _ !> _ !>".
-    lwp_finish.
-    rewrite (oblP_fuel_eq k 0 0 9 (8 ⊕ 1)%M); cycle 1.
+    lwp_lam. iFrame "TG". iExists ⊤, ∅, 10. iSplitR; first done.
+    iSplitL "Of1".
+    { by iFrame. }
+    iIntros "!> TG _ !> LC !>".
+    lwp_finish_upd.
+    rewrite (oblP_fuel_eq_set _ 0 0 9 (8 ⊕ 1)%M); cycle 1.
     { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
-    iPoseProof (oblP_fuel_add with "Gfk") as "[Gfk Gfk1]".
+    iPoseProof (oblP_fuel_add_set with "Of") as "[Of Of1]".
     lwp_bind (Store _ _).
-    iMod (gl_unlock with "TG GVkv") as "[>(TG& Glk& VP) ACC]".
+    iModIntro.
+    iInv "Hmp" as "mp". iDestruct "mp" as "[mp | mp]"; cycle 1.
+    { iDestruct "mp" as "[>mp _]". iEval (rewrite tf_until_logic) in "Hup". iDestruct "Hup" as "[Oak _]".
+      iPoseProof (oblP_assigned_fulfilled_false with "Oak mp") as "%". done. }
+    replace 10 with (9 + 1) by lia. iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
+    iApply (lwp_lc_later with "LC1"). iNext.
+    iCombine "Hup mp" as "mp".
+    iMod (tf_until_to_true with "mp") as "mp".
+    { apply N_subseteq_1. }
+    replace 9 with (8 + 1) by lia. iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
+    iApply (lwp_lc_later with "LC1"). iNext.
+    iDestruct "mp" as "[Ptrl ACCmp]".
+    iApply lwp_sfmupd. iEval (rewrite tf_atomic_logic) in "Ptrl".
+    iApply (lwp_store _ ∅ 0 with "[$Ptrl $TG $Of1]").
+    { done. }
+    iIntros "((_& TG& _)& Ptrl)".
+    iMod ("ACCmp" with "Ptrl") as "mp".
+    (** TODO: make this a modality instance. *)
+    iApply sfmupd_fupd_acc. iMod "mp". iMod (tf_until_fulfill with "mp") as "mp".
+    { apply N_subseteq_1. }
+    iPoseProof ("mp" with "[] TG") as "mp".
+    { iPureIntro. set_solver. }
+    (** TODO: add rules for sfmupd and lc. *)
+    replace 8 with (7 + 1) by lia. iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
+    iApply (lc_fupd_elim_later with "LC1"). iNext.
+    iMod ("mp" $! _) as "mp". iModIntro. iMod "mp" as "(Ptrl& TG& #Ofk)".
+    iApply fupd_mask_intro. 1: set_solver. iIntros ">_". iIntros "!> !>". iSplitL "Ptrl".
+    { iNext. iRight. iFrame. eauto. }
+    iModIntro.
+    lwp_pure.
+    replace ({[k; kl]} ∖ {[k]} : gset _) with ({[kl]} : gset _).
+    2:{ set_solver. }
+    simpl. iPoseProof (big_sepS_union with "Of") as "[_ Of]".
     { set_solver. }
-    { rewrite lookup_insert_eq. auto. }
-    iApply lwp_sfgupd.
-    iApply (lwp_store _ ∅ 0 with "[$VP $Tx $TG Gfk1]").
-    { rewrite insert_empty dom_singleton_L big_sepS_singleton. iFrame. done. }
-    iIntros "[(_& Tx& TG& _) ptl]".
-    iPoseProof ("ACC" with "TG Glk") as "ACC".
-    iMod ("ACC" $! _) as "((TG& Gc& #Gd)& ACC)".
-    iModIntro. iMod ("ACC" with "ptl") as "_". iModIntro.
-    (* simpl. *)
+    rewrite big_sepS_singleton.
+    rewrite (oblP_fuel_eq _ 0 0 8 (7 ⊕ 1)%M); cycle 1.
+    { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
+    iPoseProof (oblP_fuel_add with "Of") as "[Of Of1]".
+    simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Of1".
+    { iApply big_sepS_singleton. iFrame. }
+    iIntros "TG _ !> _ !>".
+    iModIntro.
+    rewrite (oblP_fuel_eq _ 0 0 7 (6 ⊕ 1)%M); cycle 1.
+    { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
+    iPoseProof (oblP_fuel_add with "Of") as "[Of Of1]".
     lwp_pure.
-    simpl. iFrame "Tx". iExists ⊤, ∅, ∅, 0. iSplitR; first done. iModIntro. iSplitL "TG".
-    { rewrite delete_insert_id; auto. }
-    iSplitR; first by rewrite dom_empty_L. iIntros "Tx TG _ !> _ !>".
-    lwp_pure.
-    simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-    iSplitR; first by rewrite dom_empty_L. iIntros "Tx TG _ !> _ !>".
-    iApply (lwp_exit with "TG Tx [HΦ]").
-    iModIntro. iIntros "#Tt1 #Tt2". iIntros "!>".
-    iApply "HΦ". rewrite /lift_term. iFrame "Tt1".
-    rewrite -thread_term_unfold. auto.
+    simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Of1".
+    { iApply big_sepS_singleton. iFrame. }
+    iIntros "TG _ !> _ !>".
+    iApply lwpupd_label. iIntros "PL".
+    iApply sfmupd_fupd_acc.
+    iMod (tf_until_to_true with "Hul") as "Hul". 1: set_solver.
+    iEval (replace 7 with (6 + 1) by lia) in "LC". iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
+    iApply (lc_fupd_elim_later with "LC1"). iNext.
+    iDestruct "Hul" as "[_ Hul]". iMod ("Hul" $! _) as "Hul".
+    iApply sfmupd_fupd_acc.
+    iMod ("Hul" with "[PL]") as "Hul".
+    { iNext. tf_red. iExists _. tf_red. iEval (rewrite tf_atomic_logic). iFrame. done. }
+    iModIntro. iApply sfmupd_fupd_acc.
+    iMod (tf_until_fulfill with "Hul") as "Hul". 1: set_solver.
+    iPoseProof ("Hul" with "[] TG") as "Hul".
+    { iPureIntro. set_solver. }
+    iEval (replace 6 with (5 + 1) by lia) in "LC". iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
+    iApply (lc_fupd_elim_later with "LC1"). iNext.
+    iMod ("Hul" $! _) as "Hul". iModIntro. iMod "Hul" as "(PL& TG& #OFkl)".
+    tf_red. iDestruct "PL" as "(%& PL)". tf_red. iDestruct "PL" as "(PL& %)". subst a.
+    iModIntro. iApply fupd_mask_intro. 1: set_solver. iIntros ">_". iModIntro. iFrame "PL".
+    replace ({[kl]} ∖ {[kl]} : gset _) with (∅ : oids) by set_solver.
+    iModIntro. lwp_pure.
+    simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitR; first done.
+    iIntros "TG _ !> _ !> !>".
+    lwp_finish.
+    iApply "HΦ". rewrite /lift_term. iMod (obl_terminate with "TG") as "$". done.
   Qed.
 
   Lemma mp_reader_spec i l :

@@ -86,20 +86,6 @@ Section lifting.
 
   Local Hint Resolve reducible_no_obs_reducible : core.
 
-  Lemma lwp_lc_later_ord s i E e Φ :
-    £ Ord.one -∗ (▷ lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
-  Proof.
-    iIntros "LC H". by iMod (lc_fupd_elim_later_ord with "LC H") as "H".
-  Qed.
-  Lemma lwp_lc_later s i E e Φ :
-    £n 1 -∗ (▷ lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
-  Proof. iApply lwp_lc_later_ord. Qed.
-  Lemma lwp_lc_laterN n s i E e Φ :
-    £n n -∗ (▷^n lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
-  Proof.
-    iIntros "LC H". iApply fupd_lwp. iApply (lc_fupd_add_laterN E E with "LC"). iNext. by iModIntro.
-  Qed.
-
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
     (∀ K h n σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →

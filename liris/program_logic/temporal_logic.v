@@ -1,4 +1,5 @@
 From iris.proofmode Require Import base proofmode classes.
+From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From liris.program_logic Require Export temporal_formula weakestpre.
 
@@ -321,13 +322,24 @@ Section proof.
   Proof.
     iIntros (He) "U". rewrite !tf_until_logic He Qp.div_add_distr. iDestruct "U" as "([$ $]& #U)". auto.
   Qed.
-  Lemma tf_until_frac_add N k b1 b2 q1 q2 P Q P' Q' :
-    ⟦tf_until N k b1 q1 P Q⟧ₗ -∗ ⟦tf_until N k b2 q2 P' Q'⟧ₗ -∗ ⟦tf_until N k b1 (q1 + q2)%Qp P Q⟧ₗ.
+  Lemma tf_until_frac_add N k b1 b2 q1 q2 q P Q P' Q' :
+    (q = q1 + q2)%Qp →
+    ⟦tf_until N k b1 q1 P Q⟧ₗ -∗ ⟦tf_until N k b2 q2 P' Q'⟧ₗ -∗ ⟦tf_until N k b1 q P Q⟧ₗ.
   Proof.
+    intros Hq. subst q.
     rewrite !tf_until_logic Qp.div_add_distr. iIntros "[Oa1 $] [Oa2 _]".
     iPoseProof (oblP_assigned_agree with "Oa1 Oa2") as "%". subst.
     by iCombine "Oa1 Oa2" as "Oa".
   Qed.
+
+  Global Instance tf_until_fractional N k b P Q : Fractional (λ q, ⟦tf_until N k b q P Q⟧ₗ).
+  Proof.
+    intros p q. rewrite !tf_until_logic. iSplit.
+    - iIntros "(Oa& #OI)". iFrame "OI". rewrite !Qp.div_add_distr. iDestruct "Oa" as "[Oa Oa']". iFrame.
+    - iIntros "((Oa1& #Oi)& Oa2& _)". iFrame "Oi". rewrite !Qp.div_add_distr. iCombine "Oa1 Oa2" as "$".
+  Qed.
+  Global Instance tf_until_as_fractional N k b q P Q : AsFractional (⟦tf_until N k b q P Q⟧ₗ) (λ q, ⟦tf_until N k b q P Q⟧ₗ) q.
+  Proof. split; [auto|apply _]. Qed.
 
   Lemma tf_until_alloc E i G q (b : bool) ℓ μ :
     thP_obls i G q -∗

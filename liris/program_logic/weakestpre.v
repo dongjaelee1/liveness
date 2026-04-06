@@ -818,11 +818,13 @@ Section lwp.
   Qed.
 
   Lemma lwp_bind K `{!LanguageCtx K} s i E e Φ :
-    (lwpupd i E e (lWP e @ s; i; E {{ v, lWP K (of_val v) @ s; i; E {{ Φ }} }}))
+    (lwpupd i E e (lWP e @ s; i; E {{ v, lwpupd i E (K (of_val v)) (lWP K (of_val v) @ s; i; E {{ Φ }}) }} ))
     ⊢ lwpupd i E (K e) (lWP K e @ s; i; E {{ Φ }}).
   Proof.
     revert Φ.
-    cut (∀ Φ', (lWP e @ s; i; E {{ Φ' }}) -∗ ∀ Φ, (∀ v, (Φ' v) -∗ (lWP K (of_val v) @ s; i; E {{ Φ }})) -∗ lwpupd i E (K e) (lWP K e @ s; i; E {{ Φ }})).
+    cut (∀ Φ', (lWP e @ s; i; E {{ Φ' }}) -∗
+               ∀ Φ, (∀ v, (Φ' v) -∗ (lwpupd i E (K (of_val v)) (lWP K (of_val v) @ s; i; E {{ Φ }}))) -∗
+                    lwpupd i E (K e) (lWP K e @ s; i; E {{ Φ }})).
     { iIntros (help Φ) "H". iPoseProof (lwpupd_ctx with "H") as "H". iMod "H". iApply (help with "H"); auto. }
     iIntros (Φ') "H". iIntros (Φ) "H2".
     (* iPoseProof (lwp_unfold with "H") as "H". iModIntro. *)
@@ -832,7 +834,7 @@ Section lwp.
     rewrite lwp_unfold /lwp_pre /lwp_step. destruct (to_val e) as [v|] eqn:He.
     { iPoseProof (lwpupd_ctx with "IH") as "IH". iMod "IH".
       iPoseProof ("HΦ" with "IH") as "H". rewrite lwp_unfold /lwp_pre /lwp_step.
-      apply of_to_val in He as <-. iFrame. auto. }
+      apply of_to_val in He as <-. iFrame. }
     rewrite fill_not_val; last auto.
     iModIntro.
     iIntros (K1 ?????? HK1 LU1) "SI". iMod ("IH" $! (K1 ∘ K) with "[] [//] SI") as "IH".
@@ -971,6 +973,21 @@ Section lwp.
   Proof.
     iIntros "HR HWP". iApply (lwp_wand with "HWP").
     iIntros (v) "HΦ". by iApply "HΦ".
+  Qed.
+
+  (** Later credits. *)
+  Lemma lwp_lc_later_ord s i E e Φ :
+    £ Ord.one -∗ (▷ lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "LC H". iApply fupd_lwp. by iMod (lc_fupd_elim_later_ord with "LC H") as "H".
+  Qed.
+  Lemma lwp_lc_later s i E e Φ :
+    £n 1 -∗ (▷ lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
+  Proof. iApply lwp_lc_later_ord. Qed.
+  Lemma lwp_lc_laterN n s i E e Φ :
+    £n n -∗ (▷^n lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros "LC H". iApply fupd_lwp. iApply (lc_fupd_add_laterN E E with "LC"). iNext. by iModIntro.
   Qed.
 
 End lwp.
