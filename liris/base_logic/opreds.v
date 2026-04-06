@@ -759,7 +759,7 @@ Section preds.
 
     Lemma obl_fuels_add_map α F (G : gmap oid (layer * measurable_syntax)) ν :
       obl_fuels α F -∗
-      ([∗ map] g ↦ '(l, m) ∈ G, ⌜ (α <= measure l ν)%ord ⌝ ∗ oblP_fuel g l (m × ν)%M) ==∗
+      ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in ⌜ (α <= measure l ν)%ord ⌝ ∗ oblP_fuel g l (m × ν)%M) ==∗
       obl_fuels α (G ∪ F).
     Proof.
       revert α F. induction G using map_ind; intros; iIntros "Wfs Fs".
@@ -803,7 +803,7 @@ Section preds.
     Lemma embed_fuels_add_map {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
       a ℓ F (G : gmap oid (layer * measurable_syntax)) :
       embed_fuels wf_ltA a ℓ F -∗
-      ([∗ map] g ↦ '(l, m) ∈ G, ⌜ layer_leibniz_le ℓ l ⌝ ∗ oblP_fuel g l (m × ⟪wf_ltA, a⟫)%M) ==∗
+      ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in ⌜ layer_leibniz_le ℓ l ⌝ ∗ oblP_fuel g l (m × ⟪wf_ltA, a⟫)%M) ==∗
       embed_fuels wf_ltA a ℓ (G ∪ F).
     Proof.
       rewrite !embed_fuels_unseal /embed_fuels_def.
@@ -850,7 +850,7 @@ Section preds.
 
     Lemma wit_fuels_add_map k ℓ α F (G : gmap oid (layer * measurable_syntax)) :
       wit_fuels k ℓ α F -∗
-      ([∗ map] g ↦ '(l, m) ∈ G, ⌜ (ℓ < l)%ordi ⌝ ∗ oblP_fuel g l (m × ▽)%M) ==∗
+      ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in ⌜ (ℓ < l)%ordi ⌝ ∗ oblP_fuel g l (m × ▽)%M) ==∗
       wit_fuels k ℓ α (G ∪ F).
     Proof.
       rewrite !wit_fuels_unseal /wit_fuels_def.

@@ -51,7 +51,7 @@ Section mp_proof.
                  thP_obls i ({[k; kl]}) 1 ∗
                  oblP_fuel k 0 10 ∗ oblP_fuel kl 0 10 }}}
       writer #l @ i
-      l{{{ RET #(); lift_term i fork_post #() }}}.
+    l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof.
     iIntros (Φ) "HP HΦ".
     iDestruct "HP" as "(%&%& %Nek& #Hmp& Hup& Hul& TG& Ofk& Ofkl)".
@@ -150,22 +150,50 @@ Section mp_proof.
   Qed.
 
   Lemma mp_reader_spec i l :
-    l{{{ ∃ k, mp k l ∗
-              thread_exec i 1 ∗ th_obls i ∅ 1 }}}
+    l{{{ ∃ k kl, ⌜ k ≠ kl ⌝ ∗
+                 mp k l ∗
+                 ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
+                 thP_obls i ({[kl]}) 1 ∗
+                 oblP_fuel kl 1 (10 ⊕ (10 × ▽))%M}}}
       reader #l @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof.
     iIntros (Φ) "HP HΦ".
-    iDestruct "HP" as "(%& (#Gwfk& #Gk& #Wkv& #GVkv)& Tx& TG)".
+    iDestruct "HP" as "(%&%& %HNkl& #Hmp& Ukl& TG& Fkl)".
     rewrite /reader /=.
+    rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Olk& #Ok& #Wlk)& #Hmp)".
+    iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl WFkl]".
     (* Liveness induction *)
-    iPoseProof (wit_fuels_init with "Wkv") as "(%& Wkvfs)".
-    iStopProof. induction α using WFOCM.ind. rename x into α, H into IHα.
-    iIntros "(#(Gwfk& Gk& Wkv& GVkv& Wkvfs)& Tx& TG& HΦ)".
+    iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)".
+    (* FIXME: coercions not working *)
+    iMod (wit_fuels_add_map _ _ _ _ ({[kl:=(ord.from_nat 1, ms_nat 10)]}) with "Wf0 [WFkl]") as "Wf".
+    { rewrite big_sepM_singleton. iFrame. iPureIntro. apply ordArith.lt_from_nat. lia. }
+    rewrite map_union_empty.
+    iClear "Wf0". iInduction α as [α IH] using WFOCM.ind.
+    (* iStopProof. induction α using WFOCM.ind. rename x into α, H into IHα. *)
+    (* iIntros "(#(Gwfk& Gk& Wkv& GVkv& Wkvfs)& Tx& TG& HΦ)". *)
     (* Pure steps *)
-    lwp_rec. simpl. iFrame "Tx TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro.
-    iSplitR; first by rewrite dom_empty_L. iIntros "Tx TG _ !> _ !>".
+    rewrite (oblP_fuel_eq _ 1 0 10 (9 ⊕ 1)%M); cycle 1.
+    { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
+    iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
+    lwp_rec. simpl. iFrame "TG". iExists ⊤, ∅, 100. iSplitR; first done. iModIntro. iSplitL "Fkl1".
+    { rewrite big_sepS_singleton. iFrame. }
+    iIntros "TG _ !> LC !>".
     lwp_bind (Load _).
+    iModIntro.
+    iInv "Hmp" as "mp". iDestruct "mp" as "[mp | mp]".
+    - (* Induction case. *)
+      replace 100 with (99 + 1) by lia. iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
+      iApply (lwp_lc_later with "LC1"). iNext.
+      iEval (rewrite tf_until_logic) in "mp". iDestruct "mp" as "(Oak& #OIk)".
+      iMod (oblP_inv_acc_assigned with "OIk") as "H".
+      1: apply N_subseteq_1.
+      
+
+      TODO
+
+
+
     iMod (gl_variant_acc with "GVkv") as "[>PQR ACC]". 1: set_solver.
     iDestruct "PQR" as "[[HP | HQ] | HR]"; cycle -1.
     { iDestruct "HR" as "[_ %]". done. }
