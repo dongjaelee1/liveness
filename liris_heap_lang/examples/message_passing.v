@@ -51,7 +51,7 @@ Section mp_proof.
                  thP_obls i ({[k; kl]}) 1 ∗
                  oblP_fuel k 0 10 ∗ oblP_fuel kl 0 10 }}}
       writer #l @ i
-    l{{{ RET #(); lift_term i fork_post #() }}}.
+    l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
     iIntros (Φ) "HP HΦ".
     iDestruct "HP" as "(%&%& %Nek& #Hmp& Hup& Hul& TG& Ofk& Ofkl)".
@@ -150,16 +150,15 @@ Section mp_proof.
   Qed.
 
   Lemma mp_reader_spec i l :
-    l{{{ ∃ k kl, ⌜ k ≠ kl ⌝ ∗
-                 mp k l ∗
+    l{{{ ∃ k kl, mp k l ∗
                  ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
                  thP_obls i ({[kl]}) 1 ∗
                  oblP_fuel kl 1 (10 ⊕ (10 × ▽))%M}}}
       reader #l @ i
-    l{{{ RET #(); lift_term i fork_post #() }}}.
+    l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
     iIntros (Φ) "HP HΦ".
-    iDestruct "HP" as "(%&%& %HNkl& #Hmp& Hul& TG& Fkl)".
+    iDestruct "HP" as "(%&%& #Hmp& Hul& TG& Fkl)".
     rewrite /reader /=.
     rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Olk& #Ok& #Wlk)& #Hmp)".
     iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl WFkl]".
@@ -290,39 +289,59 @@ Section mp_proof.
       iApply "HΦ". rewrite /lift_term. iMod (obl_terminate with "TG") as "$". done.
   Qed.
 
-  TODO
-
-  Lemma mp_pre i j l :
-    th_obls i G q ∗ l ↦ #0
-    ⊢ |={⊤}=>m ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_current k 0 (1/2)%Qp ∗ oblP_fuel k 0 10 ∗ mp k l.
+  Lemma mp_pre Θ i j (l : loc) Φ Ψs :
+    i ≠ j →
+    Θ = {[i := writer #l; j := reader #l ]} →
+    Φ = (∃ k kl1 kl2, ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
+                      tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
+                      tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      ⟨thP_obls i ({[k; kl1]}) 1 ∗ thP_obls j ({[kl2]}) 1 ∗
+                       oblP_fuel k 0 10 ∗ oblP_fuel kl1 0 10 ∗ oblP_fuel kl2 1 (10 ⊕ (10 × ▽))%M⟩)%F →
+    Ψs = ({[i := fork_post; j := fork_post]}) →
+    ((l ↦ #0) -∗
+     ([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+     |={⊤}=>m (⟦Φ⟧ₗ ∗
+              (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof.
-    rewrite /mp /mp. iIntros "[TG ptr]".
-    iMod (gl_alloc_obl _ _ _ _ ℓs 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& Gc& #Gwf& #Gl& Gf& #GV& #Wit& _)".
-    iFrame "Gwf Gl GV Wit". iFrame. auto.
+    iIntros (Hij HT HP HQ) "Ptrl TGs".
+    iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
+    iPoseProof (big_sepS_union with "TGs") as "[TG1 TG2]".
+    { set_solver. }
+    rewrite !big_sepS_singleton.
+    iMod (tf_until_alloc _ _ _ _ false 0 10 with "TG1") as "(%k& %Hk& TG1& #Olk& #Ok& Ofk& #Wlk& Ak)".
+    iMod ("Ak" $! _ Np (l ↦ #0)%F (l ↦ #1)%F with "Ptrl") as "Uk".
+    iPoseProof (tf_until_frac_split with "Uk") as "[Uk Uk']".
+    { symmetry; apply Qp.div_2. }
+    iMod (inv_alloc Na _ ⟦(tf_until Np k false (1 / 2) (l ↦ #0) (l ↦ #1) ∨ ⟨ oblP_fulfilled k ⟩ ∗ l ↦ #1)⟧ₗ with "[Uk']") as "#Ak".
+    { iNext. tf_red. iLeft. iFrame. }
+    iMod (tf_until_alloc _ _ _ _ false 0 10 with "TG1") as "(%kl1& %Hkl1& TG1& #Olkl1& #Okl1& Ofkl1& #Wlkl1& Akl1)".
+    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (∃ v : val, i ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl1".
+    { tf_red. done. }
+    iMod (tf_until_alloc _ _ _ _ false 1 (10 ⊕ 10 × ▽)%M with "TG2") as "(%kl2& %Hkl2& TG2& #Olkl2& #Okl2& Ofkl2& #Wlkl2& Akl2)".
+    iMod ("Akl2" $! _ Nl (⌜True⌝)%F (∃ v : val, j ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl2".
+    { tf_red. done. }
+    iModIntro. iSplitL "Uk Ukl1 Ukl2 TG1 TG2 Ofk Ofkl1 Ofkl2".
+    { subst Φ. tf_red. iExists k. tf_red. iExists kl1. tf_red. iExists kl2. do 1 tf_red. iSplit.
+      { iPureIntro. intros <-. set_solver. }
+      iFrame "Olk Ok Wlk Ak".
+      replace ({[kl1]} ∪ ({[k]} ∪ ∅)) with ({[k; kl1]} : gset _) by set_solver. rewrite union_empty_r_L. iFrame. }
+    iClear "Olk Ok Wlk Ak Olkl1 Okl1 Wlkl1 Olkl2 Okl2 Wlkl2". clear dependent k kl1 kl2.
+    iIntros "HP". subst Φ.
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%k& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%kl1& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%kl2& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%Hkne& #mp& Uk& Ukl1& Ukl2& TG1& TG2& Ofk& Ofkl1& Ofkl2)".
+    iPoseProof (mp_writer_spec i l (λ v, lift_term i fork_post v) with "[Uk Ukl1 TG1 Ofk Ofkl1]") as "WP1".
+    { iExists k, kl1. iFrame. iSplitR; eauto. }
+    iPoseProof (mp_reader_spec j l (λ v, lift_term j fork_post v) with "[Ukl2 TG2 Ofkl2]") as "WP2".
+    { iExists k, kl2. iFrame. eauto. }
+    iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
+    { rewrite lookup_insert_ne; auto. }
+    { rewrite lookup_insert_ne; auto. }
+    iSplitL "WP1".
+    { iApply "WP1". iModIntro. eauto. }
+    rewrite big_sepM2_singleton. iApply "WP2". iModIntro. eauto.
   Qed.
-    l{{{ ∃ k kl, ⌜k ≠ kl⌝ ∗
-                 mp k l ∗
-                 (* Start with the other half of the until ownership for the pointsto. *)
-                 ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
-                 ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
-                 thP_obls i ({[k; kl]}) 1 ∗
-                 oblP_fuel k 0 10 ∗ oblP_fuel kl 0 10 }}}
-      writer #l @ i
-    l{{{ RET #(); lift_term i fork_post #() }}}.
-
-    l{{{ ∃ k kl, ⌜ k ≠ kl ⌝ ∗
-                 mp k l ∗
-                 ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
-                 thP_obls i ({[kl]}) 1 ∗
-                 oblP_fuel kl 1 (10 ⊕ (10 × ▽))%M}}}
-      reader #l @ i
-    l{{{ RET #(); lift_term i fork_post #() }}}.
-
-
-    state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-                 (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-                  ⟦Φ⟧ₗ -∗
-                  |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))
-                 ∗ (|={⊤}=>m ⟦Φ⟧ₗ)) →
 
 End mp_proof.

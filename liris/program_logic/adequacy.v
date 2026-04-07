@@ -1052,18 +1052,16 @@ Section proof2.
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     ⊢ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗
     model_interp g v Ω W n (dom Θ) -∗
-    (|={⊤}=>m ∃ Γ : gmap thread_id oids, ⟦Φ⟧ₗ ∗ ([∗ map] i↦G ∈ Γ, thP_obls i G 1) ∗
-                                        (([∗ map] i↦G ∈ Γ, thP_obls i G 1) -∗
-                                         ⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }})))
+    (|={⊤}=>m ⟦Φ⟧ₗ ∗ (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }})))
     ={⊤}=∗ ti_logic Ord.lt Φ (n, τf).
   Proof.
     iIntros (BEH FS LB HIST) "[HI SIa] MI WPs".
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((%& P& TGs& WPs)& HI& %&%&%&%& %& MI)".
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((P& WPs)& HI& %&%&%&%& %& MI)".
     { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
     1: auto.
     destruct H as [LEO1 LB1].
     iPoseProof (tf_logic_tf_intuit with "[$HI $MI $P]") as "#TF".
-    iPoseProof ("WPs" with "TGs P") as "WPs".
+    iPoseProof ("WPs" with "P") as "WPs".
     iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "(WPs& HI& %&%&%&%& %& MI)".
     { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
     1: auto.
@@ -1106,11 +1104,8 @@ Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
                       let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
                       state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
                       (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-                       |={⊤}=>m (∃ (Γ : gmap thread_id oids),
-                                   ⟦Φ⟧ₗ ∗ ([∗ map] i ↦ G ∈ Γ, thP_obls i G 1) ∗
-                                   (([∗ map] i ↦ G ∈ Γ, thP_obls i G 1) -∗
-                                    ⟦Φ⟧ₗ -∗
-                                    |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
+                       |={⊤}=>m (⟦Φ⟧ₗ ∗
+                                (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
                    tf_trace Φ τ.
 Proof.
   intros τ BEH FS INIT1 INIT2 Hwp.
@@ -1131,11 +1126,8 @@ Proof.
             let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-             |={⊤}=>m (∃ (Γ : gmap thread_id oids),
-                         ⟦Φ⟧ₗ ∗ ([∗ map] i ↦ G ∈ Γ, thP_obls i G 1) ∗
-                         (([∗ map] i ↦ G ∈ Γ, thP_obls i G 1) -∗
-                          ⟦Φ⟧ₗ -∗
-                          |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
+             |={⊤}=>m (⟦Φ⟧ₗ ∗
+                      (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
   { iIntros (Htemp). iApply (Hwp Htemp). }
   eapply sat_wand; cycle 1.
   { eapply Hwp'. }
