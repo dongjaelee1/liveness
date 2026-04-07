@@ -170,9 +170,6 @@ Section mp_proof.
     { rewrite big_sepM_singleton. iFrame. iPureIntro. apply ordArith.lt_from_nat. lia. }
     rewrite map_union_empty.
     iClear "Wf0". iInduction α as [α IH] using WFOCM.ind.
-    (* iStopProof. induction α using WFOCM.ind. rename x into α, H into IHα. *)
-    (* iIntros "(#(Gwfk& Gk& Wkv& GVkv& Wkvfs)& Tx& TG& HΦ)". *)
-    (* Pure steps *)
     rewrite (oblP_fuel_eq _ 1 0 10 (9 ⊕ 1)%M); cycle 1.
     { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
     iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
@@ -295,13 +292,37 @@ Section mp_proof.
 
   TODO
 
-  Lemma mp_pre i l E G q :
+  Lemma mp_pre i j l :
     th_obls i G q ∗ l ↦ #0
-    ⊢ |={E}=>g ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_current k 0 (1/2)%Qp ∗ oblP_fuel k 0 10 ∗ mp k l.
+    ⊢ |={⊤}=>m ∃ k, ⌜ G !! k = None ⌝ ∗ th_obls i (<[k:=0]>G) q ∗ gl_current k 0 (1/2)%Qp ∗ oblP_fuel k 0 10 ∗ mp k l.
   Proof.
     rewrite /mp /mp. iIntros "[TG ptr]".
     iMod (gl_alloc_obl _ _ _ _ ℓs 10 N 0 (l ↦ #0) with "TG ptr") as "(%& %& TG& Gc& #Gwf& #Gl& Gf& #GV& #Wit& _)".
     iFrame "Gwf Gl GV Wit". iFrame. auto.
   Qed.
+    l{{{ ∃ k kl, ⌜k ≠ kl⌝ ∗
+                 mp k l ∗
+                 (* Start with the other half of the until ownership for the pointsto. *)
+                 ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
+                 ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
+                 thP_obls i ({[k; kl]}) 1 ∗
+                 oblP_fuel k 0 10 ∗ oblP_fuel kl 0 10 }}}
+      writer #l @ i
+    l{{{ RET #(); lift_term i fork_post #() }}}.
+
+    l{{{ ∃ k kl, ⌜ k ≠ kl ⌝ ∗
+                 mp k l ∗
+                 ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
+                 thP_obls i ({[kl]}) 1 ∗
+                 oblP_fuel kl 1 (10 ⊕ (10 × ▽))%M}}}
+      reader #l @ i
+    l{{{ RET #(); lift_term i fork_post #() }}}.
+
+
+    state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
+                 (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+                  ⟦Φ⟧ₗ -∗
+                  |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))
+                 ∗ (|={⊤}=>m ⟦Φ⟧ₗ)) →
 
 End mp_proof.
