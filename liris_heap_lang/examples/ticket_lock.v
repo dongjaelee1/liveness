@@ -34,10 +34,11 @@ End TicketLock.
 Class ticket_lockG Σ :=
   TLockG {
       #[local] tlock_ticketG :: ghost_mapG Σ Z (oid);
+      #[local] tlock_ackG :: ghost_mapG Σ Z (bool);
     }.
 
 Definition ticket_lockΣ : gFunctors :=
-  #[(ghost_mapΣ Z (oid))].
+  #[(ghost_mapΣ Z (oid)); (ghost_mapΣ Z (bool))].
 
 Global Instance subG_ticket_lockΣ {Σ} : subG ticket_lockΣ Σ → ticket_lockG Σ.
 Proof. solve_inG. Qed.
@@ -55,70 +56,73 @@ Section proof.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
   (** Definitions *)
-  Local Definition lock_proto_tf γt (next curr : loc) (ℓ : layer) (R : tf Σ) : tf Σ :=
-    (∃ (n c : Z) (tickets : gmap Z oid),
+  Local Definition lock_proto_tf γt γa (next curr : loc) (ℓ : layer) (R : tf Σ) : tf Σ :=
+    (∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
         next ↦ #n ∗
-        (* My ticket is c+1. *)
+        (* Thread with ticket t establishes curr ↦ t (so curr = t-1 when acquires the lock). *)
         curr ↦{#(1/2)} #c ∗
-        ⟨ghost_map_auth γt 1 tickets⟩ ∗
+        ⟨ghost_map_auth γt 1 tickets ∗ ghost_map_auth γa 1 acks⟩ ∗
+        (⌜(dom tickets = dom acks)%Z⌝) ∗
         (⌜(0 ≤ c ≤ n)%Z⌝) ∗
         (⌜ ∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z ⌝) ∗
         ([^tf_sep map] t ↦ κ ∈ tickets,
            ⟨oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi⟩ ∗
            ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ ⟨oblP_fulfilled κ⟩) ∨
-              (⌜((c + 1)%Z < t < n)%Z⌝ ∧ tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)))) ∗
-        (* Two cases for the current owner (c+1):
-           - the owner of the ticket (c+1) is active in the first case,
-           - the lock is released in the last case. *)
-        ∃ κu, (⟨(c + 1)%Z ↪[γt]□ κu⟩ ∗ tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)) ∨
-                (⟨c ↪[γt]□ κu ∗ oblP_fulfilled κu⟩ ∗ curr ↦{#(1/2)} #c%Z ∗ R ∗
-                 ((c < n)%Z → ∃ κc, ⟨(c + 1)%Z ↪[γt]□ κc⟩ ∗
-                                    tf_eventually N_eventually κc false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)))
-    )%F.
+              (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)))) ∗
+        (* Thread acks its turn and acquires the lock and resources. *)
+        ([^tf_sep map] t ↦ a ∈ acks,
+           ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ ⟨t ↪[γa]□ true⟩) ∨
+              (⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧ ⟨t ↪[γa]{#1/2} false⟩))) ∗
+        ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ R) ∨
+           (⌜(c < n)%Z⌝ ∧ ((⟨(c + 1)%Z ↪[γa]{#1/2} false⟩ ∗ curr ↦{#(1/2)} #c%Z ∗ R) ∨ (⟨(c + 1)%Z ↪[γa]□ true⟩)))))%F.
 
   Definition lock_token_tf γt (lnc : val) κu (R : tf Σ) : tf Σ :=
     (∃ (next curr : loc) (u : Z),
         (⌜lnc = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ⟨(u + 1)%Z ↪[γt]□ κu⟩ ∗
         tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R))%F.
 
-  Definition is_fair_lock_tf γt (lnc : val) (ℓ : layer) (R : tf Σ) : tf Σ :=
+  Definition is_fair_lock_tf γt γa (lnc : val) (ℓ : layer) (R : tf Σ) : tf Σ :=
     (∃ (next curr : loc), (⌜lnc = (#next, #curr)%V⌝) ∧
-                          tf_always N_inv (lock_proto_tf γt next curr ℓ R))%F.
+                          tf_always N_inv (lock_proto_tf γt γa next curr ℓ R))%F.
 
   (* Reduction to iProp. *)
-  Local Definition lock_proto γt (next curr : loc) (ℓ : layer) (R : tf Σ) : iProp Σ :=
-    ∃ (n c : Z) (tickets : gmap Z oid),
+  Local Definition lock_proto γt γa (next curr : loc) (ℓ : layer) (R : tf Σ) : iProp Σ :=
+    ∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
       next ↦ #n ∗
       curr ↦{#(1/2)} #c ∗
-      ghost_map_auth γt 1 tickets ∗
+      (ghost_map_auth γt 1 tickets ∗ ghost_map_auth γa 1 acks) ∗
+      (⌜(dom tickets = dom acks)%Z⌝) ∗
       (⌜(0 ≤ c ≤ n)%Z⌝) ∗
       (⌜ ∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z ⌝) ∗
       ([∗ map] t ↦ κ ∈ tickets,
          (oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi) ∗
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_fulfilled κ) ∨
-            (⌜((c + 1)%Z < t < n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)⟧ₗ))) ∗
-      ∃ κu, (((c + 1)%Z ↪[γt]□ κu) ∗ ⟦tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ) ∨
-              ((c ↪[γt]□ κu ∗ oblP_fulfilled κu) ∗ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ ∗
-               (⌜(c < n)%Z⌝ → ∃ κc, (c + 1)%Z ↪[γt]□ κc ∗
-                                    ⟦tf_eventually N_eventually κc false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ)).
+            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)⟧ₗ))) ∗
+      ([∗ map] t ↦ a ∈ acks,
+         ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ t ↪[γa]□ true) ∨
+            (⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧ t ↪[γa]{#1/2} false))) ∗
+      ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
+         (⌜(c < n)%Z⌝ ∧ (((c + 1)%Z ↪[γa]{#1/2} false ∗ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨ ((c + 1)%Z ↪[γa]□ true)))).
 
   Definition lock_token γt (lnc : val) κu (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc) (u : Z),
       (⌜lnc = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ (u + 1)%Z ↪[γt]□ κu ∗
       ⟦tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R)⟧ₗ.
 
-  Definition is_fair_lock γt (lnc : val) (ℓ : layer) (R : tf Σ) : iProp Σ :=
+  Definition is_fair_lock γt γa (lnc : val) (ℓ : layer) (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc), (⌜lnc = (#next, #curr)%V⌝) ∧
-                         inv N_inv ⟦⟨lock_proto γt next curr ℓ R⟩⟧ₗ.
+                         inv N_inv (lock_proto γt γa next curr ℓ R).
 
-  Lemma lock_proto_red γt next curr ℓ R :
-    ⟦lock_proto_tf γt next curr ℓ R⟧ₗ ⊣⊢ lock_proto γt next curr ℓ R.
+  Lemma lock_proto_red γt γa next curr ℓ R :
+    ⟦lock_proto_tf γt γa next curr ℓ R⟧ₗ ⊣⊢ lock_proto γt γa next curr ℓ R.
   Proof.
     rewrite /lock_proto_tf /lock_proto.
-    tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. do 2 f_equiv.
-    tf_red. rewrite !tf_atomic_logic. f_equiv. 1: done. f_equiv. 1: done. f_equiv. do 3 f_equiv.
+    tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. do 2 f_equiv.
+    tf_red. rewrite !tf_atomic_logic. f_equiv. 1: done. f_equiv. 1: done. do 5 f_equiv.
     { rewrite tf_big_opM_interp. do 3 f_equiv. do 3 tf_red. f_equiv. }
-    tf_red. do 2 f_equiv. tf_red. rewrite !tf_atomic_logic. do 2 f_equiv. done.
+    tf_red. do 1 f_equiv.
+    { rewrite tf_big_opM_interp. do 3 f_equiv. do 2 tf_red. f_equiv. }
+    tf_red. rewrite !tf_atomic_logic. do 2 f_equiv. 1: done. do 2 f_equiv. done.
   Qed.
 
   Lemma lock_token_red γt lnc κu R :
@@ -129,25 +133,22 @@ Section proof.
     tf_red. rewrite !tf_atomic_logic. f_equiv. f_equiv. done.
   Qed.
 
-  Lemma is_fair_lock_red γt lnc ℓ R :
-    ⟦is_fair_lock_tf γt lnc ℓ R⟧ₗ ⊣⊢ is_fair_lock γt lnc ℓ R.
+  Lemma is_fair_lock_red γt γa lnc ℓ R :
+    ⟦is_fair_lock_tf γt γa lnc ℓ R⟧ₗ ⊣⊢ is_fair_lock γt γa lnc ℓ R.
   Proof.
     rewrite /is_fair_lock_tf /is_fair_lock.
     tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. f_equiv. rewrite lock_proto_red. done.
   Qed.
 
   (** Properties *)
-  Global Instance is_fair_lock_persistent γt lnc ℓ R : Persistent (is_fair_lock γt lnc ℓ R).
+  Global Instance is_fair_lock_persistent γt γa lnc ℓ R : Persistent (is_fair_lock γt γa lnc ℓ R).
   Proof. rewrite /is_fair_lock. apply _. Qed.
 
   (** Program proofs *)
   Local Lemma init_spec i G ℓ (R : tf Σ) lc :
-    l{{{ thP_obls i G 1 ∗ ([∗ set] k ∈ G, oblP_fuel k 1 ▽%M) ∗
-         ⟦R⟧ₗ }}}
+    l{{{ thP_obls i G 1 ∗ ([∗ set] k ∈ G, oblP_fuel k 1 ▽%M) ∗ ⟦R⟧ₗ }}}
       TicketLock.init #() @ i
-    l{{{ γt lnc, RET lnc;
-           thP_obls i G 1 ∗ £ lc ∗
-           ⟦is_fair_lock_tf γt lnc ℓ R⟧ₗ }}}.
+    l{{{ γt γa lnc, RET lnc; thP_obls i G 1 ∗ £ lc ∗ ⟦is_fair_lock_tf γt γa lnc ℓ R⟧ₗ }}}.
   Proof.
     iIntros (Φ) "(TG& Fs& HR) HΦ".
     rewrite /TicketLock.init.
@@ -176,44 +177,31 @@ Section proof.
     iModIntro. lwp_pair. simpl.
     iFrame "TG F". iExists _, ∅, lc. iSplitR; first done. iIntros "!> TG _ !> QLC !>".
     lwp_finish_upd.
-    iMod (obl_alloc_fulfilled _ 0 0) as "(%κu& #Ofk& #Ok& OAcc& #Olk& _& #Wlk)".
-
-    TODO
-
-  Local Definition lock_proto γt (next curr : loc) (ℓ : layer) (R : tf Σ) : iProp Σ :=
-    ∃ (n c : Z) (tickets : gmap Z oid),
-      next ↦ #n ∗
-      curr ↦{#(1/2)} #c ∗
-      ghost_map_auth γt 1 tickets ∗
-      (⌜(0 ≤ c ≤ n)%Z⌝) ∗
-      (⌜ ∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z ⌝) ∗
-      ([∗ map] t ↦ κ ∈ tickets,
-         (oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi) ∗
-         ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_fulfilled κ) ∨
-            (⌜((c + 1)%Z < t < n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)⟧ₗ))) ∗
-      ∃ κu, (((c + 1)%Z ↪[γt]□ κu) ∗ ⟦tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ) ∨
-              ((c ↪[γt]□ κu ∗ oblP_fulfilled κu) ∗ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ ∗
-               (⌜(c < n)%Z⌝ → ∃ κc, (c + 1)%Z ↪[γt]□ κc ∗
-                                    ⟦tf_eventually N_eventually κc false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ)).
-
-    
-    iMod (gl_until_done_alloc) as "(%κu& #Gk& [Gck1 Gck2]& #Gdk& ACC)".
+    iMod (obl_alloc_fulfilled _ (ℓ ⊕ Z.to_nat 0)%ordi 0) as "(%κu& #Ofk& #Ok& OAcc& #Olk& _& #Wlk)".
     iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
-    iMod (gl_always_alloc) as "(%κ& _& _& #Gda& ACC2)".
-    iMod ("ACC" $! _ N_eventually True%I (curr ↦{#(1/2)} #(0)%Z ∗ gl_current κu 0 (1/2)%Qp ∗ R)%I
-           with "[$Ptr_curr0 $Gck2 $HR]") as "#GU".
     iMod (ghost_map_alloc ({[0%Z := κu]} : gmap Z oid)) as "(%γt& GMAt& GMEt)".
-    rewrite big_sepM_singleton. iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
-    iApply ("HΦ" $! γt). iFrame "Tx TG QLC".
-    rewrite /is_fair_lock. iExists next, curr. iSplitR; first done.
-    iFrame "Gda". iMod ("ACC2" $! _ _ _ with "[-]") as "$"; last done.
-    iNext. rewrite /lock_proto. iFrame "Ptr_next Ptr_curr GMAt Gk Gck1 GU GMEt".
-    iSplitR; first done. iSplitR.
-    { iPureIntro. rewrite dom_singleton_L. intros. set_solver. }
-    iSplitR.
-    { rewrite big_sepM_singleton. eauto. }
-    iIntros "%". lia.
+    iMod (ghost_map_alloc ({[0%Z := true]} : gmap Z bool)) as "(%γa& GMAa& GMEa)".
+    rewrite !big_sepM_singleton.
+    iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
+    iMod (ghost_map_elem_persist with "GMEa") as "#GMEa".
+    iMod (inv_alloc N_inv _ ⟦lock_proto_tf γt γa next curr ℓ R⟧ₗ with "[Ptr_next Ptr_curr0 Ptr_curr GMAt GMAa HR]") as "#Ak".
+    { iNext. rewrite lock_proto_red. rewrite /lock_proto. iExists 0, 0, {[0%Z := κu]}, {[0%Z := true]}.
+      iFrame "Ptr_next Ptr_curr0 GMAt GMAa". iSplitR. 1: done. iSplitR. 1: iPureIntro; lia. iSplitR.
+      { iPureIntro. intros. rewrite dom_singleton_L elem_of_singleton. split; intros.
+        - subst. lia.
+        - lia. }
+      iSplitR.
+      { rewrite big_sepM_singleton. iFrame "Ok GMEt Wlk". iLeft. iFrame "Ofk". iPureIntro. lia. }
+      iSplitR.
+      { rewrite big_sepM_singleton. iLeft. iFrame "GMEa". iPureIntro. lia. }
+      iLeft. iFrame. done. }
+    iModIntro. lwp_finish.
+    iApply ("HΦ" $! γt γa). iFrame "TG QLC".
+    rewrite is_fair_lock_red /is_fair_lock. iExists next, curr. iSplitR; first done.
+    rewrite lock_proto_red. eauto.
   Qed.
+
+  TODO
 
   (** FIXME: ordi notation levels *)
   Local Lemma acquire_spec i q G γt lnc ℓ R μ lc :
