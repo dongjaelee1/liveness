@@ -23,6 +23,29 @@ Class heap_stateGS Σ :=
       #[global] heap_stateGS_thread_mapGS :: thread_mapGS thread_id (expr) Σ;
     }.
 
+Definition heap_stateΣ : gFunctors :=
+  #[gen_heapΣ loc (option val);
+    inv_heapΣ loc (option val);
+    proph_mapΣ proph_id (val * val);
+    thread_mapΣ thread_id (expr)].
+
+Global Instance subG_heap_stateΣ {Σ} : subG heap_stateΣ Σ → heap_stateGS Σ.
+Proof.
+  intros. econstructor.
+  - econstructor.
+    { eapply subG_gen_heapGpreS. solve_inG. }
+    1,2: exact inhabitant.
+  - econstructor.
+    { eapply subG_inv_heapGpreS. solve_inG. }
+    1: exact inhabitant.
+  - econstructor.
+    { eapply subG_proph_mapGpreS. solve_inG. }
+    1: exact inhabitant.
+  - econstructor.
+    { eapply subG_thread_mapGpreS. solve_inG. }
+    1: exact inhabitant.
+Qed.
+
 (** Since we use an [option val] instance of [gen_heap], we need to add a
 [Some]. We also seal the definition to avoid confusion between the version from
 [gen_heap], and our version with [Some]. That also helps for scopes and
@@ -113,15 +136,44 @@ Class heapGS Σ :=
       #[global] heapGS_heap_stateGS :: heap_stateGS Σ;
     }.
 
+Definition heapΣ : gFunctors :=
+  #[mupdΣ;
+    histGS.histΣ (state * thread_pool heap_lang * list (observation));
+    heap_stateΣ].
+
+Global Instance subG_heapΣ {Σ} : subG heapΣ Σ → heapGS Σ.
+Proof.
+  intros. econstructor.
+  - apply subG_inv in H. destruct H. apply subG_inv in s. destruct s. apply subG_inv in s. destruct s.
+    econstructor.
+    + econstructor.
+      * econstructor.
+        { eapply subG_wsatΣ. auto. }
+        all: exact inhabitant.
+      * econstructor.
+        { eapply subG_auth_rupdΣ. auto. }
+        all: exact inhabitant.
+    + econstructor.
+      { eapply osatGS.subG_osatΣ. solve_inG. }
+      all: exact inhabitant.
+    + econstructor.
+      { eapply othreadGS.subG_othreadΣ. solve_inG. }
+      all: exact inhabitant.
+    + econstructor.
+      { eapply owitGS.subG_owitΣ. solve_inG. }
+      all: exact inhabitant.
+    + econstructor.
+      { eapply mhistGS.subG_mhistΣ. solve_inG. }
+      all: exact inhabitant.
+  - econstructor.
+    { eapply histGS.subG_histΣ. solve_inG. }
+    all: exact inhabitant.
+  - apply subG_heap_stateΣ. solve_inG.
+Qed.
+
 (** We don't want this to be an instance, which can break iMod. *)
 Definition heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ :=
   TemporalG heapGS_mupdGS heap_state_interp_class heapGS_histGS.
-
-(* Global Instance heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ := { *)
-(*     temporal_mupdGS := heapGS_mupdGS; *)
-(*     temporal_state_interp_class := heap_state_interp_class; *)
-(*     temporal_histGS := heapGS_histGS; *)
-(*   }. *)
 
 Global Instance heapGS_lirisGS `{!heapGS Σ} : lirisGS heap_lang Σ := {
     liris_temporalGS := heapGS_temporalGS;
@@ -214,7 +266,7 @@ Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ :
                  ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                  (thP_obls i G 1 -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                  ALC (£ o ={E',E}=∗ P)))
+                  ALC (£ o ={E',E}=∗ |={E}=>m P)))
     (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
   ⊢ (lWP e1 @ s; i; E {{ Φ }}).
 Proof.

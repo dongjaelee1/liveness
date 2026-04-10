@@ -68,7 +68,7 @@ Section mp_proof.
     lwp_lam. iFrame "TG". iExists ⊤, ∅, 10. iSplitR; first done.
     iSplitL "Of1".
     { by iFrame. }
-    iIntros "!> TG _ !> LC !>".
+    iIntros "!> TG _ !> LC !> !>".
     lwp_finish_upd.
     rewrite (oblP_fuel_eq_set _ 0 0 9 (8 ⊕ 1)%M); cycle 1.
     { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
@@ -114,7 +114,7 @@ Section mp_proof.
     iPoseProof (oblP_fuel_add with "Of") as "[Of Of1]".
     simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Of1".
     { iApply big_sepS_singleton. iFrame. }
-    iIntros "TG _ !> _ !>".
+    iIntros "TG _ !> _ !> !>".
     iModIntro.
     rewrite (oblP_fuel_eq _ 0 0 7 (6 ⊕ 1)%M); cycle 1.
     { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
@@ -122,7 +122,7 @@ Section mp_proof.
     lwp_pure.
     simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Of1".
     { iApply big_sepS_singleton. iFrame. }
-    iIntros "TG _ !> _ !>".
+    iIntros "TG _ !> _ !> !>".
     iApply lwpupd_label. iIntros "PL".
     iApply sfmupd_fupd_acc.
     iMod (tf_until_to_true with "Hul") as "Hul". 1: set_solver.
@@ -144,7 +144,7 @@ Section mp_proof.
     replace ({[kl]} ∖ {[kl]} : gset _) with (∅ : oids) by set_solver.
     iModIntro. lwp_pure.
     simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitR; first done.
-    iIntros "TG _ !> _ !> !>".
+    iIntros "TG _ !> _ !> !> !>".
     lwp_finish.
     iApply "HΦ". rewrite /lift_term. iMod (obl_terminate with "TG") as "$". done.
   Qed.
@@ -174,7 +174,7 @@ Section mp_proof.
     iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
     lwp_rec. simpl. iFrame "TG". iExists ⊤, ∅, 100. iSplitR; first done. iModIntro. iSplitL "Fkl1".
     { rewrite big_sepS_singleton. iFrame. }
-    iIntros "TG _ !> LC !>".
+    iIntros "TG _ !> LC !> !>".
     lwp_bind (Load _).
     iModIntro.
     iInv "Hmp" as "mp". iDestruct "mp" as "[mp | mp]".
@@ -204,25 +204,25 @@ Section mp_proof.
       iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
       lwp_let. simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Fkl1".
       { rewrite big_sepS_singleton. iFrame. }
-      iIntros "TG _ !> _ !> !>".
+      iIntros "TG _ !> _ !> !> !>".
       rewrite (oblP_fuel_eq _ _ 0 7 (6 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
       iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
       lwp_lam. simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Fkl1".
       { rewrite big_sepS_singleton. iFrame. }
-      iIntros "TG _ !> _ !> !>".
+      iIntros "TG _ !> _ !> !> !>".
       rewrite (oblP_fuel_eq _ _ 0 6 (5 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
       iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
       lwp_op. simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Fkl1".
       { rewrite big_sepS_singleton. iFrame. }
-      iIntros "TG _ !> _ !> !>".
+      iIntros "TG _ !> _ !> !> !>".
       rewrite (oblP_fuel_eq _ _ 0 5 (4 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
       iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
       lwp_if. simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Fkl1".
       { rewrite big_sepS_singleton. iFrame. }
-      iIntros "TG _ !> _ !> !>".
+      iIntros "TG _ !> _ !> !> !>".
       iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')".
       rewrite big_sepM_singleton. rewrite (oblP_fuel_eq _ 1 0 10 (9 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
@@ -244,25 +244,25 @@ Section mp_proof.
       iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
       lwp_let. simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Fkl1".
       { rewrite big_sepS_singleton. iFrame. }
-      iIntros "TG _ !> _ !> !>".
+      iIntros "TG _ !> _ !> !> !>".
       rewrite (oblP_fuel_eq _ _ 0 7 (6 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
       iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
       lwp_lam. simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Fkl1".
       { rewrite big_sepS_singleton. iFrame. }
-      iIntros "TG _ !> _ !> !>".
+      iIntros "TG _ !> _ !> !> !>".
       rewrite (oblP_fuel_eq _ _ 0 6 (5 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
       iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
       lwp_op. simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Fkl1".
       { rewrite big_sepS_singleton. iFrame. }
-      iIntros "TG _ !> _ !> !>".
+      iIntros "TG _ !> _ !> !> !>".
       rewrite (oblP_fuel_eq _ _ 0 5 (4 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
       iPoseProof (oblP_fuel_add with "Fkl") as "[Fkl Fkl1]".
       lwp_if. simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitL "Fkl1".
       { rewrite big_sepS_singleton. iFrame. }
-      iIntros "TG _ !> _ !>".
+      iIntros "TG _ !> _ !> !>".
       iApply lwpupd_label. iIntros "PL".
       iApply sfmupd_fupd_acc.
       iMod (tf_until_to_true with "Hul") as "Hul". 1: set_solver.
@@ -284,7 +284,7 @@ Section mp_proof.
       replace ({[kl]} ∖ {[kl]} : gset _) with (∅ : oids) by set_solver.
       iModIntro. lwp_pure.
       simpl. iFrame "TG". iExists ⊤, ∅, 0. iSplitR; first done. iModIntro. iSplitR; first done.
-      iIntros "TG _ !> _ !> !>".
+      iIntros "TG _ !> _ !> !> !>".
       lwp_finish.
       iApply "HΦ". rewrite /lift_term. iMod (obl_terminate with "TG") as "$". done.
   Qed.
@@ -345,3 +345,102 @@ Section mp_proof.
   Qed.
 
 End mp_proof.
+
+Section adequacy.
+
+  Let N := nroot.@ "message_passing".
+  Let Na := N.@ "always".
+  Let Np := N.@ "pointsto".
+  Let Nl := N.@ "label".
+
+  Let i : thread_id := 1%positive.
+  Let j : thread_id := 2%positive.
+  Let l : loc := Loc 0.
+  Let Θ0 : thread_pool heap_lang := {[i := writer #l; j := reader #l]}.
+  Let σ0 : gmap loc (option val) := {[l := Some #0]}.
+
+  (* Let Σ : gFunctors := *)
+  (* #[mupdΣ; *)
+  (*   histGS.histΣ (state * thread_pool heap_lang * list (observation))]. *)
+  (* Let Σ : gFunctors := heapΣ. *)
+  Let Φ `{!heapGS Σ} : tf Σ :=
+        (∃ k kl1 kl2, ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
+                      tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
+                      tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      ⟨thP_obls i ({[k; kl1]}) 1 ∗ thP_obls j ({[kl2]}) 1 ∗
+                       oblP_fuel k 0 10 ∗ oblP_fuel kl1 0 10 ∗ oblP_fuel kl2 1 (10 ⊕ (10 × ▽))%M⟩)%F.
+
+  Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
+  Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
+        {[i := fork_post; j := fork_post]}.
+
+  TODO
+
+  Theorem mp_adequacy :
+    ∀ (τ : trace heap_lang), behavior τ →
+                             fair_scheduling τ →
+                             (τ.1 = 0) →
+                             (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+                             ∃ Σ (HHeap : heapGS Σ), tf_trace Φ τ.
+  Proof.
+    intros τ Beh FS Init1 Init2.
+    
+
+
+    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ).
+    1,2,3,4: eauto.
+    iIntros (?). iExists fork_post, Ψs.
+    iMod (gen_heap_init
+    
+    
+state_interp =
+λ (Σ : gFunctors) (heap_stateGS0 : heap_stateGS Σ) (σ : state) (Θ : thread_pool heap_lang) (κs : list observation),
+  (gen_heap_interp (heap σ) ∗ thread_map_interp (dom Θ) Θ ∗ proph_map_interp κs (used_proph_id σ))%I
+     : ∀ {Σ : gFunctors}, heap_stateGS Σ → state → thread_pool heap_lang → list observation → iProp Σ
+    
+  ∃ (fork_post : thread_id → language.val heap_lang → iProp Σ) (Ψs : gmap thread_id (thread_id → language.val heap_lang → iProp Σ)),
+
+
+gen_heap_init:
+  ∀ {SI : indexT} {L : Type} {EqDecision0 : EqDecision L} {H : Countable L} {V : Type} {Σ : gFunctors},
+    gen_heapGpreS L V Σ
+    → ∀ σ : gmap L V,
+        ⊢ |==>
+            ∃ H0 : gen_heapGS L V Σ, gen_heap_interp σ ∗ ([∗ map] l↦v ∈ σ, gen_heap.pointsto l (DfracOwn 1) v) ∗
+              ([∗ map] l↦_ ∈ σ, meta_token l ⊤)
+
+  Lemma mp_pre Θ i j (l : loc) Φ Ψs :
+    i ≠ j →
+    Θ = {[i := writer #l; j := reader #l ]} →
+    Φ = (∃ k kl1 kl2, ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
+                      tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
+                      tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      ⟨thP_obls i ({[k; kl1]}) 1 ∗ thP_obls j ({[kl2]}) 1 ∗
+                       oblP_fuel k 0 10 ∗ oblP_fuel kl1 0 10 ∗ oblP_fuel kl2 1 (10 ⊕ (10 × ▽))%M⟩)%F →
+    Ψs = ({[i := fork_post; j := fork_post]}) →
+    ((l ↦ #0) -∗
+     ([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+     |={⊤}=>m (⟦Φ⟧ₗ ∗
+              (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+
+
+Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
+  `{!state_interp_class Λ Σ}
+  `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
+  s σ Θ i κs (Φ : tf Σ) :
+  ∀ (τ : trace Λ), behavior τ →
+                   fair_scheduling τ →
+                   (τ.1 = 0) →
+                   (τ.2 0 = (Θ, σ, i, κs)) →
+                   (∀ `{Htemporal : !temporalGS Λ Σ},
+                      ⊢ |={⊤}=> ∃ (fork_post : thread_id → val Λ → iProp Σ)
+                                 (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
+                      let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
+                      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
+                      (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+                       |={⊤}=>m (⟦Φ⟧ₗ ∗
+                                (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
+                   tf_trace Φ τ.
+End adequacy.

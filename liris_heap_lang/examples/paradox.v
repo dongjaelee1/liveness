@@ -3,47 +3,64 @@ From iris.algebra Require Import gmap mono_nat.
 From iris.proofmode Require Import proofmode.
 (* From transfinite.base_logic Require Import lib.ghost_map. *)
 From liris.base_logic Require Export invariants.
-From liris.program_logic Require Export temporal_rules.
+From liris.program_logic Require Export temporal_logic.
 From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
+From transfinite.base_logic.lib Require Import ghost_map.
 
 From iris.proofmode Require Import coq_tactics reduction spec_patterns.
 
 (** "pure" steps that are reducible with the thread_exec predicate, without submitting fuels. *)
 Class heapGS_no_lc `(HGS : heapGS Σ) := {
     lwp_pure_step_no_lc :
-    ∀ n R s i q E E' e1 e2 φ Φ,
-      PureExec φ thread_cond n e1 e2 →
+    ∀ n s i E E' e1 e2 φ Φ,
+      PureExec φ n e1 e2 →
       φ →
-      ([∗ map] r↦v ∈ R, gl r v) ∗
       Nat.iter n
         (λ P,
-           |={E,E'}=> thread_exec i q ∗
-                     (thread_exec i q -∗
-                      ([∗ map] r↦v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗
-                      (|={E',E}=> P)))
-        (lWP e2 @ s; i; E {{ v, Φ v }})
+           |={E,E'}=> ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+                          (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                           (|={E',E}=> |={E}=>m P)))
+        (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
       ⊢ lWP e1 @ s; i; E {{ Φ }};    
   }.
 
+Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@heapGS_no_lc Σ _} (n : nat) R s i E E' e1 e2 φ Φ :
+  PureExec φ n e1 e2 →
+  φ →
+  ([∗ set] r ∈ R, oblP_id r) ∗
+  (Nat.iter n (λ P, |={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                               (|={E',E}=> |={E}=>m P)))
+     (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
+  ⊢ (lWP e1 @ s; i; E {{ Φ }}).
+Proof.
+  iIntros (Hexec HΦ) "(#Rs& LWP)".
+  iApply (lwp_pure_step_no_lc n _ _ E E'). 1: auto.
+  iStopProof. clear Hexec. pattern n. induction n.
+  { simpl. iIntros "(#Rs& LWP)". auto. }
+  simpl. iIntros "(#Rs& LWP)".
+  iMod "LWP". iFrame "Rs".
+  iIntros "!> Wcs". iMod ("LWP" with "Wcs") as "LWP".
+  iApply IHn. iFrame "Rs". iModIntro. iFrame "LWP".
+Qed.
+
 Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@heapGS_no_lc Σ _}
   Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
-  PureExec φ thread_cond n e1 e2 →
+  PureExec φ n e1 e2 →
   φ →
-  envs_entails Δ (∃ q E' R,
-        ([∗ map] r↦v ∈ R, gl r v) ∗
-        (Nat.iter n (λ P, |={E,E'}=>
-                       thread_exec i q ∗
-                       (thread_exec i q -∗ ([∗ map] r ↦ v ∈ R, wit r v Ord.one ∨ gl_done r v) -∗ (|={E',E}=> P)))
-           (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
-  envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }}).
+  envs_entails Δ (∃ E' R,
+        ([∗ set] r ∈ R, oblP_id r) ∗
+        (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
+                       (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ (|={E',E}=> |={E}=>m P)))
+           (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
+  envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "(%&%&%& #Rs& Iter)". iApply lwp_pure_step_no_lc. 1: auto.
+  iIntros "(%&%& #Rs& Iter)". iApply lwp_pure_step_no_lc_alt. 1: auto.
   iFrame "Rs Iter".
 Qed.
 
@@ -90,18 +107,20 @@ Tactic Notation "lwp_inj_no_lc" := lwp_pure_no_lc (InjL _) || lwp_pure_no_lc (In
 Tactic Notation "lwp_pair_no_lc" := lwp_pure_no_lc (Pair _ _).
 Tactic Notation "lwp_closure_no_lc" := lwp_pure_no_lc (Rec _ _ _).
 
+(** The program. *)
 Definition loop : val := 
   rec: "loop" <> :=
     "loop" #().
 
-(** Monotone counters *)
+(** The CMRA we need. *)
 Class mcntsG Σ :=
   MCounterG {
       #[local] mcnts_inG :: inG Σ (gmapUR positive mono_natUR);
+      #[local] tlock_ticketG :: ghost_mapG Σ nat (oid);
     }.
 
 Definition mcntsΣ : gFunctors :=
-  #[GFunctor (gmapUR positive mono_natUR)].
+  #[GFunctor (gmapUR positive mono_natUR); (ghost_mapΣ nat (oid))].
 
 Global Instance subG_mcntsΣ {Σ} : subG mcntsΣ Σ → mcntsG Σ.
 Proof. solve_inG. Qed.
@@ -191,19 +210,50 @@ Section proof.
   Typeclasses Opaque cnt_auth.
 
   Let N := nroot .@ "paradox_inv".
-  Let N_inv := nroot .@ "paradox_cnt".
+  Let Nu := nroot .@ "paradox_until".
   Let N1 := nroot .@ "paradox_false".
 
-  Let ℓs : layers := (λ _, 0).
+  Definition px_inv_tf r rm i j : tf Σ :=
+    (∃ n (os : gmap nat oid),
+        ⟨cnt_auth r j n (1/2)%Qp⟩ ∗
+        ⟨ghost_map_auth rm 1 os⟩ ∗
+        ([^tf_sep map] a ↦ k ∈ os, ⟨(£ (1)%ord ∨ cnt_lb r i a)⟩ ∗
+                                   ⟨a ↪[rm]□ k⟩ ∗
+                                   ⟨oblP_id k⟩ ∗ ⟨witP_layer k 0⟩ ∗
+                                   ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1))⟩) ∨
+                                      (⟨oblP_fulfilled k ∗ (cnt_lb r j (a + 1))⟩))))%F.
 
-  Definition px_inv r i j k : iProp Σ :=
-    ∃ n, cnt_auth r j n (1/2)%Qp ∗
-         ([∗ list] a ∈ seq 0 (S n), (£ (1)%ord ∨ cnt_lb r i a) ∗
-                                    gl k a ∗ wit_layer k a 0 ∗
-                                    gl_variant N_inv k a True (cnt_lb r j (a + 1)) (cnt_lb r j (a + 1))).
+  Definition px_tf r rm i j : tf Σ :=
+    tf_always N (px_inv_tf r rm i j).
 
-  Definition px r i j k : iProp Σ :=
-    ∃ x, gl_done x 0 ∗ gl_variant N x 0 False (px_inv r i j k) False.
+  Definition px_inv r rm i j : iProp Σ :=
+    ∃ n (os : gmap nat oid),
+      cnt_auth r j n (1/2)%Qp ∗
+      ghost_map_auth rm 1 os ∗
+      ([∗ map] a ↦ k ∈ os, (£ (1)%ord ∨ cnt_lb r i a) ∗
+                           a ↪[rm]□ k ∗
+                           oblP_id k ∗ witP_layer k 0 ∗
+                           ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1))⟩⟧ₗ) ∨
+                              (oblP_fulfilled k ∗ (cnt_lb r j (a + 1))))).
+
+  Definition px r rm i j : iProp Σ :=
+    inv N (px_inv r rm i j).
+
+  Lemma px_inv_red r rm i j :
+    ⟦px_inv_tf r rm i j⟧ₗ ⊣⊢ px_inv r rm i j.
+  Proof.
+    rewrite /px_inv_tf /px_inv. 
+    tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. do 2 f_equiv.
+    rewrite tf_big_opM_interp. do 3 f_equiv. tf_red. do 4 f_equiv. done.
+  Qed.
+
+  Lemma px_red r rm i j :
+    ⟦px_tf r rm i j⟧ₗ ⊣⊢ px r rm i j.
+  Proof.
+    rewrite /px_tf /px. tf_red. f_equiv. apply px_inv_red.
+  Qed.
+
+  TODO
 
   (** The main proofs. *)
   Global Instance px_persistent r i j k : Persistent (px r i j k).

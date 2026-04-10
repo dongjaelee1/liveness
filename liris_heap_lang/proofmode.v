@@ -29,7 +29,8 @@ Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_languag
         ([∗ set] r ∈ R, oblP_id r) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
                        thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
-                       (thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ ALC (£ o ={E',E}=∗ P)))
+                       (thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                        ALC (£ o ={E',E}=∗ |={E}=>m P)))
            (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
@@ -44,21 +45,21 @@ Proof.
     iIntros "LC". iMod ("H" with "LC") as "H". iModIntro. by iApply "H". }
 Qed.
 
-Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ G R o s i E K e1 e2 φ n Φ :
+Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ n Φ :
   PureExec φ n e1 e2 →
   φ →
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
-  envs_entails Δ ((thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗
-                  ((£ (o × n)%ord ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r)) -∗
-                   lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
+  envs_entails Δ (∃ G R o, (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗
+                           (£ (o × n)%ord -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
+                            lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "[T H]". iApply lifting.lwp_pure_step_simple. 1: auto.
+  iIntros "(%&%&%& T& H)". iApply (lifting.lwp_pure_step_simple _ _ _ o). 1: auto.
   iDestruct "T" as "($& $& $)".
-  iIntros "_ TG Ws LC". iApply "H". by iFrame.
+  iIntros "_ TG Ws LC". iApply ("H" with "LC TG Ws").
 Qed.
 
 Lemma tac_lwp_value_nofupd `{!heapGS Σ} Δ s i E Φ v :
