@@ -406,7 +406,7 @@ Section adequacy.
     intros τ Beh FS Init1 Init2.
     eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ).
     1,2,3,4: eauto.
-    iIntros (?).
+    iIntros (?). exists 0%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
     iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
     iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
@@ -419,7 +419,7 @@ Section adequacy.
     { by iFrame. }
     iSplitL "Tis".
     { by iFrame. }
-    iModIntro. iIntros "TGs".
+    iModIntro. iIntros "LC TGs".
     (* Set Printing All. *)
     iMod (mp_pre Θ0 i j l with "[Ptrs] [TGs]") as "H".
     { subst i j. lia. }

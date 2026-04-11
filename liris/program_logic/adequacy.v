@@ -993,12 +993,14 @@ Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
   (τ.1 = 0) →
   (τ.2 0 = (Θ, σ, i, κs)) →
   (∀ `{Htemporal : !temporalGS Λ Σ},
+     ∃ (c : Ord.t),
      ⊢ |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
                 (fork_post : thread_id → val Λ → iProp Σ)
-                (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
+                (* FIXME: cannot unify pos_countable for some reason *)
+                (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
      let _ : lirisGS Λ Σ := LirisG Htemporal Hsic fork_post in
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-     (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
       |={⊤}=>m (∃ (Φ' : tf Σ),
                   (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
                   (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
@@ -1017,15 +1019,16 @@ Proof.
     unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
     eapply sat_mono. 2: eapply H0. simpl. iIntros "($& $& $& $)". }
   assert (Hwp' : ⊢ ∀ Htemporal : temporalGS Λ Σ,
+            ∃ (c : Ord.t),
             |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
                      (fork_post : thread_id → val Λ → iProp Σ)
                      (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
             let _ : lirisGS Λ Σ := LirisG Htemporal Hsic fork_post in
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-            (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+            (£ c -∗ ([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
              |={⊤}=>m (∃ (Φ' : tf Σ), (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
                                      (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
-  { iIntros (Htemp). iApply (Hwp Htemp). }
+  { iIntros (Htemp). destruct (Hwp Htemp). iExists x. iApply H0. }
   eapply sat_wand; cycle 1.
   { eapply Hwp'. }
   apply (sat_mono True); cycle 1.
@@ -1033,13 +1036,20 @@ Proof.
   iIntros "_ H".
   iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& MI)".
   iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
-  iExists Hmupd, Hhist. iFrame "R W WOE".
+  iExists Hmupd, Hhist.
   set (Htemp := TemporalG Hmupd Hhist : temporalGS Λ Σ).
-  iModIntro. iMod ("H" $! Htemp) as "(%Hsic& %fork_post& %Ψs& SI& SIa& WPs)".
+  iDestruct ("H" $! Htemp) as "(%& H)".
+  iDestruct "R" as "(%x& R)".
+  iMod (own_update _ (● x) with "R") as "[R LC]".
+  { apply (auth_update_alloc x ((c : ordinal_ucmra.OrdUR) ⋅ x)).
+    apply (op_local_update_discrete x ε c).
+    intros ?. apply auth_valid_trivial. }
+  iModIntro. iFrame "R W WOE". rewrite (right_id ε).
+  iMod "H" as "(%Hsic& %fork_post& %Ψs& SI& SIa& WPs)".
   iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& MI)".
   iMod (thP_obls_alloc_threads (dom Θ) with "T") as "[T Ths]".
   { set_solver. }
-  iPoseProof ("WPs" with "Ths") as "WPs". rewrite union_empty_l_L.
+  iPoseProof ("WPs" with "LC Ths") as "WPs". rewrite union_empty_l_L.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
   set (Hliris := LirisG Htemp Hsic fork_post : lirisGS Λ Σ).

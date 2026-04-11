@@ -215,26 +215,28 @@ Section proof.
 
   Definition px_inv_tf r rm i j : tf Σ :=
     (∃ n (os : gmap nat oid),
-        ⟨cnt_auth r j n (1/2)%Qp⟩ ∗
-        ⟨ghost_map_auth rm 1 os⟩ ∗
-        ([^tf_sep map] a ↦ k ∈ os, ⟨(£ (1)%ord ∨ cnt_lb r i a)⟩ ∗
-                                   ⟨a ↪[rm]□ k⟩ ∗
-                                   ⟨oblP_id k⟩ ∗ ⟨witP_layer k 0⟩ ∗
-                                   ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1))⟩) ∨
-                                      (⟨oblP_fulfilled k ∗ (cnt_lb r j (a + 1))⟩))))%F.
+        ⟨cnt_auth r j n (1/2)%Qp ∗
+         ghost_map_auth rm 1 os⟩ ∗
+        ([^tf_sep map] a ↦ k ∈ os,
+           ⟨(£ (10)%ord ∨ cnt_lb r i a) ∗
+            a ↪[rm]□ k ∗
+            oblP_id k ∗ witP_layer k 0⟩ ∗
+           ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1))⟩) ∨
+              (⟨oblP_fulfilled k ∗ (cnt_lb r j (a + 1))⟩))))%F.
 
   Definition px_tf r rm i j : tf Σ :=
     tf_always N (px_inv_tf r rm i j).
 
   Definition px_inv r rm i j : iProp Σ :=
     ∃ n (os : gmap nat oid),
-      cnt_auth r j n (1/2)%Qp ∗
-      ghost_map_auth rm 1 os ∗
-      ([∗ map] a ↦ k ∈ os, (£ (1)%ord ∨ cnt_lb r i a) ∗
-                           a ↪[rm]□ k ∗
-                           oblP_id k ∗ witP_layer k 0 ∗
-                           ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1))⟩⟧ₗ) ∨
-                              (oblP_fulfilled k ∗ (cnt_lb r j (a + 1))))).
+      (cnt_auth r j n (1/2)%Qp ∗
+       ghost_map_auth rm 1 os) ∗
+      ([∗ map] a ↦ k ∈ os,
+         ((£ (10)%ord ∨ cnt_lb r i a) ∗
+          a ↪[rm]□ k ∗
+          oblP_id k ∗ witP_layer k 0) ∗
+         ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1))⟩⟧ₗ) ∨
+            (oblP_fulfilled k ∗ (cnt_lb r j (a + 1))))).
 
   Definition px r rm i j : iProp Σ :=
     inv N (px_inv r rm i j).
@@ -243,8 +245,8 @@ Section proof.
     ⟦px_inv_tf r rm i j⟧ₗ ⊣⊢ px_inv r rm i j.
   Proof.
     rewrite /px_inv_tf /px_inv. 
-    tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. do 2 f_equiv.
-    rewrite tf_big_opM_interp. do 3 f_equiv. tf_red. do 4 f_equiv. done.
+    tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. f_equiv.
+    rewrite tf_big_opM_interp. do 3 f_equiv. tf_red. f_equiv. done.
   Qed.
 
   Lemma px_red r rm i j :
@@ -253,16 +255,16 @@ Section proof.
     rewrite /px_tf /px. tf_red. f_equiv. apply px_inv_red.
   Qed.
 
-  TODO
-
   (** The main proofs. *)
   Global Instance px_persistent r i j k : Persistent (px r i j k).
   Proof. rewrite /px. apply _. Qed.
 
+  TODO
+
   (** Receives later credits via px_inv *)
   Lemma px_loop1_spec i z r ci cj ck :
-    l{{{ thread_exec i 1 ∗ th_obls i (<[z:=0]>∅) 1 ∗
-         gl_variant N1 z 0 True False False ∗
+    l{{{ thP_obls i ({[z]}) 1 ∗
+         ⟦tf_until N1 z false 1 (⌜ True ⌝) (⌜ False ⌝)⟧ₗ ∗
          £ (1)%ord ∗ px r ci cj ck ∗
          ∃ n, cnt_auth r ci n 1%Qp ∗
               cnt_lb r cj n ∗ gl ck n ∗ wit_layer ck n 0 ∗
@@ -331,7 +333,7 @@ Section proof.
   Qed.
 
   Lemma px_loop2_spec j n r ci cj ck :
-    l{{{ thread_exec j 1 ∗ th_obls j (<[ck:=n]>∅) 1 ∗
+    l{{{ thread_exec j 1 ∗ thP_obls j (<[ck:=n]>∅) 1 ∗
          gl_variant N_inv ck n True (cnt_lb r cj (n + 1)) (cnt_lb r cj (n + 1)) ∗
          gl_current ck n (1/2)%Qp ∗
          gl_layers ck ℓs ∗ gl_fuel ck 0 10 ∗
