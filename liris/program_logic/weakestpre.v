@@ -49,12 +49,6 @@ Class temporalGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
   TemporalG {
       (** Obligation model protocol, including invariants. *)
       #[global] temporal_mupdGS :: mupdGS Σ;
-
-      (** The state (and history) interpretation is an invariant that should hold in
-          between each step of reduction.
-          Here [state] is the global state, [thread_ids] is the allocated thread ids,
-          and [list (observation Λ)] are the remaining observations. *)
-      #[global] temporal_state_interp_class :: state_interp_class Λ Σ;
       #[global] temporal_histGS :: histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ));
     }.
 Global Opaque temporal_mupdGS temporal_histGS.
@@ -65,7 +59,7 @@ Definition temporalΣ `{SI : indexT} (Λ : language) : gFunctors :=
 Global Instance subG_temporalΣ `{SI : indexT} {Λ} {Σ} : subG (temporalΣ Λ) Σ → temporalGpreS Λ Σ.
 Proof. solve_inG. Qed.
 
-Local Definition lwpupd_def `{SI : indexT} `{!temporalGS Λ Σ}
+Local Definition lwpupd_def `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   i E e : iPropO Σ -d> iPropO Σ :=
   (λ P, ∀ K h n σ Θ κs,
      (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e))⌝) →
@@ -73,15 +67,15 @@ Local Definition lwpupd_def `{SI : indexT} `{!temporalGS Λ Σ}
      |={E:n,dom Θ}=>m (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ P)%I.
 Local Definition lwpupd_aux : seal (@lwpupd_def). Proof. by eexists. Qed.
 Definition lwpupd := lwpupd_aux.(unseal).
-Global Arguments lwpupd {SI Λ Σ _}.
-Local Lemma lwpupd_unseal `{SI : indexT} `{!temporalGS Λ Σ} :
-  lwpupd = @lwpupd_def SI Λ Σ _.
+Global Arguments lwpupd {SI Λ Σ _ _}.
+Local Lemma lwpupd_unseal `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} :
+  lwpupd = @lwpupd_def SI Λ Σ _ _.
 Proof. rewrite -lwpupd_aux.(seal_eq) //. Qed.
 
 Ltac unfold_lwpupd := rewrite lwpupd_unseal /lwpupd_def.
 
 Section lwpupd.
-  Context `{SI : indexT} `{!temporalGS Λ Σ}.
+  Context `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Global Instance lwpupd_ne i E e : NonExpansive (lwpupd i E e).
   Proof. intros n P1 P2 HP. unfold_lwpupd. do 18 (f_equiv || done). Qed.
@@ -257,13 +251,19 @@ Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
       (** Ghost states for temporal properties. *)
       #[global] liris_temporalGS :: temporalGS Λ Σ;
 
+      (** The state (and history) interpretation is an invariant that should hold in
+          between each step of reduction.
+          Here [state] is the global state, [thread_ids] is the allocated thread ids,
+          and [list (observation Λ)] are the remaining observations. *)
+      #[global] liris_state_interp_class :: state_interp_class Λ Σ;
+
       (** A fixed postcondition for any forked-off thread. For most languages, e.g.
           heap_lang, this will simply be [True]. However, it is useful if one wants to
           keep track of resources precisely, as in e.g. Iron. *)
       fork_post : thread_id → val Λ → iProp Σ;
     }.
 
-Global Opaque liris_temporalGS.
+Global Opaque liris_temporalGS liris_state_interp_class.
 Global Arguments LirisG {SI Λ Σ}.
 
 (** Predicates we take the fixpoint of in order to define the lWP. *)

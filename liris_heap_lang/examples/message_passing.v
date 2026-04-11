@@ -348,10 +348,13 @@ End mp_proof.
 
 Section adequacy.
 
-  Let N := nroot.@ "message_passing".
-  Let Na := N.@ "always".
-  Let Np := N.@ "pointsto".
-  Let Nl := N.@ "label".
+  Definition mp_tp (l : loc) : tp :=
+    (tp_true ∧ tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
+
+  (** TODO: weaken the strict equality to semantics equivalence. *)
+  Lemma tf_to_tp_mp `{!heapGS Σ} k l :
+    tf_to_tp (mp_tf k l) = mp_tp l.
+  Proof. done. Qed.
 
   Let i : thread_id := 1%positive.
   Let j : thread_id := 2%positive.
@@ -359,11 +362,19 @@ Section adequacy.
   Let Θ0 : thread_pool heap_lang := {[i := writer #l; j := reader #l]}.
   Let σ0 : gmap loc (option val) := {[l := Some #0]}.
 
-  (* Let Σ : gFunctors := *)
-  (* #[mupdΣ; *)
-  (*   histGS.histΣ (state * thread_pool heap_lang * list (observation))]. *)
-  (* Let Σ : gFunctors := heapΣ. *)
-  Let Φ `{!heapGS Σ} : tf Σ :=
+  Let Φ : tp :=
+        (∃ (k kl1 kl2 : oid), ⌜ k ≠ kl1 ⌝ ∧ mp_tp l ∧
+                              tp_until (l ↦ #0) (l ↦ #1) ∧
+                              tp_eventually (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
+                              tp_eventually (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
+                              tp_true)%P.
+
+  Let N := nroot.@ "message_passing".
+  Let Na := N.@ "always".
+  Let Np := N.@ "pointsto".
+  Let Nl := N.@ "label".
+
+  Let Φ' `{!heapGS Σ} : tf Σ :=
         (∃ k kl1 kl2, ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
                       tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
                       tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
@@ -371,76 +382,59 @@ Section adequacy.
                       ⟨thP_obls i ({[k; kl1]}) 1 ∗ thP_obls j ({[kl2]}) 1 ∗
                        oblP_fuel k 0 10 ∗ oblP_fuel kl1 0 10 ∗ oblP_fuel kl2 1 (10 ⊕ (10 × ▽))%M⟩)%F.
 
+  Lemma tf_to_tp_Φ `{!heapGS Σ} :
+    tf_to_tp Φ' = Φ.
+  Proof. done. Qed.
+
+  Let Σ : gFunctors :=
+        #[mupdΣ;
+          histGS.histΣ (state * thread_pool heap_lang * list (observation));
+          heap_stateΣ].
+
   Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := fork_post; j := fork_post]}.
 
-  TODO
-
   Theorem mp_adequacy :
-    ∀ (τ : trace heap_lang), behavior τ →
-                             fair_scheduling τ →
-                             (τ.1 = 0) →
-                             (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
-                             ∃ Σ (HHeap : heapGS Σ), tf_trace Φ τ.
+    ∀ (τ : trace heap_lang),
+    behavior τ →
+    fair_scheduling τ →
+    (τ.1 = 0) →
+    (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+    tp_trace Φ τ.
   Proof.
     intros τ Beh FS Init1 Init2.
-    
-
-
     eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ).
     1,2,3,4: eauto.
-    iIntros (?). iExists fork_post, Ψs.
-    iMod (gen_heap_init
-    
-    
-state_interp =
-λ (Σ : gFunctors) (heap_stateGS0 : heap_stateGS Σ) (σ : state) (Θ : thread_pool heap_lang) (κs : list observation),
-  (gen_heap_interp (heap σ) ∗ thread_map_interp (dom Θ) Θ ∗ proph_map_interp κs (used_proph_id σ))%I
-     : ∀ {Σ : gFunctors}, heap_stateGS Σ → state → thread_pool heap_lang → list observation → iProp Σ
-    
-  ∃ (fork_post : thread_id → language.val heap_lang → iProp Σ) (Ψs : gmap thread_id (thread_id → language.val heap_lang → iProp Σ)),
+    iIntros (?).
+    iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
+    iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
+    iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
+    iMod (inv_heap_init loc (option val) (⊤ : coPset)) as "(%Hinv_heap& >HHI)".
+    set (Hheap_stateGS := @HeapStateGS Σ Hheap Hinv_heap Hproph Hthread).
+    set (HHeapGS := @HeapGS Σ Htemporal Hheap_stateGS).
+    set (HlirisGS := @heapGS_lirisGS Σ HHeapGS).
+    iExists (liris_state_interp_class), (@fork_post Σ), (@Ψs Σ).
+    iSplitL "HI TI PI".
+    { by iFrame. }
+    iSplitL "Tis".
+    { by iFrame. }
+    iModIntro. iIntros "TGs".
+    (* Set Printing All. *)
+    iMod (mp_pre Θ0 i j l with "[Ptrs] [TGs]") as "H".
+    { subst i j. lia. }
+    { done. }
+    { reflexivity. }
+    { reflexivity. }
+    { subst σ0. rewrite big_sepM_singleton.
+      by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
+    { iFrame. }
+    iDestruct "H" as "(HP& H)".
+    iModIntro. iExists Φ'. iFrame "HP". iSplit.
+    { iPureIntro. apply tf_to_tp_Φ. }
+    iFrame.
+  Qed.
 
-
-gen_heap_init:
-  ∀ {SI : indexT} {L : Type} {EqDecision0 : EqDecision L} {H : Countable L} {V : Type} {Σ : gFunctors},
-    gen_heapGpreS L V Σ
-    → ∀ σ : gmap L V,
-        ⊢ |==>
-            ∃ H0 : gen_heapGS L V Σ, gen_heap_interp σ ∗ ([∗ map] l↦v ∈ σ, gen_heap.pointsto l (DfracOwn 1) v) ∗
-              ([∗ map] l↦_ ∈ σ, meta_token l ⊤)
-
-  Lemma mp_pre Θ i j (l : loc) Φ Ψs :
-    i ≠ j →
-    Θ = {[i := writer #l; j := reader #l ]} →
-    Φ = (∃ k kl1 kl2, ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
-                      tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-                      tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-                      tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-                      ⟨thP_obls i ({[k; kl1]}) 1 ∗ thP_obls j ({[kl2]}) 1 ∗
-                       oblP_fuel k 0 10 ∗ oblP_fuel kl1 0 10 ∗ oblP_fuel kl2 1 (10 ⊕ (10 × ▽))%M⟩)%F →
-    Ψs = ({[i := fork_post; j := fork_post]}) →
-    ((l ↦ #0) -∗
-     ([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-     |={⊤}=>m (⟦Φ⟧ₗ ∗
-              (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
-
-
-Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
-  `{!state_interp_class Λ Σ}
-  `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
-  s σ Θ i κs (Φ : tf Σ) :
-  ∀ (τ : trace Λ), behavior τ →
-                   fair_scheduling τ →
-                   (τ.1 = 0) →
-                   (τ.2 0 = (Θ, σ, i, κs)) →
-                   (∀ `{Htemporal : !temporalGS Λ Σ},
-                      ⊢ |={⊤}=> ∃ (fork_post : thread_id → val Λ → iProp Σ)
-                                 (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
-                      let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
-                      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-                      (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-                       |={⊤}=>m (⟦Φ⟧ₗ ∗
-                                (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
-                   tf_trace Φ τ.
 End adequacy.
+
+(* Print Assumptions mp_adequacy. *)

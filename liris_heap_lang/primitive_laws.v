@@ -100,6 +100,11 @@ Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%F
 Notation "i ⤉ t , v " := (➢ (pred_label i t v))%F
                          (at level 20, t, v at level 1, format "i  ⤉  t , v") : tf_scope.
 
+Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%P
+                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tp_scope.
+Notation "i ⤉ t , v " := (➢ (pred_label i t v))%P
+                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : tp_scope.
+
 Lemma thread_expr_read `{!heap_stateGS Σ} :
   ∀ (Θ : thread_pool heap_lang) i e,
   thread_map_interp (dom Θ) Θ -∗ thread_expr i e -∗ ⌜Θ !! i = Some e⌝.
@@ -131,54 +136,54 @@ Definition heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap
 
 Class heapGS Σ :=
   HeapGS {
-      heapGS_mupdGS : mupdGS Σ;
-      heapGS_histGS : histGS.histGS Σ (state * thread_pool heap_lang * list (observation));
+      heapGS_temporalGS : temporalGS heap_lang Σ;
+      (* heapGS_mupdGS : mupdGS Σ; *)
+      (* heapGS_histGS : histGS.histGS Σ (state * thread_pool heap_lang * list (observation)); *)
       #[global] heapGS_heap_stateGS :: heap_stateGS Σ;
     }.
 
-Definition heapΣ : gFunctors :=
-  #[mupdΣ;
-    histGS.histΣ (state * thread_pool heap_lang * list (observation));
-    heap_stateΣ].
+(* Definition heapΣ : gFunctors := *)
+(*   #[mupdΣ; *)
+(*     histGS.histΣ (state * thread_pool heap_lang * list (observation)); *)
+(*     heap_stateΣ]. *)
 
-Global Instance subG_heapΣ {Σ} : subG heapΣ Σ → heapGS Σ.
-Proof.
-  intros. econstructor.
-  - apply subG_inv in H. destruct H. apply subG_inv in s. destruct s. apply subG_inv in s. destruct s.
-    econstructor.
-    + econstructor.
-      * econstructor.
-        { eapply subG_wsatΣ. auto. }
-        all: exact inhabitant.
-      * econstructor.
-        { eapply subG_auth_rupdΣ. auto. }
-        all: exact inhabitant.
-    + econstructor.
-      { eapply osatGS.subG_osatΣ. solve_inG. }
-      all: exact inhabitant.
-    + econstructor.
-      { eapply othreadGS.subG_othreadΣ. solve_inG. }
-      all: exact inhabitant.
-    + econstructor.
-      { eapply owitGS.subG_owitΣ. solve_inG. }
-      all: exact inhabitant.
-    + econstructor.
-      { eapply mhistGS.subG_mhistΣ. solve_inG. }
-      all: exact inhabitant.
-  - econstructor.
-    { eapply histGS.subG_histΣ. solve_inG. }
-    all: exact inhabitant.
-  - apply subG_heap_stateΣ. solve_inG.
-Qed.
+(* Global Instance subG_heapΣ {Σ} : subG heapΣ Σ → heapGS Σ. *)
+(* Proof. *)
+(*   intros. econstructor. *)
+(*   - apply subG_inv in H. destruct H. apply subG_inv in s. destruct s. apply subG_inv in s. destruct s. *)
+(*     econstructor. *)
+(*     + econstructor. *)
+(*       * econstructor. *)
+(*         { eapply subG_wsatΣ. auto. } *)
+(*         all: exact inhabitant. *)
+(*       * econstructor. *)
+(*         { eapply subG_auth_rupdΣ. auto. } *)
+(*         all: exact inhabitant. *)
+(*     + econstructor. *)
+(*       { eapply osatGS.subG_osatΣ. solve_inG. } *)
+(*       all: exact inhabitant. *)
+(*     + econstructor. *)
+(*       { eapply othreadGS.subG_othreadΣ. solve_inG. } *)
+(*       all: exact inhabitant. *)
+(*     + econstructor. *)
+(*       { eapply owitGS.subG_owitΣ. solve_inG. } *)
+(*       all: exact inhabitant. *)
+(*     + econstructor. *)
+(*       { eapply mhistGS.subG_mhistΣ. solve_inG. } *)
+(*       all: exact inhabitant. *)
+(*   - econstructor. *)
+(*     { eapply histGS.subG_histΣ. solve_inG. } *)
+(*     all: exact inhabitant. *)
+(*   - apply subG_heap_stateΣ. solve_inG. *)
+(* Qed. *)
 
-(** We don't want this to be an instance, which can break iMod. *)
-Definition heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ :=
-  TemporalG heapGS_mupdGS heap_state_interp_class heapGS_histGS.
+(* (** We don't want this to be an instance, which can break iMod. *) *)
+(* Definition heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ := *)
+(*   TemporalG heapGS_mupdGS heapGS_histGS. *)
 
 Global Instance heapGS_lirisGS `{!heapGS Σ} : lirisGS heap_lang Σ := {
     liris_temporalGS := heapGS_temporalGS;
-    (* liris_temporalGS := TemporalG heapGS_mupdGS heap_state_interp_class heapGS_histGS; *)
-    (* liris_temporalGS := heapGS_temporalGS; *)
+    liris_state_interp_class := heap_state_interp_class;
     fork_post i v := (True)%I;
   }.
 

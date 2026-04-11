@@ -10,122 +10,22 @@ From liris.algebra Require Import ordinal_existential_properties.
 
 From liris.prelude Require Import axioms.
 
-Section fair_sched.
-  Context {Λ : language}.
-
-  Definition fscnt : Type := thread_id → nat.
-
-  CoInductive beh_fscnt_th (τ : trace Λ) (i : thread_id) (c : nat) : Prop :=
-  | beh_fscnt_th_step ρ j κs c' :
-    (τ.2 τ.1) = (ρ, j, κs) →
-    ((thread_na i τ) ∨ (thread_active i τ ∧ (if (decide (i = j)) then True else c' < c))) →
-    beh_fscnt_th (trace_next τ) i c' →
-    beh_fscnt_th τ i c.
-  Definition beh_fscnt (τ : trace Λ) (γ : fscnt) : Prop :=
-    ∀ (i : thread_id), beh_fscnt_th τ i (γ i).
-
-  Lemma beh_fscnt_th_upto_le (τ : trace Λ) i (c1 c2 : nat) :
-    beh_fscnt_th τ i c1 →
-    c1 ≤ c2 →
-    beh_fscnt_th τ i c2.
-  Proof.
-    intros BEH LEc. inv BEH.
-    eapply (beh_fscnt_th_step _ _ _ _ _ _ c'). 1: eauto. 2: auto.
-    destruct H0; auto. right. destruct H0. split; auto.
-    destruct (decide (i = j)); auto. eapply Nat.lt_le_trans; eauto.
-  Qed.
-
-  (** We use choice here. *)
-  Lemma fair_scheduling_fscnt (τ : trace Λ) :
-    fair_scheduling τ → ∃ (γ : fscnt), beh_fscnt τ γ.
-  Proof.
-    intros FS. unfold beh_fscnt. apply choice. intros i. destruct τ as (n&τf).
-    assert (∀ (s : nat), ((thread_na i (n, τf)) ∨ (thread_active i (n, τf) ∧ thread_turn i (s + n, τf)))
-                       → beh_fscnt_th (n, τf) i s); cycle 1.
-    { destruct (thread_active_or_not i (n, τf)) as [TH | TH].
-      - exists 0. specialize (H 0). apply H. left. auto.
-      - specialize (FS n). unshelve edestruct FS. 1: exact i. 1: lia.
-        { exfalso. eapply (thread_active_and_not_false _ ((n, τf))); eauto. }
-        destruct H0 as [TA TEV]. unfold tr_eventually, tr_until in TEV. destruct TEV as (m& LEm& TTurn& _).
-        remember (m - n) as s. assert (m = s + n) by lia. subst m. clear Heqs LEm.
-        exists s. apply H. right. auto. }
-    revert n FS. cofix CIH; intros. destruct H as [TH | TH].
-    - rename TH into TNA. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
-      destruct (thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
-      + econstructor. 1: eauto. 1: auto.
-        unshelve eapply (CIH _ _ 0); auto. apply fair_scheduling_next. auto.
-      + pose proof FS as FSn'. specialize (FSn' (S n)).
-        unshelve edestruct FSn'. 1: exact i. 1: lia.
-        { exfalso. eapply (thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
-        destruct H as [TA TEV]. unfold tr_eventually, tr_until in TEV. destruct TEV as (m& LEm& TTurn& _).
-        remember (m - (S n)) as s'. assert (m = s' + S n) by lia. subst m. clear Heqs' LEm.
-        eapply (beh_fscnt_th_step _ _ _ _ _ _ s'). 1: eauto. 1: auto.
-        eapply CIH.
-        * apply fair_scheduling_next; auto.
-        * right. eauto.
-    - destruct TH as [TA TTurn]. destruct s.
-      (* Induction on s breask Guarded check? *)
-      { simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
-        unfold thread_turn in TTurn. simpl in TTurn. rewrite Htrn in TTurn. subst j.
-        destruct (thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
-        - econstructor. 1: eauto.
-          { right. split; auto. rewrite decide_True; auto. }
-          unshelve eapply (CIH _ _ 0); eauto. eapply fair_scheduling_next; eauto.
-        - pose proof FS as FSn'. specialize (FSn' (S n)).
-          unshelve edestruct FSn'. 1: exact i. 1: lia.
-          { exfalso. eapply (thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
-          destruct H as [TA2 TEV2]. unfold tr_eventually, tr_until in TEV2. destruct TEV2 as (m& LEm& TTurn2& _).
-          remember (m - (S n)) as s. assert (m = s + S n) by lia. subst m. clear Heqs LEm.
-          eapply (beh_fscnt_th_step _ _ _ _ _ _ s). 1: eauto.
-          { right. split; auto. rewrite decide_True; auto. }
-          apply CIH; auto. apply fair_scheduling_next; auto. }
-      { simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
-        destruct (decide (j = i)).
-        - subst j. destruct (thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
-          + econstructor. 1: eauto.
-            { right. split; auto. rewrite decide_True; auto. }
-            unshelve eapply (CIH _ _ 0); eauto. eapply fair_scheduling_next; eauto.
-          + pose proof FS as FSn'. specialize (FSn' (S n)).
-            unshelve edestruct FSn'. 1: exact i. 1: lia.
-            { exfalso. eapply (thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
-            destruct H as [TA2 TEV2]. unfold tr_eventually, tr_until in TEV2. destruct TEV2 as (m& LEm& TTurn2& _).
-            remember (m - (S n)) as s'. assert (m = s' + S n) by lia. subst m. clear Heqs' LEm.
-            eapply (beh_fscnt_th_step _ _ _ _ _ _ s'). 1: eauto.
-            { right. split; auto. rewrite decide_True; auto. }
-            apply CIH; auto. apply fair_scheduling_next; auto.
-        - eapply (beh_fscnt_th_step _ _ _ _ _ _ s). 1: eauto.
-          { right. split; auto. rewrite decide_False; auto. }
-          apply CIH; auto.
-          + apply fair_scheduling_next; auto.
-          + simpl. destruct (thread_active_or_not i (S n, τf)) as [? | TA2]; first auto.
-            right. replace (s + S n) with (S (s + n)) by lia. split; auto. }
-  Qed.
-
-  Definition fscnt_next_rel_th (τ : trace Λ) i (c1 c2 : nat) : Prop :=
-    if (decide (i = trace_thread τ)) then True
-    else if (decide (thread_na i τ)) then True
-         else (c2 < c1).
-  Definition fscnt_next_rel (τ : trace Λ) (γ1 γ2 : fscnt) : Prop :=
-    ∀ i, fscnt_next_rel_th τ i (γ1 i) (γ2 i).
-
-  (** We again use choice here. *)
-  Lemma exists_fscnt_next (τ : trace Λ) (γ : fscnt) :
-    beh_fscnt τ γ →
-    ∃ γ', beh_fscnt (trace_next τ) γ' ∧ fscnt_next_rel τ γ γ'.
-  Proof.
-    intros Beh. unfold beh_fscnt, fscnt_next_rel.
-    cut (∃ γ', ∀ i, (λ i c, beh_fscnt_th (trace_next τ) i c ∧ fscnt_next_rel_th τ i (γ i) c) i (γ' i)).
-    { intros. destruct H. exists x. split; intros; firstorder. }
-    apply choice. intros i. specialize (Beh i). inv Beh.
-    exists c'. split; auto. unfold fscnt_next_rel_th.
-    destruct τ as (n&τf). unfold trace_thread, trace_state. simpl in *.
-    rewrite H. simpl. destruct (decide (i = j)); auto. destruct H0.
-    { rewrite decide_True; auto. }
-    destruct H0. rewrite decide_False; auto.
-    intros F. eapply thread_active_and_not_false; eauto.
-  Qed.
-
-End fair_sched.
+(** Lift tf to tp. *)
+Fixpoint tf_to_tp `{SI : indexT} {Π : Type} `{Σ : gFunctors} (Φ : @tf _ Π Σ) : @tp Π :=
+  match Φ with
+  | tf_emp => tp_true
+  | tf_atomic π => tp_atomic π
+  | tf_pure P => tp_pure P
+  | tf_ghost P => tp_true
+  | tf_and P Q => tp_and (tf_to_tp P) (tf_to_tp Q)
+  | tf_or P Q => tp_or (tf_to_tp P) (tf_to_tp Q)
+  | tf_impl P Q => tp_impl P (tf_to_tp Q)
+  | tf_forall A P => tp_forall A (λ a, tf_to_tp (P a))
+  | tf_exist A P => tp_exist A (λ a, tf_to_tp (P a))
+  | tf_sep P Q => tp_and (tf_to_tp P) (tf_to_tp Q)
+  | tf_always _ P => tp_always (tf_to_tp P)
+  | tf_until _ _ _ _ P Q => tp_until (tf_to_tp P) (tf_to_tp Q)
+end.
 
 (** Trace properties in iProp, intermediate representation for the adequacy proof. *)
 Notation tiProp Λ Σ := (trace Λ → iProp Σ).
@@ -216,21 +116,17 @@ Proof. rewrite ti_until_unseal. apply (fixpoint_unfold (ti_until_pre ⊤ ltA)). 
 (** Intermediate interpretation. *)
 Fixpoint ti_logic `{SI : indexT} `{!temporalGS Λ Σ}
   {A : Type} (ltA : A → A → Prop)
-  (Φ : @tf SI (state_pred Λ) Σ) : tiProp Λ Σ :=
+  (Φ : @tp (state_pred Λ)) : tiProp Λ Σ :=
   match Φ with
-  | tf_emp => ti_pure True
-  | tf_atomic π => (ti_atomic π)%I
-  | tf_pure p => ti_pure p
-  | tf_ghost p => ti_pure True
-  | tf_and P Q => (ti_and (ti_logic ltA P) (ti_logic ltA Q))
-  | tf_or P Q => (ti_or (ti_logic ltA P) (ti_logic ltA Q))
-  | tf_impl P Q => (ti_impl P (ti_logic ltA Q))
-  | tf_forall A P => (ti_forall A (λ (a : A), ti_logic ltA (P a)))
-  | tf_exist A P => (ti_exist A (λ (a : A), ti_logic ltA (P a)))
-  | tf_sep P Q => (ti_and (ti_logic ltA P) (ti_logic ltA Q))
-  | tf_pers P => (ti_pure True)
-  | tf_always N P => (ti_always (ti_logic ltA P))
-  | tf_until N k b q P Q =>
+  | tp_atomic π => (ti_atomic π)%I
+  | tp_pure p => ti_pure p
+  | tp_and P Q => (ti_and (ti_logic ltA P) (ti_logic ltA Q))
+  | tp_or P Q => (ti_or (ti_logic ltA P) (ti_logic ltA Q))
+  | tp_impl P Q => (ti_impl P (ti_logic ltA Q))
+  | tp_forall A P => (ti_forall A (λ (a : A), ti_logic ltA (P a)))
+  | tp_exist A P => (ti_exist A (λ (a : A), ti_logic ltA (P a)))
+  | tp_always P => (ti_always (ti_logic ltA P))
+  | tp_until P Q =>
       (ti_exist A (λ a, ti_until ltA a (ti_logic ltA P) (ti_logic ltA Q)))
   end.
 
@@ -360,8 +256,8 @@ Section proof1.
   Qed.
 
   Lemma ti_always_tr_always F Φ :
-    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ τ) → tf_trace Φ τ) →
-    ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic ltA Φ) τ) → tr_always (tf_trace Φ) τ.
+    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ τ) → tp_trace Φ τ) →
+    ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic ltA Φ) τ) → tr_always (tp_trace Φ) τ.
   Proof.
     intros IH τ H. unfold tr_always. destruct τ as (n&τf).
     (** Use classical logic. *)
@@ -375,10 +271,10 @@ Section proof1.
   Qed.
 
   Lemma ti_until_tr_until (wf_ltA : well_founded ltA) F Φ1 Φ2 :
-    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ1 τ) → tf_trace Φ1 τ) →
-    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ2 τ) → tf_trace Φ2 τ) →
+    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ1 τ) → tp_trace Φ1 τ) →
+    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ2 τ) → tp_trace Φ2 τ) →
     ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_exist A (λ a, ti_until ltA a (ti_logic ltA Φ1) (ti_logic ltA Φ2)) τ) →
-         tr_until (tf_trace Φ1) (tf_trace Φ2) τ.
+         tr_until (tp_trace Φ1) (tp_trace Φ2) τ.
   Proof.
     intros IH1 IH2 τ H. unfold tr_until. destruct τ as (n&τf).
     unfold ti_exist in H. apply sat_exists in H. destruct H.
@@ -398,16 +294,14 @@ Section proof1.
     intros. destruct H0. destruct H0; eauto. apply Hp. lia.
   Qed.
 
-  Lemma ti_logic_tf_trace (wf_ltA : well_founded ltA) (F : iProp Σ) (Φ : tf Σ) (τ : trace Λ) :
-    iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ τ) → tf_trace Φ τ.
+  Lemma ti_logic_tp_trace (wf_ltA : well_founded ltA) (F : iProp Σ) (Φ : tp) (τ : trace Λ) :
+    iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ τ) → tp_trace Φ τ.
   Proof.
     revert τ. induction Φ; simpl; intros.
-    - done.
     - unfold ti_atomic in H. destruct τ. simpl in H.
       unfold tr_atomic. simpl. destruct (p n) as (((Θ&σ)&?)&?).
       apply sat_elim in H. auto.
     - unfold ti_pure in H. apply sat_elim in H. auto.
-    - done.
     - unfold ti_and in H. apply iProp_sat_lc_at_frame_and in H. destruct H.
       apply IHΦ1 in H. apply IHΦ2 in H0. split; auto.
     - unfold ti_or in H. apply sat_or in H. destruct H.
@@ -416,9 +310,6 @@ Section proof1.
     - unfold tr_impl. intros HP. unfold ti_impl in H. apply sat_impl in H; auto.
     - unfold tr_forall. intros. unfold ti_forall in H0. apply (sat_forall a) in H0. eauto.
     - unfold tr_exist. unfold ti_exist in H0. apply (sat_exists) in H0. destruct H0. eauto.
-    - unfold ti_and in H. apply iProp_sat_lc_at_frame_and in H. destruct H.
-      apply IHΦ1 in H. apply IHΦ2 in H0. split; auto.
-    - done.
     - eapply ti_always_tr_always; eauto.
     - eapply ti_until_tr_until; eauto.
   Qed.
@@ -571,7 +462,8 @@ Section proof2.
     rewrite decide_False in H2; first lia. intros F. eapply thread_active_and_not_false; eauto.
   Qed.
 
-  Lemma lwp_fix_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs g v1 v2 Ω1 Ω2 W τf γ Φ :
+  Lemma lwp_fix_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs
+    g v1 v2 Ω1 Ω2 W τf γ (Φ : tp) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
     v1 ≤ v2 →
@@ -579,14 +471,17 @@ Section proof2.
     owit_inv_lb (fair_sched_fun γ) Ω2 W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     Θ = fst <$> TQ →
+    (∃ (Φ' : tf Σ), ⌜ tf_to_tp Φ' = Φ ⌝ ∧
     (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v2 Ω2 W n (dom Θ) ∗
     ([∗ map] i ↦ '(e, Q) ∈ TQ, match to_val e with
                                | Some v => (lift_term i Q) v
                                | None => lwp_fix s i ⊤ e (lift_term i Q)
                                end) ∗
-    tf_intuit n σ Θ κs v1 Ω1 Φ
+    tf_intuit n σ Θ κs v1 Ω1 Φ')
     ⊢ ti_logic Ord.lt Φ (n, τf).
   Proof.
+    iIntros (BEH FS LEv LEO LB HIST EQTQ) "(%& %& H)". subst Φ. rename Φ' into Φ.
+    iStopProof. revert BEH FS LEv LEO LB HIST EQTQ.
     revert h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ.
     induction Φ; iIntros (h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)"; simpl.
     - done.
@@ -609,7 +504,6 @@ Section proof2.
     - unfold ti_and. iDestruct "TF" as "[TF1 TF2]". iSplit.
       + iApply (IHΦ1 with "[$HI $SIa $MI $WPs $TF1]"); eauto.
       + iApply (IHΦ2 with "[$HI $SIa $MI $WPs $TF2]"); eauto.
-    - done.
     - clear dependent v1 Ω1. rename v2 into v, Ω2 into Ω.
       iRevert (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ) "TF HI SIa MI WPs".
       iLöb as "IH". iIntros (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ) "#TF HI SIa MI WPs".
@@ -1045,18 +939,18 @@ Section proof2.
         iFrame.
   Qed.
 
-  Lemma lwp_ti_logic s h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ Φ :
+  Lemma lwp_ti_logic s h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ (Φ : tp) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
     owit_inv_lb (fair_sched_fun γ) Ω W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
-    ⊢ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗
-    model_interp g v Ω W n (dom Θ) -∗
-    (|={⊤}=>m ⟦Φ⟧ₗ ∗ (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }})))
-    ={⊤}=∗ ti_logic Ord.lt Φ (n, τf).
+    ((history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
+      model_interp g v Ω W n (dom Θ) ∗
+      (|={⊤}=>m ∃ (Φ' : tf Σ), (⌜ tf_to_tp Φ' = Φ ⌝) ∗ ⟦Φ'⟧ₗ ∗ (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }}))))
+      ⊢ |={⊤}=> ti_logic Ord.lt Φ (n, τf).
   Proof.
-    iIntros (BEH FS LB HIST) "[HI SIa] MI WPs".
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((P& WPs)& HI& %&%&%&%& %& MI)".
+    iIntros (BEH FS LB HIST) "([HI SIa]& MI& WPs)".
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((%& %HΦ& P& WPs)& HI& %&%&%&%& %& MI)".
     { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
     1: auto.
     destruct H as [LEO1 LB1].
@@ -1091,43 +985,46 @@ Section proof2.
 End proof2.
 
 Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
-  `{!state_interp_class Λ Σ}
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
-  s σ Θ i κs (Φ : tf Σ) :
-  ∀ (τ : trace Λ), behavior τ →
-                   fair_scheduling τ →
-                   (τ.1 = 0) →
-                   (τ.2 0 = (Θ, σ, i, κs)) →
-                   (∀ `{Htemporal : !temporalGS Λ Σ},
-                      ⊢ |={⊤}=> ∃ (fork_post : thread_id → val Λ → iProp Σ)
-                                 (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
-                      let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
-                      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-                      (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-                       |={⊤}=>m (⟦Φ⟧ₗ ∗
-                                (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
-                   tf_trace Φ τ.
+  s σ Θ i κs (Φ : tp) :
+  ∀ (τ : trace Λ),
+  behavior τ →
+  fair_scheduling τ →
+  (τ.1 = 0) →
+  (τ.2 0 = (Θ, σ, i, κs)) →
+  (∀ `{Htemporal : !temporalGS Λ Σ},
+     ⊢ |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
+                (fork_post : thread_id → val Λ → iProp Σ)
+                (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
+     let _ : lirisGS Λ Σ := LirisG Htemporal Hsic fork_post in
+     state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
+     (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+      |={⊤}=>m (∃ (Φ' : tf Σ),
+                  (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
+                  (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
+  tp_trace Φ τ.
 Proof.
   intros τ BEH FS INIT1 INIT2 Hwp.
   assert (iProp_sat
             (|==> ∃ (Hmupd : mupdGS Σ) (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))),
-                let _ : temporalGS Λ Σ := TemporalG Hmupd state_interp_class0 Hhist in
+                let _ : temporalGS Λ Σ := TemporalG Hmupd Hhist in
                 (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
                 wsat.wsat ∗ wsat.ownE ⊤ ∗
                 |={⊤}=> ti_logic Ord.lt Φ τ)); cycle 1.
   { apply sat_bupd, sat_exists in H0. destruct H0 as (Hmupd& ?). apply sat_exists in H0. destruct H0 as (Hhist& ?).
-    set (Htemp := TemporalG Hmupd state_interp_class0 Hhist : temporalGS Λ Σ).
-    apply (ti_logic_tf_trace Ord.lt_well_founded emp). apply (sat_fupd ⊤).
+    set (Htemp := TemporalG Hmupd Hhist : temporalGS Λ Σ).
+    apply (ti_logic_tp_trace Ord.lt_well_founded emp). apply (sat_fupd ⊤).
     unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
     eapply sat_mono. 2: eapply H0. simpl. iIntros "($& $& $& $)". }
   assert (Hwp' : ⊢ ∀ Htemporal : temporalGS Λ Σ,
-            |={⊤}=> ∃ (fork_post : thread_id → val Λ → iProp Σ)
+            |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
+                     (fork_post : thread_id → val Λ → iProp Σ)
                      (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
-            let _ : lirisGS Λ Σ := LirisG Htemporal fork_post in
+            let _ : lirisGS Λ Σ := LirisG Htemporal Hsic fork_post in
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
-             |={⊤}=>m (⟦Φ⟧ₗ ∗
-                      (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
+             |={⊤}=>m (∃ (Φ' : tf Σ), (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
+                                     (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
   { iIntros (Htemp). iApply (Hwp Htemp). }
   eapply sat_wand; cycle 1.
   { eapply Hwp'. }
@@ -1137,19 +1034,19 @@ Proof.
   iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& MI)".
   iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
   iExists Hmupd, Hhist. iFrame "R W WOE".
-  set (Htemp := TemporalG Hmupd state_interp_class0 Hhist : temporalGS Λ Σ).
-  iModIntro. iMod ("H" $! Htemp) as "(%fork_post& %Ψs& SI& SIa& WPs)".
-  iMod ("HI" with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& MI)".
+  set (Htemp := TemporalG Hmupd Hhist : temporalGS Λ Σ).
+  iModIntro. iMod ("H" $! Htemp) as "(%Hsic& %fork_post& %Ψs& SI& SIa& WPs)".
+  iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& MI)".
   iMod (thP_obls_alloc_threads (dom Θ) with "T") as "[T Ths]".
   { set_solver. }
   iPoseProof ("WPs" with "Ths") as "WPs". rewrite union_empty_l_L.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
-  set (Hliris := LirisG Htemp fork_post : lirisGS Λ Σ).
+  set (Hliris := LirisG Htemp Hsic fork_post : lirisGS Λ Σ).
   (* FIXME: just HI not working. *)
-  iApply (lwp_ti_logic with "[$HI $SIa] [$MHI $S $T $MI] WPs").
+  iApply (lwp_ti_logic with "[$HI $SIa $MHI $S $T $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
-  intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto.
+  { intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto. }
 Qed.
 
 (* Print Assumptions lwp_adequacy. *)

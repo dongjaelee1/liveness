@@ -198,16 +198,18 @@ Section hist.
 
 End hist.
 
-(* Allocation of a history interpretation. *)
-Lemma history_interp_init `{SI : indexT} `{SIC : !state_interp_class Λ Σ}
+(* Allocation of a history interpretation;
+   state_interp_class is user given, and we want it to come later. *)
+Lemma history_interp_init `{SI : indexT}
   `{HIST : !histGpreS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   σ Θ κs :
   ⊢ |==> ∃ _ : histGS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ))),
-    ((state_interp σ Θ κs) ==∗ history_interp [(σ, Θ, κs)] 0 σ Θ κs).
+    ∀ (SIC : state_interp_class Λ Σ),
+  ((state_interp σ Θ κs) ==∗ history_interp [(σ, Θ, κs)] 0 σ Θ κs).
 Proof.
   iMod (own_alloc (●ML ([(σ, Θ, κs)] : list (leibnizO _)) : mono_listUR (leibnizO _))) as (γH) "HH";
     first by apply mono_list_auth_valid.
   iModIntro; iExists (HistG SI _ _ _ γH).
-  iIntros "SI". rewrite /history_interp hG_history_auth_unseal /hG_history_auth_def. iFrame.
+  iIntros (SIC) "SI". rewrite /history_interp hG_history_auth_unseal /hG_history_auth_def. iFrame.
   iPureIntro. simpl. done.
 Qed.
