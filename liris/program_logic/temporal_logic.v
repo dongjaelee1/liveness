@@ -542,6 +542,22 @@ Section proof.
     iModIntro. iFrame.
   Qed.
 
+  Lemma tf_until_fulfill_full E N k (P Q : tf Σ) :
+    ↑N ⊆ E →
+    ⟦tf_until N k false 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
+    ▷ (⟦P⟧ₗ ∗
+       ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N}=∗
+                       ∀ i G q, (⌜k ∈ G⌝) → thP_obls i G q -∗
+                                ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ thP_obls i (G ∖ {[k]}) q ∗ oblP_fulfilled k)))).
+  Proof.
+    iIntros (HN) "Uk". iMod (tf_until_to_true with "Uk") as "H". 1: auto.
+    iModIntro. iNext. iDestruct "H" as "($& H)". iIntros (?).
+    iMod ("H" $! E') as "H". iIntros "!> HQ". iMod ("H" with "HQ") as "H".
+    iMod (tf_until_fulfill with "H") as "H". 1: auto.
+    iIntros "!> %%% % TG". iPoseProof ("H" with "[//] TG") as "H".
+    iIntros (?). iNext. iMod ("H" $! E'') as "H". iModIntro. iFrame.
+  Qed.
+
 End proof.
 
 

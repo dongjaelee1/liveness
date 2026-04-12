@@ -219,10 +219,10 @@ Section proof.
          ghost_map_auth rm 1 os⟩ ∗
         ([^tf_sep map] a ↦ k ∈ os,
            ⟨(£ (10)%ord ∨ cnt_lb r i a) ∗
-            a ↪[rm]□ k ∗
+            a ↪[rm]□ k ∗ cnt_lb r j a ∗
             oblP_id k ∗ witP_layer k 0⟩ ∗
-           ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1))⟩) ∨
-              (⟨oblP_fulfilled k ∗ (cnt_lb r j (a + 1))⟩))))%F.
+           ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩) ∨
+              (⟨oblP_fulfilled k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩))))%F.
 
   Definition px_tf r rm i j : tf Σ :=
     tf_always N (px_inv_tf r rm i j).
@@ -233,10 +233,10 @@ Section proof.
        ghost_map_auth rm 1 os) ∗
       ([∗ map] a ↦ k ∈ os,
          ((£ (10)%ord ∨ cnt_lb r i a) ∗
-          a ↪[rm]□ k ∗
+          a ↪[rm]□ k ∗ cnt_lb r j a ∗
           oblP_id k ∗ witP_layer k 0) ∗
-         ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1))⟩⟧ₗ) ∨
-            (oblP_fulfilled k ∗ (cnt_lb r j (a + 1))))).
+         ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩⟧ₗ) ∨
+            (oblP_fulfilled k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
 
   Definition px r rm i j : iProp Σ :=
     inv N (px_inv r rm i j).
@@ -259,146 +259,150 @@ Section proof.
   Global Instance px_persistent r i j k : Persistent (px r i j k).
   Proof. rewrite /px. apply _. Qed.
 
-  TODO
-
   (** Receives later credits via px_inv *)
-  Lemma px_loop1_spec i z r ci cj ck :
+  Lemma px_loop1_spec i z r rm ci cj :
     l{{{ thP_obls i ({[z]}) 1 ∗
          ⟦tf_until N1 z false 1 (⌜ True ⌝) (⌜ False ⌝)⟧ₗ ∗
-         £ (1)%ord ∗ px r ci cj ck ∗
-         ∃ n, cnt_auth r ci n 1%Qp ∗
-              cnt_lb r cj n ∗ gl ck n ∗ wit_layer ck n 0 ∗
-              gl_variant N_inv ck n True (cnt_lb r cj (S n)) (cnt_lb r cj (S n)) }}}
+         £ (10)%ord ∗
+         px r rm ci cj ∗
+         ∃ n, cnt_auth r ci n 1%Qp ∗ cnt_lb r cj n ∗
+              ∃ ck, oblP_id ck ∗ witP_layer ck 0 ∗ n ↪[rm]□ ck
+      }}}
       loop #() @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof using Type*.
-    iIntros (Φ) "(Tx& TG& #GVz& LC& (%x& #Gdx& #GVx)& %n& Cai& #Cljn& #Gckn& #Wckn& #GVckn) HΦ".
+    iIntros (Φ) "(TG& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Gckn& #Wckn& #Mn) HΦ".
     (** Lob induction *)
-    iRevert (n) "Gckn Cljn Wckn GVckn Cai". iLöb as "IH".
-    iIntros (n) "#Gckn #Cljn #Wckn #GVckn Cai".
+    iRevert (n ck) "Cljn Gckn Wckn Mn Cai". iLöb as "IH".
+    iIntros (n ck) "#Cljn #Gckn #Wckn #Mn Cai".
     (** Witness induction *)
     iPoseProof (wit_fuels_init with "Wckn") as "(%& Wfs)".
-    (* iPoseProof (tlc_split with "LC") as "[LC LCw]". *)
-    (** TODO: make interface defs and lemmas for tlc *)
+    (* iPoseProof (tlc_split_nat 9 1 with "LC") as "[LC LCw]". *)
+    (* (** TODO: make interface defs and lemmas for tlc *) *)
     (* iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ w with "LCw") as "LCw". *)
     (* { subst w. apply lf_cnt_ηξ_lt. } *)
     (* iModIntro. *)
     iRevert "Wfs".
     iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
-    iIntros "#Wfs".
+    iIntros "Wfs".
     iEval (rewrite /loop).
-    lwp_lam_no_lc. iExists _, ⊤, (<[ck:=n]>∅). iFrame "Tx". iSplitR.
-    { rewrite big_sepM_singleton. auto. }
-    iIntros "!> Tx Wcs !>". lwp_finish.
+    lwp_lam_no_lc. simpl. iExists ⊤, ({[ck]}). iSplitR.
+    { rewrite big_sepS_singleton. auto. }
+    iIntros "!> Wcs !> !>".
     iEval (rewrite -/loop).
-    rewrite big_sepM_singleton. iDestruct "Wcs" as "[Wc | #Gdckn]".
+    iEval (rewrite big_sepS_singleton) in "Wcs". iDestruct "Wcs" as "[Wc | #Gdckn]".
     - (** Witness induction *)
       iMod (wit_fuels_decr with "Wfs Wc") as "(%& %LTw& #Wfs'& _)".
-      (* iApply fupd_lwp. iApply rupd_fupd. iMod (tlc_weaken _ a0 with "LCw") as "LCw". *)
-      (* { apply Ord.lt_le; auto. }       *)
-      iPoseProof ("IHα" $! _ LTw with "Tx TG LC HΦ Cai [Wfs']") as "LWP".
-      { auto. }
-      auto.
-    - (** Version n is done; fetch next version and use Löb induction *)
-      iAssert (|={⊤}=> cnt_lb r cj (S n))%I with "[]" as ">#Cljn0".
-      { iMod (gl_variant_acc_done with "Gdckn GVckn") as "[[>#H | >(Gex& #H)] ACC]". 1: set_solver.
-        - iMod ("ACC" with "[]") as "_"; auto.
-          iNext. iApply gl_variant_cases_unfold. iLeft. iRight. auto.
-        - iMod ("ACC" with "[Gex]") as "_"; auto.
-          iNext. iApply gl_variant_cases_unfold. iRight. auto.
-      }
-      (** TODO: non-atomic invariant access *)
-      iApply fupd_lwp. iMod (gl_variant_acc_done with "Gdx GVx") as "[[H | >[_ %HF]] ACC]".
-      1: set_solver. 2: done.
-      (** TODO: interface lemmas for lwp_lc_later in lifting. also fupd and later-mod comm? *)
-      iCombine "IH H" as "H". iMod (lc_fupd_elim_later with "LC H") as "H".
-      iClear "IH". iDestruct "H" as "[IH H]". iDestruct "H" as "(%& Caj& Cs)".
-      iPoseProof (cnt_auth_lb_valid with "Caj Cljn0") as "%". destruct H0 as [Le _].
-      rewrite (seq_S n0) big_sepL_snoc. iDestruct "Cs" as "[Cs (LC& #Gckn0& #Wckn0& #GVckn0)]".
-      iDestruct "LC" as "[LC | #Clin0]"; cycle 1.
-      { iPoseProof (cnt_auth_lb_valid with "Cai Clin0") as "%". destruct H0.
-        exfalso. lia. }
-      iPoseProof (get_cnt_lb _ _ _ n0 n0 with "Caj") as "#Cljn0'". 1: auto.
-      iMod (cnt_auth_update _ _ _ n0 with "Cai") as "Cai".
+      iPoseProof ("IHα" $! _ LTw with "TG TUz LC HΦ Cai Wfs'") as "LWP".
+      eauto.
+    - (** Counter is at least n; fetch next count and use Löb induction *)
+      iApply lwpupd_fupd_l. iInv "Ipx" as "H".
+      iPoseProof (tlc_split_nat 9 1 with "LC") as "[LC LCw]".
+      (** TODO: make interface defs and lemmas for tlc *)
+      iApply (lc_fupd_add_later with "LCw"). iNext.
+      iDestruct "H" as "(%& %& (Ca& GMA)& HM)".
+      iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
+      iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
+      iDestruct "Hm" as "(Hm& [F | (_& (#Cljn1& %& #Mn1))])".
+      { rewrite /tf_eventually tf_until_logic. iDestruct "F" as "(Ga& _)".
+        iPoseProof (oblP_assigned_fulfilled_false with "Ga Gdckn") as "%". done. }
+      iPoseProof (big_sepM_delete _ _ _ _ LU with "[Hm $HM]") as "HM".
+      { iFrame. iRight. eauto. }
+      iPoseProof (ghost_map_lookup with "GMA Mn1") as "%LU1".
+      iPoseProof (big_sepM_delete _ _ _ _ LU1 with "HM") as "[Hm HM]".
+      iDestruct "Hm" as "(([LC1 | #Flb]& _& #Clbj1& #Gckn1& #Wckn1)& Hm)"; cycle 1.
+      { iPoseProof (cnt_auth_lb_valid with "Cai Flb") as "%". destruct H0. lia. }
+      iMod (cnt_auth_update _ _ _ (n + 1) with "Cai") as "Cai".
       { lia. }
-      iPoseProof (get_cnt_lb _ _ _ n0 with "Cai") as "#Clin0". 1: auto.
-      iPoseProof (big_sepL_snoc with "[$Cs]") as "Cs".
-      { iFrame "Clin0". eauto. }
-      rewrite -(seq_S n0). iMod ("ACC" with "[Caj Cs]") as "_".
-      { iNext. iApply gl_variant_cases_unfold. iLeft. iRight. rewrite /px_inv. iFrame. eauto. }
-      iModIntro. iPoseProof ("IH" with "Tx TG LC HΦ") as "H".
-      iPoseProof ("H" $! n0 with "Gckn0 Cljn0' Wckn0 [GVckn0] Cai") as "H".
-      { simpl. replace (S n0) with (n0 + 1) by lia. eauto. }
-      iFrame.
+      iPoseProof (get_cnt_lb _ _ _ (n + 1) with "Cai") as "#Clbi1". 1: lia.
+      iPoseProof (big_sepM_delete _ _ _ _ LU1 with "[Hm $HM]") as "HM".
+      { iFrame. iFrame "Clbj1". eauto. }
+      iModIntro. iSplitL "Ca GMA HM".
+      { iFrame. }
+      iIntros "!> !>". iApply ("IH" with "TG TUz LC1 HΦ Cljn1 Gckn1 Wckn1 Mn1 Cai").
   Qed.
 
-  Lemma px_loop2_spec j n r ci cj ck :
-    l{{{ thread_exec j 1 ∗ thP_obls j (<[ck:=n]>∅) 1 ∗
-         gl_variant N_inv ck n True (cnt_lb r cj (n + 1)) (cnt_lb r cj (n + 1)) ∗
-         gl_current ck n (1/2)%Qp ∗
-         gl_layers ck ℓs ∗ gl_fuel ck 0 10 ∗
-         px r ci cj ck ∗ cnt_auth r cj n (1/2)%Qp }}}
+  Lemma px_loop2_spec j n r rm ci cj ck :
+    l{{{ thP_obls j ({[ck]}) 1 ∗
+         ⟦tf_eventually Nu ck false (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
+         oblP_fuel ck 0 10 ∗
+         px r rm ci cj ∗
+         cnt_auth r cj n (1/2) ∗ n ↪[rm]□ ck }}}
       loop #() @ j
     l{{{ RET #(); lift_term j fork_post #() }}}.
   Proof using Type*.
-    iIntros (Φ) "(Tx& TG& #GVck& Gc& #Gw& Gf& (%x& #Gdx& #GVx)& Caj) HΦ".
+    iIntros (Φ) "(TG& Uck& Gf& #Ipx& Caj& #Mn) HΦ".
     (** Lob induction *)
-    iRevert (n) "GVck TG Gc Gf Caj". iLöb as "IH".
-    iIntros (n) "#GVck TG Gc Gf Caj".
+    iRevert (n ck) "TG Uck Gf Caj Mn". iLöb as "IH".
+    iIntros (n ck) "TG Uck Gf Caj #Mn".
     iEval (rewrite /loop).
-    rewrite (gl_fuel_eq ck 0 0 10 (9 ⊕ 1)%M); cycle 1.
+    rewrite (oblP_fuel_eq ck 0 0 10 (9 ⊕ 1)%M); cycle 1.
     { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. reflexivity. }
-    iPoseProof (gl_fuel_add with "Gf") as "[_ Gf1]".
-    lwp_lam. iFrame "Tx TG". iExists ⊤, ∅, 2. iSplitR; first done.
+    iPoseProof (oblP_fuel_add with "Gf") as "[_ Gf1]".
+    lwp_lam. iEval (simpl). iFrame "TG". iExists ⊤, ∅, 100. iSplitR; first done.
     iModIntro. iSplitL "Gf1".
-    { rewrite insert_empty dom_singleton_L big_sepS_singleton. eauto. }
-    iIntros "Tx TG _ !> LC !>". lwp_finish.
+    { rewrite big_sepS_singleton. iFrame. }
+    iIntros "TG _ !> LC !>".
     iEval (rewrite -/loop).
-    iPoseProof (tlc_split_nat 1 1 with "LC") as "[LC LC1]".
-    (** TODO: better interface for sfgupd-fupd access patterns *)
-    iApply sfgupd_elim_lwp. iApply (sfgupd_fupd_acc _ ∅).
-    iMod (gl_variant_acc_done with "Gdx GVx") as "[[H | >[_ %HF]] ACC]".
-    1: set_solver. 2: done.
-    (** TODO: interface lemmas for lwp_lc_later in lifting. also fupd and later-mod comm? *)
-    iCombine "IH H" as "H". iMod (lc_fupd_elim_later with "LC1 H") as "H".
-    iClear "IH". iDestruct "H" as "[IH H]". iDestruct "H" as "(%& Caj2& Cs)".
-    iPoseProof (cnt_auth_op_valid with "Caj Caj2") as "%". destruct H0 as [? _]. subst n0.
-    iCombine "Caj Caj2" as "Caj".
+    iPoseProof (tlc_split_nat 90 10 with "LC") as "[LC LC']".
+    (** TODO: better interface for sfmupd-fupd access patterns *)
+    iApply (sfmupd_fupd_acc _ ∅).
+    iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
+    iPoseProof (tlc_split_nat 89 1 with "LC") as "[LC LC1]".
+    (** TODO: make interface defs and lemmas for tlc *)
+    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iDestruct "H" as "(%& %& (Ca& GMA)& HM)".
+    iAssert (⌜ os !! (n + 1)%nat = None ⌝)%I as "%Nin".
+    { destruct (os !! (n + 1)) eqn:LU1; last auto.
+      iPoseProof (big_sepM_delete _ _ _ _ LU1 with "HM") as "[Hm HM]".
+      iDestruct "Hm" as "((_& _& #Clbj1& _)& _)". iPoseProof (cnt_auth_lb_valid with "Caj Clbj1") as "%".
+      destruct H0. lia. }
+    iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
+    iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
+    iDestruct "Hm" as "(Hm& [Uck1 | (#F& _)])"; cycle 1.
+    { rewrite /tf_eventually tf_until_logic. iDestruct "Uck" as "(Ga& _)".
+      iPoseProof (oblP_assigned_fulfilled_false with "Ga F") as "%". done. }
+    iPoseProof (tf_until_frac_add with "Uck Uck1") as "Uck".
+    { rewrite Qp.div_2. reflexivity. }
+    iPoseProof (cnt_auth_op_valid with "Caj Ca") as "%". destruct H0 as [? _]. subst n0.
+    iCombine "Ca Caj" as "Caj".
     iMod (cnt_auth_update _ _ _ (n + 1) with "Caj") as "[Caj Caj2]". 1: lia.
     iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
-    assert (NDisj : N ## N_inv).
-    { subst N N_inv. apply ndot_ne_disjoint. done. }
-    iMod (gl_unlock with "TG GVck") as "[>(TG& Glock& _) ACC2]".
+    iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
+    iMod (tf_until_alloc _ _ _ _ false 0 10 with "TG") as "(%ck1& %Nin1& TG& #Olk1& #Ok1& Of1& #Wlk1& A)".
+    iApply fupd_sfmupd_elim. iMod "mask" as "_".
+    iMod ("A" $! _ Nu ⌜True⌝%F ⟨ cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k' ⟩%F with "[//]") as "Unew".
+    iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.
+    assert (NDisj : N ## Nu).
+    { subst N Nu. apply ndot_ne_disjoint. done. }
+    iMod (tf_until_fulfill_full with "Uck") as "H".
     { set_solver. }
-    { rewrite lookup_insert_eq. done. }
-    iPoseProof ("ACC2" with "TG Glock") as "ACC2".
-    iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    iMod ("ACC2" $! _) as "((TG& Gcur& #Gdckn)& ACC2)".
-    iApply fupd_sfgupd_elim. iMod "close" as "_".
-    iMod ("ACC2" with "Cljn1") as "_".
-    iCombine "Gc Gcur" as "Gcur".
-    iMod (gl_lock with "Gcur Gdckn GVck") as "[>[Gcur _] ACC2]".
-    1: set_solver.
-    iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    iPoseProof ("ACC2" with "[TG] Gcur Gw") as "ACC2".
-    { rewrite delete_insert_id. 1: iFrame. done. }
-    iPoseProof ("ACC2" $! (n + 1) _) as "ACC2". iPoseProof ("ACC2" with "[]") as "ACC2".
-    1: iPureIntro; lia.
-    iMod ("ACC2" $! _) as "((TG& %& Gc& #Glckn1& Gf& #Wckn1& _& _)& GVckn1& ACC2)".
-    iMod ("GVckn1" $! _ True%I (cnt_lb r cj (n + 2))%I (cnt_lb r cj (n + 2))%I with "[//]") as "#GVckn1".
-    iApply fupd_sfgupd_elim. iMod "close" as "_".
-    iMod ("ACC2" with "Cljn1") as "_".
-    iMod ("ACC" with "[LC Cs Caj2]") as "_".
-    { iNext. iApply gl_variant_cases_unfold. iLeft. iRight. rewrite /px_inv.
-      iFrame "Gdx Caj2". rewrite (seq_S (n + 1)). iApply big_sepL_app.
-      replace (S n) with (n + 1) by lia. iFrame "Cs".
-      iApply big_sepL_singleton. iEval (simpl). replace (n + 1 + 1) with (n + 2) by lia.
-      iFrame "LC Glckn1 Wckn1 GVckn1".
-    }
-    iApply fupd_mask_intro. 1: set_solver. iIntros "close !>". iMod "close" as "_". iModIntro.
-    iApply ("IH" with "Tx HΦ [GVckn1] TG Gc [Gf] Caj").
-    { replace (n + 1 + 1) with (n + 2) by lia. auto. }
-    { replace (S n) with (n + 1) by lia. auto. }
+    iPoseProof (tlc_split_nat 88 1 with "LC") as "[LC LC1]".
+    (** TODO: make interface defs and lemmas for tlc *)
+    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iDestruct "H" as "(_& H)".
+    iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
+    iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim. iMod "mask" as "_".
+    iMod ("H" with "[]") as "H".
+    { iNext. tf_red. eauto. }
+    iPoseProof ("H" with "[] TG") as "H".
+    { iPureIntro. set_solver. }
+    iPoseProof (tlc_split_nat 87 1 with "LC") as "[LC LC1]".
+    (** TODO: make interface defs and lemmas for tlc *)
+    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
+    iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim. iMod "mask" as "_".
+    iMod "H" as "(_& TG& #Ofck)".
+    replace ({[ck1; ck]} ∖ {[ck]}) with ({[ck1]} : gset _) by set_solver.
+    iDestruct "Unew" as "[Unew Unew1]".
+    iMod ("IpxACC" with "[Caj2 GMA Hm LC' Unew1 HM]") as "_".
+    { iNext. iFrame "Caj2 GMA". iApply big_sepM_insert. 1: auto. iSplitL "LC' Unew1".
+      { iFrame. iSplitR; first eauto. iLeft. replace (n + 1 + 1) with (n + 2) by lia. iFrame. }
+      iApply (big_sepM_delete _ _ _ _ LU). iFrame. iRight. eauto. }
+    iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
+    iModIntro. iMod "mask" as "_". iIntros "!> !>".
+    iApply ("IH" with "HΦ TG [Unew] Of1 Caj Mn1").
+    replace (n + 1 + 1) with (n + 2) by lia. iFrame.
   Qed.
 
 End proof.
