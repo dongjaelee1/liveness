@@ -72,6 +72,7 @@ Section proof.
         (* Thread acks its turn and acquires the lock and resources. *)
         ([^tf_sep map] t ↦ a ∈ acks,
            ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ ⟨t ↪[γa]□ true⟩) ∨
+              (⌜ (t = c + 1)%Z ⌝) ∨
               (⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧ ⟨t ↪[γa]{#1/2} false⟩))) ∗
         ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ R) ∨
            (⌜(c < n)%Z⌝ ∧ ((⟨(c + 1)%Z ↪[γa]{#1/2} false⟩ ∗ curr ↦{#(1/2)} #c%Z ∗ R) ∨ (⟨(c + 1)%Z ↪[γa]□ true⟩)))))%F.
@@ -100,6 +101,7 @@ Section proof.
             (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)⟧ₗ))) ∗
       ([∗ map] t ↦ a ∈ acks,
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ t ↪[γa]□ true) ∨
+            (⌜ (t = c + 1)%Z ⌝) ∨
             (⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧ t ↪[γa]{#1/2} false))) ∗
       ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
          (⌜(c < n)%Z⌝ ∧ (((c + 1)%Z ↪[γa]{#1/2} false ∗ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨ ((c + 1)%Z ↪[γa]□ true)))).
@@ -158,7 +160,7 @@ Section proof.
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     lwp_lam. simpl.
-    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !>".
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
     lwp_bind (AllocN _ _).
     iPoseProof (oblP_fuel_eq_set _ 0 _ (2 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
@@ -175,8 +177,7 @@ Section proof.
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     iModIntro. lwp_pair. simpl.
-    iFrame "TG F". iExists _, ∅, lc. iSplitR; first done. iIntros "!> TG _ !> QLC !>".
-    lwp_finish_upd.
+    iFrame "TG F". iExists _, ∅, lc. iSplitR; first done. iIntros "!> TG _ !> QLC !> !>".
     iMod (obl_alloc_fulfilled _ (ℓ ⊕ Z.to_nat 0)%ordi 0) as "(%κu& #Ofk& #Ok& OAcc& #Olk& _& #Wlk)".
     iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
     iMod (ghost_map_alloc ({[0%Z := κu]} : gmap Z oid)) as "(%γt& GMAt& GMEt)".
@@ -201,22 +202,19 @@ Section proof.
     rewrite lock_proto_red. eauto.
   Qed.
 
-  TODO
-
   (** FIXME: ordi notation levels *)
-  Local Lemma acquire_spec i q G γt lnc ℓ R μ lc :
-    l{{{ thread_exec i q ∗
-         thP_obls i G 1 ∗ ([∗ set] k ∈ dom G, oblP_fuel k ((ℓ ⊕ (ω ⊕ 1)))%ordi ▽%M) ∗
-         is_fair_lock γt lnc ℓ R }}}
+  Local Lemma acquire_spec i G γt γa lnc ℓ R μ lc :
+    l{{{ thP_obls i G 1 ∗ ([∗ set] k ∈ G, oblP_fuel k ((ℓ ⊕ (ω ⊕ 1)))%ordi ▽%M) ∗
+         is_fair_lock γt γa lnc ℓ R }}}
       TicketLock.acquire lnc @ i
-    l{{{ κu, RET #();
-         thread_exec i q ∗ thP_obls i (<[κu:=0]>G) 1 ∗ £ lc ∗
-         (⌜ G !! κu = None ⌝) ∗ oblP_fuel κu ℓ μ ∗
-         lock_token γt lnc κu R ∗ R }}}.
+      l{{{ κu, RET #();
+           thP_obls i ({[κu]} ∪ G) 1 ∗ £ lc ∗
+           (⌜ κu ∉ G ⌝) ∗ oblP_fuel κu ℓ μ ∗
+           lock_token γt lnc κu R ∗ ⟦R⟧ₗ }}}.
   Proof.
-    iIntros (Φ) "(Tx& TG& Fs& #IFL) HΦ".
+    iIntros (Φ) "(TG& Fs& #IFL) HΦ".
     rewrite /TicketLock.acquire.
-    iAssert (|==>[∗ set] k ∈ dom G, oblP_fuel k (ℓ ⊕ ω)%ordi (100 ⊕ ▽)%M)%I with "[Fs]" as ">Fs".
+    iAssert (|==>[∗ set] k ∈ G, oblP_fuel k (ℓ ⊕ ω)%ordi (100 ⊕ ▽)%M)%I with "[Fs]" as ">Fs".
     { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% GF".
       iApply (oblP_fuel_extend with "GF"). rewrite -hessenberg.add_assoc. apply hessenberg.add_lt_l.
       rewrite ord.from_nat_1. apply ord.S_pos. }
@@ -226,67 +224,112 @@ Section proof.
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     (* argument *)
     lwp_lam. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 100. iSplitR; first done. iIntros "!> Tx TG _ !> LC !>".
+    iFrame "TG F". iExists _, ∅, 100. iSplitR; first done. iIntros "!> TG _ !> LC !> !> !>".
     (* get fst and snd of the argument *)
     (* fst *)
-    iDestruct "IFL" as "(%&%& %& %κa& #Gdka& #INV)". subst lnc.
+    iDestruct "IFL" as "(%&%& %& #INV)". subst lnc.
     iPoseProof (oblP_fuel_eq_set _ 0 _ (98 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     lwp_proj. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !> !>".
     iPoseProof (oblP_fuel_eq_set _ 0 _ (97 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     lwp_let. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !> !>".
     iPoseProof (oblP_fuel_eq_set _ 0 _ (96 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     lwp_lam. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !> !>".
     (* snd *)
     iPoseProof (oblP_fuel_eq_set _ 0 _ (95 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     lwp_proj. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !> !>".
     iPoseProof (oblP_fuel_eq_set _ 0 _ (94 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     lwp_let. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !> !>".
     iPoseProof (oblP_fuel_eq_set _ 0 _ (93 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     lwp_lam. simpl.
-    iFrame "Tx TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> Tx TG _ !> _ !>".
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
     (* FAA *)
     iPoseProof (oblP_fuel_eq_set _ 0 _ (92 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[Fs F]".
     lwp_bind (FAA _ _).
-    (** FIXME: Make IntoAcc instances for temporal acc rules? *)
-    (* iInv "INV" as "H". *)
-    iMod (gl_always_acc with "Gdka INV") as "[H ACC]". 1: set_solver.
+    (* Atomic step of FAA, *)
+    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
+    (* and we need a mupd after the step. *)
+    iApply lwp_sfmupd.
     (** TODO: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-    iApply (lifting.lwp_lc_later with "LC1"). iNext.
-    iDestruct "H" as "(%&%&%& PtrNext& PtrCurr& GMAt& %Boundc& %Domt& #HMt& %κp& #Gkp& #GMEtkp& #GEkp& Gckp& Wlkp)".
-    iApply lwp_sfgupd.
-    iApply (lwp_faa _ ∅ 0 with "[$Tx $TG $F $PtrNext]").
-    1: done.
-    iIntros "((_& Tx& TG& _)& PtrNext)".
-    (* Alloc a new ghost lock for eventually unlock *)
-    iMod (gl_until_alloc _ _ _ _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi ((50 ⊕ (50 × ▽)) ⊕ ▽)%M with "TG")
-      as "(%κu& %LUku& TG& Gcku& #Glku& #Gku& GF& #Wlku& ALLOC)".
-    iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ gl_current κu 0 (1 / 2) ∗ R)%I with "[//]") as "#GUku".
+    iApply (lwp_lc_later with "LC1"). iNext.
+    iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
+    iApply (lwp_faa _ ∅ 0 with "[$TG $F $PtrNext]"). 1: done.
+    iIntros "((_& TG& _)& PtrNext)".
+    (* Alloc a new ghost lock for eventual unlock *)
+    iMod (tf_until_alloc _ _ _ _ false (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi ((50 ⊕ (50 × ▽)) ⊕ ▽)%M with "TG")
+      as "(%κu& %LUku& TG& #Glku& #Gku& GF& #Wlku& ALLOC)".
+    iMod ("ALLOC" $! _ N_eventually ⌜True⌝%F (curr ↦{#1 / 2} #(n + 1) ∗ R)%F with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "GF") as "[GF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ μ with "QGF") as "QGF".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
     (* Update tickets map to relate κu with my ticket. *)
     iMod (ghost_map_insert_persist (n + 1)%Z κu with "GMAt") as "[GMAt #GMEtku]".
     { apply not_elem_of_dom. intros IN. apply Domt in IN. lia. }
+    iMod (ghost_map_insert (n + 1)%Z false with "GMAa") as "[GMAa [GMEaku GMEaku1]]".
+    { apply not_elem_of_dom. rewrite -EqDom. intros IN. apply Domt in IN. lia. }
+    (* Close inv. *)
+    iModIntro. iMod ("ACCinv" with "[$PtrNext $PtrCurr $GMAt $GMAa HMt HMa Hc GUku1 GMEaku1]") as "_".
+    { iNext. iSplitR.
+      { iPureIntro. rewrite !dom_insert_L EqDom. done. }
+      iSplitR.
+      { iPureIntro. lia. }
+      iSplitR.
+      { iPureIntro. intros. rewrite dom_insert_L. split; intros.
+        - apply elem_of_union in H. destruct H.
+          + apply elem_of_singleton in H. subst. lia.
+          + apply Domt in H. lia.
+        - apply elem_of_union. destruct (decide (t = (n + 1)%Z)).
+          + subst. left. apply elem_of_singleton. lia.
+          + right. apply Domt. lia. }
+      iSplitL "HMt GUku1".
+      { iApply big_sepM_insert.
+        { apply not_elem_of_dom. intros IN. apply Domt in IN. lia. }
+        iSplitR "HMt".
+        - iFrame "Gku GMEtku Wlku". iRight. iFrame. iPureIntro. lia.
+        - iApply (big_sepM_impl with "HMt"). iIntros "!> %%% H". iDestruct "H" as "($& [H | H])".
+          + by iLeft.
+          + iRight. iDestruct "H" as "(%& $)". iPureIntro. lia. }
+      iDestruct "Hc" as "[Hc | Hc]".
+      - iDestruct "Hc" as "(%& PtrCurr1& HR)". subst. iSplitL "HMa".
+        + iApply big_sepM_insert.
+          { apply not_elem_of_dom. rewrite -EqDom. intros IN. apply Domt in IN. lia. }
+          iSplitR "HMa".
+          { iRight. iLeft. done. }
+          iApply (big_sepM_impl with "HMa"). iIntros "!> %%% H". iDestruct "H" as "[$ | [$ | H]]".
+          iRight. iRight. iDestruct "H" as "[% $]". iPureIntro. lia.
+        + iRight. iSplitR. 1: iPureIntro; lia. iLeft. iFrame.
+      - iDestruct "Hc" as "(%& Hc)". iSplitL "HMa GMEaku1".
+        + iApply big_sepM_insert.
+          { apply not_elem_of_dom. rewrite -EqDom. intros IN. apply Domt in IN. lia. }
+          iSplitR "HMa".
+          { iRight. iRight. iFrame. iPureIntro. lia. }
+          iApply (big_sepM_impl with "HMa"). iIntros "!> %%% H". iDestruct "H" as "[$ | [$ | H]]".
+          iRight. iRight. iDestruct "H" as "[% $]". iPureIntro. lia.
+        + iRight. iFrame. iPureIntro. lia. }
+    iIntros "!> !>".
+    
+
+    TODO
+
     (* Two cases: c < n (need to loop) or c = n (acquire right away). *)
     assert (CASE : (c < n)%Z ∨ (c = n)) by lia. destruct CASE as [LTc | <-].
     - assert (LTn : (0 < n)%Z) by lia.
