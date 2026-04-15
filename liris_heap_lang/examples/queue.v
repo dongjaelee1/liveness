@@ -69,6 +69,7 @@ Fixpoint queue_contents `{heapGS Σ} (lh lt : loc) (vs : list val) (φ : val →
 
 TODO
 
+
 (**
   - lock invariant holds queue_contents
   - the problem: when a client enqueues a task,
@@ -82,6 +83,8 @@ TODO
          + need to ensure that to dequeue a task, worker must also increase its view.
          + when the queue is empty, all task # until know should have been dequeued.
        - we need "always (task with # is done ∨ eventually (task with # starts ∧ eventually P))"
+
+worker proto: always (∃ k, eventually k (queue is empty ∨ pop and run a task))
 
  *) 
 
