@@ -5,6 +5,7 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
+From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat mono_list.
 From transfinite.base_logic.lib Require Import ghost_map.
 
 From liris.heap_lang.examples Require Import ticket_lock.
@@ -51,6 +52,10 @@ Definition dequeue : val :=
         SOME (Fst "node")
     end.
 
+Definition put_task : val :=
+  λ: "q" "f" "a",
+    enqueue "q" ("f", "a").
+
 Definition run_task : val :=
   λ: "q",
     match: dequeue "q" with
@@ -61,14 +66,23 @@ Definition run_task : val :=
         "f" "a"
     end.
 
+(** A queue's spec with a liveness guarantee:
+    any enqueued element is eventually dequeued.
+ *)
 Fixpoint queue_contents `{heapGS Σ} (lh lt : loc) (vs : list val) (φ : val → iProp Σ) : iProp Σ :=
   match vs with
   | [] => ⌜lh = lt⌝
   | v :: vs => ∃ l : loc, lh ↦ SOMEV (v, #l) ∗ φ v ∗ queue_contents l lt vs φ
-  end%I.
+end%I.
+
+Definition local_version : Set := (positive * nat).
+
+Variant queue_op : Set :=
+  | op_enq (v : val)
+  | op_deq (v : option val) (t : local_version)
+.
 
 TODO
-
 
 (**
   - lock invariant holds queue_contents

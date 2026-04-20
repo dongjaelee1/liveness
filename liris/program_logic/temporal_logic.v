@@ -560,10 +560,6 @@ Section proof.
 
 End proof.
 
-
-
-
-
 (* (** Random tests to check universe consistency. *) *)
 
 (* From transfinite.stepindex Require Import ordinals. *)

@@ -92,6 +92,7 @@ liris/program_logic/ectx_lifting.v
 liris/program_logic/ectxi_language.v
 liris/program_logic/atomic.v
 liris/program_logic/temporal_logic.v
+liris/program_logic/temporal_logic_lib.v
 liris/program_logic/temporal_property.v
 liris/program_logic/adequacy.v
 

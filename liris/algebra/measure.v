@@ -20,7 +20,6 @@ Section measure.
   | ms_mult (s1 s2 : measurable_syntax)
   | ms_expn (s1 s2 : measurable_syntax)
   | ms_extend.
-  (* | ms_extend (s : measurable_syntax). *)
 
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
   Remark measure_rec_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
