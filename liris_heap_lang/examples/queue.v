@@ -82,6 +82,55 @@ Variant queue_op : Set :=
   | op_deq (v : option val) (t : local_version)
 .
 
+Canonical Structure queue_opO : ofe := leibnizO queue_op.
+
+(** The CMRA we need. *)
+Class lqueueGpreS (Σ : gFunctors) : Set :=
+  LqueueGpreS {
+      lqueueGpreS_log : inG Σ (mono_listUR (queue_opO));
+    }.
+
+Class lqueueG Σ :=
+  LqueueG {
+      #[local] lqueue_inG :: lqueueGpreS Σ;
+      #[local] lqueue_workerG :: ghost_mapG Σ positive (oid);
+    }.
+
+Definition ticket_lockΣ : gFunctors :=
+  #[(ghost_mapΣ Z (oid)); (ghost_mapΣ Z (bool))].
+
+Global Instance subG_ticket_lockΣ {Σ} : subG ticket_lockΣ Σ → ticket_lockG Σ.
+Proof. solve_inG. Qed.
+
+  Class lqueueGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+    LqueueGpreS {
+        lqueueGpreS_layer : inG Σ (gmap_viewR oid (agreeR (layerO)));
+        lqueueGpreS_state : inG Σ (reservation_mapUR (mono_natUR));
+        lqueueGpreS_fuel : inG Σ (reservation_mapUR bankUR);
+        (* Keep track of the current owner of each obl, if an owner exists *)
+        lqueueGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO obl_owner)));
+      }.
+
+  Class lqueueGS `{SI : indexT} (Σ : gFunctors) : Set :=
+    LqueueG {
+        lqueue_inG : lqueueGpreS Σ;
+        layer_name : gname;
+        state_name : gname;
+        fuel_name : gname;
+        owner_name : gname;
+      }.
+
+  Definition lqueueΣ `{SI : indexT} : gFunctors :=
+    #[GFunctor (gmap_viewR oid (agreeR (layerO)));
+      GFunctor (reservation_mapUR (mono_natUR));
+      GFunctor (reservation_mapUR bankUR);
+      GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO obl_owner)))
+      ].
+
+  Global Instance subG_lqueueΣ `{SI : indexT} {Σ} : subG (lqueueΣ) Σ → (lqueueGpreS Σ).
+  Proof. solve_inG. Qed.
+
+
 TODO
 
 (**
