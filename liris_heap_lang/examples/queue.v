@@ -5,81 +5,74 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
-From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat mono_list.
+From iris.algebra Require Import reservation_map dfrac_agree mono_list.
 From transfinite.base_logic.lib Require Import ghost_map.
 
 From liris.heap_lang.examples Require Import ticket_lock.
 
-(** References:
+Section code.
+  (** References:
     Iron (https://gitlab.mpi-sws.org/iris/iron/-/blob/master/theories/heap_lang/lib/queue.v)
     Transfinite Iris (https://gitlab.mpi-sws.org/iris/transfinite/-/blob/master/theories/examples/termination/eventloop.v)
- *)
+   *)
 
-(** Use a ticket lock. *)
-Definition new_queue : val :=
-  λ: <>,
-    let: "node" := ref NONE in
-    let: "lock" := TicketLock.init #() in
-    (ref "node", ref "node", "lock").
+  (** Use a ticket lock. *)
+  Definition new_queue : val :=
+    λ: <>,
+      let: "node" := ref NONE in
+      let: "lock" := TicketLock.init #() in
+      (ref "node", ref "node", "lock").
 
-Definition enqueue : val :=
-  λ: "q" "x",
-    let: "lock" := Snd "q" in
-    TicketLock.acquire "lock";;
-    let: "tptr" := Snd (Fst "q") in
-    let: "t" := !"tptr"  in
-    let: "newt" := ref NONE in
-    "t" <- SOME ("x", "newt");;
-    "tptr" <- "newt";;
-    TicketLock.release "lock".
+  Definition enqueue : val :=
+    λ: "q" "x",
+      let: "lock" := Snd "q" in
+      TicketLock.acquire "lock";;
+      let: "tptr" := Snd (Fst "q") in
+      let: "t" := !"tptr"  in
+      let: "newt" := ref NONE in
+      "t" <- SOME ("x", "newt");;
+      "tptr" <- "newt";;
+      TicketLock.release "lock".
 
-Definition dequeue : val :=
-  λ: "q",
-    let: "lock" := Snd "q" in
-    TicketLock.acquire "lock";;
-    let: "hptr" := Fst (Fst "q") in
-    let: "h" := !"hptr" in
-    match: !"h" with
-      NONE =>
-        (* Empty queue. *)
-        TicketLock.release "lock";;
-        NONE
-    | SOME "node" =>
-        let: "newh" := Snd "node" in
-        "hptr" <- "newh";;
-        Free "h";;
-        TicketLock.release "lock";;
-        SOME (Fst "node")
-    end.
+  Definition dequeue : val :=
+    λ: "q",
+      let: "lock" := Snd "q" in
+      TicketLock.acquire "lock";;
+      let: "hptr" := Fst (Fst "q") in
+      let: "h" := !"hptr" in
+      match: !"h" with
+        NONE =>
+          (* Empty queue. *)
+          TicketLock.release "lock";;
+          NONE
+      | SOME "node" =>
+          let: "newh" := Snd "node" in
+          "hptr" <- "newh";;
+          Free "h";;
+          TicketLock.release "lock";;
+          SOME (Fst "node")
+      end.
 
-Definition put_task : val :=
-  λ: "q" "f" "a",
-    enqueue "q" ("f", "a").
+  Definition put_task : val :=
+    λ: "q" "f" "a",
+      enqueue "q" ("f", "a").
 
-Definition run_task : val :=
-  λ: "q",
-    match: dequeue "q" with
-      NONE => #()
-    | SOME "fa" =>
-        let: "f" := Fst "fa" in
-        let: "a" := Snd "fa" in
-        "f" "a"
-    end.
+  Definition run_task : val :=
+    λ: "q",
+      match: dequeue "q" with
+        NONE => #()
+      | SOME "fa" =>
+          let: "f" := Fst "fa" in
+          let: "a" := Snd "fa" in
+          "f" "a"
+      end.
 
-(** A queue's spec with a liveness guarantee:
-    any enqueued element is eventually dequeued.
- *)
-Fixpoint queue_contents `{heapGS Σ} (lh lt : loc) (vs : list val) (φ : val → iProp Σ) : iProp Σ :=
-  match vs with
-  | [] => ⌜lh = lt⌝
-  | v :: vs => ∃ l : loc, lh ↦ SOMEV (v, #l) ∗ φ v ∗ queue_contents l lt vs φ
-end%I.
+End code.
 
-Definition local_version : Set := (positive * nat).
-
+(** A queue's spec with a liveness guarantee: any enqueued element is eventually dequeued. *)
 Variant queue_op : Set :=
   | op_enq (v : val)
-  | op_deq (v : option val) (t : local_version)
+  | op_deq (v : option val) (w : positive) (k : oid)
 .
 
 Canonical Structure queue_opO : ofe := leibnizO queue_op.
@@ -87,49 +80,79 @@ Canonical Structure queue_opO : ofe := leibnizO queue_op.
 (** The CMRA we need. *)
 Class lqueueGpreS (Σ : gFunctors) : Set :=
   LqueueGpreS {
-      lqueueGpreS_log : inG Σ (mono_listUR (queue_opO));
+      lqueueGpreS_queue : inG Σ (dfrac_agreeR (list val));
+      lqueueGpreS_log : inG Σ (mono_listUR (queue_op));
+      lqueueGpreS_workers : inG Σ (reservation_mapUR (mono_listUR (oid)));
     }.
 
 Class lqueueG Σ :=
   LqueueG {
       #[local] lqueue_inG :: lqueueGpreS Σ;
-      #[local] lqueue_workerG :: ghost_mapG Σ positive (oid);
+      lqueue_queue_name : gname;
+      lqueue_log_name : gname;
+      lqueue_workers_name : gname;
     }.
 
-Definition ticket_lockΣ : gFunctors :=
-  #[(ghost_mapΣ Z (oid)); (ghost_mapΣ Z (bool))].
+Definition lqueueΣ : gFunctors :=
+  #[GFunctor (dfrac_agreeR (list val)); GFunctor (mono_listUR (queue_op)); (GFunctor (reservation_mapUR (mono_listUR (oid))))].
 
-Global Instance subG_ticket_lockΣ {Σ} : subG ticket_lockΣ Σ → ticket_lockG Σ.
+Global Instance subG_lqueueΣ {Σ} : subG lqueueΣ Σ → lqueueGpreS Σ.
 Proof. solve_inG. Qed.
 
-  Class lqueueGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
-    LqueueGpreS {
-        lqueueGpreS_layer : inG Σ (gmap_viewR oid (agreeR (layerO)));
-        lqueueGpreS_state : inG Σ (reservation_mapUR (mono_natUR));
-        lqueueGpreS_fuel : inG Σ (reservation_mapUR bankUR);
-        (* Keep track of the current owner of each obl, if an owner exists *)
-        lqueueGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO obl_owner)));
-      }.
+(** User interface *)
+(* Make the instances local to this file. We cannot use #[local] in the code *)
+(* above, as that would make the instances local to the module. *)
+Local Existing Instances lqueue_inG lqueueGpreS_queue lqueueGpreS_log lqueueGpreS_workers.
 
-  Class lqueueGS `{SI : indexT} (Σ : gFunctors) : Set :=
-    LqueueG {
-        lqueue_inG : lqueueGpreS Σ;
-        layer_name : gname;
-        state_name : gname;
-        fuel_name : gname;
-        owner_name : gname;
-      }.
+Section defs.
+  Context `{!heapGS Σ, !lqueueG Σ, !ticket_lockG Σ}.
 
-  Definition lqueueΣ `{SI : indexT} : gFunctors :=
-    #[GFunctor (gmap_viewR oid (agreeR (layerO)));
-      GFunctor (reservation_mapUR (mono_natUR));
-      GFunctor (reservation_mapUR bankUR);
-      GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO obl_owner)))
-      ].
+  Definition lqG_queue (l : list val) q : iProp Σ :=
+    own lqueue_queue_name (to_dfrac_agree (DfracOwn q) l).
 
-  Global Instance subG_lqueueΣ `{SI : indexT} {Σ} : subG (lqueueΣ) Σ → (lqueueGpreS Σ).
-  Proof. solve_inG. Qed.
+  Definition lqG_log (l : list queue_op) : iProp Σ :=
+    own lqueue_log_name (●ML l).
 
+  Definition lqG_log_p (l : list queue_op) : iProp Σ :=
+    own lqueue_log_name (◯ML l).
+
+  Definition lqG_worker (w : positive) (l : list (oid)) (q : Qp) : iProp Σ :=
+    own lqueue_workers_name (reservation_map_data w (●ML{#q} l)).
+
+  Definition lqG_worker_p (w : positive) (l : list (oid)) : iProp Σ :=
+    own lqueue_workers_name (reservation_map_data w (◯ML l)).
+
+  Local Definition lqG_worker_token (E : coPset) : iProp Σ :=
+    own lqueue_workers_name (reservation_map_token (A:=(mono_listUR (oid))) E).
+
+  Fixpoint queue_contents (lh lt : loc) (vs : list val) (φ : val → iProp Σ) : iProp Σ :=
+    match vs with
+    | [] => ⌜lh = lt⌝
+    | v :: vs => ∃ l : loc, lh ↦ SOMEV (v, #l) ∗ φ v ∗ queue_contents l lt vs φ
+  end%I.
+
+  Let N := nroot.@"live_queue".
+  Let Nwe := N.@"worker_eventually".
+  Let Ni := N.@"invariant".
+
+  Definition lq_inv (ℓ : layer) : iProp Σ :=
+    (∃ (vs : list val) (log : list queue_op) (ws : gmap positive (list oid)),
+        lqG_queue vs (1/2)%Qp ∗
+        lqG_log log ∗
+        lqG_worker_token (⊤ ∖ gset_to_coPset (dom ws)) ∗
+        (⌜ ∃ w, is_Some (ws !! w) ⌝) ∗
+        ([∗ map] w ↦ ks ∈ ws,
+           lqG_worker w ks (1/2)%Qp ∗
+           ∃ ks_p k, (⌜ks = ks_p ++ [k]⌝) ∗
+                     ([∗ list] k ∈ ks_p, oblP_fulfilled k) ∗
+                     (oblP_id k ∗ witP_layer k ℓ ∗ ⟦tf_eventually Nwe k false (1/2) (⌜ True ⌝)⟧ₗ))
+    )%I.
+
+  Definition lq (ℓ : layer) (φ : val → iProp Σ) γt γa lnc ℓ : iProp Σ :=
+    inv Ni (lq_inv ℓ) ∗
+    is_fair_lock γt γa lnc ℓ (⟨∃ lh lt vs, queue_contents lh lt vs φ ∗ lqG_queue vs (1/2)%Qp⟩).
+
+End defs.
 
 TODO
 
