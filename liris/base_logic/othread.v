@@ -3,6 +3,8 @@ From iris.bi.lib Require Import cmra fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From liris.base_logic Require Export osat.
+From liris.algebra Require Export wfocm.
+From liris.algebra Require Import bcred.
 
 (** The ghost state for thread obls *)
 Module othreadGS.
@@ -14,6 +16,9 @@ Module othreadGS.
         othreadGpreS_obls : inG Σ (gmap_viewR positive (gset_disjUR oid));
         othreadGpreS_exec : inG Σ (reservation_mapUR mono_natUR);
         othreadGpreS_elem : inG Σ (gmap_viewR positive unitUR);
+        othreadGpreS_curr : inG Σ (gmap_viewR positive (agreeR positive));
+        othreadGpreS_fuel : inG Σ (reservation_mapUR (bcredUR));
+        othreadGpreS_frag : inG Σ (reservation_mapUR (gmap_viewR positive (agreeR (prod Qp oids))));
       }.
 
   Class othreadGS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -23,13 +28,19 @@ Module othreadGS.
         obls_name : gname;
         exec_name : gname;
         elem_name : gname;
+        curr_name : gname;
+        fuel_name : gname;
+        frag_name : gname;
       }.
 
   Definition othreadΣ `{SI : indexT} : gFunctors :=
     #[GFunctor (reservation_mapUR (gmap_viewR oid (unitUR)));
       GFunctor (gmap_viewR positive (gset_disjUR oid));
       GFunctor (reservation_mapUR mono_natUR);
-      GFunctor (gmap_viewR positive unitUR)
+      GFunctor (gmap_viewR positive unitUR);
+      GFunctor (gmap_viewR positive (agreeR positive));
+      GFunctor (reservation_mapUR bcredUR);
+      GFunctor (reservation_mapUR (gmap_viewR positive (agreeR (prod Qp oids))))
       ].
 
   Global Instance subG_othreadΣ `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (othreadGpreS Σ).
@@ -42,7 +53,8 @@ Import othreadGS.
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances othread_inG
-  othreadGpreS_owns othreadGpreS_obls othreadGpreS_exec othreadGpreS_elem.
+  othreadGpreS_owns othreadGpreS_obls othreadGpreS_exec othreadGpreS_elem
+  othreadGpreS_curr othreadGpreS_fuel othreadGpreS_frag.
 
 (* Owns: thread currently has this obl *)
 Definition othreadG_owns `{SI : indexT} `{!othreadGS Σ} (i : positive) (k : oid) (q : Qp) : iProp Σ :=
@@ -58,7 +70,7 @@ Local Definition othreadG_owns_auth_obls `{SI : indexT} `{!othreadGS Σ}
   (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (TObls)))).
 
 (* Thread: live obls that this thread knows, also fix to empty when thread terminates *)
-Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : gset oid) (q : Qp) : iProp Σ :=
+Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : oids) (q : Qp) : iProp Σ :=
   own obls_name (gmap_view_frag i (DfracOwn q) (GSet G)).
 Global Typeclasses Opaque othreadG_obls.
 Global Instance: Params (@othreadG_obls) 3 := {}.
@@ -96,6 +108,51 @@ Local Definition othreadG_elem_auth_id `{SI : indexT} `{!othreadGS Σ}
   (Tgls : gmap positive (gmap oid unit)) : iProp Σ :=
   (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> Tgls))).
 
+(* Curr: tracks current id for the thread's fuel *)
+Definition othreadG_curr `{SI : indexT} `{!othreadGS Σ} (i : positive) (c : positive) (q : Qp) : iProp Σ :=
+  own curr_name (gmap_view_frag i (DfracOwn q) (to_agree c)).
+Global Typeclasses Opaque othreadG_curr.
+Global Instance: Params (@othreadG_curr) 3 := {}.
+
+Local Definition othreadG_curr_auth_id `{SI : indexT} `{!othreadGS Σ}
+  (Tcs : gmap positive positive) : iProp Σ :=
+  (own curr_name (gmap_view_auth (DfracOwn 1) (to_agree <$> Tcs))).
+
+(* Fuel: manage fuels for the thread's obligations *)
+Definition othreadG_bound `{SI : indexT} `{!othreadGS Σ}
+  (c : positive) (ℵ : obl_fuel) : iProp Σ :=
+  own fuel_name (reservation_map_data (A:=bcredUR) c (credit_bound ℵ)).
+Global Typeclasses Opaque othreadG_bound.
+Global Instance: Params (@othreadG_bound) 3 := {}.
+
+Definition othreadG_fuel `{SI : indexT} `{!othreadGS Σ}
+  (c : positive) (a : obl_fuel) : iProp Σ :=
+  own fuel_name (reservation_map_data (A:=bcredUR) c (credit a)).
+Global Typeclasses Opaque othreadG_fuel.
+Global Instance: Params (@othreadG_fuel) 3 := {}.
+
+Local Definition othreadG_fuel_token_id `{SI : indexT} `{!othreadGS Σ}
+  (E : coPset) : iProp Σ :=
+  own fuel_name (reservation_map_token (A:=bcredUR) E).
+
+(* Frag: tracks fragments of the thread's obligations *)
+Definition othreadG_frag `{SI : indexT} `{!othreadGS Σ}
+  (i : positive) (x : positive) (q : Qp) (G : oids) : iProp Σ :=
+  own frag_name (reservation_map_data (A:=(gmap_viewR positive (agreeR (prod Qp oids))))
+                   i (gmap_view_frag x (DfracOwn 1) (to_agree (q, G)))).
+Global Typeclasses Opaque othreadG_frag.
+Global Instance: Params (@othreadG_frag) 3 := {}.
+
+Definition othreadG_frag_auth `{SI : indexT} `{!othreadGS Σ}
+  (i : positive) (FRs : gmap positive (prod Qp oids)) : iProp Σ :=
+  own frag_name (reservation_map_data (A:=(gmap_viewR positive (agreeR (prod Qp oids))))
+                   i (gmap_view_auth (DfracOwn 1) (to_agree <$> FRs))).
+Global Typeclasses Opaque othreadG_frag_auth.
+Global Instance: Params (@othreadG_frag_auth) 3 := {}.
+
+Local Definition othreadG_frag_token_id `{SI : indexT} `{!othreadGS Σ} TP : iProp Σ :=
+  own frag_name (reservation_map_token (A:=(gmap_viewR positive (agreeR (prod Qp oids)))) (⊤ ∖ gset_to_coPset TP)).
+
 (* Global invariant for the thread obls state. *)
 Definition othread `{SI : indexT} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
@@ -117,12 +174,29 @@ Definition othread `{SI : indexT} {Σ}
 (* Global invariant that relates obl_states to the thread pool. *)
 Definition oassigned `{SI : indexT} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
-  (Gls : gset oid) : iProp Σ :=
+  (Gls : oids) : iProp Σ :=
   locked
     ([∗ set] k ∈ Gls,
        oblG_elem k ∗
        ((∃ i, oblG_owner k i (1/2/2/2/2)%Qp ∗ othreadG_owns i k (1/2/2)%Qp ∗ othreadG_elem i) ∨
           (oblG_fulfilled k)))%I.
+
+(* Global invariant that relates obl_states to the thread fuel. *)
+Definition othread_fuel `{SI : indexT} {Σ}
+  `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
+  (TP : gset positive) : iProp Σ :=
+  locked
+    (∃ (Tcs : gmap positive positive) (FD : gset positive),
+        (⌜ dom Tcs = TP ⌝) ∗
+        othreadG_curr_auth_id Tcs ∗
+        othreadG_fuel_token_id (⊤ ∖ (gset_to_coPset FD)) ∗
+        othreadG_frag_token_id TP ∗
+        ([∗ map] i ↦ c ∈ Tcs,
+           ∃ (ℵ : obl_fuel) (FRs : gmap positive (prod Qp oids)),
+             othreadG_bound c ℵ ∗
+             ([∗ map] x ↦ '(q, G) ∈ FRs,
+                othreadG_obls i G q ∗
+                ([∗ set] g ∈ G, ∃ a, ⌜(ℵ <= a)%ord⌝ ∗ oblG_fuel g a))))%I.
 
 Section othread.
   Context `{SI : indexT} `{OSAT : !osatGS.osatGS Σ} `{!othreadGS Σ} `{OMF : !ord_mono_fun_class}.
