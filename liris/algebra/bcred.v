@@ -143,6 +143,15 @@ Section bcred.
     apply bcred_included. exists ([!a0]), ([/0]). rewrite right_id_L. rewrite partition.from_monoid_meet_right; auto.
   Qed.
 
+  Lemma credit_bound_op a1 a2 : ∃ a3, (credit_bound a1 ⋅ credit_bound a2) = credit_bound a3 ∧ (a3 ≤ a1) ∧ (a3 ≤ a2).
+  Proof.
+    destruct (OCM.le_total a1 a2).
+    - exists a1. pose proof (partition.from_monoid_meet_left _ _ H). split_and !; try done.
+      unfold credit_bound. rewrite bcred_op. rewrite H0 left_id_L. auto.
+    - exists a2. pose proof (partition.from_monoid_meet_right _ _ H). split_and !; try done.
+      unfold credit_bound. rewrite bcred_op. rewrite H0 left_id_L. auto.
+  Qed.
+
   Lemma credit_update a0 a1 (LE : a0 ≤ a1) : credit a1 ~~> credit a0.
   Proof.
     intros n mb. rewrite !bcred_opM. rewrite -!cmra_discrete_valid_iff. destruct mb; simpl; intros.
