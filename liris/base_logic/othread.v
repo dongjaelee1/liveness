@@ -2,9 +2,12 @@ From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat.
 From iris.bi.lib Require Import cmra fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From liris.base_logic Require Export osat.
+From transfinite.base_logic.lib Require Import ghost_map.
 From liris.algebra Require Export wfocm.
-From liris.algebra Require Import bcred.
+From liris.algebra Require Import bcred ordinal_ucmra.
+From liris.base_logic Require Export osat.
+
+Definition term := positive.
 
 (** The ghost state for thread obls *)
 Module othreadGS.
@@ -13,12 +16,13 @@ Module othreadGS.
   Class othreadGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     OthreadGpreS {
         othreadGpreS_owns : inG Σ (reservation_mapUR (gmap_viewR oid (unitUR)));
-        othreadGpreS_obls : inG Σ (gmap_viewR positive (gset_disjUR oid));
+        othreadGpreS_obls : inG Σ (gmap_viewR positive (gsetUR oid));
         othreadGpreS_exec : inG Σ (reservation_mapUR mono_natUR);
         othreadGpreS_elem : inG Σ (gmap_viewR positive unitUR);
-        othreadGpreS_curr : inG Σ (gmap_viewR positive (agreeR positive));
+        (* othreadGpreS_term : inG Σ (gmap_viewR positive (agreeR term)); *)
         othreadGpreS_fuel : inG Σ (reservation_mapUR (bcredUR));
-        othreadGpreS_frag : inG Σ (reservation_mapUR (gmap_viewR positive (agreeR (prod Qp oids))));
+        (* othreadGpreS_ceil : inG Σ (gmap_viewR positive (agreeR obl_fuel)); *)
+        othreadGpreS_frag : inG Σ (gmap_viewR positive (gset_disjUR oid));
       }.
 
   Class othreadGS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -28,23 +32,34 @@ Module othreadGS.
         obls_name : gname;
         exec_name : gname;
         elem_name : gname;
-        curr_name : gname;
         fuel_name : gname;
         frag_name : gname;
+        term_inG :: ghost_mapG Σ positive term;
+        term_name : gname;
+        ceil_inG :: ghost_mapG Σ positive obl_fuel;
+        ceil_name : gname;
       }.
 
-  Definition othreadΣ `{SI : indexT} : gFunctors :=
+  Definition othreadΣ_pre `{SI : indexT} : gFunctors :=
     #[GFunctor (reservation_mapUR (gmap_viewR oid (unitUR)));
-      GFunctor (gmap_viewR positive (gset_disjUR oid));
+      GFunctor (gmap_viewR positive (gsetUR oid));
       GFunctor (reservation_mapUR mono_natUR);
       GFunctor (gmap_viewR positive unitUR);
-      GFunctor (gmap_viewR positive (agreeR positive));
+      (* GFunctor (gmap_viewR positive (agreeR term)); *)
       GFunctor (reservation_mapUR bcredUR);
-      GFunctor (reservation_mapUR (gmap_viewR positive (agreeR (prod Qp oids))))
+      (* GFunctor (gmap_viewR positive (agreeR obl_fuel)) *)
+      GFunctor (gmap_viewR positive (gset_disjUR oid))
       ].
 
-  Global Instance subG_othreadΣ `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (othreadGpreS Σ).
-  Proof. solve_inG. Qed.
+  Definition othreadΣ `{SI : indexT} : gFunctors  :=
+    gFunctors.app othreadΣ_pre (gFunctors.app (ghost_mapΣ positive term) (ghost_mapΣ positive obl_fuel)).
+
+  Global Instance subG_othreadΣ_0 `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (othreadGpreS Σ).
+  Proof. intros. apply subG_inv in H. destruct H. clear s0. solve_inG. Qed.
+  Global Instance subG_othreadΣ_1 `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (ghost_mapG Σ positive term).
+  Proof. intros. apply subG_inv in H. destruct H. apply subG_inv in s0. destruct s0. apply subG_ghost_mapΣ. auto. Qed.
+  Global Instance subG_othreadΣ_2 `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (ghost_mapG Σ positive obl_fuel).
+  Proof. intros. apply subG_inv in H. destruct H. apply subG_inv in s0. destruct s0. apply subG_ghost_mapΣ. auto. Qed.
 
 End othreadGS.
 Import othreadGS.
@@ -54,7 +69,8 @@ Import othreadGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances othread_inG
   othreadGpreS_owns othreadGpreS_obls othreadGpreS_exec othreadGpreS_elem
-  othreadGpreS_curr othreadGpreS_fuel othreadGpreS_frag.
+  othreadGpreS_fuel othreadGpreS_frag.
+  (* othreadGpreS_term *) (* othreadGpreS_ceil *)
 
 (* Owns: thread currently has this obl *)
 Definition othreadG_owns `{SI : indexT} `{!othreadGS Σ} (i : positive) (k : oid) (q : Qp) : iProp Σ :=
@@ -69,15 +85,15 @@ Local Definition othreadG_owns_auth_obls `{SI : indexT} `{!othreadGS Σ}
   i (TObls : gmap oid unit) : iProp Σ :=
   (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (TObls)))).
 
-(* Thread: live obls that this thread knows, also fix to empty when thread terminates *)
-Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : oids) (q : Qp) : iProp Σ :=
-  own obls_name (gmap_view_frag i (DfracOwn q) (GSet G)).
+(* Obls: live obls assigned to this thread, also fix to empty when thread terminates *)
+Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : oids) : iProp Σ :=
+  own obls_name (gmap_view_frag i (DfracOwn 1) (G)).
 Global Typeclasses Opaque othreadG_obls.
 Global Instance: Params (@othreadG_obls) 3 := {}.
 
 Local Definition othreadG_obls_auth_id `{SI : indexT} `{!othreadGS Σ}
   (Tgls : gmap positive (gmap oid unit)) : iProp Σ :=
-  (own obls_name (gmap_view_auth (DfracOwn 1) (GSet <$> (dom <$> Tgls)))).
+  (own obls_name (gmap_view_auth (DfracOwn 1) (dom <$> Tgls))).
 
 (* Exec: tracks whether thread is executing or terminated *)
 Definition othreadG_exec `{SI : indexT} `{!othreadGS Σ} (i : positive) (q : Qp) : iProp Σ :=
@@ -85,15 +101,15 @@ Definition othreadG_exec `{SI : indexT} `{!othreadGS Σ} (i : positive) (q : Qp)
 Global Typeclasses Opaque othreadG_exec.
 Global Instance: Params (@othreadG_exec) 3 := {}.
 
-Definition othreadG_term_auth `{SI : indexT} `{!othreadGS Σ} (i : positive) : iProp Σ :=
+Definition othreadG_done_auth `{SI : indexT} `{!othreadGS Σ} (i : positive) : iProp Σ :=
   own exec_name (reservation_map_data i (●MN 1)).
-Global Typeclasses Opaque othreadG_term_auth.
-Global Instance: Params (@othreadG_term_auth) 3 := {}.
+Global Typeclasses Opaque othreadG_done_auth.
+Global Instance: Params (@othreadG_done_auth) 3 := {}.
 
-Definition othreadG_term `{SI : indexT} `{!othreadGS Σ} (i : positive) : iProp Σ :=
+Definition othreadG_done `{SI : indexT} `{!othreadGS Σ} (i : positive) : iProp Σ :=
   own exec_name (reservation_map_data i (◯MN 1)).
-Global Typeclasses Opaque othreadG_term.
-Global Instance: Params (@othreadG_term) 3 := {}.
+Global Typeclasses Opaque othreadG_done.
+Global Instance: Params (@othreadG_done) 3 := {}.
 
 Local Definition othreadG_exec_token_id `{SI : indexT} `{!othreadGS Σ} TP : iProp Σ :=
   (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))).
@@ -108,26 +124,26 @@ Local Definition othreadG_elem_auth_id `{SI : indexT} `{!othreadGS Σ}
   (Tgls : gmap positive (gmap oid unit)) : iProp Σ :=
   (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> Tgls))).
 
-(* Curr: tracks current id for the thread's fuel *)
-Definition othreadG_curr `{SI : indexT} `{!othreadGS Σ} (i : positive) (c : positive) (q : Qp) : iProp Σ :=
-  own curr_name (gmap_view_frag i (DfracOwn q) (to_agree c)).
-Global Typeclasses Opaque othreadG_curr.
-Global Instance: Params (@othreadG_curr) 3 := {}.
+(* Term: tracks current term of the thread *)
+Definition othreadG_term `{SI : indexT} `{!othreadGS Σ} (i : positive) (e : term) (q : Qp) : iProp Σ :=
+  i ↪[ term_name ]{#q} e.
+Global Typeclasses Opaque othreadG_term.
+Global Instance: Params (@othreadG_term) 3 := {}.
 
-Local Definition othreadG_curr_auth_id `{SI : indexT} `{!othreadGS Σ}
-  (Tcs : gmap positive positive) : iProp Σ :=
-  (own curr_name (gmap_view_auth (DfracOwn 1) (to_agree <$> Tcs))).
+Local Definition othreadG_term_auth_id `{SI : indexT} `{!othreadGS Σ}
+  (Tes : gmap positive term) : iProp Σ :=
+  ghost_map_auth term_name 1 Tes.
 
 (* Fuel: manage fuels for the thread's obligations *)
 Definition othreadG_bound `{SI : indexT} `{!othreadGS Σ}
-  (c : positive) (ℵ : obl_fuel) : iProp Σ :=
-  own fuel_name (reservation_map_data (A:=bcredUR) c (credit_bound ℵ)).
+  (e : term) (β : obl_fuel) : iProp Σ :=
+  own fuel_name (reservation_map_data (A:=bcredUR) e (credit_bound β)).
 Global Typeclasses Opaque othreadG_bound.
 Global Instance: Params (@othreadG_bound) 3 := {}.
 
 Definition othreadG_fuel `{SI : indexT} `{!othreadGS Σ}
-  (c : positive) (a : obl_fuel) : iProp Σ :=
-  own fuel_name (reservation_map_data (A:=bcredUR) c (credit a)).
+  (e : term) (a : obl_fuel) : iProp Σ :=
+  own fuel_name (reservation_map_data (A:=bcredUR) e (credit a)).
 Global Typeclasses Opaque othreadG_fuel.
 Global Instance: Params (@othreadG_fuel) 3 := {}.
 
@@ -135,27 +151,28 @@ Local Definition othreadG_fuel_token_id `{SI : indexT} `{!othreadGS Σ}
   (E : coPset) : iProp Σ :=
   own fuel_name (reservation_map_token (A:=bcredUR) E).
 
+(* Ceil: ceil (upperbound) of the thread's fuel *)
+Definition othreadG_ceil `{SI : indexT} `{!othreadGS Σ} (i : positive) (ℵ : obl_fuel) (q : Qp) : iProp Σ :=
+  i ↪[ ceil_name ]{#q} ℵ.
+Global Typeclasses Opaque othreadG_ceil.
+Global Instance: Params (@othreadG_ceil) 3 := {}.
+
+Local Definition othreadG_ceil_auth_id `{SI : indexT} `{!othreadGS Σ}
+  (Tcs : gmap positive obl_fuel) : iProp Σ :=
+  ghost_map_auth ceil_name 1 Tcs.
+
 (* Frag: tracks fragments of the thread's obligations *)
-Definition othreadG_frag `{SI : indexT} `{!othreadGS Σ}
-  (i : positive) (x : positive) (q : Qp) (G : oids) : iProp Σ :=
-  own frag_name (reservation_map_data (A:=(gmap_viewR positive (agreeR (prod Qp oids))))
-                   i (gmap_view_frag x (DfracOwn 1) (to_agree (q, G)))).
+Definition othreadG_frag `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : oids) (q : Qp) : iProp Σ :=
+  own frag_name (gmap_view_frag i (DfracOwn q) (GSet G)).
 Global Typeclasses Opaque othreadG_frag.
 Global Instance: Params (@othreadG_frag) 3 := {}.
 
-Definition othreadG_frag_auth `{SI : indexT} `{!othreadGS Σ}
-  (i : positive) (FRs : gmap positive (prod Qp oids)) : iProp Σ :=
-  own frag_name (reservation_map_data (A:=(gmap_viewR positive (agreeR (prod Qp oids))))
-                   i (gmap_view_auth (DfracOwn 1) (to_agree <$> FRs))).
-Global Typeclasses Opaque othreadG_frag_auth.
-Global Instance: Params (@othreadG_frag_auth) 3 := {}.
+Local Definition othreadG_frag_auth_id `{SI : indexT} `{!othreadGS Σ}
+  (Tos : gmap positive (oids)) : iProp Σ :=
+  (own frag_name (gmap_view_auth (DfracOwn 1) (GSet <$> Tos))).
 
-Local Definition othreadG_frag_token_id `{SI : indexT} `{!othreadGS Σ} TP : iProp Σ :=
-  own frag_name (reservation_map_token (A:=(gmap_viewR positive (agreeR (prod Qp oids)))) (⊤ ∖ gset_to_coPset TP)).
-
-(* Global invariant for the thread obls state. *)
-Definition othread `{SI : indexT} {Σ}
-  `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
+(* Global invariant for threads' obligations. *)
+Definition othread `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (TP : gset positive) : iProp Σ :=
   locked
     (∃ (Tgls : gmap positive (gmap oid unit)),
@@ -165,15 +182,14 @@ Definition othread `{SI : indexT} {Σ}
         othreadG_exec_token_id TP ∗
         othreadG_elem_auth_id Tgls ∗
         ([∗ map] i ↦ TObls ∈ Tgls,
-           (othreadG_exec i (1/2/2)%Qp ∨ (othreadG_term_auth i ∗ othreadG_obls i ∅ 1)) ∗
+           (othreadG_exec i (1/2/2)%Qp ∨ (othreadG_done_auth i ∗ othreadG_obls i ∅)) ∗
            othreadG_owns_auth_obls i TObls ∗
            ([∗ map] k ↦ _ ∈ TObls, oblG_owner k i (1/2/2/2/2)%Qp)
         )
     )%I.
 
-(* Global invariant that relates obl_states to the thread pool. *)
-Definition oassigned `{SI : indexT} {Σ}
-  `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
+(* Global invariant that relates obligations to the thread pool. *)
+Definition oassigned `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (Gls : oids) : iProp Σ :=
   locked
     ([∗ set] k ∈ Gls,
@@ -181,22 +197,23 @@ Definition oassigned `{SI : indexT} {Σ}
        ((∃ i, oblG_owner k i (1/2/2/2/2)%Qp ∗ othreadG_owns i k (1/2/2)%Qp ∗ othreadG_elem i) ∨
           (oblG_fulfilled k)))%I.
 
-(* Global invariant that relates obl_states to the thread fuel. *)
-Definition othread_fuel `{SI : indexT} {Σ}
-  `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
+(* Global invariant for threads' obligation fragments, terms, and fuels. *)
+Definition ofrag `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (TP : gset positive) : iProp Σ :=
   locked
-    (∃ (Tcs : gmap positive positive) (FD : gset positive),
-        (⌜ dom Tcs = TP ⌝) ∗
-        othreadG_curr_auth_id Tcs ∗
+    (∃ (Tes : gmap positive term) (Tcs : gmap positive obl_fuel) (Tos : gmap positive oids) (FD : gset positive),
+        (⌜ dom Tes = TP ∧ dom Tcs = TP ∧ dom Tos = TP ⌝) ∗
+        othreadG_term_auth_id Tes ∗
+        othreadG_ceil_auth_id Tcs ∗
+        othreadG_frag_auth_id Tos ∗
         othreadG_fuel_token_id (⊤ ∖ (gset_to_coPset FD)) ∗
-        othreadG_frag_token_id TP ∗
-        ([∗ map] i ↦ c ∈ Tcs,
-           ∃ (ℵ : obl_fuel) (FRs : gmap positive (prod Qp oids)),
-             othreadG_bound c ℵ ∗
-             ([∗ map] x ↦ '(q, G) ∈ FRs,
-                othreadG_obls i G q ∗
-                ([∗ set] g ∈ G, ∃ a, ⌜(ℵ <= a)%ord⌝ ∗ oblG_fuel g a))))%I.
+        ([∗ set] i ∈ TP,
+           ∃ (e : term) (β ℵ : obl_fuel) (G : oids),
+             ⌜ Tes !! i = Some e ∧ Tcs !! i = Some ℵ ∧ (β <= ℵ)%ord ∧ Tos !! i = Some G ⌝ ∗
+             ((othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i G) ∨ (othreadG_done i ∗ ⌜ G = ∅ ⌝)) ∗
+             othreadG_bound e β ∗
+             ([∗ set] g ∈ G, ∃ a, ⌜(β <= a)%ord⌝ ∗ oblG_fuel g a))
+    )%I.
 
 Section othread.
   Context `{SI : indexT} `{OSAT : !osatGS.osatGS Σ} `{!othreadGS Σ} `{OMF : !ord_mono_fun_class}.
@@ -221,7 +238,7 @@ Section othread.
   Proof. rewrite /othreadG_owns_auth_obls. apply _. Qed.
 
   (* Obls *)
-  Global Instance othreadG_obls_timeless i G q : Timeless (othreadG_obls i G q).
+  Global Instance othreadG_obls_timeless i G : Timeless (othreadG_obls i G).
   Proof. rewrite /othreadG_obls. apply _. Qed.
 
   Local Instance othreadG_obls_auth_id_timeless Tgls : Timeless (othreadG_obls_auth_id Tgls).
@@ -241,13 +258,13 @@ Section othread.
     AsFractional (othreadG_exec i q) (othreadG_exec i) q.
   Proof. split; [auto|apply _]. Qed.
 
-  Global Instance othreadG_term_auth_timeless i : Timeless (othreadG_term_auth i).
-  Proof. rewrite /othreadG_term_auth. apply _. Qed.
+  Global Instance othreadG_done_auth_timeless i : Timeless (othreadG_done_auth i).
+  Proof. rewrite /othreadG_done_auth. apply _. Qed.
 
-  Global Instance othreadG_term_persistent i : Persistent (othreadG_term i).
-  Proof. rewrite /othreadG_term. apply _. Qed.
-  Global Instance othreadG_term_timeless i : Timeless (othreadG_term i).
-  Proof. rewrite /othreadG_term. apply _. Qed.
+  Global Instance othreadG_done_persistent i : Persistent (othreadG_done i).
+  Proof. rewrite /othreadG_done. apply _. Qed.
+  Global Instance othreadG_done_timeless i : Timeless (othreadG_done i).
+  Proof. rewrite /othreadG_done. apply _. Qed.
 
   Local Instance othreadG_exec_token_id_timeless TP : Timeless (othreadG_exec_token_id TP).
   Proof. rewrite /othreadG_exec_token_id. apply _. Qed.
@@ -261,12 +278,66 @@ Section othread.
   Local Instance othreadG_elem_auth_id_timeless Tgls : Timeless (othreadG_elem_auth_id Tgls).
   Proof. rewrite /othreadG_elem_auth_id. apply _. Qed.
 
+  (* Term *)
+  Global Instance othreadG_term_timeless i e q : Timeless (othreadG_term i e q).
+  Proof. rewrite /othreadG_term. apply _. Qed.
+
+  Global Instance othreadG_term_fractional i e :
+    Fractional (othreadG_term i e).
+  Proof.
+    rewrite /othreadG_term. apply _.
+  Qed.
+  Global Instance othreadG_term_as_fractional i e q :
+    AsFractional (othreadG_term i e q) (othreadG_term i e) q.
+  Proof. split; [auto|apply _]. Qed.
+
+  Local Instance othreadG_term_auth_id_timeless Tes : Timeless (othreadG_term_auth_id Tes).
+  Proof. rewrite /othreadG_term_auth_id. apply _. Qed.
+
+  (* Fuel *)
+  Global Instance othreadG_bound_persistent e β : Persistent (othreadG_bound e β).
+  Proof. rewrite /othreadG_bound. apply _. Qed.
+  Global Instance othreadG_bound_timeless e β : Timeless (othreadG_bound e β).
+  Proof. rewrite /othreadG_bound. apply _. Qed.
+
+  Global Instance othreadG_fuel_timeless e a : Timeless (othreadG_fuel e a).
+  Proof. rewrite /othreadG_fuel. apply _. Qed.
+
+  Local Instance othreadG_fuel_token_id_timeless E : Timeless (othreadG_fuel_token_id E).
+  Proof. rewrite /othreadG_fuel_token_id. apply _. Qed.
+
+  (* Ceil *)
+  Global Instance othreadG_ceil_timeless i ℵ q : Timeless (othreadG_ceil i ℵ q).
+  Proof. rewrite /othreadG_ceil. apply _. Qed.
+
+  Global Instance othreadG_ceil_fractional i ℵ :
+    Fractional (othreadG_ceil i ℵ).
+  Proof.
+    rewrite /othreadG_ceil. apply _.
+  Qed.
+  Global Instance othreadG_ceil_as_fractional i ℵ q :
+    AsFractional (othreadG_ceil i ℵ q) (othreadG_ceil i ℵ) q.
+  Proof. split; [auto|apply _]. Qed.
+
+  Local Instance othreadG_ceil_auth_id_timeless Tcs : Timeless (othreadG_ceil_auth_id Tcs).
+  Proof. rewrite /othreadG_ceil_auth_id. apply _. Qed.
+
+  (* Frag *)
+  Global Instance othreadG_frag_timeless i G q : Timeless (othreadG_frag i G q).
+  Proof. rewrite /othreadG_frag. apply _. Qed.
+
+  Local Instance othreadG_frag_auth_id_timeless Tgls : Timeless (othreadG_frag_auth_id Tgls).
+  Proof. rewrite /othreadG_frag_auth_id. apply _. Qed.
+
   (* Invs *)
   Global Instance othread_timeless TP : Timeless (othread TP).
   Proof. rewrite /othread -lock. apply _. Qed.
 
   Global Instance oassigned_timeless Gls : Timeless (oassigned Gls).
   Proof. rewrite /oassigned -lock. apply _. Qed.
+
+  Global Instance ofrag_timeless TP : Timeless (ofrag TP).
+  Proof. rewrite /ofrag -lock. apply _. Qed.
 
   (** Elem rules *)
   Lemma othreadG_elem_alloc (Tgls : gmap positive (gmap oid unit)) i M :
@@ -355,116 +426,60 @@ Section othread.
     Tgls !! i = None →
     othreadG_obls_auth_id Tgls
     ⊢ |==> othreadG_obls_auth_id (<[i:=∅]>Tgls) ∗
-          othreadG_obls i ∅ 1.
+          othreadG_obls i ∅.
   Proof.
     rewrite /othreadG_obls_auth_id /othreadG_obls.
-    iIntros (Hi) "H". 
+    iIntros (Hi) "H".
     iMod (own_update with "H") as "H".
-    { eapply (gmap_view_alloc _ i (DfracOwn 1) (GSet ∅ : gset_disj _)); try done.
-      rewrite !lookup_fmap Hi. done.
-    }
+    { eapply (gmap_view_alloc _ i (DfracOwn 1) (∅ : oids)); try done.
+      rewrite !lookup_fmap Hi. done. }
     iDestruct "H" as "[H Ho]". iFrame "Ho".
     rewrite !fmap_insert. done.
   Qed.
 
   Lemma othreadG_obls_lookup Tgls i G :
     othreadG_obls_auth_id Tgls ∗
-    othreadG_obls i G 1
+    othreadG_obls i G
     ⊢ ⌜ (dom <$> Tgls) !! i = Some G ⌝.
   Proof.
     rewrite /othreadG_obls_auth_id /othreadG_obls -!own_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
     apply gmap_view_both_valid in H. destruct H as (_&_&?).
-    iPureIntro. apply leibniz_equiv, lookup_fmap_Some in H. destruct H as (?&?&?). inv H. done.
-  Qed.
-  Lemma othreadG_obls_lookup_frac Tgls i G q :
-    othreadG_obls_auth_id Tgls ∗
-    othreadG_obls i G q
-    ⊢ ∃ G', ⌜ (dom <$> Tgls) !! i = Some G' ∧ G ⊆ G' ⌝.
-  Proof.
-    rewrite /othreadG_obls_auth_id /othreadG_obls -!own_op.
-    iIntros "H". iPoseProof (own_valid with "H") as "%".
-    apply gmap_view_both_dfrac_valid_discrete_total in H. destruct H as (?&_&_&?&?&?).
-    iPureIntro. destruct x; last done. apply gset_disj_included in H1.
-    eexists. split; last eauto.
-    apply lookup_fmap_Some in H. destruct H as (?&?&?). inv H. done.
+    iPureIntro. apply leibniz_equiv, lookup_fmap_Some in H. destruct H as (?&?&?).
+    rewrite lookup_fmap H0. inv H. done.
   Qed.
 
   Lemma othreadG_obls_update Tgls i G M :
     othreadG_obls_auth_id Tgls ∗
-    othreadG_obls i G 1
+    othreadG_obls i G
     ⊢ |==> othreadG_obls_auth_id (<[i:=M]>Tgls) ∗
-        othreadG_obls i (dom M) 1.
+        othreadG_obls i (dom M).
   Proof.
     rewrite /othreadG_obls_auth_id /othreadG_obls -!own_op. apply own_update.
     rewrite !fmap_insert. apply gmap_view_replace. done.
   Qed.
-  Lemma othreadG_obls_update_local Tgls i q M1 M2 X1 X2 :
-    (Tgls !! i = Some M1) →
-    (GSet (dom M1), GSet X1) ~l~> (GSet (dom M2), GSet X2) →
-    othreadG_obls_auth_id Tgls ∗
-    othreadG_obls i X1 q
-    ⊢ |==> othreadG_obls_auth_id (<[i:=M2]>Tgls) ∗
-        othreadG_obls i X2 q.
-  Proof.
-    intros Hlookup Hlu. rewrite /othreadG_obls_auth_id /othreadG_obls -!own_op. apply own_update.
-    rewrite !fmap_insert. eapply gmap_view_update_local; eauto.
-    rewrite !lookup_fmap Hlookup. done.
-  Qed.
-
-  Lemma othreadG_obls_valid i G q :
-    othreadG_obls i G q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
-  Proof.
-    rewrite /othreadG_obls. iIntros "H".
-    iPoseProof (own_valid with "H") as "%V".
-    iPureIntro. apply gmap_view_frag_valid in V. destruct V. done.
-  Qed.
-  Lemma othreadG_obls_valid_2 i G1 G2 q1 q2 :
-    othreadG_obls i G1 q1 ∗ othreadG_obls i G2 q2 ⊢ ⌜ (q1 + q2 ≤ 1)%Qp ∧ G1 ## G2 ⌝.
-  Proof.
-    rewrite /othreadG_obls. iIntros "[H1 H2]". iCombine "H1 H2" as "H".
-    iPoseProof (own_valid with "H") as "%V".
-    iPureIntro. apply gmap_view_frag_valid in V. destruct V. split; first done.
-    apply gset_disj_valid_op in H0. done.
-  Qed.
-
-  Lemma othreadG_obls_op_1 i G1 G2 q1 q2 :
-    othreadG_obls i G1 q1 ∗ othreadG_obls i G2 q2 ⊢ othreadG_obls i (G1 ∪ G2) (q1 + q2)%Qp.
-  Proof.
-    rewrite /othreadG_obls -own_op -gmap_view_frag_op dfrac_op_own.
-    iIntros "H". iPoseProof (own_valid with "H") as "%".
-    apply gmap_view_frag_valid in H. destruct H. apply gset_disj_valid_op in H0.
-    rewrite gset_disj_union; done.
-  Qed.
-  Lemma othreadG_obls_op_2 i G1 G2 q1 q2 :
-    G1 ## G2 →
-    othreadG_obls i (G1 ∪ G2) (q1 + q2)%Qp ⊢ othreadG_obls i G1 q1 ∗ othreadG_obls i G2 q2.
-  Proof.
-    intros Hdj. rewrite /othreadG_obls -own_op -gmap_view_frag_op dfrac_op_own.
-    rewrite gset_disj_union; done.
-  Qed.
 
   (** Exec rules *)
-  Lemma othreadG_exec_term_false k q :
-    othreadG_exec k q ∗ othreadG_term k ⊢ False.
+  Lemma othreadG_exec_done_false k q :
+    othreadG_exec k q ∗ othreadG_done k ⊢ False.
   Proof.
-    rewrite /othreadG_exec /othreadG_term. iIntros "[Hl Hd]".
+    rewrite /othreadG_exec /othreadG_done. iIntros "[Hl Hd]".
     iCombine "Hl Hd" as "V". iPoseProof (own_valid with "V") as "%V".
     iPureIntro. apply reservation_map_data_valid in V.
     apply mono_nat_both_dfrac_valid in V. destruct V. lia.
   Qed.
 
-  Lemma othreadG_exec_to_term k :
-    othreadG_exec k 1 ⊢ |==> othreadG_term_auth k.
+  Lemma othreadG_exec_to_done k :
+    othreadG_exec k 1 ⊢ |==> othreadG_done_auth k.
   Proof.
-    rewrite /othreadG_exec /othreadG_term_auth.
+    rewrite /othreadG_exec /othreadG_done_auth.
     apply own_update.
     apply reservation_map_update. apply mono_nat_update. auto.
   Qed.
-  Lemma othreadG_term_auth_term k :
-    othreadG_term_auth k ⊢ othreadG_term k.
+  Lemma othreadG_done_auth_done k :
+    othreadG_done_auth k ⊢ othreadG_done k.
   Proof.
-    rewrite /othreadG_term_auth /othreadG_term.
+    rewrite /othreadG_done_auth /othreadG_done.
     apply own_mono.
     apply reservation_map_data_mono. apply mono_nat_included.
   Qed.
@@ -490,6 +505,198 @@ Section othread.
     { apply mono_nat_auth_valid. }
     by iFrame.
   Qed.
+
+  (** Term rules *)
+  (* Use ghost_map_elem rules. *)
+
+  (** Fuel rules *)
+  Lemma othreadG_fuel_eq k a0 a1 :
+    a0 w= a1 →
+    othreadG_fuel k a0 = othreadG_fuel k a1.
+  Proof. intros EQ. rewrite /othreadG_fuel. by erewrite credit_eq. Qed.
+
+  Lemma othreadG_fuel_mon k a0 a1 :
+    a0 w≤ a1 →
+    othreadG_fuel k a1 ⊢ |==> othreadG_fuel k a0.
+  Proof.
+    intros LE. rewrite /othreadG_fuel. apply own_update.
+    by apply reservation_map_update, credit_update.
+  Qed.
+
+  Lemma othreadG_fuel_split k a0 a1 :
+    othreadG_fuel k (a0 w+ a1) ⊣⊢ othreadG_fuel k a0 ∗ othreadG_fuel k a1.
+  Proof.
+    rewrite /othreadG_fuel. iSplit; [iIntros "H" | iIntros "[H1 H2]"].
+    - iEval (rewrite credit_split) in "H". iDestruct "H" as "[H1 H2]". iFrame.
+    - iEval (rewrite credit_split). iSplitL "H1"; iFrame.
+  Qed.
+
+  Lemma othreadG_fuel_mon_split k a0 a1 a2 :
+    a0 w+ a1 w≤ a2 →
+    othreadG_fuel k a2 ⊢ |==> othreadG_fuel k a0 ∗ othreadG_fuel k a1.
+  Proof.
+    intros LE. iIntros "H". iApply othreadG_fuel_split. iApply othreadG_fuel_mon; done.
+  Qed.
+
+  Lemma othreadG_fuel_lt k a0 a1 :
+    a0 w< a1 →
+    othreadG_fuel k a1 ⊢ |==> othreadG_fuel k a0 ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ othreadG_fuel k c.
+  Proof.
+    intros LT. apply WFOCM.lt_exists_left in LT. destruct LT as (?& ?& ?).
+    iIntros "H". iMod (othreadG_fuel_mon_split _ _ _ _ H0 with "H") as "[H1 H2]".
+    iModIntro. iSplitL "H1"; iFrame. done.
+  Qed.
+
+  Lemma othreadG_bound_mon k a0 a1 :
+    a0 w≤ a1 →
+    othreadG_bound k a0 ⊢ |==> othreadG_bound k a1.
+  Proof.
+    intros LE. rewrite /othreadG_bound. apply own_update.
+    by apply reservation_map_update, cmra_update_included, credit_bound_included.
+  Qed.
+
+  Lemma othreadG_fuel_spend_gen k a0 a1 :
+    othreadG_bound k a0 ∗ othreadG_fuel k a1
+    ⊢ |==> ∃ a2, ⌜(a1 w+ a2) w≤ a0⌝ ∗ othreadG_bound k a2.
+  Proof.
+    rewrite -own_op. iIntros "H". iMod (own_updateP with "H") as "(% & H)".
+    { rewrite -!reservation_map_data_op.
+      eapply (reservation_map_updateP
+                (λ x, ∃ a2, (x = (credit_bound a2)) ∧ (a1 w+ a2 w≤ a0))
+                (λ r, ∃ a2, (r = {[k := (credit_bound a2)]}) ∧ (a1 w+ a2 w≤ a0))
+             ).
+      { eapply credit_spend. }
+      { intros. destruct H as (a2&A0&A1). eexists. by subst. }
+    }
+    iSimpl. iDestruct "H" as "((%a2 & %EQ & %LE) & H)".
+    iExists a2. subst. iModIntro. iSplitR; done.
+  Qed.
+  Lemma othreadG_fuel_spend k a0 a1 :
+    wzero w< a1 →
+    othreadG_bound k a0 ∗ othreadG_fuel k a1 ⊢ |==> ∃ a2, ⌜a2 w< a0⌝ ∗ othreadG_bound k a2.
+  Proof.
+    iIntros (LT) "[Ow Oc]". iMod (othreadG_fuel_spend_gen with "[$]") as "(%&%&$)".
+    iPureIntro. eapply WFOCM.lt_exists_right; eauto.
+  Qed.
+
+  Lemma witG_compare k a0 a1 :
+    othreadG_bound k a0 ∗ othreadG_fuel k a1 ⊢ ⌜ a1 w≤ a0 ⌝.
+  Proof.
+    rewrite -own_op -!reservation_map_data_op. iIntros "H".
+    iPoseProof (own_valid with "H") as "%". apply reservation_map_data_valid in H.
+    apply credit_bound_credit_valid_compare in H. done.
+  Qed.
+
+  Lemma othreadG_bound_id_alloc D k a :
+    k ∉ D →
+    othreadG_fuel_token_id (⊤ ∖ gset_to_coPset D)
+    ⊢ |==> othreadG_fuel_token_id (⊤ ∖ gset_to_coPset ({[k]} ∪ D)) ∗
+        othreadG_bound k a ∗ othreadG_fuel k a.
+  Proof.
+    iIntros (Hk) "Htk".
+    iPoseProof (reservation_map_token_alloc_singleton _ _ k (credit_bound a ⋅ credit a) with "Htk") as "[Htk >H]"; auto.
+    { apply credit_bound_credit_valid_eq. }
+    iDestruct "H" as "[H1 H2]". rewrite /othreadG_bound /othreadG_fuel. by iFrame.
+  Qed.
+
+  (** Ceil rules *)
+  (* Use ghost_map_elem rules. *)
+
+  (** Frag rules *)
+  Lemma othreadG_frag_alloc Tos i :
+    Tos !! i = None →
+    othreadG_frag_auth_id Tos
+    ⊢ |==> othreadG_frag_auth_id (<[i:=∅]>Tos) ∗
+          othreadG_frag i ∅ 1.
+  Proof.
+    rewrite /othreadG_frag_auth_id /othreadG_frag.
+    iIntros (Hi) "H". 
+    iMod (own_update with "H") as "H".
+    { eapply (gmap_view_alloc _ i (DfracOwn 1) (GSet ∅ : gset_disj _)); try done.
+      rewrite !lookup_fmap Hi. done.
+    }
+    iDestruct "H" as "[H Ho]". iFrame "Ho".
+    rewrite !fmap_insert. done.
+  Qed.
+
+  Lemma othreadG_frag_lookup Tos i G :
+    othreadG_frag_auth_id Tos ∗
+    othreadG_frag i G 1
+    ⊢ ⌜ (Tos) !! i = Some G ⌝.
+  Proof.
+    rewrite /othreadG_frag_auth_id /othreadG_frag -!own_op.
+    iIntros "H". iPoseProof (own_valid with "H") as "%".
+    apply gmap_view_both_valid in H. destruct H as (_&_&?).
+    iPureIntro. apply leibniz_equiv, lookup_fmap_Some in H. destruct H as (?&?&?). inv H. done.
+  Qed.
+  Lemma othreadG_frag_lookup_frac Tos i G q :
+    othreadG_frag_auth_id Tos ∗
+    othreadG_frag i G q
+    ⊢ ∃ G', ⌜ (Tos) !! i = Some G' ∧ G ⊆ G' ⌝.
+  Proof.
+    rewrite /othreadG_frag_auth_id /othreadG_frag -!own_op.
+    iIntros "H". iPoseProof (own_valid with "H") as "%".
+    apply gmap_view_both_dfrac_valid_discrete_total in H. destruct H as (?&_&_&?&?&?).
+    iPureIntro. destruct x; last done. apply gset_disj_included in H1.
+    eexists. split; last eauto.
+    apply lookup_fmap_Some in H. destruct H as (?&?&?). inv H. done.
+  Qed.
+
+  Lemma othreadG_frag_update Tos i G M :
+    othreadG_frag_auth_id Tos ∗
+    othreadG_frag i G 1
+    ⊢ |==> othreadG_frag_auth_id (<[i:=M]>Tos) ∗
+        othreadG_frag i (M) 1.
+  Proof.
+    rewrite /othreadG_frag_auth_id /othreadG_frag -!own_op. apply own_update.
+    rewrite !fmap_insert. apply gmap_view_replace. done.
+  Qed.
+  Lemma othreadG_frag_update_local Tos i q M1 M2 X1 X2 :
+    (Tos !! i = Some M1) →
+    (GSet (M1), GSet X1) ~l~> (GSet (M2), GSet X2) →
+    othreadG_frag_auth_id Tos ∗
+    othreadG_frag i X1 q
+    ⊢ |==> othreadG_frag_auth_id (<[i:=M2]>Tos) ∗
+        othreadG_frag i X2 q.
+  Proof.
+    intros Hlookup Hlu. rewrite /othreadG_frag_auth_id /othreadG_frag -!own_op. apply own_update.
+    rewrite !fmap_insert. eapply gmap_view_update_local; eauto.
+    rewrite !lookup_fmap Hlookup. done.
+  Qed.
+
+  Lemma othreadG_frag_valid i G q :
+    othreadG_frag i G q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
+  Proof.
+    rewrite /othreadG_frag. iIntros "H".
+    iPoseProof (own_valid with "H") as "%V".
+    iPureIntro. apply gmap_view_frag_valid in V. destruct V. done.
+  Qed.
+  Lemma othreadG_frag_valid_2 i G1 G2 q1 q2 :
+    othreadG_frag i G1 q1 ∗ othreadG_frag i G2 q2 ⊢ ⌜ (q1 + q2 ≤ 1)%Qp ∧ G1 ## G2 ⌝.
+  Proof.
+    rewrite /othreadG_frag. iIntros "[H1 H2]". iCombine "H1 H2" as "H".
+    iPoseProof (own_valid with "H") as "%V".
+    iPureIntro. apply gmap_view_frag_valid in V. destruct V. split; first done.
+    apply gset_disj_valid_op in H0. done.
+  Qed.
+
+  Lemma othreadG_frag_op_1 i G1 G2 q1 q2 :
+    othreadG_frag i G1 q1 ∗ othreadG_frag i G2 q2 ⊢ othreadG_frag i (G1 ∪ G2) (q1 + q2)%Qp.
+  Proof.
+    rewrite /othreadG_frag -own_op -gmap_view_frag_op dfrac_op_own.
+    iIntros "H". iPoseProof (own_valid with "H") as "%".
+    apply gmap_view_frag_valid in H. destruct H. apply gset_disj_valid_op in H0.
+    rewrite gset_disj_union; done.
+  Qed.
+  Lemma othreadG_frag_op_2 i G1 G2 q1 q2 :
+    G1 ## G2 →
+    othreadG_frag i (G1 ∪ G2) (q1 + q2)%Qp ⊢ othreadG_frag i G1 q1 ∗ othreadG_frag i G2 q2.
+  Proof.
+    intros Hdj. rewrite /othreadG_frag -own_op -gmap_view_frag_op dfrac_op_own.
+    rewrite gset_disj_union; done.
+  Qed.
+
+  TODO
 
   (** othread rules *)
   Lemma othread_elem i TP :
@@ -663,9 +870,9 @@ Section othread.
     iApply (othread_delete_obl_frac with "[$]"). auto.
   Qed.
 
-  Lemma othread_exec_to_term TP i :
+  Lemma othread_exec_to_done TP i :
     othread TP ∗ othreadG_exec i (1/2 + 1/2/2)%Qp ∗ othreadG_obls i ∅ 1
-    ⊢ |==> othread TP ∗ othreadG_term i.
+    ⊢ |==> othread TP ∗ othreadG_done i.
   Proof.
     iIntros "(O& Hx& Ho)".
     rewrite /othread -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
@@ -674,18 +881,18 @@ Section othread.
     { rewrite lookup_fmap_Some in H. destruct H as (?&?&?). apply dom_empty_inv_L in H. by subst. }
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "([Hix | [Hix _]] & His & Him)"; last first.
-    { iExFalso. iPoseProof (othreadG_term_auth_term with "[$]") as "Hxt".
-      iPoseProof (othreadG_exec_term_false with "[$]") as "%F". done. }
-    iMod (othreadG_exec_to_term with "[Hx Hix]") as "Hx".
+    { iExFalso. iPoseProof (othreadG_done_auth_done with "[$]") as "Hxt".
+      iPoseProof (othreadG_exec_done_false with "[$]") as "%F". done. }
+    iMod (othreadG_exec_to_done with "[Hx Hix]") as "Hx".
     { iCombine "Hx Hix" as "Hx". rewrite -Qp.add_assoc !Qp.div_2. done. }
-    iPoseProof (othreadG_term_auth_term with "Hx") as "#Hxt".
+    iPoseProof (othreadG_done_auth_done with "Hx") as "#Hxt".
     iModIntro. iSplitL; last done.
     iExists Tgls. iSplitR; first done. iFrame "HO HB HX HE".
     iApply (big_sepM_delete _ _ i _ Hlui). iFrame. iRight. iFrame.
   Qed.
 
-  Lemma othread_term_open TP i :
-    othread TP ∗ othreadG_elem i ∗ othreadG_term i
+  Lemma othread_done_open TP i :
+    othread TP ∗ othreadG_elem i ∗ othreadG_done i
     ⊢ othreadG_obls i ∅ 1 ∗ (othreadG_obls i ∅ 1 -∗ othread TP).
   Proof.
     iIntros "(O & #He & #Hx)".
@@ -696,7 +903,7 @@ Section othread.
     destruct Hlui as (TObls&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "([Hix | [Hix Ho]] & His & Him)".
-    { iExFalso. iPoseProof (othreadG_exec_term_false with "[$]") as "%F". done. }
+    { iExFalso. iPoseProof (othreadG_exec_done_false with "[$]") as "%F". done. }
     iFrame "Ho". iIntros "Ho".
     iExists Tgls. iSplitR; first done. iFrame "HO HB HX HE".
     iApply (big_sepM_delete _ _ i _ Hlui). iFrame. iRight. iFrame.
@@ -815,9 +1022,9 @@ Section othread.
     - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "%". rewrite LUOk in H. inv H.
   Qed.
 
-  Lemma othread_assigned_term_false Ω TP k a i :
+  Lemma othread_assigned_done_false Ω TP k a i :
     Ω !! k = Some (obl_assigned a i) →
-    osat Ω ∗ othread TP ∗ oassigned (dom Ω) ∗ othreadG_elem i ∗ othreadG_term i ⊢ False.
+    osat Ω ∗ othread TP ∗ oassigned (dom Ω) ∗ othreadG_elem i ∗ othreadG_done i ⊢ False.
   Proof.
     iIntros (LUk) "(S& O& A& #He & #Hx)".
     rewrite /othread -!lock. iDestruct "O" as "(%& %Hdom& HO& HB& HX& HE& Hm)".
@@ -827,7 +1034,7 @@ Section othread.
     destruct Hlui as (TObls&Hlui).
     iDestruct (big_sepM_delete _ _ i _ Hlui with "Hm") as "[Hi Hm]".
     iDestruct "Hi" as "([Hix | [Hix Ho]] & His & Him)".
-    { iExFalso. iPoseProof (othreadG_exec_term_false with "[$Hix $Hx]") as "%F". done. }
+    { iExFalso. iPoseProof (othreadG_exec_done_false with "[$Hix $Hx]") as "%F". done. }
     iPoseProof (othreadG_obls_lookup with "[$HB $Ho]") as "%LUempty".
     rewrite /oassigned -lock. iPoseProof (big_sepS_delete _ _ k with "A") as "[A _]".
     { apply elem_of_dom_2 in LUk. auto. }
