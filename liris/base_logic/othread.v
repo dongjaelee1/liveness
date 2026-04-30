@@ -211,7 +211,7 @@ Definition ofrag `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
         othreadG_fuel_token_id (⊤ ∖ (gset_to_coPset Df)) ∗
         ([∗ set] i ∈ TP,
            ∃ (ev eu : term) (βv βu : obl_fuel) (V U : oids),
-             ⌜ Tvs !! i = Some ev ∧ Tus !! i = Some eu ∧ Fvs !! i = Some V ∧ Fus !! i = Some U ⌝ ∗
+             ⌜ Tvs !! i = Some ev ∧ Tus !! i = Some eu ∧ Fvs !! i = Some V ∧ Fus !! i = Some U ∧ V ## U ⌝ ∗
              ((othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i (V ∪ U)) ∨
                 (othreadG_done i ∗ ⌜ V = ∅ ∧ U = ∅ ⌝ ∗ othreadG_term_private i ev 1 ∗ othreadG_term_public i eu 1)) ∗
              othreadG_bound ev βv ∗
@@ -1157,7 +1157,7 @@ Section othread.
     iApply big_sepS_union. 1: set_solver.
     iSplitR "M".
     { iApply big_sepS_singleton. iExists ev, eu, βv, βu, ∅, ∅. iSplitR.
-      { iPureIntro. rewrite !lookup_insert_eq. auto. }
+      { iPureIntro. rewrite !lookup_insert_eq. split_and !; auto. set_solver. }
       iSplitL.
       - iLeft. iFrame.
       - iFrame "Bv Bu". rewrite !big_sepS_empty. done. }
@@ -1202,7 +1202,7 @@ Section othread.
     { iDestruct "Hex" as "(_& _& Tv1& _)". rewrite /othreadG_term_private.
       iCombine "Tv Tv1" as "Tv" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
       apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4).
+    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
     iPoseProof (ghost_map_lookup with "TVA Tv") as "%". rewrite LUi1 in H. inversion H; clear H. subst ev0.
     iPoseProof (othreadG_bound_op _ βv βv0 with "[$Bv $Bv0]") as "(%βv1& #Bv1& %Hbv)".
     destruct Hbv as [Hbv1 Hbv2]. iClear "Bv Bv0".
@@ -1219,7 +1219,9 @@ Section othread.
       { iPureIntro. split_and !; auto. rewrite dom_insert_L. apply elem_of_dom_2 in LUi3. rewrite -Dom3. set_solver. }
       iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
       - iExists ev, eu, βv1, βu, ({[k]} ∪ V0), U. iSplitR.
-        { iPureIntro. split_and !; auto. rewrite lookup_insert_eq. auto. }
+        { iPureIntro. split_and !; auto.
+          - rewrite lookup_insert_eq. auto.
+          - set_solver. }
         iSplitL "Tx TG".
         { iLeft. iFrame. }
         iFrame "Bv1 Bu". iFrame. iApply big_sepS_union. 1: set_solver.
@@ -1228,7 +1230,7 @@ Section othread.
         iApply (big_sepS_impl with "Fvs"). iIntros "!> %% (%&%&H)". iFrame.
         iPureIntro. etrans; eauto.
       - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-        iPureIntro. destruct H0 as (?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
+        iPureIntro. destruct H0 as (?&?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
         rewrite lookup_insert_ne; auto. }
     { iPureIntro. set_solver. }
   Qed.
@@ -1251,7 +1253,7 @@ Section othread.
     { iDestruct "Hex" as "(_& _& _& Tu1)". rewrite /othreadG_term_public.
       iCombine "Tu Tu1" as "Tu" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
       apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4).
+    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
     iPoseProof (ghost_map_lookup with "TUA Tu") as "%". rewrite LUi2 in H. inversion H; clear H. subst eu0.
     iPoseProof (othreadG_bound_op _ βu βu0 with "[$Bu $Bu0]") as "(%βu1& #Bu1& %Hbu)".
     destruct Hbu as [Hbu1 Hbu2]. iClear "Bu Bu0".
@@ -1268,7 +1270,9 @@ Section othread.
       { iPureIntro. split_and !; auto. rewrite dom_insert_L. apply elem_of_dom_2 in LUi4. rewrite -Dom4. set_solver. }
       iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
       - iExists ev, eu, βv, βu1, V, ({[k]} ∪ U0). iSplitR.
-        { iPureIntro. split_and !; auto. rewrite lookup_insert_eq. auto. }
+        { iPureIntro. split_and !; auto.
+          - rewrite lookup_insert_eq. auto.
+          - set_solver. }
         iSplitL "Tx TG".
         { iLeft. iFrame. }
         iFrame "Bv Bu1". iFrame. iApply big_sepS_union. 1: set_solver.
@@ -1277,14 +1281,14 @@ Section othread.
         iApply (big_sepS_impl with "Fus"). iIntros "!> %% (%&%&H)". iFrame.
         iPureIntro. etrans; eauto.
       - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-        iPureIntro. destruct H0 as (?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
+        iPureIntro. destruct H0 as (?&?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
         rewrite lookup_insert_ne; auto. }
     { iPureIntro. set_solver. }
   Qed.
 
   TODO
 
-    delete_obl, exec_to_done, new_term
+    delete_obl, transfer_obl priv <-> publ, exec_to_done, new_term
         ∃ ev eu, othreadG_frag_private i ∅ 1 ∗ othreadG_term_private i ev 1 ∗ othreadG_bound ev βv ∗ othreadG_fuel ev βv ∗
                  othreadG_frag_public i ∅ 1 ∗ othreadG_term_public i eu 1 ∗ othreadG_bound eu βu ∗ othreadG_fuel eu βu.
 
