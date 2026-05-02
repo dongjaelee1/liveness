@@ -5,17 +5,8 @@ From iris.prelude Require Import options.
 From liris.algebra Require Import ordinal_wfocm.
 From liris.base_logic Require Export mupd oinv.
 
-(** Obl predicates. *)
 (** All Local Definitions are only for internal uses and users should not need them. *)
-Local Definition oblP_layer_def `{SI : indexT} `{@mupdGS SI Σ}
-  k ℓ : iProp Σ :=
-  oblG_layer k ℓ.
-Local Definition oblP_layer_aux : seal (@oblP_layer_def). Proof. by eexists. Qed.
-Definition oblP_layer := oblP_layer_aux.(unseal).
-Local Definition oblP_layer_unseal :
-  @oblP_layer = @oblP_layer_def := oblP_layer_aux.(seal_eq).
-Global Arguments oblP_layer {SI Σ _}.
-
+(** Obl predicates. *)
 Local Definition oblP_id_def `{SI : indexT} `{@mupdGS SI Σ}
   k : iProp Σ :=
   oblG_elem k.
@@ -76,30 +67,7 @@ Local Definition oblP_inv_unseal :
   @oblP_inv = @oblP_inv_def := oblP_inv_aux.(seal_eq).
 Global Arguments oblP_inv {SI Σ _}.
 
-(* Thread obls *)
-Local Definition thP_obls_def `{SI : indexT} `{@mupdGS SI Σ}
-  i (G : oids) q : iProp Σ :=
-  othreadG_elem i ∗ othreadG_exec i (q/2 + q/2/2)%Qp ∗ othreadG_obls i G q ∗
-  ([∗ set] k ∈ G,
-     oblP_id k ∗ oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
-     (* oblP_id k ∗ oblG_assigned k (1/2 + 1/2/2/2/2)%Qp ∗ *)
-     (* oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp). *)
-Local Definition thP_obls_aux : seal (@thP_obls_def). Proof. by eexists. Qed.
-Definition thP_obls := thP_obls_aux.(unseal).
-Local Definition thP_obls_unseal :
-  @thP_obls = @thP_obls_def := thP_obls_aux.(seal_eq).
-Global Arguments thP_obls {SI Σ _}.
-
-Local Definition thP_term_def `{SI : indexT} `{@mupdGS SI Σ}
-  i : iProp Σ :=
-  othreadG_elem i ∗ othreadG_term i.
-Local Definition thP_term_aux : seal (@thP_term_def). Proof. by eexists. Qed.
-Definition thP_term := thP_term_aux.(unseal).
-Local Definition thP_term_unseal :
-  @thP_term = @thP_term_def := thP_term_aux.(seal_eq).
-Global Arguments thP_term {SI Σ _}.
-
-(* Obl witnesses *)
+(** Witness predicates *)
 Local Definition witP_bound_def `{SI : indexT} `{@mupdGS SI Σ}
   k α : iProp Σ :=
   oblP_id k ∗ witG_bound k α.
@@ -126,6 +94,81 @@ Definition witP_cred := witP_cred_aux.(unseal).
 Local Definition witP_cred_unseal :
   @witP_cred = @witP_cred_def := witP_cred_aux.(seal_eq).
 Global Arguments witP_cred {SI Σ _}.
+
+(** Thread predicates *)
+Local Definition thP_bound_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  e ℓ : iProp Σ :=
+  ∃ μ, othreadG_bound e (measure ℓ μ).
+Local Definition thP_bound_aux : seal (@thP_bound_def). Proof. by eexists. Qed.
+Definition thP_bound := thP_bound_aux.(unseal).
+Local Definition thP_bound_unseal :
+  @thP_bound = @thP_bound_def := thP_bound_aux.(seal_eq).
+Global Arguments thP_bound {SI Σ _ _}.
+
+Local Definition thP_fuel_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  e ℓ μ : iProp Σ :=
+  othreadG_fuel e (measure ℓ μ).
+Local Definition thP_fuel_aux : seal (@thP_fuel_def). Proof. by eexists. Qed.
+Definition thP_fuel := thP_fuel_aux.(unseal).
+Local Definition thP_fuel_unseal :
+  @thP_fuel = @thP_fuel_def := thP_fuel_aux.(seal_eq).
+Global Arguments thP_fuel {SI Σ _}.
+
+Local Definition thP_private_obls_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  i (G : oids) e ℓ q : iProp Σ :=
+  othreadG_elem i ∗ othreadG_exec i (q/2/2)%Qp ∗
+  othreadG_frag_private i G q ∗
+  thP_bound e ℓ ∗ othreadG_term_private i e (q/2)%Qp ∗
+  ([∗ set] k ∈ G,
+     oblP_id k ∗ oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
+Local Definition thP_private_obls_aux : seal (@thP_private_obls_def). Proof. by eexists. Qed.
+Definition thP_private_obls := thP_private_obls_aux.(unseal).
+Local Definition thP_private_obls_unseal :
+  @thP_private_obls = @thP_private_obls_def := thP_private_obls_aux.(seal_eq).
+Global Arguments thP_private_obls {SI Σ _ _}.
+
+Local Definition thP_private_term_def `{SI : indexT} `{@mupdGS SI Σ}
+  i e : iProp Σ :=
+  othreadG_elem i ∗ othreadG_term_private i e (1/2)%Qp.
+Local Definition thP_private_term_aux : seal (@thP_private_term_def). Proof. by eexists. Qed.
+Definition thP_private_term := thP_private_term_aux.(unseal).
+Local Definition thP_private_term_unseal :
+  @thP_private_term = @thP_private_term_def := thP_private_term_aux.(seal_eq).
+Global Arguments thP_private_term {SI Σ _}.
+
+Local Definition thP_public_obls_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  i (G : oids) e ℓ q : iProp Σ :=
+  othreadG_elem i ∗ othreadG_exec i (q/2/2)%Qp ∗
+  othreadG_frag_public i G q ∗
+  thP_bound e ℓ ∗ othreadG_term_public i e (q/2)%Qp ∗
+  ([∗ set] k ∈ G,
+     oblP_id k ∗ oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
+Local Definition thP_public_obls_aux : seal (@thP_public_obls_def). Proof. by eexists. Qed.
+Definition thP_public_obls := thP_public_obls_aux.(unseal).
+Local Definition thP_public_obls_unseal :
+  @thP_public_obls = @thP_public_obls_def := thP_public_obls_aux.(seal_eq).
+Global Arguments thP_public_obls {SI Σ _ _}.
+
+Local Definition thP_public_term_def `{SI : indexT} `{@mupdGS SI Σ}
+  i e : iProp Σ :=
+  othreadG_elem i ∗ othreadG_term_public i e (1/2)%Qp.
+Local Definition thP_public_term_aux : seal (@thP_public_term_def). Proof. by eexists. Qed.
+Definition thP_public_term := thP_public_term_aux.(unseal).
+Local Definition thP_public_term_unseal :
+  @thP_public_term = @thP_public_term_def := thP_public_term_aux.(seal_eq).
+Global Arguments thP_public_term {SI Σ _}.
+
+Local Definition thP_done_def `{SI : indexT} `{@mupdGS SI Σ}
+  i : iProp Σ :=
+  othreadG_elem i ∗ othreadG_done i.
+Local Definition thP_done_aux : seal (@thP_done_def). Proof. by eexists. Qed.
+Definition thP_done := thP_done_aux.(unseal).
+Local Definition thP_done_unseal :
+  @thP_done = @thP_done_def := thP_done_aux.(seal_eq).
+Global Arguments thP_done {SI Σ _}.
+
+
+TODO
 
 (* Collection of fuels to support induction rules *)
 Local Definition obl_fuels `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}

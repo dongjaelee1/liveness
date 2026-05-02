@@ -39,7 +39,7 @@ Proof. solve_inG. Qed.
 
 Definition model_interp `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   h i Ω W n Θ : iProp Σ :=
-  (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
+  (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ ofrag Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
 
 (** Modality for updating obls. *)
 Definition mupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
@@ -143,7 +143,7 @@ Section mupd.
     iRight. iIntros (????) "I". iMod "H".
     iModIntro. iExists Ω1. iSplitR; first done.
     iIntros (? (Prog& OW2)).
-    rewrite /model_interp. iDestruct "I" as "(HI& $& $& $& N& %OW1)".
+    rewrite /model_interp. iDestruct "I" as "(HI& $& $& $& $& N& %OW1)".
     iMod (model_history_interp_step with "HI") as "$". 1,2: done.
     iModIntro. pose proof (owit_inv_rc_step_same_gls _ _ _ OW1 Prog OW2).
     iPoseProof (owit_mon _ _ H with "N") as "$". iFrame. done.
@@ -239,7 +239,7 @@ Section mupd.
 
   Lemma model_interp_owit_inv h i Ω W n Θ :
     model_interp h i Ω W n Θ ⊢ ⌜ owit_inv Ω W ⌝.
-  Proof. iIntros "(_&_&_&_&_&$)". Qed.
+  Proof. iIntros "(_&_&_&_&_&_&$)". Qed.
 
   Definition owit_inv_lb (γ : obl_owner → obl_fuel → obl_fuel) (Ω : obls) (W : witnesses) : Prop :=
     map_Forall2
@@ -691,7 +691,7 @@ Proof.
   iMod invGS_alloc as "(%HInv& R& W& O)".
   iMod (model_history_interp_init n ∅) as "(%HHist& MHI)".
   iMod (osat_alloc) as "(%HS& S)".
-  iMod (othread_alloc) as "(%HT& T& A)".
+  iMod (othread_alloc) as "(%HT& T& A& F)".
   iMod (owit_alloc) as "(%HW& Wit)".
   iExists (MupdG HInv HS HT HW HHist). iFrame.
   iPureIntro. apply map_Forall2_empty.

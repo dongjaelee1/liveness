@@ -21,6 +21,7 @@ Module othreadGS.
         othreadGpreS_elem : inG Σ (gmap_viewR positive unitUR);
         othreadGpreS_fuel : inG Σ (reservation_mapUR (bcredUR));
         othreadGpreS_frag : inG Σ (gmap_viewR positive (gset_disjUR oid));
+        #[global] othreadGpreS_term :: ghost_mapG Σ positive term;
       }.
 
   Class othreadGS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -33,7 +34,6 @@ Module othreadGS.
         fuel_name : gname;
         frag_priv_name : gname;
         frag_publ_name : gname;
-        term_inG :: ghost_mapG Σ positive term;
         term_priv_name : gname;
         term_publ_name : gname;
       }.
@@ -50,10 +50,8 @@ Module othreadGS.
   Definition othreadΣ `{SI : indexT} : gFunctors  :=
     gFunctors.app othreadΣ_pre (ghost_mapΣ positive term).
 
-  Global Instance subG_othreadΣ_0 `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (othreadGpreS Σ).
-  Proof. intros. apply subG_inv in H. destruct H. clear s0. solve_inG. Qed.
-  Global Instance subG_othreadΣ_1 `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (ghost_mapG Σ positive term).
-  Proof. intros. apply subG_inv in H. destruct H. apply subG_ghost_mapΣ. auto. Qed.
+  Global Instance subG_othreadΣ `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (othreadGpreS Σ).
+  Proof. intros. apply subG_inv in H. destruct H. unfold othreadΣ_pre in s. econstructor; try solve_inG. Qed.
 
 End othreadGS.
 Import othreadGS.
@@ -63,7 +61,7 @@ Import othreadGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances othread_inG
   othreadGpreS_owns othreadGpreS_obls othreadGpreS_exec othreadGpreS_elem
-  othreadGpreS_fuel othreadGpreS_frag.
+  othreadGpreS_fuel othreadGpreS_frag othreadGpreS_term.
 
 (* Owns: thread currently has this obl *)
 Definition othreadG_owns `{SI : indexT} `{!othreadGS Σ} (i : positive) (k : oid) (q : Qp) : iProp Σ :=
@@ -1604,11 +1602,63 @@ Section othread.
       rewrite lookup_insert_ne; auto.
   Qed.
 
+  Lemma ofrag_exchange_fuel TP i ev eu qv qu c :
+    i ∈ TP →
+    (Ord.O < c)%ord →
+    ofrag TP ∗
+    othreadG_term_private i ev qv ∗ othreadG_fuel ev c ∗
+    othreadG_term_public i eu qu ∗ othreadG_fuel eu c
+    ⊢ |==> ∃ G, (othreadG_exec i (1 / 2 / 2) -∗ othreadG_obls i G -∗ ofrag TP) ∗
+             othreadG_term_private i ev qv ∗
+             othreadG_term_public i eu qu ∗
+             othreadG_exec i (1 / 2 / 2) ∗ othreadG_obls i G ∗
+             ([∗ set] k ∈ G, oblG_fuel k Ord.one ∗ oblG_elem k).
+  Proof.
+    iIntros (Ini Ltc) "(F& Tv& Hfv& Tu& Hfu)".
+    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
+    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu& Fvs& Fus)".
+    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& _& _& _& Tu1)". rewrite /othreadG_term_public.
+      iCombine "Tu Tu1" as "Tu" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
+      apply Qp.not_add_le_r in H. done. }
+    destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
+    iPoseProof (ghost_map_lookup with "TVA Tv") as "%". rewrite LUi1 in H. inversion H; clear H. subst ev0.
+    iPoseProof (ghost_map_lookup with "TUA Tu") as "%". rewrite LUi2 in H. inversion H; clear H. subst eu0.
+    iMod (othreadG_fuel_spend with "[$Bv $Hfv]") as "(%βv1& %HBv& #Bv1)". 1: auto.
+    iAssert (|==> ([∗ set] v ∈ V, ∃ a : Ord.t, ⌜(βv1 <= a)%ord⌝ ∗ oblG_fuel v a ∗ oblG_elem v) ∗
+               ([∗ set] v ∈ V, oblG_fuel v Ord.one ∗ oblG_elem v))%I with "[Fvs]" as ">[Fvs Rvs]".
+    { iApply big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "Fvs").
+      iIntros "!> %% (%&%& F& #E)". iFrame "E". iMod (oblG_fuel_lt _ βv1 with "F") as "(F& %& %& F1)".
+      { eapply Ord.lt_le_lt; eauto. }
+      iMod (oblG_fuel_mon _ Ord.one with "F1") as "F1".
+      { apply Ord.S_supremum. auto. }
+      iModIntro. iSplitR "F1"; iFrame. done. }
+    iMod (othreadG_fuel_spend with "[$Bu $Hfu]") as "(%βu1& %HBu& #Bu1)". 1: auto.
+    iAssert (|==> ([∗ set] u ∈ U, ∃ a : Ord.t, ⌜(βu1 <= a)%ord⌝ ∗ oblG_fuel u a ∗ oblG_elem u) ∗
+               ([∗ set] u ∈ U, oblG_fuel u Ord.one ∗ oblG_elem u))%I with "[Fus]" as ">[Fus Rus]".
+    { iApply big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "Fus").
+      iIntros "!> %% (%&%& F& #E)". iFrame "E". iMod (oblG_fuel_lt _ βu1 with "F") as "(F& %& %& F1)".
+      { eapply Ord.lt_le_lt; eauto. }
+      iMod (oblG_fuel_mon _ Ord.one with "F1") as "F1".
+      { apply Ord.S_supremum. auto. }
+      iModIntro. iSplitR "F1"; iFrame. done. }
+    iDestruct "Hex" as "($& $)". iFrame "Tv Tu". iSplitR "Rvs Rus".
+    - iIntros "!> Tx TG". iFrame "TVA TUA FVA FUA FT". iSplitR.
+      { iPureIntro. split_and !; auto. }
+      iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+      iExists ev, eu, βv1, βu1, V, U. iFrame. iFrame "Bv1 Bu1". iSplit.
+      { iPureIntro. split_and !; auto. }
+      iLeft. iFrame.
+    - iModIntro. iApply big_sepS_union; first auto. iFrame.
+  Qed.
+
 End othread.
 
 (* Allocation of initial invariant. *)
 Lemma othread_alloc `{SI : indexT} {Σ}
-  `{!@osatGS.osatGS _ Σ} `{!othreadGpreS Σ} `{!ghost_mapG Σ positive term} :
+  `{!@osatGS.osatGS _ Σ} `{!othreadGpreS Σ} :
   ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ oassigned ∅ ∗ ofrag ∅.
 Proof.
   iIntros.
@@ -1628,7 +1678,7 @@ Proof.
     first by apply gmap_view_auth_valid.
   iMod (ghost_map_alloc_empty) as (γTv) "HTv".
   iMod (ghost_map_alloc_empty) as (γTu) "HTu".
-  iModIntro. iExists (OthreadG SI _ _ γS γO γX γE γF γV γU _ γTv γTu).
+  iModIntro. iExists (OthreadG SI _ _ γS γO γX γE γF γV γU γTv γTu).
   rewrite /othread /oassigned /ofrag -!lock. iSplitL "HS HO HX HE".
   { iExists ∅. iSplitR; first done. replace (⊤ : coPset) with (⊤ ∖ gset_to_coPset ∅); [iFrame; done|]. set_solver. }
   iSplitR; first done.
