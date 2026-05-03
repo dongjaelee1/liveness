@@ -47,6 +47,8 @@ liris/bi/weakestpre.v
 #liris/cgraphs/uforests.v
 #liris/cgraphs/cgraph.v
 
+liris/algebra/map_of_sets.v
+# liris/algebra/tree.v
 liris/algebra/ocm.v
 liris/algebra/wfocm.v
 liris/algebra/ordinal_wfocm.v
@@ -57,7 +59,6 @@ liris/algebra/execution.v
 liris/algebra/bank.v
 liris/algebra/bcred.v
 liris/algebra/auth_mra.v
-# liris/algebra/tree.v
 liris/algebra/ordinal_ucmra.v
 liris/algebra/ordinal_existential_properties.v
 
