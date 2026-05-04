@@ -651,6 +651,16 @@ Section othread.
     destruct H as (?&?&?). iPureIntro. apply leibniz_equiv in H1. auto.
   Qed.
 
+  Lemma othreadG_proxy_obls_valid i π1 π2 K1 K2 :
+    othreadG_proxy_obls i π1 K1 ∗ othreadG_proxy_obls i π2 K2
+    ⊢ ⌜ π1 ≠ π2 ⌝.
+  Proof.
+    rewrite /othreadG_proxy_obls -!own_op -reservation_map_data_op.
+    iIntros "H". iPoseProof (own_valid with "H") as "%".
+    destruct (decide (π1 = π2)); auto. subst.
+    apply reservation_map_data_valid, gmap_view_frag_op_valid in H. destruct H. done.
+  Qed.
+
   (** Session rules *)
   Lemma othreadG_proxy_session_alloc_auth D i :
     i ∉ D →
@@ -1159,479 +1169,272 @@ Section othread.
     iPoseProof (big_sepM2_delete _ _ _ π with "OFs") as "[_ $]"; eauto.
   Qed.
 
-  TODO
-    mostly fix below lemmas
-
-  Lemma oproxy_alloc_obl_private Ω TP i V q1 q2 ev βv k :
+  Lemma oproxy_alloc_obl Ω TP i π s q K β k :
+    i ∈ TP →
     osat Ω ∗ othread TP ∗ oproxy TP ∗
-    othreadG_elem i ∗ othreadG_frag_private i V q1 ∗ othreadG_session_private i ev q2 ∗ othreadG_bound ev βv ∗
-    oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel k βv
+    othreadG_proxy_obls i π K ∗ othreadG_proxy_session i π s q ∗ othreadG_bound s β ∗
+    oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel k β
     ⊢ |==> osat Ω ∗ othread TP ∗ oproxy TP ∗
-        ⌜k ∉ V⌝ ∗ othreadG_frag_private i ({[k]} ∪ V) q1 ∗ othreadG_session_private i ev q2 ∗
+        ⌜k ∉ K⌝ ∗ othreadG_proxy_obls i π ({[k]} ∪ K) ∗ othreadG_proxy_session i π s q ∗
         othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
   Proof.
-    iIntros "(S& T& F& #Te& Fv& Tv& #Bv& #Oe& Oo& Of)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
+    iIntros (Ini) "(S& T& P& Po& Ps& #Tb& #Oe& Oo& Of)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv0& #Bu& Fvs& Fus)".
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa& Hex& OFs)".
+    iPoseProof (othreadG_proxy_session_lookup with "[$Psa $Ps]") as "%LUs".
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa $Po]") as "%LUo".
     iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& Tv1& _)". rewrite /othreadG_session_private.
-      iCombine "Tv Tv1" as "Tv" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
-      apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (ghost_map_lookup with "TVA Tv") as "%". rewrite LUi1 in H. inversion H; clear H. subst ev0.
-    iPoseProof (othreadG_bound_op _ βv βv0 with "[$Bv $Bv0]") as "(%βv1& #Bv1& %Hbv)".
-    destruct Hbv as [Hbv1 Hbv2]. iClear "Bv Bv0".
-    iPoseProof (othreadG_frag_private_lookup_frac with "[$FVA $Fv]") as "(%& %& %)".
-    rewrite LUi3 in H. inversion H; clear H. subst G'. rename H0 into Hsub.
+    { iDestruct "Hex" as "(_& _& %)". destruct H. subst. done. }
+    iDestruct "Hex" as "(%& Tx& TG& %)". destruct H as [Uni Disj].
+    iPoseProof (big_sepM2_delete _ _ _ _ _ _ LUo LUs with "OFs") as "[Hp OFs]".
+    iDestruct "Hp" as "(%& #Tb0& Hfs)".
+    iPoseProof (othreadG_bound_op _ β β0 with "[$Tb $Tb0]") as "(%β1& #Tb1& %Hb)".
+    destruct Hb as [Hb1 Hb2]. iClear "Tb Tb0".
     iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
-    iMod (othreadG_frag_private_update_local _ _ _ V0 ({[k]} ∪ V0) _ ({[k]} ∪ V) with "[$FVA $Fv]") as "[FVA Fv]";
-      [eauto | | ].
-    { apply gset_disj_alloc_local_update. set_solver. }
-    replace ({[k]} ∪ (V0 ∪ U)) with (({[k]} ∪ V0) ∪ U) by set_solver.
-    iModIntro. iFrame "S T TVA TUA FVA FUA FT Fv Tv To Oo".
-    iSplit.
-    { iSplit.
-      { iPureIntro. split_and !; auto. rewrite dom_insert_L. apply elem_of_dom_2 in LUi3. rewrite -Dom3. set_solver. }
-      iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-      - iExists ev, eu, βv1, βu, ({[k]} ∪ V0), U. iSplitR.
-        { iPureIntro. split_and !; auto.
-          - rewrite lookup_insert_eq. auto.
-          - set_solver. }
-        iSplitL "Tx TG".
-        { iLeft. iFrame. }
-        iFrame "Bv1 Bu". iFrame. iApply big_sepS_union. 1: set_solver.
-        iSplitR "Fvs".
-        { rewrite big_sepS_singleton. iFrame. iFrame "Oe". iPureIntro. auto. }
-        iApply (big_sepS_impl with "Fvs"). iIntros "!> %% (%&%&H)". iFrame.
-        iPureIntro. etrans; eauto.
-      - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-        iPureIntro. destruct H0 as (?&?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
-        rewrite lookup_insert_ne; auto. }
-    { iPureIntro. set_solver. }
+    iMod (othreadG_proxy_obls_update _ _ _ _ ({[k]} ∪ K) with "[$Poa $Po]") as "[Poa Po]".
+    iModIntro. iFrame "S T FT ST PT Ps To Oo Po".
+    assert (Nink2 : k ∉ K).
+    { simplify_eq. rewrite not_elem_of_union_sets in Nink. eapply Nink; eauto. }
+    iSplit. 2: auto.
+    iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+    iFrame "Poa Psa". iSplitR.
+    { iPureIntro. rewrite dom_insert_L. apply elem_of_dom_2 in LUo. set_solver. }
+    iSplitL "Tx TG".
+    { iLeft. iFrame. iPureIntro. replace ({[k]} ∪ K) with (K ∪ {[k]}) by set_solver. simplify_eq. split.
+      - rewrite union_sets_insert_union_L; auto.
+      - apply disjoint_sets_insert_union_singleton_not_in; auto. }
+    iEval (rewrite -(insert_id _ _ _ LUs)). iApply big_sepM2_insert_delete.
+    iFrame "OFs Tb1". iApply (big_sepS_union). 1: set_solver.
+    iSplitR "Hfs".
+    { iApply big_sepS_singleton. iFrame "Of Oe". iPureIntro. eauto. }
+    { iApply (big_sepS_impl with "Hfs"). iIntros "!> %% (%&%&$&$)". iPureIntro. etrans; eauto. }
   Qed.
 
-  Lemma oproxy_alloc_obl_public Ω TP i U q1 q2 eu βu k :
-    osat Ω ∗ othread TP ∗ oproxy TP ∗
-    othreadG_elem i ∗ othreadG_frag_public i U q1 ∗ othreadG_session_public i eu q2 ∗ othreadG_bound eu βu ∗
-    oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel k βu
-    ⊢ |==> osat Ω ∗ othread TP ∗ oproxy TP ∗
-        ⌜k ∉ U⌝ ∗ othreadG_frag_public i ({[k]} ∪ U) q1 ∗ othreadG_session_public i eu q2 ∗
-        othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
-  Proof.
-    iIntros "(S& T& F& #Te& Fu& Tu& #Bu& #Oe& Oo& Of)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
-    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu0& Fvs& Fus)".
-    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& _& _& Tu1)". rewrite /othreadG_session_public.
-      iCombine "Tu Tu1" as "Tu" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
-      apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (ghost_map_lookup with "TUA Tu") as "%". rewrite LUi2 in H. inversion H; clear H. subst eu0.
-    iPoseProof (othreadG_bound_op _ βu βu0 with "[$Bu $Bu0]") as "(%βu1& #Bu1& %Hbu)".
-    destruct Hbu as [Hbu1 Hbu2]. iClear "Bu Bu0".
-    iPoseProof (othreadG_frag_public_lookup_frac with "[$FUA $Fu]") as "(%& %& %)".
-    rewrite LUi4 in H. inversion H; clear H. subst G'. rename H0 into Hsub.
-    iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
-    iMod (othreadG_frag_public_update_local _ _ _ U0 ({[k]} ∪ U0) _ ({[k]} ∪ U) with "[$FUA $Fu]") as "[FUA Fu]";
-      [eauto | | ].
-    { apply gset_disj_alloc_local_update. set_solver. }
-    replace ({[k]} ∪ (V ∪ U0)) with (V ∪ ({[k]} ∪ U0)) by set_solver.
-    iModIntro. iFrame "S T TVA TUA FVA FUA FT Fu Tu To Oo".
-    iSplit.
-    { iSplit.
-      { iPureIntro. split_and !; auto. rewrite dom_insert_L. apply elem_of_dom_2 in LUi4. rewrite -Dom4. set_solver. }
-      iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-      - iExists ev, eu, βv, βu1, V, ({[k]} ∪ U0). iSplitR.
-        { iPureIntro. split_and !; auto.
-          - rewrite lookup_insert_eq. auto.
-          - set_solver. }
-        iSplitL "Tx TG".
-        { iLeft. iFrame. }
-        iFrame "Bv Bu1". iFrame. iApply big_sepS_union. 1: set_solver.
-        iSplitR "Fus".
-        { rewrite big_sepS_singleton. iFrame. iFrame "Oe". iPureIntro. auto. }
-        iApply (big_sepS_impl with "Fus"). iIntros "!> %% (%&%&H)". iFrame.
-        iPureIntro. etrans; eauto.
-      - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-        iPureIntro. destruct H0 as (?&?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
-        rewrite lookup_insert_ne; auto. }
-    { iPureIntro. set_solver. }
-  Qed.
-
-  Lemma oproxy_delete_obl_private TP i V q k :
-    k ∈ V →
-    othread TP ∗ oproxy TP ∗
-    othreadG_elem i ∗ othreadG_frag_private i V q ∗ othreadG_owns i k 1
-    ⊢ |==> othread TP ∗ oproxy TP ∗
-        othreadG_frag_private i (V ∖ {[k]}) q ∗ oblG_owner k i (1/2/2/2/2)%Qp.
-  Proof.
-    iIntros (Ink) "(T& F& #Te& Fv& To)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
-    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv0& #Bu& Fvs& Fus)".
-    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& Fv1& _)".
-      iPoseProof (othreadG_frag_private_valid_2 with "[$Fv $Fv1]") as "%". destruct H.
-      apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (othreadG_frag_private_lookup_frac with "[$FVA $Fv]") as "(%& %& %)".
-    rewrite LUi3 in H. inversion H; clear H. subst G'. rename H0 into Hsub.
-    iMod (othread_delete_obl with "[$T $TG $To]") as "(T& TG& Oo)".
-    iMod (othreadG_frag_private_update_local _ _ _ V0 (V0 ∖ {[k]}) _ (V ∖ {[k]}) with "[$FVA $Fv]") as "[FVA Fv]";
-      [eauto | | ].
-    { etrans; last eapply (gset_disj_dealloc_op_local_update _ _ {[k]}).
-      rewrite !gset_disj_union. 2,3: set_solver.
-      rewrite -!union_difference_L. 1: done. all: set_solver. }
-    iModIntro. iFrame "T TVA TUA FVA FUA FT Fv Oo".
-    iSplit.
-    { iPureIntro. split_and !; auto. rewrite dom_insert_L. apply elem_of_dom_2 in LUi3. rewrite -Dom3. set_solver. }
-    iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-    - iExists ev, eu, βv, βu, (V0 ∖ {[k]}), U. iSplitR.
-      { iPureIntro. split_and !; auto.
-        - rewrite lookup_insert_eq. auto.
-        - set_solver. }
-      iSplitL "Tx TG".
-      { iLeft. replace ((V0 ∪ U) ∖ {[k]}) with (V0 ∖ {[k]} ∪ U) by set_solver. iFrame. }
-      iFrame "Bv0 Bu". iFrame. iPoseProof (big_sepS_delete _ _ k with "Fvs") as "[_ $]". set_solver.
-    - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-      iPureIntro. destruct H0 as (?&?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
-      rewrite lookup_insert_ne; auto.
-  Qed.
-
-  Lemma oproxy_delete_obl_public TP i U q k :
-    k ∈ U →
-    othread TP ∗ oproxy TP ∗
-    othreadG_elem i ∗ othreadG_frag_public i U q ∗ othreadG_owns i k 1
-    ⊢ |==> othread TP ∗ oproxy TP ∗
-        othreadG_frag_public i (U ∖ {[k]}) q ∗ oblG_owner k i (1/2/2/2/2)%Qp.
-  Proof.
-    iIntros (Ink) "(T& F& #Te& Fu& To)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
-    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv0& #Bu& Fvs& Fus)".
-    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& _& Fu1& _)".
-      iPoseProof (othreadG_frag_public_valid_2 with "[$Fu $Fu1]") as "%". destruct H.
-      apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (othreadG_frag_public_lookup_frac with "[$FUA $Fu]") as "(%& %& %)".
-    rewrite LUi4 in H. inversion H; clear H. subst G'. rename H0 into Hsub.
-    iMod (othread_delete_obl with "[$T $TG $To]") as "(T& TG& Oo)".
-    iMod (othreadG_frag_public_update_local _ _ _ U0 (U0 ∖ {[k]}) _ (U ∖ {[k]}) with "[$FUA $Fu]") as "[FUA Fu]";
-      [eauto | | ].
-    { etrans; last eapply (gset_disj_dealloc_op_local_update _ _ {[k]}).
-      rewrite !gset_disj_union. 2,3: set_solver.
-      rewrite -!union_difference_L. 1: done. all: set_solver. }
-    iModIntro. iFrame "T TVA TUA FVA FUA FT Fu Oo".
-    iSplit.
-    { iPureIntro. split_and !; auto. rewrite dom_insert_L. set_solver. }
-    iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-    - iExists ev, eu, βv, βu, V, (U0 ∖ {[k]}). iSplitR.
-      { iPureIntro. split_and !; auto.
-        - rewrite lookup_insert_eq. auto.
-        - set_solver. }
-      iSplitL "Tx TG".
-      { iLeft. replace ((V ∪ U0) ∖ {[k]}) with (V ∪ (U0 ∖ {[k]})) by set_solver. iFrame. }
-      iFrame "Bv0 Bu". iFrame. iPoseProof (big_sepS_delete _ _ k with "Fus") as "[_ $]". set_solver.
-    - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-      iPureIntro. destruct H0 as (?&?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
-      rewrite lookup_insert_ne; auto.
-  Qed.
-
-  Lemma oproxy_obl_private_to_public TP i V U q1 q2 q3 q4 ev eu βu k :
+  Lemma oproxy_delete_obl TP i π K k :
     i ∈ TP →
-    k ∈ V →
-    oproxy TP ∗ 
-    othreadG_frag_private i V q1 ∗ othreadG_session_private i ev q2 ∗
-    othreadG_frag_public i U q3 ∗ othreadG_session_public i eu q4 ∗
-    othreadG_bound eu βu ∗ oblG_fuel k βu
-    ⊢ |==> oproxy TP ∗
-        othreadG_frag_private i (V ∖ {[k]}) q1 ∗ othreadG_session_private i ev q2 ∗
-        othreadG_frag_public i (U ∪ {[k]}) q3 ∗ othreadG_session_public i eu q4.
-  Proof.
-    iIntros (Ini Ink) "(F& Fv& Tv& Fu& Tu& #Bu& Of)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu0& Fvs& Fus)".
-    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& Tv1& _)". rewrite /othreadG_session_private.
-      iCombine "Tv Tv1" as "Tv" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
-      apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (ghost_map_lookup with "TVA Tv") as "%". rewrite LUi1 in H. inversion H; clear H. subst ev0.
-    iPoseProof (othreadG_frag_private_lookup_frac with "[$FVA $Fv]") as "(%& %& %)".
-    rewrite LUi3 in H. inversion H; clear H. subst G'. rename H0 into HsubV.
-    iPoseProof (ghost_map_lookup with "TUA Tu") as "%". rewrite LUi2 in H. inversion H; clear H. subst eu0.
-    iPoseProof (othreadG_frag_public_lookup_frac with "[$FUA $Fu]") as "(%& %& %)".
-    rewrite LUi4 in H. inversion H; clear H. subst G'. rename H0 into HsubU.
-    assert (Ink2 : k ∈ V0) by set_solver.
-    iPoseProof (big_sepS_delete _ _ _ Ink2 with "Fvs") as "[(%&_&_&#Ok) Fvs]". clear a.
-    iPoseProof (othreadG_bound_op _ βu βu0 with "[$Bu $Bu0]") as "(%βu1& #Bu1& %Hbu)".
-    destruct Hbu as [Hbu1 Hbu2]. iClear "Bu Bu0".
-    iMod (othreadG_frag_private_update_local _ _ _ V0 (V0 ∖ {[k]}) _ (V ∖ {[k]}) with "[$FVA $Fv]") as "[FVA Fv]";
-      [eauto | | ].
-    { etrans; last eapply (gset_disj_dealloc_op_local_update _ _ {[k]}).
-      rewrite !gset_disj_union. 2,3: set_solver.
-      rewrite -!union_difference_L. 1: done. all: set_solver. }
-    iMod (othreadG_frag_public_update_local _ _ _ U0 ({[k]} ∪ U0) _ ({[k]} ∪ U) with "[$FUA $Fu]") as "[FUA Fu]";
-      [eauto | | ].
-    { apply gset_disj_alloc_local_update. set_solver. }
-    replace ({[k]} ∪ U) with (U ∪ {[k]}) by set_solver.
-    iModIntro. iFrame "TVA TUA FVA FUA FT Fv Tv Fu Tu".
-    iSplit.
-    { iPureIntro. rewrite !dom_insert_L. split_and !; auto. all: set_solver. }
-    iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-    - iExists ev, eu, βv, βu1, (V0 ∖ {[k]}), ({[k]} ∪ U0). iSplitR.
-      { iPureIntro. split_and !; auto.
-        - rewrite lookup_insert_eq. auto.
-        - rewrite lookup_insert_eq. auto.
-        - set_solver. }
-      iSplitL "Tx TG".
-      { iLeft. replace (V0 ∖ {[k]} ∪ ({[k]} ∪ U0)) with (V0 ∪ U0). 1: iFrame.
-        rewrite union_assoc_L. rewrite difference_union_L. set_solver. }
-      iFrame "Bv Bu1". iFrame. iApply (big_sepS_union). 1: set_solver.
-      iSplitR "Fus".
-      + iApply big_sepS_singleton. iFrame. iFrame "Ok". iPureIntro. auto.
-      + iApply (big_sepS_impl with "Fus"). iIntros "!> %% (%& %& $& $)". iPureIntro. etrans; eauto.
-    - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-      iPureIntro. destruct H0 as (?&?&?&?&?). assert (x ≠ i) by set_solver + H. rewrite !lookup_insert_ne; auto.
-  Qed.
-
-  Lemma oproxy_obl_public_to_private TP i U V q1 q2 q3 q4 eu ev βv k :
-    i ∈ TP →
-    k ∈ U →
-    oproxy TP ∗ 
-    othreadG_frag_public i U q1 ∗ othreadG_session_public i eu q2 ∗
-    othreadG_frag_private i V q3 ∗ othreadG_session_private i ev q4 ∗
-    othreadG_bound ev βv ∗ oblG_fuel k βv
-    ⊢ |==> oproxy TP ∗
-        othreadG_frag_public i (U ∖ {[k]}) q1 ∗ othreadG_session_public i eu q2 ∗
-        othreadG_frag_private i (V ∪ {[k]}) q3 ∗ othreadG_session_private i ev q4.
-  Proof.
-    iIntros (Ini Ink) "(F& Fu& Tu& Fv& Tv& #Bv& Of)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv0& #Bu& Fvs& Fus)".
-    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& Tv1& _)". rewrite /othreadG_session_private.
-      iCombine "Tv Tv1" as "Tv" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
-      apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (ghost_map_lookup with "TVA Tv") as "%". rewrite LUi1 in H. inversion H; clear H. subst ev0.
-    iPoseProof (othreadG_frag_private_lookup_frac with "[$FVA $Fv]") as "(%& %& %)".
-    rewrite LUi3 in H. inversion H; clear H. subst G'. rename H0 into HsubV.
-    iPoseProof (ghost_map_lookup with "TUA Tu") as "%". rewrite LUi2 in H. inversion H; clear H. subst eu0.
-    iPoseProof (othreadG_frag_public_lookup_frac with "[$FUA $Fu]") as "(%& %& %)".
-    rewrite LUi4 in H. inversion H; clear H. subst G'. rename H0 into HsubU.
-    assert (Ink2 : k ∈ U0) by set_solver.
-    iPoseProof (big_sepS_delete _ _ _ Ink2 with "Fus") as "[(%&_&_&#Ok) Fus]". clear a.
-    iPoseProof (othreadG_bound_op _ βv βv0 with "[$Bv $Bv0]") as "(%βv1& #Bv1& %Hbv)".
-    destruct Hbv as [Hbv1 Hbv2]. iClear "Bv Bv0".
-    iMod (othreadG_frag_public_update_local _ _ _ U0 (U0 ∖ {[k]}) _ (U ∖ {[k]}) with "[$FUA $Fu]") as "[FUA Fu]";
-      [eauto | | ].
-    { etrans; last eapply (gset_disj_dealloc_op_local_update _ _ {[k]}).
-      rewrite !gset_disj_union. 2,3: set_solver.
-      rewrite -!union_difference_L. 1: done. all: set_solver. }
-    iMod (othreadG_frag_private_update_local _ _ _ V0 ({[k]} ∪ V0) _ ({[k]} ∪ V) with "[$FVA $Fv]") as "[FVA Fv]";
-      [eauto | | ].
-    { apply gset_disj_alloc_local_update. set_solver. }
-    replace ({[k]} ∪ V) with (V ∪ {[k]}) by set_solver.
-    iModIntro. iFrame "TVA TUA FVA FUA FT Fv Tv Fu Tu".
-    iSplit.
-    { iPureIntro. rewrite !dom_insert_L. split_and !; auto. all: set_solver. }
-    iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-    - iExists ev, eu, βv1, βu, ({[k]} ∪ V0), (U0 ∖ {[k]}). iSplitR.
-      { iPureIntro. split_and !; auto.
-        - rewrite lookup_insert_eq. auto.
-        - rewrite lookup_insert_eq. auto.
-        - set_solver. }
-      iSplitL "Tx TG".
-      { iLeft. replace ({[k]} ∪ V0 ∪ U0 ∖ {[k]}) with (V0 ∪ U0). 1: iFrame.
-        rewrite (union_comm_L {[k]}). rewrite -union_assoc_L. rewrite -union_difference_L; set_solver. }
-      iFrame "Bv1 Bu". iFrame. iApply (big_sepS_union). 1: set_solver.
-      iSplitR "Fvs".
-      + iApply big_sepS_singleton. iFrame. iFrame "Ok". iPureIntro. auto.
-      + iApply (big_sepS_impl with "Fvs"). iIntros "!> %% (%& %& $& $)". iPureIntro. etrans; eauto.
-    - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-      iPureIntro. destruct H0 as (?&?&?&?&?). assert (x ≠ i) by set_solver + H. rewrite !lookup_insert_ne; auto.
-  Qed.
-
-  Lemma oproxy_exec_to_done TP i ev eu :
+    k ∈ K →
     othread TP ∗ oproxy TP ∗
-    othreadG_exec i (1/2)%Qp ∗ othreadG_elem i ∗
-    othreadG_frag_private i ∅ 1 ∗ othreadG_session_private i ev 1 ∗
-    othreadG_frag_public i ∅ 1 ∗ othreadG_session_public i eu 1
+    othreadG_proxy_obls i π K ∗ othreadG_owns i k 1
+    ⊢ |==> othread TP ∗ oproxy TP ∗
+        othreadG_proxy_obls i π (K ∖ {[k]}) ∗ oblG_owner k i (1/2/2/2/2)%Qp.
+  Proof.
+    iIntros (Ini Ink) "(T& P& Po& To)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
+    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa& Hex& OFs)".
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa $Po]") as "%LUo".
+    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& _& %)". destruct H. subst. done. }
+    iDestruct "Hex" as "(%& Tx& TG& %)". destruct H as [Uni Disj].
+    iPoseProof (big_sepM2_delete_l _ _ _ _ _ LUo with "OFs") as "(%s& %LUs& Hp& OFs)".
+    iDestruct "Hp" as "(%& #Tb& Hfs)".
+    iMod (othread_delete_obl with "[$T $TG $To]") as "(T& TG& Oo)".
+    iMod (othreadG_proxy_obls_update _ _ _ _ (K ∖ {[k]}) with "[$Poa $Po]") as "[Poa Po]".
+    iModIntro. iFrame "T FT ST PT Oo Po".
+    iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+    iFrame "Poa Psa". iSplitR.
+    { iPureIntro. rewrite dom_insert_L. apply elem_of_dom_2 in LUo. set_solver. }
+    iSplitL "Tx TG".
+    { iLeft. iFrame. iPureIntro. simplify_eq. split.
+      - rewrite union_sets_insert_difference_singleton_L; auto.
+      - apply disjoint_sets_insert_difference; auto. }
+    iEval (rewrite -(insert_id _ _ _ LUs)). iApply big_sepM2_insert_delete.
+    iFrame "OFs". iFrame "Tb". iPoseProof (big_sepS_delete with "Hfs") as "[_ $]". auto.
+  Qed.
+
+  Lemma oproxy_obl_change_proxy TP i π1 π2 K1 K2 s2 q2 β k :
+    i ∈ TP →
+    k ∈ K1 →
+    oproxy TP ∗
+    othreadG_proxy_obls i π1 K1 ∗
+    othreadG_proxy_obls i π2 K2 ∗ othreadG_proxy_session i π2 s2 q2 ∗
+    othreadG_bound s2 β ∗ oblG_fuel k β
+    ⊢ |==> oproxy TP ∗
+        othreadG_proxy_obls i π1 (K1 ∖ {[k]}) ∗
+        othreadG_proxy_obls i π2 (K2 ∪ {[k]}) ∗ othreadG_proxy_session i π2 s2 q2.
+  Proof.
+    iIntros (Ini Ink) "(P& Po1& Po2& Ps2& #Tb& Of)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
+    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa& Hex& OFs)".
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa $Po1]") as "%LUo1".
+    assert (is_Some (Ss !! π1)) as (s1& LUs1).
+    { apply elem_of_dom. apply elem_of_dom_2 in LUo1. rewrite -Dom. auto. }
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa $Po2]") as "%LUo2".
+    iPoseProof (othreadG_proxy_session_lookup with "[$Psa $Ps2]") as "%LUs2".
+    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& _& %)". destruct H. subst. done. }
+    iDestruct "Hex" as "(%& Tx& TG& %)". destruct H as [Uni Disj].
+    iPoseProof (othreadG_proxy_obls_valid _ π1 π2 with "[$Po1 $Po2]") as "%Neqp".
+    iMod (othreadG_proxy_obls_update _ _ _ _ (K1 ∖ {[k]}) with "[$Poa $Po1]") as "[Poa Po1]".
+    iMod (othreadG_proxy_obls_update _ _ _ _ (K2 ∪ {[k]}) with "[$Poa $Po2]") as "[Poa Po2]".
+    iModIntro. iFrame "FT ST PT Po1 Po2 Ps2".
+    iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+    iFrame "Poa Psa". iSplitR.
+    { iPureIntro. rewrite !dom_insert_L. apply elem_of_dom_2 in LUo1, LUo2. set_solver. }
+    iSplitL "Tx TG".
+    { iLeft. iFrame. iPureIntro. assert (Ink2 : k ∈ union_sets Ks).
+      { apply elem_of_union_sets; eauto. }
+      simplify_eq. split.
+      - rewrite union_sets_insert_union_L; cycle 1.
+        { rewrite lookup_insert_ne; auto. }
+        rewrite union_sets_insert_difference_singleton_L; auto. rewrite -union_difference_L; set_solver.
+      - apply disjoint_sets_insert_union_singleton_not_in.
+        { rewrite lookup_insert_ne; auto. }
+        { apply disjoint_sets_insert_difference; auto. }
+        { apply not_elem_of_union_sets. intros. destruct (decide (k0 = π1)).
+          - subst. rewrite lookup_insert_eq in H. simplify_eq. set_solver.
+          - rewrite lookup_insert_ne in H; auto. specialize (Disj _ _ _ _ n H LUo1). set_solver. }
+    }
+    iEval (rewrite -(insert_id _ _ _ LUs1)). assert (LUs3 : <[π1:=s1]> Ss !! π2 = Some s2).
+    { rewrite lookup_insert_ne; auto. }
+    iEval (rewrite -(insert_id _ _ _ LUs3)). iApply big_sepM2_insert_delete.
+    iPoseProof (big_sepM2_delete _ _ _ _ _ _ LUo2 LUs2 with "OFs") as "[Fs2 OFs]".
+    iPoseProof (big_sepM2_delete _ _ _ π1 K1 s1 with "OFs") as "[Fs1 OFs]".
+    { rewrite lookup_delete_ne; auto. }
+    { rewrite lookup_delete_ne; auto. }
+    iDestruct "Fs1" as "(%βp1& #Bp1& Fs1)". iPoseProof (big_sepS_delete _ _ _ Ink with "Fs1") as "[Fk Fs1]".
+    iSplitL "Of Fk Fs2".
+    { iDestruct "Fk" as "(%&%&_&#Oe)". iDestruct "Fs2" as "(%& #Tb0& Fs)".
+      iPoseProof (othreadG_bound_op _ β β0 with "[$Tb $Tb0]") as "(%β1& #Tb1& %Hb)".
+      destruct Hb as [Hb1 Hb2]. iClear "Tb Tb0".
+      iFrame "Tb1". iApply big_sepS_union.
+      { specialize (Disj _ _ _ _ Neqp LUo1 LUo2). set_solver. }
+      iSplitL "Fs".
+      { iApply (big_sepS_impl with "Fs"). iIntros "!> %% (%& %& $& $)". iPureIntro. etrans; eauto. }
+      iApply big_sepS_singleton. iFrame "Oe Of". iPureIntro. auto. }
+    rewrite !delete_insert_ne; auto. iApply big_sepM2_insert_delete. iFrame "OFs".
+    iFrame "Bp1". iFrame.
+  Qed.
+
+  Lemma oproxy_exec_to_done TP i :
+    i ∈ TP →
+    othread TP ∗ oproxy TP ∗
+    othreadG_exec i (1/2)%Qp ∗ othreadG_proxy_session_auth i ∅ (1/2)%Qp
     ⊢ |==> othread TP ∗ oproxy TP ∗ othreadG_done i.
   Proof.
-    iIntros "(T& F& Tx& #Te& Fv& Tv& Fu& Tu)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
+    iIntros (Ini) "(T& P& Tx& Psa)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu& Fvs& Fus)".
-    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& Tv1& _)". rewrite /othreadG_session_private.
-      iCombine "Tv Tv1" as "Tv" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
-      apply Qp.not_add_le_r in H. done. }
-    iDestruct "Hex" as "(Tx2& TG)". destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa0& Hex& OFs)".
+    iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa0]") as "%". destruct H as [<- _].
+    apply dom_empty_inv_L in Dom. subst. iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& Psa1& _)". iCombine "Psa Psa0" as "Psa".
+      iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa1]") as "%". destruct H. done. }
+    iDestruct "Hex" as "(%& Tx2& TG& %)". destruct H as [Uni Disj].
+    rewrite union_sets_empty in Uni. subst.
     iCombine "Tx Tx2" as "Tx".
-    iPoseProof (ghost_map_lookup with "TVA Tv") as "%". rewrite LUi1 in H. inversion H; clear H. subst ev0.
-    iPoseProof (ghost_map_lookup with "TUA Tu") as "%". rewrite LUi2 in H. inversion H; clear H. subst eu0.
-    iPoseProof (othreadG_frag_private_lookup with "[$FVA $Fv]") as "%".
-    rewrite LUi3 in H. inversion H; clear H. subst V.
-    iPoseProof (othreadG_frag_public_lookup with "[$FUA $Fu]") as "%".
-    rewrite LUi4 in H. inversion H; clear H. subst U.
     iMod (othread_exec_to_done with "[$T $Tx $TG]") as "[T #Td]".
-    iModIntro. iFrame "T TVA TUA FVA FUA FT Td".
-    iSplit.
-    { iPureIntro. split_and !; auto. }
-    iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-    - iExists ev, eu, βv, βu, ∅, ∅. iSplitR.
-      { iPureIntro. split_and !; auto. }
-      iSplitL "Fv Tv Fu Tu".
-      { iRight. iFrame. auto. }
-      iFrame "Bv Bu". iSplitR; done.
-    - iFrame.
+    iModIntro. iFrame "T FT ST PT Td".
+    iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+    iFrame "Psa0 Poa". iSplit. 1: done.
+    iSplitL "Psa".
+    { iRight. iFrame. eauto. }
+    done.
   Qed.
 
-  Lemma oproxy_new_session_private TP i V ev0 βv :
+  Lemma oproxy_proxy_new_session TP i π K PS s1 β :
     i ∈ TP →
-    oproxy TP ∗ othreadG_frag_private i V 1 ∗
-    othreadG_session_private i ev0 1 ∗
-    ([∗ set] v ∈ V, oblG_fuel v βv)
-    ⊢ |==> ∃ ev1, oproxy TP ∗ othreadG_frag_private i V 1 ∗
-               othreadG_session_private i ev1 1 ∗ othreadG_bound ev1 βv ∗
-               othreadG_fuel ev1 βv.
+    oproxy TP ∗ othreadG_proxy_obls i π K ∗
+    othreadG_proxy_session_auth i PS (1/2)%Qp ∗ othreadG_proxy_session i π s1 1 ∗
+    ([∗ set] k ∈ K, oblG_fuel k β)
+    ⊢ |==> ∃ s2, oproxy TP ∗ othreadG_proxy_obls i π K ∗
+              othreadG_proxy_session_auth i (<[π:=s2]>PS) (1/2)%Qp ∗ othreadG_proxy_session i π s2 1 ∗
+              othreadG_bound s2 β ∗ othreadG_fuel s2 β.
   Proof.
-    iIntros (Ini) "(F& Fv& Tv& Fvs)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
+    iIntros (Ini) "(P& Po& Psa& Ps& KFs)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu& Fvs0& Fus)".
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa0& Hex& OFs)".
+    iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa0]") as "%". destruct H as [<- _].
+    iCombine "Psa Psa0" as "Psa".
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa $Po]") as "%LUo".
+    iPoseProof (othreadG_proxy_session_lookup with "[$Psa $Ps]") as "%LUs".
     iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& Tv1& _)". rewrite /othreadG_session_private.
-      iCombine "Tv Tv1" as "Tv" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
-      apply Qp.not_add_le_r in H. done. }
-    destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (othreadG_frag_private_lookup with "[$FVA $Fv]") as "%".
-    rewrite LUi3 in H. inversion H; clear H. subst V0.
-    assert (∃ ev1, ev1 ∉ Df) as (ev1&Hev).
+    { iDestruct "Hex" as "(_& Psa1& _)".
+      iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa1]") as "%". destruct H. done. }
+    iDestruct "Hex" as "(%& Tx& TG& %)". destruct H as [Uni Disj].
+    assert (∃ s2, s2 ∉ Df) as (s2&Hs).
     { eexists. eapply is_fresh. }
-    iMod (othreadG_bound_id_alloc _ _ βv Hev with "FT") as "(FT& #Bv1& Hfv)".
-    iMod (ghost_map_update ev1 with "TVA Tv") as "[TVA Tv]".
-    iModIntro. rewrite /othreadG_session_private. iFrame "TVA TUA FVA FUA FT Fv Hfv Tv Bv1".
-    iSplit.
-    { iPureIntro. split_and !; auto. rewrite dom_insert_L. apply elem_of_dom_2 in LUi3. rewrite -Dom3. set_solver. }
-    iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-    - iExists ev1, eu, βv, βu, V, U. iSplitR.
-      { iPureIntro. split_and !; auto. rewrite lookup_insert_eq. auto. }
-      iFrame. iFrame "Bv1 Bu". iPoseProof (big_sepS_sep_2 with "Fvs Fvs0") as "Fvs".
-      iApply (big_sepS_impl with "Fvs"). iIntros "!> %% ($& (%&%&_&$))". done.
-    - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-      iPureIntro. destruct H0 as (?&?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
-      rewrite lookup_insert_ne; auto.
+    iMod (othreadG_bound_id_alloc _ _ β Hs with "FT") as "(FT& #Tb& Hfs)".
+    iMod (othreadG_proxy_session_update _ _ _ _ s2 with "[$Psa $Ps]") as "[[Psa Psa0] Ps]".
+    iModIntro. iFrame "FT ST PT Po Hfs Psa Ps Tb".
+    iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+    iFrame "Poa Psa0". iSplit.
+    { iPureIntro. rewrite dom_insert_L. apply elem_of_dom_2 in LUs. set_solver. }
+    iSplitL "Tx TG".
+    { iLeft. iFrame. eauto. }
+    iEval (rewrite -(insert_id _ _ _ LUo)). iApply big_sepM2_insert_delete.
+    iPoseProof (big_sepM2_delete _ _ _ _ _ _ LUo LUs with "OFs") as "[Fs $]".
+    iDestruct "Fs" as "(%& _& Fs)". iPoseProof (big_sepS_sep_2 with "KFs Fs") as "Fs".
+    iFrame "Tb". iApply (big_sepS_impl with "Fs"). iIntros "!> %% ($& %& _& _& $)". auto.
   Qed.
 
-  Lemma oproxy_new_session_public TP i U eu0 βu :
-    i ∈ TP →
-    oproxy TP ∗ othreadG_frag_public i U 1 ∗
-    othreadG_session_public i eu0 1 ∗
-    ([∗ set] u ∈ U, oblG_fuel u βu)
-    ⊢ |==> ∃ eu1, oproxy TP ∗ othreadG_frag_public i U 1 ∗
-               othreadG_session_public i eu1 1 ∗ othreadG_bound eu1 βu ∗
-               othreadG_fuel eu1 βu.
-  Proof.
-    iIntros (Ini) "(F& Fu& Tu& Fus)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu& Fvs& Fus0)".
-    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& _& _& Tu1)". rewrite /othreadG_session_public.
-      iCombine "Tu Tu1" as "Tu" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
-      apply Qp.not_add_le_r in H. done. }
-    destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (othreadG_frag_public_lookup with "[$FUA $Fu]") as "%".
-    rewrite LUi4 in H. inversion H; clear H. subst U0.
-    assert (∃ eu1, eu1 ∉ Df) as (eu1&Heu).
-    { eexists. eapply is_fresh. }
-    iMod (othreadG_bound_id_alloc _ _ βu Heu with "FT") as "(FT& #Bu1& Hfu)".
-    iMod (ghost_map_update eu1 with "TUA Tu") as "[TUA Tu]".
-    iModIntro. rewrite /othreadG_session_public. iFrame "TVA TUA FVA FUA FT Fu Hfu Tu Bu1".
-    iSplit.
-    { iPureIntro. split_and !; auto. rewrite dom_insert_L. apply elem_of_dom_2 in LUi4. rewrite -Dom4. set_solver. }
-    iApply (big_sepS_delete _ _ _ Ini). iSplitR "M".
-    - iExists ev, eu1, βv, βu, V, U. iSplitR.
-      { iPureIntro. split_and !; auto. rewrite lookup_insert_eq. auto. }
-      iFrame. iFrame "Bv Bu1". iPoseProof (big_sepS_sep_2 with "Fus Fus0") as "Fus".
-      iApply (big_sepS_impl with "Fus"). iIntros "!> %% ($& (%&%&_&$))". done.
-    - iApply (big_sepS_impl with "M"). iIntros "!> %% (%&%&%&%&%&%&%& $)".
-      iPureIntro. destruct H0 as (?&?&?&?&?). split_and !; auto. assert (x ≠ i) by set_solver + H.
-      rewrite lookup_insert_ne; auto.
-  Qed.
-
-  Lemma oproxy_exchange_fuel TP i ev eu qv qu c :
+  Lemma oproxy_exchange_fuel TP i PS q c :
     i ∈ TP →
     (Ord.O < c)%ord →
     oproxy TP ∗
-    othreadG_session_private i ev qv ∗ othreadG_fuel ev c ∗
-    othreadG_session_public i eu qu ∗ othreadG_fuel eu c
+    othreadG_proxy_session_auth i PS q ∗
+    ([∗ map] s ∈ PS, othreadG_fuel s c)
     ⊢ |==> ∃ G, (othreadG_exec i (1 / 2 / 2) -∗ othreadG_obls i G -∗ oproxy TP) ∗
-             othreadG_session_private i ev qv ∗
-             othreadG_session_public i eu qu ∗
+             othreadG_proxy_session_auth i PS q ∗
              othreadG_exec i (1 / 2 / 2) ∗ othreadG_obls i G ∗
              ([∗ set] k ∈ G, oblG_fuel k Ord.one ∗ oblG_elem k).
   Proof.
-    iIntros (Ini Ltc) "(F& Tv& Hfv& Tu& Hfu)".
-    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
+    iIntros (Ini Ltc) "(P& Psa& Tfs)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu& Fvs& Fus)".
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa0& Hex& OFs)".
+    iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa0]") as "%". destruct H as [<- _].
     iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
-    { iDestruct "Hex" as "(_& _& _& _& Tu1)". rewrite /othreadG_session_public.
-      iCombine "Tu Tu1" as "Tu" gives "%H". destruct H. rewrite dfrac_op_own dfrac_valid_own in H.
-      apply Qp.not_add_le_r in H. done. }
-    destruct LUi as (LUi1& LUi2& LUi3& LUi4& Disj).
-    iPoseProof (ghost_map_lookup with "TVA Tv") as "%". rewrite LUi1 in H. inversion H; clear H. subst ev0.
-    iPoseProof (ghost_map_lookup with "TUA Tu") as "%". rewrite LUi2 in H. inversion H; clear H. subst eu0.
-    iMod (othreadG_fuel_spend with "[$Bv $Hfv]") as "(%βv1& %HBv& #Bv1)". 1: auto.
-    iAssert (|==> ([∗ set] v ∈ V, ∃ a : Ord.t, ⌜(βv1 <= a)%ord⌝ ∗ oblG_fuel v a ∗ oblG_elem v) ∗
-               ([∗ set] v ∈ V, oblG_fuel v Ord.one ∗ oblG_elem v))%I with "[Fvs]" as ">[Fvs Rvs]".
-    { iApply big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "Fvs").
-      iIntros "!> %% (%&%& F& #E)". iFrame "E". iMod (oblG_fuel_lt _ βv1 with "F") as "(F& %& %& F1)".
-      { eapply Ord.lt_le_lt; eauto. }
-      iMod (oblG_fuel_mon _ Ord.one with "F1") as "F1".
-      { apply Ord.S_supremum. auto. }
-      iModIntro. iSplitR "F1"; iFrame. done. }
-    iMod (othreadG_fuel_spend with "[$Bu $Hfu]") as "(%βu1& %HBu& #Bu1)". 1: auto.
-    iAssert (|==> ([∗ set] u ∈ U, ∃ a : Ord.t, ⌜(βu1 <= a)%ord⌝ ∗ oblG_fuel u a ∗ oblG_elem u) ∗
-               ([∗ set] u ∈ U, oblG_fuel u Ord.one ∗ oblG_elem u))%I with "[Fus]" as ">[Fus Rus]".
-    { iApply big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "Fus").
-      iIntros "!> %% (%&%& F& #E)". iFrame "E". iMod (oblG_fuel_lt _ βu1 with "F") as "(F& %& %& F1)".
-      { eapply Ord.lt_le_lt; eauto. }
-      iMod (oblG_fuel_mon _ Ord.one with "F1") as "F1".
-      { apply Ord.S_supremum. auto. }
-      iModIntro. iSplitR "F1"; iFrame. done. }
-    iDestruct "Hex" as "($& $)". iFrame "Tv Tu". iSplitR "Rvs Rus".
-    - iIntros "!> Tx TG". iFrame "TVA TUA FVA FUA FT". iSplitR.
-      { iPureIntro. split_and !; auto. }
-      iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
-      iExists ev, eu, βv1, βu1, V, U. iFrame. iFrame "Bv1 Bu1". iSplit.
-      { iPureIntro. split_and !; auto. }
-      iLeft. iFrame.
-    - iModIntro. iApply big_sepS_union; first auto. iFrame.
+    { iDestruct "Hex" as "(_& Psa1& _)". iCombine "Psa0 Psa1" as "Psa0".
+      iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa0]") as "%". destruct H.
+      apply Qp.not_add_le_r in H0. done. }
+    iDestruct "Hex" as "(%& Tx& TG& %)". destruct H as [Uni Disj].
+    iAssert (
+        |==> ([∗ map] K;s ∈ Ks;PS,
+             ∃ β : obl_fuel, othreadG_bound s β ∗ ([∗ set] k ∈ K, ∃ a : Ord.t, ⌜(β <= a)%ord⌝ ∗ oblG_fuel k a ∗ oblG_elem k)) ∗
+          ([∗ map] K ∈ Ks, ([∗ set] k ∈ K, oblG_fuel k Ord.one ∗ oblG_elem k)))%I
+      with "[Tfs OFs]" as ">[OFs Fs]".
+    { iAssert ([∗ map] K;s ∈ Ks;PS, True ∗ othreadG_fuel s c)%I with "[Tfs]" as "Tfs".
+      { iApply big_sepM2_sepM.
+        - intros. rewrite -!elem_of_dom Dom. auto.
+        - iFrame. done. }
+      iAssert (|==> ([∗ map] K;s ∈ Ks;PS,
+                    (([∗ set] k ∈ K, oblG_fuel k Ord.one ∗ oblG_elem k) ∗ True) ∗
+                    (∃ β, othreadG_bound s β ∗ ([∗ set] k ∈ K, ∃ a : Ord.t, ⌜(β <= a)%ord⌝ ∗ oblG_fuel k a ∗ oblG_elem k))))%I
+        with "[-]" as ">H"; cycle 1.
+      { iPoseProof (big_sepM2_sep with "H") as "[H1 H2]". iFrame.
+        iPoseProof (big_sepM2_sepM with "H1") as "[H _]".
+        - intros. rewrite -!elem_of_dom Dom. auto.
+        - iFrame. done. }
+      iPoseProof (big_sepM2_sep with "[$Tfs $OFs]") as "OFs".
+      iPoseProof (big_sepM2_alt with "OFs") as "[_ OFs]".
+      iApply big_sepM2_alt. iSplitR. 1: eauto. iApply big_sepM_bupd.
+      iApply (big_sepM_impl with "OFs"). iIntros "!> %%% [(_& F) H]".
+      destruct x as [K s]. simpl. iDestruct "H" as "(%& #Tb& KFs)".
+      iMod (othreadG_fuel_spend with "[$Tb $F]") as "(%β1& %HB& #Tb1)". 1: auto.
+      iAssert (|==> ([∗ set] k ∈ K, ∃ a : Ord.t, ⌜(β1 <= a)%ord⌝ ∗ oblG_fuel k a ∗ oblG_elem k) ∗
+                 ([∗ set] k ∈ K, oblG_fuel k Ord.one ∗ oblG_elem k))%I with "[KFs]" as ">[Fvs Rvs]".
+      { iApply big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "KFs").
+        iIntros "!> %% (%&%& F& #E)". iFrame "E". iMod (oblG_fuel_lt _ β1 with "F") as "(F& %& %& F1)".
+        { eapply Ord.lt_le_lt; eauto. }
+        iMod (oblG_fuel_mon _ Ord.one with "F1") as "F1".
+        { apply Ord.S_supremum. auto. }
+        iModIntro. iSplitR "F1"; iFrame. done. }
+      iFrame. eauto. }
+    iModIntro. iFrame "Psa Tx TG". iSplitR "Fs".
+    - iIntros "Tx TG". iFrame "FT ST PT". 
+      iApply (big_sepS_delete _ _ _ Ini). iFrame "M". iFrame "Psa0 Poa". iSplit. 1: done.
+      iFrame "OFs". iLeft. iFrame. eauto.
+    - subst. clear dependent TP i PS q c Df. iInduction Ks as [ | π K ?? LUp] using map_ind.
+      { rewrite union_sets_empty. done. }
+      rewrite union_sets_insert_L; last auto. iApply (big_sepS_union).
+      { eapply disjoint_sets_insert_disjoint_union_sets; eauto. }
+      iPoseProof (big_sepM_insert with "Fs") as "[F Fs]". 1: auto.
+      apply disjoint_sets_insert in Disj; last auto. destruct Disj as [MF Disj].
+      iPoseProof ("LUp" with "[//] Fs") as "$". iFrame.
   Qed.
 
 End othread.
@@ -1652,16 +1455,14 @@ Proof.
     first by apply gmap_view_auth_valid.
   iMod (own_alloc (reservation_map_token (A:=bcredUR) ⊤)) as (γF) "HF";
     first by apply reservation_map_token_valid.
-  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive (gset_disjUR oid))) as (γV) "HV";
-    first by apply gmap_view_auth_valid.
-  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR positive (gset_disjUR oid))) as (γU) "HU";
-    first by apply gmap_view_auth_valid.
-  iMod (ghost_map_alloc_empty) as (γTv) "HTv".
-  iMod (ghost_map_alloc_empty) as (γTu) "HTu".
-  iModIntro. iExists (OthreadG SI _ _ γS γO γX γE γF γV γU γTv γTu).
+  iMod (own_alloc (reservation_map_token (A:=(gmap_viewR proxy (gsetUR oid))) ⊤)) as (γP) "HP";
+    first by apply reservation_map_token_valid.
+  iMod (own_alloc (reservation_map_token (A:=(gmap_viewR proxy (agreeR session))) ⊤)) as (γI) "HI";
+    first by apply reservation_map_token_valid.
+  iModIntro. iExists (OthreadG SI _ _ γS γO γX γE γF γP γI).
   rewrite /othread /oassigned /oproxy -!lock. iSplitL "HS HO HX HE".
   { iExists ∅. iSplitR; first done. replace (⊤ : coPset) with (⊤ ∖ gset_to_coPset ∅); [iFrame; done|]. set_solver. }
   iSplitR; first done.
-  iExists ∅, ∅, ∅, ∅, ∅. replace (⊤ ∖ gset_to_coPset ∅) with (⊤ : coPset) by set_solver. iFrame.
-  iSplit; done.
+  iExists ∅. rewrite /othreadG_proxy_session_token /othreadG_proxy_obls_token.
+  do 3 replace (⊤ ∖ gset_to_coPset ∅) with (⊤ : coPset) by set_solver. iFrame. done.
 Qed.

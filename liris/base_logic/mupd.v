@@ -39,7 +39,7 @@ Proof. solve_inG. Qed.
 
 Definition model_interp `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   h i Ω W n Θ : iProp Σ :=
-  (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ ofrag Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
+  (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ oproxy Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
 
 (** Modality for updating obls. *)
 Definition mupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
