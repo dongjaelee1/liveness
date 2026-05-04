@@ -73,7 +73,7 @@ Local Definition othreadG_owns_auth_obls `{SI : indexT} `{!othreadGS Σ}
   i (TObls : gmap oid unit) : iProp Σ :=
   (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (TObls)))).
 
-(* Obls: live obls assigned to this thread, also fix to empty when thread sessioninates *)
+(* Obls: live obls assigned to this thread, also fix to empty when thread terminates *)
 Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : oids) : iProp Σ :=
   own obls_name (gmap_view_frag i (DfracOwn 1) (G)).
 Global Typeclasses Opaque othreadG_obls.
@@ -83,7 +83,7 @@ Local Definition othreadG_obls_auth_id `{SI : indexT} `{!othreadGS Σ}
   (Tgls : gmap positive (gmap oid unit)) : iProp Σ :=
   (own obls_name (gmap_view_auth (DfracOwn 1) (dom <$> Tgls))).
 
-(* Exec: tracks whether thread is executing or sessioninated *)
+(* Exec: tracks whether thread is executing or terminated *)
 Definition othreadG_exec `{SI : indexT} `{!othreadGS Σ} (i : positive) (q : Qp) : iProp Σ :=
   own exec_name (reservation_map_data i (●MN{#q} 0)).
 Global Typeclasses Opaque othreadG_exec.
@@ -114,14 +114,14 @@ Local Definition othreadG_elem_auth_id `{SI : indexT} `{!othreadGS Σ}
 
 (* Fuel: manage fuels for the thread's obligations *)
 Definition othreadG_bound `{SI : indexT} `{!othreadGS Σ}
-  (e : session) (β : obl_fuel) : iProp Σ :=
-  own fuel_name (reservation_map_data (A:=bcredUR) e (credit_bound β)).
+  (s : session) (β : obl_fuel) : iProp Σ :=
+  own fuel_name (reservation_map_data (A:=bcredUR) s (credit_bound β)).
 Global Typeclasses Opaque othreadG_bound.
 Global Instance: Params (@othreadG_bound) 3 := {}.
 
 Definition othreadG_fuel `{SI : indexT} `{!othreadGS Σ}
-  (e : session) (a : obl_fuel) : iProp Σ :=
-  own fuel_name (reservation_map_data (A:=bcredUR) e (credit a)).
+  (s : session) (a : obl_fuel) : iProp Σ :=
+  own fuel_name (reservation_map_data (A:=bcredUR) s (credit a)).
 Global Typeclasses Opaque othreadG_fuel.
 Global Instance: Params (@othreadG_fuel) 3 := {}.
 
@@ -145,15 +145,15 @@ Local Definition othreadG_proxy_obls_auth `{SI : indexT} `{!othreadGS Σ}
                     i (gmap_view_auth (DfracOwn 1) (POs)))).
 
 (* Sess: tracks current proxies' sessions of the thread *)
-Definition othreadG_proxy_session `{SI : indexT} `{!othreadGS Σ} (i : positive) (π : proxy) (e : session) (q : Qp) : iProp Σ :=
+Definition othreadG_proxy_session `{SI : indexT} `{!othreadGS Σ} (i : positive) (π : proxy) (s : session) (q : Qp) : iProp Σ :=
   own sess_name (reservation_map_data (A:=(gmap_viewR proxy (agreeR session)))
-                   i (gmap_view_frag π (DfracOwn q) (to_agree e))).
+                   i (gmap_view_frag π (DfracOwn q) (to_agree s))).
 Global Typeclasses Opaque othreadG_proxy_session.
 Global Instance: Params (@othreadG_proxy_session) 3 := {}.
 
-Definition othreadG_proxy_session_auth `{SI : indexT} `{!othreadGS Σ} (i : positive) (es : gmap proxy session) (q : Qp) : iProp Σ :=
+Definition othreadG_proxy_session_auth `{SI : indexT} `{!othreadGS Σ} (i : positive) (ss : gmap proxy session) (q : Qp) : iProp Σ :=
   own sess_name (reservation_map_data (A:=(gmap_viewR proxy (agreeR session)))
-                   i (gmap_view_auth (DfracOwn q) (to_agree <$> es))).
+                   i (gmap_view_auth (DfracOwn q) (to_agree <$> ss))).
 Global Typeclasses Opaque othreadG_proxy_session_auth.
 Global Instance: Params (@othreadG_proxy_session_auth) 3 := {}.
 
@@ -187,7 +187,7 @@ Definition oassigned `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ
           (oblG_fulfilled k)))%I.
 
 (* Global invariant for threads' obligation fragments and sessions. *)
-Definition ofrag `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
+Definition oproxy `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (TP : gset positive) : iProp Σ :=
   locked
     (∃ (Df : gset session),
@@ -201,7 +201,7 @@ Definition ofrag `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
              othreadG_proxy_session_auth i Ss (1/2)%Qp ∗
              ((∃ G, othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i G ∗
                     ⌜ G = union_sets Ks ∧ disjoint_sets Ks ⌝) ∨
-                (othreadG_done i ∗ ⌜ Ks = ∅ ∧ Ss = ∅ ⌝)) ∗
+                (othreadG_done i ∗ othreadG_proxy_session_auth i Ss (1/2)%Qp ∗ ⌜ Ks = ∅ ∧ Ss = ∅ ⌝)) ∗
              ([∗ map] K;s ∈ Ks;Ss,
                 ∃ β, othreadG_bound s β ∗
                      ([∗ set] k ∈ K, ∃ a, ⌜(β <= a)%ord⌝ ∗ oblG_fuel k a ∗ oblG_elem k)))
@@ -282,45 +282,45 @@ Section othread.
   Local Instance othreadG_fuel_token_id_timeless E : Timeless (othreadG_fuel_token_id E).
   Proof. rewrite /othreadG_fuel_token_id. apply _. Qed.
 
-  (* Frag *)
-  Global Instance othreadG_frag_private_timeless i G q : Timeless (othreadG_frag_private i G q).
-  Proof. rewrite /othreadG_frag_private. apply _. Qed.
+  (* Proxy *)
+  Global Instance othreadG_proxy_obls_timeless i π G : Timeless (othreadG_proxy_obls i π G).
+  Proof. rewrite /othreadG_proxy_obls. apply _. Qed.
 
-  Local Instance othreadG_frag_private_auth_id_timeless Tos : Timeless (othreadG_frag_private_auth_id Tos).
-  Proof. rewrite /othreadG_frag_private_auth_id. apply _. Qed.
+  Local Instance othreadG_proxy_obls_token_timeless TP : Timeless (othreadG_proxy_obls_token TP).
+  Proof. rewrite /othreadG_proxy_obls_token. apply _. Qed.
 
-  Global Instance othreadG_frag_public_timeless i G q : Timeless (othreadG_frag_public i G q).
-  Proof. rewrite /othreadG_frag_public. apply _. Qed.
-
-  Local Instance othreadG_frag_public_auth_id_timeless Tos : Timeless (othreadG_frag_public_auth_id Tos).
-  Proof. rewrite /othreadG_frag_public_auth_id. apply _. Qed.
+  Local Instance othreadG_proxy_obls_auth_timeless i POs : Timeless (othreadG_proxy_obls_auth i POs).
+  Proof. rewrite /othreadG_proxy_obls_auth. apply _. Qed.
 
   (* Session *)
-  Global Instance othreadG_session_private_timeless i e q : Timeless (othreadG_session_private i e q).
-  Proof. rewrite /othreadG_session_private. apply _. Qed.
+  Global Instance othreadG_proxy_session_timeless i π s q : Timeless (othreadG_proxy_session i π s q).
+  Proof. rewrite /othreadG_proxy_session. apply _. Qed.
 
-  Global Instance othreadG_session_private_fractional i e :
-    Fractional (othreadG_session_private i e).
-  Proof. rewrite /othreadG_session_private. apply _. Qed.
-  Global Instance othreadG_session_private_as_fractional i e q :
-    AsFractional (othreadG_session_private i e q) (othreadG_session_private i e) q.
+  Global Instance othreadG_proxy_session_fractional i π s :
+    Fractional (othreadG_proxy_session i π s).
+  Proof.
+    rewrite /othreadG_proxy_session. intros p q.
+    by rewrite -own_op -!reservation_map_data_op -gmap_view_frag_op agree_idemp.
+  Qed.
+  Global Instance othreadG_proxy_session_as_fractional i π s q :
+    AsFractional (othreadG_proxy_session i π s q) (othreadG_proxy_session i π s) q.
   Proof. split; [auto|apply _]. Qed.
 
-  Local Instance othreadG_session_private_auth_id_timeless Tes : Timeless (othreadG_session_private_auth_id Tes).
-  Proof. rewrite /othreadG_session_private_auth_id. apply _. Qed.
+  Global Instance othreadG_proxy_session_auth_timeless i Ss q : Timeless (othreadG_proxy_session_auth i Ss q).
+  Proof. rewrite /othreadG_proxy_session_auth. apply _. Qed.
 
-  Global Instance othreadG_session_public_timeless i e q : Timeless (othreadG_session_public i e q).
-  Proof. rewrite /othreadG_session_public. apply _. Qed.
-
-  Global Instance othreadG_session_public_fractional i e :
-    Fractional (othreadG_session_public i e).
-  Proof. rewrite /othreadG_session_public. apply _. Qed.
-  Global Instance othreadG_session_public_as_fractional i e q :
-    AsFractional (othreadG_session_public i e q) (othreadG_session_public i e) q.
+  Global Instance othreadG_proxy_session_auth_fractional i Ss :
+    Fractional (othreadG_proxy_session_auth i Ss).
+  Proof.
+    rewrite /othreadG_proxy_session_auth. intros p q.
+    by rewrite -own_op -!reservation_map_data_op -gmap_view_auth_dfrac_op.
+  Qed.
+  Global Instance othreadG_proxy_session_auth_as_fractional i Ss q :
+    AsFractional (othreadG_proxy_session_auth i Ss q) (othreadG_proxy_session_auth i Ss) q.
   Proof. split; [auto|apply _]. Qed.
 
-  Local Instance othreadG_session_public_auth_id_timeless Tes : Timeless (othreadG_session_public_auth_id Tes).
-  Proof. rewrite /othreadG_session_public_auth_id. apply _. Qed.
+  Local Instance othreadG_proxy_session_token_timeless TP : Timeless (othreadG_proxy_session_token TP).
+  Proof. rewrite /othreadG_proxy_session_token. apply _. Qed.
 
   (* Invs *)
   Global Instance othread_timeless TP : Timeless (othread TP).
@@ -329,8 +329,8 @@ Section othread.
   Global Instance oassigned_timeless Gls : Timeless (oassigned Gls).
   Proof. rewrite /oassigned -lock. apply _. Qed.
 
-  Global Instance ofrag_timeless TP : Timeless (ofrag TP).
-  Proof. rewrite /ofrag -lock. apply _. Qed.
+  Global Instance oproxy_timeless TP : Timeless (oproxy TP).
+  Proof. rewrite /oproxy -lock. apply _. Qed.
 
   (** Elem rules *)
   Lemma othreadG_elem_alloc (Tgls : gmap positive (gmap oid unit)) i M :
@@ -499,9 +499,6 @@ Section othread.
     by iFrame.
   Qed.
 
-  (** Session rules *)
-  (* Use ghost_map_auth/elem rules. *)
-
   (** Fuel rules *)
   Lemma othreadG_fuel_eq k a0 a1 :
     a0 w= a1 →
@@ -599,190 +596,142 @@ Section othread.
     rewrite H. rewrite /othreadG_bound. iIntros "$". iPureIntro. split; auto.
   Qed.
 
-  (** Frag private rules *)
-  Lemma othreadG_frag_private_alloc Tos i :
-    Tos !! i = None →
-    othreadG_frag_private_auth_id Tos
-    ⊢ |==> othreadG_frag_private_auth_id (<[i:=∅]>Tos) ∗
-          othreadG_frag_private i ∅ 1.
+  (** Proxy rules *)
+  Lemma othreadG_proxy_obls_alloc_auth D i :
+    i ∉ D →
+    othreadG_proxy_obls_token D
+    ⊢ |==> othreadG_proxy_obls_token ({[i]} ∪ D) ∗
+        othreadG_proxy_obls_auth i ∅.
   Proof.
-    rewrite /othreadG_frag_private_auth_id /othreadG_frag_private.
-    iIntros (Hi) "H". 
+    rewrite /othreadG_proxy_obls_token /othreadG_proxy_obls_auth.
+    iIntros (Hi) "Htk".
+    iPoseProof (reservation_map_token_alloc_singleton _ _ i (gmap_view_auth (DfracOwn 1) (∅ : gmap proxy oids)) with "Htk") as "[Htk >H]"; auto.
+    { apply gmap_view_auth_valid. }
+    by iFrame.
+  Qed.
+
+  Lemma othreadG_proxy_obls_alloc i (POs : gmap proxy oids) π :
+    POs !! π = None →
+    othreadG_proxy_obls_auth i POs
+    ⊢ |==> othreadG_proxy_obls_auth i (<[π:=∅]>POs) ∗
+        othreadG_proxy_obls i π ∅.
+  Proof.
+    rewrite /othreadG_proxy_obls_auth /othreadG_proxy_obls.
+    iIntros (Hk) "H". 
     iMod (own_update with "H") as "H".
-    { eapply (gmap_view_alloc _ i (DfracOwn 1) (GSet ∅ : gset_disj _)); try done.
-      rewrite !lookup_fmap Hi. done. }
-    iDestruct "H" as "[H Ho]". iFrame "Ho".
-    rewrite !fmap_insert. done.
+    { eapply reservation_map_update. eapply (gmap_view_alloc _ π (DfracOwn 1) ∅); done. }
+    rewrite reservation_map_data_op. iDestruct "H" as "[H Ho]". iFrame "Ho". done.
   Qed.
 
-  Lemma othreadG_frag_private_lookup Tos i G :
-    othreadG_frag_private_auth_id Tos ∗
-    othreadG_frag_private i G 1
-    ⊢ ⌜ (Tos) !! i = Some G ⌝.
+  Lemma othreadG_proxy_obls_delete i (POs : gmap proxy oids) π G :
+    othreadG_proxy_obls_auth i POs ∗ othreadG_proxy_obls i π G
+    ⊢ |==> othreadG_proxy_obls_auth i (delete π POs).
   Proof.
-    rewrite /othreadG_frag_private_auth_id /othreadG_frag_private -!own_op.
+    rewrite /othreadG_proxy_obls_auth /othreadG_proxy_obls -own_op -reservation_map_data_op.
+    apply own_update, reservation_map_update. apply gmap_view_delete.
+  Qed.
+
+  Lemma othreadG_proxy_obls_update i POs π G1 G2 :
+    othreadG_proxy_obls_auth i POs ∗
+    othreadG_proxy_obls i π G1
+    ⊢ |==> othreadG_proxy_obls_auth i (<[π:=G2]>POs) ∗
+        othreadG_proxy_obls i π G2.
+  Proof.
+    rewrite /othreadG_proxy_obls_auth /othreadG_proxy_obls -!own_op -!reservation_map_data_op.
+    apply own_update, reservation_map_update, gmap_view_replace. done.
+  Qed.
+
+  Lemma othreadG_proxy_obls_lookup i POs π G :
+    othreadG_proxy_obls_auth i POs ∗ othreadG_proxy_obls i π G
+    ⊢ ⌜ POs !! π = Some G ⌝.
+  Proof.
+    rewrite /othreadG_proxy_obls_auth /othreadG_proxy_obls -!own_op -reservation_map_data_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
-    apply gmap_view_both_valid in H. destruct H as (_&_&?).
-    iPureIntro. apply leibniz_equiv, lookup_fmap_Some in H. destruct H as (?&?&?). inv H. done.
-  Qed.
-  Lemma othreadG_frag_private_lookup_frac Tos i G q :
-    othreadG_frag_private_auth_id Tos ∗
-    othreadG_frag_private i G q
-    ⊢ ∃ G', ⌜ (Tos) !! i = Some G' ∧ G ⊆ G' ⌝.
-  Proof.
-    rewrite /othreadG_frag_private_auth_id /othreadG_frag_private -!own_op.
-    iIntros "H". iPoseProof (own_valid with "H") as "%".
-    apply gmap_view_both_dfrac_valid_discrete_total in H. destruct H as (?&_&_&?&?&?).
-    iPureIntro. destruct x; last done. apply gset_disj_included in H1.
-    eexists. split; last eauto.
-    apply lookup_fmap_Some in H. destruct H as (?&?&?). inv H. done.
+    apply reservation_map_data_valid, gmap_view_both_valid in H.
+    destruct H as (?&?&?). iPureIntro. apply leibniz_equiv in H1. auto.
   Qed.
 
-  Lemma othreadG_frag_private_update Tos i G M :
-    othreadG_frag_private_auth_id Tos ∗
-    othreadG_frag_private i G 1
-    ⊢ |==> othreadG_frag_private_auth_id (<[i:=M]>Tos) ∗
-        othreadG_frag_private i (M) 1.
+  (** Session rules *)
+  Lemma othreadG_proxy_session_alloc_auth D i :
+    i ∉ D →
+    othreadG_proxy_session_token D
+    ⊢ |==> othreadG_proxy_session_token ({[i]} ∪ D) ∗
+        othreadG_proxy_session_auth i ∅ 1.
   Proof.
-    rewrite /othreadG_frag_private_auth_id /othreadG_frag_private -!own_op. apply own_update.
-    rewrite !fmap_insert. apply gmap_view_replace. done.
-  Qed.
-  Lemma othreadG_frag_private_update_local Tos i q M1 M2 X1 X2 :
-    (Tos !! i = Some M1) →
-    (GSet (M1), GSet X1) ~l~> (GSet (M2), GSet X2) →
-    othreadG_frag_private_auth_id Tos ∗
-    othreadG_frag_private i X1 q
-    ⊢ |==> othreadG_frag_private_auth_id (<[i:=M2]>Tos) ∗
-        othreadG_frag_private i X2 q.
-  Proof.
-    intros Hlookup Hlu. rewrite /othreadG_frag_private_auth_id /othreadG_frag_private -!own_op. apply own_update.
-    rewrite !fmap_insert. eapply gmap_view_update_local; eauto.
-    rewrite !lookup_fmap Hlookup. done.
+    rewrite /othreadG_proxy_session_token /othreadG_proxy_session_auth.
+    iIntros (Hi) "Htk".
+    iPoseProof (reservation_map_token_alloc_singleton _ _ i (gmap_view_auth (DfracOwn 1) (to_agree <$> (∅ : gmap proxy session))) with "Htk") as "[Htk >H]"; auto.
+    { apply gmap_view_auth_valid. }
+    by iFrame.
   Qed.
 
-  Lemma othreadG_frag_private_valid i G q :
-    othreadG_frag_private i G q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
+  Lemma othreadG_proxy_session_alloc i (Ss : gmap proxy session) π s :
+    Ss !! π = None →
+    othreadG_proxy_session_auth i Ss 1
+    ⊢ |==> othreadG_proxy_session_auth i (<[π:=s]>Ss) 1 ∗
+        othreadG_proxy_session i π s 1.
   Proof.
-    rewrite /othreadG_frag_private. iIntros "H".
-    iPoseProof (own_valid with "H") as "%V".
-    iPureIntro. apply gmap_view_frag_valid in V. destruct V. done.
-  Qed.
-  Lemma othreadG_frag_private_valid_2 i G1 G2 q1 q2 :
-    othreadG_frag_private i G1 q1 ∗ othreadG_frag_private i G2 q2 ⊢ ⌜ (q1 + q2 ≤ 1)%Qp ∧ G1 ## G2 ⌝.
-  Proof.
-    rewrite /othreadG_frag_private. iIntros "[H1 H2]". iCombine "H1 H2" as "H".
-    iPoseProof (own_valid with "H") as "%V".
-    iPureIntro. apply gmap_view_frag_valid in V. destruct V. split; first done.
-    apply gset_disj_valid_op in H0. done.
-  Qed.
-
-  Lemma othreadG_frag_private_op_1 i G1 G2 q1 q2 :
-    othreadG_frag_private i G1 q1 ∗ othreadG_frag_private i G2 q2 ⊢ othreadG_frag_private i (G1 ∪ G2) (q1 + q2)%Qp.
-  Proof.
-    rewrite /othreadG_frag_private -own_op -gmap_view_frag_op dfrac_op_own.
-    iIntros "H". iPoseProof (own_valid with "H") as "%".
-    apply gmap_view_frag_valid in H. destruct H. apply gset_disj_valid_op in H0.
-    rewrite gset_disj_union; done.
-  Qed.
-  Lemma othreadG_frag_private_op_2 i G1 G2 q1 q2 :
-    G1 ## G2 →
-    othreadG_frag_private i (G1 ∪ G2) (q1 + q2)%Qp ⊢ othreadG_frag_private i G1 q1 ∗ othreadG_frag_private i G2 q2.
-  Proof.
-    intros Hdj. rewrite /othreadG_frag_private -own_op -gmap_view_frag_op dfrac_op_own.
-    rewrite gset_disj_union; done.
-  Qed.
-
-  (** Frag public rules *)
-  Lemma othreadG_frag_public_alloc Tos i :
-    Tos !! i = None →
-    othreadG_frag_public_auth_id Tos
-    ⊢ |==> othreadG_frag_public_auth_id (<[i:=∅]>Tos) ∗
-          othreadG_frag_public i ∅ 1.
-  Proof.
-    rewrite /othreadG_frag_public_auth_id /othreadG_frag_public.
-    iIntros (Hi) "H". 
+    rewrite /othreadG_proxy_session_auth /othreadG_proxy_session.
+    iIntros (Hk) "H". 
     iMod (own_update with "H") as "H".
-    { eapply (gmap_view_alloc _ i (DfracOwn 1) (GSet ∅ : gset_disj _)); try done.
-      rewrite !lookup_fmap Hi. done. }
-    iDestruct "H" as "[H Ho]". iFrame "Ho".
-    rewrite !fmap_insert. done.
+    { eapply reservation_map_update. eapply (gmap_view_alloc _ π (DfracOwn 1) (to_agree s)); try done.
+      rewrite lookup_fmap Hk. done. }
+    rewrite reservation_map_data_op. iDestruct "H" as "[H Ho]". iFrame "Ho".
+    rewrite fmap_insert. done.
   Qed.
 
-  Lemma othreadG_frag_public_lookup Tos i G :
-    othreadG_frag_public_auth_id Tos ∗
-    othreadG_frag_public i G 1
-    ⊢ ⌜ (Tos) !! i = Some G ⌝.
+  Lemma othreadG_proxy_session_delete i (Ss : gmap proxy session) π s :
+    othreadG_proxy_session_auth i Ss 1 ∗ othreadG_proxy_session i π s 1
+    ⊢ |==> othreadG_proxy_session_auth i (delete π Ss) 1.
   Proof.
-    rewrite /othreadG_frag_public_auth_id /othreadG_frag_public -!own_op.
+    rewrite /othreadG_proxy_session_auth /othreadG_proxy_session -own_op -reservation_map_data_op.
+    apply own_update, reservation_map_update. rewrite fmap_delete. apply gmap_view_delete.
+  Qed.
+
+  Lemma othreadG_proxy_session_update i Ss π s1 s2 :
+    othreadG_proxy_session_auth i Ss 1 ∗
+    othreadG_proxy_session i π s1 1
+    ⊢ |==> othreadG_proxy_session_auth i (<[π:=s2]>Ss) 1 ∗
+        othreadG_proxy_session i π s2 1.
+  Proof.
+    rewrite /othreadG_proxy_session_auth /othreadG_proxy_session -!own_op -!reservation_map_data_op.
+    apply own_update, reservation_map_update. rewrite fmap_insert. apply gmap_view_replace. done.
+  Qed.
+
+  Lemma othreadG_proxy_session_lookup i Ss π s q1 q2 :
+    othreadG_proxy_session_auth i Ss q1 ∗ othreadG_proxy_session i π s q2
+    ⊢ ⌜ Ss !! π = Some s ⌝.
+  Proof.
+    rewrite /othreadG_proxy_session_auth /othreadG_proxy_session -!own_op -reservation_map_data_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
-    apply gmap_view_both_valid in H. destruct H as (_&_&?).
-    iPureIntro. apply leibniz_equiv, lookup_fmap_Some in H. destruct H as (?&?&?). inv H. done.
+    apply reservation_map_data_valid, gmap_view_both_dfrac_valid_discrete_total in H.
+    destruct H as (?&_&_&?&?&?). iPureIntro.
+    apply lookup_fmap_Some in H. destruct H as (?&?&?). subst x.
+    apply to_agree_included, leibniz_equiv in H1. subst. auto.
   Qed.
-  Lemma othreadG_frag_public_lookup_frac Tos i G q :
-    othreadG_frag_public_auth_id Tos ∗
-    othreadG_frag_public i G q
-    ⊢ ∃ G', ⌜ (Tos) !! i = Some G' ∧ G ⊆ G' ⌝.
+
+  Lemma othreadG_proxy_session_auth_valid i Ss1 Ss2 q1 q2 :
+    othreadG_proxy_session_auth i Ss1 q1 ∗ othreadG_proxy_session_auth i Ss2 q2
+    ⊢ ⌜ Ss1 = Ss2 ∧ (q1 + q2 ≤ 1)%Qp ⌝.
   Proof.
-    rewrite /othreadG_frag_public_auth_id /othreadG_frag_public -!own_op.
+    rewrite /othreadG_proxy_session_auth -!own_op -reservation_map_data_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
-    apply gmap_view_both_dfrac_valid_discrete_total in H. destruct H as (?&_&_&?&?&?).
-    iPureIntro. destruct x; last done. apply gset_disj_included in H1.
-    eexists. split; last eauto.
-    apply lookup_fmap_Some in H. destruct H as (?&?&?). inv H. done.
+    apply reservation_map_data_valid, gmap_view_auth_dfrac_op_valid in H.
+    destruct H as (?&?). iPureIntro.
+    apply map_fmap_equiv_inj in H0.
+    2:{ apply _. }
+    apply leibniz_equiv in H0. split; auto.
   Qed.
 
-  Lemma othreadG_frag_public_update Tos i G M :
-    othreadG_frag_public_auth_id Tos ∗
-    othreadG_frag_public i G 1
-    ⊢ |==> othreadG_frag_public_auth_id (<[i:=M]>Tos) ∗
-        othreadG_frag_public i (M) 1.
+  Lemma othreadG_proxy_session_valid i π s1 s2 q1 q2 :
+    othreadG_proxy_session i π s1 q1 ∗ othreadG_proxy_session i π s2 q2
+    ⊢ ⌜ s1 = s2 ∧ (q1 + q2 ≤ 1)%Qp ⌝.
   Proof.
-    rewrite /othreadG_frag_public_auth_id /othreadG_frag_public -!own_op. apply own_update.
-    rewrite !fmap_insert. apply gmap_view_replace. done.
-  Qed.
-  Lemma othreadG_frag_public_update_local Tos i q M1 M2 X1 X2 :
-    (Tos !! i = Some M1) →
-    (GSet (M1), GSet X1) ~l~> (GSet (M2), GSet X2) →
-    othreadG_frag_public_auth_id Tos ∗
-    othreadG_frag_public i X1 q
-    ⊢ |==> othreadG_frag_public_auth_id (<[i:=M2]>Tos) ∗
-        othreadG_frag_public i X2 q.
-  Proof.
-    intros Hlookup Hlu. rewrite /othreadG_frag_public_auth_id /othreadG_frag_public -!own_op. apply own_update.
-    rewrite !fmap_insert. eapply gmap_view_update_local; eauto.
-    rewrite !lookup_fmap Hlookup. done.
-  Qed.
-
-  Lemma othreadG_frag_public_valid i G q :
-    othreadG_frag_public i G q ⊢ ⌜ (q ≤ 1)%Qp ⌝.
-  Proof.
-    rewrite /othreadG_frag_public. iIntros "H".
-    iPoseProof (own_valid with "H") as "%V".
-    iPureIntro. apply gmap_view_frag_valid in V. destruct V. done.
-  Qed.
-  Lemma othreadG_frag_public_valid_2 i G1 G2 q1 q2 :
-    othreadG_frag_public i G1 q1 ∗ othreadG_frag_public i G2 q2 ⊢ ⌜ (q1 + q2 ≤ 1)%Qp ∧ G1 ## G2 ⌝.
-  Proof.
-    rewrite /othreadG_frag_public. iIntros "[H1 H2]". iCombine "H1 H2" as "H".
-    iPoseProof (own_valid with "H") as "%V".
-    iPureIntro. apply gmap_view_frag_valid in V. destruct V. split; first done.
-    apply gset_disj_valid_op in H0. done.
-  Qed.
-
-  Lemma othreadG_frag_public_op_1 i G1 G2 q1 q2 :
-    othreadG_frag_public i G1 q1 ∗ othreadG_frag_public i G2 q2 ⊢ othreadG_frag_public i (G1 ∪ G2) (q1 + q2)%Qp.
-  Proof.
-    rewrite /othreadG_frag_public -own_op -gmap_view_frag_op dfrac_op_own.
+    rewrite /othreadG_proxy_session -!own_op -reservation_map_data_op.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
-    apply gmap_view_frag_valid in H. destruct H. apply gset_disj_valid_op in H0.
-    rewrite gset_disj_union; done.
-  Qed.
-  Lemma othreadG_frag_public_op_2 i G1 G2 q1 q2 :
-    G1 ## G2 →
-    othreadG_frag_public i (G1 ∪ G2) (q1 + q2)%Qp ⊢ othreadG_frag_public i G1 q1 ∗ othreadG_frag_public i G2 q2.
-  Proof.
-    intros Hdj. rewrite /othreadG_frag_public -own_op -gmap_view_frag_op dfrac_op_own.
-    rewrite gset_disj_union; done.
+    apply reservation_map_data_valid, gmap_view_frag_op_valid in H.
+    destruct H as (?&?). iPureIntro.
+    apply to_agree_op_valid, leibniz_equiv in H0. split; auto.
   Qed.
 
   (** othread rules *)
@@ -1112,53 +1061,25 @@ Section othread.
       rewrite LUk in H. inv H.
   Qed.
 
-  (** ofrag rules *)
-  Lemma ofrag_alloc_thread i TP (βv βu : obl_fuel) :
+  (** oproxy rules *)
+  Lemma oproxy_alloc_thread i TP :
     i ∉ TP →
-    ofrag TP ∗ othreadG_exec i (1/2/2) ∗ othreadG_obls i ∅
-    ⊢ |==> ofrag ({[i]} ∪ TP) ∗
-        ∃ ev eu, othreadG_frag_private i ∅ 1 ∗ othreadG_session_private i ev 1 ∗ othreadG_bound ev βv ∗ othreadG_fuel ev βv ∗
-                 othreadG_frag_public i ∅ 1 ∗ othreadG_session_public i eu 1 ∗ othreadG_bound eu βu ∗ othreadG_fuel eu βu.
+    oproxy TP ∗ othreadG_exec i (1/2/2) ∗ othreadG_obls i ∅
+    ⊢ |==> oproxy ({[i]} ∪ TP) ∗ othreadG_proxy_session_auth i ∅ (1/2).
   Proof.
     iIntros (Hi) "(F& Tx& TG)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
-    destruct Doms as (Dom1& Dom2& Dom3& Dom4).
-    assert (∃ ev, ev ∉ Df) as (ev&Hev).
-    { eexists. eapply is_fresh. }
-    iMod (othreadG_bound_id_alloc _ _ βv Hev with "FT") as "(FT& #Bv& Hfv)".
-    assert (∃ eu, eu ∉ ({[ev]} ∪ Df)) as (eu&Heu).
-    { eexists. eapply is_fresh. }
-    iMod (othreadG_bound_id_alloc _ _ βu Heu with "FT") as "(FT& #Bu& Hfu)".
-    iMod (ghost_map_insert i ev with "TVA") as "[TVA Tve]".
-    { apply not_elem_of_dom. rewrite Dom1. auto. }
-    iMod (ghost_map_insert i eu with "TUA") as "[TUA Tue]".
-    { apply not_elem_of_dom. rewrite Dom2. auto. }
-    iMod (othreadG_frag_private_alloc _ i with "FVA") as "[FVA Fv]".
-    { apply not_elem_of_dom. rewrite Dom3. auto. }
-    iMod (othreadG_frag_public_alloc _ i with "FUA") as "[FUA Fu]".
-    { apply not_elem_of_dom. rewrite Dom4. auto. }
-    iModIntro. iSplitR "Hfv Hfu Tve Tue Fv Fu"; cycle 1.
-    { iExists ev, eu. rewrite /othreadG_session_private /othreadG_session_public. iFrame. eauto. }
-    iFrame "TVA TUA FVA FUA FT". iSplitR.
-    { iPureIntro. rewrite !dom_insert_L. rewrite Dom1 Dom2 Dom3 Dom4. auto. }
-    iApply big_sepS_union. 1: set_solver.
-    iSplitR "M".
-    { iApply big_sepS_singleton. iExists ev, eu, βv, βu, ∅, ∅. iSplitR.
-      { iPureIntro. rewrite !lookup_insert_eq. split_and !; auto. set_solver. }
-      iSplitL.
-      - iLeft. iFrame.
-      - iFrame "Bv Bu". rewrite !big_sepS_empty. done. }
-    iApply (big_sepS_impl with "M"). iIntros "!> %% H". iDestruct "H" as "(%&%&%&%&%&%& %Doms& $)".
-    iPureIntro. assert (i ≠ x) by set_solver. rewrite !lookup_insert_ne; auto.
+    rewrite /oproxy -!lock. iDestruct "F" as "(%& FT& ST& OT& M)".
+    iMod (othreadG_proxy_session_alloc_auth _ i with "ST") as "[ST [Sa $]]". 1: auto.
+    iMod (othreadG_proxy_obls_alloc_auth _ i with "OT") as "[OT Oa]". 1: auto.
+    iModIntro. iFrame "ST OT FT". iApply big_sepS_union. 1: set_solver.
+    iFrame "M". iApply big_sepS_singleton. iFrame. iSplitR; first done.
+    iSplitL; last done. iLeft. iFrame. done.
   Qed.
 
-  Lemma ofrag_alloc_threads Θ TP (βv βu : obl_fuel) :
+  Lemma oproxy_alloc_threads Θ TP :
     Θ ## TP →
-    ofrag TP ∗ ([∗ set] i ∈ Θ, othreadG_exec i (1/2/2) ∗ othreadG_obls i ∅)
-    ⊢ |==> ofrag (TP ∪ Θ) ∗
-        ([∗ set] i ∈ Θ,
-           ∃ ev eu, othreadG_frag_private i ∅ 1 ∗ othreadG_session_private i ev 1 ∗ othreadG_bound ev βv ∗ othreadG_fuel ev βv ∗
-                    othreadG_frag_public i ∅ 1 ∗ othreadG_session_public i eu 1 ∗ othreadG_bound eu βu ∗ othreadG_fuel eu βu).
+    oproxy TP ∗ ([∗ set] i ∈ Θ, othreadG_exec i (1/2/2) ∗ othreadG_obls i ∅)
+    ⊢ |==> oproxy (TP ∪ Θ) ∗ ([∗ set] i ∈ Θ, othreadG_proxy_session_auth i ∅ (1/2)).
   Proof.
     revert TP. pattern Θ. revert Θ. apply set_ind.
     { solve_proper. }
@@ -1166,21 +1087,91 @@ Section othread.
     iIntros (i Θ Nin IH TP Disj) "[F M]".
     rewrite !big_sepS_union. 2,3: set_solver. rewrite !big_sepS_singleton. iDestruct "M" as "(Mi& M)".
     iMod (IH with "[$F $M]") as "(F& $)". 1: set_solver.
-    iMod (ofrag_alloc_thread i with "[$F $Mi]") as "(F& Hi)"; first set_solver.
+    iMod (oproxy_alloc_thread i with "[$F $Mi]") as "(F& Hi)"; first set_solver.
     iModIntro. replace ({[i]} ∪ (TP ∪ Θ)) with (TP ∪ ({[i]} ∪ Θ)) by set_solver.
     iFrame.
   Qed.
 
-  Lemma ofrag_alloc_obl_private Ω TP i V q1 q2 ev βv k :
-    osat Ω ∗ othread TP ∗ ofrag TP ∗
+  Lemma oproxy_alloc_proxy TP i Ss β :
+    i ∈ TP →
+    oproxy TP ∗ othreadG_proxy_session_auth i Ss (1/2)
+    ⊢ |==> ∃ π s, oproxy TP ∗
+               ⌜ Ss !! π = None ⌝ ∗
+               othreadG_proxy_session_auth i (<[π:=s]>Ss) (1/2) ∗
+               othreadG_proxy_session i π s 1 ∗ othreadG_proxy_obls i π ∅ ∗
+               othreadG_bound s β ∗ othreadG_fuel s β.
+  Proof.
+    iIntros (Ini) "(P& Psa)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
+    assert (∃ s, s ∉ Df) as (s&Hs).
+    { eexists. eapply is_fresh. }
+    iMod (othreadG_bound_id_alloc _ _ β Hs with "FT") as "(FT& #Bs& Hfs)".
+    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa0& Hex& OFs)".
+    iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa0]") as "%". destruct H as [<- _].
+    iCombine "Psa Psa0" as "Psa". iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& Psa1& _)".
+      iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa1]") as "%". destruct H. done. }
+    assert (∃ π, Ss !! π = None) as (π&Hp).
+    { eexists. eapply not_elem_of_dom, is_fresh. }
+    iMod (othreadG_proxy_session_alloc _ _ _ s Hp with "Psa") as "(Psa& Ps)".
+    assert (Hp2 : Ks !! π = None).
+    { apply not_elem_of_dom. apply not_elem_of_dom in Hp. rewrite Dom. auto. }
+    iMod(othreadG_proxy_obls_alloc _ _ π with "Poa") as "(Poa& Po)". 1: auto.
+    iDestruct "Psa" as "[Psa Psa0]".
+    iModIntro. iExists π, s. iFrame "Psa Ps Po Bs Hfs ST PT FT".
+    iSplit; last auto. iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+    iFrame "Psa0 Poa". iSplit.
+    { iPureIntro. rewrite !dom_insert_L Dom. auto. }
+    iSplitL "Hex".
+    { iLeft. iDestruct "Hex" as "(%& $& $& %)". iPureIntro. destruct H. subst.
+      rewrite union_sets_insert_L. 2: auto.
+      split; first set_solver. apply disjoint_sets_insert_2; auto. set_solver. }
+    iApply big_sepM2_insert; auto.
+  Qed.
+
+  Lemma oproxy_delete_proxy TP i Ss π s :
+    i ∈ TP →
+    oproxy TP ∗ othreadG_proxy_session_auth i Ss (1/2) ∗
+    othreadG_proxy_session i π s 1 ∗ othreadG_proxy_obls i π ∅
+    ⊢ |==> oproxy TP ∗ othreadG_proxy_session_auth i (delete π Ss) (1/2).
+  Proof.
+    iIntros (Ini) "(P& Psa& Ps& Po)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
+    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa0& Hex& OFs)".
+    iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa0]") as "%". destruct H as [<- _].
+    iCombine "Psa Psa0" as "Psa". iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& Psa1& _)".
+      iPoseProof (othreadG_proxy_session_auth_valid with "[$Psa $Psa1]") as "%". destruct H. done. }
+    iPoseProof (othreadG_proxy_session_lookup with "[$Psa $Ps]") as "%LUs".
+    iMod (othreadG_proxy_session_delete with "[$Psa $Ps]") as "[Psa Psa0]".
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa $Po]") as "%LUo".
+    iMod(othreadG_proxy_obls_delete with "[$Poa $Po]") as "Poa".
+    iModIntro. iFrame "Psa ST PT FT".
+    iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+    iFrame "Psa0 Poa". iSplit.
+    { iPureIntro. rewrite !dom_delete_L Dom. auto. }
+    iSplitL "Hex".
+    { iLeft. iDestruct "Hex" as "(%& $& $& %)". iPureIntro. destruct H. subst.
+      erewrite (union_sets_delete_L Ks π). 2: eauto.
+      split; first set_solver. apply disjoint_sets_delete; auto. }
+    iPoseProof (big_sepM2_delete _ _ _ π with "OFs") as "[_ $]"; eauto.
+  Qed.
+
+  TODO
+    mostly fix below lemmas
+
+  Lemma oproxy_alloc_obl_private Ω TP i V q1 q2 ev βv k :
+    osat Ω ∗ othread TP ∗ oproxy TP ∗
     othreadG_elem i ∗ othreadG_frag_private i V q1 ∗ othreadG_session_private i ev q2 ∗ othreadG_bound ev βv ∗
     oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel k βv
-    ⊢ |==> osat Ω ∗ othread TP ∗ ofrag TP ∗
+    ⊢ |==> osat Ω ∗ othread TP ∗ oproxy TP ∗
         ⌜k ∉ V⌝ ∗ othreadG_frag_private i ({[k]} ∪ V) q1 ∗ othreadG_session_private i ev q2 ∗
         othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
   Proof.
     iIntros "(S& T& F& #Te& Fv& Tv& #Bv& #Oe& Oo& Of)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
@@ -1222,16 +1213,16 @@ Section othread.
     { iPureIntro. set_solver. }
   Qed.
 
-  Lemma ofrag_alloc_obl_public Ω TP i U q1 q2 eu βu k :
-    osat Ω ∗ othread TP ∗ ofrag TP ∗
+  Lemma oproxy_alloc_obl_public Ω TP i U q1 q2 eu βu k :
+    osat Ω ∗ othread TP ∗ oproxy TP ∗
     othreadG_elem i ∗ othreadG_frag_public i U q1 ∗ othreadG_session_public i eu q2 ∗ othreadG_bound eu βu ∗
     oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel k βu
-    ⊢ |==> osat Ω ∗ othread TP ∗ ofrag TP ∗
+    ⊢ |==> osat Ω ∗ othread TP ∗ oproxy TP ∗
         ⌜k ∉ U⌝ ∗ othreadG_frag_public i ({[k]} ∪ U) q1 ∗ othreadG_session_public i eu q2 ∗
         othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
   Proof.
     iIntros "(S& T& F& #Te& Fu& Tu& #Bu& #Oe& Oo& Of)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
@@ -1273,15 +1264,15 @@ Section othread.
     { iPureIntro. set_solver. }
   Qed.
 
-  Lemma ofrag_delete_obl_private TP i V q k :
+  Lemma oproxy_delete_obl_private TP i V q k :
     k ∈ V →
-    othread TP ∗ ofrag TP ∗
+    othread TP ∗ oproxy TP ∗
     othreadG_elem i ∗ othreadG_frag_private i V q ∗ othreadG_owns i k 1
-    ⊢ |==> othread TP ∗ ofrag TP ∗
+    ⊢ |==> othread TP ∗ oproxy TP ∗
         othreadG_frag_private i (V ∖ {[k]}) q ∗ oblG_owner k i (1/2/2/2/2)%Qp.
   Proof.
     iIntros (Ink) "(T& F& #Te& Fv& To)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
@@ -1315,15 +1306,15 @@ Section othread.
       rewrite lookup_insert_ne; auto.
   Qed.
 
-  Lemma ofrag_delete_obl_public TP i U q k :
+  Lemma oproxy_delete_obl_public TP i U q k :
     k ∈ U →
-    othread TP ∗ ofrag TP ∗
+    othread TP ∗ oproxy TP ∗
     othreadG_elem i ∗ othreadG_frag_public i U q ∗ othreadG_owns i k 1
-    ⊢ |==> othread TP ∗ ofrag TP ∗
+    ⊢ |==> othread TP ∗ oproxy TP ∗
         othreadG_frag_public i (U ∖ {[k]}) q ∗ oblG_owner k i (1/2/2/2/2)%Qp.
   Proof.
     iIntros (Ink) "(T& F& #Te& Fu& To)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
@@ -1357,19 +1348,19 @@ Section othread.
       rewrite lookup_insert_ne; auto.
   Qed.
 
-  Lemma ofrag_obl_private_to_public TP i V U q1 q2 q3 q4 ev eu βu k :
+  Lemma oproxy_obl_private_to_public TP i V U q1 q2 q3 q4 ev eu βu k :
     i ∈ TP →
     k ∈ V →
-    ofrag TP ∗ 
+    oproxy TP ∗ 
     othreadG_frag_private i V q1 ∗ othreadG_session_private i ev q2 ∗
     othreadG_frag_public i U q3 ∗ othreadG_session_public i eu q4 ∗
     othreadG_bound eu βu ∗ oblG_fuel k βu
-    ⊢ |==> ofrag TP ∗
+    ⊢ |==> oproxy TP ∗
         othreadG_frag_private i (V ∖ {[k]}) q1 ∗ othreadG_session_private i ev q2 ∗
         othreadG_frag_public i (U ∪ {[k]}) q3 ∗ othreadG_session_public i eu q4.
   Proof.
     iIntros (Ini Ink) "(F& Fv& Tv& Fu& Tu& #Bu& Of)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
     iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu0& Fvs& Fus)".
@@ -1417,19 +1408,19 @@ Section othread.
       iPureIntro. destruct H0 as (?&?&?&?&?). assert (x ≠ i) by set_solver + H. rewrite !lookup_insert_ne; auto.
   Qed.
 
-  Lemma ofrag_obl_public_to_private TP i U V q1 q2 q3 q4 eu ev βv k :
+  Lemma oproxy_obl_public_to_private TP i U V q1 q2 q3 q4 eu ev βv k :
     i ∈ TP →
     k ∈ U →
-    ofrag TP ∗ 
+    oproxy TP ∗ 
     othreadG_frag_public i U q1 ∗ othreadG_session_public i eu q2 ∗
     othreadG_frag_private i V q3 ∗ othreadG_session_private i ev q4 ∗
     othreadG_bound ev βv ∗ oblG_fuel k βv
-    ⊢ |==> ofrag TP ∗
+    ⊢ |==> oproxy TP ∗
         othreadG_frag_public i (U ∖ {[k]}) q1 ∗ othreadG_session_public i eu q2 ∗
         othreadG_frag_private i (V ∪ {[k]}) q3 ∗ othreadG_session_private i ev q4.
   Proof.
     iIntros (Ini Ink) "(F& Fu& Tu& Fv& Tv& #Bv& Of)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
     iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv0& #Bu& Fvs& Fus)".
@@ -1477,15 +1468,15 @@ Section othread.
       iPureIntro. destruct H0 as (?&?&?&?&?). assert (x ≠ i) by set_solver + H. rewrite !lookup_insert_ne; auto.
   Qed.
 
-  Lemma ofrag_exec_to_done TP i ev eu :
-    othread TP ∗ ofrag TP ∗
+  Lemma oproxy_exec_to_done TP i ev eu :
+    othread TP ∗ oproxy TP ∗
     othreadG_exec i (1/2)%Qp ∗ othreadG_elem i ∗
     othreadG_frag_private i ∅ 1 ∗ othreadG_session_private i ev 1 ∗
     othreadG_frag_public i ∅ 1 ∗ othreadG_session_public i eu 1
-    ⊢ |==> othread TP ∗ ofrag TP ∗ othreadG_done i.
+    ⊢ |==> othread TP ∗ oproxy TP ∗ othreadG_done i.
   Proof.
     iIntros "(T& F& Tx& #Te& Fv& Tv& Fu& Tu)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
@@ -1515,17 +1506,17 @@ Section othread.
     - iFrame.
   Qed.
 
-  Lemma ofrag_new_session_private TP i V ev0 βv :
+  Lemma oproxy_new_session_private TP i V ev0 βv :
     i ∈ TP →
-    ofrag TP ∗ othreadG_frag_private i V 1 ∗
+    oproxy TP ∗ othreadG_frag_private i V 1 ∗
     othreadG_session_private i ev0 1 ∗
     ([∗ set] v ∈ V, oblG_fuel v βv)
-    ⊢ |==> ∃ ev1, ofrag TP ∗ othreadG_frag_private i V 1 ∗
+    ⊢ |==> ∃ ev1, oproxy TP ∗ othreadG_frag_private i V 1 ∗
                othreadG_session_private i ev1 1 ∗ othreadG_bound ev1 βv ∗
                othreadG_fuel ev1 βv.
   Proof.
     iIntros (Ini) "(F& Fv& Tv& Fvs)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
     iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu& Fvs0& Fus)".
@@ -1553,17 +1544,17 @@ Section othread.
       rewrite lookup_insert_ne; auto.
   Qed.
 
-  Lemma ofrag_new_session_public TP i U eu0 βu :
+  Lemma oproxy_new_session_public TP i U eu0 βu :
     i ∈ TP →
-    ofrag TP ∗ othreadG_frag_public i U 1 ∗
+    oproxy TP ∗ othreadG_frag_public i U 1 ∗
     othreadG_session_public i eu0 1 ∗
     ([∗ set] u ∈ U, oblG_fuel u βu)
-    ⊢ |==> ∃ eu1, ofrag TP ∗ othreadG_frag_public i U 1 ∗
+    ⊢ |==> ∃ eu1, oproxy TP ∗ othreadG_frag_public i U 1 ∗
                othreadG_session_public i eu1 1 ∗ othreadG_bound eu1 βu ∗
                othreadG_fuel eu1 βu.
   Proof.
     iIntros (Ini) "(F& Fu& Tu& Fus)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
     iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu& Fvs& Fus0)".
@@ -1591,20 +1582,20 @@ Section othread.
       rewrite lookup_insert_ne; auto.
   Qed.
 
-  Lemma ofrag_exchange_fuel TP i ev eu qv qu c :
+  Lemma oproxy_exchange_fuel TP i ev eu qv qu c :
     i ∈ TP →
     (Ord.O < c)%ord →
-    ofrag TP ∗
+    oproxy TP ∗
     othreadG_session_private i ev qv ∗ othreadG_fuel ev c ∗
     othreadG_session_public i eu qu ∗ othreadG_fuel eu c
-    ⊢ |==> ∃ G, (othreadG_exec i (1 / 2 / 2) -∗ othreadG_obls i G -∗ ofrag TP) ∗
+    ⊢ |==> ∃ G, (othreadG_exec i (1 / 2 / 2) -∗ othreadG_obls i G -∗ oproxy TP) ∗
              othreadG_session_private i ev qv ∗
              othreadG_session_public i eu qu ∗
              othreadG_exec i (1 / 2 / 2) ∗ othreadG_obls i G ∗
              ([∗ set] k ∈ G, oblG_fuel k Ord.one ∗ oblG_elem k).
   Proof.
     iIntros (Ini Ltc) "(F& Tv& Hfv& Tu& Hfu)".
-    rewrite /ofrag -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
+    rewrite /oproxy -!lock. iDestruct "F" as "(%&%&%&%&%& %Doms& TVA& TUA& FVA& FUA& FT& M)".
     destruct Doms as (Dom1& Dom2& Dom3& Dom4).
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
     iDestruct "Mi" as "(%&%&%&%&%&%& %LUi& Hex& #Bv& #Bu& Fvs& Fus)".
@@ -1648,7 +1639,7 @@ End othread.
 (* Allocation of initial invariant. *)
 Lemma othread_alloc `{SI : indexT} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGpreS Σ} :
-  ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ oassigned ∅ ∗ ofrag ∅.
+  ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ oassigned ∅ ∗ oproxy ∅.
 Proof.
   iIntros.
   iMod (own_alloc (reservation_map_token (A:=(gmap_viewR oid (unitUR))) ⊤)) as (γS) "HS";
@@ -1668,7 +1659,7 @@ Proof.
   iMod (ghost_map_alloc_empty) as (γTv) "HTv".
   iMod (ghost_map_alloc_empty) as (γTu) "HTu".
   iModIntro. iExists (OthreadG SI _ _ γS γO γX γE γF γV γU γTv γTu).
-  rewrite /othread /oassigned /ofrag -!lock. iSplitL "HS HO HX HE".
+  rewrite /othread /oassigned /oproxy -!lock. iSplitL "HS HO HX HE".
   { iExists ∅. iSplitR; first done. replace (⊤ : coPset) with (⊤ ∖ gset_to_coPset ∅); [iFrame; done|]. set_solver. }
   iSplitR; first done.
   iExists ∅, ∅, ∅, ∅, ∅. replace (⊤ ∖ gset_to_coPset ∅) with (⊤ : coPset) by set_solver. iFrame.
