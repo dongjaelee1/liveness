@@ -91,71 +91,49 @@ Local Definition witP_cred_unseal :
 Global Arguments witP_cred {SI Σ _}.
 
 (** Thread predicates *)
+(* TODO: make local? *)
 Local Definition thP_layer_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
-  e ℓ : iProp Σ :=
-  ∃ μ, othreadG_bound e (measure ℓ μ).
+  s ℓ : iProp Σ :=
+  ∃ μ, othreadG_bound s (measure ℓ μ).
 Local Definition thP_layer_aux : seal (@thP_layer_def). Proof. by eexists. Qed.
 Definition thP_layer := thP_layer_aux.(unseal).
 Local Definition thP_layer_unseal :
   @thP_layer = @thP_layer_def := thP_layer_aux.(seal_eq).
 Global Arguments thP_layer {SI Σ _ _}.
 
+(* TODO: rename to pxP ? *)
 Local Definition thP_fuel_val `{SI : indexT} `{@mupdGS SI Σ}
-  e α : iProp Σ :=
-  othreadG_fuel e α.
+  s α : iProp Σ :=
+  othreadG_fuel s α.
 
 Local Definition thP_fuel_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
-  e ℓ μ : iProp Σ :=
-  thP_fuel_val e (measure ℓ μ).
+  s ℓ μ : iProp Σ :=
+  thP_fuel_val s (measure ℓ μ).
 Local Definition thP_fuel_aux : seal (@thP_fuel_def). Proof. by eexists. Qed.
 Definition thP_fuel := thP_fuel_aux.(unseal).
 Local Definition thP_fuel_unseal :
   @thP_fuel = @thP_fuel_def := thP_fuel_aux.(seal_eq).
 Global Arguments thP_fuel {SI Σ _ _}.
 
-Local Definition thP_obls_private_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
-  i (G : oids) e ℓ q : iProp Σ :=
-  othreadG_elem i ∗ othreadG_exec i (q/2/2)%Qp ∗
-  othreadG_frag_private i G q ∗
-  thP_layer e ℓ ∗ othreadG_term_private i e (q/2)%Qp ∗
-  ([∗ set] k ∈ G,
-     oblP_id k ∗ oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
-Local Definition thP_obls_private_aux : seal (@thP_obls_private_def). Proof. by eexists. Qed.
-Definition thP_obls_private := thP_obls_private_aux.(unseal).
-Local Definition thP_obls_private_unseal :
-  @thP_obls_private = @thP_obls_private_def := thP_obls_private_aux.(seal_eq).
-Global Arguments thP_obls_private {SI Σ _ _}.
+Local Definition thP_proxy_auth_def `{SI : indexT} `{@mupdGS SI Σ}
+  i PS : iProp Σ :=
+  othreadG_proxy_session_auth i PS (1/2)%Qp.
+Local Definition thP_proxy_auth_aux : seal (@thP_proxy_auth_def). Proof. by eexists. Qed.
+Definition thP_proxy_auth := thP_proxy_auth_aux.(unseal).
+Local Definition thP_proxy_auth_unseal :
+  @thP_proxy_auth = @thP_proxy_auth_def := thP_proxy_auth_aux.(seal_eq).
+Global Arguments thP_proxy_auth {SI Σ _}.
 
-Local Definition thP_term_private_def `{SI : indexT} `{@mupdGS SI Σ}
-  i e : iProp Σ :=
-  othreadG_elem i ∗ othreadG_term_private i e (1/2)%Qp.
-Local Definition thP_term_private_aux : seal (@thP_term_private_def). Proof. by eexists. Qed.
-Definition thP_term_private := thP_term_private_aux.(unseal).
-Local Definition thP_term_private_unseal :
-  @thP_term_private = @thP_term_private_def := thP_term_private_aux.(seal_eq).
-Global Arguments thP_term_private {SI Σ _}.
-
-Local Definition thP_obls_public_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
-  i (G : oids) e ℓ q : iProp Σ :=
-  othreadG_elem i ∗ othreadG_exec i (q/2/2)%Qp ∗
-  othreadG_frag_public i G q ∗
-  thP_layer e ℓ ∗ othreadG_term_public i e (q/2)%Qp ∗
-  ([∗ set] k ∈ G,
-     oblP_id k ∗ oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
-Local Definition thP_obls_public_aux : seal (@thP_obls_public_def). Proof. by eexists. Qed.
-Definition thP_obls_public := thP_obls_public_aux.(unseal).
-Local Definition thP_obls_public_unseal :
-  @thP_obls_public = @thP_obls_public_def := thP_obls_public_aux.(seal_eq).
-Global Arguments thP_obls_public {SI Σ _ _}.
-
-Local Definition thP_term_public_def `{SI : indexT} `{@mupdGS SI Σ}
-  i e : iProp Σ :=
-  othreadG_elem i ∗ othreadG_term_public i e (1/2)%Qp.
-Local Definition thP_term_public_aux : seal (@thP_term_public_def). Proof. by eexists. Qed.
-Definition thP_term_public := thP_term_public_aux.(unseal).
-Local Definition thP_term_public_unseal :
-  @thP_term_public = @thP_term_public_def := thP_term_public_aux.(seal_eq).
-Global Arguments thP_term_public {SI Σ _}.
+Local Definition thP_proxy_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  i π s ℓ (K : oids) : iProp Σ :=
+  othreadG_elem i ∗
+  othreadG_proxy_obls i π K ∗ othreadG_proxy_session i π s (1)%Qp ∗ thP_layer s ℓ ∗
+  ([∗ set] k ∈ K, oblP_id k ∗ oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
+Local Definition thP_proxy_aux : seal (@thP_proxy_def). Proof. by eexists. Qed.
+Definition thP_proxy := thP_proxy_aux.(unseal).
+Local Definition thP_proxy_unseal :
+  @thP_proxy = @thP_proxy_def := thP_proxy_aux.(seal_eq).
+Global Arguments thP_proxy {SI Σ _ _}.
 
 Local Definition thP_done_def `{SI : indexT} `{@mupdGS SI Σ}
   i : iProp Σ :=
@@ -167,36 +145,36 @@ Local Definition thP_done_unseal :
 Global Arguments thP_done {SI Σ _}.
 
 (** Additional definitions for more convenient induction rules *)
+Local Definition collect_fuels `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  α (F : gmap session (layer * measurable_syntax)) : iProp Σ :=
+  ([∗ map] s ↦ '(l, m) ∈ F, thP_fuel_val s ((measure l m) × α)%ord).
+
+Local Definition embed_fuels_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
+  (a : A) ℓ (F : gmap session (layer * measurable_syntax)) : iProp Σ :=
+  collect_fuels (measure ℓ (⟪wf_ltA, a⟫)%M) F.
+Local Definition embed_fuels_aux : seal (@embed_fuels_def). Proof. by eexists. Qed.
+Definition embed_fuels := embed_fuels_aux.(unseal).
+Local Definition embed_fuels_unseal :
+  @embed_fuels = @embed_fuels_def := embed_fuels_aux.(seal_eq).
+Global Arguments embed_fuels {SI Σ _ _ A ltA}.
+
 Local Definition wit_fuels_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
-  k ev eu ℓ l m α : iProp Σ :=
+  k ℓ α (F : gmap session (layer * measurable_syntax)) : iProp Σ :=
   ∃ μ, ⌜ (α <= η (measure ℓ μ))%ord ⌝ ∗ witP_bound_val k α ∗
-       thP_fuel_val ev ((measure l m) × α)%ord ∗
-       thP_fuel_val eu ((measure l m) × α)%ord.
+       collect_fuels α F.
 Local Definition wit_fuels_aux : seal (@wit_fuels_def). Proof. by eexists. Qed.
 Definition wit_fuels := wit_fuels_aux.(unseal).
 Local Definition wit_fuels_unseal :
   @wit_fuels = @wit_fuels_def := wit_fuels_aux.(seal_eq).
 Global Arguments wit_fuels {SI Σ _ _}.
 
-Local Definition embed_fuels_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
-  {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
-  ev eu l m (a : A) : iProp Σ :=
-  thP_fuel_val ev ((measure l m) × (measure ord.O (⟪wf_ltA, a⟫)%M))%ord ∗
-  thP_fuel_val eu ((measure l m) × (measure ord.O (⟪wf_ltA, a⟫)%M))%ord.
-Local Definition embed_fuels_aux : seal (@embed_fuels_def). Proof. by eexists. Qed.
-Definition embed_fuels := embed_fuels_aux.(unseal).
-Local Definition embed_fuels_unseal :
-  @embed_fuels = @embed_fuels_def := embed_fuels_aux.(seal_eq).
-Global Arguments embed_fuels {SI Σ _ _ _ _}.
-
 Ltac unfold_opreds :=
   try rewrite !wit_fuels_unseal /wit_fuels_def;
   try rewrite !embed_fuels_unseal /embed_fuels_def;
   try rewrite !thP_done_unseal /thP_done_def;
-  try rewrite !thP_term_public_unseal /thP_term_public_def;
-  try rewrite !thP_obls_public_unseal /thP_obls_public_def;
-  try rewrite !thP_term_private_unseal /thP_term_private_def;
-  try rewrite !thP_obls_private_unseal /thP_obls_private_def;
+  try rewrite !thP_proxy_unseal /thP_proxy_def;
+  try rewrite !thP_proxy_auth_unseal /thP_proxy_auth_def;
   try rewrite !thP_fuel_unseal /thP_fuel_def;
   try rewrite !thP_fuel_val;
   try rewrite !thP_layer_unseal /thP_layer_def;
