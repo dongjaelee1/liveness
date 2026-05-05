@@ -82,8 +82,8 @@ Local Definition witP_layer_unseal :
 Global Arguments witP_layer {SI Σ _ _}.
 
 Local Definition witP_cred_def `{SI : indexT} `{@mupdGS SI Σ}
-  k a : iProp Σ :=
-  oblP_id k ∗ witG_witness k a.
+  k : iProp Σ :=
+  oblP_id k ∗ witG_witness k Ord.one.
 Local Definition witP_cred_aux : seal (@witP_cred_def). Proof. by eexists. Qed.
 Definition witP_cred := witP_cred_aux.(unseal).
 Local Definition witP_cred_unseal :
@@ -91,17 +91,6 @@ Local Definition witP_cred_unseal :
 Global Arguments witP_cred {SI Σ _}.
 
 (** Thread predicates *)
-(* TODO: make local? *)
-Local Definition thP_layer_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
-  s ℓ : iProp Σ :=
-  ∃ μ, othreadG_bound s (measure ℓ μ).
-Local Definition thP_layer_aux : seal (@thP_layer_def). Proof. by eexists. Qed.
-Definition thP_layer := thP_layer_aux.(unseal).
-Local Definition thP_layer_unseal :
-  @thP_layer = @thP_layer_def := thP_layer_aux.(seal_eq).
-Global Arguments thP_layer {SI Σ _ _}.
-
-(* TODO: rename to pxP ? *)
 Local Definition thP_fuel_val `{SI : indexT} `{@mupdGS SI Σ}
   s α : iProp Σ :=
   othreadG_fuel s α.
@@ -117,12 +106,16 @@ Global Arguments thP_fuel {SI Σ _ _}.
 
 Local Definition thP_proxy_auth_def `{SI : indexT} `{@mupdGS SI Σ}
   i PS : iProp Σ :=
-  othreadG_proxy_session_auth i PS (1/2)%Qp.
+  othreadG_exec i (1/2)%Qp ∗ othreadG_proxy_session_auth i PS (1/2)%Qp.
 Local Definition thP_proxy_auth_aux : seal (@thP_proxy_auth_def). Proof. by eexists. Qed.
 Definition thP_proxy_auth := thP_proxy_auth_aux.(unseal).
 Local Definition thP_proxy_auth_unseal :
   @thP_proxy_auth = @thP_proxy_auth_def := thP_proxy_auth_aux.(seal_eq).
 Global Arguments thP_proxy_auth {SI Σ _}.
+
+Local Definition thP_layer `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  s ℓ : iProp Σ :=
+  ∃ μ, othreadG_bound s (measure ℓ μ).
 
 Local Definition thP_proxy_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   i π s ℓ (K : oids) : iProp Σ :=
@@ -172,15 +165,16 @@ Global Arguments wit_fuels {SI Σ _ _}.
 Ltac unfold_opreds :=
   try rewrite !wit_fuels_unseal /wit_fuels_def;
   try rewrite !embed_fuels_unseal /embed_fuels_def;
+  try rewrite /collect_fuels;
   try rewrite !thP_done_unseal /thP_done_def;
   try rewrite !thP_proxy_unseal /thP_proxy_def;
+  try rewrite /thP_layer;
   try rewrite !thP_proxy_auth_unseal /thP_proxy_auth_def;
   try rewrite !thP_fuel_unseal /thP_fuel_def;
-  try rewrite !thP_fuel_val;
-  try rewrite !thP_layer_unseal /thP_layer_def;
+  try rewrite /thP_fuel_val;
   try rewrite !witP_cred_unseal /witP_cred_def;
   try rewrite !witP_layer_unseal /witP_layer_def;
-  try rewrite !witP_bound_val;
+  try rewrite /witP_bound_val;
   try rewrite !oblP_variant_unseal /oblP_variant_def;
   try rewrite !oblP_inv_unseal /oblP_inv_def;
   try rewrite !oblP_fuel_unseal /oblP_fuel_def;
@@ -210,9 +204,16 @@ Section preds.
     Proof. unfold_opreds. apply _. Qed.
     Global Instance witP_layer_persistent k ℓ : Persistent (witP_layer k ℓ).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance thP_layer_persistent e ℓ : Persistent (thP_layer e ℓ).
+    Local Instance thP_layer_persistent e ℓ : Persistent (thP_layer e ℓ).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance thP_done_persistent i : Persistent (thP_done i).
+    Proof. unfold_opreds. apply _. Qed.
+    Global Instance collect_fuels_empty_persistent α : Persistent (collect_fuels α ∅).
+    Proof. unfold_opreds. apply _. Qed.
+    Global Instance embed_fuels_empty_persistent {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a ℓ :
+      Persistent (embed_fuels wf_ltA a ℓ ∅).
+    Proof. unfold_opreds. apply _. Qed.
+    Global Instance wit_fuels_empty_persistent k ℓ α : Persistent (wit_fuels k ℓ α ∅).
     Proof. unfold_opreds. apply _. Qed.
 
     Global Instance oblP_id_timeless k : Timeless (oblP_id k).
@@ -226,35 +227,32 @@ Section preds.
     Global Instance oblP_fuel_timeless k ℓ μ : Timeless (oblP_fuel k ℓ μ).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance oblP_variant_timeless k P Q R :
-      Timeless P → Timeless Q → Timeless R →
-      Timeless (oblP_variant k P Q R).
+      Timeless P → Timeless Q → Timeless R → Timeless (oblP_variant k P Q R).
     Proof. intros. unfold_opreds. apply _. Qed.
     Local Instance witP_bound_val_timeless k α : Timeless (witP_bound_val k α).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance witP_layer_timeless k ℓ : Timeless (witP_layer k ℓ).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance witP_cred_timeless k a : Timeless (witP_cred k a).
+    Global Instance witP_cred_timeless k : Timeless (witP_cred k).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance thP_layer_timeless e ℓ : Timeless (thP_layer e ℓ).
+    Local Instance thP_layer_timeless e ℓ : Timeless (thP_layer e ℓ).
     Proof. unfold_opreds. apply _. Qed.
     Local Instance thP_fuel_val_timeless e α : Timeless (thP_fuel_val e α).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance thP_fuel_timeless e ℓ μ : Timeless (thP_fuel e ℓ μ).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance thP_obls_private_timeless i G e ℓ q : Timeless (thP_obls_private i G e ℓ q).
+    Global Instance thP_proxy_auth_timeless i PS : Timeless (thP_proxy_auth i PS).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance thP_term_private_timeless i e : Timeless (thP_term_private i e).
-    Proof. unfold_opreds. apply _. Qed.
-    Global Instance thP_obls_public_timeless i G e ℓ q : Timeless (thP_obls_public i G e ℓ q).
-    Proof. unfold_opreds. apply _. Qed.
-    Global Instance thP_term_public_timeless i e : Timeless (thP_term_public i e).
+    Global Instance thP_proxy_timeless i π s ℓ K : Timeless (thP_proxy i π s ℓ K).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance thP_done_timeless i : Timeless (thP_done i).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance embed_fuels_timeless {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) ev eu l m a :
-      Timeless (embed_fuels wf_ltA ev eu l m a).
+    Global Instance collect_fuels_timeless α F : Timeless (collect_fuels α F).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance wit_fuels_timeless k ev eu ℓ l m α : Timeless (wit_fuels k ev eu ℓ l m α).
+    Global Instance embed_fuels_empty_timeless {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a ℓ :
+      Timeless (embed_fuels wf_ltA a ℓ ∅).
+    Proof. unfold_opreds. apply _. Qed.
+    Global Instance wit_fuels_timeless k ℓ α F : Timeless (wit_fuels k ℓ α F).
     Proof. unfold_opreds. apply _. Qed.
 
     Global Instance oblP_inv_contractive_1 N k Q R : Contractive (λ P, oblP_inv N k P Q R).
@@ -471,87 +469,91 @@ Section preds.
       oblP_fuel k ℓ μ = oblP_fuel_val k (measure ℓ (▽ × μ)%M).
     Proof. rewrite oblP_fuel_unseal /oblP_fuel_def. auto. Qed.
 
-    Lemma oblP_fuel_eq k ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 (▽ × μ1)%M == measure ℓ2 (▽ × μ2)%M) →
-      oblP_fuel k ℓ1 μ1 = oblP_fuel k ℓ2 μ2.
+    Lemma oblP_fuel_eq k ℓ μ1 μ2 :
+      (measure ℓ (μ1)%M == measure ℓ (μ2)%M) →
+      oblP_fuel k ℓ μ1 = oblP_fuel k ℓ μ2.
     Proof.
-      unfold_oblP_fuel. intros. rewrite (oblP_fuel_val_eq k _ _ H); auto.
+      unfold_oblP_fuel. intros. rewrite !measure_mult.
+      apply oblP_fuel_val_eq. rewrite H. done.
     Qed.
-    Lemma oblP_fuel_eq_list K ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 (▽ × μ1)%M == measure ℓ2 (▽ × μ2)%M) →
-      ([∗ list] k ∈ K, oblP_fuel k ℓ1 μ1)%I ≡ ([∗ list] k ∈ K, oblP_fuel k ℓ2 μ2)%I.
+    Lemma oblP_fuel_eq_list K ℓ μ1 μ2 :
+      (measure ℓ (μ1)%M == measure ℓ (μ2)%M) →
+      ([∗ list] k ∈ K, oblP_fuel k ℓ μ1)%I ≡ ([∗ list] k ∈ K, oblP_fuel k ℓ μ2)%I.
     Proof. intros. apply big_opL_proper. intros. erewrite oblP_fuel_eq; eauto. Qed.
-    Lemma oblP_fuel_eq_set K ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 (▽ × μ1)%M == measure ℓ2 (▽ × μ2)%M) →
-      ([∗ set] k ∈ K, oblP_fuel k ℓ1 μ1)%I ≡ ([∗ set] k ∈ K, oblP_fuel k ℓ2 μ2)%I.
+    Lemma oblP_fuel_eq_set K ℓ μ1 μ2 :
+      (measure ℓ (μ1)%M == measure ℓ (μ2)%M) →
+      ([∗ set] k ∈ K, oblP_fuel k ℓ μ1)%I ≡ ([∗ set] k ∈ K, oblP_fuel k ℓ μ2)%I.
     Proof. intros. apply big_opS_proper. intros. erewrite oblP_fuel_eq; eauto. Qed.
 
-    Lemma oblP_fuel_mon k ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 (▽ × μ1)%M <= measure ℓ2 (▽ × μ2)%M)%ord →
-      oblP_fuel k ℓ2 μ2 ==∗ oblP_fuel k ℓ1 μ1.
+    Lemma oblP_fuel_mon k ℓ  μ1 μ2 :
+      (measure ℓ (μ1)%M <= measure ℓ (μ2)%M)%ord →
+      oblP_fuel k ℓ μ2 ==∗ oblP_fuel k ℓ μ1.
     Proof.
-      unfold_oblP_fuel. apply oblP_fuel_val_mon.
+      unfold_oblP_fuel. intros. apply oblP_fuel_val_mon.
+      rewrite !measure_mult. apply Jacobsthal.le_mult_r. auto.
     Qed.
-    Lemma oblP_fuel_mon_list K ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 (▽ × μ1)%M <= measure ℓ2 (▽ × μ2)%M)%ord →
-      ([∗ list] k ∈ K, oblP_fuel k ℓ2 μ2) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ1 μ1).
+    Lemma oblP_fuel_mon_list K ℓ μ1 μ2 :
+      (measure ℓ (μ1)%M <= measure ℓ (μ2)%M)%ord →
+      ([∗ list] k ∈ K, oblP_fuel k ℓ μ2) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ μ1).
     Proof.
       iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
       iModIntro. iIntros. by iApply oblP_fuel_mon.
     Qed.
-    Lemma oblP_fuel_mon_set K ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 (▽ × μ1)%M <= measure ℓ2 (▽ × μ2)%M)%ord →
-      ([∗ set] k ∈ K, oblP_fuel k ℓ2 μ2) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ1 μ1).
+    Lemma oblP_fuel_mon_set K ℓ μ1 μ2 :
+      (measure ℓ (μ1)%M <= measure ℓ (μ2)%M)%ord →
+      ([∗ set] k ∈ K, oblP_fuel k ℓ μ2) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ μ1).
     Proof.
       iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
       iModIntro. iIntros. by iApply oblP_fuel_mon.
     Qed.
 
-    TODO
-
-    Lemma oblP_fuel_mon_split k ℓ1 ℓ2 ℓ3 μ1 μ2 μ3 :
-      ((measure ℓ1 μ1 ⊕ measure ℓ2 μ2) <= measure ℓ3 μ3)%ord →
-      oblP_fuel k ℓ3 μ3 ==∗ oblP_fuel k ℓ1 μ1 ∗ oblP_fuel k ℓ2 μ2.
+    Lemma oblP_fuel_mon_split k ℓ μ1 μ2 μ3 :
+      ((measure ℓ (μ1)%M ⊕ measure ℓ (μ2)%M) <= measure ℓ (μ3)%M)%ord →
+      oblP_fuel k ℓ μ3 ==∗ oblP_fuel k ℓ μ1 ∗ oblP_fuel k ℓ μ2.
     Proof.
-      unfold_oblP_fuel. apply oblP_fuel_val_mon_split.
+      unfold_oblP_fuel. intros. apply oblP_fuel_val_mon_split.
+      rewrite !measure_mult. rewrite -ClassicJacobsthal.mult_dist. apply Jacobsthal.le_mult_r. auto.
     Qed.
-    Lemma oblP_fuel_mon_split_list K ℓ1 ℓ2 ℓ3 μ1 μ2 μ3 :
-      ((measure ℓ1 μ1 ⊕ measure ℓ2 μ2) <= measure ℓ3 μ3)%ord →
-      ([∗ list] k ∈ K, oblP_fuel k ℓ3 μ3) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ1 μ1) ∗ ([∗ list] k ∈ K, oblP_fuel k ℓ2 μ2).
+    Lemma oblP_fuel_mon_split_list K ℓ μ1 μ2 μ3 :
+      ((measure ℓ (μ1)%M ⊕ measure ℓ (μ2)%M) <= measure ℓ (μ3)%M)%ord →
+      ([∗ list] k ∈ K, oblP_fuel k ℓ μ3) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ μ1) ∗ ([∗ list] k ∈ K, oblP_fuel k ℓ μ2).
     Proof.
       iIntros (LE) "H". rewrite -big_sepL_sep -big_sepL_bupd. iApply (big_sepL_impl with "H").
       iIntros "!> % % %". iApply oblP_fuel_mon_split; auto.
     Qed.
-    Lemma oblP_fuel_mon_split_set K ℓ1 ℓ2 ℓ3 μ1 μ2 μ3 :
-      ((measure ℓ1 μ1 ⊕ measure ℓ2 μ2) <= measure ℓ3 μ3)%ord →
-      ([∗ set] k ∈ K, oblP_fuel k ℓ3 μ3) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ1 μ1) ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ2 μ2).
+    Lemma oblP_fuel_mon_split_set K ℓ μ1 μ2 μ3 :
+      ((measure ℓ (μ1)%M ⊕ measure ℓ (μ2)%M) <= measure ℓ (μ3)%M)%ord →
+      ([∗ set] k ∈ K, oblP_fuel k ℓ μ3) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ μ1) ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ μ2).
     Proof.
       iIntros (LE) "H". rewrite -big_sepS_sep -big_sepS_bupd. iApply (big_sepS_impl with "H").
       iIntros "!> % %". iApply oblP_fuel_mon_split; auto.
     Qed.
 
-    Lemma oblP_fuel_lt k ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 μ1 < measure ℓ2 μ2)%ord →
-      oblP_fuel k ℓ2 μ2 ⊢ |==> oblP_fuel k ℓ1 μ1 ∗ oblP_fuel k 0 1.
+    Lemma oblP_fuel_lt k ℓ μ1 μ2 :
+      (measure ℓ μ1 < measure ℓ μ2)%ord →
+      oblP_fuel k ℓ μ2 ⊢ |==> oblP_fuel k ℓ μ1 ∗ oblP_fuel k ℓ (1)%M.
     Proof.
-      unfold_oblP_fuel. rewrite (oblP_fuel_val_eq _ (measure (0 : layer) 1) Ord.one).
-      1: apply oblP_fuel_val_lt.
-      rewrite measure_nat Ord.from_nat_1. done.
+      unfold_oblP_fuel. intros. rewrite !measure_mult.
+      iIntros "H". iMod (oblP_fuel_val_mult _ _ _ _ H with "H") as "[$ H]".
+      iModIntro. iStopProof. erewrite oblP_fuel_val_eq. 1: eauto.
+      rewrite measure_nat Jacobsthal.mult_1_r. done.
     Qed.
-    Lemma oblP_fuel_lt_list K ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 μ1 < measure ℓ2 μ2)%ord →
-      ([∗ list] k ∈ K, oblP_fuel k ℓ2 μ2) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ1 μ1) ∗ ([∗ list] k ∈ K, oblP_fuel k 0 1).
+    Lemma oblP_fuel_lt_list K ℓ μ1 μ2 :
+      (measure ℓ μ1 < measure ℓ μ2)%ord →
+      ([∗ list] k ∈ K, oblP_fuel k ℓ μ2) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ μ1) ∗ ([∗ list] k ∈ K, oblP_fuel k ℓ 1).
     Proof.
       iIntros (LT) "H". rewrite -big_sepL_sep. iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
       iModIntro. iIntros. by iApply oblP_fuel_lt.
     Qed.
-    Lemma oblP_fuel_lt_set K ℓ1 ℓ2 μ1 μ2 :
-      (measure ℓ1 μ1 < measure ℓ2 μ2)%ord →
-      ([∗ set] k ∈ K, oblP_fuel k ℓ2 μ2) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ1 μ1) ∗ ([∗ set] k ∈ K, oblP_fuel k 0 1).
+    Lemma oblP_fuel_lt_set K ℓ μ1 μ2 :
+      (measure ℓ μ1 < measure ℓ μ2)%ord →
+      ([∗ set] k ∈ K, oblP_fuel k ℓ μ2) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ μ1) ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1).
     Proof.
       iIntros (LT) "H". rewrite -big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
       iModIntro. iIntros. by iApply oblP_fuel_lt.
     Qed.
+
+    TODO
 
     (* measurable syntax rules. *)
     Lemma oblP_fuel_embed k ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a1 a2 : A) :
@@ -596,7 +598,9 @@ Section preds.
     Lemma oblP_fuel_add k ℓ μ1 μ2 :
       oblP_fuel k ℓ (μ1 ⊕ μ2)%M ⊣⊢ oblP_fuel k ℓ μ1 ∗ oblP_fuel k ℓ μ2.
     Proof.
-      unfold_oblP_fuel. rewrite measure_add. apply oblP_fuel_val_add.
+      unfold_oblP_fuel. rewrite measure_mult measure_add.
+      etrans; last eapply oblP_fuel_val_add. erewrite oblP_fuel_val_eq. 1: reflexivity.      
+      rewrite ClassicJacobsthal.mult_dist -!measure_mult. reflexivity.
     Qed.
     Lemma oblP_fuel_add_list K ℓ μ1 μ2 :
       ([∗ list] k ∈ K, oblP_fuel k ℓ (μ1 ⊕ μ2)%M) ⊣⊢ ([∗ list] k ∈ K, oblP_fuel k ℓ μ1) ∗ ([∗ list] k ∈ K, oblP_fuel k ℓ μ2).
@@ -613,7 +617,9 @@ Section preds.
       (measure ℓ μ1 < measure ℓ μ2)%ord →
       oblP_fuel k ℓ (s × μ2)%M ⊢ |==> oblP_fuel k ℓ (s × μ1)%M ∗ oblP_fuel k ℓ s.
     Proof.
-      unfold_oblP_fuel. intros LT. rewrite !measure_mult. apply oblP_fuel_val_mult. auto.
+      unfold_oblP_fuel. intros LT. rewrite !measure_mult.
+      oblP_fuel_val_lt
+      apply oblP_fuel_val_mult. auto.
     Qed.
     Lemma oblP_fuel_mult_list K ℓ μ1 μ2 s :
       (measure ℓ μ1 < measure ℓ μ2)%ord →
@@ -761,6 +767,155 @@ Section preds.
       unfold_opreds. iIntros (Hlt) "(#Be& P)". iFrame "Be".
       iMod (witG_witness_lt with "P") as "[$ (%& %& C)]"; first done. 
       apply ord_lt_one in H. iMod (witG_witness_mon_split with "C") as "[_ $]"; done.
+    Qed.
+
+    (** thP_fuel_val rules *)
+    Local Open Scope ord.
+
+    Lemma thP_fuel_val_eq k a0 a1 :
+      (a0 == a1) → thP_fuel_val k a0 = thP_fuel_val k a1.
+    Proof.
+      unfold_opreds. intros. rewrite (oblG_fuel_eq k a0 a1); auto.
+    Qed.
+    Lemma thP_fuel_val_eq_list K a0 a1 :
+      (a0 == a1) →
+      ([∗ list] k ∈ K, thP_fuel_val k a0)%I ≡ ([∗ list] k ∈ K, thP_fuel_val k a1)%I.
+    Proof. intros. apply big_opL_proper. intros. erewrite thP_fuel_val_eq; eauto. Qed.
+    Lemma thP_fuel_val_eq_set K a0 a1 :
+      a0 == a1 →
+      ([∗ set] k ∈ K, thP_fuel_val k a0)%I ≡ ([∗ set] k ∈ K, thP_fuel_val k a1)%I.
+    Proof. intros. apply big_opS_proper. intros. erewrite thP_fuel_val_eq; eauto. Qed.
+
+    Lemma thP_fuel_val_mon k a0 a1 :
+      (a0 <= a1)%ord → thP_fuel_val k a1 ==∗ thP_fuel_val k a0.
+    Proof.
+      unfold_opreds. iIntros (Hle) "(P& Be)". iFrame. by iApply oblG_fuel_mon.
+    Qed.
+    Lemma thP_fuel_val_mon_list K a0 a1 :
+      a0 <= a1 →
+      ([∗ list] k ∈ K, thP_fuel_val k a1) ⊢ |==> ([∗ list] k ∈ K, thP_fuel_val k a0).
+    Proof.
+      iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+      iModIntro. iIntros. by iApply thP_fuel_val_mon.
+    Qed.
+    Lemma thP_fuel_val_mon_set K a0 a1 :
+      a0 <= a1 →
+      ([∗ set] k ∈ K, thP_fuel_val k a1) ⊢ |==> ([∗ set] k ∈ K, thP_fuel_val k a0).
+    Proof.
+      iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+      iModIntro. iIntros. by iApply thP_fuel_val_mon.
+    Qed.
+
+    Lemma thP_fuel_val_add k a0 a1 :
+      thP_fuel_val k (a0 ⊕ a1)%ord ⊣⊢ thP_fuel_val k a0 ∗ thP_fuel_val k a1.
+    Proof.
+      unfold_opreds. rewrite oblG_fuel_split. iSplit.
+      - iIntros "(#Ge& P1& P2)"; iFrame; eauto.
+      - iIntros "((B1& P1)& (B2& P2))"; iFrame.
+    Qed.
+    Lemma thP_fuel_val_add_list K a0 a1 :
+      ([∗ list] k ∈ K, thP_fuel_val k (a0 ⊕ a1)) ⊣⊢ ([∗ list] k ∈ K, thP_fuel_val k a0) ∗ ([∗ list] k ∈ K, thP_fuel_val k a1).
+    Proof.
+      rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply thP_fuel_val_add.
+    Qed.
+    Lemma thP_fuel_val_add_set K a0 a1 :
+      ([∗ set] k ∈ K, thP_fuel_val k (a0 ⊕ a1)) ⊣⊢ ([∗ set] k ∈ K, thP_fuel_val k a0) ∗ ([∗ set] k ∈ K, thP_fuel_val k a1).
+    Proof.
+      rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply thP_fuel_val_add.
+    Qed.
+
+    Lemma thP_fuel_val_mon_split k a0 a1 a2 :
+      ((a0 ⊕ a1) <= a2)%ord → thP_fuel_val k a2 ==∗ thP_fuel_val k a0 ∗ thP_fuel_val k a1.
+    Proof.
+      unfold_opreds. iIntros (Hle) "(#Be& P)".
+      iMod (oblG_fuel_mon_split with "P") as "[P1 P2]"; first done.
+      iFrame; eauto.
+    Qed.
+    Lemma thP_fuel_val_mon_split_list K a0 a1 a2 :
+      (a0 ⊕ a1) <= a2 →
+      ([∗ list] k ∈ K, thP_fuel_val k a2) ⊢ |==> ([∗ list] k ∈ K, thP_fuel_val k a0) ∗ ([∗ list] k ∈ K, thP_fuel_val k a1).
+    Proof.
+      iIntros (LE) "H". iPoseProof (thP_fuel_val_mon_list with "H") as ">H"; first done.
+      by iApply thP_fuel_val_add_list.
+    Qed.
+    Lemma thP_fuel_val_mon_split_set K a0 a1 a2 :
+      (a0 ⊕ a1) <= a2 →
+      ([∗ set] k ∈ K, thP_fuel_val k a2) ⊢ |==> ([∗ set] k ∈ K, thP_fuel_val k a0) ∗ ([∗ set] k ∈ K, thP_fuel_val k a1).
+    Proof.
+      iIntros (LE) "H". iPoseProof (thP_fuel_val_mon_set with "H") as ">H"; first done.
+      by iApply thP_fuel_val_add_set.
+    Qed.
+
+    Lemma thP_fuel_val_lt k a0 a1 :
+      a0 < a1 →
+      thP_fuel_val k a1 ⊢ |==> thP_fuel_val k a0 ∗ thP_fuel_val k Ord.one.
+    Proof.
+      unfold_opreds. iIntros (Hlt) "(#Be& P)".
+      iMod (oblG_fuel_lt with "P") as "(P& %& %& H)". 1: done.
+      iFrame "P Be". apply ord_lt_one in H. iMod (oblG_fuel_mon_split _ _ _ _ with "H") as "[_ $]"; done.
+    Qed.
+    Lemma thP_fuel_val_lt_list K a0 a1 :
+      a0 < a1 →
+      ([∗ list] k ∈ K, thP_fuel_val k a1) ⊢ |==> ([∗ list] k ∈ K, thP_fuel_val k a0) ∗ ([∗ list] k ∈ K, thP_fuel_val k Ord.one).
+    Proof.
+      iIntros (LT) "H". rewrite -big_sepL_sep. iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+      iModIntro. iIntros. by iApply thP_fuel_val_lt.
+    Qed.
+    Lemma thP_fuel_val_lt_set K a0 a1 :
+      a0 < a1 →
+      ([∗ set] k ∈ K, thP_fuel_val k a1) ⊢ |==> ([∗ set] k ∈ K, thP_fuel_val k a0) ∗ ([∗ set] k ∈ K, thP_fuel_val k Ord.one).
+    Proof.
+      iIntros (LT) "H". rewrite -big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+      iModIntro. iIntros. by iApply thP_fuel_val_lt.
+    Qed.
+
+    Lemma thP_fuel_val_mult k a0 a1 b :
+      (a0 < a1)%ord →
+      thP_fuel_val k (b × a1)%ord ⊢ |==> thP_fuel_val k (b × a0) ∗ thP_fuel_val k b.
+    Proof.
+      unfold_opreds. intros LT. iIntros "[#Ge Gf]". iFrame "Ge".
+      apply Ord.S_supremum in LT. iMod (oblG_fuel_mon _ ((b × a0) ⊕ b)%ord with "Gf") as "Gf".
+      { etransitivity; last eapply Jacobsthal.le_mult_r; eauto. rewrite Jacobsthal.mult_S Hessenberg.add_comm. done. }
+      by iDestruct (oblG_fuel_split with "Gf") as "[$ $]".
+    Qed.
+    Lemma thP_fuel_val_mult_list K a0 a1 b :
+      (a0 < a1)%ord →
+      ([∗ list] k ∈ K, thP_fuel_val k (b × a1))
+      ⊢ |==> ([∗ list] k ∈ K, thP_fuel_val k (b × a0)) ∗ ([∗ list] k ∈ K, thP_fuel_val k b).
+    Proof.
+      rewrite -big_sepL_sep -big_sepL_bupd. intros. apply big_sepL_mono; intros. apply thP_fuel_val_mult. auto.
+    Qed.
+    Lemma thP_fuel_val_mult_set K a0 a1 b :
+      (a0 < a1)%ord →
+      ([∗ set] k ∈ K, thP_fuel_val k (b × a1))
+      ⊢ |==> ([∗ set] k ∈ K, thP_fuel_val k (b × a0)) ∗ ([∗ set] k ∈ K, thP_fuel_val k b).
+    Proof.
+      rewrite -big_sepS_sep -big_sepS_bupd. intros. apply big_sepS_mono; intros. apply thP_fuel_val_mult. auto.
+    Qed.
+
+    Lemma thP_fuel_val_expn k a0 a1 b :
+      (a0 < a1)%ord →
+      (Ord.O < b)%ord →
+      thP_fuel_val k (b ↑ a1)%ord ⊢ |==> thP_fuel_val k ((b ↑ a0) × b).
+    Proof.
+      unfold_opreds. intros LT Pos. iIntros "[#Ge Gf]". iFrame "Ge".
+      apply Ord.S_supremum in LT. iMod (oblG_fuel_mon _ ((b ↑ a0) × b)%ord with "Gf") as "Gf".
+      { etransitivity; last eapply Jacobsthal.le_expn_r; eauto. rewrite Jacobsthal.expn_S; done. }
+      done.
+    Qed.
+    Lemma thP_fuel_val_expn_list K a0 a1 b :
+      (a0 < a1)%ord →
+      (Ord.O < b)%ord →
+      ([∗ list] k ∈ K, thP_fuel_val k (b ↑ a1)) ⊢ |==> ([∗ list] k ∈ K, thP_fuel_val k ((b ↑ a0) × b)).
+    Proof.
+      rewrite -big_sepL_bupd. intros. apply big_sepL_mono; intros. apply thP_fuel_val_expn; auto.
+    Qed.
+    Lemma thP_fuel_val_expn_set K a0 a1 b :
+      (a0 < a1)%ord →
+      (Ord.O < b)%ord →
+      ([∗ set] k ∈ K, thP_fuel_val k (b ↑ a1)) ⊢ |==> ([∗ set] k ∈ K, thP_fuel_val k ((b ↑ a0) × b)).
+    Proof.
+      rewrite -big_sepS_bupd. intros. apply big_sepS_mono; intros. apply thP_fuel_val_expn; auto.
     Qed.
 
     (** thP_fuel rules *)
