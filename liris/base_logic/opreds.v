@@ -1502,7 +1502,7 @@ Section preds.
       2:{ iExFalso. iPoseProof (osat_lookup_fulfilled with "[$S $Ge $Gu]") as "%". rewrite H in LUO1o; done. }
       iPoseProof (oblG_owner_agree _ i0 i1 with "[$Go $Go1]") as "%". destruct H as [-> _].
       iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
-      iMod (othread_delete_obl_frac with "[$O $Ob1 $Oo]") as "(O& Ob1& Go2)".
+      iMod (othread_delete_obl with "[$O $Ob1 $Oo]") as "(O& Ob1& Go2)".
       { auto. }
       iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'".
       iCombine "Go Go'" as "Go".

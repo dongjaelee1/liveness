@@ -1437,6 +1437,74 @@ Section othread.
       iPoseProof ("LUp" with "[//] Fs") as "$". iFrame.
   Qed.
 
+  Lemma oproxy_obl_change_thread TP i1 i2 π1 π2 K1 K2 s q β k :
+    i1 ∈ TP →
+    i2 ∈ TP →
+    k ∈ K1 →
+    i1 ≠ i2 →
+    oproxy TP ∗
+    othreadG_proxy_obls i1 π1 K1 ∗
+    othreadG_proxy_obls i2 π2 K2 ∗ othreadG_proxy_session i2 π2 s q ∗
+    othreadG_bound s β ∗ oblG_fuel k β
+    ⊢ |==> ∃ G1 G2,
+      (⌜ k ∉ G2 ⌝ -∗ othreadG_exec i1 (1/2/2) -∗ othreadG_obls i1 (G1 ∖ {[k]}) -∗
+       othreadG_exec i2 (1/2/2) -∗ othreadG_obls i2 ({[k]} ∪ G2) -∗ oproxy TP) ∗
+      ⌜ k ∈ G1 ⌝ ∗
+      othreadG_exec i1 (1/2/2) ∗ othreadG_obls i1 G1 ∗
+      othreadG_exec i2 (1/2/2) ∗ othreadG_obls i2 G2 ∗
+      othreadG_proxy_obls i1 π1 (K1 ∖ {[k]}) ∗ othreadG_proxy_obls i2 π2 (K2 ∪ {[k]}) ∗
+      othreadG_proxy_session i2 π2 s q.
+  Proof.
+    iIntros (Ini1 Ini2 Ink Nei) "(P& Po1& Po2& Ps2& #Tb& Of)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
+    iPoseProof (big_sepS_delete _ _ _ Ini1 with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%Ks1& %Ss1& %Dom1& Poa1& Psa1& Hex1& OFs1)".
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa1 $Po1]") as "%LUo1".
+    assert (is_Some (Ss1 !! π1)) as (s1& LUs1).
+    { apply elem_of_dom. apply elem_of_dom_2 in LUo1. rewrite -Dom1. auto. }
+    assert (Ini2' : i2 ∈ (TP ∖ {[i1]})) by set_solver.
+    iPoseProof (big_sepS_delete _ _ _ Ini2' with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%Ks2& %Ss2& %Dom2& Poa2& Psa2& Hex2& OFs2)".
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa2 $Po2]") as "%LUo2".
+    iPoseProof (othreadG_proxy_session_lookup with "[$Psa2 $Ps2]") as "%LUs2". rename s into s2.
+    iDestruct "Hex1" as "[Hex1 | Hex1]"; cycle 1.
+    { iDestruct "Hex1" as "(_& _& %)". destruct H. subst. done. }
+    iDestruct "Hex1" as "(%G1& Tx1& TG1& %)". destruct H as [Uni1 Disj1].
+    iDestruct "Hex2" as "[Hex2 | Hex2]"; cycle 1.
+    { iDestruct "Hex2" as "(_& _& %)". destruct H. subst. done. }
+    iDestruct "Hex2" as "(%G2& Tx2& TG2& %)". destruct H as [Uni2 Disj2].
+    iMod (othreadG_proxy_obls_update _ _ _ _ (K1 ∖ {[k]}) with "[$Poa1 $Po1]") as "[Poa1 Po1]".
+    iMod (othreadG_proxy_obls_update _ _ _ _ (K2 ∪ {[k]}) with "[$Poa2 $Po2]") as "[Poa2 Po2]".
+    assert (Ink2 : k ∈ G1).
+    { subst. apply elem_of_union_sets; eauto. }
+    iModIntro. iFrame "Tx1 Tx2 TG1 TG2 Po1 Po2 Ps2". iSplit; last auto.
+    iIntros (Nink) "Tx1 TG1 Tx2 TG2". iFrame "FT ST PT".
+    iPoseProof (big_sepM2_delete _ _ _ _ _ _ LUo1 LUs1 with "OFs1") as "[OF OFs1]".
+    iDestruct "OF" as "(%& #Tb0& OF)". iPoseProof (big_sepS_delete _ _ _ Ink with "OF") as "[Hof OF]".
+    iApply (big_sepS_delete _ _ _ Ini1). iSplitL "Psa1 Poa1 Tx1 TG1 OFs1 OF".
+    { iFrame "Psa1 Poa1". iSplit.
+      { iPureIntro. rewrite dom_insert_L Dom1. apply elem_of_dom_2 in LUs1. set_solver. }
+      iSplitL "Tx1 TG1".
+      { iLeft. iFrame. iPureIntro. simplify_eq. split.
+        - rewrite union_sets_insert_difference_singleton_L; auto.
+        - apply disjoint_sets_insert_difference; auto. }
+      iEval (rewrite -(insert_id _ _ _ LUs1)). iApply big_sepM2_insert_delete. iFrame "OFs1".
+      iFrame "Tb0 OF". }
+    iApply (big_sepS_delete _ _ _ Ini2'). iFrame "M".
+    iFrame "Psa2 Poa2". iSplitR.
+    { iPureIntro. rewrite !dom_insert_L. apply elem_of_dom_2 in LUo2. set_solver. }
+    iSplitL "Tx2 TG2".
+    { iLeft. iFrame. iPureIntro. simplify_eq. split.
+      - rewrite union_sets_insert_union_L; auto.
+      - apply disjoint_sets_insert_union_singleton_not_in; auto. }
+    iEval (rewrite -(insert_id _ _ _ LUs2)). iApply big_sepM2_insert_delete.
+    iPoseProof (big_sepM2_delete _ _ _ _ _ _ LUo2 LUs2 with "OFs2") as "[Fs2 OFs2]". iFrame "OFs2".
+    iDestruct "Fs2" as "(%& #Tb1& F)". iPoseProof (othreadG_bound_op _ β β1 with "[$Tb $Tb1]") as "(%& #Tb'& %)".
+    destruct H. iFrame "Tb'". iApply (big_sepS_union_2 with "[F] [-]").
+    { iApply (big_sepS_impl with "F"). iIntros "!> %% (%& %& $& $)". iPureIntro. etrans; eauto. }
+    { iDestruct "Hof" as "(%& _& _& #Ok)". iApply big_sepS_singleton. iFrame "Of Ok". iPureIntro. auto. }
+  Qed.
+
 End othread.
 
 (* Allocation of initial invariant. *)
