@@ -1245,35 +1245,101 @@ Section preds.
 
   Section fmupd.
 
-    Lemma obl_alloc_assigned_mupd n Θ i G q b ℓ μ :
-      thP_obls i G q -∗
-      |=[n,Θ]=>m ∃ k, (⌜ k ∉ G ⌝) ∗
-                     thP_obls i ({[k]} ∪ G) q ∗
+    Lemma proxy_alloc_mupd n Θ i PS ℓ μ :
+      thP_proxy_auth i PS -∗
+      |=[n,Θ]=>m ∃ π s, (⌜ PS !! π = None ⌝) ∗
+                       thP_proxy_auth i (<[π:=s]> PS) ∗ thP_proxy i π s ℓ ∅ ∗ thP_fuel s ℓ μ.
+    Proof.
+      unfold_opreds. iIntros "(#Te& Tx& Tpsa)".
+      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& P& W& %GWI)".
+      iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
+      iMod (oproxy_alloc_proxy _ _ _ (measure ℓ ((1 ⊕ ▽) × μ)%M) with "[$P $Tpsa]") as "(%&%& P& %LUp& Tpsa& Tps& Tpo& #Tb& Tf)".
+      1: auto.
+      iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
+      iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
+      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
+      rewrite /model_interp. iFrame "HI S T P W A". iSplitR; eauto.
+      iIntros "!> !>". iFrame "Te Tb". iFrame. iSplit; auto.
+    Qed.
+
+    Lemma proxy_delete_mupd n Θ i PS π s ℓ :
+      thP_proxy_auth i PS -∗
+      thP_proxy i π s ℓ ∅ -∗
+      |=[n,Θ]=>m thP_proxy_auth i (delete π PS).
+    Proof.
+      unfold_opreds. iIntros "(#Te& Tx& Tpsa) (_& Tpo& Tps& _)".
+      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& P& W& %GWI)".
+      iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
+      iMod (oproxy_delete_proxy with "[$P $Tpsa $Tps $Tpo]") as "(P& Tpsa)".
+      1: auto.
+      iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
+      iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
+      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
+      rewrite /model_interp. iFrame "HI S T P W A". iSplitR; eauto.
+      iIntros "!> !>". iFrame "Te". iFrame.
+    Qed.
+
+    Lemma proxy_new_session_mupd n Θ i PS π K s1 ℓ1 ℓ2 ℓk μ :
+      (ℓ2 < ℓk)%ordi →
+      thP_proxy_auth i PS -∗
+      thP_proxy i π s1 ℓ1 K -∗
+      ([∗ set] k ∈ K, oblP_fuel k ℓk 1) -∗
+      |=[n,Θ]=>m ∃ s2, thP_proxy_auth i (<[π:=s2]> PS) ∗ thP_proxy i π s2 ℓ2 K ∗ thP_fuel s2 ℓ2 μ.
+    Proof.
+      unfold_opreds. iIntros (LTl) "(#Te& Tx& Tpsa) (_& Tpo& Tps& _& KS) Fs".
+      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& P& W& %GWI)".
+      iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
+      iAssert (|==> [∗ set] k ∈ K, oblG_fuel k (measure ℓ2 ((1 ⊕ ▽) × μ)%M))%I with "[Fs]" as ">Fs".
+      { iApply big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% (_& F)".
+        iApply (oblG_fuel_mon with "F"). rewrite (measure_mult ℓk) measure_nat Jacobsthal.mult_1_r.
+        etrans. 1: eapply η_mono. etrans.
+        { eapply measure_extend. eauto. }
+        rewrite measure_add. apply Hessenberg.add_base_r. }
+      iMod (oproxy_proxy_new_session _ _ _ _ _ _ (measure ℓ2 ((1 ⊕ ▽) × μ)%M) with "[$P $Tpo $Tpsa $Tps $Fs]")
+        as "(%& P& Tpo& Tpsa& Tps& #Tb& Tf)".
+      1: auto.
+      iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
+      iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
+      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
+      iPoseProof (owit_mon _ _ WMon with "W") as "W".
+      rewrite /model_interp. iFrame "HI S T P W A". iSplitR; eauto.
+      iIntros "!> !>". iFrame "Te Tb". iFrame.
+    Qed.
+
+    Lemma obl_alloc_assigned_mupd n Θ i π s K b ℓ1 ℓ2 μ :
+      (ℓ1 < ℓ2)%ordi →
+      thP_proxy i π s ℓ1 K -∗
+      |=[n,Θ]=>m ∃ k, (⌜ k ∉ K ⌝) ∗
+                     thP_proxy i π s ℓ1 ({[k]} ∪ K) ∗
                      oblP_assigned k b (1/2)%Qp ∗
-                     oblP_layer k ℓ ∗
                      oblP_id k ∗
-                     oblP_fuel k ℓ μ ∗
-                     witP_layer k ℓ ∗
+                     oblP_fuel k ℓ2 μ ∗
+                     witP_layer k ℓ2 ∗
                      (∀ E N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E}=∗ oblP_inv N k P Q R).
     Proof.
-      unfold_opreds. iIntros "(#Oe& Ox& Ob& OS)".
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
+      unfold_opreds. iIntros (LTl) "(#Te& Tpo& Tps& (%& #Tb)& TOs)".
+      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& P& W& %GWI)".
       assert (NEW : ∃ k, Ω1 !! k = None).
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
       assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-      iMod (osat_alloc_obl_assigned _ k b ℓ μ i with "S") as "(S& #Gwf& #Ge& Gl& Gf& Go& %OStep)".
-      1: auto.
+      iMod (osat_alloc_obl_assigned _ k b ℓ2 (((1 ⊕ ▽) × μ) ⊕ ▽)%M i with "S") as "(S& #Gwf& #Ge& Gl& Gf& Go& %OStep)". 1: auto.
       iDestruct "Gl" as "[Gl0 Gl1]".
-      iMod (othread_alloc_obl with "[$S $O $Ob $Ge $Go]") as "(S& O& %NinGk& Ob& Oo& Go)".
-      iMod (owit_alloc_witness_assigned _ k (η (measure ℓ μ)) with "W") as "(W& #Ww)".
+      iEval (rewrite measure_add) in "Gf". iPoseProof (oblG_fuel_split with "Gf") as "[Gf Gf0]".
+      iMod (oblG_fuel_mon _ (measure ℓ1 μ0) with "Gf0") as "Gf0".
+      { etrans; first eapply η_mono. eapply measure_extend; auto. }
+      iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
+      iMod (oproxy_alloc_obl with "[$S $T $P $Tpo $Tps $Tb $Ge $Go $Gf0]") as "(S& T& P& %Nink& Tpo& Tps& To& Go)". 1: auto.      
+      iMod (owit_alloc_witness_assigned _ k (η (measure ℓ2 (((1 ⊕ ▽) × μ) ⊕ ▽)%M)) with "W") as "(W& #Ww)".
       { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
-      iDestruct "Go" as "[Go Go']". iDestruct "Oo" as "[Oo0 [Oo1 Oo']]".
-      iPoseProof (oassigned_add_obl with "[$A $Ge Go' Oo']") as "A".
+      iDestruct "Go" as "[Go Go']". iDestruct "To" as "[To0 [To1 To']]".
+      iPoseProof (oassigned_add_obl with "[$A $Ge Go' To']") as "A".
       { iLeft. iFrame. auto. }
       iDestruct "Gl0" as "[Gl0 Gl0']". iDestruct "Gl1" as "[Gl1 Gl1']".
       iCombine "Gl0 Gl1" as "Gl". iCombine "Gl0' Gl1'" as "Gl'".
-      set (Ω2:=(<[k:=(obl_assigned (OC:=ord_obl_class) (measure ℓ μ) i)]> Ω1)).
+      set (Ω2:=(<[k:=(obl_assigned (OC:=ord_obl_class) (measure ℓ2 (((1 ⊕ ▽) × μ) ⊕ ▽)%M) i)]> Ω1)).
       iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
       { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 2. eauto. }
       iModIntro. iExists Ω2. iSplitR.
@@ -1281,16 +1347,18 @@ Section preds.
       iIntros (? [WStep GWI2]) "!>".
       pose proof (owit_inv_alloc_assigned Ω1 k W1 NinOk1 GWI _ _ W2 WStep GWI2) as (NinWk1& WMon).
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
-      rewrite /model_interp. iFrame "HI S O W". iSplitL "A".
+      rewrite /model_interp. iFrame "HI S T P W". iSplitL "A".
       { subst Ω2. rewrite dom_insert_L. iFrame. eauto. }
-      iModIntro. iExists k. iFrame "Oe Gwf Ge Ww Gf Ox Gl'". iSplitR. 1: auto.
-      iSplitL "Ob OS Go Oo0 Oo1".
-      { iFrame "Ob". iApply big_sepS_union. 1: set_solver.
-        rewrite big_sepS_singleton. iFrame "OS Ge Go". iCombine "Oo0 Oo1" as "$". }
+      iModIntro. iExists k. iFrame "Te Tb Ge Ww Gf Tpo Tps Gl'". iSplitR. 1: auto.
+      iSplitL "TOs Go To0 To1".
+      { iApply big_sepS_union. 1: set_solver.
+        rewrite big_sepS_singleton. iFrame "TOs Ge Go". iCombine "To0 To1" as "$". }
       iIntros (E N P Q R) "HP". destruct b.
       - iMod (oblG_inv_alloc_assigned_true _ N _ _ P Q R with "[$Gl $HP]") as "#GVar". by iModIntro.
       - iMod (oblG_inv_alloc_assigned_false _ N _ _ P Q R with "[$Gl $HP]") as "#GVar". by iModIntro.
     Qed.
+
+    TODO (* obl_change_proxy *)
 
     Lemma obl_alloc_fulfilled_mupd n Θ ℓ μ :
       ⊢ |=[n,Θ]=>m ∃ k, oblP_fulfilled k ∗ oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗
