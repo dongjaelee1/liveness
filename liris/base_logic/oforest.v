@@ -12,7 +12,7 @@ Module otreeGS.
   (* Assumes thread ids are positive *)
   Class otreeGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     OtreeGpreS {
-        otreeGpreS_edge : inG Σ (reservation_mapUR (gmap_viewR oid unitUR));
+        otreeGpreS_edge : inG Σ (gmap_viewR oid (gsetUR oid));
         otreeGpreS_root : inG Σ (gmap_viewR positive (gsetUR oid));
       }.
 
@@ -24,7 +24,7 @@ Module otreeGS.
       }.
 
   Definition otreeΣ `{SI : indexT} : gFunctors :=
-    #[GFunctor (reservation_mapUR (gmap_viewR oid (unitUR)));
+    #[GFunctor (gmap_viewR oid (gsetUR oid));
       GFunctor (gmap_viewR positive (gsetUR oid))
       ].
 
@@ -40,18 +40,13 @@ Import otreeGS.
 Local Existing Instances otree_inG otreeGpreS_edge otreeGpreS_root.
 
 (* Edge *)
-Definition otreeG_edge `{SI : indexT} `{!otreeGS Σ} (π k : oid) (q : Qp) : iProp Σ :=
-  own edge_name (reservation_map_data π (gmap_view_frag k (DfracOwn q) ())).
+Definition otreeG_edge `{SI : indexT} `{!otreeGS Σ} (π : oid) (Ch : oids) : iProp Σ :=
+  own edge_name (gmap_view_frag π (DfracOwn 1) Ch).
 Global Typeclasses Opaque otreeG_edge.
 Global Instance: Params (@otreeG_edge) 3 := {}.
 
-Definition otreeG_edge_auth `{SI : indexT} `{!otreeGS Σ} π (Ch : oids) q : iProp Σ :=
-  (own edge_name (reservation_map_data π (gmap_view_auth (DfracOwn q) (gset_to_gmap tt Ch)))).
-Global Typeclasses Opaque otreeG_edge_auth.
-Global Instance: Params (@otreeG_edge_auth) 3 := {}.
-
-Local Definition otreeG_edge_token_id `{SI : indexT} `{!otreeGS Σ} OS : iProp Σ :=
-  (own edge_name (reservation_map_token (A:=gmap_viewR oid (unitUR)) (⊤ ∖ gset_to_coPset OS))).
+Local Definition otreeG_edge_auth `{SI : indexT} `{!otreeGS Σ} (Es : gmap oid oids) : iProp Σ :=
+  (own edge_name (gmap_view_auth (DfracOwn 1) Es)).
 
 (* Root *)
 Definition otreeG_root `{SI : indexT} `{!otreeGS Σ} (i : positive) (R : oids) : iProp Σ :=
@@ -64,21 +59,22 @@ Local Definition otreeG_root_auth `{SI : indexT} `{!otreeGS Σ} (Rs : gmap posit
 
 (* Global invariant for the obligation forest. *)
 Definition oforest `{SI : indexT} `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
-  (OS : oids) (TP : gset positive) : iProp Σ :=
+  (LO : oids) (TP : gset positive) : iProp Σ :=
   locked
-    (∃ (Rs : gmap positive oids),
-        ⌜ dom Rs = TP ⌝ ∗
-        otreeG_edge_token_id OS ∗
+    (∃ (Rs : gmap positive oids) (Es : gmap oid oids),
+        (* The argument LO is the set of live obligations; fulfilled obls don't have edges. *)
+        ⌜ dom Rs = TP ∧ dom Es = LO ⌝ ∗
+        otreeG_edge_auth Es ∗
         otreeG_root_auth Rs ∗
         ([∗ map] i ↦ R ∈ Rs,
-           ∃ (Ft : forest oid),
-             (⌜ R = dom Ft ∧ forest_wf Ft ⌝) ∗
-             ((othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i (dom (forest_fold Ft))) ∨
-                (othreadG_done i ∗ otreeG_root i ∅ ∗ ⌜ R = ∅ ∧ Ft = ∅ ⌝)) ∗
-             ([∗ map] Tr ∈ Ft,
+           ∃ (Fo : forest oid),
+             (⌜ R = dom Fo ∧ forest_wf Fo ⌝) ∗
+             ((othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i (dom (forest_fold Fo))) ∨
+                (othreadG_done i ∗ otreeG_root i ∅ ∗ ⌜ R = ∅ ∧ Fo = ∅ ⌝)) ∗
+             ([∗ map] Tr ∈ Fo,
                 ([∗ map] π ↦ Ch ∈ Tr,
-                   otreeG_edge_auth π Ch (1/2)%Qp ∗
-                   ∃ β, oblG_fuel_supply π β (1/2)%Qp ∗
+                   ⌜ Es !! π = Some Ch ⌝ ∗
+                   ∃ β, oblG_fuel_supply π β (1/2/2)%Qp ∗
                         ([∗ set] c ∈ Ch, ∃ a, ⌜ WFOCM.leR β a ⌝ ∗ oblG_fuel c a)))))%I.
 
 Section otree.
