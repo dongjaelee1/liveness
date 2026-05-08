@@ -234,10 +234,9 @@ Section otree.
     iExists ∅. iSplit. 1: done. iSplitL. 2: done. iRight. iFrame. iFrame "Td". done.
   Qed.
 
-  TODO
-
   Lemma oforest_alloc_obl_root Ω LO TP i R k o a :
-    (LO = filter_live Ω) →
+    (k ∉ dom Ω) →
+    (LO = dom (obls_filter_live Ω)) →
     osat (<[k:=o]>Ω) ∗ othread TP ∗ oforest LO TP ∗
     otreeG_root i R ∗
     oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel_supply k a (1/2/2)%Qp
@@ -245,15 +244,41 @@ Section otree.
         ⌜k ∉ R⌝ ∗ otreeG_root i ({[k]} ∪ R) ∗ otreeG_edge k ∅ ∗
         othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
   Proof.
+    iIntros (HFk HLO) "(S& T& F& Ri& #Oe& Oo& Ofs)".
+    iPoseProof (osat_lookup_owner with "[$S $Oe $Oo]") as "(%& %LUk)".
+    rewrite lookup_insert_eq in LUk. simplify_eq.
+    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomE]& EA& RA& M)".
+    iPoseProof (otreeG_root_lookup with "[$RA $Ri]") as "%LUR".
+    iPoseProof (big_sepM_delete _ _ _ _ LUR with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%& [%DomF %WFF]& Hex& HF)".
+    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& Ri2& _)". by iPoseProof (otreeG_root_valid with "[$Ri $Ri2]") as "%". }
+    iDestruct "Hex" as "(Tx& TG)".
+    iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
+    iMod (otreeG_edge_alloc _ k with "EA") as "(EA& Ek)".
+    { apply not_elem_of_dom. rewrite DomE. eapply not_elem_of_weaken. 1: eapply HFk.
+      apply subseteq_dom, obls_filter_live_subseteq. }
+    iMod (otreeG_root_update _ _ _  ({[k]} ∪ R) with "[$RA $Ri]") as "[RA Ri]".
+    assert (NinkR : k ∉ R).
+    { simplify_eq. eapply not_elem_of_weaken. 1: eapply Nink.
+      destruct WFF. apply dom_subseteq_forest_fold_dom; auto.
+      eapply map_Forall_impl. 1: eapply H0.
+      simpl. intros. apply tree_wf_root_elem. auto. }
+    assert (Ini : i ∈ TP).
+    { apply elem_of_dom_2 in LUR. subst. auto. }
+    iModIntro. iFrame "S T Ri Ek To Oo". iSplit; cycle 1. 1: auto.
+    iFrame "EA RA". iSplit.
+    { iPureIntro. subst. rewrite !dom_insert_L. split_and !. 1: set_solver.
+      rewrite DomE. set_solver. }
+    iApply big_sepM_insert_delete. iSplitR "M"; cycle 1.
+    { 
+    
     
 
+      TODO
+    
 
     TODO
-
-
-
-
-
 
           iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
 

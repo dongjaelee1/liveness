@@ -125,7 +125,7 @@ Global Instance obl_filter_live_dec `{OC : obl_class} : ∀ (x : oid * obl), Dec
 Proof. intros. rewrite /obl_filter_live. destruct x. simpl. destruct o0; solve_decision. Qed.
 
 Definition obls_filter_live `{OC : obl_class} (Ω : obls) : obls :=
-  map_filter obl_filter_live _ Ω.
+  filter obl_filter_live Ω.
 
 Section proofs.
   Context `{OC : obl_class}.
@@ -313,6 +313,32 @@ Section proofs.
       + inv H4. right. auto.
       + inv H4.
     - destruct H. inv H0. done.
+  Qed.
+
+  (** Live obls *)
+  Lemma obls_filter_live_insert Ω k a o :
+    obls_filter_live (<[k:=obl_assigned a o]>Ω) = <[k:=obl_assigned a o]>(obls_filter_live Ω).
+  Proof using.
+    rewrite /obls_filter_live map_filter_insert_True. 2: done. auto.
+  Qed.
+
+  Lemma obls_filter_live_delete Ω k :
+    obls_filter_live (delete k Ω) = delete k (obls_filter_live Ω).
+  Proof using.
+    rewrite /obls_filter_live map_filter_delete. auto.
+  Qed.
+
+  Lemma obls_filter_live_fulfill Ω k :
+    obls_filter_live (<[k:=obl_fulfilled]>Ω) = delete k (obls_filter_live Ω).
+  Proof using.
+    rewrite /obls_filter_live map_filter_insert_False. 2: intros ?; done.
+    apply obls_filter_live_delete.
+  Qed.
+
+  Lemma obls_filter_live_subseteq Ω :
+    obls_filter_live Ω ⊆ Ω.
+  Proof using.
+    rewrite /obls_filter_live. apply map_filter_subseteq.
   Qed.
 
 End proofs.
