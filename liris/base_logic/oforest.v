@@ -62,7 +62,7 @@ Definition oforest `{SI : indexT} `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS
   (LO : oids) (TP : gset positive) : iProp Σ :=
   locked
     (∃ (Rs : gmap positive oids) (Es : gmap oid oids),
-        (* The argument LO is the set of live obligations; fulfilled obls don't have edges. *)
+        (* LO is the set of live obligations; fulfilled obls don't belong to the forest. *)
         ⌜ dom Rs = TP ∧ dom Es = LO ⌝ ∗
         otreeG_edge_auth Es ∗
         otreeG_root_auth Rs ∗
@@ -124,6 +124,14 @@ Section otree.
     apply own_update, gmap_view_replace. done.
   Qed.
 
+  Lemma otreeG_edge_valid π Ch1 Ch2 :
+    otreeG_edge π Ch1 ∗ otreeG_edge π Ch2 ⊢ False.
+  Proof.
+    rewrite /otreeG_edge -!own_op.
+    iIntros "H". iPoseProof (own_valid with "H") as "%".
+    apply gmap_view_frag_op_valid in H. destruct H as (?&?). done.
+  Qed.
+
   (** Root rules *)
   Lemma otreeG_root_alloc Rs i :
     Rs !! i = None →
@@ -158,13 +166,142 @@ Section otree.
     apply own_update, gmap_view_replace. done.
   Qed.
 
+  Lemma otreeG_root_valid i R1 R2 :
+    otreeG_root i R1 ∗ otreeG_root i R2 ⊢ False.
+  Proof.
+    rewrite /otreeG_root -!own_op.
+    iIntros "H". iPoseProof (own_valid with "H") as "%".
+    apply gmap_view_frag_op_valid in H. destruct H as (?&?). done.
+  Qed.
+
   (** oforest rules *)
+  Lemma oforest_alloc_thread i LO TP :
+    i ∉ TP →
+    oforest LO TP ∗ othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i ∅
+    ⊢ |==> oforest LO ({[i]} ∪ TP) ∗ otreeG_root i ∅.
+  Proof.
+    iIntros (Hi) "(F& Tx& TG)".
+    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomE]& EA& RA& M)".
+    iMod (otreeG_root_alloc _ i with "RA") as "(RA& Ri)".
+    { apply not_elem_of_dom. rewrite DomR. auto. }
+    iModIntro. iFrame "RA EA Ri". iSplit.
+    { iPureIntro. split; auto. rewrite dom_insert_L DomR. auto. }
+    iApply big_sepM_insert.
+    { apply not_elem_of_dom. rewrite DomR. auto. }
+    iFrame "M". iExists ∅. iSplit.
+    { iPureIntro. split; auto. done. }
+    iSplitL. 2: done. iLeft. iFrame.
+  Qed.
+
+  Lemma oforest_alloc_threads Θ LO TP :
+    Θ ## TP →
+    oforest LO TP ∗ ([∗ set] i ∈ Θ, othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i ∅)
+    ⊢ |==> oforest LO (TP ∪ Θ) ∗
+        ([∗ set] i ∈ Θ, otreeG_root i ∅).
+  Proof.
+    revert TP. pattern Θ. revert Θ. apply set_ind.
+    { solve_proper. }
+    { iIntros (??) "T". rewrite union_empty_r_L. iDestruct "T" as "[$ _]". by iModIntro. }
+    iIntros (i Θ Nin IH TP Disj) "(F& Ts)".
+    iPoseProof (big_sepS_union with "Ts") as "[Ti Ts]". 1: set_solver.
+    iEval (rewrite big_sepS_singleton) in "Ti".
+    iMod (IH with "[$F $Ts]") as "(F& Hs)"; first set_solver.
+    iMod (oforest_alloc_thread i with "[$F $Ti]") as "(F& Hi)"; first set_solver.
+    iModIntro. replace ({[i]} ∪ (TP ∪ Θ)) with (TP ∪ ({[i]} ∪ Θ)) by set_solver.
+    iFrame. iApply big_sepS_union; first set_solver. rewrite big_sepS_singleton. iFrame.
+  Qed.
+
+  Lemma oforest_exec_to_done LO TP i :
+    i ∈ TP →
+    othread TP ∗ oforest LO TP ∗
+    othreadG_exec i (1/2)%Qp ∗ otreeG_root i ∅
+    ⊢ |==> othread TP ∗ oforest LO TP ∗ othreadG_done i.
+  Proof.
+    iIntros (Ini) "(T& F& Tx& Ri)".
+    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomE]& EA& RA& M)".
+    iPoseProof (otreeG_root_lookup with "[$RA $Ri]") as "%LUR".
+    iPoseProof (big_sepM_delete _ _ _ _ LUR with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%& [%DomF %WFF]& Hex& HF)".
+    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& Ri2& _)". by iPoseProof (otreeG_root_valid with "[$Ri $Ri2]") as "%". }
+    iDestruct "Hex" as "(Tx2& TG)". iCombine "Tx Tx2" as "Tx".
+    assert (EmpF : Fo = ∅).
+    { symmetry in DomF. apply dom_empty_inv_L in DomF. auto. }
+    subst. rewrite forest_fold_empty dom_empty_L.
+    iMod (othread_exec_to_done with "[$T $Tx $TG]") as "[T #Td]".
+    iModIntro. iFrame "T Td". iFrame "EA RA". iSplitR. 1: auto.
+    iApply (big_sepM_delete _ _ _ _ LUR). iFrame "M".
+    iExists ∅. iSplit. 1: done. iSplitL. 2: done. iRight. iFrame. iFrame "Td". done.
+  Qed.
+
+  TODO
+
+  Lemma oforest_alloc_obl_root Ω LO TP i R k o a :
+    (LO = filter_live Ω) →
+    osat (<[k:=o]>Ω) ∗ othread TP ∗ oforest LO TP ∗
+    otreeG_root i R ∗
+    oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel_supply k a (1/2/2)%Qp
+    ⊢ |==> osat (<[k:=o]>Ω) ∗ othread TP ∗ oforest ({[k]} ∪ LO) TP ∗
+        ⌜k ∉ R⌝ ∗ otreeG_root i ({[k]} ∪ R) ∗ otreeG_edge k ∅ ∗
+        othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
+  Proof.
+    
+
+
+    TODO
+
+
+
+
+
+
+          iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
+
+  Lemma oproxy_alloc_obl Ω TP i π s q K β k :
+    i ∈ TP →
+    osat Ω ∗ othread TP ∗ oproxy TP ∗
+    othreadG_proxy_obls i π K ∗ othreadG_proxy_session i π s q ∗ othreadG_bound s β ∗
+    oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel k β
+    ⊢ |==> osat Ω ∗ othread TP ∗ oproxy TP ∗
+        ⌜k ∉ K⌝ ∗ othreadG_proxy_obls i π ({[k]} ∪ K) ∗ othreadG_proxy_session i π s q ∗
+        othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
+  Proof.
+    iIntros (Ini) "(S& T& P& Po& Ps& #Tb& #Oe& Oo& Of)".
+    rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
+    iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%&%&%Dom& Poa& Psa& Hex& OFs)".
+    iPoseProof (othreadG_proxy_session_lookup with "[$Psa $Ps]") as "%LUs".
+    iPoseProof (othreadG_proxy_obls_lookup with "[$Poa $Po]") as "%LUo".
+    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& _& %)". destruct H. subst. done. }
+    iDestruct "Hex" as "(%& Tx& TG& %)". destruct H as [Uni Disj].
+    iPoseProof (big_sepM2_delete _ _ _ _ _ _ LUo LUs with "OFs") as "[Hp OFs]".
+    iDestruct "Hp" as "(%& #Tb0& Hfs)".
+    iPoseProof (othreadG_bound_op _ β β0 with "[$Tb $Tb0]") as "(%β1& #Tb1& %Hb)".
+    destruct Hb as [Hb1 Hb2]. iClear "Tb Tb0".
+    iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
+    iMod (othreadG_proxy_obls_update _ _ _ _ ({[k]} ∪ K) with "[$Poa $Po]") as "[Poa Po]".
+    iModIntro. iFrame "S T FT ST PT Ps To Oo Po".
+    assert (Nink2 : k ∉ K).
+    { simplify_eq. rewrite not_elem_of_union_sets in Nink. eapply Nink; eauto. }
+    iSplit. 2: auto.
+    iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
+    iFrame "Poa Psa". iSplitR.
+    { iPureIntro. rewrite dom_insert_L. apply elem_of_dom_2 in LUo. set_solver. }
+    iSplitL "Tx TG".
+    { iLeft. iFrame. iPureIntro. replace ({[k]} ∪ K) with (K ∪ {[k]}) by set_solver. simplify_eq. split.
+      - rewrite union_sets_insert_union_L; auto.
+      - apply disjoint_sets_insert_union_singleton_not_in; auto. }
+    iEval (rewrite -(insert_id _ _ _ LUs)). iApply big_sepM2_insert_delete.
+    iFrame "OFs Tb1". iApply (big_sepS_union). 1: set_solver.
+    iSplitR "Hfs".
+    { iApply big_sepS_singleton. iFrame "Of Oe". iPureIntro. eauto. }
+    { iApply (big_sepS_impl with "Hfs"). iIntros "!> %% (%&%&$&$)". iPureIntro. etrans; eauto. }
+  Qed.
 
   TODO
 
   (* TODO *)
-    (* alloc thread/s *)
-    (* thread exec to done *)
     (* alloc obl root/edge, delete obl (Ch = ∅) *)
     (* move obl to-edge (root/edge-edge) / to-root (root/edge-root)) *)
     (* refresh node *)

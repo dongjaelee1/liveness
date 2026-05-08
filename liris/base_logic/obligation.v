@@ -118,6 +118,15 @@ Notation "A ↪ₚ B | C" := (obls_cond_progress C A B) (at level 20, format "A 
 Definition obls_le `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obl_le o1 o2).
 
+(* Filter out live obligations. *)
+Definition obl_filter_live `{OC : obl_class} : (oid * obl → Prop) :=
+  λ x, match x.2 with | obl_assigned _ _ => True | _ => False end.
+Global Instance obl_filter_live_dec `{OC : obl_class} : ∀ (x : oid * obl), Decision (obl_filter_live x).
+Proof. intros. rewrite /obl_filter_live. destruct x. simpl. destruct o0; solve_decision. Qed.
+
+Definition obls_filter_live `{OC : obl_class} (Ω : obls) : obls :=
+  map_filter obl_filter_live _ Ω.
+
 Section proofs.
   Context `{OC : obl_class}.
 
