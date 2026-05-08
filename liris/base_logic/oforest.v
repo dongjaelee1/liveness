@@ -61,21 +61,23 @@ Local Definition otreeG_root_auth `{SI : indexT} `{!otreeGS Σ} (Rs : gmap posit
 Definition oforest `{SI : indexT} `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
   (LO : oids) (TP : gset positive) : iProp Σ :=
   locked
-    (∃ (Rs : gmap positive oids) (Es : gmap oid oids),
+    (∃ (Rs : gmap positive oids) (Fs : forest oid),
         (* LO is the set of live obligations; fulfilled obls don't belong to the forest. *)
-        ⌜ dom Rs = TP ∧ dom Es = LO ⌝ ∗
-        otreeG_edge_auth Es ∗
+        ⌜ dom Rs = TP ∧ disjoint_sets Rs ∧ union_sets Rs = dom Fs ⌝ ∗
+        ⌜ dom (forest_fold Fs) = LO ∧ forest_wf Fs ⌝ ∗
+        otreeG_edge_auth (forest_fold Fs) ∗
         otreeG_root_auth Rs ∗
         ([∗ map] i ↦ R ∈ Rs,
            ∃ (Fo : forest oid),
-             (⌜ R = dom Fo ∧ forest_wf Fo ⌝) ∗
+             (⌜ Fo = filter (λ '(r, t), r ∈ R) Fs ⌝) ∗
              ((othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i (dom (forest_fold Fo))) ∨
                 (othreadG_done i ∗ otreeG_root i ∅ ∗ ⌜ R = ∅ ∧ Fo = ∅ ⌝)) ∗
              ([∗ map] Tr ∈ Fo,
                 ([∗ map] π ↦ Ch ∈ Tr,
-                   ⌜ Es !! π = Some Ch ⌝ ∗
                    ∃ β, oblG_fuel_supply π β (1/2/2)%Qp ∗
                         ([∗ set] c ∈ Ch, ∃ a, ⌜ WFOCM.leR β a ⌝ ∗ oblG_fuel c a)))))%I.
+
+TODO
 
 Section otree.
   Context `{SI : indexT} `{OSAT : !osatGS.osatGS Σ} `{OTH : !othreadGS.othreadGS Σ} `{!otreeGS Σ} `{OMF : !ord_mono_fun_class}.
@@ -103,6 +105,25 @@ Section otree.
     iDestruct "H" as "[H Ho]". by iFrame.
   Qed.
 
+  Lemma otreeG_edge_update Es π Ch1 Ch2 :
+    otreeG_edge_auth Es ∗
+    otreeG_edge π Ch1
+    ⊢ |==> otreeG_edge_auth (<[π:=Ch2]>Es) ∗
+        otreeG_edge π Ch2.
+  Proof.
+    rewrite /otreeG_edge_auth /otreeG_edge -!own_op.
+    apply own_update, gmap_view_replace. done.
+  Qed.
+
+  Lemma otreeG_edge_delete Es π Ch :
+    otreeG_edge_auth Es ∗
+    otreeG_edge π Ch
+    ⊢ |==> otreeG_edge_auth (delete π Es).
+  Proof.
+    rewrite /otreeG_edge_auth /otreeG_edge -!own_op.
+    apply own_update, gmap_view_delete.
+  Qed.
+
   Lemma otreeG_edge_lookup Es π Ch :
     otreeG_edge_auth Es ∗
     otreeG_edge π Ch
@@ -112,16 +133,6 @@ Section otree.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
     apply gmap_view_both_valid in H. destruct H as (_&_&?).
     iPureIntro. apply leibniz_equiv in H. auto.
-  Qed.
-
-  Lemma otreeG_edge_update Es π Ch1 Ch2 :
-    otreeG_edge_auth Es ∗
-    otreeG_edge π Ch1
-    ⊢ |==> otreeG_edge_auth (<[π:=Ch2]>Es) ∗
-        otreeG_edge π Ch2.
-  Proof.
-    rewrite /otreeG_edge_auth /otreeG_edge -!own_op.
-    apply own_update, gmap_view_replace. done.
   Qed.
 
   Lemma otreeG_edge_valid π Ch1 Ch2 :
@@ -145,6 +156,25 @@ Section otree.
     iDestruct "H" as "[H Ho]". by iFrame.
   Qed.
 
+  Lemma otreeG_root_update Rs i R1 R2 :
+    otreeG_root_auth Rs ∗
+    otreeG_root i R1
+    ⊢ |==> otreeG_root_auth (<[i:=R2]>Rs) ∗
+        otreeG_root i R2.
+  Proof.
+    rewrite /otreeG_root_auth /otreeG_root -!own_op.
+    apply own_update, gmap_view_replace. done.
+  Qed.
+
+  Lemma otreeG_root_delete Rs i R :
+    otreeG_root_auth Rs ∗
+    otreeG_root i R
+    ⊢ |==> otreeG_root_auth (delete i Rs).
+  Proof.
+    rewrite /otreeG_root_auth /otreeG_root -!own_op.
+    apply own_update, gmap_view_delete.
+  Qed.
+
   Lemma otreeG_root_lookup Rs i R :
     otreeG_root_auth Rs ∗
     otreeG_root i R
@@ -154,16 +184,6 @@ Section otree.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
     apply gmap_view_both_valid in H. destruct H as (_&_&?).
     iPureIntro. apply leibniz_equiv in H. auto.
-  Qed.
-
-  Lemma otreeG_root_update Rs i R1 R2 :
-    otreeG_root_auth Rs ∗
-    otreeG_root i R1
-    ⊢ |==> otreeG_root_auth (<[i:=R2]>Rs) ∗
-        otreeG_root i R2.
-  Proof.
-    rewrite /otreeG_root_auth /otreeG_root -!own_op.
-    apply own_update, gmap_view_replace. done.
   Qed.
 
   Lemma otreeG_root_valid i R1 R2 :
@@ -234,7 +254,7 @@ Section otree.
     iExists ∅. iSplit. 1: done. iSplitL. 2: done. iRight. iFrame. iFrame "Td". done.
   Qed.
 
-  Lemma oforest_alloc_obl_root Ω LO TP i R k o a :
+  Lemma oforest_alloc_obl Ω LO TP i R k o a :
     (k ∉ dom Ω) →
     (LO = dom (obls_filter_live Ω)) →
     osat (<[k:=o]>Ω) ∗ othread TP ∗ oforest LO TP ∗
@@ -266,71 +286,183 @@ Section otree.
       simpl. intros. apply tree_wf_root_elem. auto. }
     assert (Ini : i ∈ TP).
     { apply elem_of_dom_2 in LUR. subst. auto. }
+    assert (NLuk : Fo !! k = None).
+    { subst. apply not_elem_of_dom; auto. }
     iModIntro. iFrame "S T Ri Ek To Oo". iSplit; cycle 1. 1: auto.
     iFrame "EA RA". iSplit.
     { iPureIntro. subst. rewrite !dom_insert_L. split_and !. 1: set_solver.
       rewrite DomE. set_solver. }
     iApply big_sepM_insert_delete. iSplitR "M"; cycle 1.
-    { 
-    
-    
+    { iApply (big_sepM_impl with "M"). iIntros "!> %%% (%& %& $& M)". iSplit; first auto.
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% M".
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% H". iDestruct "H" as "(%& $)".
+      iPureIntro.  assert (k ≠ k2); [| rewrite lookup_insert_ne; auto].
+      destruct H0. simplify_eq. apply elem_of_dom_2 in H3. rewrite DomE in H3.
+      pose proof (obls_filter_live_subseteq Ω).
+      intros <-. apply subseteq_dom in H0. set_solver + HFk H3 H0. }
+    iExists (forest_insert Fo k (tree_singleton k)). iSplit.
+    { iPureIntro. split.
+      - rewrite /forest_insert dom_insert_L. subst. auto.
+      - apply forest_insert_singleton_wf; auto. apply not_elem_of_dom; auto. }
+    iSplitL "Tx TG".
+    { iLeft. iFrame "Tx". rewrite forest_fold_insert_singleton_dom; auto. }
+    iApply big_sepM_insert. 1: auto.
+    iSplitR "HF"; cycle 1.
+    { iApply (big_sepM_impl with "HF"). iIntros "!> %%% M".
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% H". iDestruct "H" as "(%& $)".
+      iPureIntro.  assert (k ≠ k1); [| rewrite lookup_insert_ne; auto].
+      simplify_eq. apply elem_of_dom_2 in H1. rewrite DomE in H1.
+      pose proof (obls_filter_live_subseteq Ω).
+      intros <-. apply subseteq_dom in H2. set_solver + HFk H1 H2. }
+    iApply big_sepM_singleton. iFrame. iSplit; auto.
+    rewrite lookup_insert_eq; auto.
+  Qed.
+
+  (** TODO: oforest_alloc_obl_edge *)
+
+  Lemma oforest_delete_obl TP LO i R k :
+    k ∈ R →
+    othread TP ∗ oforest LO TP ∗
+    otreeG_root i R ∗ otreeG_edge k ∅ ∗
+    othreadG_owns i k 1
+    ⊢ |==> othread TP ∗ oforest (LO ∖ {[k]}) TP ∗
+        otreeG_root i (R ∖ {[k]}) ∗ oblG_owner k i (1/2/2/2/2)%Qp.
+  Proof.
+    iIntros (Ink) "(T& F& Ri& Ek& To)".
+    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomE]& EA& RA& M)".
+    iPoseProof (otreeG_edge_lookup with "[$EA $Ek]") as "%LUk".
+    iPoseProof (otreeG_root_lookup with "[$RA $Ri]") as "%LUR".
+    assert (Ini : i ∈ TP).
+    { apply elem_of_dom_2 in LUR. subst. auto. }
+    iPoseProof (big_sepM_delete _ _ _ _ LUR with "M") as "[Mi M]".
+    iDestruct "Mi" as "(%& [%DomF %WFF]& Hex& HF)".
+    iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
+    { iDestruct "Hex" as "(_& Ri2& _)". by iPoseProof (otreeG_root_valid with "[$Ri $Ri2]") as "%". }
+    iDestruct "Hex" as "(Tx& TG)".
+    iPoseProof (othread_obls_owns_elem with "[$T $TG $To]") as "%Ink2".
+    iMod (othread_delete_obl with "[$T $TG $To]") as "(T& TG& Oo)".
+    iMod (otreeG_edge_delete with "[$EA $Ek]") as "EA".
+    iMod (otreeG_root_update _ _ _  (R ∖ {[k]}) with "[$RA $Ri]") as "[RA Ri]".
+    iModIntro. iFrame "T Ri Oo".
+    iFrame "EA RA". iSplit.
+    { iPureIntro. subst. rewrite !dom_insert_L. split_and !. 1: set_solver.
+      rewrite dom_delete_L. auto. }
+    iApply big_sepM_insert_delete. iSplitR "M"; cycle 1.
+    { iApply (big_sepM_impl with "M"). iIntros "!> %%% (%& %& $& M)". iSplit; first auto.
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% M".
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% H". iDestruct "H" as "(%& $)".
+      iPureIntro. assert (k ≠ k2); [| rewrite lookup_delete_ne; auto].
+      destruct H0. simplify_eq.
 
       TODO
-    
+
+      apply elem_of_dom_2 in H3. rewrite DomE in H3.
+      pose proof (obls_filter_live_subseteq Ω).
+      intros <-. apply subseteq_dom in H0. set_solver + HFk H3 H0. }
+    iExists (forest_insert Fo k (tree_singleton k)). iSplit.
+    { iPureIntro. split.
+      - rewrite /forest_insert dom_insert_L. subst. auto.
+      - apply forest_insert_singleton_wf; auto. apply not_elem_of_dom; auto. }
+    iSplitL "Tx TG".
+    { iLeft. iFrame "Tx". rewrite forest_fold_insert_singleton_dom; auto. }
+    iApply big_sepM_insert. 1: auto.
+    iSplitR "HF"; cycle 1.
+    { iApply (big_sepM_impl with "HF"). iIntros "!> %%% M".
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% H". iDestruct "H" as "(%& $)".
+      iPureIntro.  assert (k ≠ k1); [| rewrite lookup_insert_ne; auto].
+      simplify_eq. apply elem_of_dom_2 in H1. rewrite DomE in H1.
+      pose proof (obls_filter_live_subseteq Ω).
+      intros <-. apply subseteq_dom in H2. set_solver + HFk H1 H2. }
+    iApply big_sepM_singleton. iFrame. iSplit; auto.
+    rewrite lookup_insert_eq; auto.
+  Qed.
 
     TODO
 
-          iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
+    iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
+    iMod (otreeG_edge_alloc _ k with "EA") as "(EA& Ek)".
+    { apply not_elem_of_dom. rewrite DomE. eapply not_elem_of_weaken. 1: eapply HFk.
+      apply subseteq_dom, obls_filter_live_subseteq. }
+    iMod (otreeG_root_update _ _ _  ({[k]} ∪ R) with "[$RA $Ri]") as "[RA Ri]".
+    assert (NinkR : k ∉ R).
+    { simplify_eq. eapply not_elem_of_weaken. 1: eapply Nink.
+      destruct WFF. apply dom_subseteq_forest_fold_dom; auto.
+      eapply map_Forall_impl. 1: eapply H0.
+      simpl. intros. apply tree_wf_root_elem. auto. }
+    assert (NLuk : Fo !! k = None).
+    { subst. apply not_elem_of_dom; auto. }
+    iModIntro. iFrame "S T Ri Ek To Oo". iSplit; cycle 1. 1: auto.
+    iFrame "EA RA". iSplit.
+    { iPureIntro. subst. rewrite !dom_insert_L. split_and !. 1: set_solver.
+      rewrite DomE. set_solver. }
+    iApply big_sepM_insert_delete. iSplitR "M"; cycle 1.
+    { iApply (big_sepM_impl with "M"). iIntros "!> %%% (%& %& $& M)". iSplit; first auto.
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% M".
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% H". iDestruct "H" as "(%& $)".
+      iPureIntro.  assert (k ≠ k2); [| rewrite lookup_insert_ne; auto].
+      destruct H0. simplify_eq. apply elem_of_dom_2 in H3. rewrite DomE in H3.
+      pose proof (obls_filter_live_subseteq Ω).
+      intros <-. apply subseteq_dom in H0. set_solver + HFk H3 H0. }
+    iExists (forest_insert Fo k (tree_singleton k)). iSplit.
+    { iPureIntro. split.
+      - rewrite /forest_insert dom_insert_L. subst. auto.
+      - apply forest_insert_singleton_wf; auto. apply not_elem_of_dom; auto. }
+    iSplitL "Tx TG".
+    { iLeft. iFrame "Tx". rewrite forest_fold_insert_singleton_dom; auto. }
+    iApply big_sepM_insert. 1: auto.
+    iSplitR "HF"; cycle 1.
+    { iApply (big_sepM_impl with "HF"). iIntros "!> %%% M".
+      iApply (big_sepM_impl with "M"). iIntros "!> %%% H". iDestruct "H" as "(%& $)".
+      iPureIntro.  assert (k ≠ k1); [| rewrite lookup_insert_ne; auto].
+      simplify_eq. apply elem_of_dom_2 in H1. rewrite DomE in H1.
+      pose proof (obls_filter_live_subseteq Ω).
+      intros <-. apply subseteq_dom in H2. set_solver + HFk H1 H2. }
+    iApply big_sepM_singleton. iFrame. iSplit; auto.
+    rewrite lookup_insert_eq; auto.
+  Qed.
 
-  Lemma oproxy_alloc_obl Ω TP i π s q K β k :
+
+
+
+  Lemma oproxy_delete_obl TP i π K k :
     i ∈ TP →
-    osat Ω ∗ othread TP ∗ oproxy TP ∗
-    othreadG_proxy_obls i π K ∗ othreadG_proxy_session i π s q ∗ othreadG_bound s β ∗
-    oblG_elem k ∗ oblG_owner k i (1/2 + 1/2/2)%Qp ∗ oblG_fuel k β
-    ⊢ |==> osat Ω ∗ othread TP ∗ oproxy TP ∗
-        ⌜k ∉ K⌝ ∗ othreadG_proxy_obls i π ({[k]} ∪ K) ∗ othreadG_proxy_session i π s q ∗
-        othreadG_owns i k 1 ∗ oblG_owner k i (1/2 + 1/2/2/2 + 1/2/2/2/2)%Qp.
+    k ∈ K →
+    othread TP ∗ oproxy TP ∗
+    othreadG_proxy_obls i π K ∗ othreadG_owns i k 1
+    ⊢ |==> othread TP ∗ oproxy TP ∗
+        othreadG_proxy_obls i π (K ∖ {[k]}) ∗ oblG_owner k i (1/2/2/2/2)%Qp.
   Proof.
-    iIntros (Ini) "(S& T& P& Po& Ps& #Tb& #Oe& Oo& Of)".
+    iIntros (Ini Ink) "(T& P& Po& To)".
     rewrite /oproxy -!lock. iDestruct "P" as "(%& FT& ST& PT& M)".
     iPoseProof (big_sepS_delete _ _ _ Ini with "M") as "[Mi M]".
     iDestruct "Mi" as "(%&%&%Dom& Poa& Psa& Hex& OFs)".
-    iPoseProof (othreadG_proxy_session_lookup with "[$Psa $Ps]") as "%LUs".
     iPoseProof (othreadG_proxy_obls_lookup with "[$Poa $Po]") as "%LUo".
     iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
     { iDestruct "Hex" as "(_& _& %)". destruct H. subst. done. }
     iDestruct "Hex" as "(%& Tx& TG& %)". destruct H as [Uni Disj].
-    iPoseProof (big_sepM2_delete _ _ _ _ _ _ LUo LUs with "OFs") as "[Hp OFs]".
-    iDestruct "Hp" as "(%& #Tb0& Hfs)".
-    iPoseProof (othreadG_bound_op _ β β0 with "[$Tb $Tb0]") as "(%β1& #Tb1& %Hb)".
-    destruct Hb as [Hb1 Hb2]. iClear "Tb Tb0".
-    iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
-    iMod (othreadG_proxy_obls_update _ _ _ _ ({[k]} ∪ K) with "[$Poa $Po]") as "[Poa Po]".
-    iModIntro. iFrame "S T FT ST PT Ps To Oo Po".
-    assert (Nink2 : k ∉ K).
-    { simplify_eq. rewrite not_elem_of_union_sets in Nink. eapply Nink; eauto. }
-    iSplit. 2: auto.
+    iPoseProof (big_sepM2_delete_l _ _ _ _ _ LUo with "OFs") as "(%s& %LUs& Hp& OFs)".
+    iDestruct "Hp" as "(%& #Tb& Hfs)".
+    iMod (othread_delete_obl with "[$T $TG $To]") as "(T& TG& Oo)".
+    iMod (othreadG_proxy_obls_update _ _ _ _ (K ∖ {[k]}) with "[$Poa $Po]") as "[Poa Po]".
+    iModIntro. iFrame "T FT ST PT Oo Po".
     iApply (big_sepS_delete _ _ _ Ini). iFrame "M".
     iFrame "Poa Psa". iSplitR.
     { iPureIntro. rewrite dom_insert_L. apply elem_of_dom_2 in LUo. set_solver. }
     iSplitL "Tx TG".
-    { iLeft. iFrame. iPureIntro. replace ({[k]} ∪ K) with (K ∪ {[k]}) by set_solver. simplify_eq. split.
-      - rewrite union_sets_insert_union_L; auto.
-      - apply disjoint_sets_insert_union_singleton_not_in; auto. }
+    { iLeft. iFrame. iPureIntro. simplify_eq. split.
+      - rewrite union_sets_insert_difference_singleton_L; auto.
+      - apply disjoint_sets_insert_difference; auto. }
     iEval (rewrite -(insert_id _ _ _ LUs)). iApply big_sepM2_insert_delete.
-    iFrame "OFs Tb1". iApply (big_sepS_union). 1: set_solver.
-    iSplitR "Hfs".
-    { iApply big_sepS_singleton. iFrame "Of Oe". iPureIntro. eauto. }
-    { iApply (big_sepS_impl with "Hfs"). iIntros "!> %% (%&%&$&$)". iPureIntro. etrans; eauto. }
+    iFrame "OFs". iFrame "Tb". iPoseProof (big_sepS_delete with "Hfs") as "[_ $]". auto.
   Qed.
 
   TODO
 
   (* TODO *)
-    (* alloc obl root/edge, delete obl (Ch = ∅) *)
-    (* move obl to-edge (root/edge-edge) / to-root (root/edge-root)) *)
-    (* refresh node *)
-    (* exchange fuel *)
+    (* alloc obl (root), delete obl (root & Ch = ∅) *)
+    (* move obl: root-edge (burns fuel), edge-root (no fuel), edge-edge (burns fuel) *)
+    (* replace node obl *)
+    (* progress of a tree & a forest *)
 
 Definition oforest `{SI : indexT} `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
   (LO : oids) (TP : gset positive) : iProp Σ :=
