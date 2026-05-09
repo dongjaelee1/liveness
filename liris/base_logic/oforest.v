@@ -2,7 +2,7 @@ From iris.algebra Require Import agree gset gmap gmap_view reservation_map mono_
 From iris.bi Require Import lib.cmra lib.fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From liris.algebra Require Export map_of_sets forest.
+From liris.algebra Require Import map_of_forests.
 From liris.algebra Require Import ordinal_ucmra.
 From liris.base_logic Require Export osat othread.
 
@@ -61,23 +61,19 @@ Local Definition otreeG_root_auth `{SI : indexT} `{!otreeGS Σ} (Rs : gmap posit
 Definition oforest `{SI : indexT} `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!otreeGS Σ}
   (LO : oids) (TP : gset positive) : iProp Σ :=
   locked
-    (∃ (Rs : gmap positive oids) (Fs : forest oid),
+    (∃ (Rs : gmap positive oids) (F : forest oid),
         (* LO is the set of live obligations; fulfilled obls don't belong to the forest. *)
-        ⌜ dom Rs = TP ∧ disjoint_sets Rs ∧ union_sets Rs = dom Fs ⌝ ∗
-        ⌜ dom (forest_fold Fs) = LO ∧ forest_wf Fs ⌝ ∗
-        otreeG_edge_auth (forest_fold Fs) ∗
+        ⌜ dom Rs = TP ∧ dom (forest_fold F) = LO ⌝ ∗
+        ⌜ forest_to_forests_wf F Rs ⌝ ∗
+        otreeG_edge_auth (forest_fold F) ∗
         otreeG_root_auth Rs ∗
-        ([∗ map] i ↦ R ∈ Rs,
-           ∃ (Fo : forest oid),
-             (⌜ Fo = filter (λ '(r, t), r ∈ R) Fs ⌝) ∗
-             ((othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i (dom (forest_fold Fo))) ∨
-                (othreadG_done i ∗ otreeG_root i ∅ ∗ ⌜ R = ∅ ∧ Fo = ∅ ⌝)) ∗
-             ([∗ map] Tr ∈ Fo,
-                ([∗ map] π ↦ Ch ∈ Tr,
-                   ∃ β, oblG_fuel_supply π β (1/2/2)%Qp ∗
-                        ([∗ set] c ∈ Ch, ∃ a, ⌜ WFOCM.leR β a ⌝ ∗ oblG_fuel c a)))))%I.
-
-TODO
+        ([∗ map] i ↦ f ∈ forest_to_forests F Rs,
+           ((othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i (dom (forest_fold f))) ∨
+              (othreadG_done i ∗ otreeG_root i ∅ ∗ ⌜ f = ∅ ⌝)) ∗
+           ([∗ map] t ∈ f,
+              ([∗ map] π ↦ Ch ∈ t,
+                 ∃ β, oblG_fuel_supply π β (1/2/2)%Qp ∗
+                      ([∗ set] c ∈ Ch, ∃ a, ⌜ WFOCM.leR β a ⌝ ∗ oblG_fuel c a)))))%I.
 
 Section otree.
   Context `{SI : indexT} `{OSAT : !osatGS.osatGS Σ} `{OTH : !othreadGS.othreadGS Σ} `{!otreeGS Σ} `{OMF : !ord_mono_fun_class}.
@@ -193,6 +189,8 @@ Section otree.
     iIntros "H". iPoseProof (own_valid with "H") as "%".
     apply gmap_view_frag_op_valid in H. destruct H as (?&?). done.
   Qed.
+
+  TODO
 
   (** oforest rules *)
   Lemma oforest_alloc_thread i LO TP :

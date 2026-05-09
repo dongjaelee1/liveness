@@ -88,37 +88,6 @@ Section map_of_forests.
   Definition forest_to_forests_wf (F : forest V) (Rs : gmap K (gset V)) : Prop :=
     disjoint_sets Rs ∧ (dom F = union_sets Rs) ∧ forest_wf F.
 
-  (** ** Lemmas *)
-  Lemma forest_to_forests_lookup F Rs k f :
-    forest_to_forests F Rs !! k = Some f →
-    ∃ rs, Rs !! k = Some rs ∧ f = forest_filter_roots F rs.
-  Proof using.
-    intros. apply lookup_fmap_Some in H. destruct H as (rs&?&?). eauto.
-  Qed.
-
-  Lemma forest_to_forests_disjoint_forest F Rs k1 k2 f1 f2 :
-    forest_to_forests_wf F Rs →
-    k1 ≠ k2 →
-    forest_to_forests F Rs !! k1 = Some f1 →
-    forest_to_forests F Rs !! k2 = Some f2 →
-    forest_disjoint f1 f2.
-  Proof using.
-    intros. destruct H as (Disj& Dom& Fwf).
-    apply lookup_fmap_Some in H1, H2. destruct H1 as (?&?&?), H2 as (?&?&?). simplify_eq.
-    assert (x ## x0) by (eapply Disj; eauto).
-    eapply forest_filter_roots_disjoint; eauto.
-  Qed.
-
-  Lemma forest_to_forests_lookup_wf F Rs k f :
-    forest_to_forests_wf F Rs →
-    forest_to_forests F Rs !! k = Some f →
-    forest_wf f.
-  Proof using.
-    intros. apply forest_to_forests_lookup in H0. destruct H0 as (?&?&?).
-    destruct H as (Disj& Dom& Fwf). eapply forest_subseteq_wf. 1: eapply Fwf.
-    simplify_eq. apply forest_filter_roots_subseteq.
-  Qed.
-
   (** ** Lemmas for forest_to_forests_wf F Rs. *)
   (** In this part, we state and prove lemmas about
       how forest_to_forests_wf is preserved under various operations on the forst F,
@@ -505,5 +474,39 @@ Section map_of_forests.
     - apply tree_singleton_wf.
     - apply forest_tree_disjoint_tree_singleton; auto.
   Qed.
+
+  (** ** Lemmas for the forest_to_forests function. *)
+  Lemma forest_to_forests_lookup F Rs k f :
+    forest_to_forests F Rs !! k = Some f →
+    ∃ rs, Rs !! k = Some rs ∧ f = forest_filter_roots F rs.
+  Proof using.
+    intros. apply lookup_fmap_Some in H. destruct H as (rs&?&?). eauto.
+  Qed.
+
+  Lemma forest_to_forests_disjoint_forest F Rs k1 k2 f1 f2 :
+    forest_to_forests_wf F Rs →
+    k1 ≠ k2 →
+    forest_to_forests F Rs !! k1 = Some f1 →
+    forest_to_forests F Rs !! k2 = Some f2 →
+    forest_disjoint f1 f2.
+  Proof using.
+    intros. destruct H as (Disj& Dom& Fwf).
+    apply lookup_fmap_Some in H1, H2. destruct H1 as (?&?&?), H2 as (?&?&?). simplify_eq.
+    assert (x ## x0) by (eapply Disj; eauto).
+    eapply forest_filter_roots_disjoint; eauto.
+  Qed.
+
+  Lemma forest_to_forests_lookup_wf F Rs k f :
+    forest_to_forests_wf F Rs →
+    forest_to_forests F Rs !! k = Some f →
+    forest_wf f.
+  Proof using.
+    intros. apply forest_to_forests_lookup in H0. destruct H0 as (?&?&?).
+    destruct H as (Disj& Dom& Fwf). eapply forest_subseteq_wf. 1: eapply Fwf.
+    simplify_eq. apply forest_filter_roots_subseteq.
+  Qed.
+
+  (** ** Lemmas for various forest operations and root set operations, such as lookup, insert, delete. *)
+  (** We equality lemmas for how forest_to_forests is reduced under various operations. *)
 
 End map_of_forests.
