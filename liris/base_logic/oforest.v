@@ -190,25 +190,47 @@ Section otree.
     apply gmap_view_frag_op_valid in H. destruct H as (?&?). done.
   Qed.
 
-  TODO
-
   (** oforest rules *)
+  (** TODO: move to map_of_forests *)
+  Section map_of_forests.
+    Context {K V : Type}.
+    Context `{!EqDecision K} `{!Countable K} `{!EqDecision V} `{!Countable V}.
+    Implicit Type t : tree V.
+    Implicit Type F f : forest V.
+    Implicit Type Rs : gmap K (gset V).
+    Implicit Type rs : gset V.
+
+    Lemma forest_to_forests_dom F Rs :
+      dom (forest_to_forests F Rs) = dom Rs.
+    Proof. apply dom_fmap_L. Qed.
+
+    Lemma forest_to_forests_lookup_None F Rs k :
+      Rs !! k = None →
+      forest_to_forests F Rs !! k = None.
+    Proof. rewrite -!not_elem_of_dom. intros. rewrite forest_to_forests_dom. auto. Qed.
+
+  End map_of_forests.
+
   Lemma oforest_alloc_thread i LO TP :
     i ∉ TP →
     oforest LO TP ∗ othreadG_exec i (1/2/2)%Qp ∗ othreadG_obls i ∅
     ⊢ |==> oforest LO ({[i]} ∪ TP) ∗ otreeG_root i ∅.
   Proof.
     iIntros (Hi) "(F& Tx& TG)".
-    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomE]& EA& RA& M)".
-    iMod (otreeG_root_alloc _ i with "RA") as "(RA& Ri)".
+    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomF]& %FFwf& EA& RA& M)".
+    assert (LUi : Rs !! i = None).
     { apply not_elem_of_dom. rewrite DomR. auto. }
+    iMod (otreeG_root_alloc _ i with "RA") as "(RA& Ri)". 1: auto.
     iModIntro. iFrame "RA EA Ri". iSplit.
     { iPureIntro. split; auto. rewrite dom_insert_L DomR. auto. }
+    iSplit.
+    { iPureIntro. apply forest_to_forests_wf_roots_insert_empty; auto. }
+    rewrite forest_to_forests_roots_insert delete_id. 2: auto.
     iApply big_sepM_insert.
-    { apply not_elem_of_dom. rewrite DomR. auto. }
-    iFrame "M". iExists ∅. iSplit.
-    { iPureIntro. split; auto. done. }
-    iSplitL. 2: done. iLeft. iFrame.
+    { apply forest_to_forests_lookup_None; auto. }
+    iFrame "M". iSplitL.
+    { iLeft. rewrite forest_filter_roots_empty forest_fold_empty. iFrame. }
+    rewrite forest_filter_roots_empty. done.
   Qed.
 
   Lemma oforest_alloc_threads Θ LO TP :
@@ -236,20 +258,20 @@ Section otree.
     ⊢ |==> othread TP ∗ oforest LO TP ∗ othreadG_done i.
   Proof.
     iIntros (Ini) "(T& F& Tx& Ri)".
-    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomE]& EA& RA& M)".
+    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomF]& %FFwf& EA& RA& M)".
     iPoseProof (otreeG_root_lookup with "[$RA $Ri]") as "%LUR".
-    iPoseProof (big_sepM_delete _ _ _ _ LUR with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%& [%DomF %WFF]& Hex& HF)".
+    pose proof (forest_to_forests_lookup_eq F Rs _ _ LUR) as LUFF.
+    rewrite forest_filter_roots_empty in LUFF.
+    iPoseProof (big_sepM_delete _ _ _ _ LUFF with "M") as "[Mi M]".
+    iDestruct "Mi" as "(Hex& HF)".
     iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
     { iDestruct "Hex" as "(_& Ri2& _)". by iPoseProof (otreeG_root_valid with "[$Ri $Ri2]") as "%". }
     iDestruct "Hex" as "(Tx2& TG)". iCombine "Tx Tx2" as "Tx".
-    assert (EmpF : Fo = ∅).
-    { symmetry in DomF. apply dom_empty_inv_L in DomF. auto. }
-    subst. rewrite forest_fold_empty dom_empty_L.
+    rewrite forest_fold_empty.
     iMod (othread_exec_to_done with "[$T $Tx $TG]") as "[T #Td]".
-    iModIntro. iFrame "T Td". iFrame "EA RA". iSplitR. 1: auto.
-    iApply (big_sepM_delete _ _ _ _ LUR). iFrame "M".
-    iExists ∅. iSplit. 1: done. iSplitL. 2: done. iRight. iFrame. iFrame "Td". done.
+    iModIntro. iFrame "T Td". iFrame "EA RA". iSplit. 1: auto. iSplit. 1: auto.
+    iApply (big_sepM_delete _ _ _ _ LUFF). iFrame "M".
+    iSplitL. 2: done. iRight. iFrame. iFrame "Td". done.
   Qed.
 
   Lemma oforest_alloc_obl Ω LO TP i R k o a :
@@ -265,31 +287,60 @@ Section otree.
     iIntros (HFk HLO) "(S& T& F& Ri& #Oe& Oo& Ofs)".
     iPoseProof (osat_lookup_owner with "[$S $Oe $Oo]") as "(%& %LUk)".
     rewrite lookup_insert_eq in LUk. simplify_eq.
-    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomE]& EA& RA& M)".
+    rewrite /oforest -!lock. iDestruct "F" as "(%& %& [%DomR %DomF]& %FFwf& EA& RA& M)".
     iPoseProof (otreeG_root_lookup with "[$RA $Ri]") as "%LUR".
-    iPoseProof (big_sepM_delete _ _ _ _ LUR with "M") as "[Mi M]".
-    iDestruct "Mi" as "(%& [%DomF %WFF]& Hex& HF)".
+    pose proof (forest_to_forests_lookup_eq F Rs _ _ LUR) as LUFF.
+    iPoseProof (big_sepM_delete _ _ _ _ LUFF with "M") as "[Mi M]".
+    iDestruct "Mi" as "(Hex& HF)".
     iDestruct "Hex" as "[Hex | Hex]"; cycle 1.
     { iDestruct "Hex" as "(_& Ri2& _)". by iPoseProof (otreeG_root_valid with "[$Ri $Ri2]") as "%". }
     iDestruct "Hex" as "(Tx& TG)".
     iMod (othread_alloc_obl with "[$S $T $TG $Oe $Oo]") as "(S& T& %Nink& TG& To& Oo)".
-    iMod (otreeG_edge_alloc _ k with "EA") as "(EA& Ek)".
-    { apply not_elem_of_dom. rewrite DomE. eapply not_elem_of_weaken. 1: eapply HFk.
+    assert (NLukFf : forest_fold F !! k = None).
+    { apply not_elem_of_dom. rewrite DomF. eapply not_elem_of_weaken. 1: eapply HFk.
       apply subseteq_dom, obls_filter_live_subseteq. }
+    iMod (otreeG_edge_alloc _ k with "EA") as "(EA& Ek)". 1: auto.
     iMod (otreeG_root_update _ _ _  ({[k]} ∪ R) with "[$RA $Ri]") as "[RA Ri]".
+    assert (NLuk : (forest_filter_roots F R) !! k = None).
+    { subst. apply not_elem_of_dom. eapply not_elem_of_weaken. 1: eapply Nink.
+      unshelve epose proof (forest_to_forests_lookup_eq_wf F Rs _ _ FFwf LUR). destruct H. destruct H0.
+      eapply dom_subseteq_forest_fold_dom; auto.
+      eapply map_Forall_impl. 1: eapply H1. simpl. intros. apply tree_wf_root_elem. auto. }
     assert (NinkR : k ∉ R).
-    { simplify_eq. eapply not_elem_of_weaken. 1: eapply Nink.
-      destruct WFF. apply dom_subseteq_forest_fold_dom; auto.
-      eapply map_Forall_impl. 1: eapply H0.
-      simpl. intros. apply tree_wf_root_elem. auto. }
+    { simplify_eq. apply not_elem_of_dom in NLuk. eapply not_elem_of_weaken. 1: eapply NLuk.
+      destruct FFwf as (?&?&?). rewrite forest_filter_roots_dom H0.
+      pose proof (union_sets_lookup_subseteq _ _ _ LUR). set_solver. }
     assert (Ini : i ∈ TP).
     { apply elem_of_dom_2 in LUR. subst. auto. }
-    assert (NLuk : Fo !! k = None).
-    { subst. apply not_elem_of_dom; auto. }
+    assert (NLukF : F !! k = None).
+    { apply not_elem_of_dom. eapply not_elem_of_weaken.
+      { apply not_elem_of_dom in NLukFf. eapply NLukFf. }
+      destruct FFwf as (?&?&?). destruct H1. eapply dom_subseteq_forest_fold_dom; auto.
+      eapply map_Forall_impl. 1: eapply H2. simpl. intros. apply tree_wf_root_elem. auto. }
     iModIntro. iFrame "S T Ri Ek To Oo". iSplit; cycle 1. 1: auto.
-    iFrame "EA RA". iSplit.
-    { iPureIntro. subst. rewrite !dom_insert_L. split_and !. 1: set_solver.
-      rewrite DomE. set_solver. }
+    assert (Eqk : <[k:=∅]> (forest_fold F) = forest_fold (<[k:=tree_singleton k]> F)).
+    { rewrite forest_fold_insert_L; auto.
+      - apply insert_union_singleton_l.
+      - apply forest_trees_disjoint_insert; auto. destruct FFwf as (?&?&?). destruct H1. split; auto.
+        apply forest_tree_disjoint_tree_singleton; auto.
+        eapply map_Forall_impl; eauto. simpl. intros. apply tree_wf_root_elem. auto. }
+    rewrite Eqk. iFrame "EA RA". iSplit.
+    { iPureIntro. simplify_eq. rewrite !dom_insert_L. split_and !. 1: set_solver.
+      rewrite forest_fold_insert_L; auto.
+      - rewrite dom_union_L DomF. set_solver.
+      - apply forest_trees_disjoint_insert; auto. destruct FFwf as (?&?&?). destruct H1. split; auto.
+        apply forest_tree_disjoint_tree_singleton; auto.
+        eapply map_Forall_impl; eauto. simpl. intros. apply tree_wf_root_elem. auto. }
+    iSplit.
+    { iPureIntro. replace ({[k]} ∪ R) with (R ∪ {[k]}) by set_solver.
+      apply forest_to_forests_wf_forest_insert_singleton; auto. }
+
+forest_to_forests_roots_insert:
+    forest_to_forests F (<[k:=rs]> Rs) = <[k:=forest_filter_roots F rs]> (forest_to_forests F (delete k Rs))
+forest_to_forests_forest_insert:
+    forest_to_forests (forest_insert F ρ t) Rs =
+    (λ rs : gset V, if decide (ρ ∈ rs) then <[ρ:=t]> (forest_filter_roots F rs) else forest_filter_roots F rs) <$> Rs
+    
     iApply big_sepM_insert_delete. iSplitR "M"; cycle 1.
     { iApply (big_sepM_impl with "M"). iIntros "!> %%% (%& %& $& M)". iSplit; first auto.
       iApply (big_sepM_impl with "M"). iIntros "!> %%% M".
