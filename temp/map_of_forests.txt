@@ -510,3 +510,273 @@ Section map_of_forests.
   (** We equality lemmas for how forest_to_forests is reduced under various operations. *)
 
 End map_of_forests.
+
+Section forest.
+  Context {V : Type}.
+  Context `{!EqDecision V} `{!Countable V}.
+  Implicit Type t : tree V.
+  Implicit Type f : forest V.
+  Implicit Type v u ρ π : V.
+  Implicit Type rs : gset V.
+
+  (** ** More lemmas for [forest_filter_roots] *)
+
+  Lemma forest_filter_roots_lookup_Some f rs r t :
+    forest_filter_roots f rs !! r = Some t ↔
+    f !! r = Some t ∧ r ∈ rs.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_lookup_None f rs r :
+    forest_filter_roots f rs !! r = None ↔
+    f !! r = None ∨ r ∉ rs.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_lookup_None_notin f rs r :
+    r ∉ rs ->
+    forest_filter_roots f rs !! r = None.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_empty f :
+    forest_filter_roots f ∅ = ∅.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_dom f rs :
+    dom (forest_filter_roots f rs) = dom f ∩ rs.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_full f rs :
+    dom f ⊆ rs ->
+    forest_filter_roots f rs = f.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_mono f rs1 rs2 :
+    rs1 ⊆ rs2 ->
+    forest_subseteq (forest_filter_roots f rs1) (forest_filter_roots f rs2).
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_intersection f rs1 rs2 :
+    forest_filter_roots (forest_filter_roots f rs1) rs2 =
+    forest_filter_roots f (rs1 ∩ rs2).
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_idemp f rs :
+    forest_filter_roots (forest_filter_roots f rs) rs =
+    forest_filter_roots f rs.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_union f rs1 rs2 :
+    forest_filter_roots f (rs1 ∪ rs2) =
+    forest_filter_roots f rs1 ∪ forest_filter_roots f rs2.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_disjoint_roots f rs1 rs2 :
+    rs1 ## rs2 ->
+    forest_disjoint (forest_filter_roots f rs1) (forest_filter_roots f rs2).
+  Proof. Admitted.
+
+  (** ** [forest_filter_roots] under operations on [f] *)
+
+  Lemma forest_filter_roots_insert f rs ρ t :
+    forest_filter_roots (<[ρ:=t]> f) rs =
+    if decide (ρ ∈ rs)
+    then <[ρ:=t]> (forest_filter_roots f rs)
+    else forest_filter_roots f rs.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_insert_in f rs ρ t :
+    ρ ∈ rs ->
+    forest_filter_roots (<[ρ:=t]> f) rs =
+    <[ρ:=t]> (forest_filter_roots f rs).
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_insert_notin f rs ρ t :
+    ρ ∉ rs ->
+    forest_filter_roots (<[ρ:=t]> f) rs =
+    forest_filter_roots f rs.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_delete f rs ρ :
+    forest_filter_roots (delete ρ f) rs =
+    delete ρ (forest_filter_roots f rs).
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_union_forest f1 f2 rs :
+    forest_filter_roots (forest_union f1 f2) rs =
+    forest_union (forest_filter_roots f1 rs) (forest_filter_roots f2 rs).
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_add_root f rs ρ t :
+    f !! ρ = Some t ->
+    ρ ∉ rs ->
+    forest_filter_roots f (rs ∪ {[ρ]}) =
+    <[ρ:=t]> (forest_filter_roots f rs).
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_add_root_in f rs ρ :
+    ρ ∈ rs ->
+    forest_filter_roots f (rs ∪ {[ρ]}) =
+    forest_filter_roots f rs.
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_remove_root f rs ρ :
+    ρ ∈ rs ->
+    forest_filter_roots f (rs ∖ {[ρ]}) =
+    delete ρ (forest_filter_roots f rs).
+  Proof. Admitted.
+
+  Lemma forest_filter_roots_remove_root_notin f rs ρ :
+    ρ ∉ rs ->
+    forest_filter_roots f (rs ∖ {[ρ]}) =
+    forest_filter_roots f rs.
+  Proof. Admitted.
+
+End forest.
+
+Section map_of_forests.
+  Context {K V : Type}.
+  Context `{!EqDecision K} `{!Countable K} `{!EqDecision V} `{!Countable V}.
+  Implicit Type t : tree V.
+  Implicit Type F f : forest V.
+  Implicit Type Rs : gmap K (gset V).
+  Implicit Type rs : gset V.
+
+  (** ** Basic lemmas for [forest_to_forests] *)
+
+  Lemma forest_to_forests_empty F :
+    forest_to_forests F (∅ : gmap K (gset V)) = ∅.
+  Proof. Admitted.
+
+  Lemma forest_to_forests_lookup_eq (F : forest V) (Rs : gmap K (gset V)) k rs :
+    Rs !! k = Some rs ->
+    forest_to_forests F Rs !! k = Some (forest_filter_roots F rs).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_ext F1 F2 Rs :
+    F1 = F2 ->
+    forest_to_forests F1 Rs = forest_to_forests F2 Rs.
+  Proof. Admitted.
+
+  Lemma forest_to_forests_ext_roots F Rs1 Rs2 :
+    Rs1 = Rs2 ->
+    forest_to_forests F Rs1 = forest_to_forests F Rs2.
+  Proof. Admitted.
+
+  (** ** [forest_to_forests] under operations on [Rs] *)
+
+  Lemma forest_to_forests_roots_delete F Rs k :
+    forest_to_forests F (delete k Rs) =
+    delete k (forest_to_forests F Rs).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_roots_insert F Rs k rs :
+    forest_to_forests F (<[k:=rs]> Rs) =
+    <[k:=forest_filter_roots F rs]> (forest_to_forests F (delete k Rs)).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_roots_insert_fresh F Rs k rs :
+    Rs !! k = None ->
+    forest_to_forests F (<[k:=rs]> Rs) =
+    <[k:=forest_filter_roots F rs]> (forest_to_forests F Rs).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_roots_insert_empty F Rs k :
+    forest_to_forests F (<[k:=∅]> Rs) =
+    <[k:=∅]> (forest_to_forests F (delete k Rs)).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_roots_rename_key F Rs k k' rs :
+    k' ≠ k ->
+    forest_to_forests F (<[k':=rs]>(delete k Rs)) =
+    <[k':=forest_filter_roots F rs]> (delete k (forest_to_forests F Rs)).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_roots_split_key F Rs k k' rs1 rs2 :
+    k' ≠ k ->
+    forest_to_forests F (<[k':=rs2]>(<[k:=rs1]>(delete k Rs))) =
+    <[k':=forest_filter_roots F rs2]>
+      (<[k:=forest_filter_roots F rs1]>(delete k (forest_to_forests F Rs))).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_roots_merge_keys F Rs k1 k2 rs1 rs2 :
+    k1 ≠ k2 ->
+    forest_to_forests F (<[k1:=rs1 ∪ rs2]>(delete k2 Rs)) =
+    <[k1:=forest_filter_roots F (rs1 ∪ rs2)]>
+      (delete k2 (forest_to_forests F Rs)).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_roots_merge_keys_union F Rs k1 k2 rs1 rs2 :
+    k1 ≠ k2 ->
+    forest_to_forests F (<[k1:=rs1 ∪ rs2]>(delete k2 Rs)) =
+    <[k1:=forest_filter_roots F rs1 ∪ forest_filter_roots F rs2]>
+      (delete k2 (forest_to_forests F Rs)).
+  Proof. Admitted.
+
+  (** ** [forest_to_forests] under operations on [F] *)
+
+  Lemma forest_to_forests_forest_insert F Rs ρ t :
+    forest_to_forests (forest_insert F ρ t) Rs =
+    (λ rs,
+      if decide (ρ ∈ rs)
+      then <[ρ:=t]> (forest_filter_roots F rs)
+      else forest_filter_roots F rs) <$> Rs.
+  Proof. Admitted.
+
+  Lemma forest_to_forests_forest_delete F Rs ρ :
+    forest_to_forests (delete ρ F) Rs =
+    (λ f, delete ρ f) <$> forest_to_forests F Rs.
+  Proof. Admitted.
+
+  Lemma forest_to_forests_forest_union F1 F2 Rs :
+    forest_to_forests (forest_union F1 F2) Rs =
+    (λ rs, forest_union (forest_filter_roots F1 rs) (forest_filter_roots F2 rs)) <$> Rs.
+  Proof. Admitted.
+
+  Lemma forest_to_forests_tree_split Cf Rs ρ :
+    forest_to_forests (tree_split ρ Cf) Rs =
+    (λ rs,
+      if decide (ρ ∈ rs)
+      then <[ρ:=tree_singleton ρ]> (forest_filter_roots Cf rs)
+      else forest_filter_roots Cf rs) <$> Rs.
+  Proof. Admitted.
+
+  Lemma forest_to_forests_tree_clear F Rs ρ Cf :
+    forest_to_forests (tree_clear F ρ Cf) Rs =
+    (λ rs,
+      delete ρ (forest_filter_roots F rs) ∪
+      (if decide (ρ ∈ rs)
+       then <[ρ:=tree_singleton ρ]> (forest_filter_roots Cf rs)
+       else forest_filter_roots Cf rs)) <$> Rs.
+  Proof. Admitted.
+
+  Lemma forest_to_forests_forest_move_tree F Rs ρ ρt r rt π πC :
+    ρ ≠ r ->
+    forest_to_forests (forest_move_tree F ρ ρt r rt π πC) Rs =
+    (λ rs,
+      if decide (ρ ∈ rs)
+      then <[ρ:=tree_insert ρt r rt π πC]> (delete r (forest_filter_roots F rs))
+      else delete r (forest_filter_roots F rs)) <$> Rs.
+  Proof. Admitted.
+
+  (** ** Useful pointwise corollaries *)
+
+  Lemma forest_to_forests_lookup_roots_insert F Rs k rs :
+    forest_to_forests F (<[k:=rs]> Rs) !! k =
+    Some (forest_filter_roots F rs).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_lookup_forest_insert F Rs k rs ρ t :
+    Rs !! k = Some rs ->
+    forest_to_forests (forest_insert F ρ t) Rs !! k =
+    Some
+      (if decide (ρ ∈ rs)
+       then <[ρ:=t]> (forest_filter_roots F rs)
+       else forest_filter_roots F rs).
+  Proof. Admitted.
+
+  Lemma forest_to_forests_lookup_forest_delete F Rs k rs ρ :
+    Rs !! k = Some rs ->
+    forest_to_forests (delete ρ F) Rs !! k =
+    Some (delete ρ (forest_filter_roots F rs)).
+  Proof. Admitted.
+
+End map_of_forests.

@@ -506,7 +506,702 @@ Section map_of_forests.
     simplify_eq. apply forest_filter_roots_subseteq.
   Qed.
 
-  (** ** Lemmas for various forest operations and root set operations, such as lookup, insert, delete. *)
-  (** We equality lemmas for how forest_to_forests is reduced under various operations. *)
+End map_of_forests.
+
+Section forest.
+  Context {V : Type}.
+  Context `{!EqDecision V} `{!Countable V}.
+  Implicit Type t : tree V.
+  Implicit Type f : forest V.
+  Implicit Type v u ρ π : V.
+  Implicit Type rs : gset V.
+
+  (** ** More lemmas for [forest_filter_roots] *)
+
+  Lemma forest_filter_roots_lookup_Some f rs r t :
+    forest_filter_roots f rs !! r = Some t ↔
+    f !! r = Some t ∧ r ∈ rs.
+  Proof using.
+    split.
+    - intros H.
+      apply map_lookup_filter_Some in H.
+      destruct H as [H Hr]. simpl in Hr. done.
+    - intros [H Hr].
+      apply map_lookup_filter_Some. split; auto.
+  Qed.
+
+  Lemma forest_filter_roots_lookup_None f rs r :
+    forest_filter_roots f rs !! r = None ↔
+    f !! r = None ∨ r ∉ rs.
+  Proof using.
+    split.
+    - intros Hfilt.
+      destruct (f !! r) as [t|] eqn:Hlu; [right|left]; auto.
+      intros Hr.
+      assert (forest_filter_roots f rs !! r = Some t).
+      { apply forest_filter_roots_lookup_Some. split; auto. }
+      rewrite Hfilt in H. discriminate.
+    - intros [Hnone|Hnot].
+      + destruct (forest_filter_roots f rs !! r) as [t|] eqn:Hfilt; auto.
+        apply forest_filter_roots_lookup_Some in Hfilt as [Hlu _].
+        rewrite Hnone in Hlu. discriminate.
+      + destruct (forest_filter_roots f rs !! r) as [t|] eqn:Hfilt; auto.
+        apply forest_filter_roots_lookup_Some in Hfilt as [_ Hr].
+        contradiction.
+  Qed.
+
+  Lemma forest_filter_roots_lookup_None_notin f rs r :
+    r ∉ rs ->
+    forest_filter_roots f rs !! r = None.
+  Proof using.
+    intros Hr.
+    apply forest_filter_roots_lookup_None. right. done.
+  Qed.
+
+  Lemma forest_filter_roots_empty f :
+    forest_filter_roots f ∅ = ∅.
+  Proof using.
+    apply map_eq=>r.
+    rewrite lookup_empty.
+    apply forest_filter_roots_lookup_None. right. set_solver.
+  Qed.
+
+  Lemma forest_filter_roots_dom f rs :
+    dom (forest_filter_roots f rs) = dom f ∩ rs.
+  Proof using.
+    apply set_eq=>r.
+    rewrite elem_of_dom.
+    split.
+    - intros [t Ht].
+      apply forest_filter_roots_lookup_Some in Ht as [Hf Hr].
+      apply elem_of_intersection. split.
+      + apply elem_of_dom. eauto.
+      + done.
+    - intros Hr.
+      apply elem_of_intersection in Hr as [Hdom Hrs].
+      apply elem_of_dom in Hdom as [t Ht].
+      exists t. apply forest_filter_roots_lookup_Some. split; auto.
+  Qed.
+
+  Lemma forest_filter_roots_full f rs :
+    dom f ⊆ rs ->
+    forest_filter_roots f rs = f.
+  Proof using.
+    intros Hsub.
+    apply map_eq=>r.
+    destruct (f !! r) as [t|] eqn:Hlu.
+    - apply forest_filter_roots_lookup_Some. split; auto.
+      apply Hsub. apply elem_of_dom. eauto.
+    - apply forest_filter_roots_lookup_None. left. done.
+  Qed.
+
+  Lemma forest_filter_roots_mono f rs1 rs2 :
+    rs1 ⊆ rs2 ->
+    forest_subseteq (forest_filter_roots f rs1) (forest_filter_roots f rs2).
+  Proof using.
+    intros Hsub.
+    rewrite /forest_subseteq map_subseteq_spec.
+    intros r t Hr.
+    apply forest_filter_roots_lookup_Some in Hr as [Hf Hrs].
+    apply forest_filter_roots_lookup_Some. split; auto.
+  Qed.
+
+  Lemma forest_filter_roots_intersection f rs1 rs2 :
+    forest_filter_roots (forest_filter_roots f rs1) rs2 =
+    forest_filter_roots f (rs1 ∩ rs2).
+  Proof using.
+    apply map_eq=>r.
+    destruct (forest_filter_roots (forest_filter_roots f rs1) rs2 !! r) as [t1|] eqn:H1;
+    destruct (forest_filter_roots f (rs1 ∩ rs2) !! r) as [t2|] eqn:H2; auto.
+    - apply forest_filter_roots_lookup_Some in H1 as [H1 Hrs2].
+      apply forest_filter_roots_lookup_Some in H1 as [Hf Hrs1].
+      apply forest_filter_roots_lookup_Some in H2 as [Hf' _].
+      by rewrite Hf in Hf'; simplify_eq.
+    - exfalso.
+      apply forest_filter_roots_lookup_Some in H1 as [H1 Hrs2].
+      apply forest_filter_roots_lookup_Some in H1 as [Hf Hrs1].
+      assert (forest_filter_roots f (rs1 ∩ rs2) !! r = Some t1).
+      { apply forest_filter_roots_lookup_Some. split; [done|].
+        apply elem_of_intersection. split; done. }
+      rewrite H2 in H. discriminate.
+    - exfalso.
+      apply forest_filter_roots_lookup_Some in H2 as [Hf Hrs].
+      apply elem_of_intersection in Hrs as [Hrs1 Hrs2].
+      assert (forest_filter_roots (forest_filter_roots f rs1) rs2 !! r = Some t2).
+      { apply forest_filter_roots_lookup_Some. split.
+        - apply forest_filter_roots_lookup_Some. split; done.
+        - done.
+      }
+      rewrite H1 in H. discriminate.
+  Qed.
+
+  Lemma forest_filter_roots_idemp f rs :
+    forest_filter_roots (forest_filter_roots f rs) rs =
+    forest_filter_roots f rs.
+  Proof using.
+    rewrite forest_filter_roots_intersection.
+    f_equal. set_solver.
+  Qed.
+
+  Lemma forest_filter_roots_union f rs1 rs2 :
+    forest_filter_roots f (rs1 ∪ rs2) =
+    forest_filter_roots f rs1 ∪ forest_filter_roots f rs2.
+  Proof using.
+    apply map_eq=>r.
+    destruct (f !! r) as [t|] eqn:Hf.
+    - destruct (decide (r ∈ rs1)) as [Hrs1|Hrs1].
+      + assert (Hl : forest_filter_roots f (rs1 ∪ rs2) !! r = Some t).
+        { apply forest_filter_roots_lookup_Some. split; [done|set_solver]. }
+        assert (Hr : (forest_filter_roots f rs1 ∪ forest_filter_roots f rs2) !! r = Some t).
+        { apply lookup_union_Some_l.
+          apply forest_filter_roots_lookup_Some. split; done. }
+        by rewrite Hl Hr.
+      + destruct (decide (r ∈ rs2)) as [Hrs2|Hrs2].
+        * assert (Hl : forest_filter_roots f (rs1 ∪ rs2) !! r = Some t).
+          { apply forest_filter_roots_lookup_Some. split; [done|set_solver]. }
+          assert (Hr : (forest_filter_roots f rs1 ∪ forest_filter_roots f rs2) !! r = Some t).
+          { rewrite lookup_union_r.
+            - apply forest_filter_roots_lookup_Some. split; done.
+            - apply forest_filter_roots_lookup_None. right. done. }
+          by rewrite Hl Hr.
+        * assert (Hl : forest_filter_roots f (rs1 ∪ rs2) !! r = None).
+          { apply forest_filter_roots_lookup_None. right. set_solver. }
+          assert (Hr : (forest_filter_roots f rs1 ∪ forest_filter_roots f rs2) !! r = None).
+          { apply lookup_union_None. split.
+            - apply forest_filter_roots_lookup_None. right. done.
+            - apply forest_filter_roots_lookup_None. right. done.
+          }
+          by rewrite Hl Hr.
+    - assert (Hl : forest_filter_roots f (rs1 ∪ rs2) !! r = None).
+      { apply forest_filter_roots_lookup_None. left. done. }
+      assert (Hr : (forest_filter_roots f rs1 ∪ forest_filter_roots f rs2) !! r = None).
+      { apply lookup_union_None. split;
+          apply forest_filter_roots_lookup_None; left; done. }
+      by rewrite Hl Hr.
+  Qed.
+
+  Lemma forest_filter_roots_disjoint_roots f rs1 rs2 :
+    rs1 ## rs2 ->
+    forest_disjoint (forest_filter_roots f rs1) (forest_filter_roots f rs2).
+  Proof using.
+    intros Hdisj.
+    apply map_disjoint_spec=>r t1 t2 H1 H2.
+    apply forest_filter_roots_lookup_Some in H1 as [_ Hr1].
+    apply forest_filter_roots_lookup_Some in H2 as [_ Hr2].
+    set_solver.
+  Qed.
+
+  (** ** [forest_filter_roots] under operations on [f] *)
+
+  Lemma forest_filter_roots_insert f rs ρ t :
+    forest_filter_roots (<[ρ:=t]> f) rs =
+    if decide (ρ ∈ rs)
+    then <[ρ:=t]> (forest_filter_roots f rs)
+    else forest_filter_roots f rs.
+  Proof using.
+    destruct (decide (ρ ∈ rs)) as [Hρ|Hρ].
+    - apply map_eq=>r.
+      destruct (decide (r = ρ)) as [->|Hne].
+      + rewrite lookup_insert_eq.
+        apply forest_filter_roots_lookup_Some. split; [rewrite lookup_insert_eq; done|done].
+      + rewrite lookup_insert_ne; [|done].
+        (* rewrite lookup_insert_ne; [|done]. *)
+        destruct (forest_filter_roots f rs !! r) as [tr|] eqn:Hr; auto.
+        * apply forest_filter_roots_lookup_Some in Hr as [Hf Hrs].
+          apply forest_filter_roots_lookup_Some. split; [rewrite lookup_insert_ne; done|done].
+        * apply forest_filter_roots_lookup_None in Hr as Hnone.
+          apply forest_filter_roots_lookup_None.
+          destruct Hnone as [Hnone|]; [left|right]; auto.
+          by rewrite lookup_insert_ne.
+    - apply map_eq=>r.
+      destruct (decide (r = ρ)) as [->|Hne].
+      + rewrite forest_filter_roots_lookup_None_notin; [|done].
+        symmetry. apply forest_filter_roots_lookup_None. right. done.
+      + destruct (forest_filter_roots f rs !! r) as [tr|] eqn:Hr; auto.
+        * apply forest_filter_roots_lookup_Some in Hr as [Hf Hrs].
+          apply forest_filter_roots_lookup_Some. split; [rewrite lookup_insert_ne; done|done].
+        * apply forest_filter_roots_lookup_None in Hr as Hnone.
+          apply forest_filter_roots_lookup_None.
+          destruct Hnone as [Hnone|]; [left|right]; auto.
+          by rewrite lookup_insert_ne.
+  Qed.
+
+  Lemma forest_filter_roots_insert_in f rs ρ t :
+    ρ ∈ rs ->
+    forest_filter_roots (<[ρ:=t]> f) rs =
+    <[ρ:=t]> (forest_filter_roots f rs).
+  Proof using.
+    intros Hρ.
+    rewrite forest_filter_roots_insert.
+    destruct (decide (ρ ∈ rs)); [done|contradiction].
+  Qed.
+
+  Lemma forest_filter_roots_insert_notin f rs ρ t :
+    ρ ∉ rs ->
+    forest_filter_roots (<[ρ:=t]> f) rs =
+    forest_filter_roots f rs.
+  Proof using.
+    intros Hρ.
+    rewrite forest_filter_roots_insert.
+    destruct (decide (ρ ∈ rs)); [contradiction|done].
+  Qed.
+
+  Lemma forest_filter_roots_delete f rs ρ :
+    forest_filter_roots (delete ρ f) rs =
+    delete ρ (forest_filter_roots f rs).
+  Proof using.
+    apply map_eq=>r.
+    destruct (decide (r = ρ)) as [->|Hne].
+    - rewrite lookup_delete_eq. eapply (lookup_weaken_None _ (delete ρ f)).
+      + apply lookup_delete_eq.
+      + apply forest_filter_roots_subseteq.
+    - rewrite lookup_delete_ne; [|done].
+      destruct (forest_filter_roots f rs !! r) as [tr|] eqn:Hr; auto.
+      + apply forest_filter_roots_lookup_Some in Hr as [Hf Hrs].
+        apply forest_filter_roots_lookup_Some. split; auto.
+        rewrite lookup_delete_ne; auto.
+      + apply forest_filter_roots_lookup_None in Hr as Hnone.
+        apply forest_filter_roots_lookup_None.
+        destruct Hnone as [Hnone|]; [left|right]; auto.
+        rewrite lookup_delete_ne; auto.
+  Qed.
+
+  Lemma forest_filter_roots_union_forest f1 f2 rs :
+    forest_filter_roots (forest_union f1 f2) rs =
+    forest_union (forest_filter_roots f1 rs) (forest_filter_roots f2 rs).
+  Proof using.
+    apply map_eq=>r.
+    destruct (decide (r ∈ rs)) as [Hrs|Hrs].
+    - destruct (f1 !! r) as [t1|] eqn:H1.
+      + assert (Hl : forest_filter_roots (forest_union f1 f2) rs !! r = Some t1).
+        { apply forest_filter_roots_lookup_Some. split.
+          - apply lookup_union_Some_l. done.
+          - done. }
+        assert (Hr : forest_union (forest_filter_roots f1 rs) (forest_filter_roots f2 rs) !! r = Some t1).
+        { apply lookup_union_Some_l.
+          apply forest_filter_roots_lookup_Some. split; done. }
+        by rewrite Hl Hr.
+      + destruct (f2 !! r) as [t2|] eqn:H2.
+        * assert (Hl : forest_filter_roots (forest_union f1 f2) rs !! r = Some t2).
+          { apply forest_filter_roots_lookup_Some. split.
+            - rewrite lookup_union_r; auto.
+            - done. }
+          assert (Hr : forest_union (forest_filter_roots f1 rs) (forest_filter_roots f2 rs) !! r = Some t2).
+          { rewrite lookup_union_r.
+            - apply forest_filter_roots_lookup_Some. split; done.
+            - apply forest_filter_roots_lookup_None. left. done. }
+          by rewrite Hl Hr.
+        * assert (Hl : forest_filter_roots (forest_union f1 f2) rs !! r = None).
+          { apply forest_filter_roots_lookup_None. left.
+            apply lookup_union_None. split; done. }
+          assert (Hr : forest_union (forest_filter_roots f1 rs) (forest_filter_roots f2 rs) !! r = None).
+          { apply lookup_union_None. split.
+            - apply forest_filter_roots_lookup_None. left. done.
+            - apply forest_filter_roots_lookup_None. left. done. }
+          by rewrite Hl Hr.
+    - assert (Hl : forest_filter_roots (forest_union f1 f2) rs !! r = None).
+      { apply forest_filter_roots_lookup_None. right. done. }
+      assert (Hr : forest_union (forest_filter_roots f1 rs) (forest_filter_roots f2 rs) !! r = None).
+      { apply lookup_union_None. split;
+          apply forest_filter_roots_lookup_None; right; done. }
+      by rewrite Hl Hr.
+  Qed.
+
+  Lemma forest_filter_roots_add_root f rs ρ t :
+    f !! ρ = Some t ->
+    ρ ∉ rs ->
+    forest_filter_roots f (rs ∪ {[ρ]}) =
+    <[ρ:=t]> (forest_filter_roots f rs).
+  Proof using.
+    intros Hρ Hnot.
+    apply map_eq=>r.
+    destruct (decide (r = ρ)) as [->|Hne].
+    - rewrite lookup_insert_eq.
+      apply forest_filter_roots_lookup_Some. split; [done|set_solver].
+    - rewrite lookup_insert_ne; [|done].
+      destruct (forest_filter_roots f rs !! r) as [tr|] eqn:Hr; auto.
+      + apply forest_filter_roots_lookup_Some in Hr as [Hf Hrs].
+        apply forest_filter_roots_lookup_Some. split; [done|set_solver].
+      + apply forest_filter_roots_lookup_None in Hr as Hnone.
+        apply forest_filter_roots_lookup_None.
+        destruct Hnone as [Hnone|]; [left|right]; auto.
+        set_solver.
+  Qed.
+
+  Lemma forest_filter_roots_remove_root f rs ρ :
+    ρ ∈ rs ->
+    forest_filter_roots f (rs ∖ {[ρ]}) =
+    delete ρ (forest_filter_roots f rs).
+  Proof using.
+    intros Hρ.
+    apply map_eq=>r.
+    destruct (decide (r = ρ)) as [->|Hne].
+    - rewrite lookup_delete_eq.
+      apply forest_filter_roots_lookup_None. right. set_solver.
+    - rewrite lookup_delete_ne; [|done].
+      destruct (forest_filter_roots f rs !! r) as [tr|] eqn:Hr; auto.
+      + apply forest_filter_roots_lookup_Some in Hr as [Hf Hrs].
+        apply forest_filter_roots_lookup_Some. split; [done|set_solver].
+      + apply forest_filter_roots_lookup_None in Hr as Hnone.
+        apply forest_filter_roots_lookup_None.
+        destruct Hnone as [Hnone|]; [left|right]; auto.
+        set_solver.
+  Qed.
+
+End forest.
+
+Section map_of_forests.
+  Context {K V : Type}.
+  Context `{!EqDecision K} `{!Countable K} `{!EqDecision V} `{!Countable V}.
+  Implicit Type t : tree V.
+  Implicit Type F f : forest V.
+  Implicit Type Rs : gmap K (gset V).
+  Implicit Type rs : gset V.
+
+  (** ** Basic lemmas for [forest_to_forests] *)
+
+  Lemma forest_to_forests_empty F :
+    forest_to_forests F (∅ : gmap K (gset V)) = ∅.
+  Proof using. by rewrite /forest_to_forests fmap_empty. Qed.
+
+  Lemma forest_to_forests_lookup_eq (F : forest V) (Rs : gmap K (gset V)) k rs :
+    Rs !! k = Some rs ->
+    forest_to_forests F Rs !! k = Some (forest_filter_roots F rs).
+  Proof using.
+    intros Hk.
+    by rewrite /forest_to_forests lookup_fmap Hk.
+  Qed.
+
+  (** ** [forest_to_forests] under operations on [Rs] *)
+
+  Lemma forest_to_forests_roots_delete F Rs k :
+    forest_to_forests F (delete k Rs) =
+    delete k (forest_to_forests F Rs).
+  Proof using.
+    apply map_eq=>i.
+    destruct (decide (i = k)) as [->|Hne].
+    - rewrite lookup_delete_eq.
+      by rewrite /forest_to_forests lookup_fmap lookup_delete_eq.
+    - rewrite lookup_delete_ne; [|done].
+      rewrite /forest_to_forests !lookup_fmap lookup_delete_ne; [done|done].
+  Qed.
+
+  Lemma forest_to_forests_roots_insert F Rs k rs :
+    forest_to_forests F (<[k:=rs]> Rs) =
+    <[k:=forest_filter_roots F rs]> (forest_to_forests F (delete k Rs)).
+  Proof using.
+    apply map_eq=>i.
+    destruct (decide (i = k)) as [->|Hne].
+    - rewrite lookup_insert_eq.
+      apply forest_to_forests_lookup_eq.
+      apply lookup_insert_eq.
+    - rewrite lookup_insert_ne; [|done].
+      rewrite /forest_to_forests lookup_fmap lookup_insert_ne; [|done].
+      rewrite /forest_to_forests lookup_fmap lookup_delete_ne; [done|done].
+  Qed.
+
+  Lemma forest_to_forests_roots_rename_key F Rs k k' rs :
+    k' ≠ k ->
+    forest_to_forests F (<[k':=rs]>(delete k Rs)) =
+    <[k':=forest_filter_roots F rs]> (delete k (forest_to_forests F Rs)).
+  Proof using.
+    intros Hne.
+    apply map_eq=>i.
+    destruct (decide (i = k')) as [->|Hneq'].
+    - rewrite lookup_insert_eq.
+      apply forest_to_forests_lookup_eq.
+      rewrite lookup_insert_eq. done.
+    - rewrite lookup_insert_ne; [|done].
+      destruct (decide (i = k)) as [->|Hneq].
+      + rewrite /forest_to_forests lookup_fmap lookup_insert_ne; auto.
+        rewrite ?lookup_delete_eq; auto.
+      + rewrite /forest_to_forests !lookup_fmap !lookup_insert_ne; [|done].
+        rewrite lookup_delete_ne; [|done].
+        rewrite lookup_delete_ne; [|done].
+        rewrite lookup_fmap; auto.
+  Qed.
+
+  Lemma forest_to_forests_roots_split_key F Rs k k' rs1 rs2 :
+    k' ≠ k ->
+    forest_to_forests F (<[k':=rs2]>(<[k:=rs1]>(delete k Rs))) =
+    <[k':=forest_filter_roots F rs2]>
+      (<[k:=forest_filter_roots F rs1]>(delete k (forest_to_forests F Rs))).
+  Proof using.
+    intros Hne.
+    apply map_eq=>i.
+    destruct (decide (i = k')) as [->|Hneq'].
+    - rewrite forest_to_forests_roots_insert !lookup_insert_eq. auto.
+    - rewrite lookup_insert_ne; [|done].
+      destruct (decide (i = k)) as [->|Hneq].
+      + rewrite lookup_insert_eq.
+        rewrite forest_to_forests_roots_insert lookup_insert_ne; auto.
+        rewrite delete_insert_ne; auto.
+        rewrite forest_to_forests_roots_insert lookup_insert_eq; auto.
+      + rewrite lookup_insert_ne; [|done].
+        rewrite /forest_to_forests lookup_fmap lookup_insert_ne; [|done].
+        rewrite lookup_delete_ne; [|done].
+        rewrite lookup_insert_ne; [|done].
+        rewrite -lookup_fmap fmap_delete lookup_delete_ne; auto.
+  Qed.
+
+  Lemma forest_to_forests_roots_merge_keys F Rs k1 k2 rs1 rs2 :
+    k1 ≠ k2 ->
+    forest_to_forests F (<[k1:=rs1 ∪ rs2]>(delete k2 Rs)) =
+    <[k1:=forest_filter_roots F (rs1 ∪ rs2)]>
+      (delete k2 (forest_to_forests F Rs)).
+  Proof using.
+    intros Hne.
+    apply map_eq=>i.
+    destruct (decide (i = k1)) as [->|Hneq1].
+    - rewrite forest_to_forests_roots_insert !lookup_insert_eq; auto.
+    - rewrite lookup_insert_ne; [|done].
+      destruct (decide (i = k2)) as [->|Hneq2].
+      + rewrite /forest_to_forests lookup_fmap lookup_insert_ne; auto.
+        rewrite ?lookup_delete_eq; auto.
+      + rewrite /forest_to_forests lookup_fmap lookup_insert_ne; [|done].
+        rewrite lookup_delete_ne; [|done].
+        rewrite lookup_delete_ne; [|done].
+        rewrite lookup_fmap; auto.
+  Qed.
+
+  (** ** [forest_to_forests] under operations on [F] *)
+
+  Lemma forest_to_forests_forest_insert F Rs ρ t :
+    forest_to_forests (forest_insert F ρ t) Rs =
+    (λ rs,
+      if decide (ρ ∈ rs)
+      then <[ρ:=t]> (forest_filter_roots F rs)
+      else forest_filter_roots F rs) <$> Rs.
+  Proof using.
+    apply map_eq=>k.
+    destruct (Rs !! k) as [rs|] eqn:Hk.
+    - by rewrite /forest_to_forests !lookup_fmap Hk /= forest_filter_roots_insert.
+    - by rewrite /forest_to_forests !lookup_fmap Hk.
+  Qed.
+
+  Lemma forest_to_forests_forest_delete F Rs ρ :
+    forest_to_forests (delete ρ F) Rs =
+    (λ f, delete ρ f) <$> forest_to_forests F Rs.
+  Proof using.
+    apply map_eq=>k.
+    destruct (Rs !! k) as [rs|] eqn:Hk.
+    - by rewrite /forest_to_forests !lookup_fmap Hk /= forest_filter_roots_delete.
+    - by rewrite /forest_to_forests !lookup_fmap Hk.
+  Qed.
+
+  Lemma forest_to_forests_forest_union F1 F2 Rs :
+    forest_to_forests (forest_union F1 F2) Rs =
+    (λ rs, forest_union (forest_filter_roots F1 rs) (forest_filter_roots F2 rs)) <$> Rs.
+  Proof using.
+    apply map_eq=>k.
+    destruct (Rs !! k) as [rs|] eqn:Hk.
+    - by rewrite /forest_to_forests !lookup_fmap Hk /= forest_filter_roots_union_forest.
+    - by rewrite /forest_to_forests !lookup_fmap Hk.
+  Qed.
+
+  Lemma forest_to_forests_tree_split Cf Rs ρ :
+    forest_to_forests (tree_split ρ Cf) Rs =
+    (λ rs,
+      if decide (ρ ∈ rs)
+      then <[ρ:=tree_singleton ρ]> (forest_filter_roots Cf rs)
+      else forest_filter_roots Cf rs) <$> Rs.
+  Proof using.
+    rewrite /tree_split.
+    apply forest_to_forests_forest_insert.
+  Qed.
+
+  Lemma forest_to_forests_tree_clear F Rs ρ Cf :
+    forest_to_forests (tree_clear F ρ Cf) Rs =
+    (λ rs,
+      delete ρ (forest_filter_roots F rs) ∪
+      (if decide (ρ ∈ rs)
+       then <[ρ:=tree_singleton ρ]> (forest_filter_roots Cf rs)
+       else forest_filter_roots Cf rs)) <$> Rs.
+  Proof using.
+    apply map_eq=>k.
+    destruct (Rs !! k) as [rs|] eqn:Hk.
+    - rewrite /forest_to_forests !lookup_fmap Hk /=.
+      rewrite /tree_clear.
+      rewrite forest_filter_roots_union_forest.
+      rewrite forest_filter_roots_delete.
+      rewrite /tree_split.
+      rewrite forest_filter_roots_insert.
+      done.
+    - by rewrite /forest_to_forests !lookup_fmap Hk.
+  Qed.
+
+  Lemma forest_to_forests_forest_move_tree F Rs ρ ρt r rt π πC :
+    ρ ≠ r ->
+    forest_to_forests (forest_move_tree F ρ ρt r rt π πC) Rs =
+    (λ rs,
+      if decide (ρ ∈ rs)
+      then <[ρ:=tree_insert ρt r rt π πC]> (delete r (forest_filter_roots F rs))
+      else delete r (forest_filter_roots F rs)) <$> Rs.
+  Proof using.
+    intros Hne.
+    apply map_eq=>k.
+    destruct (Rs !! k) as [rs|] eqn:Hk.
+    - rewrite /forest_to_forests !lookup_fmap Hk /=.
+      rewrite /forest_move_tree.
+      rewrite forest_filter_roots_insert.
+      rewrite !forest_filter_roots_delete.
+      destruct (decide (ρ ∈ rs)) as [Hρ|Hρ]; simpl.
+      + f_equal.
+        rewrite insert_delete_eq.
+        done.
+      + rewrite delete_id.
+        * done.
+        * rewrite lookup_delete_ne; [|congruence].
+          apply forest_filter_roots_lookup_None_notin. done.
+    - by rewrite /forest_to_forests !lookup_fmap Hk.
+  Qed.
+
+  (** ** Higher-level corollaries combining [forest_to_forests_wf] and the equalities *)
+
+  Lemma forest_to_forests_lookup_eq_wf F Rs k rs :
+    forest_to_forests_wf F Rs ->
+    Rs !! k = Some rs ->
+    forest_to_forests F Rs !! k = Some (forest_filter_roots F rs) ∧
+    forest_wf (forest_filter_roots F rs).
+  Proof using.
+    intros Hwf Hk. split.
+    - by apply forest_to_forests_lookup_eq.
+    - eapply forest_to_forests_lookup_wf; eauto.
+      by apply forest_to_forests_lookup_eq.
+  Qed.
+
+  Lemma forest_to_forests_lookup_disjoint_eq F Rs k1 k2 rs1 rs2 :
+    forest_to_forests_wf F Rs ->
+    k1 ≠ k2 ->
+    Rs !! k1 = Some rs1 ->
+    Rs !! k2 = Some rs2 ->
+    forest_disjoint (forest_filter_roots F rs1) (forest_filter_roots F rs2).
+  Proof using.
+    intros Hwf Hne Hk1 Hk2.
+    eapply forest_to_forests_disjoint_forest; eauto.
+    - by apply forest_to_forests_lookup_eq.
+    - by apply forest_to_forests_lookup_eq.
+  Qed.
+
+  Lemma forest_to_forests_lookup_forest_insert_owner F Rs k rs ρ t :
+    forest_to_forests_wf F Rs ->
+    Rs !! k = Some rs ->
+    F !! ρ = None ->
+    tree_wf ρ t ->
+    forest_tree_disjoint F t ->
+    forest_to_forests (forest_insert F ρ t) (<[k := rs ∪ {[ρ]}]> Rs) !! k =
+      Some (<[ρ := t]> (forest_filter_roots F rs)) ∧
+    forest_wf (<[ρ := t]> (forest_filter_roots F rs)).
+  Proof using.
+    intros Hwf Hk Hρnone Htwf Hdisj.
+    destruct Hwf as (HdisjRs&Hdom&Hfwf).
+    assert (Hwf' :
+      forest_to_forests_wf (forest_insert F ρ t) (<[k := rs ∪ {[ρ]}]> Rs)).
+    { eapply forest_to_forests_wf_forest_insert; eauto. split_and !; auto. }
+    assert (Hnotrs : ρ ∉ rs).
+    { intro Hrs.
+      apply not_elem_of_dom in Hρnone.
+      apply Hρnone.
+      rewrite Hdom.
+      eapply union_sets_lookup_subseteq; eauto.
+    }
+    split.
+    - erewrite forest_to_forests_lookup_eq.
+      2: apply lookup_insert_eq.
+      rewrite (forest_filter_roots_add_root (forest_insert F ρ t) rs ρ t).
+      + rewrite forest_filter_roots_insert.
+        destruct (decide (ρ ∈ rs)); [contradiction|done].
+      + rewrite /forest_insert lookup_insert_eq. done.
+      + done.
+    - eapply forest_to_forests_lookup_wf; eauto.
+      erewrite forest_to_forests_lookup_eq.
+      2: apply lookup_insert_eq.
+      rewrite (forest_filter_roots_add_root (forest_insert F ρ t) rs ρ t).
+      + rewrite forest_filter_roots_insert.
+        destruct (decide (ρ ∈ rs)); [contradiction|done].
+      + rewrite /forest_insert lookup_insert_eq. done.
+      + done.
+  Qed.
+
+  Lemma forest_to_forests_lookup_forest_delete_owner F Rs k rs ρ t :
+    forest_to_forests_wf F Rs ->
+    Rs !! k = Some rs ->
+    F !! ρ = Some t ->
+    ρ ∈ rs ->
+    forest_to_forests (delete ρ F) (<[k := rs ∖ {[ρ]}]> Rs) !! k =
+      Some (delete ρ (forest_filter_roots F rs)) ∧
+    forest_wf (delete ρ (forest_filter_roots F rs)).
+  Proof using.
+    intros Hwf Hk Hρ Hrs.
+    assert (Hwf' :
+      forest_to_forests_wf (delete ρ F) (<[k := rs ∖ {[ρ]}]> Rs)).
+    { eapply forest_to_forests_wf_forest_delete; eauto. }
+    split.
+    - erewrite forest_to_forests_lookup_eq.
+      2: apply lookup_insert_eq.
+      rewrite forest_filter_roots_delete.
+      rewrite forest_filter_roots_remove_root; [|done].
+      rewrite delete_id; [done|apply lookup_delete_eq].
+    - eapply forest_to_forests_lookup_wf; eauto.
+      erewrite forest_to_forests_lookup_eq.
+      2: apply lookup_insert_eq.
+      rewrite forest_filter_roots_delete.
+      rewrite forest_filter_roots_remove_root; [|done].
+      rewrite delete_id; [done|apply lookup_delete_eq].
+  Qed.
+
+  Lemma forest_to_forests_lookup_roots_move_root_src F Rs k1 k2 rs1 rs2 ρ :
+    forest_to_forests_wf F Rs ->
+    k1 ≠ k2 ->
+    Rs !! k1 = Some rs1 ->
+    Rs !! k2 = Some rs2 ->
+    ρ ∈ rs1 ->
+    forest_to_forests F (<[k2 := rs2 ∪ {[ρ]}]>(<[k1 := rs1 ∖ {[ρ]}]> Rs)) !! k1 =
+      Some (delete ρ (forest_filter_roots F rs1)) ∧
+    forest_wf (delete ρ (forest_filter_roots F rs1)).
+  Proof using.
+    intros Hwf Hne Hk1 Hk2 Hρ.
+    assert (Hwf' :
+      forest_to_forests_wf F (<[k2 := rs2 ∪ {[ρ]}]>(<[k1 := rs1 ∖ {[ρ]}]> Rs))).
+    { eapply forest_to_forests_wf_roots_move_root; eauto. }
+    split.
+    - erewrite forest_to_forests_lookup_eq.
+      2:{ rewrite lookup_insert_ne; [apply lookup_insert_eq|done]. }
+      by rewrite forest_filter_roots_remove_root.
+    - eapply forest_to_forests_lookup_wf; eauto.
+      erewrite forest_to_forests_lookup_eq.
+      2:{ rewrite lookup_insert_ne; [apply lookup_insert_eq|done]. }
+      by rewrite forest_filter_roots_remove_root.
+  Qed.
+
+  Lemma forest_to_forests_lookup_roots_move_root_dst F Rs k1 k2 rs1 rs2 ρ t :
+    forest_to_forests_wf F Rs ->
+    k1 ≠ k2 ->
+    Rs !! k1 = Some rs1 ->
+    Rs !! k2 = Some rs2 ->
+    ρ ∈ rs1 ->
+    F !! ρ = Some t ->
+    forest_to_forests F (<[k2 := rs2 ∪ {[ρ]}]>(<[k1 := rs1 ∖ {[ρ]}]> Rs)) !! k2 =
+      Some (<[ρ := t]> (forest_filter_roots F rs2)) ∧
+    forest_wf (<[ρ := t]> (forest_filter_roots F rs2)).
+  Proof using.
+    intros Hwf Hne Hk1 Hk2 Hρ HρF.
+    destruct Hwf as (Hdisj&Hdom&Hfwf).
+    assert (Hwf' :
+      forest_to_forests_wf F (<[k2 := rs2 ∪ {[ρ]}]>(<[k1 := rs1 ∖ {[ρ]}]> Rs))).
+    { eapply forest_to_forests_wf_roots_move_root; eauto. split_and !; auto. }
+    assert (Hrsdisj : rs1 ## rs2).
+    { eapply Hdisj; eauto. }
+    assert (Hnotrs2 : ρ ∉ rs2).
+    { set_solver. }
+    split.
+    - erewrite forest_to_forests_lookup_eq.
+      2: apply lookup_insert_eq.
+      by erewrite forest_filter_roots_add_root.
+    - eapply forest_to_forests_lookup_wf; eauto.
+      erewrite forest_to_forests_lookup_eq.
+      2: apply lookup_insert_eq.
+      by erewrite forest_filter_roots_add_root.
+  Qed.
 
 End map_of_forests.
