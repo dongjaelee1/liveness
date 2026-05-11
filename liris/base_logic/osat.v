@@ -4,7 +4,8 @@ From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From liris.algebra Require Import bank.
-From liris.algebra Require Export ordinal_wfocm layer.
+(* From liris.algebra Require Export ordinal_wfocm layer. *)
+From liris.algebra Require Export ordinal_wfocm ordinal_ucmra.
 From liris.base_logic Require Export obligation.
 
 (* FIXME: move to somewhere *)
@@ -41,14 +42,15 @@ End aux.
 Global Instance ord_obl_class : obl_class :=
   Build_obl_class Ord.t ord_wfocm_pack.
 
-Canonical Structure layerO `{SI : indexT} := leibnizO layer.
+(* Canonical Structure layerO `{SI : indexT} := leibnizO layer. *)
+(* Canonical Structure measurable_syntaxO `{SI : indexT} := leibnizO measurable_syntax. *)
 
 (** The ghost state for obls *)
 Module osatGS.
 
   Class osatGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
     OsatGpreS {
-        osatGpreS_layer : inG Σ (gmap_viewR oid (agreeR (layerO)));
+        osatGpreS_bound : inG Σ (gmap_viewR oid (agreeR (Ord.t)));
         osatGpreS_state : inG Σ (reservation_mapUR (mono_natUR));
         osatGpreS_fuel : inG Σ (reservation_mapUR bankUR);
         (* Keep track of the current owner of each obl, if an owner exists *)
@@ -58,14 +60,14 @@ Module osatGS.
   Class osatGS `{SI : indexT} (Σ : gFunctors) : Set :=
     OsatG {
         osat_inG : osatGpreS Σ;
-        layer_name : gname;
+        bound_name : gname;
         state_name : gname;
         fuel_name : gname;
         owner_name : gname;
       }.
 
   Definition osatΣ `{SI : indexT} : gFunctors :=
-    #[GFunctor (gmap_viewR oid (agreeR (layerO)));
+    #[GFunctor (gmap_viewR oid (agreeR (Ord.t)));
       GFunctor (reservation_mapUR (mono_natUR));
       GFunctor (reservation_mapUR bankUR);
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO obl_owner)))
@@ -81,24 +83,24 @@ Import osatGS.
 (* Make the instances local to this file. We cannot use #[local] in the code *)
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances osat_inG
-  osatGpreS_layer osatGpreS_state osatGpreS_fuel osatGpreS_owner.
+  osatGpreS_bound osatGpreS_state osatGpreS_fuel osatGpreS_owner.
 
 (* Layer: layer of an obl; layer can monotonically grow as version increases. *)
-Definition oblG_layer `{SI : indexT} `{!osatGS Σ}
-  (k : oid) (ℓ : layer) : iProp Σ :=
-  own layer_name (gmap_view_frag k DfracDiscarded (to_agree (ℓ : layerO))).
-Global Typeclasses Opaque oblG_layer.
-Global Instance: Params (@oblG_layer) 3 := {}.
+Definition oblG_bound `{SI : indexT} `{!osatGS Σ}
+  (k : oid) (β : Ord.t) : iProp Σ :=
+  own bound_name (gmap_view_frag k DfracDiscarded (to_agree β)).
+Global Typeclasses Opaque oblG_bound.
+Global Instance: Params (@oblG_bound) 3 := {}.
 
 Definition oblG_elem `{SI : indexT} `{!osatGS Σ}
   (k : oid) : iProp Σ :=
-  ∃ ℓ, oblG_layer k ℓ.
+  ∃ β, oblG_bound k β.
 Global Typeclasses Opaque oblG_elem.
 Global Instance: Params (@oblG_elem) 3 := {}.
 
-Local Definition oblG_layer_auth_id `{SI : indexT} `{!osatGS Σ}
-  (m : gmap oid layer) : iProp Σ :=
-  own layer_name (gmap_view_auth (V:=agreeR (layerO)) (DfracOwn 1) (to_agree <$> m)).
+Local Definition oblG_bound_auth_id `{SI : indexT} `{!osatGS Σ}
+  (m : gmap oid Ord.t) : iProp Σ :=
+  own bound_name (gmap_view_auth (V:=agreeR (Ord.t)) (DfracOwn 1) (to_agree <$> m)).
 
 (* Caputres P Until Q, need two states: in P and in Q. *)
 Definition oblG_assigned `{SI : indexT} `{!osatGS Σ}
@@ -149,24 +151,24 @@ Local Definition oblG_owner_token_id `{SI : indexT} `{!osatGS Σ}
 Definition osat `{SI : indexT} `{!osatGS Σ} `{!ord_mono_fun_class}
   (Ω : obls) : iProp Σ :=
   locked
-    ((∃ (Ls : gmap oid layer), (⌜ dom Ω = dom Ls ⌝) ∗ oblG_layer_auth_id Ls) ∗
+    ((∃ (Ls : gmap oid Ord.t), (⌜ dom Ω = dom Ls ⌝) ∗ oblG_bound_auth_id Ls) ∗
      oblG_state_token_id (⊤ ∖ gset_to_coPset (dom Ω)) ∗
      oblG_fuel_token_id (⊤ ∖ gset_to_coPset (dom Ω)) ∗
      oblG_owner_token_id (⊤ ∖ gset_to_coPset (dom Ω)) ∗
      ([∗ map] k ↦ g ∈ Ω,
-        ∃ ℓ, oblG_layer k ℓ ∗
-        ∃ α, oblG_fuel_supply k α (1/2)%Qp ∗
-        ∃ μ, (⌜ (α <= measure ℓ μ)%ord ⌝) ∗
-        match (g : obl (OC:=ord_obl_class)) with
-        | obl_assigned a t =>
-            ∃ b, oblG_assigned k b (1/2/2)%Qp ∗
-            (⌜ (α <= a)%ord ⌝) ∗
-            oblG_owner k t (1/2/2)%Qp
-        | obl_fulfilled =>
-            oblG_fulfilled k ∗
-            (∃ t, oblG_owner k t (1)%Qp) ∗
-            (∃ α', oblG_fuel_supply k α' (1/2)%Qp)
-        end))%I.
+        ∃ α β, oblG_fuel_supply k α (1/2)%Qp ∗
+               oblG_bound k β ∗
+               (⌜ (α <= β)%ord ⌝) ∗
+               match (g : obl (OC:=ord_obl_class)) with
+               | obl_assigned a t =>
+                   (∃ b, oblG_assigned k b (1/2/2)%Qp ∗
+                         (⌜ (α <= a)%ord ⌝) ∗
+                         oblG_owner k t (1/2/2)%Qp)
+               | obl_fulfilled =>
+                   (oblG_fulfilled k ∗
+                    (∃ t, oblG_owner k t (1)%Qp) ∗
+                    (∃ α', oblG_fuel_supply k α' (1/2)%Qp))
+               end))%I.
 
 (** Properties *)
 Section osat.
@@ -174,18 +176,18 @@ Section osat.
 
   (** Instances *)
   (* Layer *)
-  Global Instance oblG_layer_persistent k ℓ : Persistent (oblG_layer k ℓ).
-  Proof. rewrite /oblG_layer. apply _. Qed.
-  Global Instance oblG_layer_timeless k ℓ : Timeless (oblG_layer k ℓ).
-  Proof. rewrite /oblG_layer. apply _. Qed.
+  Global Instance oblG_bound_persistent k β : Persistent (oblG_bound k β).
+  Proof. rewrite /oblG_bound. apply _. Qed.
+  Global Instance oblG_bound_timeless k β : Timeless (oblG_bound k β).
+  Proof. rewrite /oblG_bound. apply _. Qed.
 
   Global Instance oblG_elem_persistent k : Persistent (oblG_elem k).
   Proof. rewrite /oblG_elem. apply _. Qed.
   Global Instance oblG_elem_timeless k : Timeless (oblG_elem k).
   Proof. rewrite /oblG_elem. apply _. Qed.
 
-  Local Instance oblG_layer_auth_id_timeless m : Timeless (oblG_layer_auth_id m).
-  Proof. rewrite /oblG_layer_auth_id. apply _. Qed.
+  Local Instance oblG_bound_auth_id_timeless m : Timeless (oblG_bound_auth_id m).
+  Proof. rewrite /oblG_bound_auth_id. apply _. Qed.
 
   (* State *)
   Global Instance oblG_fulfilled_persistent k : Persistent (oblG_fulfilled k).
@@ -245,45 +247,47 @@ Section osat.
   Global Instance osat_timeless Ω : Timeless (osat Ω).
   Proof. rewrite /osat -lock. apply _. Qed.
 
-  (** Layer rules *)
-  Lemma oblG_layer_lookup (Ls : gmap oid layer) k ℓ :
-    oblG_layer_auth_id Ls ∗ oblG_layer k ℓ
-    ⊢ ⌜ Ls !! k = Some ℓ ⌝.
+  (** Bound rules *)
+  Lemma oblG_bound_lookup (Ls : gmap oid Ord.t) k β :
+    oblG_bound_auth_id Ls ∗ oblG_bound k β
+    ⊢ ∃ β', ⌜ Ls !! k = Some β' ∧ (β == β')%ord ⌝.
   Proof.
-    rewrite /oblG_layer_auth_id /oblG_layer. iIntros "(H1& H2)". iStopProof.
+    rewrite /oblG_bound_auth_id /oblG_bound. iIntros "(H1& H2)". iStopProof.
     rewrite -own_op own_valid gmap_view_both_validI_total.
     iIntros "[%Q' (_& _ & HQ' & Hval & Hincl)]". rewrite !lookup_fmap.
     case: (Ls !! k)=> [Q|] /=; last first.
     { by iDestruct "HQ'" as %?. }
     iDestruct "HQ'" as %[= <-].
     rewrite !to_agree_includedI; simpl.
-    iPoseProof (internal_eq_sym with "Hincl") as "H". iPoseProof (discrete_eq with "H") as "%HG".
-    rewrite HG. done.
+    iPoseProof (internal_eq_sym with "Hincl") as "H".
+    iPoseProof (discrete_eq with "H") as "%HG".
+    iPureIntro. exists Q. split; auto. rewrite HG. done.
   Qed.
 
-  Lemma oblG_layer_agree k ℓ1 ℓ2 :
-    oblG_layer k ℓ1 ∗ oblG_layer k ℓ2 ⊢ ⌜ ℓ1 = ℓ2 ⌝.
+  Lemma oblG_bound_agree k β1 β2 :
+    oblG_bound k β1 ∗ oblG_bound k β2 ⊢ ⌜ (β1 == β2)%ord ⌝.
   Proof.
-    rewrite /oblG_layer. iIntros "(H1& H2)". iStopProof.
+    rewrite /oblG_bound. iIntros "(H1& H2)". iStopProof.
     rewrite -own_op own_valid gmap_view_frag_op_validI.
-    iIntros "(_&H)". rewrite to_agree_op_validI. iPoseProof (discrete_eq with "H") as "%". done.
+    iIntros "(_&H)". rewrite to_agree_op_validI.
+    iPoseProof (discrete_eq with "H") as "%". done.
   Qed.
 
-  Lemma oblG_layer_elem k ℓ :
-    oblG_layer k ℓ ⊢ oblG_elem k.
+  Lemma oblG_bound_elem k β :
+    oblG_bound k β ⊢ oblG_elem k.
   Proof. rewrite /oblG_elem. eauto. Qed.
 
-  Lemma oblG_layer_alloc (Ls : gmap oid layer) k ℓ :
+  Lemma oblG_bound_alloc (Ls : gmap oid Ord.t) k β :
     Ls !! k = None →
-    oblG_layer_auth_id Ls
-    ⊢ |==> oblG_layer_auth_id (<[k:=ℓ]>Ls) ∗
-        oblG_layer k ℓ.
+    oblG_bound_auth_id Ls
+    ⊢ |==> oblG_bound_auth_id (<[k:=β]>Ls) ∗
+        oblG_bound k β.
   Proof.
     iIntros (Hk) "H". 
     iMod (own_update with "H") as "[H Hw]".
-    { eapply (gmap_view_alloc _ k (DfracDiscarded) (to_agree $ (ℓ : leibnizO _))); try done.
+    { eapply (gmap_view_alloc _ k (DfracDiscarded) (to_agree $ (β))); try done.
       rewrite !lookup_fmap. rewrite not_elem_of_dom_1; first done. by apply not_elem_of_dom. }
-    rewrite /oblG_layer_auth_id /oblG_layer. rewrite fmap_insert. by iFrame.
+    rewrite /oblG_bound_auth_id /oblG_bound. rewrite fmap_insert. by iFrame.
   Qed.
 
   (** State rules *)
@@ -613,7 +617,7 @@ Section osat.
     rewrite /oblG_elem.
     rewrite /osat -!lock. iIntros "(Hsat& (%& #Ge))".
     iDestruct "Hsat" as "((%& %& HE)& HS& HF& HO& HM)".
-    iPoseProof (oblG_layer_lookup with "[$]") as "%".
+    iPoseProof (oblG_bound_lookup with "[$]") as "(%&%&%)".
     rewrite H. apply elem_of_dom_2 in H0. auto.
   Qed.
   Lemma osat_elem_lookup Ω k :
@@ -625,7 +629,7 @@ Section osat.
     apply elem_of_dom in H. destruct H.
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete _ _ _ _ H with "HM") as "[H _]".
-    iDestruct "H" as "(%& #Gy& %& Gfs& %& %& H)". destruct x.
+    iDestruct "H" as "(%& %& Gfs& #Gy& %& H)". destruct x.
     - iLeft. iPureIntro. eauto.
     - iDestruct "H" as "(#Gu& _)"; eauto.
   Qed.
@@ -639,8 +643,8 @@ Section osat.
     apply elem_of_dom in Hin; destruct Hin as [o LU].
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
-    iDestruct "LU" as "(%& Gy& %& Gfs& %& %Bound& Mk)". destruct o; first eauto.
-    - iDestruct "Mk" as "(Gu& _)". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.
+    iDestruct "LU" as "(%& %& Gfs& Gy& %Bound& Mk)". destruct o; first eauto.
+    iDestruct "Mk" as "(Gu& _)". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.
   Qed.
 
   Lemma osat_lookup_fulfilled Ω k :
@@ -652,7 +656,7 @@ Section osat.
     apply elem_of_dom in Hin; destruct Hin as [o LU].
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
-    iDestruct "LU" as "(%& Gy& %& Gfs& %& %Bound& Mk)". destruct o; [| eauto].
+    iDestruct "LU" as "(%& %& Gfs& Gy& %Bound& Mk)". destruct o; [| eauto].
     iDestruct "Mk" as "(%& Ga& _)". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.
   Qed.
 
@@ -665,36 +669,36 @@ Section osat.
     apply elem_of_dom in Hin; destruct Hin as [o LU].
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[LU _]"; first eauto.
-    iDestruct "LU" as "(%& Gy& %& Gfs& %& %Bound& Mk)". destruct o.
+    iDestruct "LU" as "(%& %& Gfs& Gy& %Bound& Mk)". destruct o.
     - iDestruct "Mk" as "(%& Gl& %& Go2)".
       iPoseProof (oblG_owner_agree with "[$Go $Go2]") as "(%&%)". subst. eauto.
     - iDestruct "Mk" as "(_& (%& Go2)& _)".
       iPoseProof (oblG_owner_agree with "[$Go $Go2]") as "(%&%)". apply Qp.not_add_le_r in H0. done.
   Qed.
 
-  Lemma osat_alloc_obl_assigned Ω k b ℓ (μ : measurable_syntax) t :
+  Lemma osat_alloc_obl_assigned Ω k b β t :
     k ∉ dom Ω →
     osat Ω
-    ⊢ |==> osat (<[k:=(obl_assigned (measure ℓ μ) t)]>Ω) ∗
-        oblG_layer k ℓ ∗
+    ⊢ |==> osat (<[k:=(obl_assigned β t)]>Ω) ∗
+        oblG_bound k β ∗
         oblG_elem k ∗
         oblG_assigned k b (1/2 + 1/2/2)%Qp ∗
-        oblG_fuel_supply k (measure ℓ μ) (1/2)%Qp ∗
-        oblG_fuel k (measure ℓ μ) ∗
+        oblG_fuel_supply k β (1/2)%Qp ∗
+        oblG_fuel k β ∗
         oblG_owner k t (1/2 + 1/2/2)%Qp ∗
-        (⌜ Ω ↪ₐ (<[k:=(obl_assigned (measure ℓ μ) t)]>Ω) ⌝).
+        (⌜ Ω ↪ₐ (<[k:=(obl_assigned β t)]>Ω) ⌝).
   Proof.
     iIntros (Hk) "Hsat". pose proof Hk as Nin. apply not_elem_of_dom in Nin.
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iDestruct "HE" as "(%& %Dom& HE)".
-    iMod (oblG_layer_alloc _ k ℓ with "HE") as "[HE #Gwf]".
+    iMod (oblG_bound_alloc _ k β with "HE") as "[HE #Gwf]".
     { apply not_elem_of_dom. rewrite -Dom. auto. }
     iMod (oblG_alloc_assigned _ k b with "HS") as "(HS& Gl)"; first auto.
-    iMod (oblG_fuel_alloc _ k (measure ℓ μ) with "HF") as "(HF& [Gfsp Gfsp0]& Gf)"; first set_solver.
+    iMod (oblG_fuel_alloc _ k β with "HF") as "(HF& [Gfsp Gfsp0]& Gf)"; first set_solver.
     iMod (oblG_owner_alloc _ k t with "HO") as "[HO Go]"; first auto.
     iDestruct "Gl" as "[Gl1 [Gl2 Gl']]". iCombine "Gl1 Gl2" as "Gl".
     iDestruct "Go" as "[Go1 [Go2 Go']]". iCombine "Go1 Go2" as "Go".
-    iPoseProof (oblG_layer_elem with "Gwf") as "#Ge".
+    iPoseProof (oblG_bound_elem with "Gwf") as "#Ge".
     iModIntro. rewrite !dom_insert_L. iFrame "HE HS HF HO". iFrame "Ge Gl Gf Go Gwf Gfsp0".
     iSplitL; cycle 1.
     { iPureIntro. exists k. split; eauto. }
@@ -703,25 +707,25 @@ Section osat.
     iApply big_sepM_insert; first auto. iFrame. eauto.
   Qed.
 
-  Lemma osat_alloc_obl_fulfilled Ω k ℓ μ :
+  Lemma osat_alloc_obl_fulfilled Ω k β :
     k ∉ dom Ω →
     osat Ω
     ⊢ |==> osat (<[k:=(obl_fulfilled)]>Ω) ∗
-        oblG_layer k ℓ ∗
+        oblG_bound k β ∗
         oblG_elem k ∗
         oblG_fulfilled k ∗
-        oblG_fuel k (measure ℓ μ) ∗
+        oblG_fuel k β ∗
         (⌜ Ω ↪ₐ (<[k:=(obl_fulfilled)]>Ω) ⌝).
   Proof.
     iIntros (Hk) "Hsat". pose proof Hk as Nin. apply not_elem_of_dom in Nin.
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iDestruct "HE" as "(%& %Dom& HE)".
-    iMod (oblG_layer_alloc _ k ℓ with "HE") as "[HE #Gwf]".
+    iMod (oblG_bound_alloc _ k β with "HE") as "[HE #Gwf]".
     { apply not_elem_of_dom. rewrite -Dom. auto. }
     iMod (oblG_alloc_fulfilled _ k with "HS") as "(HS& #Gl)"; first auto.
-    iMod (oblG_fuel_alloc _ k (measure ℓ μ) with "HF") as "(HF& [Gfsp Gfsp0]& Gf)"; first set_solver.
+    iMod (oblG_fuel_alloc _ k β with "HF") as "(HF& [Gfsp Gfsp0]& Gf)"; first set_solver.
     iMod (oblG_owner_alloc _ k inhabitant with "HO") as "[HO Go]"; first auto.
-    iPoseProof (oblG_layer_elem with "Gwf") as "#Ge".
+    iPoseProof (oblG_bound_elem with "Gwf") as "#Ge".
     iModIntro. rewrite !dom_insert_L. iFrame "HE HS HF HO". iFrame "Ge Gl Gf Gwf".
     iSplitL; cycle 1.
     { iPureIntro. exists k. split; eauto. }
@@ -741,7 +745,7 @@ Section osat.
     intros LU Hc. iIntros "(Hsat & Gf)".
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(%& #Gy& %& Gfs& %& %Bound& Mk)".
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
     iDestruct "Mk" as "(%& Glk& %LEa& Gok)".
     iMod (oblG_fuel_spend with "[$Gfs $Gf]") as "(%&%&Gfs)".
     assert (LT : a2 w< α).
@@ -749,97 +753,125 @@ Section osat.
     iModIntro. iExists a2.
     iPoseProof ((big_sepM_insert _ (delete k Ω) k (obl_assigned a2 t)) with "[HM Glk Gok Gfs]") as "HM".
     { apply lookup_delete_eq. }
-    { iFrame "HM". iFrame. iFrame "Gy". iExists μ. iPureIntro. split; last done.
+    { iFrame "HM". iFrame. iFrame "Gy". iPureIntro. split; last done.
       etrans; last eauto. apply WFOCM.lt_le. auto. }
     rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HE HS HF HO".
     rewrite insert_delete_eq. iFrame.
     iPureIntro. econstructor. eapply WFOCM.lt_le_lt; eauto.
   Qed.
 
-  Lemma osat_progress Ω (C : obl_cond) :
-    (∀ k g, C k g → ∃ a o, g = (obl_assigned a o)) →
-    osat Ω ∗
-    ([∗ map] k ↦ g ∈ Ω, (⌜ C k g ⌝ ∗ ∃ c, ⌜ (Ord.O < c)%ord ⌝ ∗ oblG_fuel k c) ∨ (⌜ ¬ C k g ⌝))
-    ⊢ |==> ∃ Ω', osat Ω' ∗ (⌜ Ω ↪ₚ Ω' | C ⌝).
+  Lemma osat_progress_one_supply Ω k a t c β q :
+    (Ω !! k = Some (obl_assigned a t)) →
+    (Ord.O < c)%ord →
+    osat Ω ∗ oblG_fuel k c ∗ oblG_fuel_supply k β q
+    ⊢ |==> ∃ a', osat (<[k:=(obl_assigned a' t)]>Ω) ∗
+              ⌜(a' w< β)⌝ ∗ oblG_fuel_supply k a' q ∗
+              (⌜ obl_progress (obl_assigned a t) (obl_assigned a' t) ⌝).
   Proof.
-    iIntros (HC) "(Hsat & Cs)".
-    iAssert (∃ Ω1 Ω2, (⌜ Ω1 ##ₘ Ω2 ∧ Ω = Ω1 ∪ Ω2 ∧ map_Forall (λ k g, C k g) Ω1 ∧ map_Forall (λ k g, ¬ C k g) Ω2 ⌝) ∗
-                      ([∗ map] k ↦ g ∈ Ω1, (⌜ C k g ⌝ ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ oblG_fuel k c)) ∗
-                      ([∗ map] k ↦ g ∈ Ω2, (⌜ ¬ C k g ⌝))
-            )%I with "[Cs]" as "(%& %& (%Disj& %EQO& %CO1& %CO2)& Cs& NCs)".
-    { iStopProof. induction Ω using map_ind; iIntros "M".
-      { iExists ∅, ∅. rewrite !big_sepM_empty. done. }
-      rewrite !big_sepM_insert; auto. iDestruct "M" as "(H& M)".
-      iPoseProof (IHΩ with "M") as "(%& %& (%Disj& %EqO& %HC1& %HC2)& M1& M2)". clear IHΩ.
-      assert (i ∉ dom Ω1 ∧ i ∉ dom Ω2).
-      { subst. apply not_elem_of_dom in H. set_solver + H. }
-      destruct H0 as [Nin1 Nin2]. apply not_elem_of_dom in Nin1, Nin2.
-      iDestruct "H" as "[(%Ci& (%& %Hc& Gfi)) | %NCi]".
-      - iExists (<[i:=x]>Ω1), Ω2. iFrame. iSplitR.
-        { iPureIntro. split_and !; auto.
-          - apply map_disjoint_insert_l_2; auto.
-          - subst. apply insert_union_l.
-          - apply map_Forall_insert; auto. }
-        iApply big_sepM_insert; auto. iFrame. done.
-      - iExists Ω1, (<[i:=x]>Ω2). iFrame. iSplitR.
-        { iPureIntro. split_and !; auto.
-          - apply map_disjoint_insert_r_2; auto.
-          - subst. apply insert_union_r; auto.
-          - apply map_Forall_insert; auto. }
-        iApply big_sepM_insert; auto.
-    }
-    assert (Sub : Ω1 ⊆ Ω).
-    { subst. apply map_union_subseteq_l. }
-    iAssert (|==> ∃ Ω' : obls, osat Ω' ∗ ⌜Ω ↪ₚ Ω' | (λ k _, k ∈ dom Ω1)⌝)%I with "[-]" as ">H"; cycle 1.
-    { iDestruct "H" as "(%& S& %)". iModIntro. iFrame. iPureIntro. destruct H as [H Hkeep].
-      split; last auto.
-      eapply obls_cond_rel_iff_lookup; first eapply H.
-      intros. simpl. subst. split; intros.
-      - apply elem_of_dom in H1. destruct H1. erewrite lookup_union_Some_l in H0; last eauto. inv H0.
-        apply CO1 in H1. auto.
-      - apply lookup_union_Some in H0; last auto. destruct H0.
-        + apply elem_of_dom; eauto.
-        + apply CO2 in H0. done.
-    }
-    iClear "NCs". iStopProof. clear dependent Ω2. revert CO1 Ω Sub.
-    induction Ω1 using map_ind; iIntros (CO Ω Sub) "(S& M)".
-    { iExists Ω. iModIntro. iFrame. iPureIntro. split; last done.
-      repeat intro. destruct (Ω !! i) eqn:LUi.
-      - econstructor. right. split; intros; done.
-      - econstructor.
-    }
-    rewrite !big_sepM_insert; auto. apply map_Forall_insert in CO; auto. destruct CO as (Ci& CO).
-    iDestruct "M" as "((_& %& %LTc& Bpi)& M)".
-    iMod (IHΩ1 CO with "[$S $M]") as "(%& S& %Prog1)".
-    { etransitivity; last eapply Sub. eapply insert_subseteq; auto. }
-    clear IHΩ1.
-    assert (LUi1 : Ω !! i = Some x).
-    { eapply lookup_weaken; last eapply Sub. apply lookup_insert_eq. }
-    assert (LUi2 : Ω' !! i = Some x).
-    { destruct Prog1 as [Prog1 Hkeep]. specialize (Prog1 i). erewrite LUi1 in Prog1. inv Prog1.
-      destruct H2.
-      - destruct H0. apply not_elem_of_dom in H. done.
-      - destruct H0. subst. auto.
-    }
-    pose proof Ci. apply HC in H0. destruct H0 as (a& t& ?). subst.
-    iMod (osat_progress_one with "[$S $Bpi]") as "(%& S& %Progi)"; auto.
-    { eauto. }
-    iFrame. iPureIntro. simpl. assert (Prog2 : Ω' ↪ₚ <[i:=(obl_assigned a' t)]> Ω' | λ k _, k = i).
-    { split.
-      - intro j. destruct (decide (j = i)).
-        { subst. rewrite LUi2. rewrite lookup_insert_eq. econstructor. left. split; auto. by econstructor 1. }
-        rewrite lookup_insert_ne; auto. destruct (Ω' !! j) eqn:LUj; econstructor. right; split; done.
-      - intro j. destruct (decide (j = i)).
-        { subst. rewrite LUi2. rewrite lookup_insert_eq. econstructor. done. }
-        rewrite lookup_insert_ne; auto. done.
-    }
-    (* Disjoint gl_conds *)
-    destruct Prog1 as [Prog1 Hkeep1], Prog2 as [Prog2 Hkeep2]. split; last (etrans; eauto).
-    eapply obls_cond_rel_split_cond. 4,5: eauto. all: simpl.
-    - intros. rewrite dom_insert_L. set_solver.
-    - intros. destruct (decide (k = i)); auto. subst. left. by apply not_elem_of_dom.
-    - repeat intro. auto.
+    intros LU Hc. iIntros "(Hsat& Gf& Gfs0)".
+    rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
+    iDestruct "Mk" as "(%& Glk& %LEa& Gok)".
+    iMod (oblG_fuel_spend_2 with "[$Gfs $Gfs0 $Gf]") as "(%& [% %]& Gfs& Gfs0)".
+    assert (LT : a2 w< α).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    assert (LT0 : a2 w< β).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    iModIntro. iExists a2.
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (obl_assigned a2 t)) with "[HM Glk Gok Gfs]") as "HM".
+    { apply lookup_delete_eq. }
+    { iFrame "HM". iFrame. iFrame "Gy". iPureIntro. split; last done.
+      etrans; last eauto. apply WFOCM.lt_le. auto. }
+    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HE HS HF HO".
+    rewrite insert_delete_eq. iFrame.
+    iPureIntro. split; auto. econstructor. eapply WFOCM.lt_le_lt. 1: eapply LT. auto.
   Qed.
+
+  (* Lemma osat_progress Ω (C : obl_cond) : *)
+  (*   (∀ k g, C k g → ∃ a o, g = (obl_assigned a o)) → *)
+  (*   osat Ω ∗ *)
+  (*   ([∗ map] k ↦ g ∈ Ω, (⌜ C k g ⌝ ∗ ∃ c, ⌜ (Ord.O < c)%ord ⌝ ∗ oblG_fuel k c) ∨ (⌜ ¬ C k g ⌝)) *)
+  (*   ⊢ |==> ∃ Ω', osat Ω' ∗ (⌜ Ω ↪ₚ Ω' | C ⌝). *)
+  (* Proof. *)
+  (*   iIntros (HC) "(Hsat & Cs)". *)
+  (*   iAssert (∃ Ω1 Ω2, (⌜ Ω1 ##ₘ Ω2 ∧ Ω = Ω1 ∪ Ω2 ∧ map_Forall (λ k g, C k g) Ω1 ∧ map_Forall (λ k g, ¬ C k g) Ω2 ⌝) ∗ *)
+  (*                     ([∗ map] k ↦ g ∈ Ω1, (⌜ C k g ⌝ ∗ ∃ c, ⌜ wzero w< c ⌝ ∗ oblG_fuel k c)) ∗ *)
+  (*                     ([∗ map] k ↦ g ∈ Ω2, (⌜ ¬ C k g ⌝)) *)
+  (*           )%I with "[Cs]" as "(%& %& (%Disj& %EQO& %CO1& %CO2)& Cs& NCs)". *)
+  (*   { iStopProof. induction Ω using map_ind; iIntros "M". *)
+  (*     { iExists ∅, ∅. rewrite !big_sepM_empty. done. } *)
+  (*     rewrite !big_sepM_insert; auto. iDestruct "M" as "(H& M)". *)
+  (*     iPoseProof (IHΩ with "M") as "(%& %& (%Disj& %EqO& %HC1& %HC2)& M1& M2)". clear IHΩ. *)
+  (*     assert (i ∉ dom Ω1 ∧ i ∉ dom Ω2). *)
+  (*     { subst. apply not_elem_of_dom in H. set_solver + H. } *)
+  (*     destruct H0 as [Nin1 Nin2]. apply not_elem_of_dom in Nin1, Nin2. *)
+  (*     iDestruct "H" as "[(%Ci& (%& %Hc& Gfi)) | %NCi]". *)
+  (*     - iExists (<[i:=x]>Ω1), Ω2. iFrame. iSplitR. *)
+  (*       { iPureIntro. split_and !; auto. *)
+  (*         - apply map_disjoint_insert_l_2; auto. *)
+  (*         - subst. apply insert_union_l. *)
+  (*         - apply map_Forall_insert; auto. } *)
+  (*       iApply big_sepM_insert; auto. iFrame. done. *)
+  (*     - iExists Ω1, (<[i:=x]>Ω2). iFrame. iSplitR. *)
+  (*       { iPureIntro. split_and !; auto. *)
+  (*         - apply map_disjoint_insert_r_2; auto. *)
+  (*         - subst. apply insert_union_r; auto. *)
+  (*         - apply map_Forall_insert; auto. } *)
+  (*       iApply big_sepM_insert; auto. *)
+  (*   } *)
+  (*   assert (Sub : Ω1 ⊆ Ω). *)
+  (*   { subst. apply map_union_subseteq_l. } *)
+  (*   iAssert (|==> ∃ Ω' : obls, osat Ω' ∗ ⌜Ω ↪ₚ Ω' | (λ k _, k ∈ dom Ω1)⌝)%I with "[-]" as ">H"; cycle 1. *)
+  (*   { iDestruct "H" as "(%& S& %)". iModIntro. iFrame. iPureIntro. destruct H as [H Hkeep]. *)
+  (*     split; last auto. *)
+  (*     eapply obls_cond_rel_iff_lookup; first eapply H. *)
+  (*     intros. simpl. subst. split; intros. *)
+  (*     - apply elem_of_dom in H1. destruct H1. erewrite lookup_union_Some_l in H0; last eauto. inv H0. *)
+  (*       apply CO1 in H1. auto. *)
+  (*     - apply lookup_union_Some in H0; last auto. destruct H0. *)
+  (*       + apply elem_of_dom; eauto. *)
+  (*       + apply CO2 in H0. done. *)
+  (*   } *)
+  (*   iClear "NCs". iStopProof. clear dependent Ω2. revert CO1 Ω Sub. *)
+  (*   induction Ω1 using map_ind; iIntros (CO Ω Sub) "(S& M)". *)
+  (*   { iExists Ω. iModIntro. iFrame. iPureIntro. split; last done. *)
+  (*     repeat intro. destruct (Ω !! i) eqn:LUi. *)
+  (*     - econstructor. right. split; intros; done. *)
+  (*     - econstructor. *)
+  (*   } *)
+  (*   rewrite !big_sepM_insert; auto. apply map_Forall_insert in CO; auto. destruct CO as (Ci& CO). *)
+  (*   iDestruct "M" as "((_& %& %LTc& Bpi)& M)". *)
+  (*   iMod (IHΩ1 CO with "[$S $M]") as "(%& S& %Prog1)". *)
+  (*   { etransitivity; last eapply Sub. eapply insert_subseteq; auto. } *)
+  (*   clear IHΩ1. *)
+  (*   assert (LUi1 : Ω !! i = Some x). *)
+  (*   { eapply lookup_weaken; last eapply Sub. apply lookup_insert_eq. } *)
+  (*   assert (LUi2 : Ω' !! i = Some x). *)
+  (*   { destruct Prog1 as [Prog1 Hkeep]. specialize (Prog1 i). erewrite LUi1 in Prog1. inv Prog1. *)
+  (*     destruct H2. *)
+  (*     - destruct H0. apply not_elem_of_dom in H. done. *)
+  (*     - destruct H0. subst. auto. *)
+  (*   } *)
+  (*   pose proof Ci. apply HC in H0. destruct H0 as (a& t& ?). subst. *)
+  (*   iMod (osat_progress_one with "[$S $Bpi]") as "(%& S& %Progi)"; auto. *)
+  (*   { eauto. } *)
+  (*   iFrame. iPureIntro. simpl. assert (Prog2 : Ω' ↪ₚ <[i:=(obl_assigned a' t)]> Ω' | λ k _, k = i). *)
+  (*   { split. *)
+  (*     - intro j. destruct (decide (j = i)). *)
+  (*       { subst. rewrite LUi2. rewrite lookup_insert_eq. econstructor. left. split; auto. by econstructor 1. } *)
+  (*       rewrite lookup_insert_ne; auto. destruct (Ω' !! j) eqn:LUj; econstructor. right; split; done. *)
+  (*     - intro j. destruct (decide (j = i)). *)
+  (*       { subst. rewrite LUi2. rewrite lookup_insert_eq. econstructor. done. } *)
+  (*       rewrite lookup_insert_ne; auto. done. *)
+  (*   } *)
+  (*   (* Disjoint gl_conds *) *)
+  (*   destruct Prog1 as [Prog1 Hkeep1], Prog2 as [Prog2 Hkeep2]. split; last (etrans; eauto). *)
+  (*   eapply obls_cond_rel_split_cond. 4,5: eauto. all: simpl. *)
+  (*   - intros. rewrite dom_insert_L. set_solver. *)
+  (*   - intros. destruct (decide (k = i)); auto. subst. left. by apply not_elem_of_dom. *)
+  (*   - repeat intro. auto. *)
+  (* Qed. *)
 
   Lemma osat_progress_one_owner Ω k a t1 t2 c :
     (Ω !! k = Some (obl_assigned a t1)) →
@@ -851,7 +883,7 @@ Section osat.
     intros LU Hc. iIntros "(Hsat& Go& Gf)".
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(%& #Gy& %& Gfs& %& %Bound& Mk)".
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
     iDestruct "Mk" as "(%& Glk& %LEa& Gok)".
     iMod (oblG_fuel_spend with "[$Gfs $Gf]") as "(%&%&Gfs)".
     assert (LT : a2 w< α).
@@ -861,11 +893,41 @@ Section osat.
     iModIntro. iExists a2.
     iPoseProof ((big_sepM_insert _ (delete k Ω) k (obl_assigned a2 t2)) with "[HM Glk Gok Gfs]") as "HM".
     { apply lookup_delete_eq. }
-    { iFrame "HM". iFrame. iFrame "Gy". iExists μ. iPureIntro. split; last done.
+    { iFrame "HM". iFrame. iFrame "Gy". iPureIntro. split; last done.
       etrans; last eauto. apply WFOCM.lt_le. auto. }
     rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HE HS HF HO".
     rewrite insert_delete_eq. iFrame.
     iPureIntro. econstructor. eapply WFOCM.lt_le_lt; eauto.
+  Qed.
+
+  Lemma osat_progress_one_owner_supply Ω k a t1 t2 c β q :
+    (Ω !! k = Some (obl_assigned a t1)) →
+    (Ord.O < c)%ord →
+    osat Ω ∗ oblG_owner k t1 (1/2 + 1/2/2)%Qp ∗ oblG_fuel k c ∗ oblG_fuel_supply k β q
+    ⊢ |==> ∃ a', osat (<[k:=(obl_assigned a' t2)]>Ω) ∗ oblG_owner k t2 (1/2 + 1/2/2)%Qp ∗
+              ⌜(a' w< β)⌝ ∗ oblG_fuel_supply k a' q ∗
+              (⌜ obl_progress (obl_assigned a t1) (obl_assigned a' t2) ⌝).
+  Proof.
+    intros LU Hc. iIntros "(Hsat& Go& Gf& Gfs0)".
+    rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
+    iDestruct "Mk" as "(%& Glk& %LEa& Gok)".
+    iMod (oblG_fuel_spend_2 with "[$Gfs $Gfs0 $Gf]") as "(%& [% %]& Gfs& Gfs0)".
+    assert (LT : a2 w< α).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    assert (LT0 : a2 w< β).
+    { apply WFOCM.lt_exists_right. exists c. split; done. }
+    iMod (oblG_owner_update_2 _ _ _ _ _ t2 with "[$Go $Gok]") as "[Go Gok]".
+    { rewrite -Qp.add_assoc !Qp.div_2. done. }
+    iModIntro. iExists a2.
+    iPoseProof ((big_sepM_insert _ (delete k Ω) k (obl_assigned a2 t2)) with "[HM Glk Gok Gfs]") as "HM".
+    { apply lookup_delete_eq. }
+    { iFrame "HM". iFrame. iFrame "Gy". iPureIntro. split; last done.
+      etrans; last eauto. apply WFOCM.lt_le. auto. }
+    rewrite -lock. rewrite dom_insert_lookup_L; last done. iFrame "HE HS HF HO".
+    rewrite insert_delete_eq. iFrame.
+    iPureIntro. split; auto. econstructor. eapply WFOCM.lt_le_lt. 1: eapply LT. auto.
   Qed.
 
   Lemma Qp_add_help_1 : (1 / 2 + 1 / 2 / 2 + 1 / 2 / 2 = 1)%Qp.
@@ -879,7 +941,7 @@ Section osat.
     iPoseProof (osat_lookup_assigned with "[$Hsat $Ge $Gl]") as "(%&%& %LU)".
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(%& #Gy& %& Gfs& %& %Bound& Mk)".
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
     iDestruct "Mk" as "(%& Glk& %LEa& Gok)".
     iPoseProof (oblG_assigned_agree with "[$Gl $Glk]") as "%". destruct H as [<- _].
     iMod (oblG_assigned_to_true_2 with "[$Gl $Glk]") as "[Gl Glk]".
@@ -902,7 +964,7 @@ Section osat.
     iPoseProof (osat_lookup_assigned with "[$Hsat $Ge $Gl]") as "(%&%& %LU)".
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(%& #Gy& %& Gfs& %& %Bound& Mk)".
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
     iDestruct "Mk" as "(%& Glk& %LEa& Gok)".
     iPoseProof (oblG_assigned_agree with "[$Gl $Glk]") as "%". destruct H as [<- _].
     iMod (oblG_assigned_to_fulfilled_2 with "[$Gl $Glk]") as "#Gf".
@@ -928,7 +990,7 @@ Section osat.
     iPoseProof (osat_lookup_owner with "[$Hsat $Ge $Go]") as "(%& %LU)".
     rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
     iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LU |].
-    iDestruct "Hk" as "(%& #Gy& %& Gfs& %& %Bound& Mk)".
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
     iDestruct "Mk" as "(%& Glk& %LEa& Gok)".
     iFrame "Go Glk Gok". iIntros "(%& Glk& Gok)".
     iFrame "HE HS HF HO". iApply (big_sepM_delete _ _ _ _ LU).
@@ -942,7 +1004,7 @@ Lemma osat_alloc `{SI : indexT} `{!osatGpreS Σ} `{!ord_mono_fun_class} :
   ⊢ |==> ∃ _ : osatGS Σ, osat ∅.
 Proof.
   iIntros.
-  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR oid (agreeR (layerO)))) as (γE) "HE";
+  iMod (own_alloc (gmap_view_auth (DfracOwn 1) ∅ : gmap_viewR oid (agreeR (Ord.t)))) as (γE) "HE";
     first by apply gmap_view_auth_valid.
   iMod (own_alloc (reservation_map_token (A:=(mono_natUR)) ⊤)) as (γS) "HS";
     first by apply reservation_map_token_valid.
