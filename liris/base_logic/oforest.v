@@ -209,6 +209,25 @@ Section otree.
       forest_to_forests F Rs !! k = None.
     Proof. rewrite -!not_elem_of_dom. intros. rewrite forest_to_forests_dom. auto. Qed.
 
+    Lemma forest_to_forests_forest_insert_new F Rs ρ t :
+      ρ ∉ union_sets Rs →
+      forest_to_forests (forest_insert F ρ t) Rs = forest_to_forests F Rs.
+    Proof.
+      intros. rewrite forest_to_forests_forest_insert. apply map_eq. intros.
+      rewrite lookup_fmap. destruct (Rs !! i) eqn:LUi.
+      - erewrite (forest_to_forests_lookup_eq _ Rs); eauto. simpl. assert (ρ ∉ g).
+        { rewrite not_elem_of_union_sets in H. eapply H; eauto. }
+        rewrite decide_False; auto.
+      - rewrite forest_to_forests_lookup_None; auto.
+    Qed.
+
+    Lemma forest_filter_roots_not_roots F R :
+      R ## dom F →
+      forest_filter_roots F R = ∅.
+    Proof.
+      intros. apply map_empty_filter. intros ???. apply elem_of_dom_2 in H0. set_solver.
+    Qed.
+
   End map_of_forests.
 
   Lemma oforest_alloc_thread i LO TP :
@@ -334,40 +353,31 @@ Section otree.
     iSplit.
     { iPureIntro. replace ({[k]} ∪ R) with (R ∪ {[k]}) by set_solver.
       apply forest_to_forests_wf_forest_insert_singleton; auto. }
-
-forest_to_forests_roots_insert:
-    forest_to_forests F (<[k:=rs]> Rs) = <[k:=forest_filter_roots F rs]> (forest_to_forests F (delete k Rs))
-forest_to_forests_forest_insert:
-    forest_to_forests (forest_insert F ρ t) Rs =
-    (λ rs : gset V, if decide (ρ ∈ rs) then <[ρ:=t]> (forest_filter_roots F rs) else forest_filter_roots F rs) <$> Rs
-    
-    iApply big_sepM_insert_delete. iSplitR "M"; cycle 1.
-    { iApply (big_sepM_impl with "M"). iIntros "!> %%% (%& %& $& M)". iSplit; first auto.
-      iApply (big_sepM_impl with "M"). iIntros "!> %%% M".
-      iApply (big_sepM_impl with "M"). iIntros "!> %%% H". iDestruct "H" as "(%& $)".
-      iPureIntro.  assert (k ≠ k2); [| rewrite lookup_insert_ne; auto].
-      destruct H0. simplify_eq. apply elem_of_dom_2 in H3. rewrite DomE in H3.
-      pose proof (obls_filter_live_subseteq Ω).
-      intros <-. apply subseteq_dom in H0. set_solver + HFk H3 H0. }
-    iExists (forest_insert Fo k (tree_singleton k)). iSplit.
-    { iPureIntro. split.
-      - rewrite /forest_insert dom_insert_L. subst. auto.
-      - apply forest_insert_singleton_wf; auto. apply not_elem_of_dom; auto. }
-    iSplitL "Tx TG".
+    assert (EqFF : forest_to_forests (<[k:=tree_singleton k]> F) (<[i:={[k]} ∪ R]> Rs)
+                   = <[i:= <[k:=tree_singleton k]> (forest_filter_roots F R)]> (delete i (forest_to_forests F Rs))).
+    { rewrite forest_to_forests_roots_insert forest_to_forests_forest_insert_new.
+      2:{ simplify_eq. destruct FFwf as (?&?&?). eapply (not_elem_of_weaken _ _ (union_sets Rs)).
+          2:{ apply elem_of_dom in Ini. destruct Ini.
+              rewrite (union_sets_delete_L Rs i _ H2). set_solver. }
+          rewrite -H0. eapply (not_elem_of_weaken _ _ (dom (forest_fold F))).
+          2:{ destruct H1. apply dom_subseteq_forest_fold_dom; auto.
+              eapply map_Forall_impl. 1: eapply H2. simpl. intros. apply tree_wf_root_elem. auto. }
+          rewrite DomF. eapply (not_elem_of_weaken _ _ (dom Ω)); eauto.
+          apply subseteq_dom. apply obls_filter_live_subseteq. }
+      assert (forest_filter_roots (<[k:=tree_singleton k]> F) ({[k]} ∪ R) = <[k:=tree_singleton k]> (forest_filter_roots F R)).
+      { rewrite forest_filter_roots_insert_in. 2: set_solver. f_equal.
+        rewrite forest_filter_roots_union (forest_filter_roots_not_roots _ {[k]}).
+        1: by rewrite map_empty_union.
+        apply not_elem_of_dom in NLukF. set_solver. }
+      rewrite H forest_to_forests_roots_delete. auto. }
+    rewrite EqFF. iApply big_sepM_insert. 1: apply lookup_delete_eq.
+    iFrame "M". iSplitL "Tx TG".
     { iLeft. iFrame "Tx". rewrite forest_fold_insert_singleton_dom; auto. }
-    iApply big_sepM_insert. 1: auto.
-    iSplitR "HF"; cycle 1.
-    { iApply (big_sepM_impl with "HF"). iIntros "!> %%% M".
-      iApply (big_sepM_impl with "M"). iIntros "!> %%% H". iDestruct "H" as "(%& $)".
-      iPureIntro.  assert (k ≠ k1); [| rewrite lookup_insert_ne; auto].
-      simplify_eq. apply elem_of_dom_2 in H1. rewrite DomE in H1.
-      pose proof (obls_filter_live_subseteq Ω).
-      intros <-. apply subseteq_dom in H2. set_solver + HFk H1 H2. }
-    iApply big_sepM_singleton. iFrame. iSplit; auto.
-    rewrite lookup_insert_eq; auto.
+    iApply big_sepM_insert. 1: auto. iFrame "HF".
+    iApply big_sepM_singleton. iFrame. done.
   Qed.
 
-  (** TODO: oforest_alloc_obl_edge *)
+  (** TODO?: oforest_alloc_obl_edge *)
 
   Lemma oforest_delete_obl TP LO i R k :
     k ∈ R →
