@@ -1208,20 +1208,19 @@ Section filter_sets.
     set_solver.
   Qed.
 
+  Lemma union_difference_subseteq `{!EqDecision A, !Countable A} (a b : gset A) :
+    a ⊆ b ∪ a ∖ b.
+  Proof using.
+    apply elem_of_subseteq. intros. destruct (decide (x ∈ b)).
+    { apply elem_of_union_l; auto. }
+    apply elem_of_union_r. set_solver.
+  Qed.
+
   Lemma filter_sets_partition_complement M ks :
     filter_sets M ks ∪ filter_sets M (dom M ∖ ks) = M.
   Proof using.
     rewrite <- (filter_sets_union M ks (dom M ∖ ks)).
-    apply filter_sets_full.
-
-    ∈
-
-    destruct (decide (ks ⊆ dom M)).
-    - rewrite -union_difference_L; auto.
-    - 
-      set_solver.
-    -
-    - 
+    apply filter_sets_full. eapply union_difference_subseteq.
   Qed.
 
   Lemma elem_of_union_sets_filter_sets_complement M ks e :
@@ -1234,7 +1233,6 @@ Section filter_sets.
       apply elem_of_difference in Hdiff as [_ Hnot].
       eauto.
     - intros (k&s&Hk&Hnot&He).
-      apply elem_of_union_sets_filter_sets.
       exists k, s. split; [done|]. split.
       + apply elem_of_difference. split.
         * apply elem_of_dom. eauto.
@@ -1252,7 +1250,7 @@ Section filter_sets.
       apply Hnot. eauto.
     - intros Hall Hin.
       destruct Hin as (k&s&Hk&Hks&He).
-      eauto.
+      eapply Hall; eauto.
   Qed.
 
   Lemma union_sets_filter_sets_complement M ks :
@@ -1260,9 +1258,9 @@ Section filter_sets.
     union_sets (filter_sets M ks) ∪
     union_sets (filter_sets M (dom M ∖ ks)).
   Proof using.
-    rewrite <- (filter_sets_partition_complement M ks).
-    apply union_sets_disj_union_L.
-    apply filter_sets_partition_complement_disjoint.
+    rewrite -union_sets_disj_union_L.
+    2: apply filter_sets_partition_complement_disjoint.
+    rewrite (filter_sets_partition_complement M ks). auto.
   Qed.
 
   Lemma elem_of_union_sets_filter_sets_partition M ks e :
@@ -1270,9 +1268,8 @@ Section filter_sets.
     e ∈ union_sets (filter_sets M ks) ∨
     e ∈ union_sets (filter_sets M (dom M ∖ ks)).
   Proof using.
-    rewrite union_sets_filter_sets_complement.
-    rewrite elem_of_union.
-    done.
+    rewrite (union_sets_filter_sets_complement M ks).
+    rewrite elem_of_union. done.
   Qed.
 
   Lemma union_sets_filter_sets_complement_disjoint M ks :
@@ -1302,18 +1299,8 @@ Section filter_sets.
   Proof using.
     apply disjoint_sets_filter_sets_full_partition_iff.
     - set_solver.
-    - set_solver.
+    - apply union_difference_subseteq.
   Qed.
-
-End filter_sets.
-
-Section filter_sets.
-  Context `{!EqDecision K, !Countable K, !EqDecision E, !Countable E}.
-  Implicit Type M : gmap K (gset E).
-  Implicit Type s : gset E.
-  Implicit Type ks : gset K.
-  Implicit Type k j : K.
-  Implicit Type e : E.
 
   (** ** A small partition API for [filter_sets] *)
 
@@ -1426,7 +1413,7 @@ Section filter_sets.
     apply union_sets_filter_sets_partition.
   Qed.
 
-  Lemma elem_of_union_sets_filter_sets_partition M ks1 ks2 e :
+  Lemma elem_of_union_sets_filter_sets_partition_subseteq M ks1 ks2 e :
     ks1 ## ks2 ->
     dom M ⊆ ks1 ∪ ks2 ->
     e ∈ union_sets M ↔
