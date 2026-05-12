@@ -534,15 +534,26 @@ Section otree.
     iSplit.
     { iPureIntro. eapply forest_to_forests_wf_forest_move_tree; eauto. }
     iFrame "RA". iSplitL "EA".
-    { destruct FFwf as (?&?&?). destruct H1.
+    { destruct FFwf as (?&?&?).
       replace (forest_fold (forest_move_tree F ρ tρ r tr k Ch)) with (<[k:={[r]} ∪ Ch]> (forest_fold F)); first auto.
+      assert (FW' : forest_wf (forest_move_tree F ρ tρ r tr k Ch)).
+      { apply forest_move_tree_wf; auto. }
       rewrite /forest_move_tree. rewrite forest_fold_insert_L; auto.
-      { rewrite (forest_fold_delete_L _ _ _ H1 LUFr). rewrite (forest_fold_delete_L (delete r F) ρ tρ).
+      { destruct H1. rewrite (forest_fold_delete_L _ _ _ H1 LUFr).
+        rewrite (forest_fold_delete_L (delete r F) ρ tρ).
         { rewrite /tree_insert. rewrite map_union_assoc -insert_union_l. auto. }
         { apply forest_trees_disjoint_delete; auto. }
         { rewrite lookup_delete_ne; auto. }
       }
-      { apply forest_trees_disjoint_insert. 1: apply lookup_delete_eq. split.
+      { destruct FW'. auto. }
+      { apply lookup_delete_eq. }
+    }
+    iSplitR "RM Tx TG".
+    { rewrite /forest_move_tree.
+
+      TODO
+
+        apply forest_trees_disjoint_insert. 1: apply lookup_delete_eq. split.
         - apply forest_tree_disjoint_forest_fold_inv. rewrite /tree_insert.
           eapply map_disjoint_insert_l_2.
           {
