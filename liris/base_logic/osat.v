@@ -676,6 +676,61 @@ Section osat.
       iPoseProof (oblG_owner_agree with "[$Go $Go2]") as "(%&%)". apply Qp.not_add_le_r in H0. done.
   Qed.
 
+  Lemma osat_bound_fuel_supply Ω k β α q :
+    osat Ω ∗ oblG_bound k β ∗ oblG_fuel_supply k α q
+    ⊢ |==> ∃ a, osat Ω ∗ ⌜(a w≤ β ∧ a w≤ α)⌝ ∗ oblG_fuel_supply k a q.
+  Proof.
+    iIntros "(Hsat& #Gb& Gfs0)".
+    iPoseProof (osat_elem with "[$Hsat]") as "%Ink". 1: rewrite /oblG_elem; eauto.
+    apply elem_of_dom in Ink. destruct Ink as (o&LUk).
+    rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LUk |].
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
+    iPoseProof (oblG_bound_agree _ β0 β with "[$Gy $Gb]") as "%Eqb".
+    iPoseProof (oblG_fuel_supply_add with "[$Gfs0 $Gfs]") as "(%& Gfs& [% %])".
+    iDestruct "Gfs" as "[Gfs0 Gfs]".
+    iModIntro. iExists b. iFrame "Gfs0". iSplit; cycle 1.
+    { iPureIntro. split; auto. rewrite -Eqb. etrans; last eauto. auto. }
+    iFrame. iApply (big_sepM_delete _ _ _ _ LUk). iFrame. iFrame "Gy". iSplit.
+    { iPureIntro. etrans; last eauto. auto. }
+    destruct o; last iFrame. iDestruct "Mk" as "(%& $& %& $)".
+    iPureIntro. etrans; last eauto. auto.
+  Qed.
+
+  Lemma osat_bound_fuel_valid_1 Ω k1 k2 β α :
+    (β w< α) →
+    osat Ω ∗ oblG_bound k1 β ∗ oblG_fuel k2 α
+    ⊢ ⌜ k1 ≠ k2 ⌝.
+  Proof.
+    iIntros (Hlt) "(Hsat& #Gb& Gf)".
+    iPoseProof (osat_elem with "[$Hsat]") as "%Ink". 1: rewrite /oblG_elem; eauto.
+    apply elem_of_dom in Ink. destruct Ink as (o&LUk).
+    rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LUk |].
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
+    iPoseProof (oblG_bound_agree _ β0 β with "[$Gy $Gb]") as "%Eqb".
+    destruct (decide (k1 = k2)); auto.
+    subst k2. iPoseProof (oblG_fuel_supply_compare with "[$Gfs $Gf]") as "%".
+    exfalso. assert (α w≤ β).
+    { rewrite -Eqb. etrans; first eapply H. auto. }
+    eapply (Ord.lt_not_le Hlt H0).
+  Qed.
+
+  Lemma osat_bound_fuel_valid_2 Ω k β α :
+    osat Ω ∗ oblG_bound k β ∗ oblG_fuel k α
+    ⊢ ⌜ α w≤ β ⌝.
+  Proof.
+    iIntros "(Hsat& #Gb& Gf)".
+    iPoseProof (osat_elem with "[$Hsat]") as "%Ink". 1: rewrite /oblG_elem; eauto.
+    apply elem_of_dom in Ink. destruct Ink as (o&LUk).
+    rewrite /osat -!lock. iDestruct "Hsat" as "(HE& HS& HF& HO& HM)".
+    iPoseProof (big_sepM_delete with "HM") as "[Hk HM]"; [eapply LUk |].
+    iDestruct "Hk" as "(%& %& Gfs& #Gy& %Bound& Mk)".
+    iPoseProof (oblG_bound_agree _ β0 β with "[$Gy $Gb]") as "%Eqb".
+    iPoseProof (oblG_fuel_supply_compare with "[$Gfs $Gf]") as "%".
+    iPureIntro. rewrite -Eqb. etrans; eauto.
+  Qed.
+
   Lemma osat_alloc_obl_assigned Ω k b β t :
     k ∉ dom Ω →
     osat Ω
