@@ -7,13 +7,12 @@ From liris.base_logic Require Export owit ogroup model_interp invariants.
 (* From liris.base_logic Require Export history_interp invariants. *)
 Import uPred.
 
-TODO
-
 Class mupdGpreS `{SI : indexT} (Σ : gFunctors) :=
   MupdGpreS {
       #[local] mupdGpreS_inv :: invGpreS Σ;
       #[local] mupdGpreS_osat :: osatGS.osatGpreS Σ;
       #[local] mupdGpreS_othread :: othreadGS.othreadGpreS Σ;
+      #[local] mupdGpreS_ogroup :: ogroupGS.ogroupGpreS Σ;
       #[local] mupdGpreS_owit :: owitGS.owitGpreS Σ;
       #[local] mupdGpreS_mhist :: mhistGS.mhistGpreS Σ;
     }.
@@ -26,22 +25,24 @@ Class mupdGS `{SI : indexT} (Σ : gFunctors) :=
       #[global] mupd_osatGS :: osatGS.osatGS Σ;
       (** Obls assigned to threads. *)
       #[global] mupd_othreadGS :: othreadGS.othreadGS Σ;
+      (** Obl groups. *)
+      #[global] mupd_ogroupGS :: ogroupGS.ogroupGS Σ;
       (** Witnesses. *)
       #[global] mupd_owitGS :: owitGS.owitGS Σ;
       (** Model history. *)
       #[global] mupd_mhistGS :: mhistGS.mhistGS Σ;
     }.
-Global Opaque mupd_invGS mupd_osatGS mupd_othreadGS mupd_owitGS mupd_mhistGS.
+Global Opaque mupd_invGS mupd_osatGS mupd_othreadGS mupd_ogroupGS mupd_owitGS mupd_mhistGS.
 Global Arguments MupdG {SI Σ}.
 
 Definition mupdΣ `{SI : indexT} : gFunctors :=
-  #[invΣ; osatGS.osatΣ; othreadGS.othreadΣ; owitGS.owitΣ; mhistGS.mhistΣ].
+  #[invΣ; osatGS.osatΣ; othreadGS.othreadΣ; ogroupGS.ogroupΣ; owitGS.owitΣ; mhistGS.mhistΣ].
 Global Instance subG_mupdΣ `{SI : indexT} {Σ} : subG mupdΣ Σ → mupdGpreS Σ.
 Proof. solve_inG. Qed.
 
 Definition model_interp `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   h i Ω W n Θ : iProp Σ :=
-  (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ oproxy Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
+  (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ ogroup Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
 
 (** Modality for updating obls. *)
 Definition mupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
@@ -693,8 +694,9 @@ Proof.
   iMod invGS_alloc as "(%HInv& R& W& O)".
   iMod (model_history_interp_init n ∅) as "(%HHist& MHI)".
   iMod (osat_alloc) as "(%HS& S)".
-  iMod (othread_alloc) as "(%HT& T& A& F)".
+  iMod (othread_alloc) as "(%HT& T& A)".
+  iMod (ogroup_alloc) as "(%HG& G)".
   iMod (owit_alloc) as "(%HW& Wit)".
-  iExists (MupdG HInv HS HT HW HHist). iFrame.
+  iExists (MupdG HInv HS HT HG HW HHist). iFrame.
   iPureIntro. apply map_Forall2_empty.
 Qed.

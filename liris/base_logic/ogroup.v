@@ -689,7 +689,6 @@ Section ogroup.
     k ∈ K1 →
     i1 ≠ i2 →
     ogroup TP ∗ ogroupG_group i1 g1 K1 ∗ ogroupG_group i2 g2 K2 ∗
-    (* ogroupG_thread i2 g2 ∗ *)
     ogroupG_bound g2 β ∗ oblG_fuel k β
     ⊢ |==> ∃ G1 G2,
       (⌜ k ∉ G2 ⌝ -∗ othreadG_exec i1 (1/2/2) -∗ othreadG_obls i1 (G1 ∖ {[k]}) -∗
@@ -698,7 +697,6 @@ Section ogroup.
       othreadG_exec i1 (1/2/2) ∗ othreadG_obls i1 G1 ∗
       othreadG_exec i2 (1/2/2) ∗ othreadG_obls i2 G2 ∗
       ogroupG_group i1 g1 (K1 ∖ {[k]}) ∗ ogroupG_group i2 g2 (K2 ∪ {[k]}).
-  (* ogroupG_thread i2 π2 s q. *)
   Proof.
     iIntros (Ini1 Ini2 Ink Nei) "(G& Po1& Po2& #Tb& Of)".
     rewrite /ogroup -!lock. iDestruct "G" as "(%& FT& ST& PT& M)".
@@ -754,7 +752,7 @@ End ogroup.
 
 (* Allocation of an initial ogroup protocol. *)
 Definition ogroup_alloc `{SI : indexT} {Σ}
-  `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!ogroupGS Σ} :
+  `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!ogroupGpreS Σ} :
   ⊢ |==> ∃ _ : ogroupGS Σ, ogroup ∅.
 Proof.
   iIntros.
