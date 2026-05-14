@@ -17,12 +17,35 @@ Ideally, we should make the library 2 universe polymorphic and remove 3.
 
 Section layer.
 
-  Definition layer : Type := ord.t.
+  Definition layer : Type := prod ord.t nat.
+
+  Lemma prod_lt_Transitive {A B} {RA : A -> A -> Prop} {RB : B -> B -> Prop} :
+    Transitive RA → Transitive RB → Transitive (prod_lt RA RB).
+  Proof.
+    intros. repeat intro. inv H1; inv H2.
+    - econstructor 1. eauto.
+    - destruct ALE.
+      + subst. econstructor 1. auto.
+      + econstructor 1; eauto.
+    - destruct ALE.
+      + subst. econstructor 1; auto.
+      + econstructor 1; eauto.
+    - destruct ALE.
+      + subst. destruct ALE0.
+        * subst. econstructor 2; eauto.
+        * econstructor 1; auto.
+      + destruct ALE0.
+        * subst. econstructor 1; eauto.
+        * econstructor 1; eauto.
+  Qed.
 
 End layer.
 
 Global Instance layer_layer_class : layer_class layer :=
-  Build_layer_class _ _ ord.lt_well_founded _.
+  Build_layer_class _ _
+    (prod_lt_well_founded _ _ _ _ ord.lt_well_founded PeanoNat.Nat.lt_wf_0)
+    (prod_lt_Transitive _ _)
+.
 
 (** Notations and Coercions. *)
 Export ordinalScope.

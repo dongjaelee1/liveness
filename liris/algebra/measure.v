@@ -27,10 +27,6 @@ Section measure.
   Remark measure_rec_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
   Proof using. intros. destruct m. auto. Qed.
 
-  Definition nat_sub (n : nat) : Type := sig (λ v, v < n).
-  Remark measure_rec_oblig_nat : ∀ (n : nat) (m : nat_sub n), (proj1_sig m) < n.
-  Proof using. intros. destruct m. auto. Qed.
-
   Fixpoint measure_rec (l : L) (ACC : Acc ltL l) {struct ACC} :
     ∀ (s : measurable_syntax), Ord.t :=
   (fix go s {struct s} :=
