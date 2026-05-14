@@ -252,7 +252,20 @@ Section sfmupd.
     iMod (model_interp_mupd_steps γ with "HP MI") as "(>($& $)& $)"; done.
   Qed.
 
-  (** Update rules *)
+  (** lc rules *)
+  Lemma lc_sfmupd_add_later E P :
+    £n 1 -∗ ▷ (|={E}=>m P) -∗ |={E}=>m P.
+  Proof.
+    iIntros "LC H". iApply fupd_sfmupd_elim. by iApply (lc_fupd_elim_later with "LC").
+  Qed.
+
+  Lemma lc_sfmupd_add_laterN E P n :
+    £n n -∗ ▷^n (|={E}=>m P) -∗ |={E}=>m P.
+  Proof.
+    iIntros "LC H". iApply fupd_sfmupd_elim. iApply (lc_fupd_add_laterN with "LC"). iNext. auto.
+  Qed.
+
+  (** ** Update rules *)
   Lemma thread_terminate E i :
     thP_groups i ∅ -∗ |={E}=>m thP_done i.
   Proof.
@@ -262,7 +275,7 @@ Section sfmupd.
   Lemma group_alloc E i G ℓ μ :
     thP_groups i G -∗
     |={E}=>m ∃ g, (⌜ g ∉ G ⌝) ∗
-                 thP_groups i ({[g]} ∪ G) ∗ ogP_group i g ℓ ∅ ∗ ogP_fuel g ℓ μ.
+                 thP_groups i ({[g]} ∪ G) ∗ ogP_obls i g ℓ ∅ ∗ ogP_fuel g ℓ μ.
   Proof.
     unfold_sfmupd. iIntros "Tb %%%%% $".
     iMod (group_alloc_mupd with "Tb") as "(%& %& $& $& $)". auto.
@@ -270,7 +283,7 @@ Section sfmupd.
 
   Lemma group_delete E i G g ℓ :
     thP_groups i G -∗
-    ogP_group i g ℓ ∅ -∗
+    ogP_obls i g ℓ ∅ -∗
     |={E}=>m thP_groups i (G ∖ {[g]}).
   Proof.
     unfold_sfmupd. iIntros "Tb Gg %%%%% $".
@@ -279,9 +292,9 @@ Section sfmupd.
 
   Lemma obl_alloc_assigned E i g K b ℓ1 ℓ2 μ :
     (ℓ1 < ℓ2)%ordi →
-    ogP_group i g ℓ1 K -∗
+    ogP_obls i g ℓ1 K -∗
     |={E}=>m ∃ k, (⌜ k ∉ K ⌝) ∗
-                 ogP_group i g ℓ1 ({[k]} ∪ K) ∗
+                 ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
                  oblP_assigned k b (1/2)%Qp ∗
                  oblP_id k ∗
                  oblP_fuel k ℓ2 μ ∗
@@ -318,11 +331,11 @@ Section sfmupd.
     ↑N ⊆ E →
     oblP_inv N k P Q R -∗
     |={E,E ∖ ↑N}=> ∀ i g ℓ K q,
-    (⌜k ∈ K⌝) → ogP_group i g ℓ K -∗ oblP_assigned k true q -∗
-    ((▷ (ogP_group i g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
-     (ogP_group i g ℓ K -∗
+    (⌜k ∈ K⌝) → ogP_obls i g ℓ K -∗ oblP_assigned k true q -∗
+    ((▷ (ogP_obls i g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
+     (ogP_obls i g ℓ K -∗
       oblP_assigned k true 1 -∗
-      ∀ E', |={E'}=>m (ogP_group i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k) ∗
+      ∀ E', |={E'}=>m (ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k) ∗
                      ((▷ (R)) ={E ∖ ↑N,E}=∗ True))).
   Proof.
     iIntros (MASK) "#Gv". iMod (obl_fulfill_mupd with "Gv") as "H". 1: auto.
@@ -334,10 +347,10 @@ Section sfmupd.
   Lemma obl_offload E i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
     k ∈ K1 →
     (ℓ2 < ℓ)%ordi →
-    ogP_group i1 g1 ℓ1 K1 -∗
-    ogP_group i2 g2 ℓ2 K2 -∗
+    ogP_obls i1 g1 ℓ1 K1 -∗
+    ogP_obls i2 g2 ℓ2 K2 -∗
     oblP_fuel k ℓ 1 -∗
-    |={E}=>m ogP_group i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
+    |={E}=>m ogP_obls i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
   Proof.
     iIntros (Ink Ltl) "Gg1 Gg2 Of".
     unfold_sfmupd. iIntros "%%%%% $".
@@ -347,10 +360,10 @@ Section sfmupd.
   Lemma obl_offload_set_mupd E i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
     K ⊆ K1 →
     (ℓ2 < ℓ)%ordi →
-    ogP_group i1 g1 ℓ1 K1 -∗
-    ogP_group i2 g2 ℓ2 K2 -∗
+    ogP_obls i1 g1 ℓ1 K1 -∗
+    ogP_obls i2 g2 ℓ2 K2 -∗
     ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
-    |={E}=>m ogP_group i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K ⊈ K2 ∨ K = ∅ ⌝.
+    |={E}=>m ogP_obls i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K ⊈ K2 ∨ K = ∅ ⌝.
   Proof.
     iIntros (Ink Ltl) "Gg1 Gg2 Of".
     unfold_sfmupd. iIntros "%%%%% $".

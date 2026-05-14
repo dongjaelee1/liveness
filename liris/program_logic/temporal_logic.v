@@ -414,8 +414,8 @@ Section proof.
 
   Lemma tf_until_alloc E i g K (b : bool) ℓ1 ℓ2 μ :
     (ℓ1 < ℓ2)%ordi →
-    ogP_group i g ℓ1 K -∗
-    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ ogP_group i g ℓ1 ({[k]} ∪ K) ∗
+    ogP_obls i g ℓ1 K -∗
+    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
                  oblP_id k ∗ oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
                  ∀ E' N (P Q : tf Σ), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) ={E'}=∗ (⟦tf_until N k b 1 P Q⟧ₗ).
   Proof.
@@ -484,8 +484,8 @@ Section proof.
     ↑N ⊆ E →
     ⟦tf_until N k true 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ∀ i g ℓ K,
-    (⌜k ∈ K⌝) → ogP_group i g ℓ K -∗
-    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_group i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k)).
+    (⌜k ∈ K⌝) → ogP_obls i g ℓ K -∗
+    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k)).
   Proof.
     rewrite tf_until_logic. iIntros (HMask) "(Oa& #OI)".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
@@ -545,8 +545,8 @@ Section proof.
     ⟦tf_until N k false 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ▷ (⟦P⟧ₗ ∗
        ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N}=∗
-                       ∀ i g ℓ K, (⌜k ∈ K⌝) → ogP_group i g ℓ K -∗
-                                  ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_group i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k)))).
+                       ∀ i g ℓ K, (⌜k ∈ K⌝) → ogP_obls i g ℓ K -∗
+                                  ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k)))).
   Proof.
     iIntros (HN) "Uk". iMod (tf_until_to_true with "Uk") as "H". 1: auto.
     iModIntro. iNext. iDestruct "H" as "($& H)". iIntros (?).

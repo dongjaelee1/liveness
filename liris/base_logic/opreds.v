@@ -108,15 +108,15 @@ Local Definition ogP_fuel_unseal :
   @ogP_fuel = @ogP_fuel_def := ogP_fuel_aux.(seal_eq).
 Global Arguments ogP_fuel {SI Σ _ _}.
 
-Local Definition ogP_group_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition ogP_obls_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   i g ℓ (K : oids) : iProp Σ :=
   othreadG_elem i ∗ ogroupG_group i g K ∗ ogroupG_thread i g ∗ (∃ μ, ogP_bound g ℓ μ) ∗
   ([∗ set] k ∈ K, oblP_id k ∗ oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
-Local Definition ogP_group_aux : seal (@ogP_group_def). Proof. by eexists. Qed.
-Definition ogP_group := ogP_group_aux.(unseal).
-Local Definition ogP_group_unseal :
-  @ogP_group = @ogP_group_def := ogP_group_aux.(seal_eq).
-Global Arguments ogP_group {SI Σ _ _}.
+Local Definition ogP_obls_aux : seal (@ogP_obls_def). Proof. by eexists. Qed.
+Definition ogP_obls := ogP_obls_aux.(unseal).
+Local Definition ogP_obls_unseal :
+  @ogP_obls = @ogP_obls_def := ogP_obls_aux.(seal_eq).
+Global Arguments ogP_obls {SI Σ _ _}.
 
 (** ** Thread predicates *)
 Local Definition thP_groups_def `{SI : indexT} `{@mupdGS SI Σ}
@@ -167,7 +167,7 @@ Ltac unfold_opreds :=
   try rewrite /collect_fuels;
   try rewrite !thP_done_unseal /thP_done_def;
   try rewrite !thP_groups_unseal /thP_groups_def;
-  try rewrite !ogP_group_unseal /ogP_group_def;
+  try rewrite !ogP_obls_unseal /ogP_obls_def;
   try rewrite !ogP_fuel_unseal /ogP_fuel_def;
   try rewrite /ogP_fuel_val;
   try rewrite /ogP_bound;
@@ -246,7 +246,7 @@ Section preds.
     Proof. unfold_opreds. apply _. Qed.
     Global Instance ogP_fuel_timeless g ℓ μ : Timeless (ogP_fuel g ℓ μ).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance ogP_group_timeless i g ℓ K : Timeless (ogP_group i g ℓ K).
+    Global Instance ogP_obls_timeless i g ℓ K : Timeless (ogP_obls i g ℓ K).
     Proof. unfold_opreds. apply _. Qed.
 
     Global Instance thP_groups_timeless i G : Timeless (thP_groups i G).
@@ -1312,7 +1312,7 @@ Section preds.
     Lemma group_alloc_mupd n Θ i G ℓ μ :
       thP_groups i G -∗
       |=[n,Θ]=>m ∃ g, (⌜ g ∉ G ⌝) ∗
-                     thP_groups i ({[g]} ∪ G) ∗ ogP_group i g ℓ ∅ ∗ ogP_fuel g ℓ μ.
+                     thP_groups i ({[g]} ∪ G) ∗ ogP_obls i g ℓ ∅ ∗ ogP_fuel g ℓ μ.
     Proof.
       unfold_opreds. iIntros "(#Te& Tx& Tpsa)".
       iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
@@ -1329,7 +1329,7 @@ Section preds.
 
     Lemma group_delete_mupd n Θ i G g ℓ :
       thP_groups i G -∗
-      ogP_group i g ℓ ∅ -∗
+      ogP_obls i g ℓ ∅ -∗
       |=[n,Θ]=>m thP_groups i (G ∖ {[g]}).
     Proof.
       unfold_opreds. iIntros "(#Te& Tx& Tpsa) (_& Tpo& Tps& _)".
@@ -1347,9 +1347,9 @@ Section preds.
 
     Lemma obl_alloc_assigned_mupd n Θ i g K b ℓ1 ℓ2 μ :
       (ℓ1 < ℓ2)%ordi →
-      ogP_group i g ℓ1 K -∗
+      ogP_obls i g ℓ1 K -∗
       |=[n,Θ]=>m ∃ k, (⌜ k ∉ K ⌝) ∗
-                     ogP_group i g ℓ1 ({[k]} ∪ K) ∗
+                     ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
                      oblP_assigned k b (1/2)%Qp ∗
                      oblP_id k ∗
                      oblP_fuel k ℓ2 μ ∗
@@ -1457,11 +1457,11 @@ Section preds.
       ↑N ⊆ E →
       oblP_inv N k P Q R -∗
       |={E,E ∖ ↑N}=> ∀ i g ℓ K q,
-      (⌜k ∈ K⌝) → ogP_group i g ℓ K -∗ oblP_assigned k true q -∗
-      ((▷ (ogP_group i g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
-       (ogP_group i g ℓ K -∗
+      (⌜k ∈ K⌝) → ogP_obls i g ℓ K -∗ oblP_assigned k true q -∗
+      ((▷ (ogP_obls i g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
+       (ogP_obls i g ℓ K -∗
         oblP_assigned k true 1 -∗
-        ∀ n Θ, |=[n,Θ]=>m (ogP_group i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k) ∗
+        ∀ n Θ, |=[n,Θ]=>m (ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k) ∗
                        ((▷ (R)) ={E ∖ ↑N,E}=∗ True))).
     Proof.
       unfold_opreds. iIntros (MASK) "(#Ge& #Gvar)".
@@ -1518,10 +1518,10 @@ Section preds.
     Local Lemma obl_change_group_mupd n Θ i g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       k ∈ K1 →
       (ℓ2 < ℓ)%ordi →
-      ogP_group i g1 ℓ1 K1 -∗
-      ogP_group i g2 ℓ2 K2 -∗
+      ogP_obls i g1 ℓ1 K1 -∗
+      ogP_obls i g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
-      |=[n,Θ]=>m ogP_group i g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
+      |=[n,Θ]=>m ogP_obls i g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_obls i g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
     Proof.
       unfold_opreds. iIntros (Ink LTl) "(#Tei& Gg1& Gt1& (%& #Gb1)& KS1) (_& Gg2& Gt2& (%& #Gb2)& KS2) Of".
       iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
@@ -1553,10 +1553,10 @@ Section preds.
       i1 ≠ i2 →
       k ∈ K1 →
       (ℓ2 < ℓ)%ordi →
-      ogP_group i1 g1 ℓ1 K1 -∗
-      ogP_group i2 g2 ℓ2 K2 -∗
+      ogP_obls i1 g1 ℓ1 K1 -∗
+      ogP_obls i2 g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
-      |=[n,Θ]=>m ogP_group i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
+      |=[n,Θ]=>m ogP_obls i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
     Proof.
       unfold_opreds. iIntros (Nei Ink LTl) "(#Tei1& Gg1& Gt1& (%& #Gb1)& KS1) (#Tei2& Gg2& Gt2& (%& #Gb2)& KS2) Of".
       iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
@@ -1619,10 +1619,10 @@ Section preds.
     Lemma obl_offload_mupd n Θ i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       k ∈ K1 →
       (ℓ2 < ℓ)%ordi →
-      ogP_group i1 g1 ℓ1 K1 -∗
-      ogP_group i2 g2 ℓ2 K2 -∗
+      ogP_obls i1 g1 ℓ1 K1 -∗
+      ogP_obls i2 g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
-      |=[n,Θ]=>m ogP_group i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
+      |=[n,Θ]=>m ogP_obls i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
     Proof.
       intros. destruct (decide (i1 = i2)).
       - subst. apply obl_change_group_mupd; auto.
@@ -1632,10 +1632,10 @@ Section preds.
     Lemma obl_offload_set_mupd n Θ i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
       K ⊆ K1 →
       (ℓ2 < ℓ)%ordi →
-      ogP_group i1 g1 ℓ1 K1 -∗
-      ogP_group i2 g2 ℓ2 K2 -∗
+      ogP_obls i1 g1 ℓ1 K1 -∗
+      ogP_obls i2 g2 ℓ2 K2 -∗
       ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
-      |=[n,Θ]=>m ogP_group i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K ⊈ K2 ∨ K = ∅ ⌝.
+      |=[n,Θ]=>m ogP_obls i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K ⊈ K2 ∨ K = ∅ ⌝.
     Proof.
       revert K1 K2. pattern K. revert K. apply set_ind.
       { solve_proper. }
