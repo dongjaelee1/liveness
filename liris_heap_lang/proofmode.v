@@ -28,8 +28,8 @@ Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_languag
   envs_entails Δ (∃ E' G R (o : Ord.t),
         ([∗ set] r ∈ R, oblP_id r) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
-                       thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
-                       (thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                       thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗
+                       (thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                         ALC (£ o ={E',E}=∗ |={E}=>m P)))
            (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
@@ -49,8 +49,8 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ n Φ :
   PureExec φ n e1 e2 →
   φ →
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
-  envs_entails Δ (∃ G R o, (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗
-                           (£ (o × n)%ord -∗ thP_obls i G 1 -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
+  envs_entails Δ (∃ G R o, (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗
+                           (£ (o × n)%ord -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
                             lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.

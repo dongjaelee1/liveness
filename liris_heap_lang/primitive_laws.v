@@ -267,9 +267,9 @@ Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ :
   φ →
   Nat.iter n
     (λ P,
-       |={E,E'}=> ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+       |={E,E'}=> ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗
                  ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                 (thP_obls i G 1 -∗
+                 (thP_groups i G -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                   ALC (£ o ={E',E}=∗ |={E}=>m P)))
     (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
@@ -286,11 +286,11 @@ Proof.
 Qed.
 
 Lemma lwp_fork s i E E' e Φ :
-  (|={E,E'}=> ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+  (|={E,E'}=> ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗
              ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-             (∀ j, thP_obls i G 1 -∗
+             (∀ j, thP_groups i G -∗
                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                   thP_obls j ∅ 1 -∗
+                   thP_groups j ∅ -∗
                    ALC (|={E',E}=>
                    (|={E}=>m Φ (LitV LitUnit)) ∗
                    (lwpupd j ⊤ e (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))))) -∗
@@ -507,10 +507,10 @@ Proof. destruct π; simpl; apply _. Qed.
 
 Lemma lwp_allocN_seq G R o s i E v n :
   (0 < n)%Z →
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗
+          (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗
           [∗ list] i ∈ seq 0 (Z.to_nat n), (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
   iIntros (Hn Φ) "(Tb& Gfs& Rs) HP".
@@ -534,10 +534,10 @@ Proof.
 Qed.
 
 Lemma lwp_alloc G R o s i E v :
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) }}}
     Alloc (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗
+          (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗
           l ↦ v ∗ meta_token l ⊤ }}}.
 Proof.
   iIntros (Φ) "P HΦ".
@@ -546,10 +546,10 @@ Proof.
 Qed.
 
 Lemma lwp_free G R o s i E l v :
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v }}}
     Free (Val $ LitV $ LitLoc l) @ s; i; E
   l{{{ RET LitV LitUnit;
-          (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) }}}.
+          (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) }}}.
 Proof.
   iIntros (Φ) "((Tb& Gfs& Rs)& Hl) HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -569,9 +569,9 @@ Proof.
 Qed.
 
 Lemma lwp_load G R o s i E l dq v :
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦{dq} v }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦{dq} v }}}
     Load (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET v; (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v }}}.
+  l{{{ RET v; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -590,9 +590,9 @@ Proof.
 Qed.
 
 Lemma lwp_store G R o s i E l v' v :
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET LitV LitUnit; (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v }}}.
+  l{{{ RET LitV LitUnit; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -612,9 +612,9 @@ Proof.
 Qed.
 
 Lemma lwp_xchg G R o s i E l v' v :
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
     Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET v'; (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v }}}.
+  l{{{ RET v'; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -635,9 +635,9 @@ Qed.
 
 Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦{dq} v' }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦{dq} v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v' }}}.
+  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦{dq} v' }}}.
 Proof.
   iIntros (?? Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -658,9 +658,9 @@ Qed.
 
 Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' :
   v' = v1 → vals_compare_safe v' v1 →
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v2 }}}.
+  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ v2 }}}.
 Proof.
   iIntros (?? Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -681,9 +681,9 @@ Proof.
 Qed.
 
 Lemma lwp_faa G R o s i E l i1 i2 :
-  l{{{ (thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ LitV (LitInt i1) }}}
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦ LitV (LitInt i1) }}}
     FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
-  l{{{ RET LitV (LitInt i1); (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
+  l{{{ RET LitV (LitInt i1); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -703,9 +703,9 @@ Proof.
 Qed.
 
 Lemma lwp_new_proph G R o s i E :
-  l{{{thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)}}}
+  l{{{thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ ([∗ set] r ∈ R, oblP_id r)}}}
     NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ proph p pvs }}}.
+  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ proph p pvs }}}.
 Proof.
   iIntros (Φ) "(Tb& Gfs& Rs) HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -767,8 +767,7 @@ Proof.
 Qed.
 
 (** FIXME: ectxi does not allow empty context, which seems necessary to compose with ResolveLCtx.
-           Can we prove this without changing this constraint?
- *)
+           Can we prove this without changing this constraint? *)
 (* Lemma lwp_resolve s i E e Φ (p : proph_id) v (pvs : list (val * val)) : *)
 (*   Atomic StronglyAtomic e → *)
 (*   to_val e = None → *)
