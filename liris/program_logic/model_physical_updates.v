@@ -65,42 +65,41 @@ Section mprog.
 
   (** Step rule *)
   Lemma mprog_step n Θ i P :
-    (|={∅}=> ∃ G, thP_obls i G 1 ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗
+    (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ogP_fuel u 0 1) ∗
                  ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                      ((thP_obls i G 1 ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r))
+                      ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r ∨ oblP_fulfilled r))
                        ={∅}=∗ P))
     ⊢ mprog n Θ i P.
   Proof.
-    unfold_opreds. iIntros "H". iMod "H" as "(%& (#Oe& Ox& Ob& OS)& GFs& %& #REs& H)".
-    iAssert ([∗ set] g ∈ G, oblG_elem g ∗ oblG_fuel g Ord.one)%I with "[GFs]" as "GFs".
-    { iApply (big_sepS_impl with "GFs"). iIntros "!> %% H".
-      rewrite (oblG_fuel_eq _ (measure (0 : layer) 1) Ord.one); auto. rewrite measure_nat Ord.from_nat_1. done. }
-    iIntros "%%%% (MH& S& O& A& W& %GWI1)".
+    unfold_opreds. iIntros "H". iMod "H" as "(%& (#Oe& Ox& Ob)& GFs& %& #REs& H)".
+    iIntros "%%%% (MH& S& O& A& G& W& %GWI1)".
+    iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
+    iMod (ogroup_exchange_fuel with "[$G $Ob $GFs]") as "(%& ACC& Gta& Ox2& Ob& GFs)". 1: auto.
+    { rewrite measure_mult measure_nat Jacobsthal.mult_1_r. rewrite measure_add measure_nat.
+      eapply Ord.lt_le_lt; last eapply Hessenberg.add_base_l. apply Ord.S_lt. }
+    iAssert ([∗ set] k ∈ G, oblG_elem k)%I as "#Ges".
+    { iApply (big_sepS_impl with "GFs"). iIntros "!> %% [_ $]". }
     iAssert (⌜ G ⊆ dom Ω1 ⌝)%I as "%GOSub".
     { rewrite elem_of_subseteq. iIntros (x INGx).
-      iPoseProof (big_sepS_delete _ _ _ INGx with "GFs") as "[(#Bex& _) _]".
-      iApply (osat_elem with "[$S $Bex]").
-    }
+      iPoseProof (big_sepS_delete _ _ _ INGx with "GFs") as "[(_& #Bex) _]".
+      iApply (osat_elem with "[$S $Bex]"). }
     iAssert ([∗ map] k ↦ _ ∈ Ω1, (⌜ k ∈ G ⌝ ∗ oblG_fuel k Ord.one) ∨ (⌜ k ∉ G ⌝))%I with "[GFs]" as "GFs".
     { rewrite !big_sepM_dom. replace (dom Ω1) with (G ∪ (dom Ω1 ∖ G)).
       2:{ rewrite -union_difference_L; auto. }
       iApply (big_sepS_union). 1: set_solver.
       iSplitL.
-      - iApply (big_sepS_impl with "GFs"). iIntros "!>" (??) "(_& Bfx)". iLeft. iFrame. done.
-      - iApply big_sepS_intro. iIntros "!>" (??). iRight. iPureIntro. set_solver + H.
-    }
+      - iApply (big_sepS_impl with "GFs"). iIntros "!>" (??) "(H& Bfx)". iLeft. iFrame. done.
+      - iApply big_sepS_intro. iIntros "!>" (??). iRight. iPureIntro. set_solver + H. }
     iAssert (∀ g, ⌜ g ∈ G ⌝ → ∃ o, ⌜ Ω1 !! g = Some o ∧ obl_cond_owner i g o ⌝)%I as "%LUG".
     { iIntros (g INGg). pose proof INGg.
-      iPoseProof (big_sepS_delete _ _ _ INGg with "OS") as "[(#Ge& Gl& Go& Oo) _]".
-      iPoseProof (othread_obls_lookup _ _ g _ _ _ INGg with "[$S $O $Oe $Ob $Ge]") as "(%& %)".
-      iExists _. iPureIntro. done.
-    }
+      iPoseProof (big_sepS_delete _ _ _ INGg with "Ges") as "[#Ge _]".
+      iPoseProof (othread_obls_lookup _ _ g _ _ INGg with "[$S $O $Oe $Ob $Ge]") as "(%& %)".
+      iExists _. iPureIntro. done. }
     iAssert (∀ k, ⌜ k ∈ dom Ω1 ⌝ → ⌜ k ∉ G ⌝ → ∃ o, ⌜ Ω1 !! k = Some o ∧ ¬ obl_cond_owner i k o ⌝)%I as "%NotG".
     { iIntros (k INOk NINGk). apply elem_of_dom in INOk. destruct INOk.
       destruct (decide (obl_cond_owner i k x)); eauto.
       iExFalso. destruct x; try done. simpl in o. subst.
-      iPoseProof (othread_assigned_obls_lookup _ _ k with "[$S $O $A $Ob]") as "%"; eauto.
-    }
+      iPoseProof (othread_assigned_obls_lookup _ _ k with "[$S $O $A $Ob]") as "%"; eauto. }
     iAssert ([∗ map] k ↦ o ∈ Ω1, (⌜ obl_cond_owner i k o ⌝ ∗ (∃ c, ⌜ WFOCM.ltR OCM.unit c ⌝ ∗ oblG_fuel k c)) ∨ (⌜ ¬ obl_cond_owner i k o ⌝))%I with "[GFs]" as "GFs".
     { iApply (big_sepM_impl with "GFs"). iIntros "!>" (???) "[(%& Bfk) | %]".
       - iLeft. iFrame "Bfk". iPureIntro; split.
@@ -108,18 +107,17 @@ Section mprog.
         + apply Ord.S_pos.
       - iRight. iPureIntro. apply NotG in H0.
         + destruct H0 as (?& ?& ?). rewrite H in H0. inv H0. auto.
-        + apply elem_of_dom; eauto.
-    }
+        + apply elem_of_dom; eauto. }
     assert (DomOW : dom Ω1 = dom W1) by (eapply owit_inv_dom; eauto).
     iAssert (⌜ R ⊆ dom W1 ⌝)%I as "%RWSub".
     { rewrite -DomOW. rewrite elem_of_subseteq. iIntros (x INRx).
       iPoseProof (big_sepS_delete _ _ _ INRx with "REs") as "[#Beg _]".
-      iPoseProof (osat_elem with "[$S $Beg]") as "%". done.
-    }
+      iPoseProof (osat_elem with "[$S $Beg]") as "%". done. }
     iMod (osat_progress with "[$S $GFs]") as "(%Ω2& S& %ProgO)".
     { intros. destruct g; try done. eauto. }
     iMod (model_history_interp_step _ _ n n _ Ω2 with "MH") as "MH". 1: done.
     { eapply obls_cond_progress_obls_le; eauto. }
+    iPoseProof ("ACC" with "Ox2 Ob") as "G".
     iModIntro. iExists Ω2. iSplitR; first done. iIntros (W2 (ProgW& GWI2)).
     iMod (owit_progress with "W") as "[W Ws]". 1: eauto.
     assert (HW1 : ∃ WR WR', WR ##ₘ WR' ∧ W1 = WR ∪ WR' ∧ R = dom WR).
@@ -146,8 +144,7 @@ Section mprog.
         { apply lookup_union_None. rewrite -H2; auto. }
         destruct H4. exists WR, (<[r:=x]>WR'). split_and !; auto.
         + apply map_disjoint_insert_r. split; auto.
-        + subst. rewrite insert_union_r; done.
-    }
+        + subst. rewrite insert_union_r; done. }
     destruct HW1 as (WR& WR'& DisjWR& EQWR& DomWR).
     iAssert (⌜ ∀ k, k ∈ R → ∃ w, WR !! k = Some w ⌝)%I as "%Rver".
     { iPureIntro. intros. subst. apply elem_of_dom in H. destruct H. eauto. }
@@ -158,7 +155,7 @@ Section mprog.
       - iDestruct "H" as "(%&%& Wc)". iLeft. iApply (witG_witness_mon with "Wc").
         apply Ord.S_supremum. eauto. }
     iCombine "REs Rs" as "Rs". iPoseProof (big_sepS_sep with "Rs") as "Rs".
-    iMod ("H" with "[$Ob $Ox $Oe $OS Rs]") as "H".
+    iMod ("H" with "[$Oe $Ox $Gta Rs]") as "H".
     { iApply (big_sepS_impl with "Rs"). iIntros "!> %% (#Ge& [Ww | Gf])"; eauto. }
     iModIntro. assert (dom Ω1 = dom Ω2) by (destruct ProgO; eapply obls_cond_rel_dom; eauto).
     rewrite /model_interp H. iFrame. done.
@@ -227,16 +224,20 @@ Section mphys.
     n1 ≤ n2 →
     Θ2 = Θ1 ∪ π →
     Θ1 ## π →
-    (|={∅}=> ([∗ set] j ∈ π, thP_obls j ∅ 1) ={∅}=∗ P)
+    (|={∅}=> ([∗ set] j ∈ π, thP_groups j ∅) ={∅}=∗ P)
     ⊢ mphys n1 n2 Θ1 Θ2 P.
   Proof.
     intros LE ->. unfold_opreds. iIntros (DisjTP) "H". iMod "H".
-    iIntros "%%%% (MH& S& O& A& W& %GWI1)".
+    iIntros "%%%% (MH& S& O& A& G& W& %GWI1)".
     iMod (model_history_interp_step _ _ n1 n2 _ Ω with "MH") as "MH". 1,2: done.
-    iMod (othread_alloc_threads π with "O") as "[O Efs]".
-    { eauto. }
-    iMod ("H" with "[Efs]") as "H".
-    { iApply (big_sepS_impl with "Efs"). iIntros "!> %% ($& $& $)". done. }
+    iMod (othread_alloc_threads π with "O") as "[O Efs]". 1: eauto.
+    iAssert (([∗ set] i ∈ π, othreadG_exec i (1/2/2) ∗ othreadG_obls i ∅) ∗
+             ([∗ set] i ∈ π, othreadG_elem i ∗ othreadG_exec i (1/2)))%I with "[Efs]" as "[TGs Efs]".
+    { iApply big_sepS_sep. iApply (big_sepS_impl with "Efs"). iIntros "!> %% ($& $& [$ $])". }
+    iMod (ogroup_alloc_threads π with "[$G $TGs]") as "[G Gtas]". 1: eauto.
+    iMod ("H" with "[Efs Gtas]") as "H".
+    { iPoseProof (big_sepS_sep with "[$Efs $Gtas]") as "Efs".
+      iApply (big_sepS_impl with "Efs"). iIntros "!> %% (($& $)& $)". }
     iModIntro. rewrite /model_interp. iFrame. done.
   Qed.
 
