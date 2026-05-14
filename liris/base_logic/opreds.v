@@ -1269,7 +1269,7 @@ Section preds.
       iIntros "!> !>". auto.
     Qed.
 
-    Lemma ogroup_alloc_mupd n Θ i G ℓ μ :
+    Lemma group_alloc_mupd n Θ i G ℓ μ :
       thP_groups i G -∗
       |=[n,Θ]=>m ∃ g, (⌜ g ∉ G ⌝) ∗
                      thP_groups i ({[g]} ∪ G) ∗ ogP_group i g ℓ ∅ ∗ ogP_fuel g ℓ μ.
@@ -1287,7 +1287,7 @@ Section preds.
       iIntros "!> !>". iFrame "Te Tb". iFrame. iSplit; auto.
     Qed.
 
-    Lemma ogroup_delete_mupd n Θ i G g ℓ :
+    Lemma group_delete_mupd n Θ i G g ℓ :
       thP_groups i G -∗
       ogP_group i g ℓ ∅ -∗
       |=[n,Θ]=>m thP_groups i (G ∖ {[g]}).
@@ -1475,13 +1475,13 @@ Section preds.
       done.
     Qed.
 
-    Local Lemma obl_change_ogroup_mupd n Θ i g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
+    Local Lemma obl_change_group_mupd n Θ i g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       k ∈ K1 →
       (ℓ2 < ℓ)%ordi →
       ogP_group i g1 ℓ1 K1 -∗
       ogP_group i g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
-      |=[n,Θ]=>m ogP_group i g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i g2 ℓ2 (K2 ∪ {[k]}).
+      |=[n,Θ]=>m ogP_group i g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
     Proof.
       unfold_opreds. iIntros (Ink LTl) "(#Tei& Gg1& Gt1& (%& #Gb1)& KS1) (_& Gg2& Gt2& (%& #Gb2)& KS2) Of".
       iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
@@ -1493,6 +1493,11 @@ Section preds.
       { rewrite measure_mult measure_add.
         etrans; first (rewrite -(Jacobsthal.mult_1_l (measure ℓ2 μ0)); reflexivity).
         eapply Jacobsthal.le_mult_l. rewrite measure_nat. apply Hessenberg.add_base_l. }
+      iAssert (⌜k ∉ K2⌝)%I as "%Nink2".
+      { destruct (decide (k ∈ K2)); auto.
+        iPoseProof (big_sepS_delete _ _ _ Ink with "KS1") as "[(_& Go& Oo) KS1]".
+        iPoseProof (big_sepS_delete _ _ _ e with "KS2") as "[(_& Go2& Oo2) KS2]".
+        iPoseProof (oblG_owner_agree with "[$Go $Go2]") as "%". destruct H. subst. done. }
       iMod (ogroup_obl_change_group with "[$G $Gg1 $Gg2 $Gb2 $Of]") as "(G& Gg1& Gg2)". 1,2: auto.
       iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
       iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
@@ -1500,8 +1505,8 @@ Section preds.
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S T G W A". iSplitR; eauto.
       iIntros "!> !>". iFrame. iPoseProof (big_sepS_delete _ _ _ Ink with "KS1") as "[Kk KS1]".
-      iFrame "Tei Gb1 Gb2 KS1". iApply (big_sepS_union_2 with "KS2").
-      iApply big_sepS_singleton. iFrame.
+      iFrame "Tei Gb1 Gb2 KS1". iSplit; last auto.
+      iApply (big_sepS_union_2 with "KS2"). iApply big_sepS_singleton. iFrame.
     Qed.
 
     Local Lemma obl_change_thread_mupd n Θ i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
@@ -1513,12 +1518,27 @@ Section preds.
       oblP_fuel k ℓ 1 -∗
       |=[n,Θ]=>m ogP_group i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
     Proof.
-      TODO
-      unfold_opreds. iIntros (LUGk) "(#Oe1& Ox1& Ob1& OS1) (#Oe2& Ox2& Ob2& OS2) (#Ge& Gf)".
-      rewrite (oblG_fuel_eq _ _ Ord.one); cycle 1.
-      { rewrite measure_nat Ord.from_nat_1. done. }
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
-      iPoseProof (big_sepS_delete _ _ _ LUGk with "OS1") as "[(_& Go& Oo) OS1]".
+      unfold_opreds. iIntros (Nei Ink LTl) "(#Tei1& Gg1& Gt1& (%& #Gb1)& KS1) (#Tei2& Gg2& Gt2& (%& #Gb2)& KS2) Of".
+      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
+      iPoseProof (othread_elem with "[$T $Tei1]") as "%Ini1".
+      iPoseProof (othread_elem with "[$T $Tei2]") as "%Ini2".
+      iMod (oblP_fuel_extend _ ℓ2 ℓ (1 ⊕ μ0)%M with "[Of]") as "Of". 1: auto.
+      { unfold_opreds. eauto. }
+      iPoseProof (oblP_fuel_add with "Of") as "[Of0 Of]".
+      unfold_opreds. iDestruct "Of" as "(#Ge& Of)". iDestruct "Of0" as "[_ Of0]".
+      iMod (oblG_fuel_mon _ (measure ℓ2 μ0) with "Of") as "Of".
+      { rewrite measure_mult measure_add.
+        etrans; first (rewrite -(Jacobsthal.mult_1_l (measure ℓ2 μ0)); reflexivity).
+        eapply Jacobsthal.le_mult_l. rewrite measure_nat. apply Hessenberg.add_base_l. }
+      iMod (oblG_fuel_mon _ (1) with "Of0") as "Of0".
+      { rewrite measure_mult measure_nat Jacobsthal.mult_1_r.
+        rewrite measure_add measure_nat. apply Hessenberg.add_base_l. }
+      iAssert (⌜k ∉ K2⌝)%I as "%Nink2".
+      { destruct (decide (k ∈ K2)); auto.
+        iPoseProof (big_sepS_delete _ _ _ Ink with "KS1") as "[(_& Go& Oo) KS1]".
+        iPoseProof (big_sepS_delete _ _ _ e with "KS2") as "[(_& Go2& Oo2) KS2]".
+        iPoseProof (oblG_owner_agree with "[$Go $Go2]") as "%". destruct H. subst. done. }
+      iPoseProof (big_sepS_delete _ _ _ Ink with "KS1") as "[(_& Go& Oo) KS1]".
       iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
       destruct LUO1o as (?&LUO1o). rename x into a.
       iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1& _) | #Gu])".
@@ -1526,42 +1546,78 @@ Section preds.
       2:{ iExFalso. iPoseProof (osat_lookup_fulfilled with "[$S $Ge $Gu]") as "%". rewrite H in LUO1o; done. }
       iPoseProof (oblG_owner_agree _ i0 i1 with "[$Go $Go1]") as "%". destruct H as [-> _].
       iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
-      iMod (othread_delete_obl with "[$O $Ob1 $Oo]") as "(O& Ob1& Go2)".
-      { auto. }
-      iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'".
-      iCombine "Go Go'" as "Go".
-      iMod (osat_progress_one_owner _ _ _ _ i2 with "[$S $Go $Gf]") as "(%& S& Go& %Gstep)".
-      1: eauto.
-      1: apply Ord.S_lt.
-      iMod (othread_alloc_obl with "[$S $O $Ob2 $Ge $Go]") as "(S& O& %NinkG2& Ob2& Oo& Go)".
+      iMod (ogroup_obl_change_thread _ i1 i2 g1 g2 with "[$G $Gg1 $Gg2 $Gb2 $Of]")
+        as "(%& %& ACC& %Ink1& Tx1& TG1& Tx2& TG2& Gg1& Gg2)". 1,2,3,4: auto.
+      iMod (othread_delete_obl with "[$T $TG1 $Oo]") as "(T& TG1& Go2)".
+      iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'". iCombine "Go Go'" as "Go".
+      iMod (osat_progress_one_owner _ _ _ _ i2 with "[$S $Go $Of0]") as "(%& S& Go& %Gstep)".
+      1: eauto. 1: apply Ord.S_lt.
+      iMod (othread_alloc_obl with "[$S $T $TG2 $Ge $Go]") as "(S& T& %NinkG2& TG2& Oo& Go)".
       iDestruct "Go" as "[Go Go']". iDestruct "Oo" as "[Oo [Oo1 Oo']]".
       iPoseProof (oassigned_add_obl with "[$A $Ge Go' Oo']") as "A".
       { iLeft. iFrame. auto. }
       set (Ω2:=(<[k:=(obl_assigned a' i2)]> Ω1)).
       assert (Gstep' : obl_step (obl_assigned a i1) (obl_assigned a' i2)) by (by econstructor 1).
       iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
-      { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }            
+      { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
+      iPoseProof ("ACC" with "[//] Tx1 TG1 Tx2 TG2") as "G".
       iModIntro. iExists Ω2. iSplitR.
       { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
       iIntros (? [WStep GWI2]).
       pose proof (owit_inv_progress_owner _ k _ _ _ LUO1o GWI _ _ Gstep' W2 WStep GWI2) as WMon.
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
-      rewrite /model_interp. iFrame "HI S O W". iSplitL "A".
+      rewrite /model_interp. iFrame "HI S T G W". iSplitL "A".
       { iModIntro. subst Ω2. rewrite dom_insert_L.
         replace ({[k]} ∪ dom Ω1 ∖ {[k]}) with (({[k]} ∪ dom Ω1)).
         { iFrame. eauto. }
         apply elem_of_dom_2 in LUO1o. rewrite -union_difference_L; set_solver. }
-      iIntros "!> !>". iFrame "Oe1 Oe2 Ox1 Ox2 OS1".
-      iFrame "Ob1 Ob2". iSplitL; last auto.
-      iApply big_sepS_union. 1: set_solver. rewrite big_sepS_singleton. iFrame. iCombine "Oo Oo1" as "Oo". eauto.
+      iIntros "!> !>". iFrame "Tei1 Tei2 Gt1 Gt2 KS1 Gg1 Gg2 Gb1 Gb2".
+      iSplitL; last auto. iApply (big_sepS_union_2 with "KS2").
+      rewrite big_sepS_singleton. iFrame. iCombine "Oo Oo1" as "Oo". eauto.
+    Qed.
+
+    Lemma obl_offload_mupd n Θ i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
+      k ∈ K1 →
+      (ℓ2 < ℓ)%ordi →
+      ogP_group i1 g1 ℓ1 K1 -∗
+      ogP_group i2 g2 ℓ2 K2 -∗
+      oblP_fuel k ℓ 1 -∗
+      |=[n,Θ]=>m ogP_group i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
+    Proof.
+      intros. destruct (decide (i1 = i2)).
+      - subst. apply obl_change_group_mupd; auto.
+      - apply obl_change_thread_mupd; auto.
+    Qed.
+
+    Lemma obl_offload_set_mupd n Θ i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
+      K ⊆ K1 →
+      (ℓ2 < ℓ)%ordi →
+      ogP_group i1 g1 ℓ1 K1 -∗
+      ogP_group i2 g2 ℓ2 K2 -∗
+      ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
+      |=[n,Θ]=>m ogP_group i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K ⊈ K2 ∨ K = ∅ ⌝.
+    Proof.
+      revert K1 K2. pattern K. revert K. apply set_ind.
+      { solve_proper. }
+      { iIntros (K1 K2 HK LTl) "Gg1 Gg2 Kfs".
+        replace (K1 ∖ ∅) with K1 by set_solver. replace (K2 ∪ ∅) with K2 by set_solver.
+        iFrame. iModIntro. iPureIntro. right. auto. }
+      iIntros (k K Nink IH K1 K2 HK LTl) "Gg1 Gg2 Kfs".
+      iPoseProof (big_sepS_union with "Kfs") as "[F Kfs]". 1: set_solver.
+      iMod (IH K1 K2 with "Gg1 Gg2 Kfs") as "(Gg1& Gg2& %Hcase)". 1: set_solver. 1: auto.
+      replace (K1 ∖ ({[k]} ∪ K)) with ((K1 ∖ K) ∖ {[k]}) by set_solver.
+      replace (K2 ∪ ({[k]} ∪ K)) with ((K2 ∪ K) ∪ {[k]}) by set_solver.
+      rewrite big_sepS_singleton.
+      iMod (obl_offload_mupd with "Gg1 Gg2 F") as "($& $& %)". 1: set_solver. 1: auto.
+      iPureIntro. set_solver.
     Qed.
 
     Lemma obl_check_witnesses_mupd n Θ (R : oids) :
       ([∗ set] r ∈ R, oblP_id r) -∗
-      |=[n,Θ]=>m ([∗ set] r ∈ R, witP_cred r Ord.O ∨ oblP_fulfilled r).
+      |=[n,Θ]=>m ([∗ set] r ∈ R, (oblP_id r ∗ witG_witness r Ord.O) ∨ oblP_fulfilled r).
     Proof.
       unfold_opreds. iIntros "#REs".
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI1)".
+      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI1)".
       iPoseProof (owit_get_credit_zero with "W") as "[W Ws]".
       assert (DomOW : dom Ω1 = dom W1) by (eapply owit_inv_dom; eauto).
       iAssert (⌜ R ⊆ dom W1 ⌝)%I as "%RWSub".
@@ -1606,7 +1662,7 @@ Section preds.
       iCombine "REs Rs" as "Rs". iPoseProof (big_sepS_sep with "Rs") as "Rs".
       pose proof (owit_inv_rc_step_same_gls _ _ _ GWI1 WStep GWI2) as WMon.
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
-      rewrite /model_interp. iFrame "HI S O W A". iSplitR; eauto.
+      rewrite /model_interp. iFrame "HI S O W G A". iSplitR; eauto.
       iIntros "!> !>". iApply (big_sepS_impl with "Rs"). iIntros "!> %% (#Ge& [Ww | Gf])".
       - iLeft. eauto.
       - iRight. eauto.
