@@ -55,6 +55,8 @@ Section proof.
   Remark N_subseteq_1 : ↑N_eventually ⊆ (⊤ : coPset) ∖ ↑N_inv.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
+  TODO
+
   (** Definitions *)
   Local Definition lock_proto_tf γt γa (next curr : loc) (ℓ : layer) (R : tf Σ) : tf Σ :=
     (∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
@@ -66,7 +68,7 @@ Section proof.
         (⌜(0 ≤ c ≤ n)%Z⌝) ∗
         (⌜ ∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z ⌝) ∗
         ([^tf_sep map] t ↦ κ ∈ tickets,
-           ⟨oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi⟩ ∗
+           ⟨oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (2 * (Z.to_nat t%Z) + 1))%ordi⟩ ∗
            ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ ⟨oblP_fulfilled κ⟩) ∨
               (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)))) ∗
         (* Thread acks its turn and acquires the lock and resources. *)

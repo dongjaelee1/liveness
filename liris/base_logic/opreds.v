@@ -38,6 +38,7 @@ Local Definition oblP_fuel_val `{SI : indexT} `{@mupdGS SI Σ}
   k α : iProp Σ :=
   oblP_id k ∗ oblG_fuel k α.
 
+TODO
 Local Definition oblP_fuel_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   k ℓ μ : iProp Σ :=
   oblP_fuel_val k (measure ℓ ((1 ⊕ ▽) × μ)%M).

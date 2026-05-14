@@ -12,6 +12,7 @@ Class layer_class (L : Type) := {
 Section measure.
   Context `{!layer_class L} `{!ord_mono_fun_class}.
 
+  (** Syntax that captures a useful subset of Ordinal. *)
   Inductive measurable_syntax  : Type :=
   (* Any well-founded ordering of type A can be embedded as long as the universe is consistent. *)
   | ms_embed {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (a : A)
@@ -21,8 +22,13 @@ Section measure.
   | ms_expn (s1 s2 : measurable_syntax)
   | ms_extend.
 
+  (** Interpretaion into Ordinal. *)
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
   Remark measure_rec_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
+  Proof using. intros. destruct m. auto. Qed.
+
+  Definition nat_sub (n : nat) : Type := sig (λ v, v < n).
+  Remark measure_rec_oblig_nat : ∀ (n : nat) (m : nat_sub n), (proj1_sig m) < n.
   Proof using. intros. destruct m. auto. Qed.
 
   Fixpoint measure_rec (l : L) (ACC : Acc ltL l) {struct ACC} :
@@ -174,6 +180,33 @@ Section measure.
     (measure l (ms_nat (S n)) == (measure l (ms_nat 1) ⊕ measure l (ms_nat n)))%ord.
   Proof using.
     rewrite <-measure_nat_add. reflexivity.
+  Qed.
+
+  (** Top element *)
+  Definition measure_top (l : L) : Ord.t :=
+    Ord.join (λ (μ : measurable_syntax), measure l μ).
+
+  Lemma measure_top_upperbound l μ :
+    (measure l μ <= measure_top l)%ord.
+  Proof using. apply Ord.join_upperbound. Qed.
+
+  Lemma measure_top_lt_extend l1 l2 :
+    ltL l1 l2 →
+    (η (measure_top l1) <= measure l2 (ms_extend))%ord.
+  Proof using.
+    intros Hlt. rewrite (measure_unfold _ (ms_extend)).
+    apply η_le_proper.
+    etransitivity; cycle 1.
+    { eapply (Ord.join_upperbound _ (exist _ l1 Hlt)). }
+    simpl. reflexivity.
+  Qed.
+
+  Lemma measure_top_lt l1 l2 :
+    ltL l1 l2 →
+    (η (measure_top l1) <= measure_top l2)%ord.
+  Proof using.
+    intros Hlt. etransitivity; first eapply measure_top_lt_extend; eauto.
+    apply measure_top_upperbound.
   Qed.
 
 End measure.
