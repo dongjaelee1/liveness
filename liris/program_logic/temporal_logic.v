@@ -412,14 +412,14 @@ Section proof.
   Global Instance tf_until_as_fractional N k b q P Q : AsFractional (⟦tf_until N k b q P Q⟧ₗ) (λ q, ⟦tf_until N k b q P Q⟧ₗ) q.
   Proof. split; [auto|apply _]. Qed.
 
-  Lemma tf_until_alloc E i G q (b : bool) ℓ μ :
-    thP_obls i G q -∗
-    |={E}=>m ∃ k, ⌜k ∉ G⌝ ∗ thP_obls i ({[k]} ∪ G) q ∗
-                 oblP_layer k ℓ ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                 ∀ E' N (P Q : tf Σ), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ)
-                                    ={E'}=∗ (⟦tf_until N k b 1 P Q⟧ₗ).
+  Lemma tf_until_alloc E i g K (b : bool) ℓ1 ℓ2 μ :
+    (ℓ1 < ℓ2)%ordi →
+    ogP_group i g ℓ1 K -∗
+    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ ogP_group i g ℓ1 ({[k]} ∪ K) ∗
+                 oblP_id k ∗ oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
+                 ∀ E' N (P Q : tf Σ), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) ={E'}=∗ (⟦tf_until N k b 1 P Q⟧ₗ).
   Proof.
-    iIntros "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& $& $& ACC)".
+    iIntros (Ltl) "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& $& ACC)". 1: auto.
     iIntros "!> %%%% H". rewrite tf_until_logic. iMod ("ACC" with "H") as "ACC". iFrame. done.
   Qed.
 
@@ -427,20 +427,19 @@ Section proof.
     ⟦Q⟧ₗ -∗
     |={E}=>m ⟦Q⟧ₗ ∗ ∃ k, oblP_fulfilled k ∗ oblP_id k ∗
                         (∀ E' N (P : tf Σ), |={E'}=> oblP_inv N k ⟦P⟧ₗ ⟦Q⟧ₗ (tf_fulfilled k Q)) ∗ 
-                        oblP_layer k ℓ ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
+                        oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "HQ".
     unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     (* FIXME: proof without unfold everything? *)
-    unfold_opreds. iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
+    unfold_opreds. iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
     assert (NEW : ∃ k, Ω1 !! k = None).
     { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
     destruct NEW as (k& NEWk).
     assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-    iMod (osat_alloc_obl_fulfilled _ k ℓ μ with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)".
-    { auto. }
-    iMod (owit_alloc_witness_fulfilled _ k (η (measure ℓ μ)) with "[$W $Gu]") as "(W& #Ww)".
+    iMod (osat_alloc_obl_fulfilled _ k ℓ ((1 ⊕ ▽) × μ)%M with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)". 1: auto.
+    iMod (owit_alloc_witness_fulfilled _ k (η (measure ℓ ((1 ⊕ ▽) × μ)%M)) with "[$W $Gu]") as "(W& #Ww)".
     { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
     iPoseProof (oassigned_add_obl with "[$A $Ge Gu]") as "A".
     { iRight. iFrame "Gu". }
@@ -457,9 +456,9 @@ Section proof.
     iPoseProof (owit_mon _ _ WMon with "W") as "W".
     iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
     { subst Ω2. rewrite dom_insert_L. iFrame. }
-    iPoseProof (tf_logic_tf_intuit with "[$SI $HI $S $O $A $W $HQ]") as "#HQi". 1: eauto.    
-    rewrite /model_interp. iFrame "HI S O A W". iSplitR; first eauto.
-    iModIntro. iMod "close" as "_". iModIntro. iFrame "SI HQ". iExists k. iFrame "Gwf Ge Ww Gf Gu".
+    iPoseProof (tf_logic_tf_intuit with "[$SI $HI $S $O $A $G $W $HQ]") as "#HQi". 1: eauto.    
+    rewrite /model_interp. iFrame "HI S O A G W". iSplitR; first eauto.
+    iModIntro. iMod "close" as "_". iModIntro. iFrame "SI HQ". iExists k. iFrame "Ge Ww Gf Gu".
     iIntros (E' N P).
     rewrite tf_fulfilled_unfold.
     iMod (oblG_inv_alloc_fulfilled _ N _ _ ⟦P⟧ₗ ⟦Q⟧ₗ with "[$Gu]") as "#GVar"; cycle 1.
@@ -481,22 +480,22 @@ Section proof.
   Qed.
 
   (** TODO: Timeless version *)
-  Lemma tf_until_fulfill E N k (P Q : tf Σ) :
+  Lemma tf_until_true_to_fulfill E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦tf_until N k true 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
-    ∀ i G q,
-    (⌜k ∈ G⌝) → thP_obls i G q -∗
-    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ thP_obls i (G ∖ {[k]}) q ∗ oblP_fulfilled k)).
+    ∀ i g ℓ K,
+    (⌜k ∈ K⌝) → ogP_group i g ℓ K -∗
+    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_group i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k)).
   Proof.
     rewrite tf_until_logic. iIntros (HMask) "(Oa& #OI)".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
-    iIntros "!> %%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
+    iIntros "!> %%%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
     iNext. iDestruct "H" as "(Oa1& Oa2& HQ)". iCombine "Oa1 Oa2" as "Oa".
     unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     (* FIXME: it would be better if we don't need to unfold everything and re-do the proof here... *)
-    unfold_opreds. iDestruct "TG" as "(#Oe& Ox& Ob& OS)". iDestruct "OI" as "(#Ge& Gvar)". iDestruct "Oa" as "(_& Gl)".
-    iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& W& %GWI)".
+    unfold_opreds. iDestruct "TG" as "(#Oe& Gg& Gt& #Gb& OS)". iDestruct "OI" as "(#Ge& Gvar)". iDestruct "Oa" as "(_& Gl)".
+    iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
     iPoseProof (big_sepS_delete _ _ _ LUGk with "OS") as "[(_& Go& Oo) OS]".
     iPoseProof (osat_lookup_assigned with "[$S $Ge $Gl]") as "%LUO1l".
     iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
@@ -507,10 +506,9 @@ Section proof.
     2:{ iExFalso. iPoseProof (oblG_assigned_fulfilled_false with "[$Gl $Gu]") as "%". done. }
     iPoseProof (oblG_owner_agree _ i i1 with "[$Go $Go1]") as "%". destruct H as [<- _].
     iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
-    iMod (othread_delete_obl_frac with "[$O $Ob $Oo]") as "(O& Ob& Go2)".
-    { auto. }
-    iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'".
-    iCombine "Go Go'" as "Go".
+    iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
+    iMod (ogroup_delete_obl with "[$O $G $Gg $Oo]") as "(O& G& Gg& Go2)". 1,2: auto.
+    iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'". iCombine "Go Go'" as "Go".
     iMod (osat_fulfill with "[$S $Ge $Gl $Go]") as "(S& #Gu& %Gstep)".
     assert (LUW : ∃ b, W1 !! k = Some (witness_assigned b) ∧ (b <= η a)%ord).
     { specialize (GWI k). rewrite LUO1l in GWI. inv GWI. destruct y; try done. eauto. }
@@ -534,33 +532,33 @@ Section proof.
     iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
     { subst Ω2. rewrite dom_insert_L. replace ({[k]} ∪ dom Ω1 ∖ {[k]}) with (({[k]} ∪ dom Ω1)). 1: iFrame.
       apply elem_of_dom_2 in LUO1l. rewrite -union_difference_L; set_solver. }
-    iPoseProof (tf_logic_tf_intuit with "[$SI $HI $S $O $A $W $HQ]") as "#HQi". 1: eauto.
-    rewrite /model_interp. iFrame "HI S O W A".
-    iApply fupd_intro. iSplitR; first eauto. iIntros "!>". iFrame "Oe Ge Gu Ox SI".
+    iPoseProof (tf_logic_tf_intuit with "[$SI $HI $S $O $A $G $W $HQ]") as "#HQi". 1: eauto.
+    rewrite /model_interp. iFrame "HI S O W A G".
+    iApply fupd_intro. iSplitR; first eauto. iIntros "!>". iFrame "Oe Ge Gb Gu Gg Gt SI".
     iMod "close" as "_". iModIntro. iMod ("ACC" with "[]") as "_".
     { iNext. iRight. iRight. rewrite tf_fulfilled_unfold. iFrame "Ge Gu Eo HE HQi". }
     iModIntro. iFrame.
   Qed.
 
-  Lemma tf_until_fulfill_full E N k (P Q : tf Σ) :
+  Lemma tf_until_fulfill E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦tf_until N k false 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ▷ (⟦P⟧ₗ ∗
        ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N}=∗
-                       ∀ i G q, (⌜k ∈ G⌝) → thP_obls i G q -∗
-                                ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ thP_obls i (G ∖ {[k]}) q ∗ oblP_fulfilled k)))).
+                       ∀ i g ℓ K, (⌜k ∈ K⌝) → ogP_group i g ℓ K -∗
+                                  ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_group i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k)))).
   Proof.
     iIntros (HN) "Uk". iMod (tf_until_to_true with "Uk") as "H". 1: auto.
     iModIntro. iNext. iDestruct "H" as "($& H)". iIntros (?).
     iMod ("H" $! E') as "H". iIntros "!> HQ". iMod ("H" with "HQ") as "H".
-    iMod (tf_until_fulfill with "H") as "H". 1: auto.
-    iIntros "!> %%% % TG". iPoseProof ("H" with "[//] TG") as "H".
+    iMod (tf_until_true_to_fulfill with "H") as "H". 1: auto.
+    iIntros "!> %%%% % TG". iPoseProof ("H" with "[//] TG") as "H".
     iIntros (?). iNext. iMod ("H" $! E'') as "H". iModIntro. iFrame.
   Qed.
 
 End proof.
 
-(* (** Random tests to check universe consistency. *) *)
+(* (** Some tests to check universe consistency. *) *)
 
 (* From transfinite.stepindex Require Import ordinals. *)
 (* From transfinite.base_logic Require Import satisfiable. *)

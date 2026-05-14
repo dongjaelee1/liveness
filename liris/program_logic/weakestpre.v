@@ -465,7 +465,7 @@ End proofmode_classes.
 
 (** Wrapper for the termination condition for soundness. *)
 Definition lift_term `{SI : indexT} `{!lirisGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
-  λ v, (thP_term i ∗ Φ i v)%I.
+  λ v, (thP_done i ∗ Φ i v)%I.
 
 (* pre-definition of lwp of which we take a least fixpoint *)
 (* For soundness of Liris, postcondition of a thread i must include othreadG_term i. *)

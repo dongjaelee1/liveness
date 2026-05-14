@@ -435,14 +435,14 @@ Section proof2.
     iIntros (HIST EQTQ) "(HI& MI& WPs)". iIntros (k o LUk). destruct o; last eauto.
     unfold thread_active. simpl. iPoseProof (history_interp_lookup with "HI") as "%Hlu".
     apply HIST in Hlu. destruct Hlu as (j& Now). rewrite Now.
-    iDestruct "MI" as "(MHI& S& T& A& W& %Inv)".
+    iDestruct "MI" as "(MHI& S& T& A& G& W& %Inv)".
     iPoseProof (othread_assigned_thread_elem with "[$S $T $A]") as "%Tin". 1: eapply LUk.
     apply elem_of_dom in Tin. destruct Tin as (e&LUth).
     rewrite EQTQ lookup_fmap_Some in LUth. destruct LUth as (?& EQe& LUth).
     destruct x as (?&Q). simpl in EQe. subst e0.
     iPoseProof (big_sepM_delete _ _ _ _ LUth with "WPs") as "[WP WPs]".
     destruct (to_val e) eqn:TVe.
-    - iDestruct "WP" as "(#Term& HQ)". iPoseProof (othread_assigned_term_false with "[$S $T $A]") as "%"; eauto.
+    - iDestruct "WP" as "(#Term& HQ)". iPoseProof (othread_assigned_done_false with "[$S $T $A]") as "%"; eauto.
       unfold_opreds. auto.
     - iPureIntro. exists e. split; auto. subst. rewrite lookup_fmap LUth. done.
   Qed.
@@ -714,7 +714,7 @@ Section proof2.
         { destruct ProgO. specialize (H0 k). rewrite LUOk in H0. inv H0. destruct y; last done. eauto. }
         destruct H as (fuel2&owner2&LUOk2).
         destruct (thread_active_or_not owner2 (n, τf)) as [TN2 | TA2].
-        { iExFalso. iDestruct "MI" as "(MHI& S& T& A& W& %OWInv)".
+        { iExFalso. iDestruct "MI" as "(MHI& S& T& A& G& W& %OWInv)".
           unfold thread_na in TN2. simpl in TN2. rewrite TRn in TN2.
           iPoseProof (othread_assigned_thread_elem with "[$S $T $A]") as "%INk". 1: eapply LUOk2.
           destruct TN2.
@@ -726,7 +726,7 @@ Section proof2.
           destruct LUTQ2 as (Q2& LUTQ2). assert (delete i1 TQ !! owner2 = Some (x, Q2)).
           { rewrite lookup_delete_ne; auto. }
           iPoseProof (big_sepM_delete _ _ _ _ H1 with "WPs") as "[WP' WPs]". rewrite H0.
-          iDestruct "WP'" as "(#Term& HQ)". iPoseProof (othread_assigned_term_false with "[$S $T $A]") as "%"; eauto.
+          iDestruct "WP'" as "(#Term& HQ)". iPoseProof (othread_assigned_done_false with "[$S $T $A]") as "%"; eauto.
           unfold_opreds. auto. }
         (** Resume the step. *)
         rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro.
@@ -1000,7 +1000,7 @@ Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
                 (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
      let _ : lirisGS Λ Σ := LirisG Htemporal Hsic fork_post in
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_groups i ∅) -∗
       |={⊤}=>m (∃ (Φ' : tf Σ),
                   (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
                   (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
@@ -1025,7 +1025,7 @@ Proof.
                      (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
             let _ : lirisGS Λ Σ := LirisG Htemporal Hsic fork_post in
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-            (£ c -∗ ([∗ set] i ∈ dom Θ, thP_obls i ∅ 1) -∗
+            (£ c -∗ ([∗ set] i ∈ dom Θ, thP_groups i ∅) -∗
              |={⊤}=>m (∃ (Φ' : tf Σ), (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
                                      (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
   { iIntros (Htemp). destruct (Hwp Htemp). iExists x. iApply H0. }
@@ -1046,15 +1046,14 @@ Proof.
     intros ?. apply auth_valid_trivial. }
   iModIntro. iFrame "R W WOE". rewrite (right_id ε).
   iMod "H" as "(%Hsic& %fork_post& %Ψs& SI& SIa& WPs)".
-  iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& MI)".
-  iMod (thP_obls_alloc_threads (dom Θ) with "T") as "[T Ths]".
-  { set_solver. }
+  iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& A& G& MI)".
+  iMod (thP_groups_alloc_threads (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
   iPoseProof ("WPs" with "LC Ths") as "WPs". rewrite union_empty_l_L.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
   set (Hliris := LirisG Htemp Hsic fork_post : lirisGS Λ Σ).
   (* FIXME: just HI not working. *)
-  iApply (lwp_ti_logic with "[$HI $SIa $MHI $S $T $MI $WPs]").
+  iApply (lwp_ti_logic with "[$HI $SIa $MHI $S $T $A $G $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
   { intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto. }
 Qed.

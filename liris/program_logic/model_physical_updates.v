@@ -67,7 +67,7 @@ Section mprog.
   Lemma mprog_step n Θ i P :
     (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ogP_fuel u 0 1) ∗
                  ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                      ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r ∨ oblP_fulfilled r))
+                      ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r))
                        ={∅}=∗ P))
     ⊢ mprog n Θ i P.
   Proof.

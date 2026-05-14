@@ -82,8 +82,8 @@ Local Definition witP_layer_unseal :
 Global Arguments witP_layer {SI Σ _ _}.
 
 Local Definition witP_cred_def `{SI : indexT} `{@mupdGS SI Σ}
-  k : iProp Σ :=
-  oblP_id k ∗ witG_witness k Ord.one.
+  k a : iProp Σ :=
+  oblP_id k ∗ witG_witness k a.
 Local Definition witP_cred_aux : seal (@witP_cred_def). Proof. by eexists. Qed.
 Definition witP_cred := witP_cred_aux.(unseal).
 Local Definition witP_cred_unseal :
@@ -237,7 +237,7 @@ Section preds.
     Proof. unfold_opreds. apply _. Qed.
     Global Instance witP_layer_timeless k ℓ : Timeless (witP_layer k ℓ).
     Proof. unfold_opreds. apply _. Qed.
-    Global Instance witP_cred_timeless k : Timeless (witP_cred k).
+    Global Instance witP_cred_timeless k a : Timeless (witP_cred k a).
     Proof. unfold_opreds. apply _. Qed.
 
     Local Instance ogP_bound_timeless g ℓ μ : Timeless (ogP_bound g ℓ μ).
@@ -701,26 +701,66 @@ Section preds.
     Proof.
       unfold_opreds. iIntros (Hle) "(P& Be)". iFrame. by iApply witG_bound_mon.
     Qed.
-    Local Lemma witP_bound_val_compare k a0 :
-      witP_bound_val k a0 -∗ witP_cred k -∗ ⌜ (1 <= a0)%ord ⌝.
+    Local Lemma witP_bound_val_compare k a0 a1 :
+      witP_bound_val k a0 -∗ witP_cred k a1 -∗ ⌜ (a1 <= a0)%ord ⌝.
     Proof.
       unfold_opreds. iIntros "(P& Be) (_& Cred)". iApply (witG_compare with "[$]").
     Qed.
-    Local Lemma witP_bound_val_spend_gen k a0 :
-      witP_bound_val k a0 -∗ witP_cred k ==∗ ∃ a2, ⌜ ((1 ⊕ a2) <= a0)%ord ⌝ ∗ witP_bound_val k a2.
+    Local Lemma witP_bound_val_spend_gen k a0 a1 :
+      witP_bound_val k a0 -∗ witP_cred k a1 ==∗ ∃ a2, ⌜ ((a1 ⊕ a2) <= a0)%ord ⌝ ∗ witP_bound_val k a2.
     Proof.
       unfold_opreds. iIntros "($& Ow) (_& Oc)". iApply (witG_witness_spend_gen with "[$]").
     Qed.
-    Local Lemma witP_bound_val_spend k a0 :
-      witP_bound_val k a0 -∗ witP_cred k ==∗ ∃ a1, ⌜ (a1 < a0)%ord ⌝ ∗ witP_bound_val k a1.
+    Local Lemma witP_bound_val_spend k a0 a1 :
+      (Ord.O < a1)%ord →
+      witP_bound_val k a0 -∗ witP_cred k a1 ==∗ ∃ a2, ⌜ (a2 < a0)%ord ⌝ ∗ witP_bound_val k a2.
     Proof.
-      unfold_opreds. iIntros "($& Ow) (_& Oc)". iApply (witG_witness_spend with "[$]"). apply Ord.S_lt.
+      unfold_opreds. iIntros (LT) "($& Ow) (_& Oc)". iApply (witG_witness_spend with "[$]"). done.
+    Qed.
+    Local Lemma witP_bound_val_spend_one k a :
+      witP_bound_val k a -∗ witP_cred k Ord.one ==∗ ∃ a0, ⌜ (a0 < a)%ord ⌝ ∗ witP_bound_val k a0.
+    Proof.
+      iIntros "Ow Oc". iApply (witP_bound_val_spend with "Ow Oc"). apply Ord.S_pos.
     Qed.
 
     (** witP_layer rules *)
     Local Lemma witP_layer_witP_bound_val k ℓ :
       witP_layer k ℓ -∗ ∃ μ, witP_bound_val k (η (measure ℓ μ)).
     Proof. unfold_opreds. eauto. Qed.
+
+    (** witP_cred rules *)
+    Lemma witP_cred_eq k a0 a1 :
+      (a0 == a1) → witP_cred k a1 = witP_cred k a0.
+    Proof.
+      unfold_opreds. intros. rewrite (witG_witness_eq k a0 a1); auto.
+    Qed.
+    Lemma witP_cred_mon k a0 a1 :
+      (a0 <= a1) → witP_cred k a1 ==∗ witP_cred k a0.
+    Proof.
+      unfold_opreds. iIntros (Hle) "(P& Be)". iFrame. by iApply witG_witness_mon.
+    Qed.
+    Lemma witP_cred_split k a0 a1 :
+      witP_cred k (a0 ⊕ a1)%ord ⊣⊢ witP_cred k a0 ∗ witP_cred k a1.
+    Proof.
+      unfold_opreds. rewrite witG_witness_split. iSplit.
+      - iIntros "(#Ge& P1& P2)"; iFrame; eauto.
+      - iIntros "((P1& B1)& (P2& B2))"; iFrame.
+    Qed.
+    Lemma witP_cred_mon_split k a0 a1 a2 :
+      ((a0 ⊕ a1) <= a2)%ord →
+      witP_cred k a2 ==∗ witP_cred k a0 ∗ witP_cred k a1.
+    Proof.
+      unfold_opreds. iIntros (Hle) "(#Be& P)".
+      iMod (witG_witness_mon_split with "P") as "[P1 P2]"; first done.
+      iFrame; eauto.
+    Qed.
+    Lemma witP_cred_lt k a0 a1 :
+      (a0 < a1) → witP_cred k a1 ==∗ witP_cred k a0 ∗ witP_cred k Ord.one.
+    Proof.
+      unfold_opreds. iIntros (Hlt) "(#Be& P)". iFrame "Be".
+      iMod (witG_witness_lt with "P") as "[$ (%& %& C)]"; first done. 
+      apply ord_lt_one in H. iMod (witG_witness_mon_split with "C") as "[_ $]"; done.
+    Qed.
 
     (** ogP_fuel_val rules *)
     Local Open Scope ord.
@@ -1236,13 +1276,13 @@ Section preds.
     Qed.
 
     Lemma wit_fuels_decr k ℓ α F :
-      wit_fuels k ℓ α F -∗ witP_cred k ==∗
+      wit_fuels k ℓ α F -∗ witP_cred k Ord.one ==∗
       ∃ α0, ⌜ (α0 < α)%ord ⌝ ∗ wit_fuels k ℓ α0 F ∗
             ([∗ map] f ↦ '(l, m) ∈ F, ogP_fuel f l m).
     Proof.
       rewrite wit_fuels_unseal /wit_fuels_def. iIntros "(%& %& #Wbk& Fs) Wk".
-      iMod (witP_bound_val_spend with "Wbk Wk") as "(%& %& #Wbk2)".
-      iExists a1. iSplitR; first done. iFrame "Wbk2". assert (a1 <= η (measure ℓ μ)).
+      iMod (witP_bound_val_spend_one with "Wbk Wk") as "(%& %& #Wbk2)".
+      iExists a0. iSplitR; first done. iFrame "Wbk2". assert (a0 <= η (measure ℓ μ)).
       { etransitivity; last eauto. apply WFOCM.lt_le. auto. }
       iFrame (H1).
       iApply (collect_fuels_decr with "Fs"). auto.
@@ -1614,7 +1654,7 @@ Section preds.
 
     Lemma obl_check_witnesses_mupd n Θ (R : oids) :
       ([∗ set] r ∈ R, oblP_id r) -∗
-      |=[n,Θ]=>m ([∗ set] r ∈ R, (oblP_id r ∗ witG_witness r Ord.O) ∨ oblP_fulfilled r).
+      |=[n,Θ]=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_fulfilled r).
     Proof.
       unfold_opreds. iIntros "#REs".
       iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI1)".

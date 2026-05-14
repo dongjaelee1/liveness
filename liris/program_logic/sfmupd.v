@@ -253,27 +253,51 @@ Section sfmupd.
   Qed.
 
   (** Update rules *)
-  Lemma obl_alloc_assigned E i G q b ℓ μ :
-    thP_obls i G q -∗
-    |={E}=>m ∃ k, (⌜ k ∉ G ⌝) ∗
-                 thP_obls i ({[k]} ∪ G) q ∗
-                 oblP_assigned k b (1/2)%Qp ∗
-                 oblP_layer k ℓ ∗
-                 oblP_id k ∗
-                 oblP_fuel k ℓ μ ∗
-                 witP_layer k ℓ ∗
-                 (∀ E' N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E'}=∗ oblP_inv N k P Q R).
+  Lemma thread_terminate E i :
+    thP_groups i ∅ -∗ |={E}=>m thP_done i.
+  Proof.
+    unfold_sfmupd. iIntros "Tb %%%%% $". iMod (thread_terminate_mupd with "Tb") as "#Tt". auto.
+  Qed.
+
+  Lemma group_alloc E i G ℓ μ :
+    thP_groups i G -∗
+    |={E}=>m ∃ g, (⌜ g ∉ G ⌝) ∗
+                 thP_groups i ({[g]} ∪ G) ∗ ogP_group i g ℓ ∅ ∗ ogP_fuel g ℓ μ.
   Proof.
     unfold_sfmupd. iIntros "Tb %%%%% $".
-    iMod (obl_alloc_assigned_mupd with "Tb") as "(%& $& $& $& $& $& $& $& H)". by iModIntro.
+    iMod (group_alloc_mupd with "Tb") as "(%& %& $& $& $)". auto.
+  Qed.
+
+  Lemma group_delete E i G g ℓ :
+    thP_groups i G -∗
+    ogP_group i g ℓ ∅ -∗
+    |={E}=>m thP_groups i (G ∖ {[g]}).
+  Proof.
+    unfold_sfmupd. iIntros "Tb Gg %%%%% $".
+    iMod (group_delete_mupd with "Tb Gg") as "$". auto.
+  Qed.
+
+  Lemma obl_alloc_assigned E i g K b ℓ1 ℓ2 μ :
+    (ℓ1 < ℓ2)%ordi →
+    ogP_group i g ℓ1 K -∗
+    |={E}=>m ∃ k, (⌜ k ∉ K ⌝) ∗
+                 ogP_group i g ℓ1 ({[k]} ∪ K) ∗
+                 oblP_assigned k b (1/2)%Qp ∗
+                 oblP_id k ∗
+                 oblP_fuel k ℓ2 μ ∗
+                 witP_layer k ℓ2 ∗
+                 (∀ E N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E}=∗ oblP_inv N k P Q R).
+  Proof.
+    unfold_sfmupd. iIntros (Ltl) "Tb %%%%% $".
+    iMod (obl_alloc_assigned_mupd with "Tb") as "(%& %& $& $& $& $& $)"; auto.
   Qed.
 
   Lemma obl_alloc_fulfilled E ℓ μ :
-    ⊢ |={E}=>m ∃ k, oblP_fulfilled k ∗ oblP_id k ∗
-                   (∀ E' N (P Q R : iProp Σ), (▷ R) ={E'}=∗ oblP_inv N k P Q R) ∗
-                   oblP_layer k ℓ ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
+    ⊢ |={E}=>m ∃ k, oblP_fulfilled k ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+                   (∀ E N (P Q R : iProp Σ), (▷ R) ={E}=∗ oblP_inv N k P Q R).
   Proof.
-    unfold_sfmupd. iIntros "%%%%% $". iMod (obl_alloc_fulfilled_mupd) as "(%& $& $& $& $& $& $)". by iModIntro.
+    unfold_sfmupd. iIntros "%%%%% $".
+    iMod (obl_alloc_fulfilled_mupd) as "(%& $& $& $& $& $)"; auto.
   Qed.
 
   Lemma obl_assigned_to_true E N k P Q R :
@@ -283,7 +307,7 @@ Section sfmupd.
                   ((▷ (oblP_assigned k false 1 ∗ P)) ∗
                    (∀ b, oblP_assigned k b 1 -∗
                          ∀ E', |={E'}=>m (oblP_assigned k true (1/2)%Qp) ∗
-                                      ((▷ (Q)) ={E ∖ ↑N,E}=∗ True))).
+                                      ((▷ Q) ={E ∖ ↑N,E}=∗ True))).
   Proof.
     iIntros (MASK) "#Gv". iMod (obl_assigned_to_true_mupd with "Gv") as "H". 1: auto.
     iIntros "!> Ga". iPoseProof ("H" with "Ga") as "[$ ACC]". iIntros "% Ga". iPoseProof ("ACC" with "Ga") as "H".
@@ -293,41 +317,49 @@ Section sfmupd.
   Lemma obl_true_to_fulfill E N k P Q R :
     ↑N ⊆ E →
     oblP_inv N k P Q R -∗
-    |={E,E ∖ ↑N}=> ∀ i G q1 q2,
-    (⌜k ∈ G⌝) → thP_obls i G q1 -∗ oblP_assigned k true q2 -∗
-    ((▷ (thP_obls i G q1 ∗ oblP_assigned k true q2 ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
-     (thP_obls i G q1 -∗
+    |={E,E ∖ ↑N}=> ∀ i g ℓ K q,
+    (⌜k ∈ K⌝) → ogP_group i g ℓ K -∗ oblP_assigned k true q -∗
+    ((▷ (ogP_group i g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
+     (ogP_group i g ℓ K -∗
       oblP_assigned k true 1 -∗
-      ∀ E', |={E'}=>m (thP_obls i (G ∖ {[k]}) q1 ∗ oblP_fulfilled k) ∗
-                   ((▷ (R)) ={E ∖ ↑N,E}=∗ True))).
+      ∀ E', |={E'}=>m (ogP_group i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k) ∗
+                     ((▷ (R)) ={E ∖ ↑N,E}=∗ True))).
   Proof.
     iIntros (MASK) "#Gv". iMod (obl_fulfill_mupd with "Gv") as "H". 1: auto.
-    iIntros "!> %%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
+    iIntros "!> %%%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
     iPoseProof ("ACC" with "TG Ga") as "H".
     unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
 
-  Lemma obl_change_owner E i1 i2 G1 G2 q1 q2 k ℓ0 :
-    k ∈ G1 →
-    thP_obls i1 G1 q1 -∗
-    thP_obls i2 G2 q2 -∗
-    oblP_fuel k ℓ0 1 -∗
-    |={E}=>m thP_obls i1 (G1 ∖ {[k]}) q1 ∗ thP_obls i2 ({[k]} ∪ G2) q2 ∗ ⌜ k ∉ G2 ⌝.
+  Lemma obl_offload E i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
+    k ∈ K1 →
+    (ℓ2 < ℓ)%ordi →
+    ogP_group i1 g1 ℓ1 K1 -∗
+    ogP_group i2 g2 ℓ2 K2 -∗
+    oblP_fuel k ℓ 1 -∗
+    |={E}=>m ogP_group i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
   Proof.
-    unfold_sfmupd. iIntros (LUG1) "Tb1 Tb2 Gf %%%%% $".
-    iMod (obl_change_owner_mupd with "Tb1 Tb2 Gf") as "H". 1: eauto.
-    by iModIntro.
+    iIntros (Ink Ltl) "Gg1 Gg2 Of".
+    unfold_sfmupd. iIntros "%%%%% $".
+    iMod (obl_offload_mupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
   Qed.
 
-  Lemma obl_terminate E i :
-    thP_obls i ∅ 1 -∗ |={E}=>m thP_term i.
+  Lemma obl_offload_set_mupd E i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
+    K ⊆ K1 →
+    (ℓ2 < ℓ)%ordi →
+    ogP_group i1 g1 ℓ1 K1 -∗
+    ogP_group i2 g2 ℓ2 K2 -∗
+    ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
+    |={E}=>m ogP_group i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_group i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K ⊈ K2 ∨ K = ∅ ⌝.
   Proof.
-    unfold_sfmupd. iIntros "Tb %%%%% $". iMod (obl_terminate_mupd with "Tb") as "#Tt". auto.
+    iIntros (Ink Ltl) "Gg1 Gg2 Of".
+    unfold_sfmupd. iIntros "%%%%% $".
+    iMod (obl_offload_set_mupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
   Qed.
 
   Lemma obl_check_witnesses E (R : oids) :
     ([∗ set] r ∈ R, oblP_id r) -∗
-    |={E}=>m ([∗ set] r ∈ R, witP_cred r Ord.O ∨ oblP_fulfilled r).
+    |={E}=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_fulfilled r).
   Proof.
     unfold_sfmupd. iIntros "Rs %%%%% $". iMod (obl_check_witnesses_mupd with "Rs") as "H". auto.
   Qed.
