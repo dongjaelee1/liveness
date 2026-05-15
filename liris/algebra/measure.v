@@ -2,7 +2,6 @@ From stdpp Require Import base.
 From liris.prelude Require Import axioms.
 From liris.prelude Require Export wf_structs ordinal_facts.
 
-(** This is only meant to be instantiated only in this file. *)
 Class layer_class (L : Type) := {
     ltL : L -> L -> Prop;
     wf_ltL : well_founded ltL;
@@ -220,6 +219,40 @@ Infix "↑" := ms_expn : msyn_scope.
 Notation "▽" := (ms_extend) : msyn_scope.
 
 (** Additional definitions and properties. *)
+
+Class Layerless `{!layer_class L} `{!ord_mono_fun_class} (μ : measurable_syntax) : Prop :=
+  layerless: ∀ (ℓ1 ℓ2 : L), (measure ℓ1 μ == measure ℓ2 μ)%ord.
+
+Section layerless.
+  Context `{!layer_class L} `{!ord_mono_fun_class}.
+
+  Global Instance ms_embed_layerless {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (a : A) :
+    Layerless (ms_embed wf_ltA a).
+  Proof using. intros ℓ1 ℓ2. rewrite !measure_embed. reflexivity. Qed.
+
+  Global Instance ms_large_layerless : Layerless (ms_large).
+  Proof using. intros ℓ1 ℓ2. rewrite !measure_large. reflexivity. Qed.
+
+  Global Instance ma_add_layerless s1 s2 :
+    Layerless s1 → Layerless s2 → Layerless (ms_add s1 s2).
+  Proof using.
+    intros HL1 HL2 ℓ1 ℓ2. rewrite !measure_add. rewrite (HL1 ℓ1 ℓ2), (HL2 ℓ1 ℓ2). reflexivity.
+  Qed.
+
+  Global Instance ma_mult_layerless s1 s2 :
+    Layerless s1 → Layerless s2 → Layerless (ms_mult s1 s2).
+  Proof using.
+    intros HL1 HL2 ℓ1 ℓ2. rewrite !measure_mult. rewrite (HL1 ℓ1 ℓ2), (HL2 ℓ1 ℓ2). reflexivity.
+  Qed.
+
+  Global Instance ma_expn_layerless s1 s2 :
+    Layerless s1 → Layerless s2 → Layerless (ms_expn s1 s2).
+  Proof using.
+    intros HL1 HL2 ℓ1 ℓ2. rewrite !measure_expn. rewrite (HL1 ℓ1 ℓ2), (HL2 ℓ1 ℓ2). reflexivity.
+  Qed.
+
+End layerless.
+
 Section layer.
   Context `{!layer_class L} `{!ord_mono_fun_class}.
 
