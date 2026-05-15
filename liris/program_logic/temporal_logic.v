@@ -413,7 +413,7 @@ Section proof.
   Proof. split; [auto|apply _]. Qed.
 
   Lemma tf_until_alloc E i g K (b : bool) ℓ1 ℓ2 μ :
-    (ℓ1 < ℓ2)%ordi →
+    (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
     ogP_obls i g ℓ1 K -∗
     |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
                  oblP_id k ∗ oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
@@ -438,8 +438,8 @@ Section proof.
     { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
     destruct NEW as (k& NEWk).
     assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-    iMod (osat_alloc_obl_fulfilled _ k ℓ ((1 ⊕ ▽) × μ)%M with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)". 1: auto.
-    iMod (owit_alloc_witness_fulfilled _ k (η (measure ℓ ((1 ⊕ ▽) × μ)%M)) with "[$W $Gu]") as "(W& #Ww)".
+    iMod (osat_alloc_obl_fulfilled _ k (measure (ℓ, 1) ((1 ⊕ ▽) × μ)%M) with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)". 1: auto.
+    iMod (owit_alloc_witness_fulfilled _ k (η (measure (ℓ, 1) ((1 ⊕ ▽) × μ)%M)) with "[$W $Gu]") as "(W& #Ww)".
     { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
     iPoseProof (oassigned_add_obl with "[$A $Ge Gu]") as "A".
     { iRight. iFrame "Gu". }

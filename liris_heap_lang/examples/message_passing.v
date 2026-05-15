@@ -32,7 +32,7 @@ Section mp_proof.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
   Definition mp_tf (k : oid) (l : loc) : tf Σ :=
-    ⟨oblP_id k ∗ witP_layer k 1⟩ ∗
+    ⟨oblP_id k ∗ witP_layer k 0⟩ ∗
     tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1)))).
 
   Definition mp (k : oid) (l : loc) : iProp Σ :=
@@ -143,8 +143,8 @@ Section mp_proof.
     l{{{ ∃ g k kl, mp k l ∗
                    ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
                    thP_groups i {[g]} ∗
-                   ogP_obls i g 2 {[kl]} ∗
-                   ogP_fuel g 2 ((1 × ▽) ⊕ 1)%M}}}
+                   ogP_obls i g 1 {[kl]} ∗
+                   ogP_fuel g 1 ((1 × ▽) ⊕ 1)%M}}}
       reader #l @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
@@ -155,10 +155,10 @@ Section mp_proof.
     iPoseProof (ogP_fuel_add with "Fg") as "[WFg Fg]".
     (* Liveness induction *)
     iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)".
-    iMod (wit_fuels_add _ _ _ _ g 2 1 with "Wf0 WFg") as "Wf".
+    iMod (wit_fuels_add _ _ _ _ g 1 1 with "Wf0 WFg") as "Wf".
     { apply ordArith.lt_from_nat. lia. }
     iClear "Wf0". iInduction α as [α IH] using WFOCM.ind.
-    iMod (ogP_fuel_extend _ 0 2 (9 ⊕ 1)%M with "Fg") as "Fg".
+    iMod (ogP_fuel_extend _ 0 1 (9 ⊕ 1)%M with "Fg") as "Fg".
     { apply ordArith.lt_from_nat. lia. }
     iPoseProof (ogP_fuel_add with "Fg") as "[Fg Fg1]".
     lwp_rec. simpl. iFrame "TG". iExists ⊤, ∅, 100. iSplitR; first done. iModIntro. iSplitL "Fg1".
@@ -286,8 +286,8 @@ Section mp_proof.
             tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
             tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
             ⟨thP_groups i {[g1]} ∗ ogP_obls i g1 0 {[k; kl1]} ∗
-             thP_groups j {[g2]} ∗ ogP_obls j g2 2 ({[kl2]}) ∗
-             ogP_fuel g1 0 10 ∗ ogP_fuel g2 2 ((1 × ▽) ⊕ 1)%M⟩)%F →
+             thP_groups j {[g2]} ∗ ogP_obls j g2 1 ({[kl2]}) ∗
+             ogP_fuel g1 0 10 ∗ ogP_fuel g2 1 ((1 × ▽) ⊕ 1)%M⟩)%F →
     Ψs = ({[i := fork_post; j := fork_post]}) →
     ((l ↦ #0) -∗
      ([∗ set] i ∈ dom Θ, thP_groups i ∅) -∗
@@ -300,20 +300,17 @@ Section mp_proof.
     { set_solver. }
     rewrite !big_sepS_singleton.
     iMod (group_alloc _ _ _ 0 10 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (tf_until_alloc _ _ _ _ false 0 1 10 with "Gg1") as "(%k& %Hk& Gg1& #Ok& Ofk& #Wlk& Ak)".
-    { apply ordArith.lt_from_nat. lia. }
+    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg1") as "(%k& %Hk& Gg1& #Ok& Ofk& #Wlk& Ak)". 1: auto.
     iMod ("Ak" $! _ Np (l ↦ #0)%F (l ↦ #1)%F with "Ptrl") as "Uk".
     iPoseProof (tf_until_frac_split with "Uk") as "[Uk Uk']".
     { symmetry; apply Qp.div_2. }
     iMod (inv_alloc Na _ ⟦(tf_until Np k false (1 / 2) (l ↦ #0) (l ↦ #1) ∨ ⟨ oblP_fulfilled k ⟩ ∗ l ↦ #1)⟧ₗ with "[Uk']") as "#Ak".
     { iNext. tf_red. iLeft. iFrame. }
-    iMod (tf_until_alloc _ _ _ _ false 0 1 10 with "Gg1") as "(%kl1& %Hkl1& Gg1& #Okl1& Ofkl1& #Wlkl1& Akl1)".
-    { apply ordArith.lt_from_nat. lia. }
+    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg1") as "(%kl1& %Hkl1& Gg1& #Okl1& Ofkl1& #Wlkl1& Akl1)". 1: auto.
     iMod ("Akl1" $! _ Nl (⌜True⌝)%F (∃ v : val, i ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl1".
     { tf_red. done. }
-    iMod (group_alloc _ _ _ 2 ((1 × ▽) ⊕ 1)%M with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
-    iMod (tf_until_alloc _ _ _ _ false 2 3 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& #Okl2& Ofkl2& #Wlkl2& Akl2)".
-    { apply ordArith.lt_from_nat. lia. }
+    iMod (group_alloc _ _ _ 1 ((1 × ▽) ⊕ 1)%M with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
+    iMod (tf_until_alloc _ _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& #Okl2& Ofkl2& #Wlkl2& Akl2)". 1: auto.
     iMod ("Akl2" $! _ Nl (⌜True⌝)%F (∃ v : val, j ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl2".
     { tf_red. done. }
     iModIntro. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
@@ -349,12 +346,24 @@ End mp_proof.
 Section adequacy.
 
   Definition mp_tp (l : loc) : tp :=
+    (tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (l ↦ #1))))%P.
+
+  Definition mp_tp' (l : loc) : tp :=
     (tp_true ∧ tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
 
-  (** TODO: weaken the strict equality to semantics equivalence. *)
-  Lemma tf_to_tp_mp `{!heapGS Σ} k l :
-    tf_to_tp (mp_tf k l) = mp_tp l.
+  (** TODO: weaken the strict equality to semantics equivalence/implication. *)
+  Remark tf_to_tp_mp' `{!heapGS Σ} k l :
+    tf_to_tp (mp_tf k l) = mp_tp' l.
   Proof. done. Qed.
+
+  Remark mp_tp_impl l :
+    ∀ τ, tp_trace (mp_tp' l) τ → tp_trace (mp_tp l) τ.
+  Proof.
+    simpl. unfold_trProp. simpl. intros. destruct τ. destruct H. intros. specialize (H0 _ H1).
+    destruct H0.
+    - destruct H0 as (?&?&?&?). left. eexists. split_and !; eauto.
+    - destruct H0. right. eauto.
+  Qed.
 
   Let i : thread_id := 1%positive.
   Let j : thread_id := 2%positive.
@@ -363,30 +372,46 @@ Section adequacy.
   Let σ0 : gmap loc (option val) := {[l := Some #0]}.
 
   Let Φ : tp :=
+        (mp_tp l ∧
+         tp_until (l ↦ #0) (l ↦ #1) ∧
+         tp_eventually (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
+         tp_eventually (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝))%P.
+
+  Let Φ' : tp :=
         (∃ (g1 g2 : ogid) (k kl1 kl2 : oid),
-            ⌜ k ≠ kl1 ⌝ ∧ mp_tp l ∧
+            ⌜ k ≠ kl1 ⌝ ∧ mp_tp' l ∧
             tp_until (l ↦ #0) (l ↦ #1) ∧
             tp_eventually (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
             tp_eventually (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
             tp_true)%P.
+
+  Remark Φ_impl :
+    ∀ τ, tp_trace Φ' τ → tp_trace Φ τ.
+  Proof.
+    Local Opaque mp_tp' mp_tp.
+    simpl. unfold_trProp. simpl. intros. destruct τ. destruct H as (?&?&?&?&?&?&?&?).
+    split. 1: apply mp_tp_impl; auto.
+    firstorder.
+    Local Transparent mp_tp' mp_tp.
+  Qed.
 
   Let N := nroot.@ "message_passing".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
   Let Nl := N.@ "label".
 
-  Let Φ' `{!heapGS Σ} : tf Σ :=
+  Let Φ_tf `{!heapGS Σ} : tf Σ :=
         (∃ g1 g2 k kl1 kl2,
             ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
             tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
             tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
             tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
             ⟨thP_groups i {[g1]} ∗ ogP_obls i g1 0 {[k; kl1]} ∗
-             thP_groups j {[g2]} ∗ ogP_obls j g2 2 ({[kl2]}) ∗
-             ogP_fuel g1 0 10 ∗ ogP_fuel g2 2 ((1 × ▽) ⊕ 1)%M⟩)%F.
+             thP_groups j {[g2]} ∗ ogP_obls j g2 1 ({[kl2]}) ∗
+             ogP_fuel g1 0 10 ∗ ogP_fuel g2 1 ((1 × ▽) ⊕ 1)%M⟩)%F.
 
   Lemma tf_to_tp_Φ `{!heapGS Σ} :
-    tf_to_tp Φ' = Φ.
+    tf_to_tp Φ_tf = Φ'.
   Proof. done. Qed.
 
   Let Σ : gFunctors :=
@@ -407,7 +432,8 @@ Section adequacy.
     tp_trace Φ τ.
   Proof.
     intros τ Beh FS Init1 Init2.
-    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ).
+    apply Φ_impl.
+    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ').
     1,2,3,4: eauto.
     iIntros (?). exists 0%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
@@ -433,7 +459,7 @@ Section adequacy.
       by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
     { iFrame. }
     iDestruct "H" as "(HP& H)".
-    iModIntro. iExists Φ'. iFrame "HP". iSplit.
+    iModIntro. iExists Φ_tf. iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
   Qed.

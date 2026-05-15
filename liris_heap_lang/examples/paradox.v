@@ -220,7 +220,7 @@ Section proof.
         ([^tf_sep map] a ↦ k ∈ os,
            ⟨(£ (10)%ord ∨ cnt_lb r i a) ∗
             a ↪[rm]□ k ∗ cnt_lb r j a ∗
-            oblP_id k ∗ witP_layer k 1⟩ ∗
+            oblP_id k ∗ witP_layer k 0⟩ ∗
            ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩) ∨
               (⟨oblP_fulfilled k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩))))%F.
 
@@ -234,7 +234,7 @@ Section proof.
       ([∗ map] a ↦ k ∈ os,
          ((£ (10)%ord ∨ cnt_lb r i a) ∗
           a ↪[rm]□ k ∗ cnt_lb r j a ∗
-          oblP_id k ∗ witP_layer k 1) ∗
+          oblP_id k ∗ witP_layer k 0) ∗
          ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩⟧ₗ) ∨
             (oblP_fulfilled k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
 
@@ -262,12 +262,12 @@ Section proof.
   (** Receives later credits via px_inv *)
   Lemma px_loop1_spec i g z r rm ci cj :
     l{{{ thP_groups i ({[g]}) ∗
-         ogP_obls i g 2 {[z]} ∗
+         ogP_obls i g 1 {[z]} ∗
          ⟦tf_until N1 z false 1 (⌜ True ⌝) (⌜ False ⌝)⟧ₗ ∗
          £ (10)%ord ∗
          px r rm ci cj ∗
          ∃ n, cnt_auth r ci n 1%Qp ∗ cnt_lb r cj n ∗
-              ∃ ck, oblP_id ck ∗ witP_layer ck 1 ∗ n ↪[rm]□ ck
+              ∃ ck, oblP_id ck ∗ witP_layer ck 0 ∗ n ↪[rm]□ ck
       }}}
       loop #() @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
@@ -367,8 +367,7 @@ Section proof.
     iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     iMod (group_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
-    iMod (tf_until_alloc _ _ _ _ false 0 1 10 with "Gg'") as "(%ck1& %Nin1& Gg'& #Ok1& Of1& #Wlk1& A)".
-    { apply ordArith.lt_from_nat. lia. }
+    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& #Ok1& Of1& #Wlk1& A)". 1: auto.
     iApply fupd_sfmupd_elim. iMod "mask" as "_".
     iMod ("A" $! _ Nu ⌜True⌝%F ⟨ cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k' ⟩%F with "[//]") as "Unew".
     iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.

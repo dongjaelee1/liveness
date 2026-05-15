@@ -169,9 +169,9 @@ Definition tf_until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_inter
   (N : namespace) (P Q R : tf Σ) : tf Σ :=
   locked
     (∃ (l : list (oid * Ord.t)) k o,
-        ⌜ ∃ m, (o <= measure ord.O m)%ord ⌝ ∗
+        ⌜ ∃ m, (o <= measure (ord.O, 1) m)%ord ⌝ ∗
         ⟨uchain_auth (1/2) (l ++ [(k, o)])⟩ ∗
-        ([^tf_sep list] ko ∈ l, ⟨oblP_fulfilled ko.1⟩ ∗ ⌜ ∃ m, (ko.2 <= measure ord.O m)%ord ⌝) ∗
+        ([^tf_sep list] ko ∈ l, ⟨oblP_fulfilled ko.1⟩ ∗ ⌜ ∃ m, (ko.2 <= measure (ord.O, 1) m)%ord ⌝) ∗
         (tf_until_chain N k o P Q ∨
            (⟨uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_fulfilled k⟩ ∗ R))
     )%F.
@@ -180,9 +180,9 @@ Definition until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_c
   (N : namespace) (P Q R : tf Σ) : iProp Σ :=
   locked
     (∃ (l : list (oid * Ord.t)) k o,
-        ⌜ ∃ m, (o <= measure ord.O m)%ord ⌝ ∗
+        ⌜ ∃ m, (o <= measure (ord.O, 1) m)%ord ⌝ ∗
                (uchain_auth (1/2) (l ++ [(k, o)])) ∗
-               ([∗ list] ko ∈ l, (oblP_fulfilled ko.1) ∗ ⌜ ∃ m, (ko.2 <= measure ord.O m)%ord ⌝) ∗
+               ([∗ list] ko ∈ l, (oblP_fulfilled ko.1) ∗ ⌜ ∃ m, (ko.2 <= measure (ord.O, 1) m)%ord ⌝) ∗
                (⟦tf_until_chain N k o P Q⟧ₗ ∨
                   ((uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_fulfilled k) ∗ ⟦R⟧ₗ))
     )%I.

@@ -91,6 +91,10 @@ Definition tr_always {Λ : language} : trProp Λ → trProp Λ :=
 Definition tr_until {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
   λ P Q, (λ τ, let '(n, τf) := τ in ∃ m, (n ≤ m) ∧ (Q (m, τf)) ∧ (∀ l, (n ≤ l < m) → (P (l, τf)))).
 
+(** TODO: better tactic for solving trProp implications. *)
+Ltac unfold_trProp :=
+  unfold tr_until, tr_always, tr_exist, tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_atomic.
+
 (** Notations *)
 
 Declare Scope tr_scope.
