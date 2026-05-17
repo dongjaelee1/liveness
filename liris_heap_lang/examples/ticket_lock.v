@@ -218,7 +218,7 @@ Section proof.
 
   (** FIXME: ordi notation levels *)
   Local Lemma acquire_spec i G γt γa lnc ℓ R μ lc :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ((ℓ ⊕ ord.large))%ordi 1) ∗
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ℵ)%ordi 1) ∗
          is_fair_lock γt γa lnc ℓ R }}}
       TicketLock.acquire lnc @ i
     l{{{ gu κu, RET #();

@@ -212,7 +212,7 @@ Delimit Scope msyn_scope with M.
 
 Coercion ms_nat : nat >-> measurable_syntax.
 Notation "'⟪' R , a '⟫'" := (ms_embed R a) (at level 50, format "⟪ R ,  a ⟫") : msyn_scope.
-Notation "⫚" := (ms_large) : msyn_scope.
+Notation "'ℵ'" := (ms_large) : msyn_scope.
 Infix "⊕" := ms_add : msyn_scope.
 Infix "×" := ms_mult : msyn_scope.
 Infix "↑" := ms_expn : msyn_scope.

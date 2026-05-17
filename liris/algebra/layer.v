@@ -51,3 +51,5 @@ Global Instance layer_layer_class : layer_class layer :=
 Export ordinalScope.
 Export arithmeticScope.
 Export hessenbergScope.
+
+Notation "'ℵ'" := (ord.large) : ordinal_scope.

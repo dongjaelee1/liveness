@@ -610,18 +610,18 @@ Section preds.
     Qed.
 
     Lemma oblP_fuel_large k ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a : A) :
-      oblP_fuel k ℓ (⫚)%M ⊢ |==> oblP_fuel k ℓ (⟪wf_ltA, a⟫)%M ∗ oblP_fuel k ℓ 1.
+      oblP_fuel k ℓ (ℵ)%M ⊢ |==> oblP_fuel k ℓ (⟪wf_ltA, a⟫)%M ∗ oblP_fuel k ℓ 1.
     Proof.
       intros. apply oblP_fuel_lt. apply measure_large_lt.
     Qed.
     Lemma oblP_fuel_large_list K ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a : A) :
-      ([∗ list] k ∈ K, oblP_fuel k ℓ (⫚)%M)
+      ([∗ list] k ∈ K, oblP_fuel k ℓ (ℵ)%M)
       ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ (⟪wf_ltA, a⟫)%M) ∗ ([∗ list] k ∈ K, oblP_fuel k ℓ 1).
     Proof.
       intros. rewrite -big_sepL_sep -big_sepL_bupd. iApply big_sepL_mono. intros. apply oblP_fuel_large.
     Qed.
     Lemma oblP_fuel_large_set K ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a : A) :
-      ([∗ set] k ∈ K, oblP_fuel k ℓ (⫚)%M)
+      ([∗ set] k ∈ K, oblP_fuel k ℓ (ℵ)%M)
       ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ (⟪wf_ltA, a⟫)%M) ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1).
     Proof.
       intros. rewrite -big_sepS_sep -big_sepS_bupd. iApply big_sepS_mono. intros. apply oblP_fuel_large.
@@ -1076,18 +1076,18 @@ Section preds.
     Qed.
 
     Lemma ogP_fuel_large k ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a : A) :
-      ogP_fuel k ℓ (⫚)%M ⊢ |==> ogP_fuel k ℓ (⟪wf_ltA, a⟫)%M ∗ ogP_fuel k ℓ 1.
+      ogP_fuel k ℓ (ℵ)%M ⊢ |==> ogP_fuel k ℓ (⟪wf_ltA, a⟫)%M ∗ ogP_fuel k ℓ 1.
     Proof.
       intros. apply ogP_fuel_lt. apply measure_large_lt.
     Qed.
     Lemma ogP_fuel_large_list K ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a : A) :
-      ([∗ list] k ∈ K, ogP_fuel k ℓ (⫚)%M)
+      ([∗ list] k ∈ K, ogP_fuel k ℓ (ℵ)%M)
       ⊢ |==> ([∗ list] k ∈ K, ogP_fuel k ℓ (⟪wf_ltA, a⟫)%M) ∗ ([∗ list] k ∈ K, ogP_fuel k ℓ 1).
     Proof.
       intros. rewrite -big_sepL_sep -big_sepL_bupd. iApply big_sepL_mono. intros. apply ogP_fuel_large.
     Qed.
     Lemma ogP_fuel_large_set K ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a : A) :
-      ([∗ set] k ∈ K, ogP_fuel k ℓ (⫚)%M)
+      ([∗ set] k ∈ K, ogP_fuel k ℓ (ℵ)%M)
       ⊢ |==> ([∗ set] k ∈ K, ogP_fuel k ℓ (⟪wf_ltA, a⟫)%M) ∗ ([∗ set] k ∈ K, ogP_fuel k ℓ 1).
     Proof.
       intros. rewrite -big_sepS_sep -big_sepS_bupd. iApply big_sepS_mono. intros. apply ogP_fuel_large.
@@ -1260,7 +1260,7 @@ Section preds.
     Qed.
 
     Lemma embed_fuels_add {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a F f ℓ μ :
-      embed_fuels wf_ltA a F -∗ ogP_fuel f ℓ (μ × ⫚)%M ==∗ embed_fuels wf_ltA a (<[f:=(ℓ, μ)]>F).
+      embed_fuels wf_ltA a F -∗ ogP_fuel f ℓ (μ × ℵ)%M ==∗ embed_fuels wf_ltA a (<[f:=(ℓ, μ)]>F).
       (* embed_fuels wf_ltA a ℓ1 F -∗ ogP_fuel f ℓ2 (μ × ⟪wf_ltA, a⟫)%M ==∗ embed_fuels wf_ltA a ℓ1 (<[f:=(ℓ2, μ)]>F). *)
     Proof.
       iIntros "Wfs Gf". rewrite !embed_fuels_unseal /embed_fuels_def.
@@ -1271,7 +1271,7 @@ Section preds.
     Lemma embed_fuels_add_map {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
       a F (G : gmap ogid (ord.t * measurable_syntax)) :
       embed_fuels wf_ltA a F -∗
-      ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in ogP_fuel g l (m × ⫚)%M) ==∗
+      ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in ogP_fuel g l (m × ℵ)%M) ==∗
       embed_fuels wf_ltA a (G ∪ F).
     Proof.
       rewrite !embed_fuels_unseal /embed_fuels_def.
