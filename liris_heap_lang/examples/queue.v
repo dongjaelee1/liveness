@@ -69,7 +69,7 @@ Section code.
 
 End code.
 
-(** A queue's spec with a liveness guarantee: any enqueued element is eventually dequeued. *)
+(** ** A queue's spec with a liveness guarantee: any element can be associated with some obligations. *)
 Variant queue_op : Set :=
   | op_enq (v : val)
   | op_deq (v : option val) (w : positive) (k : oid)

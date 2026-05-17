@@ -150,6 +150,16 @@ Section proof.
   Global Instance is_fair_lock_persistent γt γa lnc ℓ R : Persistent (is_fair_lock γt γa lnc ℓ R).
   Proof. rewrite /is_fair_lock. apply _. Qed.
 
+  (** ** Properties we want from a modular spec with liveness:
+         1. Hide implementation details, e.g., # of lines, internal data structure.
+         2. Robust against implementation changes, especially # of fuels.
+         3. Consistent format for different libraries.
+
+         'ogP_fuel g 1 1' is a good abstraction for trivially terminating functions.
+         ord.large is a good abstraction for more complex functions.
+         Ref: https://en.wikipedia.org/wiki/Hartogs_number
+   *)
+
   (** Program proofs *)
   Local Lemma init_spec i G ℓ (R : tf Σ) lc :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗ ⟦R⟧ₗ }}}
@@ -208,7 +218,7 @@ Section proof.
 
   (** FIXME: ordi notation levels *)
   Local Lemma acquire_spec i G γt γa lnc ℓ R μ lc :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ((ℓ ⊕ (ω ⊕ 1)))%ordi 1) ∗
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ((ℓ ⊕ ord.large))%ordi 1) ∗
          is_fair_lock γt γa lnc ℓ R }}}
       TicketLock.acquire lnc @ i
     l{{{ gu κu, RET #();
@@ -224,8 +234,8 @@ Section proof.
     rewrite /TicketLock.acquire.
     iAssert (|==>[∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ω)%ordi (100 ⊕ 1)%M)%I with "[Fs]" as ">Fs".
     { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% GF".
-      iApply (ogP_fuel_extend with "GF"). rewrite -hessenberg.add_assoc. apply hessenberg.add_lt_l.
-      rewrite ord.from_nat_1. apply ord.S_pos. }
+      iApply (ogP_fuel_extend with "GF").
+      apply hessenberg.lt_add_r. rewrite ord.omega_from_peano_lt_set. apply ord.large_lt_from_wf_set. }
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs Fsloop]".
     iMod (ogP_fuel_mon_gen_set _ 0 _ (99 ⊕ 1)%M with "Fs") as "Fs".
     (** FIXME: more consistent ordinal libraries, easier ordinal arith proofs *)
