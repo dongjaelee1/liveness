@@ -62,7 +62,7 @@ Section mp_proof.
     { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add with "Gf") as "[Gf Gf1]".
     (* Pure steps *)
-    lwp_lam. iFrame "TG". iExists ⊤, ∅, 10. iSplitR; first done. iModIntro. iSplitL "Gf1".
+    lwp_lam. simpl. iFrame "TG". iExists ⊤, ∅, 10. iSplitR; first done. iModIntro. iSplitL "Gf1".
     { iApply big_sepS_singleton. iFrame. }
     iIntros "TG _ !> LC !> !>".
     lwp_finish_upd.
@@ -88,9 +88,9 @@ Section mp_proof.
     iIntros "((_& TG& _)& Ptrl)".
     iMod ("ACCmp" $! _) as "ACCmp".
     iApply sfmupd_fupd_acc. iMod ("ACCmp" with "Ptrl") as "ACCmp".
+    iModIntro. 
     iPoseProof ("ACCmp" with "[] Gg") as "ACCmp".
     { iPureIntro. set_solver. }
-    iModIntro. 
     replace 8 with (7 + 1) by lia. iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
     iApply (lc_sfmupd_add_later with "LC1"). iNext.
     iMod ("ACCmp" $! _) as "ACCmp". iIntros "!> !>". iMod "ACCmp" as "(Ptrl& Gg& #Ofk)".
