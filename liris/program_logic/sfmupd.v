@@ -357,7 +357,7 @@ Section sfmupd.
     iMod (obl_offload_mupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
   Qed.
 
-  Lemma obl_offload_set_mupd E i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
+  Lemma obl_offload_set E i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
     K ⊆ K1 →
     (ℓ2 = ℓ ∨ ℓ2 < ℓ)%ordi →
     ogP_obls i1 g1 ℓ1 K1 -∗

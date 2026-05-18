@@ -5,7 +5,7 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
-From iris.algebra Require Import reservation_map dfrac_agree mono_list.
+From iris.algebra Require Import reservation_map dfrac_agree mono_list gset.
 From transfinite.base_logic.lib Require Import ghost_map.
 
 From liris.heap_lang.examples Require Import ticket_lock.
@@ -70,6 +70,73 @@ Section code.
 End code.
 
 (** ** A queue's spec with a liveness guarantee: any element can be associated with some obligations. *)
+(** The CMRA we need. *)
+Class queueGpreS (Σ : gFunctors) : Set :=
+  QueueGpreS {
+      queueGpreS_queue_vals : inG Σ (dfrac_agreeR (list val));
+      queueGpreS_queue_obls : inG Σ (dfrac_agreeR (list (oids)));
+      #[local] queueGpreS_data_inG :: ghost_mapG Σ positive (thread_id * ogid);
+    }.
+
+Class queueG Σ :=
+  QueueG {
+      #[local] queue_inG :: queueGpreS Σ;
+      queue_vals_name : gname;
+      queue_obls_name : gname;
+    }.
+
+Definition queueΣ : gFunctors :=
+  gFunctors.app
+    #[GFunctor (dfrac_agreeR (list val)); GFunctor (dfrac_agreeR (list oids))]
+    (ghost_mapΣ positive (thread_id * ogid)).
+
+Global Instance subG_queueΣ {Σ} : subG queueΣ Σ → queueGpreS Σ.
+Proof. solve_inG. Qed.
+
+(** User interface *)
+(* Make the instances local to this file. We cannot use #[local] in the code *)
+(* above, as that would make the instances local to the module. *)
+Local Existing Instances queue_inG queueGpreS_queue_vals queueGpreS_queue_obls queueGpreS_data_inG.
+
+Section defs.
+  Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
+
+  Definition qG_queue_vals (l : list val) q : iProp Σ :=
+    own queue_vals_name (to_dfrac_agree (DfracOwn q) l).
+
+  Definition qG_queue_obls (l : list oids) q : iProp Σ :=
+    own queue_obls_name (to_dfrac_agree (DfracOwn q) l).
+
+  Fixpoint queue_contents (lh lt : loc) (vs : list val) : iProp Σ :=
+    match vs with
+    | [] => ⌜lh = lt⌝
+    | v :: vs => ∃ l : loc, lh ↦ SOMEV (v, #l) ∗ queue_contents l lt vs
+  end%I.
+
+  Definition queue_holds (vs : list val) (Bs : list oids) (φ : nat → val → oids → iProp Σ) : iProp Σ :=
+    ([∗ list] n ↦ v;B ∈ vs;Bs, φ n v B).
+
+  Let N := nroot.@"queue".
+  Let Ni := N.@"invariant".
+
+  Definition queue_inv_def (ℓ : ord.t) γd : iProp Σ :=
+    (∃ (vs : list val) (Bs : list oids) (ds : gmap positive (thread_id * ogid)),
+        qG_queue_vals vs (1/2)%Qp ∗
+        qG_queue_obls Bs (1/2)%Qp ∗
+        ghost_map_auth γd 1 ds ∗
+        (∃ i g, ⌜ds = {[1%positive := (i, g)]}⌝ ∗ ogP_obls i g ℓ (foldr (λ B A, B ∪ A) ∅ Bs)) ∗
+        ([∗ list] n ↦ B ∈ Bs, [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (n ⊕ 1)%M))%I.
+
+  Definition queue_inv (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) γd γt γa lnc ℓt : iProp Σ :=
+    inv Ni (queue_inv_def ℓ γd) ∗
+    is_fair_lock γt γa lnc ℓt
+      (⟨∃ lh lt vs Bs, queue_contents lh lt vs ∗ queue_holds vs Bs φ ∗
+                       qG_queue_vals vs (1/2)%Qp ∗ qG_queue_obls Bs (1/2)%Qp⟩).
+
+End defs.
+
+TODO
+
 Variant queue_op : Set :=
   | op_enq (v : val)
   | op_deq (v : option val) (w : positive) (k : oid)
