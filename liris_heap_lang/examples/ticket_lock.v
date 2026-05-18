@@ -5,7 +5,7 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
-From transfinite.base_logic.lib Require Import token ghost_map.
+From transfinite.base_logic.lib Require Import ghost_var ghost_map.
 
 Module TicketLock.
   (** https://en.wikipedia.org/wiki/Ticket_lock *)
@@ -161,7 +161,7 @@ Section proof.
    *)
 
   (** Program proofs *)
-  Local Lemma init_spec i G ℓ (R : tf Σ) lc :
+  Lemma init_spec i G ℓ (R : tf Σ) lc :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗ ⟦R⟧ₗ }}}
       TicketLock.init #() @ i
     l{{{ γt γa lnc, RET lnc; thP_groups i G ∗ £ lc ∗ ⟦is_fair_lock_tf γt γa lnc ℓ R⟧ₗ }}}.
@@ -217,7 +217,7 @@ Section proof.
   Qed.
 
   (** FIXME: ordi notation levels *)
-  Local Lemma acquire_spec i G γt γa lnc ℓ R μ lc :
+  Lemma acquire_spec i G γt γa lnc ℓ R μ lc :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ℵ)%ordi 1) ∗
          is_fair_lock γt γa lnc ℓ R }}}
       TicketLock.acquire lnc @ i
@@ -519,7 +519,7 @@ Section proof.
       iApply ("IHα" $! α0 LTα with "HΦ Gg0 GUku GGF QGF GMEaku Fs TG LC' WFs").
   Qed.
 
-  Local Lemma release_spec i G γt γa lnc ℓ R κu gu ℓu K lc :
+  Lemma release_spec i G γt γa lnc ℓ R κu gu ℓu K lc :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗
          ogP_obls i gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          is_fair_lock γt γa lnc ℓ R ∗
