@@ -101,6 +101,8 @@ Local Existing Instances queue_inG queueGpreS_queue_vals queueGpreS_queue_obls q
 Section defs.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
+  (** ** Definitions *)
+
   Record queue_γ :=
     QueueName {
         queue_γd : gname;
@@ -126,6 +128,8 @@ Section defs.
   Let N := nroot.@"queue".
   Let Ni := N.@"invariant".
 
+  Definition wid_1 := 1%positive.
+
   Definition queue_inv (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) γd (lhptr ltptr : loc) : iProp Σ :=
     (∃ (lh lt : loc) (vs : list val) (Bs : list oids) (ds : gmap positive (thread_id * ogid)),
         lhptr ↦{#(1/2)} #lh ∗
@@ -135,34 +139,39 @@ Section defs.
         ghost_map_auth γd 1 ds ∗
         queue_contents lh lt vs ∗
         queue_holds vs Bs φ ∗
-        (∃ i g, ⌜ds = {[1%positive := (i, g)]}⌝ ∗ ogP_obls i g ℓ (foldr (λ B A, B ∪ A) ∅ Bs)) ∗
+        (∃ i g, ⌜ds = {[wid_1 := (i, g)]}⌝ ∗ ogP_obls i g ℓ (foldr (λ B A, B ∪ A) ∅ Bs)) ∗
         ([∗ list] n ↦ B ∈ Bs, [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (n ⊕ 1)%M))%I.
 
-  Definition is_queue (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) (γ : queue_γ) (q : val) lnc : iProp Σ :=
-    ∃ (lhptr ltptr : loc),
-      ⌜q = (#lhptr, #ltptr)%V⌝ ∧
+  Definition is_queue (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) (γ : queue_γ) (q : val) : iProp Σ :=
+    ∃ (lhptr ltptr : loc) (tl : val),
+      ⌜q = (#lhptr, #ltptr, tl)%V⌝ ∧
       inv Ni (queue_inv ℓ φ (queue_γd γ) lhptr ltptr) ∗
-      is_fair_lock (queue_γt γ) (queue_γa γ) lnc 0
+      is_fair_lock (queue_γt γ) (queue_γa γ) tl 0
         (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗
                          qG_queue_vals vs (1/2)%Qp ∗ qG_queue_obls Bs (1/2)%Qp⟩).
 
-  Definition queue_inv_init (φ : nat → val → oids → iProp Σ) (γ : queue_γ) (q : val) lnc : iProp Σ :=
-    (∃ (lhptr ltptr : loc) (lh lt : loc),
-        ⌜q = (#lhptr, #ltptr)%V⌝ ∧
+  Definition is_queue_init (φ : nat → val → oids → iProp Σ) (γ : queue_γ) (q : val) : iProp Σ :=
+    (∃ (lhptr ltptr : loc) (tl : val) (lh lt : loc),
+        ⌜q = (#lhptr, #ltptr, tl)%V⌝ ∧
         lhptr ↦{#(1/2)} #lh ∗
         ltptr ↦{#(1/2)} #lt ∗
         qG_queue_vals [] (1/2)%Qp ∗
         qG_queue_obls [] (1/2)%Qp ∗
         ghost_map_auth (queue_γd γ) 1 ∅ ∗
         queue_contents lh lt [] ∗
-        is_fair_lock (queue_γt γ) (queue_γa γ) lnc 0
+        is_fair_lock (queue_γt γ) (queue_γa γ) tl 0
           (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗
                            qG_queue_vals vs (1/2)%Qp ∗ qG_queue_obls Bs (1/2)%Qp⟩))%I.
 
-  Lemma queue_inv_initialize E (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) γ q lnc :
-    queue_inv_init φ γ q lnc ={E}=∗ is_queue ℓ φ γ q lnc.
+  (** ** Lemmas *)
+
+  Global Instance is_queue_persistent ℓ φ γ q : Persistent (is_queue ℓ φ γ q).
+  Proof. rewrite /is_queue. apply _. Qed.
+
+  Lemma is_queue_initialize E (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) γ q i g :
+    is_queue_init φ γ q -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ℓ φ γ q ∗ wid_1 ↪[(queue_γd γ)] (i, g).
   Proof.
-    TODO
+    iIntros "(%&%&%&%&%& %Hq& Ptrh& Ptrt& Qvs& Qbs& GMAd& Qc& #FL) Go".
 
 End defs.
 
