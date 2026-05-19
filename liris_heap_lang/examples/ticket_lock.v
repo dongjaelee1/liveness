@@ -55,7 +55,13 @@ Section proof.
   Remark N_subseteq_1 : ↑N_eventually ⊆ (⊤ : coPset) ∖ ↑N_inv.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
-  (** Definitions *)
+  Record ticketlock_γ :=
+    TicketLockName {
+        ticketlock_γt : gname;
+        ticketlock_γa : gname;
+      }.
+
+  (** ** Definitions *)
   Local Definition lock_proto_tf γt γa (next curr : loc) (ℓ : ord.t) (R : tf Σ) : tf Σ :=
     (∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
         next ↦ #n ∗
@@ -77,14 +83,14 @@ Section proof.
         ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ R) ∨
            (⌜(c < n)%Z⌝ ∧ ((⟨(c + 1)%Z ↪[γa]{#1/2} false⟩ ∗ curr ↦{#(1/2)} #c%Z ∗ R) ∨ (⟨(c + 1)%Z ↪[γa]□ true⟩)))))%F.
 
-  Definition lock_token_tf γt (lnc : val) κu (R : tf Σ) : tf Σ :=
+  Definition lock_token_tf (tl : val) (γ : ticketlock_γ) κu (R : tf Σ) : tf Σ :=
     (∃ (next curr : loc) (u : Z),
-        (⌜lnc = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ⟨(u + 1)%Z ↪[γt]□ κu⟩ ∗
+        (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ⟨(u + 1)%Z ↪[(ticketlock_γt γ)]□ κu⟩ ∗
         tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R))%F.
 
-  Definition is_fair_lock_tf γt γa (lnc : val) (ℓ : ord.t) (R : tf Σ) : tf Σ :=
-    (∃ (next curr : loc), (⌜lnc = (#next, #curr)%V⌝) ∧
-                          tf_always N_inv (lock_proto_tf γt γa next curr ℓ R))%F.
+  Definition is_fair_lock_tf (tl : val) (γ : ticketlock_γ) (ℓ : ord.t) (R : tf Σ) : tf Σ :=
+    (∃ (next curr : loc), (⌜tl = (#next, #curr)%V⌝) ∧
+                          tf_always N_inv (lock_proto_tf (ticketlock_γt γ) (ticketlock_γa γ) next curr ℓ R))%F.
 
   (* Reduction to iProp. *)
   Local Definition lock_proto γt γa (next curr : loc) (ℓ : ord.t) (R : tf Σ) : iProp Σ :=
@@ -106,18 +112,18 @@ Section proof.
       ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
          (⌜(c < n)%Z⌝ ∧ (((c + 1)%Z ↪[γa]{#1/2} false ∗ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨ ((c + 1)%Z ↪[γa]□ true)))).
 
-  Local Definition lock_token_def γt (lnc : val) κu (R : tf Σ) : iProp Σ :=
+  Local Definition lock_token_def (tl : val) (γ : ticketlock_γ) κu (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc) (u : Z),
-      (⌜lnc = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ((u + 1)%Z ↪[γt]□ κu) ∗
+      (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ((u + 1)%Z ↪[(ticketlock_γt γ)]□ κu) ∗
       ⟦tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R)⟧ₗ.
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
   Definition lock_token := lock_token_aux.(unseal).
   Local Definition lock_token_unseal :
     @lock_token = @lock_token_def := lock_token_aux.(seal_eq).
 
-  Definition is_fair_lock γt γa (lnc : val) (ℓ : ord.t) (R : tf Σ) : iProp Σ :=
-    ∃ (next curr : loc), (⌜lnc = (#next, #curr)%V⌝) ∧
-                         inv N_inv (lock_proto γt γa next curr ℓ R).
+  Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (ℓ : ord.t) (R : tf Σ) : iProp Σ :=
+    ∃ (next curr : loc), (⌜tl = (#next, #curr)%V⌝) ∧
+                         inv N_inv (lock_proto (ticketlock_γt γ) (ticketlock_γa γ) next curr ℓ R).
 
   Lemma lock_proto_red γt γa next curr ℓ R :
     ⟦lock_proto_tf γt γa next curr ℓ R⟧ₗ ⊣⊢ lock_proto γt γa next curr ℓ R.
@@ -131,26 +137,26 @@ Section proof.
     tf_red. rewrite !tf_atomic_logic. do 2 f_equiv. 1: done. do 2 f_equiv. done.
   Qed.
 
-  Lemma lock_token_red γt lnc κu R :
-    ⟦lock_token_tf γt lnc κu R⟧ₗ ⊣⊢ lock_token γt lnc κu R.
+  Lemma lock_token_red tl γ κu R :
+    ⟦lock_token_tf tl γ κu R⟧ₗ ⊣⊢ lock_token tl γ κu R.
   Proof.
     rewrite /lock_token_tf lock_token_unseal /lock_token_def.
     tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. do 2 f_equiv.
     tf_red. rewrite !tf_atomic_logic. f_equiv. f_equiv. done.
   Qed.
 
-  Lemma is_fair_lock_red γt γa lnc ℓ R :
-    ⟦is_fair_lock_tf γt γa lnc ℓ R⟧ₗ ⊣⊢ is_fair_lock γt γa lnc ℓ R.
+  Lemma is_fair_lock_red γ lnc ℓ R :
+    ⟦is_fair_lock_tf γ lnc ℓ R⟧ₗ ⊣⊢ is_fair_lock γ lnc ℓ R.
   Proof.
     rewrite /is_fair_lock_tf /is_fair_lock.
     tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. f_equiv. rewrite lock_proto_red. done.
   Qed.
 
-  (** Properties *)
-  Global Instance is_fair_lock_persistent γt γa lnc ℓ R : Persistent (is_fair_lock γt γa lnc ℓ R).
+  (** ** Properties *)
+  Global Instance is_fair_lock_persistent tl γ ℓ R : Persistent (is_fair_lock tl γ ℓ R).
   Proof. rewrite /is_fair_lock. apply _. Qed.
 
-  (** ** Properties we want from a modular spec with liveness:
+  (** ** Remark: Properties we want from a modular spec with liveness:
          1. Hide implementation details, e.g., # of lines, internal data structure.
          2. Robust against implementation changes, especially # of fuels.
          3. Consistent format for different libraries.
@@ -160,11 +166,11 @@ Section proof.
          Ref: https://en.wikipedia.org/wiki/Hartogs_number
    *)
 
-  (** Program proofs *)
-  Lemma init_spec i G ℓ (R : tf Σ) lc :
+  (** ** Program proofs *)
+  Lemma TicketLock_init_spec i G ℓ (R : tf Σ) lc :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗ ⟦R⟧ₗ }}}
       TicketLock.init #() @ i
-    l{{{ γt γa lnc, RET lnc; thP_groups i G ∗ £ lc ∗ ⟦is_fair_lock_tf γt γa lnc ℓ R⟧ₗ }}}.
+    l{{{ tl γ, RET tl; thP_groups i G ∗ £ lc ∗ is_fair_lock tl γ ℓ R }}}.
   Proof.
     iIntros (Φ) "(TG& Fs& HR) HΦ".
     rewrite /TicketLock.init.
@@ -211,23 +217,23 @@ Section proof.
       { rewrite big_sepM_singleton. iLeft. iFrame "GMEa". iPureIntro. lia. }
       iLeft. iFrame. done. }
     iModIntro. lwp_finish.
-    iApply ("HΦ" $! γt γa). iFrame "TG QLC".
-    rewrite is_fair_lock_red /is_fair_lock. iExists next, curr. iSplitR; first done.
+    iApply ("HΦ" $! _ (TicketLockName γt γa)). iFrame "TG QLC".
+    rewrite /is_fair_lock. iExists next, curr. iSplitR; first done.
     rewrite lock_proto_red. eauto.
   Qed.
 
   (** FIXME: ordi notation levels *)
-  Lemma acquire_spec i G γt γa lnc ℓ R μ lc :
+  Lemma TicketLock_acquire_spec i G tl γ ℓ R μ lc :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ℵ)%ordi 1) ∗
-         is_fair_lock γt γa lnc ℓ R }}}
-      TicketLock.acquire lnc @ i
+         is_fair_lock tl γ ℓ R }}}
+      TicketLock.acquire tl @ i
     l{{{ gu κu, RET #();
          (⌜ gu ∉ G ⌝) ∗
          thP_groups i ({[gu]} ∪ G) ∗
          ogP_obls i gu ℓ {[κu]} ∗
          ogP_fuel gu ℓ μ ∗
          oblP_fuel κu ℓ μ ∗
-         lock_token γt lnc κu R ∗ ⟦R⟧ₗ ∗
+         lock_token tl γ κu R ∗ ⟦R⟧ₗ ∗
          £ lc }}}.
   Proof.
     iIntros (Φ) "(TG& Fs& #IFL) HΦ".
@@ -249,7 +255,7 @@ Section proof.
     iFrame "TG F". iExists _, ∅, 100. iSplitR; first done. iIntros "!> TG _ !> LC !> !> !>".
     (* get fst and snd of the argument *)
     (* fst *)
-    iDestruct "IFL" as "(%&%& %& #INV)". subst lnc.
+    iDestruct "IFL" as "(%&%& %& #INV)". subst tl.
     iPoseProof (ogP_fuel_eq_set _ 0 _ (98 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
@@ -519,12 +525,12 @@ Section proof.
       iApply ("IHα" $! α0 LTα with "HΦ Gg0 GUku GGF QGF GMEaku Fs TG LC' WFs").
   Qed.
 
-  Lemma release_spec i G γt γa lnc ℓ R κu gu ℓu K lc :
+  Lemma TicketLock_release_spec i G tl γ ℓ R κu gu ℓu K lc :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗
          ogP_obls i gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
-         is_fair_lock γt γa lnc ℓ R ∗
-         lock_token γt lnc κu R ∗ ⟦R⟧ₗ }}}
-      TicketLock.release lnc @ i
+         is_fair_lock tl γ  ℓ R ∗
+         lock_token tl γ κu R ∗ ⟦R⟧ₗ }}}
+      TicketLock.release tl @ i
     l{{{ RET #();
          thP_groups i G ∗
          ogP_obls i gu ℓu (K ∖ {[κu]}) ∗
@@ -541,7 +547,7 @@ Section proof.
     iFrame "TG F". iExists _, ∅, 100. iSplitR; first done. iIntros "!> TG _ !> LC !> !> !>".
     rewrite lock_token_unseal /lock_token_def.
     iDestruct "LT" as "(%& %& %& %& PtrCurr0& #GMEtku& GEku)".
-    subst lnc.
+    subst tl.
     iPoseProof (ogP_fuel_eq_set _ 0 _ (98 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".

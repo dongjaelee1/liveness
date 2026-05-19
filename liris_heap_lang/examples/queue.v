@@ -6,18 +6,18 @@ From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 From iris.algebra Require Import reservation_map dfrac_agree mono_list gset.
-From transfinite.base_logic.lib Require Import ghost_map.
+From transfinite.base_logic.lib Require Import ghost_var ghost_map.
 
 From liris.heap_lang.examples Require Import ticket_lock.
 
-Section code.
+Module Queue.
   (** References:
     Iron (https://gitlab.mpi-sws.org/iris/iron/-/blob/master/theories/heap_lang/lib/queue.v)
     Transfinite Iris (https://gitlab.mpi-sws.org/iris/transfinite/-/blob/master/theories/examples/termination/eventloop.v)
    *)
 
   (** Use a ticket lock. *)
-  Definition new_queue : val :=
+  Definition init : val :=
     λ: <>,
       let: "node" := ref NONE in
       let: "lock" := TicketLock.init #() in
@@ -53,6 +53,7 @@ Section code.
           SOME (Fst "node")
       end.
 
+  (* FIXME: move to other file *)
   Definition put_task : val :=
     λ: "q" "f" "a",
       enqueue "q" ("f", "a").
@@ -67,7 +68,7 @@ Section code.
           "f" "a"
       end.
 
-End code.
+End Queue.
 
 (** ** A queue's spec with a liveness guarantee: any element can be associated with some obligations. *)
 (** The CMRA we need. *)
@@ -75,7 +76,8 @@ Class queueGpreS (Σ : gFunctors) : Set :=
   QueueGpreS {
       queueGpreS_queue_vals : inG Σ (dfrac_agreeR (list val));
       queueGpreS_queue_obls : inG Σ (dfrac_agreeR (list (oids)));
-      #[local] queueGpreS_data_inG :: ghost_mapG Σ positive (thread_id * ogid);
+      #[local] queueGpreS_data_inG :: ghost_varG Σ (thread_id * ogid);
+      (* #[local] queueGpreS_data_inG :: ghost_mapG Σ positive (thread_id * ogid); *)
     }.
 
 Class queueG Σ :=
@@ -88,7 +90,8 @@ Class queueG Σ :=
 Definition queueΣ : gFunctors :=
   gFunctors.app
     #[GFunctor (dfrac_agreeR (list val)); GFunctor (dfrac_agreeR (list oids))]
-    (ghost_mapΣ positive (thread_id * ogid)).
+    (ghost_varΣ (thread_id * ogid)).
+    (* (ghost_mapΣ positive (thread_id * ogid)). *)
 
 Global Instance subG_queueΣ {Σ} : subG queueΣ Σ → queueGpreS Σ.
 Proof. solve_inG. Qed.
@@ -98,7 +101,7 @@ Proof. solve_inG. Qed.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances queue_inG queueGpreS_queue_vals queueGpreS_queue_obls queueGpreS_data_inG.
 
-Section defs.
+Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
   (** ** Definitions *)
@@ -128,19 +131,31 @@ Section defs.
   Let N := nroot.@"queue".
   Let Ni := N.@"invariant".
 
-  Definition wid_1 := 1%positive.
+  (* Definition wid_1 := 1%positive. *)
 
   Definition queue_inv (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) γd (lhptr ltptr : loc) : iProp Σ :=
-    (∃ (lh lt : loc) (vs : list val) (Bs : list oids) (ds : gmap positive (thread_id * ogid)),
+    (∃ (lh lt : loc) (vs : list val) (Bs : list oids) (i : thread_id) (g : ogid),
         lhptr ↦{#(1/2)} #lh ∗
         ltptr ↦{#(1/2)} #lt ∗
         qG_queue_vals vs (1/2)%Qp ∗
         qG_queue_obls Bs (1/2)%Qp ∗
-        ghost_map_auth γd 1 ds ∗
+        ghost_var γd (1/2)%Qp (i, g) ∗
         queue_contents lh lt vs ∗
         queue_holds vs Bs φ ∗
-        (∃ i g, ⌜ds = {[wid_1 := (i, g)]}⌝ ∗ ogP_obls i g ℓ (foldr (λ B A, B ∪ A) ∅ Bs)) ∗
+        ogP_obls i g ℓ (foldr (λ B A, B ∪ A) ∅ Bs) ∗
         ([∗ list] n ↦ B ∈ Bs, [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (n ⊕ 1)%M))%I.
+
+  (* Definition queue_inv (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) γd (lhptr ltptr : loc) : iProp Σ := *)
+  (*   (∃ (lh lt : loc) (vs : list val) (Bs : list oids) (ds : gmap positive (thread_id * ogid)), *)
+  (*       lhptr ↦{#(1/2)} #lh ∗ *)
+  (*       ltptr ↦{#(1/2)} #lt ∗ *)
+  (*       qG_queue_vals vs (1/2)%Qp ∗ *)
+  (*       qG_queue_obls Bs (1/2)%Qp ∗ *)
+  (*       ghost_map_auth γd 1 ds ∗ *)
+  (*       queue_contents lh lt vs ∗ *)
+  (*       queue_holds vs Bs φ ∗ *)
+  (*       (∃ i g, ⌜ds = {[wid_1 := (i, g)]}⌝ ∗ ogP_obls i g ℓ (foldr (λ B A, B ∪ A) ∅ Bs)) ∗ *)
+  (*       ([∗ list] n ↦ B ∈ Bs, [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (n ⊕ 1)%M))%I. *)
 
   Definition is_queue (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) (γ : queue_γ) (q : val) : iProp Σ :=
     ∃ (lhptr ltptr : loc) (tl : val),
@@ -157,11 +172,24 @@ Section defs.
         ltptr ↦{#(1/2)} #lt ∗
         qG_queue_vals [] (1/2)%Qp ∗
         qG_queue_obls [] (1/2)%Qp ∗
-        ghost_map_auth (queue_γd γ) 1 ∅ ∗
+        ghost_var (queue_γd γ) 1 (inhabitant, inhabitant) ∗
         queue_contents lh lt [] ∗
         is_fair_lock (queue_γt γ) (queue_γa γ) tl 0
           (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗
                            qG_queue_vals vs (1/2)%Qp ∗ qG_queue_obls Bs (1/2)%Qp⟩))%I.
+
+  (* Definition is_queue_init (φ : nat → val → oids → iProp Σ) (γ : queue_γ) (q : val) : iProp Σ := *)
+  (*   (∃ (lhptr ltptr : loc) (tl : val) (lh lt : loc), *)
+  (*       ⌜q = (#lhptr, #ltptr, tl)%V⌝ ∧ *)
+  (*       lhptr ↦{#(1/2)} #lh ∗ *)
+  (*       ltptr ↦{#(1/2)} #lt ∗ *)
+  (*       qG_queue_vals [] (1/2)%Qp ∗ *)
+  (*       qG_queue_obls [] (1/2)%Qp ∗ *)
+  (*       ghost_map_auth (queue_γd γ) 1 ∅ ∗ *)
+  (*       queue_contents lh lt [] ∗ *)
+  (*       is_fair_lock (queue_γt γ) (queue_γa γ) tl 0 *)
+  (*         (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ *)
+  (*                          qG_queue_vals vs (1/2)%Qp ∗ qG_queue_obls Bs (1/2)%Qp⟩))%I. *)
 
   (** ** Lemmas *)
 
@@ -169,14 +197,73 @@ Section defs.
   Proof. rewrite /is_queue. apply _. Qed.
 
   Lemma is_queue_initialize E (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) γ q i g :
-    is_queue_init φ γ q -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ℓ φ γ q ∗ wid_1 ↪[(queue_γd γ)] (i, g).
+    is_queue_init φ γ q -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ℓ φ γ q ∗ ghost_var (queue_γd γ) (1/2)%Qp (i, g).
+    (* is_queue_init φ γ q -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ℓ φ γ q ∗ wid_1 ↪[(queue_γd γ)] (i, g). *)
   Proof.
-    iIntros "(%&%&%&%&%& %Hq& Ptrh& Ptrt& Qvs& Qbs& GMAd& Qc& #FL) Go".
+    iIntros "(%&%&%&%&%& %Hq& Ptrh& Ptrt& Qvs& Qbs& GVd& Qc& #FL) Go".
+    rewrite /is_queue.
+    iMod (ghost_var_update (i, g) with "GVd") as "[GVd $]".
+    (* iMod (ghost_map_insert wid_1 (i, g) with "GMAd") as "[GMAd GMAe]". 1: done. *)
+    iMod (inv_alloc Ni _ (queue_inv ℓ φ (queue_γd γ) lhptr ltptr) with "[Ptrh Ptrt Qvs Qbs GVd Qc Go]") as "#Invq".
+    { iNext. rewrite /queue_inv. iFrame. iSplitR.
+      { iApply big_sepL2_nil. auto. }
+      iSplitL "Go"; auto. }
+    iModIntro. iFrame "FL Invq". auto.
+  Qed.
 
-End defs.
+  TODO
 
-TODO
+  (** ** Program proofs *)
+  Lemma Queue_init_spec i G ℓ (R : tf Σ) lc :
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) }}}
+      Queue.init #() @ i
+    l{{{ γ q, RET q; thP_groups i G ∗ £ lc ∗ is_queue_init φ γ q }}}.
+  Proof.
 
+
+  TODO
+
+  Definition init : val :=
+    λ: <>,
+      let: "node" := ref NONE in
+      let: "lock" := TicketLock.init #() in
+      (ref "node", ref "node", "lock").
+
+  Definition enqueue : val :=
+    λ: "q" "x",
+      let: "lock" := Snd "q" in
+      TicketLock.acquire "lock";;
+      let: "tptr" := Snd (Fst "q") in
+      let: "t" := !"tptr"  in
+      let: "newt" := ref NONE in
+      "t" <- SOME ("x", "newt");;
+      "tptr" <- "newt";;
+      TicketLock.release "lock".
+
+  Definition dequeue : val :=
+    λ: "q",
+      let: "lock" := Snd "q" in
+      TicketLock.acquire "lock";;
+      let: "hptr" := Fst (Fst "q") in
+      let: "h" := !"hptr" in
+      match: !"h" with
+        NONE =>
+          (* Empty queue. *)
+          TicketLock.release "lock";;
+          NONE
+      | SOME "node" =>
+          let: "newh" := Snd "node" in
+          "hptr" <- "newh";;
+          Free "h";;
+          TicketLock.release "lock";;
+          SOME (Fst "node")
+      end.
+
+End proof.
+
+
+
+(* old stuff *)
 Variant queue_op : Set :=
   | op_enq (v : val)
   | op_deq (v : option val) (w : positive) (k : oid)
