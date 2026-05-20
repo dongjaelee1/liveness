@@ -128,15 +128,15 @@ Section proof.
     | v :: vs => (∃ l : loc, lh ↦ SOMEV (v, #l) ∗ queue_contents l lt vs)
     end%I.
 
-  Definition queue_holds (vs : list val) (Bs : list oids) (φ : nat → val → oids → iProp Σ) : iProp Σ :=
-    ([∗ list] n ↦ v;B ∈ vs;Bs, φ n v B).
+  Definition queue_holds (vs : list val) (Bs : list oids) (φ : val → oids → iProp Σ) : iProp Σ :=
+    ([∗ list] v;B ∈ vs;Bs, φ v B).
 
   Let N := nroot.@"queue".
   Let Ni := N.@"invariant".
 
   (* Definition wid_1 := 1%positive. *)
 
-  Definition queue_inv (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) γ (lhptr ltptr : loc) : iProp Σ :=
+  Definition queue_inv (ℓ : ord.t) (φ : val → oids → iProp Σ) γ (lhptr ltptr : loc) : iProp Σ :=
     (∃ (lh lt : loc) (vs : list val) (Bs : list oids) (i : thread_id) (g : ogid),
         lhptr ↦{#(1/2)} #lh ∗
         ltptr ↦{#(1/2)} #lt ∗
@@ -160,7 +160,7 @@ Section proof.
   (*       (∃ i g, ⌜ds = {[wid_1 := (i, g)]}⌝ ∗ ogP_obls i g ℓ (foldr (λ B A, B ∪ A) ∅ Bs)) ∗ *)
   (*       ([∗ list] n ↦ B ∈ Bs, [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (n ⊕ 1)%M))%I. *)
 
-  Definition is_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) : iProp Σ :=
+  Definition is_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) (φ : val → oids → iProp Σ) : iProp Σ :=
     ∃ (lhptr ltptr : loc) (tl : val),
       ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       inv Ni (queue_inv ℓ φ γ lhptr ltptr) ∗
@@ -168,7 +168,7 @@ Section proof.
         (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗
                          qG_queue_vals (queue_γv γ) vs (1/2)%Qp ∗ qG_queue_obls (queue_γb γ) Bs (1/2)%Qp⟩).
 
-  Definition is_queue_init (ql :val) (γ : queue_γ) (φ : nat → val → oids → iProp Σ) : iProp Σ :=
+  Definition is_queue_init (ql :val) (γ : queue_γ) (φ : val → oids → iProp Σ) : iProp Σ :=
     (∃ (lhptr ltptr : loc) (tl : val) (lh lt : loc),
         ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
         lhptr ↦{#(1/2)} #lh ∗
@@ -199,7 +199,7 @@ Section proof.
   Global Instance is_queue_persistent ql γ ℓ φ : Persistent (is_queue ql γ ℓ φ).
   Proof. rewrite /is_queue. apply _. Qed.
 
-  Lemma is_queue_initialize E ql γ (ℓ : ord.t) (φ : nat → val → oids → iProp Σ) i g :
+  Lemma is_queue_initialize E ql γ (ℓ : ord.t) (φ : val → oids → iProp Σ) i g :
     is_queue_init ql γ φ -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ql γ ℓ φ ∗ ghost_var (queue_γd γ) (1/2)%Qp (i, g).
     (* is_queue_init φ γ q -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ℓ φ γ q ∗ wid_1 ↪[(queue_γd γ)] (i, g). *)
   Proof.
@@ -216,18 +216,20 @@ Section proof.
 
   (** ** Program proofs *)
   (** FIXME: better fuel format for libraries that uses other libraries *)
-  Lemma Queue_init_spec i G φ lc :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 2 1) }}}
+  Lemma Queue_init_spec :
+    ∃ μ, ∀ i G φ lc,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 μ) }}}
       Queue.init #() @ i
     l{{{ ql γ, RET ql; thP_groups i G ∗ £ lc ∗ is_queue_init ql γ φ }}}.
   Proof.
-    iIntros (Φ) "(TG& Fs) HΦ".
+    pose proof (TicketLock_init_spec) as (μ& Hspec).
+    exists (20 ⊕ μ)%M. iIntros (i G φ lc Φ) "(TG& Fs) HΦ".
     rewrite /Queue.init.
-    iMod (ogP_fuel_extend_set _ 1 _ (1 ⊕ 1)%M with "Fs") as "Fs".
-    { apply ordArith.lt_from_nat. lia. }
+    (* iMod (ogP_fuel_extend_set _ 1 _ (1 ⊕ 1)%M with "Fs") as "Fs". *)
+    (* { apply ordArith.lt_from_nat. lia. } *)
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F_TicketLock]".    
-    iMod (ogP_fuel_extend_set _ 0 _ 20%M with "Fs") as "Fs".
-    { apply ordArith.lt_from_nat. lia. }
+    (* iMod (ogP_fuel_extend_set _ 0 _ 20%M with "Fs") as "Fs". *)
+    (* { apply ordArith.lt_from_nat. lia. } *)
     iPoseProof (ogP_fuel_eq_set _ 0 _ (19 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
@@ -307,7 +309,8 @@ Section proof.
       as (γb) "[HQbs HQbs0]".
     { rewrite -dfrac_agree_op. done. }
     iModIntro.
-    iApply (TicketLock_init_spec _ _ 0 (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue_vals γv vs (1/2)%Qp ∗ qG_queue_obls γb Bs (1/2)%Qp⟩%F) 0 with "[$TG $F_TicketLock Ptr_hd0 Ptr_tl0 HQvs0 HQbs0]").
+    (* iPoseProof (Hspec i G 0 (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue_vals γv vs (1/2)%Qp ∗ qG_queue_obls γb Bs (1/2)%Qp⟩%F) 0 Φ) as "#H". *)
+    iApply (Hspec _ _ 0 (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue_vals γv vs (1/2)%Qp ∗ qG_queue_obls γb Bs (1/2)%Qp⟩%F) 0 with "[$TG $F_TicketLock Ptr_hd0 Ptr_tl0 HQvs0 HQbs0]").
     { tf_red. iFrame. }
     iIntros (tl γtl) "(TG& _& #IFL)".
     iPoseProof (ogP_fuel_eq_set _ 0 _ (8 ⊕ 1)%M with "Fs") as "Fs".

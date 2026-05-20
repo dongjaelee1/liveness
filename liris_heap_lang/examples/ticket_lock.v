@@ -165,17 +165,22 @@ Section proof.
          ord.large is a good abstraction for more complex functions.
          Ref: https://en.wikipedia.org/wiki/Hartogs_number
    *)
+  (** ** Remark: Spec we want for a function that trivially terminates (w/o witness induction):
+         "flat layer"=0. A possible format is ∃ μ in front of the spec, as in TicketLock_init_sepc.
+   *)
 
   (** ** Program proofs *)
-  Lemma TicketLock_init_spec i G ℓ (R : tf Σ) lc :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗ ⟦R⟧ₗ }}}
+  Lemma TicketLock_init_spec :
+    ∃ μ, ∀ i G ℓ (R : tf Σ) lc,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 μ) ∗ ⟦R⟧ₗ }}}
       TicketLock.init #() @ i
     l{{{ tl γ, RET tl; thP_groups i G ∗ £ lc ∗ is_fair_lock tl γ ℓ R }}}.
   Proof.
-    iIntros (Φ) "(TG& Fs& HR) HΦ".
+    exists 4.
+    iIntros (i G ℓ R lc Φ) "(TG& Fs& HR) HΦ".
     rewrite /TicketLock.init.
-    iMod (ogP_fuel_extend_set _ 0 _ 4%M with "Fs") as "Fs".
-    { apply ordArith.lt_from_nat. lia. }
+    (* iMod (ogP_fuel_extend_set _ 0 _ 4%M with "Fs") as "Fs". *)
+    (* { apply ordArith.lt_from_nat. lia. } *)
     iPoseProof (ogP_fuel_eq_set _ 0 _ (3 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
