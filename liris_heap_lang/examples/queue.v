@@ -165,8 +165,8 @@ Section proof.
       ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       inv Ni (queue_inv ℓ φ γ lhptr ltptr) ∗
       is_fair_lock tl (queue_ticketlock_γ γ) 0
-        (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗
-                         qG_queue_vals (queue_γv γ) vs (1/2)%Qp ∗ qG_queue_obls (queue_γb γ) Bs (1/2)%Qp⟩).
+        (∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗
+                        qG_queue_vals (queue_γv γ) vs (1/2)%Qp ∗ qG_queue_obls (queue_γb γ) Bs (1/2)%Qp).
 
   Definition is_queue_init (ql :val) (γ : queue_γ) (φ : val → oids → iProp Σ) : iProp Σ :=
     (∃ (lhptr ltptr : loc) (tl : val) (lh lt : loc),
@@ -178,8 +178,8 @@ Section proof.
         ghost_var (queue_γd γ) 1 (inhabitant, inhabitant) ∗
         queue_contents lh lt [] ∗
         is_fair_lock tl (queue_ticketlock_γ γ) 0
-          (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗
-                           qG_queue_vals (queue_γv γ) vs (1/2)%Qp ∗ qG_queue_obls (queue_γb γ) Bs (1/2)%Qp⟩))%I.
+          (∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗
+                          qG_queue_vals (queue_γv γ) vs (1/2)%Qp ∗ qG_queue_obls (queue_γb γ) Bs (1/2)%Qp))%I.
 
   (* Definition is_queue_init (φ : nat → val → oids → iProp Σ) (γ : queue_γ) (q : val) : iProp Σ := *)
   (*   (∃ (lhptr ltptr : loc) (tl : val) (lh lt : loc), *)
@@ -215,15 +215,15 @@ Section proof.
   Qed.
 
   (** ** Program proofs *)
-  (** FIXME: better fuel format for libraries that uses other libraries *)
+  (** FIXME: better format for triples with this pattern *)
   Lemma Queue_init_spec :
-    ∃ μ, ∀ i G φ lc,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 μ) }}}
+    ⊢ ∃ m, ∀ i G φ lc,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) }}}
       Queue.init #() @ i
     l{{{ ql γ, RET ql; thP_groups i G ∗ £ lc ∗ is_queue_init ql γ φ }}}.
   Proof.
-    pose proof (TicketLock_init_spec) as (μ& Hspec).
-    exists (20 ⊕ μ)%M. iIntros (i G φ lc Φ) "(TG& Fs) HΦ".
+    iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
+    iExists (20 ⊕ m)%M. iIntros (i G φ lc) "!> % (TG& Fs) HΦ".
     rewrite /Queue.init.
     (* iMod (ogP_fuel_extend_set _ 1 _ (1 ⊕ 1)%M with "Fs") as "Fs". *)
     (* { apply ordArith.lt_from_nat. lia. } *)
@@ -309,9 +309,8 @@ Section proof.
       as (γb) "[HQbs HQbs0]".
     { rewrite -dfrac_agree_op. done. }
     iModIntro.
-    (* iPoseProof (Hspec i G 0 (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue_vals γv vs (1/2)%Qp ∗ qG_queue_obls γb Bs (1/2)%Qp⟩%F) 0 Φ) as "#H". *)
-    iApply (Hspec _ _ 0 (⟨∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue_vals γv vs (1/2)%Qp ∗ qG_queue_obls γb Bs (1/2)%Qp⟩%F) 0 with "[$TG $F_TicketLock Ptr_hd0 Ptr_tl0 HQvs0 HQbs0]").
-    { tf_red. iFrame. }
+    iApply ("TicketLock_init_spec" $! _ _ 0 (∃ lh lt vs Bs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue_vals γv vs (1/2)%Qp ∗ qG_queue_obls γb Bs (1/2)%Qp)%I 0 with "[$TG $F_TicketLock Ptr_hd0 Ptr_tl0 HQvs0 HQbs0]").
+    { iFrame. }
     iIntros (tl γtl) "(TG& _& #IFL)".
     iPoseProof (ogP_fuel_eq_set _ 0 _ (8 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }

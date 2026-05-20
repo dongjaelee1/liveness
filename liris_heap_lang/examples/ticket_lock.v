@@ -62,7 +62,7 @@ Section proof.
       }.
 
   (** ** Definitions *)
-  Local Definition lock_proto_tf γt γa (next curr : loc) (ℓ : ord.t) (R : tf Σ) : tf Σ :=
+  Local Definition lock_proto_tf γt γa (next curr : loc) (ℓ : ord.t) (R : iProp Σ) : tf Σ :=
     (∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
         next ↦ #n ∗
         (* Thread with ticket t establishes curr ↦ t (so curr = t-1 when acquires the lock). *)
@@ -74,26 +74,26 @@ Section proof.
         ([^tf_sep map] t ↦ κ ∈ tickets,
            ⟨oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi⟩ ∗
            ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ ⟨oblP_fulfilled κ⟩) ∨
-              (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)))) ∗
+              (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ ⟨R⟩)))) ∗
         (* Thread acks its turn and acquires the lock and resources. *)
         ([^tf_sep map] t ↦ a ∈ acks,
            ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ ⟨t ↪[γa]□ true⟩) ∨
               (⌜ (t = c + 1)%Z ⌝) ∨
               (⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧ ⟨t ↪[γa]{#1/2} false⟩))) ∗
-        ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ R) ∨
-           (⌜(c < n)%Z⌝ ∧ ((⟨(c + 1)%Z ↪[γa]{#1/2} false⟩ ∗ curr ↦{#(1/2)} #c%Z ∗ R) ∨ (⟨(c + 1)%Z ↪[γa]□ true⟩)))))%F.
+        ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ ⟨R⟩) ∨
+           (⌜(c < n)%Z⌝ ∧ ((⟨(c + 1)%Z ↪[γa]{#1/2} false⟩ ∗ curr ↦{#(1/2)} #c%Z ∗ ⟨R⟩) ∨ (⟨(c + 1)%Z ↪[γa]□ true⟩)))))%F.
 
-  Definition lock_token_tf (tl : val) (γ : ticketlock_γ) κu (R : tf Σ) : tf Σ :=
+  Definition lock_token_tf (tl : val) (γ : ticketlock_γ) κu (R : iProp Σ) : tf Σ :=
     (∃ (next curr : loc) (u : Z),
         (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ⟨(u + 1)%Z ↪[(ticketlock_γt γ)]□ κu⟩ ∗
-        tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R))%F.
+        tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ ⟨R⟩))%F.
 
-  Definition is_fair_lock_tf (tl : val) (γ : ticketlock_γ) (ℓ : ord.t) (R : tf Σ) : tf Σ :=
+  Definition is_fair_lock_tf (tl : val) (γ : ticketlock_γ) (ℓ : ord.t) (R : iProp Σ) : tf Σ :=
     (∃ (next curr : loc), (⌜tl = (#next, #curr)%V⌝) ∧
                           tf_always N_inv (lock_proto_tf (ticketlock_γt γ) (ticketlock_γa γ) next curr ℓ R))%F.
 
   (* Reduction to iProp. *)
-  Local Definition lock_proto γt γa (next curr : loc) (ℓ : ord.t) (R : tf Σ) : iProp Σ :=
+  Local Definition lock_proto γt γa (next curr : loc) (ℓ : ord.t) (R : iProp Σ) : iProp Σ :=
     ∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
       next ↦ #n ∗
       curr ↦{#(1/2)} #c ∗
@@ -104,24 +104,24 @@ Section proof.
       ([∗ map] t ↦ κ ∈ tickets,
          (oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi) ∗
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_fulfilled κ) ∨
-            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)⟧ₗ))) ∗
+            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ ⟨R⟩)⟧ₗ))) ∗
       ([∗ map] t ↦ a ∈ acks,
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ t ↪[γa]□ true) ∨
             (⌜ (t = c + 1)%Z ⌝) ∨
             (⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧ t ↪[γa]{#1/2} false))) ∗
-      ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
-         (⌜(c < n)%Z⌝ ∧ (((c + 1)%Z ↪[γa]{#1/2} false ∗ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨ ((c + 1)%Z ↪[γa]□ true)))).
+      ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ R) ∨
+         (⌜(c < n)%Z⌝ ∧ (((c + 1)%Z ↪[γa]{#1/2} false ∗ curr ↦{#(1/2)} #c%Z ∗ R) ∨ ((c + 1)%Z ↪[γa]□ true)))).
 
-  Local Definition lock_token_def (tl : val) (γ : ticketlock_γ) κu (R : tf Σ) : iProp Σ :=
+  Local Definition lock_token_def (tl : val) (γ : ticketlock_γ) κu (R : iProp Σ) : iProp Σ :=
     ∃ (next curr : loc) (u : Z),
       (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ((u + 1)%Z ↪[(ticketlock_γt γ)]□ κu) ∗
-      ⟦tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R)⟧ₗ.
+      ⟦tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ ⟨R⟩)⟧ₗ.
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
   Definition lock_token := lock_token_aux.(unseal).
   Local Definition lock_token_unseal :
     @lock_token = @lock_token_def := lock_token_aux.(seal_eq).
 
-  Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (ℓ : ord.t) (R : tf Σ) : iProp Σ :=
+  Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (ℓ : ord.t) (R : iProp Σ) : iProp Σ :=
     ∃ (next curr : loc), (⌜tl = (#next, #curr)%V⌝) ∧
                          inv N_inv (lock_proto (ticketlock_γt γ) (ticketlock_γa γ) next curr ℓ R).
 
@@ -171,13 +171,13 @@ Section proof.
 
   (** ** Program proofs *)
   Lemma TicketLock_init_spec :
-    ∃ μ, ∀ i G ℓ (R : tf Σ) lc,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 μ) ∗ ⟦R⟧ₗ }}}
+    ⊢ ∃ m, ∀ i G ℓ R lc,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗ R }}}
       TicketLock.init #() @ i
     l{{{ tl γ, RET tl; thP_groups i G ∗ £ lc ∗ is_fair_lock tl γ ℓ R }}}.
   Proof.
-    exists 4.
-    iIntros (i G ℓ R lc Φ) "(TG& Fs& HR) HΦ".
+    iExists 4.
+    iIntros (i G ℓ R lc) "!> %Φ (TG& Fs& HR) HΦ".
     rewrite /TicketLock.init.
     (* iMod (ogP_fuel_extend_set _ 0 _ 4%M with "Fs") as "Fs". *)
     (* { apply ordArith.lt_from_nat. lia. } *)
@@ -228,8 +228,9 @@ Section proof.
   Qed.
 
   (** FIXME: ordi notation levels *)
-  Lemma TicketLock_acquire_spec i G tl γ ℓ R μ lc :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ℵ)%ordi 1) ∗
+  Lemma TicketLock_acquire_spec :
+    ⊢ ∃ m, ∀ i G tl γ ℓ R μ lc,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ℵ)%ordi m) ∗
          is_fair_lock tl γ ℓ R }}}
       TicketLock.acquire tl @ i
     l{{{ gu κu, RET #();
@@ -238,10 +239,11 @@ Section proof.
          ogP_obls i gu ℓ {[κu]} ∗
          ogP_fuel gu ℓ μ ∗
          oblP_fuel κu ℓ μ ∗
-         lock_token tl γ κu R ∗ ⟦R⟧ₗ ∗
+         lock_token tl γ κu R ∗ R ∗
          £ lc }}}.
   Proof.
-    iIntros (Φ) "(TG& Fs& #IFL) HΦ".
+    iExists 1.
+    iIntros (i G tl γ ℓ R μ lc) "!> % (TG& Fs& #IFL) HΦ".
     rewrite /TicketLock.acquire.
     iAssert (|==>[∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ω)%ordi (100 ⊕ 1)%M)%I with "[Fs]" as ">Fs".
     { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% GF".
@@ -314,7 +316,7 @@ Section proof.
     (* Unlock obligation *)
     iMod (tf_until_alloc _ _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
       as "(%κu& %LUku& Gg0& #Gku& OGF& #Wlku& ALLOC)". 1: auto.
-    iMod ("ALLOC" $! _ N_eventually ⌜True⌝%F (curr ↦{#1 / 2} #(n + 1) ∗ R)%F with "[//]") as "[GUku GUku1]".
+    iMod ("ALLOC" $! _ N_eventually ⌜True⌝%F (curr ↦{#1 / 2} #(n + 1) ∗ ⟨R⟩)%F with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ 1 with "GGF") as "GGF".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
@@ -530,21 +532,23 @@ Section proof.
       iApply ("IHα" $! α0 LTα with "HΦ Gg0 GUku GGF QGF GMEaku Fs TG LC' WFs").
   Qed.
 
-  Lemma TicketLock_release_spec i G tl γ ℓ R κu gu ℓu K lc :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗
+  Lemma TicketLock_release_spec :
+    ⊢ ∃ m, ∀ i G tl γ ℓ R κu gu ℓu K lc,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗
          ogP_obls i gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          is_fair_lock tl γ  ℓ R ∗
-         lock_token tl γ κu R ∗ ⟦R⟧ₗ }}}
+         lock_token tl γ κu R ∗ R }}}
       TicketLock.release tl @ i
     l{{{ RET #();
          thP_groups i G ∗
          ogP_obls i gu ℓu (K ∖ {[κu]}) ∗
          £ lc}}}.
   Proof.
-    iIntros (Φ) "(TG& Fs& Gg& %LUkl& #IFL& LT& HR) HΦ".
+    iExists 100.
+    iIntros (i G tl γ ℓ R κu gu ℓu K lc) "!> % (TG& Fs& Gg& %LUkl& #IFL& LT& HR) HΦ".
     rewrite /TicketLock.release.
-    iMod (ogP_fuel_extend_set _ 0 _ 100%M with "Fs") as "Fs".
-    { apply ordArith.lt_from_nat. lia. }
+    (* iMod (ogP_fuel_extend_set _ 0 _ 100%M with "Fs") as "Fs". *)
+    (* { apply ordArith.lt_from_nat. lia. } *)
     iPoseProof (ogP_fuel_eq_set _ 0 _ (99 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
