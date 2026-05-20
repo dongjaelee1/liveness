@@ -289,6 +289,21 @@ Section proof.
     simpl. iFrame. auto.
   Qed.
 
+  Lemma queue_contents_enqueue lh lt vs φ :
+    queue_contents lh lt vs φ -∗
+    (lt ↦ NONEV ∗
+     (∀ v B (l : loc), lt ↦ SOMEV (v, #l) -∗ φ v B -∗ l ↦ NONEV -∗ queue_contents lh l (vs ++ [(v, B)]) φ)).
+  Proof.
+    revert lh lt φ. induction vs; iIntros (???) "H"; simpl.
+    { iDestruct "H" as "(%& Ptr_lh)". subst. iFrame. iIntros (???) "Ptr_lt Hφ Ptr_l".
+      iExists l. iFrame. auto. }
+    destruct a as (v&B). iDestruct "H" as "(%& Ptr_lh& Hφ& QC)".
+    iPoseProof (IHvs with "QC") as "($& ACC)".
+    iIntros (???) "Ptr_lt Hφ0 Ptr_l0". iFrame "Ptr_lh Hφ".
+    iApply ("ACC" with "Ptr_lt Hφ0 Ptr_l0").
+  Qed.
+
+  (** TODO: LAT-style spec that enables the client to put ogP_obls in some invariant. *)
   Lemma Queue_enqueue_spec :
     ⊢ ∃ m, ∀ i G g B φ lc γ ℓ ℓ' (ql x : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
@@ -349,6 +364,124 @@ Section proof.
     iApply ("TicketLock_acquire_spec" $! _ _ _ _ _ _ 100%M 0 with "[$TG F_ma $IFL]").
     { iApply ogP_fuel_layer_eq_set. 2: iFrame. by rewrite hessenberg.add_O_l. }
     iIntros (gu ku) "(_& %Ningu& TG& Ggu& F_gu& F_ku& Lock& R)".
+    rewrite (ogP_fuel_eq gu 0 _ (94 ⊕ 6)%M); cycle 1.
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add with "F_gu") as "[F_gu _]".
+    iPoseProof (big_sepS_union _ {[gu]} G with "[$Fs F_gu]") as "Fs". 1: set_solver.
+    { iApply big_sepS_singleton. auto. }
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (93 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (92 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (91 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (90 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (89 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (88 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (87 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iDestruct "R" as "(%&%&%& Ptr_lh& Ptr_lt& Queue)".    
+    lwp_bind (Load _).
+    iModIntro.
+    iApply (lwp_load _ ∅ 0 with "[$TG $F $Ptr_lt]"). 1: done.
+    iIntros "((_& TG& _)& Ptr_lt)".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (86 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (85 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (84 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (83 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    lwp_bind (AllocN _ _).
+    iApply (lwp_alloc _ ∅ 0 with "[$TG $F]"). 1: done.
+    iModIntro. iIntros (ptr_newt) "((_& TG& _)& Ptr_newt& _)".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (82 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 100. iSplitR; first done. iIntros "!> TG _ !> LC !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (81 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (80 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (79 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iModIntro.
+    lwp_pure. simpl.
+    iFrame "TG F". iExists _, ∅, 0. iSplitR; first done. iIntros "!> TG _ !> _ !> !>".
+    (** Physical enqueue *)
+    lwp_bind (Store _ _).
+    iModIntro. iInv "IQ" as "qinv". iApply lwp_sfmupd.
+    iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+    iApply (lwp_lc_later with "LC1"). iNext.
+    iDestruct "qinv" as "(%&%&%&%&%& Ptr_lh0& Ptr_lt0& Queue0& Gvar& QC& Gq& Fq)".
+    iPoseProof (pointsto_agree with "Ptr_lt Ptr_lt0") as "%". simplify_eq. rename lt0 into lt.
+    iPoseProof (pointsto_agree with "Ptr_lh Ptr_lh0") as "%". simplify_eq. rename lh0 into lh.
+    iPoseProof (own_valid_2 with "Queue Queue0") as "%".
+    apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs0.
+    iPoseProof (queue_contents_enqueue with "QC") as "(QC_Ptr_lt& QC_ACC)".
+    iPoseProof (ogP_fuel_eq_set _ 0 _ (78 ⊕ 1)%M with "Fs") as "Fs".
+    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
+    iApply (lwp_store _ ∅ 0 with "[$TG $F $QC_Ptr_lt]"). 1: done.
+    iIntros "((_& TG& _)& QC_Ptr_lt)".
+    iMod (oblP_fuel_extend_set _ ℓ _ (1 ⊕ ℵ)%M with "FB") as "FB".
+    { apply hessenberg.add_lt_l. apply ord.S_lt. }
+    iPoseProof (oblP_fuel_add_set with "FB") as "[FB FBq]".
+    iMod (obl_offload_set with "GB Gq FB") as "(GB& Gq& %HG)". 1: set_solver. 1: by left.
+    
 
     TODO
     
@@ -456,17 +589,7 @@ Section proof.
 
   TODO
 
-  Definition enqueue : val :=
-    λ: "q" "x",
-      let: "lock" := Snd "q" in
-      TicketLock.acquire "lock";;
-      let: "tptr" := Snd (Fst "q") in
-      let: "t" := !"tptr"  in
-      let: "newt" := ref NONE in
-      "t" <- SOME ("x", "newt");;
-      "tptr" <- "newt";;
-      TicketLock.release "lock".
-
+    (* Also dequeue_main for the main (bounded) worker, or a nice representation for both cases *)
   Definition dequeue : val :=
     λ: "q",
       let: "lock" := Snd "q" in
