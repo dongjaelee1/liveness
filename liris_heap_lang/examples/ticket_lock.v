@@ -174,7 +174,7 @@ Section proof.
     ⊢ ∃ m, ∀ i G ℓ R lc,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗ R }}}
       TicketLock.init #() @ i
-    l{{{ tl γ, RET tl; thP_groups i G ∗ £ lc ∗ is_fair_lock tl γ ℓ R }}}.
+    l{{{ tl γ, RET tl; £ lc ∗ thP_groups i G ∗ is_fair_lock tl γ ℓ R }}}.
   Proof.
     iExists 4.
     iIntros (i G ℓ R lc) "!> %Φ (TG& Fs& HR) HΦ".
@@ -234,13 +234,13 @@ Section proof.
          is_fair_lock tl γ ℓ R }}}
       TicketLock.acquire tl @ i
     l{{{ gu κu, RET #();
+         £ lc ∗
          (⌜ gu ∉ G ⌝) ∗
          thP_groups i ({[gu]} ∪ G) ∗
          ogP_obls i gu ℓ {[κu]} ∗
          ogP_fuel gu ℓ μ ∗
          oblP_fuel κu ℓ μ ∗
-         lock_token tl γ κu R ∗ R ∗
-         £ lc }}}.
+         lock_token tl γ κu R ∗ R }}}.
   Proof.
     iExists 1.
     iIntros (i G tl γ ℓ R μ lc) "!> % (TG& Fs& #IFL) HΦ".
@@ -315,7 +315,7 @@ Section proof.
       as "(%gu0& %Ningu0& TG& Gg0& GF)".
     (* Unlock obligation *)
     iMod (tf_until_alloc _ _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
-      as "(%κu& %LUku& Gg0& #Gku& OGF& #Wlku& ALLOC)". 1: auto.
+      as "(%κu& %LUku& Gg0& #Gku& OGF& #Wlku& ALLOC)". 1: by left.
     iMod ("ALLOC" $! _ N_eventually ⌜True⌝%F (curr ↦{#1 / 2} #(n + 1) ∗ ⟨R⟩)%F with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ 1 with "GGF") as "GGF".
@@ -486,7 +486,7 @@ Section proof.
       subst G'.
       (* Create a new group and offload the unlock obligation to it. *)
       iMod (group_alloc _ _ _ (ℓ)%ordi (μ)%M with "TG") as "(%gu& %Ningu& TG& Gg& QGF')".
-      iMod (obl_offload with "Gg0 Gg GGF") as "(Gg0& Gg& %Ningu')". 1: set_solver. 1: auto.
+      iMod (obl_offload with "Gg0 Gg GGF") as "(Gg0& Gg& %Ningu')". 1: set_solver. 1: by left.
       replace ({[κu]} ∖ {[κu]}) with (∅ : gset oid) by set_solver.
       rewrite union_empty_l_L.
       iMod (group_delete with "TG Gg0") as "TG".
@@ -540,9 +540,9 @@ Section proof.
          lock_token tl γ κu R ∗ R }}}
       TicketLock.release tl @ i
     l{{{ RET #();
+         £ lc ∗
          thP_groups i G ∗
-         ogP_obls i gu ℓu (K ∖ {[κu]}) ∗
-         £ lc}}}.
+         ogP_obls i gu ℓu (K ∖ {[κu]}) }}}.
   Proof.
     iExists 100.
     iIntros (i G tl γ ℓ R κu gu ℓu K lc) "!> % (TG& Fs& Gg& %LUkl& #IFL& LT& HR) HΦ".

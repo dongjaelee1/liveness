@@ -413,7 +413,7 @@ Section proof.
   Proof. split; [auto|apply _]. Qed.
 
   Lemma tf_until_alloc E i g K (b : bool) ℓ1 ℓ2 μ :
-    (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+    (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
     ogP_obls i g ℓ1 K -∗
     |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
                  oblP_id k ∗ oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗

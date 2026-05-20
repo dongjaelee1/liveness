@@ -291,7 +291,7 @@ Section sfmupd.
   Qed.
 
   Lemma obl_alloc_assigned E i g K b ℓ1 ℓ2 μ :
-    (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+    (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
     ogP_obls i g ℓ1 K -∗
     |={E}=>m ∃ k, (⌜ k ∉ K ⌝) ∗
                  ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
@@ -346,7 +346,7 @@ Section sfmupd.
 
   Lemma obl_offload E i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
     k ∈ K1 →
-    (ℓ2 = ℓ ∨ ℓ2 < ℓ)%ordi →
+    (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
     ogP_obls i1 g1 ℓ1 K1 -∗
     ogP_obls i2 g2 ℓ2 K2 -∗
     oblP_fuel k ℓ 1 -∗
@@ -359,7 +359,7 @@ Section sfmupd.
 
   Lemma obl_offload_set E i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
     K ⊆ K1 →
-    (ℓ2 = ℓ ∨ ℓ2 < ℓ)%ordi →
+    (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
     ogP_obls i1 g1 ℓ1 K1 -∗
     ogP_obls i2 g2 ℓ2 K2 -∗
     ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗

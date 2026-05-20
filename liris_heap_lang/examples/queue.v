@@ -172,7 +172,7 @@ Section proof.
     ⊢ ∃ m, ∀ i G φ lc,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) }}}
       Queue.init #() @ i
-    l{{{ ql γ, RET ql; thP_groups i G ∗ £ lc ∗ is_queue_init ql γ φ }}}.
+    l{{{ ql γ, RET ql; £ lc ∗ thP_groups i G ∗ is_queue_init ql γ φ }}}.
   Proof.
     iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
     iExists (20 ⊕ m)%M. iIntros (i G φ lc) "!> % (TG& Fs) HΦ".
@@ -256,7 +256,7 @@ Section proof.
     iModIntro.
     iApply ("TicketLock_init_spec" $! _ _ 0 (∃ lh lt vs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue γq vs (1/2)%Qp)%I 0 with "[$TG $F_TicketLock Ptr_hd0 Ptr_tl0 HQvs0]").
     { iFrame. }
-    iIntros (tl γtl) "(TG& _& #IFL)".
+    iIntros (tl γtl) "(_& TG& #IFL)".
     iPoseProof (ogP_fuel_eq_set _ 0 _ (8 ⊕ 1)%M with "Fs") as "Fs".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F]".
@@ -290,16 +290,17 @@ Section proof.
   Qed.
 
   Lemma Queue_enqueue_spec :
-    ⊢ ∃ m, ∀ i G B φ lc γ ℓ (ql x : val),
+    ⊢ ∃ m, ∀ i G g B φ lc γ ℓ ℓ' (ql x : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
-         ⌜ B ⊆ G ⌝ ∗ ([∗ set] b ∈ B, ogP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
+         ogP_obls i g ℓ' B ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
+         φ x B ∗
          is_queue ql γ ℓ φ }}}
       Queue.enqueue ql x @ i
-    l{{{ RET #(); thP_groups i (G ∖ B) ∗ £ lc }}}.
+    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls i g ℓ' ∅ }}}.
   Proof.
     iPoseProof (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iPoseProof (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
-    iExists (1 ⊕ ma ⊕ mr)%M. iIntros (i G B φ lc γ ℓ ql x) "!> % (TG& Fs& %SubB& FB& #IQ) HΦ".
+    iExists (1 ⊕ ma ⊕ mr)%M. iIntros (i G g B φ lc γ ℓ ℓ' ql x) "!> % (TG& Fs& GB& FB& Hφ& #IQ) HΦ".
     rewrite /Queue.enqueue.
     iPoseProof (ogP_fuel_add_set with "Fs") as "[Fs F_m]".
     iPoseProof (ogP_fuel_add_set with "F_m") as "[F_ma F_mr]".
@@ -346,9 +347,10 @@ Section proof.
     lwp_bind (TicketLock.acquire tl).
     iModIntro.
     iApply ("TicketLock_acquire_spec" $! _ _ _ _ _ _ 100%M 0 with "[$TG F_ma $IFL]").
-    { TODO
+    { iApply ogP_fuel_layer_eq_set. 2: iFrame. by rewrite hessenberg.add_O_l. }
+    iIntros (gu ku) "(_& %Ningu& TG& Ggu& F_gu& F_ku& Lock& R)".
 
-      iApply ogP_fuel_eq_set last iApply "F_ma". _ rewrite hessenberg.add_O_l.
+    TODO
     
 
 

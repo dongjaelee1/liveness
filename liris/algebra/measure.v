@@ -6,6 +6,9 @@ Class layer_class (L : Type) := {
     ltL : L -> L -> Prop;
     wf_ltL : well_founded ltL;
     #[global] ltL_transitive :: Transitive ltL;
+    eqL : L → L → Prop;
+    #[global] eqL_equivalence :: Equivalence eqL;
+    #[global] lt_eq_proper_L :: Proper (eqL ==> eqL ==> iff) ltL;
   }.
 
 Section measure.
@@ -152,6 +155,41 @@ Section measure.
     (o <= measure l2 (ms_extend))%ord.
   Proof using Type*.
     intros Hlt (t& ?). etransitivity; last eapply (measure_extend l1 l2); eauto.
+  Qed.
+
+  Lemma measure_layer_eq (l1 l2 : L) m :
+    eqL l1 l2 →
+    (measure l1 m == measure l2 m)%ord.
+  Proof using Type*.
+    induction m; intros Heq.
+    - rewrite !measure_embed. reflexivity.
+    - rewrite !measure_large. reflexivity.
+    - rewrite !measure_add. rewrite IHm1; auto. rewrite IHm2; auto. reflexivity.
+    - rewrite !measure_mult. rewrite IHm1; auto. rewrite IHm2; auto. reflexivity.
+    - rewrite !measure_expn. rewrite IHm1; auto. rewrite IHm2; auto. reflexivity.
+    - rewrite !measure_unfold. split.
+      + apply η_le_proper. apply Ord.le_join.
+        intros (a& HLa1). assert (HLa2 : ltL a l2).
+        { eapply lt_eq_proper_L. 3: eapply HLa1. 1: reflexivity. symmetry. auto. }
+        exists (exist _ a HLa2). simpl. reflexivity.
+      + apply η_le_proper. apply Ord.le_join.
+        intros (a& HLa2). assert (HLa1 : ltL a l1).
+        { eapply lt_eq_proper_L. 3: eapply HLa2. 1: reflexivity. auto. }
+        exists (exist _ a HLa1). simpl. reflexivity.
+  Qed.
+
+  Global Instance measure_layer_le_proper μ : Proper ((λ ℓ1 ℓ2, eqL ℓ1 ℓ2 ∨ ltL ℓ1 ℓ2) ==> Ord.le) (λ ℓ, measure ℓ μ).
+  Proof using.
+    induction μ; repeat intro.
+    - rewrite !measure_embed. reflexivity.
+    - rewrite !measure_large. reflexivity.
+    - rewrite !measure_add. rewrite IHμ1, IHμ2; eauto. reflexivity.
+    - rewrite !measure_mult. rewrite IHμ1, IHμ2; eauto. reflexivity.
+    - rewrite !measure_expn. rewrite IHμ1, IHμ2; eauto. reflexivity.
+    - destruct H0.
+      + rewrite measure_layer_eq; first reflexivity. auto.
+      + etransitivity; last (eapply measure_extend; eauto).
+        eapply η_mono.
   Qed.
 
   (** Useful instances. *)

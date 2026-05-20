@@ -476,6 +476,22 @@ Section preds.
       oblP_fuel k ℓ μ = oblP_fuel_val k (measure (ℓ, 1) ((1 ⊕ ▽) × μ)%M).
     Proof. rewrite oblP_fuel_unseal /oblP_fuel_def. auto. Qed.
 
+    Lemma oblP_fuel_layer_eq k ℓ1 ℓ2 μ :
+      (ℓ1 == ℓ2)%ordi →
+      oblP_fuel k ℓ1 μ = oblP_fuel k ℓ2 μ.
+    Proof.
+      unfold_oblP_fuel. intros.
+      apply oblP_fuel_val_eq. apply measure_layer_eq. split; auto.
+    Qed.
+    Lemma oblP_fuel_layer_eq_list K ℓ1 ℓ2 μ :
+      (ℓ1 == ℓ2)%ordi →
+      ([∗ list] k ∈ K, oblP_fuel k ℓ1 μ)%I ≡ ([∗ list] k ∈ K, oblP_fuel k ℓ2 μ)%I.
+    Proof. intros. apply big_opL_proper. intros. erewrite oblP_fuel_layer_eq; eauto. Qed.
+    Lemma oblP_fuel_layer_eq_set K ℓ1 ℓ2 μ :
+      (ℓ1 == ℓ2)%ordi →
+      ([∗ set] k ∈ K, oblP_fuel k ℓ1 μ)%I ≡ ([∗ set] k ∈ K, oblP_fuel k ℓ2 μ)%I.
+    Proof. intros. apply big_opS_proper. intros. erewrite oblP_fuel_layer_eq; eauto. Qed.
+
     Lemma oblP_fuel_eq k ℓ μ1 μ2 :
       (measure (ℓ, 1) (μ1)%M == measure (ℓ, 1) (μ2)%M) →
       oblP_fuel k ℓ μ1 = oblP_fuel k ℓ μ2.
@@ -493,18 +509,18 @@ Section preds.
     Proof. intros. apply big_opS_proper. intros. erewrite oblP_fuel_eq; eauto. Qed.
 
     Lemma oblP_fuel_mon_gen k ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
       (measure (ℓ1, 1) (μ1)%M <= measure (ℓ2, 1) (μ2)%M)%ord →
       oblP_fuel k ℓ2 μ2 ==∗ oblP_fuel k ℓ1 μ1.
     Proof.
       unfold_oblP_fuel. intros. apply oblP_fuel_val_mon.
       rewrite !measure_mult. etrans; first eapply Jacobsthal.le_mult_r; eauto.
-      eapply Jacobsthal.le_mult_l. apply measure_layer_leibniz_le_proper. destruct H.
-      - left. subst; auto.
+      eapply Jacobsthal.le_mult_l. apply measure_layer_le_proper. destruct H.
+      - left. split; auto.
       - right. econstructor 1. auto.
     Qed.
     Lemma oblP_fuel_mon_gen_list K ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
       (measure (ℓ1, 1) (μ1)%M <= measure (ℓ2, 1) (μ2)%M)%ord →
       ([∗ list] k ∈ K, oblP_fuel k ℓ2 μ2) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ1 μ1).
     Proof.
@@ -512,7 +528,7 @@ Section preds.
       iModIntro. iIntros. by iApply oblP_fuel_mon_gen.
     Qed.
     Lemma oblP_fuel_mon_gen_set K ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
       (measure (ℓ1, 1) (μ1)%M <= measure (ℓ2, 1) (μ2)%M)%ord →
       ([∗ set] k ∈ K, oblP_fuel k ℓ2 μ2) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ1 μ1).
     Proof.
@@ -523,7 +539,7 @@ Section preds.
     Lemma oblP_fuel_mon k ℓ μ1 μ2 :
       (measure (ℓ, 1) (μ1)%M <= measure (ℓ, 1) (μ2)%M)%ord →
       oblP_fuel k ℓ μ2 ==∗ oblP_fuel k ℓ μ1.
-    Proof. intros. apply oblP_fuel_mon_gen; auto. Qed.
+    Proof. intros. apply oblP_fuel_mon_gen; auto. left; reflexivity. Qed.
     Lemma oblP_fuel_mon_list K ℓ μ1 μ2 :
       (measure (ℓ, 1) (μ1)%M <= measure (ℓ, 1) (μ2)%M)%ord →
       ([∗ list] k ∈ K, oblP_fuel k ℓ μ2) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ μ1).
@@ -942,6 +958,22 @@ Section preds.
       ogP_fuel k ℓ μ = ogP_fuel_val k (measure (ℓ, 0) ((1 ⊕ ▽) × μ)%M).
     Proof. rewrite ogP_fuel_unseal /ogP_fuel_def. auto. Qed.
 
+    Lemma ogP_fuel_layer_eq k ℓ1 ℓ2 μ :
+      (ℓ1 == ℓ2)%ordi →
+      ogP_fuel k ℓ1 μ = ogP_fuel k ℓ2 μ.
+    Proof.
+      unfold_ogP_fuel. intros.
+      apply ogP_fuel_val_eq. apply measure_layer_eq. split; auto.
+    Qed.
+    Lemma ogP_fuel_layer_eq_list K ℓ1 ℓ2 μ :
+      (ℓ1 == ℓ2)%ordi →
+      ([∗ list] k ∈ K, ogP_fuel k ℓ1 μ)%I ≡ ([∗ list] k ∈ K, ogP_fuel k ℓ2 μ)%I.
+    Proof. intros. apply big_opL_proper. intros. erewrite ogP_fuel_layer_eq; eauto. Qed.
+    Lemma ogP_fuel_layer_eq_set K ℓ1 ℓ2 μ :
+      (ℓ1 == ℓ2)%ordi →
+      ([∗ set] k ∈ K, ogP_fuel k ℓ1 μ)%I ≡ ([∗ set] k ∈ K, ogP_fuel k ℓ2 μ)%I.
+    Proof. intros. apply big_opS_proper. intros. erewrite ogP_fuel_layer_eq; eauto. Qed.
+
     Lemma ogP_fuel_eq k ℓ μ1 μ2 :
       (measure (ℓ, 0) (μ1)%M == measure (ℓ, 0) (μ2)%M) →
       ogP_fuel k ℓ μ1 = ogP_fuel k ℓ μ2.
@@ -959,18 +991,18 @@ Section preds.
     Proof. intros. apply big_opS_proper. intros. erewrite ogP_fuel_eq; eauto. Qed.
 
     Lemma ogP_fuel_mon_gen k ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
       (measure (ℓ1, 0) (μ1)%M <= measure (ℓ2, 0) (μ2)%M)%ord →
       ogP_fuel k ℓ2 μ2 ==∗ ogP_fuel k ℓ1 μ1.
     Proof.
       unfold_ogP_fuel. intros. apply ogP_fuel_val_mon.
       rewrite !measure_mult. etrans; first eapply Jacobsthal.le_mult_r; eauto.
-      eapply Jacobsthal.le_mult_l. apply measure_layer_leibniz_le_proper. destruct H.
-      - left. subst; auto.
+      eapply Jacobsthal.le_mult_l. apply measure_layer_le_proper. destruct H.
+      - left. split; auto.
       - right. econstructor 1. auto.
     Qed.
     Lemma ogP_fuel_mon_gen_list K ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
       (measure (ℓ1, 0) (μ1)%M <= measure (ℓ2, 0) (μ2)%M)%ord →
       ([∗ list] k ∈ K, ogP_fuel k ℓ2 μ2) ⊢ |==> ([∗ list] k ∈ K, ogP_fuel k ℓ1 μ1).
     Proof.
@@ -978,7 +1010,7 @@ Section preds.
       iModIntro. iIntros. by iApply ogP_fuel_mon_gen.
     Qed.
     Lemma ogP_fuel_mon_gen_set K ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
       (measure (ℓ1, 0) (μ1)%M <= measure (ℓ2, 0) (μ2)%M)%ord →
       ([∗ set] k ∈ K, ogP_fuel k ℓ2 μ2) ⊢ |==> ([∗ set] k ∈ K, ogP_fuel k ℓ1 μ1).
     Proof.
@@ -989,7 +1021,7 @@ Section preds.
     Lemma ogP_fuel_mon k ℓ μ1 μ2 :
       (measure (ℓ, 0) (μ1)%M <= measure (ℓ, 0) (μ2)%M)%ord →
       ogP_fuel k ℓ μ2 ==∗ ogP_fuel k ℓ μ1.
-    Proof. intros. apply ogP_fuel_mon_gen; auto. Qed.
+    Proof. intros. apply ogP_fuel_mon_gen; auto. left; done. Qed.
     Lemma ogP_fuel_mon_list K ℓ μ1 μ2 :
       (measure (ℓ, 0) (μ1)%M <= measure (ℓ, 0) (μ2)%M)%ord →
       ([∗ list] k ∈ K, ogP_fuel k ℓ μ2) ⊢ |==> ([∗ list] k ∈ K, ogP_fuel k ℓ μ1).
@@ -1398,8 +1430,8 @@ Section preds.
     Qed.
 
     Lemma obl_alloc_assigned_mupd n Θ i g K b ℓ1 ℓ2 μ :
-      (ℓ1 = ℓ2 ∨ ℓ1 < ℓ2)%ordi →
-      (* FIXME?: above should be good enough, but below is more consistent *)
+      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (* FIXME?: above should be good enough, but below is more concise *)
       (* (ℓ1 <= ℓ2)%ordi → *)
       ogP_obls i g ℓ1 K -∗
       |=[n,Θ]=>m ∃ k, (⌜ k ∉ K ⌝) ∗
@@ -1571,7 +1603,7 @@ Section preds.
 
     Local Lemma obl_change_group_mupd n Θ i g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       k ∈ K1 →
-      (ℓ2 = ℓ ∨ ℓ2 < ℓ)%ordi →
+      (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
       ogP_obls i g1 ℓ1 K1 -∗
       ogP_obls i g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
@@ -1604,7 +1636,7 @@ Section preds.
     Local Lemma obl_change_thread_mupd n Θ i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       i1 ≠ i2 →
       k ∈ K1 →
-      (ℓ2 = ℓ ∨ ℓ2 < ℓ)%ordi →
+      (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
       ogP_obls i1 g1 ℓ1 K1 -∗
       ogP_obls i2 g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
@@ -1668,7 +1700,7 @@ Section preds.
 
     Lemma obl_offload_mupd n Θ i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       k ∈ K1 →
-      (ℓ2 = ℓ ∨ ℓ2 < ℓ)%ordi →
+      (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
       ogP_obls i1 g1 ℓ1 K1 -∗
       ogP_obls i2 g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
@@ -1681,7 +1713,7 @@ Section preds.
 
     Lemma obl_offload_set_mupd n Θ i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
       K ⊆ K1 →
-      (ℓ2 = ℓ ∨ ℓ2 < ℓ)%ordi →
+      (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
       ogP_obls i1 g1 ℓ1 K1 -∗
       ogP_obls i2 g2 ℓ2 K2 -∗
       ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
