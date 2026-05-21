@@ -244,6 +244,18 @@ Section lwpupd.
     rewrite app_assoc Nat.add_assoc. iFrame. iPureIntro. destruct H0. split; auto. etrans; eauto.
   Qed.
 
+  (** Later credits. *)
+  Lemma lc_lwpupd_add_later i E e P :
+    £n 1 -∗ (▷ lwpupd i E e P) -∗ lwpupd i E e P.
+  Proof.
+    iIntros "LC H". iApply sfmupd_lwpupd_elim. iApply (lc_sfmupd_add_later with "LC"). by iNext.
+  Qed.
+  Lemma lc_lwpupd_add_laterN n i E e P :
+    £n n -∗ (▷^n lwpupd i E e P) -∗ lwpupd i E e P.
+  Proof.
+    iIntros "LC H". iApply sfmupd_lwpupd_elim. iApply (lc_sfmupd_add_laterN with "LC"). by iNext.
+  Qed.
+
 End lwpupd.
 
 Class lirisGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
