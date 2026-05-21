@@ -110,26 +110,51 @@ Section proof.
       (∃ lk γlk v,
           (n +ₗ 0) ↦□ lk ∗
           (n +ₗ 1) ↦□ (Int.into_val v) ∗
-          ▷ is_fair_lock lk γlk ℓ (
+          is_fair_lock lk γlk ℓ (
               ∃ (next : loc),
                 (n +ₗ 2) ↦ #next ∗ ▷ is_node next γ
       ))%I.
 
-  Local Instance is_fair_lock_contractive lk γlk ℓ : Contractive (is_fair_lock lk γlk ℓ).
-  Proof. Admitted.
+  Ltac solve_contractive :=
+    solve_proper_core ltac:(fun _ => first [f_contractive | f_equiv | (eapply dist_lt; last eassumption)]).
+
+  (* FIXME: extremely messy. *)
+  Local Instance is_fair_lock_ne lk γlk ℓ : NonExpansive (is_fair_lock lk γlk ℓ).
+  Proof.
+    intros ??. intros.
+    rewrite /is_fair_lock.
+    solve_proper_prepare.
+    clean_flip.
+    do 5 f_equiv.
+    f_equiv.
+    rewrite /ticket_lock.lock_proto.
+    rewrite /tf_eventually.
+    setoid_rewrite tf_until_logic.
+    setoid_rewrite tf_fulfilled_unfold.
+
+    do 10 f_equiv.
+    do 4 f_equiv.
+    f_equiv.
+    2:{ repeat f_equiv; assumption. }
+    do 7 f_equiv.
+
+    unfold_opreds.
+    f_equiv.
+    rewrite /oblG_inv.
+    f_contractive.
+    rewrite /oblG_variant.
+    f_equiv.
+    rewrite /oblG_assigned.
+    f_equiv.
+    { f_equiv. tf_red. f_equiv. eapply dist_lt; last eassumption. done. }
+    do 15 f_equiv.
+    Transparent tf_intuit. simpl. Opaque tf_intuit.
+    f_equiv.
+  Qed.
 
   Local Instance is_node_pre_contractive : Contractive is_node_pre.
   Proof.
-    intros n f g Hfg x γ.
-    rewrite /is_node_pre.
-    do 3 (f_equiv; intros ?).
-    do 2 f_equiv.
-    f_contractive.
-    f_equiv.
-    f_equiv; intros ?.
-    f_equiv.
-    f_equiv.
-    apply Hfg.
+    solve_contractive.
   Qed.
 
   Definition is_node : loc → lcs_names → iProp Σ := fixpoint is_node_pre.
