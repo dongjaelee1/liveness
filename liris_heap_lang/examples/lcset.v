@@ -49,8 +49,8 @@ Module LockCouplingSet.
       lockNode "x";;
       (rec: "loop" "curr" :=
          let: "next" := !(nextRef "curr") in
-         lockNode "next";;
          if: Int.lt (getVal "next") "e" then
+           lockNode "next";;
            unlockNode "curr";;
            "locate" "next" "e"
          else ("curr", "next")) "x".
@@ -62,7 +62,6 @@ Module LockCouplingSet.
       let: "next" := Snd "p" in
       let: "contains" := ~ (Int.lt "v" (getVal "next")) in
       unlockNode "curr";;
-      unlockNode "next";;
       "contains".
 
   Definition add : val :=
@@ -73,8 +72,7 @@ Module LockCouplingSet.
       (if: Int.lt "v" (getVal "next") then
          nextRef "curr" <- newNode "v" "next"
        else #());;
-      unlockNode "curr";;
-      unlockNode "next".
+      unlockNode "curr".
 
   Definition remove : val :=
     λ: "head" "v",
@@ -82,9 +80,10 @@ Module LockCouplingSet.
       let: "curr" := Fst "p" in
       let: "next" := Snd "p" in
       (if: Int.lt "v" (getVal "next") then #() else
-         nextRef "curr" <- !(nextRef "next"));;
-      unlockNode "curr";;
-      unlockNode "next".
+         lockNode "next";;
+         nextRef "curr" <- !(nextRef "next");;
+         unlockNode "next");;
+      unlockNode "curr".
 
 End LockCouplingSet.
 
