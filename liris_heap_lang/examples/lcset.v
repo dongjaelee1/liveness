@@ -6,74 +6,7 @@ From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map.
 
-From liris.heap_lang.examples Require Import ticket_lock.
-
-Module Int.
-
-(* 0 is always represented as (InjRV 0); (InjLV 0) should never appear. *)
-Definition into_val (z : Z) : val :=
-  if decide (z < 0)%Z then
-    InjLV #(Z.to_nat (-z))
-  else
-    InjRV #(Z.to_nat z).
-
-Definition lt : val :=
-  λ: "l" "r",
-  match: "l" with
-    InjL "l" =>
-      match: "r" with
-        InjL "r" => "r" < "l"
-      | InjR "r" => #true
-      end
-  | InjR "l" =>
-      match: "r" with
-        InjL "r" => #false
-      | InjR "r" => "l" < "r"
-      end
-  end.
-
-Section proof.
-  Context `{!heapGS Σ}.
-
-  Ltac post_wp :=
-    iFrame; iExists ∅, 0; iSplitR; [by eauto | iIntros "Hg Hfuel _ _"; iModIntro; simpl].
-
-  Ltac lwp_pures := repeat (lwp_pure; post_wp).
-
-  Lemma wp_lt l r i G :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) }}}
-      lt (into_val l) (into_val r) @ i
-    l{{{ RET #(bool_decide (l < r)); True }}}.
-  Proof.
-    iIntros (?) "[Htg Hfuel] HΦ".
-
-    iMod (ogP_fuel_extend_set _ 0 _ (100)%M with "Hfuel") as "Hfuel".
-    { apply ordArith.lt_from_nat. lia. }
-
-    lwp_lam. post_wp.
-    lwp_pures.
-
-    unfold into_val. destruct (decide (l < 0)%Z).
-    - lwp_pures. destruct (decide (r < 0)%Z).
-      + lwp_pures. lwp_finish. iModIntro.
-        rewrite !bool_decide_decide.
-        repeat destruct decide; (try by iApply "HΦ"); lia.
-      + lwp_pures. lwp_finish. iModIntro.
-        rewrite !bool_decide_decide.
-        repeat destruct decide; (try by iApply "HΦ"); lia.
-    - lwp_pures. destruct (decide (r < 0)%Z).
-      + lwp_pures. lwp_finish. iModIntro.
-        rewrite !bool_decide_decide.
-        repeat destruct decide; (try by iApply "HΦ"); lia.
-      + lwp_pures. lwp_finish. iModIntro.
-        rewrite !bool_decide_decide.
-        repeat destruct decide; (try by iApply "HΦ"); lia.
-  Qed.
-
-End proof.
-
-End Int.
-
+From liris.heap_lang.examples Require Import ticket_lock extended_int.
 
 Module LockCouplingSet.
   (** https://www.cs.toronto.edu/~azadeh/resources/papers/tada-live.pdf
@@ -87,42 +20,25 @@ Module LockCouplingSet.
       The set is represented by a pointer to its head sentinel.  The head's
       value is never compared, so we pick an arbitrary placeholder. *)
 
-  Definition lockRef : val := λ: "x", "x" +ₗ #0.
-  Definition valRef  : val := λ: "x", "x" +ₗ #1.
+  Definition getLock : val := λ: "x", !("x" +ₗ #0).
+  Definition getVal : val := λ: "x", !("x" +ₗ #1).
   Definition nextRef : val := λ: "x", "x" +ₗ #2.
 
-  (** Order on node values: [NONE] denotes +∞, [SOME z] denotes [z]. *)
-  Definition val_lt : val :=
-    λ: "a" "b",
-      match: "a" with
-        NONE => #false
-      | SOME "x" =>
-          match: "b" with
-            NONE => #true
-          | SOME "y" => "x" < "y"
-          end
-      end.
-
   Definition lockNode : val :=
-    λ: "x", TicketLock.acquire !(lockRef "x").
+    λ: "x", TicketLock.acquire (getLock "x").
 
   Definition unlockNode : val :=
-    λ: "x", TicketLock.release !(lockRef "x").
+    λ: "x", TicketLock.release (getLock "x").
 
-  (** Allocate a new node with the given value and next pointer.  The lock
-      starts unlocked. *)
   Definition newNode : val :=
-    λ: "v" "nxt",
-      let: "n" := AllocN #3 #0 in
-      lockRef "n" <- TicketLock.init #();;
-      valRef  "n" <- "v";;
-      nextRef "n" <- "nxt";;
-      "n".
+    λ: "value" "next",
+      let: "lk" := TicketLock.init #() in
+      ref ("lk", "value", "next").
 
   Definition makeSet : val :=
     λ: <>,
-      let: "tail" := newNode NONE #() in
-      let: "head" := newNode (SOME #0) "tail" in
+      let: "tail" := newNode (Int.into_val +∞) #(Loc 0) in
+      let: "head" := newNode (Int.into_val -∞) "tail" in
       "head".
 
   (** Traverse the list hand-over-hand, starting from a locked [curr], until
@@ -131,54 +47,43 @@ Module LockCouplingSet.
   Definition locate : val :=
     λ: "x" "e",
       lockNode "x";;
-      Fst ((rec: "loop" "curr" "v" :=
-              let: "next" := !(nextRef "curr") in
-              lockNode "next";;
-              if: val_lt !(valRef "next") (SOME "v") then
-                unlockNode "curr";;
-                "locate" "next" "v"
-              else ("curr", "next")) "x" "e").
+      (rec: "loop" "curr" :=
+         let: "next" := !(nextRef "curr") in
+         lockNode "next";;
+         if: Int.lt (getVal "next") "e" then
+           unlockNode "curr";;
+           "locate" "next" "e"
+         else ("curr", "next")) "x".
 
   Definition member : val :=
     λ: "head" "v",
-      lockNode "head";;
       let: "p" := locate "head" "v" in
       let: "curr" := Fst "p" in
       let: "next" := Snd "p" in
-      let: "r" := ~ (val_lt (SOME "v") !(valRef "next")) in
+      let: "contains" := ~ (Int.lt "v" (getVal "next")) in
       unlockNode "curr";;
       unlockNode "next";;
-      "r".
+      "contains".
 
   Definition add : val :=
     λ: "head" "v",
-      lockNode "head";;
       let: "p" := locate "head" "v" in
       let: "curr" := Fst "p" in
       let: "next" := Snd "p" in
-      let: "r" :=
-        if: val_lt (SOME "v") !(valRef "next") then
-          let: "n" := newNode (SOME "v") "next" in
-          nextRef "curr" <- "n";;
-          #true
-        else #false in
+      (if: Int.lt "v" (getVal "next") then
+         nextRef "curr" <- newNode "v" "next"
+       else #());;
       unlockNode "curr";;
-      unlockNode "next";;
-      "r".
+      unlockNode "next".
 
   Definition remove : val :=
     λ: "head" "v",
-      lockNode "head";;
       let: "p" := locate "head" "v" in
       let: "curr" := Fst "p" in
       let: "next" := Snd "p" in
-      let: "r" :=
-        if: val_lt (SOME "v") !(valRef "next") then #false
-        else
-          nextRef "curr" <- !(nextRef "next");;
-          #true in
+      (if: Int.lt "v" (getVal "next") then #() else
+         nextRef "curr" <- !(nextRef "next"));;
       unlockNode "curr";;
-      unlockNode "next";;
-      "r".
+      unlockNode "next".
 
 End LockCouplingSet.
