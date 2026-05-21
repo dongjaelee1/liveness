@@ -333,16 +333,14 @@ Section proof.
     iRevert (n g ck) "TG Gg Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n g ck) "TG Gg Uck Gf Caj #Mn".
     iEval (rewrite /loop).
-    rewrite (ogP_fuel_eq g 0 10 (9 ⊕ 1)%M); cycle 1.
-    { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done. }
-    iPoseProof (ogP_fuel_add with "Gf") as "[_ Gf1]".
-    lwp_lam. iEval (simpl). iFrame "TG". iExists ⊤, ∅, 100. iSplitR; first done.
-    iModIntro. iSplitL "Gf1".
-    { rewrite big_sepS_singleton. iFrame. }
-    iIntros "TG _ !> LC !>".
+    iAssert ([∗ set] g ∈ {[g]}, ogP_fuel g 0 10)%I with "[Gf]" as "GF".
+    { iApply big_sepS_singleton. iFrame. }
+    lwp_pure. simpl.
+    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
     iEval (rewrite -/loop).
     iPoseProof (tlc_split_nat 90 10 with "LC") as "[LC LC']".
     (** TODO: better interface for sfmupd-fupd access patterns *)
+    iApply (sfmupd_lwpupd_elim).
     iApply (sfmupd_fupd_acc _ ∅).
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
     iPoseProof (tlc_split_nat 89 1 with "LC") as "[LC LC1]".

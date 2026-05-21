@@ -18,7 +18,7 @@ Tactic Notation "lwp_expr_eval" tactic3(t) :=
   | |- environments.envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
       notypeclasses refine (tac_lwp_expr_eval _ _ _ _ _ e _ _ _);
       [let x := fresh in intros x; t; unfold x; notypeclasses refine eq_refl|]
-  | _ => fail "lwp_expr_eval: not a 'wp'"
+  | _ => fail "lwp_expr_eval: not a 'lwp'"
   end.
 Ltac lwp_expr_simpl := lwp_expr_eval simpl.
 
@@ -45,21 +45,44 @@ Proof.
     iIntros "LC". iMod ("H" with "LC") as "H". iModIntro. by iApply "H". }
 Qed.
 
-Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ n Φ :
+(** FIXME: better way to handle this condition *)
+Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ :
   PureExec φ n e1 e2 →
   φ →
+  0 < n →
+  (* m = n + m' → *)
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
-  envs_entails Δ (∃ G R o, (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 n) ∗ ([∗ set] r ∈ R, oblP_id r)) ∗
-                           (£ (o × n)%ord -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
-                            lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
+  envs_entails Δ (∃ G (m : nat) R (o : Ord.t),
+        (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗
+         (** FIXME: nat add notation not working? *)
+         ([∗ set] r ∈ R, oblP_id r) ∧ ⌜ (m = n + m')%nat ⌝) ∗
+        (thP_groups i G -∗
+         ([∗ set] g ∈ G, ogP_fuel g 0 m') -∗
+         ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_fulfilled r) -∗
+         £ (o)%ord -∗
+         lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
-  rewrite envs_entails_unseal=> ?? ->.
+  rewrite envs_entails_unseal=> ?? ? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "(%&%&%& T& H)". iApply (lifting.lwp_pure_step_simple _ _ _ o). 1: auto.
-  iDestruct "T" as "($& $& $)".
-  iIntros "_ TG Ws LC". iApply ("H" with "LC TG Ws").
+  iIntros "(%&%&%&%& T& H)".
+  iApply (lifting.lwp_pure_step_simple _ _ _ o). 1: auto.
+  iDestruct "T" as "($& Fs& $& %)". subst.
+  iPoseProof (ogP_fuel_eq_set _ _ _ (n ⊕ m')%M with "Fs") as "Fs".
+  { rewrite measure_add !measure_nat Hessenberg.add_from_nat. done. }
+  iPoseProof (ogP_fuel_add_set with "Fs") as "[$ Fs]".
+  iIntros "_ TG Ws LC".
+  iAssert (|==> ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_fulfilled r))%I with "[Ws]" as ">Ws".
+  { iApply big_sepS_bupd. iApply (big_sepS_impl with "Ws"). iIntros "!> %% [H | H]". 2: by iFrame.
+    iMod (witP_cred_lt with "H") as "[_ H]".
+    { apply OrdArith.lt_from_nat. eauto. }
+    by iFrame. }
+  iApply lwpupd_fupd_l. iApply rupd_fupd. iMod (tlc_weaken _ o with "LC") as "LC".
+  { unshelve etransitivity. 1: exact (o × 1)%ord.
+    - rewrite Jacobsthal.mult_1_r. done.
+    - apply Jacobsthal.le_mult_r, OrdArith.le_from_nat. lia. }
+  iApply ("H" with "TG Fs Ws LC").
 Qed.
 
 Lemma tac_lwp_value_nofupd `{!heapGS Σ} Δ s i E Φ v :
@@ -110,11 +133,13 @@ Tactic Notation "lwp_pure" open_constr(efoc) :=
     let e := eval simpl in e in
     reshape_expr e ltac:(fun K e' =>
       unify e' efoc;
-      eapply (tac_lwp_pure _ _ _ _ K e');
+      (* eapply (tac_lwp_pure _ _ _ _ K e'); *)
+      eapply (tac_lwp_pure_simple _ _ _ _ K e');
       [tc_solve                       (* PureExec *)
       |try solve_vals_compare_safe    (* The pure condition for PureExec --
          handles trivial goals, including [vals_compare_safe] *)
       (* |tc_solve                       (* IntoLaters *) *)
+      |try lia (* must take at least one step *)
       |idtac (* new goal *)
       (* |idtac "use lwp_finish to cleanup new lwp"    (* new goal *) *)
       (* |lwp_finish                      (* new goal *) *)
@@ -197,7 +222,7 @@ Tactic Notation "lwp_bind" open_constr(efoc) :=
   | |- envs_entails _ (lwpupd ?i ?E ?e (lwp ?s ?i ?E ?e ?Q)) =>
     first [ reshape_expr e ltac:(fun K e' => unify e' efoc; lwp_bind_core K)
           | fail 1 "lwp_bind: cannot find" efoc "in" e ]
-  | _ => fail "lwp_bind: not a 'lwp'"
+  | _ => fail "lwp_bind: not a 'lwpupd lwp'"
   end.
 
 (** Tactics for lwpupd lwp form. *)
