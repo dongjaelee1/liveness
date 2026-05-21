@@ -101,7 +101,20 @@ Local Existing Instances queue_inG queueGpreS_queue queueGpreS_data_inG.
 Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
+  Ltac post_lwp :=
+    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
+
+  Ltac lwp_pures := repeat (iModIntro; lwp_pure; post_lwp).
+
+  Ltac post_lwp_lc n :=
+    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
+
+  Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
+
   (** ** Definitions *)
+
+  Let N := nroot.@"queue".
+  Let Ni := N.@"invariant".
 
   Record queue_γ :=
     QueueName {
@@ -119,36 +132,36 @@ Section proof.
     | (v, B) :: vs => (∃ l : loc, lh ↦ SOMEV (v, #l) ∗ φ v B ∗ queue_contents l lt vs φ)
     end%I.
 
-  Let N := nroot.@"queue".
-  Let Ni := N.@"invariant".
-
-  Definition queue_inv (ℓ : ord.t) (φ : val → oids → iProp Σ) γ (lhptr ltptr : loc) : iProp Σ :=
-    (∃ (lh lt : loc) (vs : list (val * oids)) (i : thread_id) (g : ogid),
-        lhptr ↦{#(1/2)} #lh ∗
-        ltptr ↦{#(1/2)} #lt ∗
-        qG_queue (queue_γq γ) vs (1/2)%Qp ∗
-        ghost_var (queue_γd γ) (1/2)%Qp (i, g) ∗
-        queue_contents lh lt vs φ ∗
+  (* Mostly protects ghost resources + sync using qG_queue *)
+  Local Definition queue_inv (ℓ : ord.t) γq γd : iProp Σ :=
+    (∃ (vs : list (val * oids)) (i : thread_id) (g : ogid),
+        qG_queue γq vs (1/2)%Qp ∗
+        ghost_var γd (1/2)%Qp (i, g) ∗
         ogP_obls i g ℓ (foldr (λ B A, B ∪ A) ∅ (snd <$> vs)) ∗
         ([∗ list] n ↦ B ∈ (snd <$> vs), [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (n ⊕ 1)%M))%I.
 
+  (* Mostly protects physical resources + sync using qG_queue *)
+  Local Definition queue_lock (φ : val → oids → iProp Σ) γq (lhptr ltptr : loc) : iProp Σ :=
+    (∃ (lh lt : loc) (vs : list (val * oids)),
+        lhptr ↦ #lh ∗
+        ltptr ↦ #lt ∗
+        qG_queue γq vs (1/2)%Qp ∗
+        queue_contents lh lt vs φ)%I.
+
+  (** The invariant *)
   Definition is_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) (φ : val → oids → iProp Σ) : iProp Σ :=
     ∃ (lhptr ltptr : loc) (tl : val),
       ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
-      inv Ni (queue_inv ℓ φ γ lhptr ltptr) ∗
-      is_fair_lock tl (queue_ticketlock_γ γ) 0
-        (∃ lh lt vs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue (queue_γq γ) vs (1/2)%Qp).
+      inv Ni (queue_inv ℓ (queue_γq γ) (queue_γd γ)) ∗
+      is_fair_lock tl (queue_ticketlock_γ γ) 0 (queue_lock φ (queue_γq γ) lhptr ltptr).
 
+  (** Enables delayed initialization after picking a worker thread. *)
   Definition is_queue_init (ql :val) (γ : queue_γ) (φ : val → oids → iProp Σ) : iProp Σ :=
-    (∃ (lhptr ltptr : loc) (tl : val) (lh lt : loc),
+    (∃ (lhptr ltptr : loc) (tl : val),
         ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
-        lhptr ↦{#(1/2)} #lh ∗
-        ltptr ↦{#(1/2)} #lt ∗
         qG_queue (queue_γq γ) [] (1/2)%Qp ∗
         ghost_var (queue_γd γ) 1 (inhabitant, inhabitant) ∗
-        queue_contents lh lt [] φ ∗
-        is_fair_lock tl (queue_ticketlock_γ γ) 0
-          (∃ lh lt vs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue (queue_γq γ) vs (1/2)%Qp))%I.
+        is_fair_lock tl (queue_ticketlock_γ γ) 0 (queue_lock φ (queue_γq γ) lhptr ltptr))%I.
 
   (** ** Lemmas *)
 
@@ -158,10 +171,10 @@ Section proof.
   Lemma is_queue_initialize E ql γ (ℓ : ord.t) (φ : val → oids → iProp Σ) i g :
     is_queue_init ql γ φ -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ql γ ℓ φ ∗ ghost_var (queue_γd γ) (1/2)%Qp (i, g).
   Proof.
-    iIntros "(%&%&%&%&%& %Hq& Ptrh& Ptrt& Qvs& GVd& Qc& #FL) Go".
+    iIntros "(%&%&%& %Hq& Qvs& GVd& #FL) Go".
     rewrite /is_queue.
     iMod (ghost_var_update (i, g) with "GVd") as "[GVd $]".
-    iMod (inv_alloc Ni _ (queue_inv ℓ φ γ lhptr ltptr) with "[Ptrh Ptrt Qvs GVd Qc Go]") as "#Invq".
+    iMod (inv_alloc Ni _ (queue_inv ℓ (queue_γq γ) (queue_γd γ)) with "[Qvs GVd Go]") as "#Invq".
     { iNext. rewrite /queue_inv. iFrame. iSplitL; last done. iFrame. }
     iModIntro. iFrame "FL Invq". auto.
   Qed.
@@ -180,8 +193,7 @@ Section proof.
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_TicketLock]".
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     (** Alloc node ptr *)
     iPoseProof (ogP_fuel_eq_set _ 0 _ (17 ⊕ 1)%M with "GF") as "GF".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
@@ -189,10 +201,7 @@ Section proof.
     lwp_bind (AllocN _ _).
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (ptr_node) "((_& TG& _)& Ptr_node& _)".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     (** Alloc hd ptr *)
     iPoseProof (ogP_fuel_eq_set _ 0 _ (14 ⊕ 1)%M with "GF") as "GF".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
@@ -200,10 +209,7 @@ Section proof.
     lwp_bind (AllocN _ _).
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (lhptr) "((_& TG& _)& Ptr_hd& _)".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     (** Alloc tl ptr *)
     iPoseProof (ogP_fuel_eq_set _ 0 _ (11 ⊕ 1)%M with "GF") as "GF".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
@@ -211,35 +217,23 @@ Section proof.
     lwp_bind (AllocN _ _).
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (ltptr) "((_& TG& _)& Ptr_tl& _)".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     (** Init TicketLock *)
     (** FIXME: better tactic for function calls *)
     lwp_bind (TicketLock.init #()).
-    iDestruct "Ptr_hd" as "[Ptr_hd Ptr_hd0]". iDestruct "Ptr_tl" as "[Ptr_tl Ptr_tl0]".
-    iMod (own_alloc (to_dfrac_agree (DfracOwn (1/2)) ([] : list (val * oids)) ⋅ to_dfrac_agree (DfracOwn (1/2)) ([] : list (val * oids))))
-      as (γq) "[HQvs HQvs0]".
+    iMod (own_alloc (to_dfrac_agree (DfracOwn (1/2)) ([] : list (val * oids)) ⋅ to_dfrac_agree (DfracOwn (1/2)) ([] : list (val * oids)))) as (γq) "[HQvs HQvs0]".
     { rewrite -dfrac_agree_op. done. }
     iModIntro.
-    iApply ("TicketLock_init_spec" $! _ _ 0 (∃ lh lt vs, lhptr ↦{#(1/2)} #lh ∗ ltptr ↦{#(1/2)} #lt ∗ qG_queue γq vs (1/2)%Qp)%I 0 with "[$TG $F_TicketLock Ptr_hd0 Ptr_tl0 HQvs0]").
-    { iFrame. }
+    iApply ("TicketLock_init_spec" $! _ _ 0 (queue_lock φ γq lhptr ltptr)%I 0
+             with "[$TG $F_TicketLock Ptr_node Ptr_hd Ptr_tl HQvs0]").
+    { iFrame. eauto. }
     iIntros (tl γtl) "(_& TG& #IFL)".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     iModIntro. lwp_finish.
     iMod (ghost_var_alloc (inhabitant : thread_id, inhabitant : ogid)) as (γd) "Gv".
     iApply ("HΦ" $! _ (QueueName γtl γq γd)).
     iModIntro. iFrame "TG Q_LC".
-    rewrite /is_queue_init. iFrame "Ptr_hd Ptr_tl HQvs Gv IFL". iSplit. 1: auto.
-    simpl. iFrame. auto.
+    rewrite /is_queue_init. iFrame "HQvs Gv IFL". auto.
   Qed.
 
   Lemma queue_contents_enqueue lh lt vs φ :
@@ -278,18 +272,10 @@ Section proof.
       rewrite ord.from_nat_from_peano_lt. apply ord.large_lt_from_wf. }
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     (** Need ql *)
     iDestruct "IQ" as "(%&%&%& %Hql& #IQ& #IFL)". simplify_eq.
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     (** Acquire lock *)
     lwp_bind (TicketLock.acquire tl).
     iModIntro.
@@ -301,46 +287,27 @@ Section proof.
     iPoseProof (ogP_fuel_add with "F_gu") as "[F_gu _]".
     iPoseProof (big_sepS_union _ {[gu]} G with "[$GF F_gu]") as "GF". 1: set_solver.
     { iApply big_sepS_singleton. auto. }
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     iPoseProof (ogP_fuel_eq_set _ 0 _ (87 ⊕ 1)%M with "GF") as "GF".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
+
+    TODO
+
     iDestruct "R" as "(%&%&%& Ptr_lh& Ptr_lt& Queue)".    
     lwp_bind (Load _).
     iModIntro.
     iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $Ptr_lt]"). 1: done.
     iIntros "((_& TG& _)& Ptr_lt)".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     iPoseProof (ogP_fuel_eq_set _ 0 _ (83 ⊕ 1)%M with "GF") as "GF".
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
     lwp_bind (AllocN _ _).
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (ptr_newt) "((_& TG& _)& Ptr_newt& _)".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pure_lc 100.
+    lwp_pures.
     (** Physical enqueue *)
     lwp_bind (Store _ _).
     iModIntro. iInv "IQ" as "qinv". iApply lwp_sfmupd.
@@ -362,6 +329,8 @@ Section proof.
     iPoseProof (oblP_fuel_add_set with "FB") as "[FB FBq]".
     iMod (obl_offload_set with "GB Gq FB") as "(GB& Gq& %HG)". 1: set_solver. 1: by left.
     iPoseProof ("QC_ACC" with "QC_Ptr_lt Hφ Ptr_newt") as "QC".
+
+    TODO
 
     TODO
 

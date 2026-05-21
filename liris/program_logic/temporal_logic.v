@@ -162,6 +162,11 @@ Section proof.
   Global Instance tf_fulfilled_persistent k Q : Persistent (tf_fulfilled k Q).
   Proof. rewrite tf_fulfilled_unseal /tf_fulfilled_def. apply _. Qed.
 
+  Global Instance tf_until_contractive_1 N k b q Q : Contractive (λ (P : iProp Σ), tf_logic (tf_until N k b q ⟨P⟩ Q)).
+  Proof. simpl. repeat intro. f_equiv. apply oblP_inv_contractive_1. auto. Qed.
+  Global Instance tf_until_contractive_2 N k b q P : Contractive (λ (Q : iProp Σ), tf_logic (tf_until N k b q P ⟨Q⟩)).
+  Proof. simpl. repeat intro. f_equiv. apply oblP_inv_contractive_2. auto. Qed.
+
   Lemma tf_fulfilled_unfold k Q :
     tf_fulfilled k Q = (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ hG_event n' (σ', Θ', κs') ∗ tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
   Proof. rewrite tf_fulfilled_unseal /tf_fulfilled_def. done. Qed.

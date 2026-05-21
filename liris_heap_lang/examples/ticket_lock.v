@@ -125,7 +125,7 @@ Section proof.
     ∃ (next curr : loc), (⌜tl = (#next, #curr)%V⌝) ∧
                          inv N_inv (lock_proto (ticketlock_γt γ) (ticketlock_γa γ) next curr ℓ R).
 
-  Lemma lock_proto_red γt γa next curr ℓ R :
+  Local Lemma lock_proto_red γt γa next curr ℓ R :
     ⟦lock_proto_tf γt γa next curr ℓ R⟧ₗ ⊣⊢ lock_proto γt γa next curr ℓ R.
   Proof.
     rewrite /lock_proto_tf /lock_proto.
