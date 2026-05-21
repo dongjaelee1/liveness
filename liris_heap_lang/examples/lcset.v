@@ -87,3 +87,61 @@ Module LockCouplingSet.
       unlockNode "next".
 
 End LockCouplingSet.
+
+Class lcsG Σ :=
+  {
+    lcs_lockG :: ticket_lockG Σ;
+  }.
+
+Record lcs_names :=
+  {
+    set_gn : gname;
+  }.
+
+Section proof.
+  Context `{!heapGS Σ} `{!lcsG Σ}.
+
+  Axiom ℓ : ord.t.
+
+  Definition is_node_pre
+      (is_node : loc -d> lcs_names -d> iPropO Σ) :
+      loc -d> lcs_names -d> iPropO Σ :=
+    λ n γ,
+      (∃ lk γlk v,
+          (n +ₗ 0) ↦□ lk ∗
+          (n +ₗ 1) ↦□ (Int.into_val v) ∗
+          ▷ is_fair_lock lk γlk ℓ (
+              ∃ (next : loc),
+                (n +ₗ 2) ↦ #next ∗ ▷ is_node next γ
+      ))%I.
+
+  Local Instance is_fair_lock_contractive lk γlk ℓ : Contractive (is_fair_lock lk γlk ℓ).
+  Proof. Admitted.
+
+  Local Instance is_node_pre_contractive : Contractive is_node_pre.
+  Proof.
+    intros n f g Hfg x γ.
+    rewrite /is_node_pre.
+    do 3 (f_equiv; intros ?).
+    do 2 f_equiv.
+    f_contractive.
+    f_equiv.
+    f_equiv; intros ?.
+    f_equiv.
+    f_equiv.
+    apply Hfg.
+  Qed.
+
+  Definition is_node : loc → lcs_names → iProp Σ := fixpoint is_node_pre.
+
+  Lemma is_node_unfold n γ : is_node n γ ⊣⊢ is_node_pre is_node n γ.
+  Proof. apply (fixpoint_unfold is_node_pre n γ). Qed.
+
+  (* Definition is_lcsSet (root : loc) γ : iProp Σ := *)
+  (*     is_node root. *)
+
+  (* Lemma wp_makeSet : *)
+  (*   l{{{ True }}} *)
+  (*    makeSet *)
+  (*   l{{{ RET #(); True }}}. *)
+End proof.
