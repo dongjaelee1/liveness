@@ -47,9 +47,8 @@ Section proof.
   Proof.
     iIntros (?) "[Htg Hfuel] HΦ".
 
-    (* TODO: fuel extending tactic? *)
     iMod (ogP_fuel_extend_set _ 0 _ (100)%M with "Hfuel") as "Hfuel".
-    { admit. } (* TODO: ord automation *)
+    { apply ordArith.lt_from_nat. lia. }
 
     lwp_lam. post_wp.
     lwp_pures.
@@ -69,9 +68,9 @@ Section proof.
       + lwp_pures. lwp_finish. iModIntro.
         rewrite !bool_decide_decide.
         repeat destruct decide; (try by iApply "HΦ"); lia.
-  Admitted.
+  Qed.
 
-End int_proof.
+End proof.
 
 End Int.
 
