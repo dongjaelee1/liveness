@@ -8,6 +8,74 @@ From transfinite.base_logic.lib Require Import ghost_var ghost_map.
 
 From liris.heap_lang.examples Require Import ticket_lock.
 
+Module Int.
+
+(* 0 is always represented as (InjRV 0); (InjLV 0) should never appear. *)
+Definition into_val (z : Z) : val :=
+  if decide (z < 0)%Z then
+    InjLV #(Z.to_nat (-z))
+  else
+    InjRV #(Z.to_nat z).
+
+Definition lt : val :=
+  λ: "l" "r",
+  match: "l" with
+    InjL "l" =>
+      match: "r" with
+        InjL "r" => "r" < "l"
+      | InjR "r" => #true
+      end
+  | InjR "l" =>
+      match: "r" with
+        InjL "r" => #false
+      | InjR "r" => "l" < "r"
+      end
+  end.
+
+Section proof.
+  Context `{!heapGS Σ}.
+
+  Ltac post_wp :=
+    iFrame; iExists ∅, 0; iSplitR; [by eauto | iIntros "Hg Hfuel _ _"; iModIntro; simpl].
+
+  Ltac lwp_pures := repeat (lwp_pure; post_wp).
+
+  Lemma wp_lt l r i G :
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) }}}
+      lt (into_val l) (into_val r) @ i
+    l{{{ RET #(bool_decide (l < r)); True }}}.
+  Proof.
+    iIntros (?) "[Htg Hfuel] HΦ".
+
+    (* TODO: fuel extending tactic? *)
+    iMod (ogP_fuel_extend_set _ 0 _ (100)%M with "Hfuel") as "Hfuel".
+    { admit. } (* TODO: ord automation *)
+
+    lwp_lam. post_wp.
+    lwp_pures.
+
+    unfold into_val. destruct (decide (l < 0)%Z).
+    - lwp_pures. destruct (decide (r < 0)%Z).
+      + lwp_pures. lwp_finish. iModIntro.
+        rewrite !bool_decide_decide.
+        repeat destruct decide; (try by iApply "HΦ"); lia.
+      + lwp_pures. lwp_finish. iModIntro.
+        rewrite !bool_decide_decide.
+        repeat destruct decide; (try by iApply "HΦ"); lia.
+    - lwp_pures. destruct (decide (r < 0)%Z).
+      + lwp_pures. lwp_finish. iModIntro.
+        rewrite !bool_decide_decide.
+        repeat destruct decide; (try by iApply "HΦ"); lia.
+      + lwp_pures. lwp_finish. iModIntro.
+        rewrite !bool_decide_decide.
+        repeat destruct decide; (try by iApply "HΦ"); lia.
+  Admitted.
+
+End int_proof.
+
+End Int.
+
+
 Module LockCouplingSet.
   (** https://www.cs.toronto.edu/~azadeh/resources/papers/tada-live.pdf
       Fig 27 and 28
