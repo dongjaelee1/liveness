@@ -88,38 +88,10 @@ Module LockCouplingSet.
 
 End LockCouplingSet.
 
-Class lcsG Σ :=
-  {
-    lcs_lockG :: ticket_lockG Σ;
-  }.
-
-Record lcs_names :=
-  {
-    set_gn : gname;
-  }.
-
-Section proof.
-  Context `{!heapGS Σ} `{!lcsG Σ}.
-
-  Axiom ℓ : ord.t.
-
-  Definition is_node_pre
-      (is_node : loc -d> lcs_names -d> iPropO Σ) :
-      loc -d> lcs_names -d> iPropO Σ :=
-    λ n γ,
-      (∃ lk γlk v,
-          (n +ₗ 0) ↦□ lk ∗
-          (n +ₗ 1) ↦□ (Int.into_val v) ∗
-          is_fair_lock lk γlk ℓ (
-              ∃ (next : loc),
-                (n +ₗ 2) ↦ #next ∗ ▷ is_node next γ
-      ))%I.
-
-  Ltac solve_contractive :=
-    solve_proper_core ltac:(fun _ => first [f_contractive | f_equiv | (eapply dist_lt; last eassumption)]).
-
+Section ticket_lock.
+  Context `{!heapGS Σ} `{!ticket_lockG Σ}.
   (* FIXME: extremely messy. *)
-  Local Instance is_fair_lock_ne lk γlk ℓ : NonExpansive (is_fair_lock lk γlk ℓ).
+  Global Instance is_fair_lock_ne lk γlk ℓ : NonExpansive (is_fair_lock lk γlk ℓ).
   Proof.
     intros ??. intros.
     rewrite /is_fair_lock.
@@ -152,6 +124,39 @@ Section proof.
     f_equiv.
   Qed.
 
+End ticket_lock.
+
+Class lcsG Σ :=
+  {
+    lcs_lockG :: ticket_lockG Σ;
+  }.
+
+Record lcs_names :=
+  {
+    set_gn : gname;
+  }.
+
+
+Section proof.
+  Context `{!heapGS Σ} `{!lcsG Σ}.
+
+  Axiom ℓ : ord.t.
+
+  Definition is_node_pre
+      (is_node : loc -d> lcs_names -d> iPropO Σ) :
+      loc -d> lcs_names -d> iPropO Σ :=
+    λ n γ,
+      (∃ lk γlk v,
+          (n +ₗ 0) ↦□ lk ∗
+          (n +ₗ 1) ↦□ (Int.into_val v) ∗
+          is_fair_lock lk γlk ℓ (
+              ∃ (next : loc),
+                (n +ₗ 2) ↦ #next ∗ ▷ is_node next γ
+      ))%I.
+
+  Ltac solve_contractive :=
+    solve_proper_core ltac:(fun _ => first [f_contractive | f_equiv | (eapply dist_lt; last eassumption)]).
+
   Local Instance is_node_pre_contractive : Contractive is_node_pre.
   Proof.
     solve_contractive.
@@ -162,8 +167,8 @@ Section proof.
   Lemma is_node_unfold n γ : is_node n γ ⊣⊢ is_node_pre is_node n γ.
   Proof. apply (fixpoint_unfold is_node_pre n γ). Qed.
 
-  (* Definition is_lcsSet (root : loc) γ : iProp Σ := *)
-  (*     is_node root. *)
+  Definition is_lcsSet (root : loc) γ : iProp Σ :=
+    is_node root γ.
 
   (* Lemma wp_makeSet : *)
   (*   l{{{ True }}} *)
