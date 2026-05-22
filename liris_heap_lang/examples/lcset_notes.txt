@@ -1,0 +1,3 @@
+Q: Is it possible to assign a layer to each lock when the lock is allocated and
+never change it? I.e. static layers for locks?
+A: Seems impossible. The layer of `n.next.lock` must be less than `n.lock`. Also, new integers may always be inserted into the set, so the current assignment of layers for each node must support adding an unbounded number of layers ahead of it. In an infinite execution, this would be an infinitely decreasing chain, which contradicts well-foundedness of the layer for `initialNode.lock`.

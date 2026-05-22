@@ -139,18 +139,19 @@ Record lcs_names :=
 Section proof.
   Context `{!heapGS Σ} `{!lcsG Σ}.
 
-  Axiom ℓ : ord.t.
-
   Definition is_node_pre
       (is_node : loc -d> lcs_names -d> iPropO Σ) :
       loc -d> lcs_names -d> iPropO Σ :=
     λ n γ,
-      (∃ lk γlk v,
+      (∃ lk γlk cur_val,
           (n +ₗ 0) ↦□ lk ∗
-          (n +ₗ 1) ↦□ (Int.into_val v) ∗
-          is_fair_lock lk γlk ℓ (
-              ∃ (next : loc),
-                (n +ₗ 2) ↦ #next ∗ ▷ is_node next γ
+          (n +ₗ 1) ↦□ (Int.into_val cur_val) ∗
+          is_fair_lock lk γlk 1 (
+              ∃ (next : loc) next_val,
+                (n +ₗ 2) ↦ #next ∗
+                ▷ is_node next γ ∗
+                (next +ₗ 1) ↦□ (Int.into_val next_val)
+                (* own ghost state for range. *)
       ))%I.
 
   Ltac solve_contractive :=
@@ -166,11 +167,31 @@ Section proof.
   Lemma is_node_unfold n γ : is_node n γ ⊣⊢ is_node_pre is_node n γ.
   Proof. apply (fixpoint_unfold is_node_pre n γ). Qed.
 
-  Definition is_lcsSet (root : loc) γ : iProp Σ :=
+  Definition is_set (root : loc) γ : iProp Σ :=
     is_node root γ.
 
-  (* Lemma wp_makeSet : *)
-  (*   l{{{ True }}} *)
-  (*    makeSet *)
-  (*   l{{{ RET #(); True }}}. *)
+  Axiom own_set : ∀ (γ : lcs_names) (s : gset Z), iProp Σ.
+
+  Import LockCouplingSet.
+
+  Ltac post_wp :=
+    iFrame; iExists ∅, 0; iSplitR; [by eauto | iIntros "Hg Hfuel _ _"; iModIntro; simpl].
+
+  Local Lemma wp_newNode i G (next : loc) :
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) }}}
+     newNode (Int.into_val value) #next @ i
+    l{{{ RET #s; is_node s γ ∗ own_set γ ∅ }}}.
+
+  Lemma wp_makeSet i G :
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) }}}
+     makeSet #() @ i
+    l{{{ s γ, RET #s; is_set s γ ∗ own_set γ ∅ }}}.
+  Proof.
+    iIntros (?) "(Hg & Hfuel) HΦ".
+
+    iMod (ogP_fuel_extend_set _ 0 _ (ℵ × ℵ)%M with "Hfuel") as "Hfuel".
+    { apply ordArith.lt_from_nat. lia. }
+
+    lwp_lam. post_wp.
+  Qed.
 End proof.
