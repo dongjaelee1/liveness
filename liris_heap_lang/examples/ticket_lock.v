@@ -46,10 +46,14 @@ Proof. solve_inG. Qed.
 
 Record ticketlock_γ :=
   TicketLockName {
-      ticketlock_ticket : gname;
-      ticketlock_ack : gname;
-      ticketlock_config : gname;
+      ticketlock_γt : gname;
+      ticketlock_γa : gname;
+      ticketlock_γc : gname;
     }.
+
+Notation "γ ↪LOCK dq l" :=
+  (∃ v, ghost_map_elem (ticketlock_γc γ) v dq l)%I
+    (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK dq  l") : bi_scope.
 
 Section proof.
   Context `{!heapGS Σ, !ticket_lockG Σ}.
@@ -104,7 +108,7 @@ Section proof.
 
   Local Definition lock_token_def (tl : val) (γ : ticketlock_γ) κu dq ℓ (R : iProp Σ) : iProp Σ :=
     ∃ (next curr : loc) (u : Z) (v : nat),
-      (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ((u + 1)%Z ↪[(ticketlock_ticket γ)]□ (κu, v, dq, ℓ)) ∗
+      (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗ ((u + 1)%Z ↪[(ticketlock_γt γ)]□ (κu, v, dq, ℓ)) ∗
       ⟦tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ ⟨R⟩)⟧ₗ.
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
   Definition lock_token := lock_token_aux.(unseal).
@@ -114,30 +118,33 @@ Section proof.
   Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : iProp Σ) : iProp Σ :=
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
-      inv N_inv (lock_inv (ticketlock_ticket γ) (ticketlock_ack γ) (ticketlock_config γ) next curr R).
+      inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γa γ) (ticketlock_γc γ) next curr R).
 
   (** ** Properties *)
   Global Instance is_fair_lock_persistent tl γ R : Persistent (is_fair_lock tl γ R).
   Proof. rewrite /is_fair_lock. apply _. Qed.
 
-  Lemma lock_reconfig E tl γ R v ℓ1 ℓ2 :
+  Lemma lock_reconfig E tl γ R ℓ1 ℓ2 :
     ↑N_inv ⊆ E →
-    is_fair_lock tl γ R -∗ £ 1 -∗ v ↪[ticketlock_config γ] ℓ1 ={E}=∗ (S v) ↪[ticketlock_config γ] ℓ2.
+    is_fair_lock tl γ R -∗ £ 1 -∗ γ ↪LOCK ℓ1 ={E}=∗ γ ↪LOCK ℓ2.
   Proof.
-    iIntros (Hmask) "#IFL LC CF".
-    (* TODO *)
+  Admitted.
+  
+    (* iIntros (Hmask) "#IFL LC CF". *)
     (* iDestruct "IFL" as "(%&%& %& #INV)". iInv "INV" as "H". *)
     (* iApply (lc_fupd_add_later with "LC"). iNext. *)
+
+    (* TODO *)
+
     (* iDestruct "H" as "(%&%&%&%&%& Pnext& Pcurr& (GMAt& GMAa& GMAl)& H)". *)
     (* iPoseProof (ghost_map_lookup with "GMAl LL") as "%". *)
     (* iMod (ghost_map_update ℓ2 with "GMAl LL") as "[GMAl LL]". *)
     (* iModIntro. iSplitR "LL". 2: by iFrame. *)
     (* iNext. rewrite insert_insert_eq. iFrame "Pnext Pcurr GMAt GMAa GMAl". *)
-  Admitted.
 
-  Lemma lock_config_persist γ v dq ℓ :
-    v ↪[γ]{dq} ℓ ==∗ v ↪[γ]□ ℓ.
-  Proof. apply ghost_map_elem_persist. Qed.
+  Lemma lock_config_persist γ dq ℓ :
+    (γ ↪LOCK{dq} ℓ) ==∗ γ ↪LOCK□ ℓ.
+  Proof. iIntros "(%& H)". iMod (ghost_map_elem_persist with "H"). eauto. Qed.
 
   (** ** Remark: Properties we want from a modular spec with liveness:
          1. Hide implementation details, e.g., # of lines, internal data structure.
@@ -155,7 +162,7 @@ Section proof.
     ⊢ ∃ m, ∀ i G ℓ R lc,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗ R }}}
       TicketLock.init #() @ i
-    l{{{ tl γ v, RET tl; £ lc ∗ thP_groups i G ∗ v ↪[ticketlock_config γ] ℓ ∗ is_fair_lock tl γ R }}}.
+    l{{{ tl γ, RET tl; £ lc ∗ thP_groups i G ∗ γ ↪LOCK ℓ ∗ is_fair_lock tl γ R }}}.
   Proof.
   Admitted.
   (*   iExists 4. *)
@@ -205,9 +212,9 @@ Section proof.
 
   (** FIXME: ordi notation levels *)
   Lemma TicketLock_acquire_spec :
-    ⊢ ∃ m, ∀ i G tl γ v dq ℓ R μ lc,
+    ⊢ ∃ m, ∀ i G tl γ dq ℓ R μ lc,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ℵ)%ordi m) ∗
-         v ↪[ticketlock_config γ]{dq} ℓ ∗
+         γ ↪LOCK{dq} ℓ ∗
          is_fair_lock tl γ R }}}
       TicketLock.acquire tl @ i
     l{{{ gu κu, RET #();
@@ -474,11 +481,11 @@ Section proof.
          is_fair_lock tl γ R ∗
          lock_token tl γ κu dq ℓ R ∗ R }}}
       TicketLock.release tl @ i
-    l{{{ v, RET #();
+    l{{{ RET #();
          £ lc ∗
          thP_groups i G ∗
          ogP_obls i gu ℓu (K ∖ {[κu]}) ∗
-         v ↪[ticketlock_config γ]{dq} ℓ }}}.
+         γ ↪LOCK{dq} ℓ }}}.
   Proof.
   Admitted.
   
