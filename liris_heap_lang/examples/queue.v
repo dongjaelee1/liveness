@@ -86,12 +86,17 @@ Class queueG Σ :=
     }.
 
 Definition queueΣ : gFunctors :=
-  gFunctors.app
-    #[GFunctor (dfrac_agreeR (list (val * oids)))]
-    (ghost_varΣ (thread_id * ogid)).
+    #[GFunctor (dfrac_agreeR (list (val * oids))); ghost_varΣ (thread_id * ogid)].
 
 Global Instance subG_queueΣ {Σ} : subG queueΣ Σ → queueGpreS Σ.
 Proof. solve_inG. Qed.
+
+Record queue_γ :=
+  QueueName {
+      queue_ticketlock_γ : ticketlock_γ;
+      queue_γq : gname;
+      queue_γd : gname;
+    }.
 
 (** User interface *)
 (* Make the instances local to this file. We cannot use #[local] in the code *)
@@ -116,17 +121,10 @@ Section proof.
   Let N := nroot.@"queue".
   Let Ni := N.@"invariant".
 
-  Record queue_γ :=
-    QueueName {
-        queue_ticketlock_γ : ticketlock_γ;
-        queue_γq : gname;
-        queue_γd : gname;
-      }.
-
   Local Definition qG_queue γ (l : list (val * oids)) q : iProp Σ :=
     own γ (to_dfrac_agree (DfracOwn q) l).
 
-  Definition qG_worker γ i g : iProp Σ :=
+  Definition queue_worker γ i g : iProp Σ :=
     ghost_var (queue_γd γ) (1/2)%Qp (i, g).
 
   Local Fixpoint queue_contents (lh lt : loc) (vs : list (val * oids)) (φ : val → oids → iProp Σ) : iProp Σ :=
@@ -175,7 +173,7 @@ Section proof.
   Proof. rewrite /is_queue. apply _. Qed.
 
   Lemma is_queue_initialize E ql γ (ℓ : ord.t) (φ : val → oids → iProp Σ) i g :
-    is_queue_init ql γ φ -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ql γ ℓ φ ∗ qG_worker γ i g.
+    is_queue_init ql γ φ -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ql γ ℓ φ ∗ queue_worker γ i g.
   Proof.
     iIntros "(%&%&%& %Hq& Qvs& GVd& #FL) Go".
     rewrite /is_queue.
@@ -417,14 +415,14 @@ Section proof.
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
          ogP_obls i g ℓ A ∗
          (if b
-          then qG_worker γ wi wg ∗ ogP_obls ni ng ℓ ∅
+          then queue_worker γ wi wg ∗ ogP_obls ni ng ℓ ∅
           else ⌜ wi = inhabitant ∧ ni = inhabitant ∧ wg = inhabitant ∧ ng = inhabitant ⌝) ∗
          is_queue ql γ ℓ φ }}}
       Queue.dequeue ql @ i
     l{{{ x B, RET x; £ lc ∗ thP_groups i G ∗ ogP_obls i g ℓ (A ∪ B) ∗
                      (match x with | NONEV => ⌜B = ∅⌝ | SOMEV v => φ x B | _ => False end) ∗
                      (if b
-                      then qG_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅
+                      then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅
                       else True) }}}.
   Proof.
     iPoseProof (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
@@ -494,7 +492,7 @@ Section proof.
       iDestruct "qinv" as "(%&%&%& Queue0& Gvar& %Disj& Gq& Fq)".
       iPoseProof (own_valid_2 with "Queue Queue0") as "%".
       apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs.
-      iAssert (|={⊤ ∖ ↑Ni,⊤}=> if b then qG_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅ else True)%I
+      iAssert (|={⊤ ∖ ↑Ni,⊤}=> if b then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅ else True)%I
         with "[IQ_ACC Queue0 Gvar Gq Fq HW]" as "IQ_ACC".
       { destruct b.
         - iDestruct "HW" as "(Gw& Gq1)". iPoseProof (ghost_var_agree with "Gvar Gw") as "%". simplify_eq.
@@ -544,7 +542,7 @@ Section proof.
       apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs.
       iMod (own_update_2 with "Queue Queue0") as "[Queue Queue0]".
       { eapply (dfrac_agree_update_2 _ _ _ _ (vs')). rewrite dfrac_op_own Qp.div_2. auto. }
-      iAssert (|={⊤ ∖ ↑Ni}=>m |={⊤ ∖ ↑Ni,⊤}=> ogP_obls i g ℓ (A ∪ B) ∗ (if b then qG_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅ else True))%I
+      iAssert (|={⊤ ∖ ↑Ni}=>m |={⊤ ∖ ↑Ni,⊤}=> ogP_obls i g ℓ (A ∪ B) ∗ (if b then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅ else True))%I
         with "[IQ_ACC Queue0 Gvar Gq Fq HW Gg]" as "IQ_ACC".
       { destruct b.
         - iDestruct "HW" as "(Gw& Gq1)". iPoseProof (ghost_var_agree with "Gvar Gw") as "%". simplify_eq.
@@ -668,13 +666,13 @@ Section defs.
   Definition lqG_log_p (l : list queue_op) : iProp Σ :=
     own lqueue_log_name (◯ML l).
 
-  Definition lqG_worker (w : positive) (l : list (oid)) (q : Qp) : iProp Σ :=
+  Definition lqueue_worker (w : positive) (l : list (oid)) (q : Qp) : iProp Σ :=
     own lqueue_workers_name (reservation_map_data w (●ML{#q} l)).
 
-  Definition lqG_worker_p (w : positive) (l : list (oid)) : iProp Σ :=
+  Definition lqueue_worker_p (w : positive) (l : list (oid)) : iProp Σ :=
     own lqueue_workers_name (reservation_map_data w (◯ML l)).
 
-  Local Definition lqG_worker_token (E : coPset) : iProp Σ :=
+  Local Definition lqueue_worker_token (E : coPset) : iProp Σ :=
     own lqueue_workers_name (reservation_map_token (A:=(mono_listUR (oid))) E).
 
   Fixpoint queue_contents (lh lt : loc) (vs : list val) (φ : val → iProp Σ) : iProp Σ :=
@@ -691,10 +689,10 @@ Section defs.
     (∃ (vs : list val) (log : list queue_op) (ws : gmap positive (list oid)),
         lqG_queue vs (1/2)%Qp ∗
         lqG_log log ∗
-        lqG_worker_token (⊤ ∖ gset_to_coPset (dom ws)) ∗
+        lqueue_worker_token (⊤ ∖ gset_to_coPset (dom ws)) ∗
         (⌜ ∃ w, is_Some (ws !! w) ⌝) ∗
         ([∗ map] w ↦ ks ∈ ws,
-           lqG_worker w ks (1/2)%Qp ∗
+           lqueue_worker w ks (1/2)%Qp ∗
            ∃ ks_p k, (⌜ks = ks_p ++ [k]⌝) ∗
                      ([∗ list] k ∈ ks_p, oblP_fulfilled k) ∗
                      (oblP_id k ∗ witP_layer k ℓ ∗ ⟦tf_eventually Nwe k false (1/2) (⌜ True ⌝)⟧ₗ))
