@@ -363,7 +363,7 @@ Section sfmupd.
     ogP_obls i1 g1 ℓ1 K1 -∗
     ogP_obls i2 g2 ℓ2 K2 -∗
     ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
-    |={E}=>m ogP_obls i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K ⊈ K2 ∨ K = ∅ ⌝.
+    |={E}=>m ogP_obls i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K2 ## K ⌝.
   Proof.
     iIntros (Ink Ltl) "Gg1 Gg2 Of".
     unfold_sfmupd. iIntros "%%%%% $".

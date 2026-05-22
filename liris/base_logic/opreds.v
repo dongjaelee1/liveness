@@ -1717,16 +1717,16 @@ Section preds.
       ogP_obls i1 g1 ℓ1 K1 -∗
       ogP_obls i2 g2 ℓ2 K2 -∗
       ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
-      |=[n,Θ]=>m ogP_obls i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K ⊈ K2 ∨ K = ∅ ⌝.
+      |=[n,Θ]=>m ogP_obls i1 g1 ℓ1 (K1 ∖ K) ∗ ogP_obls i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K2 ## K ⌝.
     Proof.
       revert K1 K2. pattern K. revert K. apply set_ind.
       { solve_proper. }
       { iIntros (K1 K2 HK LTl) "Gg1 Gg2 Kfs".
         replace (K1 ∖ ∅) with K1 by set_solver. replace (K2 ∪ ∅) with K2 by set_solver.
-        iFrame. iModIntro. iPureIntro. right. auto. }
+        iFrame. iModIntro. iPureIntro. set_solver. }
       iIntros (k K Nink IH K1 K2 HK LTl) "Gg1 Gg2 Kfs".
       iPoseProof (big_sepS_union with "Kfs") as "[F Kfs]". 1: set_solver.
-      iMod (IH K1 K2 with "Gg1 Gg2 Kfs") as "(Gg1& Gg2& %Hcase)". 1: set_solver. 1: auto.
+      iMod (IH K1 K2 with "Gg1 Gg2 Kfs") as "(Gg1& Gg2& %Disj)". 1: set_solver. 1: auto.
       replace (K1 ∖ ({[k]} ∪ K)) with ((K1 ∖ K) ∖ {[k]}) by set_solver.
       replace (K2 ∪ ({[k]} ∪ K)) with ((K2 ∪ K) ∪ {[k]}) by set_solver.
       rewrite big_sepS_singleton.

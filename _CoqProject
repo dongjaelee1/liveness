@@ -47,6 +47,7 @@ liris/bi/weakestpre.v
 #liris/cgraphs/uforests.v
 #liris/cgraphs/cgraph.v
 
+liris/algebra/list_of_sets.v
 liris/algebra/map_of_sets.v
 # liris/algebra/tree.v
 liris/algebra/forest.v
