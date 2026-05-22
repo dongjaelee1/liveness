@@ -492,8 +492,8 @@ Section proof.
     ⊢ ∃ m, ∀ i G tl γ dq ℓ R κu gu ℓu K lc,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗
          ogP_obls i gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
-         is_fair_lock tl γ R ∗
-         γ ↪LOCK{dq} ℓ ∗ lock_token tl γ κu R ∗ R }}}
+         lock_token tl γ κu R ∗ R ∗
+         γ ↪LOCK{dq} ℓ ∗ is_fair_lock tl γ R }}}
       TicketLock.release tl @ i
     l{{{ RET #();
          £ lc ∗
@@ -502,7 +502,7 @@ Section proof.
          γ ↪LOCK{dq} ℓ }}}.
   Proof.
     iExists 100.
-    iIntros (i G tl γ dq ℓ R κu gu ℓu K lc) "!> % (TG& GF& Gg& %LUkl& #IFL& CF& LT& HR) HΦ".
+    iIntros (i G tl γ dq ℓ R κu gu ℓu K lc) "!> % (TG& GF& Gg& %LUkl& LT& HR& CF& #IFL) HΦ".
     rewrite /TicketLock.release.
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
