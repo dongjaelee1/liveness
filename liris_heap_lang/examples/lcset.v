@@ -201,8 +201,8 @@ Section proof.
   Admitted.
 
   Tactic Notation "lOneFuel" open_constr(Hfuel) "as" open_constr(Hdestruct) :=
-    rewrite (ogP_fuel_eq_set _ _ _ (1⊕(_:nat))%M);
-    [ | rewrite measure_add !measure_nat -Hessenberg.add_from_nat // ];
+    iDestruct (ogP_fuel_eq_set _ _ _ (1⊕(_:nat))%M with Hfuel) as Hfuel;
+    [ rewrite measure_add !measure_nat -Hessenberg.add_from_nat // | ];
     iDestruct (ogP_fuel_add_set with Hfuel) as Hdestruct.
 
   Opaque Int.into_val.
@@ -229,6 +229,52 @@ Section proof.
     repeat (lwp_pure; post_wp).
     lwp_finish. iModIntro.
     iApply "HΦ". iFrame "∗#".
+  Qed.
+
+  Lemma lwp_lockNode i G n γ :
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗
+         is_node n γ }}}
+     lockNode #n @ i
+    l{{{ RET #(); thP_groups i G }}}.
+  Proof.
+  Admitted.
+
+  Ltac lwp_pures := lwp_pure; repeat (post_wp; lwp_pure); post_wp_bind.
+  Lemma lwp_locate i G s γ (e : Z) :
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗
+         is_set s γ }}}
+     locate #s (Int.into_val e) @ i
+    l{{{ s, RET #s; is_node s γ }}}.
+  Proof.
+    iIntros (?) "(Hg & Hfuel & #Hs) HΦ".
+    iDestruct (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
+    iDestruct (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
+
+    iMod (ogP_fuel_extend_set _ 0 _ (100⊕ma⊕mr)%M with "Hfuel") as "Hfuel".
+    { apply ordArith.lt_from_nat. lia. }
+    rewrite /is_set is_node_unfold.
+    iDestruct "Hs" as  (???) "(#lock & #val & #Hlock)".
+
+    (* TODO: instance for splitting. *)
+    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HlockFuel]".
+
+    lwp_lam. post_wp. lwp_pures. iModIntro. lwp_lam. post_wp. lwp_lam. post_wp.
+    lwp_pures. lwp_bind (! _)%E. iModIntro.
+
+    lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
+    iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.acquire lk). iModIntro.
+
+    iDestruct (ogP_fuel_add_set with "HlockFuel") as "[HacqFuel HrelFuel]".
+    (* TODO: lock should abstract away the gap `ℵ` into an opaque defn like
+       "lockΔ : ord.t" or something. *)
+    iApply ("TicketLock_acquire_spec" with "[$Hg]").
+    { iFrame "#". }
+    Search ℵ%M.
+
+    lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_lockNode with "[$]"). iModIntro.
+    iIntros "Hg !>". lwp_pures.
   Qed.
 
 End proof.
