@@ -109,7 +109,8 @@ Section proof.
   Ltac post_lwp :=
     simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
 
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure; post_lwp).
+  Ltac lwp_pure_one := (iModIntro; lwp_pure; post_lwp).
+  Ltac lwp_pures := repeat (lwp_pure_one).
 
   Ltac post_lwp_lc n :=
     simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
