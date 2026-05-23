@@ -54,17 +54,18 @@ Definition ti_exist `{SI : indexT} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ 
 (** 'Always' is a co-inductive fixpoint. *)
 (* We need to use ∧ here for the proof. *)
 Definition ti_always_pre `{SI : indexT} `{!temporalGS Λ Σ} E
-  (ti_always : (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
-  (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
-  λ P τ, (|={E,∅}=> ▷ |={∅,E}=> ((P τ) ∧ |={E,∅}=> ALC (|={∅,E}=> ti_always P (trace_next τ))))%I.
+  (ti_always : (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
+  (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
+  λ P1 P2 τ, (|={E,∅}=> ▷ |={∅,E}=> ((P1 τ) ∧ |={E,∅}=> (P2 τ) ∧ ALC (|={∅,E}=> ti_always P1 P2 (trace_next τ))))%I.
 
+(** FIXME: hacky proof*)
 Local Instance ti_always_pre_contractive `{SI : indexT} `{!temporalGS Λ Σ} E : Contractive (ti_always_pre E).
 Proof.
-  rewrite /ti_always_pre. repeat intro. do 5 (f_equiv).
-  f_contractive. do 2 (f_equiv).
+  rewrite /ti_always_pre. repeat intro. do 6 (f_equiv).
+  f_contractive. do 1 (f_equiv). repeat red. repeat red in H. eauto.
 Qed.
 
-Local Definition ti_always_def `{SI : indexT} `{!temporalGS Λ Σ} : tiProp Λ Σ → tiProp Λ Σ :=
+Local Definition ti_always_def `{SI : indexT} `{!temporalGS Λ Σ} : tiProp Λ Σ → tiProp Λ Σ → tiProp Λ Σ :=
   fixpoint (ti_always_pre ⊤).
 Local Definition ti_always_aux : seal (@ti_always_def). Proof. by eexists. Qed.
 Definition ti_always := ti_always_aux.(unseal).
@@ -72,8 +73,8 @@ Global Arguments ti_always {SI Λ Σ _}.
 Local Lemma ti_always_unseal `{SI : indexT} `{!temporalGS Λ Σ} : ti_always = @ti_always_def SI Λ Σ _.
 Proof. rewrite -ti_always_aux.(seal_eq) //. Qed.
 
-Lemma ti_always_unfold `{SI : indexT} `{!temporalGS Λ Σ} (P : tiProp Λ Σ) (τ : trace Λ) :
-  ti_always P τ ⊣⊢ ti_always_pre ⊤ (ti_always) P τ.
+Lemma ti_always_unfold `{SI : indexT} `{!temporalGS Λ Σ} (P1 P2 : tiProp Λ Σ) (τ : trace Λ) :
+  ti_always P1 P2 τ ⊣⊢ ti_always_pre ⊤ (ti_always) P1 P2 τ.
 Proof. rewrite ti_always_unseal. apply (fixpoint_unfold (ti_always_pre ⊤)). Qed.
 
 (** 'Until' is an inductive fixpoint, decreasing argument of Type A. *)
@@ -125,7 +126,7 @@ Fixpoint ti_logic `{SI : indexT} `{!temporalGS Λ Σ}
   | tp_impl P Q => (ti_impl P (ti_logic ltA Q))
   | tp_forall A P => (ti_forall A (λ (a : A), ti_logic ltA (P a)))
   | tp_exist A P => (ti_exist A (λ (a : A), ti_logic ltA (P a)))
-  | tp_always P => (ti_always (ti_logic ltA P))
+  | tp_always P => (ti_always (ti_logic ltA P) (ti_pure True))
   | tp_until P Q =>
       (ti_exist A (λ a, ti_until ltA a (ti_logic ltA P) (ti_logic ltA Q)))
   end.
@@ -238,36 +239,45 @@ Section proof1.
   (*   intros. do 4 (apply sat_exists in H; destruct H). eauto. *)
   (* Qed. *)
 
-  Lemma ti_always_trace_next F Φ τ :
-    iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic ltA Φ) τ) →
-    iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic ltA Φ) (trace_next τ)).
+  Lemma ti_always_trace_next F P1 P2 τ :
+    iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 τ) →
+    iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 (trace_next τ)).
   Proof.
     intros. rewrite ti_always_unfold /ti_always_pre in H.
     apply sat_fupd, sat_later, sat_fupd in H. apply iProp_sat_lc_at_frame_and in H. destruct H.
-    apply sat_fupd, sat_ALC, sat_fupd in H0. auto.
+    apply sat_fupd in H0. apply iProp_sat_lc_at_frame_and in H0. destruct H0.
+    apply sat_ALC, sat_fupd in H1. auto.
   Qed.
-  Lemma ti_always_trace_later F Φ n x τf :
+
+  Lemma ti_always_trace_later F P1 P2 n x τf :
     n ≤ x →
-    iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic ltA Φ) (n, τf)) →
-    iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic ltA Φ) (x, τf)).
+    iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 (n, τf)) →
+    iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 (x, τf)).
   Proof.
     intro LE. induction LE; intros; first auto.
     apply IHLE in H. apply ti_always_trace_next in H. done.
   Qed.
 
-  Lemma ti_always_tr_always F Φ :
-    (∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_logic ltA Φ τ) → tp_trace Φ τ) →
-    ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_always (ti_logic ltA Φ) τ) → tr_always (tp_trace Φ) τ.
+  Lemma ti_always_tr_always F (P1 P2 : tiProp Λ Σ) (R1 R2 : trProp Λ) :
+    (∀ τ, iProp_sat_lc_at_frame F ⊤ (P1 τ) → R1 τ) →
+    (∀ τ, iProp_sat_lc_at_frame F ∅ (P2 τ) → R2 τ) →
+    ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 τ) → (tr_always (R1 ∧ R2))%R τ.
   Proof.
-    intros IH τ H. unfold tr_always. destruct τ as (n&τf).
+    intros IH1 IH2 τ H. unfold tr_always. destruct τ as (n&τf).
     (** Use classical logic. *)
     intro m. pattern m. revert m. apply Classical_Pred_Type.not_ex_not_all.
     intros ?. destruct H0. apply Classical_Prop.imply_to_and in H0. destruct H0.
     apply H1. clear H1.
     eapply ti_always_trace_later in H. 2: eauto.
-    eapply IH. rewrite ti_always_unfold /ti_always_pre in H.
-    apply sat_fupd, sat_later, sat_fupd in H.
-    apply iProp_sat_lc_at_frame_and in H. destruct H. auto.
+    split.
+    - eapply IH1. rewrite ti_always_unfold /ti_always_pre in H.
+      apply sat_fupd, sat_later, sat_fupd in H.
+      apply iProp_sat_lc_at_frame_and in H. destruct H. auto.
+    - eapply IH2. rewrite ti_always_unfold /ti_always_pre in H.
+      apply sat_fupd, sat_later, sat_fupd in H.
+      apply iProp_sat_lc_at_frame_and in H. destruct H.
+      apply sat_fupd in H1. apply iProp_sat_lc_at_frame_and in H1. destruct H1.      
+      auto.
   Qed.
 
   Lemma ti_until_tr_until (wf_ltA : well_founded ltA) F Φ1 Φ2 :
@@ -299,7 +309,7 @@ Section proof1.
   Proof.
     revert τ. induction Φ; simpl; intros.
     - unfold ti_atomic in H. destruct τ. simpl in H.
-      unfold tr_atomic. simpl. destruct (p n) as (((Θ&σ)&?)&?).
+      unfold tr_atomic. simpl. destruct (t n) as (((Θ&σ)&?)&?).
       apply sat_elim in H. auto.
     - unfold ti_pure in H. apply sat_elim in H. auto.
     - unfold ti_and in H. apply iProp_sat_lc_at_frame_and in H. destruct H.
@@ -310,7 +320,9 @@ Section proof1.
     - unfold tr_impl. intros HP. unfold ti_impl in H. apply sat_impl in H; auto.
     - unfold tr_forall. intros. unfold ti_forall in H0. apply (sat_forall a) in H0. eauto.
     - unfold tr_exist. unfold ti_exist in H0. apply (sat_exists) in H0. destruct H0. eauto.
-    - eapply ti_always_tr_always; eauto.
+    - cut (tr_always (tp_trace Φ ∧ tr_pure True)%R τ).
+      + unfold tr_always. destruct τ. intros. eapply H0 in H1. destruct H1. auto.
+      + eapply ti_always_tr_always; eauto. done.
     - eapply ti_until_tr_until; eauto.
   Qed.
 
@@ -326,7 +338,7 @@ Section proof2.
 
   Definition obls_thread_active (Ω : obls) (τ : trace Λ) :=
     map_Forall (λ _ o, match o with
-                       | obl_assigned _ i => thread_active i τ
+                       | obl_assigned _ i => ts_emb (thread_active i) τ
                        | _ => True
                        end
       ) Ω.
@@ -434,7 +446,7 @@ Section proof2.
   Proof.
     iIntros (HIST EQTQ) "(HI& MI& WPs)". iIntros (k o LUk). destruct o; last eauto.
     unfold thread_active. simpl. iPoseProof (history_interp_lookup with "HI") as "%Hlu".
-    apply HIST in Hlu. destruct Hlu as (j& Now). rewrite Now.
+    apply HIST in Hlu. destruct Hlu as (j& Now). unfold ts_emb. simpl. rewrite Now.
     iDestruct "MI" as "(MHI& S& T& A& G& W& %Inv)".
     iPoseProof (othread_assigned_thread_elem with "[$S $T $A]") as "%Tin". 1: eapply LUk.
     apply elem_of_dom in Tin. destruct Tin as (e&LUth).
@@ -448,7 +460,7 @@ Section proof2.
   Qed.
 
   Lemma owit_inv_lb_step_na_turn τ Ω W γ1 γ2 :
-    thread_na (trace_thread τ) τ →
+    ts_emb (thread_na (trace_thread τ)) τ →
     obls_thread_active Ω τ →
     owit_inv_lb (fair_sched_fun γ1) Ω W →
     fscnt_next_rel τ γ1 γ2 →
@@ -532,18 +544,19 @@ Section proof2.
         iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
         iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
         unshelve epose proof (mprog_exists_step i1 Ω Ω2 W (n, τf) γ _ OTA OWinv LB FS ProgO).
-        { unfold trace_thread, trace_state. simpl. rewrite TRn. done. }
+        { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
         destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
         iMod ("WP" $! W2 with "[]") as "[MI WP]".
         { iPureIntro. split; auto. }
-        rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro. iMod "WP". simpl.
+        rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro. iSplit. 1: done.
+        iMod "WP". simpl.
         iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g'& %v'& %Ω3& %W3& %& MI)".
         2: eapply LB2.
         { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
         destruct H as [LEO LB3]. iMod "WP" as "(HI& WP& Efs)".
         unfold trace_next in *. simpl in *. assert (TDisj : Θ ##ₘ efs).
         { eapply map_disjoint_dom_2, fork_thread_ids; eauto. }
-        remember ((<[i1:=e2]> Θ) ∪ efs) as Θ2. rewrite -HeqΘ2.
+        remember ((<[i1:=e2]> Θ) ∪ efs) as Θ2.
         replace (dom (<[i1:=e2]> Θ) ∪ dom efs) with (dom Θ2); cycle 1.
         { subst Θ2. rewrite dom_union_L. auto. }
         remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
@@ -616,9 +629,9 @@ Section proof2.
         pose proof (exists_fscnt_next _ _ FS). destruct H as (γ2& FS2& FSrel).
         unfold trace_next in *. simpl in *.
         assert (TNow : trace_thread (n, τf) = i1).
-        { unfold trace_thread, trace_state. simpl. rewrite TRn. done. }
-        assert (TNA : thread_na i1 (n, τf)).
-        { unfold thread_na. simpl. rewrite TRn. right. eauto. }
+        { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
+        assert (TNA : ts_emb (thread_na i1) (n, τf)).
+        { unfold ts_emb, thread_na. simpl. rewrite TRn. right. eauto. }
         rewrite -TNow in TNA. pose proof (owit_inv_lb_step_na_turn _ _ _ _ _ TNA OTA LB FSrel) as LB2.
         iDestruct "MI" as "[MHI MI]". iMod (model_history_interp_step _ _ _ (S n) with "MHI") as "MHI".
         1: lia. 1: reflexivity.
@@ -632,7 +645,8 @@ Section proof2.
             destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
             rewrite H2 TRn1. eauto. }
         1: eauto.
-        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iModIntro. iMod "close" as "_". iModIntro. iFrame.
+        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iSplit. 1: done.
+        iModIntro. iMod "close" as "_". iModIntro. iFrame.
     - rewrite /ti_exist. iDestruct "TF" as "[(%&%&#EA) #TF]".
       iPoseProof (event_obl_model_history_interp_lookup with "[MI $EA]") as "%".
       { iDestruct "MI" as "[$ _]". }
@@ -706,16 +720,16 @@ Section proof2.
         iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
         iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
         unshelve epose proof (mprog_exists_step i1 Ω Ω2 W (n, τf) γ _ OTA OWinv LB FS ProgO).
-        { unfold trace_thread, trace_state. simpl. rewrite TRn. done. }
+        { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
         destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
         iMod ("WP" $! W2 with "[]") as "[MI WP]".
         { iPureIntro. split; auto. }
         assert (∃ fuel' owner', Ω2 !! k = Some (obl_assigned fuel' owner')).
         { destruct ProgO. specialize (H0 k). rewrite LUOk in H0. inv H0. destruct y; last done. eauto. }
         destruct H as (fuel2&owner2&LUOk2).
-        destruct (thread_active_or_not owner2 (n, τf)) as [TN2 | TA2].
+        destruct (ts_emb_thread_active_or_not owner2 (n, τf)) as [TN2 | TA2].
         { iExFalso. iDestruct "MI" as "(MHI& S& T& A& G& W& %OWInv)".
-          unfold thread_na in TN2. simpl in TN2. rewrite TRn in TN2.
+          unfold ts_emb, thread_na in TN2. simpl in TN2. rewrite TRn in TN2.
           iPoseProof (othread_assigned_thread_elem with "[$S $T $A]") as "%INk". 1: eapply LUOk2.
           destruct TN2.
           { apply not_elem_of_dom in H. done. }
@@ -739,7 +753,7 @@ Section proof2.
           - destruct H. subst i1. inv H0; inv H. apply fair_sched_fun_mon_gen; auto.
           - destruct H. inv H0. specialize (FSrel owner2). unfold fscnt_next_rel_th in FSrel.
             rewrite decide_False in FSrel; cycle 1.
-            { unfold trace_thread, trace_state. simpl. rewrite TRn. done. }
+            { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
             rewrite decide_False in FSrel.
             { apply Hessenberg.lt_add_r. apply OrdArith.lt_from_nat. auto. }
             intros F. eapply (thread_active_and_not_false _ _ F TA2). }
@@ -753,7 +767,7 @@ Section proof2.
         destruct H as [LEO LB3]. iMod "WP" as "(HI& WP& Efs)".
         unfold trace_next in *. simpl in *. assert (TDisj : Θ ##ₘ efs).
         { eapply map_disjoint_dom_2, fork_thread_ids; eauto. }
-        remember ((<[i1:=e2]> Θ) ∪ efs) as Θ2. rewrite -HeqΘ2.
+        remember ((<[i1:=e2]> Θ) ∪ efs) as Θ2.
         replace (dom (<[i1:=e2]> Θ) ∪ dom efs) with (dom Θ2); cycle 1.
         { subst Θ2. rewrite dom_union_L. auto. }
         remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
@@ -908,9 +922,9 @@ Section proof2.
         pose proof (exists_fscnt_next _ _ FS). destruct H as (γ2& FS2& FSrel).
         unfold trace_next in *. simpl in *.
         assert (TNow : trace_thread (n, τf) = i1).
-        { unfold trace_thread, trace_state. simpl. rewrite TRn. done. }
-        assert (TNA : thread_na i1 (n, τf)).
-        { unfold thread_na. simpl. rewrite TRn. right. eauto. }
+        { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
+        assert (TNA : ts_emb (thread_na i1) (n, τf)).
+        { unfold ts_emb, thread_na. simpl. rewrite TRn. right. eauto. }
         rewrite -TNow in TNA. pose proof (owit_inv_lb_step_na_turn _ _ _ _ _ TNA OTA LB FSrel) as LB2.
         iDestruct "MI" as "[MHI MI]". iMod (model_history_interp_step _ _ _ (S n) with "MHI") as "MHI".
         1: lia. 1: reflexivity.
