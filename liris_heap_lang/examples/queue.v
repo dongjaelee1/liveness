@@ -389,12 +389,12 @@ Section proof.
 
   (** TODO: LAT-style spec that enables the client to put ogP_obls in some invariant. *)
   Lemma Queue_dequeue_spec :
-    ⊢ ∃ m, ∀ (b : bool) i G g A φ lc γ ℓ wi ni wg ng (ql : val),
+    ⊢ ∃ m, ∀ (b : bool) wi ni wg ng i G g A φ lc γ ℓ (ql : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
          ogP_obls i g ℓ A ∗
          (if b
           then queue_worker γ wi wg ∗ ogP_obls ni ng ℓ ∅
-          else ⌜ wi = inhabitant ∧ ni = inhabitant ∧ wg = inhabitant ∧ ng = inhabitant ⌝) ∗
+          else True) ∗
          is_queue ql γ ℓ φ }}}
       Queue.dequeue ql @ i
     l{{{ x B, RET x; £ lc ∗ thP_groups i G ∗ ogP_obls i g ℓ (A ∪ B) ∗
@@ -405,7 +405,7 @@ Section proof.
   Proof.
     iPoseProof (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iPoseProof (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
-    iExists (1 ⊕ ma ⊕ mr)%M. iIntros (b i G g A φ lc γ ℓ wi ni wg ng ql) "!> % (TG& GF& Gg& HW& #IQ) HΦ".
+    iExists (1 ⊕ ma ⊕ mr)%M. iIntros (b wi ni wg ng i G g A φ lc γ ℓ ql) "!> % (TG& GF& Gg& HW& #IQ) HΦ".
     rewrite /Queue.dequeue.
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_m]".
     iPoseProof (ogP_fuel_add_set with "F_m") as "[F_ma F_mr]".
