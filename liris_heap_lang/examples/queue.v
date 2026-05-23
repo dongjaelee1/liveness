@@ -8,7 +8,7 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import reservation_map dfrac_agree mono_list gset.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map.
 From liris.algebra Require Import list_of_sets.
-From liris.heap_lang.examples Require Import ticket_lock.
+From liris.heap_lang.examples Require Export ticket_lock.
 
 Module Queue.
   (** References:
@@ -53,21 +53,6 @@ Module Queue.
           Free "h";;
           TicketLock.release "lock";;
           SOME (Fst "node")
-      end.
-
-  (* FIXME: move to other file *)
-  Definition put_task : val :=
-    λ: "q" "f" "a",
-      enqueue "q" ("f", "a").
-
-  Definition run_task : val :=
-    λ: "q",
-      match: dequeue "q" with
-        NONE => #()
-      | SOME "fa" =>
-          let: "f" := Fst "fa" in
-          let: "a" := Snd "fa" in
-          "f" "a"
       end.
 
 End Queue.
