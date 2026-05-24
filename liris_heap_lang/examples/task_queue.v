@@ -32,7 +32,7 @@ Module TaskQueue.
       run_task "q";;
       "worker" "q".
 
-  (** Initializes a queue and Forks a worker thread *)
+  (** Initializes a queue and Forks one worker thread *)
   Definition init : val :=
     λ: <>,
       let: "q" := Queue.init #() in
@@ -55,6 +55,7 @@ Section proof.
 
   Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
+  (** ** Definitions *)
   Definition is_task (ℓ : ord.t) : val → oids → iProp Σ :=
     λ v B, (∃ f a m, ∀ lc i j G g K ℓt ℓg,
               ⌜(v = (f, a)%V) ∧ (ℓt < ℓ)%ordi⌝ ∧
@@ -63,52 +64,28 @@ Section proof.
                 f a @ i
               l{{{ rv, RET rv; £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓg (K ∖ B) }}})%I.
 
-  TODO
-
-  (** ** Definitions *)
   (** The invariant *)
-  Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) (φ : val → oids → iProp Σ) : iProp Σ :=
-    ∃ (lhptr ltptr : loc) (tl : val),
-      ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
-      inv Ni (queue_inv ℓ (queue_γq γ) (queue_γd γ)) ∗
-      (queue_ticketlock_γ γ) ↪LOCK□ 0 ∗
-      is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr).
-
-  (** Enables delayed initialization after picking a worker thread. *)
-  Definition is_queue_init (ql :val) (γ : queue_γ) (φ : val → oids → iProp Σ) : iProp Σ :=
-    (∃ (lhptr ltptr : loc) (tl : val),
-        ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
-        qG_queue (queue_γq γ) [] (1/2)%Qp ∗
-        ghost_var (queue_γd γ) 1 (inhabitant, inhabitant) ∗
-        (queue_ticketlock_γ γ) ↪LOCK□ 0 ∗
-        is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I.
+  Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) : iProp Σ :=
+    is_queue ql γ ℓ (is_task ℓ).
 
   (** ** Lemmas *)
-
-  Global Instance is_queue_persistent ql γ ℓ φ : Persistent (is_queue ql γ ℓ φ).
-  Proof. rewrite /is_queue. apply _. Qed.
-
-  Lemma is_queue_initialize E ql γ (ℓ : ord.t) (φ : val → oids → iProp Σ) i g :
-    is_queue_init ql γ φ -∗ ogP_obls i g ℓ ∅ ={E}=∗ is_queue ql γ ℓ φ ∗ queue_worker γ i g.
-  Proof.
-    iIntros "(%&%&%& %Hq& Qvs& GVd& #FL) Go".
-    rewrite /is_queue.
-    iMod (ghost_var_update (i, g) with "GVd") as "[GVd $]".
-    iMod (inv_alloc Ni _ (queue_inv ℓ (queue_γq γ) (queue_γd γ)) with "[Qvs GVd Go]") as "#Invq".
-    { iNext. rewrite /queue_inv. iFrame. iSplitR.
-      { iPureIntro. intros. done. }
-      iSplitL; last done. iFrame. }
-    iModIntro. iFrame "FL Invq". auto.
-  Qed.
+  Global Instance is_task_queue_persistent ql γ ℓ : Persistent (is_task_queue ql γ ℓ).
+  Proof. rewrite /is_task_queue. apply _. Qed.
 
   (** ** Program proofs *)
   (** FIXME: better notation for triples with this pattern *)
-  Lemma Queue_init_spec :
-    ⊢ ∃ m, ∀ i G φ lc,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) }}}
-      Queue.init #() @ i
-    l{{{ ql γ, RET ql; £ lc ∗ thP_groups i G ∗ is_queue_init ql γ φ }}}.
+  Lemma TaskQueue_put_task_spec :
+    ⊢ ∃ m, ∀ lc i j G g K B γ ℓ ℓ' (ql task_f task_a : val),
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
+         ogP_obls j g ℓ' K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
+         is_task ℓ (task_f, task_a)%V B ∗ is_task_queue ql γ ℓ }}}
+      TaskQueue.put_task ql task_f task_a @ i
+    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓ' (K ∖ B) }}}.
   Proof.
+
+    TODO
+
+
     iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
     iExists (20 ⊕ m)%M. iIntros (i G φ lc) "!> % (TG& GF) HΦ".
     rewrite /Queue.init.
