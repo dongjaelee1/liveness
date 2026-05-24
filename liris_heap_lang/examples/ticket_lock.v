@@ -176,13 +176,13 @@ Section proof.
 
   (** ** Program proofs *)
   Lemma TicketLock_init_spec :
-    ⊢ ∃ m, ∀ i G ℓ lc,
+    ⊢ ∃ m, ∀ lc ℓ i G,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) }}}
       TicketLock.init #() @ i
     l{{{ tl γ, RET tl; £ lc ∗ thP_groups i G ∗ γ ↪LOCK ℓ ∗ (∀ E R, R ={E}=∗ is_fair_lock tl γ R) }}}.
   Proof.
     iExists 4.
-    iIntros (i G ℓ lc) "!> %Φ (TG& GF) HΦ".
+    iIntros (lc ℓ i G) "!> %Φ (TG& GF) HΦ".
     rewrite /TicketLock.init.
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
@@ -231,7 +231,7 @@ Section proof.
 
   (** FIXME: ordi notation levels *)
   Lemma TicketLock_acquire_spec :
-    ⊢ ∃ m, ∀ i G tl γ dq ℓ R μ lc,
+    ⊢ ∃ m, ∀ lc μ i G tl γ dq ℓ R,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ℵ)%ordi m) ∗
          γ ↪LOCK{dq} ℓ ∗
          is_fair_lock tl γ R }}}
@@ -246,7 +246,7 @@ Section proof.
          γ ↪LOCK{dq} ℓ ∗ lock_token tl γ κu R ∗ R }}}.
   Proof.
     iExists 1.
-    iIntros (i G tl γ dq ℓ R μ lc) "!> % (TG& Fs& CF& #IFL) HΦ".
+    iIntros (lc μ i G tl γ dq ℓ R) "!> % (TG& Fs& CF& #IFL) HΦ".
     rewrite /TicketLock.acquire.
     iAssert (|==>[∗ set] g ∈ G, ogP_fuel g (ℓ ⊕ ω)%ordi (100 ⊕ 1)%M)%I with "[Fs]" as ">Fs".
     { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% GF".
@@ -489,20 +489,20 @@ Section proof.
   Qed.
 
   Lemma TicketLock_release_spec :
-    ⊢ ∃ m, ∀ i G tl γ dq ℓ R κu gu ℓu K lc,
+    ⊢ ∃ m, ∀ lc i j G tl γ dq ℓ R κu gu ℓu K,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗
-         ogP_obls i gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
+         ogP_obls j gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token tl γ κu R ∗ R ∗
          γ ↪LOCK{dq} ℓ ∗ is_fair_lock tl γ R }}}
       TicketLock.release tl @ i
     l{{{ RET #();
          £ lc ∗
          thP_groups i G ∗
-         ogP_obls i gu ℓu (K ∖ {[κu]}) ∗
+         ogP_obls j gu ℓu (K ∖ {[κu]}) ∗
          γ ↪LOCK{dq} ℓ }}}.
   Proof.
     iExists 100.
-    iIntros (i G tl γ dq ℓ R κu gu ℓu K lc) "!> % (TG& GF& Gg& %LUkl& LT& HR& CF& #IFL) HΦ".
+    iIntros (lc i j G tl γ dq ℓ R κu gu ℓu K) "!> % (TG& GF& Gg& %LUkl& LT& HR& CF& #IFL) HΦ".
     rewrite /TicketLock.release.
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".

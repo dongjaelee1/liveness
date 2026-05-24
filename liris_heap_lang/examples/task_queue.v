@@ -41,41 +41,6 @@ Module TaskQueue.
 
 End TaskQueue.
 
-TODO
-
-(** ** A queue's spec with a liveness guarantee: any element can be associated with some obligations. *)
-(** The CMRA we need. *)
-Class queueGpreS (Σ : gFunctors) : Set :=
-  QueueGpreS {
-      queueGpreS_queue : inG Σ (dfrac_agreeR (list (val* oids)));
-      #[local] queueGpreS_data_inG :: ghost_varG Σ (thread_id * ogid);
-    }.
-
-Class queueG Σ :=
-  QueueG {
-      #[local] queue_inG :: queueGpreS Σ;
-    }.
-
-Definition queueΣ : gFunctors :=
-    #[GFunctor (dfrac_agreeR (list (val * oids))); ghost_varΣ (thread_id * ogid)].
-
-Global Instance subG_queueΣ {Σ} : subG queueΣ Σ → queueGpreS Σ.
-Proof. solve_inG. Qed.
-
-Record queue_γ :=
-  QueueName {
-      queue_ticketlock_γ : ticketlock_γ;
-      queue_γq : gname;
-      queue_γd : gname;
-    }.
-
-(** User interface *)
-(* Make the instances local to this file. We cannot use #[local] in the code *)
-(* above, as that would make the instances local to the module. *)
-(** FIXME: why do we need this? Is there a more consistent way of doing this?
-           ticket lock inG is also here, doesn't look great. *)
-Local Existing Instances queue_inG queueGpreS_queue queueGpreS_data_inG tlock_config_inG.
-
 Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
@@ -90,43 +55,19 @@ Section proof.
 
   Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
+  Definition is_task (ℓ : ord.t) : val → oids → iProp Σ :=
+    λ v B, (∃ f a m, ∀ lc i j G g K ℓt ℓg,
+              ⌜(v = (f, a)%V) ∧ (ℓt < ℓ)%ordi⌝ ∧
+              l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓt m) ∗
+                   ogP_obls j g ℓg K ∗ ⌜ B ⊆ K ⌝ }}}
+                f a @ i
+              l{{{ rv, RET rv; £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓg (K ∖ B) }}})%I.
+
+  TODO
+
   (** ** Definitions *)
-
-  Let N := nroot.@"queue".
-  Let Ni := N.@"invariant".
-
-  Local Definition qG_queue γ (l : list (val * oids)) q : iProp Σ :=
-    own γ (to_dfrac_agree (DfracOwn q) l).
-
-  Definition queue_worker γ i g : iProp Σ :=
-    ghost_var (queue_γd γ) (1/2)%Qp (i, g).
-
-  Local Fixpoint queue_contents (lh lt : loc) (vs : list (val * oids)) (φ : val → oids → iProp Σ) : iProp Σ :=
-    match vs with
-    | [] => (⌜lh = lt⌝ ∗ lh ↦ NONEV)
-    | (v, B) :: vs => (∃ l : loc, lh ↦ SOMEV (v, #l) ∗ φ v B ∗ queue_contents l lt vs φ)
-    end%I.
-
-  (* Mostly protects ghost resources + sync using qG_queue *)
-  Local Definition queue_inv (ℓ : ord.t) γq γd : iProp Σ :=
-    (∃ (vs : list (val * oids)) (i : thread_id) (g : ogid),
-        qG_queue γq vs (1/2)%Qp ∗
-        ghost_var γd (1/2)%Qp (i, g) ∗
-        (* FIXME: library for pairwise disjointedness *)
-        ⌜ disjoint_list_of_sets (vs.*2) ⌝ ∗
-        ogP_obls i g ℓ (union_list_of_sets (vs.*2)) ∗
-        ([∗ list] n ↦ B ∈ (vs.*2), [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (S n)%M))%I.
-
-  (* Mostly protects physical resources + sync using qG_queue *)
-  Local Definition queue_lock (φ : val → oids → iProp Σ) γq (lhptr ltptr : loc) : iProp Σ :=
-    (∃ (lh lt : loc) (vs : list (val * oids)),
-        lhptr ↦ #lh ∗
-        ltptr ↦ #lt ∗
-        qG_queue γq vs (1/2)%Qp ∗
-        queue_contents lh lt vs φ)%I.
-
   (** The invariant *)
-  Definition is_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) (φ : val → oids → iProp Σ) : iProp Σ :=
+  Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) (φ : val → oids → iProp Σ) : iProp Σ :=
     ∃ (lhptr ltptr : loc) (tl : val),
       ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       inv Ni (queue_inv ℓ (queue_γq γ) (queue_γd γ)) ∗

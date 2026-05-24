@@ -177,13 +177,13 @@ Section proof.
   (** ** Program proofs *)
   (** FIXME: better notation for triples with this pattern *)
   Lemma Queue_init_spec :
-    ⊢ ∃ m, ∀ i G φ lc,
+    ⊢ ∃ m, ∀ lc φ i G,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) }}}
       Queue.init #() @ i
     l{{{ ql γ, RET ql; £ lc ∗ thP_groups i G ∗ is_queue_init ql γ φ }}}.
   Proof.
     iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
-    iExists (20 ⊕ m)%M. iIntros (i G φ lc) "!> % (TG& GF) HΦ".
+    iExists (20 ⊕ m)%M. iIntros (lc φ i G) "!> % (TG& GF) HΦ".
     rewrite /Queue.init.
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_TicketLock]".
     lwp_lam. simpl.
@@ -219,7 +219,7 @@ Section proof.
     iMod (own_alloc (to_dfrac_agree (DfracOwn (1/2)) ([] : list (val * oids)) ⋅ to_dfrac_agree (DfracOwn (1/2)) ([] : list (val * oids)))) as (γq) "[HQvs HQvs0]".
     { rewrite -dfrac_agree_op. done. }
     iModIntro.
-    iApply ("TicketLock_init_spec" $! _ _ 0 0 with "[$TG $F_TicketLock]").
+    iApply ("TicketLock_init_spec" $! 0 0 with "[$TG $F_TicketLock]").
     iIntros (tl γtl) "(_& TG& CF& IFL)".
     iMod (lock_config_persist with "CF") as "#CF".
     iMod ("IFL" $! _ (queue_lock φ γq lhptr ltptr)%I with "[Ptr_node Ptr_hd Ptr_tl HQvs0]") as "#IFL".
@@ -248,17 +248,18 @@ Section proof.
 
   (** TODO: LAT-style spec that enables the client to put ogP_obls in some invariant. *)
   Lemma Queue_enqueue_spec :
-    ⊢ ∃ m, ∀ i G g B φ lc γ ℓ ℓ' (ql x : val),
+    ⊢ ∃ m, ∀ lc i j G g K B φ γ ℓ ℓ' (ql x : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
-         ogP_obls i g ℓ' B ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
+         ogP_obls j g ℓ' K ∗
+         ⌜ B ⊆ K ⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
          φ x B ∗
          is_queue ql γ ℓ φ }}}
       Queue.enqueue ql x @ i
-    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls i g ℓ' ∅ }}}.
+    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓ' (K ∖ B) }}}.
   Proof.
     iPoseProof (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iPoseProof (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
-    iExists (1 ⊕ ma ⊕ mr)%M. iIntros (i G g B φ lc γ ℓ ℓ' ql x) "!> % (TG& Fs& GB& FB& Hφ& #IQ) HΦ".
+    iExists (1 ⊕ ma ⊕ mr)%M. iIntros (lc i j G g K B φ γ ℓ ℓ' ql x) "!> % (TG& Fs& GB& %SubBK& FB& Hφ& #IQ) HΦ".
     rewrite /Queue.enqueue.
     iPoseProof (ogP_fuel_add_set with "Fs") as "[GF F_m]".
     iPoseProof (ogP_fuel_add_set with "F_m") as "[F_ma F_mr]".
@@ -275,7 +276,7 @@ Section proof.
     (** Acquire lock *)
     lwp_bind (TicketLock.acquire tl).
     iModIntro.
-    iApply ("TicketLock_acquire_spec" $! _ _ _ _ _ _ _ (100 ⊕ mr)%M 0 with "[$TG F_ma $IFL]").
+    iApply ("TicketLock_acquire_spec" $! 0 (100 ⊕ mr)%M with "[$TG F_ma $IFL]").
     { iApply ogP_fuel_layer_eq_set. 2: iFrame. by rewrite hessenberg.add_O_l. }
     iIntros (gu ku) "(_& %Ningu& TG& Ggu& F_gu& F_ku& _& Lock& R)".
     iPoseProof (ogP_fuel_add with "F_gu") as "[F_gu F_mr_gu]".
@@ -374,15 +375,15 @@ Section proof.
 
   (** TODO: LAT-style spec that enables the client to put ogP_obls in some invariant. *)
   Lemma Queue_dequeue_spec :
-    ⊢ ∃ m, ∀ (b : bool) wi ni wg ng i G g A φ lc γ ℓ (ql : val),
+    ⊢ ∃ m, ∀ lc (b : bool) wi ni wg ng i j G g A φ γ ℓ (ql : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
-         ogP_obls i g ℓ A ∗
+         ogP_obls j g ℓ A ∗
          (if b
           then queue_worker γ wi wg ∗ ogP_obls ni ng ℓ ∅
           else True) ∗
          is_queue ql γ ℓ φ }}}
       Queue.dequeue ql @ i
-    l{{{ x B, RET x; £ lc ∗ thP_groups i G ∗ ogP_obls i g ℓ (A ∪ B) ∗
+    l{{{ x B, RET x; £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓ (A ∪ B) ∗
                      (match x with | NONEV => ⌜B = ∅⌝ | SOMEV v => φ v B | _ => False end) ∗
                      (if b
                       then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅
@@ -390,7 +391,7 @@ Section proof.
   Proof.
     iPoseProof (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iPoseProof (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
-    iExists (1 ⊕ ma ⊕ mr)%M. iIntros (b wi ni wg ng i G g A φ lc γ ℓ ql) "!> % (TG& GF& Gg& HW& #IQ) HΦ".
+    iExists (1 ⊕ ma ⊕ mr)%M. iIntros (lc b wi ni wg ng i j G g A φ γ ℓ ql) "!> % (TG& GF& Gg& HW& #IQ) HΦ".
     rewrite /Queue.dequeue.
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_m]".
     iPoseProof (ogP_fuel_add_set with "F_m") as "[F_ma F_mr]".
@@ -406,7 +407,7 @@ Section proof.
     (** Acquire lock *)
     lwp_bind (TicketLock.acquire tl).
     iModIntro.
-    iApply ("TicketLock_acquire_spec" $! _ _ _ _ _ _ _ (100 ⊕ mr)%M 0 with "[$TG F_ma $IFL]").
+    iApply ("TicketLock_acquire_spec" $! 0 (100 ⊕ mr)%M with "[$TG F_ma $IFL]").
     { iApply ogP_fuel_layer_eq_set. 2: iFrame. by rewrite hessenberg.add_O_l. }
     iIntros (gu ku) "(_& %Ningu& TG& Ggu& F_gu& F_ku& _& Lock& R)".
     iPoseProof (ogP_fuel_add with "F_gu") as "[F_gu F_mr_gu]".
@@ -505,7 +506,7 @@ Section proof.
       apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs.
       iMod (own_update_2 with "Queue Queue0") as "[Queue Queue0]".
       { eapply (dfrac_agree_update_2 _ _ _ _ (vs')). rewrite dfrac_op_own Qp.div_2. auto. }
-      iAssert (|={⊤ ∖ ↑Ni}=>m |={⊤ ∖ ↑Ni,⊤}=> ogP_obls i g ℓ (A ∪ B) ∗ (if b then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅ else True))%I
+      iAssert (|={⊤ ∖ ↑Ni}=>m |={⊤ ∖ ↑Ni,⊤}=> ogP_obls j g ℓ (A ∪ B) ∗ (if b then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅ else True))%I
         with "[IQ_ACC Queue0 Gvar Gq Fq HW Gg]" as "IQ_ACC".
       { destruct b.
         - iDestruct "HW" as "(Gw& Gq1)". iPoseProof (ghost_var_agree with "Gvar Gw") as "%". simplify_eq.
