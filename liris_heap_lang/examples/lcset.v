@@ -32,8 +32,11 @@ Module LockCouplingSet.
 
   Definition newNode : val :=
     λ: "value" "next",
-      let: "lk" := TicketLock.init #() in
-      ref ("lk", "value", "next").
+      let: "n" := AllocN #3 #0 in
+      "n" +ₗ #0 <- TicketLock.init #();;
+      "n" +ₗ #1 <- "value";;
+      "n" +ₗ #2 <- "next";;
+      "n".
 
   Definition makeSet : val :=
     λ: <>,
@@ -110,20 +113,41 @@ Record lcs_names :=
 Section proof.
   Context `{!heapGS Σ} `{!lcsG Σ}.
 
+  Definition lockΔ : ord.t := ℵ%ordi.
+
+  (* Includes element a and b, unless they are infinite, and excludes everything
+     in between. *)
+  Local Axiom own_interval : ∀ (γ : lcs_names) (a : Int.t) (b : Int.t), iProp Σ.
+
+  Axiom own_set : ∀ (γ : lcs_names) (s : gset Z), iProp Σ.
+
+  Local Axiom alloc_set : ⊢ |==> ∃ γ, own_set γ ∅ ∗ own_interval γ -∞ +∞.
+
+  Local Axiom own_interval_not_NegInf : ∀ γ a b,
+    own_interval γ a b ⊢ ⌜ b ≠ Int.NegInf ⌝.
+
   Definition is_node_pre
-      (is_node : loc -d> lcs_names -d> iPropO Σ) :
-      loc -d> lcs_names -d> iPropO Σ :=
-    λ n γ,
-      (∃ lk γlk cur_val,
+      (is_node : loc -d> lcs_names -d> Int.t -d> ticketlock_γ -d> iPropO Σ) :
+      loc -d> lcs_names -d> Int.t -d> ticketlock_γ -d> iPropO Σ :=
+    λ n γ v γlk,
+      (∃ lk,
+          (n +ₗ 1) ↦□ (Int.into_val v) ∗
           (n +ₗ 0) ↦□ lk ∗
-          (n +ₗ 1) ↦□ (Int.into_val cur_val) ∗
           is_fair_lock lk γlk (
-              γlk ↪LOCK{#1/2} 0 ∗
-              ∃ (next : loc) next_val,
-                (n +ₗ 2) ↦ #next ∗
-                ▷ is_node next γ ∗
-                (next +ₗ 1) ↦□ (Int.into_val next_val)
-                (* own ghost state for range. *)
+              ∃ ℓ (n' : loc) v',
+                γlk ↪LOCK{#1/2} ℓ ∗
+                (n +ₗ 2) ↦ #n' ∗
+                (n' +ₗ 1) ↦□ (Int.into_val v') ∗
+                own_interval γ v v' ∗
+                (match v' with
+                 | +∞ => True
+                 | -∞ => False
+                 | _ => (∃ γlk' ℓ',
+                           ▷ is_node n' γ v' γlk' ∗
+                           γlk' ↪LOCK{#1/2} ℓ' ∗
+                           ⌜ ((ℓ' ⊕ lockΔ) < ℓ)%ordi ⌝)
+                 end)
+                (* TODO: own ghost state for range. *)
       ))%I.
 
   Ltac solve_contractive :=
@@ -131,21 +155,21 @@ Section proof.
 
   Local Instance is_node_pre_contractive : Contractive is_node_pre.
   Proof.
-    solve_contractive.
-  Qed.
+    (* solve_contractive. *) (* TODO: probably the match statement. *)
+  Admitted.
 
-  Definition is_node : loc → lcs_names → iProp Σ := fixpoint is_node_pre.
+  Definition is_node : loc → lcs_names → Int.t → ticketlock_γ → iProp Σ := fixpoint is_node_pre.
 
-  Lemma is_node_unfold n γ : is_node n γ ⊣⊢ is_node_pre is_node n γ.
+  Lemma is_node_unfold n γ v γlk : is_node n γ v γlk ⊣⊢ is_node_pre is_node n γ v γlk.
   Proof. apply (fixpoint_unfold is_node_pre n γ). Qed.
 
-  Instance is_node_persistent n γ : Persistent (is_node n γ).
+  Instance is_node_persistent n γ v γlk : Persistent (is_node n γ v γlk).
   Proof. rewrite is_node_unfold. apply _. Qed.
 
   Definition is_set (root : loc) γ : iProp Σ :=
-    is_node root γ.
-
-  Axiom own_set : ∀ (γ : lcs_names) (s : gset Z), iProp Σ.
+    ∃ γlk,
+      γlk ↪LOCK□ (ℵ × lockΔ)%ordi ∗
+      is_node root γ Int.NegInf γlk.
 
   Import LockCouplingSet.
 
@@ -155,25 +179,127 @@ Section proof.
   Ltac post_wp_bind :=
     iFrame; iExists ∅, 0; iSplitR; [by eauto | iIntros "Hg Hfuel _ _"; simpl].
 
-  Local Lemma lwp_newNode i G (next : loc) γ v :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗
-         is_node next γ }}}
-     newNode (Int.into_val v) #next @ i
-    l{{{ s, RET #s; thP_groups i G ∗ is_node s γ }}}.
-  Proof.
-  Admitted.
-
-  Local Lemma lwp_newNode_tail i G :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) }}}
-     newNode (Int.into_val +∞) #(Loc 0) @ i
-    l{{{ γ s, RET #s; thP_groups i G ∗ is_node s γ ∗ own_set γ ∅ }}}.
-  Proof.
-  Admitted.
+  Ltac lwp_pures := lwp_pure; repeat (post_wp; lwp_pure); post_wp_bind.
 
   Tactic Notation "lOneFuel" open_constr(Hfuel) "as" open_constr(Hdestruct) :=
     iDestruct (ogP_fuel_eq_set _ _ _ (1⊕(_:nat))%M with Hfuel) as Hfuel;
     [ rewrite measure_add !measure_nat -Hessenberg.add_from_nat // | ];
     iDestruct (ogP_fuel_add_set with Hfuel) as Hdestruct.
+
+  Local Lemma lwp_newNode :
+    ⊢ ∃ m,
+      ∀ ℓ i G (next : loc) γ v v',
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗
+         (match v' with
+           | +∞ => (next +ₗ 1) ↦□ (Int.into_val +∞)
+           | _ => (∃ γlk' ℓ',
+                     is_node next γ v' γlk' ∗
+                     γlk' ↪LOCK{#1/2} ℓ' ∗
+                     ⌜ ((ℓ' ⊕ lockΔ) < ℓ)%ordi ⌝)
+           end) ∗
+         own_interval γ v v'
+      }}}
+     newNode (Int.into_val v) #next @ i
+    l{{{ s γlk, RET #s; thP_groups i G ∗ is_node s γ v γlk ∗ γlk ↪LOCK{#1/2} ℓ }}}.
+  Proof.
+    iDestruct (TicketLock_init_spec) as (mi) "TicketLock_init_spec".
+    iExists (100 ⊕ mi ⊕ mi)%M.
+    iIntros.
+    iIntros (?) "!# (Hg & Hfuel & Hn' & Hown) HΦ".
+    iDestruct (own_interval_not_NegInf with "Hown") as "%".
+
+    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HlockFuel]".
+    lwp_lam. post_wp. lwp_pures. lwp_bind (AllocN _ _).
+    iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_allocN _ ∅ 0 with "[$Hg $Hf //]"); first done.
+    iIntros (n) "[(_ & Hg & _) (Hn & _)]". iModIntro.
+    lwp_pures.
+
+    lwp_bind (TicketLock.init _).
+    iModIntro.
+    iDestruct (ogP_fuel_add_set with "HlockFuel") as "[Hlock HlockFuel]".
+    iApply ("TicketLock_init_spec" $! 0 ℓ with "[$]").
+    iIntros (lk γlk) "(_ & Hg & Hlk & Hlk_inv) !>".
+    lwp_pures.
+
+    rewrite !array_cons. rewrite Loc.add_0 Loc.add_assoc /=.
+    iDestruct "Hn" as "(lk & val & next & _)".
+
+    lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $lk //]").
+    iIntros "[(_ & Hg & _) lk]". iMod (pointsto_persist with "lk") as "#lk".
+    iModIntro. lwp_pures.
+
+    lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $val //]").
+    iIntros "[(_ & Hg & _) val]". iMod (pointsto_persist with "val") as "#val".
+    iModIntro. lwp_pures.
+
+    lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $next //]").
+    iIntros "[(_ & Hg & _) next]".
+    iModIntro. lwp_pures.
+
+    iModIntro. lwp_finish. iApply "HΦ".
+    iEval (rewrite is_node_unfold).
+    iDestruct "Hlk" as "[Hlk ?]". iFrame.
+    iMod ("Hlk_inv" with "[-]") as "#H".
+    2:{ iModIntro. iFrame "#". rewrite Loc.add_0. iFrame "#". }
+    iFrame "∗#%".
+    destruct v'; try done.
+    - iDestruct "Hn'" as (??) "(#Hn' & $ & %Hℓ)".
+      iDestruct (is_node_unfold with "Hn'") as (lk') "(#? & _)".
+      iFrame "#". iFrame "∗#%".
+    - iFrame.
+  Qed.
+
+  Local Lemma lwp_newNode_tail :
+    ⊢ ∃ m,
+        ∀ i G,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) }}}
+     newNode (Int.into_val +∞) #(Loc 0) @ i
+    l{{{ n, RET #n; thP_groups i G ∗ (n +ₗ 1) ↦□ (Int.into_val +∞) }}}.
+  Proof using lcsG0.
+    iDestruct (TicketLock_init_spec) as (mi) "TicketLock_init_spec".
+    iExists (100 ⊕ mi ⊕ mi)%M.
+    iIntros. iIntros (?) "!# (Hg & Hfuel) HΦ".
+
+    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HlockFuel]".
+
+    lwp_lam. post_wp. lwp_pures. lwp_bind (AllocN _ _).
+    iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_allocN _ ∅ 0 with "[$Hg $Hf //]"); first done.
+    iIntros (n) "[(_ & Hg & _) (Hn & _)]". iModIntro.
+    lwp_pures.
+
+    lwp_bind (TicketLock.init _).
+    iModIntro.
+    iDestruct (ogP_fuel_add_set with "HlockFuel") as "[Hlock HlockFuel]".
+    iApply ("TicketLock_init_spec" $! 0 0 with "[$]").
+    iIntros (lk γlk) "(_ & Hg & Hlk & Hlk_inv) !>".
+    lwp_pures.
+
+    rewrite !array_cons. rewrite Loc.add_0 Loc.add_assoc /=.
+    iDestruct "Hn" as "(lk & val & next & _)".
+
+    lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $lk //]").
+    iIntros "[(_ & Hg & _) lk]". iMod (pointsto_persist with "lk") as "#lk".
+    iModIntro. lwp_pures.
+
+    lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $val //]").
+    iIntros "[(_ & Hg & _) val]". iMod (pointsto_persist with "val") as "#val".
+    iModIntro. lwp_pures.
+
+    lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $next //]").
+    iIntros "[(_ & Hg & _) next]".
+    iModIntro. lwp_pures.
+
+    iModIntro. lwp_finish. iApply "HΦ". iModIntro.
+    iFrame "∗#".
+  Qed.
 
   Opaque Int.into_val.
   Lemma lwp_makeSet i G :
@@ -182,34 +308,29 @@ Section proof.
     l{{{ s γ, RET #s; thP_groups i G ∗ is_set s γ ∗ own_set γ ∅ }}}.
   Proof.
     iIntros (?) "(Hg & Hfuel) HΦ".
+    iDestruct lwp_newNode_tail as (mnt) "lwp_newNode_tail".
+    iDestruct lwp_newNode as (mn) "lwp_newNode".
 
-    iMod (ogP_fuel_extend_set _ 0 _ (100)%M with "Hfuel") as "Hfuel".
+    iMod (ogP_fuel_extend_set _ 0 _ (100 ⊕ mnt ⊕ mn)%M with "Hfuel") as "Hfuel".
     { apply ordArith.lt_from_nat. lia. }
 
+    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
     lwp_lam. post_wp_bind.
+
     lwp_bind (newNode _ _). iModIntro.
+    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[Hf HcallFuel]".
+    iApply ("lwp_newNode_tail" with "[$Hg $Hf]").
+    iIntros (n') "(Hg & #Hn')". iModIntro. lwp_pures.
 
-    lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_newNode_tail with "[$]").
-    iIntros "%γ %s_tail (Hg & #Htail & Hs) !>".
-    lwp_pure. post_wp. lwp_pure. post_wp_bind.
-
-    lwp_bind (newNode _ _). iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_newNode with "[$]"). iIntros "* [Hg #Hhead] !>".
-    repeat (lwp_pure; post_wp).
-    lwp_finish. iModIntro.
-    iApply "HΦ". iFrame "∗#".
+    lwp_bind (newNode _ _). iModIntro.
+    iMod alloc_set as (γ) "[Hset Hown]".
+    iApply ("lwp_newNode" with "[$Hg $HcallFuel $Hown]").
+    { iFrame "#". }
+    iIntros (n γlk) "(Hg & Hn & ?)". iModIntro. lwp_pures. iModIntro.
+    lwp_finish. iApply "HΦ". iFrame.
+    iMod (lock_config_persist with "[$]") as "#$". done.
   Qed.
 
-  Lemma lwp_lockNode i G n γ :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗
-         is_node n γ }}}
-     lockNode #n @ i
-    l{{{ RET #(); thP_groups i G }}}.
-  Proof.
-  Admitted.
-
-  Ltac lwp_pures := lwp_pure; repeat (post_wp; lwp_pure); post_wp_bind.
   Lemma lwp_locate i G s γ (e : Z) :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗
          is_set s γ }}}
