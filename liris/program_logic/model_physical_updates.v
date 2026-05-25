@@ -65,18 +65,22 @@ Section mprog.
 
   (** Step rule *)
   Lemma mprog_step n Θ i P :
-    (|={∅}=> ∃ U ℓ, thP_groups i U ∗ ([∗ set] u ∈ U, ogP_fuel u ℓ 1) ∗
+    (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ∃ ℓ, ogP_fuel u ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                         ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r))
                          ={∅}=∗ P))
     ⊢ mprog n Θ i P.
   Proof.
-    unfold_opreds. iIntros "H". iMod "H" as "(%&%& (#Oe& Ox& Ob)& GFs& %& #REs& H)".
+    unfold_opreds. iIntros "H". iMod "H" as "(%& (#Oe& Ox& Ob)& GFs& %& #REs& H)".
     iIntros "%%%% (MH& S& O& A& G& W& %GWI1)".
+    iAssert (|==> [∗ set] u ∈ U, ogroupG_fuel u Ord.one)%I with "[GFs]" as ">GFs".
+    { iApply big_sepS_bupd. iApply (big_sepS_impl with "GFs"). iIntros "!> % % (%& F)".
+      iApply (ogroupG_fuel_mon with "F"). 
+      rewrite measure_mult measure_nat Jacobsthal.mult_1_r. rewrite measure_add measure_nat.
+      eapply Hessenberg.add_base_l. }
     iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
     iMod (ogroup_exchange_fuel with "[$G $Ob $GFs]") as "(%& ACC& Gta& Ox2& Ob& GFs)". 1: auto.
-    { rewrite measure_mult measure_nat Jacobsthal.mult_1_r. rewrite measure_add measure_nat.
-      eapply Ord.lt_le_lt; last eapply Hessenberg.add_base_l. apply Ord.S_lt. }
+    { apply Ord.S_lt. }
     iAssert ([∗ set] k ∈ G, oblG_elem k)%I as "#Ges".
     { iApply (big_sepS_impl with "GFs"). iIntros "!> %% [_ $]". }
     iAssert (⌜ G ⊆ dom Ω1 ⌝)%I as "%GOSub".

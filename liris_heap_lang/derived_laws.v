@@ -100,9 +100,9 @@ Proof.
   intros. rewrite Nat2Z.inj_succ -Z.add_1_l -Loc.add_assoc. done.
 Qed.
 
-Lemma lwp_allocN G ℓ R o s i E v n :
+Lemma lwp_allocN G R o s i E v n :
   (0 < n)%Z →
-  l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
        ([∗ set] r ∈ R, oblP_id r) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
@@ -117,9 +117,9 @@ Proof.
   by iApply pointsto_seq_array.
 Qed.
 
-Lemma lwp_allocN_vec G ℓ R o s i E v n :
+Lemma lwp_allocN_vec G R o s i E v n :
   (0 < n)%Z →
-  l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
        ([∗ set] r ∈ R, oblP_id r) }}}
     AllocN #n v @ s; i; E
   l{{{ l, RET #l;
@@ -133,9 +133,9 @@ Proof.
 Qed.
 
 (** * Rules for accessing array elements *)
-Lemma lwp_load_offset G ℓ R o s i E l dq off vs v :
+Lemma lwp_load_offset G R o s i E l dq off vs v :
   vs !! off = Some v →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗{dq} vs }}}
     ! #(l +ₗ off) @ s; i; E
   l{{{ RET v; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗{dq} vs }}}.
@@ -147,16 +147,16 @@ Proof.
   iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma lwp_load_offset_vec G ℓ R o s i E l dq sz (off : fin sz) (vs : vec val sz) :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+Lemma lwp_load_offset_vec G R o s i E l dq sz (off : fin sz) (vs : vec val sz) :
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗{dq} vs }}}
     ! #(l +ₗ off) @ s; i; E
   l{{{ RET vs !!! off; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗{dq} vs }}}.
 Proof. apply lwp_load_offset. by apply vlookup_lookup. Qed.
 
-Lemma lwp_store_offset G ℓ R o s i E l off (vs : list val) (v : val) :
+Lemma lwp_store_offset G R o s i E l off (vs : list val) (v : val) :
   is_Some (vs !! off) →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
   l{{{ RET #(); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ (l ↦∗ (<[off:=v]> vs)) }}}.
@@ -167,8 +167,8 @@ Proof.
   iApply "HΦ". iFrame "T". iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma lwp_store_offset_vec G ℓ R o s i E l sz (off : fin sz) (vs : vec val sz) v :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+Lemma lwp_store_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v :
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
   l{{{ RET #(); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ vinsert off v vs }}}.
@@ -177,9 +177,9 @@ Proof.
   eexists. by apply vlookup_lookup.
 Qed.
 
-Lemma lwp_xchg_offset G ℓ R o s i E l off (vs : list val) (v v' : val) :
+Lemma lwp_xchg_offset G R o s i E l off (vs : list val) (v v' : val) :
   vs !! off = Some v →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v' @ s; i; E
   l{{{ RET v; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ <[off:=v']> vs }}}.
@@ -190,8 +190,8 @@ Proof.
   iApply "HΦ". iFrame. iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma lwp_xchg_offset_vec G ℓ R o s i E l sz (off : fin sz) (vs : vec val sz) v :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+Lemma lwp_xchg_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v :
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v @ s; i; E
   l{{{ RET (vs !!! off); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ vinsert off v vs }}}.
@@ -200,11 +200,11 @@ Proof.
   by apply vlookup_lookup.
 Qed.
 
-Lemma lwp_cmpxchg_suc_offset G ℓ R o s i E l off vs (v' v1 v2 : val) :
+Lemma lwp_cmpxchg_suc_offset G R o s i E l off vs (v' v1 v2 : val) :
   vs !! off = Some v' →
   v' = v1 →
   vals_compare_safe v' v1 →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (v', #true); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ <[off:=v2]> vs }}}.
@@ -215,10 +215,10 @@ Proof.
   iIntros "[T Hl1]". iApply "HΦ". iFrame. iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma lwp_cmpxchg_suc_offset_vec G ℓ R o s i E l sz (off : fin sz) (vs : vec val sz) v1 v2 :
+Lemma lwp_cmpxchg_suc_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v1 v2 :
   vs !!! off = v1 →
   vals_compare_safe (vs !!! off) v1 →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (vs !!! off, #true); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ vinsert off v2 vs }}}.
@@ -228,11 +228,11 @@ Proof.
   by apply vlookup_lookup.
 Qed.
 
-Lemma lwp_cmpxchg_fail_offset G ℓ R o s i E l dq off vs (v0 v1 v2 : val) :
+Lemma lwp_cmpxchg_fail_offset G R o s i E l dq off vs (v0 v1 v2 : val) :
   vs !! off = Some v0 →
   v0 ≠ v1 →
   vals_compare_safe v0 v1 →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗{dq} vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (v0, #false); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗{dq} vs }}}.
@@ -245,10 +245,10 @@ Proof.
   rewrite list_insert_id; last done. iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma lwp_cmpxchg_fail_offset_vec G ℓ R o s i E l dq sz (off : fin sz) (vs : vec val sz) (v1 v2 : val) :
+Lemma lwp_cmpxchg_fail_offset_vec G R o s i E l dq sz (off : fin sz) (vs : vec val sz) (v1 v2 : val) :
   vs !!! off ≠ v1 →
   vals_compare_safe (vs !!! off) v1 →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗{dq} vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (vs !!! off, #false); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗{dq} vs }}}.
@@ -257,9 +257,9 @@ Proof.
   by apply vlookup_lookup.
 Qed.
 
-Lemma lwp_faa_offset G ℓ R o s i E l off vs (i1 i2 : Z) :
+Lemma lwp_faa_offset G R o s i E l off vs (i1 i2 : Z) :
   vs !! off = Some #i1 →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
   l{{{ RET LitV (LitInt i1); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
@@ -270,9 +270,9 @@ Proof.
   iIntros "[T Hl1]". iApply "HΦ". iFrame. iApply "Hl2". iApply "Hl1".
 Qed.
 
-Lemma lwp_faa_offset_vec G ℓ R o s i E l sz (off : fin sz) (vs : vec val sz) (i1 i2 : Z) :
+Lemma lwp_faa_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) (i1 i2 : Z) :
   vs !!! off = #i1 →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
   l{{{ RET LitV (LitInt i1); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ vinsert off #(i1 + i2) vs }}}.

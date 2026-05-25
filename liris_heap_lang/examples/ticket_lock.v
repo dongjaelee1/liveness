@@ -187,19 +187,16 @@ Section proof.
     iExists 4.
     iIntros (lc ℓ i G) "!> %Φ (TG& GF) HΦ".
     rewrite /TicketLock.init.
+    iPoseProof (ogP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
     lwp_bind (AllocN _ _).
-    iPoseProof (ogP_fuel_eq_set _ 0 _ (2 ⊕ 1)%M with "GF") as "GF".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
-    iApply (lwp_alloc _ _ ∅ 0 with "[$TG $GF1]"). 1: done.
+    iPoseProof (ogP_fuels_add 2 1 with "GF") as "[GF GF1]". 1: lia.
+    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (curr) "((_& TG& _)& Ptr_curr& _)".
     lwp_bind (AllocN _ _).
-    iPoseProof (ogP_fuel_eq_set _ 0 _ (1 ⊕ 1)%M with "GF") as "GF".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
-    iApply (lwp_alloc _ _ ∅ 0 with "[$TG $GF1]"). 1: done.
+    iPoseProof (ogP_fuels_add 1 1 with "GF") as "[GF GF1]". 1: lia.
+    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (next) "((_& TG& _)& Ptr_next& _)".
     lwp_pure_lc lc. iRename "LC" into "QLC".
     iMod (obl_alloc_fulfilled _ (ℓ ⊕ Z.to_nat 0)%ordi 0) as "(%κu& #Ofk& #Ok& _& #Wlk& OAcc)".
@@ -256,12 +253,7 @@ Section proof.
       iApply (ogP_fuel_extend with "GF").
       apply hessenberg.lt_add_r. rewrite ord.omega_from_peano_lt_set. apply ord.large_lt_from_wf_set. }
     iPoseProof (ogP_fuel_add_set with "Fs") as "[GF Fsloop]".
-    iMod (ogP_fuel_mon_gen_set _ 0 _ (100)%M with "GF") as "GF".
-    (** FIXME: more consistent ordinal libraries, easier ordinal arith proofs *)
-    { right. eapply (@ord.lt_le_lt (ord.S (ℓ ⊕ 0)%ordi)). 1: apply ord.S_pos.
-      rewrite -hessenberg.add_S_r. apply hessenberg.le_add_r.
-      apply ord.lt_le, ordinal_facts.omega_lt_one. }
-    { rewrite !measure_nat. done. }
+    iPoseProof (ogP_fuels_init with "GF") as "GF".
     (* argument *)
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
@@ -270,9 +262,7 @@ Section proof.
     (* fst *)
     lwp_pures.
     (* FAA *)
-    iPoseProof (ogP_fuel_eq_set _ 0 _ (92 ⊕ 1)%M with "GF") as "GF".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF' GF1]".
+    iPoseProof (ogP_fuels_add 92 1 with "GF") as "[GF GF1]". 1: lia.
     lwp_bind (FAA _ _).
     (* Atomic step of FAA, *)
     iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
@@ -282,12 +272,12 @@ Section proof.
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
-    iApply (lwp_faa _ _ ∅ 0 with "[$TG $GF1 $PtrNext]"). 1: done.
+    iApply (lwp_faa _ ∅ 0 with "[$TG $GF1 $PtrNext]"). 1: done.
     iIntros "((_& TG& _)& PtrNext)".
     (** Alloc a new ghost lock for eventual unlock *)
     (* Temporary group for the loop *)
     iMod (group_alloc _ _ _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (50 ⊕ (50 × ▽))%M with "TG")
-      as "(%gu0& %Ningu0& TG& Gg0& GF)".
+      as "(%gu0& %Ningu0& TG& Gg0& GF')".
     (* Unlock obligation *)
     iMod (tf_until_alloc _ _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
       as "(%κu& %LUku& Gg0& #Gku& OGF& #Wlku& ALLOC)". 1: by left.
@@ -349,18 +339,12 @@ Section proof.
     rename n into my. assert (Hmy : (0 ≤ my)%Z) by lia.
     clear dependent c tickets acks. clear LUku.
     (* Update fuels. *)
-    iPoseProof (ogP_fuel_add with "GF") as "[GF GFloop]".
+    iPoseProof (ogP_fuel_add with "GF'") as "[GF' GFloop]".
     iMod (ogP_fuel_extend_set _ (ℓ ⊕ Z.to_nat (my + 1))%ordi _ (50 × ▽)%M with "Fsloop") as "Fsloop".
     { apply hessenberg.lt_add_r. apply ord.omega_upperbound. }
     iPoseProof (big_sepS_insert _ G gu0 with "[$Fsloop $GFloop]") as "Fsloop". 1: auto.
-    iPoseProof (ogP_fuel_eq_set _ 0 _ (42 ⊕ 50)%M with "GF'") as "GF'".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. reflexivity. }
-    iPoseProof (ogP_fuel_add_set with "GF'") as "[_ GF']".
-    iMod (ogP_fuel_mon_gen _ 0 _ 50 with "GF") as "GF".
-    { right. replace (Z.to_nat (my + 1)) with (S (Z.to_nat my)) by lia.
-      eapply ord.lt_le_lt; first apply ord.S_pos. rewrite ord.from_nat_S hessenberg.add_S_r. done. }
-    { rewrite !measure_nat. done. }
-    iPoseProof (big_sepS_insert _ (G) gu0 with "[$GF' $GF]") as "GF". 1: auto.
+    iPoseProof (ogP_fuels_add 42 50 with "GF") as "[_ GF]". 1: lia.
+    iPoseProof (ogP_fuels_add_group with "GF' GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
     do 2 lwp_pure_one.
@@ -409,10 +393,8 @@ Section proof.
     iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
-    iPoseProof (ogP_fuel_eq_set _ 0 _ (45 ⊕ 1)%M with "GF") as "GF".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
-    iApply (lwp_load _ _ {[κp]} 98%ord with "[$TG $GF1 $PtrCurr]").
+    iPoseProof (ogP_fuels_add 45 1 with "GF") as "[GF GF1]". 1: lia.
+    iApply (lwp_load _ {[κp]} 98%ord with "[$TG $GF1 $PtrCurr]").
     { rewrite big_sepS_singleton. eauto. }
     iIntros "((LC'& TG& Wc)& PtrCurr)". iEval (rewrite big_sepS_singleton) in "Wc".
     (* Two cases: it's my turn, or not. *)
@@ -488,6 +470,7 @@ Section proof.
         - right. replace (Z.to_nat (my + 1)) with (S (Z.to_nat my)) by lia.
           eapply ord.lt_le_lt; first apply ord.S_pos. rewrite ord.from_nat_S hessenberg.add_S_r. done.
         - rewrite !measure_nat. apply OrdArith.le_from_nat. lia. }
+      iPoseProof (ogP_fuels_init with "Fs") as "Fs".
       iApply ("IHα" $! α0 LTα with "CF HΦ Gg0 GUku GGF QGF GMEaku TG Fs LC' WFs").
   Qed.
 
@@ -507,6 +490,7 @@ Section proof.
     iExists 100.
     iIntros (lc i j G tl γ dq ℓ R κu gu ℓu K) "!> % (TG& GF& Gg& %LUkl& LT& HR& CF& #IFL) HΦ".
     rewrite /TicketLock.release.
+    iPoseProof (ogP_fuels_init with "GF") as "GF".
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
     rewrite lock_token_unseal /lock_token_def.
@@ -514,11 +498,9 @@ Section proof.
     subst tl.
     lwp_pures.
     lwp_bind (Load _).
-    iPoseProof (ogP_fuel_eq_set _ 0 _ (95 ⊕ 1)%M with "GF") as "GF".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
+    iPoseProof (ogP_fuels_add 95 1 with "GF") as "[GF GF1]". 1: lia.
     iModIntro.
-    iApply (lwp_load _ _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
+    iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
     iIntros "((_& TG& _)& PtrCurr0)".
     iModIntro. lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
@@ -535,10 +517,8 @@ Section proof.
     iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". inversion H. subst u. clear H.
     (* FIXME: does not combine the dfrac part. *)
     (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
-    iPoseProof (ogP_fuel_eq_set _ 0 _ (93 ⊕ 1)%M with "GF") as "GF".
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
-    iApply (lwp_store _ _ ∅ lc with "[$TG $GF1 PtrCurr PtrCurr0]").
+    iPoseProof (ogP_fuels_add 93 1 with "GF") as "[GF GF1]". 1: lia.
+    iApply (lwp_store _ ∅ lc with "[$TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iSplitL "PtrCurr"; iFrame. }
     iIntros "((QLC& TG& _)& [PtrCurr PtrCurr0])".
     iPoseProof (ghost_map_lookup with "GMAt GMEtku") as "%LUt".

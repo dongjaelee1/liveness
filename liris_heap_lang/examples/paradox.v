@@ -333,7 +333,7 @@ Section proof.
     iRevert (n g ck) "TG Gg Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n g ck) "TG Gg Uck Gf Caj #Mn".
     iEval (rewrite /loop).
-    iAssert ([∗ set] g ∈ {[g]}, ogP_fuel g 0 10)%I with "[Gf]" as "GF".
+    iPoseProof (ogP_fuels_init {[g]} with "[Gf]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".

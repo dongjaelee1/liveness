@@ -21,7 +21,7 @@ Section wp.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                  (∀ e2 σ2 efs, (⌜base_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_groups i G -∗
@@ -36,7 +36,7 @@ Section wp.
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros "H". iApply (lwp_lift_step s i E e1 Φ). iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
-    iMod ("H" $! K with "[//] [//] Hσ") as "(%& %& %& $& $& %& $& H)"; iModIntro.
+    iMod ("H" $! K with "[//] [//] Hσ") as "(%& %& $& $& %& $& H)"; iModIntro.
     destruct H. iSplit; first by destruct s; eauto.
     iIntros (e2 σ2 efs ?). iApply "H"; eauto.
   Qed.
@@ -68,7 +68,7 @@ Section wp.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                  ∀ e2 σ2 efs, (⌜base_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                               thP_groups i G -∗
@@ -82,7 +82,7 @@ Section wp.
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H". iApply lwp_lift_atomic_step.
-    iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "(%& %&%&$&$& %&$& H)"; iModIntro.
+    iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "(%& %&$&$& %&$& H)"; iModIntro.
     destruct H1. iSplit; first by destruct s; auto.
     iIntros (e2 σ2 efs Hstep). iApply "H"; eauto.
   Qed.
@@ -92,7 +92,7 @@ Section wp.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                  ∀ e2 σ2 efs, (⌜base_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                               thP_groups i G -∗
@@ -105,7 +105,7 @@ Section wp.
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H". iApply lwp_lift_atomic_base_step.
-    iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "($& %&%&$&$& %&$& H)"; iModIntro.
+    iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "($& %&$&$& %&$& H)"; iModIntro.
     iIntros (??? Hstep). iMod ("H" with "[# //]") as "H".
     iIntros "!> Tb Wcs _". iMod ("H" with "Tb Wcs") as ">(%& I& $)".
     subst. rewrite !map_union_empty. iFrame. iModIntro. done.
@@ -119,7 +119,7 @@ Section wp.
     PureExecSI ς i →
     (|={E,E'}=>
        ς i ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                  (ς i -∗
                   thP_groups i G -∗

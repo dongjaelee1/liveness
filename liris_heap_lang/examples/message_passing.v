@@ -70,13 +70,11 @@ Section mp_proof.
     iDestruct "HP" as "(%&%&%& %Nek& #Hmp& Hup& Hul& TG& Gg& Gf)".
     rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Ok& #Wlk)& #Hmp)".
     rewrite /writer /=.
-    iAssert ([∗ set] g ∈ {[g]}, ogP_fuel g 0 10)%I with "[Gf]" as "GF".
+    iPoseProof (ogP_fuels_init {[g]} 10 with "[Gf]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 10. iSplitR; first eauto. iIntros "TG GF _ LC".
-    rewrite (ogP_fuel_eq_set _ 0 9 (8 ⊕ 1)%M); cycle 1.
-    { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done. }
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
+    iPoseProof (ogP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
     lwp_bind (Store _ _).
     iModIntro.
     iInv "Hmp" as "mp". iDestruct "mp" as "[mp | mp]"; cycle 1.
@@ -91,7 +89,7 @@ Section mp_proof.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "mp" as "[Ptrl ACCmp]".
     iApply lwp_sfmupd. iEval (rewrite tf_atomic_logic) in "Ptrl".
-    iApply (lwp_store _ _ ∅ 0 with "[$Ptrl $TG $GF1]"). 1: done.
+    iApply (lwp_store _ ∅ 0 with "[$Ptrl $TG $GF1]"). 1: done.
     iIntros "((_& TG& _)& Ptrl)".
     iMod ("ACCmp" $! _) as "ACCmp".
     iApply sfmupd_fupd_acc. iMod ("ACCmp" with "Ptrl") as "ACCmp".
@@ -125,7 +123,7 @@ Section mp_proof.
     iMod (group_delete with "TG Gg") as "TG".
     replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ogid) by set_solver.
     iModIntro. lwp_pure. simpl.
-    iFrame "TG". iExists 0, 1, ∅, 0. iSplitR; first eauto. iIntros "TG _ _ _".
+    iFrame "TG". iExists 1, ∅, 0. iSplitR; first eauto. iIntros "TG _ _ _".
     iModIntro.
     lwp_finish.
     iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$". done.
@@ -152,7 +150,7 @@ Section mp_proof.
     iClear "Wf0". iInduction α as [α IH] using WFOCM.ind.
     iMod (ogP_fuel_extend _ 0 1 (10)%M with "Fg") as "Fg".
     { apply ordArith.lt_from_nat. lia. }
-    iAssert ([∗ set] g ∈ {[g]}, ogP_fuel g 0 10)%I with "[Fg]" as "GF".
+    iPoseProof (ogP_fuels_init {[g]} with "[Fg]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_rec. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
@@ -167,10 +165,8 @@ Section mp_proof.
       1: apply N_subseteq_1.
       iDestruct ("H" with "Oak") as "[H HACC]". iDestruct "H" as ">(Oak& Oak'& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
-      rewrite (ogP_fuel_eq_set _ 0 9 (8 ⊕ 1)%M); cycle 1.
-      { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done. }
-      iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
-      iApply (lwp_load _ _ ({[k]} : gset _) 0 with "[$TG $Ptrl $GF1]").
+      iPoseProof (ogP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
+      iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TG $Ptrl $GF1]").
       { iApply big_sepS_singleton. auto. }
       iIntros "[(_& TG& Rs) Ptrl]".
       iEval (rewrite big_sepS_singleton) in "Rs". iDestruct "Rs" as "[Wck | #Ofk]"; cycle 1.
@@ -187,10 +183,8 @@ Section mp_proof.
     - (* k is fulfilled. *)
       iDestruct "mp" as ">(#Ofk& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
-      rewrite (ogP_fuel_eq_set _ 0 9 (8 ⊕ 1)%M); cycle 1.
-      { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done. }
-      iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
-      iApply (lwp_load _ _ ∅ 0 with "[$TG $Ptrl $GF1]"). 1: done.
+      iPoseProof (ogP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
+      iApply (lwp_load _ ∅ 0 with "[$TG $Ptrl $GF1]"). 1: done.
       iIntros "[(_& TG& _) Ptrl]".
       iModIntro. iSplitL "Ptrl".
       { iNext. iRight. iFrame. eauto. }
@@ -215,7 +209,7 @@ Section mp_proof.
       iMod (group_delete with "TG Gg") as "TG".
       replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ogid) by set_solver.
       iModIntro. lwp_pure. simpl.
-      iFrame "TG". iExists 0, 1, ∅, 0. iSplitR; first eauto. iIntros "TG _ _ _".
+      iFrame "TG". iExists 1, ∅, 0. iSplitR; first eauto. iIntros "TG _ _ _".
       iModIntro.
       lwp_finish.
       iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$". done.

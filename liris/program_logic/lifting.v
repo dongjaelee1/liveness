@@ -26,20 +26,20 @@ Section lifting.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
-              ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                   (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
-                                 thP_groups i G -∗
-                                 ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                                 ([∗ set] j ∈ dom efs, thP_groups j ∅) -∗
-                                 ALC (|={∅,E}=>
-                                        (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
-                                         state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                        (lwpupd i E e2 (ν e2 efs)))))
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+            ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
+                               thP_groups i G -∗
+                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                               ([∗ set] j ∈ dom efs, thP_groups j ∅) -∗
+                               ALC (|={∅,E}=>
+                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
+                                      (lwpupd i E e2 (ν e2 efs)))))
     ⊢ lwp_step s i E e1 ν.
   Proof.
     iIntros "H". iIntros (??????? ??) "SI".
-    iMod ("H" with "[//] [//] SI") as "($& %& %& GOs& GFs& %& #REs& H)".
+    iMod ("H" with "[//] [//] SI") as "($& %& GOs& GFs& %& #REs& H)".
     iIntros "!> % % % %Step".
     iApply (mprog_step). iModIntro. iFrame "GOs GFs REs". iIntros "(GOs& Ws)".
     iApply (mphys_step _ (S n) _ _ (dom efs)). 1: eauto.
@@ -60,25 +60,25 @@ Section lifting.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
-              ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                   (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
-                                 thP_groups i G -∗
-                                 ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                                 ([∗ set] j ∈ dom efs, thP_groups j ∅) -∗
-                                 ALC (|={∅,E}=>
-                                        (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
-                                         state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                        lwpupd i E e2 ((lWP e2 @ s; i; E {{ Φ }}) ∗
-                                                       ([∗ map] j ↦ ef ∈ efs,
-                                                          lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+            ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
+                               thP_groups i G -∗
+                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                               ([∗ set] j ∈ dom efs, thP_groups j ∅) -∗
+                               ALC (|={∅,E}=>
+                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
+                                      lwpupd i E e2 ((lWP e2 @ s; i; E {{ Φ }}) ∗
+                                                     ([∗ map] j ↦ ef ∈ efs,
+                                                        lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros "H". rewrite lwp_unfold /lwp_pre. destruct (to_val e1) eqn:He.
     { unfold_lwpupd. iIntros (?????? ??) "SI". iMod ("H" $! K _ _ _ _ [] with "[//] [//] SI") as "[[% %] _]". done. }
     iApply lwp_step_step. iIntros (??????? ??) "I".
     iMod ("H" $! K with "[//] [//] I") as "(%& H)". destruct H1 as [_ H1].
-    iModIntro. iSplitR; first done. iDestruct "H" as "(%& %& $& $& %& $& H)".
+    iModIntro. iSplitR; first done. iDestruct "H" as "(%& $& $& %& $& H)".
     iIntros (????). iMod ("H" with "[//]") as "H". iIntros "!> TG RWs Efs".
     iMod ("H" with "TG RWs Efs") as "H".
     iMod "H" as "[$ H]". iModIntro. iMod "H" as "[H Efs]". iFrame. auto.
@@ -105,7 +105,7 @@ Section lifting.
     PureExecSI ς i →
     (|={E,E'}=>
        ς i ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
        ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
          (ς i -∗
           thP_groups i G -∗
@@ -117,7 +117,7 @@ Section lifting.
   Proof.
     iIntros (Hsafe Hstep HCS) "H".
     iApply lwp_lift_step. iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
-    iMod "H" as "(Hc& (%& %& Tb& Gfs& %& #Rs& H))".
+    iMod "H" as "(Hc& (%& Tb& Gfs& %& #Rs& H))".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit.
     { iPureIntro. split.
       - specialize (Hsafe σ1 ∅). destruct s; eauto using reducible_not_val.
@@ -150,7 +150,7 @@ Section lifting.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_groups i G -∗
@@ -167,7 +167,7 @@ Section lifting.
     iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "(%& H)".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
     iSplit; first auto.
-    iDestruct "H" as "(%& %& Tb& Gfs& %& #Rs& H)".
+    iDestruct "H" as "(%& Tb& Gfs& %& #Rs& H)".
     iExists _. iFrame "Tb Gfs". iExists _. iFrame "Rs".
     iIntros (????). iMod ("H" with "[//]") as "H".
     iIntros "!> Tb Wcs Efs". iMod ("H" with "Tb Wcs Efs") as "H".
@@ -182,7 +182,7 @@ Section lifting.
     PureExecSI ς i →
     (|={E,E'}=>
        ς i ∗
-       ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
        ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
          (ς i -∗
           thP_groups i G -∗
@@ -192,7 +192,7 @@ Section lifting.
   Proof.
     iIntros (? Hpuredet HCS) "H". iApply (lwp_lift_pure_step_no_fork s i E E'); eauto.
     { naive_solver. }
-    iMod "H" as "($& %& %& $& $& %& $& H)". iModIntro.
+    iMod "H" as "($& %& $& $& %& $& H)". iModIntro.
     iIntros "Hc Tb Wcs". iMod ("H" with "Hc Tb Wcs") as ">H".
     iIntros "!> % % % % % %". edestruct Hpuredet as (?&?&?&?); eauto. by subst.
   Qed.
@@ -203,7 +203,7 @@ Section lifting.
     PureExecSI ς i →
     (Nat.iter n (λ P, |={E,E'}=>
                    ς i ∗
-                   ∃ G ℓ, thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+                   ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                    (ς i -∗
                     thP_groups i G -∗
@@ -220,7 +220,7 @@ Section lifting.
       simpl in *. inv Hexec. iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
       - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
       - eauto.
-      - iDestruct "Hlwp" as ">($& %& %& $& $& %& $& H)".
+      - iDestruct "Hlwp" as ">($& %& $& $& %& $& H)".
         iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Hc Gb Wcs") as "H".
         iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
         iPoseProof (tlc_split with "LC") as "[LC LC2]".
@@ -229,7 +229,7 @@ Section lifting.
     iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
     - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
     - eauto.
-    - iDestruct "Hlwp" as ">($& %& %& $& $& %& $& H)".
+    - iDestruct "Hlwp" as ">($& %& $& $& %& $& H)".
       iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Hc Gb Wcs") as "H".
       iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
       iPoseProof (tlc_split with "LC") as "[LC LC2]".
@@ -237,12 +237,12 @@ Section lifting.
       iMod "H". iModIntro. iMod "H". iApply "IH"; auto.
   Qed.
 
-  Lemma lwp_pure_step_alt `{!Inhabited (state Λ)} (n : nat) G ℓ R (o : Ord.t) s i E E' e1 e2 φ Φ ς :
+  Lemma lwp_pure_step_alt `{!Inhabited (state Λ)} (n : nat) G R (o : Ord.t) s i E E' e1 e2 φ Φ ς :
     PureExec φ n e1 e2 →
     φ →
     PureExecSI ς i →
     ([∗ set] r ∈ R, oblP_id r) ∗
-    (Nat.iter n (λ P, |={E,E'}=> ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
+    (Nat.iter n (λ P, |={E,E'}=> ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
                                 (ς i -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                  ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
@@ -259,11 +259,11 @@ Section lifting.
     iMod "LWP". iModIntro. iFrame "LWP".
   Qed.
 
-  Lemma lwp_pure_step_simple `{!Inhabited (state Λ)} n G ℓ R (o : Ord.t) s i E e1 e2 φ Φ ς :
+  Lemma lwp_pure_step_simple `{!Inhabited (state Λ)} n G R (o : Ord.t) s i E e1 e2 φ Φ ς :
     PureExec φ n e1 e2 →
     φ →
     PureExecSI ς i →
-    (ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, oblP_id r) ∗
+    (ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, oblP_id r) ∗
      (ς i -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
       £ (o × n)%ord -∗ lwpupd i E e2 (lWP e2 @ s; i ; E {{ Φ }})))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
@@ -279,9 +279,11 @@ Section lifting.
       unfold_opreds.
       rewrite Ord.from_nat_O. done. }
     iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
-    iAssert (([∗ set] g ∈ G, ogP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
-    { iApply (ogP_fuel_add_set). rewrite (ogP_fuel_eq_set _ _ (n ⊕ 1)%M (S n)%M). 1: auto.
-      rewrite measure_nat_S measure_add. by rewrite Hessenberg.add_comm. }
+    iAssert (([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
+    { iApply big_sepS_sep. iApply (big_sepS_impl with "Gfs"). iIntros "!> %% (%& F)".
+      rewrite (ogP_fuel_eq _ _ (S n)%M (n ⊕ 1)%M); cycle 1.
+      { rewrite measure_nat_S measure_add. by rewrite Hessenberg.add_comm. }
+      iPoseProof (ogP_fuel_add with "F") as "($& $)". }
     iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
     iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
     iIntros "!> Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").

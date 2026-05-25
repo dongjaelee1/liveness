@@ -108,6 +108,12 @@ Local Definition ogP_fuel_unseal :
   @ogP_fuel = @ogP_fuel_def := ogP_fuel_aux.(seal_eq).
 Global Arguments ogP_fuel {SI Σ _ _}.
 
+(** Useful pattern for burning fules when taking a step *)
+Global Notation ogP_fuels G n := ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ n)%I.
+(* Definition ogP_fuels `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class} *)
+(*   G (n : nat) : iProp Σ := *)
+(*   ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ n). *)
+
 Local Definition ogP_obls_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   i g ℓ (K : oids) : iProp Σ :=
   othreadG_elem i ∗ ogroupG_group i g K ∗ ogroupG_thread i g ∗ (∃ μ, ogP_bound g ℓ μ) ∗
@@ -1217,6 +1223,55 @@ Section preds.
       ([∗ set] k ∈ K, ogP_fuel k ℓ2 (1)%M) ⊢ |==> ([∗ set] k ∈ K, ogP_fuel k ℓ1 μ).
     Proof.
       intros. rewrite -big_sepS_bupd. iApply big_sepS_mono. intros. eapply ogP_fuel_extend; eauto.
+    Qed.
+
+    (** Useful pattern for burning fules when taking a step *)
+    Lemma ogP_fuel_add_nat m1 m2 n k ℓ :
+      (n = m1 + m2)%nat →
+      ogP_fuel k ℓ n ⊣⊢ (ogP_fuel k ℓ m1 ∗ ogP_fuel k ℓ m2)%I.
+    Proof.
+      intros ->. rewrite -ogP_fuel_add. erewrite ogP_fuel_eq. 1: reflexivity.
+      rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done.
+    Qed.
+
+    Lemma ogP_fuels_add m1 m2 n K :
+      (n = m1 + m2)%nat →
+      ogP_fuels K n ⊢ ogP_fuels K m1 ∗ ogP_fuels K m2.
+    Proof.
+      intros ->. rewrite -big_sepS_sep. iIntros "H"; iApply (big_sepS_impl with "H"); iIntros "!> %% H".
+      iDestruct "H" as "(%& H)". iPoseProof (ogP_fuel_add_nat with "H") as "[H F]". 1: eauto. iFrame.
+    Qed.
+
+    Lemma ogP_fuels_init K (n : nat) ℓ :
+      ([∗ set] k ∈ K, ogP_fuel k ℓ (n)%M)%I ⊢ ogP_fuels K n.
+    Proof. iIntros "H". iApply (big_sepS_impl with "H"). iIntros "!> %% $". Qed.
+
+    Lemma ogP_fuels_add_group K k ℓ n :
+      ogP_fuel k ℓ n -∗ ogP_fuels K n -∗ ogP_fuels ({[k]} ∪ K) n.
+    Proof.
+      iIntros "H2 H1". iApply (big_sepS_union_2 with "[H2] H1"). iApply big_sepS_singleton. iFrame.
+    Qed.
+
+    Lemma ogP_fuels_add_groups K1 K2 n :
+      ogP_fuels K1 n -∗ ogP_fuels K2 n -∗ ogP_fuels (K1 ∪ K2) n.
+    Proof.
+      iIntros "H1 H2". iApply (big_sepS_union_2 with "H1 H2").
+    Qed.
+
+    Lemma ogP_fuels_remove_group k K n :
+      ogP_fuels K n -∗ ogP_fuels (K ∖ {[k]}) n.
+    Proof.
+      iIntros "H". destruct (decide (k ∈ K)); cycle 1.
+      { replace (K ∖ {[k]}) with K by set_solver. auto. }
+      iPoseProof (big_sepS_delete _ _ k with "H") as "[_ $]". auto.
+    Qed.
+
+    Lemma ogP_fuels_remove_groups K2 K1 n :
+      ogP_fuels K1 n -∗ ogP_fuels (K1 ∖ K2) n.
+    Proof.
+      rewrite -(difference_union_intersection_L K1 K2).
+      iIntros "H". iPoseProof (big_sepS_union with "H") as "[H1 H2]". 1: set_solver.
+      rewrite (difference_union_intersection_L K1 K2). iFrame.
     Qed.
 
     (** ** thP_groups rules *)
