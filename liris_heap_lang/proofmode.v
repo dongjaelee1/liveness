@@ -25,10 +25,10 @@ Ltac lwp_expr_simpl := lwp_expr_eval simpl.
 Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
   PureExec φ n e1 e2 →
   φ →
-  envs_entails Δ (∃ E' G R (o : Ord.t),
+  envs_entails Δ (∃ E' G ℓ R (o : Ord.t),
         ([∗ set] r ∈ R, oblP_id r) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
-                       thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗
+                       thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ 1) ∗
                        (thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                         ALC (£ o ={E',E}=∗ |={E}=>m P)))
            (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
@@ -37,7 +37,7 @@ Proof.
   rewrite envs_entails_unseal=> ?? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "(%&%&%&%& #Rs& Iter)". iApply lifting.lwp_pure_step_alt. 1: auto.
+  iIntros "(%&%&%&%&%& #Rs& Iter)". iApply lifting.lwp_pure_step_alt. 1: auto.
   iFrame "Rs". iApply (iter_modal_mono_modal with "Iter").
   { iIntros (??) "Hab >($& $& H)". iIntros "!> TG Rs". iMod ("H" with "TG Rs") as "H".
     iIntros "LC". iMod ("H" with "LC") as "H". iModIntro. by iApply "Hab". }
@@ -52,12 +52,12 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ :
   0 < n →
   (* m = n + m' → *)
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
-  envs_entails Δ (∃ G (m : nat) R (o : Ord.t),
-        (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗
+  envs_entails Δ (∃ G (ℓ : ord.t) (m : nat) R (o : Ord.t),
+        (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓ m) ∗
          (** FIXME: nat add notation not working? *)
          ([∗ set] r ∈ R, oblP_id r) ∧ ⌜ (m = n + m')%nat ⌝) ∗
         (thP_groups i G -∗
-         ([∗ set] g ∈ G, ogP_fuel g 0 m') -∗
+         ([∗ set] g ∈ G, ogP_fuel g ℓ m') -∗
          ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_fulfilled r) -∗
          £ (o)%ord -∗
          lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
@@ -66,8 +66,8 @@ Proof.
   rewrite envs_entails_unseal=> ?? ? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "(%&%&%&%& T& H)".
-  iApply (lifting.lwp_pure_step_simple _ _ _ o). 1: auto.
+  iIntros "(%&%&%&%&%& T& H)".
+  iApply (lifting.lwp_pure_step_simple _ _ _ _ o). 1: auto.
   iDestruct "T" as "($& Fs& $& %)". subst.
   iPoseProof (ogP_fuel_eq_set _ _ _ (n ⊕ m')%M with "Fs") as "Fs".
   { rewrite measure_add !measure_nat Hessenberg.add_from_nat. done. }
@@ -150,13 +150,13 @@ Tactic Notation "lwp_pure" open_constr(efoc) :=
 Tactic Notation "lwp_pure" :=
   lwp_pure _.
 
-(* TODO: do this in one go, without [repeat]. *)
-Ltac lwp_pures :=
-  iStartProof;
-  first [ (* The `;[]` makes sure that no side-condition magically spawns. *)
-          progress repeat (lwp_pure _; [])
-        | lwp_finish (* In case lwp_pure never ran, make sure we do the usual cleanup. *)
-        ].
+(* (* TODO: do this in one go, without [repeat]. *) *)
+(* Ltac lwp_pures := *)
+(*   iStartProof; *)
+(*   first [ (* The `;[]` makes sure that no side-condition magically spawns. *) *)
+(*           progress repeat (lwp_pure _; []) *)
+(*         | lwp_finish (* In case lwp_pure never ran, make sure we do the usual cleanup. *) *)
+(*         ]. *)
 
 (** Unlike [lwp_pures], the tactics [lwp_rec] and [lwp_lam] should also reduce
 lambdas/recs that are hidden behind a definition, i.e. they should use

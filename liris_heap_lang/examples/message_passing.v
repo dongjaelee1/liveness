@@ -21,6 +21,18 @@ Definition reader : val :=
 
 Section mp_proof.
   Context `{!heapGS Σ}.
+
+  Ltac post_lwp :=
+    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
+
+  Ltac lwp_pure_one := (iModIntro; lwp_pure; post_lwp).
+  Ltac lwp_pures := repeat (lwp_pure_one).
+
+  Ltac post_lwp_lc n :=
+    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
+
+  Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
+
   Let N := nroot.@ "message_passing".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
@@ -79,7 +91,7 @@ Section mp_proof.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "mp" as "[Ptrl ACCmp]".
     iApply lwp_sfmupd. iEval (rewrite tf_atomic_logic) in "Ptrl".
-    iApply (lwp_store _ ∅ 0 with "[$Ptrl $TG $GF1]"). 1: done.
+    iApply (lwp_store _ _ ∅ 0 with "[$Ptrl $TG $GF1]"). 1: done.
     iIntros "((_& TG& _)& Ptrl)".
     iMod ("ACCmp" $! _) as "ACCmp".
     iApply sfmupd_fupd_acc. iMod ("ACCmp" with "Ptrl") as "ACCmp".
@@ -92,10 +104,7 @@ Section mp_proof.
     iIntros "!> !>". iSplitL "Ptrl".
     { iNext. iRight. iFrame. eauto. }
     replace ({[k; kl]} ∖ {[k]} : gset _) with ({[kl]} : gset _) by set_solver.
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    do 2 lwp_pure_one.
     iApply lwpupd_label. iIntros "PL".
     iApply sfmupd_fupd_acc.
     iMod (tf_until_fulfill with "Hul") as "Hul". 1: set_solver.
@@ -116,7 +125,7 @@ Section mp_proof.
     iMod (group_delete with "TG Gg") as "TG".
     replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ogid) by set_solver.
     iModIntro. lwp_pure. simpl.
-    iFrame "TG". iExists 1, ∅, 0. iSplitR; first eauto. iIntros "TG _ _ _".
+    iFrame "TG". iExists 0, 1, ∅, 0. iSplitR; first eauto. iIntros "TG _ _ _".
     iModIntro.
     lwp_finish.
     iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$". done.
@@ -161,7 +170,7 @@ Section mp_proof.
       rewrite (ogP_fuel_eq_set _ 0 9 (8 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done. }
       iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
-      iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TG $Ptrl $GF1]").
+      iApply (lwp_load _ _ ({[k]} : gset _) 0 with "[$TG $Ptrl $GF1]").
       { iApply big_sepS_singleton. auto. }
       iIntros "[(_& TG& Rs) Ptrl]".
       iEval (rewrite big_sepS_singleton) in "Rs". iDestruct "Rs" as "[Wck | #Ofk]"; cycle 1.
@@ -170,15 +179,7 @@ Section mp_proof.
       { iModIntro. iApply oblP_variant_unfold. iLeft. iFrame. }
       iModIntro. iModIntro. iSplitL "Oak".
       { iNext. rewrite tf_until_logic. iLeft. iFrame. eauto. }
-      iModIntro.
-      lwp_let. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-      iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-      iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-      iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      do 4 lwp_pure_one.
       iModIntro.
       iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')".
       rewrite big_sepM_singleton.
@@ -189,18 +190,11 @@ Section mp_proof.
       rewrite (ogP_fuel_eq_set _ 0 9 (8 ⊕ 1)%M); cycle 1.
       { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done. }
       iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF1]".
-      iApply (lwp_load _ ∅ 0 with "[$TG $Ptrl $GF1]"). 1: done.
+      iApply (lwp_load _ _ ∅ 0 with "[$TG $Ptrl $GF1]"). 1: done.
       iIntros "[(_& TG& _) Ptrl]".
       iModIntro. iSplitL "Ptrl".
       { iNext. iRight. iFrame. eauto. }
-      iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-      iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-      iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-      iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      do 4 lwp_pure_one.
       iApply lwpupd_label. iIntros "PL".
       iApply sfmupd_fupd_acc.
       iMod (tf_until_fulfill with "Hul") as "Hul". 1: set_solver.
@@ -221,7 +215,7 @@ Section mp_proof.
       iMod (group_delete with "TG Gg") as "TG".
       replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ogid) by set_solver.
       iModIntro. lwp_pure. simpl.
-      iFrame "TG". iExists 1, ∅, 0. iSplitR; first eauto. iIntros "TG _ _ _".
+      iFrame "TG". iExists 0, 1, ∅, 0. iSplitR; first eauto. iIntros "TG _ _ _".
       iModIntro.
       lwp_finish.
       iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$". done.

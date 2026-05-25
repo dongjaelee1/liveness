@@ -65,13 +65,13 @@ Section mprog.
 
   (** Step rule *)
   Lemma mprog_step n Θ i P :
-    (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ogP_fuel u 0 1) ∗
-                 ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-                      ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r))
-                       ={∅}=∗ P))
+    (|={∅}=> ∃ U ℓ, thP_groups i U ∗ ([∗ set] u ∈ U, ogP_fuel u ℓ 1) ∗
+                   ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+                        ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r))
+                         ={∅}=∗ P))
     ⊢ mprog n Θ i P.
   Proof.
-    unfold_opreds. iIntros "H". iMod "H" as "(%& (#Oe& Ox& Ob)& GFs& %& #REs& H)".
+    unfold_opreds. iIntros "H". iMod "H" as "(%&%& (#Oe& Ox& Ob)& GFs& %& #REs& H)".
     iIntros "%%%% (MH& S& O& A& G& W& %GWI1)".
     iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
     iMod (ogroup_exchange_fuel with "[$G $Ob $GFs]") as "(%& ACC& Gta& Ox2& Ob& GFs)". 1: auto.
