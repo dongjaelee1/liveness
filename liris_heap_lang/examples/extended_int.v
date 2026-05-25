@@ -47,10 +47,10 @@ Section proof.
 
   Ltac lwp_pures := repeat (lwp_pure; post_wp).
 
-  Lemma wp_lt x y i G :
+  Lemma lwp_lt x y i G :
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) }}}
       lt (into_val x) (into_val y) @ i
-    l{{{ RET #(bool_decide (lt_rel x y)); True }}}.
+    l{{{ RET #(bool_decide (lt_rel x y)); thP_groups i G }}}.
   Proof.
     iIntros (?) "[Htg Hfuel] HΦ".
 

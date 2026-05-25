@@ -15,10 +15,7 @@ Module LockCouplingSet.
       Each node is a contiguous block of three cells:
         offset 0: lock      (a [TicketLock] value)
         offset 1: value     (NONE for the tail sentinel = +∞, SOME z otherwise)
-        offset 2: next      (location of the successor; unused on the tail)
-
-      The set is represented by a pointer to its head sentinel.  The head's
-      value is never compared, so we pick an arbitrary placeholder. *)
+        offset 2: next      (location of the successor; unused on the tail) *)
 
   Definition getLock : val := λ: "x", !("x" +ₗ #0).
   Definition getVal : val := λ: "x", !("x" +ₗ #1).
@@ -126,6 +123,26 @@ Section proof.
   Local Axiom own_interval_not_NegInf : ∀ γ a b,
     own_interval γ a b ⊢ ⌜ b ≠ Int.NegInf ⌝.
 
+  Definition node_lock_inv_pre
+      (is_node : loc -d> lcs_names -d> Int.t -d> ticketlock_γ -d> iPropO Σ) :
+      loc -d> lcs_names -d> Int.t -d> ticketlock_γ -d> iPropO Σ :=
+    λ n γ v γlk,
+      (∃ ℓ (n' : loc) v',
+          γlk ↪LOCK{#1/2} ℓ ∗
+          (n +ₗ 2) ↦ #n' ∗
+          (n' +ₗ 1) ↦□ (Int.into_val v') ∗
+          own_interval γ v v' ∗
+          (match v' with
+           | +∞ => True
+           | -∞ => False
+           | _ => (∃ γlk' ℓ',
+                     ▷ is_node n' γ v' γlk' ∗
+                     γlk' ↪LOCK{#1/2} ℓ' ∗
+                     ⌜ ((ℓ' ⊕ lockΔ) < ℓ)%ordi ⌝)
+           end)
+          (* TODO: own ghost state for range. *)
+      )%I.
+
   Definition is_node_pre
       (is_node : loc -d> lcs_names -d> Int.t -d> ticketlock_γ -d> iPropO Σ) :
       loc -d> lcs_names -d> Int.t -d> ticketlock_γ -d> iPropO Σ :=
@@ -133,22 +150,7 @@ Section proof.
       (∃ lk,
           (n +ₗ 1) ↦□ (Int.into_val v) ∗
           (n +ₗ 0) ↦□ lk ∗
-          is_fair_lock lk γlk (
-              ∃ ℓ (n' : loc) v',
-                γlk ↪LOCK{#1/2} ℓ ∗
-                (n +ₗ 2) ↦ #n' ∗
-                (n' +ₗ 1) ↦□ (Int.into_val v') ∗
-                own_interval γ v v' ∗
-                (match v' with
-                 | +∞ => True
-                 | -∞ => False
-                 | _ => (∃ γlk' ℓ',
-                           ▷ is_node n' γ v' γlk' ∗
-                           γlk' ↪LOCK{#1/2} ℓ' ∗
-                           ⌜ ((ℓ' ⊕ lockΔ) < ℓ)%ordi ⌝)
-                 end)
-                (* TODO: own ghost state for range. *)
-      ))%I.
+          is_fair_lock lk γlk (node_lock_inv_pre is_node n γ v γlk))%I.
 
   Ltac solve_contractive :=
     solve_proper_core ltac:(fun _ => first [f_contractive | f_equiv | (eapply dist_lt; last eassumption)]).
@@ -159,6 +161,9 @@ Section proof.
   Admitted.
 
   Definition is_node : loc → lcs_names → Int.t → ticketlock_γ → iProp Σ := fixpoint is_node_pre.
+
+  Definition node_lock_inv : loc → lcs_names → Int.t → ticketlock_γ → iProp Σ :=
+    node_lock_inv_pre is_node.
 
   Lemma is_node_unfold n γ v γlk : is_node n γ v γlk ⊣⊢ is_node_pre is_node n γ v γlk.
   Proof. apply (fixpoint_unfold is_node_pre n γ). Qed.
@@ -211,7 +216,7 @@ Section proof.
     iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HlockFuel]".
     lwp_lam. post_wp. lwp_pures. lwp_bind (AllocN _ _).
     iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_allocN _ ∅ 0 with "[$Hg $Hf //]"); first done.
+    iApply (lwp_allocN _ _ ∅ 0 with "[$Hg $Hf //]"); first done.
     iIntros (n) "[(_ & Hg & _) (Hn & _)]". iModIntro.
     lwp_pures.
 
@@ -226,17 +231,17 @@ Section proof.
     iDestruct "Hn" as "(lk & val & next & _)".
 
     lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $lk //]").
+    iApply (lwp_store _ _ ∅ 0 with "[$Hg $Hf $lk //]").
     iIntros "[(_ & Hg & _) lk]". iMod (pointsto_persist with "lk") as "#lk".
     iModIntro. lwp_pures.
 
     lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $val //]").
+    iApply (lwp_store _ _ ∅ 0 with "[$Hg $Hf $val //]").
     iIntros "[(_ & Hg & _) val]". iMod (pointsto_persist with "val") as "#val".
     iModIntro. lwp_pures.
 
     lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $next //]").
+    iApply (lwp_store _ _ ∅ 0 with "[$Hg $Hf $next //]").
     iIntros "[(_ & Hg & _) next]".
     iModIntro. lwp_pures.
 
@@ -268,7 +273,7 @@ Section proof.
 
     lwp_lam. post_wp. lwp_pures. lwp_bind (AllocN _ _).
     iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_allocN _ ∅ 0 with "[$Hg $Hf //]"); first done.
+    iApply (lwp_allocN _ _ ∅ 0 with "[$Hg $Hf //]"); first done.
     iIntros (n) "[(_ & Hg & _) (Hn & _)]". iModIntro.
     lwp_pures.
 
@@ -283,17 +288,17 @@ Section proof.
     iDestruct "Hn" as "(lk & val & next & _)".
 
     lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $lk //]").
+    iApply (lwp_store _ _ ∅ 0 with "[$Hg $Hf $lk //]").
     iIntros "[(_ & Hg & _) lk]". iMod (pointsto_persist with "lk") as "#lk".
     iModIntro. lwp_pures.
 
     lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $val //]").
+    iApply (lwp_store _ _ ∅ 0 with "[$Hg $Hf $val //]").
     iIntros "[(_ & Hg & _) val]". iMod (pointsto_persist with "val") as "#val".
     iModIntro. lwp_pures.
 
     lwp_bind (_ <- _)%E. iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $next //]").
+    iApply (lwp_store _ _ ∅ 0 with "[$Hg $Hf $next //]").
     iIntros "[(_ & Hg & _) next]".
     iModIntro. lwp_pures.
 
@@ -332,40 +337,110 @@ Section proof.
   Qed.
 
   Lemma lwp_locate i G s γ (e : Z) :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) ∗
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (1 ⊕ ℵ × ((ℵ × lockΔ) ⊕ ℵ))%ordi 1) ∗
          is_set s γ }}}
      locate #s (Int.into_val e) @ i
-    l{{{ s, RET #s; is_node s γ }}}.
+    l{{{ gu κu v v' n (n' : loc) ℓ γlk, RET (#n, #n');
+         thP_groups i ({[gu]} ∪ G) ∗
+         ogP_obls i gu 0 {[κu]} ∗ ogP_fuel gu 0 100 ∗
+         is_node n γ v γlk ∗
+         (n +ₗ 2) ↦ #n' ∗
+         (n' +ₗ 1) ↦□ (Int.into_val v') ∗
+         (match v' with
+           | +∞ => True
+           | _ => (∃ γlk' ℓ',
+                     is_node n' γ v' γlk' ∗
+                     γlk' ↪LOCK{#1/2} ℓ' ∗
+                     ⌜ ((ℓ' ⊕ lockΔ) < ℓ)%ordi ⌝)
+           end) ∗
+         own_interval γ v v'
+         (* TODO: obligation to release n's lock *)
+    }}}.
   Proof.
     iIntros (?) "(Hg & Hfuel & #Hs) HΦ".
     iDestruct (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iDestruct (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
 
-    iMod (ogP_fuel_extend_set _ 0 _ (100⊕ma⊕mr)%M with "Hfuel") as "Hfuel".
-    { apply ordArith.lt_from_nat. lia. }
-    rewrite /is_set is_node_unfold.
-    iDestruct "Hs" as  (???) "(#lock & #val & #Hlock)".
+    iMod (ogP_fuel_extend_set _ ((ℵ × lockΔ) ⊕ ℵ)%ordi _ (100 ⊕ ma ⊕ (ℵ × (ℵ ⊕ ma ⊕ mr)))%M with "Hfuel") as "Hfuel".
+    { admit. }
+    iDestruct "Hs" as (?) "[#Hlk_ℓ #Hn]".
 
     (* TODO: instance for splitting. *)
     iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HlockFuel]".
 
+    (* TODO: why is lwp_pure only at level 0? Makes it annoying to use fuel when
+       it's at a higher layer. *)
+    iMod (ogP_fuel_mon_gen_set _ 0%ordi _ 100 with "Hfuel") as "Hfuel".
+    { admit. }
+    { admit. }
     lwp_lam. post_wp. lwp_pures. iModIntro. lwp_lam. post_wp. lwp_lam. post_wp.
     lwp_pures. lwp_bind (! _)%E. iModIntro.
 
+    iDestruct (is_node_unfold with "Hn") as (?) "(#lk & #val & #Hlk)".
     lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
+    iApply (lwp_load _ _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
     iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.acquire lk). iModIntro.
 
     iDestruct (ogP_fuel_add_set with "HlockFuel") as "[HacqFuel HrelFuel]".
-    (* TODO: lock should abstract away the gap `ℵ` into an opaque defn like
-       "lockΔ : ord.t" or something. *)
-    iApply ("TicketLock_acquire_spec" with "[$Hg]").
-    { iFrame "#". }
-    Search ℵ%M.
+    iApply ("TicketLock_acquire_spec" $! 0 ∅ with "[$Hg HacqFuel]").
+    { iFrame "#". iFrame. }
+    iIntros (??) "(_ & %Hgu & Hg & Hobl & Hf & _ & _ & Htok & Hown)".
+
+    iModIntro.
+    lwp_pure.
+  Admitted.
+
+  Lemma lwp_member i G s γ (e : Z) :
+    ∀ Φ,
+    (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (1 ⊕ ℵ × ((ℵ × lockΔ) ⊕ ℵ))%ordi 1) ∗ is_set s γ) -∗
+    (|={⊤,∅}=> ∃ s, own_set γ s ∗ (own_set γ s ={∅,⊤}=∗ Φ #(bool_decide (e ∈ s)))) -∗
+    lWP member #s (Int.into_val e) @ i {{ Φ }}.
+  Proof.
+    iIntros (?) "(Hg & Hfuel & Hs) Hau".
+    iDestruct (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
+
+    iMod (ogP_fuel_extend_set _ 0%ordi _ (100)%M with "Hfuel") as "Hfuel".
+    { admit. }
+    iDestruct "Hs" as (?) "[#Hlk_ℓ #Hroot]".
+
+    lwp_lam. post_wp. lwp_pures. lwp_bind (locate _ _).
+    iModIntro. iApply (lwp_locate with "[Hg]").
+    { iFrame. iFrame "#". admit. }
+    iIntros "* (Hg & Hκ & Hg_fuel & Hn)". iModIntro.
+    lwp_pure.
+    iDestruct (big_sepS_insert_2 with "[Hg_fuel] Hfuel") as "Hfuel".
+    { simpl.
+      erewrite (ogP_fuel_eq _ _ _ (3⊕(97:nat))%M).
+      2:{ admit. }
+      iDestruct (ogP_fuel_add with "Hg_fuel") as "[_ Hg_fuel]".
+      iFrame.
+    }
+    post_wp. lwp_pures. iModIntro.
+    lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
+
+    iDestruct "Hn" as "(Hn & next & #v' & Hn')".
 
     lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_lockNode with "[$]"). iModIntro.
-    iIntros "Hg !>". lwp_pures.
+    iApply (lwp_load _ _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
+    iIntros "[(_ & Hg & _) _]". lwp_bind (Int.lt _ _). iModIntro.
+    iApply (Int.lwp_lt with "[$Hg]").
+    { admit. } (* TODO: fuel *)
+    iIntros "Hg !>". lwp_pures. iModIntro. lwp_lam. post_wp.
+    lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
+
+    iDestruct (is_node_unfold with "Hn") as (?) "(#Hv & #lk & #Hlk)".
+    lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_load _ _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
+    iIntros "[(_ & Hg & _) _]".  lwp_bind (TicketLock.release _).
+    iModIntro.
+    iApply ("TicketLock_release_spec" with "[$Hg H]").
+
+    iFrame.
+    lwp_unop.
+    lwp_pures.
+
+    lwp_lam. post_wp.
   Qed.
+
 
 End proof.
