@@ -78,10 +78,6 @@ Record ticketlock_γ :=
       ticketlock_γc : gname;
     }.
 
-Notation "γ ↪LOCK dq l" :=
-  (own (ticketlock_γc γ) (auth_mra_auth ord.le dq l))%I
-    (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK dq  l") : bi_scope.
-
 Section proof.
   Context `{!heapGS Σ, !ticket_lockG Σ}.
 
@@ -145,6 +141,13 @@ Section proof.
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
       inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γa γ) (ticketlock_γc γ) next curr R).
+
+  Definition own_fair_lock_level (γ : ticketlock_γ) (ℓ : ord.t) (dq : dfrac) :=
+    own (ticketlock_γc γ) (auth_mra_auth ord.le dq ℓ).
+
+  Notation "γ ↪LOCK dq l" :=
+    (own_fair_lock_level γ l dq)%I
+      (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK dq  l") : bi_scope.
 
   (** ** Properties *)
   Global Instance is_fair_lock_persistent tl γ R : Persistent (is_fair_lock tl γ R).
@@ -601,3 +604,7 @@ Section proof.
   Qed.
 
 End proof.
+
+Global Notation "γ ↪LOCK dq l" :=
+  (own_fair_lock_level γ l dq)%I
+    (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK dq  l") : bi_scope.

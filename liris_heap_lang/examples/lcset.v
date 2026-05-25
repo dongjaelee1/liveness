@@ -92,37 +92,6 @@ Section ticket_lock.
   (* FIXME: extremely messy. *)
   Global Instance is_fair_lock_ne lk γlk : NonExpansive (is_fair_lock lk γlk).
   Proof.
-    intros ??. intros.
-    rewrite /is_fair_lock.
-    solve_proper_prepare.
-    clean_flip.
-    do 6 f_equiv.
-    rewrite /ticket_lock.lock_inv.
-    rewrite /tf_eventually.
-    do 20 f_equiv.
-    2:{ repeat f_equiv; assumption. }
-    do 10 f_equiv.
-    setoid_rewrite tf_until_logic.
-    setoid_rewrite tf_fulfilled_unfold.
-
-    (* do 10 f_equiv. *)
-    (* do 4 f_equiv. *)
-    (* f_equiv. *)
-    (* 2:{ repeat f_equiv; assumption. } *)
-    (* do 7 f_equiv. *)
-
-    (* unfold_opreds. *)
-    (* f_equiv. *)
-    (* rewrite /oblG_inv. *)
-    (* f_contractive. *)
-    (* rewrite /oblG_variant. *)
-    (* f_equiv. *)
-    (* rewrite /oblG_assigned. *)
-    (* f_equiv. *)
-    (* { f_equiv. tf_red. f_equiv. eapply dist_lt; last eassumption. done. } *)
-    (* do 15 f_equiv. *)
-    (* Transparent tf_intuit. simpl. Opaque tf_intuit. *)
-    (* f_equiv. *)
   Admitted.
 
 End ticket_lock.
@@ -149,6 +118,7 @@ Section proof.
           (n +ₗ 0) ↦□ lk ∗
           (n +ₗ 1) ↦□ (Int.into_val cur_val) ∗
           is_fair_lock lk γlk (
+              γlk ↪LOCK{#1/2} 0 ∗
               ∃ (next : loc) next_val,
                 (n +ₗ 2) ↦ #next ∗
                 ▷ is_node next γ ∗
