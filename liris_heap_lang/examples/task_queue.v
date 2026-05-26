@@ -58,10 +58,12 @@ Section proof.
 
   (** ** Definitions *)
   Definition is_task (ℓ : ord.t) : val → oids → iProp Σ :=
-    λ v B, (∃ f a ℓt m,
+    λ v B, (∃ f a ℓt (P : iProp Σ) m,
                ⌜(v = (f, a)%V) ∧ (ℓt < ℓ)%ordi⌝ ∧
+               P ∗
                ∀ lc i j G g K ℓg,
-              l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓt m) ∗ ogP_obls j g ℓg K ∗ ⌜ B ⊆ K ⌝ }}}
+               l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℓt m) ∗
+                    ogP_obls j g ℓg K ∗ ⌜ B ⊆ K ⌝ ∗ P }}}
                 f a @ i
               l{{{ rv, RET rv; £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓg (K ∖ B) }}})%I.
 
@@ -146,7 +148,7 @@ Section proof.
         iApply "HΦ". iFrame.
     - destruct Hcase as (v& Hcase). subst x.
       iDestruct "Hx" as "(%&%& Htask& Gg& Fg& %Ning& HW)".
-      iDestruct "Htask" as "(%&%&%&%mt& %Htask& TASK)".
+      iDestruct "Htask" as "(%&%&%&%&%mt& %Htask& HP& TASK)".
       iPoseProof (ogP_fuel_add with "Fg") as "[_ Fg]".
       iPoseProof (ogP_fuel_add_nat 99 1 with "Fg") as "[Fg' Fg]". 1: lia.
       iPoseProof (ogP_fuels_add_group with "Fg' GF") as "GF".
@@ -167,7 +169,7 @@ Section proof.
         { eapply ord.lt_le_lt. 1: eauto. done. }
         iModIntro.
         iApply lwp_sfmupd.
-        iApply ("TASK" $! 0 with "[$TG $F_task $Gg]").
+        iApply ("TASK" $! 0 with "[$TG $F_task $Gg $HP]").
         { iPureIntro. set_solver. }
         iIntros (?) "(_& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
         iMod (group_delete with "TG Gg") as "TG". replace (({[g; ng]} ∪ G) ∖ {[g]}) with ({[ng]} ∪ G) by set_solver.
@@ -180,7 +182,7 @@ Section proof.
         { eapply ord.lt_le_lt. 1: eauto. done. }
         iModIntro.
         iApply lwp_sfmupd.
-        iApply ("TASK" $! 0 with "[$TG $F_task $Gg]").
+        iApply ("TASK" $! 0 with "[$TG $F_task $Gg $HP]").
         { iPureIntro. set_solver. }
         iIntros (?) "(_& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
         iMod (group_delete with "TG Gg") as "TG". replace (({[g]} ∪ G) ∖ {[g]}) with G by set_solver.

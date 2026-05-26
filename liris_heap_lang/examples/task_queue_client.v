@@ -7,31 +7,26 @@ From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 From liris.heap_lang.examples Require Export task_queue.
 
-Definition decr_with_task_queue : val :=
-  λ: "q" "l" "n",
-    (rec: "f" "a" :=
-       let: "q" := Fst (Fst "a") in
-       let: "l" := Snd (Fst "a") in
-       let: "n" := Snd "a" in
-       if: "n" ≤ #0%Z
-       then "l" <- #1%Z
-       else TaskQueue.put_task "q" "f" ("q", "l", "n" - #1%Z)) ("q", "l", "n").
+Definition decr_reentrant : val :=
+  (rec: "f" "a" :=
+     let: "q" := Fst (Fst "a") in
+     let: "l" := Snd (Fst "a") in
+     let: "n" := Snd "a" in
+     if: "n" ≤ #0%Z
+     then "l" <- #1%Z
+     else TaskQueue.put_task "q" "f" ("q", "l", "n" - #1%Z)).
+  (* λ: "a", *)
+  (*   (rec: "f" "a" := *)
+  (*      let: "q" := Fst (Fst "a") in *)
+  (*      let: "l" := Snd (Fst "a") in *)
+  (*      let: "n" := Snd "a" in *)
+  (*      if: "n" ≤ #0%Z *)
+  (*      then "l" <- #1%Z *)
+  (*      else TaskQueue.put_task "q" "f" ("q", "l", "n" - #1%Z)) "a". *)
+       (* else TaskQueue.put_task "q" (λ: "a", "f" "a") ("q", "l", "n" - #1%Z)) "a". *)
 
-TODO
-
-Definition writer : val :=
-  λ: "l", "l" <- #1;;
-          Label "exit" #().
-
-Definition reader : val := 
-  rec: "reader" "l" :=
-    let: "n" := !"l" in
-    if: "n" = #1
-    then Label "exit" #()
-    else "reader" "l".
-
-Section mp_proof.
-  Context `{!heapGS Σ}.
+Section proof.
+  Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
   Ltac post_lwp :=
     simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
@@ -44,26 +39,130 @@ Section mp_proof.
 
   Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
-  Let N := nroot.@ "message_passing".
+  Let N := nroot.@ "task_queue_client".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
-  Let Nl := N.@ "label".
 
   Remark N_disj_1 : Na ## Np.
   Proof. by apply ndot_ne_disjoint. Qed.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
-  Definition mp_tf (k : oid) (l : loc) : tf Σ :=
-    ⟨oblP_id k ∗ witP_layer k 0⟩ ∗
-    tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1)))).
+  (** ℵ <= ℓq (TaskQueue_worker/init/put_task_spec *)
+  Let ℓq : ord.t := (ℵ ⊕ 1)%ordi.
 
-  Definition mp (k : oid) (l : loc) : iProp Σ :=
-    ⟦mp_tf k l⟧ₗ.
+  Definition decr_reentrant_inv (arg : val) γ (k : oid) : iProp Σ :=
+    ∃ (ql : val) (l : loc) (n : Z),
+      ⌜arg = (ql, #l, #n)%V⌝ ∧
+      oblP_id k ∗ witP_layer k (ℓq ⊕ 1)%ordi ∗
+      ⟦tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1))))⟧ₗ ∗
+      is_task_queue ql γ ℓq.
 
-  (** The main proofs. *)
-  Global Instance mp_persistent k l : Persistent (mp k l).
-  Proof. rewrite /mp /mp_tf. tf_red. apply _. Qed.
+  (** The main proof. *)
+  Global Instance decr_reentrant_persistent arg γ k : Persistent (decr_reentrant_inv arg γ k).
+  Proof. rewrite /decr_reentrant_inv. apply _. Qed.
+
+  Lemma decr_reentrant_spec :
+    ⊢ ∃ m, ∀ lc i j G g k K γ ℓg arg,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
+         ogP_obls j g ℓg K ∗ ⌜k ∈ K⌝ ∗
+         ∃ (ql : val) (l : loc) (n : Z),
+           ⌜arg = (ql, #l, #n)%V⌝ ∗
+           oblP_fuel k (ℓq ⊕ 1)%ordi (Z.to_nat n)%M ∗
+           ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
+         decr_reentrant_inv arg γ k }}}
+      decr_reentrant arg @ i
+    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓg (K ∖ {[k]}) }}}.
+  Proof.
+    unfold decr_reentrant.
+    (** Lob to bootstrap the spec *)
+    iLöb as "TASK".
+    iPoseProof (TaskQueue_put_task_spec) as (mp) "TaskQueue_put_task_spec".
+    iExists (100 ⊕ mp)%M. iIntros (lc i j G g k K γ ℓg arg) "!> % (TG& GF& Gg& %Sub& %&%&%& %Harg& OF& Huntil& #DRI) HΦ".
+    iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_put_task]".
+    iPoseProof (ogP_fuels_init with "GF") as "GF".
+    lwp_pure. simpl.
+    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
+    subst arg.
+    lwp_pures.
+    destruct (decide (n ≤ 0)%Z).
+    - iClear "TASK TaskQueue_put_task_spec". rewrite bool_decide_eq_true_2; last done.
+      lwp_pure_lc 100.
+      lwp_bind (Store _ _).
+      iDestruct "DRI" as "(%&%&%& %& Oik& Wlk& Inv& ITQ)". symmetry in H. simplify_eq.
+      iModIntro.
+      iEval (rewrite tf_always_logic) in "Inv".
+      iMod (inv_acc with "Inv") as "[H ACCinv]". 1: set_solver.
+      (* and we need a mupd after the step. *)
+      iApply lwp_sfmupd.
+      iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+      iApply (lwp_lc_later with "LC1"). iNext.
+      iEval (tf_red) in "H". iDestruct "H" as "[H | H]"; cycle 1.
+      { iDestruct "H" as "(HF& _)".
+        rewrite tf_until_logic. iDestruct "Huntil" as "(HA& _)".
+        iPoseProof (oblP_assigned_fulfilled_false with "HA HF") as "%". done. }
+      iCombine "Huntil H" as "Huntil".
+      iMod (tf_until_fulfill with "Huntil") as "ACCuntil". 1: apply N_subseteq_1.
+      iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
+      iApply (lwp_lc_later with "LC1"). iNext.
+      iDestruct "ACCuntil" as "[Ptrl ACCuntil]". iEval (rewrite tf_atomic_logic) in "Ptrl".
+      iPoseProof (ogP_fuels_add 85 1 with "GF") as "[GF GF1]". 1: lia.
+      iApply lwp_sfmupd.
+      iApply (lwp_store _ ∅ 0 with "[$TG $GF1 $Ptrl]"). 1: done.
+      iIntros "((_& TG& _)& Ptrl)".
+      iMod ("ACCuntil" $! _ with "Ptrl") as ">ACCuntil".
+      iPoseProof ("ACCuntil" with "[] Gg") as "ACCuntil".
+      { iPureIntro. set_solver. }
+      iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
+      iApply (lc_sfmupd_add_later with "LC1"). iNext.
+      iMod ("ACCuntil" $! _) as "ACCuntil". iModIntro.
+      iMod "ACCuntil" as "(Ptrl& Gg& #Gfk)".
+      do 2 iModIntro. iMod ("ACCinv" with "[Ptrl]") as "_".
+      { iNext. tf_red. iRight. iFrame. eauto. }
+      iModIntro. iApply ("HΦ" with "[$Q_LC $TG $Gg]").
+    - rewrite bool_decide_eq_false_2; last done.
+      lwp_pure_lc 100.
+      lwp_pures.
+      iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      lwp_bind (TaskQueue.put_task _ _ _).
+      assert (Hn : Z.to_nat n = 1 + Z.to_nat (n - 1)) by lia.
+      rewrite (oblP_fuel_eq k _ _ (1 ⊕ (Z.to_nat (n - 1)))%M); cycle 1.
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat Hn. done. }
+      iPoseProof (oblP_fuel_add with "OF") as "[OF1 OF]".
+      iModIntro. iApply ("TaskQueue_put_task_spec" $! 0 _ _ _ _ _ {[k]} γ ℓq with "[$TG $F_put_task $Gg OF1 OF Huntil]").
+      { iClear "TaskQueue_put_task_spec". iSplit.
+        { iPureIntro. set_solver. }
+        iSplitL "OF1".
+        { iApply big_sepS_singleton. iFrame. }
+        iDestruct "DRI" as "(%&%&%& %& Oik& Wlk& Inv& ITQ)". simplify_eq.
+        rewrite /is_task_queue. iFrame "ITQ".
+        rewrite /is_task. iDestruct "TASK" as (mt) "TASK".
+        iExists _, _, ℵ%ordi, _, mt. iSplit.
+        { iPureIntro. split; first eauto. apply hessenberg.add_lt_l. apply ord.S_lt. }
+        iSplitL.
+        { iCombine "OF Huntil" as "H". iApply "H". }
+        iIntros (???????) "!> % (TG& GF& Gg& %Hsub& OF& Huntil) HΦ".
+        iApply ("TASK" $! lc0 with "[$TG $GF $Gg $OF $Huntil]").
+        { iSplit.
+          { iPureIntro. set_solver. }
+          iExists _. iSplit; first done. iFrame "Oik Wlk Inv".
+          rewrite /is_task_queue. iFrame "ITQ". eauto. }
+        iIntros "(LC& TG& Gg)". iApply ("HΦ" with "[$LC $TG $Gg]"). }
+      iIntros "(_& TG& Gg)". iApply ("HΦ" with "[$Q_LC $TG $Gg]").
+  Qed.
+
+    TODO
+    
+         
+    
+  Lemma TaskQueue_put_task_spec :
+    ⊢ ∃ m, ∀ lc i j G g K B γ ℓ ℓg (ql task_f task_a : val),
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
+         ogP_obls j g ℓg K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
+         is_task ℓ (task_f, task_a)%V B ∗ is_task_queue ql γ ℓ }}}
+      TaskQueue.put_task ql task_f task_a @ i
+    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓg (K ∖ B) }}}.
 
   Lemma mp_writer_spec i l :
     l{{{ ∃ g k kl, ⌜k ≠ kl⌝ ∗
@@ -290,7 +389,7 @@ Section mp_proof.
     rewrite big_sepM2_singleton. iApply "WP2". iModIntro. eauto.
   Qed.
 
-End mp_proof.
+End proof.
 
 Section adequacy.
 
