@@ -336,6 +336,36 @@ Section proof.
 
   Definition locateℓ : ord.t := ((ℵ × lockΔ) ⊕ ℵ)%ordi.
 
+  (* Loop invariant for the recursive [loop] inside [locate].
+
+     At the top of an iteration we hold curr's lock at some level ℓ_curr, and
+     the body sees a 2ℵ gap above curr's successor (n'_lock_level ⊕ 2ℵ
+     ≤ ℓ_curr).  Each iteration uses ℵ of that gap to [lock_reconfig] the
+     successor, bumping its level by ℵ.  Eventually this raises all walked
+     nodes high enough that [add]'s newly-allocated nodes can fit beneath
+     curr's level. *)
+  Definition locate_loop_inv
+      (gu : ogid) (κu : oid) (γ : lcs_names) (e : Z)
+      (curr : loc) (lk : val) (γlk : ticketlock_γ) (v : Int.t) : iProp Σ :=
+    (∃ ℓ_curr,
+       γlk ↪LOCK{#1/2} ℓ_curr ∗
+       lock_token lk γlk κu (∃ n'' v'', node_lock_inv curr γ v γlk n'' v'') ∗
+       is_node curr γ v lk γlk ∗
+       ⌜ Int.lt_rel v e ⌝ ∗
+       (* The opened body, with a 2ℵ gap between curr and its successor. *)
+       (∃ (n' : loc) v',
+          (curr +ₗ 2) ↦ #n' ∗
+          (n' +ₗ 1) ↦□ (Int.into_val v') ∗
+          own_interval γ v v' ∗
+          (match v' with
+           | +∞ => True
+           | -∞ => False
+           | _  => (∃ lk' γlk' ℓ',
+                      is_node n' γ v' lk' γlk' ∗
+                      γlk' ↪LOCK{#1/2} ℓ' ∗
+                      ⌜ ((ℓ' ⊕ ℵ ⊕ ℵ) < ℓ_curr)%ordi ⌝)
+           end)))%I.
+
   Lemma lwp_locate :
     ⊢ ∃ m, ∀ μ i G s γ (e : Z),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g locateℓ m) ∗
@@ -354,28 +384,71 @@ Section proof.
     iDestruct (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iDestruct (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
 
-    (* iMod (ogP_fuel_extend_set _ ((ℵ × lockΔ) ⊕ ℵ)%ordi _ (ℵ × (ℵ ⊕ ma ⊕ mr))%M with "Hfuel") as "Hfuel". *)
-    (* { admit. } *)
-    iDestruct "Hs" as (??) "[#Hlk_ℓ #Hn]".
+    iDestruct "Hs" as (γlk_root lk_root) "[#Hlk_ℓ #Hn_root]".
 
+    (* TODO: distribute the incoming [locateℓ = (ℵ × lockΔ) ⊕ ℵ] fuel down to
+       the concrete amounts needed per step (loads, branches, acquire/release
+       per iteration).  The bound is large because the loop is unbounded in
+       list length; the ordinal level pays for it. *)
     iAssert (ogP_fuels G 100)%I with "[]" as "-#Hfuel".
     { admit. }
 
+    (* Step into  locate := λ x e, lockNode x ;; (rec loop curr := ...) x.
+       First acquire the head's lock; its level is [ℵ × lockΔ] (from is_set). *)
     lwp_lam. post_wp. lwp_pures. iModIntro. lwp_lam. post_wp. lwp_lam. post_wp.
     lwp_pures. lwp_bind (! _)%E. iModIntro.
 
-    iDestruct (is_node_unfold with "Hn") as "(#lk & #val & #Hlk)".
+    iDestruct (is_node_unfold with "Hn_root") as "(#lk_root_p & #val_root & #Hlk_root)".
     lOneFuel "Hfuel" as "[Hf Hfuel]".
     iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
-    iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.acquire lk). iModIntro.
+    iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.acquire _). iModIntro.
 
-    (* iDestruct (ogP_fuels_add_gen with "HlockFuel") as "[HacqFuel HrelFuel]". *)
-    (* iApply ("TicketLock_acquire_spec" $! 0 ∅ with "[$Hg HacqFuel]"). *)
-    (* { iFrame "#". iFrame. } *)
-    (* iIntros (??) "(_ & %Hgu & Hg & Hobl & Hf & _ & _ & Htok & Hown)". *)
+    (* TODO: apply [TicketLock_acquire_spec] for the head sentinel to obtain
+       [Htok], [Hobl], and the opened head body — establishing
+       [locate_loop_inv gu κu γ e root lk_root γlk_root -∞] before entering
+       the recursive loop. *)
 
-    (* iModIntro. *)
-    (* lwp_pure. *)
+    (* The locate function's recursive loop walks the list.  Strategy from
+       here:
+
+       1. iLöb on a goal of shape
+              locate_loop_inv gu κu γ e curr lk γlk v ∗ <ambient fuel/groups>
+              -∗ lWP (loop #curr) {{ <postcondition shape> }}
+          quantifying over [curr v lk γlk] inside the Löb.
+
+       2. Per iteration:
+            a. Load curr.next = n'.
+            b. Load n'.val = v'.
+            c. Branch on Int.lt v' e.
+
+            ── then-branch (recurse) ──
+            d. Apply [TicketLock_acquire_spec] to n''s lock, instantiating with
+               the half-token already in the loop invariant.  After acquire we
+               hold both halves of n''s ↪LOCK token (one from the loop inv,
+               one returned by acquire), so we can combine and call
+               [lock_reconfig] to raise n''s level from ℓ' to ℓ' ⊕ ℵ — paid for
+               by the 2ℵ headroom from the loop invariant.
+            e. Split n''s token back into halves.  One half stays in n''s now-
+               held body for the next iteration's loop inv; the other half is
+               packaged into curr's body for releasing it.
+            f. Apply [TicketLock_release_spec] to curr's lock with the
+               rebuilt body.  The released body still has the 2ℵ gap to its
+               (unchanged) successor (= old n'), so the gap invariant holds.
+            g. Recurse via the Löb hypothesis with curr := n'.
+
+            ── else-branch (terminate) ──
+            d'. Repackage the body into [node_lock_inv curr γ v γlk n' v'],
+                apply [HΦ].  Pure facts [Int.lt_rel v e] / [¬ Int.lt_rel v' e]
+                / [Int.lt_rel v v'] follow from the loop inv and the branch
+                test (the last one from [own_interval γ v v'] excluding the
+                degenerate case).
+
+       3. The head sentinel establishes the 2ℵ gap upfront: its level is
+          [ℵ × lockΔ] = ℵ × ℵ, while [makeSet] gives nodes installed beneath
+          it a level [≤ ℵ × lockΔ − lockΔ] (one step down in the lockΔ-chain).
+          The difference is [lockΔ = ℵ ≥ 2ℵ] for ordinal addition in the
+          density sense; the bookkeeping is tedious but routine. *)
+    admit.
   Admitted.
 
   Lemma own_interval_agree (x : Z) γ s a b:
