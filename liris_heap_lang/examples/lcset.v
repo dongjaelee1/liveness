@@ -334,20 +334,23 @@ Section proof.
     iMod (lock_config_persist with "[$]") as "#$". done.
   Qed.
 
-  Lemma lwp_locate i G s γ (e : Z) :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (1 ⊕ ℵ × ((ℵ × lockΔ) ⊕ ℵ))%ordi 1) ∗
+  Definition locateℓ : ord.t := (1 ⊕ ℵ × ((ℵ × lockΔ) ⊕ ℵ))%ordi.
+
+  Lemma lwp_locate :
+    ⊢ ∃ m, ∀ μ i G s γ (e : Z),
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g locateℓ m) ∗
          is_set s γ }}}
      locate #s (Int.into_val e) @ i
     l{{{ gu κu v v' n (n' : loc) lk γlk, RET (#n, #n');
          thP_groups i ({[gu]} ∪ G) ∗
-         ogP_obls i gu 0 {[κu]} ∗ ogP_fuel gu 0 100 ∗
+         ogP_obls i gu 0 {[κu]} ∗ ogP_fuel gu 0 μ ∗
          node_lock_inv n γ v γlk n' v' ∗
          lock_token lk γlk κu (∃ n'' v'', node_lock_inv n γ v γlk n'' v'') ∗
          is_node n γ v lk γlk ∗
          ⌜ Int.lt_rel v e ∧ ¬ Int.lt_rel v' e ∧ Int.lt_rel v v' ⌝
     }}}.
   Proof.
-    iIntros (?) "(Hg & HlockFuel & #Hs) HΦ".
+    iExists 1. iIntros. iIntros (Φ) "!# (Hg & HlockFuel & #Hs) HΦ".
     iDestruct (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iDestruct (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
 
@@ -389,33 +392,43 @@ Section proof.
   Admitted.
 
   Lemma lwp_member i G s γ (e : Z) :
+    ⊢ ∃ m,
     ∀ Φ,
-    (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (1 ⊕ ℵ × ((ℵ × lockΔ) ⊕ ℵ))%ordi 1) ∗ is_set s γ) -∗
+    (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g locateℓ m) ∗ is_set s γ) -∗
     (|={⊤,∅}=> ∃ s, own_set γ s ∗ (own_set γ s ={∅,⊤}=∗ Φ #(bool_decide (e ∈ s)))) -∗
     lWP member #s (Int.into_val e) @ i {{ Φ }}.
   Proof.
     iDestruct TicketLock_release_spec as (mr) "TicketLock_release_spec".
     iDestruct Int.lwp_lt as (mlt) "Int_lwp_lt".
+    iDestruct lwp_locate as (mlc) "lwp_locate".
 
-    iIntros (Φ) "(Hg & HlocateFuel & Hs) Hau".
+    iExists (100 ⊕ mlc ⊕ mlt ⊕ mr)%M.
+
+    iIntros (Φ) "(Hg & Hfuel & Hs) Hau".
 
     iDestruct "Hs" as (??) "[#Hlk_ℓ #Hroot]".
 
-    iAssert (ogP_fuels G 100)%I with "[]" as "-#Hfuel".
-    { admit. }
+    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
+    iDestruct (ogP_fuels_init with "Hfuel") as "Hfuel".
+    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HlocateFuel HcallFuel]".
+    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HltFuel HreleaseFuel]".
+    iDestruct (ogP_fuels_init with "HltFuel") as "HltFuel".
+    iDestruct (ogP_fuels_init with "HreleaseFuel") as "HreleaseFuel".
 
     lwp_lam. post_wp. lwp_pures. lwp_bind (locate _ _).
-    iModIntro. iApply (lwp_locate with "[Hg]").
-    { iFrame. iFrame "#". admit. }
+    iModIntro.
+    iApply ("lwp_locate" $! (97 ⊕ mlt ⊕ mr)%M with "[$Hg $HlocateFuel]").
+    { iFrame "#". }
     iIntros "* (Hg & Hκ & Hg_fuel & Hown & Htok & #Hn & %Hrange)". iModIntro.
     lwp_pure.
-    iDestruct (big_sepS_insert_2 with "[Hg_fuel] Hfuel") as "Hfuel".
-    { simpl.
-      erewrite (ogP_fuel_eq _ _ _ (3⊕(97:nat))%M).
-      2:{ admit. }
-      iDestruct (ogP_fuel_add with "Hg_fuel") as "[_ Hg_fuel]".
-      iFrame.
-    }
+    iDestruct (ogP_fuel_add with "Hg_fuel") as "[Hfuel_gu Hg_fuel]".
+    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HltFuel_gu HreleaseFuel_gu]".
+    iDestruct (big_sepS_insert_2 with "[Hfuel_gu] Hfuel") as "Hfuel".
+    { iFrame. }
+    iDestruct (big_sepS_insert_2 with "[HltFuel_gu] HltFuel") as "HltFuel".
+    { iFrame. }
+    iDestruct (big_sepS_insert_2 with "[HreleaseFuel_gu] HreleaseFuel") as "HreleaseFuel".
+    { iFrame. }
     post_wp. lwp_pures. iModIntro.
     lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
 
@@ -425,8 +438,8 @@ Section proof.
     lOneFuel "Hfuel" as "[Hf Hfuel]".
     iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
     iIntros "[(_ & Hg & _) _]". lwp_bind (Int.lt _ _). iModIntro.
-    iApply ("Int_lwp_lt" with "[$Hg]").
-    { admit. } (* TODO: fuel *)
+
+    iApply ("Int_lwp_lt" with "[$Hg $HltFuel]").
     iIntros "Hg !>". lwp_pures. iModIntro. lwp_lam. post_wp.
     lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
 
@@ -442,8 +455,8 @@ Section proof.
     iMod ("Hau" with "[$]") as "HΦ". iModIntro.
 
     iModIntro.
-    iApply ("TicketLock_release_spec" $! 0 with "[$Hg $Htok $Hκ Hlk0_ℓ Hn' next Hown]").
-    { iFrame "#". iFrame. admit. } (* TODO: fuel *)
+    iApply ("TicketLock_release_spec" $! 0 with "[$Hg $Htok $Hκ Hlk0_ℓ Hn' next Hown HreleaseFuel]").
+    { iFrame "#". iFrame. iPureIntro. set_solver. }
 
     iIntros "(_ & Hg & Ho)".
 
@@ -462,6 +475,6 @@ Section proof.
       + rewrite bool_decide_false //.
         rewrite bool_decide_true //. simpl in *. lia.
     - rewrite bool_decide_false //.
-  Admitted.
+  Qed.
 
 End proof.
