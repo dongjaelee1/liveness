@@ -47,15 +47,13 @@ Section proof.
 
   Ltac lwp_pures := repeat (lwp_pure; post_wp).
 
-  Lemma lwp_lt x y i G :
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 1 1) }}}
+  Lemma lwp_lt :
+    ⊢ ∃ m, ∀ x y i G,
+    l{{{ thP_groups i G ∗ ogP_fuels G m }}}
       lt (into_val x) (into_val y) @ i
     l{{{ RET #(bool_decide (lt_rel x y)); thP_groups i G }}}.
   Proof.
-    iIntros (?) "[Htg Hfuel] HΦ".
-
-    iMod (ogP_fuel_extend_set _ 0 _ (100)%M with "Hfuel") as "Hfuel".
-    { apply ordArith.lt_from_nat. lia. }
+    iExists 100. iIntros. iIntros (?) "!# [Htg Hfuel] HΦ".
 
     lwp_lam. post_wp.
     lwp_pures.
