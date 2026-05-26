@@ -419,7 +419,7 @@ Section proof.
 
     iDestruct "Hbody" as (n0 v0 ℓ0) "(Hlk_half & nextp & #val0 & Hown & Hn0)".
 
-    iApply lwp_sfmupd.
+    iApply fupd_lwp.
     iAssert (|={⊤}=> ∃ (n0' : loc) (v0' : Int.t) (ℓ0' : ord.t),
               γlk_root ↪LOCK{#1/2} ℓ0' ∗
               (s +ₗ 2) ↦ #n0' ∗
@@ -447,82 +447,19 @@ Section proof.
     { iExists ℓ0'. iFrame "Hlk_half Htok Hn_root".
       iSplit; [iPureIntro; admit|].
       iExists n0', v0'. iFrame. }
+    iModIntro.  (* close the fupd from [fupd_lwp] *)
 
-    (* Strategy for the rest of the proof:
+    (* The loop body doesn't need the head-specific [is_set] persistents
+       ([#Hlk_ℓ], [#Hn_root], [#val_root], [#lk_root_p], [#Hlk_root]); they
+       constrain γlk_root and lk_root, which iLöb wants to generalise.  Drop
+       them now so iRevert succeeds. *)
+    iClear "Hlk_ℓ Hn_root val_root lk_root_p Hlk_root".
+    iLöb as "IH" forall (s lk_root γlk_root) "Hloop".
 
-       1. Acquire the head's lock.  The acquire spec's fuel precondition is
-          [ogP_fuel g (ℓ ⊕ ℵ) m], and for the head ℓ = ℵ × lockΔ, so the
-          required level is exactly [locateℓ = ℵ × lockΔ ⊕ ℵ] — the level of
-          the *input* fuel [HlockFuel].  Plumbing that through requires
-          reconciling the spec's quantified amount [m] with locate's witness
-          (currently [iExists 1]), via [ogP_fuel_extend_set] from level
-          locateℓ down to a sub-level with arbitrary amount.
-
-       2. After acquire, unpack the opened body [∃ ℓ0 n0 v0, …] and assemble
-          [locate_loop_inv gu κu γ e s lk_root γlk_root -∞].  The 2ℵ gap
-          claimed by the loop invariant is established by [makeSet]: the head
-          sits at level [ℵ × lockΔ = ℵ × ℵ], and its initial successor (the
-          tail sentinel) sits at level 0, leaving plenty of room.
-
-          NOTE: the body's finite-branch payload carries [▷ is_node n0 …]
-          (the ▷ comes from the [is_node_pre]-fixpoint Contractive structure),
-          but [locate_loop_inv] expects the un-▷ form.  Strip the ▷ using the
-          [LC : £ 1] credit accumulated by the curr.lk load above:
-
-              iApply lwpupd_fupd_l.
-              iMod (lc_fupd_elim_later with "LC Hnext_laterly") as "#Hnext".
-              iModIntro. iModIntro.
-
-          A fresh credit is harvested per iteration via the same trick on the
-          loop's own [! (nextRef curr)] load.
-
-       3. Step into [(rec loop curr := …) "x"] and iLöb-induct on a
-          generalisation (Coq variables only):
-
-              ∀ curr lk γlk v,
-                locate_loop_inv gu κu γ e curr lk γlk v -∗
-                <ambient: thP_groups, ogP_fuels, ogP_fuel gu …> -∗
-                lWP <inlined-loop-body curr> {{ … }}.
-
-       4. Per iteration:
-            a. Load curr.next  (uses [nextp] inside [locate_loop_inv]).
-            b. Load n'.val     (uses persistent [(n' +ₗ 1) ↦□ …]).
-            c. [Int.lwp_lt] on v' against e.
-
-            ── then-branch ([Int.lt v' e]) ──
-            d. [TicketLock_acquire_spec] on n', supplying the
-               [γlk' ↪LOCK{#1/2} ℓ'] half-token from the loop inv.  After
-               acquire we have both halves of n''s ↪LOCK token:
-                 • the half we just brought in (from the loop inv);
-                 • the half stashed in n''s body (the [γlk' ↪LOCK{#1/2} ℓ']
-                   inside [node_lock_inv_pre]).
-               Combine and call [lock_reconfig] to raise ℓ' → ℓ' ⊕ ℵ — paid
-               for by ℵ of the 2ℵ headroom.
-            e. Split the bumped token back into halves.  One half is stored
-               into curr's body (so curr can be released), the other half
-               is kept for the next [locate_loop_inv] (covering n').
-            f. [TicketLock_release_spec] on curr.  The released body still
-               points at n', now with the bumped level recorded as
-               [γlk' ↪LOCK{#1/2} (ℓ' ⊕ ℵ)] in the finite branch.
-            g. Recurse via [IH].
-
-            ── else-branch (¬ [Int.lt v' e]) ──
-            d'. Repackage the body of [locate_loop_inv] into
-                [node_lock_inv curr γ v γlk n' v'].  The loop inv carries a
-                stronger ⌜ℓ' ⊕ ℵ ⊕ ℵ < ℓ_curr⌝ than [node_lock_inv]'s
-                ⌜ℓ' ⊕ lockΔ < ℓ_curr⌝ (since lockΔ = ℵ), so the weaker
-                condition follows.
-            d''. Discharge the pure facts:
-                  - [Int.lt_rel v e]:   from the loop inv.
-                  - [¬ Int.lt_rel v' e]: from the else branch.
-                  - [Int.lt_rel v v']:  from [own_interval γ v v'] +
-                                         [v < e] + [e ≤ v'] + well-formedness
-                                         (excluding the v = v' degeneracy).
-
-       5. The pure facts [Int.lt_rel v v'] and [Int.lt_rel -∞ e] would benefit
-          from a small bookkeeping lemma about [own_interval] (e.g. that an
-          [own_interval γ a b] entails [a ≤ b] strictly, or a non-degeneracy
-          lemma analogous to [own_interval_not_NegInf]). *)
+    (* TODO: step into the rec body, load curr.next, load n'.val, branch:
+          - then: acquire n', combine + lock_reconfig + split halves +
+            release curr, recurse via IH;
+          - else: repackage loop_inv into node_lock_inv and apply HΦ. *)
     admit.
   Admitted.
 
