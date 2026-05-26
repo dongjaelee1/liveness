@@ -1251,8 +1251,8 @@ Section preds.
       iDestruct "H" as "(%& H)". iPoseProof (ogP_fuel_add_nat with "H") as "[H F]". 1: eauto. iFrame.
     Qed.
 
-    Lemma ogP_fuels_init K (n : nat) ℓ :
-      ([∗ set] k ∈ K, ogP_fuel k ℓ (n)%M)%I ⊢ ogP_fuels K n.
+    Lemma ogP_fuels_init K m ℓ :
+      ([∗ set] k ∈ K, ogP_fuel k ℓ m)%I ⊢ ogP_fuels K m.
     Proof. iIntros "H". iApply (big_sepS_impl with "H"). iIntros "!> %% $". Qed.
 
     Lemma ogP_fuels_add_group K k ℓ n :

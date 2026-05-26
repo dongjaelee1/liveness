@@ -185,11 +185,7 @@ Section proof.
     iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
     iExists (20 ⊕ m)%M. iIntros (lc φ i G) "!> % (TG& GF) HΦ".
     rewrite /Queue.init.
-
-    TODO
-
-    iPoseProof (ogP_fuels_add_set with "GF") as "[GF F_TicketLock]".
-    iPoseProof (ogP_fuels_init with "GF") as "GF".
+    iPoseProof (ogP_fuels_add_gen with "GF") as "[GF F_TicketLock]".
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
     lwp_pures.
@@ -276,16 +272,8 @@ Section proof.
     iIntros (gu ku) "(_& %Ningu& TG& Ggu& F_gu& F_ku& _& Lock& R)".
     iPoseProof (ogP_fuel_add with "F_gu") as "[F_gu F_mr_gu]".
     (* Prepare fuels for the unlock call. *)
-    iMod (ogP_fuel_mon_gen_set _ 0 _ (mr)%M with "F_mr") as "F_mr".
-    { right. unshelve etrans. 1: exact 1.
-      { eapply ordArith.lt_from_nat. lia. }
-      rewrite ord.from_nat_from_peano_lt. apply ord.large_lt_from_wf. }
-    { apply measure_layer_le_proper. right. econstructor 1.
-      unshelve etrans. 1: exact 1.
-      { eapply ordArith.lt_from_nat. lia. }
-      rewrite ord.from_nat_from_peano_lt. apply ord.large_lt_from_wf. }
-    iPoseProof (big_sepS_union _ {[gu]} G with "[$F_mr F_mr_gu]") as "F_mr". 1: set_solver.
-    { iApply big_sepS_singleton. auto. }
+    iPoseProof (ogP_fuels_init with "F_mr") as "F_mr".
+    iPoseProof (ogP_fuels_add_group with "F_mr_gu F_mr") as "F_mr".
     rewrite (ogP_fuel_eq gu 0 _ (94 ⊕ 6)%M); cycle 1.
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add with "F_gu") as "[F_gu _]".
@@ -330,7 +318,7 @@ Section proof.
     iMod (oblP_fuel_extend_set _ ℓ _ (1 ⊕ ℵ)%M with "FB") as "FB".
     { apply hessenberg.add_lt_l. apply ord.S_lt. }
     iPoseProof (oblP_fuel_add_set with "FB") as "[FB FBq]".
-    iMod (obl_offload_set with "GB Gq FB") as "(GB& Gq& %HGdisj)". 1: set_solver. 1: by left.
+    iMod (obl_offload_set with "GB Gq FB") as "(GB& Gq& %HGdisj)". 1: set_solver. 1: done.
     iMod (oblP_fuel_mon_set _ _ (S (length (vs.*2)))%M with "FBq") as "FBq".
     { rewrite !measure_nat measure_large. apply Ord.lt_le. unshelve etrans. 1: exact ω%ord.
       - apply Ord.omega_upperbound.
@@ -405,16 +393,8 @@ Section proof.
     iIntros (gu ku) "(_& %Ningu& TG& Ggu& F_gu& F_ku& _& Lock& R)".
     iPoseProof (ogP_fuel_add with "F_gu") as "[F_gu F_mr_gu]".
     (* Prepare fuels for the unlock call. *)
-    iMod (ogP_fuel_mon_gen_set _ 0 _ (mr)%M with "F_mr") as "F_mr".
-    { right. unshelve etrans. 1: exact 1.
-      { eapply ordArith.lt_from_nat. lia. }
-      rewrite ord.from_nat_from_peano_lt. apply ord.large_lt_from_wf. }
-    { apply measure_layer_le_proper. right. econstructor 1.
-      unshelve etrans. 1: exact 1.
-      { eapply ordArith.lt_from_nat. lia. }
-      rewrite ord.from_nat_from_peano_lt. apply ord.large_lt_from_wf. }
-    iPoseProof (big_sepS_union _ {[gu]} G with "[$F_mr F_mr_gu]") as "F_mr". 1: set_solver.
-    { iApply big_sepS_singleton. auto. }
+    iPoseProof (ogP_fuels_init with "F_mr") as "F_mr".
+    iPoseProof (ogP_fuels_add_group with "F_mr_gu F_mr")as "F_mr".
     rewrite (ogP_fuel_eq gu 0 _ (96 ⊕ 4)%M); cycle 1.
     { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (ogP_fuel_add with "F_gu") as "[F_gu _]".
@@ -444,43 +424,41 @@ Section proof.
       iDestruct "qinv" as "(%&%&%& Queue0& Gvar& %Disj& Gq& Fq)".
       iPoseProof (own_valid_2 with "Queue Queue0") as "%".
       apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs.
-      iAssert (|={⊤ ∖ ↑Ni}=>m |={⊤ ∖ ↑Ni,⊤}=>
-                 if b
-                 then ∃ ng, thP_groups i ({[ng]} ∪ ({[gu]} ∪ G)) ∗ ⌜ng ∉ G⌝ ∗
-                            queue_worker γ i ng ∗ ogP_obls wi wg ℓ ∅ ∗ ogP_fuel ng ℓ (μ ⊕ 83 ⊕ mr)%M
-                 else thP_groups i ({[gu]} ∪ G))%I
-        with "[IQ_ACC Queue0 Gvar Gq Fq HW TG]" as "IQ_ACC".
-      { destruct b.
-        - iPoseProof (ghost_var_agree with "Gvar HW") as "%". simplify_eq. simpl.
-          iMod (group_alloc _ _ _ ℓ (μ ⊕ 83 ⊕ mr)%M with "TG") as "(%ng& %Ninng& TG& Gng& Fng)".
-          iMod (ghost_var_update_2 (i, ng) with "Gvar HW") as "[Gvar Gw]". 1: by rewrite Qp.div_2.
-          iFrame "TG Gw Gq Fng". iModIntro. iMod ("IQ_ACC" with "[-]") as "_"; cycle 1.
-          { iPureIntro. set_solver. }
-          iNext. iFrame. simpl. iFrame. iPureIntro. auto.
-        - iFrame "TG". iModIntro. iApply "IQ_ACC". iNext. iFrame. iPureIntro. auto. }
-      iMod "IQ_ACC". iModIntro. iMod "IQ_ACC" as "HW".
       destruct b.
-      + iDestruct "HW" as "(%& TG& %Ninng& HW& Gwg& Fng)".
+      + iPoseProof (ghost_var_agree with "Gvar HW") as "%". simplify_eq. simpl.
+        iMod (group_alloc _ _ _ ℓ (μ ⊕ 83 ⊕ mr)%M with "TG") as "(%ng& %Ninng& TG& Gng& Fng)".
+        iMod (ghost_var_update_2 (i, ng) with "Gvar HW") as "[Gvar HW]". 1: by rewrite Qp.div_2.
+        iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Fq Gng]") as "_".
+        { iNext. iFrame. simpl. iFrame. iPureIntro. auto. }
         iPoseProof (ogP_fuel_add with "Fng") as "[Fng Fng']".
         iPoseProof (ogP_fuel_add with "Fng'") as "[Fng' Fng_mr]".
-        iPoseProof (ogP_fuels_add_group with "Fng' GF")as "GF".
-
-        TODO
-
-        iMod (ogP_fuel_mon_gen
-        iPoseProof (big_sepS_union _ {[ng]} with "$Fng_mr $F_mr")as "F_mr".
+        iPoseProof (ogP_fuels_add_group with "Fng_mr F_mr") as "F_mr".
         iModIntro.
-        iApply ("TicketLock_release_spec" with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
-      { iSplit. 1: iPureIntro; set_solver. iFrame. simpl. by iFrame. }
-      (* FIXME: it would be nice if we don't get this evar *)
-      Unshelve. 2: exact 0.
-      iIntros "(_& TG& Ggu& _)".
-      replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
-      iMod (group_delete with "TG Ggu") as "TG". replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
-      iPoseProof (big_sepS_union _ {[gu]} G with "GF") as "[_ GF]". 1: set_solver.
-      lwp_pures.
-      iModIntro. lwp_finish.
-      iApply ("HΦ" $! _ ∅). rewrite union_empty_r_L. iFrame. by iModIntro.
+        iApply ("TicketLock_release_spec" $! 0 with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
+        { iSplit. 1: iPureIntro; set_solver. iFrame. simpl. by iFrame. }
+        iIntros "(_& TG& Ggu& _)".
+        replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
+        iMod (group_delete with "TG Ggu") as "TG".
+        replace (({[ng]} ∪ ({[gu]} ∪ G)) ∖ {[gu]}) with ({[ng]} ∪ G) by set_solver.
+        iPoseProof (ogP_fuels_remove_group gu with "GF") as "GF".
+        replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
+        iPoseProof (ogP_fuels_add_group with "Fng' GF")as "GF".
+        lwp_pures.
+        iModIntro. lwp_finish.
+        iApply ("HΦ"). iFrame. iModIntro. iPureIntro. set_solver.
+      + iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Fq Gq]") as "_".
+        { iNext. iFrame. simpl. auto. }
+        iModIntro.
+        iApply ("TicketLock_release_spec" $! 0 with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
+        { iSplit. 1: iPureIntro; set_solver. iFrame. simpl. by iFrame. }
+        iIntros "(_& TG& Ggu& _)".
+        replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
+        iMod (group_delete with "TG Ggu") as "TG".
+        iPoseProof (ogP_fuels_remove_group gu with "GF") as "GF".
+        replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
+        lwp_pures.
+        iModIntro. lwp_finish.
+        iApply ("HΦ"). iFrame. by iModIntro.
     - simpl. iDestruct "QC" as "(%ln& QC_Ptr_lh& Hφ& QC)".
       iModIntro.
       iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $QC_Ptr_lh]"). 1: done.
