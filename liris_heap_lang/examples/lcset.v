@@ -383,6 +383,7 @@ Section proof.
     iExists 1. iIntros. iIntros (Φ) "!# (Hg & HlockFuel & #Hs) HΦ".
     iDestruct (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iDestruct (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
+    iDestruct (Int.lwp_lt) as (mlt) "Int_lwp_lt".
 
     iDestruct "Hs" as (γlk_root lk_root) "[#Hlk_ℓ #Hn_root]".
 
@@ -470,8 +471,39 @@ Section proof.
     iAssert (ogP_fuels ({[gu]} ∪ G) 100)%I as "-#Hfuel". { admit. }
     post_wp.
 
-    (* TODO: load curr.next (with [lwp_load _ ∅ 1] for a £1 credit),
-       read n'.val via the persistent pointsto, apply [Int.lwp_lt], branch:
+    lwp_pures. iModIntro.
+
+    lwp_lam. post_wp. lwp_pures.
+    lwp_bind (! _)%E. iModIntro.
+    lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_load _ ∅ 1 with "[Hf Hg $nextp]"). { iFrame "∗#". done. }
+    iIntros "[(Hlc' & Hg & _) nextp]". iModIntro.
+    lwp_pures. iModIntro. lwp_lam. post_wp. lwp_pures.
+    lwp_bind (! _)%E. iModIntro.
+    lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_load _ ∅ 0 with "[$Hg $Hf]").
+    { iFrame "#". done. }
+    iIntros "[(_ & Hg & _) _]".
+
+    lwp_bind (Int.lt _ _). iModIntro.
+    iApply ("Int_lwp_lt" with "[$Hg]").
+    { admit. } (* TODO: fuel for lt *)
+    iIntros "Hg !>".
+    destruct (decide (Int.lt_rel v' e)) as [Hlt|Hge].
+    {
+      rewrite bool_decide_true //. lwp_pures. iModIntro.
+      lwp_lam. post_wp. lwp_lam. post_wp. lwp_pures.
+      lwp_bind (! _)%E.
+      destruct v'; try done.
+      iDestruct "Hn'" as (???) "(#Hn' & Hlk'_ℓ & %Hℓ)".
+      lOneFuel "Hfuel" as "[Hf Hfuel]".
+      iModIntro. iApply (lwp_load _ ∅ 1 with "[Hf Hg]").
+      { iFrame "∗#". iDestruct (is_node_unfold with "Hn'") as "(? & $ & _)". done. }
+      iIntros "[(_ & Hg & _) _]". iModIntro.
+    }
+
+
+    (* TODO: read n'.val (persistent), apply [Int.lwp_lt], branch:
          - then: acquire n', combine + lock_reconfig + split halves +
            release curr, recurse via IH;
          - else: repackage loop_inv into node_lock_inv and apply HΦ. *)
