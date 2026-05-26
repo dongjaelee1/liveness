@@ -470,8 +470,8 @@ Section proof.
     iAssert (ogP_fuels ({[gu]} ∪ G) 100)%I as "-#Hfuel". { admit. }
     post_wp.
 
-    (* TODO: load curr.next (with [lwp_load _ ∅ 1] to harvest a £1 credit
-       for the next iteration's ▷-strip), load n'.val, [Int.lwp_lt], branch:
+    (* TODO: load curr.next (with [lwp_load _ ∅ 1] for a £1 credit),
+       read n'.val via the persistent pointsto, apply [Int.lwp_lt], branch:
          - then: acquire n', combine + lock_reconfig + split halves +
            release curr, recurse via IH;
          - else: repackage loop_inv into node_lock_inv and apply HΦ. *)
