@@ -292,8 +292,8 @@ Lemma lwp_fork s i E E' e Φ :
                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                    thP_groups j ∅ -∗
                    ALC (|={E',E}=>
-                   (|={E}=>m Φ (LitV LitUnit)) ∗
-                   (lwpupd j ⊤ e (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))))) -∗
+                        |={E}=>m (|={E}=>m Φ (LitV LitUnit)) ∗
+                                (lwpupd j ⊤ e (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))))) -∗
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step.
@@ -304,7 +304,7 @@ Proof.
   iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
   iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tb Wcs [Efs]") as "H".
   { rewrite dom_singleton_L big_sepS_singleton. eauto. }
-  iMod "H" as "(H& E)".
+  iMod "H" as "HE".
   iMod (hG_history_auth_app with "Ha") as "Ha".
   rewrite big_sepM_singleton. iFrame.
   replace (dom (<[i:=K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
@@ -313,8 +313,8 @@ Proof.
   iMod (thread_map_thread_update _ _ (K #()) with "[$It $Ti]") as "[It Ti]".
   replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
   { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
-  iFrame. iModIntro. iSplitR "H"; cycle 1.
-  { iMod "H". by iFrame. }
+  iFrame. iModIntro. iSplitR "HE"; cycle 1.
+  { iMod "HE". iDestruct "HE" as "[>H $]". by iFrame. }
   iSplitR.
   { iPureIntro. destruct HI. split.
     - rewrite length_app H. simpl. lia.

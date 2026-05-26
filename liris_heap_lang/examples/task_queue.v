@@ -76,15 +76,15 @@ Section proof.
   (** ** Program proofs *)
   (** FIXME: better notation for triples with this pattern *)
   Lemma TaskQueue_put_task_spec :
-    ⊢ ∃ m, ∀ lc i j G g K B γ ℓ ℓ' (ql task_f task_a : val),
+    ⊢ ∃ m, ∀ lc i j G g K B γ ℓ ℓg (ql task_f task_a : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
-         ogP_obls j g ℓ' K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
+         ogP_obls j g ℓg K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
          is_task ℓ (task_f, task_a)%V B ∗ is_task_queue ql γ ℓ }}}
       TaskQueue.put_task ql task_f task_a @ i
-    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓ' (K ∖ B) }}}.
+    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓg (K ∖ B) }}}.
   Proof.
     iPoseProof (Queue_enqueue_spec) as (m) "Queue_enqueue_spec".
-    iExists (100 ⊕ m)%M. iIntros (lc i j G g K B γ ℓ ℓ' ql task_f task_a) "!> % (TG& GF& Gg& %Sub& OF& TASK& (%Hℓ& #IQ)) HΦ".
+    iExists (100 ⊕ m)%M. iIntros (lc i j G g K B γ ℓ ℓg ql task_f task_a) "!> % (TG& GF& Gg& %Sub& OF& TASK& (%Hℓ& #IQ)) HΦ".
     rewrite /TaskQueue.put_task.
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_Queue_enqueue]".
     iPoseProof (ogP_fuels_init with "GF") as "GF".
@@ -191,7 +191,8 @@ Section proof.
     ⊢ ∃ m, ∀ (b : bool) i G γ ℓ (ql : val),
     l{{{ thP_groups i G ∗
          (if b
-          then (∃ g, ([∗ set] g ∈ G, ogP_fuel g (ℓ)%ordi m) ∗ queue_worker γ i g ∗ ⌜G = {[g]} ∧ (ℵ <= ℓ)%ordi⌝)
+          then (∃ g, ⌜G = {[g]} ∧ (ℵ <= ℓ)%ordi⌝ ∧ (ogP_fuel g (ℓ)%ordi m) ∗ queue_worker γ i g)
+          (* then (∃ g, ([∗ set] g ∈ G, ogP_fuel g (ℓ)%ordi m) ∗ queue_worker γ i g ∗ ⌜G = {[g]} ∧ (ℵ <= ℓ)%ordi⌝) *)
           else (⌜G = ∅⌝)) ∗
          is_task_queue ql γ ℓ }}}
       TaskQueue.worker ql @ i
@@ -203,7 +204,9 @@ Section proof.
     iClear "HΦ".
     rewrite /TaskQueue.worker.
     destruct b.
-    - iDestruct "HW" as "(%& GF& Qw& %)". destruct H as (->& Hlayer).
+    - iDestruct "HW" as "(%& %& GF& Qw)". destruct H as (->& Hlayer).
+      iAssert ([∗ set] g ∈ {[g]}, ogP_fuel g (ℓ)%ordi _)%I with "[GF]" as "GF".
+      { iApply big_sepS_singleton. iFrame. }
       iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_mr]".
       iPoseProof (ogP_fuels_init with "GF") as "GF".
       lwp_pure. simpl.
@@ -258,13 +261,40 @@ Section proof.
       iApply ("IH" with "TG GF").
   Qed.
 
-  TODO
-
-  (** Initializes a queue and Forks one worker thread *)
-  Definition init : val :=
-    λ: <>,
-      let: "q" := Queue.init #() in
-      Fork (worker "q");;
-      "q".
+  Lemma TaskQueue_init_spec :
+    ⊢ ∃ m, ∀ (lc : Ord.t) i G ℓ,
+    l{{{ thP_groups i G ∗ ogP_fuels G m ∗ ⌜(ℵ <= ℓ)%ordi⌝ }}}
+      TaskQueue.init #() @ i
+    l{{{ ql γ, RET ql; £ lc ∗ thP_groups i G ∗ is_task_queue ql γ ℓ }}}.
+  Proof.
+    iPoseProof (Queue_init_spec) as (mqi) "Queue_init_spec".
+    iPoseProof (TaskQueue_worker_spec) as (mtw) "TaskQueue_worker_spec".
+    (** For internal steps and function calls *)
+    iExists (100%nat ⊕ mqi)%M. iIntros (lc i G ℓ) "!> % (TG& GF& %Hlayer) HΦ".
+    rewrite /TaskQueue.init.
+    iPoseProof (ogP_fuels_add_gen with "GF") as "[GF GF_qi]".
+    lwp_pure. simpl.
+    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
+    lwp_bind (Queue.init _).
+    iModIntro.
+    iApply ("Queue_init_spec" $! 0 (is_task ℓ) with "[$TG $GF_qi]").
+    iIntros (??) "(_& TG& IQI)".
+    lwp_pures.
+    lwp_bind (Fork _).
+    iPoseProof (ogP_fuels_add 96 1 with "GF") as "[GF GF1]". 1: lia.
+    iModIntro.
+    iApply (lwp_fork). iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
+    iIntros (?) "TG _ TGj !>". iModIntro.
+    iMod (group_alloc _ _ _ ℓ mtw with "TGj") as "(%& %Ning& TGj& Gg& Fg)".
+    iMod (is_queue_initialize with "IQI Gg") as "[#IQ Qw]".
+    iModIntro. iSplitR "TGj Fg Qw".
+    - iModIntro. lwp_pures.
+      iModIntro. lwp_finish.
+      rewrite /is_task_queue. iApply ("HΦ" with "[$Q_LC $TG $IQ]").
+    - iModIntro. rewrite /is_task_queue.
+      iApply ("TaskQueue_worker_spec" $! true with "[$TGj $Fg $Qw $IQ]").
+      { iPureIntro. split; auto. set_solver. }
+      iIntros "%". done.
+  Qed.
 
 End proof.

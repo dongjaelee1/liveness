@@ -242,18 +242,18 @@ Section proof.
 
   (** TODO: LAT-style spec that enables the client to put ogP_obls in some invariant. *)
   Lemma Queue_enqueue_spec :
-    ⊢ ∃ m, ∀ lc i j G g K B φ γ ℓ ℓ' (ql x : val),
+    ⊢ ∃ m, ∀ lc i j G g K B φ γ ℓ ℓg (ql x : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
-         ogP_obls j g ℓ' K ∗
+         ogP_obls j g ℓg K ∗
          ⌜ B ⊆ K ⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
          φ x B ∗
          is_queue ql γ ℓ φ }}}
       Queue.enqueue ql x @ i
-    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓ' (K ∖ B) }}}.
+    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓg (K ∖ B) }}}.
   Proof.
     iPoseProof (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iPoseProof (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
-    iExists (100 ⊕ ma ⊕ mr)%M. iIntros (lc i j G g K B φ γ ℓ ℓ' ql x) "!> % (TG& Fs& GB& %SubBK& FB& Hφ& #IQ) HΦ".
+    iExists (100 ⊕ ma ⊕ mr)%M. iIntros (lc i j G g K B φ γ ℓ ℓg ql x) "!> % (TG& Fs& GB& %SubBK& FB& Hφ& #IQ) HΦ".
     rewrite /Queue.enqueue.
     iPoseProof (ogP_fuel_add_set with "Fs") as "[GF F_m]".
     iPoseProof (ogP_fuel_add_set with "F_m") as "[F_ma F_mr]".

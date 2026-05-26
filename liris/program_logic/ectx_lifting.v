@@ -77,8 +77,9 @@ Section wp.
                               ALC (|={E2,E1}=>
                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                     (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
-                                     [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+                                     |={E1}=>m
+                                              (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
+                                            [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H". iApply lwp_lift_atomic_step.
@@ -108,7 +109,7 @@ Section wp.
     iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "($& %&$&$& %&$& H)"; iModIntro.
     iIntros (??? Hstep). iMod ("H" with "[# //]") as "H".
     iIntros "!> Tb Wcs _". iMod ("H" with "Tb Wcs") as ">(%& I& $)".
-    subst. rewrite !map_union_empty. iFrame. iModIntro. done.
+    subst. rewrite !map_union_empty. iFrame. iModIntro. iModIntro. done.
   Qed.
 
   Lemma lwp_lift_pure_det_base_step_no_fork {s i E E' Φ ς} e1 e2 :

@@ -159,8 +159,9 @@ Section lifting.
                                ALC (|={E2,E1}=>
                                       (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                      (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
-                                      [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))
+                                      |={E1}=>m
+                                               (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
+                                             [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros "H". iApply (lwp_lift_step s i E1 e1).
@@ -171,8 +172,9 @@ Section lifting.
     iExists _. iFrame "Tb Gfs". iExists _. iFrame "Rs".
     iIntros (????). iMod ("H" with "[//]") as "H".
     iIntros "!> Tb Wcs Efs". iMod ("H" with "Tb Wcs Efs") as "H".
-    iMod "Hclose" as "_". iMod "H" as "($&Hq&$)".
-    iModIntro. destruct (to_val e2) eqn:?; last by iExFalso.
+    iMod "Hclose" as "_". iMod "H" as "($&Hq)".
+    iModIntro. iMod "Hq" as "[Hq $]".
+    destruct (to_val e2) eqn:?; last by iExFalso.
     iApply lwp_value_lwpupd; last eauto. by apply of_to_val.
   Qed.
 
