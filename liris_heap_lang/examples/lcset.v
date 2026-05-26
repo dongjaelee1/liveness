@@ -400,8 +400,53 @@ Section proof.
 
     iDestruct (is_node_unfold with "Hn_root") as "(#val_root & #lk_root_p & #Hlk_root)".
     lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
-    iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.acquire _). iModIntro.
+    iApply (lwp_load _ ∅ 1 with "[Hf Hg]"). { iFrame "∗#". done. }
+    iIntros "[(Hlc & Hg & _) _]". lwp_bind (TicketLock.acquire _). iModIntro.
+
+    (* Acquire the head's lock.  Fuel reconciliation (locate's [iExists 1] vs
+       acquire's [m]) admitted. *)
+    iAssert ([∗ set] g ∈ G, ogP_fuel g ((ℵ × lockΔ) ⊕ ℵ)%ordi ma)%I
+      with "[]" as "-#HacqFuel". { admit. }
+    iApply ("TicketLock_acquire_spec" with "[$Hg $HacqFuel]").
+    { iFrame "#". }
+    iIntros (gu κu) "(_ & %Hgu & Hg & Hobl & Hf_gu & _ & _ & Htok & Hbody)".
+    iModIntro. lwp_pure.
+
+    (* Refresh ambient fuel for the new group set {[gu]} ∪ G. *)
+    iClear "Hfuel".
+    iAssert (ogP_fuels ({[gu]} ∪ G) 100)%I as "-#Hfuel". { admit. }
+    post_wp.
+
+    iDestruct "Hbody" as (n0 v0 ℓ0) "(Hlk_half & nextp & #val0 & Hown & Hn0)".
+
+    iApply lwp_sfmupd.
+    iAssert (|={⊤}=> ∃ (n0' : loc) (v0' : Int.t) (ℓ0' : ord.t),
+              γlk_root ↪LOCK{#1/2} ℓ0' ∗
+              (s +ₗ 2) ↦ #n0' ∗
+              (n0' +ₗ 1) ↦□ (Int.into_val v0') ∗
+              own_interval γ Int.NegInf v0' ∗
+              match v0' with
+              | +∞ => True
+              | -∞ => False
+              | _ => (∃ lk' γlk' ℓ',
+                        is_node n0' γ v0' lk' γlk' ∗
+                        γlk' ↪LOCK{#1/2} ℓ' ∗
+                        ⌜ ((ℓ' ⊕ ℵ ⊕ ℵ) < ℓ0')%ordi ⌝)
+              end)%I
+      with "[Hlk_half nextp Hown Hn0 Hlc]" as ">Hbody'".
+    { iExists n0, v0, ℓ0. iFrame "Hlk_half nextp val0 Hown".
+      destruct v0 as [| z |]; [done| |by iModIntro].
+      iDestruct "Hn0" as (lk' γlk' ℓ') "(Hn_later & Hlk' & %Hb)".
+      iMod (lc_fupd_elim_later with "Hlc Hn_later") as "#Hn".
+      iModIntro. iExists lk', γlk', ℓ'. iFrame "Hn Hlk'".
+      iPureIntro. admit. }
+
+    iDestruct "Hbody'" as (n0' v0' ℓ0') "(Hlk_half & nextp & val0' & Hown & Hn0)".
+    iAssert (locate_loop_inv gu κu γ e s lk_root γlk_root Int.NegInf)%I
+      with "[Hlk_half Htok nextp val0' Hown Hn0]" as "Hloop".
+    { iExists ℓ0'. iFrame "Hlk_half Htok Hn_root".
+      iSplit; [iPureIntro; admit|].
+      iExists n0', v0'. iFrame. }
 
     (* Strategy for the rest of the proof:
 
@@ -418,6 +463,18 @@ Section proof.
           claimed by the loop invariant is established by [makeSet]: the head
           sits at level [ℵ × lockΔ = ℵ × ℵ], and its initial successor (the
           tail sentinel) sits at level 0, leaving plenty of room.
+
+          NOTE: the body's finite-branch payload carries [▷ is_node n0 …]
+          (the ▷ comes from the [is_node_pre]-fixpoint Contractive structure),
+          but [locate_loop_inv] expects the un-▷ form.  Strip the ▷ using the
+          [LC : £ 1] credit accumulated by the curr.lk load above:
+
+              iApply lwpupd_fupd_l.
+              iMod (lc_fupd_elim_later with "LC Hnext_laterly") as "#Hnext".
+              iModIntro. iModIntro.
+
+          A fresh credit is harvested per iteration via the same trick on the
+          loop's own [! (nextRef curr)] load.
 
        3. Step into [(rec loop curr := …) "x"] and iLöb-induct on a
           generalisation (Coq variables only):
