@@ -456,7 +456,21 @@ Section proof.
     iClear "Hlk_ℓ Hn_root val_root lk_root_p Hlk_root".
     iLöb as "IH" forall (s lk_root γlk_root) "Hloop".
 
-    (* TODO: step into the rec body, load curr.next, load n'.val, branch:
+    (* Unpack the loop invariant.  [Hn_curr : is_node s γ Int.NegInf …] is
+       persistent (we re-extract its components) and [Hbody] is the opened
+       lock-body of curr at level ℓ_curr. *)
+    iDestruct "Hloop" as (ℓ_curr)
+      "(Hlk_half & Htok & #Hn_curr & %Hv_lt_e & Hbody)".
+    iDestruct (is_node_unfold with "Hn_curr") as "(#val_curr & #lk_curr & #Hlk_curr)".
+    iDestruct "Hbody" as (n' v') "(nextp & #val_next & Hown & Hn')".
+
+    (* Step into  (rec loop curr := body) s. *)
+    lwp_pure.
+    iClear "Hfuel".
+    iAssert (ogP_fuels ({[gu]} ∪ G) 100)%I as "-#Hfuel". { admit. }
+    post_wp.
+
+    (* TODO: load curr.next, load n'.val, Int.lt, branch:
           - then: acquire n', combine + lock_reconfig + split halves +
             release curr, recurse via IH;
           - else: repackage loop_inv into node_lock_inv and apply HΦ. *)
