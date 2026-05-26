@@ -398,56 +398,74 @@ Section proof.
     lwp_lam. post_wp. lwp_pures. iModIntro. lwp_lam. post_wp. lwp_lam. post_wp.
     lwp_pures. lwp_bind (! _)%E. iModIntro.
 
-    iDestruct (is_node_unfold with "Hn_root") as "(#lk_root_p & #val_root & #Hlk_root)".
+    iDestruct (is_node_unfold with "Hn_root") as "(#val_root & #lk_root_p & #Hlk_root)".
     lOneFuel "Hfuel" as "[Hf Hfuel]".
     iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
     iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.acquire _). iModIntro.
 
-    (* TODO: apply [TicketLock_acquire_spec] for the head sentinel to obtain
-       [Htok], [Hobl], and the opened head body — establishing
-       [locate_loop_inv gu κu γ e root lk_root γlk_root -∞] before entering
-       the recursive loop. *)
+    (* Strategy for the rest of the proof:
 
-    (* The locate function's recursive loop walks the list.  Strategy from
-       here:
+       1. Acquire the head's lock.  The acquire spec's fuel precondition is
+          [ogP_fuel g (ℓ ⊕ ℵ) m], and for the head ℓ = ℵ × lockΔ, so the
+          required level is exactly [locateℓ = ℵ × lockΔ ⊕ ℵ] — the level of
+          the *input* fuel [HlockFuel].  Plumbing that through requires
+          reconciling the spec's quantified amount [m] with locate's witness
+          (currently [iExists 1]), via [ogP_fuel_extend_set] from level
+          locateℓ down to a sub-level with arbitrary amount.
 
-       1. iLöb on a goal of shape
-              locate_loop_inv gu κu γ e curr lk γlk v ∗ <ambient fuel/groups>
-              -∗ lWP (loop #curr) {{ <postcondition shape> }}
-          quantifying over [curr v lk γlk] inside the Löb.
+       2. After acquire, unpack the opened body [∃ ℓ0 n0 v0, …] and assemble
+          [locate_loop_inv gu κu γ e s lk_root γlk_root -∞].  The 2ℵ gap
+          claimed by the loop invariant is established by [makeSet]: the head
+          sits at level [ℵ × lockΔ = ℵ × ℵ], and its initial successor (the
+          tail sentinel) sits at level 0, leaving plenty of room.
 
-       2. Per iteration:
-            a. Load curr.next = n'.
-            b. Load n'.val = v'.
-            c. Branch on Int.lt v' e.
+       3. Step into [(rec loop curr := …) "x"] and iLöb-induct on a
+          generalisation (Coq variables only):
 
-            ── then-branch (recurse) ──
-            d. Apply [TicketLock_acquire_spec] to n''s lock, instantiating with
-               the half-token already in the loop invariant.  After acquire we
-               hold both halves of n''s ↪LOCK token (one from the loop inv,
-               one returned by acquire), so we can combine and call
-               [lock_reconfig] to raise n''s level from ℓ' to ℓ' ⊕ ℵ — paid for
-               by the 2ℵ headroom from the loop invariant.
-            e. Split n''s token back into halves.  One half stays in n''s now-
-               held body for the next iteration's loop inv; the other half is
-               packaged into curr's body for releasing it.
-            f. Apply [TicketLock_release_spec] to curr's lock with the
-               rebuilt body.  The released body still has the 2ℵ gap to its
-               (unchanged) successor (= old n'), so the gap invariant holds.
-            g. Recurse via the Löb hypothesis with curr := n'.
+              ∀ curr lk γlk v,
+                locate_loop_inv gu κu γ e curr lk γlk v -∗
+                <ambient: thP_groups, ogP_fuels, ogP_fuel gu …> -∗
+                lWP <inlined-loop-body curr> {{ … }}.
 
-            ── else-branch (terminate) ──
-            d'. Repackage the body into [node_lock_inv curr γ v γlk n' v'],
-                apply [HΦ].  Pure facts [Int.lt_rel v e] / [¬ Int.lt_rel v' e]
-                / [Int.lt_rel v v'] follow from the loop inv and the branch
-                test (the last one from [own_interval γ v v'] excluding the
-                degenerate case).
+       4. Per iteration:
+            a. Load curr.next  (uses [nextp] inside [locate_loop_inv]).
+            b. Load n'.val     (uses persistent [(n' +ₗ 1) ↦□ …]).
+            c. [Int.lwp_lt] on v' against e.
 
-       3. The head sentinel establishes the 2ℵ gap upfront: its level is
-          [ℵ × lockΔ] = ℵ × ℵ, while [makeSet] gives nodes installed beneath
-          it a level [≤ ℵ × lockΔ − lockΔ] (one step down in the lockΔ-chain).
-          The difference is [lockΔ = ℵ ≥ 2ℵ] for ordinal addition in the
-          density sense; the bookkeeping is tedious but routine. *)
+            ── then-branch ([Int.lt v' e]) ──
+            d. [TicketLock_acquire_spec] on n', supplying the
+               [γlk' ↪LOCK{#1/2} ℓ'] half-token from the loop inv.  After
+               acquire we have both halves of n''s ↪LOCK token:
+                 • the half we just brought in (from the loop inv);
+                 • the half stashed in n''s body (the [γlk' ↪LOCK{#1/2} ℓ']
+                   inside [node_lock_inv_pre]).
+               Combine and call [lock_reconfig] to raise ℓ' → ℓ' ⊕ ℵ — paid
+               for by ℵ of the 2ℵ headroom.
+            e. Split the bumped token back into halves.  One half is stored
+               into curr's body (so curr can be released), the other half
+               is kept for the next [locate_loop_inv] (covering n').
+            f. [TicketLock_release_spec] on curr.  The released body still
+               points at n', now with the bumped level recorded as
+               [γlk' ↪LOCK{#1/2} (ℓ' ⊕ ℵ)] in the finite branch.
+            g. Recurse via [IH].
+
+            ── else-branch (¬ [Int.lt v' e]) ──
+            d'. Repackage the body of [locate_loop_inv] into
+                [node_lock_inv curr γ v γlk n' v'].  The loop inv carries a
+                stronger ⌜ℓ' ⊕ ℵ ⊕ ℵ < ℓ_curr⌝ than [node_lock_inv]'s
+                ⌜ℓ' ⊕ lockΔ < ℓ_curr⌝ (since lockΔ = ℵ), so the weaker
+                condition follows.
+            d''. Discharge the pure facts:
+                  - [Int.lt_rel v e]:   from the loop inv.
+                  - [¬ Int.lt_rel v' e]: from the else branch.
+                  - [Int.lt_rel v v']:  from [own_interval γ v v'] +
+                                         [v < e] + [e ≤ v'] + well-formedness
+                                         (excluding the v = v' degeneracy).
+
+       5. The pure facts [Int.lt_rel v v'] and [Int.lt_rel -∞ e] would benefit
+          from a small bookkeeping lemma about [own_interval] (e.g. that an
+          [own_interval γ a b] entails [a ≤ b] strictly, or a non-degeneracy
+          lemma analogous to [own_interval_not_NegInf]). *)
     admit.
   Admitted.
 
