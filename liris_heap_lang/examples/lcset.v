@@ -595,7 +595,7 @@ Section proof.
 
       (* Acquire next's lock.  From Hn' (the [match v'] in node_lock_inv at
          v' = Fin e) we have is_node next and the half lock-token. *)
-      iDestruct "Hn'" as (γlk' lk' ℓ') "(Hnext & Hlk'_ℓ & %Hℓ')".
+      iDestruct "Hn'" as (lk' γlk' ℓ') "(Hnext & Hlk'_ℓ & %Hℓ')".
       iMod (lc_fupd_elim_later with "[$] Hnext") as "#Hnext".
 
       iDestruct (is_node_unfold with "Hnext") as "(#v_next & #lk_next & #Hlk_next)".
@@ -605,13 +605,13 @@ Section proof.
       iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
       iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.acquire _). iModIntro.
 
-      iApply ("TicketLock_acquire_spec" $! 0 ∅ with "[$Hg HacqFuel]").
-      { iFrame "#". iFrame. }
+      iApply ("TicketLock_acquire_spec" $! 0 81 with "[$Hg HacqFuel Hlk'_ℓ]").
+      { iFrame "#". iFrame. admit. } (* TODO: acquire fuel *)
       iIntros (gu' κu') "(_ & %Hgu' & Hg & Hobl' & Hf' & _ & _ & Htok' & Hown_next)".
       iModIntro. lwp_pure.
 
       (* Read next.next, then store it into curr.next. *)
-      iDestruct "Hown_next" as (?) "(Hlk'_ℓ' & nextp' & #v'' & Hown' & Hn'')".
+      iDestruct "Hown_next" as (???) "(Hlk'_ℓ' & nextp' & #v'' & Hown' & Hn'')".
       lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
       lOneFuel "Hfuel" as "[Hf Hfuel]".
       iApply (lwp_load _ ∅ 0 with "[Hf Hg $nextp']"). { iFrame "∗#". done. }
@@ -716,29 +716,69 @@ Section proof.
     destruct (decide (Int.lt_rel e v')) as [Hlt|Hge].
     - (* Insert branch.  This is the structurally novel part vs. member/remove. *)
       rewrite bool_decide_true; last done.
-      lwp_pures. iModIntro.
+      lwp_pures.
 
-      (* TODO: high-level shape of the rest of this branch:
-         1. Open the AU.  Use [own_set_add] with the current [own_interval γ v v']
-            to obtain [own_set γ (s' ∪ {[e]})] together with the split intervals
-            [own_interval γ v (Fin e)] and [own_interval γ (Fin e) v'].
-            Close the AU (linearisation point of [add]).
-         2. Call [lwp_newNode] with v := e, next := <the located [next] node>,
-            v' := <the located [v']>.  This consumes:
-              - the half-token for next from Hn' (when v' is finite, Hn' carries
-                exactly the required [is_node ∗ ↪LOCK{#1/2} ∗ ⌜ℓ' ⊕ lockΔ < ℓ⌝]);
-              - [own_interval γ e v'].
-            The +∞ case is handled by the alternate branch of newNode's
-            precondition: just frame [(next +ₗ 1) ↦□ +∞] (we have [v'] which is
-            this very pointsto).
-            We get back a fresh [is_node n_new γ e lk_new γlk_new] and the half
-            lock-token [γlk_new ↪LOCK{#1/2} ℓ_new] for the new node.
-         3. Store [nextp]: curr.next := #n_new.  This replaces the n' in curr's
-            lock body with n_new; the new body uses [own_interval γ v (Fin e)]
-            (held from step 1) and the finite-branch payload for v' = Fin e
-            (the new node's is_node + half-token from step 2).
-         4. Release curr's lock with the rebuilt body, then return #(). *)
-      admit.
+      iDestruct (own_interval_not_NegInf with "Hown") as %Hnot_neginf.
+
+      (* The insert step is  nextRef curr <- newNode v next  — newNode evaluates
+         first, then the store.  We open the AU around [newNode]: this is the
+         linearisation point of [add].  Doing the AU early is safe because we
+         hold curr's lock, so no concurrent thread can act on [e] between this
+         logical update and the matching physical store below. *)
+      lwp_bind (newNode _ _)%E.
+
+      iApply lwpupd_fupd_l.
+      iMod "Hau" as (s') "[Hs Hau]".
+      iMod (own_set_add γ s' v v' e with "Hs Hown")
+        as "(Hs & Hown_lo & Hown_hi)".
+      { by destruct Hrange. }
+      { destruct v' as [| | k]; simpl in *; try done. }
+      iMod ("Hau" with "Hs") as "HΦ".
+      iModIntro. iModIntro.
+
+      (* Call newNode with value e and successor n'.  In the finite case Hn'
+         carries exactly the required half-token; in the +∞ case [#v'] is the
+         persistent pointsto we need.
+         The new node's lock level ℓ_new must satisfy
+              (n'-level ⊕ lockΔ) < ℓ_new   and   ℓ_new ⊕ lockΔ < ℓ_curr,
+         which exists by density of the ordinal order — left as an admit. *)
+      iApply ("lwp_newNode" $! _ i ({[gu]} ∪ G) _ γ e v'
+                with "[$Hg $HnewFuel Hn' $Hown_hi]").
+      { destruct v' as [| | k] eqn:Hv'.
+        - by destruct Hnot_neginf.
+        - iFrame.
+        - iDestruct "Hn'" as (lk' γlk' ℓ') "(#Hnext & Hlk' & %Hℓ')".
+          iExists lk', γlk', ℓ'. iFrame "Hnext Hlk'".
+          iPureIntro. (* ℓ' ⊕ lockΔ < ℓ_new *) admit. }
+      iIntros (n_new lk_new γlk_new) "(Hg & #Hn_new & Hlk_new_ℓ) !>".
+      lwp_pures. iModIntro. lwp_pures.
+
+      (* Store curr.next := #n_new — the physical counterpart of the LP above. *)
+      lwp_lam. post_wp. lwp_pures. lwp_bind (_ <- _)%E. iModIntro.
+      lOneFuel "Hfuel" as "[Hf Hfuel]".
+      iApply (lwp_store _ ∅ 0 with "[$Hg $Hf $nextp]").
+      iIntros "[(_ & Hg & _) nextp]". iModIntro. lwp_pures. iModIntro.
+
+      (* Step into [unlockNode curr] and release curr's lock, supplying the
+         rebuilt body (with n'' := n_new, v'' := Fin e). *)
+      lwp_lam. post_wp. lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
+      lOneFuel "Hfuel" as "[Hf Hfuel]".
+      iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
+      iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.release _).
+
+      iApply lwp_sfmupd.
+      iDestruct (is_node_unfold with "Hn_new") as "(#vN & #lkN & #HlkN_inv)".
+      iApply ("TicketLock_release_spec" $! 0 with
+                "[$Hg $Htok $Hκ Hlk0_ℓ nextp Hown_lo Hlk_new_ℓ HrelFuel]").
+      { iFrame "#". iSplit; [iPureIntro; set_solver|].
+        iExists n_new, (Int.Fin e), _.
+        iFrame "Hlk0_ℓ nextp vN Hown_lo".
+        iExists lk_new, γlk_new, _. iFrame "Hn_new Hlk_new_ℓ".
+        iPureIntro. (* ℓ_new ⊕ lockΔ < ℓ_curr *) admit. }
+      iIntros "(_ & Hg & Ho)". rewrite difference_diag_L.
+      iMod (group_delete with "Hg Ho") as "Hg". iModIntro.
+      iDestruct (ogP_fuels_remove_group gu with "Hfuel") as "Hfuel".
+      iFrame.
 
     - (* Already-present branch.  Mirrors lwp_remove's not-in-set branch:
          observe e ∈ s' via own_interval_agree, close the AU with the same
