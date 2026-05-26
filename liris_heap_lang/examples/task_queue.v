@@ -66,9 +66,8 @@ Section proof.
               l{{{ rv, RET rv; £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓg (K ∖ B) }}})%I.
 
   (** The invariant *)
-  (* The lt condition is not needed if use classical facts *)
   Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) : iProp Σ :=
-    (⌜(ord.O < ℓ)%ordi⌝) ∗ is_queue ql γ ℓ (is_task ℓ).
+    is_queue ql γ ℓ (is_task ℓ).
 
   (** ** Lemmas *)
   Global Instance is_task_queue_persistent ql γ ℓ : Persistent (is_task_queue ql γ ℓ).
@@ -99,42 +98,52 @@ Section proof.
     iIntros "(_& TG& Gg)". iApply ("HΦ" with "[$Q_LC $TG $Gg]").
   Qed.
 
-  TODO
-
   Lemma TaskQueue_run_task_spec :
-    ⊢ ∃ m, ∀ lc (b : bool) wi ni wg ng i j G g A γ ℓ (ql : val),
+    ⊢ ∃ m, ∀ lc μ (b : bool) wi wg i G γ ℓ (ql : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℵ ⊕ ℓ)%ordi m) ∗
-         ogP_obls j g ℓ A ∗
          (if b
-          then queue_worker γ wi wg ∗ ogP_obls ni ng ℓ ∅
+          then queue_worker γ wi wg
           else True) ∗
          is_task_queue ql γ ℓ }}}
       TaskQueue.run_task ql @ i
-    l{{{ rv, RET rv; £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓ A ∗
-                     (if b
-                      then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅
-                      else True) }}}.
+      l{{{ rv, RET rv; £ lc ∗
+                       (if b
+                        then (∃ ng, thP_groups i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
+                                    queue_worker γ i ng ∗ ogP_obls wi wg ℓ ∅ ∗ ogP_fuel ng ℓ μ)
+                        else (thP_groups i G)) }}}.
   Proof.
     iPoseProof (Queue_dequeue_spec) as (m) "Queue_dequeue_spec".
     (** For internal steps, executing task, and calling dequeue *)
-    iExists (100 ⊕ 1 ⊕ m)%M. iIntros (lc b wi ni wg ng i j G g A γ ℓ ql) "!> % (TG& GF& Gg& HW& (%Hℓ& #IQ)) HΦ".
+    iExists (100 ⊕ 1 ⊕ m)%M. iIntros (lc μ b wi wg i G γ ℓ ql) "!> % (TG& GF& HW& #ITQ) HΦ".
+    (* To make some iFrame faster *)
+    unfold is_task_queue.
     rewrite /TaskQueue.run_task.
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_m]".
     iPoseProof (ogP_fuel_add_set with "F_m") as "[F_task F_m]".
     iPoseProof (ogP_fuels_init with "GF") as "GF".
-    assert (Hlayer : (ℵ < (ℵ ⊕ ℓ))%ordi).
-    { apply hessenberg.add_lt_l; auto. }
-    iMod (ogP_fuel_mon_gen_set _ ℵ%ordi _ m with "F_m") as "F_m". 1: auto.
-    { apply measure_layer_le_proper. right. econstructor 1. auto. }      
+    iMod (ogP_fuel_mon_gen_set _ ℵ%ordi _ m with "F_m") as "F_m".
+    { apply hessenberg.add_base_l. }
+    (* FIXME: better interface *)
+    { assert ((ℵ < (ℵ ⊕ ℓ)) ∨ ℵ == (ℵ ⊕ ℓ))%ordi.
+      { apply classicOrd.le_eq_or_lt. apply hessenberg.add_base_l. }
+      apply measure_layer_le_proper. destruct H.
+      - right. econstructor 1. auto.
+      - left. split; auto. }
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
     lwp_bind (Queue.dequeue _).
-    iModIntro. iApply ("Queue_dequeue_spec" $! 0 b with "[$TG $F_m $Gg $HW $IQ]").
-    iIntros (x B) "(_& TG& Gg& %Hdisj& Hx& HW)".
+    iModIntro. iApply ("Queue_dequeue_spec" $! 0 (μ ⊕ 99)%M b with "[$TG $F_m $HW $ITQ]").
+    iIntros (x) "(_& Hx)".
     iAssert (⌜x = NONEV ∨ ∃ v, x = SOMEV v⌝)%I as "%Hcase".
     { destruct x; eauto. destruct x; auto. destruct l; auto. }
     destruct Hcase as [Hcase | Hcase].
-    - subst x. iPoseProof "Hx" as "%". subst B. rewrite union_empty_r_L.
+    - subst x. destruct b.
+      + iDestruct "Hx" as "(%& TG& %Ninng& Hw& Gwg& Fng)".
+        iPoseProof (ogP_fuel_add with "Fng") as "[Fng Fng']".
+        iPoseProof (ogP_fuels_add_group with "Fng' GF") as "GF".
+        
+
+      iPoseProof "Hx" as "%". subst B. rewrite union_empty_r_L.
       lwp_pures.
       iModIntro. lwp_finish. iModIntro.
       iApply "HΦ". iFrame.

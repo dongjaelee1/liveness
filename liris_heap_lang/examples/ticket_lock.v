@@ -473,20 +473,19 @@ Section proof.
   Qed.
 
   Lemma TicketLock_release_spec :
-    ⊢ ∃ m, ∀ lc i j G tl γ dq ℓ R κu gu ℓu K,
+    ⊢ ∃ m, ∀ lc i j G tl γ R κu gu ℓu K,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m) ∗
          ogP_obls j gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token tl γ κu R ∗ R ∗
-         γ ↪LOCK{dq} ℓ ∗ is_fair_lock tl γ R }}}
+         is_fair_lock tl γ R }}}
       TicketLock.release tl @ i
     l{{{ RET #();
          £ lc ∗
          thP_groups i G ∗
-         ogP_obls j gu ℓu (K ∖ {[κu]}) ∗
-         γ ↪LOCK{dq} ℓ }}}.
+         ogP_obls j gu ℓu (K ∖ {[κu]}) }}}.
   Proof.
     iExists 100.
-    iIntros (lc i j G tl γ dq ℓ R κu gu ℓu K) "!> % (TG& GF& Gg& %LUkl& LT& HR& CF& #IFL) HΦ".
+    iIntros (lc i j G tl γ R κu gu ℓu K) "!> % (TG& GF& Gg& %LUkl& LT& HR& #IFL) HΦ".
     rewrite /TicketLock.release.
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
@@ -577,7 +576,7 @@ Section proof.
               lia. }
         iRight. iSplit. 1: iPureIntro; lia.
         iLeft. replace (c + 1 + 1)%Z with (c + 2)%Z by lia. iFrame. }
-    iApply ("HΦ" with "[$TG $Gg $QLC $CF]").
+    iApply ("HΦ" with "[$TG $Gg $QLC]").
   Qed.
 
 End proof.
