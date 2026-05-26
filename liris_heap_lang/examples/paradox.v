@@ -365,7 +365,7 @@ Section proof.
     iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     iMod (group_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
-    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& #Ok1& Of1& #Wlk1& A)". 1: by left.
+    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& #Ok1& Of1& #Wlk1& A)". 1: done.
     iApply fupd_sfmupd_elim. iMod "mask" as "_".
     iMod ("A" $! _ Nu ⌜True⌝%F ⟨ cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k' ⟩%F with "[//]") as "Unew".
     iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.

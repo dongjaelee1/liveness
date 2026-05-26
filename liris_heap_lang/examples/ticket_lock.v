@@ -180,14 +180,13 @@ Section proof.
   (** ** Program proofs *)
   Lemma TicketLock_init_spec :
     ⊢ ∃ m, ∀ lc ℓ i G,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) }}}
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m) }}}
       TicketLock.init #() @ i
     l{{{ tl γ, RET tl; £ lc ∗ thP_groups i G ∗ γ ↪LOCK ℓ ∗ (∀ E R, R ={E}=∗ is_fair_lock tl γ R) }}}.
   Proof.
     iExists 4.
     iIntros (lc ℓ i G) "!> %Φ (TG& GF) HΦ".
     rewrite /TicketLock.init.
-    iPoseProof (ogP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
     lwp_bind (AllocN _ _).
@@ -280,7 +279,7 @@ Section proof.
       as "(%gu0& %Ningu0& TG& Gg0& GF')".
     (* Unlock obligation *)
     iMod (tf_until_alloc _ _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
-      as "(%κu& %LUku& Gg0& #Gku& OGF& #Wlku& ALLOC)". 1: by left.
+      as "(%κu& %LUku& Gg0& #Gku& OGF& #Wlku& ALLOC)". 1: done.
     iMod ("ALLOC" $! _ N_eventually ⌜True⌝%F (curr ↦{#1 / 2} #(n + 1) ∗ ⟨R⟩)%F with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ 1 with "GGF") as "GGF".
@@ -433,7 +432,7 @@ Section proof.
       subst G'.
       (* Create a new group and offload the unlock obligation to it. *)
       iMod (group_alloc _ _ _ (ℓ)%ordi (μ)%M with "TG") as "(%gu& %Ningu& TG& Gg& QGF')".
-      iMod (obl_offload with "Gg0 Gg GGF") as "(Gg0& Gg& %Ningu')". 1: set_solver. 1: by left.
+      iMod (obl_offload with "Gg0 Gg GGF") as "(Gg0& Gg& %Ningu')". 1: set_solver. 1: done.
       replace ({[κu]} ∖ {[κu]}) with (∅ : gset oid) by set_solver.
       rewrite union_empty_l_L.
       iMod (group_delete with "TG Gg0") as "TG".
@@ -467,8 +466,7 @@ Section proof.
       iClear "GF LC". iAssert (|==> ([∗ set] k ∈ G', ogP_fuel k 0 47))%I with "[Fs']" as ">Fs".
       { rewrite -big_sepS_bupd big_sepM_gset_to_gmap. iApply (big_sepS_impl with "Fs'").
         iIntros "!> %% F". iApply (ogP_fuel_mon_gen with "F").
-        - right. replace (Z.to_nat (my + 1)) with (S (Z.to_nat my)) by lia.
-          eapply ord.lt_le_lt; first apply ord.S_pos. rewrite ord.from_nat_S hessenberg.add_S_r. done.
+        - apply ord.O_bot.
         - rewrite !measure_nat. apply OrdArith.le_from_nat. lia. }
       iPoseProof (ogP_fuels_init with "Fs") as "Fs".
       iApply ("IHα" $! α0 LTα with "CF HΦ Gg0 GUku GGF QGF GMEaku TG Fs LC' WFs").
@@ -476,7 +474,7 @@ Section proof.
 
   Lemma TicketLock_release_spec :
     ⊢ ∃ m, ∀ lc i j G tl γ dq ℓ R κu gu ℓu K,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) ∗
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m) ∗
          ogP_obls j gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token tl γ κu R ∗ R ∗
          γ ↪LOCK{dq} ℓ ∗ is_fair_lock tl γ R }}}
@@ -490,7 +488,6 @@ Section proof.
     iExists 100.
     iIntros (lc i j G tl γ dq ℓ R κu gu ℓu K) "!> % (TG& GF& Gg& %LUkl& LT& HR& CF& #IFL) HΦ".
     rewrite /TicketLock.release.
-    iPoseProof (ogP_fuels_init with "GF") as "GF".
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
     rewrite lock_token_unseal /lock_token_def.

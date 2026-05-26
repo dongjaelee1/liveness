@@ -515,18 +515,19 @@ Section preds.
     Proof. intros. apply big_opS_proper. intros. erewrite oblP_fuel_eq; eauto. Qed.
 
     Lemma oblP_fuel_mon_gen k ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 <= ℓ2)%ordi →
       (measure (ℓ1, 1) (μ1)%M <= measure (ℓ2, 1) (μ2)%M)%ord →
       oblP_fuel k ℓ2 μ2 ==∗ oblP_fuel k ℓ1 μ1.
     Proof.
       unfold_oblP_fuel. intros. apply oblP_fuel_val_mon.
       rewrite !measure_mult. etrans; first eapply Jacobsthal.le_mult_r; eauto.
-      eapply Jacobsthal.le_mult_l. apply measure_layer_le_proper. destruct H.
-      - left. split; auto.
+      eapply Jacobsthal.le_mult_l. apply measure_layer_le_proper.
+      apply classicOrd.le_eq_or_lt in H. destruct H.
       - right. econstructor 1. auto.
+      - left. split; auto.
     Qed.
     Lemma oblP_fuel_mon_gen_list K ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 <= ℓ2)%ordi →
       (measure (ℓ1, 1) (μ1)%M <= measure (ℓ2, 1) (μ2)%M)%ord →
       ([∗ list] k ∈ K, oblP_fuel k ℓ2 μ2) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ1 μ1).
     Proof.
@@ -534,7 +535,7 @@ Section preds.
       iModIntro. iIntros. by iApply oblP_fuel_mon_gen.
     Qed.
     Lemma oblP_fuel_mon_gen_set K ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 <= ℓ2)%ordi →
       (measure (ℓ1, 1) (μ1)%M <= measure (ℓ2, 1) (μ2)%M)%ord →
       ([∗ set] k ∈ K, oblP_fuel k ℓ2 μ2) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ1 μ1).
     Proof.
@@ -545,7 +546,7 @@ Section preds.
     Lemma oblP_fuel_mon k ℓ μ1 μ2 :
       (measure (ℓ, 1) (μ1)%M <= measure (ℓ, 1) (μ2)%M)%ord →
       oblP_fuel k ℓ μ2 ==∗ oblP_fuel k ℓ μ1.
-    Proof. intros. apply oblP_fuel_mon_gen; auto. left; reflexivity. Qed.
+    Proof. intros. apply oblP_fuel_mon_gen; auto. done. Qed.
     Lemma oblP_fuel_mon_list K ℓ μ1 μ2 :
       (measure (ℓ, 1) (μ1)%M <= measure (ℓ, 1) (μ2)%M)%ord →
       ([∗ list] k ∈ K, oblP_fuel k ℓ μ2) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ μ1).
@@ -997,18 +998,19 @@ Section preds.
     Proof. intros. apply big_opS_proper. intros. erewrite ogP_fuel_eq; eauto. Qed.
 
     Lemma ogP_fuel_mon_gen k ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 <= ℓ2)%ordi →
       (measure (ℓ1, 0) (μ1)%M <= measure (ℓ2, 0) (μ2)%M)%ord →
       ogP_fuel k ℓ2 μ2 ==∗ ogP_fuel k ℓ1 μ1.
     Proof.
       unfold_ogP_fuel. intros. apply ogP_fuel_val_mon.
       rewrite !measure_mult. etrans; first eapply Jacobsthal.le_mult_r; eauto.
-      eapply Jacobsthal.le_mult_l. apply measure_layer_le_proper. destruct H.
-      - left. split; auto.
+      eapply Jacobsthal.le_mult_l. apply measure_layer_le_proper.
+      apply classicOrd.le_eq_or_lt in H. destruct H.
       - right. econstructor 1. auto.
+      - left. split; auto.
     Qed.
     Lemma ogP_fuel_mon_gen_list K ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 <= ℓ2)%ordi →
       (measure (ℓ1, 0) (μ1)%M <= measure (ℓ2, 0) (μ2)%M)%ord →
       ([∗ list] k ∈ K, ogP_fuel k ℓ2 μ2) ⊢ |==> ([∗ list] k ∈ K, ogP_fuel k ℓ1 μ1).
     Proof.
@@ -1016,7 +1018,7 @@ Section preds.
       iModIntro. iIntros. by iApply ogP_fuel_mon_gen.
     Qed.
     Lemma ogP_fuel_mon_gen_set K ℓ1 ℓ2 μ1 μ2 :
-      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
+      (ℓ1 <= ℓ2)%ordi →
       (measure (ℓ1, 0) (μ1)%M <= measure (ℓ2, 0) (μ2)%M)%ord →
       ([∗ set] k ∈ K, ogP_fuel k ℓ2 μ2) ⊢ |==> ([∗ set] k ∈ K, ogP_fuel k ℓ1 μ1).
     Proof.
@@ -1027,7 +1029,7 @@ Section preds.
     Lemma ogP_fuel_mon k ℓ μ1 μ2 :
       (measure (ℓ, 0) (μ1)%M <= measure (ℓ, 0) (μ2)%M)%ord →
       ogP_fuel k ℓ μ2 ==∗ ogP_fuel k ℓ μ1.
-    Proof. intros. apply ogP_fuel_mon_gen; auto. left; done. Qed.
+    Proof. intros. apply ogP_fuel_mon_gen; auto. done. Qed.
     Lemma ogP_fuel_mon_list K ℓ μ1 μ2 :
       (measure (ℓ, 0) (μ1)%M <= measure (ℓ, 0) (μ2)%M)%ord →
       ([∗ list] k ∈ K, ogP_fuel k ℓ μ2) ⊢ |==> ([∗ list] k ∈ K, ogP_fuel k ℓ μ1).
@@ -1232,6 +1234,13 @@ Section preds.
     Proof.
       intros ->. rewrite -ogP_fuel_add. erewrite ogP_fuel_eq. 1: reflexivity.
       rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat. done.
+    Qed.
+
+    Lemma ogP_fuels_add_gen m1 m2 K :
+      ogP_fuels K (m1 ⊕ m2)%M ⊢ ogP_fuels K m1 ∗ ogP_fuels K m2.
+    Proof.
+      rewrite -big_sepS_sep. iIntros "H"; iApply (big_sepS_impl with "H"); iIntros "!> %% H".
+      iDestruct "H" as "(%& H)". iPoseProof (ogP_fuel_add with "H") as "[$ $]".
     Qed.
 
     Lemma ogP_fuels_add m1 m2 n K :
@@ -1485,9 +1494,7 @@ Section preds.
     Qed.
 
     Lemma obl_alloc_assigned_mupd n Θ i g K b ℓ1 ℓ2 μ :
-      (ℓ1 == ℓ2 ∨ ℓ1 < ℓ2)%ordi →
-      (* FIXME?: above should be good enough, but below is more concise *)
-      (* (ℓ1 <= ℓ2)%ordi → *)
+      (ℓ1 <= ℓ2)%ordi →
       ogP_obls i g ℓ1 K -∗
       |=[n,Θ]=>m ∃ k, (⌜ k ∉ K ⌝) ∗
                      ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
@@ -1507,7 +1514,8 @@ Section preds.
       iDestruct "Gl" as "[Gl0 Gl1]".
       iEval (rewrite measure_add) in "Gf". iPoseProof (oblG_fuel_split with "Gf") as "[Gf Gf0]".
       iMod (oblG_fuel_mon _ (measure (ℓ1, 0) μ0) with "Gf0") as "Gf0".
-      { etrans; first eapply η_mono. eapply measure_extend. econstructor 2; auto. }
+      { etrans; first eapply η_mono. eapply measure_extend.
+        apply classicOrd.le_eq_or_lt in LTl. econstructor 2; auto. destruct LTl; auto. }
       iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
       iMod (ogroup_alloc_obl with "[$S $T $P $Tpo $Tps $Tb $Ge $Go $Gf0]") as "(S& T& P& %Nink& Tpo& Tps& To& Go)". 1: auto.      
       iMod (owit_alloc_witness_assigned _ k (η (measure (ℓ2, 1) (((1 ⊕ ▽) × μ) ⊕ ▽)%M)) with "W") as "(W& #Ww)".
@@ -1658,7 +1666,7 @@ Section preds.
 
     Local Lemma obl_change_group_mupd n Θ i g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       k ∈ K1 →
-      (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
+      (ℓ2 <= ℓ)%ordi →
       ogP_obls i g1 ℓ1 K1 -∗
       ogP_obls i g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
@@ -1671,7 +1679,8 @@ Section preds.
       iMod (oblG_fuel_mon _ (measure (ℓ2, 0) μ0) with "Of") as "Of".
       { rewrite measure_mult measure_add measure_nat Jacobsthal.mult_1_r.
         etrans; last eapply Hessenberg.add_base_r.
-        etrans; first eapply η_mono. apply measure_extend. econstructor 2; auto. }
+        etrans; first eapply η_mono. apply measure_extend.
+        apply classicOrd.le_eq_or_lt in LTl. econstructor 2; auto. destruct LTl; auto. }
       iAssert (⌜k ∉ K2⌝)%I as "%Nink2".
       { destruct (decide (k ∈ K2)); auto.
         iPoseProof (big_sepS_delete _ _ _ Ink with "KS1") as "[(_& Go& Oo) KS1]".
@@ -1691,7 +1700,7 @@ Section preds.
     Local Lemma obl_change_thread_mupd n Θ i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       i1 ≠ i2 →
       k ∈ K1 →
-      (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
+      (ℓ2 <= ℓ)%ordi →
       ogP_obls i1 g1 ℓ1 K1 -∗
       ogP_obls i2 g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
@@ -1705,7 +1714,8 @@ Section preds.
       iMod (oblG_fuel_mon _ (measure (ℓ2, 0) (1 ⊕ μ0)%M) with "Of") as "Of".
       { rewrite measure_mult (measure_add (ℓ, 1)) measure_nat Jacobsthal.mult_1_r.
         etrans; last eapply Hessenberg.add_base_r.
-        etrans; first eapply η_mono. apply measure_extend. econstructor 2; auto. }
+        etrans; first eapply η_mono. apply measure_extend.
+        apply classicOrd.le_eq_or_lt in LTl. econstructor 2; auto. destruct LTl; auto. }
       iEval (rewrite measure_add) in "Of".
       iPoseProof (oblG_fuel_split with "Of") as "[Of0 Of]".
       iMod (oblG_fuel_mon _ (1) with "Of0") as "Of0".
@@ -1755,7 +1765,7 @@ Section preds.
 
     Lemma obl_offload_mupd n Θ i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       k ∈ K1 →
-      (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
+      (ℓ2 <= ℓ)%ordi →
       ogP_obls i1 g1 ℓ1 K1 -∗
       ogP_obls i2 g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
@@ -1768,7 +1778,7 @@ Section preds.
 
     Lemma obl_offload_set_mupd n Θ i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
       K ⊆ K1 →
-      (ℓ2 == ℓ ∨ ℓ2 < ℓ)%ordi →
+      (ℓ2 <= ℓ)%ordi →
       ogP_obls i1 g1 ℓ1 K1 -∗
       ogP_obls i2 g2 ℓ2 K2 -∗
       ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗

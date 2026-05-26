@@ -178,14 +178,17 @@ Section proof.
   (** FIXME: better notation for triples with this pattern *)
   Lemma Queue_init_spec :
     ⊢ ∃ m, ∀ lc φ i G,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 m) }}}
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m) }}}
       Queue.init #() @ i
     l{{{ ql γ, RET ql; £ lc ∗ thP_groups i G ∗ is_queue_init ql γ φ }}}.
   Proof.
     iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
     iExists (20 ⊕ m)%M. iIntros (lc φ i G) "!> % (TG& GF) HΦ".
     rewrite /Queue.init.
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_TicketLock]".
+
+    TODO
+
+    iPoseProof (ogP_fuels_add_set with "GF") as "[GF F_TicketLock]".
     iPoseProof (ogP_fuels_init with "GF") as "GF".
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
@@ -358,23 +361,33 @@ Section proof.
 
   (** TODO: LAT-style spec that enables the client to put ogP_obls in some invariant. *)
   Lemma Queue_dequeue_spec :
-    ⊢ ∃ m, ∀ lc (b : bool) wi ni wg ng i j G g A φ γ ℓ (ql : val),
+    ⊢ ∃ m, ∀ lc μ (b : bool) wi wg i G φ γ ℓ (ql : val),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g ℵ%ordi m) ∗
-         ogP_obls j g ℓ A ∗
          (if b
-          then queue_worker γ wi wg ∗ ogP_obls ni ng ℓ ∅
+          then queue_worker γ wi wg
           else True) ∗
          is_queue ql γ ℓ φ }}}
       Queue.dequeue ql @ i
-    l{{{ x B, RET x; £ lc ∗ thP_groups i G ∗ ogP_obls j g ℓ (A ∪ B) ∗ ⌜A ## B⌝ ∗
-                     (match x with | NONEV => ⌜B = ∅⌝ | SOMEV v => φ v B | _ => False end) ∗
-                     (if b
-                      then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅
-                      else True) }}}.
+      l{{{ x, RET x; £ lc ∗
+                     (match x with
+                      | NONEV =>
+                          (if b
+                           then (∃ ng, thP_groups i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
+                                       queue_worker γ i ng ∗ ogP_obls wi wg ℓ ∅ ∗ ogP_fuel ng ℓ μ)
+                           else (thP_groups i G))
+                      | SOMEV v =>
+                          (∃ g B, φ v B ∗ ogP_obls i g ℓ B ∗ ogP_fuel g ℓ μ ∗
+                                  (if b
+                                   then (∃ ng, thP_groups i ({[g; ng]} ∪ G) ∗ ⌜g ∉ G ∧ ng ∉ G ∧ g ≠ ng⌝ ∗
+                                               queue_worker γ i ng ∗ ogP_obls wi wg ℓ ∅ ∗ ogP_fuel ng ℓ μ)
+                                   else (thP_groups i ({[g]} ∪ G) ∗ ⌜g ∉ G⌝)))
+                      | _ => (False)
+                      end)
+      }}}.
   Proof.
     iPoseProof (TicketLock_acquire_spec) as (ma) "TicketLock_acquire_spec".
     iPoseProof (TicketLock_release_spec) as (mr) "TicketLock_release_spec".
-    iExists (100 ⊕ ma ⊕ mr)%M. iIntros (lc b wi ni wg ng i j G g A φ γ ℓ ql) "!> % (TG& GF& Gg& HW& #IQ) HΦ".
+    iExists (100 ⊕ ma ⊕ mr)%M. iIntros (lc μ b wi wg i G φ γ ℓ ql) "!> % (TG& GF& HW& #IQ) HΦ".
     rewrite /Queue.dequeue.
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_m]".
     iPoseProof (ogP_fuel_add_set with "F_m") as "[F_ma F_mr]".
@@ -431,16 +444,33 @@ Section proof.
       iDestruct "qinv" as "(%&%&%& Queue0& Gvar& %Disj& Gq& Fq)".
       iPoseProof (own_valid_2 with "Queue Queue0") as "%".
       apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs.
-      iAssert (|={⊤ ∖ ↑Ni,⊤}=> if b then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅ else True)%I
-        with "[IQ_ACC Queue0 Gvar Gq Fq HW]" as "IQ_ACC".
+      iAssert (|={⊤ ∖ ↑Ni}=>m |={⊤ ∖ ↑Ni,⊤}=>
+                 if b
+                 then ∃ ng, thP_groups i ({[ng]} ∪ ({[gu]} ∪ G)) ∗ ⌜ng ∉ G⌝ ∗
+                            queue_worker γ i ng ∗ ogP_obls wi wg ℓ ∅ ∗ ogP_fuel ng ℓ (μ ⊕ 83 ⊕ mr)%M
+                 else thP_groups i ({[gu]} ∪ G))%I
+        with "[IQ_ACC Queue0 Gvar Gq Fq HW TG]" as "IQ_ACC".
       { destruct b.
-        - iDestruct "HW" as "(Gw& Gq1)". iPoseProof (ghost_var_agree with "Gvar Gw") as "%". simplify_eq.
-          simpl. iMod (ghost_var_update_2 (ni, ng) with "Gvar Gw") as "[Gvar Gw]". 1: by rewrite Qp.div_2.
-          iFrame "Gw Gq". iApply "IQ_ACC". iNext. iFrame. simpl. iFrame. iPureIntro. auto.
-        - iApply "IQ_ACC". iNext. iFrame. iPureIntro. auto. }
-      iModIntro. iMod "IQ_ACC" as "HW".
-      iModIntro.
-      iApply ("TicketLock_release_spec" with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
+        - iPoseProof (ghost_var_agree with "Gvar HW") as "%". simplify_eq. simpl.
+          iMod (group_alloc _ _ _ ℓ (μ ⊕ 83 ⊕ mr)%M with "TG") as "(%ng& %Ninng& TG& Gng& Fng)".
+          iMod (ghost_var_update_2 (i, ng) with "Gvar HW") as "[Gvar Gw]". 1: by rewrite Qp.div_2.
+          iFrame "TG Gw Gq Fng". iModIntro. iMod ("IQ_ACC" with "[-]") as "_"; cycle 1.
+          { iPureIntro. set_solver. }
+          iNext. iFrame. simpl. iFrame. iPureIntro. auto.
+        - iFrame "TG". iModIntro. iApply "IQ_ACC". iNext. iFrame. iPureIntro. auto. }
+      iMod "IQ_ACC". iModIntro. iMod "IQ_ACC" as "HW".
+      destruct b.
+      + iDestruct "HW" as "(%& TG& %Ninng& HW& Gwg& Fng)".
+        iPoseProof (ogP_fuel_add with "Fng") as "[Fng Fng']".
+        iPoseProof (ogP_fuel_add with "Fng'") as "[Fng' Fng_mr]".
+        iPoseProof (ogP_fuels_add_group with "Fng' GF")as "GF".
+
+        TODO
+
+        iMod (ogP_fuel_mon_gen
+        iPoseProof (big_sepS_union _ {[ng]} with "$Fng_mr $F_mr")as "F_mr".
+        iModIntro.
+        iApply ("TicketLock_release_spec" with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
       { iSplit. 1: iPureIntro; set_solver. iFrame. simpl. by iFrame. }
       (* FIXME: it would be nice if we don't get this evar *)
       Unshelve. 2: exact 0.
