@@ -542,8 +542,8 @@ Section proof.
     iDestruct "Hown" as (?) "(Hlk0_ℓ & nextp & #v' & Hown & Hn')".
 
     lOneFuel "Hfuel" as "[Hf Hfuel]".
-    iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
-    iIntros "[(_ & Hg & _) _]". lwp_bind (Int.lt _ _). iModIntro.
+    iApply (lwp_load _ ∅ 1 with "[Hf Hg]"). { iFrame "∗#". done. }
+    iIntros "[(Hlc & Hg & _) _]". lwp_bind (Int.lt _ _). iModIntro.
 
     iApply ("Int_lwp_lt" with "[$Hg $HltFuel]").
     iIntros "Hg !>".
@@ -595,10 +595,12 @@ Section proof.
 
       (* Acquire next's lock.  From Hn' (the [match v'] in node_lock_inv at
          v' = Fin e) we have is_node next and the half lock-token. *)
-      iDestruct "Hn'" as (γlk' ℓ') "(#Hnext & Hlk'_ℓ & %Hℓ')".
+      iDestruct "Hn'" as (γlk' lk' ℓ') "(Hnext & Hlk'_ℓ & %Hℓ')".
+      iMod (lc_fupd_elim_later with "[$] Hnext") as "#Hnext".
+
       iDestruct (is_node_unfold with "Hnext") as "(#v_next & #lk_next & #Hlk_next)".
 
-      lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
+      lwp_lam. post_wp. lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
       lOneFuel "Hfuel" as "[Hf Hfuel]".
       iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
       iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.acquire _). iModIntro.
@@ -643,6 +645,136 @@ Section proof.
          This needs a small adjustment to the invariant or an auxiliary
          "detached node" predicate. *)
       admit.
+  Admitted.
+
+  (* Splicing a fresh node in between curr and next requires splitting the
+     interval (curr,next) at e and inserting e into the abstract set. *)
+  Local Axiom own_set_add : ∀ γ s a c (e : Z),
+    Int.lt_rel a e → Int.lt_rel (Int.Fin e) c →
+    own_set γ s -∗ own_interval γ a c ==∗
+      own_set γ (s ∪ {[e]}) ∗ own_interval γ a (Int.Fin e) ∗ own_interval γ (Int.Fin e) c.
+
+  Lemma lwp_add i G s γ (e : Z) :
+    ⊢ ∃ m,
+    ∀ Φ,
+    (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g locateℓ m) ∗ is_set s γ) -∗
+    (|={⊤,∅}=> ∃ s, own_set γ s ∗ (own_set γ (s ∪ {[e]}) ={∅,⊤}=∗ Φ #())) -∗
+    lWP add #s (Int.into_val e) @ i {{ Φ }}.
+  Proof.
+    iDestruct TicketLock_release_spec as (mr) "TicketLock_release_spec".
+    iDestruct Int.lwp_lt as (mlt) "Int_lwp_lt".
+    iDestruct lwp_locate as (mlc) "lwp_locate".
+    iDestruct lwp_newNode as (mn) "lwp_newNode".
+
+    iExists (100 ⊕ mlc ⊕ mlt ⊕ mn ⊕ mr)%M.
+
+    iIntros (Φ) "(Hg & Hfuel & Hs) Hau".
+    iDestruct "Hs" as (??) "[#Hlk_ℓ #Hroot]".
+
+    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
+    iDestruct (ogP_fuels_init with "Hfuel") as "Hfuel".
+    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HlocateFuel HcallFuel]".
+    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HltFuel HcallFuel]".
+    iDestruct (ogP_fuels_init with "HltFuel") as "HltFuel".
+    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HnewFuel HrelFuel]".
+    iDestruct (ogP_fuels_init with "HnewFuel") as "HnewFuel".
+    iDestruct (ogP_fuels_init with "HrelFuel") as "HrelFuel".
+
+    lwp_lam. post_wp. lwp_pures. lwp_bind (locate _ _).
+    iModIntro.
+    iApply ("lwp_locate" $! (97 ⊕ mlt ⊕ mn ⊕ mr)%M with "[$Hg $HlocateFuel]").
+    { iFrame "#". }
+    iIntros "* (Hg & Hκ & Hg_fuel & Hown & Htok & #Hn & %Hrange)". iModIntro.
+    lwp_pure.
+
+    (* Distribute the gu fuel like member/remove. *)
+    iDestruct (ogP_fuel_add with "Hg_fuel") as "[Hfuel_gu Hg_fuel]".
+    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HltFuel_gu Hg_fuel]".
+    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HnewFuel_gu HrelFuel_gu]".
+    iDestruct (big_sepS_insert_2 with "[Hfuel_gu] Hfuel") as "Hfuel". { iFrame. }
+    iDestruct (big_sepS_insert_2 with "[HltFuel_gu] HltFuel") as "HltFuel". { iFrame. }
+    iDestruct (big_sepS_insert_2 with "[HnewFuel_gu] HnewFuel") as "HnewFuel". { iFrame. }
+    iDestruct (big_sepS_insert_2 with "[HrelFuel_gu] HrelFuel") as "HrelFuel". { iFrame. }
+
+    post_wp. lwp_pures. iModIntro.
+    lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
+
+    (* Read next.val. *)
+    iDestruct (is_node_unfold with "Hn") as "(#v & #lk & #Hlk_inv)".
+    iDestruct "Hown" as (?) "(Hlk0_ℓ & nextp & #v' & Hown & Hn')".
+
+    lOneFuel "Hfuel" as "[Hf Hfuel]".
+    iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
+    iIntros "[(_ & Hg & _) _]". lwp_bind (Int.lt _ _). iModIntro.
+
+    iApply ("Int_lwp_lt" with "[$Hg $HltFuel]").
+    iIntros "Hg !>".
+
+    (* Branch on e < next.val.  locate gave us v < e ≤ v'.
+         - if e < v': e ∉ s, allocate a node holding e and splice it in;
+         - else: e = v' ∈ s, the AU postcondition reduces to own_set γ s. *)
+    destruct (decide (Int.lt_rel e v')) as [Hlt|Hge].
+    - (* Insert branch.  This is the structurally novel part vs. member/remove. *)
+      rewrite bool_decide_true; last done.
+      lwp_pures. iModIntro.
+
+      (* TODO: high-level shape of the rest of this branch:
+         1. Open the AU.  Use [own_set_add] with the current [own_interval γ v v']
+            to obtain [own_set γ (s' ∪ {[e]})] together with the split intervals
+            [own_interval γ v (Fin e)] and [own_interval γ (Fin e) v'].
+            Close the AU (linearisation point of [add]).
+         2. Call [lwp_newNode] with v := e, next := <the located [next] node>,
+            v' := <the located [v']>.  This consumes:
+              - the half-token for next from Hn' (when v' is finite, Hn' carries
+                exactly the required [is_node ∗ ↪LOCK{#1/2} ∗ ⌜ℓ' ⊕ lockΔ < ℓ⌝]);
+              - [own_interval γ e v'].
+            The +∞ case is handled by the alternate branch of newNode's
+            precondition: just frame [(next +ₗ 1) ↦□ +∞] (we have [v'] which is
+            this very pointsto).
+            We get back a fresh [is_node n_new γ e lk_new γlk_new] and the half
+            lock-token [γlk_new ↪LOCK{#1/2} ℓ_new] for the new node.
+         3. Store [nextp]: curr.next := #n_new.  This replaces the n' in curr's
+            lock body with n_new; the new body uses [own_interval γ v (Fin e)]
+            (held from step 1) and the finite-branch payload for v' = Fin e
+            (the new node's is_node + half-token from step 2).
+         4. Release curr's lock with the rebuilt body, then return #(). *)
+      admit.
+
+    - (* Already-present branch.  Mirrors lwp_remove's not-in-set branch:
+         observe e ∈ s' via own_interval_agree, close the AU with the same
+         set (since s' ∪ {[e]} = s'), then unlock curr. *)
+      rewrite bool_decide_false; last done.
+      assert (v' = Int.Fin e) as Hv'eq.
+      { destruct v'; simpl in *; try naive_solver. f_equal.
+        destruct Hrange as (_ & ? & _). lia. }
+      subst v'.
+
+      lwp_pures. iModIntro.
+      lwp_lam. post_wp. lwp_lam. post_wp. lwp_pures. lwp_bind (! _)%E. iModIntro.
+
+      lOneFuel "Hfuel" as "[Hf Hfuel]".
+      iApply (lwp_load _ ∅ 0 with "[Hf Hg]"). { iFrame "∗#". done. }
+      iIntros "[(_ & Hg & _) _]". lwp_bind (TicketLock.release _).
+
+      iApply lwpupd_fupd_l.
+      iMod "Hau" as (s') "[Hs Hau]".
+      iDestruct (own_interval_agree e with "[$] [$]") as %Hmem.
+      { naive_solver. }
+      { naive_solver. }
+      (* e ∈ s', so s' ∪ {[e]} = s'. *)
+      assert (e ∈ s') as Hin.
+      { simpl in Hmem. destruct decide in Hmem; [done|lia]. }
+      replace (s' ∪ {[e]}) with s' by set_solver.
+      iMod ("Hau" with "[$]") as "HΦ". iModIntro.
+
+      iModIntro. iApply lwp_sfmupd.
+      iApply ("TicketLock_release_spec" $! 0 with
+                "[$Hg $Htok $Hκ Hlk0_ℓ Hn' nextp Hown HrelFuel]").
+      { iFrame "#". iFrame. iPureIntro. set_solver. }
+      iIntros "(_ & Hg & Ho)". rewrite difference_diag_L.
+      iMod (group_delete with "Hg Ho") as "Hg". iModIntro.
+      iDestruct (ogP_fuels_remove_group gu with "Hfuel") as "Hfuel".
+      iFrame.
   Admitted.
 
 End proof.
