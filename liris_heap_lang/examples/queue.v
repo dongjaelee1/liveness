@@ -336,11 +336,12 @@ Section proof.
       replace (length vs.*2 + 0)%nat with (length vs.*2)%nat by lia. done. }
     iModIntro.
     iApply lwp_sfmupd.
+    iDestruct "IFL" as "[CF IFL]".
     iApply ("TicketLock_release_spec" with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
     { iSplit. 1: iPureIntro; set_solver. iFrame. }
     (* FIXME: it would be nice if we don't get this evar *)
     Unshelve. 2: exact 0.
-    iIntros "(_& TG& Ggu& _)".
+    iIntros "(_& TG& Ggu)".
     replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
     iMod (group_delete with "TG Ggu") as "TG". replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
     replace (B ∖ B) with (∅ : oids) by set_solver.
@@ -364,11 +365,11 @@ Section proof.
                                        queue_worker γ i ng ∗ ogP_obls wi wg ℓ ∅ ∗ ogP_fuel ng ℓ μ)
                            else (thP_groups i G))
                       | SOMEV v =>
-                          (∃ g B, φ v B ∗ ogP_obls i g ℓ B ∗ ogP_fuel g ℓ μ ∗
+                          (∃ g B, φ v B ∗ ogP_obls i g ℓ B ∗ ogP_fuel g ℓ μ ∗ ⌜g ∉ G⌝ ∗
                                   (if b
-                                   then (∃ ng, thP_groups i ({[g; ng]} ∪ G) ∗ ⌜g ∉ G ∧ ng ∉ G ∧ g ≠ ng⌝ ∗
+                                   then (∃ ng, thP_groups i ({[g; ng]} ∪ G) ∗ ⌜ng ∉ G ∧ g ≠ ng⌝ ∗
                                                queue_worker γ i ng ∗ ogP_obls wi wg ℓ ∅ ∗ ogP_fuel ng ℓ μ)
-                                   else (thP_groups i ({[g]} ∪ G) ∗ ⌜g ∉ G⌝)))
+                                   else (thP_groups i ({[g]} ∪ G))))
                       | _ => (False)
                       end)
       }}}.
@@ -434,9 +435,10 @@ Section proof.
         iPoseProof (ogP_fuel_add with "Fng'") as "[Fng' Fng_mr]".
         iPoseProof (ogP_fuels_add_group with "Fng_mr F_mr") as "F_mr".
         iModIntro.
+        iDestruct "IFL" as "[CF IFL]".
         iApply ("TicketLock_release_spec" $! 0 with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
         { iSplit. 1: iPureIntro; set_solver. iFrame. simpl. by iFrame. }
-        iIntros "(_& TG& Ggu& _)".
+        iIntros "(_& TG& Ggu)".
         replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
         iMod (group_delete with "TG Ggu") as "TG".
         replace (({[ng]} ∪ ({[gu]} ∪ G)) ∖ {[gu]}) with ({[ng]} ∪ G) by set_solver.
@@ -449,9 +451,10 @@ Section proof.
       + iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Fq Gq]") as "_".
         { iNext. iFrame. simpl. auto. }
         iModIntro.
+        iDestruct "IFL" as "[CF IFL]".
         iApply ("TicketLock_release_spec" $! 0 with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
         { iSplit. 1: iPureIntro; set_solver. iFrame. simpl. by iFrame. }
-        iIntros "(_& TG& Ggu& _)".
+        iIntros "(_& TG& Ggu)".
         replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
         iMod (group_delete with "TG Ggu") as "TG".
         iPoseProof (ogP_fuels_remove_group gu with "GF") as "GF".
@@ -523,9 +526,10 @@ Section proof.
         iPoseProof (ogP_fuel_add with "Fng") as "(Fng& Fng_mr)".
         iPoseProof (ogP_fuels_add_group with "Fg_mr F_mr") as "F_mr".
         iPoseProof (ogP_fuels_add_group with "Fng_mr F_mr") as "F_mr".
+        iDestruct "IFL" as "[CF IFL]".
         iApply ("TicketLock_release_spec" $! 0 with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
         { iSplit. 1: iPureIntro; set_solver. iFrame. }
-        iIntros "(_& TG& Ggu& _)".
+        iIntros "(_& TG& Ggu)".
         replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
         iMod (group_delete with "TG Ggu") as "TG".
         iPoseProof (ogP_fuels_add_group with "Fg GF") as "GF".
@@ -536,6 +540,8 @@ Section proof.
         iModIntro. lwp_finish.
         iModIntro. iApply "HΦ". iFrame "Q_LC".
         iExists g. iFrame. iSplit.
+        { iPureIntro. set_solver. }
+        iSplit.
         { replace ({[ng]} ∪ ({[g]} ∪ G)) with ({[g; ng]} ∪ G) by set_solver. iFrame. }
         { iPureIntro. split_and !; set_solver. }
       + rename g into ng. rewrite !fmap_cons. iPoseProof (big_sepL_cons with "Fq") as "[FB Fq]".
@@ -561,9 +567,10 @@ Section proof.
         iPoseProof (ogP_fuel_add with "Fg") as "(Fg_Q& Fg)".
         iPoseProof (ogP_fuel_add with "Fg") as "(Fg& Fg_mr)".
         iPoseProof (ogP_fuels_add_group with "Fg_mr F_mr") as "F_mr".
+        iDestruct "IFL" as "[CF IFL]".
         iApply ("TicketLock_release_spec" $! 0 with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
         { iSplit. 1: iPureIntro; set_solver. iFrame. }
-        iIntros "(_& TG& Ggu& _)".
+        iIntros "(_& TG& Ggu)".
         replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
         iMod (group_delete with "TG Ggu") as "TG".
         iPoseProof (ogP_fuels_add_group with "Fg GF") as "GF".

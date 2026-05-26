@@ -100,7 +100,11 @@ Section proof.
 
   Lemma TaskQueue_run_task_spec :
     ⊢ ∃ m, ∀ lc μ (b : bool) wi wg i G γ ℓ (ql : val),
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℵ ⊕ ℓ)%ordi m) ∗
+    l{{{ thP_groups i G ∗
+         (* For dequeue *)
+         ([∗ set] g ∈ G, ogP_fuel g (ℵ)%ordi m) ∗
+         (* For task *)
+         ([∗ set] g ∈ G, ogP_fuel g (ℓ)%ordi 1) ∗
          (if b
           then queue_worker γ wi wg
           else True) ∗
@@ -113,26 +117,17 @@ Section proof.
                         else (thP_groups i G)) }}}.
   Proof.
     iPoseProof (Queue_dequeue_spec) as (m) "Queue_dequeue_spec".
-    (** For internal steps, executing task, and calling dequeue *)
-    iExists (100 ⊕ 1 ⊕ m)%M. iIntros (lc μ b wi wg i G γ ℓ ql) "!> % (TG& GF& HW& #ITQ) HΦ".
+    (** For internal steps and calling dequeue *)
+    iExists (100 ⊕ m)%M. iIntros (lc μ b wi wg i G γ ℓ ql) "!> % (TG& GF& F_task& HW& #ITQ) HΦ".
     (* To make some iFrame faster *)
     unfold is_task_queue.
     rewrite /TaskQueue.run_task.
     iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_m]".
-    iPoseProof (ogP_fuel_add_set with "F_m") as "[F_task F_m]".
     iPoseProof (ogP_fuels_init with "GF") as "GF".
-    iMod (ogP_fuel_mon_gen_set _ ℵ%ordi _ m with "F_m") as "F_m".
-    { apply hessenberg.add_base_l. }
-    (* FIXME: better interface *)
-    { assert ((ℵ < (ℵ ⊕ ℓ)) ∨ ℵ == (ℵ ⊕ ℓ))%ordi.
-      { apply classicOrd.le_eq_or_lt. apply hessenberg.add_base_l. }
-      apply measure_layer_le_proper. destruct H.
-      - right. econstructor 1. auto.
-      - left. split; auto. }
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
     lwp_bind (Queue.dequeue _).
-    iModIntro. iApply ("Queue_dequeue_spec" $! 0 (μ ⊕ 99)%M b with "[$TG $F_m $HW $ITQ]").
+    iModIntro. iApply ("Queue_dequeue_spec" $! 0 (μ ⊕ 100)%M b with "[$TG $F_m $HW $ITQ]").
     iIntros (x) "(_& Hx)".
     iAssert (⌜x = NONEV ∨ ∃ v, x = SOMEV v⌝)%I as "%Hcase".
     { destruct x; eauto. destruct x; auto. destruct l; auto. }
@@ -140,79 +135,136 @@ Section proof.
     - subst x. destruct b.
       + iDestruct "Hx" as "(%& TG& %Ninng& Hw& Gwg& Fng)".
         iPoseProof (ogP_fuel_add with "Fng") as "[Fng Fng']".
+        iPoseProof (ogP_fuel_add_nat 99 1 with "Fng'") as "[Fng' _]". 1: lia.
         iPoseProof (ogP_fuels_add_group with "Fng' GF") as "GF".
-        
-
-      iPoseProof "Hx" as "%". subst B. rewrite union_empty_r_L.
-      lwp_pures.
-      iModIntro. lwp_finish. iModIntro.
-      iApply "HΦ". iFrame.
+        lwp_pures.
+        iModIntro. lwp_finish. iModIntro.
+        iApply "HΦ". iFrame. iPureIntro. auto.
+      + iRename "Hx" into "TG".
+        lwp_pures.
+        iModIntro. lwp_finish. iModIntro.
+        iApply "HΦ". iFrame.
     - destruct Hcase as (v& Hcase). subst x.
-      iDestruct "Hx" as "(%&%&%&%mt& (%FA& %Hll)& Hx)". subst v.
-      lwp_pures.
-      lwp_bind (f a).
-      iMod (ogP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
-      { eapply ord.lt_le_lt. 1: eauto. eapply hessenberg.add_base_r. }
-      iModIntro.
-      iApply ("Hx" $! 0 with "[$TG $F_task $Gg]").
-      { iPureIntro. set_solver. }
-      iIntros (?) "(_& TG& Gg)". replace ((A ∪ B) ∖ B) with A by set_solver.
-      iApply "HΦ". iFrame.
+      iDestruct "Hx" as "(%&%& Htask& Gg& Fg& %Ning& HW)".
+      iDestruct "Htask" as "(%&%&%&%mt& %Htask& TASK)".
+      iPoseProof (ogP_fuel_add with "Fg") as "[_ Fg]".
+      iPoseProof (ogP_fuel_add_nat 99 1 with "Fg") as "[Fg' Fg]". 1: lia.
+      iPoseProof (ogP_fuels_add_group with "Fg' GF") as "GF".
+      iPoseProof (big_sepS_union _ {[g]} with "[Fg $F_task]") as "F_task". 1: set_solver.
+      { iApply big_sepS_singleton. iFrame. }
+      destruct b.
+      + iDestruct "HW" as "(%& TG& %HG& Qw& Gwg& Fng)". destruct HG as (Ninng& Neq).
+        iPoseProof (ogP_fuel_add with "Fng") as "[Fng_Q Fng]".
+        iPoseProof (ogP_fuel_add_nat 99 1 with "Fng") as "[Fng' Fng]". 1: lia.
+        iPoseProof (ogP_fuels_add_group with "Fng' GF") as "GF".
+        iPoseProof (big_sepS_union _ {[ng]} with "[Fng $F_task]") as "F_task". 1: set_solver.
+        { iApply big_sepS_singleton. iFrame. }
+        replace ({[ng]} ∪ ({[g]} ∪ G)) with ({[g; ng]} ∪ G) by set_solver.
+        destruct Htask as (->& Hltask).
+        lwp_pures.
+        lwp_bind (f a).
+        iMod (ogP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
+        { eapply ord.lt_le_lt. 1: eauto. done. }
+        iModIntro.
+        iApply lwp_sfmupd.
+        iApply ("TASK" $! 0 with "[$TG $F_task $Gg]").
+        { iPureIntro. set_solver. }
+        iIntros (?) "(_& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
+        iMod (group_delete with "TG Gg") as "TG". replace (({[g; ng]} ∪ G) ∖ {[g]}) with ({[ng]} ∪ G) by set_solver.
+        iModIntro. iApply "HΦ". iFrame "Q_LC". iExists ng. iFrame. iPureIntro. set_solver.
+      + iRename "HW" into "TG".
+        destruct Htask as (->& Hltask).
+        lwp_pures.
+        lwp_bind (f a).
+        iMod (ogP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
+        { eapply ord.lt_le_lt. 1: eauto. done. }
+        iModIntro.
+        iApply lwp_sfmupd.
+        iApply ("TASK" $! 0 with "[$TG $F_task $Gg]").
+        { iPureIntro. set_solver. }
+        iIntros (?) "(_& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
+        iMod (group_delete with "TG Gg") as "TG". replace (({[g]} ∪ G) ∖ {[g]}) with G by set_solver.
+        iModIntro. iApply "HΦ". iFrame.
   Qed.
 
   Lemma TaskQueue_worker_spec :
     ⊢ ∃ m, ∀ (b : bool) i G γ ℓ (ql : val),
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℵ ⊕ ℓ)%ordi m) ∗
+    l{{{ thP_groups i G ∗
          (if b
-          then ∃ g, queue_worker γ i g ∗ ⌜G = {[g]}⌝
-          else ⌜G = ∅⌝) ∗
+          then (∃ g, ([∗ set] g ∈ G, ogP_fuel g (ℓ)%ordi m) ∗ queue_worker γ i g ∗ ⌜G = {[g]} ∧ (ℵ <= ℓ)%ordi⌝)
+          else (⌜G = ∅⌝)) ∗
          is_task_queue ql γ ℓ }}}
       TaskQueue.worker ql @ i
-    l{{{ RET #(); False }}}.
+      l{{{ RET #(); False }}}.
   Proof.
     iPoseProof (TaskQueue_run_task_spec) as (mr) "TaskQueue_run_task_spec".
     (** For internal steps and executing run_task *)
-    iExists (100 ⊕ mr)%M. iIntros (b i G γ ℓ ql) "!> % (TG& GF& HW& #ITQ) HΦ".
-    rewrite /TaskQueue.worker.
-    iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_mr]".
-    iPoseProof (ogP_fuels_init with "GF") as "GF".
-    lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-    lwp_pure_one.
-    (** Lob (co-)induction *)
+    iExists (100 ⊕ mr ⊕ 1)%M. iIntros (b i G γ ℓ ql) "!> % (TG& HW& #ITQ) HΦ".
     iClear "HΦ".
-    iRevert (G) "HW F_mr TG GF". iLöb as "IH". iIntros (G) "HW F_mr TG GF".
-    lwp_pures.
-    lwp_bind (TaskQueue.run_task _).
+    rewrite /TaskQueue.worker.
     destruct b.
-    - iDestruct "HW" as "(%& QW& %HG)". subst G.
-
-
-      TODO
-
-    
-    lwp_pures.
-    lwp_pures.
-    iModIntro. iApply ("Queue_dequeue_spec" $! 0 b with "[$TG $F_m $Gg $HW $IQ]").
-    iIntros (x B) "(_& TG& Gg& %Hdisj& Hx& HW)".
-    iAssert (⌜x = NONEV ∨ ∃ v, x = SOMEV v⌝)%I as "%Hcase".
-    { destruct x; eauto. destruct x; auto. destruct l; auto. }
-    destruct Hcase as [Hcase | Hcase].
-    - subst x. iPoseProof "Hx" as "%". subst B. rewrite union_empty_r_L.
+    - iDestruct "HW" as "(%& GF& Qw& %)". destruct H as (->& Hlayer).
+      iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_mr]".
+      iPoseProof (ogP_fuels_init with "GF") as "GF".
+      lwp_pure. simpl.
+      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      lwp_pure_one.
+      (** Lob (co-)induction *)
+      iRevert (g) "Qw F_mr TG GF". iLöb as "IH". iIntros (g) "HW F_mr TG GF".
       lwp_pures.
-      iModIntro. lwp_finish. iModIntro.
-      iApply "HΦ". iFrame.
-    - destruct Hcase as (v& Hcase). subst x.
-      iDestruct "Hx" as "(%&%&%&%mt& (%FA& %Hll)& Hx)". subst v.
-      lwp_pures.
-      lwp_bind (f a).
-      iMod (ogP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
-      { eapply ord.lt_le_lt. 1: eauto. eapply hessenberg.add_base_r. }
+      lwp_bind (TaskQueue.run_task _).
+      iPoseProof (ogP_fuel_add_set with "F_mr") as "[F_mr F_mr1]".
+      iMod (ogP_fuel_mon_gen_set _ ℵ%ordi _ mr with "F_mr") as "F_mr". 1: auto.
+      { apply measure_layer_le_proper. apply classicOrd.le_eq_or_lt in Hlayer. destruct Hlayer.
+        - right. econstructor 1. auto.
+        - left. split; auto. }
       iModIntro.
-      iApply ("Hx" $! 0 with "[$TG $F_task $Gg]").
-      { iPureIntro. set_solver. }
-      iIntros (?) "(_& TG& Gg)". replace ((A ∪ B) ∖ B) with A by set_solver.
-      iApply "HΦ". iFrame.
+      iApply ("TaskQueue_run_task_spec" $! 100 (100 ⊕ (mr ⊕ 1))%M true with "[$TG $F_mr $F_mr1 $HW $ITQ]").
+      iIntros (rv) "(LC& (%& TG& %Ninng& Qw& Gg& Fng))".
+      iMod (group_delete with "TG Gg") as "TG". replace ({[ng; g]} ∖ {[g]}) with ({[ng]} : gset ogid) by set_solver.
+      iClear "GF".
+      iAssert (([∗ set] k ∈ {[ng]}, ogP_fuel k ℓ (100 ⊕ (mr ⊕ 1))%M))%I with "[Fng]" as "GF".
+      { iApply big_sepS_singleton. iFrame. }
+      iPoseProof (ogP_fuel_add_set with "GF") as "[GF F_mr]".
+      iPoseProof (ogP_fuels_init with "GF") as "GF".
+      do 2 lwp_pure_one.
+      iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      iApply ("IH" with "Qw F_mr TG GF").
+    - iDestruct "HW" as "%". subst G.
+      iAssert ([∗ set] g ∈ ∅, ogP_fuel g 0 100)%I as "GF''". 1: done.
+      iPoseProof (ogP_fuels_init with "GF''") as "GF'".
+      lwp_pure. simpl.
+      iFrame "TG GF'". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      iClear "GF' GF''".
+      lwp_pure_one.
+      (** Lob (co-)induction *)
+      iRevert "TG GF". iLöb as "IH". iIntros "TG GF".
+      lwp_pures.
+      lwp_bind (TaskQueue.run_task _).
+      iModIntro.
+      iApply ("TaskQueue_run_task_spec" $! 100 (100 ⊕ (mr ⊕ 1))%M false 1%positive 1%positive with "[$TG $ITQ]").
+      1: iSplit; done.
+      iIntros (rv) "(LC& TG)".
+      iClear "GF".
+      iAssert ([∗ set] g ∈ ∅, ogP_fuel g 0 100)%I as "GF''". 1: done.
+      iPoseProof (ogP_fuels_init with "GF''") as "GF'".
+      iModIntro. lwp_pure. simpl.
+      iFrame "TG GF'". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      iClear "GF' GF''".
+      do 1 lwp_pure_one.
+      iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      iApply ("IH" with "TG GF").
   Qed.
+
+  TODO
+
+  (** Initializes a queue and Forks one worker thread *)
+  Definition init : val :=
+    λ: <>,
+      let: "q" := Queue.init #() in
+      Fork (worker "q");;
+      "q".
 
 End proof.
