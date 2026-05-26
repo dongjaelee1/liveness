@@ -485,66 +485,94 @@ Section proof.
       apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs.
       iMod (own_update_2 with "Queue Queue0") as "[Queue Queue0]".
       { eapply (dfrac_agree_update_2 _ _ _ _ (vs')). rewrite dfrac_op_own Qp.div_2. auto. }
-      iAssert (|={⊤ ∖ ↑Ni}=>m |={⊤ ∖ ↑Ni,⊤}=> ogP_obls j g ℓ (A ∪ B) ∗ ⌜A ## B⌝ ∗ (if b then queue_worker γ ni ng ∗ ogP_obls wi wg ℓ ∅ else True))%I
-        with "[IQ_ACC Queue0 Gvar Gq Fq HW Gg]" as "IQ_ACC".
-      { destruct b.
-        - iDestruct "HW" as "(Gw& Gq1)". iPoseProof (ghost_var_agree with "Gvar Gw") as "%". simplify_eq.
-          rewrite !fmap_cons. iPoseProof (big_sepL_cons with "Fq") as "[FB Fq]".
-          simpl.
-          iAssert (([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ (S k)) ∗
-                   ([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ 1))%I
-            with "[Fq]" as "[Fq F]".
-          { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %% % H".
-            iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
-            { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat.
-              replace (S (S k)) with (S k + 1) by lia. done. }
-            iApply (oblP_fuel_add_set with "H"). }
-          iMod (obl_offload_set with "Gq Gg FB") as "(Gq& Gg& %)". 1: set_solver. 1: by left.
-          assert (B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
-          { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
-          destruct H0 as (DisjB& Disj').
-          replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
-          iMod (ghost_var_update_2 (ni, ng) with "Gvar Gw") as "[Gvar Gw]". 1: by rewrite Qp.div_2.
-          iAssert ([∗ set] b ∈ union_list_of_sets vs'.*2, oblP_fuel b ℓ 1)%I with "[F]" as "F".
-          { iClear "TicketLock_acquire_spec TicketLock_release_spec IQ IFL".
-            remember (vs'.*2) as l. clear dependent vs'. clear DisjB Disj'. iInduction l as [ | ]. 1: done.
-            iPoseProof (big_sepL_cons with "F") as "[Fb F]".
-            iPoseProof ("IHl" with "F") as "F".
-            rewrite union_list_of_sets_cons. iApply (big_sepS_union_2 with "Fb F"). }
-          iMod (obl_offload_set with "Gq Gq1 F") as "(Gq& Gq1& %)". 1: set_solver. 1: by left.
-          replace (union_list_of_sets vs'.*2 ∖ union_list_of_sets vs'.*2) with (∅ : oids) by set_solver.
-          rewrite union_empty_l_L. iFrame "Gg Gw Gq". iModIntro. iMod ("IQ_ACC" with "[-]"); last by iModIntro.
-          iNext. iFrame. iPureIntro. auto.
-        - iClear "HW".
-          rewrite !fmap_cons. iPoseProof (big_sepL_cons with "Fq") as "[FB Fq]".
-          simpl.
-          iAssert (([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ (S k)) ∗
-                   ([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ 1))%I
-            with "[Fq]" as "[Fq F]".
-          { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %% % H".
-            iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
-            { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat.
-              replace (S (S k)) with (S k + 1) by lia. done. }
-            iApply (oblP_fuel_add_set with "H"). }
-          iMod (obl_offload_set with "Gq Gg FB") as "(Gq& Gg& %)". 1: set_solver. 1: by left.
-          assert (B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
-          { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
-          destruct H0 as (DisjB& Disj').
-          replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
-          iFrame "Gg". iModIntro. iMod ("IQ_ACC" with "[-]"); last by iModIntro. iNext. iFrame. auto. }
-      iMod "IQ_ACC". iModIntro. iMod "IQ_ACC" as "HW".
-      iModIntro.
-      iApply ("TicketLock_release_spec" with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
-      { iSplit. 1: iPureIntro; set_solver. iFrame. }
-      (* FIXME: it would be nice if we don't get this evar *)
-      Unshelve. 2: exact 0.
-      iIntros "(_& TG& Ggu& _)".
-      replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
-      iMod (group_delete with "TG Ggu") as "TG". replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
-      iPoseProof (big_sepS_union _ {[gu]} G with "GF") as "[_ GF]". 1: set_solver.
-      lwp_pures.
-      iModIntro. lwp_finish.
-      iApply "HΦ". iDestruct "HW" as "(Gg& HW)". iFrame. by iModIntro.
+      destruct b.
+      + iPoseProof (ghost_var_agree with "Gvar HW") as "%". simplify_eq.
+        rewrite !fmap_cons. iPoseProof (big_sepL_cons with "Fq") as "[FB Fq]".
+        simpl.
+        iAssert (([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ (S k)) ∗
+                 ([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ 1))%I
+          with "[Fq]" as "[Fq F]".
+        { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %% % H".
+          iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
+          { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat.
+            replace (S (S k)) with (S k + 1) by lia. done. }
+          iApply (oblP_fuel_add_set with "H"). }
+        iMod (group_alloc _ _ _ ℓ (μ ⊕ 74 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
+        iMod (obl_offload_set with "Gq Gg FB") as "(Gq& Gg& %)". 1: set_solver. 1: done.
+        assert (B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
+        { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
+        destruct H0 as (DisjB& Disj').
+        replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
+        iMod (group_alloc _ _ _ ℓ (μ ⊕ 74 ⊕ mr)%M with "TG") as "(%ng& %Ninng& TG& Gng& Fng)".
+        iMod (ghost_var_update_2 (i, ng) with "Gvar HW") as "[Gvar HW]". 1: by rewrite Qp.div_2.
+        iAssert ([∗ set] b ∈ union_list_of_sets vs'.*2, oblP_fuel b ℓ 1)%I with "[F]" as "F".
+        { iClear "TicketLock_acquire_spec TicketLock_release_spec IQ IFL".
+          remember (vs'.*2) as l. clear dependent vs'. clear DisjB Disj'. iInduction l as [ | ]. 1: done.
+          iPoseProof (big_sepL_cons with "F") as "[Fb F]".
+          iPoseProof ("IHl" with "F") as "F".
+          rewrite union_list_of_sets_cons. iApply (big_sepS_union_2 with "Fb F"). }
+        iMod (obl_offload_set with "Gq Gng F") as "(Gq& Gng& %)". 1: set_solver. 1: done.
+        replace (union_list_of_sets vs'.*2 ∖ union_list_of_sets vs'.*2) with (∅ : oids) by set_solver.
+        rewrite !union_empty_l_L.
+        iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Gng Fq]") as "_".
+        { iNext. iFrame. iPureIntro. auto. }
+        iModIntro.
+        iPoseProof (ogP_fuel_add with "Fg") as "(Fg_Q& Fg)".
+        iPoseProof (ogP_fuel_add with "Fg") as "(Fg& Fg_mr)".
+        iPoseProof (ogP_fuel_add with "Fng") as "(Fng_Q& Fng)".
+        iPoseProof (ogP_fuel_add with "Fng") as "(Fng& Fng_mr)".
+        iPoseProof (ogP_fuels_add_group with "Fg_mr F_mr") as "F_mr".
+        iPoseProof (ogP_fuels_add_group with "Fng_mr F_mr") as "F_mr".
+        iApply ("TicketLock_release_spec" $! 0 with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
+        { iSplit. 1: iPureIntro; set_solver. iFrame. }
+        iIntros "(_& TG& Ggu& _)".
+        replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
+        iMod (group_delete with "TG Ggu") as "TG".
+        iPoseProof (ogP_fuels_add_group with "Fg GF") as "GF".
+        iPoseProof (ogP_fuels_add_group with "Fng GF") as "GF".
+        iPoseProof (ogP_fuels_remove_group gu with "GF") as "GF".
+        replace (({[ng]} ∪ ({[g]} ∪ ({[gu]} ∪ G))) ∖ {[gu]}) with (({[ng]} ∪ ({[g]} ∪ G))) by set_solver.
+        lwp_pures.
+        iModIntro. lwp_finish.
+        iModIntro. iApply "HΦ". iFrame "Q_LC".
+        iExists g. iFrame. iSplit.
+        { replace ({[ng]} ∪ ({[g]} ∪ G)) with ({[g; ng]} ∪ G) by set_solver. iFrame. }
+        { iPureIntro. split_and !; set_solver. }
+      + rename g into ng. rewrite !fmap_cons. iPoseProof (big_sepL_cons with "Fq") as "[FB Fq]".
+        simpl.
+        iAssert (([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ (S k)) ∗
+                 ([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ 1))%I
+          with "[Fq]" as "[Fq F]".
+        { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %% % H".
+          iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
+          { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat.
+            replace (S (S k)) with (S k + 1) by lia. done. }
+          iApply (oblP_fuel_add_set with "H"). }
+        iMod (group_alloc _ _ _ ℓ (μ ⊕ 74 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
+        iMod (obl_offload_set with "Gq Gg FB") as "(Gq& Gg& %)". 1: set_solver. 1: done.
+        assert (B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
+        { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
+        destruct H0 as (DisjB& Disj').
+        replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
+        rewrite !union_empty_l_L.
+        iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Gq Fq]") as "_".
+        { iNext. iFrame. iPureIntro. auto. }
+        iModIntro.
+        iPoseProof (ogP_fuel_add with "Fg") as "(Fg_Q& Fg)".
+        iPoseProof (ogP_fuel_add with "Fg") as "(Fg& Fg_mr)".
+        iPoseProof (ogP_fuels_add_group with "Fg_mr F_mr") as "F_mr".
+        iApply ("TicketLock_release_spec" $! 0 with "[$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
+        { iSplit. 1: iPureIntro; set_solver. iFrame. }
+        iIntros "(_& TG& Ggu& _)".
+        replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
+        iMod (group_delete with "TG Ggu") as "TG".
+        iPoseProof (ogP_fuels_add_group with "Fg GF") as "GF".
+        iPoseProof (ogP_fuels_remove_group gu with "GF") as "GF".
+        replace (({[g]} ∪ ({[gu]} ∪ G)) ∖ {[gu]}) with (({[g]} ∪ G)) by set_solver.
+        lwp_pures.
+        iModIntro. lwp_finish.
+        iModIntro. iApply "HΦ". iFrame "Q_LC".
+        iExists g. iFrame. iPureIntro. set_solver.
   Qed.
 
 End proof.
