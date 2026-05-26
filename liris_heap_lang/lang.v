@@ -122,6 +122,9 @@ Inductive expr :=
   | Resolve (e0 : expr) (e1 : expr) (e2 : expr) (* wrapped expr, proph, val *)
   (* Label *)
   | Label (t : string) (e : expr)
+  (* Non-determinism *)
+  (* Reference: trillium/fairis *)
+  | ChooseNat
 with val :=
   | LitV (l : base_lit)
   | RecV (f x : binder) (e : expr)
@@ -282,6 +285,7 @@ Proof.
      | Resolve e0 e1 e2, Resolve e0' e1' e2' =>
         cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
      | Label t e, Label t' e' => cast_if_and (decide (t = t')) (decide (e = e'))
+     | ChooseNat, ChooseNat => left _
      | _, _ => right _
      end
    with gov (v1 v2 : val) {struct v1} : Decision (v1 = v2) :=
@@ -364,6 +368,7 @@ Proof.
      | NewProph => GenNode 20 []
      | Resolve e0 e1 e2 => GenNode 21 [go e0; go e1; go e2]
      | Label t e => GenNode 22 [GenLeaf (inl (inl t)); go e]
+     | ChooseNat => GenNode 23 []
      end
    with gov v :=
      match v with
@@ -402,6 +407,7 @@ Proof.
      | GenNode 20 [] => NewProph
      | GenNode 21 [e0; e1; e2] => Resolve (go e0) (go e1) (go e2)
      | GenNode 22 [GenLeaf (inl (inl t)); e] => Label t (go e)
+     | GenNode 23 [] => ChooseNat
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -416,7 +422,7 @@ Proof.
    for go).
  refine (inj_countable' enc dec _).
  refine (fix go (e : expr) {struct e} := _ with gov (v : val) {struct v} := _ for go).
- - destruct e as [v| | | | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
+ - destruct e as [v| | | | | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
      [exact (gov v)|done..].
  - destruct v; by f_equal.
 Qed.
@@ -542,6 +548,7 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | NewProph => NewProph
   | Resolve ex e1 e2 => Resolve (subst x v ex) (subst x v e1) (subst x v e2)
   | Label t e => Label t (subst x v e)
+  | ChooseNat => ChooseNat
   end.
 
 Definition subst' (mx : binder) (v : val) : expr → expr :=
@@ -768,6 +775,10 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
               (of_val v) σ
               (* (of_val v) (state_upd_labels (λ ls, ls ++ [(i, l, v)]) σ) *)
               ∅
+  | ChooseNatS (n : nat) σ Θ :
+    base_step i ChooseNat σ Θ
+      []
+      (Val $ LitV $ LitInt n) σ ∅
 .
 
 (** Basic properties about the language *)

@@ -80,6 +80,9 @@ Section atomic.
 
   Global Instance label_atomic s t v : Atomic s (Label t (Val v)).
   Proof. solve_atomic. Qed.
+
+  Global Instance choosenat_atomic s : Atomic s (ChooseNat).
+  Proof. solve_atomic. Qed.
 End atomic.
 
 (** * Instances of the [PureExec] class *)
@@ -176,4 +179,5 @@ Section pure_exec.
   Global Instance pure_label t v :
     PureExec True 1 (Label t (of_val v)) (of_val v).
   Proof. solve_pure_exec. Qed.
+
 End pure_exec.

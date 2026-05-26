@@ -350,6 +350,48 @@ Proof.
   by iFrame.
 Qed.
 
+(** ChooseNat *)
+Lemma lwp_choosenat o s i E E' e Φ :
+  (|={E,E'}=> ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+             (∀ (n : nat), thP_groups i G -∗
+                         ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                         ALC (£ o ={E',E}=∗ (|={E}=>m Φ (#n))))) -∗
+  lWP ChooseNat @ s; i; E {{ Φ }}.
+Proof.
+  iIntros "H". iApply lwp_lift_atomic_base_step_no_fork.
+
+  TODO
+
+
+  iIntros (K h n σ1 Θ κ κs HK HT) "I". iMod "H" as "(%&$&$& %&$& H)".
+  iModIntro. iSplit; first eauto with base_step.
+  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
+  iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
+  iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tb Wcs [Efs]") as "H".
+  { rewrite dom_singleton_L big_sepS_singleton. eauto. }
+  iMod "H" as "HE".
+  iMod (hG_history_auth_app with "Ha") as "Ha".
+  rewrite big_sepM_singleton. iFrame.
+  replace (dom (<[i:=K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
+  { rewrite dom_union_L dom_insert_lookup_L; eauto. rewrite dom_singleton_L. auto. }
+  iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
+  iMod (thread_map_thread_update _ _ (K #()) with "[$It $Ti]") as "[It Ti]".
+  replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
+  { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
+  iFrame. iModIntro. iSplitR "HE"; cycle 1.
+  { iMod "HE". iDestruct "HE" as "[>H $]". by iFrame. }
+  iSplitR.
+  { iPureIntro. destruct HI. split.
+    - rewrite length_app H. simpl. lia.
+    - rewrite last_app. simpl. auto. }
+  iApply (big_sepM_union).
+  { apply map_disjoint_singleton_r_2, not_elem_of_dom. rewrite dom_insert_lookup; eauto. }
+  rewrite big_sepM_singleton. iFrame "Tj".
+  iApply (big_sepM_insert_delete). iFrame.
+Qed.
+
 (** Heap *)
 
 (** We need to adjust the [gen_heap] and [gen_inv_heap] lemmas because of our
