@@ -48,8 +48,10 @@ Section proof.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
-  (** ℵ <= ℓq (TaskQueue_worker/init/put_task_spec *)
+  (** ℵ < ℓq (by TaskQueue_put_task_spec, is_task *)
   Let ℓq : ord.t := (ℵ ⊕ 1)%ordi.
+  Remark ℓq_cond : (ℵ < ℓq)%ordi.
+  Proof. apply hessenberg.add_lt_l. apply ord.S_lt. Qed.
 
   Definition decr_reentrant_inv (arg : val) γ (k : oid) : iProp Σ :=
     ∃ (ql : val) (l : loc) (n : Z),
@@ -139,7 +141,7 @@ Section proof.
         rewrite /is_task_queue. iFrame "ITQ".
         rewrite /is_task. iDestruct "TASK" as (mt) "TASK".
         iExists _, _, ℵ%ordi, _, mt. iSplit.
-        { iPureIntro. split; first eauto. apply hessenberg.add_lt_l. apply ord.S_lt. }
+        { iPureIntro. split; first eauto. apply ℓq_cond. }
         iSplitL.
         { iCombine "OF Huntil" as "H". iApply "H". }
         iIntros (???????) "!> % (TG& GF& Gg& %Hsub& OF& Huntil) HΦ".
