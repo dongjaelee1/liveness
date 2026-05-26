@@ -344,7 +344,7 @@ Section proof.
          node_lock_inv n γ v γlk n' v' ∗
          lock_token lk γlk κu (∃ n'' v'', node_lock_inv n γ v γlk n'' v'') ∗
          is_node n γ v lk γlk ∗
-         ⌜ Int.lt_rel v e ∧ ¬ Int.lt_rel e v' ⌝
+         ⌜ Int.lt_rel v e ∧ ¬ Int.lt_rel v' e ∧ Int.lt_rel v v' ⌝
     }}}.
   Proof.
     iIntros (?) "(Hg & HlockFuel & #Hs) HΦ".
@@ -377,7 +377,7 @@ Section proof.
   Admitted.
 
   Lemma own_interval_agree (x : Z) γ s a b:
-    Int.lt_rel a x → ¬ Int.lt_rel x b →
+    Int.lt_rel a x → ¬ Int.lt_rel b x →
     own_set γ s -∗
     own_interval γ a b -∗
     ⌜ match b with
@@ -455,17 +455,12 @@ Section proof.
     lwp_pures. iModIntro. lwp_finish.
 
     destruct v'.
-    - rewrite !bool_decide_false //.
-      2:{ naive_solver. }
-      admit.
+    - exfalso. simpl in *. by destruct v; naive_solver.
     - destruct decide in Hagree.
       + subst. rewrite bool_decide_true //.
         rewrite bool_decide_false //. lia.
-      + simpl in *. rewrite bool_decide_false //.
-        rewrite bool_decide_false //.
-        2:{ lia. }
-        simpl.
-        admit.
+      + rewrite bool_decide_false //.
+        rewrite bool_decide_true //. simpl in *. lia.
     - rewrite bool_decide_false //.
   Admitted.
 
