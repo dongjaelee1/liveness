@@ -351,7 +351,7 @@ Proof.
 Qed.
 
 (** ChooseNat *)
-Lemma lwp_choosenat o s i E E' e Φ :
+Lemma lwp_choosenat_step o s i E E' Φ :
   (|={E,E'}=> ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
                   ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
                        (∀ (n : nat), thP_groups i G -∗
@@ -385,6 +385,18 @@ Proof.
     - rewrite length_app H. simpl. lia.
     - rewrite last_app. simpl. auto. }
   iApply (big_sepM_insert_delete _ _ i). iFrame. 
+Qed.
+
+Lemma lwp_choosenat G R o s i E :
+  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, oblP_id r)) }}}
+    ChooseNat @ s; i; E
+  l{{{ (n : nat), RET LitV (LitInt n);
+                (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) }}}.
+Proof.
+  iIntros (Φ) "(TG& GF& Rs) HΦ".
+  iApply (lwp_choosenat_step o with "[$TG $GF $Rs HΦ]").
+  iIntros "!> % TG RC !> LC !> !>".
+  iApply ("HΦ" with "[$TG $RC $LC]").
 Qed.
 
 (** Heap *)

@@ -21,13 +21,14 @@ Definition client : val :=
           let: "n" := ChooseNat in
           decr_reentrant ("q", "l", "n");;
           (rec: "while" <> := if: !"l" = #1%Z
-                             then Label "exit" #()
+                             then #()
                              else "while" #()) #().
 
 Definition main : val :=
   λ: <>,
     let: "q" := TaskQueue.init #() in
-    client "q".
+    client "q";;
+    Label "exit" #().
 
 Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
@@ -158,7 +159,125 @@ Section proof.
       iIntros "(_& TG& Gg)". iApply ("HΦ" with "[$Q_LC $TG $Gg]").
   Qed.
 
+  Lemma client_spec :
+    ⊢ ∃ m, ∀ lc i G γ ql,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g (ℓq ⊕ 2)%ordi m) ∗
+         is_task_queue ql γ ℓq }}}
+      client ql @ i
+    l{{{ RET #(); £ lc ∗ thP_groups i G }}}.
+  Proof.
+    unfold client.
+    iPoseProof (decr_reentrant_spec) as (md) "decr_reentrant_spec".
+    (* Internal steps, func call, while loop *)
+    iExists (100 ⊕ md ⊕ (100 × ▽))%M. iIntros (lc i G γ ql) "!> % (TG& GF& #ITQ) HΦ".
+    iPoseProof (ogP_fuel_add_set with "GF") as "[GF GF2]".
+    iPoseProof (ogP_fuel_add_set with "GF2") as "[F_md GFloop]".
+    iPoseProof (ogP_fuels_init with "GF") as "GF".
+    lwp_pure. simpl.
+    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
+    lwp_bind (AllocN _ _).
+    iPoseProof (ogP_fuels_add 98 1 with "GF") as "[GF GF1]". 1: lia.
+    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
+    iModIntro. iIntros (ptr_l) "((_& TG& _)& Ptr_l& _)".
+    lwp_pures.
+    lwp_bind (ChooseNat).
+    iPoseProof (ogP_fuels_add 95 1 with "GF") as "[GF GF1]". 1: lia.
+    iModIntro. iApply (lwp_choosenat _ ∅ 0 with "[$TG $GF1]"). 1: done.
+    iIntros (n) "(_& TG& _)".
+    lwp_pures.
+
     TODO
+    
+
+    
+    lwp_pures.
+
+    
+    subst arg.
+    lwp_pures.
+    destruct (decide (n ≤ 0)%Z).
+    - iClear "TASK TaskQueue_put_task_spec". rewrite bool_decide_eq_true_2; last done.
+      lwp_pure_lc 100.
+      lwp_bind (Store _ _).
+      iDestruct "DRI" as "(%&%&%& %& Oik& Wlk& Inv& ITQ)". symmetry in H. simplify_eq.
+      iModIntro.
+      iEval (rewrite tf_always_logic) in "Inv".
+      iMod (inv_acc with "Inv") as "[H ACCinv]". 1: set_solver.
+      (* and we need a mupd after the step. *)
+      iApply lwp_sfmupd.
+      iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+      iApply (lwp_lc_later with "LC1"). iNext.
+      iEval (tf_red) in "H". iDestruct "H" as "[H | H]"; cycle 1.
+      { iDestruct "H" as "(HF& _)".
+        rewrite tf_until_logic. iDestruct "Huntil" as "(HA& _)".
+        iPoseProof (oblP_assigned_fulfilled_false with "HA HF") as "%". done. }
+      iCombine "Huntil H" as "Huntil".
+      iMod (tf_until_fulfill with "Huntil") as "ACCuntil". 1: apply N_subseteq_1.
+      iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
+      iApply (lwp_lc_later with "LC1"). iNext.
+      iDestruct "ACCuntil" as "[Ptrl ACCuntil]". iEval (rewrite tf_atomic_logic) in "Ptrl".
+      iPoseProof (ogP_fuels_add 85 1 with "GF") as "[GF GF1]". 1: lia.
+      iApply lwp_sfmupd.
+      iApply (lwp_store _ ∅ 0 with "[$TG $GF1 $Ptrl]"). 1: done.
+      iIntros "((_& TG& _)& Ptrl)".
+      iMod ("ACCuntil" $! _ with "Ptrl") as ">ACCuntil".
+      iPoseProof ("ACCuntil" with "[] Gg") as "ACCuntil".
+      { iPureIntro. set_solver. }
+      iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
+      iApply (lc_sfmupd_add_later with "LC1"). iNext.
+      iMod ("ACCuntil" $! _) as "ACCuntil". iModIntro.
+      iMod "ACCuntil" as "(Ptrl& Gg& #Gfk)".
+      do 2 iModIntro. iMod ("ACCinv" with "[Ptrl]") as "_".
+      { iNext. tf_red. iRight. iFrame. eauto. }
+      iModIntro. iApply ("HΦ" with "[$Q_LC $TG $Gg]").
+    - rewrite bool_decide_eq_false_2; last done.
+      lwp_pure_lc 100.
+      lwp_pures.
+      iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      lwp_bind (TaskQueue.put_task _ _ _).
+      assert (Hn : Z.to_nat n = 1 + Z.to_nat (n - 1)) by lia.
+      rewrite (oblP_fuel_eq k _ _ (1 ⊕ (Z.to_nat (n - 1)))%M); cycle 1.
+      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat Hn. done. }
+      iPoseProof (oblP_fuel_add with "OF") as "[OF1 OF]".
+      iModIntro. iApply ("TaskQueue_put_task_spec" $! 0 _ _ _ _ _ {[k]} γ ℓq with "[$TG $F_put_task $Gg OF1 OF Huntil]").
+      { iClear "TaskQueue_put_task_spec". iSplit.
+        { iPureIntro. set_solver. }
+        iSplitL "OF1".
+        { iApply big_sepS_singleton. iFrame. }
+        iDestruct "DRI" as "(%&%&%& %& Oik& Wlk& Inv& ITQ)". simplify_eq.
+        rewrite /is_task_queue. iFrame "ITQ".
+        rewrite /is_task. iDestruct "TASK" as (mt) "TASK".
+        iExists _, _, ℵ%ordi, _, mt. iSplit.
+        { iPureIntro. split; first eauto. apply ℓq_cond. }
+        iSplitL.
+        { iCombine "OF Huntil" as "H". iApply "H". }
+        iIntros (???????) "!> % (TG& GF& Gg& %Hsub& OF& Huntil) HΦ".
+        iApply ("TASK" $! lc0 with "[$TG $GF $Gg $OF $Huntil]").
+        { iSplit.
+          { iPureIntro. set_solver. }
+          iExists _. iSplit; first done. iFrame "Oik Wlk Inv".
+          rewrite /is_task_queue. iFrame "ITQ". eauto. }
+        iIntros "(LC& TG& Gg)". iApply ("HΦ" with "[$LC $TG $Gg]"). }
+      iIntros "(_& TG& Gg)". iApply ("HΦ" with "[$Q_LC $TG $Gg]").
+  Qed.
+
+  
+
+
+  TODO
+Definition client : val :=
+  λ: "q", let: "l" := ref #0 in
+          let: "n" := ChooseNat in
+          decr_reentrant ("q", "l", "n");;
+          (rec: "while" <> := if: !"l" = #1%Z
+                             then Label "exit" #()
+                             else "while" #()) #().
+
+Definition main : val :=
+  λ: <>,
+    let: "q" := TaskQueue.init #() in
+    client "q".
     
 End proof.
 
