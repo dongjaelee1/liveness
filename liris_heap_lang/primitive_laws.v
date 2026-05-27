@@ -353,43 +353,38 @@ Qed.
 (** ChooseNat *)
 Lemma lwp_choosenat o s i E E' e Φ :
   (|={E,E'}=> ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-             ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
-             (∀ (n : nat), thP_groups i G -∗
-                         ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
-                         ALC (£ o ={E',E}=∗ (|={E}=>m Φ (#n))))) -∗
+                  ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+                       (∀ (n : nat), thP_groups i G -∗
+                                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                                   ALC (£ o ={E',E}=∗ (|={E}=>m Φ (#n))))) -∗
   lWP ChooseNat @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step_no_fork.
-
-  TODO
-
-
   iIntros (K h n σ1 Θ κ κs HK HT) "I". iMod "H" as "(%&$&$& %&$& H)".
   iModIntro. iSplit; first eauto with base_step.
+  (** FIXME: evar nat *)
+  Unshelve. 2: exact 0.
   iIntros (v2 σ2 efs Hstep); inv_base_step.
   iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
-  iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
-  iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tb Wcs [Efs]") as "H".
-  { rewrite dom_singleton_L big_sepS_singleton. eauto. }
+  iIntros "!> Tb Wcs". iPoseProof ("H" $! n0 with "Tb Wcs") as "H".
+  iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
+  iPoseProof (tlc_split with "LC") as "[LC LC2]".
+  iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H".
   iMod "H" as "HE".
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  rewrite big_sepM_singleton. iFrame.
-  replace (dom (<[i:=K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
-  { rewrite dom_union_L dom_insert_lookup_L; eauto. rewrite dom_singleton_L. auto. }
+  rewrite !map_union_empty. iFrame.
+  replace (dom (<[i:=K #n0]> Θ)) with (dom Θ); cycle 1.
+  { rewrite dom_insert_lookup_L; eauto. }
   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
-  iMod (thread_map_thread_update _ _ (K #()) with "[$It $Ti]") as "[It Ti]".
-  replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
-  { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
-  iFrame. iModIntro. iSplitR "HE"; cycle 1.
-  { iMod "HE". iDestruct "HE" as "[>H $]". by iFrame. }
-  iSplitR.
+  iMod (thread_map_thread_update _ _ (K #n0) with "[$It $Ti]") as "[It Ti]".
+  iFrame. iModIntro. iSplit; first done.
+  iSplitR "HE"; cycle 1.
+  { iMod "HE". iModIntro. iFrame. }
+  iSplit.
   { iPureIntro. destruct HI. split.
     - rewrite length_app H. simpl. lia.
     - rewrite last_app. simpl. auto. }
-  iApply (big_sepM_union).
-  { apply map_disjoint_singleton_r_2, not_elem_of_dom. rewrite dom_insert_lookup; eauto. }
-  rewrite big_sepM_singleton. iFrame "Tj".
-  iApply (big_sepM_insert_delete). iFrame.
+  iApply (big_sepM_insert_delete _ _ i). iFrame. 
 Qed.
 
 (** Heap *)

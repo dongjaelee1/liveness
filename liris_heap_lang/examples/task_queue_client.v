@@ -16,11 +16,9 @@ Definition decr_reentrant : val :=
      then "l" <- #1%Z
      else TaskQueue.put_task "q" "f" ("q", "l", "n" - #1%Z)).
 
-TODO
-
 Definition client : val :=
   λ: "q", let: "l" := ref #0 in
-          let: "n" := #10 in
+          let: "n" := ChooseNat in
           decr_reentrant ("q", "l", "n");;
           (rec: "while" <> := if: !"l" = #1%Z
                              then Label "exit" #()
