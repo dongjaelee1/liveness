@@ -417,6 +417,7 @@ Section proof.
   Global Instance tf_until_as_fractional N k b q P Q : AsFractional (⟦tf_until N k b q P Q⟧ₗ) (λ q, ⟦tf_until N k b q P Q⟧ₗ) q.
   Proof. split; [auto|apply _]. Qed.
 
+  (** Update rules *)
   Lemma tf_until_alloc E i g K (b : bool) ℓ1 ℓ2 μ :
     (ℓ1 <= ℓ2)%ordi →
     ogP_obls i g ℓ1 K -∗
@@ -559,6 +560,29 @@ Section proof.
     iMod (tf_until_true_to_fulfill with "H") as "H". 1: auto.
     iIntros "!> %%%% % TG". iPoseProof ("H" with "[//] TG") as "H".
     iIntros (?). iNext. iMod ("H" $! E'') as "H". iModIntro. iFrame.
+  Qed.
+
+  (** Access rules *)
+  Lemma tf_until_fulfilled_false N k b q P Q :
+    ⟦tf_until N k b q P Q⟧ₗ -∗ oblP_fulfilled k -∗ False.
+  Proof.
+    rewrite tf_until_logic. iIntros "[Oa _] #Of".
+    iPoseProof (oblP_assigned_fulfilled_false with "Oa Of") as "%". done.
+  Qed.
+
+  Lemma tf_until_acc E N k b q P Q :
+    ↑N ⊆ E →
+    ⟦tf_until N k b q P Q⟧ₗ ={E,E ∖ ↑N}=∗
+    ▷ ((if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) ∗ ((▷ if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) ={E ∖ ↑N,E}=∗ ⟦tf_until N k b q P Q⟧ₗ)).
+  Proof.
+    rewrite !tf_until_logic. iIntros (Hmask) "(Oa& #OI)".
+    iMod (oblP_inv_acc_assigned with "OI") as "H". 1: set_solver.
+    iPoseProof ("H" with "Oa") as "[H ACC]".
+    iModIntro. iNext. iDestruct "H" as "(Oa& H)". destruct b.
+    - iDestruct "H" as "(Oa2& $)". iIntros "HQ". iFrame "Oa OI". iApply "ACC".
+      iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame.
+    - iDestruct "H" as "(Oa2& $)". iIntros "HP". iFrame "Oa OI". iApply "ACC".
+      iNext. iApply oblP_variant_unfold. iLeft. iFrame.
   Qed.
 
 End proof.
