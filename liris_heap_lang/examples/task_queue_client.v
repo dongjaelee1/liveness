@@ -9,18 +9,18 @@ From liris.heap_lang.examples Require Export task_queue.
 
 Definition decr_reentrant : val :=
   (rec: "f" "a" :=
-     let: "q" := Fst (Fst "a") in
-     let: "l" := Snd (Fst "a") in
-     let: "n" := Snd "a" in
+     let: "q" := Fst "a" in
+     let: "l" := Snd "a" in
+     let: "n" := !"l" in
      if: "n" ≤ #0%Z
-     then "l" <- #1%Z
-     else TaskQueue.put_task "q" "f" ("q", "l", "n" - #1%Z)).
+     then #()
+     else "l" <- ("n" - #1%Z);; TaskQueue.put_task "q" "f" ("q", "l")).
 
 Definition client : val :=
   λ: "q", let: "l" := ref #0 in
-          let: "n" := ChooseNat in
-          decr_reentrant ("q", "l", "n");;
-          (rec: "while" <> := if: !"l" = #1%Z
+          "l" <- ChooseNat;;
+          decr_reentrant ("q", "l");;
+          (rec: "while" <> := if: !"l" = #0%Z
                              then #()
                              else "while" #()) #().
 
@@ -58,9 +58,9 @@ Section proof.
   Remark ℓq_cond : (ℵ < ℓq)%ordi.
   Proof. apply hessenberg.add_lt_l. apply ord.S_lt. Qed.
 
-  Definition decr_reentrant_inv (arg : val) γ (k : oid) : iProp Σ :=
-    ∃ (ql : val) (l : loc) (n : Z),
-      ⌜arg = (ql, #l, #n)%V⌝ ∧
+  Definition is_decr_reentrant (arg : val) γ (k : oid) : iProp Σ :=
+    ∃ (ql : val) (l : loc),
+      ⌜arg = (ql, #l)%V⌝ ∧
       oblP_id k ∗ witP_layer k (ℓq ⊕ 1)%ordi ∗
       ⟦tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1))))⟧ₗ ∗
       is_task_queue ql γ ℓq.
