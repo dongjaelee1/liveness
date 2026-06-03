@@ -54,7 +54,8 @@ Section mp_proof.
   Global Instance mp_persistent k l : Persistent (mp k l).
   Proof. rewrite /mp /mp_tf. tf_red. apply _. Qed.
 
-  Lemma mp_writer_spec i l :
+  Lemma mp_writer_spec :
+    ⊢ ∃ m, ∀ i l,
     l{{{ ∃ g k kl, ⌜k ≠ kl⌝ ∗
                    mp k l ∗
                    (* Start with the other half of the until ownership for the pointsto. *)
@@ -62,11 +63,11 @@ Section mp_proof.
                    ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
                    thP_groups i {[g]} ∗
                    ogP_obls i g 0 ({[k; kl]}) ∗
-                   ogP_fuel g 0 10 }}}
+                   ogP_fuel g 0 m }}}
       writer #l @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
-    iIntros (Φ) "HP HΦ".
+    iExists 10. iIntros (i l Φ) "!> HP HΦ".
     iDestruct "HP" as "(%&%&%& %Nek& #Hmp& Hup& Hul& TG& Gg& Gf)".
     rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Ok& #Wlk)& #Hmp)".
     rewrite /writer /=.
@@ -129,16 +130,18 @@ Section mp_proof.
     iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$". done.
   Qed.
 
-  Lemma mp_reader_spec i l :
+  Lemma mp_reader_spec :
+    ⊢ ∃ m, ∀ i l,
     l{{{ ∃ g k kl, mp k l ∗
                    ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
                    thP_groups i {[g]} ∗
                    ogP_obls i g 1 {[kl]} ∗
-                   ogP_fuel g 1 ((1 × ▽) ⊕ 1)%M}}}
+                   ogP_fuel g 1 m}}}
+                   (* ogP_fuel g 1 ((1 × ▽) ⊕ 1)%M}}} *)
       reader #l @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
-    iIntros (Φ) "HP HΦ".
+    iExists ((1 × ▽) ⊕ 1)%M. iIntros (i l Φ) "!> HP HΦ".
     iDestruct "HP" as "(%&%&%& #Hmp& Hul& TG& Gg& Fg)".
     rewrite /reader /=.
     rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Ok& #Wlk)& #Hmp)".
@@ -218,40 +221,42 @@ Section mp_proof.
   Lemma mp_pre Θ i j (l : loc) Φ Ψs :
     i ≠ j →
     Θ = {[i := writer #l; j := reader #l ]} →
-    Φ = (∃ g1 g2 k kl1 kl2,
-            ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
-            tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-            tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-            tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-            ⟨thP_groups i {[g1]} ∗ ogP_obls i g1 0 {[k; kl1]} ∗
-             thP_groups j {[g2]} ∗ ogP_obls j g2 1 ({[kl2]}) ∗
-             ogP_fuel g1 0 10 ∗ ogP_fuel g2 1 ((1 × ▽) ⊕ 1)%M⟩)%F →
+    Φ = (λ m1 m2, (∃ g1 g2 k kl1 kl2,
+                      ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
+                      tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
+                      tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      ⟨thP_groups i {[g1]} ∗ ogP_obls i g1 0 {[k; kl1]} ∗
+                       thP_groups j {[g2]} ∗ ogP_obls j g2 1 ({[kl2]}) ∗
+                       ogP_fuel g1 0 m1 ∗ ogP_fuel g2 1 m2⟩)%F) →
     Ψs = ({[i := fork_post; j := fork_post]}) →
     ((l ↦ #0) -∗
      ([∗ set] i ∈ dom Θ, thP_groups i ∅) -∗
-     |={⊤}=>m (⟦Φ⟧ₗ ∗
-              (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+     |={⊤}=>m ∃ m1 m2, (⟦Φ m1 m2⟧ₗ ∗
+                       (⟦Φ m1 m2⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof.
     iIntros (Hij HT HP HQ) "Ptrl TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     iPoseProof (big_sepS_union with "TGs") as "[TG1 TG2]".
     { set_solver. }
     rewrite !big_sepS_singleton.
-    iMod (group_alloc _ _ _ 0 10 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg1") as "(%k& %Hk& Gg1& #Ok& Ofk& #Wlk& Ak)". 1: done.
+    iPoseProof (mp_writer_spec) as (m1) "mp_writer_spec".
+    iPoseProof (mp_reader_spec) as (m2) "mp_reader_spec".
+    iMod (group_alloc _ _ _ 0 m1 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
+    iMod (tf_until_alloc _ _ _ _ false 0 0 m1 with "Gg1") as "(%k& %Hk& Gg1& #Ok& Ofk& #Wlk& Ak)". 1: done.
     iMod ("Ak" $! _ Np (l ↦ #0)%F (l ↦ #1)%F with "Ptrl") as "Uk".
     iPoseProof (tf_until_frac_split with "Uk") as "[Uk Uk']".
     { symmetry; apply Qp.div_2. }
     iMod (inv_alloc Na _ ⟦(tf_until Np k false (1 / 2) (l ↦ #0) (l ↦ #1) ∨ ⟨ oblP_fulfilled k ⟩ ∗ l ↦ #1)⟧ₗ with "[Uk']") as "#Ak".
     { iNext. tf_red. iLeft. iFrame. }
-    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg1") as "(%kl1& %Hkl1& Gg1& #Okl1& Ofkl1& #Wlkl1& Akl1)". 1: done.
+    iMod (tf_until_alloc _ _ _ _ false 0 0 m1 with "Gg1") as "(%kl1& %Hkl1& Gg1& #Okl1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nl (⌜True⌝)%F (∃ v : val, i ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl1".
     { tf_red. done. }
-    iMod (group_alloc _ _ _ 1 ((1 × ▽) ⊕ 1)%M with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
+    iMod (group_alloc _ _ _ 1 m2 with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
     iMod (tf_until_alloc _ _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& #Okl2& Ofkl2& #Wlkl2& Akl2)". 1: done.
     iMod ("Akl2" $! _ Nl (⌜True⌝)%F (∃ v : val, j ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl2".
     { tf_red. done. }
-    iModIntro. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
+    iModIntro. iExists m1, m2. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
     { subst Φ.
       tf_red. iExists g1. tf_red. iExists g2.
       tf_red. iExists k. tf_red. iExists kl1. tf_red. iExists kl2.
@@ -267,9 +272,9 @@ Section mp_proof.
     iEval (tf_red) in "HP". iDestruct "HP" as "(%kl1& HP)".
     iEval (tf_red) in "HP". iDestruct "HP" as "(%kl2& HP)".
     iEval (tf_red) in "HP". iDestruct "HP" as "(%Hkne& #mp& Uk& Ukl1& Ukl2& TG1& Gg1& TG2& Gg2& Gf1& Gf2)".
-    iPoseProof (mp_writer_spec i l (λ v, lift_term i fork_post v) with "[Uk Ukl1 TG1 Gg1 Gf1]") as "WP1".
+    iPoseProof ("mp_writer_spec" $! i l (λ v, lift_term i fork_post v) with "[Uk Ukl1 TG1 Gg1 Gf1]") as "WP1".
     { iExists g1, k, kl1. iFrame. iSplitR; eauto. }
-    iPoseProof (mp_reader_spec j l (λ v, lift_term j fork_post v) with "[Ukl2 TG2 Gg2 Gf2]") as "WP2".
+    iPoseProof ("mp_reader_spec" $! j l (λ v, lift_term j fork_post v) with "[Ukl2 TG2 Gg2 Gf2]") as "WP2".
     { iExists g2, k, kl2. iFrame. eauto. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { rewrite lookup_insert_ne; auto. }
@@ -338,18 +343,19 @@ Section adequacy.
   Let Np := N.@ "pointsto".
   Let Nl := N.@ "label".
 
-  Let Φ_tf `{!heapGS Σ} : tf Σ :=
-        (∃ g1 g2 k kl1 kl2,
-            ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
-            tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-            tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-            tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-            ⟨thP_groups i {[g1]} ∗ ogP_obls i g1 0 {[k; kl1]} ∗
-             thP_groups j {[g2]} ∗ ogP_obls j g2 1 ({[kl2]}) ∗
-             ogP_fuel g1 0 10 ∗ ogP_fuel g2 1 ((1 × ▽) ⊕ 1)%M⟩)%F.
+  Let Φ_tf `{!heapGS Σ} : _ → _ → tf Σ :=
+        λ m1 m2,
+          (∃ g1 g2 k kl1 kl2,
+              ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
+              tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
+              tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+              tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+              ⟨thP_groups i {[g1]} ∗ ogP_obls i g1 0 {[k; kl1]} ∗
+               thP_groups j {[g2]} ∗ ogP_obls j g2 1 ({[kl2]}) ∗
+               ogP_fuel g1 0 m1 ∗ ogP_fuel g2 1 m2⟩)%F.
 
-  Lemma tf_to_tp_Φ `{!heapGS Σ} :
-    tf_to_tp Φ_tf = Φ'.
+  Lemma tf_to_tp_Φ `{!heapGS Σ} m1 m2 :
+    tf_to_tp (Φ_tf m1 m2) = Φ'.
   Proof. done. Qed.
 
   Let Σ : gFunctors :=
@@ -396,8 +402,8 @@ Section adequacy.
     { subst σ0. rewrite big_sepM_singleton.
       by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
     { iFrame. }
-    iDestruct "H" as "(HP& H)".
-    iModIntro. iExists Φ_tf. iFrame "HP". iSplit.
+    iDestruct "H" as (m1 m2) "(HP& H)".
+    iModIntro. iExists (Φ_tf m1 m2). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
   Qed.
