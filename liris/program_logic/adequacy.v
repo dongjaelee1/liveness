@@ -309,7 +309,7 @@ Section proof1.
   Proof.
     revert τ. induction Φ; simpl; intros.
     - unfold ti_atomic in H. destruct τ. simpl in H.
-      unfold tr_atomic. simpl. destruct (t n) as (((Θ&σ)&?)&?).
+      unfold tr_atomic, ts_emb, ts_atomic. simpl. destruct (t n) as (((Θ&σ)&?)&?).
       apply sat_elim in H. auto.
     - unfold ti_pure in H. apply sat_elim in H. auto.
     - unfold ti_and in H. apply iProp_sat_lc_at_frame_and in H. destruct H.

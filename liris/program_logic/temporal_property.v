@@ -62,10 +62,22 @@ Global Arguments tp_strongrelease {Π}.
 Definition tp_true {Π} : @tp Π := ⌜ True ⌝%P.
 
 (** ** Semantics. *)
+(** trace_state properties *)
+Definition tsProp (Λ : language) := trace_state Λ → Prop.
+
+Definition ts_and {Λ : language} : tsProp Λ → tsProp Λ → tsProp Λ :=
+  λ P Q, (λ ξ, (P ξ) ∧ (Q ξ)).
+
+Definition ts_atomic {Λ : language} (π : state_pred Λ) : tsProp Λ :=
+  λ ξ, let '((Θ, σ), _, _) := ξ in state_sat σ Θ π.
+
 Definition trProp (Λ : language) : Type := trace Λ → Prop.
 
+Definition ts_emb {Λ : language} : tsProp Λ → trProp Λ :=
+  λ P τ, P (trace_now τ).
+
 Definition tr_atomic {Λ : language} (π : state_pred Λ) : trProp Λ :=
-  λ τ, let '((Θ, σ), _, _) := (τ.2 τ.1) in state_sat σ Θ π.
+  ts_emb (ts_atomic π).
 
 Definition tr_pure {Λ : language} (P : Prop) : trProp Λ :=
   λ _, P.
@@ -90,6 +102,18 @@ Definition tr_always {Λ : language} : trProp Λ → trProp Λ :=
 
 Definition tr_until {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
   λ P Q, (λ τ, let '(n, τf) := τ in ∃ m, (n ≤ m) ∧ (Q (m, τf)) ∧ (∀ l, (n ≤ l < m) → (P (l, τf)))).
+
+Global Instance ts_emb_decide {Λ : language} (P : tsProp Λ) :
+  (∀ ξ, Decision (P ξ)) → ∀ τ, Decision (ts_emb P τ).
+Proof.
+  intros. unfold ts_emb. destruct τ as (n& τf). simpl. eauto.
+Qed.
+
+Lemma ts_emb_and_comm {Λ : language} (P Q : tsProp Λ) :
+  ∀ τ, ts_emb (ts_and P Q) τ ↔ (tr_and (ts_emb P) (ts_emb Q)) τ.
+Proof.
+  intros. unfold ts_emb, ts_and, trace_now, tr_and. auto.
+Qed.
 
 (** TODO: better tactic for solving trProp implications. *)
 Ltac unfold_trProp :=
@@ -128,27 +152,6 @@ Fixpoint tp_trace {Λ : language} (Φ : @tp (state_pred Λ)) : trProp Λ :=
 (** Useful patterns *)
 Definition tr_eventually {Λ : language} : trProp Λ → trProp Λ :=
   λ Q, tr_until (⌜ True ⌝)%R Q.
-
-(** ** trace_state properties *)
-Definition tsProp (Λ : language) := trace_state Λ → Prop.
-
-Definition ts_and {Λ : language} : tsProp Λ → tsProp Λ → tsProp Λ :=
-  λ P Q, (λ ξ, (P ξ) ∧ (Q ξ)).
-
-Definition ts_emb {Λ : language} : tsProp Λ → trProp Λ :=
-  λ P τ, P (trace_now τ).
-
-Global Instance ts_emb_decide {Λ : language} (P : tsProp Λ) :
-  (∀ ξ, Decision (P ξ)) → ∀ τ, Decision (ts_emb P τ).
-Proof.
-  intros. unfold ts_emb. destruct τ as (n& τf). simpl. eauto.
-Qed.
-
-Lemma ts_emb_and_comm {Λ : language} (P Q : tsProp Λ) :
-  ∀ τ, ts_emb (ts_and P Q) τ ↔ (ts_emb P ∧ ts_emb Q)%R τ.
-Proof.
-  intros. unfold ts_emb, ts_and, trace_now, tr_and. auto.
-Qed.
 
 (** ** Define fair scheduling as a property of a trace. *)
 

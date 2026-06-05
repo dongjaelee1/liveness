@@ -6,18 +6,26 @@ From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 
-(* From liris.heap_lang.lib Require Import par. *)
+Section mp_code.
 
-Definition writer : val :=
-  λ: "l", "l" <- #1;;
+  Definition set_one : val :=
+    λ: "x", "x" <- #1.
+
+  Definition X_loc : loc := Loc 0.
+  Definition X : val := #X_loc.
+
+  Definition writer : val :=
+    λ: <>, set_one X;;
           Label "exit" #().
 
-Definition reader : val := 
-  rec: "reader" "l" :=
-    let: "n" := !"l" in
-    if: "n" = #1
-    then Label "exit" #()
-    else "reader" "l".
+  Definition reader : val := 
+    rec: "reader" <> :=
+      let: "n" := !X in
+      if: "n" = #1
+      then Label "exit" #()
+      else "reader" #().
+
+End mp_code.
 
 Section mp_proof.
   Context `{!heapGS Σ}.
@@ -42,6 +50,8 @@ Section mp_proof.
   Proof. by apply ndot_ne_disjoint. Qed.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
+
+  TODO
 
   Definition mp_tf (k : oid) (l : loc) : tf Σ :=
     ⟨oblP_id k ∗ witP_layer k 0⟩ ∗
