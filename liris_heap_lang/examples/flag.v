@@ -8,10 +8,10 @@ From iris.prelude Require Import options.
 
 Module Flag.
 
-  Definition set_flag : val :=
+  Definition set : val :=
     λ: "x", "x" <- #1.
 
-  Definition wait_flag : val := 
+  Definition wait : val := 
     rec: "wait" "x" :=
       let: "n" := !"x" in
       if: "n" = #1
@@ -37,7 +37,6 @@ Section proof.
   Let N := nroot.@ "message_passing".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
-  Let Nl := N.@ "label".
 
   Remark N_disj_1 : Na ## Np.
   Proof. by apply ndot_ne_disjoint. Qed.
@@ -59,21 +58,21 @@ Section proof.
   Lemma flag_inv_tf_red l k ℓ : ⟦flag_inv_tf l k ℓ⟧ₗ = flag_inv l k ℓ.
   Proof. rewrite /flag_inv /flag_inv_tf. tf_red. auto. Qed.
 
-  Lemma Flag_set_flag_spec :
+  Lemma Flag_set_spec :
     ⊢ ∃ μ, ∀ lc i j l G g K k ℓ ℓg,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) ∗
          grP_obls j g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
          (* The other half of the until ownership for the pointsto. *)
          ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
          flag_inv l k ℓ }}}
-      Flag.set_flag #l @ i
+      Flag.set #l @ i
     l{{{ RET #(); £ lc ∗ thP_groups i G ∗
                   grP_obls j g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}}.
   Proof.
     iExists 10. iIntros (lc i j l G g K k ℓ ℓg Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& Gg& %Ink& HU& #flag_inv)".
     iDestruct "flag_inv" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
-    rewrite /Flag.set_flag.
+    rewrite /Flag.set.
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
     lwp_bind (Store _ _).
@@ -107,17 +106,17 @@ Section proof.
     iApply ("HΦ" with "[$Q_LC $TG $Gg $Odk]").
   Qed.
 
-  Lemma Flag_wait_flag_spec :
+  Lemma Flag_wait_spec :
     ⊢ ∃ μ, ∀ lc i l G k ℓ,
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
          flag_inv l k ℓ }}}
-      Flag.wait_flag #l @ i
+      Flag.wait #l @ i
     l{{{ RET #(); £ lc ∗ thP_groups i G ∗ oblP_discharged k }}}.
   Proof.
     iExists ((1 × ▽) ⊕ 1)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& #flag_inv)".
     iDestruct "flag_inv" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
-    rewrite /Flag.wait_flag.
+    rewrite /Flag.wait.
     iPoseProof (grP_fuel_add_set with "GF") as "[W_GF GF]".
     (* Liveness induction *)
     iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)".
@@ -186,3 +185,28 @@ Section proof.
   Qed.
 
 End proof.
+
+Section trace.
+
+  (** Export to trace properties *)
+  Definition flag_inv_tp (l : loc) : tp :=
+    (tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (l ↦ #1))))%P.
+
+  (** TODO: weaken the strict equality to semantics equivalence/implication. *)
+  Definition flag_inv_tp' (l : loc) : tp :=
+    (tp_true ∧ tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
+
+  Remark flag_inv_tf_to_tp' `{!heapGS Σ} l k ℓ :
+    tf_to_tp (flag_inv_tf l k ℓ) = flag_inv_tp' l.
+  Proof. done. Qed.
+
+  Remark flag_inv_tp_impl l :
+    ∀ τ, tp_trace (flag_inv_tp' l) τ → tp_trace (flag_inv_tp l) τ.
+  Proof.
+    simpl. unfold_trProp. intros. destruct τ. destruct H. intros. specialize (H0 _ H1).
+    destruct H0.
+    - destruct H0 as (?&?&?&?). left. eexists. split_and !; eauto.
+    - destruct H0. right. eauto.
+  Qed.
+
+End trace.
