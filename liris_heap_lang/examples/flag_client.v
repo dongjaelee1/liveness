@@ -6,6 +6,8 @@ From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 
+From liris.heap_lang.examples Require Export flag.
+
 Section mp_code.
 
   Definition set_flag : val :=

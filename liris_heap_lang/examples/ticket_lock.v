@@ -116,7 +116,7 @@ Section proof.
       (** Finished or waiting threads *)
       ([∗ map] t ↦ κ ∈ tickets,
          (** We need auth_mra_know to sync what other threads know about the configuration *)
-         (∃ ℓ, oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi ∗ (own γc (◯AM[ord.le] ℓ))) ∗
+         (∃ ℓ, t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi ∗ (own γc (◯AM[ord.le] ℓ))) ∗
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_discharged κ) ∨
             (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ ⟨R⟩)⟧ₗ))) ∗
       (** Acknowledgement *)
@@ -198,7 +198,7 @@ Section proof.
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (next) "((_& TG& _)& Ptr_next& _)".
     lwp_pure_lc lc. iRename "LC" into "QLC".
-    iMod (obl_alloc_discharged _ (ℓ ⊕ Z.to_nat 0)%ordi 0) as "(%κu& #Ofk& #Ok& _& #Wlk& OAcc)".
+    iMod (obl_alloc_discharged _ (ℓ ⊕ Z.to_nat 0)%ordi 0) as "(%κu& #Ofk& _& #Wlk& OAcc)".
     iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
     iMod (ghost_map_alloc ({[0%Z := (κu)]} : gmap Z (oid))) as "(%γt& GMAt& GMEt)".
     iMod (ghost_map_alloc ({[0%Z := true]} : gmap Z bool)) as "(%γa& GMAa& GMEa)".
@@ -221,7 +221,7 @@ Section proof.
         - subst. lia.
         - lia. }
       iSplitR.
-      { rewrite big_sepM_singleton. iFrame "Ok GMEt Wlk CFl". iLeft. iFrame "Ofk". iPureIntro. lia. }
+      { rewrite big_sepM_singleton. iFrame "GMEt Wlk CFl". iLeft. iFrame "Ofk". iPureIntro. lia. }
       iSplitR.
       { rewrite big_sepM_singleton. iLeft. iFrame "GMEa". iPureIntro. lia. }
       iLeft. iFrame. done. }
@@ -279,7 +279,7 @@ Section proof.
       as "(%gu0& %Ningu0& TG& Gg0& GF')".
     (* Unlock obligation *)
     iMod (tf_until_alloc _ _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
-      as "(%κu& %LUku& Gg0& #Gku& OGF& #Wlku& ALLOC)". 1: done.
+      as "(%κu& %LUku& Gg0& OGF& #Wlku& ALLOC)". 1: done.
     iMod ("ALLOC" $! _ N_eventually ⌜True⌝%F (curr ↦{#1 / 2} #(n + 1) ∗ ⟨R⟩)%F with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ 1 with "GGF") as "GGF".
@@ -312,7 +312,7 @@ Section proof.
       { iApply big_sepM_insert.
         { apply not_elem_of_dom. intros IN. apply Domt in IN. lia. }
         iSplitR "HMt".
-        - iFrame "Gku GMEtku Wlku CFl". iRight. iFrame. iPureIntro. lia.
+        - iFrame "GMEtku Wlku CFl". iRight. iFrame. iPureIntro. lia.
         - iApply (big_sepM_impl with "HMt"). iIntros "!> %%% H".
           iDestruct "H" as "($& [H | H])".
           + by iLeft.
@@ -363,7 +363,7 @@ Section proof.
     { iSplit; first eauto. iFrame. }
     iSplitL "PtrNext PtrCurr GMAt GMAa HMt HMa Hc".
     { iFrame. eauto. }
-    iIntros "!> !>". iDestruct "Hkp" as "(%& #Okp& #Mtkp& #Wlkp& #CFlp)".
+    iIntros "!> !>". iDestruct "Hkp" as "(%& #Mtkp& #Wlkp& #CFlp)".
     clear dependent n c tickets acks.
     rewrite union_empty_r_L.
     (** Witness induction. *)
@@ -371,13 +371,12 @@ Section proof.
     iAssert (⌜(ℓ0 <= ℓ)%ordi⌝)%I as "%Hcf".
     { iCombine "CF CFlp" gives %?. apply auth_mra_both_dfrac_valid in H. 2: apply _. destruct H. auto. }
     iPoseProof (wit_fuels_init with "Wlkp") as "(%& WFs0)".
-    iMod (wit_fuels_add_map _ _ _ _ (gset_to_gmap ((ℓ ⊕ Z.to_nat (my + 1))%ordi, ms_nat 50) G')
-           with "WFs0 [Fsloop]") as "WFs".
-    { rewrite big_sepM_gset_to_gmap. iApply (big_sepS_impl with "Fsloop"). iIntros "!> %% F".
-      iFrame. iPureIntro. unshelve eapply ord.le_lt_lt. 1: exact (ℓ ⊕ Z.to_nat my)%ordi.
+    iMod (wit_fuels_add_map _ _ _ _ G' (ℓ ⊕ Z.to_nat (my + 1))%ordi (50)%M
+           with "WFs0 Fsloop") as "WFs".
+    { unshelve eapply ord.le_lt_lt. 1: exact (ℓ ⊕ Z.to_nat my)%ordi.
       - apply hessenberg.le_add_l. auto.
       - apply hessenberg.lt_add_r. apply ordArith.lt_from_nat. lia. }
-    iClear "Wlkp WFs0". rewrite map_union_empty. iRevert "WFs".
+    iClear "WFs0". rewrite map_union_empty. iRevert "WFs".
     iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
     iIntros "WFs".
     (* Execute loop body. *)
@@ -398,7 +397,7 @@ Section proof.
     iIntros "((LC'& TG& Wc)& PtrCurr)". iEval (rewrite big_sepS_singleton) in "Wc".
     (* Two cases: it's my turn, or not. *)
     destruct (decide (my = c)).
-    - iClear "Okp Mtkp IHα WFs LC' Wc". clear dependent κp. subst c.
+    - iClear "Wlkp Mtkp IHα WFs LC' Wc". clear dependent κp. subst c.
       iPoseProof (ghost_map_lookup with "GMAt GMEtku") as "%LUt".
       iPoseProof (ghost_map_lookup with "GMAa GMEaku") as "%LUa".
       assert (Boundmy : (my + 1 ≤ n)%Z).
