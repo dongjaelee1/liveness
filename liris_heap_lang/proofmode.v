@@ -26,7 +26,7 @@ Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_languag
   PureExec φ n e1 e2 →
   φ →
   envs_entails Δ (∃ E' G R (o : Ord.t),
-        ([∗ set] r ∈ R, oblP_id r) ∗
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
                        thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
                        (thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
@@ -55,7 +55,7 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ :
   envs_entails Δ (∃ G (m : nat) R (o : Ord.t),
         (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m) ∗
          (** FIXME: nat add notation not working? *)
-         ([∗ set] r ∈ R, oblP_id r) ∧ ⌜ (m = n + m')%nat ⌝) ∗
+         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∧ ⌜ (m = n + m')%nat ⌝) ∗
         (thP_groups i G -∗
          ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m') -∗
          ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_fulfilled r) -∗

@@ -8,8 +8,15 @@ From iris.prelude Require Import options.
 
 Section mp_code.
 
-  Definition set_one : val :=
+  Definition set_flag : val :=
     λ: "x", "x" <- #1.
+
+  Definition wait_flag : val := 
+    rec: "wait" "x" :=
+      let: "n" := !"x" in
+      if: "n" = #1
+      then #()
+      else "wait" "x".
 
   Definition X_loc : loc := Loc 0.
   Definition X : val := #X_loc.

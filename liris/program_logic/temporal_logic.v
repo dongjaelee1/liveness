@@ -422,16 +422,16 @@ Section proof.
     (ℓ1 <= ℓ2)%ordi →
     ogP_obls i g ℓ1 K -∗
     |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
-                 oblP_id k ∗ oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
+                 oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
                  ∀ E' N (P Q : tf Σ), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) ={E'}=∗ (⟦tf_until N k b 1 P Q⟧ₗ).
   Proof.
-    iIntros (Ltl) "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& $& ACC)". 1: auto.
+    iIntros (Ltl) "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& ACC)". 1: auto.
     iIntros "!> %%%% H". rewrite tf_until_logic. iMod ("ACC" with "H") as "ACC". iFrame. done.
   Qed.
 
   Lemma tf_fulfilled_alloc E ℓ μ (Q : tf Σ) :
     ⟦Q⟧ₗ -∗
-    |={E}=>m ⟦Q⟧ₗ ∗ ∃ k, oblP_fulfilled k ∗ oblP_id k ∗
+    |={E}=>m ⟦Q⟧ₗ ∗ ∃ k, oblP_fulfilled k ∗
                         (∀ E' N (P : tf Σ), |={E'}=> oblP_inv N k ⟦P⟧ₗ ⟦Q⟧ₗ (tf_fulfilled k Q)) ∗ 
                         oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.

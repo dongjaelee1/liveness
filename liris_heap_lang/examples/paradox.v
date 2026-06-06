@@ -20,7 +20,7 @@ Class heapGS_no_lc `(HGS : heapGS Σ) := {
       φ →
       Nat.iter n
         (λ P,
-           |={E,E'}=> ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+           |={E,E'}=> ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                           (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                            (|={E',E}=> |={E}=>m P)))
         (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
@@ -30,7 +30,7 @@ Class heapGS_no_lc `(HGS : heapGS Σ) := {
 Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@heapGS_no_lc Σ _} (n : nat) R s i E E' e1 e2 φ Φ :
   PureExec φ n e1 e2 →
   φ →
-  ([∗ set] r ∈ R, oblP_id r) ∗
+  ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
   (Nat.iter n (λ P, |={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
                                (|={E',E}=> |={E}=>m P)))
      (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
@@ -51,7 +51,7 @@ Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@heapGS_no_lc Σ _}
   PureExec φ n e1 e2 →
   φ →
   envs_entails Δ (∃ E' R,
-        ([∗ set] r ∈ R, oblP_id r) ∗
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
                        (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ (|={E',E}=> |={E}=>m P)))
            (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
@@ -219,8 +219,7 @@ Section proof.
          ghost_map_auth rm 1 os⟩ ∗
         ([^tf_sep map] a ↦ k ∈ os,
            ⟨(£ (10)%ord ∨ cnt_lb r i a) ∗
-            a ↪[rm]□ k ∗ cnt_lb r j a ∗
-            oblP_id k ∗ witP_layer k 0⟩ ∗
+            a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0⟩ ∗
            ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩) ∨
               (⟨oblP_fulfilled k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩))))%F.
 
@@ -233,8 +232,7 @@ Section proof.
        ghost_map_auth rm 1 os) ∗
       ([∗ map] a ↦ k ∈ os,
          ((£ (10)%ord ∨ cnt_lb r i a) ∗
-          a ↪[rm]□ k ∗ cnt_lb r j a ∗
-          oblP_id k ∗ witP_layer k 0) ∗
+          a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0) ∗
          ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩⟧ₗ) ∨
             (oblP_fulfilled k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
 
@@ -267,15 +265,15 @@ Section proof.
          £ (10)%ord ∗
          px r rm ci cj ∗
          ∃ n, cnt_auth r ci n 1%Qp ∗ cnt_lb r cj n ∗
-              ∃ ck, oblP_id ck ∗ witP_layer ck 0 ∗ n ↪[rm]□ ck
+              ∃ ck, witP_layer ck 0 ∗ n ↪[rm]□ ck
       }}}
       loop #() @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof using Type*.
-    iIntros (Φ) "(TG& Gg& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Gckn& #Wckn& #Mn) HΦ".
+    iIntros (Φ) "(TG& Gg& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Wckn& #Mn) HΦ".
     (** Lob induction *)
-    iRevert (n ck) "Cljn Gckn Wckn Mn Cai". iLöb as "IH".
-    iIntros (n ck) "#Cljn #Gckn #Wckn #Mn Cai".
+    iRevert (n ck) "Cljn Wckn Mn Cai". iLöb as "IH".
+    iIntros (n ck) "#Cljn #Wckn #Mn Cai".
     (** Witness induction *)
     iPoseProof (wit_fuels_init with "Wckn") as "(%& Wfs)".
     iRevert "Wfs".
@@ -306,7 +304,7 @@ Section proof.
       { iFrame. iRight. eauto. }
       iPoseProof (ghost_map_lookup with "GMA Mn1") as "%LU1".
       iPoseProof (big_sepM_delete _ _ _ _ LU1 with "HM") as "[Hm HM]".
-      iDestruct "Hm" as "(([LC1 | #Flb]& _& #Clbj1& #Gckn1& #Wckn1)& Hm)"; cycle 1.
+      iDestruct "Hm" as "(([LC1 | #Flb]& _& #Clbj1& #Wckn1)& Hm)"; cycle 1.
       { iPoseProof (cnt_auth_lb_valid with "Cai Flb") as "%". destruct H0. lia. }
       iMod (cnt_auth_update _ _ _ (n + 1) with "Cai") as "Cai".
       { lia. }
@@ -315,7 +313,7 @@ Section proof.
       { iFrame. iFrame "Clbj1". eauto. }
       iModIntro. iSplitL "Ca GMA HM".
       { iFrame. }
-      iIntros "!> !>". iApply ("IH" with "TG Gg TUz LC1 HΦ Cljn1 Gckn1 Wckn1 Mn1 Cai").
+      iIntros "!> !>". iApply ("IH" with "TG Gg TUz LC1 HΦ Cljn1 Wckn1 Mn1 Cai").
   Qed.
 
   Lemma px_loop2_spec j n r rm ci cj ck :
@@ -365,7 +363,7 @@ Section proof.
     iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     iMod (group_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
-    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& #Ok1& Of1& #Wlk1& A)". 1: done.
+    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
     iApply fupd_sfmupd_elim. iMod "mask" as "_".
     iMod ("A" $! _ Nu ⌜True⌝%F ⟨ cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k' ⟩%F with "[//]") as "Unew".
     iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.

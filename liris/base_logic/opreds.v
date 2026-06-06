@@ -7,14 +7,8 @@ From liris.base_logic Require Export mupd oinv.
 
 (** All Local Definitions are only for internal uses and users should not need them. *)
 (** ** Obl predicates. *)
-Local Definition oblP_id_def `{SI : indexT} `{@mupdGS SI Σ}
-  k : iProp Σ :=
+Local Definition oblP_id `{SI : indexT} `{@mupdGS SI Σ} k : iProp Σ :=
   oblG_elem k.
-Local Definition oblP_id_aux : seal (@oblP_id_def). Proof. by eexists. Qed.
-Definition oblP_id := oblP_id_aux.(unseal).
-Local Definition oblP_id_unseal :
-  @oblP_id = @oblP_id_def := oblP_id_aux.(seal_eq).
-Global Arguments oblP_id {SI Σ _}.
 
 Local Definition oblP_assigned_def `{SI : indexT} `{@mupdGS SI Σ}
   k b q : iProp Σ :=
@@ -186,7 +180,7 @@ Ltac unfold_opreds :=
   try rewrite /oblP_fuel_val;
   try rewrite !oblP_fulfilled_unseal /oblP_fulfilled_def;
   try rewrite !oblP_assigned_unseal /oblP_assigned_def;
-  try rewrite !oblP_id_unseal /oblP_id_def.
+  try rewrite /oblP_id.
 
 Ltac unfold_oblP_fuel :=
   try rewrite !oblP_fuel_unseal /oblP_fuel_def.
@@ -199,7 +193,7 @@ Section preds.
   Section liveness_preds.
 
     (** ** Instances *)
-    Global Instance oblP_id_persistent k : Persistent (oblP_id k).
+    Local Instance oblP_id_persistent k : Persistent (oblP_id k).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance oblP_fulfilled_persistent k : Persistent (oblP_fulfilled k).
     Proof. unfold_opreds. apply _. Qed.
@@ -225,7 +219,7 @@ Section preds.
     Global Instance wit_fuels_empty_persistent k ℓ α : Persistent (wit_fuels k ℓ α ∅).
     Proof. unfold_opreds. apply _. Qed.
 
-    Global Instance oblP_id_timeless k : Timeless (oblP_id k).
+    Local Instance oblP_id_timeless k : Timeless (oblP_id k).
     Proof. unfold_opreds. apply _. Qed.
     Global Instance oblP_assigned_timeless k b q : Timeless (oblP_assigned k b q).
     Proof. unfold_opreds. apply _. Qed.
@@ -1499,7 +1493,6 @@ Section preds.
       |=[n,Θ]=>m ∃ k, (⌜ k ∉ K ⌝) ∗
                      ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
                      oblP_assigned k b (1/2)%Qp ∗
-                     oblP_id k ∗
                      oblP_fuel k ℓ2 μ ∗
                      witP_layer k ℓ2 ∗
                      (∀ E N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E}=∗ oblP_inv N k P Q R).
@@ -1545,7 +1538,7 @@ Section preds.
     Qed.
 
     Lemma obl_alloc_fulfilled_mupd n Θ ℓ μ :
-      ⊢ |=[n,Θ]=>m ∃ k, oblP_fulfilled k ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+      ⊢ |=[n,Θ]=>m ∃ k, oblP_fulfilled k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                        (∀ E N (P Q R : iProp Σ), (▷ R) ={E}=∗ oblP_inv N k P Q R).
     Proof.
       unfold_opreds.
@@ -1800,7 +1793,7 @@ Section preds.
     Qed.
 
     Lemma obl_check_witnesses_mupd n Θ (R : oids) :
-      ([∗ set] r ∈ R, oblP_id r) -∗
+      ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
       |=[n,Θ]=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_fulfilled r).
     Proof.
       unfold_opreds. iIntros "#REs".
@@ -1810,6 +1803,7 @@ Section preds.
       iAssert (⌜ R ⊆ dom W1 ⌝)%I as "%RWSub".
       { rewrite -DomOW. rewrite elem_of_subseteq. iIntros (x INRx).
         iPoseProof (big_sepS_delete _ _ _ INRx with "REs") as "[#Beg _]".
+        iDestruct "Beg" as "(%&%& Beg& _)".
         iPoseProof (osat_elem with "[$S $Beg]") as "%". done. }
       iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
       iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
@@ -1851,8 +1845,8 @@ Section preds.
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S O W G A". iSplitR; eauto.
       iIntros "!> !>". iApply (big_sepS_impl with "Rs"). iIntros "!> %% (#Ge& [Ww | Gf])".
-      - iLeft. eauto.
-      - iRight. eauto.
+      - iLeft. iDestruct "Ge" as "(%&%& $& _)". eauto.
+      - iRight. iDestruct "Ge" as "(%&%& $& _)". eauto.
     Qed.
 
     (** ** Variant access rules *)

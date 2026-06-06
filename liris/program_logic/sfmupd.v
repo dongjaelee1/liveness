@@ -296,7 +296,6 @@ Section sfmupd.
     |={E}=>m ∃ k, (⌜ k ∉ K ⌝) ∗
                  ogP_obls i g ℓ1 ({[k]} ∪ K) ∗
                  oblP_assigned k b (1/2)%Qp ∗
-                 oblP_id k ∗
                  oblP_fuel k ℓ2 μ ∗
                  witP_layer k ℓ2 ∗
                  (∀ E N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E}=∗ oblP_inv N k P Q R).
@@ -306,11 +305,11 @@ Section sfmupd.
   Qed.
 
   Lemma obl_alloc_fulfilled E ℓ μ :
-    ⊢ |={E}=>m ∃ k, oblP_fulfilled k ∗ oblP_id k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+    ⊢ |={E}=>m ∃ k, oblP_fulfilled k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                    (∀ E N (P Q R : iProp Σ), (▷ R) ={E}=∗ oblP_inv N k P Q R).
   Proof.
     unfold_sfmupd. iIntros "%%%%% $".
-    iMod (obl_alloc_fulfilled_mupd) as "(%& $& $& $& $& $)"; auto.
+    iMod (obl_alloc_fulfilled_mupd) as "(%& $& $& $& $)"; auto.
   Qed.
 
   Lemma obl_assigned_to_true E N k P Q R :
@@ -371,7 +370,7 @@ Section sfmupd.
   Qed.
 
   Lemma obl_check_witnesses E (R : oids) :
-    ([∗ set] r ∈ R, oblP_id r) -∗
+    ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
     |={E}=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_fulfilled r).
   Proof.
     unfold_sfmupd. iIntros "Rs %%%%% $". iMod (obl_check_witnesses_mupd with "Rs") as "H". auto.

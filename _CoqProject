@@ -134,6 +134,7 @@ liris_heap_lang/lib/array.v
 # liris_heap_lang/lib/arith.v
 # liris_heap_lang/lib/logatom_lock.v
 
+liris_heap_lang/examples/flag.v
 liris_heap_lang/examples/message_passing.v
 liris_heap_lang/examples/paradox.v
 liris_heap_lang/examples/ticket_lock.v

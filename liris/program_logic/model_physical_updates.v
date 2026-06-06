@@ -66,7 +66,7 @@ Section mprog.
   (** Step rule *)
   Lemma mprog_step n Θ i P :
     (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ∃ ℓ, ogP_fuel u ℓ 1) ∗
-                   ∃ R, ([∗ set] r ∈ R, oblP_id r) ∗
+                   ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                         ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r))
                          ={∅}=∗ P))
     ⊢ mprog n Θ i P.
@@ -116,6 +116,7 @@ Section mprog.
     iAssert (⌜ R ⊆ dom W1 ⌝)%I as "%RWSub".
     { rewrite -DomOW. rewrite elem_of_subseteq. iIntros (x INRx).
       iPoseProof (big_sepS_delete _ _ _ INRx with "REs") as "[#Beg _]".
+      iDestruct "Beg" as "(%&%& Beg& _)".
       iPoseProof (osat_elem with "[$S $Beg]") as "%". done. }
     iMod (osat_progress with "[$S $GFs]") as "(%Ω2& S& %ProgO)".
     { intros. destruct g; try done. eauto. }
@@ -160,7 +161,7 @@ Section mprog.
         apply Ord.S_supremum. eauto. }
     iCombine "REs Rs" as "Rs". iPoseProof (big_sepS_sep with "Rs") as "Rs".
     iMod ("H" with "[$Oe $Ox $Gta Rs]") as "H".
-    { iApply (big_sepS_impl with "Rs"). iIntros "!> %% (#Ge& [Ww | Gf])"; eauto. }
+    { iApply (big_sepS_impl with "Rs"). iIntros "!> %% ((%&%& #Ge& #Wb)& [Ww | Gf])"; eauto. }
     iModIntro. assert (dom Ω1 = dom Ω2) by (destruct ProgO; eapply obls_cond_rel_dom; eauto).
     rewrite /model_interp H. iFrame. done.
   Qed.

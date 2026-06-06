@@ -103,7 +103,7 @@ Qed.
 Lemma lwp_allocN G R o s i E v n :
   (0 < n)%Z →
   l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-       ([∗ set] r ∈ R, oblP_id r) }}}
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
          (£ o ∗ thP_groups i G ∗
@@ -120,7 +120,7 @@ Qed.
 Lemma lwp_allocN_vec G R o s i E v n :
   (0 < n)%Z →
   l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-       ([∗ set] r ∈ R, oblP_id r) }}}
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) }}}
     AllocN #n v @ s; i; E
   l{{{ l, RET #l;
          (£ o ∗ thP_groups i G ∗
@@ -136,7 +136,7 @@ Qed.
 Lemma lwp_load_offset G R o s i E l dq off vs v :
   vs !! off = Some v →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗{dq} vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗{dq} vs }}}
     ! #(l +ₗ off) @ s; i; E
   l{{{ RET v; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗{dq} vs }}}.
 Proof.
@@ -149,7 +149,7 @@ Qed.
 
 Lemma lwp_load_offset_vec G R o s i E l dq sz (off : fin sz) (vs : vec val sz) :
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗{dq} vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗{dq} vs }}}
     ! #(l +ₗ off) @ s; i; E
   l{{{ RET vs !!! off; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗{dq} vs }}}.
 Proof. apply lwp_load_offset. by apply vlookup_lookup. Qed.
@@ -157,7 +157,7 @@ Proof. apply lwp_load_offset. by apply vlookup_lookup. Qed.
 Lemma lwp_store_offset G R o s i E l off (vs : list val) (v : val) :
   is_Some (vs !! off) →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
   l{{{ RET #(); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ (l ↦∗ (<[off:=v]> vs)) }}}.
 Proof.
@@ -169,7 +169,7 @@ Qed.
 
 Lemma lwp_store_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v :
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
   l{{{ RET #(); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ vinsert off v vs }}}.
 Proof.
@@ -180,7 +180,7 @@ Qed.
 Lemma lwp_xchg_offset G R o s i E l off (vs : list val) (v v' : val) :
   vs !! off = Some v →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v' @ s; i; E
   l{{{ RET v; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ <[off:=v']> vs }}}.
 Proof.
@@ -192,7 +192,7 @@ Qed.
 
 Lemma lwp_xchg_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v :
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v @ s; i; E
   l{{{ RET (vs !!! off); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ vinsert off v vs }}}.
 Proof.
@@ -205,7 +205,7 @@ Lemma lwp_cmpxchg_suc_offset G R o s i E l off vs (v' v1 v2 : val) :
   v' = v1 →
   vals_compare_safe v' v1 →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (v', #true); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ <[off:=v2]> vs }}}.
 Proof.
@@ -219,7 +219,7 @@ Lemma lwp_cmpxchg_suc_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val s
   vs !!! off = v1 →
   vals_compare_safe (vs !!! off) v1 →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (vs !!! off, #true); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ vinsert off v2 vs }}}.
 Proof.
@@ -233,7 +233,7 @@ Lemma lwp_cmpxchg_fail_offset G R o s i E l dq off vs (v0 v1 v2 : val) :
   v0 ≠ v1 →
   vals_compare_safe v0 v1 →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗{dq} vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗{dq} vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (v0, #false); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗{dq} vs }}}.
 Proof.
@@ -249,7 +249,7 @@ Lemma lwp_cmpxchg_fail_offset_vec G R o s i E l dq sz (off : fin sz) (vs : vec v
   vs !!! off ≠ v1 →
   vals_compare_safe (vs !!! off) v1 →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗{dq} vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗{dq} vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
   l{{{ RET (vs !!! off, #false); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗{dq} vs }}}.
 Proof.
@@ -260,7 +260,7 @@ Qed.
 Lemma lwp_faa_offset G R o s i E l off vs (i1 i2 : Z) :
   vs !! off = Some #i1 →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-       ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
   l{{{ RET LitV (LitInt i1); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
 Proof.
@@ -273,7 +273,7 @@ Qed.
 Lemma lwp_faa_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) (i1 i2 : Z) :
   vs !!! off = #i1 →
   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-        ([∗ set] r ∈ R, oblP_id r)) ∗ l ↦∗ vs }}}
+        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
   l{{{ RET LitV (LitInt i1); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ l ↦∗ vinsert off #(i1 + i2) vs }}}.
 Proof.
@@ -286,7 +286,7 @@ Qed.
 (* (** Lemmas for some particular expression inside the [Resolve]. *) *)
 (* Lemma lwp_resolve_proph G R o s i E (p : proph_id) (pvs : list (val * val)) v : *)
 (*   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ *)
-(*         ([∗ set] r ∈ R, oblP_id r)) ∗ proph p pvs }}} *)
+(*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs }}} *)
 (*     ResolveProph (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E *)
 (*   l{{{ pvs', RET (LitV LitUnit); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ ⌜pvs = (LitV LitUnit, v)::pvs'⌝ ∗ proph p pvs' }}}. *)
 (* Proof. *)
@@ -300,7 +300,7 @@ Qed.
 (* Lemma lwp_resolve_cmpxchg_suc G R o s i E l (p : proph_id) (pvs : list (val * val)) (v1 v2 v : val) : *)
 (*   vals_compare_safe v1 v1 → *)
 (*   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ *)
-(*         ([∗ set] r ∈ R, oblP_id r)) ∗ proph p pvs ∗ ▷ l ↦ v1 }}} *)
+(*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs ∗ ▷ l ↦ v1 }}} *)
 (*     Resolve (CmpXchg #l v1 v2) #p v @ s; i; E *)
 (*   l{{{ RET (v1, #true) ; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ ∃ pvs', ⌜pvs = ((v1, #true)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦ v2 }}}. *)
 (* Proof. *)
@@ -314,7 +314,7 @@ Qed.
 (* Lemma lwp_resolve_cmpxchg_fail G R o s i E l (p : proph_id) (pvs : list (val * val)) dq (v' v1 v2 v : val) : *)
 (*   v' ≠ v1 → vals_compare_safe v' v1 → *)
 (*   l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g 0 1) ∗ *)
-(*         ([∗ set] r ∈ R, oblP_id r)) ∗ proph p pvs ∗ ▷ l ↦{dq} v' }}} *)
+(*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs ∗ ▷ l ↦{dq} v' }}} *)
 (*     Resolve (CmpXchg #l v1 v2) #p v @ s; i; E *)
 (*   l{{{ RET (v', #false) ; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r)) ∗ ∃ pvs', ⌜pvs = ((v', #false)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦{dq} v' }}}. *)
 (* Proof. *)
