@@ -28,7 +28,7 @@ Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_languag
   envs_entails Δ (∃ E' G R (o : Ord.t),
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
-                       thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+                       thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
                        (thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                         ALC (£ o ={E',E}=∗ |={E}=>m P)))
            (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
@@ -53,11 +53,11 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ :
   (* m = n + m' → *)
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
   envs_entails Δ (∃ G (m : nat) R (o : Ord.t),
-        (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m) ∗
+        (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ m) ∗
          (** FIXME: nat add notation not working? *)
          ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∧ ⌜ (m = n + m')%nat ⌝) ∗
         (thP_groups i G -∗
-         ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m') -∗
+         ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ m') -∗
          ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r) -∗
          £ (o)%ord -∗
          lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
@@ -69,10 +69,10 @@ Proof.
   iIntros "(%&%&%&%& T& H)".
   iApply (lifting.lwp_pure_step_simple _ _ _ o). 1: auto.
   iDestruct "T" as "($& Fs& $& %)". subst.
-  iAssert (([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ m'))%I with "[Fs]" as "[$ Fs]".
+  iAssert (([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ m'))%I with "[Fs]" as "[$ Fs]".
   { iApply big_sepS_sep. iApply (big_sepS_impl with "Fs"). iIntros "!> %% (%& H)".
-    rewrite (ogP_fuel_eq _ _ _ (n ⊕ m')%M).
-    - iPoseProof (ogP_fuel_add with "H") as "[$ $]".
+    rewrite (grP_fuel_eq _ _ _ (n ⊕ m')%M).
+    - iPoseProof (grP_fuel_add with "H") as "[$ $]".
     - rewrite measure_add !measure_nat Hessenberg.add_from_nat. done. }
   iIntros "_ TG Ws LC".
   iAssert (|==> ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r))%I with "[Ws]" as ">Ws".

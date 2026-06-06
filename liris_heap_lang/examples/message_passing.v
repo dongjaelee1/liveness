@@ -79,8 +79,8 @@ Section mp_proof.
                    ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
                    ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
                    thP_groups i {[g]} ∗
-                   ogP_obls i g 0 ({[k; kl]}) ∗
-                   ogP_fuel g 0 m }}}
+                   grP_obls i g 0 ({[k; kl]}) ∗
+                   grP_fuel g 0 m }}}
       writer #l @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
@@ -88,11 +88,11 @@ Section mp_proof.
     iDestruct "HP" as "(%&%&%& %Nek& #Hmp& Hup& Hul& TG& Gg& Gf)".
     rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Ok& #Wlk)& #Hmp)".
     rewrite /writer /=.
-    iPoseProof (ogP_fuels_init {[g]} 10 with "[Gf]") as "GF".
+    iPoseProof (grP_fuels_init {[g]} 10 with "[Gf]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 10. iSplitR; first eauto. iIntros "TG GF _ LC".
-    iPoseProof (ogP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
     lwp_bind (Store _ _).
     iModIntro.
     iInv "Hmp" as "mp". iDestruct "mp" as "[mp | mp]"; cycle 1.
@@ -152,9 +152,9 @@ Section mp_proof.
     l{{{ ∃ g k kl, mp k l ∗
                    ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
                    thP_groups i {[g]} ∗
-                   ogP_obls i g 1 {[kl]} ∗
-                   ogP_fuel g 1 m}}}
-                   (* ogP_fuel g 1 ((1 × ▽) ⊕ 1)%M}}} *)
+                   grP_obls i g 1 {[kl]} ∗
+                   grP_fuel g 1 m}}}
+                   (* grP_fuel g 1 ((1 × ▽) ⊕ 1)%M}}} *)
       reader #l @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
@@ -162,15 +162,15 @@ Section mp_proof.
     iDestruct "HP" as "(%&%&%& #Hmp& Hul& TG& Gg& Fg)".
     rewrite /reader /=.
     rewrite /mp /mp_tf. do 2 tf_red. iDestruct "Hmp" as "((#Ok& #Wlk)& #Hmp)".
-    iPoseProof (ogP_fuel_add with "Fg") as "[WFg Fg]".
+    iPoseProof (grP_fuel_add with "Fg") as "[WFg Fg]".
     (* Liveness induction *)
     iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)".
     iMod (wit_fuels_add _ _ _ _ g 1 1 with "Wf0 WFg") as "Wf".
     { apply ordArith.lt_from_nat. lia. }
     iClear "Wf0". iInduction α as [α IH] using WFOCM.ind.
-    iMod (ogP_fuel_extend _ 0 1 (10)%M with "Fg") as "Fg".
+    iMod (grP_fuel_extend _ 0 1 (10)%M with "Fg") as "Fg".
     { apply ordArith.lt_from_nat. lia. }
-    iPoseProof (ogP_fuels_init {[g]} with "[Fg]") as "GF".
+    iPoseProof (grP_fuels_init {[g]} with "[Fg]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_rec. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
@@ -185,7 +185,7 @@ Section mp_proof.
       1: apply N_subseteq_1.
       iDestruct ("H" with "Oak") as "[H HACC]". iDestruct "H" as ">(Oak& Oak'& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (ogP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
+      iPoseProof (grP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
       iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TG $Ptrl $GF1]").
       { iApply big_sepS_singleton. auto. }
       iIntros "[(_& TG& Rs) Ptrl]".
@@ -203,7 +203,7 @@ Section mp_proof.
     - (* k is discharged. *)
       iDestruct "mp" as ">(#Ofk& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (ogP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
+      iPoseProof (grP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
       iApply (lwp_load _ ∅ 0 with "[$TG $Ptrl $GF1]"). 1: done.
       iIntros "[(_& TG& _) Ptrl]".
       iModIntro. iSplitL "Ptrl".
@@ -243,9 +243,9 @@ Section mp_proof.
                       tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
                       tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
                       tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-                      ⟨thP_groups i {[g1]} ∗ ogP_obls i g1 0 {[k; kl1]} ∗
-                       thP_groups j {[g2]} ∗ ogP_obls j g2 1 ({[kl2]}) ∗
-                       ogP_fuel g1 0 m1 ∗ ogP_fuel g2 1 m2⟩)%F) →
+                      ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗
+                       thP_groups j {[g2]} ∗ grP_obls j g2 1 ({[kl2]}) ∗
+                       grP_fuel g1 0 m1 ∗ grP_fuel g2 1 m2⟩)%F) →
     Ψs = ({[i := fork_post; j := fork_post]}) →
     ((l ↦ #0) -∗
      ([∗ set] i ∈ dom Θ, thP_groups i ∅) -∗
@@ -367,9 +367,9 @@ Section adequacy.
               tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
               tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
               tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-              ⟨thP_groups i {[g1]} ∗ ogP_obls i g1 0 {[k; kl1]} ∗
-               thP_groups j {[g2]} ∗ ogP_obls j g2 1 ({[kl2]}) ∗
-               ogP_fuel g1 0 m1 ∗ ogP_fuel g2 1 m2⟩)%F.
+              ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗
+               thP_groups j {[g2]} ∗ grP_obls j g2 1 ({[kl2]}) ∗
+               grP_fuel g1 0 m1 ∗ grP_fuel g2 1 m2⟩)%F.
 
   Lemma tf_to_tp_Φ `{!heapGS Σ} m1 m2 :
     tf_to_tp (Φ_tf m1 m2) = Φ'.

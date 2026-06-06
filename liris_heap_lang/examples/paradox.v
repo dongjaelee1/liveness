@@ -260,7 +260,7 @@ Section proof.
   (** Receives later credits via px_inv *)
   Lemma px_loop1_spec i g z r rm ci cj :
     l{{{ thP_groups i ({[g]}) ∗
-         ogP_obls i g 1 {[z]} ∗
+         grP_obls i g 1 {[z]} ∗
          ⟦tf_until N1 z false 1 (⌜ True ⌝) (⌜ False ⌝)⟧ₗ ∗
          £ (10)%ord ∗
          px r rm ci cj ∗
@@ -318,9 +318,9 @@ Section proof.
 
   Lemma px_loop2_spec j n r rm ci cj ck :
     l{{{ ∃ g, thP_groups j {[g]} ∗
-              ogP_obls j g 0 {[ck]} ∗
+              grP_obls j g 0 {[ck]} ∗
               ⟦tf_eventually Nu ck false (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
-              ogP_fuel g 0 10 ∗
+              grP_fuel g 0 10 ∗
               px r rm ci cj ∗
               cnt_auth r cj n (1/2) ∗ n ↪[rm]□ ck }}}
       loop #() @ j
@@ -331,7 +331,7 @@ Section proof.
     iRevert (n g ck) "TG Gg Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n g ck) "TG Gg Uck Gf Caj #Mn".
     iEval (rewrite /loop).
-    iPoseProof (ogP_fuels_init {[g]} with "[Gf]") as "GF".
+    iPoseProof (grP_fuels_init {[g]} with "[Gf]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".

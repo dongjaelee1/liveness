@@ -65,7 +65,7 @@ Section mprog.
 
   (** Step rule *)
   Lemma mprog_step n Θ i P :
-    (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ∃ ℓ, ogP_fuel u ℓ 1) ∗
+    (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ∃ ℓ, grP_fuel u ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                         ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r))
                          ={∅}=∗ P))

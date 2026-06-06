@@ -185,12 +185,12 @@ Section proof.
   Ltac lwp_pures := lwp_pure; repeat (post_wp; lwp_pure); post_wp_bind.
 
   Tactic Notation "lOneFuel" open_constr(Hfuel) "as" open_constr(Hdestruct) :=
-    iDestruct (ogP_fuels_add 1 with Hfuel) as Hdestruct; first done.
+    iDestruct (grP_fuels_add 1 with Hfuel) as Hdestruct; first done.
 
   Local Lemma lwp_newNode :
     ⊢ ∃ m,
       ∀ ℓ i G (next : loc) γ v v',
-    l{{{ thP_groups i G ∗ ogP_fuels G m ∗
+    l{{{ thP_groups i G ∗ grP_fuels G m ∗
          (match v' with
            | +∞ => (next +ₗ 1) ↦□ (Int.into_val +∞)
            | _ => (∃ lk' γlk' ℓ',
@@ -209,11 +209,11 @@ Section proof.
     iIntros (?) "!# (Hg & Hfuel & Hn' & Hown) HΦ".
     iDestruct (own_interval_not_NegInf with "Hown") as "%".
 
-    iDestruct (ogP_fuels_add_gen with "Hfuel") as "[Hfuel HcallFuel]".
+    iDestruct (grP_fuels_add_gen with "Hfuel") as "[Hfuel HcallFuel]".
 
     lwp_lam. post_wp. lwp_pures. lwp_bind (AllocN _ _).
     iModIntro.
-    Search "ogP_fuels".
+    Search "grP_fuels".
 
     lOneFuel "Hfuel" as "[Hf Hfuel]".
     iApply (lwp_allocN _ ∅ 0 with "[$Hg $Hf //]"); first done.
@@ -222,7 +222,7 @@ Section proof.
 
     lwp_bind (TicketLock.init _).
     iModIntro.
-    iDestruct (ogP_fuels_add_gen with "HcallFuel") as "[Hlock HcallFuel]".
+    iDestruct (grP_fuels_add_gen with "HcallFuel") as "[Hlock HcallFuel]".
     iApply ("TicketLock_init_spec" $! 0 ℓ with "[$]").
     iIntros (lk γlk) "(_ & Hg & Hlk & Hlk_inv) !>".
     lwp_pures.
@@ -261,7 +261,7 @@ Section proof.
   Local Lemma lwp_newNode_tail :
     ⊢ ∃ m,
         ∀ i G,
-    l{{{ thP_groups i G ∗ ogP_fuels G m }}}
+    l{{{ thP_groups i G ∗ grP_fuels G m }}}
      newNode (Int.into_val +∞) #(Loc 0) @ i
     l{{{ n, RET #n; thP_groups i G ∗ (n +ₗ 1) ↦□ (Int.into_val +∞) }}}.
   Proof using lcsG0.
@@ -269,7 +269,7 @@ Section proof.
     iExists (100 ⊕ mi ⊕ mi)%M.
     iIntros. iIntros (?) "!# (Hg & Hfuel) HΦ".
 
-    iDestruct (ogP_fuels_add_gen with "Hfuel") as "[Hfuel HlockFuel]".
+    iDestruct (grP_fuels_add_gen with "Hfuel") as "[Hfuel HlockFuel]".
 
     lwp_lam. post_wp. lwp_pures. lwp_bind (AllocN _ _).
     iModIntro. lOneFuel "Hfuel" as "[Hf Hfuel]".
@@ -279,7 +279,7 @@ Section proof.
 
     lwp_bind (TicketLock.init _).
     iModIntro.
-    iDestruct (ogP_fuels_add_gen with "HlockFuel") as "[Hlock HlockFuel]".
+    iDestruct (grP_fuels_add_gen with "HlockFuel") as "[Hlock HlockFuel]".
     iApply ("TicketLock_init_spec" $! 0 0 with "[$]").
     iIntros (lk γlk) "(_ & Hg & Hlk & Hlk_inv) !>".
     lwp_pures.
@@ -309,7 +309,7 @@ Section proof.
   Opaque Int.into_val.
   Lemma lwp_makeSet :
     ⊢ ∃ m, ∀ i G,
-    l{{{ thP_groups i G ∗ ogP_fuels G m }}}
+    l{{{ thP_groups i G ∗ grP_fuels G m }}}
      makeSet #() @ i
     l{{{ s γ, RET #s; thP_groups i G ∗ is_set s γ ∗ own_set γ ∅ }}}.
   Proof.
@@ -317,11 +317,11 @@ Section proof.
     iDestruct lwp_newNode as (mn) "lwp_newNode".
     iExists (100 ⊕ mnt ⊕ mn)%M. iIntros. iIntros (?) "!# (Hg & Hfuel) HΦ".
 
-    iDestruct (ogP_fuels_add_gen with "Hfuel") as "[Hfuel HcallFuel]".
+    iDestruct (grP_fuels_add_gen with "Hfuel") as "[Hfuel HcallFuel]".
     lwp_lam. post_wp_bind.
 
     lwp_bind (newNode _ _). iModIntro.
-    iDestruct (ogP_fuels_add_gen with "HcallFuel") as "[Hf HcallFuel]".
+    iDestruct (grP_fuels_add_gen with "HcallFuel") as "[Hf HcallFuel]".
     iApply ("lwp_newNode_tail" with "[$Hg $Hf]").
     iIntros (n') "(Hg & #Hn')". iModIntro. lwp_pures.
 
@@ -368,12 +368,12 @@ Section proof.
 
   Lemma lwp_locate :
     ⊢ ∃ m, ∀ μ i G s γ (e : Z),
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g locateℓ m) ∗
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g locateℓ m) ∗
          is_set s γ }}}
      locate #s (Int.into_val e) @ i
     l{{{ gu κu v v' n (n' : loc) lk γlk, RET (#n, #n');
          thP_groups i ({[gu]} ∪ G) ∗
-         ogP_obls i gu 0 {[κu]} ∗ ogP_fuel gu 0 μ ∗
+         grP_obls i gu 0 {[κu]} ∗ grP_fuel gu 0 μ ∗
          node_lock_inv n γ v γlk n' v' ∗
          lock_token lk γlk κu (∃ n'' v'', node_lock_inv n γ v γlk n'' v'') ∗
          is_node n γ v lk γlk ∗
@@ -391,7 +391,7 @@ Section proof.
        the concrete amounts needed per step (loads, branches, acquire/release
        per iteration).  The bound is large because the loop is unbounded in
        list length; the ordinal level pays for it. *)
-    iAssert (ogP_fuels G 100)%I with "[]" as "-#Hfuel".
+    iAssert (grP_fuels G 100)%I with "[]" as "-#Hfuel".
     { admit. }
 
     (* Step into  locate := λ x e, lockNode x ;; (rec loop curr := ...) x.
@@ -406,7 +406,7 @@ Section proof.
 
     (* Acquire the head's lock.  Fuel reconciliation (locate's [iExists 1] vs
        acquire's [m]) admitted. *)
-    iAssert ([∗ set] g ∈ G, ogP_fuel g ((ℵ × lockΔ) ⊕ ℵ)%ordi ma)%I
+    iAssert ([∗ set] g ∈ G, grP_fuel g ((ℵ × lockΔ) ⊕ ℵ)%ordi ma)%I
       with "[]" as "-#HacqFuel". { admit. }
     iApply ("TicketLock_acquire_spec" with "[$Hg $HacqFuel]").
     { iFrame "#". }
@@ -415,7 +415,7 @@ Section proof.
 
     (* Refresh ambient fuel for the new group set {[gu]} ∪ G. *)
     iClear "Hfuel".
-    iAssert (ogP_fuels ({[gu]} ∪ G) 100)%I as "-#Hfuel". { admit. }
+    iAssert (grP_fuels ({[gu]} ∪ G) 100)%I as "-#Hfuel". { admit. }
     post_wp.
 
     iDestruct "Hbody" as (n0 v0 ℓ0) "(Hlk_half & nextp & #val0 & Hown & Hn0)".
@@ -468,7 +468,7 @@ Section proof.
     (* Step into  (rec loop curr := body) s. *)
     lwp_pure.
     iClear "Hfuel".
-    iAssert (ogP_fuels ({[gu]} ∪ G) 100)%I as "-#Hfuel". { admit. }
+    iAssert (grP_fuels ({[gu]} ∪ G) 100)%I as "-#Hfuel". { admit. }
     post_wp.
 
     lwp_pures. iModIntro.
@@ -525,7 +525,7 @@ Section proof.
   Lemma lwp_member i G s γ (e : Z) :
     ⊢ ∃ m,
     ∀ Φ,
-    (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g locateℓ m) ∗ is_set s γ) -∗
+    (thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g locateℓ m) ∗ is_set s γ) -∗
     (|={⊤,∅}=> ∃ s, own_set γ s ∗ (own_set γ s ={∅,⊤}=∗ Φ #(bool_decide (e ∈ s)))) -∗
     lWP member #s (Int.into_val e) @ i {{ Φ }}.
   Proof.
@@ -539,12 +539,12 @@ Section proof.
 
     iDestruct "Hs" as (??) "[#Hlk_ℓ #Hroot]".
 
-    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
-    iDestruct (ogP_fuels_init with "Hfuel") as "Hfuel".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HlocateFuel HcallFuel]".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HltFuel HreleaseFuel]".
-    iDestruct (ogP_fuels_init with "HltFuel") as "HltFuel".
-    iDestruct (ogP_fuels_init with "HreleaseFuel") as "HreleaseFuel".
+    iDestruct (grP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
+    iDestruct (grP_fuels_init with "Hfuel") as "Hfuel".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HlocateFuel HcallFuel]".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HltFuel HreleaseFuel]".
+    iDestruct (grP_fuels_init with "HltFuel") as "HltFuel".
+    iDestruct (grP_fuels_init with "HreleaseFuel") as "HreleaseFuel".
 
     lwp_lam. post_wp. lwp_pures. lwp_bind (locate _ _).
     iModIntro.
@@ -552,8 +552,8 @@ Section proof.
     { iFrame "#". }
     iIntros "* (Hg & Hκ & Hg_fuel & Hown & Htok & #Hn & %Hrange)". iModIntro.
     lwp_pure.
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[Hfuel_gu Hg_fuel]".
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HltFuel_gu HreleaseFuel_gu]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[Hfuel_gu Hg_fuel]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[HltFuel_gu HreleaseFuel_gu]".
     iDestruct (big_sepS_insert_2 with "[Hfuel_gu] Hfuel") as "Hfuel".
     { iFrame. }
     iDestruct (big_sepS_insert_2 with "[HltFuel_gu] HltFuel") as "HltFuel".
@@ -595,7 +595,7 @@ Section proof.
     iMod (group_delete with "Hg Ho") as "Hg".
     iModIntro.
 
-    iDestruct (ogP_fuels_remove_group gu with "Hfuel") as "Hfuel".
+    iDestruct (grP_fuels_remove_group gu with "Hfuel") as "Hfuel".
     lwp_pures. iModIntro. lwp_finish.
 
     destruct v'.
@@ -623,7 +623,7 @@ Section proof.
   Lemma lwp_remove i G s γ (e : Z) :
     ⊢ ∃ m,
     ∀ Φ,
-    (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g locateℓ m) ∗ is_set s γ) -∗
+    (thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g locateℓ m) ∗ is_set s γ) -∗
     (|={⊤,∅}=> ∃ s, own_set γ s ∗ (own_set γ (s ∖ {[e]}) ={∅,⊤}=∗ Φ #())) -∗
     lWP remove #s (Int.into_val e) @ i {{ Φ }}.
   Proof.
@@ -637,16 +637,16 @@ Section proof.
     iIntros (Φ) "(Hg & Hfuel & Hs) Hau".
     iDestruct "Hs" as (??) "[#Hlk_ℓ #Hroot]".
 
-    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
-    iDestruct (ogP_fuels_init with "Hfuel") as "Hfuel".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HlocateFuel HcallFuel]".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HltFuel HcallFuel]".
-    iDestruct (ogP_fuels_init with "HltFuel") as "HltFuel".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HacqFuel HcallFuel]".
-    iDestruct (ogP_fuels_init with "HacqFuel") as "HacqFuel".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HrelNextFuel HrelCurrFuel]".
-    iDestruct (ogP_fuels_init with "HrelNextFuel") as "HrelNextFuel".
-    iDestruct (ogP_fuels_init with "HrelCurrFuel") as "HrelCurrFuel".
+    iDestruct (grP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
+    iDestruct (grP_fuels_init with "Hfuel") as "Hfuel".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HlocateFuel HcallFuel]".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HltFuel HcallFuel]".
+    iDestruct (grP_fuels_init with "HltFuel") as "HltFuel".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HacqFuel HcallFuel]".
+    iDestruct (grP_fuels_init with "HacqFuel") as "HacqFuel".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HrelNextFuel HrelCurrFuel]".
+    iDestruct (grP_fuels_init with "HrelNextFuel") as "HrelNextFuel".
+    iDestruct (grP_fuels_init with "HrelCurrFuel") as "HrelCurrFuel".
 
     lwp_lam. post_wp. lwp_pures. lwp_bind (locate _ _).
     iModIntro.
@@ -656,10 +656,10 @@ Section proof.
     lwp_pure.
 
     (* Distribute the per-call fuel down to gu, mirroring lwp_member. *)
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[Hfuel_gu Hg_fuel]".
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HltFuel_gu Hg_fuel]".
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HacqFuel_gu Hg_fuel]".
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HrelNextFuel_gu HrelCurrFuel_gu]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[Hfuel_gu Hg_fuel]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[HltFuel_gu Hg_fuel]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[HacqFuel_gu Hg_fuel]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[HrelNextFuel_gu HrelCurrFuel_gu]".
     iDestruct (big_sepS_insert_2 with "[Hfuel_gu] Hfuel") as "Hfuel". { iFrame. }
     iDestruct (big_sepS_insert_2 with "[HltFuel_gu] HltFuel") as "HltFuel". { iFrame. }
     iDestruct (big_sepS_insert_2 with "[HacqFuel_gu] HacqFuel") as "HacqFuel". { iFrame. }
@@ -712,7 +712,7 @@ Section proof.
       { iFrame "#". iFrame. iPureIntro. set_solver. }
       iIntros "(_ & Hg & Ho)". rewrite difference_diag_L.
       iMod (group_delete with "Hg Ho") as "Hg".
-      iDestruct (ogP_fuels_remove_group gu with "Hfuel") as "Hfuel".
+      iDestruct (grP_fuels_remove_group gu with "Hfuel") as "Hfuel".
       iModIntro. iApply "HΦ".
 
     - (* In-set branch: e = next.val.  Pin down v' = Fin e. *)
@@ -789,7 +789,7 @@ Section proof.
   Lemma lwp_add i G s γ (e : Z) :
     ⊢ ∃ m,
     ∀ Φ,
-    (thP_groups i G ∗ ([∗ set] g ∈ G, ogP_fuel g locateℓ m) ∗ is_set s γ) -∗
+    (thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g locateℓ m) ∗ is_set s γ) -∗
     (|={⊤,∅}=> ∃ s, own_set γ s ∗ (own_set γ (s ∪ {[e]}) ={∅,⊤}=∗ Φ #())) -∗
     lWP add #s (Int.into_val e) @ i {{ Φ }}.
   Proof.
@@ -803,14 +803,14 @@ Section proof.
     iIntros (Φ) "(Hg & Hfuel & Hs) Hau".
     iDestruct "Hs" as (??) "[#Hlk_ℓ #Hroot]".
 
-    iDestruct (ogP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
-    iDestruct (ogP_fuels_init with "Hfuel") as "Hfuel".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HlocateFuel HcallFuel]".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HltFuel HcallFuel]".
-    iDestruct (ogP_fuels_init with "HltFuel") as "HltFuel".
-    iDestruct (ogP_fuel_add_set with "HcallFuel") as "[HnewFuel HrelFuel]".
-    iDestruct (ogP_fuels_init with "HnewFuel") as "HnewFuel".
-    iDestruct (ogP_fuels_init with "HrelFuel") as "HrelFuel".
+    iDestruct (grP_fuel_add_set with "Hfuel") as "[Hfuel HcallFuel]".
+    iDestruct (grP_fuels_init with "Hfuel") as "Hfuel".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HlocateFuel HcallFuel]".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HltFuel HcallFuel]".
+    iDestruct (grP_fuels_init with "HltFuel") as "HltFuel".
+    iDestruct (grP_fuel_add_set with "HcallFuel") as "[HnewFuel HrelFuel]".
+    iDestruct (grP_fuels_init with "HnewFuel") as "HnewFuel".
+    iDestruct (grP_fuels_init with "HrelFuel") as "HrelFuel".
 
     lwp_lam. post_wp. lwp_pures. lwp_bind (locate _ _).
     iModIntro.
@@ -820,9 +820,9 @@ Section proof.
     lwp_pure.
 
     (* Distribute the gu fuel like member/remove. *)
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[Hfuel_gu Hg_fuel]".
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HltFuel_gu Hg_fuel]".
-    iDestruct (ogP_fuel_add with "Hg_fuel") as "[HnewFuel_gu HrelFuel_gu]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[Hfuel_gu Hg_fuel]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[HltFuel_gu Hg_fuel]".
+    iDestruct (grP_fuel_add with "Hg_fuel") as "[HnewFuel_gu HrelFuel_gu]".
     iDestruct (big_sepS_insert_2 with "[Hfuel_gu] Hfuel") as "Hfuel". { iFrame. }
     iDestruct (big_sepS_insert_2 with "[HltFuel_gu] HltFuel") as "HltFuel". { iFrame. }
     iDestruct (big_sepS_insert_2 with "[HnewFuel_gu] HnewFuel") as "HnewFuel". { iFrame. }
@@ -909,7 +909,7 @@ Section proof.
         iPureIntro. (* ℓ_new ⊕ lockΔ < ℓ_curr *) admit. }
       iIntros "(_ & Hg & Ho)". rewrite difference_diag_L.
       iMod (group_delete with "Hg Ho") as "Hg". iModIntro.
-      iDestruct (ogP_fuels_remove_group gu with "Hfuel") as "Hfuel".
+      iDestruct (grP_fuels_remove_group gu with "Hfuel") as "Hfuel".
       iFrame.
 
     - (* Already-present branch.  Mirrors lwp_remove's not-in-set branch:
@@ -945,7 +945,7 @@ Section proof.
       { iFrame "#". iFrame. iPureIntro. set_solver. }
       iIntros "(_ & Hg & Ho)". rewrite difference_diag_L.
       iMod (group_delete with "Hg Ho") as "Hg". iModIntro.
-      iDestruct (ogP_fuels_remove_group gu with "Hfuel") as "Hfuel".
+      iDestruct (grP_fuels_remove_group gu with "Hfuel") as "Hfuel".
       iFrame.
   Admitted.
 

@@ -26,7 +26,7 @@ Section lifting.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_groups i G -∗
@@ -60,7 +60,7 @@ Section lifting.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_groups i G -∗
@@ -105,7 +105,7 @@ Section lifting.
     PureExecSI ς i →
     (|={E,E'}=>
        ς i ∗
-       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
        ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
          (ς i -∗
           thP_groups i G -∗
@@ -150,7 +150,7 @@ Section lifting.
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_groups i G -∗
@@ -184,7 +184,7 @@ Section lifting.
     PureExecSI ς i →
     (|={E,E'}=>
        ς i ∗
-       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+       ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
        ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
          (ς i -∗
           thP_groups i G -∗
@@ -205,7 +205,7 @@ Section lifting.
     PureExecSI ς i →
     (Nat.iter n (λ P, |={E,E'}=>
                    ς i ∗
-                   ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+                   ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                    (ς i -∗
                     thP_groups i G -∗
@@ -244,7 +244,7 @@ Section lifting.
     φ →
     PureExecSI ς i →
     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-    (Nat.iter n (λ P, |={E,E'}=> ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
+    (Nat.iter n (λ P, |={E,E'}=> ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
                                 (ς i -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                  ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
@@ -265,7 +265,7 @@ Section lifting.
     PureExec φ n e1 e2 →
     φ →
     PureExecSI ς i →
-    (ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
+    (ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
      (ς i -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_discharged r) -∗
       £ (o × n)%ord -∗ lwpupd i E e2 (lWP e2 @ s; i ; E {{ Φ }})))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
@@ -281,11 +281,11 @@ Section lifting.
       unfold_opreds.
       rewrite Ord.from_nat_O. done. }
     iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
-    iAssert (([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
+    iAssert (([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
     { iApply big_sepS_sep. iApply (big_sepS_impl with "Gfs"). iIntros "!> %% (%& F)".
-      rewrite (ogP_fuel_eq _ _ (S n)%M (n ⊕ 1)%M); cycle 1.
+      rewrite (grP_fuel_eq _ _ (S n)%M (n ⊕ 1)%M); cycle 1.
       { rewrite measure_nat_S measure_add. by rewrite Hessenberg.add_comm. }
-      iPoseProof (ogP_fuel_add with "F") as "($& $)". }
+      iPoseProof (grP_fuel_add with "F") as "($& $)". }
     iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
     iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
     iIntros "!> Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").
