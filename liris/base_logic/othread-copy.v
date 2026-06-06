@@ -184,7 +184,7 @@ Definition oassigned `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ
     ([∗ set] k ∈ Gls,
        oblG_elem k ∗
        ((∃ i, oblG_owner k i (1/2/2/2/2)%Qp ∗ othreadG_owns i k (1/2/2)%Qp ∗ othreadG_elem i) ∨
-          (oblG_fulfilled k)))%I.
+          (oblG_discharged k)))%I.
 
 (* Global invariant for threads' obligation fragments and sessions. *)
 Definition oproxy `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
@@ -984,7 +984,7 @@ Section othread.
   (** oassigned rules *)
   Lemma oassigned_add_obl Gls k :
     oassigned Gls ∗
-    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i) ∨ oblG_fulfilled k))
+    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i) ∨ oblG_discharged k))
     ⊢ oassigned ({[k]} ∪ Gls).
   Proof.
     iIntros "(A& H)". rewrite /oassigned -!lock. destruct (decide (k ∈ Gls)).
@@ -1001,7 +1001,7 @@ Section othread.
     k ∈ Gls →
     oassigned Gls
     ⊢ oassigned (Gls ∖ {[k]}) ∗
-    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i) ∨ oblG_fulfilled k)).
+    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i) ∨ oblG_discharged k)).
   Proof.
     rewrite /oassigned -!lock. iIntros (INk) "A".
     iPoseProof (big_sepS_delete with "A") as "[$ $]". auto.
@@ -1018,7 +1018,7 @@ Section othread.
     iDestruct "A" as "(#Gek& [(%& Gok& Ook& #Tei) | #Guk])".
     - iPoseProof (osat_lookup_owner with "[$S $Gek $Gok]") as "(%&%)".
       rewrite LUOk in H. inv H. iApply (othread_obls_owns_elem with "[$O $Tbs $Ook]").
-    - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "%H".
+    - iPoseProof (osat_lookup_discharged with "[$S $Gek $Guk]") as "%H".
       rewrite LUOk in H. inv H.
   Qed.
 
@@ -1043,7 +1043,7 @@ Section othread.
     iDestruct "A" as "(#Gek& [(%& Gok& Ook& #Tei) | #Guk])".
     - iPoseProof (osat_lookup_owner with "[$S $Gek $Gok]") as "%". destruct H. rewrite LUOk in H. inv H.
       iPoseProof (othread_elem with "[$O $Tei]") as "%".  auto.
-    - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "%". rewrite LUOk in H. inv H.
+    - iPoseProof (osat_lookup_discharged with "[$S $Gek $Guk]") as "%". rewrite LUOk in H. inv H.
   Qed.
 
   Lemma othread_assigned_done_false Ω TP k a i :
@@ -1067,7 +1067,7 @@ Section othread.
       iPoseProof (othreadG_owns_lookup with "[$His $Ook]") as "%".
       rewrite lookup_fmap_Some in LUempty. destruct LUempty as (?&?&?). apply dom_empty_inv_L in H0. subst x.
       rewrite Hlui in H1. inv H1.
-    - iPoseProof (osat_lookup_fulfilled with "[$S $Gek $Guk]") as "%H".
+    - iPoseProof (osat_lookup_discharged with "[$S $Gek $Guk]") as "%H".
       rewrite LUk in H. inv H.
   Qed.
 

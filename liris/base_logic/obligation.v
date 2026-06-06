@@ -22,28 +22,28 @@ Definition obl_owner := positive.
 
 Variant obl `{OC : obl_class} : Type :=
   | obl_assigned (fuel : obl_fuel) (owner : obl_owner)
-  | obl_fulfilled.
+  | obl_discharged.
 
 (* Step relations. *)
 Variant obl_progress `{OC : obl_class} : obl → obl → Prop :=
   | obl_progress_intro f1 f2 o1 o2 (LTf : f2 w< f1) :
     obl_progress (obl_assigned f1 o1) (obl_assigned f2 o2).
 
-Variant obl_fulfill `{OC : obl_class} : obl → obl → Prop :=
-  | obl_fulfill_intro f o :
-    obl_fulfill (obl_assigned f o) (obl_fulfilled).
+Variant obl_discharge `{OC : obl_class} : obl → obl → Prop :=
+  | obl_discharge_intro f o :
+    obl_discharge (obl_assigned f o) (obl_discharged).
 
 Variant obl_step `{OC : obl_class} : obl → obl → Prop :=
   | obl_step_progress g1 g2 :
     obl_progress g1 g2 → obl_step g1 g2
-  | obl_step_fulfill g1 g2 :
-    obl_fulfill g1 g2 → obl_step g1 g2.
+  | obl_step_discharge g1 g2 :
+    obl_discharge g1 g2 → obl_step g1 g2.
 
 Definition obl_keep `{OC : obl_class} : obl → obl → Prop :=
   λ g1 g2,
     match g1, g2 with
     | (obl_assigned _ _), (obl_assigned _ _) => True
-    | (obl_fulfilled), (obl_fulfilled) => True
+    | (obl_discharged), (obl_discharged) => True
     | _, _ => False
     end.
 
@@ -51,8 +51,8 @@ Definition obl_le `{OC : obl_class} : obl → obl → Prop :=
   λ g1 g2,
     match g1, g2 with
     | (obl_assigned f1 o1), (obl_assigned f2 o2) => (f2 w≤ f1 ∧ o1 = o2) ∨ (f2 w< f1)
-    | (obl_assigned _ _), obl_fulfilled => True
-    | (obl_fulfilled), (obl_fulfilled) => True
+    | (obl_assigned _ _), obl_discharged => True
+    | (obl_discharged), (obl_discharged) => True
     | _, _ => False
     end.
 
@@ -328,8 +328,8 @@ Section proofs.
     rewrite /obls_filter_live map_filter_delete. auto.
   Qed.
 
-  Lemma obls_filter_live_fulfill Ω k :
-    obls_filter_live (<[k:=obl_fulfilled]>Ω) = delete k (obls_filter_live Ω).
+  Lemma obls_filter_live_discharge Ω k :
+    obls_filter_live (<[k:=obl_discharged]>Ω) = delete k (obls_filter_live Ω).
   Proof using.
     rewrite /obls_filter_live map_filter_insert_False. 2: intros ?; done.
     apply obls_filter_live_delete.

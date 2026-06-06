@@ -5,7 +5,7 @@ From transfinite.stepindex Require Import utils.
 
 Variant witness `{OC : obl_class} : Type :=
   | witness_assigned (wit : obl_fuel)
-  | witness_fulfilled
+  | witness_discharged
 .
 
 (* Step relations. *)
@@ -13,21 +13,21 @@ Variant witness_progress `{OC : obl_class} : witness → witness → Prop :=
   | witness_progress_intro f1 f2 (LTf : f2 w< f1) :
     witness_progress (witness_assigned f1) (witness_assigned f2).
 
-Variant witness_fulfill `{OC : obl_class} : witness → witness → Prop :=
-  | witness_fulfill_intro f :
-    witness_fulfill (witness_assigned f) (witness_fulfilled).
+Variant witness_discharge `{OC : obl_class} : witness → witness → Prop :=
+  | witness_discharge_intro f :
+    witness_discharge (witness_assigned f) (witness_discharged).
 
 Variant witness_step `{OC : obl_class} : witness → witness → Prop :=
   | witness_step_progress g1 g2 :
     witness_progress g1 g2 → witness_step g1 g2
-  | witness_step_fulfill g1 g2 :
-    witness_fulfill g1 g2 → witness_step g1 g2.
+  | witness_step_discharge g1 g2 :
+    witness_discharge g1 g2 → witness_step g1 g2.
 
 Definition witness_keep `{OC : obl_class} : witness → witness → Prop :=
   λ w1 w2,
     match w1, w2 with
     | (witness_assigned _), (witness_assigned _) => True
-    | (witness_fulfilled), (witness_fulfilled) => True
+    | (witness_discharged), (witness_discharged) => True
     | _, _ => False
     end.
 
@@ -91,7 +91,7 @@ Definition wits_mon `{OC : obl_class} : witnesses → witnesses → Prop :=
   λ W1 W2, map_Forall2 (λ _ w1 w2,
                           match w1, w2 with
                           | witness_assigned a1, witness_assigned a2 => a2 w≤ a1
-                          | witness_fulfilled, witness_fulfilled => True
+                          | witness_discharged, witness_discharged => True
                           | _, _ => False
                           end) W1 W2.
 

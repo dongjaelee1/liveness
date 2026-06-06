@@ -171,9 +171,9 @@ Definition tf_until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_inter
     (∃ (l : list (oid * Ord.t)) k o,
         ⌜ ∃ m, (o <= measure (ord.O, 1) m)%ord ⌝ ∗
         ⟨uchain_auth (1/2) (l ++ [(k, o)])⟩ ∗
-        ([^tf_sep list] ko ∈ l, ⟨oblP_fulfilled ko.1⟩ ∗ ⌜ ∃ m, (ko.2 <= measure (ord.O, 1) m)%ord ⌝) ∗
+        ([^tf_sep list] ko ∈ l, ⟨oblP_discharged ko.1⟩ ∗ ⌜ ∃ m, (ko.2 <= measure (ord.O, 1) m)%ord ⌝) ∗
         (tf_until_chain N k o P Q ∨
-           (⟨uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_fulfilled k⟩ ∗ R))
+           (⟨uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_discharged k⟩ ∗ R))
     )%F.
 
 Definition until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ}
@@ -182,9 +182,9 @@ Definition until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_c
     (∃ (l : list (oid * Ord.t)) k o,
         ⌜ ∃ m, (o <= measure (ord.O, 1) m)%ord ⌝ ∗
                (uchain_auth (1/2) (l ++ [(k, o)])) ∗
-               ([∗ list] ko ∈ l, (oblP_fulfilled ko.1) ∗ ⌜ ∃ m, (ko.2 <= measure (ord.O, 1) m)%ord ⌝) ∗
+               ([∗ list] ko ∈ l, (oblP_discharged ko.1) ∗ ⌜ ∃ m, (ko.2 <= measure (ord.O, 1) m)%ord ⌝) ∗
                (⟦tf_until_chain N k o P Q⟧ₗ ∨
-                  ((uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_fulfilled k) ∗ ⟦R⟧ₗ))
+                  ((uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_discharged k) ∗ ⟦R⟧ₗ))
     )%I.
 
 Lemma tf_until_chain_log_red `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ} N P Q R :

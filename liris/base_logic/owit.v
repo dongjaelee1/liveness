@@ -64,8 +64,8 @@ Definition owit `{SI : indexT} {Σ}
         match w with
         | witness_assigned b =>
             (∃ α, (⌜ WFOCM.leR b α ⌝) ∗ witG_witness k α)
-        | witness_fulfilled =>
-            (oblG_fulfilled k)
+        | witness_discharged =>
+            (oblG_discharged k)
         end)
     )%I.
 
@@ -75,7 +75,7 @@ Definition owit_inv `{!ord_mono_fun_class}
   map_Forall2 (λ k g w,
                  match g, w with
                  | (obl_assigned a _), (witness_assigned b) => (b w≤ η a)
-                 | (obl_fulfilled), (witness_fulfilled) => True
+                 | (obl_discharged), (witness_discharged) => True
                  | _, _ => False
                  end
     ) Ω W.
@@ -206,10 +206,10 @@ Section owit.
     iFrame. done.
   Qed.
 
-  Lemma owit_alloc_witness_fulfilled W k a :
+  Lemma owit_alloc_witness_discharged W k a :
     k ∉ dom W →
-    owit W ∗ oblG_fulfilled k
-    ⊢ |==> owit (<[k:=(witness_fulfilled)]>W) ∗ witG_bound k a.
+    owit W ∗ oblG_discharged k
+    ⊢ |==> owit (<[k:=(witness_discharged)]>W) ∗ witG_bound k a.
   Proof.
     iIntros (Nink) "(W& #Gu)".
     rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
@@ -240,7 +240,7 @@ Section owit.
     iDestruct "WH1" as "(%& %& $)". iPureIntro. etransitivity; eauto.
   Qed.
 
-  (* witness_step rules: progress, fulfill, expire *)
+  (* witness_step rules: progress, discharge, expire *)
   Lemma owit_progress_one W k w1 w2 :
     W !! k = Some (witness_assigned w1) →
     witness_step (witness_assigned w1) (witness_assigned w2) →
@@ -274,8 +274,8 @@ Section owit.
            match w with
            | witness_assigned _ =>
                (∃ c, ⌜ wzero w< c ⌝ ∗ witG_witness k c)
-           | witness_fulfilled =>
-               (oblG_fulfilled k)
+           | witness_discharged =>
+               (oblG_discharged k)
            end).
   Proof.
     iIntros ([Step Keep]) "W".
@@ -312,10 +312,10 @@ Section owit.
     eapply wits_cond_progress_mon; eauto.
   Qed.
 
-  Lemma owit_fulfill W k a :
+  Lemma owit_discharge W k a :
     W !! k = Some (witness_assigned a) →
-    owit W ∗ oblG_fulfilled k
-    ⊢ owit (<[k:=(witness_fulfilled)]>W).
+    owit W ∗ oblG_discharged k
+    ⊢ owit (<[k:=(witness_discharged)]>W).
   Proof.
     iIntros (Luk) "[W #Guk]".
     rewrite /owit -!lock. iDestruct "W" as "(Wti& WM)".
@@ -334,8 +334,8 @@ Section owit.
        match w with
        | witness_assigned _ =>
            (witG_witness k wzero)
-       | witness_fulfilled =>
-           (oblG_fulfilled k)
+       | witness_discharged =>
+           (oblG_discharged k)
        end).
   Proof.
     iIntros "W".
@@ -463,14 +463,14 @@ Section owit.
     - rewrite lookup_insert_ne in INV2; auto.
   Qed.
 
-  Lemma owit_inv_fulfill Ω k a t W1 :
+  Lemma owit_inv_discharge Ω k a t W1 :
     Ω !! k = Some (obl_assigned a t) →
     owit_inv Ω W1 →
-    obl_step (obl_assigned a t) (obl_fulfilled) →
+    obl_step (obl_assigned a t) (obl_discharged) →
     ∀ W2,
     W1 ↓∘ W2 →
-    owit_inv (<[k:=(obl_fulfilled)]> Ω) W2 →
-    (∃ b, W1 !! k = Some (witness_assigned b) ∧ wits_mon (<[k:=(witness_fulfilled)]> W1) W2).
+    owit_inv (<[k:=(obl_discharged)]> Ω) W2 →
+    (∃ b, W1 !! k = Some (witness_assigned b) ∧ wits_mon (<[k:=(witness_discharged)]> W1) W2).
   Proof.
     intros LUO INV1 GStep W2 WSStep INV2.
     inv GStep; inv H.
@@ -480,7 +480,7 @@ Section owit.
     destruct y; try done. symmetry in H2.
     eexists. split; first eauto.
     inv WSStep. inv H; cycle 1.
-    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obl_fulfilled)]> Ω)) in H4; eauto; first done.
+    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obl_discharged)]> Ω)) in H4; eauto; first done.
       rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
     apply wits_one_to_wits_cond in H4. destruct H4 as (?&H4). assert (x = k).
     { specialize (H4 k). rewrite H0 H2 in H4. inv H4. destruct H6.
@@ -531,13 +531,13 @@ Section owit.
     - rewrite lookup_insert_ne in H1; auto. rewrite H in H1. inv H1.
   Qed.
 
-  Lemma owit_inv_alloc_fulfilled Ω k W1 :
+  Lemma owit_inv_alloc_discharged Ω k W1 :
     k ∉ dom Ω →
     owit_inv Ω W1 →
     ∀ W2,
     W1 ↓∘ W2 →
-    owit_inv (<[k:=(obl_fulfilled)]> Ω) W2 →
-    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_fulfilled)]> W1) W2).
+    owit_inv (<[k:=(obl_discharged)]> Ω) W2 →
+    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_discharged)]> W1) W2).
   Proof.
     intros LUO INV1 W2 WSStep INV2.
     apply not_elem_of_dom in LUO.

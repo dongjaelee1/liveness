@@ -62,7 +62,7 @@ Section proof.
     ∃ (ql : val) (l : loc),
       ⌜arg = (ql, #l)%V⌝ ∧
       oblP_id k ∗ witP_layer k (ℓq ⊕ 1)%ordi ∗
-      ⟦tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1))))⟧ₗ ∗
+      ⟦tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))))⟧ₗ ∗
       is_task_queue ql γ ℓq.
 
   (** The main proof. *)
@@ -107,9 +107,9 @@ Section proof.
       iEval (tf_red) in "H". iDestruct "H" as "[H | H]"; cycle 1.
       { iDestruct "H" as "(HF& _)".
         rewrite tf_until_logic. iDestruct "Huntil" as "(HA& _)".
-        iPoseProof (oblP_assigned_fulfilled_false with "HA HF") as "%". done. }
+        iPoseProof (oblP_assigned_discharged_false with "HA HF") as "%". done. }
       iCombine "Huntil H" as "Huntil".
-      iMod (tf_until_fulfill with "Huntil") as "ACCuntil". 1: apply N_subseteq_1.
+      iMod (tf_until_discharge with "Huntil") as "ACCuntil". 1: apply N_subseteq_1.
       iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
       iApply (lwp_lc_later with "LC1"). iNext.
       iDestruct "ACCuntil" as "[Ptrl ACCuntil]". iEval (rewrite tf_atomic_logic) in "Ptrl".
@@ -210,9 +210,9 @@ Section proof.
       iEval (tf_red) in "H". iDestruct "H" as "[H | H]"; cycle 1.
       { iDestruct "H" as "(HF& _)".
         rewrite tf_until_logic. iDestruct "Huntil" as "(HA& _)".
-        iPoseProof (oblP_assigned_fulfilled_false with "HA HF") as "%". done. }
+        iPoseProof (oblP_assigned_discharged_false with "HA HF") as "%". done. }
       iCombine "Huntil H" as "Huntil".
-      iMod (tf_until_fulfill with "Huntil") as "ACCuntil". 1: apply N_subseteq_1.
+      iMod (tf_until_discharge with "Huntil") as "ACCuntil". 1: apply N_subseteq_1.
       iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
       iApply (lwp_lc_later with "LC1"). iNext.
       iDestruct "ACCuntil" as "[Ptrl ACCuntil]". iEval (rewrite tf_atomic_logic) in "Ptrl".

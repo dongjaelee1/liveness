@@ -304,12 +304,12 @@ Section sfmupd.
     iMod (obl_alloc_assigned_mupd with "Tb") as "(%& %& $& $& $& $& $)"; auto.
   Qed.
 
-  Lemma obl_alloc_fulfilled E ℓ μ :
-    ⊢ |={E}=>m ∃ k, oblP_fulfilled k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+  Lemma obl_alloc_discharged E ℓ μ :
+    ⊢ |={E}=>m ∃ k, oblP_discharged k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                    (∀ E N (P Q R : iProp Σ), (▷ R) ={E}=∗ oblP_inv N k P Q R).
   Proof.
     unfold_sfmupd. iIntros "%%%%% $".
-    iMod (obl_alloc_fulfilled_mupd) as "(%& $& $& $& $)"; auto.
+    iMod (obl_alloc_discharged_mupd) as "(%& $& $& $& $)"; auto.
   Qed.
 
   Lemma obl_assigned_to_true E N k P Q R :
@@ -326,7 +326,7 @@ Section sfmupd.
     unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
 
-  Lemma obl_true_to_fulfill E N k P Q R :
+  Lemma obl_true_to_discharge E N k P Q R :
     ↑N ⊆ E →
     oblP_inv N k P Q R -∗
     |={E,E ∖ ↑N}=> ∀ i g ℓ K q,
@@ -334,10 +334,10 @@ Section sfmupd.
     ((▷ (ogP_obls i g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
      (ogP_obls i g ℓ K -∗
       oblP_assigned k true 1 -∗
-      ∀ E', |={E'}=>m (ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k) ∗
+      ∀ E', |={E'}=>m (ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_discharged k) ∗
                      ((▷ (R)) ={E ∖ ↑N,E}=∗ True))).
   Proof.
-    iIntros (MASK) "#Gv". iMod (obl_fulfill_mupd with "Gv") as "H". 1: auto.
+    iIntros (MASK) "#Gv". iMod (obl_discharge_mupd with "Gv") as "H". 1: auto.
     iIntros "!> %%%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
     iPoseProof ("ACC" with "TG Ga") as "H".
     unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
@@ -371,7 +371,7 @@ Section sfmupd.
 
   Lemma obl_check_witnesses E (R : oids) :
     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
-    |={E}=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_fulfilled r).
+    |={E}=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_discharged r).
   Proof.
     unfold_sfmupd. iIntros "Rs %%%%% $". iMod (obl_check_witnesses_mupd with "Rs") as "H". auto.
   Qed.

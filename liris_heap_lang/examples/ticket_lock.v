@@ -117,7 +117,7 @@ Section proof.
       ([∗ map] t ↦ κ ∈ tickets,
          (** We need auth_mra_know to sync what other threads know about the configuration *)
          (∃ ℓ, oblP_id κ ∗ t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi ∗ (own γc (◯AM[ord.le] ℓ))) ∗
-         ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_fulfilled κ) ∨
+         ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_discharged κ) ∨
             (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ ⟨R⟩)⟧ₗ))) ∗
       (** Acknowledgement *)
       ([∗ map] t ↦ a ∈ acks,
@@ -198,7 +198,7 @@ Section proof.
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (next) "((_& TG& _)& Ptr_next& _)".
     lwp_pure_lc lc. iRename "LC" into "QLC".
-    iMod (obl_alloc_fulfilled _ (ℓ ⊕ Z.to_nat 0)%ordi 0) as "(%κu& #Ofk& #Ok& _& #Wlk& OAcc)".
+    iMod (obl_alloc_discharged _ (ℓ ⊕ Z.to_nat 0)%ordi 0) as "(%κu& #Ofk& #Ok& _& #Wlk& OAcc)".
     iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
     iMod (ghost_map_alloc ({[0%Z := (κu)]} : gmap Z (oid))) as "(%γt& GMAt& GMEt)".
     iMod (ghost_map_alloc ({[0%Z := true]} : gmap Z bool)) as "(%γa& GMAa& GMEa)".
@@ -445,7 +445,7 @@ Section proof.
         iExFalso. iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[Hmt _]".
         iDestruct "Hmt" as "(_& [Hmt | Hmt])"; cycle 1.
         { iDestruct "Hmt" as "(_& Ukp)". iEval (rewrite /tf_eventually tf_until_logic) in "Ukp".
-          iDestruct "Ukp" as "(Oa& _)". iPoseProof (oblP_assigned_fulfilled_false with "Oa Gfkp")as "%". done. }
+          iDestruct "Ukp" as "(Oa& _)". iPoseProof (oblP_assigned_discharged_false with "Oa Gfkp")as "%". done. }
         iDestruct "Hmt" as "(%Boundmy& _)". assert (Boundmy1 : (0 ≤ my < c)%Z) by lia.
         iPoseProof (ghost_map_lookup with "GMAa GMEaku") as "%LUa".
         iPoseProof (big_sepM_delete _ _ _ _ LUa with "HMa") as "[Hma _]".
@@ -523,7 +523,7 @@ Section proof.
     { iDestruct "Hmt2" as "(%& #Of)". lia. }
     iDestruct "Hmt2" as "(%Boundc1& GEku1)". iCombine "GEku GEku1" as "GEku".
     iApply sfmupd_fupd_acc.
-    iMod (tf_until_fulfill with "GEku") as "H".
+    iMod (tf_until_discharge with "GEku") as "H".
     1: apply N_subseteq_1.
     iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
     iApply (lc_fupd_add_later with "LC1"). iNext.

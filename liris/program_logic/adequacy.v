@@ -385,21 +385,21 @@ Section proof2.
             (match o2 with
              | obl_assigned a _ => match w' with
                                   | witness_assigned b => b w≤ η a
-                                  | witness_fulfilled => False
+                                  | witness_discharged => False
                                   end
-             | obl_fulfilled => match w' with
+             | obl_discharged => match w' with
                                | witness_assigned _ => False
-                               | witness_fulfilled => True
+                               | witness_discharged => True
                                end
              end) ∧
             (match o2 with
              | obl_assigned a i => match w' with
                                   | witness_assigned b => (fair_sched_fun γ2 i a) w≤ b
-                                  | witness_fulfilled => False
+                                  | witness_discharged => False
                                   end
-             | obl_fulfilled => match w' with
+             | obl_discharged => match w' with
                                | witness_assigned _ => False
-                               | witness_fulfilled => True
+                               | witness_discharged => True
                                end
              end)).
     { intros (w'& Hw1& Hw2& Hw3& Hw4). exists (<[k:=w']>W2). split_and !.
@@ -431,7 +431,7 @@ Section proof2.
     - simpl in Stepk. destruct Stepk as [Turn | NoTurn].
       + destruct Turn as [F Stepk]. done.
       + destruct NoTurn as [_ <-]. simpl in Keepk. clear Keepk. simpl in *.
-        exists (witness_fulfilled). split_and !; auto.
+        exists (witness_discharged). split_and !; auto.
   Qed.
 
   Lemma get_obls_thread_active s h n σ Θ TQ κs g v Ω W τf :
@@ -696,7 +696,7 @@ Section proof2.
         iModIntro. iLeft. iApply (IHΦ2 with "[$HI $SIa $MI $WPs $TFQ]"); eauto. done. }
       { iDestruct "Var" as "[OF _]". iDestruct "MI" as "(MHI& S& MI)".
         iEval (unfold_opreds) in "OF". iDestruct "OF" as "(#OE& #OF)".
-        iPoseProof (osat_lookup_fulfilled with "[$S $OE $OF]") as "%". rewrite LUOk in H. inv H. }
+        iPoseProof (osat_lookup_discharged with "[$S $OE $OF]") as "%". rewrite LUOk in H. inv H. }
       iPoseProof (tf_logic_tf_intuit with "[$HI $MI $HP]") as "#TFP". iMod ("ACC" with "[Var HP]") as "_".
       { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
       iModIntro. iRight. iSplit.

@@ -12,7 +12,7 @@ Definition oblG_variant `{SI : indexT} `{!osatGS.osatGS Σ}
   (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
   (oblG_assigned k false q ∗ P) ∨
     (oblG_assigned k true q ∗ Q) ∨
-    (oblG_fulfilled k ∗ R).
+    (oblG_discharged k ∗ R).
 
 Definition oblG_inv `{SI : indexT} `{!osatGS.osatGS Σ} `{!invGS Σ}
   (N : namespace) (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
@@ -57,29 +57,29 @@ Section oinv.
       destruct H0 as [? _]. subst. iFrame.
     - iDestruct "H" as "[Ga2 HP]". iPoseProof (oblG_assigned_agree with "[$Ga $Ga2]") as "%".
       destruct H0 as [? _]. subst. iFrame.
-    - iDestruct "H" as "[Gf _]". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.
+    - iDestruct "H" as "[Gf _]". iPoseProof (oblG_assigned_discharged_false with "[$]") as "%". done.
   Qed.
 
-  Lemma oblG_inv_acc_fulfilled E N k q P Q R :
+  Lemma oblG_inv_acc_discharged E N k q P Q R :
     ↑N ⊆ E →
     oblG_inv N k q P Q R
-    ={E,E ∖ ↑N}=∗ oblG_fulfilled k -∗
+    ={E,E ∖ ↑N}=∗ oblG_discharged k -∗
     ((▷ (R)) ∗
      (▷ oblG_variant k q P Q R ={E ∖ ↑N,E}=∗ True)).
   Proof.
     iIntros (HE) "#GU". iMod (oblG_inv_acc with "GU") as "[H ACC]"; first auto.
     iIntros "!> #Gf". iSplitR "ACC"; last iFrame. iNext. iDestruct "H" as "[H | [H | H]]".
-    - iDestruct "H" as "[Ga2 HP]". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.
-    - iDestruct "H" as "[Ga2 HP]". iPoseProof (oblG_assigned_fulfilled_false with "[$]") as "%". done.
+    - iDestruct "H" as "[Ga2 HP]". iPoseProof (oblG_assigned_discharged_false with "[$]") as "%". done.
+    - iDestruct "H" as "[Ga2 HP]". iPoseProof (oblG_assigned_discharged_false with "[$]") as "%". done.
     - iDestruct "H" as "[_ $]".
   Qed.
 
-  Lemma oblG_inv_acc_fulfilled_persistent E N k q P Q R :
+  Lemma oblG_inv_acc_discharged_persistent E N k q P Q R :
     Persistent R →
     ↑N ⊆ E →
-    oblG_inv N k q P Q R -∗ oblG_fulfilled k ={E}[E ∖ ↑N]▷=∗ R.
+    oblG_inv N k q P Q R -∗ oblG_discharged k ={E}[E ∖ ↑N]▷=∗ R.
   Proof.
-    iIntros (PR HE) "#GU #Gf". iMod (oblG_inv_acc_fulfilled with "GU Gf") as "[H ACC]". 1: auto.
+    iIntros (PR HE) "#GU #Gf". iMod (oblG_inv_acc_discharged with "GU Gf") as "[H ACC]". 1: auto.
     iModIntro. iNext. iPoseProof "H" as "#H". iFrame "H". iApply "ACC". iRight. iRight. eauto.
   Qed.
 
@@ -90,8 +90,8 @@ Section oinv.
   Lemma oblG_inv_alloc_assigned_true E N k q P Q R :
     (▷ (oblG_assigned k true q ∗ Q )) ={E}=∗ oblG_inv N k q P Q R.
   Proof. iIntros "H". iApply inv_alloc. iNext. iRight. iLeft. iDestruct "H" as "($&$)". Qed.
-  Lemma oblG_inv_alloc_fulfilled E N k q P Q R :
-    (▷ (oblG_fulfilled k ∗ R)) ={E}=∗ oblG_inv N k q P Q R.
+  Lemma oblG_inv_alloc_discharged E N k q P Q R :
+    (▷ (oblG_discharged k ∗ R)) ={E}=∗ oblG_inv N k q P Q R.
   Proof. iIntros "H". iApply inv_alloc. iNext. iRight. iRight. iDestruct "H" as "($&$)". Qed.
 
 End oinv.

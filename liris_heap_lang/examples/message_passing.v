@@ -62,7 +62,7 @@ Section mp_proof.
 
   Definition mp_tf (k : oid) (l : loc) : tf Σ :=
     ⟨oblP_id k ∗ witP_layer k 0⟩ ∗
-    tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_fulfilled k⟩ ∗ (l ↦ #1)))).
+    tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1)))).
 
   Definition mp (k : oid) (l : loc) : iProp Σ :=
     ⟦mp_tf k l⟧ₗ.
@@ -97,11 +97,11 @@ Section mp_proof.
     iModIntro.
     iInv "Hmp" as "mp". iDestruct "mp" as "[mp | mp]"; cycle 1.
     { iDestruct "mp" as "[>mp _]". iEval (rewrite tf_until_logic) in "Hup". iDestruct "Hup" as "[Oak _]".
-      iPoseProof (oblP_assigned_fulfilled_false with "Oak mp") as "%". done. }
+      iPoseProof (oblP_assigned_discharged_false with "Oak mp") as "%". done. }
     replace 10 with (9 + 1) by lia. iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iCombine "Hup mp" as "mp".
-    iMod (tf_until_fulfill with "mp") as "mp".
+    iMod (tf_until_discharge with "mp") as "mp".
     { apply N_subseteq_1. }
     replace 9 with (8 + 1) by lia. iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -123,7 +123,7 @@ Section mp_proof.
     do 2 lwp_pure_one.
     iApply lwpupd_label. iIntros "PL".
     iApply sfmupd_fupd_acc.
-    iMod (tf_until_fulfill with "Hul") as "Hul". 1: set_solver.
+    iMod (tf_until_discharge with "Hul") as "Hul". 1: set_solver.
     iModIntro.
     iEval (replace 7 with (6 + 1) by lia) in "LC". iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
     iApply (lc_sfmupd_add_later with "LC1"). iNext.
@@ -190,7 +190,7 @@ Section mp_proof.
       { iApply big_sepS_singleton. auto. }
       iIntros "[(_& TG& Rs) Ptrl]".
       iEval (rewrite big_sepS_singleton) in "Rs". iDestruct "Rs" as "[Wck | #Ofk]"; cycle 1.
-      { iPoseProof (oblP_assigned_fulfilled_false with "Oak Ofk") as "%". done. }
+      { iPoseProof (oblP_assigned_discharged_false with "Oak Ofk") as "%". done. }
       iMod ("HACC" with "[Oak' Ptrl]") as "_".
       { iModIntro. iApply oblP_variant_unfold. iLeft. iFrame. }
       iModIntro. iModIntro. iSplitL "Oak".
@@ -200,7 +200,7 @@ Section mp_proof.
       iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')".
       rewrite big_sepM_singleton.
       iApply ("IH" $! α0 LTα with "Hul TG Gg HΦ Fkl' Wf'").
-    - (* k is fulfilled. *)
+    - (* k is discharged. *)
       iDestruct "mp" as ">(#Ofk& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
       iPoseProof (ogP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
@@ -211,7 +211,7 @@ Section mp_proof.
       do 4 lwp_pure_one.
       iApply lwpupd_label. iIntros "PL".
       iApply sfmupd_fupd_acc.
-      iMod (tf_until_fulfill with "Hul") as "Hul". 1: set_solver.
+      iMod (tf_until_discharge with "Hul") as "Hul". 1: set_solver.
       iModIntro.
       iEval (replace 100 with (99 + 1) by lia) in "LC". iPoseProof (tlc_split_nat with "LC") as "[LC LC1]".
       iApply (lc_sfmupd_add_later with "LC1"). iNext.
@@ -264,7 +264,7 @@ Section mp_proof.
     iMod ("Ak" $! _ Np (l ↦ #0)%F (l ↦ #1)%F with "Ptrl") as "Uk".
     iPoseProof (tf_until_frac_split with "Uk") as "[Uk Uk']".
     { symmetry; apply Qp.div_2. }
-    iMod (inv_alloc Na _ ⟦(tf_until Np k false (1 / 2) (l ↦ #0) (l ↦ #1) ∨ ⟨ oblP_fulfilled k ⟩ ∗ l ↦ #1)⟧ₗ with "[Uk']") as "#Ak".
+    iMod (inv_alloc Na _ ⟦(tf_until Np k false (1 / 2) (l ↦ #0) (l ↦ #1) ∨ ⟨ oblP_discharged k ⟩ ∗ l ↦ #1)⟧ₗ with "[Uk']") as "#Ak".
     { iNext. tf_red. iLeft. iFrame. }
     iMod (tf_until_alloc _ _ _ _ false 0 0 m1 with "Gg1") as "(%kl1& %Hkl1& Gg1& #Okl1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nl (⌜True⌝)%F (∃ v : val, i ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl1".

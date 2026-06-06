@@ -106,7 +106,7 @@ Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ �
   | tf_until N k b q P Q =>
       (oblP_assigned k b (q/2)%Qp ∗
        oblP_inv N k (tf_logic P)%I (tf_logic Q)%I
-         (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
+         (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_discharged ∗
                                 hG_event n' (σ', Θ', κs') ∗
                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I
   end
@@ -128,7 +128,7 @@ with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
        | tf_until N k b q P Q =>
            ((∃ f o, event_obl i (n, Ω) k (obl_assigned f o)) ∗
             oblP_inv N k (tf_logic P)%I (tf_logic Q)
-              (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
+              (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_discharged ∗
                                      hG_event n' (σ', Θ', κs') ∗
                                      tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)
        end.
@@ -136,17 +136,17 @@ with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
 Global Arguments tf_logic {SI Λ Σ _ _}.
 Global Arguments tf_intuit {SI Λ Σ _ _}.
 
-Local Definition tf_fulfilled_def `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+Local Definition tf_discharged_def `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   k (Q : tf Σ) : iProp Σ :=
-  (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗
+  (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_discharged ∗
                          hG_event n' (σ', Θ', κs') ∗
                          tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
-Local Definition tf_fulfilled_aux : seal (@tf_fulfilled_def). Proof. by eexists. Qed.
-Definition tf_fulfilled := tf_fulfilled_aux.(unseal).
-Global Arguments tf_fulfilled {SI Λ Σ _ _}.
-Local Lemma tf_fulfilled_unseal `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} :
-  tf_fulfilled = @tf_fulfilled_def SI Λ Σ _ _.
-Proof. rewrite -tf_fulfilled_aux.(seal_eq) //. Qed.
+Local Definition tf_discharged_aux : seal (@tf_discharged_def). Proof. by eexists. Qed.
+Definition tf_discharged := tf_discharged_aux.(unseal).
+Global Arguments tf_discharged {SI Λ Σ _ _}.
+Local Lemma tf_discharged_unseal `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} :
+  tf_discharged = @tf_discharged_def SI Λ Σ _ _.
+Proof. rewrite -tf_discharged_aux.(seal_eq) //. Qed.
 
 Section proof.
   Context `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
@@ -159,17 +159,17 @@ Section proof.
     induction Φ; simpl; apply _.
   Qed.
 
-  Global Instance tf_fulfilled_persistent k Q : Persistent (tf_fulfilled k Q).
-  Proof. rewrite tf_fulfilled_unseal /tf_fulfilled_def. apply _. Qed.
+  Global Instance tf_discharged_persistent k Q : Persistent (tf_discharged k Q).
+  Proof. rewrite tf_discharged_unseal /tf_discharged_def. apply _. Qed.
 
   Global Instance tf_until_contractive_1 N k b q Q : Contractive (λ (P : iProp Σ), tf_logic (tf_until N k b q ⟨P⟩ Q)).
   Proof. simpl. repeat intro. f_equiv. apply oblP_inv_contractive_1. auto. Qed.
   Global Instance tf_until_contractive_2 N k b q P : Contractive (λ (Q : iProp Σ), tf_logic (tf_until N k b q P ⟨Q⟩)).
   Proof. simpl. repeat intro. f_equiv. apply oblP_inv_contractive_2. auto. Qed.
 
-  Lemma tf_fulfilled_unfold k Q :
-    tf_fulfilled k Q = (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_fulfilled ∗ hG_event n' (σ', Θ', κs') ∗ tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
-  Proof. rewrite tf_fulfilled_unseal /tf_fulfilled_def. done. Qed.
+  Lemma tf_discharged_unfold k Q :
+    tf_discharged k Q = (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_discharged ∗ hG_event n' (σ', Θ', κs') ∗ tf_intuit n' σ' Θ' κs' i' Ω' Q)%I.
+  Proof. rewrite tf_discharged_unseal /tf_discharged_def. done. Qed.
 
   Lemma tf_logic_tf_intuit Φ h n σ Θ κs m i Ω W :
     (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ tf_logic Φ)
@@ -246,8 +246,8 @@ Section reduction.
     ⟦tf_always N P⟧ₗ = (inv N ⟦P⟧ₗ)%I.
   Proof. done. Qed.
   Lemma tf_until_logic N k b q P Q :
-    ⟦tf_until N k b q P Q⟧ₗ = (oblP_assigned k b (q/2)%Qp ∗ oblP_inv N k (⟦P⟧ₗ) (⟦Q⟧ₗ) (tf_fulfilled k Q))%I.
-  Proof. rewrite tf_fulfilled_unfold. done. Qed.
+    ⟦tf_until N k b q P Q⟧ₗ = (oblP_assigned k b (q/2)%Qp ∗ oblP_inv N k (⟦P⟧ₗ) (⟦Q⟧ₗ) (tf_discharged k Q))%I.
+  Proof. rewrite tf_discharged_unfold. done. Qed.
 
 End reduction.
 
@@ -429,10 +429,10 @@ Section proof.
     iIntros "!> %%%% H". rewrite tf_until_logic. iMod ("ACC" with "H") as "ACC". iFrame. done.
   Qed.
 
-  Lemma tf_fulfilled_alloc E ℓ μ (Q : tf Σ) :
+  Lemma tf_discharged_alloc E ℓ μ (Q : tf Σ) :
     ⟦Q⟧ₗ -∗
-    |={E}=>m ⟦Q⟧ₗ ∗ ∃ k, oblP_fulfilled k ∗
-                        (∀ E' N (P : tf Σ), |={E'}=> oblP_inv N k ⟦P⟧ₗ ⟦Q⟧ₗ (tf_fulfilled k Q)) ∗ 
+    |={E}=>m ⟦Q⟧ₗ ∗ ∃ k, oblP_discharged k ∗
+                        (∀ E' N (P : tf Σ), |={E'}=> oblP_inv N k ⟦P⟧ₗ ⟦Q⟧ₗ (tf_discharged k Q)) ∗ 
                         oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "HQ".
@@ -444,12 +444,12 @@ Section proof.
     { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
     destruct NEW as (k& NEWk).
     assert (NinOk1 : k ∉ dom Ω1) by (eapply not_elem_of_dom; eauto).
-    iMod (osat_alloc_obl_fulfilled _ k (measure (ℓ, 1) ((1 ⊕ ▽) × μ)%M) with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)". 1: auto.
-    iMod (owit_alloc_witness_fulfilled _ k (η (measure (ℓ, 1) ((1 ⊕ ▽) × μ)%M)) with "[$W $Gu]") as "(W& #Ww)".
+    iMod (osat_alloc_obl_discharged _ k (measure (ℓ, 1) ((1 ⊕ ▽) × μ)%M) with "S") as "(S& #Gwf& #Ge& #Gu& Gf& %OStep)". 1: auto.
+    iMod (owit_alloc_witness_discharged _ k (η (measure (ℓ, 1) ((1 ⊕ ▽) × μ)%M)) with "[$W $Gu]") as "(W& #Ww)".
     { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
     iPoseProof (oassigned_add_obl with "[$A $Ge Gu]") as "A".
     { iRight. iFrame "Gu". }
-    set (Ω2:=(<[k:=(obl_fulfilled)]> Ω1)).
+    set (Ω2:=(<[k:=(obl_discharged)]> Ω1)).
     iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
     { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 2. eauto. }
     iPoseProof (model_history_interp_event_obl_now k with "HI") as "#Eo".
@@ -458,7 +458,7 @@ Section proof.
     iModIntro. iExists Ω2. iSplitR.
     { iPureIntro. econstructor 2. econstructor 2. auto. }
     iIntros (? [WStep GWI2]) "!>".
-    pose proof (owit_inv_alloc_fulfilled Ω1 k W1 NinOk1 GWI W2 WStep GWI2) as (NinWk1& WMon).
+    pose proof (owit_inv_alloc_discharged Ω1 k W1 NinOk1 GWI W2 WStep GWI2) as (NinWk1& WMon).
     iPoseProof (owit_mon _ _ WMon with "W") as "W".
     iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
     { subst Ω2. rewrite dom_insert_L. iFrame. }
@@ -466,8 +466,8 @@ Section proof.
     rewrite /model_interp. iFrame "HI S O A G W". iSplitR; first eauto.
     iModIntro. iMod "close" as "_". iModIntro. iFrame "SI HQ". iExists k. iFrame "Ge Ww Gf Gu".
     iIntros (E' N P).
-    rewrite tf_fulfilled_unfold.
-    iMod (oblG_inv_alloc_fulfilled _ N _ _ ⟦P⟧ₗ ⟦Q⟧ₗ with "[$Gu]") as "#GVar"; cycle 1.
+    rewrite tf_discharged_unfold.
+    iMod (oblG_inv_alloc_discharged _ N _ _ ⟦P⟧ₗ ⟦Q⟧ₗ with "[$Gu]") as "#GVar"; cycle 1.
     { iFrame "GVar". done. }
     iFrame "Eo HE HQi".
   Qed.
@@ -486,12 +486,12 @@ Section proof.
   Qed.
 
   (** TODO: Timeless version *)
-  Lemma tf_until_true_to_fulfill E N k (P Q : tf Σ) :
+  Lemma tf_until_true_to_discharge E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦tf_until N k true 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ∀ i g ℓ K,
     (⌜k ∈ K⌝) → ogP_obls i g ℓ K -∗
-    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k)).
+    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)).
   Proof.
     rewrite tf_until_logic. iIntros (HMask) "(Oa& #OI)".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
@@ -509,21 +509,21 @@ Section proof.
     rewrite LUO1l in LUO1o. inv LUO1o. rename x1 into a.
     iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1& _) | #Gu])".
     { apply elem_of_dom. eauto. }
-    2:{ iExFalso. iPoseProof (oblG_assigned_fulfilled_false with "[$Gl $Gu]") as "%". done. }
+    2:{ iExFalso. iPoseProof (oblG_assigned_discharged_false with "[$Gl $Gu]") as "%". done. }
     iPoseProof (oblG_owner_agree _ i i1 with "[$Go $Go1]") as "%". destruct H as [<- _].
     iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
     iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
     iMod (ogroup_delete_obl with "[$O $G $Gg $Oo]") as "(O& G& Gg& Go2)". 1,2: auto.
     iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'". iCombine "Go Go'" as "Go".
-    iMod (osat_fulfill with "[$S $Ge $Gl $Go]") as "(S& #Gu& %Gstep)".
+    iMod (osat_discharge with "[$S $Ge $Gl $Go]") as "(S& #Gu& %Gstep)".
     assert (LUW : ∃ b, W1 !! k = Some (witness_assigned b) ∧ (b <= η a)%ord).
     { specialize (GWI k). rewrite LUO1l in GWI. inv GWI. destruct y; try done. eauto. }
     destruct LUW as (b&LUW1& LEab).
-    iPoseProof (owit_fulfill with "[$W $Gu]") as "W". 1: eauto.
+    iPoseProof (owit_discharge with "[$W $Gu]") as "W". 1: eauto.
     iPoseProof (oassigned_add_obl _ k with "[$A $Ge]") as "A".
     { iRight. eauto. }
-    set (Ω2:=(<[k:=(obl_fulfilled)]> Ω1)).
-    assert (Gstep' : obl_step (obl_assigned a i) obl_fulfilled) by (by econstructor 2).
+    set (Ω2:=(<[k:=(obl_discharged)]> Ω1)).
+    assert (Gstep' : obl_step (obl_assigned a i) obl_discharged) by (by econstructor 2).
     iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
     { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
     iPoseProof (model_history_interp_event_obl_now k with "HI") as "#Eo".
@@ -532,7 +532,7 @@ Section proof.
     iModIntro. iExists Ω2. iSplitR.
     { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
     iIntros (? [WStep GWI2]).
-    pose proof (owit_inv_fulfill _ _ _ _ _ LUO1l GWI Gstep' W2 WStep GWI2) as (?& LUW& WMon).
+    pose proof (owit_inv_discharge _ _ _ _ _ LUO1l GWI Gstep' W2 WStep GWI2) as (?& LUW& WMon).
     rewrite LUW1 in LUW. inv LUW.
     iPoseProof (owit_mon _ _ WMon with "W") as "W".
     iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
@@ -542,32 +542,32 @@ Section proof.
     rewrite /model_interp. iFrame "HI S O W A G".
     iApply fupd_intro. iSplitR; first eauto. iIntros "!>". iFrame "Oe Ge Gb Gu Gg Gt SI".
     iMod "close" as "_". iModIntro. iMod ("ACC" with "[]") as "_".
-    { iNext. iRight. iRight. rewrite tf_fulfilled_unfold. iFrame "Ge Gu Eo HE HQi". }
+    { iNext. iRight. iRight. rewrite tf_discharged_unfold. iFrame "Ge Gu Eo HE HQi". }
     iModIntro. iFrame.
   Qed.
 
-  Lemma tf_until_fulfill E N k (P Q : tf Σ) :
+  Lemma tf_until_discharge E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦tf_until N k false 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ▷ (⟦P⟧ₗ ∗
        ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N}=∗
                        ∀ i g ℓ K, (⌜k ∈ K⌝) → ogP_obls i g ℓ K -∗
-                                  ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_fulfilled k)))).
+                                  ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ ogP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)))).
   Proof.
     iIntros (HN) "Uk". iMod (tf_until_to_true with "Uk") as "H". 1: auto.
     iModIntro. iNext. iDestruct "H" as "($& H)". iIntros (?).
     iMod ("H" $! E') as "H". iIntros "!> HQ". iMod ("H" with "HQ") as "H".
-    iMod (tf_until_true_to_fulfill with "H") as "H". 1: auto.
+    iMod (tf_until_true_to_discharge with "H") as "H". 1: auto.
     iIntros "!> %%%% % TG". iPoseProof ("H" with "[//] TG") as "H".
     iIntros (?). iNext. iMod ("H" $! E'') as "H". iModIntro. iFrame.
   Qed.
 
   (** Access rules *)
-  Lemma tf_until_fulfilled_false N k b q P Q :
-    ⟦tf_until N k b q P Q⟧ₗ -∗ oblP_fulfilled k -∗ False.
+  Lemma tf_until_discharged_false N k b q P Q :
+    ⟦tf_until N k b q P Q⟧ₗ -∗ oblP_discharged k -∗ False.
   Proof.
     rewrite tf_until_logic. iIntros "[Oa _] #Of".
-    iPoseProof (oblP_assigned_fulfilled_false with "Oa Of") as "%". done.
+    iPoseProof (oblP_assigned_discharged_false with "Oa Of") as "%". done.
   Qed.
 
   Lemma tf_until_acc E N k b q P Q :

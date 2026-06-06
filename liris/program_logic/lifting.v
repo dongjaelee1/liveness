@@ -30,7 +30,7 @@ Section lifting.
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_groups i G -∗
-                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_groups j ∅) -∗
                                ALC (|={∅,E}=>
                                       (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
@@ -64,7 +64,7 @@ Section lifting.
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_groups i G -∗
-                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_groups j ∅) -∗
                                ALC (|={∅,E}=>
                                       (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
@@ -109,7 +109,7 @@ Section lifting.
        ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
          (ς i -∗
           thP_groups i G -∗
-          ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+          ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
           ALC (|={E',E}=>
                  ∀ σ Θ κ e2 efs, (⌜prim_step i e1 σ Θ κ e2 σ efs⌝) -∗
                  lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
@@ -154,7 +154,7 @@ Section lifting.
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
                                thP_groups i G -∗
-                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_groups j ∅) -∗
                                ALC (|={E2,E1}=>
                                       (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
@@ -188,7 +188,7 @@ Section lifting.
        ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
          (ς i -∗
           thP_groups i G -∗
-          ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+          ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
           ALC (|={E',E}=> lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
@@ -209,7 +209,7 @@ Section lifting.
                    ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                    (ς i -∗
                     thP_groups i G -∗
-                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                     ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
@@ -245,7 +245,7 @@ Section lifting.
     PureExecSI ς i →
     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
     (Nat.iter n (λ P, |={E,E'}=> ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ 1) ∗
-                                (ς i -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                                (ς i -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                  ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
@@ -266,7 +266,7 @@ Section lifting.
     φ →
     PureExecSI ς i →
     (ς i ∗ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, ogP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-     (ς i -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_fulfilled r) -∗
+     (ς i -∗ thP_groups i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_discharged r) -∗
       £ (o × n)%ord -∗ lwpupd i E e2 (lWP e2 @ s; i ; E {{ Φ }})))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.

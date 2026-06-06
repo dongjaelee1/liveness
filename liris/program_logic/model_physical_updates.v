@@ -67,7 +67,7 @@ Section mprog.
   Lemma mprog_step n Θ i P :
     (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ∃ ℓ, ogP_fuel u ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                        ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r))
+                        ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r))
                          ={∅}=∗ P))
     ⊢ mprog n Θ i P.
   Proof.
@@ -153,7 +153,7 @@ Section mprog.
     destruct HW1 as (WR& WR'& DisjWR& EQWR& DomWR).
     iAssert (⌜ ∀ k, k ∈ R → ∃ w, WR !! k = Some w ⌝)%I as "%Rver".
     { iPureIntro. intros. subst. apply elem_of_dom in H. destruct H. eauto. }
-    iAssert (|==> [∗ set] r ∈ R, (witG_witness r Ord.one) ∨ (oblG_fulfilled r))%I with "[Ws]" as ">Rs".
+    iAssert (|==> [∗ set] r ∈ R, (witG_witness r Ord.one) ∨ (oblG_discharged r))%I with "[Ws]" as ">Rs".
     { subst W1. iPoseProof (big_sepM_union with "Ws") as "[Ws1 _]"; first auto. iClear "REs".
       subst R. rewrite -big_sepS_bupd -big_sepM_dom. iApply (big_sepM_impl with "Ws1").
       iIntros "!> %%% H".  destruct x; eauto.

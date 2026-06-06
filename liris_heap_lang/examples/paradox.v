@@ -21,7 +21,7 @@ Class heapGS_no_lc `(HGS : heapGS Σ) := {
       Nat.iter n
         (λ P,
            |={E,E'}=> ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                          (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+                          (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                            (|={E',E}=> |={E}=>m P)))
         (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
       ⊢ lWP e1 @ s; i; E {{ Φ }};    
@@ -31,7 +31,7 @@ Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@heapGS_no_lc Σ _} (n : nat) R s 
   PureExec φ n e1 e2 →
   φ →
   ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-  (Nat.iter n (λ P, |={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗
+  (Nat.iter n (λ P, |={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                (|={E',E}=> |={E}=>m P)))
      (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
   ⊢ (lWP e1 @ s; i; E {{ Φ }}).
@@ -53,7 +53,7 @@ Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@heapGS_no_lc Σ _}
   envs_entails Δ (∃ E' R,
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
-                       (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_fulfilled r) -∗ (|={E',E}=> |={E}=>m P)))
+                       (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗ (|={E',E}=> |={E}=>m P)))
            (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
@@ -221,7 +221,7 @@ Section proof.
            ⟨(£ (10)%ord ∨ cnt_lb r i a) ∗
             a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0⟩ ∗
            ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩) ∨
-              (⟨oblP_fulfilled k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩))))%F.
+              (⟨oblP_discharged k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩))))%F.
 
   Definition px_tf r rm i j : tf Σ :=
     tf_always N (px_inv_tf r rm i j).
@@ -234,7 +234,7 @@ Section proof.
          ((£ (10)%ord ∨ cnt_lb r i a) ∗
           a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0) ∗
          ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩⟧ₗ) ∨
-            (oblP_fulfilled k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
+            (oblP_discharged k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
 
   Definition px r rm i j : iProp Σ :=
     inv N (px_inv r rm i j).
@@ -299,7 +299,7 @@ Section proof.
       iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
       iDestruct "Hm" as "(Hm& [F | (_& (#Cljn1& %& #Mn1))])".
       { rewrite /tf_eventually tf_until_logic. iDestruct "F" as "(Ga& _)".
-        iPoseProof (oblP_assigned_fulfilled_false with "Ga Gdckn") as "%". done. }
+        iPoseProof (oblP_assigned_discharged_false with "Ga Gdckn") as "%". done. }
       iPoseProof (big_sepM_delete _ _ _ _ LU with "[Hm $HM]") as "HM".
       { iFrame. iRight. eauto. }
       iPoseProof (ghost_map_lookup with "GMA Mn1") as "%LU1".
@@ -354,7 +354,7 @@ Section proof.
     iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
     iDestruct "Hm" as "(Hm& [Uck1 | (#F& _)])"; cycle 1.
     { rewrite /tf_eventually tf_until_logic. iDestruct "Uck" as "(Ga& _)".
-      iPoseProof (oblP_assigned_fulfilled_false with "Ga F") as "%". done. }
+      iPoseProof (oblP_assigned_discharged_false with "Ga F") as "%". done. }
     iPoseProof (tf_until_frac_add with "Uck Uck1") as "Uck".
     { rewrite Qp.div_2. reflexivity. }
     iPoseProof (cnt_auth_op_valid with "Caj Ca") as "%". destruct H0 as [? _]. subst n0.
@@ -369,7 +369,7 @@ Section proof.
     iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.
     assert (NDisj : N ## Nu).
     { subst N Nu. apply ndot_ne_disjoint. done. }
-    iMod (tf_until_fulfill with "Uck") as "H". 1: set_solver.
+    iMod (tf_until_discharge with "Uck") as "H". 1: set_solver.
     iPoseProof (tlc_split_nat 88 1 with "LC") as "[LC LC1]".
     (** TODO: make interface defs and lemmas for tlc *)
     iApply (lc_fupd_add_later with "LC1"). iNext.

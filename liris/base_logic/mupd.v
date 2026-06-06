@@ -250,11 +250,11 @@ Section mupd.
          match g with
          | obl_assigned a i => match w with
                               | witness_assigned b => (γ i a) w≤ b
-                              | witness_fulfilled => False
+                              | witness_discharged => False
                               end
-         | obl_fulfilled => match w with
+         | obl_discharged => match w with
                            | witness_assigned _ => False
-                           | witness_fulfilled => True
+                           | witness_discharged => True
                            end
          end)
       Ω W.
@@ -287,7 +287,7 @@ Section mupd.
           - rewrite !lookup_insert_ne; eauto. }
       + pose proof Inv as Inv2. specialize (Inv2 x). rewrite H in Inv2. inv Inv2.
         inv H1. destruct y; try done. symmetry in H2.
-        exists (<[x:=(witness_fulfilled)]>W1). split_and !.
+        exists (<[x:=(witness_discharged)]>W1). split_and !.
         * econstructor 2. econstructor. exists x. do 2 eexists. split_and !; eauto. econstructor 2. econstructor.
         * intros ?. destruct (decide (i = x)).
           { subst. rewrite !lookup_insert_eq. econstructor. auto. }
@@ -305,7 +305,7 @@ Section mupd.
         * subst. intros ?. destruct (decide (i = k)).
           { subst. rewrite !lookup_insert_eq. econstructor. eapply GSched. }
           { rewrite !lookup_insert_ne; eauto. }
-      + exists (<[k:=(witness_fulfilled)]>W1). split_and !.
+      + exists (<[k:=(witness_discharged)]>W1). split_and !.
         * econstructor 2. econstructor 2. exists k. split; eauto.
           apply not_elem_of_dom. apply not_elem_of_dom in LUO. rewrite -Dom. auto.
         * subst. intros ?. destruct (decide (i = k)).
