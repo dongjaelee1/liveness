@@ -578,6 +578,13 @@ Section transfinite_lc.
     apply tlc_split.
   Qed.
 
+  Lemma tlc_split_one (n m : nat) :
+    n = (1 + m)%nat →
+    £n n -∗ £n m ∗ £n 1.
+  Proof.
+    rewrite -tlc_split_nat. intros ->. rewrite Nat.add_comm. auto.
+  Qed.
+
   Lemma tlc_one_nat :
     £n 1 ⊣⊢ £ Ord.one.
   Proof. by rewrite Ord.from_nat_1. Qed.
