@@ -319,4 +319,4 @@ Section adequacy.
 
 End adequacy.
 
-Print Assumptions flag_client_adequacy.
+(* Print Assumptions flag_client_adequacy. *)
