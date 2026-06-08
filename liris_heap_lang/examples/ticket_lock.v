@@ -60,14 +60,14 @@ End TicketLock.
 (** The CMRA we need. *)
 Class ticket_lockG Σ :=
   TLockG {
-      #[local] tlock_ticketG :: ghost_mapG Σ Z ((positive * ogid * ord.t * measurable_syntax) + oid);
-      #[local] tlock_serving_inG :: inG Σ (auth_mraUR (Z.le));
+      #[local] tlock_ticketG :: ghost_mapG Σ Z (option (positive * ogid * ord.t * measurable_syntax));
+      #[local] tlock_oblG :: ghost_mapG Σ Z (option oid);
       #[local] tlock_config_inG :: inG Σ (auth_mraUR (ord.le));
     }.
 
 Definition ticket_lockΣ : gFunctors :=
-  #[ghost_mapΣ Z ((positive * ogid * ord.t * measurable_syntax) + oid);
-    GFunctor (auth_mraUR (Z.le));
+  #[ghost_mapΣ Z (option (positive * ogid * ord.t * measurable_syntax));
+    ghost_mapΣ Z (option oid);
     GFunctor (auth_mraUR (ord.le))
     ].
 
@@ -77,7 +77,7 @@ Proof. solve_inG. Qed.
 Record ticketlock_γ :=
   TicketLockName {
       ticketlock_γt : gname;
-      ticketlock_γs : gname;
+      ticketlock_γo : gname;
       ticketlock_γc : gname;
     }.
 
@@ -108,37 +108,46 @@ Section proof.
   (** We can define the tf counterparts for these definitions
       if we want to extract top level trace properties of library functions. *)
 
-  Local Definition lock_inv γt γs γc (next curr : loc) (R : tf Σ) : iProp Σ :=
-    ∃ (n c : Z) (tickets : gmap Z ((positive * ogid * ord.t * measurable_syntax) + oid)),
+  Local Definition lock_inv γt γo γc (next curr : loc) (R : tf Σ) : iProp Σ :=
+    ∃ (n c : Z)
+      (tickets : gmap Z (option (positive * ogid * ord.t * measurable_syntax)))
+      (obls : gmap Z (option oid)),
       next ↦ #n ∗
       curr ↦{#(1/2)} #c ∗
-      (own γs (●AM[Z.le] c)) ∗
       ghost_map_auth γt 1 tickets ∗
+      ghost_map_auth γo 1 obls ∗
+      (⌜(dom tickets = dom obls)%Z⌝) ∗
       (⌜(0 ≤ c ≤ n)%Z⌝) ∗
       (⌜ ∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z ⌝) ∗
       (** Finished or waiting threads *)
       (* We need auth_mra_know to sync what other threads know about the configuration *)
-      ([∗ map] t ↦ oκ ∈ tickets,
-         ((∃ κ, ⌜(0 ≤ t ≤ c)%Z⌝ ∧ t ↪[γt]□ (inr κ) ∗ oblP_discharged κ) ∨
+      ([∗ set] t ∈ dom tickets,
+         ((∃ κ, ⌜(0 ≤ t ≤ c)%Z⌝ ∧
+                t ↪[γt]□ (None : option (positive * ogid * ord.t * measurable_syntax)) ∗
+                t ↪[γo]□ (Some κ) ∗
+                oblP_discharged κ) ∨
             (⌜ (t = c + 1)%Z ⌝) ∨
-            (∃ i g ℓ μ, ⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧ t ↪[γt]{#1/2} (inl (i, g, ℓ, μ)) ∗
+            (∃ i g ℓ μ, ⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧
+                        t ↪[γt]{#1/2} (Some (i, g, ℓ, μ)) ∗
+                        t ↪[γo] (None : option oid) ∗
                         (own γc (◯AM[ord.le] ℓ)) ∗ grP_obls i g ℓ ∅))) ∗
       ((⌜(c = n)⌝ ∧ curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
          (⌜(c < n)%Z⌝ ∧
           (* Allocates new obligation on behalf of next owner. *)
-          ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗
-                 ((∃ i g μ, (c + 1)%Z ↪[γt]{#1/2} (inl (i, g, ℓ, μ)) ∗
+          ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗ (c + 1)%Z ↪[γo]□ (Some κ) ∗
+                 ((∃ i g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (i, g, ℓ, μ)) ∗
                             ⟦tf_eventually N_ev κ false 1 (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
                             grP_obls i g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
                             curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
                     (* Current owner acquired the lock. *)
-                    ((c + 1)%Z ↪[γt]□ (inr κ) ∗
+                    ((c + 1)%Z ↪[γt]□ (None : option (positive * ogid * ord.t * measurable_syntax)) ∗
                      ⟦tf_eventually N_ev κ false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ)))).
 
   Local Definition lock_token_def (tl : val) (γ : ticketlock_γ) κu (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc) (u : Z),
       (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗
-      ((u + 1)%Z ↪[(ticketlock_γt γ)]□ (inr κu)) ∗
+      ((u + 1)%Z ↪[(ticketlock_γt γ)]□ (None : option (positive * ogid * ord.t * measurable_syntax))) ∗
+      ((u + 1)%Z ↪[(ticketlock_γo γ)]□ (Some κu)) ∗
       ⟦tf_eventually N_ev κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R)⟧ₗ.
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
   Definition lock_token := lock_token_aux.(unseal).
@@ -148,7 +157,7 @@ Section proof.
   Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
-      inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γs γ) (ticketlock_γc γ) next curr R).
+      inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) next curr R).
 
   Definition own_fair_lock_level (γ : ticketlock_γ) (ℓ : ord.t) (dq : dfrac) :=
     own (ticketlock_γc γ) (auth_mra_auth ord.le dq ℓ).
@@ -207,11 +216,11 @@ Section proof.
     iModIntro. lwp_pure_lc lc. iRename "LC" into "QLC".
     iMod (obl_alloc_discharged _ (ℓ)%ordi 0) as "(%κu& #Ofk& _& #Wlk& OAcc)".
     iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
-    iMod (ghost_map_alloc ({[0%Z := (inr κu)]} : gmap Z ((positive * ogid * ord.t * measurable_syntax) + oid))) as "(%γt& GMAt& GMEt)".
+    iMod (ghost_map_alloc ({[0%Z := None]} : gmap Z (option (positive * ogid * ord.t * measurable_syntax)))) as "(%γt& GMAt& GMEt)".
+    iMod (ghost_map_alloc ({[0%Z := (Some κu)]} : gmap Z (option oid))) as "(%γo& GMAo& GMEo)".
     rewrite !big_sepM_singleton.
     iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
-    iMod (own_alloc (●AM[Z.le] 0%Z)) as "(%γs& SV)".
-    { apply auth_mra_auth_valid. }
+    iMod (ghost_map_elem_persist with "GMEo") as "#GMEo".
     iMod (own_alloc (●AM[ord.le] ℓ)) as "(%γc& CF)".
     { apply auth_mra_auth_valid. }
     iAssert (own (γc) (◯AM[ord.le] ℓ))%I as "#CFl".
@@ -219,19 +228,21 @@ Section proof.
       rewrite -own_op -auth_mra_auth_know_op. done. }
     iModIntro. lwp_finish.
     iModIntro.
-    iApply ("HΦ" $! _ (TicketLockName γt γs γc)). iFrame "TG QLC CF".
+    iApply ("HΦ" $! _ (TicketLockName γt γo γc)). iFrame "TG QLC CF".
     iIntros (??) "HR".
-    iMod (inv_alloc N_inv _ (lock_inv γt γs γc next curr R) with "[Ptr_next Ptr_curr0 Ptr_curr SV GMAt HR]") as "#Ak".
-    { iNext. rewrite /lock_inv. iExists 0, 0, {[0%Z := (inr κu)]}.
-      iFrame "Ptr_next Ptr_curr0 SV GMAt". iSplit. 1: done. iSplit.
+    iMod (inv_alloc N_inv _ (lock_inv γt γo γc next curr R) with "[Ptr_next Ptr_curr0 Ptr_curr GMAt GMAo HR]") as "#Ak".
+    { iNext. rewrite /lock_inv. iExists 0, 0, {[0%Z := (None)]}, {[0%Z := (Some κu)]}.
+      iFrame "Ptr_next Ptr_curr0 GMAt GMAo". iSplit. 1: done. iSplit. 1: done. iSplit.
       { iPureIntro. intros. rewrite dom_singleton_L elem_of_singleton. split; intros.
         - subst. lia.
         - lia. }
       iSplitR.
-      { rewrite big_sepM_singleton. iLeft. iFrame "GMEt Ofk". iPureIntro. lia. }
+      { rewrite dom_singleton_L big_sepS_singleton. iLeft. eauto. }
       iLeft. iFrame. iPureIntro. lia. }
     iModIntro. rewrite /is_fair_lock. iExists next, curr. iSplitR; first done. eauto.
   Qed.
+
+  TODO
 
   (** FIXME: ordi notation levels *)
   Lemma TicketLock_acquire_spec :

@@ -190,11 +190,11 @@ Section proof.
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
     lwp_bind (AllocN _ _).
-    iPoseProof (grP_fuels_add 2 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (curr) "((_& TG& _)& Ptr_curr& _)".
     lwp_bind (AllocN _ _).
-    iPoseProof (grP_fuels_add 1 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (next) "((_& TG& _)& Ptr_next& _)".
     lwp_pure_lc lc. iRename "LC" into "QLC".
@@ -261,7 +261,7 @@ Section proof.
     (* fst *)
     lwp_pures.
     (* FAA *)
-    iPoseProof (grP_fuels_add 92 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     lwp_bind (FAA _ _).
     (* Atomic step of FAA, *)
     iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
@@ -342,7 +342,7 @@ Section proof.
     iMod (grP_fuel_extend_set _ (ℓ ⊕ Z.to_nat (my + 1))%ordi _ (50 × ▽)%M with "Fsloop") as "Fsloop".
     { apply hessenberg.lt_add_r. apply ord.omega_upperbound. }
     iPoseProof (big_sepS_insert _ G gu0 with "[$Fsloop $GFloop]") as "Fsloop". 1: auto.
-    iPoseProof (grP_fuels_add 42 50 with "GF") as "[_ GF]". 1: lia.
+    iPoseProof (grP_fuels_add 42 50 with "GF") as "[_ GF]".
     iPoseProof (grP_fuels_add_group with "GF' GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
@@ -391,7 +391,7 @@ Section proof.
     iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
-    iPoseProof (grP_fuels_add 45 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_load _ {[κp]} 98%ord with "[$TG $GF1 $PtrCurr]").
     { rewrite big_sepS_singleton. eauto. }
     iIntros "((LC'& TG& Wc)& PtrCurr)". iEval (rewrite big_sepS_singleton) in "Wc".
@@ -493,7 +493,7 @@ Section proof.
     subst tl.
     lwp_pures.
     lwp_bind (Load _).
-    iPoseProof (grP_fuels_add 95 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
     iIntros "((_& TG& _)& PtrCurr0)".
@@ -512,7 +512,7 @@ Section proof.
     iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". inversion H. subst u. clear H.
     (* FIXME: does not combine the dfrac part. *)
     (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
-    iPoseProof (grP_fuels_add 93 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_store _ ∅ lc with "[$TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iSplitL "PtrCurr"; iFrame. }
     iIntros "((QLC& TG& _)& [PtrCurr PtrCurr0])".
