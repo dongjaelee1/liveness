@@ -11,8 +11,8 @@ From transfinite.base_logic.lib Require Import ghost_map.
 (** FIXME: move to more general directory *)
 Section FIXME.
 
-  Global Program Instance ordinal_auth_mra_class : auth_mra_class ord.t :=
-    Build_auth_mra_class ord.t ord.le _ ord.eq _ _ _.
+  Global Program Instance ordinal_auth_mra_class : auth_mra_class ord.le ord.eq :=
+    Build_auth_mra_class ord.t _ _ _ _ _ _.
   Next Obligation.
     repeat intro. split; auto.
   Qed.

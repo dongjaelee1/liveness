@@ -151,21 +151,93 @@ End auth_mra.
 Global Typeclasses Opaque auth_mra_auth auth_mra_know.
 
 (* Properties needed to use the full set of rules *)
-Class auth_mra_class (A : Type) := {
-    auth_mra_R : A → A → Prop;
+Class auth_mra_class {A : Type} (auth_mra_R : A → A → Prop) (auth_mra_equiv : Equiv A):= {
     #[global] auth_mra_R_PreOrder :: PreOrder auth_mra_R;
-    #[global] auth_mra_equiv :: Equiv A;
     #[global] auth_mra_equiv_Reflexive :: Reflexive (≡@{A});
     #[global] auth_mra_AntiSymm :: AntiSymm (≡@{A}) auth_mra_R;
     #[global] auth_mra_Proper :: Proper (((≡@{A}) ==> (≡@{A}) ==> iff)) auth_mra_R;
   }.
 
-Class auth_mra_eq_class (A : Type) := {
-    auth_mra_eq_R : A → A → Prop;
+Class auth_mra_eq_class {A : Type} (auth_mra_eq_R : A → A → Prop) := {
     #[global] auth_mra_eq_R_PreOrder :: PreOrder auth_mra_eq_R;
     #[global] auth_mra_eq_AntiSymm :: AntiSymm (=@{A}) auth_mra_eq_R;
     #[global] auth_mra_eq_Proper :: Proper (((=@{A}) ==> (=@{A}) ==> iff)) auth_mra_eq_R;
   }.
 
-Global Instance auth_mra_eq_instance `{AMEC : auth_mra_eq_class A} : auth_mra_class A.
+Global Instance auth_mra_eq_instance `{AMEC : @auth_mra_eq_class A R} : auth_mra_class R (=@{A}).
 Proof. destruct AMEC. econstructor; eauto. Qed.
+
+(** FIXME: move to a more general directory. *)
+(** Lexicographical ordering *)
+Variant lex_R {A B} (EA RA : A -> A -> Prop) (RB : B -> B -> Prop) : A * B -> A * B -> Prop :=
+  | lex_R_left a0 a1 b0 b1
+      (HA : RA a0 a1) (NA : ¬ EA a0 a1)
+    :
+    lex_R EA RA RB (a0, b0) (a1, b1)
+  | lex_R_right a0 a1 b0 b1
+      (HA : EA a0 a1) (HB : RB b0 b1)
+    :
+    lex_R EA RA RB (a0, b0) (a1, b1).
+
+Global Instance lex_R_Reflexive {A B} {EA RA : A -> A -> Prop} {RB : B -> B -> Prop} :
+  Reflexive EA -> Reflexive RB -> Reflexive (lex_R EA RA RB).
+Proof.
+  intros. repeat intro. destruct x. econstructor 2; eauto.
+Qed.
+
+Global Instance lex_R_Transitive {A B} {EA RA : A -> A -> Prop} {RB : B -> B -> Prop}
+  (EQUIV : Equivalence EA)
+  (ANSY : AntiSymm EA RA)
+  (PROPER_1 : forall a a1 a2, EA a1 a2 -> RA a a1 -> RA a a2)
+  (PROPER_2 : forall a a1 a2, EA a1 a2 -> RA a1 a -> RA a2 a) :
+  Transitive RA -> Transitive RB -> Transitive (lex_R EA RA RB).
+Proof.
+  intros. repeat intro. inv H1; inv H2; simplify_eq /=.
+  - econstructor 1; eauto.
+  - econstructor 1; eauto. firstorder.
+  - econstructor 1; eauto; firstorder.
+  - econstructor 2; eauto. etrans; eauto.
+Qed.
+
+Global Instance lex_R_AntiSymm {A B} {EA RA : A -> A -> Prop} {EB RB : B -> B -> Prop}
+  (EQUIV : Equivalence EA)
+  (ANSYA : AntiSymm EA RA)
+  (ANSYB : AntiSymm EB RB) :
+  AntiSymm (prod_relation EA EB) (lex_R EA RA RB).
+Proof.
+  repeat intro. inv H; inv H0; simplify_eq /=; firstorder.
+Qed.
+
+Global Instance lex_R_auth_mra_instance {A B : Type}
+  (EA RA : A → A → Prop) (EB RB : B → B → Prop) :
+  Equivalence EA →
+  Symmetric EB →
+  Reflexive RB →
+  auth_mra_class RA EA → auth_mra_class RB EB →
+  auth_mra_class (lex_R EA RA RB) (prod_relation EA EB).
+Proof.
+  intros. destruct H2, H3. econstructor; eauto.
+  - econstructor.
+    + eapply lex_R_Reflexive; eauto.
+    + eapply lex_R_Transitive; eauto. all: try apply _.
+      * intros. eapply auth_mra_Proper0. 3: eauto. all: eauto.
+      * intros. eapply auth_mra_Proper0. 3: eauto. all: eauto.
+  - eapply lex_R_AntiSymm; eauto.
+  - repeat intro. split; intro.
+    + destruct x, x0, y, y0. inv H2. inv H3. inv H4; simplify_eq /=.
+      * econstructor 1.
+        -- eapply auth_mra_Proper0. 3: eauto. all: eauto.
+        -- intros ?. apply NA. etrans; first eauto.
+           symmetry. etrans; first eauto. symmetry; eauto.
+      * econstructor 2.
+        -- symmetry in H5. etrans; first eauto. etrans; first eauto. auto.
+        -- eapply auth_mra_Proper1. 3: eauto. all: symmetry; eauto.
+    + destruct x, x0, y, y0. inv H2. inv H3. inv H4; simplify_eq /=.
+      * econstructor 1.
+        -- eapply auth_mra_Proper0. 3: eauto. all: eauto.
+        -- intros ?. apply NA. symmetry in H5. etrans; first eauto.
+           etrans; first eauto. auto.
+      * econstructor 2.
+        -- etrans; first eauto. etrans; first eauto. symmetry. auto.
+        -- eapply auth_mra_Proper1. 3: eauto. all: symmetry; eauto.
+Qed.
