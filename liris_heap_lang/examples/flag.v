@@ -76,7 +76,7 @@ Section proof.
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
     lwp_bind (Store _ _).
-    iPoseProof (grP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iInv "HA" as "inv". iDestruct "inv" as "[inv | inv]"; cycle 1.
     { iDestruct "inv" as "[>inv _]".
@@ -139,7 +139,7 @@ Section proof.
       iApply (lwp_lc_later with "LC1"). iNext.
       iDestruct "inv" as "(Ptrl& inv_acc)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (grP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
+      iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
       iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TG $Ptrl $GF1]").
       { iApply big_sepS_singleton. eauto. }
       iIntros "[(_& TG& Rs) Ptrl]".
@@ -157,7 +157,7 @@ Section proof.
     - (* k is discharged. *)
       iDestruct "inv" as ">(#Odk& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (grP_fuels_add 8 1 with "GF") as "[GF GF1]". 1: lia.
+      iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
       iApply (lwp_load _ ∅ 0 with "[$TG $Ptrl $GF1]"). 1: done.
       iIntros "[(_& TG& _) Ptrl]".
       iModIntro. iSplitL "Ptrl".

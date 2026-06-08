@@ -1237,12 +1237,18 @@ Section preds.
       iDestruct "H" as "(%& H)". iPoseProof (grP_fuel_add with "H") as "[$ $]".
     Qed.
 
-    Lemma grP_fuels_add m1 m2 n K :
+    Lemma grP_fuels_add (n m : nat) K :
+      grP_fuels K (n + m)%nat ⊢ grP_fuels K n ∗ grP_fuels K m.
+    Proof.
+      rewrite -big_sepS_sep. iIntros "H"; iApply (big_sepS_impl with "H"); iIntros "!> %% H".
+      iDestruct "H" as "(%& H)". iPoseProof (grP_fuel_add_nat with "H") as "[H F]". 1: eauto. iFrame.
+    Qed.
+
+    Lemma grP_fuels_add_nat (m1 m2 n : nat) K :
       (n = m1 + m2)%nat →
       grP_fuels K n ⊢ grP_fuels K m1 ∗ grP_fuels K m2.
     Proof.
-      intros ->. rewrite -big_sepS_sep. iIntros "H"; iApply (big_sepS_impl with "H"); iIntros "!> %% H".
-      iDestruct "H" as "(%& H)". iPoseProof (grP_fuel_add_nat with "H") as "[H F]". 1: eauto. iFrame.
+      intros ->. apply grP_fuels_add.
     Qed.
 
     Lemma grP_fuels_init K m ℓ :
