@@ -15,7 +15,7 @@ Section classical_proofs.
       destruct (classic (sn R y)). auto. naive_solver.
   Qed.
 
-  (** We show that any Acc has a measure (as long as universe is consistent). *)
+  (** We show that any Acc has a measure_rep (as long as universe is consistent). *)
   Inductive Acc_ord_tree {A} (R : relation A) x (μ : ord_tree A) : Prop :=
   | Acc_ord_tree_intro μ' :
     (ord_tree_lt_tc μ' μ) →

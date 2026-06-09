@@ -275,7 +275,7 @@ Section proof.
     iPoseProof (grP_fuels_init with "F_mr") as "F_mr".
     iPoseProof (grP_fuels_add_group with "F_mr_gu F_mr") as "F_mr".
     rewrite (grP_fuel_eq gu 0 _ (94 ⊕ 6)%M); cycle 1.
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (grP_fuel_add with "F_gu") as "[F_gu _]".
     iPoseProof (grP_fuels_add_group with "F_gu GF") as "GF".
     lwp_pures.
@@ -320,7 +320,7 @@ Section proof.
     iPoseProof (oblP_fuel_add_set with "FB") as "[FB FBq]".
     iMod (obl_offload_set with "GB Gq FB") as "(GB& Gq& %HGdisj)". 1: set_solver. 1: done.
     iMod (oblP_fuel_mon_set _ _ (S (length (vs.*2)))%M with "FBq") as "FBq".
-    { rewrite !measure_nat measure_large. apply Ord.lt_le. unshelve etrans. 1: exact ω%ord.
+    { rewrite !measure_rep_nat measure_rep_large. apply Ord.lt_le. unshelve etrans. 1: exact ω%ord.
       - apply Ord.omega_upperbound.
       - rewrite Ord.omega_from_peano_lt_set. apply Ord.large_lt_from_wf_set. }
     iModIntro.
@@ -397,7 +397,7 @@ Section proof.
     iPoseProof (grP_fuels_init with "F_mr") as "F_mr".
     iPoseProof (grP_fuels_add_group with "F_mr_gu F_mr")as "F_mr".
     rewrite (grP_fuel_eq gu 0 _ (96 ⊕ 4)%M); cycle 1.
-    { rewrite measure_add !measure_nat -Hessenberg.add_from_nat. done. }
+    { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (grP_fuel_add with "F_gu") as "[F_gu _]".
     iPoseProof (grP_fuels_add_group with "F_gu GF") as "GF".
     lwp_pures.
@@ -497,7 +497,7 @@ Section proof.
           with "[Fq]" as "[Fq F]".
         { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %% % H".
           iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
-          { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat.
+          { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
             replace (S (S k)) with (S k + 1) by lia. done. }
           iApply (oblP_fuel_add_set with "H"). }
         iMod (group_alloc _ _ _ ℓ (μ ⊕ 74 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
@@ -551,7 +551,7 @@ Section proof.
           with "[Fq]" as "[Fq F]".
         { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %% % H".
           iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
-          { rewrite measure_add !measure_nat. rewrite -Hessenberg.add_from_nat.
+          { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
             replace (S (S k)) with (S k + 1) by lia. done. }
           iApply (oblP_fuel_add_set with "H"). }
         iMod (group_alloc _ _ _ ℓ (μ ⊕ 74 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".

@@ -60,13 +60,13 @@ End TicketLock.
 (** The CMRA we need. *)
 Class ticket_lockG Σ :=
   TLockG {
-      #[local] tlock_ticketG :: ghost_mapG Σ Z (option (positive * ogid * ord.t * measurable_syntax));
+      #[local] tlock_ticketG :: ghost_mapG Σ Z (option (positive * ogid * ord.t * measure));
       #[local] tlock_oblG :: ghost_mapG Σ Z (option oid);
       #[local] tlock_config_inG :: inG Σ (auth_mraUR (ord.le));
     }.
 
 Definition ticket_lockΣ : gFunctors :=
-  #[ghost_mapΣ Z (option (positive * ogid * ord.t * measurable_syntax));
+  #[ghost_mapΣ Z (option (positive * ogid * ord.t * measure));
     ghost_mapΣ Z (option oid);
     GFunctor (auth_mraUR (ord.le))
     ].
@@ -110,7 +110,7 @@ Section proof.
 
   Local Definition lock_inv γt γo γc (next curr : loc) (R : tf Σ) : iProp Σ :=
     ∃ (n c : Z)
-      (tickets : gmap Z (option (positive * ogid * ord.t * measurable_syntax)))
+      (tickets : gmap Z (option (positive * ogid * ord.t * measure)))
       (obls : gmap Z (option oid)),
       next ↦ #n ∗
       curr ↦{#(1/2)} #c ∗
@@ -123,7 +123,7 @@ Section proof.
       (* We need auth_mra_know to sync what other threads know about the configuration *)
       ([∗ set] t ∈ dom tickets,
          ((∃ κ, ⌜(0 ≤ t ≤ c)%Z⌝ ∧
-                t ↪[γt]□ (None : option (positive * ogid * ord.t * measurable_syntax)) ∗
+                t ↪[γt]□ (None : option (positive * ogid * ord.t * measure)) ∗
                 t ↪[γo]□ (Some κ) ∗
                 oblP_discharged κ) ∨
             (⌜ (t = c + 1)%Z ⌝) ∨
@@ -141,12 +141,12 @@ Section proof.
                             grP_obls i g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
                             curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
                     (* Current owner acquired the lock. *)
-                    ((c + 1)%Z ↪[γt]□ (None : option (positive * ogid * ord.t * measurable_syntax)))))).
+                    ((c + 1)%Z ↪[γt]□ (None : option (positive * ogid * ord.t * measure)))))).
 
   Local Definition lock_token_def (tl : val) (γ : ticketlock_γ) κu (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc) (u : Z),
       (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗
-      ((u + 1)%Z ↪[(ticketlock_γt γ)]□ (None : option (positive * ogid * ord.t * measurable_syntax))) ∗
+      ((u + 1)%Z ↪[(ticketlock_γt γ)]□ (None : option (positive * ogid * ord.t * measure))) ∗
       ((u + 1)%Z ↪[(ticketlock_γo γ)]□ (Some κu)) ∗
       ⟦tf_eventually N_ev κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R)⟧ₗ.
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
@@ -216,7 +216,7 @@ Section proof.
     iModIntro. lwp_pure_lc lc. iRename "LC" into "QLC".
     iMod (obl_alloc_discharged _ (ℓ)%ordi 0) as "(%κu& #Ofk& _& #Wlk& OAcc)".
     iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
-    iMod (ghost_map_alloc ({[0%Z := None]} : gmap Z (option (positive * ogid * ord.t * measurable_syntax)))) as "(%γt& GMAt& GMEt)".
+    iMod (ghost_map_alloc ({[0%Z := None]} : gmap Z (option (positive * ogid * ord.t * measure)))) as "(%γt& GMAt& GMEt)".
     iMod (ghost_map_alloc ({[0%Z := (Some κu)]} : gmap Z (option oid))) as "(%γo& GMAo& GMEo)".
     rewrite !big_sepM_singleton.
     iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
@@ -609,7 +609,7 @@ Section proof.
           - iApply grP_fuels_init. iApply big_sepS_singleton. iFrame.
           - iPoseProof (big_sepM_gset_to_gmap with "Fs'") as "H".
             iPoseProof (grP_fuel_eq_set _ _ _ (47 ⊕ 3)%M with "H") as "H".
-            { rewrite measure_add !measure_nat -Hessenberg.add_from_nat.
+            { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat.
               replace 50 with (47 + 3) by lia. done. }
             iPoseProof (grP_fuel_add_set _ _ 47 with "H") as "[H _]".
             iApply grP_fuels_init. iFrame. }

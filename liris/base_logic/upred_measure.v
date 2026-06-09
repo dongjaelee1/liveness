@@ -2,7 +2,7 @@ From iris.proofmode Require Import proofmode.
 From transfinite.base_logic Require Import upred.
 From liris Require Import wf_structs.
 
-Section measure.
+Section measure_rep.
   Context `{SI: indexT} {M : ucmra}.
   Implicit Types φ : Prop.
   Implicit Types P Q : uPred M.
@@ -40,7 +40,7 @@ Section measure.
   Infix "<ₒ" := (ord_tree_lt) (at level 60).
   Notation ot := (ord_tree (index * M)%type).
 
-  Lemma entails_measure P (Q : ot → uPred M) : (P ⊢ ∃ o, Q o) → (∃ o1, (P ⊢ ∃ o0, Q o0 ∧ ⌜o0 <ₒ o1⌝)).
+  Lemma entails_measure_rep P (Q : ot → uPred M) : (P ⊢ ∃ o, Q o) → (∃ o1, (P ⊢ ∃ o0, Q o0 ∧ ⌜o0 <ₒ o1⌝)).
   Proof.
     unseal; intros HQ. inv HQ. simpl in *.
     assert (H : ∀ (nx : (index * M)%type) (SAT : (λ a, ✓{a.1} a.2 ∧ uPred_holds P a.1 a.2) nx),
@@ -51,7 +51,7 @@ Section measure.
     exists x0. auto.
   Qed.
 
-  Lemma impl_measure P (Q : ot → uPred M) : (P → (∃ o, Q o)) ⊢ ∃ o1, (P → ∃ o0, Q o0 ∧ ⌜o0 <ₒ o1⌝).
+  Lemma impl_measure_rep P (Q : ot → uPred M) : (P → (∃ o, Q o)) ⊢ ∃ o1, (P → ∃ o0, Q o0 ∧ ⌜o0 <ₒ o1⌝).
   Proof.
     unseal; split=> n x ? //=H.
     assert (H' : ∀ (nx : (index * M)%type) (SAT : (λ a, x ≼ a.2 ∧ a.1 ⪯ᵢ n ∧ ✓{a.1} a.2 ∧ uPred_holds P a.1 a.2) nx),
@@ -62,7 +62,7 @@ Section measure.
     destruct H'; [auto |]. exists x0. auto.
   Qed.
 
-  Lemma wand_measure P (Q : ot → uPred M) : (P -∗ (∃ o, Q o)) ⊢ ∃ o1, (P -∗ ∃ o0, Q o0 ∧ ⌜o0 <ₒ o1⌝).
+  Lemma wand_measure_rep P (Q : ot → uPred M) : (P -∗ (∃ o, Q o)) ⊢ ∃ o1, (P -∗ ∃ o0, Q o0 ∧ ⌜o0 <ₒ o1⌝).
   Proof.
     unseal; split=> n x ? //=H.
     assert (H' : ∀ (nx : (index * M)%type) (SAT : (λ a, a.1 ⪯ᵢ n ∧ ✓{a.1} (x ⋅ a.2) ∧ uPred_holds P a.1 a.2) nx),
@@ -73,17 +73,17 @@ Section measure.
     destruct H'; [auto |]. exists x0. auto.
   Qed.
 
-  Lemma plainly_measure (P : ot → uPred M) : ■ (∃ o, P o) ⊢ ∃ o, (■ P o).
+  Lemma plainly_measure_rep (P : ot → uPred M) : ■ (∃ o, P o) ⊢ ∃ o, (■ P o).
   Proof.
     unseal; split=> n x ? //=H.
   Qed.
 
-  Lemma persistently_measure (P : ot → uPred M) : □ (∃ o, P o) ⊢ ∃ o, (□ P o).
+  Lemma persistently_measure_rep (P : ot → uPred M) : □ (∃ o, P o) ⊢ ∃ o, (□ P o).
   Proof.
     unseal; split=> n x ? //=H.
   Qed.
 
-  Lemma later_measure (P : ot → uPred M) : ▷ (∃ o, P o) ⊢ ∃ o1, ▷ (∃ o0, P o0 ∧ ⌜o0 <ₒ o1⌝).
+  Lemma later_measure_rep (P : ot → uPred M) : ▷ (∃ o, P o) ⊢ ∃ o1, ▷ (∃ o0, P o0 ∧ ⌜o0 <ₒ o1⌝).
   Proof.
     unseal; split=> n x ? //=H.
     assert (H' : ∀ (nx : (index * M)%type) (SAT : (λ a, a.1 ≺ᵢ n) nx),
@@ -94,7 +94,7 @@ Section measure.
     destruct H'; [auto |]. exists x0. auto.
   Qed.
 
-  Lemma bupd_measure (P : ot → uPred M) : (|==> (∃ o, P o)) ⊢ ∃ o1, |==> (∃ o0, P o0 ∧ ⌜o0 <ₒ o1⌝).
+  Lemma bupd_measure_rep (P : ot → uPred M) : (|==> (∃ o, P o)) ⊢ ∃ o1, |==> (∃ o0, P o0 ∧ ⌜o0 <ₒ o1⌝).
   Proof.
     unseal; split=> n x ? //=H.
     assert (H' : ∀ (nx : (index * M)%type) (SAT : (λ a, a.1 ⪯ᵢ n ∧ ✓{a.1} (x ⋅ a.2)) nx),
@@ -105,7 +105,7 @@ Section measure.
     destruct H'; [auto |]. destruct H2 as ((?&?&?)&?). eauto.
   Qed.
 
-End measure.
+End measure_rep.
 
 Section logic.
   Context `{SI: indexT} {PROP : bi} {A : Type}.
@@ -113,7 +113,7 @@ Section logic.
   Infix "<ₒ" := (ord_tree_lt) (at level 60).
   Notation ot := (ord_tree (index * A)%type).
 
-  Lemma mono_match_measure (P : ot → PROP) o1 :
+  Lemma mono_match_measure_rep (P : ot → PROP) o1 :
     (∀ o o', ⌜o <ₒ o'⌝ -∗ P o -∗ P o') ⊢ (∃ o0, P o0 ∧ ⌜o0 <ₒ o1⌝) -∗ P o1.
   Proof.
     iIntros "Hm (%o0&He&%Ho)". iApply "Hm".

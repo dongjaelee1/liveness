@@ -9,7 +9,7 @@ This one has different definitions and we use it exclusively for step-index, so 
 2. From Ordinal Require Export Ordinal.
 This is the opam library, and we use this for logic's internal definitions, namely fuels and witnesses.
 3. From liris.ordinal Require Import Ordinal.
-This is a copy of 2. We use this as the layer of measure.
+This is a copy of 2. We use this as the layer of measure_rep.
 This causes universe inconsistency, so we have a copy to use as layer.
 
 Ideally, we should make the library 2 universe polymorphic and remove 3.

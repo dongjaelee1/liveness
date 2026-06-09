@@ -220,7 +220,7 @@ Section proof.
       lwp_bind (TaskQueue.run_task _).
       iPoseProof (grP_fuel_add_set with "F_mr") as "[F_mr F_mr1]".
       iMod (grP_fuel_mon_gen_set _ ℵ%ordi _ mr with "F_mr") as "F_mr". 1: auto.
-      { apply measure_layer_le_proper. apply classicOrd.le_eq_or_lt in Hlayer. destruct Hlayer.
+      { apply measure_rep_layer_le_proper. apply classicOrd.le_eq_or_lt in Hlayer. destruct Hlayer.
         - right. econstructor 1. auto.
         - left. split; auto. }
       iModIntro.

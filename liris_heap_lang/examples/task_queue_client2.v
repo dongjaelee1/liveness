@@ -135,7 +135,7 @@ Section proof.
       lwp_bind (TaskQueue.put_task _ _ _).
       assert (Hn : Z.to_nat n = 1 + Z.to_nat (n - 1)) by lia.
       rewrite (oblP_fuel_eq k _ _ (1 ⊕ (Z.to_nat (n - 1)))%M); cycle 1.
-      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat Hn. done. }
+      { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat Hn. done. }
       iPoseProof (oblP_fuel_add with "OF") as "[OF1 OF]".
       iModIntro. iApply ("TaskQueue_put_task_spec" $! 0 _ _ _ _ _ {[k]} γ ℓq with "[$TG $F_put_task $Gg OF1 OF Huntil]").
       { iClear "TaskQueue_put_task_spec". iSplit.
@@ -238,7 +238,7 @@ Section proof.
       lwp_bind (TaskQueue.put_task _ _ _).
       assert (Hn : Z.to_nat n = 1 + Z.to_nat (n - 1)) by lia.
       rewrite (oblP_fuel_eq k _ _ (1 ⊕ (Z.to_nat (n - 1)))%M); cycle 1.
-      { rewrite measure_add !measure_nat -Hessenberg.add_from_nat Hn. done. }
+      { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat Hn. done. }
       iPoseProof (oblP_fuel_add with "OF") as "[OF1 OF]".
       iModIntro. iApply ("TaskQueue_put_task_spec" $! 0 _ _ _ _ _ {[k]} γ ℓq with "[$TG $F_put_task $Gg OF1 OF Huntil]").
       { iClear "TaskQueue_put_task_spec". iSplit.

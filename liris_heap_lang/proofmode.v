@@ -73,7 +73,7 @@ Proof.
   { iApply big_sepS_sep. iApply (big_sepS_impl with "Fs"). iIntros "!> %% (%& H)".
     rewrite (grP_fuel_eq _ _ _ (n ⊕ m')%M).
     - iPoseProof (grP_fuel_add with "H") as "[$ $]".
-    - rewrite measure_add !measure_nat Hessenberg.add_from_nat. done. }
+    - rewrite measure_rep_add !measure_rep_nat Hessenberg.add_from_nat. done. }
   iIntros "_ TG Ws LC".
   iAssert (|==> ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r))%I with "[Ws]" as ">Ws".
   { iApply big_sepS_bupd. iApply (big_sepS_impl with "Ws"). iIntros "!> %% [H | H]". 2: by iFrame.

@@ -466,7 +466,7 @@ Section proof.
       { rewrite -big_sepS_bupd big_sepM_gset_to_gmap. iApply (big_sepS_impl with "Fs'").
         iIntros "!> %% F". iApply (grP_fuel_mon_gen with "F").
         - apply ord.O_bot.
-        - rewrite !measure_nat. apply OrdArith.le_from_nat. lia. }
+        - rewrite !measure_rep_nat. apply OrdArith.le_from_nat. lia. }
       iPoseProof (grP_fuels_init with "Fs") as "Fs".
       iApply ("IHα" $! α0 LTα with "CF HΦ Gg0 GUku GGF QGF GMEaku TG Fs LC' WFs").
   Qed.

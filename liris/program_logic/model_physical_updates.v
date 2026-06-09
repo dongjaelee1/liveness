@@ -76,7 +76,7 @@ Section mprog.
     iAssert (|==> [∗ set] u ∈ U, ogroupG_fuel u Ord.one)%I with "[GFs]" as ">GFs".
     { iApply big_sepS_bupd. iApply (big_sepS_impl with "GFs"). iIntros "!> % % (%& F)".
       iApply (ogroupG_fuel_mon with "F"). 
-      rewrite measure_mult measure_nat Jacobsthal.mult_1_r. rewrite measure_add measure_nat.
+      rewrite measure_rep_mult measure_rep_nat Jacobsthal.mult_1_r. rewrite measure_rep_add measure_rep_nat.
       eapply Hessenberg.add_base_l. }
     iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
     iMod (ogroup_exchange_fuel with "[$G $Ob $GFs]") as "(%& ACC& Gta& Ox2& Ob& GFs)". 1: auto.

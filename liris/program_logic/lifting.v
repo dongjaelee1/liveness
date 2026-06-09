@@ -284,7 +284,7 @@ Section lifting.
     iAssert (([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
     { iApply big_sepS_sep. iApply (big_sepS_impl with "Gfs"). iIntros "!> %% (%& F)".
       rewrite (grP_fuel_eq _ _ (S n)%M (n ⊕ 1)%M); cycle 1.
-      { rewrite measure_nat_S measure_add. by rewrite Hessenberg.add_comm. }
+      { rewrite measure_rep_nat_S measure_rep_add. by rewrite Hessenberg.add_comm. }
       iPoseProof (grP_fuel_add with "F") as "($& $)". }
     iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
     iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
