@@ -135,13 +135,13 @@ Section proof.
          (⌜(c < n)%Z⌝ ∧
           (* Allocates new obligation on behalf of next owner. *)
           ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗ (c + 1)%Z ↪[γo]□ (Some κ) ∗
+                 ⟦tf_eventually N_ev κ false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
                  ((∃ i g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (i, g, ℓ, μ)) ∗
-                            ⟦tf_eventually N_ev κ false 1 (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
+                            ⟦tf_eventually N_ev κ false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
                             grP_obls i g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
                             curr ↦{#(1/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
                     (* Current owner acquired the lock. *)
-                    ((c + 1)%Z ↪[γt]□ (None : option (positive * ogid * ord.t * measurable_syntax)) ∗
-                     ⟦tf_eventually N_ev κ false (1/2) (curr ↦{#(1/2)} #(c + 1)%Z ∗ R)⟧ₗ)))).
+                    ((c + 1)%Z ↪[γt]□ (None : option (positive * ogid * ord.t * measurable_syntax)))))).
 
   Local Definition lock_token_def (tl : val) (γ : ticketlock_γ) κu (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc) (u : Z),
@@ -242,8 +242,6 @@ Section proof.
     iModIntro. rewrite /is_fair_lock. iExists next, curr. iSplitR; first done. eauto.
   Qed.
 
-  TODO
-
   (** FIXME: ordi notation levels *)
   Lemma TicketLock_acquire_spec :
     ⊢ ∃ μ, ∀ lc m i G tl γ dq ℓ R,
@@ -260,7 +258,7 @@ Section proof.
          oblP_fuel κu ℓ m ∗
          γ ↪LOCK{dq} ℓ ∗ lock_token tl γ κu R ∗ ⟦R⟧ₗ }}}.
   Proof.
-    iExists (100 ⊕ (((50 × ▽) × ℵ) ⊕ (50 × ▽)))%M.
+    iExists (100 ⊕ (((50 ⊕ (50 × ▽)) × ℵ) ⊕ (50 × ▽)))%M.
     iIntros (lc m i G tl γ dq ℓ R) "!> % (TG& Fs& CF& #IFL) HΦ".
     iPoseProof (grP_fuel_add_set with "Fs") as "[GF Fsloop]".
     iPoseProof (grP_fuels_init with "GF") as "GF".
@@ -281,15 +279,17 @@ Section proof.
     (** FIXME: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
-    iDestruct "H" as "(%&%&%& PtrNext& PtrCurr& SV& GMAt& %Boundc& %Domt& HMt& Hc)".
+    iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iApply (lwp_faa _ ∅ 0 with "[$TG $GF1 $PtrNext]"). 1: done.
     iIntros "((_& TG& _)& PtrNext)".
     (** Alloc a new group to receive new unlock obligation *)
     iMod (group_alloc _ _ _ (ℓ)%ordi (50 ⊕ m)%M with "TG") as "(%gu& %Ningu& TG& Gg& Gf)".
     iPoseProof (grP_fuel_add with "Gf") as "[Gf Q_Gf]".
-    (* Update tickets map. *)
-    iMod (ghost_map_insert (n + 1)%Z (inl (i, gu, ℓ, m)) with "GMAt") as "[GMAt GMEt]".
+    (* Update maps. *)
+    iMod (ghost_map_insert (n + 1)%Z (Some (i, gu, ℓ, m)) with "GMAt") as "[GMAt GMEt]".
     { apply not_elem_of_dom. intros IN. apply Domt in IN. lia. }
+    iMod (ghost_map_insert (n + 1)%Z (None) with "GMAo") as "[GMAo GMEo]".
+    { apply not_elem_of_dom. intros IN. rewrite -EqDom in IN. apply Domt in IN. lia. }
     iAssert (own (ticketlock_γc γ) (◯AM[ord.le] ℓ))%I as "#CFl".
     { iAssert (γ ↪LOCK{dq} ℓ ∗ own (ticketlock_γc γ) (◯AM[ord.le] ℓ))%I with "[CF]" as "[_ $]".
       rewrite -own_op -auth_mra_auth_know_op. done. }
@@ -302,12 +302,16 @@ Section proof.
         as "(%κu& %LUku& Gg& OGF& #Wlku& ALLOC)". 1: done.
       iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1 / 2} #(n + 1) ∗ R)%F with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
-      iMod (ghost_map_update (inr κu) with "GMAt GMEt") as "[GMAt GMEt]".
+      iMod (ghost_map_update (None) with "GMAt GMEt") as "[GMAt GMEt]".
       iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
-      rewrite insert_insert_eq.
+      iMod (ghost_map_update (Some κu) with "GMAo GMEo") as "[GMAo GMEo]".
+      iMod (ghost_map_elem_persist with "GMEo") as "#GMEo".
+      rewrite !insert_insert_eq.
       iModIntro.
-      iMod ("ACCinv" with "[$PtrNext $PtrCurr $SV $GMAt HMt GUku]") as "_".
+      iMod ("ACCinv" with "[$PtrNext $PtrCurr $GMAt $GMAo HMt GUku]") as "_".
       { iNext. iSplit.
+        { iPureIntro. rewrite !dom_insert_L EqDom. done. }
+        iSplit.
         { iPureIntro. lia. }
         iSplit.
         { iPureIntro. intros. rewrite dom_insert_L. split; intros.
@@ -317,20 +321,21 @@ Section proof.
           - apply elem_of_union. destruct (decide (t = (n + 1)%Z)).
             + subst. left. apply elem_of_singleton. lia.
             + right. apply Domt. lia. }
+        assert (Hnin : (n + 1)%Z ∉ dom tickets).
+        { specialize (Domt (n + 1)%Z). intro F. apply Domt in F. lia. }
         iSplitL "HMt".
-        { iApply big_sepM_insert.
-          { apply not_elem_of_dom. intros IN. apply Domt in IN. lia. }
+        { rewrite dom_insert_L. iApply big_sepS_union. 1: set_solver.
           iSplitR "HMt".
-          - iRight. iLeft. done.
-          - iApply (big_sepM_impl with "HMt"). iIntros "!> %%% H".
+          - iApply big_sepS_singleton. iRight. iLeft. done.
+          - iApply (big_sepS_impl with "HMt"). iIntros "!> %% H".
             iDestruct "H" as "[$ | [$ | H]]".
             iDestruct "H" as "(%&%&%&%& %& _)". lia. }
         iRight. iSplit.
         { iPureIntro. lia. }
-        iFrame "CFl Wlku". iRight. iFrame. eauto. }
+        iFrame "CFl Wlku GMEo GUku". iRight. eauto. }
       iIntros "!> !>".
       rename n into my. assert (Hmy : (0 ≤ my)%Z) by lia.
-      clear dependent tickets. clear Boundc LUku.
+      clear dependent tickets obls. clear Boundc LUku.
       iClear "Fsloop".
       (* Update fuels. *)
       iPoseProof (grP_fuels_add_nat 50 with "GF") as "[GF _]". 1: done.
@@ -356,8 +361,10 @@ Section proof.
     (* Not my turn. *)
     iDestruct "GMEt" as "[GMEt0 GMEt]".
     iModIntro.
-    iMod ("ACCinv" with "[$PtrNext $PtrCurr $SV $GMAt HMt Hc Gg GMEt]") as "_".
+    iMod ("ACCinv" with "[$PtrNext $PtrCurr $GMAt $GMAo HMt Hc Gg GMEt GMEo]") as "_".
     { iDestruct "Hc" as "(%LTc& Hc)". iNext. iSplit.
+      { iPureIntro. rewrite !dom_insert_L EqDom. done. }
+      iSplit.
       { iPureIntro. lia. }
       iSplit.
       { iPureIntro. intros. rewrite dom_insert_L. split; intros.
@@ -367,21 +374,21 @@ Section proof.
         - apply elem_of_union. destruct (decide (t = (n + 1)%Z)).
           + subst. left. apply elem_of_singleton. lia.
           + right. apply Domt. lia. }
-      iSplitL "HMt Gg GMEt".
-      { iApply big_sepM_insert.
-        { apply not_elem_of_dom. intros IN. apply Domt in IN. lia. }
+      assert (Hnin : (n + 1)%Z ∉ dom tickets).
+      { specialize (Domt (n + 1)%Z). intro F. apply Domt in F. lia. }
+      iSplitL "HMt Gg GMEt GMEo".
+      { rewrite dom_insert_L. iApply big_sepS_union. 1: set_solver.
         iSplitR "HMt".
-        - iRight. iRight. iFrame "Gg GMEt CFl". iPureIntro. lia.
-        - iApply (big_sepM_impl with "HMt"). iIntros "!> %%% H".
+        - iApply big_sepS_singleton. iRight. iRight. iFrame "Gg GMEt GMEo CFl". iPureIntro. lia.
+        - iApply (big_sepS_impl with "HMt"). iIntros "!> %% H".
           iDestruct "H" as "[$ | [$ | H]]".
-          do 2 iRight.
-          iDestruct "H" as "(%&%&%&%& %& $& $& $)". iPureIntro. lia. }
+          do 2 iRight. iDestruct "H" as "(%&%&%&%& %& $& $& $)". iPureIntro. lia. }
       iRight. iSplit.
       { iPureIntro. lia. }
       iFrame. }
     iIntros "!> !>".
     rename n into my. assert (Hmy : (0 ≤ my)%Z) by lia.
-    clear dependent c tickets.
+    clear dependent c tickets obls.
     (* Update fuels. *)
     iPoseProof (grP_fuels_add_nat 50 with "GF") as "[GF _]". 1: done.
     iPoseProof (grP_fuels_add_group with "Gf GF") as "GF".
@@ -392,31 +399,34 @@ Section proof.
     iApply fupd_lwp. iInv "INV" as "H".
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lc_fupd_add_later with "LC1"). iNext.
-    iDestruct "H" as "(%&%&%& PtrNext& PtrCurr& SV& GMAt& %Boundc& %Domt& HMt& Hc)".
+    iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iPoseProof (ghost_map_lookup with "GMAt GMEt0") as "%LUt".
     iDestruct "Hc" as "[Hc | Hc]".
     { iExFalso. iDestruct "Hc" as "(%& _)". subst c.
       pose proof LUt as INt. apply elem_of_dom_2 in INt. apply Domt in INt.
-      iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[Ht _]".
+      assert (Elemt : (my + 1)%Z ∈ dom tickets) by (apply elem_of_dom; eauto).
+      iPoseProof (big_sepS_delete _ _ _ Elemt with "HMt") as "[Ht _]".
       iDestruct "Ht" as "[Ht | Ht]".
-      - iDestruct "Ht" as "(%&%& #GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. destruct H0. done.
+      - iDestruct "Ht" as "(%&%& #GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. by destruct H0.
       - iDestruct "Ht" as "[% | (%&%&%&%&%& _)]". 1: lia. 1: lia. }
     (** Two cases: my turn, or not. *)
     iDestruct "Hc" as "(%LTc& Hc)".
     destruct (decide (my = c)).
     { (* My turn. *)
-      subst c. iDestruct "Hc" as "(%&%κu& _& #Wl& Hc)". iDestruct "Hc" as "[Hc | Hc]"; cycle 1.
-      { iDestruct "Hc" as "(#GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. destruct H. done. }
+      subst c. iDestruct "Hc" as "(%&%κu& _& #Wl& #GMEo& HE0& Hc)".
+      iDestruct "Hc" as "[Hc | #GMEt1]"; cycle 1.
+      { iCombine "GMEt0 GMEt1" gives %?. by destruct H. }
       iDestruct "Hc" as "(%&%&%& GMEt& HE& Gg& Of& PtrCurr0& HR)".
       iCombine "GMEt GMEt0" as "GMEt" gives %?. destruct H as [_ H]. simplify_eq.
       replace (DfracOwn (1 / 2) ⋅ DfracOwn (1 / 2)) with (DfracOwn 1); cycle 1.
       { rewrite dfrac_op_own Qp.div_2. done. }
-      iMod (ghost_map_update (inr κu) with "GMAt GMEt") as "[GMAt GMEt]".
+      iMod (ghost_map_update (None) with "GMAt GMEt") as "[GMAt GMEt]".
       iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
-      iDestruct "HE" as "[HE HE0]".
       iModIntro.
-      iSplitL "PtrNext PtrCurr SV GMAt HMt HE".
-      { iNext. iFrame "PtrNext PtrCurr SV GMAt". iSplit.
+      iSplitL "PtrNext PtrCurr GMAt GMAo HMt HE".
+      { iNext. iFrame "PtrNext PtrCurr GMAt GMAo". iSplit.
+        { iPureIntro. rewrite dom_insert_lookup_L; eauto. }
+        iSplit.
         { iPureIntro. lia. }
         iSplit.
         { iPureIntro. intros. rewrite dom_insert_L. split; intros.
@@ -427,14 +437,12 @@ Section proof.
             + subst. left. apply elem_of_singleton. lia.
             + right. apply Domt. lia. }
         iSplitL "HMt".
-        { iApply big_sepM_insert_delete.
-          iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[_ $]".
-          iRight. iLeft. eauto. }
+        { rewrite dom_insert_lookup_L; eauto. }
         iRight. iSplit.
         { iPureIntro. lia. }
-        iFrame "CFl Wl". iRight. iFrame. eauto. }
+        iFrame "CFl Wl GMEo". iFrame. iRight. eauto. }
       iIntros "!>".
-      clear dependent tickets n.
+      clear dependent tickets n obls.
       iClear "Fsloop".
       (* Update fuels. *)
       lwp_pure_one.
@@ -454,21 +462,20 @@ Section proof.
       iApply ("HΦ" with "[$TG $Gg $Q_Gf $Of PtrCurr0 $HR HE0 $LC $CF]"). iSplit. 1: set_solver.
       rewrite lock_token_unseal /lock_token_def. iFrame "PtrCurr0 HE0". eauto. }
     (* Not my turn, induction. *)
-    iDestruct "Hc" as "(%ℓ0&%& #CFl0& #Wl0& Hc)".
-    iAssert (own (ticketlock_γs γ) (◯AM[Z.le] c))%I as "#SVl".
-    { iAssert (own (ticketlock_γs γ) (●AM[Z.le] c) ∗ own (ticketlock_γs γ) (◯AM[Z.le] c))%I
-        with "[SV]" as "[_ $]".
-      rewrite -own_op -auth_mra_auth_know_op. done. }
+    iDestruct "Hc" as "(%ℓ0&%& #CFl0& #Wl0& #GMEo0& Hc)".
     assert (Hc : (0 ≤ c)%Z) by lia.
+    assert (Elemt : (my + 1)%Z ∈ dom tickets) by (apply elem_of_dom; eauto).
     iAssert (⌜(c < my)%Z⌝)%I as "%LTmy".
-    { iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[H _]".
+    { iPoseProof (big_sepS_delete _ _ _ Elemt with "HMt") as "[H _]".
       iDestruct "H" as "[H | [% | H]]".
       - iDestruct "H" as "(%& %& GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. by destruct H0.
       - lia.
       - iDestruct "H" as "(%&%&%&%& %& _)". iPureIntro. lia. }
     iModIntro.
-    iSplitL "PtrNext PtrCurr SV GMAt HMt Hc".
-    { iNext. iFrame "PtrNext PtrCurr SV GMAt". iSplit.
+    iSplitL "PtrNext PtrCurr GMAt GMAo HMt Hc".
+    { iNext. iFrame "PtrNext PtrCurr GMAt GMAo". iSplit.
+      1: eauto.
+      iSplit.
       { iPureIntro. lia. }
       iSplit.
       { auto.  }
@@ -476,19 +483,19 @@ Section proof.
       { iFrame. }
       iRight. iSplit.
       { iPureIntro. lia. }
-      iFrame "CFl0 Wl0". iFrame. }
+      iFrame "CFl0 Wl0 GMEo0". iFrame. }
     iIntros "!>".
-    clear dependent tickets n. rename n0 into NEQc. rename c into prev.
+    clear dependent tickets n obls. clear Hmy n0. rename c into prev.
     iAssert (⌜(ℓ0 <= ℓ)%ordi⌝)%I as "%Hcf".
     { iCombine "CF CFl0" gives %?. apply auth_mra_both_dfrac_valid in H. 2: apply _. by destruct H. }
     iPoseProof (grP_fuel_add_set with "Fsloop") as "[Fsloop1 Fsloop]".
     (** Nest 1: Embed induction. *)
-    remember (Z.to_nat (prev - my)%Z) as ν. clear Hmy NEQc.
+    remember (Z.to_nat (my - prev)%Z) as ν.
     iPoseProof (embed_fuels_init (lt_wf) ν) as "EFs0".
     iMod (embed_fuels_add_map with "EFs0 Fsloop1") as "EFs". rewrite map_union_empty.
-    iClear "EFs0". iRevert (gu Ningu prev Hc LTmy Heqν) "Q_Gf GMEt0 TG GF SVl EFs".
+    iClear "EFs0". iRevert (κ ℓ0 Hcf gu Ningu prev Hc LTmy Heqν) "CFl0 Wl0 Q_Gf GMEt0 TG GF GMEo0 EFs".
     iInduction ν as [ν IHν] using (well_founded_induction lt_wf).
-    iIntros (gu Ningu prev Hc LTmy Heqν) "Q_Gf GMEt0 TG GF #SVl EFs".
+    iIntros (κ ℓ0 Hcf gu Ningu prev Hc LTmy Heqν) "#CFl0 #Wl0 Q_Gf GMEt0 TG GF #GMEo0 EFs".
     (** Nest 2: Witness induction. *)
     iPoseProof (wit_fuels_init with "Wl0") as "(%& WFs0)".
     iMod (wit_fuels_add_map with "WFs0 Fsloop") as "WFs".
@@ -508,7 +515,7 @@ Section proof.
     (** TODO: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
-    iDestruct "H" as "(%&%&%& PtrNext& PtrCurr& SV& GMAt& %Boundc& %Domt& HMt& Hc)".
+    iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_load _ {[κ]} 98%ord with "[$TG $GF1 $PtrCurr]").
     { rewrite big_sepS_singleton. eauto. }
@@ -516,35 +523,35 @@ Section proof.
     (* Two cases: it's my turn, or not. *)
     destruct (decide (my = c)).
     { (* My turn *)
-      iClear "CFl CFl0 Wl0 SVl IHν IHα EFs WFs LC' Wc". clear dependent κ prev. subst c.
+      iClear "CFl CFl0 Wl0 IHν GMEo0 IHα EFs WFs LC' Wc". clear dependent κ prev. subst c.
       iPoseProof (ghost_map_lookup with "GMAt GMEt0") as "%LUt".
       assert (Boundmy : (my + 1 ≤ n)%Z).
       { apply elem_of_dom_2 in LUt. apply Domt in LUt. lia. }
       iDestruct "Hc" as "[Hc | Hc]".
       { iDestruct "Hc" as "(%& _)". subst n. lia. }
-      iDestruct "Hc" as "(_& %&%κu& #CFl& #Wl& [Hc | Hc])"; cycle 1.
-      { iDestruct "Hc" as "(GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. by destruct H. }
+      iDestruct "Hc" as "(_& %&%κu& #CFl& #Wl& #GMEo& HE0& [Hc | GMEt1])"; cycle 1.
+      { iCombine "GMEt0 GMEt1" gives %?. by destruct H. }
       iDestruct "Hc" as "(%&%&%& GMEt1& HE& Gg& Ofk& PtrCurr0& HR)".
       iCombine "GMEt1 GMEt0" as "GMEt" gives %?. destruct H as [_ H]. simplify_eq.
       replace (DfracOwn (1 / 2) ⋅ DfracOwn (1 / 2)) with (DfracOwn 1); cycle 1.
       { rewrite dfrac_op_own Qp.div_2. done. }
-      iMod (ghost_map_update (inr κu) with "GMAt GMEt") as "[GMAt GMEt]".
+      iMod (ghost_map_update (None) with "GMAt GMEt") as "[GMAt GMEt]".
       iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
-      iDestruct "HE" as "[HE HE0]".
       iModIntro.
-      iMod ("ACCinv" with "[$PtrNext $PtrCurr $SV $GMAt HMt HE]") as "_".
+      iMod ("ACCinv" with "[$PtrNext $PtrCurr $GMAt $GMAo HMt HE]") as "_".
       { iNext. iSplit.
+        { iPureIntro. rewrite dom_insert_lookup_L; eauto. }
+        iSplit.
         { iPureIntro. lia. }
         iSplit.
         { rewrite dom_insert_lookup_L; eauto. }
         iSplitL "HMt".
-        { iApply big_sepM_dom. rewrite dom_insert_lookup_L; last eauto.
-          iApply big_sepM_dom. iFrame. }
+        { rewrite dom_insert_lookup_L; eauto. }
         iRight. iSplit.
         { iPureIntro. lia. }
-        iFrame "CFl Wl". iRight. iFrame. eauto. }
+        iFrame "CFl Wl GMEo". iFrame. iRight. eauto. }
       iIntros "!>".
-      clear dependent tickets n.
+      clear dependent tickets n obls.
       iClear "LC".
       iModIntro. lwp_pure_lc lc.
       rewrite bool_decide_eq_true_2; last done.
@@ -557,11 +564,12 @@ Section proof.
       iPoseProof (ghost_map_lookup with "GMAt GMEt0") as "%LUt".
       assert (Boundmy : (my + 1 ≤ n)%Z).
       { apply elem_of_dom_2 in LUt. apply Domt in LUt. lia. }
-      iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[H HMt]".
+      assert (Elemt : (my + 1)%Z ∈ dom tickets) by (apply elem_of_dom; eauto).
+      iPoseProof (big_sepS_delete _ _ _ Elemt with "HMt") as "[H HMt]".
       iDestruct "H" as "[H | [% | H]]".
-      { iDestruct "H" as "(%&%& GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. destruct H0. done. }
+      { iDestruct "H" as "(%&%& GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. by destruct H0. }
       { lia. }
-      iDestruct "H" as "(%&%&%&%& %& GMEt1& _& Gg)".
+      iDestruct "H" as "(%&%&%&%& %& GMEt1& GMEo& _& Gg)".
       iCombine "GMEt1 GMEt0" as "GMEt" gives %?. destruct H0 as [_ H0]. simplify_eq.
       iMod (group_delete with "TG Gg") as "TG".
       iPoseProof (grP_fuels_remove_group gu with "GF") as "GF".
@@ -573,13 +581,22 @@ Section proof.
       (* Update tickets map. *)
       replace (DfracOwn (1 / 2) ⋅ DfracOwn (1 / 2)) with (DfracOwn 1); cycle 1.
       { rewrite dfrac_op_own Qp.div_2. done. }      
-      iMod (ghost_map_update (inl (i, gu, ℓ, m)) with "GMAt GMEt") as "[GMAt [GMEt GMEt0]]".
+      iMod (ghost_map_update (Some (i, gu, ℓ, m)) with "GMAt GMEt") as "[GMAt [GMEt GMEt0]]".
       iPoseProof (grP_fuels_add_group with "Gf GF") as "GF".
       iDestruct "Wc" as "[Wc | #Gdk]".
-      - iModIntro. iMod ("ACCinv" with "[PtrNext SV GMAt HMt PtrCurr Hc Gg GMEt]") as "_".
-        { iNext. iFrame "PtrNext SV GMAt PtrCurr Hc". iSplit. 1: eauto. iSplit.
+      - iModIntro. iMod ("ACCinv" with "[PtrNext GMAt GMAo HMt PtrCurr Hc Gg GMEt GMEo]") as "_".
+        { iNext. iFrame "PtrNext GMAt GMAo PtrCurr Hc". iSplit.
           { iPureIntro. rewrite dom_insert_lookup_L; eauto. }
-          iApply big_sepM_insert_delete. iFrame "HMt". do 2 iRight. iFrame. eauto. }
+          iSplit.
+          1: eauto.
+          iSplit.
+          { iPureIntro. rewrite dom_insert_lookup_L; eauto. }
+          rewrite dom_insert_lookup_L; last eauto.
+          assert (Temp : (dom tickets) = ((dom tickets ∖ {[(my + 1)%Z]}) ∪ {[(my + 1)%Z]})).
+          { rewrite difference_union_L. set_solver. }
+          iEval (rewrite Temp).
+          iApply big_sepS_union. 1: set_solver. iFrame "HMt".
+          iApply big_sepS_singleton. do 2 iRight. iFrame. eauto. }
         iModIntro.
         iModIntro. lwp_pure_one.
         rewrite bool_decide_eq_false_2; cycle 1.
@@ -597,17 +614,69 @@ Section proof.
             iPoseProof (grP_fuel_add_set _ _ 47 with "H") as "[H _]".
             iApply grP_fuels_init. iFrame. }
         iApply ("IHα" $! α0 LTα with "CF HΦ LC' EFs [//] Q_Gf GMEt0 TG Fs WFs").
-      - TODO
-
-        destruct (decide (c = 
-        
+      - iPoseProof (ghost_map_lookup with "GMAo GMEo0") as "%LUp".
+        iAssert (⌜(prev < c)%Z⌝)%I as "%Hpc".
+        { iClear "IHν IHα". destruct (decide (prev = c)).
+          { subst c. iDestruct "Hc" as "[(%& _) | Hc]".
+            { subst n. lia. }
+            iDestruct "Hc" as "(%& %&%& _& _& #GMEo1& HE& _)".
+            iPoseProof (ghost_map_elem_agree with "GMEo0 GMEo1") as "%". simplify_eq.
+            iPoseProof (tf_until_discharged_false with "HE Gdk") as "%". done. }
+          assert (Elemp : (prev + 1)%Z ∈ (dom tickets ∖ {[(my + 1)%Z]})).
+          { apply elem_of_dom_2 in LUp. rewrite -EqDom in LUp.
+            assert ((prev + 1)%Z ≠ (my + 1)%Z) by lia. set_solver. }
+          iPoseProof (big_sepS_delete _ _ _ Elemp with "HMt") as "[H _]".
+          iDestruct "H" as "[H | [% | H]]".
+          - iDestruct "H" as "(%& %& _)". iPureIntro. lia.
+          - exfalso. lia.
+          - iDestruct "H" as "(%&%&%&%& %& _& GMEo1& _)".
+            iCombine "GMEo0 GMEo1" gives %HF. by destruct HF. }
+        iDestruct "Hc" as "[(%& _) | Hc]".
+        { exfalso. lia. }
+        iDestruct "Hc" as "(%& %&%& #CFl1& #Wl1& #GMEo1& Hc)".
+        iModIntro. iMod ("ACCinv" with "[PtrNext GMAt GMAo HMt PtrCurr Hc Gg GMEt GMEo]") as "_".
+        { iNext. iFrame "PtrNext GMAt GMAo PtrCurr". iSplit.
+          { iPureIntro. rewrite dom_insert_lookup_L; eauto. }
+          iSplit.
+          1: eauto.
+          iSplit.
+          { iPureIntro. rewrite dom_insert_lookup_L; eauto. }
+          iSplitR "Hc".
+          { rewrite dom_insert_lookup_L; last eauto.
+            assert (Temp : (dom tickets) = ((dom tickets ∖ {[(my + 1)%Z]}) ∪ {[(my + 1)%Z]})).
+            { rewrite difference_union_L. set_solver. }
+            iEval (rewrite Temp).
+            iApply big_sepS_union. 1: set_solver. iFrame "HMt".
+            iApply big_sepS_singleton. do 2 iRight. iFrame. eauto. }
+          iRight. iSplit; first auto. iFrame "CFl1 Wl1 GMEo1 Hc". }
+        iModIntro.
+        iModIntro. lwp_pure_one.
+        rewrite bool_decide_eq_false_2; cycle 1.
+        { intro. inv H. }
+        iModIntro. lwp_pure_one.
+        assert (LTn : (Z.to_nat (my - c)%Z) < Z.to_nat (my - prev)) by lia.
+        iMod (embed_fuels_decr _ _ (Z.to_nat (my - c)%Z) with "EFs") as "(EFs& Fs')". 1: auto.
+        iClear "GF LC IHα".
+        iPoseProof (big_sepM_gset_to_gmap with "Fs'") as "Fs'".
+        iPoseProof (grP_fuel_add_set with "Fs'") as "[Fs0 Fs1]".
+        iAssert (grP_fuels ({[gu]} ∪ G) 47)%I with "[Loop_Gf Fs0]" as "Fs".
+        { iPoseProof (grP_fuels_init with "Fs0") as "Fs0".
+          iPoseProof (grP_fuels_add 47 with "Fs0") as "[Fs0 _]".
+          iApply (grP_fuels_add_group with "Loop_Gf Fs0"). }
+        iAssert (⌜(ℓ1 <= ℓ)%ordi⌝)%I as "%Hcf1".
+        { iCombine "CF CFl1" gives %?. apply auth_mra_both_dfrac_valid in H1.
+          2: apply _. by destruct H1. }
+        iApply ("IHν" $! _ LTn with "CF HΦ LC' Fs1 [//] [//] [] [] [//] CFl1 Wl1 Q_Gf GMEt0 TG Fs GMEo1 EFs").
+        { iPureIntro. lia. }
+        { iPureIntro. lia. }
+    }
   Qed.
 
   Lemma TicketLock_release_spec :
-    ⊢ ∃ m, ∀ lc i j G tl γ R κu gu ℓu K,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ m) ∗
+    ⊢ ∃ μ, ∀ lc i j G tl γ R κu gu ℓu K,
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) ∗
          grP_obls j gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
-         lock_token tl γ κu R ∗ R ∗
+         lock_token tl γ κu R ∗ ⟦R⟧ₗ ∗
          is_fair_lock tl γ R }}}
       TicketLock.release tl @ i
     l{{{ RET #();
@@ -618,96 +687,102 @@ Section proof.
     iExists 100.
     iIntros (lc i j G tl γ R κu gu ℓu K) "!> % (TG& GF& Gg& %LUkl& LT& HR& #IFL) HΦ".
     rewrite /TicketLock.release.
-    lwp_lam. simpl.
-    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
+    lwp_pure_lc 100.
     rewrite lock_token_unseal /lock_token_def.
-    iDestruct "LT" as "(%& %& %& %& PtrCurr0& #GMEtku& GEku)".
+    iDestruct "LT" as "(%& %& %& %& PtrCurr0& #GMEtku& #GMEo& GEku)".
     subst tl.
     lwp_pures.
     lwp_bind (Load _).
-    iPoseProof (grP_fuels_add 95 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
     iIntros "((_& TG& _)& PtrCurr0)".
-    iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    lwp_pures.
     (* Update curr and unlock κl. *)
-    iDestruct "IFL" as "(%&%& %& #INV)". symmetry in H. inv H.
+    iDestruct "IFL" as "(%&%& %& #INV)". symmetry in H. simplify_eq /=.
     (* Atomic step of Store, *)
     iModIntro.
     iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
-    iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+    iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
-    iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
-    iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". inversion H. subst u. clear H.
+    iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
+    iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". symmetry in H. simplify_eq /=.
     (* FIXME: does not combine the dfrac part. *)
     (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
-    iPoseProof (grP_fuels_add 93 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_store _ ∅ lc with "[$TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iSplitL "PtrCurr"; iFrame. }
     iIntros "((QLC& TG& _)& [PtrCurr PtrCurr0])".
     iPoseProof (ghost_map_lookup with "GMAt GMEtku") as "%LUt".
-    iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[Hmt HMt]".
-    iDestruct "Hmt" as "(Hmt1& [Hmt2 | Hmt2])".
-    { iDestruct "Hmt2" as "(%& #Of)". lia. }
-    iDestruct "Hmt2" as "(%Boundc1& GEku1)". iCombine "GEku GEku1" as "GEku".
+    assert (LEc : ((c + 1) ≤ n)%Z).
+    { apply elem_of_dom_2, Domt in LUt. lia. }
+    iDestruct "Hc" as "[(%& _) | (_& %&%& #CFl& #Wl& #GMEo0& HE& Hc)]".
+    { lia. }
+    iClear "Hc".
+    iPoseProof (ghost_map_elem_agree with "GMEo0 GMEo") as "%". simplify_eq /=. iClear "GMEo0".
+    iCombine "GEku HE" as "GEku".
+    (** We need a sfmupd later. *)
+    iApply sfmupd_trans.
     iApply sfmupd_fupd_acc.
     iMod (tf_until_discharge with "GEku") as "H".
     1: apply N_subseteq_1.
-    iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
+    iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
     { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
-    iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
+    iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
+    iModIntro.
     iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
-    iModIntro. iMod ("ACCinv" with "[$PtrNext $GMAt $GMAa HMa Hc PtrCurr0 $PtrCurr Hmt1 HMt HR]") as "_".
-    { iNext. iSplitR. 1: auto. iSplitR. 1: iPureIntro; lia. iSplitR. 1: auto. iSplitL "Hmt1 HMt".
-      { iApply (big_sepM_delete _ _ _ _ LUt). iSplitR "HMt".
-        - iFrame. iLeft. iSplit; auto. iPureIntro. lia.
-        - iApply (big_sepM_impl with "HMt"). iIntros "!> %% % H". iDestruct "H" as "($& [H | H])".
-          + iDestruct "H" as "(%& H)". iLeft. iFrame. iPureIntro. lia.
-          + iDestruct "H" as "(%& H)". assert (Neq : k ≠ (c + 1)%Z).
-            { intros ->. rewrite lookup_delete_eq in H. done. }
-            iRight. iFrame. iPureIntro. lia. }
-      destruct (decide (c + 1 = n)%Z).
-      - subst n. iDestruct "Hc" as "[Hc | (_& [Hc | #Hc])]".
-        { iDestruct "Hc" as "(%& _)". lia. }
-        { iDestruct "Hc" as "(_& PtrCurr& _)".
-          iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". inv H. lia. }
-        iSplitR "PtrCurr0 HR".
-        + iApply (big_sepM_impl with "HMa"). iIntros "!> %%% H". iDestruct "H" as "[H | [% | H]]".
-          * iDestruct "H" as "(%& H)". iLeft. iFrame. iPureIntro. lia.
-          * subst. iLeft. iFrame "Hc". iPureIntro. lia.
-          * iDestruct "H" as "(%& _)". lia.
-        + iLeft. iFrame. iPureIntro. lia.
-      - iDestruct "Hc" as "[Hc | (_& [Hc | #Hc])]".
-        { iDestruct "Hc" as "(%& _)". lia. }
-        { iDestruct "Hc" as "(_& PtrCurr& _)".
-          iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". inv H. lia. }
-        assert (LUt2 : is_Some (acks !! (c + 2)%Z)).
-        { apply elem_of_dom. rewrite -EqDom. apply Domt. lia. }
-        destruct LUt2 as [a LUt2]. iPoseProof (big_sepM_delete _ _ _ _ LUt2 with "HMa") as "[Hma HMa]".
-        iDestruct "Hma" as "[Hma | [% | Hma]]".
-        { iDestruct "Hma" as "[% _]". lia. }
-        { lia. }
-        iDestruct "Hma" as "(%& GMEa)". iSplitL "HMa".
-        { iApply (big_sepM_delete _ _ _ _ LUt2). iSplitR.
+    (** Two cases: there is a waiting thread, or not. *)
+    destruct (decide (c + 1 = n)%Z).
+    - (* No waiting thread. *)
+      subst n. clear LEc.
+      iModIntro. iMod ("ACCinv" with "[$PtrNext $GMAt $GMAo PtrCurr0 $PtrCurr HMt HR]") as "_".
+      { iNext. iSplitR. 1: auto. iSplitR. 1: iPureIntro; lia. iSplitR. 1: auto. iSplitL "HMt".
+        { iApply (big_sepS_impl with "HMt"). iIntros "!> %% [H | [% | H]]".
+          - iDestruct "H" as "(%&%& H1& H2& H3)". iLeft. iFrame. iPureIntro. lia.
+          - iLeft. simplify_eq /=. iFrame "GMEtku GMEo Ofk". iPureIntro. lia.
+          - iDestruct "H" as "(%&%&%&%& %& _)". lia. }
+        iLeft. iFrame. eauto. }
+      iApply ("HΦ" with "[$TG $Gg $QLC]").
+    - (* There is a waiting thread; create an unlock obligation for it. *)
+      assert (LUt1 : (c + 2)%Z ∈ dom tickets).
+      { apply Domt. lia. }
+      iPoseProof (big_sepS_delete _ _ _ LUt1 with "HMt") as "[H HMt]".
+      iDestruct "H" as "[H | [% | H]]".
+      { iDestruct "H" as "(%& %& _)". lia. }
+      { lia. }
+      iDestruct "H" as "(%&%&%&%& %Hc1& GMEt1& GMEo1& #CFl1& Gg1)".
+      (* Unlock obligation *)
+      iMod (tf_until_alloc _ _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
+        as "(%κu1& %LUku1& Gg1& OGF1& #Wlku1& ALLOC)". 1: done.
+      iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1 / 2} #(c + 2) ∗ R)%F with "[//]") as "[GUku GUku0]".
+      rewrite union_empty_r_L.
+      iMod (ghost_map_update (Some κu1) with "GMAo GMEo1") as "[GMAo GMEo1]".
+      iMod (ghost_map_elem_persist with "GMEo1") as "#GMEo1".
+      iModIntro. iMod ("ACCinv" with "[$PtrNext $GMAt $GMAo PtrCurr0 $PtrCurr HMt GMEt1 Gg1 OGF1 GUku GUku0 HR]") as "_".
+      { iNext. iSplitR.
+        { iPureIntro. rewrite dom_insert_lookup_L; eauto. apply elem_of_dom. by rewrite -EqDom. }
+        iSplitR. 1: iPureIntro; lia. iSplitR. 1: auto. iSplitL "HMt".
+        { iApply (big_sepS_delete _ _ _ LUt1). iSplitR "HMt".
           - iRight. iLeft. iPureIntro. lia.
-          - iApply (big_sepM_impl with "HMa"). iIntros "!> %%% H". iDestruct "H" as "[(%& H) | [% | (%& H)]]".
-            + iLeft. iFrame. iPureIntro. lia.
-            + subst. iLeft. iFrame "Hc". iPureIntro. lia.
-            + iRight. iRight. iFrame. iPureIntro. assert (Neq : k ≠ (c + 2)%Z).
-              { intros ->. rewrite lookup_delete_eq in H0. done. }
+          - iApply (big_sepS_impl with "HMt"). iIntros "!> %% [H | [% | H]]".
+            + iDestruct "H" as "(%&%& H1& H2& H3)". iLeft. iFrame. iPureIntro. lia.
+            + iLeft. simplify_eq /=. iFrame "GMEtku GMEo Ofk". iPureIntro. lia.
+            + iDestruct "H" as "(%&%&%&%& %& H)". iRight. iRight. iFrame. iPureIntro.
+              destruct (decide (x = (c + 2)%Z)).
+              { subst. set_solver. }
               lia. }
         iRight. iSplit. 1: iPureIntro; lia.
-        iLeft. replace (c + 1 + 1)%Z with (c + 2)%Z by lia. iFrame. }
-    iApply ("HΦ" with "[$TG $Gg $QLC]").
+        replace (c + 1 + 1)%Z with (c + 2)%Z by lia.
+        iFrame "CFl1 Wlku1 GMEo1 GUku0". iLeft. iFrame. }
+      iApply ("HΦ" with "[$TG $Gg $QLC]").
   Qed.
 
 End proof.
