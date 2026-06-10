@@ -13,8 +13,7 @@ Module Flag.
 
   Definition wait : val := 
     rec: "wait" "x" :=
-      let: "n" := !"x" in
-      if: "n" = #1
+      if: !"x" = #1
       then #()
       else "wait" "x".
 
@@ -149,7 +148,7 @@ Section proof.
       iMod ("inv_acc" with "Ptrl") as "inv".
       iModIntro. iModIntro. iSplitL "inv".
       { iFrame. }
-      do 4 (iModIntro; lwp_pure_one).
+      do 2 (iModIntro; lwp_pure_one).
       iModIntro.
       iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')".
       iApply ("IH" $! α0 LTα with "TG HΦ [Fkl'] Wf'").
