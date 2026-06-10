@@ -6,6 +6,7 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
+From iris.algebra.lib Require Import dfrac_agree.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map.
 
 (** FIXME: move to more general directory *)
@@ -59,6 +60,9 @@ Module TicketLock.
     λ: "lnc",
       let: "next" := Fst "lnc" in
       let: "curr" := Snd "lnc" in
+      (* Need to be consistent with the eventual property;
+         must modify the eventual property to remove this line. *)
+      "curr" <- !"curr" + #1;;
       Free "next";;
       Free "curr".
 
@@ -71,13 +75,16 @@ Class ticket_lockG Σ :=
       #[local] tlock_oblG :: ghost_mapG Σ Z (option oid);
       #[local] tlock_tokenG :: ghost_varG Σ (Z);
       #[local] tlock_config_inG :: inG Σ (auth_mraUR (ord.le));
+      (* FIXME: update ghost_var in param Iris and use that. *)
+      #[local] tlock_alive_inG :: inG Σ (dfrac_agreeR unit);
     }.
 
 Definition ticket_lockΣ : gFunctors :=
   #[ghost_mapΣ Z (option (positive * ogid * ord.t * measure));
     ghost_mapΣ Z (option oid);
     ghost_varΣ (Z);
-    GFunctor (auth_mraUR (ord.le))
+    GFunctor (auth_mraUR (ord.le));
+    GFunctor (dfrac_agreeR unit)
     ].
 
 Global Instance subG_ticket_lockΣ {Σ} : subG ticket_lockΣ Σ → ticket_lockG Σ.
@@ -89,6 +96,7 @@ Record ticketlock_γ :=
       ticketlock_γo : gname;
       ticketlock_γk : gname;
       ticketlock_γc : gname;
+      ticketlock_γa : gname;
     }.
 
 Section proof.
@@ -112,28 +120,39 @@ Section proof.
 
   Remark N_disj_1 : N_ev ## N_inv.
   Proof. by apply ndot_ne_disjoint. Qed.
-  Remark N_subseteq_1 : ↑N_ev ⊆ (⊤ : coPset) ∖ ↑N_inv.
-  Proof. pose proof N_disj_1. set_solver. Qed.
+  Remark N_subseteq_1 (E : coPset) : (↑N ⊆ E) → ↑N_ev ⊆ E ∖ ↑N_inv.
+  Proof. intros. pose proof N_disj_1. pose proof (nclose_subseteq N "ev"). set_solver. Qed.
+  Remark N_inv_subseteq (E : coPset) : (↑N ⊆ E) → ↑N_inv ⊆ E.
+  Proof. intros. etrans; last eapply H. apply nclose_subseteq. Qed.
 
   (** ** Definitions *)
   (** We can define the tf counterparts for these definitions
       if we want to extract top level trace properties of library functions. *)
 
-  Definition own_fair_lock_level (γ : ticketlock_γ) (ℓ : ord.t) (dq : dfrac) :=
+  Definition own_fair_lock_alive (γ : ticketlock_γ) (dq : dfrac) :=
+    own (ticketlock_γa γ) (to_dfrac_agree dq tt).
+
+  Notation "γ ↪LOCK_AL dq" :=
+    (own_fair_lock_alive γ dq)%I
+      (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_AL dq") : bi_scope.
+
+  Definition own_fair_lock_layer (γ : ticketlock_γ) (ℓ : ord.t) (dq : dfrac) :=
     own (ticketlock_γc γ) (auth_mra_auth ord.le dq ℓ).
 
-  Notation "γ ↪LOCK dq l" :=
-    (own_fair_lock_level γ l dq)%I
-      (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK dq  l") : bi_scope.
+  Notation "γ ↪LOCK_CF dq l" :=
+    (own_fair_lock_layer γ l dq)%I
+      (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_CF dq  l") : bi_scope.
 
   Local Definition lock_token_inv γo γk (curr : loc) (R : tf Σ) : iProp Σ :=
     ∃ (c : Z),
-      (ghost_var γk 1 c) ∨
-        (∃ κ, ghost_var γk (1/2) c ∗ (curr ↦{#(1/2 + 1/2/2)} #c) ∗ ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
+      (ghost_var γk 1 (c)) ∨
+        (∃ κ, ghost_var γk (1/2) (c) ∗
+              (curr ↦{#(1/2 + 1/2/2)} #c) ∗
+              ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
               ⟦tf_eventually N_ev κ false (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ).
 
-  Local Definition lock_inv γt γo γc (next curr : loc) (R : tf Σ) : iProp Σ :=
-    (∃ ℓ, own γc (auth_mra_auth ord.le (DfracOwn 1) ℓ)) ∨
+  Local Definition lock_inv γt γo γc γa (next curr : loc) (R : tf Σ) : iProp Σ :=
+    (own γa (to_dfrac_agree (DfracOwn 1) tt)) ∨
       (∃ (n c : Z)
          (tickets : gmap Z (option (positive * ogid * ord.t * measure)))
          (obls : gmap Z (option oid)),
@@ -171,11 +190,11 @@ Section proof.
   Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
-      inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) next curr R) ∗
+      inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R) ∗
       inv N_tk (lock_token_inv (ticketlock_γo γ) (ticketlock_γk γ) curr R).
 
   Local Definition lock_token_def (γ : ticketlock_γ) κu : iProp Σ :=
-    ∃ (c : Z), ghost_var (ticketlock_γk γ) (1/2) c ∗
+    ∃ (c : Z), ghost_var (ticketlock_γk γ) (1/2) (c) ∗
                ((c + 1)%Z ↪[(ticketlock_γt γ)]□ (None : option (positive * ogid * ord.t * measure))) ∗
                ((c + 1)%Z ↪[(ticketlock_γo γ)]□ (Some κu)).
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
@@ -187,9 +206,13 @@ Section proof.
   Global Instance is_fair_lock_persistent tl γ R : Persistent (is_fair_lock tl γ R).
   Proof. rewrite /is_fair_lock. apply _. Qed.
 
+  Lemma lock_alive_persist γ dq :
+    (γ ↪LOCK_AL{dq}) ==∗ γ ↪LOCK_AL□.
+  Proof. iIntros "H". iApply (own_update with "H"). apply dfrac_agree_persist. Qed.
+
   Lemma lock_reconfig γ ℓ1 ℓ2 :
     (ℓ1 <= ℓ2)%ordi →
-    γ ↪LOCK ℓ1 ==∗ γ ↪LOCK ℓ2.
+    γ ↪LOCK_CF ℓ1 ==∗ γ ↪LOCK_CF ℓ2.
   Proof.
     iIntros (LE). iIntros "H". iApply (own_update with "H").
     (* FIXME: typeclass not solved *)
@@ -197,11 +220,11 @@ Section proof.
   Qed.
 
   Lemma lock_config_persist γ dq ℓ :
-    (γ ↪LOCK{dq} ℓ) ==∗ γ ↪LOCK□ ℓ.
+    (γ ↪LOCK_CF{dq} ℓ) ==∗ γ ↪LOCK_CF□ ℓ.
   Proof. iIntros "H". iApply (own_update with "H"). apply auth_mra_auth_persist. Qed.
 
   Lemma lock_config_valid γ dq1 dq2 ℓ1 ℓ2 :
-    γ ↪LOCK{dq1} ℓ1 -∗ γ ↪LOCK{dq2} ℓ2 -∗ ⌜(✓ (dq1 ⋅ dq2)) ∧ (ℓ1 == ℓ2)%ordi⌝.
+    γ ↪LOCK_CF{dq1} ℓ1 -∗ γ ↪LOCK_CF{dq2} ℓ2 -∗ ⌜(✓ (dq1 ⋅ dq2)) ∧ (ℓ1 == ℓ2)%ordi⌝.
   Proof.
     iIntros "H1 H2". iCombine "H1 H2" gives %HCF.
     unshelve eapply auth_mra_auth_dfrac_op_valid in HCF.
@@ -222,14 +245,17 @@ Section proof.
          "flat layer"=0. A possible format is ∃ μ in front of the spec, as in TicketLock_init_sepc. *)
 
   (** ** Program proofs *)
+  (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_init_spec :
-    ⊢ ∃ μ, ∀ lc ℓ i G,
+    ⊢ ∃ μ, ∀ lc ℓ i G (E : coPset),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) }}}
-      TicketLock.init #() @ i
-    l{{{ tl γ, RET tl; £ lc ∗ thP_groups i G ∗ γ ↪LOCK ℓ ∗ (∀ E R, ⟦R⟧ₗ ={E}=∗ is_fair_lock tl γ R) }}}.
+      TicketLock.init #() @ i; E
+    l{{{ tl γ, RET tl; £ lc ∗
+                       thP_groups i G ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
+                       (∀ E R, ⟦R⟧ₗ ={E}=∗ is_fair_lock tl γ R) }}}.
   Proof.
     iExists 10.
-    iIntros (lc ℓ i G) "!> %Φ (TG& GF) HΦ".
+    iIntros (lc ℓ i G E) "!> %Φ (TG& GF) HΦ".
     rewrite /TicketLock.init.
     lwp_pure_one.
     lwp_bind (AllocN _ _).
@@ -249,6 +275,8 @@ Section proof.
     rewrite !big_sepM_singleton.
     iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
     iMod (ghost_map_elem_persist with "GMEo") as "#GMEo".
+    iMod (own_alloc (to_dfrac_agree (DfracOwn 1) tt)) as "(%γa& AL)".
+    { done. }
     iMod (own_alloc (●AM[ord.le] ℓ)) as "(%γc& CF)".
     { apply auth_mra_auth_valid. }
     iAssert (own (γc) (◯AM[ord.le] ℓ))%I as "#CFl".
@@ -257,9 +285,9 @@ Section proof.
     iMod (ghost_var_alloc (0 : Z)) as "(%γk& GV)".
     iModIntro. lwp_finish.
     iModIntro.
-    iApply ("HΦ" $! _ (TicketLockName γt γo γk γc)). iFrame "TG QLC CF".
+    iApply ("HΦ" $! _ (TicketLockName γt γo γk γc γa)). iFrame "TG QLC AL CF".
     iIntros (??) "HR".
-    iMod (inv_alloc N_inv _ (lock_inv γt γo γc next curr R) with "[Ptr_next Ptr_curr Ptr_curr0 GMAt GMAo HR ]") as "#Ak".
+    iMod (inv_alloc N_inv _ (lock_inv γt γo γc γa next curr R) with "[Ptr_next Ptr_curr Ptr_curr0 GMAt GMAo HR]") as "#Ak".
     { iNext. rewrite /lock_inv. iRight. iExists 0, 0, {[0%Z := (None)]}, {[0%Z := (Some κu)]}.
       iFrame "Ptr_next Ptr_curr GMAt GMAo". iSplit. 1: done. iSplit. 1: done. iSplit.
       { iPureIntro. intros. rewrite dom_singleton_L elem_of_singleton. split; intros.
@@ -273,12 +301,14 @@ Section proof.
   Qed.
 
   (** FIXME: ordi notation levels *)
+  (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_acquire_spec :
-    ⊢ ∃ μ, ∀ lc m i G tl γ dq ℓ R,
+    ⊢ ∃ μ, ∀ lc m i G tl γ dq1 dq2 ℓ R (E : coPset) (MASK : ↑N ⊆ E),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
-         γ ↪LOCK{dq} ℓ ∗
+         γ ↪LOCK_AL{dq1} ∗
+         γ ↪LOCK_CF{dq2} ℓ ∗
          is_fair_lock tl γ R }}}
-      TicketLock.acquire tl @ i
+      TicketLock.acquire tl @ i; E
     l{{{ gu κu, RET #();
          £ lc ∗
          (⌜ gu ∉ G ⌝) ∗
@@ -286,10 +316,10 @@ Section proof.
          grP_obls i gu ℓ {[κu]} ∗
          grP_fuel gu ℓ m ∗
          oblP_fuel κu ℓ m ∗
-         γ ↪LOCK{dq} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ }}}.
+         γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ }}}.
   Proof.
     iExists (100 ⊕ (((50 ⊕ (50 × ▽)) × ℵ) ⊕ (50 × ▽)))%M.
-    iIntros (lc m i G tl γ dq ℓ R) "!> % (TG& Fs& CF& #IFL) HΦ".
+    iIntros (lc m i G tl γ dq1 dq2 ℓ R E MASK) "!> % (TG& Fs& AL& CF& #IFL) HΦ".
     iPoseProof (grP_fuel_add_set with "Fs") as "[GF Fsloop]".
     iPoseProof (grP_fuels_init with "GF") as "GF".
     rewrite /TicketLock.acquire.
@@ -303,14 +333,16 @@ Section proof.
     lwp_bind (FAA _ _).
     iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     (* Atomic step of FAA, *)
-    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
+    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]".
+    { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     (** FIXME: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
-    iDestruct "H" as "[(%& H) | H]".
-    { iPoseProof (lock_config_valid with "CF H") as "[%HCF _]". by apply dfrac_valid_own_r in HCF. }
+    iDestruct "H" as "[H | H]".
+    { iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL. destruct HAL.
+      apply dfrac_valid_own_r in H. done. }
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iApply (lwp_faa _ ∅ 0 with "[$TG $GF1 $PtrNext]"). 1: done.
     iIntros "((_& TG& _)& PtrNext)".
@@ -323,7 +355,7 @@ Section proof.
     iMod (ghost_map_insert (n + 1)%Z (None) with "GMAo") as "[GMAo GMEo]".
     { apply not_elem_of_dom. intros IN. rewrite -EqDom in IN. apply Domt in IN. lia. }
     iAssert (own (ticketlock_γc γ) (◯AM[ord.le] ℓ))%I as "#CFl".
-    { iAssert (γ ↪LOCK{dq} ℓ ∗ own (ticketlock_γc γ) (◯AM[ord.le] ℓ))%I with "[CF]" as "[_ $]".
+    { iAssert (γ ↪LOCK_CF{dq2} ℓ ∗ own (ticketlock_γc γ) (◯AM[ord.le] ℓ))%I with "[CF]" as "[_ $]".
       rewrite -own_op -auth_mra_auth_know_op. done. }
     (** Close inv; two cases: my turn, or not. *)
     iDestruct "Hc" as "[Hc | Hc]".
@@ -394,10 +426,10 @@ Section proof.
       iApply (lc_fupd_add_later with "LC1"). iNext.
       iDestruct "H" as "(%& [GV | (%& GV& PtrCurr1& GMEo1& HE1)])"; cycle 1.
       { iCombine "PtrCurr0 PtrCurr1" gives %HPC. destruct HPC. done. }
-      iMod (ghost_var_update my with "GV") as "[GV GV0]".
+      iMod (ghost_var_update (my) with "GV") as "[GV0 GV]".
       iModIntro. iSplitL "GV GUku0 PtrCurr0".
       { iNext. iExists _. iRight. iFrame. eauto. }
-      iApply ("HΦ" with "[$TG $Gg $Q_Gf $OGF $HR $LC $CF GV0]"). iSplit. 1: set_solver.
+      iApply ("HΦ" with "[$TG $Gg $Q_Gf $OGF $HR $LC $AL $CF GV0]"). iSplit. 1: set_solver.
       rewrite lock_token_unseal /lock_token_def. iFrame "GV0". eauto. }
     (* Not my turn. *)
     iDestruct "GMEt" as "[GMEt0 GMEt]".
@@ -440,8 +472,9 @@ Section proof.
     iApply fupd_lwp. iInv "INV" as "H".
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lc_fupd_add_later with "LC1"). iNext.
-    iDestruct "H" as "[(%& H) | H]".
-    { iPoseProof (lock_config_valid with "CF H") as "[%HCF _]". by apply dfrac_valid_own_r in HCF. }
+    iDestruct "H" as "[H | H]".
+    { iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL. destruct HAL.
+      apply dfrac_valid_own_r in H. done. }
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iPoseProof (ghost_map_lookup with "GMAt GMEt0") as "%LUt".
     iDestruct "Hc" as "[Hc | Hc]".
@@ -508,10 +541,10 @@ Section proof.
       iApply (lc_fupd_add_later with "LC1"). iNext.
       iDestruct "H" as "(%& [GV | (%& GV& PtrCurr1& GMEo1& HE1)])"; cycle 1.
       { iCombine "PtrCurr0 PtrCurr1" gives %HPC. destruct HPC. done. }
-      iMod (ghost_var_update my with "GV") as "[GV GV0]".
-      iModIntro. iSplitL "GV HE0 PtrCurr0".
+      iMod (ghost_var_update (my) with "GV") as "[GV GV0]".
+      iModIntro. iSplitL "GV0 HE0 PtrCurr0".
       { iNext. iExists _. iRight. iFrame. eauto. }
-      iApply ("HΦ" with "[$TG $Gg $Q_Gf $Of $HR $LC $CF GV0]"). iSplit. 1: set_solver.
+      iApply ("HΦ" with "[$TG $Gg $Q_Gf $Of $HR $LC $AL $CF GV]"). iSplit. 1: set_solver.
       rewrite lock_token_unseal /lock_token_def. iFrame. eauto. }
     (* Not my turn, induction. *)
     iDestruct "Hc" as "(%ℓ0&%& #CFl0& #Wl0& #GMEo0& Hc)".
@@ -561,14 +594,16 @@ Section proof.
     lwp_pure_one.
     lwp_bind (Load _).
     (* Atomic step of Load, *)
-    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
+    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]".
+    { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     (** TODO: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
-    iDestruct "H" as "[(%& H) | H]".
-    { iPoseProof (lock_config_valid with "CF H") as "[%HCF _]". by apply dfrac_valid_own_r in HCF. }
+    iDestruct "H" as "[H | H]".
+    { iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL. destruct HAL.
+      apply dfrac_valid_own_r in H. done. }
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_load _ {[κ]} 98%ord with "[$TG $GF1 $PtrCurr]").
@@ -617,10 +652,10 @@ Section proof.
       iApply (lc_fupd_add_later with "LC1"). iNext.
       iDestruct "H" as "(%& [GV | (%& GV& PtrCurr1& GMEo1& HE1)])"; cycle 1.
       { iCombine "PtrCurr0 PtrCurr1" gives %HPC. destruct HPC. done. }
-      iMod (ghost_var_update my with "GV") as "[GV GV0]".
-      iModIntro. iSplitL "GV HE0 PtrCurr0".
+      iMod (ghost_var_update (my) with "GV") as "[GV GV0]".
+      iModIntro. iSplitL "GV0 HE0 PtrCurr0".
       { iNext. iExists _. iRight. iFrame. eauto. }
-      iApply ("HΦ" with "[$TG $Gg $Q_Gf $Ofk $HR $LC $CF GV0]"). iSplit. 1: set_solver.
+      iApply ("HΦ" with "[$TG $Gg $Q_Gf $Ofk $HR $LC $AL $CF GV]"). iSplit. 1: set_solver.
       rewrite lock_token_unseal /lock_token_def. iFrame. eauto. }
     { (* Inductive cases: prev still holding, or new owner. *)
       (* Must refresh my group. *)
@@ -676,7 +711,7 @@ Section proof.
               replace 50 with (47 + 3) by lia. done. }
             iPoseProof (grP_fuel_add_set _ _ 47 with "H") as "[H _]".
             iApply grP_fuels_init. iFrame. }
-        iApply ("IHα" $! α0 LTα with "CF HΦ LC' EFs [//] Q_Gf GMEt0 TG Fs WFs").
+        iApply ("IHα" $! α0 LTα with "AL CF HΦ LC' EFs [//] Q_Gf GMEt0 TG Fs WFs").
       - iPoseProof (ghost_map_lookup with "GMAo GMEo0") as "%LUp".
         iAssert (⌜(prev < c)%Z⌝)%I as "%Hpc".
         { iClear "IHν IHα". destruct (decide (prev = c)).
@@ -729,28 +764,29 @@ Section proof.
         iAssert (⌜(ℓ1 <= ℓ)%ordi⌝)%I as "%Hcf1".
         { iCombine "CF CFl1" gives %?. apply auth_mra_both_dfrac_valid in H1.
           2: apply _. by destruct H1. }
-        iApply ("IHν" $! _ LTn with "CF HΦ LC' Fs1 [//] [//] [] [] [//] CFl1 Wl1 Q_Gf GMEt0 TG Fs GMEo1 EFs").
+        iApply ("IHν" $! _ LTn with "AL CF HΦ LC' Fs1 [//] [//] [] [] [//] CFl1 Wl1 Q_Gf GMEt0 TG Fs GMEo1 EFs").
         { iPureIntro. lia. }
         { iPureIntro. lia. }
     }
   Qed.
 
+  (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_release_spec :
-    ⊢ ∃ μ, ∀ lc i j G tl γ dq ℓ R κu gu ℓu K,
+    ⊢ ∃ μ, ∀ lc i j G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E),
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) ∗
          grP_obls j gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token γ κu ∗ ⟦R⟧ₗ ∗
-         γ ↪LOCK{dq} ℓ ∗
+         γ ↪LOCK_AL{dq} ∗
          is_fair_lock tl γ R }}}
-      TicketLock.release tl @ i
+      TicketLock.release tl @ i; E
     l{{{ RET #();
          £ lc ∗
          thP_groups i G ∗
          grP_obls j gu ℓu (K ∖ {[κu]}) ∗
-         γ ↪LOCK{dq} ℓ }}}.
+         γ ↪LOCK_AL{dq} }}}.
   Proof.
     iExists 100.
-    iIntros (lc i j G tl γ dq ℓ R κu gu ℓu K) "!> % (TG& GF& Gg& %LUkl& LT& HR& CF& #IFL) HΦ".
+    iIntros (lc i j G tl γ dq R κu gu ℓu K E MASK) "!> % (TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
     rewrite /TicketLock.release.
     lwp_pure_lc 100.
     rewrite lock_token_unseal /lock_token_def.
@@ -763,7 +799,7 @@ Section proof.
     iApply (lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%& [TK | (%& GV0& PtrCurr0& #GMEo0& GEku)])".
     { iCombine "GV TK" gives %HTK. destruct HTK. done. }
-    iCombine "GV GV0" as "GV" gives %?. destruct H as [_ <-].
+    iCombine "GV0 GV" as "GV" gives %?. destruct H as [_ ->].
     iCombine "GMEo GMEo0" gives %?. destruct H as [_ ?]. simplify_eq /=. iClear "GMEo0".
     iModIntro. iSplitL "GV".
     { iNext. iExists _. iLeft. iFrame. }
@@ -777,13 +813,15 @@ Section proof.
     lwp_pures.
     (* Atomic step of Store, *)
     iModIntro.
-    iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
+    iMod (inv_acc with "INV") as "[H ACCinv]".
+    { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
-    iDestruct "H" as "[(%& H) | H]".
-    { iPoseProof (lock_config_valid with "CF H") as "[%HCF _]". by apply dfrac_valid_own_r in HCF. }
+    iDestruct "H" as "[H | H]".
+    { iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL. destruct HAL.
+      apply dfrac_valid_own_r in H. done. }
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". simplify_eq /=.
     (* FIXME: does not combine the dfrac part. *)
@@ -806,7 +844,7 @@ Section proof.
     iApply sfmupd_trans.
     iApply sfmupd_fupd_acc.
     iMod (tf_until_discharge with "GEku") as "H".
-    1: apply N_subseteq_1.
+    { apply N_subseteq_1. set_solver. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
@@ -830,7 +868,7 @@ Section proof.
           - iLeft. simplify_eq /=. iFrame "GMEtku GMEo Ofk". iPureIntro. lia.
           - iDestruct "H" as "(%&%&%&%& %& _)". lia. }
         iLeft. iFrame. eauto. }
-      iApply ("HΦ" with "[$TG $Gg $QLC $CF]").
+      iApply ("HΦ" with "[$TG $Gg $QLC $AL]").
     - (* There is a waiting thread; create an unlock obligation for it. *)
       assert (LUt1 : (c + 2)%Z ∈ dom tickets).
       { apply Domt. lia. }
@@ -840,7 +878,7 @@ Section proof.
       { lia. }
       iDestruct "H" as "(%&%&%&%& %Hc1& GMEt1& GMEo1& #CFl1& Gg1)".
       (* Unlock obligation *)
-      iMod (tf_until_alloc _ _ _ _ false _ (ℓ1)%ordi (μ)%M with "Gg1")
+      iMod (tf_until_alloc _ _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
         as "(%κu1& %LUku1& Gg1& OGF1& #Wlku1& ALLOC)". 1: done.
       iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%F with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
@@ -862,13 +900,120 @@ Section proof.
         iRight. iSplit. 1: iPureIntro; lia.
         replace (c + 1 + 1)%Z with (c + 2)%Z by lia.
         iFrame "CFl1 Wlku1 GMEo1 GUku0". iLeft. iFrame. }
-      iApply ("HΦ" with "[$TG $Gg $QLC $CF]").
+      iApply ("HΦ" with "[$TG $Gg $QLC $AL]").
   Qed.
 
-  (** Lock delete spec *)
+  (** TODO: LAT-style spec for better interaction w/ user invariants. *)
+  Lemma TicketLock_delete_spec :
+    ⊢ ∃ μ, ∀ lc i j G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E),
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) ∗
+         grP_obls j gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
+         lock_token γ κu ∗ ⟦R⟧ₗ ∗
+         γ ↪LOCK_AL ∗
+         is_fair_lock tl γ R }}}
+      TicketLock.delete tl @ i; E
+    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ grP_obls j gu ℓu (K ∖ {[κu]}) ∗ ⟦R⟧ₗ }}}.
+  Proof.
+    iExists 100.
+    iIntros (lc i j G tl γ R κu gu ℓu K E MASK) "!> % (TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
+    rewrite /TicketLock.delete.
+    lwp_pure_lc 100.
+    rewrite lock_token_unseal /lock_token_def.
+    iDestruct "LT" as "(%& GV& #GMEtku& #GMEo)".
+    iDestruct "IFL" as "(%&%& %& #INV& #ITK)".
+    subst tl.
+    (** Exchange token. *)
+    iApply lwpupd_fupd_l. iInv "ITK" as "H".
+    iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
+    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iDestruct "H" as "(%& [TK | (%& GV0& PtrCurr0& #GMEo0& GEku)])".
+    { iCombine "GV TK" gives %HTK. destruct HTK. done. }
+    iCombine "GV0 GV" as "GV" gives %?. destruct H as [_ ->].
+    iCombine "GMEo GMEo0" gives %?. destruct H as [_ ?]. simplify_eq /=. iClear "GMEo0".
+    iModIntro. iSplitL "GV".
+    { iNext. iExists _. iLeft. iFrame. }
+    iModIntro.
+    lwp_pures.
+    lwp_bind (Load _).
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iModIntro.
+    iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
+    iIntros "((_& TG& _)& PtrCurr0)".
+    lwp_pures.
+    (* Atomic step of Store, *)
+    lwp_bind (Store _ _).
+    iModIntro.
+    iMod (inv_acc with "INV") as "[H ACCinv]".
+    { apply N_inv_subseteq. auto. }
+    (* and we need a mupd after the step. *)
+    iApply lwp_sfmupd.
+    iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
+    iApply (lwp_lc_later with "LC1"). iNext.
+    iDestruct "H" as "[H | H]".
+    { iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL. destruct HAL.
+      apply dfrac_valid_own_r in H. done. }
+    iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
+    iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". simplify_eq /=.
+    (* FIXME: does not combine the dfrac part. *)
+    (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iApply (lwp_store _ ∅ lc with "[$TG $GF1 PtrCurr PtrCurr0]").
+    { iSplitR; first done. iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]".
+      iCombine "PtrCurr1 PtrCurr0 PtrCurr" as "$". }
+    iIntros "((QLC& TG& _)& [[PtrCurr PtrCurr1] PtrCurr0])".
+    iCombine "PtrCurr0 PtrCurr1" as "PtrCurr0".
+    iPoseProof (ghost_map_lookup with "GMAt GMEtku") as "%LUt".
+    assert (LEc : ((c + 1) ≤ n)%Z).
+    { apply elem_of_dom_2, Domt in LUt. lia. }
+    iDestruct "Hc" as "[(%& _) | (_& %&%& #CFl& #Wl& #GMEo0& HE& Hc)]".
+    { lia. }
+    iClear "Hc".
+    iPoseProof (ghost_map_elem_agree with "GMEo0 GMEo") as "%". simplify_eq /=. iClear "GMEo0".
+    iCombine "GEku HE" as "GEku".
+    (** We need a sfmupd later. *)
+    iApply sfmupd_trans.
+    iApply sfmupd_fupd_acc.
+    iMod (tf_until_discharge with "GEku") as "H".
+    { apply N_subseteq_1. set_solver. }
+    iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
+    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iModIntro.
+    iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
+    iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
+    { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
+    iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
+    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
+    iModIntro.
+    iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
+    (** Return full CF to the invariant. *)
+    iModIntro. iMod ("ACCinv" with "[AL]") as "_".
+    { iNext. iLeft. iFrame. }
+    rewrite tf_atomic_logic.
+    iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]". iCombine "PtrCurr1 PtrCurr PtrCurr0" as "PtrCurr".
+    iClear "HMt GMAt GMAo". clear dependent tickets obls.
+    iModIntro.
+    lwp_pures.
+    lwp_bind (Free _).
+    iModIntro.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iApply (lwp_free _ ∅ 0 with "[$TG $GF1 $PtrNext]"). 1: done.
+    iIntros "(_& TG& _)".
+    lwp_pures.
+    lwp_bind (Free _).
+    iModIntro.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iApply (lwp_free _ ∅ 0 with "[$TG $GF1 $PtrCurr]"). 1: done.
+    iIntros "(_& TG& _)".
+    iApply ("HΦ" with "[$]").
+  Qed.
 
 End proof.
 
-Global Notation "γ ↪LOCK dq l" :=
-  (own_fair_lock_level γ l dq)%I
-    (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK dq  l") : bi_scope.
+Global Notation "γ ↪LOCK_AL dq" :=
+  (own_fair_lock_alive γ dq)%I
+    (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_AL dq") : bi_scope.
+
+Global Notation "γ ↪LOCK_CF dq l" :=
+  (own_fair_lock_layer γ l dq)%I
+    (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_CF dq  l") : bi_scope.

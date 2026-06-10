@@ -79,7 +79,7 @@ Section proof.
   (** FIXME: better notation for triples with this pattern *)
   Lemma TaskQueue_put_task_spec :
     ⊢ ∃ m, ∀ lc i j G g K B γ ℓ ℓg (ql task_f task_a : val),
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g ℵ%ordi m) ∗
+    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g 1%ordi m) ∗
          grP_obls j g ℓg K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
          is_task ℓ (task_f, task_a)%V B ∗ is_task_queue ql γ ℓ }}}
       TaskQueue.put_task ql task_f task_a @ i
@@ -104,7 +104,7 @@ Section proof.
     ⊢ ∃ m, ∀ lc μ (b : bool) wi wg i G γ ℓ (ql : val),
     l{{{ thP_groups i G ∗
          (* For dequeue *)
-         ([∗ set] g ∈ G, grP_fuel g (ℵ)%ordi m) ∗
+         ([∗ set] g ∈ G, grP_fuel g (1)%ordi m) ∗
          (* For task *)
          ([∗ set] g ∈ G, grP_fuel g (ℓ)%ordi 1) ∗
          (if b
@@ -193,8 +193,7 @@ Section proof.
     ⊢ ∃ m, ∀ (b : bool) i G γ ℓ (ql : val),
     l{{{ thP_groups i G ∗
          (if b
-          then (∃ g, ⌜G = {[g]} ∧ (ℵ <= ℓ)%ordi⌝ ∧ (grP_fuel g (ℓ)%ordi m) ∗ queue_worker γ i g)
-          (* then (∃ g, ([∗ set] g ∈ G, grP_fuel g (ℓ)%ordi m) ∗ queue_worker γ i g ∗ ⌜G = {[g]} ∧ (ℵ <= ℓ)%ordi⌝) *)
+          then (∃ g, ⌜G = {[g]} ∧ (1 <= ℓ)%ordi⌝ ∧ (grP_fuel g (ℓ)%ordi m) ∗ queue_worker γ i g)
           else (⌜G = ∅⌝)) ∗
          is_task_queue ql γ ℓ }}}
       TaskQueue.worker ql @ i
@@ -219,7 +218,7 @@ Section proof.
       lwp_pures.
       lwp_bind (TaskQueue.run_task _).
       iPoseProof (grP_fuel_add_set with "F_mr") as "[F_mr F_mr1]".
-      iMod (grP_fuel_mon_gen_set _ ℵ%ordi _ mr with "F_mr") as "F_mr". 1: auto.
+      iMod (grP_fuel_mon_gen_set _ 1%ordi _ mr with "F_mr") as "F_mr". 1: auto.
       { apply measure_rep_layer_le_proper. apply classicOrd.le_eq_or_lt in Hlayer. destruct Hlayer.
         - right. econstructor 1. auto.
         - left. split; auto. }
@@ -265,7 +264,7 @@ Section proof.
 
   Lemma TaskQueue_init_spec :
     ⊢ ∃ m, ∀ (lc : Ord.t) i G ℓ,
-    l{{{ thP_groups i G ∗ grP_fuels G m ∗ ⌜(ℵ <= ℓ)%ordi⌝ }}}
+    l{{{ thP_groups i G ∗ grP_fuels G m ∗ ⌜(1 <= ℓ)%ordi⌝ }}}
       TaskQueue.init #() @ i
     l{{{ ql γ, RET ql; £ lc ∗ thP_groups i G ∗ is_task_queue ql γ ℓ }}}.
   Proof.
@@ -283,7 +282,7 @@ Section proof.
     iIntros (??) "(_& TG& IQI)".
     lwp_pures.
     lwp_bind (Fork _).
-    iPoseProof (grP_fuels_add 96 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iApply (lwp_fork). iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
     iIntros (?) "TG _ TGj !>". iModIntro.
