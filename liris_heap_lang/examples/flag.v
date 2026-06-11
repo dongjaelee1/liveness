@@ -44,11 +44,11 @@ Section proof.
 
   Definition flag_inv_tf (l : loc) k ℓ : tf Σ :=
     ⟨witP_layer k ℓ⟩ ∗
-    tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1)))).
+    alwaysP Na (((untilP Np k (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1)))).
 
   Definition flag_inv (l : loc) k ℓ : iProp Σ :=
     (witP_layer k ℓ) ∗
-    ⟦tf_always Na (((tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))))⟧ₗ.
+    ⟦alwaysP Na (((untilP Np k (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))))⟧ₗ.
 
   (** The main proofs. *)
   Global Instance flag_inv_persistent l k ℓ : Persistent (flag_inv l k ℓ).
@@ -62,7 +62,7 @@ Section proof.
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) ∗
          grP_obls j g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
          (* The other half of the until ownership for the pointsto. *)
-         ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
+         ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
          flag_inv l k ℓ }}}
       Flag.set #l @ i
     l{{{ RET #(); £ lc ∗ thP_groups i G ∗
@@ -172,7 +172,7 @@ Section proof.
     l ↦ #0 -∗
     grP_obls i g ℓg K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ grP_obls i g ℓg ({[k]} ∪ K) ∗ oblP_fuel k ℓ μ ∗
-                 ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗ flag_inv l k ℓ.
+                 ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗ flag_inv l k ℓ.
   Proof.
     iIntros (Hle) "Ptr Gg". rewrite /flag_inv.
     iMod (tf_until_alloc _ _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.

@@ -266,6 +266,10 @@ Ltac tf_red :=
 (* Making this opaque is reasonable only if we have a better reduction tactic than simpl. *)
 Global Opaque tf_logic tf_intuit.
 
+Global Notation alwaysP N P := (tf_always N P%F)%F.
+Global Notation untilP N k q P Q := (tf_until N k false q P%F Q%F)%F.
+Global Notation eventuallyP N k q Q := (tf_eventually N k false q Q%F)%F.
+
 (** Ofe and Monoid structure. *)
 Global Instance tf_equiv `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : Equiv (tf Σ) :=
   λ Φ1 Φ2, ⟦Φ1⟧ₗ ≡ ⟦Φ2⟧ₗ.
@@ -475,7 +479,7 @@ Section proof.
   (** TODO: Timeless version *)
   Lemma tf_until_to_true E N k (P Q : tf Σ) :
     ↑N ⊆ E →
-    ⟦tf_until N k false 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
+    ⟦untilP N k 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ▷ (⟦P⟧ₗ ∗ ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N,E}=∗ ⟦tf_until N k true 1 P Q⟧ₗ)).
   Proof.
     rewrite !tf_until_logic. iIntros (HM) "(Oa& #Oi)".
@@ -548,7 +552,7 @@ Section proof.
 
   Lemma tf_until_discharge E N k (P Q : tf Σ) :
     ↑N ⊆ E →
-    ⟦tf_until N k false 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
+    ⟦untilP N k 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ▷ (⟦P⟧ₗ ∗
        ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N}=∗
                        ∀ i g ℓ K, (⌜k ∈ K⌝) → grP_obls i g ℓ K -∗

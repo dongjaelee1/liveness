@@ -104,9 +104,6 @@ Global Arguments grP_fuel {SI Σ _ _}.
 
 (** Useful pattern for burning fules when taking a step *)
 Global Notation grP_fuels G n := ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ n)%I.
-(* Definition grP_fuels `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class} *)
-(*   G (n : nat) : iProp Σ := *)
-(*   ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ n). *)
 
 Local Definition grP_obls_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   i g ℓ (K : oids) : iProp Σ :=
@@ -554,6 +551,31 @@ Section preds.
     Proof.
       iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
       iModIntro. iIntros. by iApply oblP_fuel_mon.
+    Qed.
+
+    Lemma oblP_fuel_layer_mon k ℓ1 ℓ2 μ :
+      (ℓ1 <= ℓ2)%ordi →
+      oblP_fuel k ℓ2 μ ==∗ oblP_fuel k ℓ1 μ.
+    Proof.
+      iIntros (LE) "H". iApply (oblP_fuel_mon_gen with "H"). 1: auto.
+      apply measure_rep_layer_le_proper.
+      apply classicOrd.le_eq_or_lt in LE. destruct LE.
+      - right. econstructor; auto.
+      - left. econstructor; auto.
+    Qed.
+    Lemma oblP_fuel_layer_mon_list K ℓ1 ℓ2 μ :
+      (ℓ1 <= ℓ2)%ordi →
+      ([∗ list] k ∈ K, oblP_fuel k ℓ2 μ) ⊢ |==> ([∗ list] k ∈ K, oblP_fuel k ℓ1 μ).
+    Proof.
+      iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+      iModIntro. iIntros. by iApply oblP_fuel_layer_mon.
+    Qed.
+    Lemma oblP_fuel_layer_mon_set K ℓ1 ℓ2 μ :
+      (ℓ1 <= ℓ2)%ordi →
+      ([∗ set] k ∈ K, oblP_fuel k ℓ2 μ) ⊢ |==> ([∗ set] k ∈ K, oblP_fuel k ℓ1 μ).
+    Proof.
+      iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+      iModIntro. iIntros. by iApply oblP_fuel_layer_mon.
     Qed.
 
     Lemma oblP_fuel_mon_split k ℓ μ1 μ2 μ3 :
@@ -1037,6 +1059,31 @@ Section preds.
     Proof.
       iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
       iModIntro. iIntros. by iApply grP_fuel_mon.
+    Qed.
+
+    Lemma grP_fuel_layer_mon k ℓ1 ℓ2 μ :
+      (ℓ1 <= ℓ2)%ordi →
+      grP_fuel k ℓ2 μ ==∗ grP_fuel k ℓ1 μ.
+    Proof.
+      iIntros (LE) "H". iApply (grP_fuel_mon_gen with "H"). 1: auto.
+      apply measure_rep_layer_le_proper.
+      apply classicOrd.le_eq_or_lt in LE. destruct LE.
+      - right. econstructor; auto.
+      - left. econstructor; auto.
+    Qed.
+    Lemma grP_fuel_layer_mon_list K ℓ1 ℓ2 μ :
+      (ℓ1 <= ℓ2)%ordi →
+      ([∗ list] k ∈ K, grP_fuel k ℓ2 μ) ⊢ |==> ([∗ list] k ∈ K, grP_fuel k ℓ1 μ).
+    Proof.
+      iIntros (LE) "H". iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
+      iModIntro. iIntros. by iApply grP_fuel_layer_mon.
+    Qed.
+    Lemma grP_fuel_layer_mon_set K ℓ1 ℓ2 μ :
+      (ℓ1 <= ℓ2)%ordi →
+      ([∗ set] k ∈ K, grP_fuel k ℓ2 μ) ⊢ |==> ([∗ set] k ∈ K, grP_fuel k ℓ1 μ).
+    Proof.
+      iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+      iModIntro. iIntros. by iApply grP_fuel_layer_mon.
     Qed.
 
     Lemma grP_fuel_mon_split k ℓ μ1 μ2 μ3 :

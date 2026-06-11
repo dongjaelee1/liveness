@@ -56,8 +56,8 @@ Section proof.
     l{{{ thP_groups i {[g]} ∗ grP_fuel g 0 μ ∗
          grP_obls i g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
          (* Start with the other half of the until ownership for the pointsto. *)
-         ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
-         ⟦tf_eventually Nl kl false 1 (i ⤉ "exit", #())⟧ₗ ∗
+         ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
+         ⟦eventuallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
          flag_inv l k 0 }}}
       writer #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
@@ -105,8 +105,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i g k kl,
     l{{{ thP_groups i {[g]} ∗ grP_fuel g 1 μ ∗
          grP_obls i g 1 {[kl]} ∗
-         ⟦tf_eventually Nl kl false 1 (i ⤉ "exit", #1)⟧ₗ ∗
-         (* ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗ *)
+         ⟦eventuallyP Nl kl 1 (i ⤉ "exit", #1)⟧ₗ ∗
          flag_inv l k 0 }}}
       reader #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
@@ -154,9 +153,9 @@ Section proof.
     Θ = {[i := writer #(); j := reader #() ]} →
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
                       ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
-                      tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-                      tf_eventually Nl kl1 false 1 (i ⤉ "exit", #()) ∗
-                      tf_eventually Nl kl2 false 1 (j ⤉ "exit", #1) ∗
+                      untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
+                      eventuallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
+                      eventuallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
                       ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗
                        thP_groups j {[g2]} ∗ grP_obls j g2 1 ({[kl2]}) ∗
                        grP_fuel g1 0 μ1 ∗ grP_fuel g2 1 μ2⟩)%F) →
@@ -255,9 +254,9 @@ Section adequacy.
         λ μ1 μ2,
           (∃ g1 g2 k kl1 kl2,
               ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
-              tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-              tf_eventually Nl kl1 false 1 (i ⤉ "exit", #()) ∗
-              tf_eventually Nl kl2 false 1 (j ⤉ "exit", #1) ∗
+              untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
+              eventuallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
+              eventuallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
               ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗
                thP_groups j {[g2]} ∗ grP_obls j g2 1 ({[kl2]}) ∗
                grP_fuel g1 0 μ1 ∗ grP_fuel g2 1 μ2⟩)%F.
