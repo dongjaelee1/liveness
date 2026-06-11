@@ -14,12 +14,12 @@ Section code.
   Definition X : val := #X_loc.
 
   Definition writer : val :=
-    λ: <>, Flag.set X;;
-          Label "exit" #().
+    λ: <>, let: "v" := Flag.set X in
+          Label "exit" "v".
 
   Definition reader : val :=
-    λ: <>, Flag.wait X;;
-          Label "exit" #().
+    λ: <>, let: "v" := Flag.wait X in
+          Label "exit" "v".
 
 End code.
 
@@ -57,7 +57,7 @@ Section proof.
          grP_obls i g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
          (* Start with the other half of the until ownership for the pointsto. *)
          ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
-         ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
+         ⟦tf_eventually Nl kl false 1 (i ⤉ "exit", #())⟧ₗ ∗
          flag_inv l k 0 }}}
       writer #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
@@ -85,13 +85,12 @@ Section proof.
     iApply (lc_sfmupd_add_later with "LC1"). iNext.
     iDestruct "HE" as "[_ HE]". iMod ("HE" $! _) as "HE".
     iMod ("HE" with "[PL]") as "HE".
-    { iNext. tf_red. iExists _. tf_red. iEval (rewrite tf_atomic_logic). iFrame. done. }
+    { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
     iPoseProof ("HE" with "[] Gg") as "HE".
     { iPureIntro. set_solver. }
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lc_sfmupd_add_later with "LC1"). iNext.
     iMod ("HE" $! _) as "HE". iModIntro. iMod "HE" as "(PL& Gg& #Odkl)".
-    tf_red. iDestruct "PL" as "(%& PL)". tf_red. iDestruct "PL" as "(PL& %)". subst a.
     iModIntro. iFrame "PL".
     replace ({[kl]} ∖ {[kl]} : gset _) with (∅ : oids) by set_solver.
     iMod (group_delete with "TG Gg") as "TG".
@@ -106,7 +105,8 @@ Section proof.
     ⊢ ∃ μ, ∀ i g k kl,
     l{{{ thP_groups i {[g]} ∗ grP_fuel g 1 μ ∗
          grP_obls i g 1 {[kl]} ∗
-         ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗
+         ⟦tf_eventually Nl kl false 1 (i ⤉ "exit", #1)⟧ₗ ∗
+         (* ⟦tf_eventually Nl kl false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝)⟧ₗ ∗ *)
          flag_inv l k 0 }}}
       reader #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
@@ -133,13 +133,12 @@ Section proof.
     iApply (lc_sfmupd_add_later with "LC1"). iNext.
     iDestruct "HE" as "[_ HE]". iMod ("HE" $! _) as "HE".
     iMod ("HE" with "[PL]") as "HE".
-    { iNext. tf_red. iExists _. tf_red. iEval (rewrite tf_atomic_logic). iFrame. done. }
+    { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
     iPoseProof ("HE" with "[] Gg") as "HE".
     { iPureIntro. set_solver. }
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lc_sfmupd_add_later with "LC1"). iNext.
     iMod ("HE" $! _) as "HE". iModIntro. iMod "HE" as "(PL& Gg& #Odkl)".
-    tf_red. iDestruct "PL" as "(%& PL)". tf_red. iDestruct "PL" as "(PL& %)". subst a.
     iModIntro. iFrame "PL".
     replace ({[kl]} ∖ {[kl]} : gset _) with (∅ : oids) by set_solver.
     iMod (group_delete with "TG Gg") as "TG".
@@ -156,8 +155,8 @@ Section proof.
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
                       ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
                       tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-                      tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-                      tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+                      tf_eventually Nl kl1 false 1 (i ⤉ "exit", #()) ∗
+                      tf_eventually Nl kl2 false 1 (j ⤉ "exit", #1) ∗
                       ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗
                        thP_groups j {[g2]} ∗ grP_obls j g2 1 ({[kl2]}) ∗
                        grP_fuel g1 0 μ1 ∗ grP_fuel g2 1 μ2⟩)%F) →
@@ -177,11 +176,11 @@ Section proof.
     iMod (group_alloc _ _ _ 0 μ1 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (flag_inv_init _ _ _ _ _ 0 _ μ1 with "Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #flag_inv)". 1: done.
     iMod (tf_until_alloc _ _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (∃ v : val, i ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl1".
+    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (i ⤉ "exit",#())%F with "[]") as "Ukl1".
     { tf_red. done. }
     iMod (group_alloc _ _ _ 1 μ2 with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
     iMod (tf_until_alloc _ _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
-    iMod ("Akl2" $! _ Nl (⌜True⌝)%F (∃ v : val, j ⤉ "exit",v ∗ ⌜v = #()⌝)%F with "[]") as "Ukl2".
+    iMod ("Akl2" $! _ Nl (⌜True⌝)%F (j ⤉ "exit",#1)%F with "[]") as "Ukl2".
     { tf_red. done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
     { subst Φ.
@@ -225,15 +224,15 @@ Section adequacy.
   Let Φ : tp :=
         (flag_inv_tp l ∧
          tp_until (l ↦ #0) (l ↦ #1) ∧
-         tp_eventually (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
-         tp_eventually (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝))%P.
+         tp_eventually (i ⤉ "exit", #()) ∧
+         tp_eventually (j ⤉ "exit", #1))%P.
 
   Let Φ' : tp :=
         (∃ (g1 g2 : ogid) (k kl1 kl2 : oid),
             ⌜ k ≠ kl1 ⌝ ∧ flag_inv_tp' l ∧
             tp_until (l ↦ #0) (l ↦ #1) ∧
-            tp_eventually (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
-            tp_eventually (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
+            tp_eventually (i ⤉ "exit", #()) ∧
+            tp_eventually (j ⤉ "exit", #1) ∧
             tp_true)%P.
 
   Remark Φ_impl :
@@ -257,8 +256,8 @@ Section adequacy.
           (∃ g1 g2 k kl1 kl2,
               ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
               tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-              tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-              tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+              tf_eventually Nl kl1 false 1 (i ⤉ "exit", #()) ∗
+              tf_eventually Nl kl2 false 1 (j ⤉ "exit", #1) ∗
               ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗
                thP_groups j {[g2]} ∗ grP_obls j g2 1 ({[kl2]}) ∗
                grP_fuel g1 0 μ1 ∗ grP_fuel g2 1 μ2⟩)%F.

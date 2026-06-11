@@ -14,7 +14,7 @@ Module Flag.
   Definition wait : val := 
     rec: "wait" "x" :=
       if: !"x" = #1
-      then #()
+      then #1
       else "wait" "x".
 
 End Flag.
@@ -110,7 +110,7 @@ Section proof.
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
          flag_inv l k ℓ }}}
       Flag.wait #l @ i
-    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ oblP_discharged k }}}.
+    l{{{ RET #1; £ lc ∗ thP_groups i G ∗ oblP_discharged k }}}.
   Proof.
     iExists ((1 × ▽) ⊕ 1)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& #flag_inv)".
