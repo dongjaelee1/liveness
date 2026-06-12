@@ -106,9 +106,7 @@ Section lwpupd.
   Proof.
     unfold_lwpupd. iIntros (Sub) "H %%%%%% %% SI". iPoseProof ("H" $! K with "[//] [//] SI") as "H".
     iMod (fupd_mask_subseteq E1) as "close". 1: done.
-    iMod "H". iModIntro. iMod "H" as ">H". iMod "close" as "_".
-    iMod (fupd_mask_subseteq ∅) as "close". 1: set_solver.
-    iIntros "!> !>". iMod "close" as "_". by iApply "H".
+    iMod "H". iMod "close" as "_". iModIntro. auto.
   Qed.
 
   (** Expression and context. *)
@@ -202,7 +200,8 @@ Section lwpupd.
     (|={E1,E2}=> lwpupd i E2 e (|={E2,E1}=> P)) ⊢ (lwpupd i E1 e P).
   Proof.
     unfold_lwpupd. iIntros "H %%%%%% %% I". iMod "H". iPoseProof ("H" $! K with "[//] [//] I") as "H".
-    iMod "H". iModIntro. iMod "H". iModIntro. iMod "H" as "[$ H]". auto.
+    iApply fmupd_fupd_r. iMod "H". iModIntro.
+    iDestruct "H" as "[$ H]". auto.
   Qed.
 
   (** Elim rule. *)
@@ -730,8 +729,7 @@ Section lwp.
     { unfold_lwpupd. iIntros (?????? ??) "SI".
       iMod (fupd_mask_subseteq E1) as "Hclose"; first done.
       iMod ("IH" $! K with "[//] [//] SI") as "IH".
-      iApply fupd_mask_intro. 1: set_solver.
-      iIntros "Hclose2". iMod "IH". iMod "Hclose2" as "_". iMod "IH" as "[SI IH]".
+      iDestruct "IH" as "[SI IH]".
       iMod "Hclose" as "_".
       iMod ("HΦ" with "IH [//] [//] SI") as "$". done.
     }
@@ -791,7 +789,7 @@ Section lwp.
     iIntros "H". rewrite !lwp_unfold /lwp_pre.
     destruct (to_val e) as [v|] eqn:He.
     { unfold_lwpupd. iIntros (?????? ??) "SI". iMod ("H" $! K with "[//] [//] SI") as ">H".
-      iModIntro. iMod "H". iModIntro. iMod "H" as "[$ H]". done. }
+      iApply fmupd_fupd_r. iModIntro. iDestruct "H" as "[$ H]". done. }
     iIntros (??????? ??) "SI". iMod ("H" $! K with "[//] [//] SI") as "H". iMod "H".
     iModIntro. iPoseProof "H" as "[$ H]".
     iIntros (??? STEP). iMod ("H" with "[//]") as "H".

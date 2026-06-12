@@ -440,20 +440,21 @@ Section mupd.
 End mupd.
 
 (* Wrapper to use fupd. *)
-Definition fmupd `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} E n Θ : iPropO Σ -d> iPropO Σ :=
-  (λ P, |={E,∅}=> |=[n,Θ]=>m |={∅,E}=> P)%I.
-Notation "'|={' E : n , Θ '}=>m' P" := (fmupd E n Θ P) (at level 99, P at level 200, format "|={ E : n , Θ }=>m  P").
+Definition fmupd `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} E1 E2 n Θ : iPropO Σ -d> iPropO Σ :=
+  (λ P, |={E1,∅}=> |=[n,Θ]=>m |={∅,E2}=> P)%I.
+Notation "'|={' E1 , E2 : n , Θ '}=>m' P" := (fmupd E1 E2 n Θ P) (at level 99, P at level 200, format "|={ E1 , E2 : n , Θ }=>m  P").
+Notation "'|={' E : n , Θ '}=>m' P" := (fmupd E E n Θ P) (at level 99, P at level 200, format "|={ E : n , Θ }=>m  P").
 
 Section fmupd.
   Context `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}.
   Implicit Type Θ : (gset positive).
 
-  Global Instance fmupd_ne E n Θ : NonExpansive (fmupd E n Θ).
+  Global Instance fmupd_ne E1 E2 n Θ : NonExpansive (fmupd E1 E2 n Θ).
   Proof. intros ? P1 P2 HP. rewrite /fmupd. do 12 (f_equiv || done). Qed.
-  Global Instance fmupd_proper E n Θ : Proper ((≡) ==> (≡)) (fmupd E n Θ).
+  Global Instance fmupd_proper E1 E2 n Θ : Proper ((≡) ==> (≡)) (fmupd E1 E2 n Θ).
   Proof. intros P P' ?. apply equiv_dist=>?. apply fmupd_ne. apply equiv_dist. done. Qed.
 
-  Lemma fupd_fmupd E n Θ P : (|={E}=> P) ⊢ (|={E:n,Θ}=>m P).
+  Lemma fupd_fmupd E1 E2 n Θ P : (|={E1,E2}=> P) ⊢ (|={E1,E2:n,Θ}=>m P).
   Proof.
     rewrite /fmupd. iIntros ">Hupd".
     iApply fupd_mask_intro. 1: set_solver.
@@ -475,14 +476,22 @@ Section fmupd.
     iIntros "!> !>". iMod "Hclose". done.
   Qed.
 
-  Lemma fupd_fmupd_elim E n Θ P :
-    (|={E}=> |={E:n,Θ}=>m P) ⊢ |={E:n,Θ}=>m P.
+  Lemma fupd_fmupd_elim E1 E2 n Θ P :
+    (|={E1}=> |={E1,E2:n,Θ}=>m P) ⊢ |={E1,E2:n,Θ}=>m P.
   Proof.
     iIntros "H". iMod "H". iApply "H".
   Qed.
 
-  Lemma mupd_fmupd_elim E n Θ P :
-    (|=[n,Θ]=>m |={E:n,Θ}=>m P) ⊢ |={E:n,Θ}=>m P.
+  Lemma fupd_fmupd_elim_2 E1 E2 n Θ P :
+    (|={E1,E2:n,Θ}=>m |={E2}=> P) ⊢ |={E1,E2:n,Θ}=>m P.
+  Proof.
+    iIntros "H". iMod "H". iModIntro. iMod "H" as ">H".
+    iMod "H" as "$". iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+    iModIntro. by iMod "close".
+  Qed.
+
+  Lemma mupd_fmupd_elim E1 E2 n Θ P :
+    (|=[n,Θ]=>m |={E1,E2:n,Θ}=>m P) ⊢ |={E1,E2:n,Θ}=>m P.
   Proof.
     iIntros "H". iApply fupd_mask_intro. 1: set_solver.
     iIntros "Fupd". iMod "H". iMod "Fupd" as "_". done.
@@ -495,15 +504,13 @@ Section fmupd.
   Proof.
     iIntros (Sub) "H".
     iMod (fupd_mask_subseteq E1) as "close". 1: done.
-    iMod "H". iModIntro. iMod "H" as ">H".
-    iMod "close" as "_".
-    iMod (fupd_mask_subseteq ∅) as "close". 1: set_solver.
-    iIntros "!> !>". iMod "close" as "_". by iApply "H".
+    iMod "H". iModIntro. iMod "H" as "H".
+    iModIntro. iMod "H" as "$". eauto.
   Qed.
 
   (** We can combine two obl updates into one. *)
-  Lemma fmupd_bind E n Θ P Q :
-    (P -∗ |={E:n,Θ}=>m Q) ⊢ (|={E:n,Θ}=>m P) -∗ (|={E:n,Θ}=>m Q).
+  Lemma fmupd_bind E1 E2 E3 n Θ P Q :
+    (P -∗ |={E2,E3:n,Θ}=>m Q) ⊢ (|={E1,E2:n,Θ}=>m P) -∗ (|={E1,E3:n,Θ}=>m Q).
   Proof.
     iIntros "H >HP".
     iModIntro. iMod "HP" as ">HP".
@@ -511,46 +518,50 @@ Section fmupd.
   Qed.
 
   (* derived lemmas *)
-  Lemma fmupd_mono E n Θ P Q : (P ⊢ Q) → (|={E:n,Θ}=>m P) ⊢ (|={E:n,Θ}=>m Q).
+  Lemma fmupd_mono E1 E2 n Θ P Q : (P ⊢ Q) → (|={E1,E2:n,Θ}=>m P) ⊢ (|={E1,E2:n,Θ}=>m Q).
   Proof.
     intros Hent. iApply fmupd_bind.
     iIntros "P"; iApply fmupd_intro; by iApply Hent.
   Qed.
-  Lemma fmupd_trans E n Θ P :  (|={E:n,Θ}=>m |={E:n,Θ}=>m P) ⊢ |={E:n,Θ}=>m P.
+  Lemma fmupd_trans E1 E2 E3 n Θ P :  (|={E1,E3:n,Θ}=>m |={E3,E2:n,Θ}=>m P) ⊢ |={E1,E2:n,Θ}=>m P.
   Proof.
     iIntros "HP". iApply fmupd_bind; eauto.
   Qed.
-  Lemma fmupd_frame_r E n Θ P R : (|={E:n,Θ}=>m P) ∗ R ⊢ |={E:n,Θ}=>m P ∗ R.
+  Lemma fmupd_frame_r E1 E2 n Θ P R : (|={E1,E2:n,Θ}=>m P) ∗ R ⊢ |={E1,E2:n,Θ}=>m P ∗ R.
   Proof.
     iIntros "[Hupd R]". iApply (fmupd_bind with "[R]"); last done.
     iIntros "P". iApply fmupd_intro. by iFrame.
   Qed.
 
-  Global Instance fmupd_ent_proper E n Θ : Proper ((⊢) ==> (⊢)) (fmupd E n Θ).
+  Global Instance fmupd_ent_proper E1 E2 n Θ : Proper ((⊢) ==> (⊢)) (fmupd E1 E2 n Θ).
   Proof. intros P Q PQ. by apply fmupd_mono. Qed.
-  Global Instance fmupd_flip_ent_proper E n Θ : Proper (flip (⊢) ==> flip (⊢)) (fmupd E n Θ).
+  Global Instance fmupd_flip_ent_proper E1 E2 n Θ : Proper (flip (⊢) ==> flip (⊢)) (fmupd E1 E2 n Θ).
   Proof. intros P Q PQ; by apply fmupd_mono. Qed.
-  Global Instance fmupd_equiv_proper E n Θ : Proper ((≡) ==> (≡)) (fmupd E n Θ) := ne_proper _.
+  Global Instance fmupd_equiv_proper E1 E2 n Θ : Proper ((≡) ==> (≡)) (fmupd E1 E2 n Θ) := ne_proper _.
 
-  Lemma fmupd_fupd_l E n Θ P :
-    (|={E}=> |={E:n,Θ}=>m P) ⊢ (|={E:n,Θ}=>m P).
+  Lemma fmupd_fupd_l E1 E2 n Θ P :
+    (|={E1,E2}=> |={E2:n,Θ}=>m P) ⊢ (|={E1,E2:n,Θ}=>m P).
   Proof.
     by erewrite fupd_fmupd, fmupd_trans.
   Qed.
-  Lemma fmupd_fupd_r E n Θ P :
-    (|={E:n,Θ}=>m |={E}=> P) ⊢ (|={E:n,Θ}=>m P).
+  Lemma fmupd_fupd_r E1 E2 n Θ P :
+    (|={E1:n,Θ}=>m |={E1,E2}=> P) ⊢ (|={E1,E2:n,Θ}=>m P).
   Proof.
     by erewrite fupd_fmupd, fmupd_trans.
   Qed.
 
-  Lemma fmupd_frame_l E n Θ R Q : (R ∗ |={E:n,Θ}=>m Q) ⊢ |={E:n,Θ}=>m R ∗ Q.
+  Lemma fmupd_frame_l E1 E2 n Θ R Q : (R ∗ |={E1,E2:n,Θ}=>m Q) ⊢ |={E1,E2:n,Θ}=>m R ∗ Q.
   Proof. rewrite !(comm _ R); apply fmupd_frame_r. Qed.
-  Lemma fmupd_wand_l E n Θ P Q : (P -∗ Q) ∗ (|={E:n,Θ}=>m P) ⊢ |={E:n,Θ}=>m Q.
+  Lemma fmupd_wand_l E1 E2 n Θ P Q : (P -∗ Q) ∗ (|={E1,E2:n,Θ}=>m P) ⊢ |={E1,E2:n,Θ}=>m Q.
   Proof. by rewrite fmupd_frame_l wand_elim_l. Qed.
-  Lemma fmupd_wand_r E n Θ P Q : (|={E:n,Θ}=>m P) ∗ (P -∗ Q) ⊢ |={E:n,Θ}=>m Q.
+  Lemma fmupd_wand_r E1 E2 n Θ P Q : (|={E1,E2:n,Θ}=>m P) ∗ (P -∗ Q) ⊢ |={E1,E2:n,Θ}=>m Q.
   Proof. by rewrite fmupd_frame_r wand_elim_r. Qed.
   Lemma fmupd_sep E n Θ P Q : (|={E:n,Θ}=>m P) ∗ (|={E:n,Θ}=>m Q) ⊢ |={E:n,Θ}=>m P ∗ Q.
   Proof. by rewrite fmupd_frame_r fmupd_frame_l fmupd_trans. Qed.
+  Lemma fmupd_sep_l E1 E2 E3 n Θ P Q : (|={E1,E3:n,Θ}=>m P) ∗ (|={E3,E2:n,Θ}=>m Q) ⊢ |={E1,E2:n,Θ}=>m P ∗ Q.
+  Proof. rewrite fmupd_frame_r fmupd_frame_l. apply fmupd_trans. Qed.
+  Lemma fmupd_sep_r E1 E2 E3 n Θ P Q : (|={E3,E2:n,Θ}=>m P) ∗ (|={E1,E3:n,Θ}=>m Q) ⊢ |={E1,E2:n,Θ}=>m P ∗ Q.
+  Proof. rewrite bi.sep_comm. rewrite fmupd_frame_r fmupd_frame_l bi.sep_comm. apply fmupd_trans. Qed.
   Lemma fmupd_idemp E n Θ P : (|={E:n,Θ}=>m |={E:n,Θ}=>m P) ⊣⊢ |={E:n,Θ}=>m P.
   Proof.
     apply: anti_symm.
@@ -559,7 +570,7 @@ Section fmupd.
   Qed.
 
   Global Instance fmupd_homomorphism E n Θ :
-    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (fmupd E n Θ).
+    MonoidHomomorphism bi_sep bi_sep (flip (⊢)) (fmupd E E n Θ).
   Proof. split; [split|]; try apply _; [apply fmupd_sep | apply fmupd_intro]. Qed.
 
   Lemma big_sepL_fmupd {A} (Φ : nat → A → iProp Σ) E n Θ l :
@@ -575,37 +586,37 @@ Section fmupd.
     ([∗ mset] x ∈ l, |={E:n,Θ}=>m Φ x) ⊢ |={E:n,Θ}=>m [∗ mset] x ∈ l, Φ x.
   Proof. by rewrite (big_opMS_commute _). Qed.
 
-  Lemma except_0_fmupd E n Θ P : ◇ (|={E:n,Θ}=>m P) ⊢ (|={E:n,Θ}=>m ◇ P).
+  Lemma except_0_fmupd E1 E2 n Θ P : ◇ (|={E1,E2:n,Θ}=>m P) ⊢ (|={E1,E2:n,Θ}=>m ◇ P).
   Proof.
     rewrite /bi_except_0. apply or_elim; eauto using fmupd_mono, or_intro_r.
-    by rewrite -fmupd_intro -or_intro_l.
+    rewrite -fupd_fmupd. iIntros "H". iApply except_0_fupd. iMod "H". done.
   Qed.
 
-  Global Instance elim_fupd_fmupd (p : bool) E n Θ P Q :
-    ElimModal True p false (|={E}=> P) P (|={E:n,Θ}=>m Q) (|={E:n,Θ}=>m Q)%I.
+  Global Instance elim_fupd_fmupd (p : bool) E1 E2 E3 n Θ P Q :
+    ElimModal True p false (|={E1,E2}=> P) P (|={E1,E3:n,Θ}=>m Q) (|={E2,E3:n,Θ}=>m Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
-    iIntros "_ [HP HPQ]". iApply fupd_fmupd_elim.
-    iMod "HP". by iApply "HPQ".
+    iIntros "_ [HP HPQ]". iApply fmupd_trans.
+    iApply fupd_fmupd. iMod "HP". by iApply "HPQ".
   Qed.
 
-  Global Instance elim_mupd_fmupd (p : bool) E n Θ P Q :
-    ElimModal True p false (|=[n,Θ]=>m P) P (|={E:n,Θ}=>m Q) (|={E:n,Θ}=>m Q)%I.
+  Global Instance elim_mupd_fmupd (p : bool) E1 E2 n Θ P Q :
+    ElimModal True p false (|=[n,Θ]=>m P) P (|={E1,E2:n,Θ}=>m Q) (|={E1,E2:n,Θ}=>m Q)%I.
   Proof.
     rewrite /ElimModal bi.intuitionistically_if_elim //=.
     iIntros "_ [HP HPQ]". iApply mupd_fmupd_elim.
     iMod "HP". by iApply "HPQ".
   Qed.
 
-  Global Instance add_modal_fupd_fmupd E n Θ P Q :
-    AddModal (|={E}=> P) P (|={E:n,Θ}=>m Q).
+  Global Instance add_modal_fupd_fmupd E1 E2 n Θ P Q :
+    AddModal (|={E1}=> P) P (|={E1,E2:n,Θ}=>m Q).
   Proof.
     rewrite /AddModal; rewrite fupd_fmupd; iIntros "[HP HPQ]".
     iApply (fmupd_bind with "HPQ HP").
   Qed.
 
-  Global Instance add_modal_mupd_fmupd E n Θ P Q :
-    AddModal (|=[n,Θ]=>m P) P (|={E:n,Θ}=>m Q).
+  Global Instance add_modal_mupd_fmupd E1 E2 n Θ P Q :
+    AddModal (|=[n,Θ]=>m P) P (|={E1,E2:n,Θ}=>m Q).
   Proof.
     rewrite /AddModal; rewrite mupd_fmupd; iIntros "[HP HPQ]".
     iApply (fmupd_bind with "HPQ HP").
@@ -626,15 +637,15 @@ Section fmupd.
     apply wand_intro_l. by rewrite fmupd_sep wand_elim_r.
   Qed.
 
-  Global Instance into_wand_fmupd_persistent p q E n Θ R P Q :
-    IntoWand false q R P Q → IntoWand p q (|={E:n,Θ}=>m R) P (|={E:n,Θ}=>m Q).
+  Global Instance into_wand_fmupd_persistent p q E1 E2 n Θ R P Q :
+    IntoWand false q R P Q → IntoWand p q (|={E1,E2:n,Θ}=>m R) P (|={E1,E2:n,Θ}=>m Q).
   Proof.
     rewrite /IntoWand /= => HR. rewrite intuitionistically_if_elim HR.
     apply wand_intro_l. by rewrite fmupd_frame_l wand_elim_r.
   Qed.
 
-  Global Instance into_wand_fmupd_args p q E n Θ R P Q :
-    IntoWand p false R P Q → IntoWand' p q R (|={E:n,Θ}=>m P) (|={E:n,Θ}=>m Q).
+  Global Instance into_wand_fmupd_args p q E1 E2 n Θ R P Q :
+    IntoWand p false R P Q → IntoWand' p q R (|={E1,E2:n,Θ}=>m P) (|={E1,E2:n,Θ}=>m Q).
   Proof.
     rewrite /IntoWand' /IntoWand /= => ->.
     apply wand_intro_l. by rewrite intuitionistically_if_elim fmupd_wand_r.
@@ -644,20 +655,20 @@ Section fmupd.
     FromSep P Q1 Q2 → FromSep (|={E:n,Θ}=>m P) (|={E:n,Θ}=>m Q1) (|={E:n,Θ}=>m Q2).
   Proof. rewrite /FromSep=><-. apply fmupd_sep. Qed.
 
-  Global Instance from_or_fmupd E n Θ P Q1 Q2 :
-    FromOr P Q1 Q2 → FromOr (|={E:n,Θ}=>m P) (|={E:n,Θ}=>m Q1) (|={E:n,Θ}=>m Q2).
+  Global Instance from_or_fmupd E1 E2 n Θ P Q1 Q2 :
+    FromOr P Q1 Q2 → FromOr (|={E1,E2:n,Θ}=>m P) (|={E1,E2:n,Θ}=>m Q1) (|={E1,E2:n,Θ}=>m Q2).
   Proof.
     rewrite /FromOr=><-.
     apply or_elim; apply fmupd_mono; auto using or_intro_l, or_intro_r.
   Qed.
 
-  Global Instance from_exist_fmupd {A} E n Θ P (Φ : A → iProp Σ) :
-    FromExist P Φ → FromExist (|={E:n,Θ}=>m P) (λ a, |={E:n,Θ}=>m Φ a)%I.
+  Global Instance from_exist_fmupd {A} E1 E2 n Θ P (Φ : A → iProp Σ) :
+    FromExist P Φ → FromExist (|={E1,E2:n,Θ}=>m P) (λ a, |={E1,E2:n,Θ}=>m Φ a)%I.
   Proof.
     rewrite /FromExist=><-. apply exist_elim=> a. by rewrite -(exist_intro a).
   Qed.
 
-  Global Instance is_except_0_fmupd E n Θ P : IsExcept0 P → IsExcept0 (|={E:n,Θ}=>m P).
+  Global Instance is_except_0_fmupd E1 E2 n Θ P : IsExcept0 P → IsExcept0 (|={E1,E2:n,Θ}=>m P).
   Proof.
     rewrite /IsExcept0=> HP.
     by rewrite -{2}HP -(except_0_idemp P) -except_0_fmupd -(except_0_intro P).
@@ -667,18 +678,18 @@ Section fmupd.
     FromModal True modality_id (|={E:n,Θ}=>m P) (|={E:n,Θ}=>m P) P.
   Proof. by rewrite /FromModal /= -fmupd_intro. Qed.
 
-  Global Instance elim_modal_fmupd p E n Θ P Q :
-    ElimModal True p false (|={E:n,Θ}=>m P) P (|={E:n,Θ}=>m Q) (|={E:n,Θ}=>m Q).
+  Global Instance elim_modal_fmupd p E1 E2 E3 n Θ P Q :
+    ElimModal True p false (|={E1,E2:n,Θ}=>m P) P (|={E1,E3:n,Θ}=>m Q) (|={E2,E3:n,Θ}=>m Q).
   Proof.
     by rewrite /ElimModal
       intuitionistically_if_elim fmupd_frame_r wand_elim_r fmupd_trans.
   Qed.
 
-  Global Instance add_modal_fmupd E n Θ P Q : AddModal (|={E:n,Θ}=>m P) P (|={E:n,Θ}=>m Q).
+  Global Instance add_modal_fmupd E1 E2 n Θ P Q : AddModal (|={E1:n,Θ}=>m P) P (|={E1,E2:n,Θ}=>m Q).
   Proof. by rewrite /AddModal fmupd_frame_r wand_elim_r fmupd_trans. Qed.
 
-  Global Instance frame_fmupd p E n Θ R P Q :
-    Frame p R P Q → Frame p R (|={E:n,Θ}=>m P) (|={E:n,Θ}=>m Q).
+  Global Instance frame_fmupd p E1 E2 n Θ R P Q :
+    Frame p R P Q → Frame p R (|={E1,E2:n,Θ}=>m P) (|={E1,E2:n,Θ}=>m Q).
   Proof. rewrite /Frame=><-. by rewrite fmupd_frame_l. Qed.
 
 End fmupd.
