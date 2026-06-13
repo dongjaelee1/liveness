@@ -56,7 +56,7 @@ Section proof.
     l{{{ thP_groups i {[g]} ∗ grP_fuel g 0 μ ∗
          grP_obls i g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
          (* Start with the other half of the until ownership for the pointsto. *)
-         ⟦untilP Np k (1/2) (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1)⟧ₗ ∗
+         ⟦untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)⟧ₗ ∗
          ⟦eventuallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
          flag_inv l k 0 }}}
       writer #() @ i
@@ -153,7 +153,7 @@ Section proof.
     Θ = {[i := writer #(); j := reader #() ]} →
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
                       ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
-                      untilP Np k (1/2) (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1) ∗
+                      untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1) ∗
                       eventuallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
                       eventuallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
                       ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗
@@ -222,14 +222,14 @@ Section adequacy.
 
   Let Φ : tp :=
         (flag_inv_tp l ∧
-         tp_until (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1) ∧
+         tp_until (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1) ∧
          tp_eventually (i ⤉ "exit", #()) ∧
          tp_eventually (j ⤉ "exit", #1))%P.
 
   Let Φ' : tp :=
         (∃ (g1 g2 : ogid) (k kl1 kl2 : oid),
             ⌜ k ≠ kl1 ⌝ ∧ flag_inv_tp' l ∧
-            tp_until (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1) ∧
+            tp_until (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1) ∧
             tp_eventually (i ⤉ "exit", #()) ∧
             tp_eventually (j ⤉ "exit", #1) ∧
             tp_true)%P.
@@ -254,7 +254,7 @@ Section adequacy.
         λ μ1 μ2,
           (∃ g1 g2 k kl1 kl2,
               ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
-              untilP Np k (1/2) (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1) ∗
+              untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1) ∗
               eventuallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
               eventuallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
               ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗

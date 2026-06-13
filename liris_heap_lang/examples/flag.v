@@ -44,11 +44,11 @@ Section proof.
 
   Definition flag_inv_tf (l : loc) k ℓ : tf Σ :=
     ⟨witP_layer k ℓ⟩ ∗
-    alwaysP Na (((untilP Np k (1/2) (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1)))).
+    alwaysP Na (((untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1)))).
 
   Definition flag_inv (l : loc) k ℓ : iProp Σ :=
     (witP_layer k ℓ) ∗
-    ⟦alwaysP Na (((untilP Np k (1/2) (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))))⟧ₗ.
+    ⟦alwaysP Na (((untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))))⟧ₗ.
 
   (** The main proofs. *)
   Global Instance flag_inv_persistent l k ℓ : Persistent (flag_inv l k ℓ).
@@ -62,7 +62,7 @@ Section proof.
     l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) ∗
          grP_obls j g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
          (* The other half of the until ownership for the pointsto. *)
-         ⟦untilP Np k (1/2) (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1)⟧ₗ ∗
+         ⟦untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)⟧ₗ ∗
          flag_inv l k ℓ }}}
       Flag.set #l @ i
     l{{{ RET #(); £ lc ∗ thP_groups i G ∗
@@ -182,12 +182,12 @@ Section proof.
     l ↦ #0 -∗
     grP_obls i g ℓg K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ grP_obls i g ℓg ({[k]} ∪ K) ∗ oblP_fuel k ℓ μ ∗
-                 ⟦untilP Np k (1/2) (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1)⟧ₗ ∗ flag_inv l k ℓ.
+                 ⟦untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)⟧ₗ ∗ flag_inv l k ℓ.
   Proof.
     iIntros (Hle) "Ptr Gg". rewrite /flag_inv.
     iMod (tf_until_alloc _ _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
-    iMod ("H" $! _ Np (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v)%F (l ↦ #1)%F with "[Ptr]") as "H".
-    { iNext. tf_red. iExists _. tf_red. rewrite tf_atomic_logic. iFrame. iPureIntro. lia. }
+    iMod ("H" $! _ Np (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v)%F (l ↦ #1)%F with "[Ptr]") as "H".
+    { iNext. tf_red. iExists _. tf_red. rewrite tf_atomic_logic. iFrame. iPureIntro. done. }
     iDestruct "H" as "[H1 H2]".
     do 2 tf_red.
     iMod (inv_alloc with "[H1]") as "$". 2: by iFrame.
@@ -200,11 +200,11 @@ Section trace.
 
   (** Export to trace properties *)
   Definition flag_inv_tp (l : loc) : tp :=
-    (tp_always (((tp_until (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1)) ∨ (l ↦ #1))))%P.
+    (tp_always (((tp_until (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)) ∨ (l ↦ #1))))%P.
 
   (** TODO: weaken the strict equality to semantics equivalence/implication. *)
   Definition flag_inv_tp' (l : loc) : tp :=
-    (tp_true ∧ tp_always (((tp_until (∃ (v : Z), ⌜v ≠ 1⌝ ∧ l ↦ #v) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
+    (tp_true ∧ tp_always (((tp_until (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
 
   Remark flag_inv_tf_to_tp' `{!heapGS Σ} l k ℓ :
     tf_to_tp (flag_inv_tf l k ℓ) = flag_inv_tp' l.
