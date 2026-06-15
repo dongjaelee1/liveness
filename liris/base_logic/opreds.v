@@ -1517,6 +1517,33 @@ Section preds.
       iFrame (H1). iApply (collect_fuels_decr with "Fs"). auto.
     Qed.
 
+    Lemma wit_fuels_ind k ℓ α F (P : iProp Σ) :
+      □ ((witP_cred k Ord.one ==∗ P) -∗
+         ([∗ map] f ↦ '(l, m) ∈ F, grP_fuel f l m) ==∗ P) ∗
+      wit_fuels k ℓ α F
+      ⊢ ([∗ map] f ↦ '(l, m) ∈ F, grP_fuel f l m) ==∗ P.
+    Proof.
+      iIntros "[#H WF]". iInduction α as [α IH] using (well_founded_ind WFOCM.lt_wf).
+      iApply "H". iIntros "Wc". iMod (wit_fuels_decr with "WF Wc") as "(%&%& WF& Fs)".
+      iApply ("IH" with "[//] WF Fs").
+    Qed.
+
+    Lemma wit_layer_ind k ℓ G l m (P : iProp Σ) :
+      (ℓ < l)%ordi →
+      □ ((witP_cred k Ord.one ==∗ P) -∗
+         ([∗ set] g ∈ G, grP_fuel g l m) ==∗ P) ∗
+      witP_layer k ℓ ∗
+      ([∗ set] g ∈ G, grP_fuel g l (m × ▽)%M)
+      ⊢ ([∗ set] g ∈ G, grP_fuel g l m) ==∗ P.
+    Proof.
+      iIntros (LT) "(#IND& #Wl& FG) F". iPoseProof (wit_fuels_init with "Wl") as "[% Wf0]".
+      iMod (wit_fuels_add_map with "Wf0 FG") as "WF". 1: auto.
+      iApply (wit_fuels_ind with "[IND $WF] [F]").
+      - iIntros "!> H F". rewrite map_union_empty big_sepM_gset_to_gmap.
+        iApply ("IND" with "H F").
+      - rewrite map_union_empty big_sepM_gset_to_gmap. iFrame.
+    Qed.
+
   End liveness_preds.
 
   Section fmupd.
