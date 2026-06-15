@@ -1422,6 +1422,34 @@ Section preds.
       rewrite measure_rep_embed measure_rep_large. apply Ord.lt_le, Ord.large_lt_from_wf.
     Qed.
 
+    Lemma embed_fuels_add_map_gen_fuel {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
+      a F (G : gmap ogid (ord.t * measure)) :
+      embed_fuels wf_ltA a F -∗
+      ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in grP_fuel g l (m × ℵ)%M) ==∗
+      embed_fuels wf_ltA a (G ∪ F) ∗ ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in grP_fuel g l m).
+    Proof.
+      rewrite !embed_fuels_unseal /embed_fuels_def.
+      iIntros "Gfs Fs".
+      iAssert (
+          |==>([∗ map] g↦'(l, m) ∈ G,
+              ⌜(measure_rep (0 : ord.t, 0) (⟪wf_ltA, a⟫)%M) <= measure_rep (l, 0) (⟪wf_ltA, a⟫)%M⌝
+              ∗ grP_fuel g l (m × (⟪wf_ltA, a⟫)%M)%M) ∗
+           ([∗ map] g↦'(l, m) ∈ G, grP_fuel g l m))%I with "[Fs]" as ">[Fs0 Fs1]".
+      { rewrite -big_sepM_sep -big_sepM_bupd. iApply (big_sepM_impl with "Fs").
+        iIntros "!> %%%". destruct x. iIntros "F".
+        iMod (grP_fuel_mon _ _ (m ⊕ (m × ⟪wf_ltA, a⟫)%M)%M with "F") as "H".
+        { rewrite measure_rep_add (measure_rep_mult _ _ (⟪wf_ltA, a⟫)%M).
+          rewrite -Jacobsthal.mult_S ord_S_add. replace (Ord.S Ord.O) with Ord.one by auto.
+          rewrite -Ord.from_nat_1 -(measure_rep_nat (t, 0)) -(measure_rep_add).
+          rewrite measure_rep_mult. apply Jacobsthal.le_mult_r.
+          rewrite !measure_rep_add measure_rep_nat measure_rep_embed measure_rep_large.
+          rewrite -ord_S_add. apply Ord.S_supremum, Ord.large_lt_from_wf. }
+        iPoseProof (grP_fuel_add with "H") as "[$ $]". iPureIntro.
+        do 2 rewrite measure_rep_embed. done. }
+      iFrame "Fs1".
+      iApply (collect_fuels_add_map_gen with "Gfs Fs0").
+    Qed.
+
     Lemma embed_fuels_add_map_gen {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
       a F (G : gmap ogid (ord.t * measure)) :
       embed_fuels wf_ltA a F -∗
@@ -1432,6 +1460,17 @@ Section preds.
       iIntros "Gfs Fs". iApply (collect_fuels_add_map_gen with "Gfs [Fs]").
       iApply (big_sepM_impl with "Fs"). iIntros "!> %%%". destruct x. iIntros "$".
       iPureIntro. rewrite measure_rep_embed measure_rep_large. apply Ord.lt_le, Ord.large_lt_from_wf.
+    Qed.
+
+    Lemma embed_fuels_add_map_fuel {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
+      a F G l m :
+      embed_fuels wf_ltA a F -∗
+      ([∗ set] g ∈ G, grP_fuel g l (m × ℵ)%M) ==∗
+      embed_fuels wf_ltA a ((gset_to_gmap (l, m) G) ∪ F) ∗ ([∗ set] g ∈ G, grP_fuel g l m).
+    Proof.
+      iIntros "EF FG". iMod (embed_fuels_add_map_gen_fuel with "EF [FG]") as "[$ F]".
+      - rewrite big_sepM_gset_to_gmap. iFrame.
+      - rewrite big_sepM_gset_to_gmap. by iFrame.
     Qed.
 
     Lemma embed_fuels_add_map {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
