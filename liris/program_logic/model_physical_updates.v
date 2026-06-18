@@ -65,21 +65,21 @@ Section mprog.
 
   (** Step rule *)
   Lemma mprog_step n Θ i P :
-    (|={∅}=> ∃ U, thP_groups i U ∗ ([∗ set] u ∈ U, ∃ ℓ, grP_fuel u ℓ 1) ∗
+    (|={∅}=> ∃ U, thP_carriers i U ∗ ([∗ set] u ∈ U, ∃ ℓ, crP_fuel u ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                        ((thP_groups i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r))
+                        ((thP_carriers i U ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r))
                          ={∅}=∗ P))
     ⊢ mprog n Θ i P.
   Proof.
-    unfold_opreds. iIntros "H". iMod "H" as "(%& (#Oe& Ox& Ob)& GFs& %& #REs& H)".
+    unfold_opreds. iIntros "H". iMod "H" as "(%& (#Oe& Ox& Ob& Ow)& GFs& %& #REs& H)".
     iIntros "%%%% (MH& S& O& A& G& W& %GWI1)".
-    iAssert (|==> [∗ set] u ∈ U, ogroupG_fuel u Ord.one)%I with "[GFs]" as ">GFs".
+    iAssert (|==> [∗ set] u ∈ U, ocarrierG_fuel u Ord.one)%I with "[GFs]" as ">GFs".
     { iApply big_sepS_bupd. iApply (big_sepS_impl with "GFs"). iIntros "!> % % (%& F)".
-      iApply (ogroupG_fuel_mon with "F"). 
+      iApply (ocarrierG_fuel_mon with "F"). 
       rewrite measure_rep_mult measure_rep_nat Jacobsthal.mult_1_r. rewrite measure_rep_add measure_rep_nat.
       eapply Hessenberg.add_base_l. }
     iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
-    iMod (ogroup_exchange_fuel with "[$G $Ob $GFs]") as "(%& ACC& Gta& Ox2& Ob& GFs)". 1: auto.
+    iMod (ocarrier_exchange_fuel with "[$G $Ob $GFs]") as "(%& ACC& Gta& Ox2& Ob& GFs)". 1: auto.
     { apply Ord.S_lt. }
     iAssert ([∗ set] k ∈ G, oblG_elem k)%I as "#Ges".
     { iApply (big_sepS_impl with "GFs"). iIntros "!> %% [_ $]". }
@@ -160,7 +160,7 @@ Section mprog.
       - iDestruct "H" as "(%&%& Wc)". iLeft. iApply (witG_witness_mon with "Wc").
         apply Ord.S_supremum. eauto. }
     iCombine "REs Rs" as "Rs". iPoseProof (big_sepS_sep with "Rs") as "Rs".
-    iMod ("H" with "[$Oe $Ox $Gta Rs]") as "H".
+    iMod ("H" with "[$Oe $Ox $Ow $Gta Rs]") as "H".
     { iApply (big_sepS_impl with "Rs"). iIntros "!> %% ((%&%& #Ge& #Wb)& [Ww | Gf])"; eauto. }
     iModIntro. assert (dom Ω1 = dom Ω2) by (destruct ProgO; eapply obls_cond_rel_dom; eauto).
     rewrite /model_interp H. iFrame. done.
@@ -229,7 +229,7 @@ Section mphys.
     n1 ≤ n2 →
     Θ2 = Θ1 ∪ π →
     Θ1 ## π →
-    (|={∅}=> ([∗ set] j ∈ π, thP_groups j ∅) ={∅}=∗ P)
+    (|={∅}=> ([∗ set] j ∈ π, thP_carriers j ∅) ={∅}=∗ P)
     ⊢ mphys n1 n2 Θ1 Θ2 P.
   Proof.
     intros LE ->. unfold_opreds. iIntros (DisjTP) "H". iMod "H".
@@ -239,10 +239,10 @@ Section mphys.
     iAssert (([∗ set] i ∈ π, othreadG_exec i (1/2/2) ∗ othreadG_obls i ∅) ∗
              ([∗ set] i ∈ π, othreadG_elem i ∗ othreadG_exec i (1/2)))%I with "[Efs]" as "[TGs Efs]".
     { iApply big_sepS_sep. iApply (big_sepS_impl with "Efs"). iIntros "!> %% ($& $& [$ $])". }
-    iMod (ogroup_alloc_threads π with "[$G $TGs]") as "[G Gtas]". 1: eauto.
+    iMod (ocarrier_alloc_threads π with "[$G $TGs]") as "[G Gtas]". 1: eauto.
     iMod ("H" with "[Efs Gtas]") as "H".
     { iPoseProof (big_sepS_sep with "[$Efs $Gtas]") as "Efs".
-      iApply (big_sepS_impl with "Efs"). iIntros "!> %% (($& $)& $)". }
+      iApply (big_sepS_impl with "Efs"). iIntros "!> %% (($& $)& $)". done. }
     iModIntro. rewrite /model_interp. iFrame. done.
   Qed.
 

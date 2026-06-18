@@ -71,23 +71,23 @@ Section proof.
 
   Lemma decr_reentrant_spec :
     ⊢ ∃ m, ∀ lc i j G g k K γ ℓg arg,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g ℵ%ordi m) ∗
-         grP_obls j g ℓg K ∗ ⌜k ∈ K⌝ ∗
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℵ%ordi m) ∗
+         crP_obls j g ℓg K ∗ ⌜k ∈ K⌝ ∗
          ∃ (ql : val) (l : loc) (n : Z),
            ⌜arg = (ql, #l, #n)%V⌝ ∗
            oblP_fuel k (ℓq ⊕ 1)%ordi (Z.to_nat n)%M ∗
            ⟦tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
          decr_reentrant_inv arg γ k }}}
       decr_reentrant arg @ i
-    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ grP_obls j g ℓg (K ∖ {[k]}) }}}.
+    l{{{ RET #(); £ lc ∗ thP_carriers i G ∗ crP_obls j g ℓg (K ∖ {[k]}) }}}.
   Proof.
     unfold decr_reentrant.
     (** Lob to bootstrap the spec *)
     iLöb as "TASK".
     iPoseProof (TaskQueue_put_task_spec) as (mp) "TaskQueue_put_task_spec".
     iExists (100 ⊕ mp)%M. iIntros (lc i j G g k K γ ℓg arg) "!> % (TG& GF& Gg& %Sub& %&%&%& %Harg& OF& Huntil& #DRI) HΦ".
-    iPoseProof (grP_fuel_add_set with "GF") as "[GF F_put_task]".
-    iPoseProof (grP_fuels_init with "GF") as "GF".
+    iPoseProof (crP_fuel_add_set with "GF") as "[GF F_put_task]".
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
     subst arg.
@@ -113,7 +113,7 @@ Section proof.
       iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
       iApply (lwp_lc_later with "LC1"). iNext.
       iDestruct "ACCuntil" as "[Ptrl ACCuntil]". iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (grP_fuels_add 85 1 with "GF") as "[GF GF1]". 1: lia.
+      iPoseProof (crP_fuels_add 85 1 with "GF") as "[GF GF1]". 1: lia.
       iApply lwp_sfmupd.
       iApply (lwp_store _ ∅ 0 with "[$TG $GF1 $Ptrl]"). 1: done.
       iIntros "((_& TG& _)& Ptrl)".
@@ -161,27 +161,27 @@ Section proof.
 
   Lemma client_spec :
     ⊢ ∃ m, ∀ lc i G γ ql,
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g (ℓq ⊕ 2)%ordi m) ∗
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓq ⊕ 2)%ordi m) ∗
          is_task_queue ql γ ℓq }}}
       client ql @ i
-    l{{{ RET #(); £ lc ∗ thP_groups i G }}}.
+    l{{{ RET #(); £ lc ∗ thP_carriers i G }}}.
   Proof.
     unfold client.
     iPoseProof (decr_reentrant_spec) as (md) "decr_reentrant_spec".
     (* Internal steps, func call, while loop *)
     iExists (100 ⊕ md ⊕ (100 × ▽))%M. iIntros (lc i G γ ql) "!> % (TG& GF& #ITQ) HΦ".
-    iPoseProof (grP_fuel_add_set with "GF") as "[GF GF2]".
-    iPoseProof (grP_fuel_add_set with "GF2") as "[F_md GFloop]".
-    iPoseProof (grP_fuels_init with "GF") as "GF".
+    iPoseProof (crP_fuel_add_set with "GF") as "[GF GF2]".
+    iPoseProof (crP_fuel_add_set with "GF2") as "[F_md GFloop]".
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
     lwp_bind (AllocN _ _).
-    iPoseProof (grP_fuels_add 98 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (crP_fuels_add 98 1 with "GF") as "[GF GF1]". 1: lia.
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (ptr_l) "((_& TG& _)& Ptr_l& _)".
     lwp_pures.
     lwp_bind (ChooseNat).
-    iPoseProof (grP_fuels_add 95 1 with "GF") as "[GF GF1]". 1: lia.
+    iPoseProof (crP_fuels_add 95 1 with "GF") as "[GF GF1]". 1: lia.
     iModIntro. iApply (lwp_choosenat _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iIntros (n) "(_& TG& _)".
     lwp_pures.
@@ -216,7 +216,7 @@ Section proof.
       iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
       iApply (lwp_lc_later with "LC1"). iNext.
       iDestruct "ACCuntil" as "[Ptrl ACCuntil]". iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (grP_fuels_add 85 1 with "GF") as "[GF GF1]". 1: lia.
+      iPoseProof (crP_fuels_add 85 1 with "GF") as "[GF GF1]". 1: lia.
       iApply lwp_sfmupd.
       iApply (lwp_store _ ∅ 0 with "[$TG $GF1 $Ptrl]"). 1: done.
       iIntros "((_& TG& _)& Ptrl)".
@@ -316,7 +316,7 @@ Section adequacy.
          tp_eventually (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝))%P.
 
   Let Φ' : tp :=
-        (∃ (g1 g2 : ogid) (k kl1 kl2 : oid),
+        (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
             ⌜ k ≠ kl1 ⌝ ∧ mp_tp' l ∧
             tp_until (l ↦ #0) (l ↦ #1) ∧
             tp_eventually (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
@@ -344,9 +344,9 @@ Section adequacy.
             tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
             tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
             tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-            ⟨thP_groups i {[g1]} ∗ grP_obls i g1 0 {[k; kl1]} ∗
-             thP_groups j {[g2]} ∗ grP_obls j g2 1 ({[kl2]}) ∗
-             grP_fuel g1 0 10 ∗ grP_fuel g2 1 ((1 × ▽) ⊕ 1)%M⟩)%F.
+            ⟨thP_carriers i {[g1]} ∗ crP_obls i g1 0 {[k; kl1]} ∗
+             thP_carriers j {[g2]} ∗ crP_obls j g2 1 ({[kl2]}) ∗
+             crP_fuel g1 0 10 ∗ crP_fuel g2 1 ((1 × ▽) ⊕ 1)%M⟩)%F.
 
   Lemma tf_to_tp_Φ `{!heapGS Σ} :
     tf_to_tp Φ_tf = Φ'.

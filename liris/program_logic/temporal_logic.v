@@ -422,10 +422,10 @@ Section proof.
   Proof. split; [auto|apply _]. Qed.
 
   (** Update rules *)
-  Lemma tf_until_alloc E i g K (b : bool) ℓ1 ℓ2 μ :
+  Lemma tf_until_alloc E g K (b : bool) ℓ1 ℓ2 μ :
     (ℓ1 <= ℓ2)%ordi →
-    grP_obls i g ℓ1 K -∗
-    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ grP_obls i g ℓ1 ({[k]} ∪ K) ∗
+    crP_obls g ℓ1 K -∗
+    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
                  oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
                  ∀ E' N (P Q : tf Σ), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) ={E'}=∗ (⟦tf_until N k b 1 P Q⟧ₗ).
   Proof.
@@ -493,18 +493,19 @@ Section proof.
   Lemma tf_until_true_to_discharge E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦tf_until N k true 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
-    ∀ i g ℓ K,
-    (⌜k ∈ K⌝) → grP_obls i g ℓ K -∗
-    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ grP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)).
+    ∀ g ℓ K,
+    (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
+    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)).
   Proof.
     rewrite tf_until_logic. iIntros (HMask) "(Oa& #OI)".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
-    iIntros "!> %%%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
+    iIntros "!> %%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
     iNext. iDestruct "H" as "(Oa1& Oa2& HQ)". iCombine "Oa1 Oa2" as "Oa".
     unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     (* FIXME: it would be better if we don't need to unfold everything and re-do the proof here... *)
-    unfold_opreds. iDestruct "TG" as "(#Oe& Gg& Gt& #Gb& OS)". iDestruct "OI" as "(#Ge& Gvar)". iDestruct "Oa" as "(_& Gl)".
+    unfold_opreds. iDestruct "TG" as "(%& #Oe& Gg& Gt& Gw& #Gb& OS)".
+    iDestruct "OI" as "(#Ge& Gvar)". iDestruct "Oa" as "(_& Gl)".
     iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
     iPoseProof (big_sepS_delete _ _ _ LUGk with "OS") as "[(_& Go& Oo) OS]".
     iPoseProof (osat_lookup_assigned with "[$S $Ge $Gl]") as "%LUO1l".
@@ -517,7 +518,7 @@ Section proof.
     iPoseProof (oblG_owner_agree _ i i1 with "[$Go $Go1]") as "%". destruct H as [<- _].
     iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
     iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
-    iMod (ogroup_delete_obl with "[$O $G $Gg $Oo]") as "(O& G& Gg& Go2)". 1,2: auto.
+    iMod (ocarrier_delete_obl with "[$O $G $Gg $Oo]") as "(O& G& Gg& Go2)". 1,2: auto.
     iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'". iCombine "Go Go'" as "Go".
     iMod (osat_discharge with "[$S $Ge $Gl $Go]") as "(S& #Gu& %Gstep)".
     assert (LUW : ∃ b, W1 !! k = Some (witness_assigned b) ∧ (b <= η a)%ord).
@@ -555,14 +556,14 @@ Section proof.
     ⟦untilP N k 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ▷ (⟦P⟧ₗ ∗
        ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N}=∗
-                       ∀ i g ℓ K, (⌜k ∈ K⌝) → grP_obls i g ℓ K -∗
-                                  ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ grP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)))).
+                       ∀ g ℓ K, (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
+                                ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)))).
   Proof.
     iIntros (HN) "Uk". iMod (tf_until_to_true with "Uk") as "H". 1: auto.
     iModIntro. iNext. iDestruct "H" as "($& H)". iIntros (?).
     iMod ("H" $! E') as "H". iIntros "!> HQ". iMod ("H" with "HQ") as "H".
     iMod (tf_until_true_to_discharge with "H") as "H". 1: auto.
-    iIntros "!> %%%% % TG". iPoseProof ("H" with "[//] TG") as "H".
+    iIntros "!> %%% % TG". iPoseProof ("H" with "[//] TG") as "H".
     iIntros (?). iNext. iMod ("H" $! E'') as "H". iModIntro. iFrame.
   Qed.
 

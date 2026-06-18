@@ -259,8 +259,8 @@ Section proof.
 
   (** Receives later credits via px_inv *)
   Lemma px_loop1_spec i g z r rm ci cj :
-    l{{{ thP_groups i ({[g]}) ∗
-         grP_obls i g 1 {[z]} ∗
+    l{{{ thP_carriers i ({[g]}) ∗
+         crP_obls g 1 {[z]} ∗
          ⟦tf_until N1 z false 1 (⌜ True ⌝) (⌜ False ⌝)⟧ₗ ∗
          £ (10)%ord ∗
          px r rm ci cj ∗
@@ -317,10 +317,10 @@ Section proof.
   Qed.
 
   Lemma px_loop2_spec j n r rm ci cj ck :
-    l{{{ ∃ g, thP_groups j {[g]} ∗
-              grP_obls j g 0 {[ck]} ∗
+    l{{{ ∃ g, thP_carriers j {[g]} ∗
+              crP_obls g 0 {[ck]} ∗
               ⟦tf_eventually Nu ck false (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
-              grP_fuel g 0 10 ∗
+              crP_fuel g 0 10 ∗
               px r rm ci cj ∗
               cnt_auth r cj n (1/2) ∗ n ↪[rm]□ ck }}}
       loop #() @ j
@@ -331,7 +331,7 @@ Section proof.
     iRevert (n g ck) "TG Gg Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n g ck) "TG Gg Uck Gf Caj #Mn".
     iEval (rewrite /loop).
-    iPoseProof (grP_fuels_init {[g]} with "[Gf]") as "GF".
+    iPoseProof (crP_fuels_init {[g]} with "[Gf]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
@@ -362,8 +362,8 @@ Section proof.
     iMod (cnt_auth_update _ _ _ (n + 1) with "Caj") as "[Caj Caj2]". 1: lia.
     iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
-    iMod (group_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
-    iMod (tf_until_alloc _ _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
+    iMod (carrier_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
+    iMod (tf_until_alloc _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
     iApply fupd_sfmupd_elim. iMod "mask" as "_".
     iMod ("A" $! _ Nu ⌜True⌝%F ⟨ cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k' ⟩%F with "[//]") as "Unew".
     iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.
@@ -393,7 +393,7 @@ Section proof.
       iApply (big_sepM_delete _ _ _ _ LU). iFrame. iRight. eauto. }
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     replace ({[ck]} ∖ {[ck]}) with (∅ : gset oid) by set_solver.
-    iMod (group_delete with "TG Gg") as "TG".
+    iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
     replace ({[g'; g]} ∖ {[g]}) with ({[g']} : gset _) by set_solver.
     rewrite union_empty_r_L.
     iModIntro. iMod "mask" as "_". iIntros "!> !>".

@@ -77,7 +77,7 @@ liris/base_logic/witness.v
 liris/base_logic/osat.v
 liris/base_logic/owit.v
 liris/base_logic/othread.v
-liris/base_logic/ogroup.v
+liris/base_logic/ocarrier.v
 liris/base_logic/model_interp.v
 liris/base_logic/mupd.v
 liris/base_logic/oinv.v

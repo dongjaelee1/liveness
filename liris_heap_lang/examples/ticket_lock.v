@@ -71,7 +71,7 @@ End TicketLock.
 (** The CMRA we need. *)
 Class ticket_lockG Σ :=
   TLockG {
-      #[local] tlock_ticketG :: ghost_mapG Σ Z (option (positive * ogid * ord.t * measure));
+      #[local] tlock_ticketG :: ghost_mapG Σ Z (option (ocid * ord.t * measure));
       #[local] tlock_oblG :: ghost_mapG Σ Z (option oid);
       #[local] tlock_tokenG :: ghost_varG Σ (Z);
       #[local] tlock_config_inG :: inG Σ (auth_mraUR (ord.le));
@@ -80,7 +80,7 @@ Class ticket_lockG Σ :=
     }.
 
 Definition ticket_lockΣ : gFunctors :=
-  #[ghost_mapΣ Z (option (positive * ogid * ord.t * measure));
+  #[ghost_mapΣ Z (option (ocid * ord.t * measure));
     ghost_mapΣ Z (option oid);
     ghost_varΣ (Z);
     GFunctor (auth_mraUR (ord.le));
@@ -154,7 +154,7 @@ Section proof.
   Local Definition lock_inv γt γo γc γa (next curr : loc) (R : tf Σ) : iProp Σ :=
     (own γa (to_dfrac_agree (DfracOwn 1) tt)) ∨
       (∃ (n c : Z)
-         (tickets : gmap Z (option (positive * ogid * ord.t * measure)))
+         (tickets : gmap Z (option (ocid * ord.t * measure)))
          (obls : gmap Z (option oid)),
           next ↦ #n ∗
           curr ↦{#(1/2/2)} #c ∗
@@ -167,25 +167,25 @@ Section proof.
           (* We need auth_mra_know to sync what other threads know about the configuration *)
           ([∗ set] t ∈ dom tickets,
              ((∃ κ, ⌜(0 ≤ t ≤ c)%Z⌝ ∧
-                    t ↪[γt]□ (None : option (positive * ogid * ord.t * measure)) ∗
+                    t ↪[γt]□ (None : option (ocid * ord.t * measure)) ∗
                     t ↪[γo]□ (Some κ) ∗
                     oblP_discharged κ) ∨
                 (⌜ (t = c + 1)%Z ⌝) ∨
-                (∃ i g ℓ μ, ⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧
-                            t ↪[γt]{#1/2} (Some (i, g, ℓ, μ)) ∗
+                (∃ g ℓ μ, ⌜((c + 1)%Z < t ≤ n)%Z⌝ ∧
+                            t ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
                             t ↪[γo] (None : option oid) ∗
-                            (own γc (◯AM[ord.le] ℓ)) ∗ grP_obls i g ℓ ∅))) ∗
+                            (own γc (◯AM[ord.le] ℓ)) ∗ crP_obls g ℓ ∅))) ∗
           ((⌜(c = n)⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
              (⌜(c < n)%Z⌝ ∧
               (* Allocates new obligation on behalf of next owner. *)
               ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗ (c + 1)%Z ↪[γo]□ (Some κ) ∗
                      ⟦eventuallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
-                     ((∃ i g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (i, g, ℓ, μ)) ∗
+                     ((∃ g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
                                 ⟦eventuallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
-                                grP_obls i g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
+                                crP_obls g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
                                 curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
                         (* Current owner acquired the lock. *)
-                        ((c + 1)%Z ↪[γt]□ (None : option (positive * ogid * ord.t * measure))))))).
+                        ((c + 1)%Z ↪[γt]□ (None : option (ocid * ord.t * measure))))))).
 
   Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc),
@@ -195,7 +195,7 @@ Section proof.
 
   Local Definition lock_token_def (γ : ticketlock_γ) κu : iProp Σ :=
     ∃ (c : Z), ghost_var (ticketlock_γk γ) (1/2) (c) ∗
-               ((c + 1)%Z ↪[(ticketlock_γt γ)]□ (None : option (positive * ogid * ord.t * measure))) ∗
+               ((c + 1)%Z ↪[(ticketlock_γt γ)]□ (None : option (ocid * ord.t * measure))) ∗
                ((c + 1)%Z ↪[(ticketlock_γo γ)]□ (Some κu)).
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
   Definition lock_token := lock_token_aux.(unseal).
@@ -238,7 +238,7 @@ Section proof.
          2. Robust against implementation changes, especially # of fuels.
          3. Consistent format for different libraries.
 
-         'grP_fuel g 1 1' is a good abstraction for trivially terminating functions.
+         'crP_fuel g 1 1' is a good abstraction for trivially terminating functions.
          ord.large is a good abstraction for more complex functions.
          Ref: https://en.wikipedia.org/wiki/Hartogs_number *)
   (** ** Remark: Spec we want for a function that trivially terminates (w/o witness induction):
@@ -248,10 +248,10 @@ Section proof.
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_init_spec :
     ⊢ ∃ μ, ∀ lc ℓ i G (E : coPset),
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) }}}
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) }}}
       TicketLock.init #() @ i; E
     l{{{ tl γ, RET tl; £ lc ∗
-                       thP_groups i G ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
+                       thP_carriers i G ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
                        (∀ E R, ⟦R⟧ₗ ={E}=∗ is_fair_lock tl γ R) }}}.
   Proof.
     iExists 10.
@@ -259,18 +259,18 @@ Section proof.
     rewrite /TicketLock.init.
     lwp_pure_one.
     lwp_bind (AllocN _ _).
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (curr) "((_& TG& _)& Ptr_curr& _)".
     lwp_bind (AllocN _ _).
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (next) "((_& TG& _)& Ptr_next& _)".
     iModIntro. lwp_pure_lc lc. iRename "LC" into "QLC".
     iMod (obl_alloc_discharged _ (ℓ)%ordi 0) as "(%κu& #Ofk& _& #Wlk& OAcc)".
     iDestruct "Ptr_curr" as "[[Ptr_curr Ptr_curr1] Ptr_curr0]".
     iCombine "Ptr_curr0 Ptr_curr1" as "Ptr_curr0".
-    iMod (ghost_map_alloc ({[0%Z := None]} : gmap Z (option (positive * ogid * ord.t * measure)))) as "(%γt& GMAt& GMEt)".
+    iMod (ghost_map_alloc ({[0%Z := None]} : gmap Z (option (ocid * ord.t * measure)))) as "(%γt& GMAt& GMEt)".
     iMod (ghost_map_alloc ({[0%Z := (Some κu)]} : gmap Z (option oid))) as "(%γo& GMAo& GMEo)".
     rewrite !big_sepM_singleton.
     iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
@@ -304,7 +304,7 @@ Section proof.
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_acquire_spec :
     ⊢ ∃ μ, ∀ lc m i G tl γ dq1 dq2 ℓ R (E : coPset) (MASK : ↑N ⊆ E),
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, grP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
          γ ↪LOCK_AL{dq1} ∗
          γ ↪LOCK_CF{dq2} ℓ ∗
          is_fair_lock tl γ R }}}
@@ -312,16 +312,16 @@ Section proof.
     l{{{ gu κu, RET #();
          £ lc ∗
          (⌜ gu ∉ G ⌝) ∗
-         thP_groups i ({[gu]} ∪ G) ∗
-         grP_obls i gu ℓ {[κu]} ∗
-         grP_fuel gu ℓ m ∗
+         thP_carriers i ({[gu]} ∪ G) ∗
+         crP_obls gu ℓ {[κu]} ∗
+         crP_fuel gu ℓ m ∗
          oblP_fuel κu ℓ m ∗
          γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ }}}.
   Proof.
     iExists (100 ⊕ (((50 ⊕ (50 × ▽)) × ℵ) ⊕ (50 × ▽)))%M.
     iIntros (lc m i G tl γ dq1 dq2 ℓ R E MASK) "!> % (TG& Fs& AL& CF& #IFL) HΦ".
-    iPoseProof (grP_fuel_add_set with "Fs") as "[GF Fsloop]".
-    iPoseProof (grP_fuels_init with "GF") as "GF".
+    iPoseProof (crP_fuel_add_set with "Fs") as "[GF Fsloop]".
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     rewrite /TicketLock.acquire.
     (* argument *)
     lwp_pure_lc 100.
@@ -331,7 +331,7 @@ Section proof.
     lwp_pures.
     (* FAA *)
     lwp_bind (FAA _ _).
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     (* Atomic step of FAA, *)
     iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
@@ -346,11 +346,11 @@ Section proof.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iApply (lwp_faa _ ∅ 0 with "[$TG $GF1 $PtrNext]"). 1: done.
     iIntros "((_& TG& _)& PtrNext)".
-    (** Alloc a new group to receive new unlock obligation *)
-    iMod (group_alloc _ _ _ (ℓ)%ordi (50 ⊕ m)%M with "TG") as "(%gu& %Ningu& TG& Gg& Gf)".
-    iPoseProof (grP_fuel_add with "Gf") as "[Gf Q_Gf]".
+    (** Alloc a new carrier to receive new unlock obligation *)
+    iMod (carrier_alloc _ _ _ (ℓ)%ordi (50 ⊕ m)%M with "TG") as "(%gu& %Ningu& TG& Gg& Gf)".
+    iPoseProof (crP_fuel_add with "Gf") as "[Gf Q_Gf]".
     (* Update maps. *)
-    iMod (ghost_map_insert (n + 1)%Z (Some (i, gu, ℓ, m)) with "GMAt") as "[GMAt GMEt]".
+    iMod (ghost_map_insert (n + 1)%Z (Some (gu, ℓ, m)) with "GMAt") as "[GMAt GMEt]".
     { apply not_elem_of_dom. intros IN. apply Domt in IN. lia. }
     iMod (ghost_map_insert (n + 1)%Z (None) with "GMAo") as "[GMAo GMEo]".
     { apply not_elem_of_dom. intros IN. rewrite -EqDom in IN. apply Domt in IN. lia. }
@@ -362,7 +362,7 @@ Section proof.
     { (* My turn *)
       iDestruct "Hc" as "(%& PtrCurr0& HR)". subst c.
       (* Unlock obligation *)
-      iMod (tf_until_alloc _ _ _ _ false _ (ℓ)%ordi (m)%M with "Gg")
+      iMod (tf_until_alloc _ _ _ false _ (ℓ)%ordi (m)%M with "Gg")
         as "(%κu& %LUku& Gg& OGF& #Wlku& ALLOC)". 1: done.
       iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%F with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
@@ -393,7 +393,7 @@ Section proof.
           - iApply big_sepS_singleton. iRight. iLeft. done.
           - iApply (big_sepS_impl with "HMt"). iIntros "!> %% H".
             iDestruct "H" as "[$ | [$ | H]]".
-            iDestruct "H" as "(%&%&%&%& %& _)". lia. }
+            iDestruct "H" as "(%&%&%& %& _)". lia. }
         iRight. iSplit.
         { iPureIntro. lia. }
         iFrame "CFl Wlku GMEo GUku". iRight. eauto. }
@@ -402,8 +402,8 @@ Section proof.
       clear dependent tickets obls. clear Boundc LUku.
       iClear "Fsloop".
       (* Update fuels. *)
-      iPoseProof (grP_fuels_add_nat 50 with "GF") as "[GF _]". 1: done.
-      iPoseProof (grP_fuels_add_group with "Gf GF") as "GF".
+      iPoseProof (crP_fuels_add_nat 50 with "GF") as "[GF _]". 1: done.
+      iPoseProof (crP_fuels_add_carrier with "Gf GF") as "GF".
       lwp_pure_one.
       do 2 (iModIntro; lwp_pure_one).
       (** The while loop. *)
@@ -412,7 +412,7 @@ Section proof.
       lwp_bind (Load _).
       (* Atomic step of Load, *)
       iModIntro.
-      iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]". 1: eauto.
+      iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]". 1: eauto.
       iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
       iIntros "((_& TG& _)& PtrCurr0)".
       iRename "LC" into "LC1".
@@ -455,7 +455,7 @@ Section proof.
         - iApply big_sepS_singleton. iRight. iRight. iFrame "Gg GMEt GMEo CFl". iPureIntro. lia.
         - iApply (big_sepS_impl with "HMt"). iIntros "!> %% H".
           iDestruct "H" as "[$ | [$ | H]]".
-          do 2 iRight. iDestruct "H" as "(%&%&%&%& %& $& $& $)". iPureIntro. lia. }
+          do 2 iRight. iDestruct "H" as "(%&%&%& %& $& $& $)". iPureIntro. lia. }
       iRight. iSplit.
       { iPureIntro. lia. }
       iFrame. }
@@ -463,8 +463,8 @@ Section proof.
     rename n into my. assert (Hmy : (0 ≤ my)%Z) by lia.
     clear dependent c tickets obls.
     (* Update fuels. *)
-    iPoseProof (grP_fuels_add_nat 50 with "GF") as "[GF _]". 1: done.
-    iPoseProof (grP_fuels_add_group with "Gf GF") as "GF".
+    iPoseProof (crP_fuels_add_nat 50 with "GF") as "[GF _]". 1: done.
+    iPoseProof (crP_fuels_add_carrier with "Gf GF") as "GF".
     lwp_pure_one.
     do 2 (iModIntro; lwp_pure_one).
     (** My turn or need induction. *)
@@ -484,7 +484,7 @@ Section proof.
       iPoseProof (big_sepS_delete _ _ _ Elemt with "HMt") as "[Ht _]".
       iDestruct "Ht" as "[Ht | Ht]".
       - iDestruct "Ht" as "(%&%& #GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. by destruct H0.
-      - iDestruct "Ht" as "[% | (%&%&%&%&%& _)]". 1: lia. 1: lia. }
+      - iDestruct "Ht" as "[% | (%&%&%&%& _)]". 1: lia. 1: lia. }
     (** Two cases: my turn, or not. *)
     iDestruct "Hc" as "(%LTc& Hc)".
     destruct (decide (my = c)).
@@ -492,7 +492,7 @@ Section proof.
       subst c. iDestruct "Hc" as "(%&%κu& _& #Wl& #GMEo& HE0& Hc)".
       iDestruct "Hc" as "[Hc | #GMEt1]"; cycle 1.
       { iCombine "GMEt0 GMEt1" gives %?. by destruct H. }
-      iDestruct "Hc" as "(%&%&%& GMEt& HE& Gg& Of& PtrCurr0& HR)".
+      iDestruct "Hc" as "(%&%& GMEt& HE& Gg& Of& PtrCurr0& HR)".
       iCombine "GMEt GMEt0" as "GMEt" gives %?. destruct H as [_ H]. simplify_eq.
       replace (DfracOwn (1 / 2) ⋅ DfracOwn (1 / 2)) with (DfracOwn 1); cycle 1.
       { rewrite dfrac_op_own Qp.div_2. done. }
@@ -527,7 +527,7 @@ Section proof.
       lwp_bind (Load _).
       (* Atomic step of Load, *)
       iModIntro.
-      iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]". 1: eauto.
+      iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]". 1: eauto.
       iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
       iIntros "((_& TG& _)& PtrCurr0)".
       iRename "LC" into "LC1".
@@ -555,7 +555,7 @@ Section proof.
       iDestruct "H" as "[H | [% | H]]".
       - iDestruct "H" as "(%& %& GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. by destruct H0.
       - lia.
-      - iDestruct "H" as "(%&%&%&%& %& _)". iPureIntro. lia. }
+      - iDestruct "H" as "(%&%&%& %& _)". iPureIntro. lia. }
     iModIntro.
     iSplitL "PtrNext PtrCurr GMAt GMAo HMt Hc".
     { iNext. iRight. iFrame "PtrNext PtrCurr GMAt GMAo". iSplit.
@@ -573,7 +573,7 @@ Section proof.
     clear dependent tickets n obls. clear Hmy n0. rename c into prev.
     iAssert (⌜(ℓ0 <= ℓ)%ordi⌝)%I as "%Hcf".
     { iCombine "CF CFl0" gives %?. apply auth_mra_both_dfrac_valid in H. 2: apply _. by destruct H. }
-    iPoseProof (grP_fuel_add_set with "Fsloop") as "[Fsloop1 Fsloop]".
+    iPoseProof (crP_fuel_add_set with "Fsloop") as "[Fsloop1 Fsloop]".
     (** Nest 1: Embed induction. *)
     remember (Z.to_nat (my - prev)%Z) as ν.
     iPoseProof (embed_fuels_init (lt_wf) ν) as "EFs0".
@@ -605,7 +605,7 @@ Section proof.
     { iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL. destruct HAL.
       apply dfrac_valid_own_r in H. done. }
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_load _ {[κ]} 98%ord with "[$TG $GF1 $PtrCurr]").
     { rewrite big_sepS_singleton. eauto. }
     iIntros "((LC'& TG& Wc)& PtrCurr)". iEval (rewrite big_sepS_singleton) in "Wc".
@@ -620,7 +620,7 @@ Section proof.
       { iDestruct "Hc" as "(%& _)". subst n. lia. }
       iDestruct "Hc" as "(_& %&%κu& #CFl& #Wl& #GMEo& HE0& [Hc | GMEt1])"; cycle 1.
       { iCombine "GMEt0 GMEt1" gives %?. by destruct H. }
-      iDestruct "Hc" as "(%&%&%& GMEt1& HE& Gg& Ofk& PtrCurr0& HR)".
+      iDestruct "Hc" as "(%&%& GMEt1& HE& Gg& Ofk& PtrCurr0& HR)".
       iCombine "GMEt1 GMEt0" as "GMEt" gives %?. destruct H as [_ H]. simplify_eq.
       replace (DfracOwn (1 / 2) ⋅ DfracOwn (1 / 2)) with (DfracOwn 1); cycle 1.
       { rewrite dfrac_op_own Qp.div_2. done. }
@@ -658,7 +658,7 @@ Section proof.
       iApply ("HΦ" with "[$TG $Gg $Q_Gf $Ofk $HR $LC $AL $CF GV]"). iSplit. 1: set_solver.
       rewrite lock_token_unseal /lock_token_def. iFrame. eauto. }
     { (* Inductive cases: prev still holding, or new owner. *)
-      (* Must refresh my group. *)
+      (* Must refresh my carrier. *)
       iPoseProof (ghost_map_lookup with "GMAt GMEt0") as "%LUt".
       assert (Boundmy : (my + 1 ≤ n)%Z).
       { apply elem_of_dom_2 in LUt. apply Domt in LUt. lia. }
@@ -667,20 +667,20 @@ Section proof.
       iDestruct "H" as "[H | [% | H]]".
       { iDestruct "H" as "(%&%& GMEt1& _)". iCombine "GMEt0 GMEt1" gives %?. by destruct H0. }
       { lia. }
-      iDestruct "H" as "(%&%&%&%& %& GMEt1& GMEo& _& Gg)".
+      iDestruct "H" as "(%&%&%& %& GMEt1& GMEo& _& Gg)".
       iCombine "GMEt1 GMEt0" as "GMEt" gives %?. destruct H0 as [_ H0]. simplify_eq.
-      iMod (group_delete with "TG Gg") as "TG".
-      iPoseProof (grP_fuels_remove_group gu with "GF") as "GF".
+      iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
+      iPoseProof (crP_fuels_remove_carrier gu with "GF") as "GF".
       replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
       rename gu into gu_prev, LUt into LUt_prev. iClear "Q_Gf". clear Ningu.
-      iMod (group_alloc _ _ _ (ℓ)%ordi (45 ⊕ 47 ⊕ m)%M with "TG") as "(%gu& %Ningu& TG& Gg& Gf)".
-      iPoseProof (grP_fuel_add with "Gf") as "[Gf Q_Gf]".
-      iPoseProof (grP_fuel_add with "Q_Gf") as "[Loop_Gf Q_Gf]".
+      iMod (carrier_alloc _ _ _ (ℓ)%ordi (45 ⊕ 47 ⊕ m)%M with "TG") as "(%gu& %Ningu& TG& Gg& Gf)".
+      iPoseProof (crP_fuel_add with "Gf") as "[Gf Q_Gf]".
+      iPoseProof (crP_fuel_add with "Q_Gf") as "[Loop_Gf Q_Gf]".
       (* Update tickets map. *)
       replace (DfracOwn (1 / 2) ⋅ DfracOwn (1 / 2)) with (DfracOwn 1); cycle 1.
       { rewrite dfrac_op_own Qp.div_2. done. }      
-      iMod (ghost_map_update (Some (i, gu, ℓ, m)) with "GMAt GMEt") as "[GMAt [GMEt GMEt0]]".
-      iPoseProof (grP_fuels_add_group with "Gf GF") as "GF".
+      iMod (ghost_map_update (Some (gu, ℓ, m)) with "GMAt GMEt") as "[GMAt [GMEt GMEt0]]".
+      iPoseProof (crP_fuels_add_carrier with "Gf GF") as "GF".
       iDestruct "Wc" as "[Wc | #Gdk]".
       - iModIntro. iMod ("ACCinv" with "[PtrNext GMAt GMAo HMt PtrCurr Hc Gg GMEt GMEo]") as "_".
         { iNext. iRight. iFrame "PtrNext GMAt GMAo PtrCurr Hc". iSplit.
@@ -702,15 +702,15 @@ Section proof.
         iModIntro. lwp_pure_one.
         iMod (wit_fuels_decr with "WFs Wc") as "(%& %LTα& WFs& Fs')".
         iClear "GF LC".
-        iAssert (grP_fuels ({[gu]} ∪ G) 47)%I with "[Loop_Gf Fs']" as "Fs".
+        iAssert (crP_fuels ({[gu]} ∪ G) 47)%I with "[Loop_Gf Fs']" as "Fs".
         { iApply big_sepS_union. 1: set_solver. iSplitL "Loop_Gf".
-          - iApply grP_fuels_init. iApply big_sepS_singleton. iFrame.
+          - iApply crP_fuels_init. iApply big_sepS_singleton. iFrame.
           - iPoseProof (big_sepM_gset_to_gmap with "Fs'") as "H".
-            iPoseProof (grP_fuel_eq_set _ _ _ (47 ⊕ 3)%M with "H") as "H".
+            iPoseProof (crP_fuel_eq_set _ _ _ (47 ⊕ 3)%M with "H") as "H".
             { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat.
               replace 50 with (47 + 3) by lia. done. }
-            iPoseProof (grP_fuel_add_set _ _ 47 with "H") as "[H _]".
-            iApply grP_fuels_init. iFrame. }
+            iPoseProof (crP_fuel_add_set _ _ 47 with "H") as "[H _]".
+            iApply crP_fuels_init. iFrame. }
         iApply ("IHα" $! α0 LTα with "AL CF HΦ LC' EFs [//] Q_Gf GMEt0 TG Fs WFs").
       - iPoseProof (ghost_map_lookup with "GMAo GMEo0") as "%LUp".
         iAssert (⌜(prev < c)%Z⌝)%I as "%Hpc".
@@ -727,7 +727,7 @@ Section proof.
           iDestruct "H" as "[H | [% | H]]".
           - iDestruct "H" as "(%& %& _)". iPureIntro. lia.
           - exfalso. lia.
-          - iDestruct "H" as "(%&%&%&%& %& _& GMEo1& _)".
+          - iDestruct "H" as "(%&%&%& %& _& GMEo1& _)".
             iCombine "GMEo0 GMEo1" gives %HF. by destruct HF. }
         iDestruct "Hc" as "[(%& _) | Hc]".
         { exfalso. lia. }
@@ -756,11 +756,11 @@ Section proof.
         iMod (embed_fuels_decr _ _ (Z.to_nat (my - c)%Z) with "EFs") as "(EFs& Fs')". 1: auto.
         iClear "GF LC IHα".
         iPoseProof (big_sepM_gset_to_gmap with "Fs'") as "Fs'".
-        iPoseProof (grP_fuel_add_set with "Fs'") as "[Fs0 Fs1]".
-        iAssert (grP_fuels ({[gu]} ∪ G) 47)%I with "[Loop_Gf Fs0]" as "Fs".
-        { iPoseProof (grP_fuels_init with "Fs0") as "Fs0".
-          iPoseProof (grP_fuels_add 47 with "Fs0") as "[Fs0 _]".
-          iApply (grP_fuels_add_group with "Loop_Gf Fs0"). }
+        iPoseProof (crP_fuel_add_set with "Fs'") as "[Fs0 Fs1]".
+        iAssert (crP_fuels ({[gu]} ∪ G) 47)%I with "[Loop_Gf Fs0]" as "Fs".
+        { iPoseProof (crP_fuels_init with "Fs0") as "Fs0".
+          iPoseProof (crP_fuels_add 47 with "Fs0") as "[Fs0 _]".
+          iApply (crP_fuels_add_carrier with "Loop_Gf Fs0"). }
         iAssert (⌜(ℓ1 <= ℓ)%ordi⌝)%I as "%Hcf1".
         { iCombine "CF CFl1" gives %?. apply auth_mra_both_dfrac_valid in H1.
           2: apply _. by destruct H1. }
@@ -772,21 +772,21 @@ Section proof.
 
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_release_spec :
-    ⊢ ∃ μ, ∀ lc i j G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E),
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) ∗
-         grP_obls j gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
+    ⊢ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E),
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗
+         crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token γ κu ∗ ⟦R⟧ₗ ∗
          γ ↪LOCK_AL{dq} ∗
          is_fair_lock tl γ R }}}
       TicketLock.release tl @ i; E
     l{{{ RET #();
          £ lc ∗
-         thP_groups i G ∗
-         grP_obls j gu ℓu (K ∖ {[κu]}) ∗
+         thP_carriers i G ∗
+         crP_obls gu ℓu (K ∖ {[κu]}) ∗
          γ ↪LOCK_AL{dq} }}}.
   Proof.
     iExists 100.
-    iIntros (lc i j G tl γ dq R κu gu ℓu K E MASK) "!> % (TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
+    iIntros (lc i G tl γ dq R κu gu ℓu K E MASK) "!> % (TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
     rewrite /TicketLock.release.
     lwp_pure_lc 100.
     rewrite lock_token_unseal /lock_token_def.
@@ -806,7 +806,7 @@ Section proof.
     iModIntro.
     lwp_pures.
     lwp_bind (Load _).
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
     iIntros "((_& TG& _)& PtrCurr0)".
@@ -826,7 +826,7 @@ Section proof.
     iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". simplify_eq /=.
     (* FIXME: does not combine the dfrac part. *)
     (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_store _ ∅ lc with "[$TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]".
       iCombine "PtrCurr1 PtrCurr0 PtrCurr" as "$". }
@@ -866,7 +866,7 @@ Section proof.
         { iApply (big_sepS_impl with "HMt"). iIntros "!> %% [H | [% | H]]".
           - iDestruct "H" as "(%&%& H1& H2& H3)". iLeft. iFrame. iPureIntro. lia.
           - iLeft. simplify_eq /=. iFrame "GMEtku GMEo Ofk". iPureIntro. lia.
-          - iDestruct "H" as "(%&%&%&%& %& _)". lia. }
+          - iDestruct "H" as "(%&%&%& %& _)". lia. }
         iLeft. iFrame. eauto. }
       iApply ("HΦ" with "[$TG $Gg $QLC $AL]").
     - (* There is a waiting thread; create an unlock obligation for it. *)
@@ -876,9 +876,9 @@ Section proof.
       iDestruct "H" as "[H | [% | H]]".
       { iDestruct "H" as "(%& %& _)". lia. }
       { lia. }
-      iDestruct "H" as "(%&%&%&%& %Hc1& GMEt1& GMEo1& #CFl1& Gg1)".
+      iDestruct "H" as "(%&%&%& %Hc1& GMEt1& GMEo1& #CFl1& Gg1)".
       (* Unlock obligation *)
-      iMod (tf_until_alloc _ _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
+      iMod (tf_until_alloc _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
         as "(%κu1& %LUku1& Gg1& OGF1& #Wlku1& ALLOC)". 1: done.
       iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%F with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
@@ -893,7 +893,7 @@ Section proof.
           - iApply (big_sepS_impl with "HMt"). iIntros "!> %% [H | [% | H]]".
             + iDestruct "H" as "(%&%& H1& H2& H3)". iLeft. iFrame. iPureIntro. lia.
             + iLeft. simplify_eq /=. iFrame "GMEtku GMEo Ofk". iPureIntro. lia.
-            + iDestruct "H" as "(%&%&%&%& %& H)". iRight. iRight. iFrame. iPureIntro.
+            + iDestruct "H" as "(%&%&%& %& H)". iRight. iRight. iFrame. iPureIntro.
               destruct (decide (x = (c + 2)%Z)).
               { subst. set_solver. }
               lia. }
@@ -905,17 +905,17 @@ Section proof.
 
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_delete_spec :
-    ⊢ ∃ μ, ∀ lc i j G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E),
-    l{{{ thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ μ) ∗
-         grP_obls j gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
+    ⊢ ∃ μ, ∀ lc i G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E),
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗
+         crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token γ κu ∗ ⟦R⟧ₗ ∗
          γ ↪LOCK_AL ∗
          is_fair_lock tl γ R }}}
       TicketLock.delete tl @ i; E
-    l{{{ RET #(); £ lc ∗ thP_groups i G ∗ grP_obls j gu ℓu (K ∖ {[κu]}) ∗ ⟦R⟧ₗ }}}.
+    l{{{ RET #(); £ lc ∗ thP_carriers i G ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ ⟦R⟧ₗ }}}.
   Proof.
     iExists 100.
-    iIntros (lc i j G tl γ R κu gu ℓu K E MASK) "!> % (TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
+    iIntros (lc i G tl γ R κu gu ℓu K E MASK) "!> % (TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
     rewrite /TicketLock.delete.
     lwp_pure_lc 100.
     rewrite lock_token_unseal /lock_token_def.
@@ -935,7 +935,7 @@ Section proof.
     iModIntro.
     lwp_pures.
     lwp_bind (Load _).
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
     iIntros "((_& TG& _)& PtrCurr0)".
@@ -956,7 +956,7 @@ Section proof.
     iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". simplify_eq /=.
     (* FIXME: does not combine the dfrac part. *)
     (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_store _ ∅ lc with "[$TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]".
       iCombine "PtrCurr1 PtrCurr0 PtrCurr" as "$". }
@@ -996,13 +996,13 @@ Section proof.
     lwp_pures.
     lwp_bind (Free _).
     iModIntro.
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_free _ ∅ 0 with "[$TG $GF1 $PtrNext]"). 1: done.
     iIntros "(_& TG& _)".
     lwp_pures.
     lwp_bind (Free _).
     iModIntro.
-    iPoseProof (grP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_free _ ∅ 0 with "[$TG $GF1 $PtrCurr]"). 1: done.
     iIntros "(_& TG& _)".
     iApply ("HΦ" with "[$]").

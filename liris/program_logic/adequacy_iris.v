@@ -279,7 +279,7 @@ Theorem lwp_adequacy_safety_iris (Σ : gFunctors) (Λ : language)
      let _ : lirisGS Λ Σ := LirisG Htemporal Hsic fork_post in
      ⌜(∃ Q, Ψs !! j = Some Q ∧ ∀ v, (Q j v ⊢ ⌜Φ j v⌝))⌝ ∧
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_groups i ∅) -∗
+     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
       (|={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ lift_term i Ψ }})))) →
   safety_iris j Φ τ.
 Proof.
@@ -303,7 +303,7 @@ Proof.
             let _ : lirisGS Λ Σ := LirisG Htemporal Hsic fork_post in
             ⌜(∃ (Q : thread_id → val Λ → iProp Σ), Ψs !! j = Some Q ∧ ∀ v, (Q j v ⊢ ⌜Φ j v⌝))⌝ ∧
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-            (£ c -∗ ([∗ set] i ∈ dom Θ, thP_groups i ∅) -∗
+            (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
              (|={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ lift_term i Ψ }})))).
   { iIntros (Htemp). destruct (Hwp Htemp). iExists x. iApply H0. }
   eapply sat_wand; cycle 1.
@@ -324,7 +324,7 @@ Proof.
   iModIntro. iFrame "R W WOE". rewrite (right_id ε).
   iMod "H" as "(%Hsic& %fork_post& %Ψs& %POST& SI& SIa& WPs)".
   iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& A& G& MI)".
-  iMod (thP_groups_alloc_threads (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
+  iMod (thP_carriers_alloc_threads (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
   iPoseProof ("WPs" with "LC Ths") as "WPs". rewrite union_empty_l_L.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).

@@ -49,9 +49,9 @@ Section proof.
 
   Lemma lwp_lt :
     ⊢ ∃ m, ∀ x y i G,
-    l{{{ thP_groups i G ∗ grP_fuels G m }}}
+    l{{{ thP_carriers i G ∗ crP_fuels G m }}}
       lt (into_val x) (into_val y) @ i
-    l{{{ RET #(bool_decide (lt_rel x y)); thP_groups i G }}}.
+    l{{{ RET #(bool_decide (lt_rel x y)); thP_carriers i G }}}.
   Proof.
     iExists 100. iIntros. iIntros (?) "!# [Htg Hfuel] HΦ".
 

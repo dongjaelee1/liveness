@@ -272,34 +272,35 @@ Section sfmupd.
 
   (** ** Update rules *)
   Lemma thread_terminate E i :
-    thP_groups i ∅ -∗ |={E}=>m thP_done i.
+    thP_carriers i ∅ -∗ |={E}=>m thP_done i.
   Proof.
     unfold_sfmupd. iIntros "Tb %%%%% $". iMod (thread_terminate_mupd with "Tb") as "#Tt". auto.
   Qed.
 
-  Lemma group_alloc E i G ℓ μ :
-    thP_groups i G -∗
+  Lemma carrier_alloc E i G ℓ μ :
+    thP_carriers i G -∗
     |={E}=>m ∃ g, (⌜ g ∉ G ⌝) ∗
-                 thP_groups i ({[g]} ∪ G) ∗ grP_obls i g ℓ ∅ ∗ grP_fuel g ℓ μ.
+                 thP_carriers i ({[g]} ∪ G) ∗ crP_obls g ℓ ∅ ∗ crP_fuel g ℓ μ.
   Proof.
     unfold_sfmupd. iIntros "Tb %%%%% $".
-    iMod (group_alloc_mupd with "Tb") as "(%& %& $& $& $)". auto.
+    iMod (carrier_alloc_mupd with "Tb") as "(%& %& $& $& $)". auto.
   Qed.
 
-  Lemma group_delete E i G g ℓ :
-    thP_groups i G -∗
-    grP_obls i g ℓ ∅ -∗
-    |={E}=>m thP_groups i (G ∖ {[g]}).
+  Lemma carrier_delete E i G g ℓ :
+    g ∈ G →
+    thP_carriers i G -∗
+    crP_obls g ℓ ∅ -∗
+    |={E}=>m thP_carriers i (G ∖ {[g]}).
   Proof.
-    unfold_sfmupd. iIntros "Tb Gg %%%%% $".
-    iMod (group_delete_mupd with "Tb Gg") as "$". auto.
+    unfold_sfmupd. iIntros (Ing) "Tb Gg %%%%% $".
+    iMod (carrier_delete_mupd with "Tb Gg") as "$"; auto.
   Qed.
 
-  Lemma obl_alloc_assigned E i g K b ℓ1 ℓ2 μ :
+  Lemma obl_alloc_assigned E g K b ℓ1 ℓ2 μ :
     (ℓ1 <= ℓ2)%ordi →
-    grP_obls i g ℓ1 K -∗
+    crP_obls g ℓ1 K -∗
     |={E}=>m ∃ k, (⌜ k ∉ K ⌝) ∗
-                 grP_obls i g ℓ1 ({[k]} ∪ K) ∗
+                 crP_obls g ℓ1 ({[k]} ∪ K) ∗
                  oblP_assigned k b (1/2)%Qp ∗
                  oblP_fuel k ℓ2 μ ∗
                  witP_layer k ℓ2 ∗
@@ -334,40 +335,40 @@ Section sfmupd.
   Lemma obl_true_to_discharge E N k P Q R :
     ↑N ⊆ E →
     oblP_inv N k P Q R -∗
-    |={E,E ∖ ↑N}=> ∀ i g ℓ K q,
-    (⌜k ∈ K⌝) → grP_obls i g ℓ K -∗ oblP_assigned k true q -∗
-    ((▷ (grP_obls i g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
-     (grP_obls i g ℓ K -∗
+    |={E,E ∖ ↑N}=> ∀ g ℓ K q,
+    (⌜k ∈ K⌝) → crP_obls g ℓ K -∗ oblP_assigned k true q -∗
+    ((▷ (crP_obls g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
+     (crP_obls g ℓ K -∗
       oblP_assigned k true 1 -∗
-      ∀ E', |={E'}=>m (grP_obls i g ℓ (K ∖ {[k]}) ∗ oblP_discharged k) ∗
+      ∀ E', |={E'}=>m (crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k) ∗
                      ((▷ (R)) ={E ∖ ↑N,E}=∗ True))).
   Proof.
     iIntros (MASK) "#Gv". iMod (obl_discharge_mupd with "Gv") as "H". 1: auto.
-    iIntros "!> %%%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
+    iIntros "!> %%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
     iPoseProof ("ACC" with "TG Ga") as "H".
     unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
 
-  Lemma obl_offload E i1 i2 g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
+  Lemma obl_offload E g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
     k ∈ K1 →
     (ℓ2 <= ℓ)%ordi →
-    grP_obls i1 g1 ℓ1 K1 -∗
-    grP_obls i2 g2 ℓ2 K2 -∗
+    crP_obls g1 ℓ1 K1 -∗
+    crP_obls g2 ℓ2 K2 -∗
     oblP_fuel k ℓ 1 -∗
-    |={E}=>m grP_obls i1 g1 ℓ1 (K1 ∖ {[k]}) ∗ grP_obls i2 g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
+    |={E}=>m crP_obls g1 ℓ1 (K1 ∖ {[k]}) ∗ crP_obls g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
   Proof.
     iIntros (Ink Ltl) "Gg1 Gg2 Of".
     unfold_sfmupd. iIntros "%%%%% $".
     iMod (obl_offload_mupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
   Qed.
 
-  Lemma obl_offload_set E i1 i2 g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
+  Lemma obl_offload_set E g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
     K ⊆ K1 →
     (ℓ2 <= ℓ)%ordi →
-    grP_obls i1 g1 ℓ1 K1 -∗
-    grP_obls i2 g2 ℓ2 K2 -∗
+    crP_obls g1 ℓ1 K1 -∗
+    crP_obls g2 ℓ2 K2 -∗
     ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
-    |={E}=>m grP_obls i1 g1 ℓ1 (K1 ∖ K) ∗ grP_obls i2 g2 ℓ2 (K2 ∪ K) ∗ ⌜ K2 ## K ⌝.
+    |={E}=>m crP_obls g1 ℓ1 (K1 ∖ K) ∗ crP_obls g2 ℓ2 (K2 ∪ K) ∗ ⌜ K2 ## K ⌝.
   Proof.
     iIntros (Ink Ltl) "Gg1 Gg2 Of".
     unfold_sfmupd. iIntros "%%%%% $".

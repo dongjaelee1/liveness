@@ -267,9 +267,9 @@ Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ :
   φ →
   Nat.iter n
     (λ P,
-       |={E,E'}=> ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
+       |={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
                  ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                 (thP_groups i G -∗
+                 (thP_carriers i G -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                   ALC (£ o ={E',E}=∗ |={E}=>m P)))
     (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
@@ -286,11 +286,11 @@ Proof.
 Qed.
 
 Lemma lwp_fork s i E E' e Φ :
-  (|={E,E'}=> ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
+  (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
              ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-             (∀ j, thP_groups i G -∗
+             (∀ j, thP_carriers i G -∗
                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                   thP_groups j ∅ -∗
+                   thP_carriers j ∅ -∗
                    ALC (|={E',E}=>
                         |={E}=>m (|={E}=>m Φ (LitV LitUnit)) ∗
                                 (lwpupd j ⊤ e (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))))) -∗
@@ -352,9 +352,9 @@ Qed.
 
 (** ChooseNat *)
 Lemma lwp_choosenat_step o s i E E' Φ :
-  (|={E,E'}=> ∃ G, thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗
+  (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
                   ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                       (∀ (n : nat), thP_groups i G -∗
+                       (∀ (n : nat), thP_carriers i G -∗
                                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                    ALC (£ o ={E',E}=∗ (|={E}=>m Φ (#n))))) -∗
   lWP ChooseNat @ s; i; E {{ Φ }}.
@@ -388,10 +388,10 @@ Proof.
 Qed.
 
 Lemma lwp_choosenat G R o s i E :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     ChooseNat @ s; i; E
   l{{{ (n : nat), RET LitV (LitInt n);
-                (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+                (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
   iIntros (Φ) "(TG& GF& Rs) HΦ".
   iApply (lwp_choosenat_step o with "[$TG $GF $Rs HΦ]").
@@ -556,10 +556,10 @@ Proof. destruct π; simpl; apply _. Qed.
 
 Lemma lwp_allocN_seq G R o s i E v n :
   (0 < n)%Z →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
+          (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
           [∗ list] i ∈ seq 0 (Z.to_nat n), (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
   iIntros (Hn Φ) "(Tb& Gfs& Rs) HP".
@@ -583,10 +583,10 @@ Proof.
 Qed.
 
 Lemma lwp_alloc G R o s i E v :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     Alloc (Val v) @ s; i; E
   l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
+          (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
           l ↦ v ∗ meta_token l ⊤ }}}.
 Proof.
   iIntros (Φ) "P HΦ".
@@ -595,10 +595,10 @@ Proof.
 Qed.
 
 Lemma lwp_free G R o s i E l v :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
     Free (Val $ LitV $ LitLoc l) @ s; i; E
   l{{{ RET LitV LitUnit;
-          (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+          (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
   iIntros (Φ) "((Tb& Gfs& Rs)& Hl) HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -618,9 +618,9 @@ Proof.
 Qed.
 
 Lemma lwp_load G R o s i E l dq v :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v }}}
     Load (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET v; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
+  l{{{ RET v; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -639,9 +639,9 @@ Proof.
 Qed.
 
 Lemma lwp_store G R o s i E l v' v :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET LitV LitUnit; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
+  l{{{ RET LitV LitUnit; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -661,9 +661,9 @@ Proof.
 Qed.
 
 Lemma lwp_xchg G R o s i E l v' v :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET v'; (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
+  l{{{ RET v'; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -684,9 +684,9 @@ Qed.
 
 Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v' }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
+  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
 Proof.
   iIntros (?? Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -707,9 +707,9 @@ Qed.
 
 Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' :
   v' = v1 → vals_compare_safe v' v1 →
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
+  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
 Proof.
   iIntros (?? Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -730,9 +730,9 @@ Proof.
 Qed.
 
 Lemma lwp_faa G R o s i E l i1 i2 :
-  l{{{ (thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ LitV (LitInt i1) }}}
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ LitV (LitInt i1) }}}
     FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
-  l{{{ RET LitV (LitInt i1); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
+  l{{{ RET LitV (LitInt i1); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
@@ -752,9 +752,9 @@ Proof.
 Qed.
 
 Lemma lwp_new_proph G R o s i E :
-  l{{{thP_groups i G ∗ ([∗ set] g ∈ G, ∃ ℓ, grP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
+  l{{{thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
     NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thP_groups i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
+  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
 Proof.
   iIntros (Φ) "(Tb& Gfs& Rs) HΦ".
   iApply lwp_lift_atomic_base_step_no_fork.
