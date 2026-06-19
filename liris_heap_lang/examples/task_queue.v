@@ -21,17 +21,14 @@ Module TaskQueue.
       match: Queue.dequeue "q" with
         NONE => #()
       | SOME "fa" =>
-          let: "f" := Fst "fa" in
-          let: "a" := Snd "fa" in
-          "f" "a"
+          (Fst "fa") (Snd "fa")
       end.
 
   (** Infinite loop *)
   Definition worker : val :=
-    λ: "q",
-      (rec: "while" <> :=
-         run_task "q";;
-         "while" #()) #().
+    rec: "loop" "q" :=
+      run_task "q";;
+      "loop" "q".
 
   (** Initializes a queue and Forks one worker thread *)
   Definition init : val :=
@@ -212,12 +209,10 @@ Section proof.
       { iApply big_sepS_singleton. iFrame. }
       iPoseProof (crP_fuel_add_set with "GF") as "[GF F_mr]".
       iPoseProof (crP_fuels_init with "GF") as "GF".
-      lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
-      lwp_pure_one.
       (** Lob (co-)induction *)
       iRevert (g) "Qw F_mr TG GF". iLöb as "IH". iIntros (g) "HW F_mr TG GF".
-      lwp_pures.
+      lwp_pure. simpl.
+      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
       lwp_bind (TaskQueue.run_task _).
       iPoseProof (crP_fuel_add_set with "F_mr") as "[F_mr F_mr1]".
       iMod (crP_fuel_mon_gen_set _ 1%ordi _ mr with "F_mr") as "F_mr". 1: auto.
@@ -225,29 +220,27 @@ Section proof.
         - right. econstructor 1. auto.
         - left. split; auto. }
       iModIntro.
-      iApply ("TaskQueue_run_task_spec" $! 100 (100 ⊕ (mr ⊕ 1))%M true with "[$TG $F_mr $F_mr1 $HW $ITQ]").
+      iApply ("TaskQueue_run_task_spec" $! 100 (102 ⊕ (mr ⊕ 1))%M true with "[$TG $F_mr $F_mr1 $HW $ITQ]").
       iIntros (rv) "(LC& (%& TG& %Ninng& Qw& Gg& Fng))".
       iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
       replace ({[ng; g]} ∖ {[g]}) with ({[ng]} : gset ocid) by set_solver.
       iClear "GF".
-      iAssert (([∗ set] k ∈ {[ng]}, crP_fuel k ℓ (100 ⊕ (mr ⊕ 1))%M))%I with "[Fng]" as "GF".
+      iAssert (([∗ set] k ∈ {[ng]}, crP_fuel k ℓ (102 ⊕ (mr ⊕ 1))%M))%I with "[Fng]" as "GF".
       { iApply big_sepS_singleton. iFrame. }
       iPoseProof (crP_fuel_add_set with "GF") as "[GF F_mr]".
       iPoseProof (crP_fuels_init with "GF") as "GF".
       do 2 lwp_pure_one.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
       iApply (lc_lwpupd_add_later with "LC1"). iNext.
-      iApply ("IH" with "Qw F_mr TG GF").
+      iModIntro. iApply ("IH" with "Qw F_mr TG GF").
     - iDestruct "HW" as "%". subst G.
+      (** Lob (co-)induction *)
+      iRevert "TG". iLöb as "IH". iIntros "TG".
       iAssert ([∗ set] g ∈ ∅, crP_fuel g 0 100)%I as "GF''". 1: done.
       iPoseProof (crP_fuels_init with "GF''") as "GF'".
       lwp_pure. simpl.
       iFrame "TG GF'". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
       iClear "GF' GF''".
-      lwp_pure_one.
-      (** Lob (co-)induction *)
-      iRevert "TG GF". iLöb as "IH". iIntros "TG GF".
-      lwp_pures.
       lwp_bind (TaskQueue.run_task _).
       iModIntro.
       iApply ("TaskQueue_run_task_spec" $! 100 (100 ⊕ (mr ⊕ 1))%M false 1%positive with "[$TG $ITQ]").
@@ -262,7 +255,7 @@ Section proof.
       do 1 lwp_pure_one.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
       iApply (lc_lwpupd_add_later with "LC1"). iNext.
-      iApply ("IH" with "TG GF").
+      iApply ("IH" with "TG").
   Qed.
 
   Lemma TaskQueue_init_spec :
