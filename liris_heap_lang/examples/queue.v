@@ -20,10 +20,7 @@ Module Queue.
   Definition init : val :=
     λ: <>,
       let: "node" := ref NONE in
-      let: "hd" := ref "node" in
-      let: "tl" := ref "node" in
-      let: "lock" := TicketLock.init #() in
-      ("hd", "tl", "lock").
+      (ref "node", ref "node", TicketLock.init #()).
 
   Definition enqueue : val :=
     λ: "q" "x",
@@ -48,8 +45,7 @@ Module Queue.
           TicketLock.release "lock";;
           NONE
       | SOME "node" =>
-          let: "newh" := Snd "node" in
-          "hptr" <- "newh";;
+          "hptr" <- (Snd "node");;
           Free "h";;
           TicketLock.release "lock";;
           SOME (Fst "node")
@@ -196,18 +192,6 @@ Section proof.
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (ptr_node) "((_& TG& _)& Ptr_node& _)".
     lwp_pures.
-    (** Alloc hd ptr *)
-    lwp_bind (AllocN _ _).
-    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
-    iModIntro. iIntros (lhptr) "((_& TG& _)& Ptr_hd& _)".
-    lwp_pures.
-    (** Alloc tl ptr *)
-    lwp_bind (AllocN _ _).
-    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
-    iModIntro. iIntros (ltptr) "((_& TG& _)& Ptr_tl& _)".
-    lwp_pures.
     (** Init TicketLock *)
     (** FIXME: better tactic for function calls *)
     lwp_bind (TicketLock.init #()).
@@ -218,9 +202,19 @@ Section proof.
     iIntros (tl γtl) "(_& TG& AL& CF& IFL)".
     iMod (lock_alive_persist with "AL") as "#AL".
     iMod (lock_config_persist with "CF") as "#CF".
+    (** Alloc tl ptr *)
+    lwp_bind (AllocN _ _).
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
+    iModIntro. iIntros (ltptr) "((_& TG& _)& Ptr_tl& _)".
+    (** Alloc hd ptr *)
+    lwp_bind (AllocN _ _).
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
+    iModIntro. iIntros (lhptr) "((_& TG& _)& Ptr_hd& _)".
+    lwp_pures.
     iMod ("IFL" $! _ (⟨queue_lock φ γq lhptr ltptr⟩)%F with "[Ptr_node Ptr_hd Ptr_tl HQvs0]") as "#IFL".
     { tf_red. iFrame. eauto. }
-    lwp_pures.
     iModIntro. lwp_finish.
     iMod (ghost_var_alloc (inhabitant : ocid)) as (γd) "Gv".
     iApply ("HΦ" $! _ (QueueName γtl γq γd)).
@@ -508,13 +502,13 @@ Section proof.
           { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
             replace (S (S k)) with (S k + 1) by lia. done. }
           iApply (oblP_fuel_add_set with "H"). }
-        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 74 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
+        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 76 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
         iMod (obl_offload_set with "Gq Gg FB") as "(Gq& Gg& %)". 1: set_solver. 1: done.
         assert (B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
         { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
         destruct H0 as (DisjB& Disj').
         replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
-        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 74 ⊕ mr)%M with "TG") as "(%ng& %Ninng& TG& Gng& Fng)".
+        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 76 ⊕ mr)%M with "TG") as "(%ng& %Ninng& TG& Gng& Fng)".
         iMod (ghost_var_update_2 (ng) with "Gvar HW") as "[Gvar HW]". 1: by rewrite Qp.div_2.
         iAssert ([∗ set] b ∈ union_list_of_sets vs'.*2, oblP_fuel b ℓ 1)%I with "[F]" as "F".
         { iClear "TicketLock_acquire_spec TicketLock_release_spec IQ IFL".
@@ -563,7 +557,7 @@ Section proof.
           { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
             replace (S (S k)) with (S k + 1) by lia. done. }
           iApply (oblP_fuel_add_set with "H"). }
-        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 74 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
+        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 76 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
         iMod (obl_offload_set with "Gq Gg FB") as "(Gq& Gg& %)". 1: set_solver. 1: done.
         assert (B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
         { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
