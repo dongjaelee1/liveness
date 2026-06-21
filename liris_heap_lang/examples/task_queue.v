@@ -55,11 +55,11 @@ Section proof.
 
   (** ** Definitions *)
   Definition is_task (ℓ : ord.t) : val → oids → iProp Σ :=
-    λ v B, (∃ f a ℓt (P : iProp Σ) m,
+    λ v B, (∃ f a ℓt (P : iProp Σ),
                ⌜(v = (f, a)%V) ∧ (ℓt < ℓ)%ordi⌝ ∧
                P ∗
-               ∀ lc i G g K ℓg,
-               l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓt m) ∗
+               ∃ μ, ∀ lc i G g K ℓg,
+               l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓt μ) ∗
                     crP_obls g ℓg K ∗ ⌜ B ⊆ K ⌝ ∗ P }}}
                 f a @ i
               l{{{ rv, RET rv; £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ B) }}})%I.
@@ -145,7 +145,7 @@ Section proof.
         iApply "HΦ". iFrame.
     - destruct Hcase as (v& Hcase). subst x.
       iDestruct "Hx" as "(%&%& Htask& Gg& Fg& %Ning& HW)".
-      iDestruct "Htask" as "(%&%&%&%&%mt& %Htask& HP& TASK)".
+      iDestruct "Htask" as "(%&%&%&%& %Htask& HP& %mt& TASK)".
       iPoseProof (crP_fuel_add with "Fg") as "[_ Fg]".
       iPoseProof (crP_fuel_add_nat 99 1 with "Fg") as "[Fg' Fg]". 1: lia.
       iPoseProof (crP_fuels_add_carrier with "Fg' GF") as "GF".
