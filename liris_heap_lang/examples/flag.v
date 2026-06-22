@@ -33,7 +33,7 @@ Section proof.
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
-  Let N := nroot.@ "message_passing".
+  Let N := nroot.@ "flag".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
 
