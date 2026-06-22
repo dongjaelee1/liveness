@@ -5,25 +5,48 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
+From transfinite.base_logic.lib Require Import ghost_var.
 
 Module Handover.
 
   (** Put x at buffer b *)
   Definition send : val :=
-    λ: "b" "x", "b" <- SOME "x".
+    λ: "b" "f" "a", "b" <- SOME ("f", "a").
 
   (** Checks until the buffer b contains SOME x *)
   Definition receive : val := 
     rec: "wait" "b" :=
       match: !"b" with
         NONE => "wait" "b"
-      | SOME "x" => "x"
+      | SOME "x" => (Fst "x") (Snd "x")
       end.
 
 End Handover.
 
+(** The CMRA we need. *)
+Class handoverGpreS (Σ : gFunctors) : Set :=
+  HandoverGpreS {
+      #[local] handoverGpreS_data_inG :: ghost_varG Σ (ocid);
+    }.
+
+Class handoverG Σ :=
+  HandoverG {
+      #[local] handover_inG :: handoverGpreS Σ;
+    }.
+
+Definition handoverΣ : gFunctors :=
+    #[ghost_varΣ (ocid)].
+
+Global Instance subG_handoverΣ {Σ} : subG handoverΣ Σ → handoverGpreS Σ.
+Proof. solve_inG. Qed.
+
+Record handover_γ :=
+  HandoverName {
+      handover_γd : gname;
+    }.
+
 Section proof.
-  Context `{!heapGS Σ}.
+  Context `{!heapGS Σ, !handoverG Σ}.
 
   Ltac post_lwp :=
     simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
@@ -45,22 +68,31 @@ Section proof.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
-  TODO
+  (** ** Definitions *)
+  Definition is_task (ℓ : ord.t) : val → val → oids → iProp Σ :=
+    λ f a K, (∃ ℓt (P : iProp Σ),
+               ⌜(ℓt < ℓ)%ordi⌝ ∧
+               P ∗
+               ∃ μ, ∀ lc i G g K' ℓg,
+               l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓt μ) ∗
+                    crP_obls g ℓg K' ∗ ⌜ K ⊆ K' ⌝ ∗ P }}}
+                f a @ i
+              l{{{ rv, RET rv; £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}})%I.
 
-  Definition handover_inv_tf (l : loc) k ℓ : tf Σ :=
-    ⟨witP_layer k ℓ⟩ ∗
-    alwaysP Na (((untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1)))).
+  Definition handover_inv (l : loc) γd ℓ : iProp Σ :=
+    ∃ g, (l ↦ NONEV ∗ ghost_var γd (1/2)%Qp g ∗ crP_obls g ℓ ∅) ∨
+           (∃ (f a : val) K, l ↦ SOMEV (f, a) ∗ ghost_var γd (1/2)%Qp (g) ∗
+                             crP_obls g ℓ K ∗ is_task ℓ f a K) ∨
+           ghost_var γd (1)%Qp g.
 
-  Definition handover_inv (l : loc) k ℓ : iProp Σ :=
-    (witP_layer k ℓ) ∗
-    ⟦alwaysP Na (((untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))))⟧ₗ.
+  Definition is_handover (l : loc) (γ : handover_γ) ℓ : iProp Σ :=
+    ⟦alwaysP Na (⟨handover_inv l (handover_γd γ) ℓ⟩)⟧ₗ.
 
   (** The main proofs. *)
-  Global Instance handover_inv_persistent l k ℓ : Persistent (handover_inv l k ℓ).
-  Proof. rewrite /handover_inv. tf_red. apply _. Qed.
+  Global Instance handover_inv_persistent l k ℓ : Persistent (is_handover l k ℓ).
+  Proof. rewrite /is_handover. tf_red. apply _. Qed.
 
-  Lemma handover_inv_tf_red l k ℓ : ⟦handover_inv_tf l k ℓ⟧ₗ = handover_inv l k ℓ.
-  Proof. rewrite /handover_inv /handover_inv_tf. tf_red. auto. Qed.
+  TODO
 
   Lemma Handover_set_spec :
     ⊢ ∃ μ, ∀ lc i l G g K k ℓ ℓg,
