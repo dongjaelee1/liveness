@@ -16,7 +16,7 @@ Module Handover.
   Definition receive : val := 
     rec: "wait" "b" :=
       match: !"b" with
-        NONE => "awit" "b"
+        NONE => "wait" "b"
       | SOME "x" => "x"
       end.
 

@@ -37,7 +37,7 @@ Section proof.
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
-  Let N := nroot.@ "message_passing".
+  Let N := nroot.@ "flag".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
 
@@ -56,7 +56,7 @@ Section proof.
     l{{{ thP_carriers i {[g]} ∗ crP_fuel g 0 μ ∗
          crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
          (* Start with the other half of the until ownership for the pointsto. *)
-         ⟦untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)⟧ₗ ∗
+         ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
          ⟦eventuallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
          flag_inv l k 0 }}}
       writer #() @ i
@@ -71,7 +71,8 @@ Section proof.
     rewrite /writer /=.
     lwp_pure_one.
     lwp_bind (Flag.set X).
-    iModIntro. iApply ("Flag_set_spec" $! 10 with "[$TG GF_s $Gg $HU $flag_inv]").
+    iModIntro.
+    iApply ("Flag_set_spec" $! 10 with "[$TG GF_s $Gg $HU $flag_inv]").
     { iSplit; last (iPureIntro; set_solver).
       iApply crP_fuels_init. iApply big_sepS_singleton. iFrame. }
     iIntros "(LC& TG& Gg& #Od)".
@@ -153,7 +154,7 @@ Section proof.
     Θ = {[i := writer #(); j := reader #() ]} →
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
                       ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
-                      untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1) ∗
+                      untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
                       eventuallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
                       eventuallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
                       ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
@@ -222,14 +223,14 @@ Section adequacy.
 
   Let Φ : tp :=
         (flag_inv_tp l ∧
-         tp_until (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1) ∧
+         tp_until (l ↦ #0) (l ↦ #1) ∧
          tp_eventually (i ⤉ "exit", #()) ∧
          tp_eventually (j ⤉ "exit", #1))%P.
 
   Let Φ' : tp :=
         (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
             ⌜ k ≠ kl1 ⌝ ∧ flag_inv_tp' l ∧
-            tp_until (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1) ∧
+            tp_until (l ↦ #0) (l ↦ #1) ∧
             tp_eventually (i ⤉ "exit", #()) ∧
             tp_eventually (j ⤉ "exit", #1) ∧
             tp_true)%P.
@@ -244,7 +245,7 @@ Section adequacy.
     Local Transparent flag_inv_tp' flag_inv_tp.
   Qed.
 
-  Let N := nroot.@ "message_passing".
+  Let N := nroot.@ "flag".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
 
@@ -254,7 +255,7 @@ Section adequacy.
         λ μ1 μ2,
           (∃ g1 g2 k kl1 kl2,
               ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
-              untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1) ∗
+              untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
               eventuallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
               eventuallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
               ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
