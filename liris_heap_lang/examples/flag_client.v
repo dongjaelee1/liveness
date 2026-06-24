@@ -43,11 +43,6 @@ Section proof.
 
   Let Nl := nroot.@ "writer_label".
 
-  Remark N_disj_1 : Na ## Np.
-  Proof. by apply ndot_ne_disjoint. Qed.
-  Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
-  Proof. pose proof N_disj_1. set_solver. Qed.
-
   Let l := X_loc.
 
   (** The main proofs. *)

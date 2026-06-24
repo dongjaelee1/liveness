@@ -5,35 +5,23 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
-From liris.heap_lang.examples Require Export handover.
+From liris.heap_lang.examples Require Export flag handover.
 
-TODO
+Section code.
 
-Definition decr_reentrant : val :=
-  (rec: "f" "a" :=
-     let: "q" := Fst (Fst "a") in
-     let: "l" := Snd (Fst "a") in
-     let: "n" := Snd "a" in
-     if: "n" ≤ #0%Z
-     then "l" <- #1%Z
-     else TaskQueue.put_task "q" "f" ("q", "l", "n" - #1%Z)).
+  Definition main : val :=
+    λ: <>,
+      let: "x" := ref #0 in
+      let: "b" := ref NONE in
+      Fork (Handover.receive "b");;
+      Handover.send "b" Flag.set "x";;
+      let: "v" := Flag.wait "x" in
+      Label "exit" "v".
 
-Definition client : val :=
-  λ: "q", let: "l" := ref #0 in
-          let: "n" := ChooseNat in
-          decr_reentrant ("q", "l", "n");;
-          (rec: "while" <> := if: !"l" = #1%Z
-                             then #()
-                             else "while" #()) #().
-
-Definition main : val :=
-  λ: <>,
-    let: "q" := TaskQueue.init #() in
-    client "q";;
-    Label "exit" #().
+End code.
 
 Section proof.
-  Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
+  Context `{!heapGS Σ, !handoverG Σ}.
 
   Ltac post_lwp :=
     simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
@@ -50,30 +38,20 @@ Section proof.
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
 
-  Let Nl := nroot.@ "writer_label".
-
-  Remark N_disj_1 : Na ## Np.
-  Proof. by apply ndot_ne_disjoint. Qed.
-  Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
-  Proof. pose proof N_disj_1. set_solver. Qed.
-
-  TODO
-
-  Let l := X_loc.
+  Let Nl := nroot.@ "label".
 
   (** The main proofs. *)
-  Lemma writer_spec :
+  Lemma main_spec :
     ⊢ ∃ μ, ∀ i g k kl,
     l{{{ thP_carriers i {[g]} ∗ crP_fuel g 0 μ ∗
          crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
-         (* Start with the other half of the until ownership for the pointsto. *)
-         ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
          ⟦eventuallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
          flag_inv l k 0 }}}
       writer #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
     iPoseProof (Flag_set_spec) as (μ_s) "Flag_set_spec".
+    iPoseProof (Flag_wait_spec) as (μ_w) "Flag_wait_spec".
     iExists (10 ⊕ μ_s)%M. iIntros (i g k kl Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& Gg& %Neqk& HU& HE& #flag_inv)".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_s]".
