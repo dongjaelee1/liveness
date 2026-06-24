@@ -93,9 +93,15 @@ Section proof.
     iMod (flag_inv_init _ _ _ _ 1 _ 1 with "Ptrx Cg0") as "(%& _& Cg0& Of& HU& #flag_inv)". 1: done.
     rewrite union_empty_r_L.
     iModIntro.
+    iMod (crP_fuel_layer_mon _ 0 with "GF_hs") as "GF_hs".
+    { apply ordArith.le_from_nat. lia. }
+    iMod (crP_fuel_layer_mon _ 0 with "GF0") as "GF0".
+    { apply ordArith.le_from_nat. lia. }
     iApply ("Handover_send_spec" $! 0 _ _ Flag.set #ptrx _ _ {[k]} with "[$TG GF_hs GF0 $Cg0 Of Ptrb HU $is_handover]").
     { iSplitL "GF_hs GF0".
-      { iApply (crP_fuels_add_carrier with "GF0"). iApply big_sepS_singleton. iFrame. }
+      { iApply (big_sepS_union_2 with "[GF0]").
+        - iApply big_sepS_singleton. iFrame.
+        - iApply big_sepS_singleton. iFrame. }
       iSplit.
       { iPureIntro. set_solver. }
       iSplitL "Of".
@@ -106,7 +112,7 @@ Section proof.
       iFrame "HU". iExists μ_fs. iIntros (?????? ?) "!> (TG& GF& Cg& %INk& HU) HΦ".
       iApply ("Flag_set_spec" $! lc with "[$TG GF $Cg $HU $flag_inv]").
       { iSplit.
-        - iApply (crP_fuels_init with "[$]").
+        - iFrame.
         - iPureIntro. set_solver. }
       iIntros "(LC& TG& Cg& _)". iApply ("HΦ" with "[$]"). }
     iIntros "(_& TG& Cg0)".

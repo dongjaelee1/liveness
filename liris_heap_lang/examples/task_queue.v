@@ -75,8 +75,8 @@ Section proof.
   (** ** Program proofs *)
   (** FIXME: better notation for triples with this pattern *)
   Lemma TaskQueue_put_task_spec :
-    ⊢ ∃ m, ∀ lc i G g K B γ ℓ ℓg (ql task_f task_a : val),
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi m) ∗
+    ⊢ ∃ μ, ∀ lc i G g K B γ ℓ ℓg (ql task_f task_a : val),
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
          crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
          is_task ℓ (task_f, task_a)%V B ∗ is_task_queue ql γ ℓ }}}
       TaskQueue.put_task ql task_f task_a @ i
@@ -98,10 +98,10 @@ Section proof.
   Qed.
 
   Lemma TaskQueue_run_task_spec :
-    ⊢ ∃ m, ∀ lc μ (b : bool) wg i G γ ℓ (ql : val),
+    ⊢ ∃ μ, ∀ lc m (b : bool) wg i G γ ℓ (ql : val),
     l{{{ thP_carriers i G ∗
          (* For dequeue *)
-         ([∗ set] g ∈ G, crP_fuel g (1)%ordi m) ∗
+         ([∗ set] g ∈ G, crP_fuel g (1)%ordi μ) ∗
          (* For task *)
          ([∗ set] g ∈ G, crP_fuel g (ℓ)%ordi 1) ∗
          (if b
@@ -112,7 +112,7 @@ Section proof.
       l{{{ rv, RET rv; £ lc ∗
                        (if b
                         then (∃ ng, thP_carriers i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
-                                    queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ μ)
+                                    queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
                         else (thP_carriers i G)) }}}.
   Proof.
     iPoseProof (Queue_dequeue_spec) as (m) "Queue_dequeue_spec".
@@ -189,10 +189,10 @@ Section proof.
   Qed.
 
   Lemma TaskQueue_worker_spec :
-    ⊢ ∃ m, ∀ (b : bool) i G γ ℓ (ql : val),
+    ⊢ ∃ μ, ∀ (b : bool) i G γ ℓ (ql : val),
     l{{{ thP_carriers i G ∗
          (if b
-          then (∃ g, ⌜G = {[g]} ∧ (1 <= ℓ)%ordi⌝ ∧ (crP_fuel g (ℓ)%ordi m) ∗ queue_worker γ g)
+          then (∃ g, ⌜G = {[g]} ∧ (1 <= ℓ)%ordi⌝ ∧ (crP_fuel g (ℓ)%ordi μ) ∗ queue_worker γ g)
           else (⌜G = ∅⌝)) ∗
          is_task_queue ql γ ℓ }}}
       TaskQueue.worker ql @ i
@@ -259,8 +259,8 @@ Section proof.
   Qed.
 
   Lemma TaskQueue_init_spec :
-    ⊢ ∃ m, ∀ (lc : Ord.t) i G ℓ,
-    l{{{ thP_carriers i G ∗ crP_fuels G m ∗ ⌜(1 <= ℓ)%ordi⌝ }}}
+    ⊢ ∃ μ, ∀ (lc : Ord.t) i G ℓ,
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗ ⌜(1 <= ℓ)%ordi⌝ }}}
       TaskQueue.init #() @ i
     l{{{ ql γ, RET ql; £ lc ∗ thP_carriers i G ∗ is_task_queue ql γ ℓ }}}.
   Proof.
@@ -269,7 +269,8 @@ Section proof.
     (** For internal steps and function calls *)
     iExists (100%nat ⊕ mqi)%M. iIntros (lc i G ℓ) "!> % (TG& GF& %Hlayer) HΦ".
     rewrite /TaskQueue.init.
-    iPoseProof (crP_fuels_add_gen with "GF") as "[GF GF_qi]".
+    iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_qi]".
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
     lwp_bind (Queue.init _).

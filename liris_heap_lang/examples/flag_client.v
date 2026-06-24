@@ -69,7 +69,7 @@ Section proof.
     iModIntro.
     iApply ("Flag_set_spec" $! 10 with "[$TG GF_s $Gg $HU $flag_inv]").
     { iSplit; last (iPureIntro; set_solver).
-      iApply crP_fuels_init. iApply big_sepS_singleton. iFrame. }
+      iApply big_sepS_singleton. iFrame. }
     iIntros "(LC& TG& Gg& #Od)".
     replace ({[k; kl]} ∖ {[k]}) with ({[kl]} : gset _) by set_solver.
     do 2 (iModIntro; lwp_pure_one).

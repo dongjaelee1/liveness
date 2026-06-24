@@ -175,14 +175,15 @@ Section proof.
   (** FIXME: better notation for triples with this pattern *)
   Lemma Queue_init_spec :
     ⊢ ∃ μ, ∀ lc φ i G,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) }}}
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) }}}
       Queue.init #() @ i
     l{{{ ql γ, RET ql; £ lc ∗ thP_carriers i G ∗ is_queue_init ql γ φ }}}.
   Proof.
     iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
     iExists (20 ⊕ m)%M. iIntros (lc φ i G) "!> % (TG& GF) HΦ".
     rewrite /Queue.init.
-    iPoseProof (crP_fuels_add_gen with "GF") as "[GF F_TicketLock]".
+    iPoseProof (crP_fuel_add_set with "GF") as "[GF F_TicketLock]".
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
     lwp_pures.
@@ -269,8 +270,12 @@ Section proof.
     iIntros (gu ku) "(_& %Ningu& TG& Ggu& F_gu& F_ku& _& _& Lock& R)".
     iPoseProof (crP_fuel_add with "F_gu") as "[F_gu F_mr_gu]".
     (* Prepare fuels for the unlock call. *)
-    iPoseProof (crP_fuels_init with "F_mr") as "F_mr".
-    iPoseProof (crP_fuels_add_carrier with "F_mr_gu F_mr") as "F_mr".
+    (* iPoseProof (crP_fuels_init with "F_mr") as "F_mr". *)
+    (* iPoseProof (crP_fuels_add_carrier with "F_mr_gu F_mr") as "F_mr". *)
+    iMod (crP_fuel_layer_mon_set _ 0 with "F_mr") as "F_mr".
+    { apply ordArith.le_from_nat. lia. }
+    iPoseProof (big_sepS_union_2 with "[F_mr_gu] F_mr") as "F_mr".
+    { iApply big_sepS_singleton. iFrame. }
     rewrite (crP_fuel_eq gu 0 _ (94 ⊕ 6)%M); cycle 1.
     { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (crP_fuel_add with "F_gu") as "[F_gu _]".
@@ -394,8 +399,12 @@ Section proof.
     iIntros (gu ku) "(_& %Ningu& TG& Ggu& F_gu& F_ku& _& _& Lock& R)".
     iPoseProof (crP_fuel_add with "F_gu") as "[F_gu F_mr_gu]".
     (* Prepare fuels for the unlock call. *)
-    iPoseProof (crP_fuels_init with "F_mr") as "F_mr".
-    iPoseProof (crP_fuels_add_carrier with "F_mr_gu F_mr")as "F_mr".
+    iMod (crP_fuel_layer_mon_set _ 0 with "F_mr") as "F_mr".
+    { apply ordArith.le_from_nat. lia. }
+    iPoseProof (big_sepS_union_2 with "[F_mr_gu] F_mr") as "F_mr".
+    { iApply big_sepS_singleton. iFrame. }
+    (* iPoseProof (crP_fuels_init with "F_mr") as "F_mr". *)
+    (* iPoseProof (crP_fuels_add_carrier with "F_mr_gu F_mr")as "F_mr". *)
     rewrite (crP_fuel_eq gu 0 _ (96 ⊕ 4)%M); cycle 1.
     { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (crP_fuel_add with "F_gu") as "[F_gu _]".
@@ -433,7 +442,11 @@ Section proof.
         { iNext. iFrame. simpl. iFrame. iPureIntro. auto. }
         iPoseProof (crP_fuel_add with "Fng") as "[Fng Fng']".
         iPoseProof (crP_fuel_add with "Fng'") as "[Fng' Fng_mr]".
-        iPoseProof (crP_fuels_add_carrier with "Fng_mr F_mr") as "F_mr".
+        iMod (crP_fuel_layer_mon _ 0 with "Fng_mr") as "Fng_mr".
+        { apply ord.O_bot. }
+        iPoseProof (big_sepS_union_2 with "[Fng_mr] F_mr") as "F_mr".
+        { iApply big_sepS_singleton. iFrame. }
+        (* iPoseProof (crP_fuels_add_carrier with "Fng_mr F_mr") as "F_mr". *)
         iModIntro.
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
@@ -526,8 +539,16 @@ Section proof.
         iPoseProof (crP_fuel_add with "Fg") as "(Fg& Fg_mr)".
         iPoseProof (crP_fuel_add with "Fng") as "(Fng_Q& Fng)".
         iPoseProof (crP_fuel_add with "Fng") as "(Fng& Fng_mr)".
-        iPoseProof (crP_fuels_add_carrier with "Fg_mr F_mr") as "F_mr".
-        iPoseProof (crP_fuels_add_carrier with "Fng_mr F_mr") as "F_mr".
+        iMod (crP_fuel_layer_mon _ 0 with "Fg_mr") as "Fg_mr".
+        { apply ord.O_bot. }
+        iPoseProof (big_sepS_union_2 with "[Fg_mr] F_mr") as "F_mr".
+        { iApply big_sepS_singleton. iFrame. }
+        iMod (crP_fuel_layer_mon _ 0 with "Fng_mr") as "Fng_mr".
+        { apply ord.O_bot. }
+        iPoseProof (big_sepS_union_2 with "[Fng_mr] F_mr") as "F_mr".
+        { iApply big_sepS_singleton. iFrame. }
+        (* iPoseProof (crP_fuels_add_carrier with "Fg_mr F_mr") as "F_mr". *)
+        (* iPoseProof (crP_fuels_add_carrier with "Fng_mr F_mr") as "F_mr". *)
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
         { iPureIntro. set_solver. }
@@ -569,7 +590,11 @@ Section proof.
         iModIntro.
         iPoseProof (crP_fuel_add with "Fg") as "(Fg_Q& Fg)".
         iPoseProof (crP_fuel_add with "Fg") as "(Fg& Fg_mr)".
-        iPoseProof (crP_fuels_add_carrier with "Fg_mr F_mr") as "F_mr".
+        iMod (crP_fuel_layer_mon _ 0 with "Fg_mr") as "Fg_mr".
+        { apply ord.O_bot. }
+        iPoseProof (big_sepS_union_2 with "[Fg_mr] F_mr") as "F_mr".
+        { iApply big_sepS_singleton. iFrame. }
+        (* iPoseProof (crP_fuels_add_carrier with "Fg_mr F_mr") as "F_mr". *)
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
         { iPureIntro. set_solver. }

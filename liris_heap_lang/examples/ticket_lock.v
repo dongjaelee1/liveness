@@ -248,7 +248,7 @@ Section proof.
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_init_spec :
     ⊢ ∃ μ, ∀ lc ℓ i G (E : coPset),
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) }}}
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) }}}
       TicketLock.init #() @ i; E
     l{{{ tl γ, RET tl; £ lc ∗
                        thP_carriers i G ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
@@ -257,6 +257,7 @@ Section proof.
     iExists 10.
     iIntros (lc ℓ i G E) "!> %Φ (TG& GF) HΦ".
     rewrite /TicketLock.init.
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_one.
     lwp_bind (AllocN _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
@@ -773,7 +774,7 @@ Section proof.
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_release_spec :
     ⊢ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E),
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token γ κu ∗ ⟦R⟧ₗ ∗
          γ ↪LOCK_AL{dq} ∗
@@ -788,6 +789,7 @@ Section proof.
     iExists 100.
     iIntros (lc i G tl γ dq R κu gu ℓu K E MASK) "!> % (TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
     rewrite /TicketLock.release.
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc 100.
     rewrite lock_token_unseal /lock_token_def.
     iDestruct "LT" as "(%& GV& #GMEtku& #GMEo)".
@@ -906,7 +908,7 @@ Section proof.
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_delete_spec :
     ⊢ ∃ μ, ∀ lc i G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E),
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token γ κu ∗ ⟦R⟧ₗ ∗
          γ ↪LOCK_AL ∗
@@ -917,6 +919,7 @@ Section proof.
     iExists 100.
     iIntros (lc i G tl γ R κu gu ℓu K E MASK) "!> % (TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
     rewrite /TicketLock.delete.
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc 100.
     rewrite lock_token_unseal /lock_token_def.
     iDestruct "LT" as "(%& GV& #GMEtku& #GMEo)".

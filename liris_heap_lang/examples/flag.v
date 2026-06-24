@@ -59,7 +59,8 @@ Section proof.
 
   Lemma Flag_set_spec :
     ⊢ ∃ μ, ∀ lc i l G g K k ℓ ℓg,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗
+    (* l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗ *)
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
          (* The other half of the until ownership for the pointsto. *)
          ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
@@ -72,6 +73,7 @@ Section proof.
     iDestruct "HP" as "(TG& GF& Gg& %Ink& HU& #flag_inv)".
     iDestruct "flag_inv" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.set.
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
     lwp_bind (Store _ _).

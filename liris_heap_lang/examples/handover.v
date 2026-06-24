@@ -15,9 +15,9 @@ Module Handover.
 
   (** Checks until the buffer b contains SOME x *)
   Definition receive : val := 
-    rec: "wait" "b" :=
+    rec: "loop" "b" :=
       match: !"b" with
-        NONE => "wait" "b"
+        NONE => "loop" "b"
       | SOME "x" => (Fst "x") (Snd "x")
       end.
 
@@ -107,7 +107,7 @@ Section proof.
 
   Lemma Handover_send_spec :
     ⊢ ∃ μ, ∀ lc i (b : loc) (f a : val) G g K K' γ ℓ ℓg,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls g ℓg K' ∗ ⌜ K ⊆ K' ⌝ ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ%ordi 1) ∗
          b ↦{#(1/2)} NONEV ∗
          is_task ℓ f a K ∗ is_handover b γ ℓ }}}
@@ -118,6 +118,7 @@ Section proof.
     iDestruct "HP" as "(TG& GF& Cg& %SubK& OFK& Ptrb& is_task& #handover_inv)".
     rewrite /is_handover. iEval (do 2 tf_red) in "handover_inv".
     rewrite /Handover.send.
+    iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
     lwp_pures.
