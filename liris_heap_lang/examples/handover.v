@@ -45,8 +45,6 @@ Record handover_γ :=
       handover_γd : gname;
     }.
 
-(* Local Existing Instances handover_inG handoverGpreS_data_inG. *)
-
 Section proof.
   Context `{!heapGS Σ, !handoverG Σ}.
 
@@ -144,21 +142,21 @@ Section proof.
   Qed.
 
   Lemma Handover_receive_spec :
-    ⊢ ∃ μ, ∀ lc i b G g γ ℓ,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓ μ) ∗
-         ⌜G = {[g]}⌝ ∗ ghost_var (handover_γd γ) (1/2)%Qp g ∗
+    ⊢ ∃ μ, ∀ lc i b g γ ℓ,
+    l{{{ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g ℓ μ) ∗
+         ghost_var (handover_γd γ) (1/2)%Qp g ∗
          is_handover b γ ℓ }}}
       Handover.receive #b @ i
     l{{{ v, RET v; £ lc ∗ thP_carriers i ∅ }}}.
   Proof.
     (** For internal steps and executing run_task *)
-    iExists (10 ⊕ 1)%M. iIntros (lc i b G g γ ℓ Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& %EQg& Gv& #handover_inv)".
+    iExists (10 ⊕ 1)%M. iIntros (lc i b g γ ℓ Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TG& GF& Gv& #handover_inv)".
     rewrite /Handover.receive.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_task]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     (** Lob (co-)induction *)
-    iRevert (g G EQg) "TG GF Gv F_task". iLöb as "IH". iIntros (g G EQg) "TG GF Gv F_task".
+    iRevert (g) "TG GF Gv F_task". iLöb as "IH". iIntros (g) "TG GF Gv F_task".
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
     lwp_bind (Load _).
@@ -189,7 +187,7 @@ Section proof.
       { iNext. iExists _. iLeft. iFrame. }
       do 3 (iModIntro; lwp_pure_one).
       iPoseProof (crP_fuels_add 2 with "GF") as "[_ GF]".
-      iModIntro. iApply ("IH" with "HΦ [] TG GF Gv F_task"). done.
+      iModIntro. iApply ("IH" with "HΦ TG GF Gv F_task").
     - iDestruct "inv" as "(%&%&%& Ptrb& Gv0& Cg& is_task)".
       iApply (lwp_load _ ∅ 0 with "[$Ptrb $TG $GF1]"). 1: done.
       iIntros "((_& TG& _)& Ptrb)".
