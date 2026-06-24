@@ -45,6 +45,8 @@ Record handover_γ :=
       handover_γd : gname;
     }.
 
+(* Local Existing Instances handover_inG handoverGpreS_data_inG. *)
+
 Section proof.
   Context `{!heapGS Σ, !handoverG Σ}.
 
@@ -79,181 +81,134 @@ Section proof.
                 f a @ i
               l{{{ rv, RET rv; £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}})%I.
 
-  Definition handover_inv (l : loc) γd ℓ : iProp Σ :=
-    ∃ g, (l ↦ NONEV ∗ ghost_var γd (1/2)%Qp g ∗ crP_obls g ℓ ∅) ∨
-           (∃ (f a : val) K, l ↦ SOMEV (f, a) ∗ ghost_var γd (1/2)%Qp (g) ∗
+  Definition handover_inv (b : loc) γd ℓ : iProp Σ :=
+    ∃ g, (b ↦{#(1/2)} NONEV ∗ ghost_var γd (1/2)%Qp g ∗ crP_obls g ℓ ∅) ∨
+           (∃ (f a : val) K, b ↦ SOMEV (f, a) ∗ ghost_var γd (1/2)%Qp (g) ∗
                              crP_obls g ℓ K ∗ is_task ℓ f a K) ∨
-           ghost_var γd (1)%Qp g.
+           (∃ (f a : val), b ↦ SOMEV (f, a) ∗ ghost_var γd (1)%Qp g).
 
-  Definition is_handover (l : loc) (γ : handover_γ) ℓ : iProp Σ :=
-    ⟦alwaysP Na (⟨handover_inv l (handover_γd γ) ℓ⟩)⟧ₗ.
+  Definition is_handover (b : loc) (γ : handover_γ) ℓ : iProp Σ :=
+    ⟦alwaysP Na (⟨handover_inv b (handover_γd γ) ℓ⟩)⟧ₗ.
 
   (** The main proofs. *)
-  Global Instance handover_inv_persistent l k ℓ : Persistent (is_handover l k ℓ).
+  Global Instance handover_inv_persistent b γ ℓ : Persistent (is_handover b γ ℓ).
   Proof. rewrite /is_handover. tf_red. apply _. Qed.
 
-  TODO
-
-  Lemma Handover_set_spec :
-    ⊢ ∃ μ, ∀ lc i l G g K k ℓ ℓg,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗
-         crP_obls g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
-         (* The other half of the until ownership for the pointsto. *)
-         ⟦untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)⟧ₗ ∗
-         handover_inv l k ℓ }}}
-      Handover.set #l @ i
-    l{{{ RET #(); £ lc ∗ thP_carriers i G ∗
-                  crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}}.
+  Lemma is_handover_initialize E b ℓ g :
+     b ↦{#(1/2)} NONEV -∗ crP_obls g ℓ ∅
+    ={E}=∗ ∃ γ, is_handover b γ ℓ ∗ ghost_var (handover_γd γ) (1/2)%Qp g.
   Proof.
-    iExists 10. iIntros (lc i l G g K k ℓ ℓg Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gg& %Ink& HU& #handover_inv)".
-    iDestruct "handover_inv" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
-    rewrite /Handover.set.
+    iIntros "Ptr Co".
+    iMod (ghost_var_alloc g) as "(%& [Gv Gv0])".
+    iExists (HandoverName γ). iFrame "Gv0".
+    rewrite /is_handover. simpl.
+    iMod (inv_alloc Na _ (handover_inv b γ ℓ) with "[Ptr Co Gv]") as "#Inv".
+    { iNext. rewrite /handover_inv. iExists g. iLeft. iFrame. }
+    eauto.
+  Qed.
+
+  Lemma Handover_send_spec :
+    ⊢ ∃ μ, ∀ lc i (b : loc) (f a : val) G g K K' γ ℓ ℓg,
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗
+         crP_obls g ℓg K' ∗ ⌜ K ⊆ K' ⌝ ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ%ordi 1) ∗
+         b ↦{#(1/2)} NONEV ∗
+         is_task ℓ f a K ∗ is_handover b γ ℓ }}}
+      Handover.send #b f a @ i
+    l{{{ RET #(); £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}}.
+  Proof.
+    iExists 20. iIntros (lc i b f a G g K K' γ ℓ ℓg Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TG& GF& Cg& %SubK& OFK& Ptrb& is_task& #handover_inv)".
+    rewrite /is_handover. iEval (do 2 tf_red) in "handover_inv".
+    rewrite /Handover.send.
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
+    lwp_pures.
     lwp_bind (Store _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    iInv "HA" as "inv". iDestruct "inv" as "[inv | inv]"; cycle 1.
-    { iDestruct "inv" as "[>inv _]".
-      iEval (rewrite tf_until_logic) in "HU". iDestruct "HU" as "[Oak _]".
-      iPoseProof (oblP_assigned_discharged_false with "Oak inv") as "%". done. }
+    iInv "handover_inv" as "inv".
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
-    iCombine "HU inv" as "inv".
-    iMod (tf_until_discharge with "inv") as "inv".
-    { apply N_subseteq_1. }
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-    iApply (lwp_lc_later with "LC1"). iNext.
-    iDestruct "inv" as "[Ptrl ACCinv]".
-    iApply lwp_sfmupd.
-    iEval (tf_red) in "Ptrl". iDestruct "Ptrl" as "(%& Ptrl)".
-    iEval (tf_red) in "Ptrl". iDestruct "Ptrl" as "(%& Ptrl)".
-    iEval (rewrite tf_atomic_logic) in "Ptrl".
-    iApply (lwp_store _ ∅ 0 with "[$Ptrl $TG $GF1]"). 1: done.
-    iIntros "((_& TG& _)& Ptrl)".
-    iMod ("ACCinv" $! _) as "ACCinv".
-    iApply sfmupd_fupd_acc. iMod ("ACCinv" with "Ptrl") as "ACCinv".
-    iModIntro. 
-    iPoseProof ("ACCinv" with "[] Gg") as "ACCinv".
-    { iPureIntro. set_solver. }
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iMod ("ACCinv" $! _) as "ACCinv". iIntros "!> !>". iMod "ACCinv" as "(Ptrl& Gg& #Odk)".
-    iIntros "!> !>". iSplitL "Ptrl".
-    { iNext. iRight. iFrame. eauto. }
-    iApply ("HΦ" with "[$Q_LC $TG $Gg $Odk]").
+    iDestruct "inv" as "(%& [inv | [inv | inv]])".
+    - iDestruct "inv" as "(Ptrb0& Gv& Cg0)".
+      iApply lwp_sfmupd.
+      iCombine "Ptrb Ptrb0" as "Ptrb".
+      iApply (lwp_store _ ∅ 0 with "[$Ptrb $TG $GF1]"). 1: done.
+      iIntros "((_& TG& _)& Ptrb)".
+      iMod (obl_offload_set with "Cg Cg0 OFK") as "(Cg& Cg0& %DisjK)". 1: auto. 1: done.
+      rewrite union_empty_l_L. iModIntro. iModIntro. iSplitR "HΦ Q_LC TG Cg".
+      { iNext. iExists _. iRight. iLeft. iFrame. }
+      iApply "HΦ". iFrame.
+    - iDestruct "inv" as "(%&%&%& Ptrb0& _)". iCombine "Ptrb Ptrb0" gives %?. destruct H. done.
+    - iDestruct "inv" as "(%&%& Ptrb0& _)". iCombine "Ptrb Ptrb0" gives %?. destruct H. done.
   Qed.
 
-  Lemma Handover_wait_spec :
-    ⊢ ∃ μ, ∀ lc i l G k ℓ,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
-         handover_inv l k ℓ }}}
-      Handover.wait #l @ i
-    l{{{ RET #1; £ lc ∗ thP_carriers i G ∗ oblP_discharged k }}}.
+  Lemma Handover_receive_spec :
+    ⊢ ∃ μ, ∀ lc i b G g γ ℓ,
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓ μ) ∗
+         ⌜G = {[g]}⌝ ∗ ghost_var (handover_γd γ) (1/2)%Qp g ∗
+         is_handover b γ ℓ }}}
+      Handover.receive #b @ i
+    l{{{ v, RET v; £ lc ∗ thP_carriers i ∅ }}}.
   Proof.
-    iExists ((1 × ▽) ⊕ 1)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& #handover_inv)".
-    iDestruct "handover_inv" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
-    rewrite /Handover.wait.
-    iPoseProof (crP_fuel_add_set with "GF") as "[W_GF GF]".
-    (* Liveness induction *)
-    iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)".
-    iMod (wit_fuels_add_map with "Wf0 W_GF") as "Wf".
-    { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
-    iClear "Wf0". iInduction α as [α IH] using WFOCM.ind.
-    iMod (crP_fuel_extend_set _ ℓ _ (10)%M with "GF") as "GF".
-    { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
+    (** For internal steps and executing run_task *)
+    iExists (10 ⊕ 1)%M. iIntros (lc i b G g γ ℓ Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TG& GF& %EQg& Gv& #handover_inv)".
+    rewrite /Handover.receive.
+    iPoseProof (crP_fuel_add_set with "GF") as "[GF F_task]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
-    lwp_pure_lc 100.
+    (** Lob (co-)induction *)
+    iRevert (g G EQg) "TG GF Gv F_task". iLöb as "IH". iIntros (g G EQg) "TG GF Gv F_task".
+    lwp_pure_lc (lc ⊕ 10)%ord.
+    iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
     lwp_bind (Load _).
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    iInv "HA" as "inv". iDestruct "inv" as "[inv | inv]".
-    - (* Induction case. *)
-      iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-      iApply (lwp_lc_later with "LC1"). iNext.
-      iMod (tf_until_acc with "inv") as "inv".
-      1: apply N_subseteq_1.
-      iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-      iApply (lwp_lc_later with "LC1"). iNext.
-      iDestruct "inv" as "(Ptrl& inv_acc)".
-      iEval (tf_red) in "Ptrl". iDestruct "Ptrl" as "(%& Ptrl)".
-      iEval (tf_red) in "Ptrl". iDestruct "Ptrl" as "(%& Ptrl)".
-      iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-      iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TG $Ptrl $GF1]").
-      { iApply big_sepS_singleton. eauto. }
-      iIntros "[(_& TG& Rs) Ptrl]".
-      iEval (rewrite big_sepS_singleton) in "Rs". iDestruct "Rs" as "[Wck | #Odk]"; cycle 1.
-      { iMod ("inv_acc" with "[Ptrl]") as "H".
-        { iNext. tf_red. iExists _. tf_red. rewrite !tf_atomic_logic. iFrame "Ptrl". eauto. }
-        iPoseProof (tf_until_discharged_false with "H Odk") as "%". done. }
-      iMod ("inv_acc" with "[Ptrl]") as "inv".
-      { iNext. tf_red. iExists _. tf_red. rewrite !tf_atomic_logic. iFrame "Ptrl". eauto. }
-      iModIntro. iModIntro. iSplitL "inv".
-      { iFrame. }
-      iModIntro; lwp_pure_one.
-      rewrite bool_decide_false; cycle 1.
-      { intro F. simplify_eq /=. }
-      iModIntro; lwp_pure_one.
-      iModIntro.
-      iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')".
-      iApply ("IH" $! α0 LTα with "TG HΦ [Fkl'] Wf'").
-      rewrite map_union_empty. iPoseProof (big_sepM_gset_to_gmap with "Fkl'") as "H". iFrame.
-    - (* k is discharged. *)
-      iDestruct "inv" as ">(#Odk& Ptrl)".
-      iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-      iApply (lwp_load _ ∅ 0 with "[$TG $Ptrl $GF1]"). 1: done.
-      iIntros "[(_& TG& _) Ptrl]".
-      iModIntro. iSplitL "Ptrl".
-      { iNext. iRight. iFrame. eauto. }
-      iClear "LC". iModIntro. lwp_pure_lc lc.
+    (** Cases. *)
+    rewrite /is_handover. iEval (do 2 tf_red) in "handover_inv".
+    iInv "handover_inv" as "inv".
+    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+    iApply (lwp_lc_later with "LC1"). iNext.
+    iDestruct "inv" as "(%& [inv | [inv | inv]])".
+    - iDestruct "inv" as "(Ptrb& Gv0& Cg)".
+      iApply lwp_sfmupd.
+      iApply (lwp_load _ ∅ 0 with "[$Ptrb $TG $GF1]"). 1: done.
+      iIntros "((_& TG& _)& Ptrb)".
+      iCombine "Gv Gv0" gives %H. destruct H as [_ <-]. subst.
+      iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
+      replace ({[g]} ∖ {[g]}) with (∅ : gset ocid) by set_solver.
+      iMod (carrier_alloc _ _ _ ℓ (15 ⊕ 1)%M with "TG") as "(%g'& _& TG& Cg'& Gf)".
+      iMod (ghost_var_update_2 g' with "Gv Gv0") as "(Gv& Gv0)". 1: by rewrite Qp.div_2.
+      iClear "F_task GF". clear g.
+      rewrite union_empty_r_L.
+      iAssert ([∗ set] g ∈ {[g']}, crP_fuel g (ℓ)%ordi _)%I with "[Gf]" as "GF".
+      { iApply big_sepS_singleton. iFrame. }      
+      iPoseProof (crP_fuel_add_set with "GF") as "[GF F_task]".
+      iPoseProof (crP_fuels_init with "GF") as "GF".
+      iModIntro. iModIntro. iSplitL "Ptrb Gv0 Cg'".
+      { iNext. iExists _. iLeft. iFrame. }
+      do 3 (iModIntro; lwp_pure_one).
+      iPoseProof (crP_fuels_add 2 with "GF") as "[_ GF]".
+      iModIntro. iApply ("IH" with "HΦ [] TG GF Gv F_task"). done.
+    - iDestruct "inv" as "(%&%&%& Ptrb& Gv0& Cg& is_task)".
+      iApply (lwp_load _ ∅ 0 with "[$Ptrb $TG $GF1]"). 1: done.
+      iIntros "((_& TG& _)& Ptrb)".
+      iCombine "Gv Gv0" as "Gv" gives %H. destruct H as [_ <-]. subst.
+      iModIntro. iSplitL "Ptrb Gv".
+      { iNext. iExists _. iRight. iRight. iFrame. }
       lwp_pures.
-      iModIntro. lwp_finish.
-      iModIntro. iApply ("HΦ" with "[$]").
-  Qed.
-
-  Lemma handover_inv_init E l g K ℓ ℓg μ :
-    (ℓg <= ℓ)%ordi →
-    l ↦ #0 -∗
-    crP_obls g ℓg K -∗
-    |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ crP_obls g ℓg ({[k]} ∪ K) ∗ oblP_fuel k ℓ μ ∗
-                 ⟦untilP Np k (1/2) (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)⟧ₗ ∗ handover_inv l k ℓ.
-  Proof.
-    iIntros (Hle) "Ptr Gg". rewrite /handover_inv.
-    iMod (tf_until_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
-    iMod ("H" $! _ Np (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v)%F (l ↦ #1)%F with "[Ptr]") as "H".
-    { iNext. tf_red. iExists _. tf_red. rewrite tf_atomic_logic. iFrame. iPureIntro. done. }
-    iDestruct "H" as "[H1 H2]".
-    do 2 tf_red.
-    iMod (inv_alloc with "[H1]") as "$". 2: by iFrame.
-    iNext. by iLeft.
+      lwp_bind (f a).
+      iDestruct "is_task" as "(%&%& %Hlt& HP& %& task)".
+      iModIntro.
+      iMod (crP_fuel_extend_set _ ℓt _ μ with "F_task") as "F_task". 1: eauto.
+      iApply lwp_sfmupd.
+      iApply ("task" $! 0 with "[$TG $F_task $Cg $HP]"). 1: eauto.
+      iIntros (?) "(_& TG& Cg)". replace (K ∖ K) with (∅ : gset ocid) by set_solver.
+      iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
+      replace ({[g]} ∖ {[g]}) with (∅ : gset ocid) by set_solver.
+      iApply ("HΦ" with "[$Q_LC $TG]").
+    - iDestruct "inv" as "(%&%& _& Gv0)".
+      iCombine "Gv Gv0" gives %H. destruct H as [? _]. done.
   Qed.
 
 End proof.
-
-Section trace.
-
-  (** Export to trace properties *)
-  Definition handover_inv_tp (l : loc) : tp :=
-    (tp_always (((tp_until (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)) ∨ (l ↦ #1))))%P.
-
-  (** TODO: weaken the strict equality to semantics equivalence/implication. *)
-  Definition handover_inv_tp' (l : loc) : tp :=
-    (tp_true ∧ tp_always (((tp_until (∃ v, ⌜v ≠ #1⌝ ∧ l ↦ v) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
-
-  Remark handover_inv_tf_to_tp' `{!heapGS Σ} l k ℓ :
-    tf_to_tp (handover_inv_tf l k ℓ) = handover_inv_tp' l.
-  Proof. done. Qed.
-
-  Remark handover_inv_tp_impl l :
-    ∀ τ, tp_trace (handover_inv_tp' l) τ → tp_trace (handover_inv_tp l) τ.
-  Proof.
-    simpl. unfold_trProp. intros. destruct τ. destruct H. intros. specialize (H0 _ H1).
-    destruct H0.
-    - destruct H0 as (?&?&?&?). left. eexists. split_and !; eauto.
-    - destruct H0. right. eauto.
-  Qed.
-
-End trace.
