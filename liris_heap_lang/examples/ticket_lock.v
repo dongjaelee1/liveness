@@ -149,7 +149,7 @@ Section proof.
         (∃ κ, ghost_var γk (1/2) (c) ∗
               (curr ↦{#(1/2 + 1/2/2)} #c) ∗
               ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
-              ⟦eventuallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ).
+              ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ).
 
   Local Definition lock_inv γt γo γc γa (next curr : loc) (R : tf Σ) : iProp Σ :=
     (own γa (to_dfrac_agree (DfracOwn 1) tt)) ∨
@@ -179,9 +179,9 @@ Section proof.
              (⌜(c < n)%Z⌝ ∧
               (* Allocates new obligation on behalf of next owner. *)
               ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗ (c + 1)%Z ↪[γo]□ (Some κ) ∗
-                     ⟦eventuallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
+                     ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
                      ((∃ g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
-                                ⟦eventuallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
+                                ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
                                 crP_obls g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
                                 curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
                         (* Current owner acquired the lock. *)

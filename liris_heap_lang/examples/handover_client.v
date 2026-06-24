@@ -45,7 +45,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i g k kl,
     l{{{ thP_carriers i {[g]} ∗ crP_fuel g 0 μ ∗
          crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
-         ⟦eventuallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
+         ⟦finallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
          flag_inv l k 0 }}}
       writer #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
@@ -95,7 +95,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i g k kl,
     l{{{ thP_carriers i {[g]} ∗ crP_fuel g 1 μ ∗
          crP_obls g 1 {[kl]} ∗
-         ⟦eventuallyP Nl kl 1 (i ⤉ "exit", #1)⟧ₗ ∗
+         ⟦finallyP Nl kl 1 (i ⤉ "exit", #1)⟧ₗ ∗
          flag_inv l k 0 }}}
       reader #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
@@ -144,8 +144,8 @@ Section proof.
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
                       ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
                       untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
-                      eventuallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
-                      eventuallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
+                      finallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
+                      finallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
                       ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                        thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
                        crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F) →
@@ -213,15 +213,15 @@ Section adequacy.
   Let Φ : tp :=
         (flag_inv_tp l ∧
          tp_until (l ↦ #0) (l ↦ #1) ∧
-         tp_eventually (i ⤉ "exit", #()) ∧
-         tp_eventually (j ⤉ "exit", #1))%P.
+         tp_finally (i ⤉ "exit", #()) ∧
+         tp_finally (j ⤉ "exit", #1))%P.
 
   Let Φ' : tp :=
         (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
             ⌜ k ≠ kl1 ⌝ ∧ flag_inv_tp' l ∧
             tp_until (l ↦ #0) (l ↦ #1) ∧
-            tp_eventually (i ⤉ "exit", #()) ∧
-            tp_eventually (j ⤉ "exit", #1) ∧
+            tp_finally (i ⤉ "exit", #()) ∧
+            tp_finally (j ⤉ "exit", #1) ∧
             tp_true)%P.
 
   Remark Φ_impl :
@@ -245,8 +245,8 @@ Section adequacy.
           (∃ g1 g2 k kl1 kl2,
               ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
               untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
-              eventuallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
-              eventuallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
+              finallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
+              finallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
               ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
                crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F.

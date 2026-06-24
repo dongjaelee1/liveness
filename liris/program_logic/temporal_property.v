@@ -40,9 +40,9 @@ Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%P)) ..)) :
 
 (** Define patterns corresponding to LTL temporal properties. *)
 (* Eventually P *)
-Definition tp_eventually {Π} (P : @tp Π) : tp :=
+Definition tp_finally {Π} (P : @tp Π) : tp :=
   (tp_until ⌜ True ⌝ P)%P.
-Global Arguments tp_eventually {Π}.
+Global Arguments tp_finally {Π}.
 
 (* P Weak until Q *)
 Definition tp_weakuntil {Π} (P Q : @tp Π) : tp :=

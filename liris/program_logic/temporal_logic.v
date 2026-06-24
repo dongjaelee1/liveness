@@ -53,9 +53,9 @@ Infix "∗" := (tf_sep) : tf_scope.
 
 (** Define patterns corresponding to LTL temporal properties. *)
 (* Eventually P *)
-Definition tf_eventually `{SI : indexT} {Π} {Σ} N k b q (P : @tf SI Π Σ) : tf Σ :=
+Definition tf_finally `{SI : indexT} {Π} {Σ} N k b q (P : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q ⌜ True ⌝ P)%F.
-Global Arguments tf_eventually {SI Π Σ}.
+Global Arguments tf_finally {SI Π Σ}.
 
 (* P Weak until Q *)
 Definition tf_weakuntil `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
@@ -268,7 +268,7 @@ Global Opaque tf_logic tf_intuit.
 
 Global Notation alwaysP N P := (tf_always N P%F)%F.
 Global Notation untilP N k q P Q := (tf_until N k false q P%F Q%F)%F.
-Global Notation eventuallyP N k q Q := (tf_eventually N k false q Q%F)%F.
+Global Notation finallyP N k q Q := (tf_finally N k false q Q%F)%F.
 
 (** Ofe and Monoid structure. *)
 Global Instance tf_equiv `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : Equiv (tf Σ) :=

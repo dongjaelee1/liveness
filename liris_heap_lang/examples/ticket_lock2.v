@@ -118,7 +118,7 @@ Section proof.
          (** We need auth_mra_know to sync what other threads know about the configuration *)
          (∃ ℓ, t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi ∗ (own γc (◯AM[ord.le] ℓ))) ∗
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_discharged κ) ∨
-            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_eventually N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ ⟨R⟩)⟧ₗ))) ∗
+            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_finally N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ ⟨R⟩)⟧ₗ))) ∗
       (** Acknowledgement *)
       ([∗ map] t ↦ a ∈ acks,
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ t ↪[γa]□ true) ∨
@@ -131,7 +131,7 @@ Section proof.
     ∃ (next curr : loc) (u : Z),
       (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗
       ((u + 1)%Z ↪[(ticketlock_γt γ)]□ (κu)) ∗
-      ⟦tf_eventually N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ ⟨R⟩)⟧ₗ.
+      ⟦tf_finally N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ ⟨R⟩)⟧ₗ.
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
   Definition lock_token := lock_token_aux.(unseal).
   Local Definition lock_token_unseal :
@@ -443,7 +443,7 @@ Section proof.
       { iPoseProof (ghost_map_lookup with "GMAt Mtkp") as "%LUt".
         iExFalso. iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[Hmt _]".
         iDestruct "Hmt" as "(_& [Hmt | Hmt])"; cycle 1.
-        { iDestruct "Hmt" as "(_& Ukp)". iEval (rewrite /tf_eventually tf_until_logic) in "Ukp".
+        { iDestruct "Hmt" as "(_& Ukp)". iEval (rewrite /tf_finally tf_until_logic) in "Ukp".
           iDestruct "Ukp" as "(Oa& _)". iPoseProof (oblP_assigned_discharged_false with "Oa Gfkp")as "%". done. }
         iDestruct "Hmt" as "(%Boundmy& _)". assert (Boundmy1 : (0 ≤ my < c)%Z) by lia.
         iPoseProof (ghost_map_lookup with "GMAa GMEaku") as "%LUa".

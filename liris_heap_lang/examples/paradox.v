@@ -220,7 +220,7 @@ Section proof.
         ([^tf_sep map] a ↦ k ∈ os,
            ⟨(£ (10)%ord ∨ cnt_lb r i a) ∗
             a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0⟩ ∗
-           ((tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩) ∨
+           ((tf_finally Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩) ∨
               (⟨oblP_discharged k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩))))%F.
 
   Definition px_tf r rm i j : tf Σ :=
@@ -233,7 +233,7 @@ Section proof.
       ([∗ map] a ↦ k ∈ os,
          ((£ (10)%ord ∨ cnt_lb r i a) ∗
           a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0) ∗
-         ((⟦tf_eventually Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩⟧ₗ) ∨
+         ((⟦tf_finally Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩⟧ₗ) ∨
             (oblP_discharged k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
 
   Definition px r rm i j : iProp Σ :=
@@ -298,7 +298,7 @@ Section proof.
       iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
       iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
       iDestruct "Hm" as "(Hm& [F | (_& (#Cljn1& %& #Mn1))])".
-      { rewrite /tf_eventually tf_until_logic. iDestruct "F" as "(Ga& _)".
+      { rewrite /tf_finally tf_until_logic. iDestruct "F" as "(Ga& _)".
         iPoseProof (oblP_assigned_discharged_false with "Ga Gdckn") as "%". done. }
       iPoseProof (big_sepM_delete _ _ _ _ LU with "[Hm $HM]") as "HM".
       { iFrame. iRight. eauto. }
@@ -319,7 +319,7 @@ Section proof.
   Lemma px_loop2_spec j n r rm ci cj ck :
     l{{{ ∃ g, thP_carriers j {[g]} ∗
               crP_obls g 0 {[ck]} ∗
-              ⟦tf_eventually Nu ck false (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
+              ⟦tf_finally Nu ck false (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
               crP_fuel g 0 10 ∗
               px r rm ci cj ∗
               cnt_auth r cj n (1/2) ∗ n ↪[rm]□ ck }}}
@@ -353,7 +353,7 @@ Section proof.
     iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
     iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
     iDestruct "Hm" as "(Hm& [Uck1 | (#F& _)])"; cycle 1.
-    { rewrite /tf_eventually tf_until_logic. iDestruct "Uck" as "(Ga& _)".
+    { rewrite /tf_finally tf_until_logic. iDestruct "Uck" as "(Ga& _)".
       iPoseProof (oblP_assigned_discharged_false with "Ga F") as "%". done. }
     iPoseProof (tf_until_frac_add with "Uck Uck1") as "Uck".
     { rewrite Qp.div_2. reflexivity. }

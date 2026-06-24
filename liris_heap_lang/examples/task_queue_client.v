@@ -312,15 +312,15 @@ Section adequacy.
   Let Φ : tp :=
         (mp_tp l ∧
          tp_until (l ↦ #0) (l ↦ #1) ∧
-         tp_eventually (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
-         tp_eventually (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝))%P.
+         tp_finally (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
+         tp_finally (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝))%P.
 
   Let Φ' : tp :=
         (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
             ⌜ k ≠ kl1 ⌝ ∧ mp_tp' l ∧
             tp_until (l ↦ #0) (l ↦ #1) ∧
-            tp_eventually (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
-            tp_eventually (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
+            tp_finally (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
+            tp_finally (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
             tp_true)%P.
 
   Remark Φ_impl :
@@ -342,8 +342,8 @@ Section adequacy.
         (∃ g1 g2 k kl1 kl2,
             ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
             tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-            tf_eventually Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-            tf_eventually Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+            tf_finally Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
+            tf_finally Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
             ⟨thP_carriers i {[g1]} ∗ crP_obls i g1 0 {[k; kl1]} ∗
              thP_carriers j {[g2]} ∗ crP_obls j g2 1 ({[kl2]}) ∗
              crP_fuel g1 0 10 ∗ crP_fuel g2 1 ((1 × ▽) ⊕ 1)%M⟩)%F.
