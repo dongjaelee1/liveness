@@ -7,7 +7,7 @@ From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_var.
 
-Module Handover.
+Module Handoff.
 
   (** Put x at buffer b *)
   Definition send : val :=
@@ -21,32 +21,32 @@ Module Handover.
       | SOME "x" => (Fst "x") (Snd "x")
       end.
 
-End Handover.
+End Handoff.
 
 (** The CMRA we need. *)
-Class handoverGpreS (Σ : gFunctors) : Set :=
-  HandoverGpreS {
-      #[local] handoverGpreS_data_inG :: ghost_varG Σ (ocid);
+Class handoffGpreS (Σ : gFunctors) : Set :=
+  HandoffGpreS {
+      #[local] handoffGpreS_data_inG :: ghost_varG Σ (ocid);
     }.
 
-Class handoverG Σ :=
-  HandoverG {
-      #[local] handover_inG :: handoverGpreS Σ;
+Class handoffG Σ :=
+  HandoffG {
+      #[local] handoff_inG :: handoffGpreS Σ;
     }.
 
-Definition handoverΣ : gFunctors :=
+Definition handoffΣ : gFunctors :=
     #[ghost_varΣ (ocid)].
 
-Global Instance subG_handoverΣ {Σ} : subG handoverΣ Σ → handoverGpreS Σ.
+Global Instance subG_handoffΣ {Σ} : subG handoffΣ Σ → handoffGpreS Σ.
 Proof. solve_inG. Qed.
 
-Record handover_γ :=
-  HandoverName {
-      handover_γd : gname;
+Record handoff_γ :=
+  HandoffName {
+      handoff_γd : gname;
     }.
 
 Section proof.
-  Context `{!heapGS Σ, !handoverG Σ}.
+  Context `{!heapGS Σ, !handoffG Σ}.
 
   Ltac post_lwp :=
     simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
@@ -59,7 +59,7 @@ Section proof.
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
-  Let N := nroot.@ "handover".
+  Let N := nroot.@ "handoff".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
 
@@ -79,45 +79,45 @@ Section proof.
                 f a @ i
               l{{{ rv, RET rv; £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}})%I.
 
-  Definition handover_inv (b : loc) γd ℓ : iProp Σ :=
+  Definition handoff_inv (b : loc) γd ℓ : iProp Σ :=
     ∃ g, (b ↦{#(1/2)} NONEV ∗ ghost_var γd (1/2)%Qp g ∗ crP_obls g ℓ ∅) ∨
            (∃ (f a : val) K, b ↦ SOMEV (f, a) ∗ ghost_var γd (1/2)%Qp (g) ∗
                              crP_obls g ℓ K ∗ is_task ℓ f a K) ∨
            (∃ (f a : val), b ↦ SOMEV (f, a) ∗ ghost_var γd (1)%Qp g).
 
-  Definition is_handover (b : loc) (γ : handover_γ) ℓ : iProp Σ :=
-    ⟦alwaysP Na (⟨handover_inv b (handover_γd γ) ℓ⟩)⟧ₗ.
+  Definition is_handoff (b : loc) (γ : handoff_γ) ℓ : iProp Σ :=
+    ⟦alwaysP Na (⟨handoff_inv b (handoff_γd γ) ℓ⟩)⟧ₗ.
 
   (** The main proofs. *)
-  Global Instance handover_inv_persistent b γ ℓ : Persistent (is_handover b γ ℓ).
-  Proof. rewrite /is_handover. tf_red. apply _. Qed.
+  Global Instance handoff_inv_persistent b γ ℓ : Persistent (is_handoff b γ ℓ).
+  Proof. rewrite /is_handoff. tf_red. apply _. Qed.
 
-  Lemma is_handover_initialize E b ℓ g :
+  Lemma is_handoff_initialize E b ℓ g :
      b ↦{#(1/2)} NONEV -∗ crP_obls g ℓ ∅
-    ={E}=∗ ∃ γ, is_handover b γ ℓ ∗ ghost_var (handover_γd γ) (1/2)%Qp g.
+    ={E}=∗ ∃ γ, is_handoff b γ ℓ ∗ ghost_var (handoff_γd γ) (1/2)%Qp g.
   Proof.
     iIntros "Ptr Co".
     iMod (ghost_var_alloc g) as "(%& [Gv Gv0])".
-    iExists (HandoverName γ). iFrame "Gv0".
-    rewrite /is_handover. simpl.
-    iMod (inv_alloc Na _ (handover_inv b γ ℓ) with "[Ptr Co Gv]") as "#Inv".
-    { iNext. rewrite /handover_inv. iExists g. iLeft. iFrame. }
+    iExists (HandoffName γ). iFrame "Gv0".
+    rewrite /is_handoff. simpl.
+    iMod (inv_alloc Na _ (handoff_inv b γ ℓ) with "[Ptr Co Gv]") as "#Inv".
+    { iNext. rewrite /handoff_inv. iExists g. iLeft. iFrame. }
     eauto.
   Qed.
 
-  Lemma Handover_send_spec :
+  Lemma Handoff_send_spec :
     ⊢ ∃ μ, ∀ lc i (b : loc) (f a : val) G g K K' γ ℓ ℓg,
     l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls g ℓg K' ∗ ⌜ K ⊆ K' ⌝ ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ%ordi 1) ∗
          b ↦{#(1/2)} NONEV ∗
-         is_task ℓ f a K ∗ is_handover b γ ℓ }}}
-      Handover.send #b f a @ i
+         is_task ℓ f a K ∗ is_handoff b γ ℓ }}}
+      Handoff.send #b f a @ i
     l{{{ RET #(); £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}}.
   Proof.
     iExists 20. iIntros (lc i b f a G g K K' γ ℓ ℓg Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Cg& %SubK& OFK& Ptrb& is_task& #handover_inv)".
-    rewrite /is_handover. iEval (do 2 tf_red) in "handover_inv".
-    rewrite /Handover.send.
+    iDestruct "HP" as "(TG& GF& Cg& %SubK& OFK& Ptrb& is_task& #handoff_inv)".
+    rewrite /is_handoff. iEval (do 2 tf_red) in "handoff_inv".
+    rewrite /Handoff.send.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
@@ -125,7 +125,7 @@ Section proof.
     lwp_bind (Store _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    iInv "handover_inv" as "inv".
+    iInv "handoff_inv" as "inv".
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "inv" as "(%& [inv | [inv | inv]])".
@@ -142,18 +142,18 @@ Section proof.
     - iDestruct "inv" as "(%&%& Ptrb0& _)". iCombine "Ptrb Ptrb0" gives %?. destruct H. done.
   Qed.
 
-  Lemma Handover_receive_spec :
+  Lemma Handoff_receive_spec :
     ⊢ ∃ μ, ∀ lc i b g γ ℓ,
     l{{{ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g ℓ μ) ∗
-         ghost_var (handover_γd γ) (1/2)%Qp g ∗
-         is_handover b γ ℓ }}}
-      Handover.receive #b @ i
+         ghost_var (handoff_γd γ) (1/2)%Qp g ∗
+         is_handoff b γ ℓ }}}
+      Handoff.receive #b @ i
     l{{{ v, RET v; £ lc ∗ thP_carriers i ∅ }}}.
   Proof.
     (** For internal steps and executing run_task *)
     iExists (10 ⊕ 1)%M. iIntros (lc i b g γ ℓ Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gv& #handover_inv)".
-    rewrite /Handover.receive.
+    iDestruct "HP" as "(TG& GF& Gv& #handoff_inv)".
+    rewrite /Handoff.receive.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_task]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     (** Lob (co-)induction *)
@@ -164,8 +164,8 @@ Section proof.
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     (** Cases. *)
-    rewrite /is_handover. iEval (do 2 tf_red) in "handover_inv".
-    iInv "handover_inv" as "inv".
+    rewrite /is_handoff. iEval (do 2 tf_red) in "handoff_inv".
+    iInv "handoff_inv" as "inv".
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "inv" as "(%& [inv | [inv | inv]])".

@@ -136,8 +136,8 @@ liris_heap_lang/lib/array.v
 
 liris_heap_lang/examples/flag.v
 liris_heap_lang/examples/flag_client.v
-liris_heap_lang/examples/handover.v
-liris_heap_lang/examples/handover_client.v
+liris_heap_lang/examples/handoff.v
+liris_heap_lang/examples/handoff_client.v
 liris_heap_lang/examples/paradox.v
 liris_heap_lang/examples/ticket_lock.v
 liris_heap_lang/examples/ticket_lock2.v

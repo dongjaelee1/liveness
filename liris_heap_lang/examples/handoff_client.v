@@ -5,23 +5,23 @@ From liris.heap_lang Require Export lang.
 From liris.heap_lang Require Import notation.
 From liris.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
-From liris.heap_lang.examples Require Export flag handover.
+From liris.heap_lang.examples Require Export flag handoff.
 
 Section code.
 
   Definition main : val :=
     λ: <>,
       let: "b" := ref NONE in
-      Fork (Handover.receive "b");;
+      Fork (Handoff.receive "b");;
       let: "x" := ref #0 in
-      Handover.send "b" Flag.set "x";;
+      Handoff.send "b" Flag.set "x";;
       let: "v" := Flag.wait "x" in
       Label "exit" "v".
 
 End code.
 
 Section proof.
-  Context `{!heapGS Σ, !handoverG Σ}.
+  Context `{!heapGS Σ, !handoffG Σ}.
 
   Ltac post_lwp :=
     simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
@@ -46,11 +46,11 @@ Section proof.
          ⟦finallyP Nl kl 1 (i ⤉ "exit", #1)⟧ₗ }}}
       main #() @ i
     l{{{ v, RET v; lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
-  Proof using handoverG0.
+  Proof using handoffG0.
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
-    iPoseProof (Handover_send_spec) as (μ_hs) "Handover_send_spec".
-    iPoseProof (Handover_receive_spec) as (μ_hr) "Handover_receive_spec".
+    iPoseProof (Handoff_send_spec) as (μ_hs) "Handoff_send_spec".
+    iPoseProof (Handoff_receive_spec) as (μ_hr) "Handoff_receive_spec".
     iExists (20 ⊕ μ_hs ⊕ μ_fw)%M. iIntros (i g kl Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& Cg& HF)".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_m]".
@@ -72,11 +72,11 @@ Section proof.
     iMod (carrier_alloc _ _ _ 1 μ_hr with "TGj") as "(%& _& TGj& Cgj& GFj)".
     rewrite union_empty_r_L.
     iDestruct "Ptrb" as "[Ptrb Ptrb0]".
-    iMod (is_handover_initialize with "Ptrb0 Cgj") as "(%γh& #is_handover& Gv)".
+    iMod (is_handoff_initialize with "Ptrb0 Cgj") as "(%γh& #is_handoff& Gv)".
     iModIntro. iSplitR "TGj GFj Gv"; cycle 1.
-    { lwp_bind (Handover.receive _).
+    { lwp_bind (Handoff.receive _).
       iModIntro. iApply lwp_sfmupd.
-      iApply ("Handover_receive_spec" $! 0 with "[$TGj GFj $Gv $is_handover]").
+      iApply ("Handoff_receive_spec" $! 0 with "[$TGj GFj $Gv $is_handoff]").
       { iApply big_sepS_singleton. iFrame. }
       iIntros (?) "(_& TGj)". iMod (thread_terminate with "TGj") as "TGj".
       rewrite /lift_term. iModIntro. by iFrame. }
@@ -87,7 +87,7 @@ Section proof.
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (ptrx) "((_& TG& _)& Ptrx& _)".
     lwp_pures.
-    lwp_bind (Handover.send _ _ _).
+    lwp_bind (Handoff.send _ _ _).
     (** Need carrier at layer 1 for Flag.set. *)
     iMod (carrier_alloc _ _ _ 1 μ_hs with "TG") as "(%& %& TG& Cg0& GF0)".
     iMod (flag_inv_init _ _ _ _ 1 _ 1 with "Ptrx Cg0") as "(%& _& Cg0& Of& HU& #flag_inv)". 1: done.
@@ -97,7 +97,7 @@ Section proof.
     { apply ordArith.le_from_nat. lia. }
     iMod (crP_fuel_layer_mon _ 0 with "GF0") as "GF0".
     { apply ordArith.le_from_nat. lia. }
-    iApply ("Handover_send_spec" $! 0 _ _ Flag.set #ptrx _ _ {[k]} with "[$TG GF_hs GF0 $Cg0 Of Ptrb HU $is_handover]").
+    iApply ("Handoff_send_spec" $! 0 _ _ Flag.set #ptrx _ _ {[k]} with "[$TG GF_hs GF0 $Cg0 Of Ptrb HU $is_handoff]").
     { iSplitL "GF_hs GF0".
       { iApply (big_sepS_union_2 with "[GF0]").
         - iApply big_sepS_singleton. iFrame.
@@ -157,7 +157,7 @@ Section proof.
     (([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ, (⟦Φ μ⟧ₗ ∗
                    (⟦Φ μ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
-  Proof using handoverG0.
+  Proof using handoffG0.
     iIntros (HT HP HQ) "TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     rewrite !big_sepS_singleton.
@@ -225,14 +225,14 @@ Section adequacy.
         #[mupdΣ;
           histGS.histΣ (state * thread_pool heap_lang * list (observation));
           heap_stateΣ;
-          handoverΣ
+          handoffΣ
           ].
 
   Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := (λ _ v, ⌜v = #1⌝)%I]}.
 
-  Theorem handover_client_adequacy :
+  Theorem handoff_client_adequacy :
     ∀ (τ : trace heap_lang),
     behavior τ →
     fair_scheduling τ →
@@ -268,9 +268,9 @@ Section adequacy.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
     (* TODO: FIXME? *)
-    Unshelve. apply HandoverG. apply _.
+    Unshelve. apply HandoffG. apply _.
   Qed.
 
 End adequacy.
 
-(* Print Assumptions handover_client_adequacy. *)
+(* Print Assumptions handoff_client_adequacy. *)
