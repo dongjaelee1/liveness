@@ -399,6 +399,18 @@ Proof.
   iApply ("HΦ" with "[$TG $RC $LC]").
 Qed.
 
+Local Remark lwp_choosez_exists G R o s i E :
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+    ChooseNat @ s; i; E
+  l{{{ v, RET v; ∃ (n : nat), ⌜v = #n⌝ ∧
+                (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+Proof.
+  iIntros (Φ) "(TG& GF& Rs) HΦ".
+  iPoseProof (lwp_choosenat with "[$TG $GF $Rs]") as "H".
+  iApply "H". iIntros (?) "H".
+  iApply "HΦ". iExists n. iFrame. auto.
+Qed.
+
 (** Heap *)
 
 (** We need to adjust the [gen_heap] and [gen_inv_heap] lemmas because of our
