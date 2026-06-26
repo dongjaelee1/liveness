@@ -90,7 +90,7 @@ Section proof.
     lwp_bind (Handoff.send _ _ _).
     (** Need carrier at layer 1 for Flag.set. *)
     iMod (carrier_alloc _ _ _ 1 μ_hs with "TG") as "(%& %& TG& Cg0& GF0)".
-    iMod (flag_inv_init _ _ _ _ 1 _ 1 with "Ptrx Cg0") as "(%& _& Cg0& Of& HU& #flag_inv)". 1: done.
+    iMod (is_flag_init _ _ _ _ 1 _ 1 with "Ptrx Cg0") as "(%& _& Cg0& Of& HU& #is_flag)". 1: done.
     rewrite union_empty_r_L.
     iModIntro.
     iMod (crP_fuel_layer_mon _ 0 with "GF_hs") as "GF_hs".
@@ -110,7 +110,7 @@ Section proof.
       iSplit.
       { iPureIntro. apply ordArith.lt_from_nat. lia. }
       iFrame "HU". iExists μ_fs. iIntros (?????? ?) "!> (TG& GF& Cg& %INk& HU) HΦ".
-      iApply ("Flag_set_spec" $! lc with "[$TG GF $Cg $HU $flag_inv]").
+      iApply ("Flag_set_spec" $! lc with "[$TG GF $Cg $HU $is_flag]").
       { iSplit.
         - iFrame.
         - iPureIntro. set_solver. }
@@ -121,7 +121,7 @@ Section proof.
     replace ({[g1; g]} ∖ {[g1]}) with ({[g]} : gset ocid) by set_solver.
     lwp_pures.
     lwp_bind (Flag.wait _).
-    iModIntro. iApply ("Flag_wait_spec" $! 0 with "[$TG GF_fw $flag_inv]").
+    iModIntro. iApply ("Flag_wait_spec" $! 0 with "[$TG GF_fw $is_flag]").
     { iApply big_sepS_singleton. erewrite crP_fuel_layer_eq. 1: iFrame.
       rewrite -hessenberg.add_from_nat. done. }
     iIntros "(_& TG& #Odk)".

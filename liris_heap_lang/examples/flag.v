@@ -42,36 +42,36 @@ Section proof.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
-  Definition flag_inv_tf (l : loc) k ℓ : tf Σ :=
-    ⟨witP_layer k ℓ⟩ ∗
-    alwaysP Na (((untilP Np k (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1)))).
+  Definition flag_inv_tf (l : loc) k : tf Σ :=
+    ((untilP Np k (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))).
 
-  Definition flag_inv (l : loc) k ℓ : iProp Σ :=
-    (witP_layer k ℓ) ∗
-    ⟦alwaysP Na (((untilP Np k (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))))⟧ₗ.
+  Definition is_flag_tf (l : loc) k ℓ : tf Σ :=
+    ⟨witP_layer k ℓ⟩ ∗ alwaysP Na (flag_inv_tf l k).
+
+  Definition is_flag (l : loc) k ℓ : iProp Σ :=
+    (witP_layer k ℓ) ∗ ⟦alwaysP Na (flag_inv_tf l k)⟧ₗ.
 
   (** The main proofs. *)
-  Global Instance flag_inv_persistent l k ℓ : Persistent (flag_inv l k ℓ).
-  Proof. rewrite /flag_inv. tf_red. apply _. Qed.
+  Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).
+  Proof. rewrite /is_flag. tf_red. apply _. Qed.
 
-  Lemma flag_inv_tf_red l k ℓ : ⟦flag_inv_tf l k ℓ⟧ₗ = flag_inv l k ℓ.
-  Proof. rewrite /flag_inv /flag_inv_tf. tf_red. auto. Qed.
+  Lemma is_flag_tf_red l k ℓ : ⟦is_flag_tf l k ℓ⟧ₗ = is_flag l k ℓ.
+  Proof. rewrite /is_flag /is_flag_tf. tf_red. auto. Qed.
 
   Lemma Flag_set_spec :
     ⊢ ∃ μ, ∀ lc i l G g K k ℓ ℓg,
-    (* l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ μ) ∗ *)
     l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
          (* The other half of the until ownership for the pointsto. *)
          ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
-         flag_inv l k ℓ }}}
+         is_flag l k ℓ }}}
       Flag.set #l @ i
     l{{{ RET #(); £ lc ∗ thP_carriers i G ∗
                   crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}}.
   Proof.
     iExists 10. iIntros (lc i l G g K k ℓ ℓg Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gg& %Ink& HU& #flag_inv)".
-    iDestruct "flag_inv" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
+    iDestruct "HP" as "(TG& GF& Gg& %Ink& HU& #is_flag)".
+    iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.set.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc (lc ⊕ 10)%ord.
@@ -111,13 +111,13 @@ Section proof.
   Lemma Flag_wait_spec :
     ⊢ ∃ μ, ∀ lc i l G k ℓ,
     l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
-         flag_inv l k ℓ }}}
+         is_flag l k ℓ }}}
       Flag.wait #l @ i
     l{{{ RET #1; £ lc ∗ thP_carriers i G ∗ oblP_discharged k }}}.
   Proof.
     iExists ((1 × ▽) ⊕ 1)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& #flag_inv)".
-    iDestruct "flag_inv" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
+    iDestruct "HP" as "(TG& GF& #is_flag)".
+    iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.wait.
     iPoseProof (crP_fuel_add_set with "GF") as "[W_GF GF]".
     (* Liveness induction *)
@@ -176,14 +176,14 @@ Section proof.
       iModIntro. iApply ("HΦ" with "[$]").
   Qed.
 
-  Lemma flag_inv_init E l g K ℓ ℓg μ :
+  Lemma is_flag_init E l g K ℓ ℓg μ :
     (ℓg <= ℓ)%ordi →
     l ↦ #0 -∗
     crP_obls g ℓg K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ crP_obls g ℓg ({[k]} ∪ K) ∗ oblP_fuel k ℓ μ ∗
-                 ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗ flag_inv l k ℓ.
+                 ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗ is_flag l k ℓ.
   Proof.
-    iIntros (Hle) "Ptr Gg". rewrite /flag_inv.
+    iIntros (Hle) "Ptr Gg". rewrite /is_flag.
     iMod (tf_until_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
     iMod ("H" $! _ Np (l ↦ #0)%F (l ↦ #1)%F with "[Ptr]") as "H".
     { iNext. iFrame. }
@@ -198,19 +198,19 @@ End proof.
 Section trace.
 
   (** Export to trace properties *)
-  Definition flag_inv_tp (l : loc) : tp :=
+  Definition is_flag_tp (l : loc) : tp :=
     (tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (l ↦ #1))))%P.
 
   (** TODO: weaken the strict equality to semantics equivalence/implication. *)
-  Definition flag_inv_tp' (l : loc) : tp :=
+  Definition is_flag_tp' (l : loc) : tp :=
     (tp_true ∧ tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
 
-  Remark flag_inv_tf_to_tp' `{!heapGS Σ} l k ℓ :
-    tf_to_tp (flag_inv_tf l k ℓ) = flag_inv_tp' l.
+  Remark is_flag_tf_to_tp' `{!heapGS Σ} l k ℓ :
+    tf_to_tp (is_flag_tf l k ℓ) = is_flag_tp' l.
   Proof. done. Qed.
 
-  Remark flag_inv_tp_impl l :
-    ∀ τ, tp_trace (flag_inv_tp' l) τ → tp_trace (flag_inv_tp l) τ.
+  Remark is_flag_tp_impl l :
+    ∀ τ, tp_trace (is_flag_tp' l) τ → tp_trace (is_flag_tp l) τ.
   Proof.
     simpl. unfold_trProp. intros. destruct τ. destruct H. intros. specialize (H0 _ H1).
     destruct H0.

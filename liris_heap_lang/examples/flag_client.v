@@ -53,13 +53,13 @@ Section proof.
          (* Start with the other half of the until ownership for the pointsto. *)
          ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
          ⟦finallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
-         flag_inv l k 0 }}}
+         is_flag l k 0 }}}
       writer #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
     iPoseProof (Flag_set_spec) as (μ_s) "Flag_set_spec".
     iExists (10 ⊕ μ_s)%M. iIntros (i g k kl Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gg& %Neqk& HU& HE& #flag_inv)".
+    iDestruct "HP" as "(TG& GF& Gg& %Neqk& HU& HE& #is_flag)".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_s]".
     iPoseProof (crP_fuels_init {[g]} with "[GF]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
@@ -67,7 +67,7 @@ Section proof.
     lwp_pure_one.
     lwp_bind (Flag.set X).
     iModIntro.
-    iApply ("Flag_set_spec" $! 10 with "[$TG GF_s $Gg $HU $flag_inv]").
+    iApply ("Flag_set_spec" $! 10 with "[$TG GF_s $Gg $HU $is_flag]").
     { iSplit; last (iPureIntro; set_solver).
       iApply big_sepS_singleton. iFrame. }
     iIntros "(LC& TG& Gg& #Od)".
@@ -102,20 +102,20 @@ Section proof.
     l{{{ thP_carriers i {[g]} ∗ crP_fuel g 1 μ ∗
          crP_obls g 1 {[kl]} ∗
          ⟦finallyP Nl kl 1 (i ⤉ "exit", #1)⟧ₗ ∗
-         flag_inv l k 0 }}}
+         is_flag l k 0 }}}
       reader #() @ i
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
     iPoseProof (Flag_wait_spec) as (μ_w) "Flag_wait_spec".
     iExists (10 ⊕ μ_w)%M. iIntros (i g k kl Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gg& HE& #flag_inv)".
+    iDestruct "HP" as "(TG& GF& Gg& HE& #is_flag)".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_w]".
     iPoseProof (crP_fuels_init {[g]} with "[GF]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     rewrite /reader /=.
     lwp_pure_one.
     lwp_bind (Flag.wait X).
-    iModIntro. iApply ("Flag_wait_spec" $! 10 with "[$TG GF_w $flag_inv]").
+    iModIntro. iApply ("Flag_wait_spec" $! 10 with "[$TG GF_w $is_flag]").
     { iApply big_sepS_singleton. erewrite crP_fuel_layer_eq. 1: iFrame.
       rewrite hessenberg.add_O_l. done. }
     iIntros "(LC& TG& #Od)".
@@ -148,7 +148,7 @@ Section proof.
     i ≠ j →
     Θ = {[i := writer #(); j := reader #() ]} →
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
-                      ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
+                      ⌜ k ≠ kl1 ⌝ ∗ is_flag_tf l k 0 ∗
                       untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
                       finallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
                       finallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
@@ -169,7 +169,7 @@ Section proof.
     iPoseProof (writer_spec) as (μ1) "writer_spec".
     iPoseProof (reader_spec) as (μ2) "reader_spec".
     iMod (carrier_alloc _ _ _ 0 μ1 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (flag_inv_init _ _ _ _ 0 _ μ1 with "Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #flag_inv)". 1: done.
+    iMod (is_flag_init _ _ _ _ 0 _ μ1 with "Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #is_flag)". 1: done.
     iMod (tf_until_alloc _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nl (⌜True⌝)%F (i ⤉ "exit",#())%F with "[]") as "Ukl1".
     { tf_red. done. }
@@ -181,19 +181,19 @@ Section proof.
     { subst Φ.
       tf_red. iExists g1. tf_red. iExists g2.
       tf_red. iExists k. tf_red. iExists kl1. tf_red. iExists kl2.
-      rewrite -flag_inv_tf_red.
+      rewrite -is_flag_tf_red.
       tf_red. iSplit.
       { iPureIntro. intros <-. set_solver. }
-      iFrame "flag_inv Uk".
+      iFrame "is_flag Uk".
       replace ({[kl1]} ∪ ({[k]} ∪ ∅)) with ({[k; kl1]} : gset _) by set_solver. rewrite !union_empty_r_L. iFrame. }
-    iClear "flag_inv Wlkl1 Wlkl2". clear dependent g1 g2 k kl1 kl2.
+    iClear "is_flag Wlkl1 Wlkl2". clear dependent g1 g2 k kl1 kl2.
     iIntros "HP". subst Φ.
     iEval (tf_red) in "HP". iDestruct "HP" as "(%g1& HP)".
     iEval (tf_red) in "HP". iDestruct "HP" as "(%g2& HP)".
     iEval (tf_red) in "HP". iDestruct "HP" as "(%k& HP)".
     iEval (tf_red) in "HP". iDestruct "HP" as "(%kl1& HP)".
     iEval (tf_red) in "HP". iDestruct "HP" as "(%kl2& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%Hkne& #flag_inv& Uk& Ukl1& Ukl2& TG1& Gg1& TG2& Gg2& Gf1& Gf2)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%Hkne& #is_flag& Uk& Ukl1& Ukl2& TG1& Gg1& TG2& Gg2& Gf1& Gf2)".
     iPoseProof ("writer_spec" $! i g1 k kl1 (λ v, lift_term i fork_post v) with "[Uk Ukl1 TG1 Gg1 Gf1]") as "WP1".
     { iFrame. iSplit; eauto. }
     iPoseProof ("reader_spec" $! j g2 k kl2 (λ v, lift_term j fork_post v) with "[Ukl2 TG2 Gg2 Gf2]") as "WP2".
@@ -217,14 +217,14 @@ Section adequacy.
   Let σ0 : gmap loc (option val) := {[l := Some #0]}.
 
   Let Φ : tp :=
-        (flag_inv_tp l ∧
+        (is_flag_tp l ∧
          tp_until (l ↦ #0) (l ↦ #1) ∧
          tp_finally (i ⤉ "exit", #()) ∧
          tp_finally (j ⤉ "exit", #1))%P.
 
   Let Φ' : tp :=
         (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
-            ⌜ k ≠ kl1 ⌝ ∧ flag_inv_tp' l ∧
+            ⌜ k ≠ kl1 ⌝ ∧ is_flag_tp' l ∧
             tp_until (l ↦ #0) (l ↦ #1) ∧
             tp_finally (i ⤉ "exit", #()) ∧
             tp_finally (j ⤉ "exit", #1) ∧
@@ -233,11 +233,11 @@ Section adequacy.
   Remark Φ_impl :
     ∀ τ, tp_trace Φ' τ → tp_trace Φ τ.
   Proof.
-    Local Opaque flag_inv_tp' flag_inv_tp.
+    Local Opaque is_flag_tp' is_flag_tp.
     simpl. unfold_trProp. intros. destruct τ. destruct H as (?&?&?&?&?&?&?&?).
-    split. 1: apply flag_inv_tp_impl; auto.
+    split. 1: apply is_flag_tp_impl; auto.
     firstorder.
-    Local Transparent flag_inv_tp' flag_inv_tp.
+    Local Transparent is_flag_tp' is_flag_tp.
   Qed.
 
   Let N := nroot.@ "flag".
@@ -249,7 +249,7 @@ Section adequacy.
   Let Φ_tf `{!heapGS Σ} : _ → _ → tf Σ :=
         λ μ1 μ2,
           (∃ g1 g2 k kl1 kl2,
-              ⌜ k ≠ kl1 ⌝ ∗ flag_inv_tf l k 0 ∗
+              ⌜ k ≠ kl1 ⌝ ∗ is_flag_tf l k 0 ∗
               untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
               finallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
               finallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
