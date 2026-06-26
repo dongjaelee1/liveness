@@ -51,7 +51,7 @@ Section proof.
     l{{{ thP_carriers i {[g]} ∗ crP_fuel g 0 μ ∗
          crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
          (* Start with the other half of the until ownership for the pointsto. *)
-         ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
+         flag_tk l k ∗
          ⟦finallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
          is_flag l k 0 }}}
       writer #() @ i

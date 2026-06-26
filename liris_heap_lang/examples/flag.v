@@ -51,6 +51,9 @@ Section proof.
   Definition is_flag (l : loc) k ℓ : iProp Σ :=
     (witP_layer k ℓ) ∗ ⟦alwaysP Na (flag_inv_tf l k)⟧ₗ.
 
+  Definition flag_tk (l : loc) k : iProp Σ :=
+    ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ.
+
   (** The main proofs. *)
   Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).
   Proof. rewrite /is_flag. tf_red. apply _. Qed.
@@ -63,7 +66,7 @@ Section proof.
     l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
          (* The other half of the until ownership for the pointsto. *)
-         ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗
+         flag_tk l k ∗
          is_flag l k ℓ }}}
       Flag.set #l @ i
     l{{{ RET #(); £ lc ∗ thP_carriers i G ∗
@@ -81,7 +84,7 @@ Section proof.
     iModIntro.
     iInv "HA" as "inv". iDestruct "inv" as "[inv | inv]"; cycle 1.
     { iDestruct "inv" as "[>inv _]".
-      iEval (rewrite tf_until_logic) in "HU". iDestruct "HU" as "[Oak _]".
+      iEval (rewrite /flag_tk tf_until_logic) in "HU". iDestruct "HU" as "[Oak _]".
       iPoseProof (oblP_assigned_discharged_false with "Oak inv") as "%". done. }
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -181,7 +184,7 @@ Section proof.
     l ↦ #0 -∗
     crP_obls g ℓg K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ crP_obls g ℓg ({[k]} ∪ K) ∗ oblP_fuel k ℓ μ ∗
-                 ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ ∗ is_flag l k ℓ.
+                 flag_tk l k ∗ is_flag l k ℓ.
   Proof.
     iIntros (Hle) "Ptr Gg". rewrite /is_flag.
     iMod (tf_until_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
