@@ -100,6 +100,7 @@ liris/program_logic/temporal_logic_lib.v
 liris/program_logic/temporal_property.v
 liris/program_logic/adequacy.v
 liris/program_logic/adequacy_iris.v
+liris/program_logic/fuel_burning_triple.v
 
 liris_heap_lang/locations.v
 liris_heap_lang/lang.v
