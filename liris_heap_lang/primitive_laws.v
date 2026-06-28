@@ -350,6 +350,76 @@ Proof.
   by iFrame.
 Qed.
 
+(* Lemma lwp_label_step o s i E E' t e v Φ : *)
+(*   TCEq (to_val e) (Some v) → *)
+(*   (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ *)
+(*                   ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗ *)
+(*                        (thP_carriers i G -∗ *)
+(*                         ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗ *)
+(*                         label i t v -∗ *)
+(*                         ALC (£ o -∗ |={E',E}=>m (label i t v ∗ Φ v)))) -∗ *)
+(*                         (* ALC (£ o ={E',E}=∗ (|={E}=>m label i t v ∗ Φ v)))) -∗ *) *)
+(*   lWP (Label t e) @ s; i; E {{ Φ }}. *)
+(* Proof. *)
+(*   iIntros (He) "H". inv He. apply of_to_val in H0. subst e. *)
+(*   iApply lwp_lift_atomic_base_step_no_fork. *)
+(*   iIntros (K h n σ1 Θ κ κs HK HT) "I". iMod "H" as "(%&$&$& %&$& H)". *)
+(*   iModIntro. iSplit; first eauto with base_step. *)
+(*   iIntros (e2 σ2 efs Hstep); inv_base_step. *)
+(*   iDestruct "I" as "[HI Ia]". *)
+(*   (* iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]". *) *)
+(*   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]". *)
+(*   iIntros "!> Tb Wcs". iPoseProof ("H" with "Tb Wcs [Ti]") as "H". *)
+(*   { rewrite label_unseal /label_def. iFrame. eauto. } *)
+(*   iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC". *)
+(*   iPoseProof (tlc_split with "LC") as "[LC LC2]". *)
+(*   iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H". *)
+(*   iEval (unfold_sfmupd) in "H". *)
+
+(*   iPoseProof ("H" with "HI") as ">(HI& Ti& H)". *)
+
+(*   TODO *)
+
+(*   iMod "H" as "HE". *)
+(*   iMod (hG_history_auth_app with "Ha") as "Ha". *)
+(*   rewrite !map_union_empty. iFrame. *)
+(*   replace (dom (<[i:=K v]> Θ)) with (dom Θ); cycle 1. *)
+(*   { rewrite dom_insert_lookup_L; eauto. } *)
+(*   iPoseProof (thread_expr_read with "It Ti") as "%HT". *)
+(*   iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H". *)
+(*   { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. } *)
+
+
+(*   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]". *)
+(*   iMod (thread_map_thread_update _ _ (K #n0) with "[$It $Ti]") as "[It Ti]". *)
+(*   iFrame. iModIntro. iSplit; first done. *)
+(*   iSplitR "HE"; cycle 1. *)
+(*   { iMod "HE". iModIntro. iFrame. } *)
+(*   iSplit. *)
+(*   { iPureIntro. destruct HI. split. *)
+(*     - rewrite length_app H. simpl. lia. *)
+(*     - rewrite last_app. simpl. auto. } *)
+(*   iApply (big_sepM_insert_delete _ _ i). iFrame.  *)
+(* Qed. *)
+(*   TCEq (to_val e) (Some v) → *)
+(*   (label i t v -∗ |={E}=>m (label i t v ∗ lwpupd i E (Label t e) P)) -∗ *)
+(*   lwpupd i E (Label t e) P. *)
+(* Proof. *)
+(*   unfold_lwpupd. iIntros (He) "H %%%%%% %HK %HT I". *)
+(*   iDestruct "I" as "[HI Ia]". *)
+(*   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]". *)
+(*   inv He. apply of_to_val in H0. subst e. *)
+(*   iEval (unfold_sfmupd) in "H". iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& H)". *)
+(*   { rewrite label_unseal /label_def. iFrame. eauto. } *)
+(*   rewrite label_unseal /label_def. iDestruct "Ti" as "(%&%& Ti)". *)
+(*   clear dependent K. *)
+(*   iDestruct "HI" as "(%HI& Ha& (Ih& It& Ip))". *)
+(*   iPoseProof (thread_expr_read with "It Ti") as "%HT". *)
+(*   iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H". *)
+(*   { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. } *)
+(*   by iFrame. *)
+(* Qed. *)
+
 (** ChooseNat *)
 Lemma lwp_choosenat_step o s i E E' Φ :
   (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
@@ -377,6 +447,8 @@ Proof.
   { rewrite dom_insert_lookup_L; eauto. }
   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
   iMod (thread_map_thread_update _ _ (K #n0) with "[$It $Ti]") as "[It Ti]".
+  replace (dom (<[i:=K #n0]> Θ)) with (dom Θ); cycle 1.
+  { rewrite dom_insert_lookup_L; eauto. }
   iFrame. iModIntro. iSplit; first done.
   iSplitR "HE"; cycle 1.
   { iMod "HE". iModIntro. iFrame. }

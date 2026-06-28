@@ -32,7 +32,7 @@ Section lifting.
                                thP_carriers i G -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
-                               ALC (|={∅,E}=>
+                               ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       (lwpupd i E e2 (ν e2 efs)))))
@@ -46,8 +46,9 @@ Section lifting.
     { rewrite dom_insert_lookup_L; auto. }
     { eapply fork_thread_ids; eauto. }
     iIntros "!> !> Efs".
-    iMod ("H" with "[//] GOs Ws Efs") as "H". iModIntro.
-    iMod "H". iMod "H" as "[HI H]".
+    iMod ("H" with "[//] GOs Ws Efs") as "H".
+    iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+    iMod "H". iMod "close" as "_". iMod "H" as "[HI H]".
     unfold_lwpupd. iMod ("H" $! K with "[//] [] HI") as "H".
     { iPureIntro. rewrite lookup_union_l.
       - rewrite lookup_insert_eq. auto.
@@ -66,7 +67,7 @@ Section lifting.
                                thP_carriers i G -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
-                               ALC (|={∅,E}=>
+                               ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       lwpupd i E e2 ((lWP e2 @ s; i; E {{ Φ }}) ∗
@@ -156,7 +157,7 @@ Section lifting.
                                thP_carriers i G -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
-                               ALC (|={E2,E1}=>
+                               ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       |={E1}=>m

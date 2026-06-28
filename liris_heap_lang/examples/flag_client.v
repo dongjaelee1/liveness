@@ -58,7 +58,7 @@ Section proof.
     l{{{ v, RET v; lift_term i fork_post v }}}.
   Proof.
     iPoseProof (Flag_set_spec) as (μ_s) "Flag_set_spec".
-    iExists (10 ⊕ μ_s)%M. iIntros (i g k kl Φ) "!> HP HΦ".
+    iExists (4 ⊕ μ_s)%M. iIntros (i g k kl Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& Gg& %Neqk& HU& HE& #is_flag)".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_s]".
     iPoseProof (crP_fuels_init {[g]} with "[GF]") as "GF".
