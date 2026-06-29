@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From liris.program_logic Require Export lifting temporal_logic.
 
-Definition step_triple `{SI : indexT} `{!lirisGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+Definition fuel_burning_triple `{SI : indexT} `{!lirisGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,
     l{{{ thP_carriers i G ∗ P }}} e @ s; i; E l{{{v, RET v; thP_carriers i G' ∗ Q v }}}%I.
 
@@ -14,11 +14,11 @@ Section proof.
   Lemma step_triple_until_discharge s i E G P e Q N k (Φ Ψ : tf Σ) `{!Atomic (stuckness_to_atomicity s) e} :
     TCEq (to_val e) None →
     ↑N ⊆ E →
-    step_triple s i (E ∖ ↑N) G G
+    fuel_burning_triple s i (E ∖ ↑N) G G
       (P ∗ ⟦Φ⟧ₗ)%I
       e
       (λ v, ∃ g ℓ K, Q v ∗ ⟦Ψ⟧ₗ ∗ crP_obls g ℓ K ∗ ⌜k ∈ K⌝)%I
-    ⊢ step_triple s i E G G
+    ⊢ fuel_burning_triple s i E G G
         (P ∗ ⟦untilP N k 1 Φ Ψ⟧ₗ ∗ £ 2)%I
         e
         (λ v, Q v ∗ ∃ g ℓ K, ⟦Ψ⟧ₗ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)%I.
