@@ -434,6 +434,29 @@ Section proof2.
         exists (witness_discharged). split_and !; auto.
   Qed.
 
+  Lemma get_obls_thread_active_gen (h : list _) n (σ : state Λ) (Θ : thread_pool Λ) (κs : list (observation Λ)) g v Ω W τf :
+    (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
+    h !! n = Some (σ, Θ, κs) →
+    model_interp g v Ω W n (dom Θ) ∗
+    ([∗ map] i ↦ e ∈ Θ, match to_val e with
+                        | Some _ => (thP_done i)
+                        | None => True
+                        end)
+    ⊢ ⌜obls_thread_active Ω (n, τf)⌝.
+  Proof.
+    iIntros (HIST Hlu) "(MI& #WPs)". iIntros (k o LUk). destruct o; last eauto.
+    unfold thread_active. simpl.
+    apply HIST in Hlu. destruct Hlu as (j& Now). unfold ts_emb. simpl. rewrite Now.
+    iDestruct "MI" as "(MHI& S& T& A& G& W& %Inv)".
+    iPoseProof (othread_assigned_thread_elem with "[$S $T $A]") as "%Tin". 1: eapply LUk.
+    apply elem_of_dom in Tin. destruct Tin as (e&LUth).
+    iPoseProof (big_sepM_delete _ _ _ _ LUth with "WPs") as "[#WP WPs0]".
+    destruct (to_val e) eqn:TVe.
+    - iPoseProof (othread_assigned_done_false with "[$S $T $A]") as "%"; eauto.
+      unfold_opreds. auto.
+    - iPureIntro. exists e. split; auto.
+  Qed.
+
   Lemma get_obls_thread_active s h n σ Θ TQ κs g v Ω W τf :
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     Θ = fst <$> TQ →
@@ -444,19 +467,12 @@ Section proof2.
                                end)
     ⊢ ⌜obls_thread_active Ω (n, τf)⌝.
   Proof.
-    iIntros (HIST EQTQ) "(HI& MI& WPs)". iIntros (k o LUk). destruct o; last eauto.
-    unfold thread_active. simpl. iPoseProof (history_interp_lookup with "HI") as "%Hlu".
-    apply HIST in Hlu. destruct Hlu as (j& Now). unfold ts_emb. simpl. rewrite Now.
-    iDestruct "MI" as "(MHI& S& T& A& G& W& %Inv)".
-    iPoseProof (othread_assigned_thread_elem with "[$S $T $A]") as "%Tin". 1: eapply LUk.
-    apply elem_of_dom in Tin. destruct Tin as (e&LUth).
-    rewrite EQTQ lookup_fmap_Some in LUth. destruct LUth as (?& EQe& LUth).
-    destruct x as (?&Q). simpl in EQe. subst e0.
-    iPoseProof (big_sepM_delete _ _ _ _ LUth with "WPs") as "[WP WPs]".
-    destruct (to_val e) eqn:TVe.
-    - iDestruct "WP" as "(#Term& HQ)". iPoseProof (othread_assigned_done_false with "[$S $T $A]") as "%"; eauto.
-      unfold_opreds. auto.
-    - iPureIntro. exists e. split; auto. subst. rewrite lookup_fmap LUth. done.
+    iIntros (HIST EQTQ) "(HI& MI& WPs)".
+    iPoseProof (history_interp_lookup with "HI") as "%Hlu".
+    iApply (get_obls_thread_active_gen with "[$MI WPs]"). 1: eauto. 1: eauto.
+    subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
+    iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto.
+    iDestruct "H" as "[$ _]".
   Qed.
 
   Lemma owit_inv_lb_step_na_turn τ Ω W γ1 γ2 :
@@ -530,6 +546,10 @@ Section proof2.
       iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
       rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
       rename κs0 into κs, H1 into TRn, H3 into TRn1, H4 into BEH.
+      iAssert ([∗ map] i ↦ e ∈ Θ, match to_val e with | Some _ => (thP_done i) | None => True end)%I as "#THs".
+      { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
+        iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
+      iPoseProof (history_interp_lookup with "HI") as "%Hlu".
       destruct H2 as [TStep | TDone].
       + iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
         inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
@@ -546,16 +566,11 @@ Section proof2.
         { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
         destruct H as [OND LB0].
         iPoseProof (model_interp_owit_inv with "MI") as "%OWinv0".
-
-        TODO: prove OND preserves OTA
-
-        
+        iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA0". 1,2: eauto.
         iDestruct "WP" as "[%NStuck WP]".
         iPoseProof ("WP" with "[//]") as "WP". rewrite /mprog.
         iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
-
-
-        unshelve epose proof (mprog_exists_step i1 Ω0 Ω2 W0 (n, τf) γ _ OTA OWinv0 LB0 FS ProgO).
+        unshelve epose proof (mprog_exists_step i1 Ω0 Ω2 W0 (n, τf) γ _ OTA0 OWinv0 LB0 FS ProgO).
         { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
         destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
         iMod ("WP" $! W2 with "[]") as "[MI WP]".
@@ -578,7 +593,8 @@ Section proof2.
                                                             end))%I with "[Efs]" as "Efs".
         { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
           destruct (to_val x) eqn:EQx.
-          - rewrite lwp_fix_unfold_fix /lwp_pre EQx lwpupd_trans. iApply "WP".
+          - rewrite lwp_fix_unfold_fix /lwp_pre EQx. iMod "WP".
+            iApply sfmupd_lwpupd. iMod "WP". by iModIntro.
           - iApply "WP". }
         iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
         { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
@@ -586,11 +602,16 @@ Section proof2.
           apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
         1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2.
         * rewrite lwp_fix_unfold_fix /lwp_pre He2.
-          iMod (all_interp_lwpupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)".
-          { subst Θ2. rewrite lookup_union_l.
-            - apply lookup_insert_eq.
-            - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
-          1: eapply LB4. destruct H as [LEO3 LB5].
+          iDestruct "HI" as "[HI SIa]".
+          iMod (all_interp_sfgupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)".
+          (* iMod (all_interp_lwpupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)". *)
+          2: eapply LB4.
+          { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+          (* { subst Θ2. rewrite lookup_union_l. *)
+          (*   - apply lookup_insert_eq. *)
+          (*   - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. } *)
+          (* 1: eapply LB4. *)
+          destruct H as [LEO3 LB5].
           iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                      (match to_val e with
                       | Some v => lift_term j Q v
@@ -600,7 +621,7 @@ Section proof2.
             { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
               apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
             iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
-          iDestruct "HI" as "[HI SIa]".
+          (* iDestruct "HI" as "[HI SIa]". *)
           iPoseProof (history_interp_wf with "HI") as "%HistWF".
           iPoseProof ("IH" with "[] [] [] [] [] TF HI SIa MI WPs") as "H".
           1: eauto. 1: eauto. 1: eauto.
@@ -718,6 +739,10 @@ Section proof2.
       iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
       rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
       rename κs0 into κs, H1 into TRn, H3 into TRn1, H4 into BEH.
+      iAssert ([∗ map] i ↦ e ∈ Θ, match to_val e with | Some _ => (thP_done i) | None => True end)%I as "#THs".
+      { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
+        iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
+      iPoseProof (history_interp_lookup with "HI") as "%Hlu".
       destruct H2 as [TStep | TDone].
       + iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
         inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
@@ -726,18 +751,35 @@ Section proof2.
         destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_delete _ _ _ _ LUTQi1 with "WPs") as "[WP WPs]".
         pose proof (val_stuck _ _ _ _ _ _ _ _ PStep) as He1. rewrite He1.
         iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
-        iMod ("WP" $! id with "[] [//] [$HI $SIa]") as "[%NStuck WP]".
+        iMod ("WP" $! id with "[] [//] [$HI $SIa]") as "WP".
         { iPureIntro. apply _. }
-        iPoseProof ("WP" with "[//]") as "WP". rewrite /mprog.
         iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
+        iMod (model_interp_gupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
+        2: eapply LB.
+        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+        destruct H as [OND LB0].
+        iPoseProof (model_interp_owit_inv with "MI") as "%OWinv0".
+        iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA0". 1,2: eauto.
+        iDestruct "WP" as "[%NStuck WP]".
+        iPoseProof ("WP" with "[//]") as "WP". rewrite /mprog.
         iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
-        unshelve epose proof (mprog_exists_step i1 Ω Ω2 W (n, τf) γ _ OTA OWinv LB FS ProgO).
+        unshelve epose proof (mprog_exists_step i1 Ω0 Ω2 W0 (n, τf) γ _ OTA0 OWinv0 LB0 FS ProgO).
         { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
         destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
         iMod ("WP" $! W2 with "[]") as "[MI WP]".
         { iPureIntro. split; auto. }
+        assert (∃ fuel0 owner0, Ω0 !! k = Some (obl_assigned fuel0 owner0) ∧ (fuel0 w≤ fuel) ∧
+                                (fair_sched_fun γ owner0 fuel0 w≤ fair_sched_fun γ owner fuel)).
+        { destruct OND. assert (is_Some (Ω0 !! k)).
+          { apply elem_of_dom. apply elem_of_dom_2 in LUOk. set_solver + LUOk H. }
+          destruct H1. specialize (H0 _ _ _ LUOk H1). destruct x; simpl in H0; [|done]. destruct H0.
+          - destruct H0. subst. exists fuel0, owner0. split_and !; eauto.
+            apply Hessenberg.le_add_l. apply Jacobsthal.le_mult_r. auto.
+          - exists fuel0, owner0. split_and !; eauto. 1: eapply WFOCM.lt_le; eauto.
+            eapply WFOCM.lt_le, fair_sched_fun_mon; auto. }
+        destruct H as (fuel0&owner0&LUOk0& LEfuel0& FSLEfuel0).
         assert (∃ fuel' owner', Ω2 !! k = Some (obl_assigned fuel' owner')).
-        { destruct ProgO. specialize (H0 k). rewrite LUOk in H0. inv H0. destruct y; last done. eauto. }
+        { destruct ProgO. specialize (H0 k). rewrite LUOk0 in H0. inv H0. destruct y; by eauto. }
         destruct H as (fuel2&owner2&LUOk2).
         destruct (ts_emb_thread_active_or_not owner2 (n, τf)) as [TN2 | TA2].
         { iExFalso. iDestruct "MI" as "(MHI& S& T& A& G& W& %OWInv)".
@@ -761,9 +803,12 @@ Section proof2.
         1: eapply LUOk2.
         { iDestruct "MI" as "[$ _]". }
         assert (Drop : (fair_sched_fun γ2 owner2 fuel2 < fair_sched_fun γ owner fuel)%ord).
-        { destruct ProgO as [StepO KeepO]. specialize (StepO k). rewrite LUOk LUOk2 in StepO. inv StepO. simpl in H1. destruct H1.
+        { destruct ProgO as [StepO KeepO]. specialize (StepO k). rewrite LUOk0 LUOk2 in StepO.
+          inv StepO. simpl in H1. destruct H1.
           - destruct H. subst i1. inv H0; inv H. apply fair_sched_fun_mon_gen; auto.
-          - destruct H. inv H0. specialize (FSrel owner2). unfold fscnt_next_rel_th in FSrel.
+            eapply WFOCM.lt_le_lt; eauto.
+          - eapply WFOCM.lt_le_lt; last eapply FSLEfuel0.
+            destruct H. inv H0. specialize (FSrel owner2). unfold fscnt_next_rel_th in FSrel.
             rewrite decide_False in FSrel; cycle 1.
             { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
             rewrite decide_False in FSrel.
@@ -789,19 +834,30 @@ Section proof2.
                                                             end))%I with "[Efs]" as "Efs".
         { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
           destruct (to_val x) eqn:EQx.
-          - rewrite lwp_fix_unfold_fix /lwp_pre EQx lwpupd_trans. iApply "WP".
+          - rewrite lwp_fix_unfold_fix /lwp_pre EQx. iMod "WP".
+            iApply sfmupd_lwpupd. iMod "WP". by iModIntro.
           - iApply "WP". }
         iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
         { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
           apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom.
           apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
         1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2.
+        (* iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)". *)
+        (* { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id. *)
+        (*   apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom. *)
+        (*   apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. } *)
+        (* 1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2. *)
         * rewrite lwp_fix_unfold_fix /lwp_pre He2.
-          iMod (all_interp_lwpupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)".
-          { subst Θ2. rewrite lookup_union_l.
-            - apply lookup_insert_eq.
-            - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
-          1: eapply LB4. destruct H as [LEO3 LB5].
+          iDestruct "HI" as "[HI SIa]".
+          iMod (all_interp_sfgupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)".
+          2: eapply LB4.
+          { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+          destruct H as [LEO3 LB5].
+          (* iMod (all_interp_lwpupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)". *)
+          (* { subst Θ2. rewrite lookup_union_l. *)
+          (*   - apply lookup_insert_eq. *)
+          (*   - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. } *)
+          (* 1: eapply LB4. destruct H as [LEO3 LB5]. *)
           iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                      (match to_val e with
                       | Some v => lift_term j Q v
@@ -811,10 +867,9 @@ Section proof2.
             { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
               apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
             iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
-          iDestruct "HI" as "[HI SIa]".
           iPoseProof (history_interp_wf with "HI") as "%HistWF".
           assert (LEO5 : obls_le Ω2 Ω5).
-          { etrans; first eauto. etrans; first eauto. eauto. }          
+          { etrans; first eauto. etrans; first eauto. apply obls_nd_obls_le; auto. }
           destruct (Ω5 !! k) eqn:LUOk5; cycle 1.
           { apply elem_of_dom_2 in LUOk2. destruct LEO5. apply not_elem_of_dom in LUOk5. set_solver + LUOk2 H LUOk5. }
           destruct o.
@@ -844,10 +899,10 @@ Section proof2.
             iPoseProof (event_obl_model_history_interp_lookup with "[MI $EF]") as "%".
             { iDestruct "MI" as "[$ _]". }
             simpl in H. destruct H as (LUMHi'& LUOk'& LEi'& LEn'& LEO').
-            destruct (le_gt_dec (S (S v)) i'); cycle 1.
-            { iPoseProof (event_obl_compare i' (S (S v)) with "[$EF $EA]") as "%". 1: lia.
+            destruct (le_gt_dec (S (S (v + v0))) i'); cycle 1.
+            { iPoseProof (event_obl_compare i' (S (S (v + v0))) with "[$EF $EA]") as "%". 1: lia.
               simpl in H. destruct H as (?&?&?). done. }
-            iPoseProof (event_obl_compare (S (S v)) i' with "[$EA $EF]") as "%". 1: auto.
+            iPoseProof (event_obl_compare (S (S (v + v0))) i' with "[$EA $EF]") as "%". 1: auto.
             simpl in H. destruct H as (LEn'2& LEO'2& _). rename l into LEv1.
             assert (n' = S n) by lia. subst n'. clear LEn' LEn'2.
             iPoseProof (history_interp_hG_event_lookup with "[$HI $HE]") as "%".
@@ -906,10 +961,10 @@ Section proof2.
             iPoseProof (event_obl_model_history_interp_lookup with "[MI $EF]") as "%".
             { iDestruct "MI" as "[$ _]". }
             simpl in H. destruct H as (LUMHi'& LUOk'& LEi'& LEn'& LEO').
-            destruct (le_gt_dec (S (S v)) i'); cycle 1.
-            { iPoseProof (event_obl_compare i' (S (S v)) with "[$EF $EA]") as "%". 1: lia.
+            destruct (le_gt_dec (S (S (v + v0))) i'); cycle 1.
+            { iPoseProof (event_obl_compare i' (S (S (v + v0))) with "[$EF $EA]") as "%". 1: lia.
               simpl in H. destruct H as (?&?&?). done. }
-            iPoseProof (event_obl_compare (S (S v)) i' with "[$EA $EF]") as "%". 1: auto.
+            iPoseProof (event_obl_compare (S (S (v + v0))) i' with "[$EA $EF]") as "%". 1: auto.
             simpl in H. destruct H as (LEn'2& LEO'2& _). rename l into LEv1.
             assert (n' = S n) by lia. subst n'. clear LEn' LEn'2.
             iPoseProof (history_interp_hG_event_lookup with "[$HI $HE]") as "%".
@@ -997,7 +1052,7 @@ Section proof2.
     { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
       rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
       simpl. destruct (to_val e) eqn:He.
-      - rewrite lwpupd_trans. iFrame.
+      - iMod "H". iApply sfmupd_lwpupd. iMod "H". by iModIntro.
       - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
     iMod (all_interp_lwpupd_steps_gmap γ with "WPs [$HI $SIa] MI") as "(WPs& HI& %&%&%&%& %& MI)".
     { subst Θ. done. }

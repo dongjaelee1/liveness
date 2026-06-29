@@ -56,6 +56,14 @@ Definition obl_le `{OC : obl_class} : obl → obl → Prop :=
     | _, _ => False
     end.
 
+Definition obl_nd `{OC : obl_class} : obl → obl → Prop :=
+  λ g1 g2,
+    match g1, g2 with
+    | (obl_assigned f1 o1), (obl_assigned f2 o2) => (f2 w≤ f1 ∧ o1 = o2) ∨ (f2 w< f1)
+    | (obl_discharged), (obl_discharged) => True
+    | _, _ => False
+    end.
+
 (** To a map *)
 Definition oid := positive.
 
@@ -135,7 +143,7 @@ Definition obls_le `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obl_le o1 o2).
 
 Definition obls_nd `{OC : obl_class} : obls → obls → Prop :=
-  λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obl_keep o1 o2).
+  λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obl_nd o1 o2).
 
 (* Filter out live obligations. *)
 Definition obl_filter_live `{OC : obl_class} : (oid * obl → Prop) :=
@@ -341,6 +349,21 @@ Section proofs.
   Qed.
 
   (** nd relation *)
+  Global Instance obl_nd_reflexive : Reflexive obl_nd.
+  Proof using.
+    repeat intro. destruct x; try done. left. done.
+  Qed.
+  Global Instance obl_nd_transitive : Transitive obl_nd.
+  Proof using.
+    repeat intro. destruct x, y, z; try done. destruct H, H0.
+    - destruct H, H0. subst. left. split; auto. etrans; eauto.
+    - destruct H. subst. right. eapply WFOCM.lt_le_lt; eauto.
+    - destruct H0. subst. right. eapply WFOCM.le_lt_lt; eauto.
+    - right. etrans; eauto.
+  Qed.
+  Global Instance obl_nd_antisymmetric : Antisymmetric _ obl_keep obl_nd.
+  Proof using. repeat intro. destruct x, y, H, H0; auto; econstructor. Qed.
+
   Global Instance obls_nd_reflexive : Reflexive obls_nd.
   Proof using. repeat intro. split; first done. intros. rewrite H in H0. inv H0. done. Qed.
   Global Instance obls_nd_transitive : Transitive obls_nd.
@@ -355,15 +378,15 @@ Section proofs.
   Proof using.
     repeat intro. destruct H, H0. assert (dom x = dom y) by set_solver. clear H H0.
     destruct (x !! i) eqn:LUx, (y !! i) eqn:LUy.
-    - econstructor. eauto.
+    - econstructor. eapply obl_nd_antisymmetric; eauto.
     - apply elem_of_dom_2 in LUx. apply not_elem_of_dom in LUy. set_solver.
     - apply elem_of_dom_2 in LUy. apply not_elem_of_dom in LUx. set_solver.
     - econstructor.
   Qed.
 
-  Lemma obl_progress_keep o1 o2 :
-    obl_progress o1 o2 → obl_keep o1 o2.
-  Proof using. intros. inv H. econstructor. Qed.
+  Lemma obl_progress_nd o1 o2 :
+    obl_progress o1 o2 → obl_nd o1 o2.
+  Proof using. intros. inv H. econstructor 2. eauto. Qed.
 
   Lemma obls_nd_step_rc_obls_nd Ω1 Ω2 : Ω1 ↪ₙ∘ Ω2 → obls_nd Ω1 Ω2.
   Proof using.
@@ -372,7 +395,7 @@ Section proofs.
     inv H.
     - pose proof (obls_one_progress_dom _ _ H0). split; first set_solver.
       intros. destruct H0 as (k0&o3&o4&?&?&?). subst. destruct (decide (k0 = k)).
-      + subst. rewrite lookup_insert_eq in H2. inv H2. apply obl_progress_keep; auto.
+      + subst. rewrite lookup_insert_eq in H2. inv H2. apply obl_progress_nd; auto.
       + rewrite lookup_insert_ne in H2; auto. rewrite H1 in H2. inv H2. done.
     - destruct H0 as (?&?&?&?). subst. split.
       + rewrite dom_insert. set_solver.
@@ -385,6 +408,16 @@ Section proofs.
   Proof using.
     intros. inv H; [econstructor 1 | econstructor 2]; eauto. inv H0.
     destruct H as (?&?&?&?&?); subst. do 3 eexists. split_and !; eauto. econstructor 1; eauto.
+  Qed.
+
+  Lemma obl_nd_obl_le o1 o2 : obl_nd o1 o2 → obl_le o1 o2.
+  Proof using.
+    intros. destruct o1, o2; eauto. inv H.
+  Qed.
+
+  Lemma obls_nd_obls_le Ω1 Ω2 : obls_nd Ω1 Ω2 → obls_le Ω1 Ω2.
+  Proof using.
+    intros. destruct H. split; auto. intros. apply obl_nd_obl_le; eauto.
   Qed.
 
   (** Live obls *)
