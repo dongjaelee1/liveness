@@ -421,7 +421,7 @@ Section proof.
       rewrite bool_decide_eq_true_2; last done.
       lwp_pures.
       iModIntro. lwp_finish.
-      iApply sfmupd_fupd_acc.
+      iApply sfgupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
       iApply (lc_fupd_add_later with "LC1"). iNext.
@@ -536,7 +536,7 @@ Section proof.
       rewrite bool_decide_eq_true_2; last done.
       lwp_pures.
       iModIntro. lwp_finish.
-      iApply sfmupd_fupd_acc.
+      iApply sfgupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
       iApply (lc_fupd_add_later with "LC1"). iNext.
@@ -647,7 +647,7 @@ Section proof.
       rewrite bool_decide_eq_true_2; last done.
       lwp_pures.
       iModIntro. lwp_finish.
-      iApply sfmupd_fupd_acc.
+      iApply sfgupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
       iApply (lc_fupd_add_later with "LC1"). iNext.

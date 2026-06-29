@@ -425,7 +425,7 @@ Section proof.
   Lemma tf_until_alloc E g K (b : bool) ℓ1 ℓ2 μ :
     (ℓ1 <= ℓ2)%ordi →
     crP_obls g ℓ1 K -∗
-    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
+    |={E}=>g ∃ k, ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
                  oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
                  ∀ E' N (P Q : tf Σ), ▷ (if b then ⟦Q⟧ₗ else ⟦P⟧ₗ) ={E'}=∗ (⟦tf_until N k b 1 P Q⟧ₗ).
   Proof.
@@ -435,15 +435,17 @@ Section proof.
 
   Lemma tf_discharged_alloc E ℓ μ (Q : tf Σ) :
     ⟦Q⟧ₗ -∗
-    |={E}=>m ⟦Q⟧ₗ ∗ ∃ k, oblP_discharged k ∗
+    |={E}=>g ⟦Q⟧ₗ ∗ ∃ k, oblP_discharged k ∗
                         (∀ E' N (P : tf Σ), |={E'}=> oblP_inv N k ⟦P⟧ₗ ⟦Q⟧ₗ (tf_discharged k Q)) ∗ 
                         oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "HQ".
-    unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI".
+    unfold_sfgupd. rewrite /fgupd. iIntros (?????) "SI".
+    (* unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI". *)
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     (* FIXME: proof without unfold everything? *)
-    unfold_opreds. iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
+    unfold_opreds. iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
+    (* unfold_opreds. iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)". *)
     assert (NEW : ∃ k, Ω1 !! k = None).
     { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
     destruct NEW as (k& NEWk).
@@ -462,7 +464,8 @@ Section proof.
     iModIntro. iExists Ω2. iSplitR.
     { iPureIntro. econstructor 2. econstructor 2. auto. }
     iIntros (? [WStep GWI2]) "!>".
-    pose proof (owit_inv_alloc_discharged Ω1 k W1 NinOk1 GWI W2 WStep GWI2) as (NinWk1& WMon).
+    unshelve epose proof (owit_inv_alloc_discharged Ω1 k W1 NinOk1 GWI W2 _ GWI2) as (NinWk1& WMon).
+    { inv WStep; eauto. econstructor 2. apply wits_nd_step_wits_step. auto. }
     iPoseProof (owit_mon _ _ WMon with "W") as "W".
     iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
     { subst Ω2. rewrite dom_insert_L. iFrame. }
@@ -480,7 +483,7 @@ Section proof.
   Lemma tf_until_to_true E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦untilP N k 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
-    ▷ (⟦P⟧ₗ ∗ ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N,E}=∗ ⟦tf_until N k true 1 P Q⟧ₗ)).
+    ▷ (⟦P⟧ₗ ∗ ∀ E', |={E'}=>g ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N,E}=∗ ⟦tf_until N k true 1 P Q⟧ₗ)).
   Proof.
     rewrite !tf_until_logic. iIntros (HM) "(Oa& #Oi)".
     iMod (obl_assigned_to_true with "Oi Oa") as "[H ACC]". 1: auto.
@@ -555,7 +558,7 @@ Section proof.
     ↑N ⊆ E →
     ⟦untilP N k 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
     ▷ (⟦P⟧ₗ ∗
-       ∀ E', |={E'}=>m ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N}=∗
+       ∀ E', |={E'}=>g ((▷ ⟦Q⟧ₗ) ={E ∖ ↑N}=∗
                        ∀ g ℓ K, (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
                                 ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (⟦Q⟧ₗ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)))).
   Proof.

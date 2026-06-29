@@ -200,7 +200,8 @@ Section proof.
       iDestruct "is_task" as "(%&%& %Hlt& HP& %& task)".
       iModIntro.
       iMod (crP_fuel_extend_set _ ℓt _ μ with "F_task") as "F_task". 1: eauto.
-      iApply lwp_sfmupd.
+      iApply lwp_sfgupd.
+      (* iApply lwp_sfmupd. *)
       iApply ("task" $! 0 with "[$TG $F_task $Cg $HP]"). 1: eauto.
       iIntros (?) "(_& TG& Cg)". replace (K ∖ K) with (∅ : gset ocid) by set_solver.
       iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.

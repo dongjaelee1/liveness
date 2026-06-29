@@ -25,6 +25,7 @@ Section lifting.
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
+       |=[n,dom Θ]=>g
        (⌜ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -39,7 +40,8 @@ Section lifting.
     ⊢ lwp_step s i E e1 ν.
   Proof.
     iIntros "H". iIntros (??????? ??) "SI".
-    iMod ("H" with "[//] [//] SI") as "($& %& GOs& GFs& %& #REs& H)".
+    iMod ("H" with "[//] [//] SI") as "H". iModIntro.
+    iMod "H" as "($& %& GOs& GFs& %& #REs& H)".
     iIntros "!> % % % %Step".
     iApply (mprog_step). iModIntro. iFrame "GOs GFs REs". iIntros "(GOs& Ws)".
     iApply (mphys_step _ (S n) _ _ (dom efs)). 1: eauto.
@@ -57,9 +59,11 @@ Section lifting.
   Qed.
 
   Lemma lwp_lift_step s i E e1 Φ :
+    to_val e1 = None →
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
+       |=[n,dom Θ]=>g
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -75,10 +79,10 @@ Section lifting.
                                                         lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
-    iIntros "H". rewrite lwp_unfold /lwp_pre. destruct (to_val e1) eqn:He.
-    { unfold_lwpupd. iIntros (?????? ??) "SI". iMod ("H" $! K _ _ _ _ [] with "[//] [//] SI") as "[[% %] _]". done. }
+    iIntros (He) "H". rewrite lwp_unfold /lwp_pre. rewrite He.
     iApply lwp_step_step. iIntros (??????? ??) "I".
-    iMod ("H" $! K with "[//] [//] I") as "(%& H)". destruct H1 as [_ H1].
+    iMod ("H" $! K with "[//] [//] I") as "H". iModIntro.
+    iMod "H" as "(%& H)". destruct H1 as [_ H1].
     iModIntro. iSplitR; first done. iDestruct "H" as "(%& $& $& %& $& H)".
     iIntros (????). iMod ("H" with "[//]") as "H". iIntros "!> TG RWs Efs".
     iMod ("H" with "TG RWs Efs") as "H".
@@ -95,12 +99,12 @@ Section lifting.
   Proof.
     rewrite lwp_unfold /lwp_pre /lwp_step =>->.
     iIntros "H" (K h n σ Θ κ κs ??) "Hσ". iMod ("H" $! K with "[//] [//] Hσ") as "[% %Hirr]".
-    iModIntro. iSplit; first done.
-    iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
+    iModIntro. iSplitR; first done.
+    iModIntro. iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
   Qed.
 
   (** Derived lifting lemmas. *)
-  Lemma lwp_lift_pure_step_no_fork s i E E' e1 Φ ς :
+  Lemma lwp_lift_pure_step_no_fork `{!Inhabited (state Λ)} s i E E' e1 Φ ς :
     (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
     (∀ κ σ1 Θ e2 σ2 efs, prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
     PureExecSI ς i →
@@ -117,9 +121,11 @@ Section lifting.
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hsafe Hstep HCS) "H".
-    iApply lwp_lift_step. iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
+    iApply lwp_lift_step.
+    { specialize (Hsafe inhabitant inhabitant). destruct s; eauto using reducible_not_val. }
+    iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
     iMod "H" as "(Hc& (%& Tb& Gfs& %& #Rs& H))".
-    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit.
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iModIntro. iSplit.
     { iPureIntro. split.
       - specialize (Hsafe σ1 ∅). destruct s; eauto using reducible_not_val.
       - destruct s; auto. }
@@ -147,9 +153,11 @@ Section lifting.
   Qed.
 
   Lemma lwp_lift_atomic_step {s i E1 E2 Φ} e1 :
+    to_val e1 = None →
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
+       |=[n,dom Θ]=>g
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -165,9 +173,11 @@ Section lifting.
                                              [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
-    iIntros "H". iApply (lwp_lift_step s i E1 e1).
-    iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "(%& H)".
+    iIntros (He) "H". iApply (lwp_lift_step s i E1 e1). 1: auto.
+    iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ1".
+    iMod ("H" $! K with "[//] [//] Hσ1") as "H".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
+    iMod "H" as "(%& H)". iModIntro.
     iSplit; first auto.
     iDestruct "H" as "(%& Tb& Gfs& %& #Rs& H)".
     iExists _. iFrame "Tb Gfs". iExists _. iFrame "Rs".
@@ -176,7 +186,8 @@ Section lifting.
     iMod "Hclose" as "_". iMod "H" as "($&Hq)".
     iModIntro. iMod "Hq" as "[Hq $]".
     destruct (to_val e2) eqn:?; last by iExFalso.
-    iApply lwp_value_lwpupd; last eauto. by apply of_to_val.
+    simpl. iMod "Hq". iModIntro.
+    iApply lwp_value; last eauto. by apply of_to_val.
   Qed.
 
   Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s i E E' Φ ς} e1 e2 :

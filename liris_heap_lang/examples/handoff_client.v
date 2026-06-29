@@ -75,7 +75,8 @@ Section proof.
     iMod (is_handoff_initialize with "Ptrb0 Cgj") as "(%γh& #is_handoff& Gv)".
     iModIntro. iSplitR "TGj GFj Gv"; cycle 1.
     { lwp_bind (Handoff.receive _).
-      iModIntro. iApply lwp_sfmupd.
+      iModIntro.
+      iApply lwp_sfmupd.
       iApply ("Handoff_receive_spec" $! 0 with "[$TGj GFj $Gv $is_handoff]").
       { iApply big_sepS_singleton. iFrame. }
       iIntros (?) "(_& TGj)". iMod (thread_terminate with "TGj") as "TGj".

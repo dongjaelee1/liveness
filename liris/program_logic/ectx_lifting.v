@@ -17,9 +17,11 @@ Section wp.
   Local Hint Resolve base_stuck_stuck : core.
 
   Lemma lwp_lift_base_step {s i E Φ} e1 :
+    to_val e1 = None →
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
+       |=[n,dom Θ]=>g
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -35,8 +37,9 @@ Section wp.
                                                         lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
-    iIntros "H". iApply (lwp_lift_step s i E e1 Φ). iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
-    iMod ("H" $! K with "[//] [//] Hσ") as "(%& %& $& $& %& $& H)"; iModIntro.
+    iIntros (He) "H". iApply (lwp_lift_step s i E e1 Φ). 1: auto. iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
+    iMod ("H" $! K with "[//] [//] Hσ") as "H". iModIntro.
+    iMod "H" as "(%& %& $& $& %& $& H)". iModIntro.
     destruct H. iSplit; first by destruct s; eauto.
     iIntros (e2 σ2 efs ?). iApply "H"; eauto.
   Qed.
@@ -64,9 +67,11 @@ Section wp.
   Qed.
 
   Lemma lwp_lift_atomic_base_step {s i E1 E2 Φ} e1 :
+    to_val e1 = None →
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
+       |=[n,dom Θ]=>g
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -82,16 +87,19 @@ Section wp.
                                             [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
-    iIntros "H". iApply lwp_lift_atomic_step.
-    iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "(%& %&$&$& %&$& H)"; iModIntro.
-    destruct H1. iSplit; first by destruct s; auto.
+    iIntros (He) "H". iApply lwp_lift_atomic_step. 1: auto.
+    iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "H".
+    iModIntro. iMod "H" as "(%& %&$&$& %&$& H)".
+    iModIntro. destruct H1. iSplit; first by destruct s; auto.
     iIntros (e2 σ2 efs Hstep). iApply "H"; eauto.
   Qed.
 
   Lemma lwp_lift_atomic_base_step_no_fork {s i E1 E2 Φ} e1 :
+    to_val e1 = None →
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
        (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
+       |=[n,dom Θ]=>g
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -105,8 +113,9 @@ Section wp.
                                      (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2))))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
-    iIntros "H". iApply lwp_lift_atomic_base_step.
-    iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "($& %&$&$& %&$& H)"; iModIntro.
+    iIntros (He) "H". iApply lwp_lift_atomic_base_step. 1: auto.
+    iIntros (??????? ??) "Hσ1". iMod ("H" $! K with "[//] [//] Hσ1") as "H". iModIntro.
+    iMod "H" as "($& %&$&$& %&$& H)"; iModIntro.
     iIntros (??? Hstep). iMod ("H" with "[# //]") as "H".
     iIntros "!> Tb Wcs _". iMod ("H" with "Tb Wcs") as ">(%& I& $)".
     subst. rewrite !map_union_empty. iFrame. iModIntro. iModIntro. done.

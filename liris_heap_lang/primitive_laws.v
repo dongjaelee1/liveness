@@ -296,9 +296,9 @@ Lemma lwp_fork s i E E' e Φ :
                                 (lwpupd j ⊤ e (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))))) -∗
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
-  iIntros "H". iApply lwp_lift_atomic_base_step.
+  iIntros "H". iApply lwp_lift_atomic_base_step. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "I". iMod "H" as "(%&$&$& %&$& H)".
-  iModIntro. iSplit; first eauto with base_step.
+  iModIntro. iModIntro. iSplit; first eauto with base_step.
   iIntros (v2 σ2 efs Hstep); inv_base_step.
   iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
   iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
@@ -429,9 +429,9 @@ Lemma lwp_choosenat_step o s i E E' Φ :
                                    ALC (£ o ={E',E}=∗ (|={E}=>m Φ (#n))))) -∗
   lWP ChooseNat @ s; i; E {{ Φ }}.
 Proof.
-  iIntros "H". iApply lwp_lift_atomic_base_step_no_fork.
+  iIntros "H". iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "I". iMod "H" as "(%&$&$& %&$& H)".
-  iModIntro. iSplit; first eauto with base_step.
+  iModIntro. iModIntro. iSplit; first eauto with base_step.
   (** FIXME: evar nat *)
   Unshelve. 2: exact 0.
   iIntros (v2 σ2 efs Hstep); inv_base_step.
@@ -647,8 +647,8 @@ Lemma lwp_allocN_seq G R o s i E v n :
           [∗ list] i ∈ seq 0 (Z.to_nat n), (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
   iIntros (Hn Φ) "(Tb& Gfs& Rs) HP".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h ? σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs & Ht & Hk) Ia] !>". iSplit.
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h ? σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs & Ht & Hk) Ia] !> !>". iSplit.
   { iPureIntro. split; first done. destruct n; auto with lia base_step. }
   iFrame "Tb Gfs Rs". iIntros (v2 σ2 efs Hstep); inv_base_step.
   iMod (gen_heap_alloc_big _ (heap_array _ (replicate (Z.to_nat n) v)) with "Hs")
@@ -685,8 +685,8 @@ Lemma lwp_free G R o s i E l v :
           (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
   iIntros (Φ) "((Tb& Gfs& Rs)& Hl) HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !>".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -707,8 +707,8 @@ Lemma lwp_load G R o s i E l dq v :
   l{{{ RET v; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !>".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -728,8 +728,8 @@ Lemma lwp_store G R o s i E l v' v :
   l{{{ RET LitV LitUnit; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !>".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -750,8 +750,8 @@ Lemma lwp_xchg G R o s i E l v' v :
   l{{{ RET v'; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !>".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -773,8 +773,8 @@ Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 :
   l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
 Proof.
   iIntros (?? Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !>".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -796,8 +796,8 @@ Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' :
   l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
 Proof.
   iIntros (?? Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !>".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -819,8 +819,8 @@ Lemma lwp_faa G R o s i E l i1 i2 :
   l{{{ RET LitV (LitInt i1); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
   iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !>".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -841,8 +841,8 @@ Lemma lwp_new_proph G R o s i E :
   l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
 Proof.
   iIntros (Φ) "(Tb& Gfs& Rs) HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !>".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
   iIntros (v2 σ2 efs Hstep); inv_base_step.

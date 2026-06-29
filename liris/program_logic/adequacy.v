@@ -604,13 +604,8 @@ Section proof2.
         * rewrite lwp_fix_unfold_fix /lwp_pre He2.
           iDestruct "HI" as "[HI SIa]".
           iMod (all_interp_sfgupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)".
-          (* iMod (all_interp_lwpupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)". *)
           2: eapply LB4.
           { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
-          (* { subst Θ2. rewrite lookup_union_l. *)
-          (*   - apply lookup_insert_eq. *)
-          (*   - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. } *)
-          (* 1: eapply LB4. *)
           destruct H as [LEO3 LB5].
           iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                      (match to_val e with
@@ -621,7 +616,6 @@ Section proof2.
             { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
               apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
             iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
-          (* iDestruct "HI" as "[HI SIa]". *)
           iPoseProof (history_interp_wf with "HI") as "%HistWF".
           iPoseProof ("IH" with "[] [] [] [] [] TF HI SIa MI WPs") as "H".
           1: eauto. 1: eauto. 1: eauto.
