@@ -538,12 +538,24 @@ Section proof2.
         destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_delete _ _ _ _ LUTQi1 with "WPs") as "[WP WPs]".
         pose proof (val_stuck _ _ _ _ _ _ _ _ PStep) as He1. rewrite He1.
         iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
-        iMod ("WP" $! id with "[] [//] [$HI $SIa]") as "[%NStuck WP]".
+        iMod ("WP" $! id with "[] [//] [$HI $SIa]") as "WP".
         { iPureIntro. apply _. }
-        iPoseProof ("WP" with "[//]") as "WP". rewrite /mprog.
         iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
+        iMod (model_interp_gupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
+        2: eapply LB.
+        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+        destruct H as [OND LB0].
+        iPoseProof (model_interp_owit_inv with "MI") as "%OWinv0".
+
+        TODO: prove OND preserves OTA
+
+        
+        iDestruct "WP" as "[%NStuck WP]".
+        iPoseProof ("WP" with "[//]") as "WP". rewrite /mprog.
         iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
-        unshelve epose proof (mprog_exists_step i1 Ω Ω2 W (n, τf) γ _ OTA OWinv LB FS ProgO).
+
+
+        unshelve epose proof (mprog_exists_step i1 Ω0 Ω2 W0 (n, τf) γ _ OTA OWinv0 LB0 FS ProgO).
         { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
         destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
         iMod ("WP" $! W2 with "[]") as "[MI WP]".
