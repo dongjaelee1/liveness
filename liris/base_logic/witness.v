@@ -266,4 +266,9 @@ Section witnesses.
     destruct H as (?&?&?&?&?); subst. do 3 eexists. split_and !; eauto. econstructor 1; eauto.
   Qed.
 
+  Lemma wits_nd_step_wits_step_o W1 W2 : W1 ↓ₙ∘ W2 → W1 ↓∘ W2.
+  Proof using.
+    intros. inv H. 1: done. econstructor 2. apply wits_nd_step_wits_step; auto.
+  Qed.
+
 End witnesses.

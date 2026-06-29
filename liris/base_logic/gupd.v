@@ -113,7 +113,7 @@ Section gupd.
     iMod (model_history_interp_step with "HI") as "$". 1,2: done.
     iModIntro.
     unshelve epose proof (owit_inv_rc_step_same_gls _ _ _ OW1 _ OW2).
-    { inv Prog; eauto. econstructor 2. by apply wits_nd_step_wits_step. }
+    { by apply wits_nd_step_wits_step_o. }
     iPoseProof (owit_mon _ _ H with "N") as "$". iFrame. done.
   Qed.
 

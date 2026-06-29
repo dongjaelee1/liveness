@@ -3,7 +3,7 @@ From iris.bi Require Export fixpoint.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From liris.algebra Require Import ordinal_wfocm.
-From liris.base_logic Require Export mupd oinv.
+From liris.base_logic Require Export oinv gupd.
 From transfinite.base_logic.lib Require Import ghost_map.
 
 (** All Local Definitions are only for internal uses and users should not need them. *)
@@ -1587,35 +1587,37 @@ Section preds.
   Section fmupd.
 
     (** ** Update rules *)
-    Lemma thread_terminate_mupd n Θ i :
-      thP_carriers i ∅ -∗ |=[n,Θ]=>m thP_done i.
+    Lemma thread_terminate_gupd n Θ i :
+      thP_carriers i ∅ -∗ |=[n,Θ]=>g thP_done i.
     Proof.
       unfold_opreds. iIntros "(#Oe& Ox& Ob& _)".
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
+      iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
       iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
       iMod (ocarrier_exec_to_done with "[$O $G $Ox $Ob]") as "(O& G& #Ot)". 1: auto.
       iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
       iModIntro. iExists Ω1. iSplitR; first done.
       iIntros (? [WStep GWI2]).
-      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
+      unshelve epose proof (owit_inv_rc_step_same_gls _ _ _ GWI _ GWI2) as WMon.
+      { by apply wits_nd_step_wits_step_o. }
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S O G W A". iSplitR; eauto.
       iIntros "!> !>". auto.
     Qed.
 
-    Lemma carrier_alloc_mupd n Θ i G ℓ μ :
+    Lemma carrier_alloc_gupd n Θ i G ℓ μ :
       thP_carriers i G -∗
-      |=[n,Θ]=>m ∃ g, (⌜ g ∉ G ⌝) ∗
+      |=[n,Θ]=>g ∃ g, (⌜ g ∉ G ⌝) ∗
                      thP_carriers i ({[g]} ∪ G) ∗ crP_obls g ℓ ∅ ∗ crP_fuel g ℓ μ.
     Proof.
       unfold_opreds. iIntros "(#Te& Tx& Tpsa& Cws)".
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
+      iApply gupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
       iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
       iMod (ocarrier_alloc_carrier _ _ _ (measure_rep (ℓ, 0) ((1 ⊕ ▽) × μ)%M) with "[$G $Tpsa]") as "(%& G& %LUp& Tpsa& Tps& Tpo& #Tb& Tf& Cw)".
       1: auto.
       iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
       iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
-      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
+      unshelve epose proof (owit_inv_rc_step_same_gls _ _ _ GWI _ GWI2) as WMon.
+      { by apply wits_nd_step_wits_step_o. }
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S T G W A". iSplitR; eauto.
       iIntros "!> !>". iFrame "Te Tb". iFrame. rewrite /ocarrierG_owned. iDestruct "Cw" as "[Cw $]".
@@ -1623,31 +1625,32 @@ Section preds.
       iApply big_sepS_singleton. iFrame.
     Qed.
 
-    Lemma carrier_delete_mupd n Θ i G g ℓ :
+    Lemma carrier_delete_gupd n Θ i G g ℓ :
       g ∈ G →
       thP_carriers i G -∗
       crP_obls g ℓ ∅ -∗
-      |=[n,Θ]=>m thP_carriers i (G ∖ {[g]}).
+      |=[n,Θ]=>g thP_carriers i (G ∖ {[g]}).
     Proof.
       unfold_opreds. iIntros (INg) "(#Te& Tx& Tpsa& Cws) (%& _& Tpo& Tps& Cw& _)".
       iPoseProof (big_sepS_delete _ _ _ INg with "Cws") as "[Cw0 Cws]".
       rewrite /ocarrierG_owned. iCombine "Cw Cw0" as "Cw" gives %H. destruct H as [_ ->].
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& P& W& %GWI)".
+      iApply gupd_unfold. iRight. iIntros (????) "(HI& S& T& A& P& W& %GWI)".
       iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
       iMod (ocarrier_delete_carrier with "[$P $Tpsa $Tps $Tpo]") as "(P& Tpsa)".
       1: auto.
       iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
       iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
-      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
+      unshelve epose proof (owit_inv_rc_step_same_gls _ _ _ GWI _ GWI2) as WMon.
+      { by apply wits_nd_step_wits_step_o. }
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S T P W A". iSplitR; eauto.
       iIntros "!> !>". iFrame "Te". iFrame.
     Qed.
 
-    Lemma obl_alloc_assigned_mupd n Θ g K b ℓ1 ℓ2 μ :
+    Lemma obl_alloc_assigned_gupd n Θ g K b ℓ1 ℓ2 μ :
       (ℓ1 <= ℓ2)%ordi →
       crP_obls g ℓ1 K -∗
-      |=[n,Θ]=>m ∃ k, (⌜ k ∉ K ⌝) ∗
+      |=[n,Θ]=>g ∃ k, (⌜ k ∉ K ⌝) ∗
                      crP_obls g ℓ1 ({[k]} ∪ K) ∗
                      oblP_assigned k b (1/2)%Qp ∗
                      oblP_fuel k ℓ2 μ ∗
@@ -1655,7 +1658,7 @@ Section preds.
                      (∀ E N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E}=∗ oblP_inv N k P Q R).
     Proof.
       unfold_opreds. iIntros (LTl) "(%& #Te& Tpo& Tps& Cw& (%& #Tb)& TOs)".
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& P& W& %GWI)".
+      iApply gupd_unfold. iRight. iIntros (????) "(HI& S& T& A& P& W& %GWI)".
       assert (NEW : ∃ k, Ω1 !! k = None).
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
@@ -1681,7 +1684,8 @@ Section preds.
       iModIntro. iExists Ω2. iSplitR.
       { subst Ω2. iPureIntro. econstructor 2. econstructor 2. eauto. }
       iIntros (? [WStep GWI2]) "!>".
-      pose proof (owit_inv_alloc_assigned Ω1 k W1 NinOk1 GWI _ _ W2 WStep GWI2) as (NinWk1& WMon).
+      unshelve epose proof (owit_inv_alloc_assigned Ω1 k W1 NinOk1 GWI _ _ W2 _ GWI2) as (NinWk1& WMon).
+      { by apply wits_nd_step_wits_step_o. }
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S T P W". iSplitL "A".
       { subst Ω2. rewrite dom_insert_L. iFrame. eauto. }
@@ -1694,12 +1698,12 @@ Section preds.
       - iMod (oblG_inv_alloc_assigned_false _ N _ _ P Q R with "[$Gl $HP]") as "#GVar". by iModIntro.
     Qed.
 
-    Lemma obl_alloc_discharged_mupd n Θ ℓ μ :
-      ⊢ |=[n,Θ]=>m ∃ k, oblP_discharged k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+    Lemma obl_alloc_discharged_gupd n Θ ℓ μ :
+      ⊢ |=[n,Θ]=>g ∃ k, oblP_discharged k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                        (∀ E N (P Q R : iProp Σ), (▷ R) ={E}=∗ oblP_inv N k P Q R).
     Proof.
       unfold_opreds.
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& P& W& %GWI)".
+      iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& P& W& %GWI)".
       assert (NEW : ∃ k, Ω1 !! k = None).
       { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
       destruct NEW as (k& NEWk).
@@ -1716,7 +1720,8 @@ Section preds.
       iModIntro. iExists Ω2. iSplitR.
       { iPureIntro. econstructor 2. econstructor 2. auto. }
       iIntros (? [WStep GWI2]) "!>".
-      pose proof (owit_inv_alloc_discharged Ω1 k W1 NinOk1 GWI W2 WStep GWI2) as (NinWk1& WMon).
+      unshelve epose proof (owit_inv_alloc_discharged Ω1 k W1 NinOk1 GWI W2 _ GWI2) as (NinWk1& WMon).
+      { by apply wits_nd_step_wits_step_o. }
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S O P W". iSplitL "A".
       { subst Ω2. rewrite dom_insert_L. iFrame. eauto. }
@@ -1726,13 +1731,13 @@ Section preds.
       iModIntro. eauto.
     Qed.
 
-    Lemma obl_assigned_to_true_mupd E N k P Q R :
+    Lemma obl_assigned_to_true_gupd E N k P Q R :
       ↑N ⊆ E →
       oblP_inv N k P Q R -∗
       |={E,E ∖ ↑N}=> oblP_assigned k false (1/2)%Qp -∗
                     ((▷ (oblP_assigned k false 1 ∗ P)) ∗
                      (∀ b, oblP_assigned k b 1 -∗
-                           ∀ n Θ, |=[n,Θ]=>m (oblP_assigned k true (1/2)%Qp) ∗
+                           ∀ n Θ, |=[n,Θ]=>g (oblP_assigned k true (1/2)%Qp) ∗
                                           ((▷ Q) ={E ∖ ↑N,E}=∗ True))).
     Proof.
       unfold_opreds. iIntros (MASK) "(#Ge& #Gvar)".
@@ -1741,11 +1746,12 @@ Section preds.
       { iNext. iDestruct "H" as "([Ga1 Ga1']& [Ga2 Ga2']& $)". iFrame "Ge".
         iCombine "Ga1 Ga2" as "Ga". iCombine "Ga1' Ga2'" as "Ga'". iCombine "Ga Ga'" as "$". }
       iIntros (b) "(_& Ga) %%".
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& P& W& %GWI1)".
+      iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& P& W& %GWI1)".
       iMod (osat_assigned_to_true with "[$S $Ge $Ga]") as "(S& Ga)".
       iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
       iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
-      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI1 WStep GWI2) as WMon.
+      unshelve epose proof (owit_inv_rc_step_same_gls _ _ _ GWI1 _ GWI2) as WMon.
+      { by apply wits_nd_step_wits_step_o. }
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S O P W A". iSplitR; eauto.
       iDestruct "Ga" as "[[Ga1 Ga2] [Ga1' Ga2']]". iCombine "Ga1 Ga1'" as "Ga1". iCombine "Ga2 Ga2'" as "Ga2".
@@ -1815,18 +1821,18 @@ Section preds.
       done.
     Qed.
 
-    Lemma obl_offload_mupd n Θ g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
+    Lemma obl_offload_gupd n Θ g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
       k ∈ K1 →
       (ℓ2 <= ℓ)%ordi →
       crP_obls g1 ℓ1 K1 -∗
       crP_obls g2 ℓ2 K2 -∗
       oblP_fuel k ℓ 1 -∗
-      |=[n,Θ]=>m crP_obls g1 ℓ1 (K1 ∖ {[k]}) ∗ crP_obls g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
+      |=[n,Θ]=>g crP_obls g1 ℓ1 (K1 ∖ {[k]}) ∗ crP_obls g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
     Proof.
       unfold_opreds. iIntros (Ink LTl) "(%i1& #Tei1& Gg1& Gt1& Cw1& (%& #Gb1)& KS1) (%i2& #Tei2& Gg2& Gt2& Cw2& (%& #Gb2)& KS2) Of".
       destruct (decide (i1 = i2)).
       - subst.
-        iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
+        iApply gupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
         iPoseProof (othread_elem with "[$T $Tei1]") as "%Ini".
         iDestruct "Of" as "(#Oek& Of)".
         iMod (oblG_fuel_mon _ (measure_rep (ℓ2, 0) μ0) with "Of") as "Of".
@@ -1842,13 +1848,14 @@ Section preds.
         iMod (ocarrier_obl_change_carrier with "[$G $Gg1 $Gg2 $Gb2 $Of]") as "(G& Gg1& Gg2)". 1,2: auto.
         iMod (model_history_interp_step _ _ n n _ Ω1 with "HI") as "HI". 1,2: done.
         iModIntro. iExists Ω1. iSplitR; first done. iIntros (? [WStep GWI2]).
-        pose proof (owit_inv_rc_step_same_gls _ _ _ GWI WStep GWI2) as WMon.
+        unshelve epose proof (owit_inv_rc_step_same_gls _ _ _ GWI _ GWI2) as WMon.
+        { by apply wits_nd_step_wits_step_o. }
         iPoseProof (owit_mon _ _ WMon with "W") as "W".
         rewrite /model_interp. iFrame "HI S T G W A". iSplitR; eauto.
         iIntros "!> !>". iFrame. iPoseProof (big_sepS_delete _ _ _ Ink with "KS1") as "[Kk KS1]".
         iFrame "Tei1 Gb1 Gb2 KS1". iSplit; last auto.
         iApply (big_sepS_union_2 with "KS2"). iApply big_sepS_singleton. iFrame.
-      - iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
+      - iApply gupd_unfold. iRight. iIntros (????) "(HI& S& T& A& G& W& %GWI)".
         iPoseProof (othread_elem with "[$T $Tei1]") as "%Ini1".
         iPoseProof (othread_elem with "[$T $Tei2]") as "%Ini2".
         iDestruct "Of" as "(#Ge& Of)".
@@ -1892,7 +1899,8 @@ Section preds.
         iModIntro. iExists Ω2. iSplitR.
         { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
         iIntros (? [WStep GWI2]).
-        pose proof (owit_inv_progress_owner _ k _ _ _ LUO1o GWI _ _ Gstep' W2 WStep GWI2) as WMon.
+        unshelve epose proof (owit_inv_progress_owner _ k _ _ _ LUO1o GWI _ _ Gstep' W2 _ GWI2) as WMon.
+        { by apply wits_nd_step_wits_step_o. }
         iPoseProof (owit_mon _ _ WMon with "W") as "W".
         rewrite /model_interp. iFrame "HI S T G W". iSplitL "A".
         { iModIntro. subst Ω2. rewrite dom_insert_L.
@@ -1904,13 +1912,13 @@ Section preds.
         rewrite big_sepS_singleton. iFrame. iCombine "Oo Oo1" as "Oo". eauto.
     Qed.
 
-    Lemma obl_offload_set_mupd n Θ g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
+    Lemma obl_offload_set_gupd n Θ g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
       K ⊆ K1 →
       (ℓ2 <= ℓ)%ordi →
       crP_obls g1 ℓ1 K1 -∗
       crP_obls g2 ℓ2 K2 -∗
       ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
-      |=[n,Θ]=>m crP_obls g1 ℓ1 (K1 ∖ K) ∗ crP_obls g2 ℓ2 (K2 ∪ K) ∗ ⌜ K2 ## K ⌝.
+      |=[n,Θ]=>g crP_obls g1 ℓ1 (K1 ∖ K) ∗ crP_obls g2 ℓ2 (K2 ∪ K) ∗ ⌜ K2 ## K ⌝.
     Proof.
       revert K1 K2. pattern K. revert K. apply set_ind.
       { solve_proper. }
@@ -1923,16 +1931,16 @@ Section preds.
       replace (K1 ∖ ({[k]} ∪ K)) with ((K1 ∖ K) ∖ {[k]}) by set_solver.
       replace (K2 ∪ ({[k]} ∪ K)) with ((K2 ∪ K) ∪ {[k]}) by set_solver.
       rewrite big_sepS_singleton.
-      iMod (obl_offload_mupd with "Gg1 Gg2 F") as "($& $& %)". 1: set_solver. 1: auto.
+      iMod (obl_offload_gupd with "Gg1 Gg2 F") as "($& $& %)". 1: set_solver. 1: auto.
       iPureIntro. set_solver.
     Qed.
 
-    Lemma obl_check_witnesses_mupd n Θ (R : oids) :
+    Lemma obl_check_witnesses_gupd n Θ (R : oids) :
       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
-      |=[n,Θ]=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_discharged r).
+      |=[n,Θ]=>g ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_discharged r).
     Proof.
       unfold_opreds. iIntros "#REs".
-      iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI1)".
+      iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI1)".
       iPoseProof (owit_get_credit_zero with "W") as "[W Ws]".
       assert (DomOW : dom Ω1 = dom W1) by (eapply owit_inv_dom; eauto).
       iAssert (⌜ R ⊆ dom W1 ⌝)%I as "%RWSub".
@@ -1976,7 +1984,8 @@ Section preds.
         subst R. rewrite -big_sepS_bupd -big_sepM_dom. iApply (big_sepM_impl with "Ws1").
         iIntros "!> %%% H".  destruct x; eauto. }
       iCombine "REs Rs" as "Rs". iPoseProof (big_sepS_sep with "Rs") as "Rs".
-      pose proof (owit_inv_rc_step_same_gls _ _ _ GWI1 WStep GWI2) as WMon.
+      unshelve epose proof (owit_inv_rc_step_same_gls _ _ _ GWI1 _ GWI2) as WMon.
+      { by apply wits_nd_step_wits_step_o. }
       iPoseProof (owit_mon _ _ WMon with "W") as "W".
       rewrite /model_interp. iFrame "HI S O W G A". iSplitR; eauto.
       iIntros "!> !>". iApply (big_sepS_impl with "Rs"). iIntros "!> %% (#Ge& [Ww | Gf])".
