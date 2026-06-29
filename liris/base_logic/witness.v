@@ -54,6 +54,22 @@ Notation "A ↓∘ B" := (rc (wits_step) A B) (at level 20, format "A  ↓∘  B
 Notation "A ↓⁺ B" := (tc (wits_step) A B) (at level 20, format "A  ↓⁺  B").
 Notation "A ↓⋆ B" := (rtc (wits_step) A B) (at level 20, format "A  ↓⋆  B").
 
+(** Definitions for non-discharging stpes. *)
+Definition wits_one_progress `{OC : obl_class} : witnesses → witnesses → Prop :=
+  λ W1 W2, ∃ k w1 w2, (W1 !! k = Some w1) ∧ (witness_progress w1 w2) ∧ (W2 = <[k:=w2]>W1).
+Infix "↓₁ₚ" := (wits_one_progress) (at level 20).
+
+Variant wits_nd_step `{OC : obl_class} : witnesses → witnesses → Prop :=
+  | wits_nd_step_one_progress W1 W2 :
+    W1 ↓₁ₚ W2 → wits_nd_step W1 W2
+  | wits_nd_step_alloc W1 W2 :
+    W1 ↓ₐ W2 → wits_nd_step W1 W2.
+
+Notation "A ↓ₙ B" := (wits_nd_step A B) (at level 20, format "A  ↓ₙ  B").
+Notation "A ↓ₙ∘ B" := (rc (wits_nd_step) A B) (at level 20, format "A  ↓ₙ∘  B").
+Notation "A ↓ₙ⁺ B" := (tc (wits_nd_step) A B) (at level 20, format "A  ↓ₙ⁺  B").
+Notation "A ↓ₙ⋆ B" := (rtc (wits_nd_step) A B) (at level 20, format "A  ↓ₙ⋆  B").
+
 (** Definitions for strict progress of witnesses. *)
 (* Only witnesses that satisfy wit_cond makes R *)
 Definition wit_cond `{OC : obl_class} := (oid → witness → Prop).
@@ -123,6 +139,12 @@ Section witnesses.
     - rewrite lookup_insert_ne; last auto. specialize (STEP i). inv STEP; auto. destruct H5.
       + destruct H5. done.
       + destruct H5. subst. auto.
+  Qed.
+
+  (** For the one progress step relation. *)
+  Lemma wits_one_progress_dom W1 W2 : W1 ↓₁ₚ W2 → dom W1 = dom W2.
+  Proof using.
+    intros. destruct H as (?&?&?&?&?&?). subst. rewrite dom_insert_lookup_L; eauto.
   Qed.
 
   (** For the conditional step relation *)
@@ -236,6 +258,12 @@ Section witnesses.
       + inv H0. eapply WFOCM.lt_le; eauto.
       + inv H0; done.
     - subst. destruct w2; try done.
+  Qed.
+
+  Lemma wits_nd_step_wits_step W1 W2 : W1 ↓ₙ W2 → W1 ↓ W2.
+  Proof using.
+    intros. inv H; [econstructor 1 | econstructor 2]; eauto. inv H0.
+    destruct H as (?&?&?&?&?); subst. do 3 eexists. split_and !; eauto. econstructor 1; eauto.
   Qed.
 
 End witnesses.

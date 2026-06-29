@@ -44,7 +44,7 @@ Definition model_interp `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   h i Ω W n Θ : iProp Σ :=
   (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ ocarrier Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
 
-(** Modality for updating obls. *)
+(** ** Modality for updating obls. *)
 Definition mupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (mupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,

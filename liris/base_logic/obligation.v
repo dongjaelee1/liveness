@@ -82,6 +82,22 @@ Notation "A ↪∘ B" := (rc (obls_step) A B) (at level 20, format "A  ↪∘  B
 Notation "A ↪⁺ B" := (tc (obls_step) A B) (at level 20, format "A  ↪⁺  B").
 Notation "A ↪⋆ B" := (rtc (obls_step) A B) (at level 20, format "A  ↪⋆  B").
 
+(** Definitions for non-discharging stpes. *)
+Definition obls_one_progress `{OC : obl_class} : obls → obls → Prop :=
+  λ Ω1 Ω2, ∃ k g1 g2, (Ω1 !! k = Some g1) ∧ (obl_progress g1 g2) ∧ (Ω2 = <[k:=g2]>Ω1).
+Infix "↪₁ₚ" := (obls_one_progress) (at level 20).
+
+Variant obls_nd_step `{OC : obl_class} : obls → obls → Prop :=
+  | obls_nd_step_one_progress Ω1 Ω2 :
+    Ω1 ↪₁ₚ Ω2 → obls_nd_step Ω1 Ω2
+  | obls_nd_step_alloc Ω1 Ω2 :
+    Ω1 ↪ₐ Ω2 → obls_nd_step Ω1 Ω2.
+
+Notation "A ↪ₙ B" := (obls_nd_step A B) (at level 20, format "A  ↪ₙ  B").
+Notation "A ↪ₙ∘ B" := (rc (obls_nd_step) A B) (at level 20, format "A  ↪ₙ∘  B").
+Notation "A ↪ₙ⁺ B" := (tc (obls_nd_step) A B) (at level 20, format "A  ↪ₙ⁺  B").
+Notation "A ↪ₙ⋆ B" := (rtc (obls_nd_step) A B) (at level 20, format "A  ↪ₙ⋆  B").
+
 (** Definitions for strict progress of obls. *)
 (* Only ghost locks that satisfy obl_cond makes R *)
 Definition obl_cond `{OC : obl_class} := (oid → obl → Prop).
@@ -102,12 +118,12 @@ Definition obl_cond_one `{OC : obl_class} (v : oid) : obl_cond :=
 Global Instance obl_cond_one_dec `{OC : obl_class} : ∀ v k g, Decision (obl_cond_one v k g).
 Proof using. intros. rewrite /obl_cond_one. solve_decision. Qed.
 
-(* Ghost locks conditional step relation *)
+(* Conditional step relation *)
 Definition obls_cond_step `{OC : obl_class} (C : obl_cond) : obls → obls → Prop :=
   obls_cond_rel C obl_step.
 Notation "A ↪ₛ B | C" := (obls_cond_step C A B) (at level 20, format "A  ↪ₛ  B  |  C").
 
-(* Ghost locks making strict progresses *)
+(* Strict progresses *)
 Definition obls_keep `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, map_Forall2 (λ k g1 g2, obl_keep g1 g2) Ω1 Ω2.
 
@@ -117,6 +133,9 @@ Notation "A ↪ₚ B | C" := (obls_cond_progress C A B) (at level 20, format "A 
 
 Definition obls_le `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obl_le o1 o2).
+
+Definition obls_nd `{OC : obl_class} : obls → obls → Prop :=
+  λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obl_keep o1 o2).
 
 (* Filter out live obligations. *)
 Definition obl_filter_live `{OC : obl_class} : (oid * obl → Prop) :=
@@ -155,6 +174,12 @@ Section proofs.
     - rewrite lookup_insert_ne; last auto. specialize (STEP i). inv STEP; auto. destruct H5.
       + destruct H5. done.
       + destruct H5. subst. auto.
+  Qed.
+
+  (** For the one progress step relation. *)
+  Lemma obls_one_progress_dom Ω1 Ω2 : Ω1 ↪₁ₚ Ω2 → dom Ω1 = dom Ω2.
+  Proof using.
+    intros. destruct H as (?&?&?&?&?&?). subst. rewrite dom_insert_lookup_L; eauto.
   Qed.
 
   (** For the conditional step relation *)
@@ -248,7 +273,7 @@ Section proofs.
   Global Instance obls_keep_equivalence : Equivalence obls_keep.
   Proof using. econstructor; apply _. Qed.
 
-  (** Le. *)
+  (** le relation *)
   Global Instance obl_le_reflexive : Reflexive obl_le.
   Proof using.
     repeat intro. destruct x; try done. left. done.
@@ -313,6 +338,53 @@ Section proofs.
       + inv H4. right. auto.
       + inv H4.
     - destruct H. inv H0. done.
+  Qed.
+
+  (** nd relation *)
+  Global Instance obls_nd_reflexive : Reflexive obls_nd.
+  Proof using. repeat intro. split; first done. intros. rewrite H in H0. inv H0. done. Qed.
+  Global Instance obls_nd_transitive : Transitive obls_nd.
+  Proof using.
+    repeat intro. destruct H, H0. split.
+    - set_solver.
+    - intros. destruct (y !! k) eqn:LUy; cycle 1.
+      { apply elem_of_dom_2 in H3. apply not_elem_of_dom in LUy. set_solver. }
+      specialize (H1 _ _ _ H3 LUy). specialize (H2 _ _ _ LUy H4). etrans; eauto.
+  Qed.
+  Global Instance obls_nd_antisymmetric : Antisymmetric _ obls_keep obls_nd.
+  Proof using.
+    repeat intro. destruct H, H0. assert (dom x = dom y) by set_solver. clear H H0.
+    destruct (x !! i) eqn:LUx, (y !! i) eqn:LUy.
+    - econstructor. eauto.
+    - apply elem_of_dom_2 in LUx. apply not_elem_of_dom in LUy. set_solver.
+    - apply elem_of_dom_2 in LUy. apply not_elem_of_dom in LUx. set_solver.
+    - econstructor.
+  Qed.
+
+  Lemma obl_progress_keep o1 o2 :
+    obl_progress o1 o2 → obl_keep o1 o2.
+  Proof using. intros. inv H. econstructor. Qed.
+
+  Lemma obls_nd_step_rc_obls_nd Ω1 Ω2 : Ω1 ↪ₙ∘ Ω2 → obls_nd Ω1 Ω2.
+  Proof using.
+    intros. destruct H.
+    { subst. done. }
+    inv H.
+    - pose proof (obls_one_progress_dom _ _ H0). split; first set_solver.
+      intros. destruct H0 as (k0&o3&o4&?&?&?). subst. destruct (decide (k0 = k)).
+      + subst. rewrite lookup_insert_eq in H2. inv H2. apply obl_progress_keep; auto.
+      + rewrite lookup_insert_ne in H2; auto. rewrite H1 in H2. inv H2. done.
+    - destruct H0 as (?&?&?&?). subst. split.
+      + rewrite dom_insert. set_solver.
+      + intros. destruct (decide (x = k)).
+        * subst. rewrite lookup_insert_eq in H1. inv H1.
+        * rewrite lookup_insert_ne in H1; auto. rewrite H0 in H1. inv H1. done.
+  Qed.
+
+  Lemma obls_nd_step_obls_step Ω1 Ω2 : Ω1 ↪ₙ Ω2 → Ω1 ↪ Ω2.
+  Proof using.
+    intros. inv H; [econstructor 1 | econstructor 2]; eauto. inv H0.
+    destruct H as (?&?&?&?&?); subst. do 3 eexists. split_and !; eauto. econstructor 1; eauto.
   Qed.
 
   (** Live obls *)
