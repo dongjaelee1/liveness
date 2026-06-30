@@ -3,6 +3,13 @@ From liris.program_logic Require Export lifting temporal_logic.
 
 Definition fuel_burning_triple `{SI : indexT} `{!lirisGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,
+    (∀ (Φ : val Λ → iPropI Σ),
+       (thP_carriers i G ∗ P) -∗
+       (∀ v, thP_carriers i G' ∗ Q v -∗ Φ v) -∗
+       lWP e @ s; i; E {{ v, Φ v }})%I.
+
+Definition fuel_burning_triple_persistent `{SI : indexT} `{!lirisGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+  λ s i E G G' P e Q,
     l{{{ thP_carriers i G ∗ P }}} e @ s; i; E l{{{v, RET v; thP_carriers i G' ∗ Q v }}}%I.
 
 Section proof.
@@ -10,6 +17,46 @@ Section proof.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
   Implicit Types e : expr Λ.
+
+  Local Lemma entails_persistent {A B : Type} (P : A → B → iProp Σ) :
+    (⊢ (∃ (a : A), ∀ (b : B), P a b)%I) →
+    Persistent (∃ (a : A), ∀ (b : B), P a b)%I.
+  Proof.
+    intros H. rewrite /Persistent. iIntros "_".
+    iModIntro. eauto.
+  Qed.
+
+  Lemma fuel_burning_triple_entails_to_persistent s i E G1 G2 P e Q :
+    (⊢ fuel_burning_triple s i E G1 G2 P e Q) →
+    (⊢ fuel_burning_triple_persistent s i E G1 G2 P e Q).
+  Proof.
+    intros H. iIntros "% !> PRE POST". iApply (H with "PRE POST").
+  Qed.
+
+  Lemma measured_fuel_burning_triple_entails_to_persistent {A B : Type} s i E G1 G2
+    (P : A → B → iProp Σ) e (Q : A → B → val Λ → iProp Σ) :
+    (⊢ ∃ (a : A), ∀ (b : B), fuel_burning_triple s i E G1 G2 (P a b) e (λ v, Q a b v)) →
+    (⊢ ∃ (a : A), ∀ (b : B), fuel_burning_triple_persistent s i E G1 G2 (P a b) e (Q a b)).
+  Proof.
+    intros H. iPoseProof H as (a) "#H".
+    iExists a. iIntros "% % !> PRE POST". iApply ("H" with "PRE POST").
+  Qed.
+
+  Lemma fuel_burning_triple_persistent_entails s i E G1 G2 P e Q :
+    fuel_burning_triple_persistent s i E G1 G2 P e Q
+    ⊢ fuel_burning_triple s i E G1 G2 P e Q.
+  Proof.
+    iIntros "H". iIntros "% PRE POST". iApply ("H" with "PRE POST").
+  Qed.
+
+  Lemma fuel_burning_triple_persistent_iff s i E G1 G2 P e Q :
+    fuel_burning_triple_persistent s i E G1 G2 P e Q
+    ⊣⊢ □ fuel_burning_triple s i E G1 G2 P e Q.
+  Proof.
+    iSplit; iIntros "#H".
+    - iIntros "!> % PRE POST". iApply ("H" with "PRE POST").
+    - iIntros "% !> PRE POST". iApply ("H" with "PRE POST").
+  Qed.
 
   Lemma fuel_burning_triple_carrier_alloc s i E G P e Q ℓ μ :
     (∀ g, fuel_burning_triple s i E ({[g]} ∪ G) G
@@ -21,7 +68,7 @@ Section proof.
         e
         Q.
   Proof.
-    iIntros "#H % !> (TG& HP) POST".
+    iIntros "H % (TG& HP) POST".
     iMod (carrier_alloc _ _ _ ℓ μ with "TG") as "(%& %& TG& Cg& Fg)".
     iPoseProof ("H" with "[$TG $HP $Cg $Fg]") as "WP". 1: auto.
     iApply ("WP" with "POST").
@@ -39,7 +86,7 @@ Section proof.
         e
         (λ v, Q v ∗ ⟦Ψ⟧ₗ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)%I.
   Proof.
-    iIntros (He Hmask) "#H % !> (TG& HP& HU& LC) POST".
+    iIntros (He Hmask) "H % (TG& HP& HU& LC) POST".
     iMod (tf_until_discharge with "HU") as "HUacc". 1: auto.
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -69,7 +116,7 @@ Section proof.
         e
         (λ v, ∃ g ℓ K, Q v ∗ ⟦Ψ⟧ₗ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)%I.
   Proof.
-    iIntros (He Hmask) "#H % !> (TG& HP& HU& LC) POST".
+    iIntros (He Hmask) "H % (TG& HP& HU& LC) POST".
     iMod (tf_until_discharge with "HU") as "HUacc". 1: auto.
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -99,12 +146,35 @@ Section proof.
         e
         Q.
   Proof.
-    iIntros "(#H& %LEl) % !> (TG& HP) POST".
+    iIntros "(H& %LEl) % (TG& HP) POST".
     iDestruct "HP" as "(HP& Cg& HΦ)".
     iMod (tf_until_alloc _ _ _ false _ ℓ2 μ with "Cg") as "(%& %& Cg& Of& #Wl& Acc)". 1: auto.
     iMod ("Acc" $! _ N Φ Ψ with "HΦ") as "HU".
     iPoseProof ("H" with "[$TG $HP $Cg $HU $Wl $Of]") as "WP". 1: auto.
     iApply ("WP" with "POST").
+  Qed.
+
+  Lemma fuel_burning_triple_wit_ind s i E G P e Q k ℓ1 ℓ2 μ :
+    (□ fuel_burning_triple s i E G G
+       (P ∗
+        (witP_cred k 1 ={E}=∗ ([∗ set] g ∈ G, crP_fuel g ℓ2 μ) ∗ fuel_burning_triple s i E G G P e Q))
+       e Q) ∧
+    witP_layer k ℓ1 ∗ ⌜(ℓ1 < ℓ2)%ordi⌝
+    ⊢ fuel_burning_triple s i E G G
+        (P ∗ ([∗ set] g ∈ G, crP_fuel g ℓ2 (μ × ▽)%M))
+        e Q.
+  Proof.
+    iIntros "(#H& #Wl& %LTl) % (TG& HP) POST".
+    iDestruct "HP" as "[HP FS]".
+    iRevert (Φ) "TG HP POST".
+    iAssert (|==> ∀ Φ, (thP_carriers i G -∗ P -∗ (∀ v : val Λ, thP_carriers i G ∗ Q v -∗ Φ v) -∗ lWP e @ s; i; E {{ v, Φ v }}))%I with "[-]" as "HA"; cycle 1.
+    { iMod "HA" as "HA". eauto. }
+    iApply (wit_layer_ind with "[$Wl $FS]"). 1: auto.
+    iIntros "!> IH !> % TG HP POST".
+    iApply ("H" with "[$TG $HP IH] POST").
+    iIntros "Wc". iMod ("IH" with "Wc") as "[Fs IH]".
+    iFrame. iModIntro.
+    iIntros "% (TG& HP) POST". iApply ("IH" with "TG HP POST").
   Qed.
 
 End proof.
