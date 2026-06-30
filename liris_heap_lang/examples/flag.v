@@ -118,7 +118,7 @@ Section proof.
       Flag.wait #l @ i
     l{{{ RET #1; £ lc ∗ thP_carriers i G ∗ oblP_discharged k }}}.
   Proof.
-    iExists ((1 × ▽) ⊕ 1)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
+    iExists ((4 × ▽) ⊕ 4)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& #is_flag)".
     iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.wait.
@@ -128,8 +128,6 @@ Section proof.
     iMod (wit_fuels_add_map with "Wf0 W_GF") as "Wf".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
     iClear "Wf0". iInduction α as [α IH] using WFOCM.ind.
-    iMod (crP_fuel_extend_set _ ℓ _ (10)%M with "GF") as "GF".
-    { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc 100.
     lwp_bind (Load _).
