@@ -124,10 +124,15 @@ Section proof.
     rewrite /Flag.wait.
     iPoseProof (crP_fuel_add_set with "GF") as "[W_GF GF]".
     (* Liveness induction *)
-    iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)".
-    iMod (wit_fuels_add_map with "Wf0 W_GF") as "Wf".
+    (* iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)". *)
+    (* iMod (wit_fuels_add_map with "Wf0 W_GF") as "Wf". *)
+    (* { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. } *)
+    (* iClear "Wf0". *)
+    (* iInduction α as [α IH] using WFOCM.ind. *)
+    iRevert "TG HΦ GF". iPoseProof (wit_layer_ind with "[$Wlk $W_GF]") as ">H".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
-    iClear "Wf0". iInduction α as [α IH] using WFOCM.ind.
+    2:{ iApply "H". }
+    iIntros "!> IH !> TG HΦ GF".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc 100.
     lwp_bind (Load _).
@@ -160,9 +165,10 @@ Section proof.
       iModIntro; lwp_pure_one.
       (* iModIntro; lwp_pure_one. *)
       iModIntro.
-      iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')".
-      iApply ("IH" $! α0 LTα with "TG HΦ [Fkl'] Wf'").
-      rewrite map_union_empty. iPoseProof (big_sepM_gset_to_gmap with "Fkl'") as "H". iFrame.
+      iMod ("IH" with "Wck") as "[GF' IH]". iApply ("IH" with "TG HΦ GF'").
+      (* iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')". *)
+      (* iApply ("IH" $! α0 LTα with "TG HΦ [Fkl'] Wf'"). *)
+      (* rewrite map_union_empty. iPoseProof (big_sepM_gset_to_gmap with "Fkl'") as "H". iFrame. *)
     - (* k is discharged. *)
       iDestruct "inv" as ">(#Odk& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
