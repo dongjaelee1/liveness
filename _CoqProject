@@ -139,6 +139,7 @@ liris_heap_lang/lib/array.v
 
 liris_heap_lang/examples/flag.v
 liris_heap_lang/examples/flag_client.v
+liris_heap_lang/examples/flag_fork.v
 liris_heap_lang/examples/nondet.v
 liris_heap_lang/examples/handoff.v
 liris_heap_lang/examples/handoff_client.v

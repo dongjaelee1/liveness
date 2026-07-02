@@ -78,6 +78,15 @@ Global Arguments label {Σ _}.
 Notation "i ⤉ t , v " := (label i t v)
                          (at level 20, t, v at level 1, format "i  ⤉  t , v") : bi_scope.
 
+Local Definition retP_def `{heap_stateGS Σ}
+  (i : thread_id) (v : val) : iProp Σ :=
+  (∃ (K : ctx heap_lang), ⌜ LanguageCtx K ⌝ ∧ thread_expr i (K (of_val v))).
+Local Definition retP_aux : seal (@retP_def). Proof. by eexists. Qed.
+Definition retP := retP_aux.(unseal).
+Local Definition retP_unseal :
+  @retP = @retP_def := retP_aux.(seal_eq).
+Global Arguments retP {Σ _}.
+
 Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
    thread_map_interp (dom Θ) Θ ∗
@@ -93,17 +102,23 @@ Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
       pointsto l dq v
   | pred_label i t v =>
       label i t v
+  | pred_ret i v =>
+      retP i v
   end.
 
 Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%F
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tf_scope.
-Notation "i ⤉ t , v " := (➢ (pred_label i t v))%F
+Notation "i ⤉ t , v" := (➢ (pred_label i t v))%F
                          (at level 20, t, v at level 1, format "i  ⤉  t , v") : tf_scope.
+Notation "'ret' v @ i" := (➢ (pred_ret i v))%F
+                         (at level 20, v, i at level 1, format "ret  v @ i") : tf_scope.
 
 Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%P
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tp_scope.
-Notation "i ⤉ t , v " := (➢ (pred_label i t v))%P
+Notation "i ⤉ t , v" := (➢ (pred_label i t v))%P
                          (at level 20, t, v at level 1, format "i  ⤉  t , v") : tp_scope.
+Notation "'ret' v @ i" := (➢ (pred_ret i v))%P
+                         (at level 20, v, i at level 1, format "ret  v @ i") : tp_scope.
 
 Lemma thread_expr_read `{!heap_stateGS Σ} :
   ∀ (Θ : thread_pool heap_lang) i e,
@@ -120,6 +135,8 @@ Proof.
   iIntros (????) "[(HI& TI& PI) SP]". destruct π; simpl.
   - rewrite pointsto_unseal /pointsto_def. iPoseProof (gen_heap_valid with "HI SP") as "%". eauto.
   - rewrite label_unseal /label_def. iDestruct "SP" as "(%&%& Ti)".
+    iPoseProof (thread_expr_read with "TI Ti") as "%". eauto.
+  - rewrite retP_unseal /retP_def. iDestruct "SP" as "(%&%& Ti)".
     iPoseProof (thread_expr_read with "TI Ti") as "%". eauto.
 Qed.
 
@@ -223,12 +240,14 @@ Implicit Types v : val.
 (** thread_expr *)
 Local Ltac unfold_defs :=
   (* try rewrite thread_term_unseal /thread_term_def; *)
-  try rewrite label_unseal /label_def.
+  try rewrite label_unseal /label_def retP_unseal /retP_def.
 
 Global Instance thread_expr_timeless i e : Timeless (thread_expr i e).
 Proof. apply _. Qed.
 Global Instance label_timeless i t v : Timeless (label i t v).
 Proof. rewrite label_unseal /label_def. apply _. Qed.
+Global Instance retP_timeless i v : Timeless (retP i v).
+Proof. rewrite retP_unseal /retP_def. apply _. Qed.
 
 Lemma thread_exprs_update_one Θ i e :
   is_Some (Θ !! i) →
@@ -242,6 +261,7 @@ Proof.
   iApply (big_sepM_insert_delete). iFrame.
 Qed.
 
+(** Pure steps *)
 Definition trivial_cond : thread_id → iProp Σ := λ _, True%I.
 
 Global Instance trivial_pure_exec_si i : PureExecSI (trivial_cond) i.
@@ -327,7 +347,7 @@ Qed.
 
 (** Label *)
 (** We don't need to take an actual step.
-    "label i t v" only means that thread i executes "Label t v" in some context,
+    "label i t v" means that thread i executes "Label t v" in some context,
     and "Label t v" is a pure step.
  *)
 Lemma lwpupd_label i E t e v (P : iProp Σ) :
@@ -419,6 +439,30 @@ Qed.
 (*   { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. } *)
 (*   by iFrame. *)
 (* Qed. *)
+
+(** RetP *)
+(** We don't need to take an actual step.
+    "ret i v" means that thread i is crrently a value "v" in some context.
+ *)
+Lemma lwpupd_retP i E e v (P : iProp Σ) :
+  TCEq (to_val e) (Some v) →
+  (retP i v -∗ |={E}=>m (retP i v ∗ lwpupd i E (e) P)) -∗
+  lwpupd i E (e) P.
+Proof.
+  unfold_lwpupd. iIntros (He) "H %%%%%% %HK %HT I".
+  iDestruct "I" as "[HI Ia]".
+  iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
+  inv He. apply of_to_val in H0. subst e.
+  iEval (unfold_sfmupd) in "H". iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& H)".
+  { rewrite retP_unseal /retP_def. iFrame. eauto. }
+  rewrite retP_unseal /retP_def. iDestruct "Ti" as "(%&%& Ti)".
+  clear dependent K.
+  iDestruct "HI" as "(%HI& Ha& (Ih& It& Ip))".
+  iPoseProof (thread_expr_read with "It Ti") as "%HT".
+  iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H".
+  { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. }
+  by iFrame.
+Qed.
 
 (** ChooseNat *)
 Lemma lwp_choosenat_step o s i E E' Φ :

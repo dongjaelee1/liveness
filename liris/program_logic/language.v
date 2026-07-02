@@ -154,8 +154,6 @@ Section language.
     (* atomic execution *)
     prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs →
     ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
-    (* ((is_Some (to_val e1) ∧ e1 = e2 ∧ σ1 = σ2 ∧ efs = ∅) *)
-    (*  ∨ prim_step e1 σ1 (dom ths) κ e2 σ2 efs) → *)
     thread_step i ρ1 κ ρ2.
   Local Hint Constructors thread_step : core.
 

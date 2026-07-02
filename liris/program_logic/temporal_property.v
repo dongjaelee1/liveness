@@ -155,8 +155,6 @@ Definition tr_eventually {Λ : language} : trProp Λ → trProp Λ :=
 
 (** ** Define fair scheduling as a property of a trace. *)
 
-(* These might be expressible using tr_atomic, with some appropriate state_sat.
-   But this definition is only used in the adequacy, so we leave it specific for now. *)
 Definition thread_active {Λ : language} (i : thread_id) : tsProp Λ :=
   λ ξ, let '((Θ, σ), _, _) := ξ in ∃ e, Θ !! i = Some e ∧ to_val e = None.
 

@@ -217,6 +217,7 @@ Record state : Type := {
 Variant state_pred : Type :=
   | pred_pointsto (l : loc) (dq : dfrac) (v : val)
   | pred_label (i : thread_id) (x : string) (v : val)
+  | pred_ret (i : thread_id) (v : val)
 .
 
 Definition state_sat : state → gmap thread_id expr → state_pred → Prop :=
@@ -225,7 +226,8 @@ Definition state_sat : state → gmap thread_id expr → state_pred → Prop :=
                (heap σ) !! l = Some (Some v)
            | pred_label i t v =>
                ∃ (K : expr → expr), Θ !! i = Some (K (Label t (of_val v)))
-               (* (labels σ) !! n = Some (i, l, v) *)
+           | pred_ret i v =>
+               ∃ (K : expr → expr), Θ !! i = Some (K (of_val v))
            end.
 
 (** Equality and other typeclass stuff *)
