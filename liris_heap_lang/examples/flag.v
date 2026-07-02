@@ -8,6 +8,9 @@ From iris.prelude Require Import options.
 
 Module Flag.
 
+  Definition init : val :=
+    λ: <>, ref #0.
+
   Definition set : val :=
     λ: "x", "x" <- #1.
 
@@ -60,6 +63,50 @@ Section proof.
 
   Lemma is_flag_tf_red l k ℓ : ⟦is_flag_tf l k ℓ⟧ₗ = is_flag l k ℓ.
   Proof. rewrite /is_flag /is_flag_tf. tf_red. auto. Qed.
+
+  Lemma is_flag_init E l g K ℓ ℓg μ :
+    (ℓg <= ℓ)%ordi →
+    l ↦ #0 -∗
+    crP_obls g ℓg K -∗
+    |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ crP_obls g ℓg ({[k]} ∪ K) ∗ oblP_fuel k ℓ μ ∗
+                 flag_tk l k ∗ is_flag l k ℓ.
+  Proof.
+    iIntros (Hle) "Ptr Gg". rewrite /is_flag.
+    iMod (tf_until_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
+    iMod ("H" $! _ Np (l ↦ #0)%F (l ↦ #1)%F with "[Ptr]") as "H".
+    { iNext. iFrame. }
+    iDestruct "H" as "[H1 H2]".
+    do 2 tf_red.
+    iMod (inv_alloc with "[H1]") as "$". 2: by iFrame.
+    iNext. by iLeft.
+  Qed.
+
+  Lemma Flag_init_spec :
+    ⊢ ∃ μ, ∀ lc i G ℓ m,
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) }}}
+      Flag.init #() @ i
+      l{{{ x g k, RET #x; £ lc ∗ (⌜g ∉ G⌝) ∗ thP_carriers i ({[g]} ∪ G) ∗
+                         crP_obls g ℓ {[k]} ∗
+                         crP_fuel g ℓ m ∗
+                         oblP_fuel k ℓ m ∗
+                         flag_tk x k ∗ is_flag x k ℓ }}}.
+  Proof.
+    iExists 10. iIntros (lc i G ℓ m Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TG& GF)".
+    rewrite /Flag.init.
+    iPoseProof (crP_fuels_init with "GF") as "GF".
+    lwp_pure_lc (lc)%ord.
+    iApply lwpupd_lwp_sfmupd.
+    lwp_bind (AllocN _ _).
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
+    iModIntro. iIntros (ptrx) "((_& TG& _)& Ptrx& _)".
+    iMod (carrier_alloc _ _ _ (ℓ) (m)%M with "TG") as "(%& %Ing& TG& Cg& Gf)".
+    iMod (is_flag_init _ ptrx _ _ (ℓ) _ m with "Ptrx Cg") as "(%k& _& Cg& Of& Ftk& #is_flag)". 1: done.
+    rewrite union_empty_r_L.
+    iApply ("HΦ" with "[$LC $TG $Cg $Gf $Of $Ftk $is_flag]").
+    iPureIntro. auto.
+  Qed.
 
   Lemma Flag_set_spec :
     ⊢ ∃ μ, ∀ lc i l G g K k ℓ ℓg,
@@ -181,23 +228,6 @@ Section proof.
       lwp_pures.
       iModIntro. lwp_finish.
       iModIntro. iApply ("HΦ" with "[$]").
-  Qed.
-
-  Lemma is_flag_init E l g K ℓ ℓg μ :
-    (ℓg <= ℓ)%ordi →
-    l ↦ #0 -∗
-    crP_obls g ℓg K -∗
-    |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ crP_obls g ℓg ({[k]} ∪ K) ∗ oblP_fuel k ℓ μ ∗
-                 flag_tk l k ∗ is_flag l k ℓ.
-  Proof.
-    iIntros (Hle) "Ptr Gg". rewrite /is_flag.
-    iMod (tf_until_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
-    iMod ("H" $! _ Np (l ↦ #0)%F (l ↦ #1)%F with "[Ptr]") as "H".
-    { iNext. iFrame. }
-    iDestruct "H" as "[H1 H2]".
-    do 2 tf_red.
-    iMod (inv_alloc with "[H1]") as "$". 2: by iFrame.
-    iNext. by iLeft.
   Qed.
 
 End proof.

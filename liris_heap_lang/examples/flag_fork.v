@@ -13,7 +13,7 @@ Module FlagFork.
   Definition main : val :=
     λ: <>,
       (* alloc a flag x and forks a set-thread and wait *)
-      let: "x" := ref #0 in
+      let: "x" := Flag.init #() in
       Fork (Flag.set "x");;
       Flag.wait "x";;
       #42.
@@ -45,27 +45,42 @@ Section proof.
       FlagFork.main #() @ i
     l{{{ v, RET v; ⌜v = #42⌝ ∗ lift_term i fork_post v }}}.
   Proof.
+    iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
-    iExists (10 ⊕ μ_fs ⊕ μ_fw)%M. iIntros (i g kr Φ) "!> HP HΦ".
+    iExists (10 ⊕ μ_fi ⊕ μ_fw)%M. iIntros (i g kr Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& Cg& HF)".
     iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
-    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fs GF_fw]".
+    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fi GF_fw]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     rewrite /FlagFork.main /=.
     lwp_pure_lc 100.
-    lwp_bind (AllocN _ _).
-    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
-    iModIntro. iIntros (ptrx) "((_& TG& _)& Ptrx& _)".
+    lwp_bind (Flag.init _).
+    iMod (crP_fuel_layer_mon_set _ (0)%ordi with "GF_fi") as "GF_fi".
+    { apply ordArith.le_from_nat. lia. }
+    iModIntro.
+    iApply ("Flag_init_spec" $! 0 _ _ 0 9 with "[$TG $GF_fi]").
+    iIntros "% % % (_& %Ning& TG& Cg0& Cf0& Of0& Ftk& #is_flag)".
+    iPoseProof (crP_fuels_add_carrier with "Cf0 GF") as "GF".
     lwp_pures.
     lwp_bind (Fork _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro. iApply lwp_fork. iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
     iIntros (j) "TG _ TGj !> !>".
     iMod (carrier_alloc _ _ _ (0) (μ_fs)%M with "TGj") as "(%& _& TGj& Cgj& GFj)".
-    iMod (is_flag_init _ ptrx _ _ (0) _ 0 with "Ptrx Cgj") as "(%k& _& Cgj& _& Ftk& #is_flag)". 1: done.
     rewrite !union_empty_r_L.
+    iMod (obl_offload_set with "Cg0 Cgj [Of0]") as "(Cg0& Cgj& _)".
+    3:{ rewrite (oblP_fuel_eq _ _ _ (1 ⊕ 8)%M).
+        - iPoseProof (oblP_fuel_add _ _ 1 8 with "Of0") as "[Of0 _]".
+          iApply big_sepS_singleton. iFrame.
+        - rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. simpl. done. }
+    1: set_solver. 1: done.
+    replace ({[k]} ∖ {[k]}) with (∅ : oids) by set_solver.
+    rewrite union_empty_l_L.
+    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
+    iPoseProof (crP_fuels_remove_carrier g0 with "GF") as "GF".
+    replace ({[g0; g]} ∖ {[g0]}) with ({[g]} : oids) by set_solver.
+    clear dependent g0. rename g1 into g0.
     iModIntro. iSplitR "TGj GFj Cgj Ftk".
     - iModIntro. lwp_pures.
       lwp_bind (Flag.wait _).
