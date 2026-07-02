@@ -67,7 +67,7 @@ Section proof.
     lwp_pures.
     lwp_bind (Fork _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iModIntro. iApply lwp_fork. iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
+    iModIntro. iApply lwp_fork_step. iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
     iIntros (j) "TG _ TGj !> !>".
     iMod (carrier_alloc _ _ _ 1 μ_hr with "TGj") as "(%& _& TGj& Cgj& GFj)".
     rewrite union_empty_r_L.

@@ -16,7 +16,7 @@ Module FlagFork.
       let: "x" := Flag.init #() in
       Fork (Flag.set "x");;
       Flag.wait "x";;
-      #42.
+      Ret #42.
 
 End FlagFork.
 
@@ -65,63 +65,46 @@ Section proof.
     lwp_pures.
     lwp_bind (Fork _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iModIntro. iApply lwp_fork. iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
-    iIntros (j) "TG _ TGj !> !>".
-    iMod (carrier_alloc _ _ _ (0) (μ_fs)%M with "TGj") as "(%& _& TGj& Cgj& GFj)".
-    rewrite !union_empty_r_L.
-    iMod (obl_offload_set with "Cg0 Cgj [Of0]") as "(Cg0& Cgj& _)".
-    3:{ rewrite (oblP_fuel_eq _ _ _ (1 ⊕ 8)%M).
-        - iPoseProof (oblP_fuel_add _ _ 1 8 with "Of0") as "[Of0 _]".
-          iApply big_sepS_singleton. iFrame.
-        - rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. simpl. done. }
-    1: set_solver. 1: done.
-    replace ({[k]} ∖ {[k]}) with (∅ : oids) by set_solver.
-    rewrite union_empty_l_L.
-    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g0 with "GF") as "GF".
-    replace ({[g0; g]} ∖ {[g0]}) with ({[g]} : oids) by set_solver.
-    clear dependent g0. rename g1 into g0.
-    iModIntro. iSplitR "TGj GFj Cgj Ftk".
-    - iModIntro. lwp_pures.
-      lwp_bind (Flag.wait _).
-      iModIntro.
-      iMod (crP_fuel_layer_mon_set _ ((0) ⊕ 1)%ordi with "GF_fw") as "GF_fw".
-      { rewrite -hessenberg.add_from_nat. done. }
-      iApply ("Flag_wait_spec" $! 0 with "[$TG $GF_fw $is_flag]").
-      iIntros "(_& TG& #Od0)".
-      lwp_pures.
-      iApply lwpupd_retP. iIntros "PL".
-      iMod (tf_until_discharge with "HF") as "HF". 1: set_solver.
-      iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-      iApply (lc_sfmupd_add_later with "LC1"). iNext.
-      iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
-      iMod ("HF" with "[PL]") as "HF".
-      { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
-      iPoseProof ("HF" with "[] Cg") as "HF".
-      { iPureIntro. set_solver. }
-      iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-      iApply (lc_sfmupd_add_later with "LC1"). iNext.
-      iMod ("HF" $! _) as "HF". iMod "HF" as "(PL& Gg& #Odkl)".
-      iModIntro. iFrame "PL".
-      replace ({[kr]} ∖ {[kr]} : gset _) with (∅ : oids) by set_solver.
-      iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
-      iPoseProof (crP_fuels_remove_carrier g with "GF") as "GF".
-      replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
-      iModIntro. lwp_finish.
-      iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$".
-      iModIntro. eauto.
-    - iModIntro.
-      iApply lwp_sfmupd.
+    iModIntro.
+    iApply (lwp_fork 0 μ_fs {[k]} (flag_tk x k)%I _ ∅ 0 with
+             "[] [$TG $GF1 $Cg0 Of0 $Ftk]").
+    1: set_solver.
+    { iIntros (j g2 Φ') "!> (TGj& GFj& Cgj& Ftk) HΦ'".
+      iApply lwp_sfgupd.
       iApply ("Flag_set_spec" $! 0 with "[$TGj GFj $Cgj $Ftk $is_flag]").
-      {iSplit.
-        - iApply big_sepS_singleton. iFrame.
-        - iPureIntro. set_solver. }
+      { iFrame. iPureIntro. set_solver. }
       iIntros "(_& TG& Cg& #Od)".
       replace ({[k]} ∖ {[k]}) with (∅ : gset oid) by set_solver.
       iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
-      replace ({[g0]} ∖ {[g0]}) with (∅ : gset ocid) by set_solver.
+      replace ({[g2]} ∖ {[g2]}) with (∅ : gset ocid) by set_solver.
       iMod (thread_terminate with "TG") as "#Td".
-      iModIntro. rewrite /lift_term. by iFrame "Td".
+      iModIntro. rewrite /lift_term. iApply "HΦ'". eauto. }
+    { iSplitR; first done.
+      rewrite (oblP_fuel_eq _ _ _ (1 ⊕ 8)%M).
+      - iPoseProof (oblP_fuel_add _ _ 1 8 with "Of0") as "[Of0 _]".
+        iApply big_sepS_singleton. iFrame.
+      - rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. simpl. done. }
+    iIntros "((_& TG& _)& Cg0)".
+    replace ({[k]} ∖ {[k]}) with (∅ : oids) by set_solver.
+    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
+    iPoseProof (crP_fuels_remove_carrier g0 with "GF") as "GF".
+    replace ({[g0; g]} ∖ {[g0]}) with ({[g]} : oids) by set_solver.
+    clear dependent g0.
+    lwp_pures.
+    lwp_bind (Flag.wait _).
+    iModIntro.
+    iMod (crP_fuel_layer_mon_set _ ((0) ⊕ 1)%ordi with "GF_fw") as "GF_fw".
+    { rewrite -hessenberg.add_from_nat. done. }
+    iApply ("Flag_wait_spec" $! 0 with "[$TG $GF_fw $is_flag]").
+    iIntros "(_& TG& #Od0)".
+    lwp_pures.
+    (** FIXME: Ret not working well *)
+    rewrite unfold_Ret. simpl. rewrite -unfold_Ret.
+    lwp_bind (Ret _).
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iModIntro.
+    iApply (lwp_ret with "[$TG $GF1 $Cg $HF]"). 1,2: done. 1: set_solver.
+    iApply "HΦ".
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :
@@ -208,7 +191,7 @@ Section adequacy.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := (λ _ v, ⌜v = #42⌝)%I]}.
 
-  Theorem handoff_client_adequacy :
+  Theorem main_adequacy :
     ∀ (τ : trace heap_lang),
     behavior τ →
     fair_scheduling τ →
@@ -247,4 +230,4 @@ Section adequacy.
 
 End adequacy.
 
-(* Print Assumptions handoff_client_adequacy. *)
+(* Print Assumptions main_adequacy. *)

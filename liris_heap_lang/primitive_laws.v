@@ -61,6 +61,10 @@ Global Arguments pointsto {Σ _}.
 
 Notation "l ↦ dq v" := (pointsto l dq v)
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
+Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%F
+                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tf_scope.
+Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%P
+                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tp_scope.
 
 (** Predicates for label invocations. *)
 Definition thread_expr `{heap_stateGS Σ} (i : thread_id) (e : expr) : iProp Σ :=
@@ -77,6 +81,10 @@ Global Arguments label {Σ _}.
 
 Notation "i ⤉ t , v " := (label i t v)
                          (at level 20, t, v at level 1, format "i  ⤉  t , v") : bi_scope.
+Notation "i ⤉ t , v" := (➢ (pred_label i t v))%F
+                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : tf_scope.
+Notation "i ⤉ t , v" := (➢ (pred_label i t v))%P
+                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : tp_scope.
 
 Local Definition retP_def `{heap_stateGS Σ}
   (i : thread_id) (v : val) : iProp Σ :=
@@ -86,6 +94,13 @@ Definition retP := retP_aux.(unseal).
 Local Definition retP_unseal :
   @retP = @retP_def := retP_aux.(seal_eq).
 Global Arguments retP {Σ _}.
+
+Notation "'ret' v @ i" := (retP i v)%I
+                         (at level 20, v, i at level 1, format "ret  v @ i") : bi_scope.
+Notation "'ret' v @ i" := (➢ (pred_ret i v))%F
+                         (at level 20, v, i at level 1, format "ret  v @ i") : tf_scope.
+Notation "'ret' v @ i" := (➢ (pred_ret i v))%P
+                         (at level 20, v, i at level 1, format "ret  v @ i") : tp_scope.
 
 Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
@@ -105,20 +120,6 @@ Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
   | pred_ret i v =>
       retP i v
   end.
-
-Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%F
-                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tf_scope.
-Notation "i ⤉ t , v" := (➢ (pred_label i t v))%F
-                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : tf_scope.
-Notation "'ret' v @ i" := (➢ (pred_ret i v))%F
-                         (at level 20, v, i at level 1, format "ret  v @ i") : tf_scope.
-
-Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%P
-                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tp_scope.
-Notation "i ⤉ t , v" := (➢ (pred_label i t v))%P
-                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : tp_scope.
-Notation "'ret' v @ i" := (➢ (pred_ret i v))%P
-                         (at level 20, v, i at level 1, format "ret  v @ i") : tp_scope.
 
 Lemma thread_expr_read `{!heap_stateGS Σ} :
   ∀ (Θ : thread_pool heap_lang) i e,
@@ -305,7 +306,7 @@ Proof.
     iMod ("H" with "TG Crs") as "H". iIntros "LC". iMod ("H" with "LC") as "$". done.
 Qed.
 
-Lemma lwp_fork s i E E' e Φ :
+Lemma lwp_fork_step s i E E' e Φ :
   (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
              ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
              (∀ j, thP_carriers i G -∗
@@ -343,6 +344,27 @@ Proof.
   { apply map_disjoint_singleton_r_2, not_elem_of_dom. rewrite dom_insert_lookup; eauto. }
   rewrite big_sepM_singleton. iFrame "Tj".
   iApply (big_sepM_insert_delete). iFrame.
+Qed.
+
+Lemma lwp_fork ℓ μ K P G R o s i E e g1 K1 :
+  K ⊆ K1 →
+  (∀ j g2, l{{{ thP_carriers j {[g2]} ∗ ([∗ set] g ∈ {[g2]}, crP_fuel g ℓ μ) ∗ crP_obls g2 ℓ K ∗ P }}}
+             e @ s; j; ⊤ l{{{ v, RET v; lift_term j (λ _ _, True) v }}})%I
+  ⊢
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ crP_obls g1 ℓ K1 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) ∗ P }}}
+    Fork e @ s; i; E
+                     l{{{ RET #(); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ crP_obls g1 ℓ (K1 ∖ K)}}}.
+Proof.
+  iIntros (HK) "#Hfork !> %Φ ((TG& GF& Rs)& Cg& OF& HP) HΦ".
+  iApply lwp_fork_step. iModIntro. iFrame "TG GF Rs".
+  iIntros (j) "TG Ws TGj". iApply (ALC_credits _ _ o). iIntros "!> LC !>".
+  iMod (carrier_alloc _ _ _ ℓ μ with "TGj") as "(%g2& _& TGj& Cg2& GF2)".
+  iMod (obl_offload_set with "Cg Cg2 OF") as "(Cg& Cg2& _)". 1: set_solver. 1: done.
+  rewrite union_empty_l_L union_empty_r_L. iModIntro. iSplitR "HP TGj GF2 Cg2".
+  - iApply ("HΦ" with "[$LC $TG $Ws $Cg]").
+  - iModIntro. iApply ("Hfork" with "[$TGj GF2 $Cg2 $HP]").
+    { iApply big_sepS_singleton. iFrame. }
+    auto.
 Qed.
 
 (** Label *)
@@ -440,7 +462,7 @@ Qed.
 (*   by iFrame. *)
 (* Qed. *)
 
-(** RetP *)
+(** retP *)
 (** We don't need to take an actual step.
     "ret i v" means that thread i is crrently a value "v" in some context.
  *)
@@ -462,6 +484,41 @@ Proof.
   iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H".
   { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. }
   by iFrame.
+Qed.
+
+(** ret_done *)
+Lemma lwp_ret G s i E e v g ℓ K k N :
+  TCEq (to_val e) (Some v) →
+  G = {[g]} → K = {[k]} → ↑N ⊆ E →
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1)) ∗ crP_obls g ℓ K ∗ ⟦finallyP N k 1 (ret v@i)⟧ₗ }}}
+    Ret e @ s; i; E
+  l{{{ v', RET v'; ⌜v' = v⌝ ∗ lift_term i fork_post v}}}.
+Proof.
+  intros H -> -> Hmask. inv H. apply of_to_val in H1. subst.
+  rewrite unfold_Ret.
+  iIntros (Φ) "[(TG& GF) (Cg& HF)] HΦ".
+  iApply (lwp_pure_step _ (10)%ord). 1: done. simpl. iModIntro.
+  iFrame "TG GF". iExists ∅. iSplitR; first done. iIntros "TG Ws !> LC".
+  do 2 iModIntro.
+  iApply lwpupd_retP. iIntros "PL".
+  iMod (tf_until_discharge with "HF") as "HF". 1: set_solver.
+  iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+  iApply (lc_sfmupd_add_later with "LC1"). iNext.
+  iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
+  iMod ("HF" with "[PL]") as "HF".
+  { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
+  iPoseProof ("HF" with "[] Cg") as "HF".
+  { iPureIntro. set_solver. }
+  iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+  iApply (lc_sfmupd_add_later with "LC1"). iNext.
+  iMod ("HF" $! _) as "HF". iMod "HF" as "(PL& Gg& #Odkl)".
+  iModIntro. iFrame "PL".
+  replace ({[k]} ∖ {[k]} : gset _) with (∅ : oids) by set_solver.
+  iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
+  replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
+  iModIntro. iApply lwp_value_sfgupd.
+  iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$".
+  by iModIntro.
 Qed.
 
 (** ChooseNat *)

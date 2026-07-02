@@ -93,7 +93,7 @@ Section proof.
       lwp_pures.
       lwp_bind (Fork _).
       iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-      iModIntro. iApply lwp_fork. iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
+      iModIntro. iApply lwp_fork_step. iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
       iIntros (j) "TG _ TGj !> !>".
       iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
       iApply (lc_sfmupd_add_later with "LC1"). iNext.
@@ -164,7 +164,7 @@ Section proof.
     lwp_pures.
     lwp_bind (Fork _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iModIntro. iApply lwp_fork. iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
+    iModIntro. iApply lwp_fork_step. iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
     iIntros (j) "TG _ TGj !> !>".
     iMod (carrier_alloc _ _ _ (Z.to_nat (n)%Z) (μ_nn)%M with "TGj") as "(%& _& TGj& Cgj& GFj)".
     iMod (is_flag_init _ ptrx _ _ (Z.to_nat (n)%Z) _ 0 with "Ptrx Cgj") as "(%k& _& Cgj& _& Ftk& #is_flag)". 1: done.

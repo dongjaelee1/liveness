@@ -157,3 +157,12 @@ Notation "'match:' e0 'with' 'SOME' x => e2 | 'NONE' => e1 'end'" :=
 
 Notation ResolveProph e1 e2 := (Resolve Skip e1 e2) (only parsing).
 Notation "'resolve_proph:' p 'to:' v" := (ResolveProph p v) (at level 100) : expr_scope.
+
+(** One-step pure reduction. Prevents step-tactics from evaluating Ret v. *)
+Local Definition Ret_def e : expr := ((λ: "x", "x")%V e).
+Local Definition Ret_aux : seal (@Ret_def). Proof. by eexists. Qed.
+Definition Ret := Ret_aux.(unseal).
+Local Definition Ret_unseal :
+  @Ret = @Ret_def := Ret_aux.(seal_eq).
+Lemma unfold_Ret e : Ret e = ((λ: "x", "x")%V e).
+Proof. rewrite Ret_unseal /Ret_def. done. Qed.

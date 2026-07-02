@@ -281,7 +281,7 @@ Section proof.
     lwp_bind (Fork _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    iApply (lwp_fork). iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
+    iApply (lwp_fork_step). iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
     iIntros (?) "TG _ TGj !>". iModIntro.
     iMod (carrier_alloc _ _ _ ℓ mtw with "TGj") as "(%& %Ning& TGj& Gg& Fg)".
     iMod (is_queue_initialize with "IQI Gg") as "[#IQ Qw]".
