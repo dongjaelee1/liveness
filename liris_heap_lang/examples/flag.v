@@ -16,7 +16,7 @@ Module Flag.
 
   Definition wait : val := 
     rec: "wait" "x" :=
-      if: !"x" = #0
+      if: !"x" ≠ #1
       then "wait" "x"
       else #1.
 
@@ -165,7 +165,7 @@ Section proof.
       Flag.wait #l @ i
     l{{{ RET #1; £ lc ∗ thP_carriers i G ∗ oblP_discharged k }}}.
   Proof.
-    iExists ((4 × ▽) ⊕ 4)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
+    iExists ((5 × ▽) ⊕ 5)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
     iDestruct "HP" as "(TG& GF& #is_flag)".
     iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.wait.
@@ -210,6 +210,8 @@ Section proof.
       (* rewrite bool_decide_false; cycle 1. *)
       (* { intro F. simplify_eq /=. } *)
       iModIntro; lwp_pure_one.
+      iModIntro; lwp_pure_one.
+      (* rewrite bool_decide_true; cycle 1. *)
       (* iModIntro; lwp_pure_one. *)
       iModIntro.
       iMod ("IH" with "Wck") as "[GF' IH]". iApply ("IH" with "TG HΦ GF'").
