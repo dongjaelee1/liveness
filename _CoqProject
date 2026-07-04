@@ -149,6 +149,5 @@ liris_heap_lang/examples/ticket_lock2.v
 liris_heap_lang/examples/queue.v
 liris_heap_lang/examples/task_queue.v
 liris_heap_lang/examples/task_queue_client.v
-liris_heap_lang/examples/task_queue_client2.v
 liris_heap_lang/examples/extended_int.v
 liris_heap_lang/examples/lcset.v
