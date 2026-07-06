@@ -16,7 +16,7 @@ Section code.
       let: "x" := ref #0 in
       Handoff.send "b" Flag.set "x";;
       let: "v" := Flag.wait "x" in
-      Label "exit" "v".
+      Ret "v".
 
 End code.
 
@@ -43,7 +43,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i g kl,
     l{{{ thP_carriers i {[g]} ∗ crP_fuel g 2 μ ∗
          crP_obls g 2 {[kl]} ∗
-         ⟦finallyP Nl kl 1 (i ⤉ "exit", #1)⟧ₗ }}}
+         ⟦finallyP Nl kl 1 (ret #1 @ i)⟧ₗ }}}
       main #() @ i
     l{{{ v, RET v; lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
   Proof using handoffG0.
@@ -127,31 +127,18 @@ Section proof.
       rewrite -hessenberg.add_from_nat. done. }
     iIntros "(_& TG& #Odk)".
     do 2 (iModIntro; lwp_pure_one).
-    iApply lwpupd_label. iIntros "PL".
-    iMod (tf_until_discharge with "HF") as "HF". 1: set_solver.
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
-    iMod ("HF" with "[PL]") as "HF".
-    { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
-    iPoseProof ("HF" with "[] Cg") as "HF".
-    { iPureIntro. set_solver. }
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iMod ("HF" $! _) as "HF". iMod "HF" as "(PL& Cg& #Odkl)".
-    iModIntro. iFrame "PL".
-    replace ({[kl]} ∖ {[kl]}) with (∅ : oids) by set_solver.
-    iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g with "GF") as "GF".
-    replace ({[g]} ∖ {[g]}) with (∅ : gset ocid) by set_solver.
-    lwp_pures.
-    iModIntro. lwp_finish.
-    iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$". by iModIntro.
+    rewrite unfold_Ret. simpl. rewrite -unfold_Ret.
+    lwp_bind (Ret _).
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iModIntro.
+    iApply (lwp_ret with "[$TG $GF1 $Cg $HF]"). 1,2: done. 1: set_solver.
+    iIntros (?) "(%& H)". iApply "HΦ".
+    rewrite /lift_term. simpl. subst. iDestruct "H" as "(H& _)". iSplitL; eauto.
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := main #() ]} →
-    Φ = (λ μ, (∃ g kl, finallyP Nl kl 1 (i ⤉ "exit", #1) ∗
+    Φ = (λ μ, (∃ g kl, finallyP Nl kl 1 (ret #1 @ i) ∗
                        ⟨thP_carriers i {[g]} ∗ crP_obls g 2 {[kl]} ∗
                         crP_fuel g 2 μ⟩)%F) →
     Ψs = ({[i := (λ _ v, ⌜v = #1⌝)%I]}) →
@@ -165,7 +152,7 @@ Section proof.
     iPoseProof (main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ 2 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (tf_until_alloc _ _ _ false 2 2 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (i ⤉ "exit",#1)%F with "[]") as "Ukl1".
+    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (ret #1 @ i)%F with "[]") as "Ukl1".
     { tf_red. done. }
     iModIntro. iExists μ. iSplitL "Ukl1 TG1 Gg1 Gf1 Ofkl1".
     { subst Φ.
@@ -195,11 +182,11 @@ Section adequacy.
   Let σ0 : gmap loc (option val) := ∅.
 
   Let Φ : tp :=
-        (tp_finally (i ⤉ "exit", #1))%P.
+        (tp_finally (ret #1 @ i))%P.
 
   Let Φ' : tp :=
         (∃ (g : ocid) (kl : oid),
-            tp_finally (i ⤉ "exit", #1) ∧
+            tp_finally (ret #1 @ i) ∧
             tp_true)%P.
 
   Remark Φ_impl :
@@ -214,7 +201,7 @@ Section adequacy.
   Let Φ_tf `{!heapGS Σ} : _ → tf Σ :=
         λ μ,
           (∃ g kl,
-              finallyP Nl kl 1 (i ⤉ "exit", #1) ∗
+              finallyP Nl kl 1 (ret #1 @ i) ∗
               ⟨thP_carriers i {[g]} ∗ crP_obls g 2 {[kl]} ∗
                crP_fuel g 2 μ⟩)%F.
 
