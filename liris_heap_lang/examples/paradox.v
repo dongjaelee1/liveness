@@ -13,7 +13,6 @@ From transfinite.base_logic.lib Require Import ghost_map.
 From iris.proofmode Require Import coq_tactics reduction spec_patterns.
 
 (** "pure" steps that are reducible with the thread_exec predicate, without submitting fuels. *)
-(* Class lirisGS_no_lc `(HGS : heapGS Σ) := { *)
 Class lirisGS_no_lc `(HGS : lirisGS Λ Σ) := {
     lwp_pure_step_no_lc :
     ∀ n s i E E' e1 e2 φ Φ,
@@ -504,69 +503,60 @@ End proof.
 
 Section adequacy.
 
-  TODO
-
   Let i : thread_id := 1%positive.
   Let j : thread_id := 2%positive.
-  Let l : loc := X_loc.
-  Let Θ0 : thread_pool heap_lang := {[i := writer #(); j := reader #()]}.
-  Let σ0 : gmap loc (option val) := {[l := Some #0]}.
+  Let Θ0 : thread_pool heap_lang := {[i := loop #(); j := loop #()]}.
+  Let σ0 : gmap loc (option val) := ∅.
 
-  Let Φ : tp :=
-        (is_flag_tp l ∧
-         tp_until (l ↦ #0) (l ↦ #1) ∧
-         tp_finally (i ⤉ "exit", #()) ∧
-         tp_finally (j ⤉ "exit", #1))%P.
+  Let Φ : tp (Π:=state_pred) :=
+        (tp_finally (⌜ False ⌝) ∧
+         tp_finally (⌜ True ⌝))%P.
 
-  Let Φ' : tp :=
-        (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
-            ⌜ k ≠ kl1 ⌝ ∧ is_flag_tp' l ∧
-            tp_until (l ↦ #0) (l ↦ #1) ∧
-            tp_finally (i ⤉ "exit", #()) ∧
-            tp_finally (j ⤉ "exit", #1) ∧
+  Let Φ' : tp (Π:=state_pred) :=
+        (∃ (g1 g2 : ocid) (z ck : oid) (r rm: gname) (ci cj : positive) (n :nat),
+            tp_finally (⌜ False ⌝) ∧
+            tp_finally (⌜ True ⌝) ∧
             tp_true)%P.
 
   Remark Φ_impl :
     ∀ τ, tp_trace Φ' τ → tp_trace Φ τ.
   Proof.
-    Local Opaque is_flag_tp' is_flag_tp.
-    simpl. unfold_trProp. intros. destruct τ. destruct H as (?&?&?&?&?&?&?&?).
-    split. 1: apply is_flag_tp_impl; auto.
+    simpl. unfold_trProp. intros. destruct τ. destruct H as (?&?&?&?&?&?&?&?&?&?&?&?).
     firstorder.
-    Local Transparent is_flag_tp' is_flag_tp.
   Qed.
 
-  Let N := nroot.@ "flag".
-  Let Na := N.@ "always".
-  Let Np := N.@ "pointsto".
+  Let N := nroot .@ "paradox_inv".
+  Let Nu := nroot .@ "paradox_until".
+  Let N1 := nroot .@ "paradox_false".
 
-  Let Nl := nroot.@ "writer_label".
+  Let Φ_tf `{!heapGS Σ} `{!mcntsG Σ} : tf (Π:=state_pred) Σ :=
+        (∃ g1 g2 z ck r rm ci cj n,
+            untilP N1 z 1 (⌜ True ⌝) (⌜ False ⌝) ∗
+            finallyP Nu ck (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩ ∗
+            ⟨£ (10 : Ord.t)%ord ∗
+             px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
+             cnt_lb r cj n ∗  n ↪[rm]□ ck ∗
+             witP_layer ck 0 ∗
+             thP_carriers i {[g1]} ∗ crP_obls g1 1 {[z]} ∗
+             thP_carriers j {[g2]} ∗ crP_obls g2 0 {[ck]} ∗ crP_fuel g2 0 10⟩)%F.
 
-  Let Φ_tf `{!heapGS Σ} : _ → _ → tf Σ :=
-        λ μ1 μ2,
-          (∃ g1 g2 k kl1 kl2,
-              ⌜ k ≠ kl1 ⌝ ∗ is_flag_tf l k 0 ∗
-              untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
-              finallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
-              finallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
-              ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
-               thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
-               crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F.
-
-  Lemma tf_to_tp_Φ `{!heapGS Σ} m1 m2 :
-    tf_to_tp (Φ_tf m1 m2) = Φ'.
+  Lemma tf_to_tp_Φ `{!heapGS Σ} `{!mcntsG Σ} :
+    tf_to_tp (Φ_tf) = Φ'.
   Proof. done. Qed.
 
   Let Σ : gFunctors :=
         #[mupdΣ;
           histGS.histΣ (state * thread_pool heap_lang * list (observation));
-          heap_stateΣ].
+          heap_stateΣ;
+          mcntsΣ
+          ].
 
   Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := fork_post; j := fork_post]}.
 
-  Theorem flag_client_adequacy :
+  Theorem loop_paradox :
+    (∀ Λ0 Σ0 (HGS : lirisGS Λ0 Σ0), @lirisGS_no_lc _ Λ0 Σ0 HGS) →
     ∀ (τ : trace heap_lang),
     behavior τ →
     fair_scheduling τ →
@@ -574,11 +564,11 @@ Section adequacy.
     (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
     tp_trace Φ τ.
   Proof.
-    intros τ Beh FS Init1 Init2.
+    intros LNLC τ Beh FS Init1 Init2.
     apply Φ_impl.
     eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ').
     1,2,3,4: eauto.
-    iIntros (?). exists 0%ord.
+    iIntros (?). exists 10%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
     iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
     iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
@@ -593,16 +583,14 @@ Section adequacy.
     { by iFrame. }
     iModIntro. iIntros "LC TGs".
     (* Set Printing All. *)
-    iMod (flag_client_pre Θ0 i j with "[Ptrs] [TGs]") as "H".
+    iMod (px_loop_pre Θ0 i j with "[$LC] [TGs]") as "H".
     { subst i j. lia. }
     { done. }
     { reflexivity. }
     { reflexivity. }
-    { subst σ0. rewrite big_sepM_singleton.
-      by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
     { iFrame. }
-    iDestruct "H" as (m1 m2) "(HP& H)".
-    iModIntro. iExists (Φ_tf m1 m2). iFrame "HP". iSplit.
+    iDestruct "H" as "(HP& H)".
+    iModIntro. iExists (Φ_tf). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
   Qed.
