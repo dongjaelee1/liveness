@@ -86,21 +86,12 @@ Notation "i ⤉ t , v" := (➢ (pred_label i t v))%F
 Notation "i ⤉ t , v" := (➢ (pred_label i t v))%P
                          (at level 20, t, v at level 1, format "i  ⤉  t , v") : tp_scope.
 
-Local Definition retP_def `{heap_stateGS Σ}
-  (i : thread_id) (v : val) : iProp Σ :=
-  (∃ (K : ctx heap_lang), ⌜ LanguageCtx K ⌝ ∧ thread_expr i (K (of_val v))).
-Local Definition retP_aux : seal (@retP_def). Proof. by eexists. Qed.
-Definition retP := retP_aux.(unseal).
-Local Definition retP_unseal :
-  @retP = @retP_def := retP_aux.(seal_eq).
-Global Arguments retP {Σ _}.
-
-Notation "'ret' v @ i" := (retP i v)%I
-                         (at level 20, v, i at level 1, format "ret  v @ i") : bi_scope.
-Notation "'ret' v @ i" := (➢ (pred_ret i v))%F
-                         (at level 20, v, i at level 1, format "ret  v @ i") : tf_scope.
-Notation "'ret' v @ i" := (➢ (pred_ret i v))%P
-                         (at level 20, v, i at level 1, format "ret  v @ i") : tp_scope.
+Notation "'exit' v @ i" := (label i "exit" v)%I
+                         (at level 20, v, i at level 1, format "exit  v @ i") : bi_scope.
+Notation "'exit' v @ i" := (➢ (pred_label i "exit" v))%F
+                         (at level 20, v, i at level 1, format "exit  v @ i") : tf_scope.
+Notation "'exit' v @ i" := (➢ (pred_label i "exit" v))%P
+                         (at level 20, v, i at level 1, format "exit  v @ i") : tp_scope.
 
 Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
@@ -117,8 +108,6 @@ Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
       pointsto l dq v
   | pred_label i t v =>
       label i t v
-  | pred_ret i v =>
-      retP i v
   end.
 
 Lemma thread_expr_read `{!heap_stateGS Σ} :
@@ -136,8 +125,6 @@ Proof.
   iIntros (????) "[(HI& TI& PI) SP]". destruct π; simpl.
   - rewrite pointsto_unseal /pointsto_def. iPoseProof (gen_heap_valid with "HI SP") as "%". eauto.
   - rewrite label_unseal /label_def. iDestruct "SP" as "(%&%& Ti)".
-    iPoseProof (thread_expr_read with "TI Ti") as "%". eauto.
-  - rewrite retP_unseal /retP_def. iDestruct "SP" as "(%&%& Ti)".
     iPoseProof (thread_expr_read with "TI Ti") as "%". eauto.
 Qed.
 
@@ -241,14 +228,12 @@ Implicit Types v : val.
 (** thread_expr *)
 Local Ltac unfold_defs :=
   (* try rewrite thread_term_unseal /thread_term_def; *)
-  try rewrite label_unseal /label_def retP_unseal /retP_def.
+  try rewrite label_unseal /label_def.
 
 Global Instance thread_expr_timeless i e : Timeless (thread_expr i e).
 Proof. apply _. Qed.
 Global Instance label_timeless i t v : Timeless (label i t v).
 Proof. rewrite label_unseal /label_def. apply _. Qed.
-Global Instance retP_timeless i v : Timeless (retP i v).
-Proof. rewrite retP_unseal /retP_def. apply _. Qed.
 
 Lemma thread_exprs_update_one Θ i e :
   is_Some (Θ !! i) →
@@ -392,6 +377,45 @@ Proof.
   by iFrame.
 Qed.
 
+(** Exit *)
+Lemma lwp_exit G s i E e v g ℓ K k N :
+  TCEq (to_val e) (Some v) →
+  G = {[g]} → K = {[k]} → ↑N ⊆ E →
+  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1)) ∗ crP_obls g ℓ K ∗ ⟦finallyP N k 1 (exit v@i)⟧ₗ }}}
+    Exit e @ s; i; E
+  l{{{ v', RET v'; ⌜v' = v⌝ ∗ lift_term i fork_post v}}}.
+Proof.
+  intros H -> -> Hmask. inv H. apply of_to_val in H1. subst.
+  rewrite unfold_Exit.
+  iIntros (Φ) "[(TG& GF) (Cg& HF)] HΦ".
+  iApply (lwp_pure_step _ (10)%ord). 1: done. simpl. iModIntro.
+  iFrame "TG GF". iExists ∅. iSplitR; first done. iIntros "TG _ !> LC".
+  do 2 iModIntro.
+  iApply lwpupd_label. iIntros "PL".
+  iMod (tf_until_discharge with "HF") as "HF". 1: set_solver.
+  iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+  iApply (lc_sfmupd_add_later with "LC1"). iNext.
+  iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
+  iMod ("HF" with "[PL]") as "HF".
+  { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
+  iPoseProof ("HF" with "[] Cg") as "HF".
+  { iPureIntro. set_solver. }
+  iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+  iApply (lc_sfmupd_add_later with "LC1"). iNext.
+  iMod ("HF" $! _) as "HF". iMod "HF" as "(PL& Gg& #Odkl)".
+  iModIntro. iFrame "PL".
+  replace ({[k]} ∖ {[k]} : gset _) with (∅ : oids) by set_solver.
+  iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
+  replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
+  iModIntro.
+  iApply (lwp_pure_step _ (0)%ord). 1: done. simpl. iModIntro.
+  iFrame "TG". iSplitR; first done. iExists ∅. iSplitR; first done. iIntros "TG _ !> _".
+  do 2 iModIntro. iApply lwp_value_sfgupd.
+  iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$".
+  by iModIntro.
+Qed.
+
+
 (* Lemma lwp_label_step o s i E E' t e v Φ : *)
 (*   TCEq (to_val e) (Some v) → *)
 (*   (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ *)
@@ -461,65 +485,6 @@ Qed.
 (*   { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. } *)
 (*   by iFrame. *)
 (* Qed. *)
-
-(** retP *)
-(** We don't need to take an actual step.
-    "ret i v" means that thread i is crrently a value "v" in some context.
- *)
-Lemma lwpupd_retP i E e v (P : iProp Σ) :
-  TCEq (to_val e) (Some v) →
-  (retP i v -∗ |={E}=>m (retP i v ∗ lwpupd i E (e) P)) -∗
-  lwpupd i E (e) P.
-Proof.
-  unfold_lwpupd. iIntros (He) "H %%%%%% %HK %HT I".
-  iDestruct "I" as "[HI Ia]".
-  iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
-  inv He. apply of_to_val in H0. subst e.
-  iEval (unfold_sfmupd) in "H". iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& H)".
-  { rewrite retP_unseal /retP_def. iFrame. eauto. }
-  rewrite retP_unseal /retP_def. iDestruct "Ti" as "(%&%& Ti)".
-  clear dependent K.
-  iDestruct "HI" as "(%HI& Ha& (Ih& It& Ip))".
-  iPoseProof (thread_expr_read with "It Ti") as "%HT".
-  iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H".
-  { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. }
-  by iFrame.
-Qed.
-
-(** ret_done *)
-Lemma lwp_ret G s i E e v g ℓ K k N :
-  TCEq (to_val e) (Some v) →
-  G = {[g]} → K = {[k]} → ↑N ⊆ E →
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1)) ∗ crP_obls g ℓ K ∗ ⟦finallyP N k 1 (ret v@i)⟧ₗ }}}
-    Ret e @ s; i; E
-  l{{{ v', RET v'; ⌜v' = v⌝ ∗ lift_term i fork_post v}}}.
-Proof.
-  intros H -> -> Hmask. inv H. apply of_to_val in H1. subst.
-  rewrite unfold_Ret.
-  iIntros (Φ) "[(TG& GF) (Cg& HF)] HΦ".
-  iApply (lwp_pure_step _ (10)%ord). 1: done. simpl. iModIntro.
-  iFrame "TG GF". iExists ∅. iSplitR; first done. iIntros "TG Ws !> LC".
-  do 2 iModIntro.
-  iApply lwpupd_retP. iIntros "PL".
-  iMod (tf_until_discharge with "HF") as "HF". 1: set_solver.
-  iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-  iApply (lc_sfmupd_add_later with "LC1"). iNext.
-  iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
-  iMod ("HF" with "[PL]") as "HF".
-  { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
-  iPoseProof ("HF" with "[] Cg") as "HF".
-  { iPureIntro. set_solver. }
-  iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-  iApply (lc_sfmupd_add_later with "LC1"). iNext.
-  iMod ("HF" $! _) as "HF". iMod "HF" as "(PL& Gg& #Odkl)".
-  iModIntro. iFrame "PL".
-  replace ({[k]} ∖ {[k]} : gset _) with (∅ : oids) by set_solver.
-  iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
-  replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
-  iModIntro. iApply lwp_value_sfgupd.
-  iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$".
-  by iModIntro.
-Qed.
 
 (** ChooseNat *)
 Lemma lwp_choosenat_step o s i E E' Φ :

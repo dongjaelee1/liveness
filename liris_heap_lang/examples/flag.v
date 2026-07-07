@@ -64,6 +64,7 @@ Section proof.
   Lemma is_flag_tf_red l k ℓ : ⟦is_flag_tf l k ℓ⟧ₗ = is_flag l k ℓ.
   Proof. rewrite /is_flag /is_flag_tf. tf_red. auto. Qed.
 
+  (** until-alloc-flag version **)
   Lemma is_flag_init E l g K ℓ ℓg μ :
     (ℓg <= ℓ)%ordi →
     l ↦ #0 -∗
@@ -82,17 +83,18 @@ Section proof.
   Qed.
 
   Lemma Flag_init_spec :
-    ⊢ ∃ μ, ∀ lc i G ℓ m,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) }}}
+    ⊢ ∃ μ, ∀ lc i G g K ℓ m,
+    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
+         crP_obls g ℓ K }}}
       Flag.init #() @ i
-      l{{{ x g k, RET #x; £ lc ∗ (⌜g ∉ G⌝) ∗ thP_carriers i ({[g]} ∪ G) ∗
-                         crP_obls g ℓ {[k]} ∗
-                         crP_fuel g ℓ m ∗
-                         oblP_fuel k ℓ m ∗
-                         flag_tk x k ∗ is_flag x k ℓ }}}.
+    l{{{ x k, RET #x; £ lc ∗ thP_carriers i G ∗
+                      (⌜k ∉ K⌝) ∗
+                      crP_obls g ℓ ({[k]} ∪ K) ∗
+                      oblP_fuel k ℓ m ∗
+                      flag_tk x k ∗ is_flag x k ℓ }}}.
   Proof.
-    iExists 10. iIntros (lc i G ℓ m Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF)".
+    iExists 10. iIntros (lc i G g K ℓ m Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TG& GF& Cg)".
     rewrite /Flag.init.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc (lc)%ord.
@@ -101,10 +103,9 @@ Section proof.
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iModIntro. iIntros (ptrx) "((_& TG& _)& Ptrx& _)".
-    iMod (carrier_alloc _ _ _ (ℓ) (m)%M with "TG") as "(%& %Ing& TG& Cg& Gf)".
-    iMod (is_flag_init _ ptrx _ _ (ℓ) _ m with "Ptrx Cg") as "(%k& _& Cg& Of& Ftk& #is_flag)". 1: done.
-    rewrite union_empty_r_L.
-    iApply ("HΦ" with "[$LC $TG $Cg $Gf $Of $Ftk $is_flag]").
+    iMod (is_flag_init _ ptrx _ _ (ℓ) _ m with "Ptrx Cg") as "(%k& %Hk& Cg& Of& Ftk& #is_flag)".
+    1: done.
+    iApply ("HΦ" with "[$LC $TG $Cg $Of $Ftk $is_flag]").
     iPureIntro. auto.
   Qed.
 

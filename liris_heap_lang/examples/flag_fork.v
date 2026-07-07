@@ -16,7 +16,7 @@ Module FlagFork.
       let: "x" := Flag.init #() in
       Fork (Flag.set "x");;
       Flag.wait "x";;
-      Ret #42.
+      Exit #42.
 
 End FlagFork.
 
@@ -41,7 +41,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i g kr,
     l{{{ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (1)%ordi μ) ∗
          crP_obls g 1 {[kr]} ∗
-         ⟦finallyP Nr kr 1 (ret #42@i)⟧ₗ }}}
+         ⟦finallyP Nr kr 1 (exit #42@i)⟧ₗ }}}
       FlagFork.main #() @ i
     l{{{ v, RET v; ⌜v = #42⌝ ∗ lift_term i fork_post v }}}.
   Proof.
@@ -58,9 +58,13 @@ Section proof.
     lwp_bind (Flag.init _).
     iMod (crP_fuel_layer_mon_set _ (0)%ordi with "GF_fi") as "GF_fi".
     { apply ordArith.le_from_nat. lia. }
+    iMod (carrier_alloc _ _ _ 0 (μ_fi ⊕ 9)%M with "TG") as "(%& %Ning& TG& Cg0& Cf0)".
+    iPoseProof (crP_fuel_add with "Cf0") as "[Cf_fi Cf0]".
     iModIntro.
-    iApply ("Flag_init_spec" $! 0 _ _ 0 9 with "[$TG $GF_fi]").
-    iIntros "% % % (_& %Ning& TG& Cg0& Cf0& Of0& Ftk& #is_flag)".
+    iApply ("Flag_init_spec" $! 0 _ _ _ _ 0 9 with "[$TG GF_fi Cf_fi $Cg0]").
+    { iApply big_sepS_union. 1: set_solver. rewrite !big_sepS_singleton. iFrame. }
+    iIntros "% % (_& TG& _& Cg0& Of0& Ftk& #is_flag)".
+    rewrite union_empty_r_L.
     iPoseProof (crP_fuels_add_carrier with "Cf0 GF") as "GF".
     lwp_pures.
     lwp_bind (Fork _).
@@ -99,17 +103,17 @@ Section proof.
     iIntros "(_& TG& #Od0)".
     lwp_pures.
     (** FIXME: Ret not working well *)
-    rewrite unfold_Ret. simpl. rewrite -unfold_Ret.
-    lwp_bind (Ret _).
+    rewrite unfold_Exit. simpl. rewrite -unfold_Exit.
+    lwp_bind (Exit _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    iApply (lwp_ret with "[$TG $GF1 $Cg $HF]"). 1,2: done. 1: set_solver.
+    iApply (lwp_exit with "[$TG $GF1 $Cg $HF]"). 1,2: done. 1: set_solver.
     iApply "HΦ".
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := FlagFork.main #() ]} →
-    Φ = (λ μ, (∃ g kr, finallyP Nr kr 1 (ret #42@i) ∗
+    Φ = (λ μ, (∃ g kr, finallyP Nr kr 1 (exit #42@i) ∗
                        ⟨thP_carriers i {[g]} ∗ crP_obls g 1 {[kr]} ∗
                         crP_fuel g 1 μ⟩)%F) →
     Ψs = ({[i := (λ _ v, ⌜v = #42⌝)%I]}) →
@@ -123,7 +127,7 @@ Section proof.
     iPoseProof (FlagFork_main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ 1 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (tf_until_alloc _ _ _ false 1 1 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nr (⌜True⌝)%F (ret #42@i)%F with "[]") as "Ukl1".
+    iMod ("Akl1" $! _ Nr (⌜True⌝)%F (exit #42@i)%F with "[]") as "Ukl1".
     { tf_red. done. }
     iModIntro. iExists μ. iSplitL "Ukl1 TG1 Gg1 Gf1 Ofkl1".
     { subst Φ.
@@ -154,11 +158,11 @@ Section adequacy.
   Let σ0 : gmap loc (option val) := ∅.
 
   Let Φ : tp :=
-        (tp_finally (ret #42@i))%P.
+        (tp_finally (exit #42@i))%P.
 
   Let Φ' : tp :=
         (∃ (g : ocid) (kr : oid),
-            tp_finally (ret #42@i) ∧
+            tp_finally (exit #42@i) ∧
             tp_true)%P.
 
   Remark Φ_impl :
@@ -173,7 +177,7 @@ Section adequacy.
   Let Φ_tf `{!heapGS Σ} : _ → tf Σ :=
         λ μ,
           (∃ g kl,
-              finallyP Nr kl 1 (ret #42@i) ∗
+              finallyP Nr kl 1 (exit #42@i) ∗
               ⟨thP_carriers i {[g]} ∗ crP_obls g 1 {[kl]} ∗
                crP_fuel g 1 μ⟩)%F.
 

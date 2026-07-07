@@ -13,7 +13,8 @@ From transfinite.base_logic.lib Require Import ghost_map.
 From iris.proofmode Require Import coq_tactics reduction spec_patterns.
 
 (** "pure" steps that are reducible with the thread_exec predicate, without submitting fuels. *)
-Class heapGS_no_lc `(HGS : heapGS Σ) := {
+(* Class lirisGS_no_lc `(HGS : heapGS Σ) := { *)
+Class lirisGS_no_lc `(HGS : lirisGS Λ Σ) := {
     lwp_pure_step_no_lc :
     ∀ n s i E E' e1 e2 φ Φ,
       PureExec φ n e1 e2 →
@@ -27,7 +28,7 @@ Class heapGS_no_lc `(HGS : heapGS Σ) := {
       ⊢ lWP e1 @ s; i; E {{ Φ }};    
   }.
 
-Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@heapGS_no_lc Σ _} (n : nat) R s i E E' e1 e2 φ Φ :
+Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@lirisGS_no_lc _ _ Σ _} (n : nat) R s i E E' e1 e2 φ Φ :
   PureExec φ n e1 e2 →
   φ →
   ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -46,7 +47,7 @@ Proof.
   iApply IHn. iFrame "Rs". iModIntro. iFrame "LWP".
 Qed.
 
-Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@heapGS_no_lc Σ _}
+Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@lirisGS_no_lc _ _ Σ _}
   Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
   PureExec φ n e1 e2 →
   φ →
@@ -126,7 +127,7 @@ Global Instance subG_mcntsΣ {Σ} : subG mcntsΣ Σ → mcntsG Σ.
 Proof. solve_inG. Qed.
 
 Section proof.
-  Context `{!heapGS Σ, !mcntsG Σ} `{@heapGS_no_lc Σ _}.
+  Context `{!heapGS Σ, !mcntsG Σ} `{@lirisGS_no_lc _ _ Σ _}.
 
   Definition cnt_auth (γ : gname) (i : positive) n (q : Qp) : iProp Σ :=
     own γ ({[i := ●MN{#q} n]}).
@@ -258,7 +259,8 @@ Section proof.
   Proof. rewrite /px. apply _. Qed.
 
   (** Receives later credits via px_inv *)
-  Lemma px_loop1_spec i g z r rm ci cj :
+  Lemma px_loop1_spec :
+    ⊢ ∀ i g z r rm ci cj,
     l{{{ thP_carriers i ({[g]}) ∗
          crP_obls g 1 {[z]} ∗
          ⟦tf_until N1 z false 1 (⌜ True ⌝) (⌜ False ⌝)⟧ₗ ∗
@@ -270,7 +272,8 @@ Section proof.
       loop #() @ i
     l{{{ RET #(); lift_term i fork_post #() }}}.
   Proof using Type*.
-    iIntros (Φ) "(TG& Gg& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Wckn& #Mn) HΦ".
+    iIntros (i g z r rm ci cj).
+    iIntros (Φ) "!> (TG& Gg& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Wckn& #Mn) HΦ".
     (** Lob induction *)
     iRevert (n ck) "Cljn Wckn Mn Cai". iLöb as "IH".
     iIntros (n ck) "#Cljn #Wckn #Mn Cai".
@@ -316,7 +319,8 @@ Section proof.
       iIntros "!> !>". iApply ("IH" with "TG Gg TUz LC1 HΦ Cljn1 Wckn1 Mn1 Cai").
   Qed.
 
-  Lemma px_loop2_spec j n r rm ci cj ck :
+  Lemma px_loop2_spec :
+    ⊢ ∀ j n r rm ci cj ck,
     l{{{ ∃ g, thP_carriers j {[g]} ∗
               crP_obls g 0 {[ck]} ∗
               ⟦tf_finally Nu ck false (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
@@ -326,7 +330,7 @@ Section proof.
       loop #() @ j
     l{{{ RET #(); lift_term j fork_post #() }}}.
   Proof using Type*.
-    iIntros (Φ) "(%& TG& Gg& Uck& Gf& #Ipx& Caj& #Mn) HΦ".
+    iIntros (j n r rm ci cj ck) "!> %Φ (%& TG& Gg& Uck& Gf& #Ipx& Caj& #Mn) HΦ".
     (** Lob induction *)
     iRevert (n g ck) "TG Gg Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n g ck) "TG Gg Uck Gf Caj #Mn".
@@ -401,4 +405,208 @@ Section proof.
     replace (n + 1 + 1) with (n + 2) by lia. iFrame.
   Qed.
 
+  Lemma px_init E g :
+    crP_obls g 0 ∅
+    ⊢ |={E}=>g ∃ ck r rm ci cj n,
+                crP_obls g 0 {[ck]} ∗
+                ⟦finallyP Nu ck (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
+                witP_layer ck 0 ∗
+                px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
+                cnt_lb r cj n ∗  n ↪[rm]□ ck.
+  Proof.
+    iIntros "Cg".
+    set (r := inhabitant : gname).
+    iMod (alloc_cnt_base r) as "CB".
+    iMod (alloc_cnt_auth _ 0 with "CB") as "(CB& %ci& CAi)".
+    iPoseProof (get_cnt_lb with "CAi") as "#Cli". 1: reflexivity.
+    iMod (alloc_cnt_auth _ 0 with "CB") as "(CB& %cj& CAj)".
+    iPoseProof (get_cnt_lb with "CAj") as "#Clj". 1: reflexivity.
+    iMod (ghost_map_alloc (∅ : gmap nat oid)) as "(%rm& GM& _)".
+    iMod (tf_until_alloc _ _ _ false _ _ 10 with "Cg") as "(%ck& _& Cg& Gf& #Wl& ACC)".
+    1: reflexivity. rewrite union_empty_r_L.
+    iMod ("ACC" $! _ Nu (⌜True⌝)%F ⟨(cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')⟩%F
+           with "[//]") as "HF".
+    iMod (ghost_map_insert_persist 0 ck with "GM") as "(GM& #GMe)". 1: done.
+    iExists ck, r, rm, ci, cj, 0.
+    iDestruct "HF" as "[HF HF0]". iDestruct "CAj" as "[CAj CAj0]".
+    iFrame. iFrame "Wl Clj GMe".
+    rewrite /px /px_inv.
+    iMod (inv_alloc with "[-]") as "H". 2: by iFrame "H".
+    iNext. iExists 0, {[0 := ck]}.
+    iFrame. iApply big_sepM_singleton. iSplitR "HF".
+    - iFrame "GMe Clj Wl". iRight. eauto.
+    - iLeft. iFrame.
+  Qed.
+
+  Lemma px_loop_pre Θ i j Φ Ψs :
+    i ≠ j →
+    Θ = {[i := loop #(); j := loop #() ]} →
+    Φ = ((∃ g1 g2 z ck r rm ci cj n,
+             untilP N1 z 1 (⌜ True ⌝) (⌜ False ⌝) ∗
+             finallyP Nu ck (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩ ∗
+             ⟨£ (10)%ord ∗
+              px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
+              cnt_lb r cj n ∗  n ↪[rm]□ ck ∗
+              witP_layer ck 0 ∗
+              thP_carriers i {[g1]} ∗ crP_obls g1 1 {[z]} ∗
+              thP_carriers j {[g2]} ∗ crP_obls g2 0 {[ck]} ∗ crP_fuel g2 0 10⟩)%F) →
+    Ψs = ({[i := fork_post; j := fork_post]}) →
+    (£ (10)%ord -∗
+     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     |={⊤}=>m (⟦Φ⟧ₗ ∗
+              (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+  Proof using H.
+    iIntros (Hij HT HP HQ) "LC TGs".
+    iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
+    iPoseProof (big_sepS_union with "TGs") as "[TG1 TG2]".
+    { set_solver. }
+    rewrite !big_sepS_singleton.
+    iPoseProof (px_loop1_spec) as "px_loop1_spec".
+    iPoseProof (px_loop2_spec) as "px_loop2_spec".
+    iMod (carrier_alloc _ _ _ 1 0 with "TG1") as "(%g1& _& TG1& Gg1& _)".
+    iMod (carrier_alloc _ _ _ 0 10 with "TG2") as "(%g2& _& TG2& Gg2& Gf2)".
+    iMod (tf_until_alloc _ _ _ false _ _ 0 with "Gg1") as "(%z& _& Gg1& _& _& ACC)". 1: reflexivity.
+    iMod ("ACC" $! _ N1 (⌜ True ⌝)%F (⌜ False ⌝)%F with "[//]") as "HFz".
+    rewrite !union_empty_r_L.
+    iMod (px_init with "Gg2") as "(%&%&%&%&%&%& Gg2& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)".
+    iModIntro. iSplitL.
+    { subst Φ.
+      tf_red. iExists g1. tf_red. iExists g2.
+      tf_red. iExists z. tf_red. iExists ck. tf_red. iExists r. tf_red. iExists rm.
+      tf_red. iExists ci. tf_red. iExists cj. tf_red. iExists n.
+      tf_red. iFrame. iFrame "px Clj GMe Wl". }
+    iClear "Wl px Clj GMe". clear dependent g1 g2 z ck r rm ci cj n.
+    iIntros "HP". subst Φ.
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%g1& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%g2& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%z& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%ck& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%r& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%rm& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%ci& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%cj& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%n& HP)".
+    iEval (tf_red) in "HP".
+    iDestruct "HP" as "(HFz& HFck& LC& #px& CAi& CAj& #Clj& #GMe& #Wl& TG1& Cg1& TG2& Cg2& Gf)".
+    iPoseProof ("px_loop1_spec" $! i g1 z r rm ci cj (λ v, lift_term i fork_post v)
+                 with "[$TG1 $Cg1 $HFz $LC $px $CAi $Clj $Wl $GMe]") as "WP1".
+    iPoseProof ("px_loop2_spec" $! j n r rm ci cj ck (λ v, lift_term j fork_post v)
+                 with "[$TG2 $Cg2 $HFck $Gf $px $CAj $GMe]") as "WP2".
+    iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
+    { rewrite lookup_insert_ne; auto. }
+    { rewrite lookup_insert_ne; auto. }
+    iSplitL "WP1".
+    { iApply "WP1". iModIntro. eauto. }
+    rewrite big_sepM2_singleton. iApply "WP2". iModIntro. eauto.
+  Qed.
+
 End proof.
+
+Section adequacy.
+
+  TODO
+
+  Let i : thread_id := 1%positive.
+  Let j : thread_id := 2%positive.
+  Let l : loc := X_loc.
+  Let Θ0 : thread_pool heap_lang := {[i := writer #(); j := reader #()]}.
+  Let σ0 : gmap loc (option val) := {[l := Some #0]}.
+
+  Let Φ : tp :=
+        (is_flag_tp l ∧
+         tp_until (l ↦ #0) (l ↦ #1) ∧
+         tp_finally (i ⤉ "exit", #()) ∧
+         tp_finally (j ⤉ "exit", #1))%P.
+
+  Let Φ' : tp :=
+        (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
+            ⌜ k ≠ kl1 ⌝ ∧ is_flag_tp' l ∧
+            tp_until (l ↦ #0) (l ↦ #1) ∧
+            tp_finally (i ⤉ "exit", #()) ∧
+            tp_finally (j ⤉ "exit", #1) ∧
+            tp_true)%P.
+
+  Remark Φ_impl :
+    ∀ τ, tp_trace Φ' τ → tp_trace Φ τ.
+  Proof.
+    Local Opaque is_flag_tp' is_flag_tp.
+    simpl. unfold_trProp. intros. destruct τ. destruct H as (?&?&?&?&?&?&?&?).
+    split. 1: apply is_flag_tp_impl; auto.
+    firstorder.
+    Local Transparent is_flag_tp' is_flag_tp.
+  Qed.
+
+  Let N := nroot.@ "flag".
+  Let Na := N.@ "always".
+  Let Np := N.@ "pointsto".
+
+  Let Nl := nroot.@ "writer_label".
+
+  Let Φ_tf `{!heapGS Σ} : _ → _ → tf Σ :=
+        λ μ1 μ2,
+          (∃ g1 g2 k kl1 kl2,
+              ⌜ k ≠ kl1 ⌝ ∗ is_flag_tf l k 0 ∗
+              untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
+              finallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
+              finallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
+              ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
+               thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
+               crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F.
+
+  Lemma tf_to_tp_Φ `{!heapGS Σ} m1 m2 :
+    tf_to_tp (Φ_tf m1 m2) = Φ'.
+  Proof. done. Qed.
+
+  Let Σ : gFunctors :=
+        #[mupdΣ;
+          histGS.histΣ (state * thread_pool heap_lang * list (observation));
+          heap_stateΣ].
+
+  Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
+  Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
+        {[i := fork_post; j := fork_post]}.
+
+  Theorem flag_client_adequacy :
+    ∀ (τ : trace heap_lang),
+    behavior τ →
+    fair_scheduling τ →
+    (τ.1 = 0) →
+    (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+    tp_trace Φ τ.
+  Proof.
+    intros τ Beh FS Init1 Init2.
+    apply Φ_impl.
+    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ').
+    1,2,3,4: eauto.
+    iIntros (?). exists 0%ord.
+    iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
+    iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
+    iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
+    iMod (inv_heap_init loc (option val) (⊤ : coPset)) as "(%Hinv_heap& >HHI)".
+    set (Hheap_stateGS := @HeapStateGS Σ Hheap Hinv_heap Hproph Hthread).
+    set (HHeapGS := @HeapGS Σ Htemporal Hheap_stateGS).
+    set (HlirisGS := @heapGS_lirisGS Σ HHeapGS).
+    iExists (liris_state_interp_class), (@fork_post Σ), (@Ψs Σ).
+    iSplitL "HI TI PI".
+    { by iFrame. }
+    iSplitL "Tis".
+    { by iFrame. }
+    iModIntro. iIntros "LC TGs".
+    (* Set Printing All. *)
+    iMod (flag_client_pre Θ0 i j with "[Ptrs] [TGs]") as "H".
+    { subst i j. lia. }
+    { done. }
+    { reflexivity. }
+    { reflexivity. }
+    { subst σ0. rewrite big_sepM_singleton.
+      by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
+    { iFrame. }
+    iDestruct "H" as (m1 m2) "(HP& H)".
+    iModIntro. iExists (Φ_tf m1 m2). iFrame "HP". iSplit.
+    { iPureIntro. apply tf_to_tp_Φ. }
+    iFrame.
+  Qed.
+
+End adequacy.
+
+(* Print Assumptions flag_client_adequacy. *)

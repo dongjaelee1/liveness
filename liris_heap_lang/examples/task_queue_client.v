@@ -16,17 +16,14 @@ Definition decr_reentrant : val :=
      then Flag.set "x"
      else TaskQueue.put_task "q" "f" ("q", "x", "n" - #1%Z)).
 
-Definition client : val :=
-  λ: "q", let: "x" := Flag.init in
-          let: "n" := ChooseNat in
-          decr_reentrant ("q", "x", "n");;
-          Flag.wait "x".
-
 Definition main : val :=
   λ: <>,
     let: "q" := TaskQueue.init #() in
-    client "q";;
-    Ret #42.
+    let: "x" := Flag.init in
+    let: "n" := ChooseNat in
+    decr_reentrant ("q", "x", "n");;
+    let: "v" := Flag.wait "x" in
+    Ret "v".
 
 Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
@@ -41,6 +38,8 @@ Section proof.
     simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
+
+  Let Nl := nroot.@ "label".
 
   (** 1 < ℓq (by TaskQueue_put_task_spec, is_task *)
   Let ℓq : ord.t := (1 ⊕ 1)%ordi.
@@ -124,16 +123,17 @@ Section proof.
       iIntros "(_& TG& Gg)". iApply ("HΦ" with "[$Q_LC $TG $Gg]").
   Qed.
 
-  TODO
-
-  Lemma client_spec :
-    ⊢ ∃ m, ∀ lc i G γ ql,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓq ⊕ 2)%ordi m) ∗
-         is_task_queue ql γ ℓq }}}
-      client ql @ i
-    l{{{ RET #(); £ lc ∗ thP_carriers i G }}}.
+  Lemma main_spec :
+    ⊢ ∃ μ, ∀ i g kl,
+    l{{{ thP_carriers i {[g]} ∗ crP_fuel g (ℓq ⊕ 2)%ordi μ ∗
+         crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
+         ⟦finallyP Nl kl 1 (ret #1 @ i)⟧ₗ }}}
+      main #() @ i
+    l{{{ v, RET v; lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
   Proof.
-    unfold client.
+
+    TODO
+    unfold main.
     iPoseProof (decr_reentrant_spec) as (md) "decr_reentrant_spec".
     (* Internal steps, func call, while loop *)
     iExists (100 ⊕ md ⊕ (100 × ▽))%M. iIntros (lc i G γ ql) "!> % (TG& GF& #ITQ) HΦ".
@@ -233,7 +233,7 @@ Section proof.
 
 
   TODO
-Definition client : val :=
+Definition main : val :=
   λ: "q", let: "l" := ref #0 in
           let: "n" := ChooseNat in
           decr_reentrant ("q", "l", "n");;
@@ -244,7 +244,7 @@ Definition client : val :=
 Definition main : val :=
   λ: <>,
     let: "q" := TaskQueue.init #() in
-    client "q".
+    main "q".
     
 End proof.
 
