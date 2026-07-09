@@ -19,11 +19,11 @@ Definition decr_reentrant : val :=
 Definition main : val :=
   λ: <>,
     let: "q" := TaskQueue.init #() in
-    let: "x" := Flag.init in
+    let: "x" := Flag.init #() in
     let: "n" := ChooseNat in
     decr_reentrant ("q", "x", "n");;
     let: "v" := Flag.wait "x" in
-    Ret "v".
+    Exit "v".
 
 Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
@@ -125,210 +125,185 @@ Section proof.
 
   Lemma main_spec :
     ⊢ ∃ μ, ∀ i g kl,
-    l{{{ thP_carriers i {[g]} ∗ crP_fuel g (ℓq ⊕ 2)%ordi μ ∗
+    l{{{ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (ℓq ⊕ 2)%ordi μ) ∗
          crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
-         ⟦finallyP Nl kl 1 (ret #1 @ i)⟧ₗ }}}
+         ⟦finallyP Nl kl 1 (exit #1 @ i)⟧ₗ }}}
       main #() @ i
     l{{{ v, RET v; lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
-  Proof.
-
-    TODO
+  Proof using queueG0 ticket_lockG0.
     unfold main.
-    iPoseProof (decr_reentrant_spec) as (md) "decr_reentrant_spec".
-    (* Internal steps, func call, while loop *)
-    iExists (100 ⊕ md ⊕ (100 × ▽))%M. iIntros (lc i G γ ql) "!> % (TG& GF& #ITQ) HΦ".
-    iPoseProof (crP_fuel_add_set with "GF") as "[GF GF2]".
-    iPoseProof (crP_fuel_add_set with "GF2") as "[F_md GFloop]".
+    iPoseProof (TaskQueue_init_spec) as (μ_ti) "TaskQueue_init_spec".
+    iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".
+    iPoseProof (decr_reentrant_spec) as (μ_d) "decr_reentrant_spec".
+    iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
+    (* Internal steps, func calls, wait *)
+    iExists (100 ⊕ μ_ti ⊕ μ_fi ⊕ μ_d ⊕ μ_fw)%M. iIntros (i g kl) "!> % (TG& GF& Cg& HF) HΦ".
+    iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
+    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_ti GF_m]".
+    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fi GF_m]".
+    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_d GF_fw]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
-    lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
-    lwp_bind (AllocN _ _).
-    iPoseProof (crP_fuels_add 98 1 with "GF") as "[GF GF1]". 1: lia.
-    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
-    iModIntro. iIntros (ptr_l) "((_& TG& _)& Ptr_l& _)".
+    lwp_pure_lc 100.
+    lwp_pures.
+    lwp_bind (TaskQueue.init _).
+    iMod (crP_fuel_layer_mon_set _ (0)%ordi with "GF_ti") as "GF_ti".
+    { apply ord.O_bot. }
+    iModIntro. iApply ("TaskQueue_init_spec" $! 0 _ _ ℓq with "[$TG $GF_ti]").
+    { iPureIntro. apply ord.lt_le, ℓq_cond. }
+    iClear "TaskQueue_init_spec".
+    iIntros (ql qγ) "(_& TG& #ITQ)".
+    lwp_pures.
+    lwp_bind (Flag.init _).
+    iMod (carrier_alloc _ _ _ (ℓq ⊕ 1)%ordi (μ_fi ⊕ μ_d ⊕ 97)%M with "TG")
+      as "(%& %NinG& TG& Cg0& GF0)".
+    iPoseProof (crP_fuel_add with "GF0") as "[F_init0 GF0]".
+    iPoseProof (crP_fuel_add with "GF0") as "[F_d0 GF0]".
+    iMod (crP_fuel_layer_mon_set _ 0 with "GF_fi") as "F_init".
+    { apply ord.O_bot. }
+    iMod (crP_fuel_layer_mon _ 0 with "F_init0") as "F_init0".
+    { apply ord.O_bot. }
+    iModIntro.
+    iApply ("Flag_init_spec" $! 0 _ _ _ _ _ (ℵ)%M with "[$TG F_init F_init0 $Cg0]").
+    { iApply big_sepS_union. 1: set_solver. rewrite !big_sepS_singleton. iFrame. }
+    iIntros "%ptrx %k (_& TG& _& Cg0& Of0& Ftk& #is_flag)".
+    rewrite union_empty_r_L.
+    iClear "Flag_init_spec".
+    iPoseProof (crP_fuels_add_carrier with "GF0 GF") as "GF".
     lwp_pures.
     lwp_bind (ChooseNat).
-    iPoseProof (crP_fuels_add 95 1 with "GF") as "[GF GF1]". 1: lia.
-    iModIntro. iApply (lwp_choosenat _ ∅ 0 with "[$TG $GF1]"). 1: done.
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iModIntro.
+    iApply (lwp_choosenat _ ∅ 0 with "[$TG $GF1]"). 1: done.
     iIntros (n) "(_& TG& _)".
     lwp_pures.
-
-    TODO
-    
-
-    
-    lwp_pures.
-
-    
-    subst arg.
-    lwp_pures.
-    destruct (decide (n ≤ 0)%Z).
-    - iClear "TASK TaskQueue_put_task_spec". rewrite bool_decide_eq_true_2; last done.
-      lwp_pure_lc 100.
-      lwp_bind (Store _ _).
-      iDestruct "DRI" as "(%&%&%& %& Oik& Wlk& Inv& ITQ)". symmetry in H. simplify_eq.
-      iModIntro.
-      iEval (rewrite tf_always_logic) in "Inv".
-      iMod (inv_acc with "Inv") as "[H ACCinv]". 1: set_solver.
-      (* and we need a mupd after the step. *)
-      iApply lwp_sfmupd.
-      iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-      iApply (lwp_lc_later with "LC1"). iNext.
-      iEval (tf_red) in "H". iDestruct "H" as "[H | H]"; cycle 1.
-      { iDestruct "H" as "(HF& _)".
-        rewrite tf_until_logic. iDestruct "Huntil" as "(HA& _)".
-        iPoseProof (oblP_assigned_discharged_false with "HA HF") as "%". done. }
-      iCombine "Huntil H" as "Huntil".
-      iMod (tf_until_discharge with "Huntil") as "ACCuntil". 1: apply N_subseteq_1.
-      iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
-      iApply (lwp_lc_later with "LC1"). iNext.
-      iDestruct "ACCuntil" as "[Ptrl ACCuntil]". iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (crP_fuels_add 85 1 with "GF") as "[GF GF1]". 1: lia.
-      iApply lwp_sfmupd.
-      iApply (lwp_store _ ∅ 0 with "[$TG $GF1 $Ptrl]"). 1: done.
-      iIntros "((_& TG& _)& Ptrl)".
-      iMod ("ACCuntil" $! _ with "Ptrl") as ">ACCuntil".
-      iPoseProof ("ACCuntil" with "[] Gg") as "ACCuntil".
+    lwp_bind (decr_reentrant _).
+    iMod (oblP_fuel_mon _ _ (n)%M with "Of0") as "Of0".
+    { rewrite !measure_rep_nat measure_rep_large.
+      etrans; first (eapply Ord.lt_le, Ord.omega_upperbound).
+      rewrite Ord.omega_from_peano_lt_set.
+      eapply Ord.lt_le, Ord.large_lt_from_wf_set. }
+    iMod (crP_fuel_layer_mon_set _ 1 with "GF_d") as "F_d".
+    { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.le_from_nat. lia. }
+    iMod (crP_fuel_layer_mon _ 1 with "F_d0") as "F_d0".
+    { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.le_from_nat. lia. }
+    iModIntro.
+    iApply ("decr_reentrant_spec" $! 0 with "[$TG F_d F_d0 $Cg0 Of0 $Ftk]").
+    { iSplitR "Of0".
+      { iApply big_sepS_union. 1: set_solver. rewrite !big_sepS_singleton. iFrame. }
+      iSplitR.
       { iPureIntro. set_solver. }
-      iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
-      iApply (lc_sfmupd_add_later with "LC1"). iNext.
-      iMod ("ACCuntil" $! _) as "ACCuntil". iModIntro.
-      iMod "ACCuntil" as "(Ptrl& Gg& #Gfk)".
-      do 2 iModIntro. iMod ("ACCinv" with "[Ptrl]") as "_".
-      { iNext. tf_red. iRight. iFrame. eauto. }
-      iModIntro. iApply ("HΦ" with "[$Q_LC $TG $Gg]").
-    - rewrite bool_decide_eq_false_2; last done.
-      lwp_pure_lc 100.
-      lwp_pures.
-      iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-      iApply (lc_lwpupd_add_later with "LC1"). iNext.
-      lwp_bind (TaskQueue.put_task _ _ _).
-      assert (Hn : Z.to_nat n = 1 + Z.to_nat (n - 1)) by lia.
-      rewrite (oblP_fuel_eq k _ _ (1 ⊕ (Z.to_nat (n - 1)))%M); cycle 1.
-      { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat Hn. done. }
-      iPoseProof (oblP_fuel_add with "OF") as "[OF1 OF]".
-      iModIntro. iApply ("TaskQueue_put_task_spec" $! 0 _ _ _ _ _ {[k]} γ ℓq with "[$TG $F_put_task $Gg OF1 OF Huntil]").
-      { iClear "TaskQueue_put_task_spec". iSplit.
-        { iPureIntro. set_solver. }
-        iSplitL "OF1".
-        { iApply big_sepS_singleton. iFrame. }
-        iDestruct "DRI" as "(%&%&%& %& Oik& Wlk& Inv& ITQ)". simplify_eq.
-        rewrite /is_task_queue. iFrame "ITQ".
-        rewrite /is_task. iDestruct "TASK" as (mt) "TASK".
-        iExists _, _, ℵ%ordi, _, mt. iSplit.
-        { iPureIntro. split; first eauto. apply ℓq_cond. }
-        iSplitL.
-        { iCombine "OF Huntil" as "H". iApply "H". }
-        iIntros (???????) "!> % (TG& GF& Gg& %Hsub& OF& Huntil) HΦ".
-        iApply ("TASK" $! lc0 with "[$TG $GF $Gg $OF $Huntil]").
-        { iSplit.
-          { iPureIntro. set_solver. }
-          iExists _. iSplit; first done. iFrame "Oik Wlk Inv".
-          rewrite /is_task_queue. iFrame "ITQ". eauto. }
-        iIntros "(LC& TG& Gg)". iApply ("HΦ" with "[$LC $TG $Gg]"). }
-      iIntros "(_& TG& Gg)". iApply ("HΦ" with "[$Q_LC $TG $Gg]").
+      iExists ql, n. iSplitR; first done. replace (Z.to_nat n) with n by lia.
+      iFrame. iFrame "ITQ is_flag". eauto. }
+    iClear "decr_reentrant_spec".
+    iIntros "(_& TG& Cg0)".
+    replace ({[k]} ∖ {[k]}) with (∅ : oids) by set_solver.
+    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
+    iPoseProof (crP_fuels_remove_carrier g0 with "GF") as "GF".
+    replace ({[g0; g]} ∖ {[g0]}) with ({[g]} : gset ocid) by set_solver.
+    lwp_pures.
+    lwp_bind (Flag.wait _).
+    iModIntro.
+    iMod (crP_fuel_layer_mon_set _ ((ℓq ⊕ 1) ⊕ 1)%ordi with "GF_fw") as "GF_fw".
+    { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.le_from_nat. lia. }
+    iApply ("Flag_wait_spec" $! 0 with "[$TG $GF_fw $is_flag]").
+    iIntros "(_& TG& #Od0)".
+    lwp_pures.
+    rewrite unfold_Exit. simpl. rewrite -unfold_Exit.
+    lwp_bind (Exit _).
+    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iModIntro.
+    iApply (lwp_exit with "[$TG $GF1 $Cg $HF]"). 1,2: done. 1: set_solver.
+    iIntros (?) "(%& H)". iApply "HΦ".
+    rewrite /lift_term. simpl. subst. iDestruct "H" as "(H& _)". iSplitL; eauto.
   Qed.
 
-  
+  Lemma main_pre Θ i Φ Ψs :
+    Θ = {[i := main #() ]} →
+    Φ = (λ μ, (∃ g kl, finallyP Nl kl 1 (exit #1 @ i) ∗
+                       ⟨thP_carriers i {[g]} ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
+                        crP_fuel g (ℓq ⊕ 2)%ordi μ⟩)%F) →
+    Ψs = ({[i := (λ _ v, ⌜v = #1⌝)%I]}) →
+    (([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     |={⊤}=>m ∃ μ, (⟦Φ μ⟧ₗ ∗
+                   (⟦Φ μ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+  Proof using queueG0 ticket_lockG0.
+    iIntros (HT HP HQ) "TGs".
+    iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
+    rewrite !big_sepS_singleton.
+    iPoseProof (main_spec) as (μ) "main_spec".
+    iMod (carrier_alloc _ _ _ (ℓq ⊕ 2)%ordi μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
+    iMod (tf_until_alloc _ _ _ false (ℓq ⊕ 2)%ordi (ℓq ⊕ 2)%ordi 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
+    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (exit #1 @ i)%F with "[]") as "Ukl1".
+    { tf_red. done. }
+    iModIntro. iExists μ. iSplitL "Ukl1 TG1 Gg1 Gf1 Ofkl1".
+    { subst Φ.
+      tf_red. iExists g1. tf_red. iExists kl1. tf_red.
+      rewrite !union_empty_r_L. iFrame. }
+    iClear "Wlkl1". clear dependent g1 kl1.
+    iIntros "HP". subst Φ.
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%g1& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(%kl1& HP)".
+    iEval (tf_red) in "HP". iDestruct "HP" as "(HF& TG& Cg& GF)".
+    iPoseProof ("main_spec" $! i g1 kl1 (λ v, lift_term i (λ _ v, ⌜v = #1⌝)%I v) with "[TG Cg GF HF]") as "WP".
+    { iFrame. iApply big_sepS_singleton. iFrame. }
+    iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
+    { done. }
+    { done. }
+    iSplitL "WP".
+    { iApply "WP". iModIntro. eauto. }
+    done.
+  Qed.
 
-
-  TODO
-Definition main : val :=
-  λ: "q", let: "l" := ref #0 in
-          let: "n" := ChooseNat in
-          decr_reentrant ("q", "l", "n");;
-          (rec: "while" <> := if: !"l" = #1%Z
-                             then Label "exit" #()
-                             else "while" #()) #().
-
-Definition main : val :=
-  λ: <>,
-    let: "q" := TaskQueue.init #() in
-    main "q".
-    
 End proof.
 
 Section adequacy.
 
-  Definition mp_tp (l : loc) : tp :=
-    (tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (l ↦ #1))))%P.
-
-  Definition mp_tp' (l : loc) : tp :=
-    (tp_true ∧ tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
-
-  (** TODO: weaken the strict equality to semantics equivalence/implication. *)
-  Remark tf_to_tp_mp' `{!heapGS Σ} k l :
-    tf_to_tp (mp_tf k l) = mp_tp' l.
-  Proof. done. Qed.
-
-  Remark mp_tp_impl l :
-    ∀ τ, tp_trace (mp_tp' l) τ → tp_trace (mp_tp l) τ.
-  Proof.
-    simpl. unfold_trProp. simpl. intros. destruct τ. destruct H. intros. specialize (H0 _ H1).
-    destruct H0.
-    - destruct H0 as (?&?&?&?). left. eexists. split_and !; eauto.
-    - destruct H0. right. eauto.
-  Qed.
-
   Let i : thread_id := 1%positive.
-  Let j : thread_id := 2%positive.
-  Let l : loc := Loc 0.
-  Let Θ0 : thread_pool heap_lang := {[i := writer #l; j := reader #l]}.
-  Let σ0 : gmap loc (option val) := {[l := Some #0]}.
+  Let Θ0 : thread_pool heap_lang := {[i := main #()]}.
+  Let σ0 : gmap loc (option val) := ∅.
 
   Let Φ : tp :=
-        (mp_tp l ∧
-         tp_until (l ↦ #0) (l ↦ #1) ∧
-         tp_finally (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
-         tp_finally (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝))%P.
+        (tp_finally (exit #1 @ i))%P.
 
   Let Φ' : tp :=
-        (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
-            ⌜ k ≠ kl1 ⌝ ∧ mp_tp' l ∧
-            tp_until (l ↦ #0) (l ↦ #1) ∧
-            tp_finally (∃ v, (i ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
-            tp_finally (∃ v, (j ⤉ "exit", v) ∧ ⌜ v = #() ⌝) ∧
+        (∃ (g : ocid) (kl : oid),
+            tp_finally (exit #1 @ i) ∧
             tp_true)%P.
 
   Remark Φ_impl :
     ∀ τ, tp_trace Φ' τ → tp_trace Φ τ.
   Proof.
-    Local Opaque mp_tp' mp_tp.
-    simpl. unfold_trProp. simpl. intros. destruct τ. destruct H as (?&?&?&?&?&?&?&?).
-    split. 1: apply mp_tp_impl; auto.
+    simpl. unfold_trProp. intros. destruct τ. destruct H as (?&?&?&?).
     firstorder.
-    Local Transparent mp_tp' mp_tp.
   Qed.
 
-  Let N := nroot.@ "message_passing".
-  Let Na := N.@ "always".
-  Let Np := N.@ "pointsto".
-  Let Nl := N.@ "label".
+  Let Nl := nroot.@ "label".
+  Let ℓq : ord.t := (1 ⊕ 1)%ordi.
 
-  Let Φ_tf `{!heapGS Σ} : tf Σ :=
-        (∃ g1 g2 k kl1 kl2,
-            ⌜ k ≠ kl1 ⌝ ∗ mp_tf k l ∗
-            tf_until Np k false (1/2) (l ↦ #0) (l ↦ #1) ∗
-            tf_finally Nl kl1 false 1 (∃ v, (i ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-            tf_finally Nl kl2 false 1 (∃ v, (j ⤉ "exit", v) ∗ ⌜ v = #() ⌝) ∗
-            ⟨thP_carriers i {[g1]} ∗ crP_obls i g1 0 {[k; kl1]} ∗
-             thP_carriers j {[g2]} ∗ crP_obls j g2 1 ({[kl2]}) ∗
-             crP_fuel g1 0 10 ∗ crP_fuel g2 1 ((1 × ▽) ⊕ 1)%M⟩)%F.
+  Let Φ_tf `{!heapGS Σ} : _ → tf Σ :=
+        λ μ,
+          (∃ g kl,
+              finallyP Nl kl 1 (exit #1 @ i) ∗
+              ⟨thP_carriers i {[g]} ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
+               crP_fuel g (ℓq ⊕ 2)%ordi μ⟩)%F.
 
-  Lemma tf_to_tp_Φ `{!heapGS Σ} :
-    tf_to_tp Φ_tf = Φ'.
+  Lemma tf_to_tp_Φ `{!heapGS Σ} m :
+    tf_to_tp (Φ_tf m) = Φ'.
   Proof. done. Qed.
 
   Let Σ : gFunctors :=
         #[mupdΣ;
           histGS.histΣ (state * thread_pool heap_lang * list (observation));
-          heap_stateΣ].
+          heap_stateΣ;
+          queueΣ;
+          ticket_lockΣ
+          ].
 
   Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
-        {[i := fork_post; j := fork_post]}.
+        {[i := (λ _ v, ⌜v = #1⌝)%I]}.
 
-  Theorem mp_adequacy :
+  Theorem task_queue_client_adequacy :
     ∀ (τ : trace heap_lang),
     behavior τ →
     fair_scheduling τ →
@@ -354,21 +329,19 @@ Section adequacy.
     iSplitL "Tis".
     { by iFrame. }
     iModIntro. iIntros "LC TGs".
-    (* Set Printing All. *)
-    iMod (mp_pre Θ0 i j l with "[Ptrs] [TGs]") as "H".
-    { subst i j. lia. }
+    iMod (main_pre Θ0 i with "[TGs]") as "H".
     { done. }
     { reflexivity. }
     { reflexivity. }
-    { subst σ0. rewrite big_sepM_singleton.
-      by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
     { iFrame. }
-    iDestruct "H" as "(HP& H)".
-    iModIntro. iExists Φ_tf. iFrame "HP". iSplit.
+    iDestruct "H" as (μ) "(HP& H)".
+    iModIntro. iExists (Φ_tf μ). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
+    (* TODO: FIXME? *)
+    Unshelve. apply QueueG. apply _.
   Qed.
 
 End adequacy.
 
-(* Print Assumptions mp_adequacy. *)
+(* Print Assumptions task_queue_client_adequacy. *)
