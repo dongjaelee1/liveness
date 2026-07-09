@@ -54,16 +54,6 @@ Section proof.
   Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
   (** ** Definitions *)
-  (* Definition is_task (ℓ : ord.t) : val → oids → iProp Σ := *)
-  (*   λ v B, (∃ f a ℓt (P : iProp Σ), *)
-  (*              ⌜(v = (f, a)%V) ∧ (ℓt < ℓ)%ordi⌝ ∧ *)
-  (*              P ∗ *)
-  (*              ∃ μ, ∀ lc i G g K ℓg, *)
-  (*              l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓt μ) ∗ *)
-  (*                   crP_obls g ℓg K ∗ ⌜ B ⊆ K ⌝ ∗ P }}} *)
-  (*               f a @ i *)
-  (*             l{{{ rv, RET rv; £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ B) }}})%I. *)
-
   (** The invariant *)
   Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) : iProp Σ :=
     is_queue ql γ ℓ (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I.
@@ -80,7 +70,6 @@ Section proof.
     l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
          crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
          is_task ℓ task_f task_a B ∗ is_task_queue ql γ ℓ }}}
-         (* is_task ℓ (task_f, task_a)%V B ∗ is_task_queue ql γ ℓ }}} *)
       TaskQueue.put_task ql task_f task_a @ i
     l{{{ RET #(); £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ B) }}}.
   Proof.
