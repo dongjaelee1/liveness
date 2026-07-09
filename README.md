@@ -12,10 +12,7 @@
   opam repo add coq-released https://coq.inria.fr/opam/released
   opam repo add iris-dev https://gitlab.mpi-sws.org/iris/opam.git
 ```
-3. (Outdated) ~~Run `make build-dep` to install the right versions of the dependencies, 
-   in particular Coq 8.10.2 and coq-stdpp 1.3.0.~~
-
-   (New) Install parametric Iris:
+3. (New) Install parametric Iris:
 ```
   git clone https://gitlab.mpi-sws.org/dongjae/iris.git
   cd iris
