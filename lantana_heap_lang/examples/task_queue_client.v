@@ -109,8 +109,10 @@ Section proof.
         { iApply big_sepS_singleton. iFrame. }
         rewrite /is_task_queue. iFrame "is_task_queue".
         rewrite /is_task. iDestruct "TASK" as (mt) "TASK".
-        iExists _, _, 1%ordi, _. iSplit.
-        { iPureIntro. split; first eauto. apply ℓq_cond. }
+        iExists 1%ordi, _. iSplit.
+        (* iExists _, _, 1%ordi, _. iSplit. *)
+        { iPureIntro. apply ℓq_cond. }
+        (* { iPureIntro. split; first eauto. apply ℓq_cond. } *)
         iSplitL.
         { iCombine "Of Ftk" as "H". iApply "H". }
         iExists mt. iIntros (??????) "!> % (TG& GF& Gg& %Hsub& OF& Ftk) HΦ".

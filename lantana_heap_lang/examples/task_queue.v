@@ -8,7 +8,7 @@ From iris.prelude Require Import options.
 From iris.algebra Require Import reservation_map dfrac_agree mono_list gset.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map.
 From lantana.algebra Require Import list_of_sets.
-From lantana.heap_lang.examples Require Export queue.
+From lantana.heap_lang.examples Require Export queue handoff.
 
 Module TaskQueue.
 
@@ -54,19 +54,20 @@ Section proof.
   Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
   (** ** Definitions *)
-  Definition is_task (ℓ : ord.t) : val → oids → iProp Σ :=
-    λ v B, (∃ f a ℓt (P : iProp Σ),
-               ⌜(v = (f, a)%V) ∧ (ℓt < ℓ)%ordi⌝ ∧
-               P ∗
-               ∃ μ, ∀ lc i G g K ℓg,
-               l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓt μ) ∗
-                    crP_obls g ℓg K ∗ ⌜ B ⊆ K ⌝ ∗ P }}}
-                f a @ i
-              l{{{ rv, RET rv; £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ B) }}})%I.
+  (* Definition is_task (ℓ : ord.t) : val → oids → iProp Σ := *)
+  (*   λ v B, (∃ f a ℓt (P : iProp Σ), *)
+  (*              ⌜(v = (f, a)%V) ∧ (ℓt < ℓ)%ordi⌝ ∧ *)
+  (*              P ∗ *)
+  (*              ∃ μ, ∀ lc i G g K ℓg, *)
+  (*              l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓt μ) ∗ *)
+  (*                   crP_obls g ℓg K ∗ ⌜ B ⊆ K ⌝ ∗ P }}} *)
+  (*               f a @ i *)
+  (*             l{{{ rv, RET rv; £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ B) }}})%I. *)
 
   (** The invariant *)
   Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) : iProp Σ :=
-    is_queue ql γ ℓ (is_task ℓ).
+    is_queue ql γ ℓ (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I.
+    (* is_queue ql γ ℓ (is_task ℓ). *)
 
   (** ** Lemmas *)
   Global Instance is_task_queue_persistent ql γ ℓ : Persistent (is_task_queue ql γ ℓ).
@@ -78,7 +79,8 @@ Section proof.
     ⊢ ∃ μ, ∀ lc i G g K B γ ℓ ℓg (ql task_f task_a : val),
     l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
          crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
-         is_task ℓ (task_f, task_a)%V B ∗ is_task_queue ql γ ℓ }}}
+         is_task ℓ task_f task_a B ∗ is_task_queue ql γ ℓ }}}
+         (* is_task ℓ (task_f, task_a)%V B ∗ is_task_queue ql γ ℓ }}} *)
       TaskQueue.put_task ql task_f task_a @ i
     l{{{ RET #(); £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ B) }}}.
   Proof.
@@ -145,7 +147,8 @@ Section proof.
         iApply "HΦ". iFrame.
     - destruct Hcase as (v& Hcase). subst x.
       iDestruct "Hx" as "(%&%& Htask& Gg& Fg& %Ning& HW)".
-      iDestruct "Htask" as "(%&%&%&%& %Htask& HP& %mt& TASK)".
+      iDestruct "Htask" as "(%&%&%& (%&%& %Htask& HP& %mt& TASK))".
+      (* iDestruct "Htask" as "(%&%&%&%& %Htask& HP& %mt& TASK)". *)
       iPoseProof (crP_fuel_add with "Fg") as "[_ Fg]".
       iPoseProof (crP_fuel_add_nat 99 1 with "Fg") as "[Fg' Fg]". 1: lia.
       iPoseProof (crP_fuels_add_carrier with "Fg' GF") as "GF".
@@ -159,7 +162,8 @@ Section proof.
         iPoseProof (big_sepS_union _ {[ng]} with "[Fng $F_task]") as "F_task". 1: set_solver.
         { iApply big_sepS_singleton. iFrame. }
         replace ({[ng]} ∪ ({[g]} ∪ G)) with ({[g; ng]} ∪ G) by set_solver.
-        destruct Htask as (->& Hltask).
+        subst v.
+        (* destruct Htask as (->& Hltask). *)
         lwp_pures.
         lwp_bind (f a).
         iMod (crP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
@@ -173,7 +177,8 @@ Section proof.
         replace (({[g; ng]} ∪ G) ∖ {[g]}) with ({[ng]} ∪ G) by set_solver.
         iModIntro. iApply "HΦ". iFrame "Q_LC". iExists ng. iFrame. iPureIntro. set_solver.
       + iRename "HW" into "TG".
-        destruct Htask as (->& Hltask).
+        subst v.
+        (* destruct Htask as (->& Hltask). *)
         lwp_pures.
         lwp_bind (f a).
         iMod (crP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
@@ -275,7 +280,7 @@ Section proof.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
     lwp_bind (Queue.init _).
     iModIntro.
-    iApply ("Queue_init_spec" $! 0 (is_task ℓ) with "[$TG $GF_qi]").
+    iApply ("Queue_init_spec" $! 0 (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I with "[$TG $GF_qi]").
     iIntros (??) "(_& TG& IQI)".
     lwp_pures.
     lwp_bind (Fork _).
