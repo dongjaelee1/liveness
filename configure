@@ -1,4 +1,26 @@
 #!/bin/bash
+set -e
+
+NJOBS="${NJOBS:-8}"
+
+# Opam repositories for Coq packages and dev versions of std++.
 opam repo add coq-released https://coq.inria.fr/opam/released
+opam repo add iris-dev https://gitlab.mpi-sws.org/iris/opam.git
+
+# The Ordinal library.
 opam remote add coq-sf -k git --rank=1 https://github.com/snu-sf/sf-opam-coq-archive
-opam install coq-ordinal.0.5.6
+opam install -y coq-ordinal.0.5.6
+
+# Build and install the bundled parametric Iris and transfinite Iris
+# developments (shipped as zip files in the repository root).
+rm -rf vendor
+mkdir -p vendor
+unzip -q iris-parametric-index.zip -d vendor
+unzip -q transfinite-parametric-index.zip -d vendor
+
+make -C vendor/iris-parametric-index builddep
+make -C vendor/iris-parametric-index -j"$NJOBS"
+make -C vendor/iris-parametric-index install
+
+make -C vendor/transfinite-parametric-index -j"$NJOBS"
+make -C vendor/transfinite-parametric-index install

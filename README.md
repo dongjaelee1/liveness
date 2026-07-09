@@ -1,49 +1,32 @@
 ### Installation (not tested)
 
-1. Setup a new opam switch and switch to it:
+The development depends on parametric Iris and transfinite Iris, whose sources
+are bundled in this repository as `iris-parametric-index.zip` and
+`transfinite-parametric-index.zip`.
+
+1. Set up a new opam switch and switch to it:
   ```
   opam update
   opam switch create liris 5.2.1
   eval $(opam env)
   ```
 
-2. Add the Coq opam repository (maybe also iris-dev): 
-```
-  opam repo add coq-released https://coq.inria.fr/opam/released
-  opam repo add iris-dev https://gitlab.mpi-sws.org/iris/opam.git
-```
-3. (New) Install parametric Iris:
-```
-  git clone https://gitlab.mpi-sws.org/dongjae/iris.git
-  cd iris
-  git checkout dongjae/parametric-index
-  make builddep
-  make -j8
-  make install
-```
-  Install transfinite Iris:
-```
-  git clone https://gitlab.mpi-sws.org/dongjae/transfinite-parametric-stepindex.git
-  cd transfinite-parametric-stepindex
-  git checkout dongjae/parametric-index
-  make -j8
-  make install
-```
-  Install additional libraries:
-```
+2. Run the configure script:
+  ```
   ./configure
-```
+  ```
+  This adds the required opam repositories, installs the Ordinal library, and
+  then unpacks the bundled zip files into `vendor/` and builds and installs
+  parametric Iris and transfinite Iris from them. Set `NJOBS` to control build
+  parallelism (default 8), e.g. `NJOBS=4 ./configure`.
 
-4. Run `make -jN` to build the full development, where `N` is the number of threads
-   to use for the build process.
+3. Run `make -jN` to build the full development, where `N` is the number of
+   threads to use for the build process.
 
 ## Acknowledgements
 
-Files in `cgraphs/` directory are modifications of files from https://github.com/julesjacobs/cgraphs.
-The paper is available at:
-* "Connectivity graphs: a method for proving deadlock freedom based on separation logic"
-  by Jules Jacobs, Stephanie Balzer, and Robbert Krebbers, POPL 2022.
-  See https://dl.acm.org/doi/abs/10.1145/3498662
+The `liris/ordinal/` directory is a copy of the Ordinal library, available at
+https://github.com/snu-sf/Ordinal.
 
 (Transfinite Iris) The mechanization of set-theoretic ordinals and the underlying ZF model construction 
 has been based on Coq code by Dominik Kirst and Gert Smolka, available at: 

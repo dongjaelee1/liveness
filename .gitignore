@@ -14,6 +14,7 @@
 .coqdeps.d
 .coq-native/
 build-dep/
+vendor/
 Makefile.coq
 .Makefile.coq.d
 Makefile.coq.conf
