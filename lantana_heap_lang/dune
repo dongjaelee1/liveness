@@ -1,0 +1,5 @@
+(include_subdirs qualified)
+(coq.theory
+ (name lantana.heap_lang)
+ (package coq-lantana-heap-lang)
+ (theories stdpp lantana))

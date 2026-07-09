@@ -9,7 +9,7 @@ access to their upstream repositories is needed.
 1. Set up a new opam switch and switch to it:
   ```
   opam update
-  opam switch create liris 5.2.1
+  opam switch create lantana 5.2.1
   eval $(opam env)
   ```
 
@@ -27,7 +27,7 @@ access to their upstream repositories is needed.
 
 ## Acknowledgements
 
-The `liris/ordinal/` directory is a copy of the Ordinal library, available at
+The `lantana/ordinal/` directory is a copy of the Ordinal library, available at
 https://github.com/snu-sf/Ordinal.
 
 (Transfinite Iris) The mechanization of set-theoretic ordinals and the underlying ZF model construction 
