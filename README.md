@@ -1,8 +1,10 @@
-### Installation (not tested)
+### Installation
 
-The development depends on parametric Iris and transfinite Iris, whose sources
-are bundled in this repository as `iris-parametric-index.zip` and
-`transfinite-parametric-index.zip`.
+The development depends on std++ (version `dev.2025-07-31.0.8c814126`, i.e.,
+upstream commit `8c814126`), parametric Iris, and transfinite Iris, whose
+sources are bundled in this repository as `stdpp.zip`,
+`iris-parametric-index.zip`, and `transfinite-parametric-index.zip`, so no
+access to their upstream repositories is needed.
 
 1. Set up a new opam switch and switch to it:
   ```
@@ -15,10 +17,10 @@ are bundled in this repository as `iris-parametric-index.zip` and
   ```
   ./configure
   ```
-  This adds the required opam repositories, installs the Ordinal library, and
-  then unpacks the bundled zip files into `vendor/` and builds and installs
-  parametric Iris and transfinite Iris from them. Set `NJOBS` to control build
-  parallelism (default 8), e.g. `NJOBS=4 ./configure`.
+  This installs Coq 9.0.0 and the Ordinal library via opam, and then unpacks
+  the bundled zip files into `vendor/` and builds and installs std++,
+  parametric Iris, and transfinite Iris from them. Set `NJOBS` to control
+  build parallelism (default 8), e.g. `NJOBS=4 ./configure`.
 
 3. Run `make -jN` to build the full development, where `N` is the number of
    threads to use for the build process.
