@@ -37,19 +37,11 @@ liris/ordinal/ordinal_facts.v
 liris/prelude/axioms.v
 liris/prelude/wf_structs.v
 liris/prelude/ordinal_facts.v
-# liris/prelude/tree.v
 
 liris/bi/weakestpre.v
 
-#liris/cgraphs/mapexcl.v
-#liris/cgraphs/multiset.v
-#liris/cgraphs/util.v
-#liris/cgraphs/uforests.v
-#liris/cgraphs/cgraph.v
-
 liris/algebra/list_of_sets.v
 liris/algebra/map_of_sets.v
-# liris/algebra/tree.v
 liris/algebra/forest.v
 liris/algebra/map_of_forests.v
 liris/algebra/ocm.v
@@ -83,8 +75,6 @@ liris/base_logic/mupd.v
 liris/base_logic/gupd.v
 liris/base_logic/oinv.v
 liris/base_logic/opreds.v
-# liris/base_logic/thread_view_obls.v
-# liris/base_logic/digraph.v
 
 liris/program_logic/language.v
 liris/program_logic/history_interp.v
@@ -114,28 +104,8 @@ liris_heap_lang/metatheory.v
 liris_heap_lang/primitive_laws.v
 liris_heap_lang/derived_laws.v
 liris_heap_lang/proofmode.v
-# liris_heap_lang/adequacy.v
-# liris_heap_lang/total_adequacy.v
-# liris_heap_lang/proph_erasure.v
 
 liris_heap_lang/lib/array.v
-# liris_heap_lang/lib/counter.v
-# liris_heap_lang/lib/spawn.v
-# liris_heap_lang/lib/par.v
-# liris_heap_lang/lib/assert.v
-# liris_heap_lang/lib/lock.v
-# liris_heap_lang/lib/rw_lock.v
-# liris_heap_lang/lib/spin_lock.v
-# liris_heap_lang/lib/ticket_lock.v
-# liris_heap_lang/lib/rw_spin_lock.v
-# liris_heap_lang/lib/nondet_bool.v
-# liris_heap_lang/lib/lazy_coin.v
-# liris_heap_lang/lib/clairvoyant_coin.v
-# liris_heap_lang/lib/atomic_heap.v
-# liris_heap_lang/lib/increment.v
-# liris_heap_lang/lib/diverge.v
-# liris_heap_lang/lib/arith.v
-# liris_heap_lang/lib/logatom_lock.v
 
 liris_heap_lang/examples/flag.v
 liris_heap_lang/examples/flag_client.v
@@ -150,4 +120,3 @@ liris_heap_lang/examples/queue.v
 liris_heap_lang/examples/task_queue.v
 liris_heap_lang/examples/task_queue_client.v
 liris_heap_lang/examples/extended_int.v
-liris_heap_lang/examples/lcset.v
