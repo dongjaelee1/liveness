@@ -158,8 +158,24 @@ Section ectxi_language.
     intros []%eq_None_not_Some. eapply fill_val, Hsub. by rewrite /= fill_app.
   Qed.
 
-  Global Instance ectxi_lang_ctx_item Ki : LanguageCtx (fill_item Ki).
-  Proof. change (LanguageCtx (fill [Ki])). apply _. Qed.
+  Global Instance ectxi_lang_ctx_item Ki : @LanguageCtx ectxi_lang [Ki].
+  Proof. apply _. Qed.
+
+  (** The same reducible expression determines its surrounding context.
+      This uses context decomposition, not determinism of the step. *)
+  Lemma fill_ctx_step_inj (K1 K2 : ectx) e i σ τ κ e' σ' efs :
+    language.prim_step i e σ τ κ e' σ' efs →
+    fill K1 e = fill K2 e → K1 = K2.
+  Proof.
+    intros [R r r' -> -> Hbase] Heq.
+    rewrite -!fill_app in Heq.
+    assert (base_reducible i r σ τ) as Hr.
+    { exists κ, r', σ', efs. exact Hbase. }
+    destruct (base_redex_unique (R ++ K1) (R ++ K2) i r r σ τ Heq Hr Hr)
+      as [HK _].
+    change (R ++ K1 = R ++ K2) in HK.
+    by apply (inj (app R)).
+  Qed.
 End ectxi_language.
 
 Global Arguments ectxi_lang_ectx : clear implicits.

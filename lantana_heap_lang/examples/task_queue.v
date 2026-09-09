@@ -43,13 +43,13 @@ Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
   Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
+    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
 
   Ltac lwp_pure_one := (iModIntro; lwp_pure; post_lwp).
   Ltac lwp_pures := repeat (lwp_pure_one).
 
   Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
+    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
 
   Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
@@ -66,31 +66,31 @@ Section proof.
   (** ** Program proofs *)
   (** FIXME: better notation for triples with this pattern *)
   Lemma TaskQueue_put_task_spec :
-    ⊢ ∃ μ, ∀ lc i G g K B γ ℓ ℓg (ql task_f task_a : val),
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
+    ⊢ ∃ μ, ∀ lc i G g K B γ ℓ ℓg (ql task_f task_a : val) C,
+    l{{{ thread_expr i C (TaskQueue.put_task ql task_f task_a) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
          crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗ ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
          is_task ℓ task_f task_a B ∗ is_task_queue ql γ ℓ }}}
       TaskQueue.put_task ql task_f task_a @ i
-    l{{{ RET #(); £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ B) }}}.
+    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ B) }}}.
   Proof.
     iPoseProof (Queue_enqueue_spec) as (m) "Queue_enqueue_spec".
-    iExists (100 ⊕ m)%M. iIntros (lc i G g K B γ ℓ ℓg ql task_f task_a) "!> % (TG& GF& Gg& %Sub& OF& TASK& (%Hℓ& #IQ)) HΦ".
+    iExists (100 ⊕ m)%M. iIntros (lc i G g K B γ ℓ ℓg ql task_f task_a C) "!> % (TE& TG& GF& Gg& %Sub& OF& TASK& (%Hℓ& #IQ)) HΦ".
     rewrite /TaskQueue.put_task.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_Queue_enqueue]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
+    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     lwp_pures.
     (** Queue enqueue *)
     lwp_bind (Queue.enqueue _ _).
-    iModIntro. iApply ("Queue_enqueue_spec" $! 0 with "[$TG $F_Queue_enqueue $Gg $OF TASK $IQ]").
+    iModIntro. iApply ("Queue_enqueue_spec" $! 0 with "[$TE $TG $F_Queue_enqueue $Gg $OF TASK $IQ]").
     { by iFrame. }
-    iIntros "(_& TG& Gg)". iApply ("HΦ" with "[$Q_LC $TG $Gg]").
+    iIntros "(TE& _& TG& Gg)". iApply ("HΦ" with "[$TE $Q_LC $TG $Gg]").
   Qed.
 
   Lemma TaskQueue_run_task_spec :
-    ⊢ ∃ μ, ∀ lc m (b : bool) wg i G γ ℓ (ql : val),
-    l{{{ thP_carriers i G ∗
+    ⊢ ∃ μ, ∀ lc m (b : bool) wg i G γ ℓ (ql : val) C,
+    l{{{ thread_expr i C (TaskQueue.run_task ql) ∗ thP_carriers i G ∗
          (* For dequeue *)
          ([∗ set] g ∈ G, crP_fuel g (1)%ordi μ) ∗
          (* For task *)
@@ -100,7 +100,7 @@ Section proof.
           else True) ∗
          is_task_queue ql γ ℓ }}}
       TaskQueue.run_task ql @ i
-      l{{{ rv, RET rv; £ lc ∗
+      l{{{ rv, RET rv; thread_expr i C (of_val rv) ∗ £ lc ∗
                        (if b
                         then (∃ ng, thP_carriers i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
                                     queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
@@ -108,17 +108,17 @@ Section proof.
   Proof.
     iPoseProof (Queue_dequeue_spec) as (m) "Queue_dequeue_spec".
     (** For internal steps and calling dequeue *)
-    iExists (100 ⊕ m)%M. iIntros (lc μ b wg i G γ ℓ ql) "!> % (TG& GF& F_task& HW& #ITQ) HΦ".
+    iExists (100 ⊕ m)%M. iIntros (lc μ b wg i G γ ℓ ql C) "!> % (TE& TG& GF& F_task& HW& #ITQ) HΦ".
     (* To make some iFrame faster *)
     unfold is_task_queue.
     rewrite /TaskQueue.run_task.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_m]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
+    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     lwp_bind (Queue.dequeue _).
-    iModIntro. iApply ("Queue_dequeue_spec" $! 0 (μ ⊕ 100)%M b with "[$TG $F_m $HW $ITQ]").
-    iIntros (x) "(_& Hx)".
+    iModIntro. iApply ("Queue_dequeue_spec" $! 0 (μ ⊕ 100)%M b with "[$TE $TG $F_m $HW $ITQ]").
+    iIntros (x) "(TE& _& Hx)".
     iAssert (⌜x = NONEV ∨ ∃ v, x = SOMEV v⌝)%I as "%Hcase".
     { destruct x; eauto. destruct x; auto. destruct l; auto. }
     destruct Hcase as [Hcase | Hcase].
@@ -159,12 +159,12 @@ Section proof.
         { eapply ord.lt_le_lt. 1: eauto. done. }
         iModIntro.
         iApply lwp_sfmupd.
-        iApply ("TASK" $! 0 with "[$TG $F_task $Gg $HP]").
+        iApply ("TASK" $! 0 with "[$TE $TG $F_task $Gg $HP]").
         { iPureIntro. set_solver. }
-        iIntros (?) "(_& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
+        iIntros (?) "(TE& _& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
         iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
         replace (({[g; ng]} ∪ G) ∖ {[g]}) with ({[ng]} ∪ G) by set_solver.
-        iModIntro. iApply "HΦ". iFrame "Q_LC". iExists ng. iFrame. iPureIntro. set_solver.
+        iModIntro. iApply "HΦ". iFrame "TE Q_LC". iExists ng. iFrame. iPureIntro. set_solver.
       + iRename "HW" into "TG".
         subst v.
         (* destruct Htask as (->& Hltask). *)
@@ -174,17 +174,17 @@ Section proof.
         { eapply ord.lt_le_lt. 1: eauto. done. }
         iModIntro.
         iApply lwp_sfmupd.
-        iApply ("TASK" $! 0 with "[$TG $F_task $Gg $HP]").
+        iApply ("TASK" $! 0 with "[$TE $TG $F_task $Gg $HP]").
         { iPureIntro. set_solver. }
-        iIntros (?) "(_& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
+        iIntros (?) "(TE& _& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
         iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
         replace (({[g]} ∪ G) ∖ {[g]}) with G by set_solver.
         iModIntro. iApply "HΦ". iFrame.
   Qed.
 
   Lemma TaskQueue_worker_spec :
-    ⊢ ∃ μ, ∀ (b : bool) i G γ ℓ (ql : val),
-    l{{{ thP_carriers i G ∗
+    ⊢ ∃ μ, ∀ (b : bool) i G γ ℓ (ql : val) C,
+    l{{{ thread_expr i C (TaskQueue.worker ql) ∗ thP_carriers i G ∗
          (if b
           then (∃ g, ⌜G = {[g]} ∧ (1 <= ℓ)%ordi⌝ ∧ (crP_fuel g (ℓ)%ordi μ) ∗ queue_worker γ g)
           else (⌜G = ∅⌝)) ∗
@@ -194,7 +194,7 @@ Section proof.
   Proof.
     iPoseProof (TaskQueue_run_task_spec) as (mr) "TaskQueue_run_task_spec".
     (** For internal steps and executing run_task *)
-    iExists (100 ⊕ mr ⊕ 1)%M. iIntros (b i G γ ℓ ql) "!> % (TG& HW& #ITQ) HΦ".
+    iExists (100 ⊕ mr ⊕ 1)%M. iIntros (b i G γ ℓ ql C) "!> % (TE& TG& HW& #ITQ) HΦ".
     iClear "HΦ".
     rewrite /TaskQueue.worker.
     destruct b.
@@ -204,9 +204,9 @@ Section proof.
       iPoseProof (crP_fuel_add_set with "GF") as "[GF F_mr]".
       iPoseProof (crP_fuels_init with "GF") as "GF".
       (** Lob (co-)induction *)
-      iRevert (g) "Qw F_mr TG GF". iLöb as "IH". iIntros (g) "HW F_mr TG GF".
+      iRevert (g) "Qw F_mr TG GF TE". iLöb as "IH". iIntros (g) "HW F_mr TG GF TE".
       lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
       lwp_bind (TaskQueue.run_task _).
       iPoseProof (crP_fuel_add_set with "F_mr") as "[F_mr F_mr1]".
       iMod (crP_fuel_mon_gen_set _ 1%ordi _ mr with "F_mr") as "F_mr". 1: auto.
@@ -214,8 +214,8 @@ Section proof.
         - right. econstructor 1. auto.
         - left. split; auto. }
       iModIntro.
-      iApply ("TaskQueue_run_task_spec" $! 100 (102 ⊕ (mr ⊕ 1))%M true with "[$TG $F_mr $F_mr1 $HW $ITQ]").
-      iIntros (rv) "(LC& (%& TG& %Ninng& Qw& Gg& Fng))".
+      iApply ("TaskQueue_run_task_spec" $! 100 (102 ⊕ (mr ⊕ 1))%M true with "[$TE $TG $F_mr $F_mr1 $HW $ITQ]").
+      iIntros (rv) "(TE& LC& (%& TG& %Ninng& Qw& Gg& Fng))".
       iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
       replace ({[ng; g]} ∖ {[g]}) with ({[ng]} : gset ocid) by set_solver.
       iClear "GF".
@@ -226,65 +226,65 @@ Section proof.
       do 2 lwp_pure_one.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
       iApply (lc_lwpupd_add_later with "LC1"). iNext.
-      iModIntro. iApply ("IH" with "Qw F_mr TG GF").
+      iModIntro. iApply ("IH" with "Qw F_mr TG GF TE").
     - iDestruct "HW" as "%". subst G.
       (** Lob (co-)induction *)
-      iRevert "TG". iLöb as "IH". iIntros "TG".
+      iRevert "TG TE". iLöb as "IH". iIntros "TG TE".
       iAssert ([∗ set] g ∈ ∅, crP_fuel g 0 100)%I as "GF''". 1: done.
       iPoseProof (crP_fuels_init with "GF''") as "GF'".
       lwp_pure. simpl.
-      iFrame "TG GF'". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      iFrame "TG GF'". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
       iClear "GF' GF''".
       lwp_bind (TaskQueue.run_task _).
       iModIntro.
-      iApply ("TaskQueue_run_task_spec" $! 100 (100 ⊕ (mr ⊕ 1))%M false 1%positive with "[$TG $ITQ]").
+      iApply ("TaskQueue_run_task_spec" $! 100 (100 ⊕ (mr ⊕ 1))%M false 1%positive with "[$TE $TG $ITQ]").
       1: iSplit; done.
-      iIntros (rv) "(LC& TG)".
+      iIntros (rv) "(TE& LC& TG)".
       iClear "GF".
       iAssert ([∗ set] g ∈ ∅, crP_fuel g 0 100)%I as "GF''". 1: done.
       iPoseProof (crP_fuels_init with "GF''") as "GF'".
       iModIntro. lwp_pure. simpl.
-      iFrame "TG GF'". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      iFrame "TG GF'". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
       iClear "GF' GF''".
       do 1 lwp_pure_one.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
       iApply (lc_lwpupd_add_later with "LC1"). iNext.
-      iApply ("IH" with "TG").
+      iApply ("IH" with "TG TE").
   Qed.
 
   Lemma TaskQueue_init_spec :
-    ⊢ ∃ μ, ∀ (lc : Ord.t) i G ℓ,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗ ⌜(1 <= ℓ)%ordi⌝ }}}
+    ⊢ ∃ μ, ∀ (lc : Ord.t) i G ℓ C,
+    l{{{ thread_expr i C (TaskQueue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗ ⌜(1 <= ℓ)%ordi⌝ }}}
       TaskQueue.init #() @ i
-    l{{{ ql γ, RET ql; £ lc ∗ thP_carriers i G ∗ is_task_queue ql γ ℓ }}}.
+    l{{{ ql γ, RET ql; thread_expr i C (of_val ql) ∗ £ lc ∗ thP_carriers i G ∗ is_task_queue ql γ ℓ }}}.
   Proof.
     iPoseProof (Queue_init_spec) as (mqi) "Queue_init_spec".
     iPoseProof (TaskQueue_worker_spec) as (mtw) "TaskQueue_worker_spec".
     (** For internal steps and function calls *)
-    iExists (100%nat ⊕ mqi)%M. iIntros (lc i G ℓ) "!> % (TG& GF& %Hlayer) HΦ".
+    iExists (100%nat ⊕ mqi)%M. iIntros (lc i G ℓ C) "!> % (TE& TG& GF& %Hlayer) HΦ".
     rewrite /TaskQueue.init.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_qi]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC".
+    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     lwp_bind (Queue.init _).
     iModIntro.
-    iApply ("Queue_init_spec" $! 0 (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I with "[$TG $GF_qi]").
-    iIntros (??) "(_& TG& IQI)".
+    iApply ("Queue_init_spec" $! 0 (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I with "[$TE $TG $GF_qi]").
+    iIntros (??) "(TE& _& TG& IQI)".
     lwp_pures.
     lwp_bind (Fork _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    iApply (lwp_fork_step). iModIntro. iFrame "TG GF1". iExists ∅. iSplitR; first done.
-    iIntros (?) "TG _ TGj !>". iModIntro.
+    iApply (lwp_fork_step). iModIntro. iFrame "TE TG GF1". iExists ∅. iSplitR; first done.
+    iIntros (?) "TE TEj TG _ TGj !>". iModIntro.
     iMod (carrier_alloc _ _ _ ℓ mtw with "TGj") as "(%& %Ning& TGj& Gg& Fg)".
     iMod (is_queue_initialize with "IQI Gg") as "[#IQ Qw]".
-    iModIntro. iSplitR "TGj Fg Qw".
+    iModIntro. iSplitR "TEj TGj Fg Qw".
     - iModIntro. lwp_pures.
       iModIntro. lwp_finish.
-      rewrite /is_task_queue. iApply ("HΦ" with "[$Q_LC $TG $IQ]").
+      rewrite /is_task_queue. iApply ("HΦ" with "[$TE $Q_LC $TG $IQ]").
     - iModIntro. rewrite /is_task_queue.
-      iApply ("TaskQueue_worker_spec" $! true with "[$TGj $Fg $Qw $IQ]").
+      iApply ("TaskQueue_worker_spec" $! true with "[$TEj $TGj $Fg $Qw $IQ]").
       { iPureIntro. split; auto. set_solver. }
       iIntros "%". done.
   Qed.

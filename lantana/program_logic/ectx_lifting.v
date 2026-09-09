@@ -128,10 +128,10 @@ Section wp.
        base_step i e1 σ1 τ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
     PureExecSI ς i →
     (|={E,E'}=>
-       ς i ∗
+       ς i e1 ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                 (ς i -∗
+                 (ς i e2 -∗
                   thP_carriers i G -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                   ALC (|={E',E}=> lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))

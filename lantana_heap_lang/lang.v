@@ -213,20 +213,6 @@ Record state : Type := {
     (* labels : list (thread_id * string * val); *)
   }.
 
-(** State predicates. *)
-Variant state_pred : Type :=
-  | pred_pointsto (l : loc) (dq : dfrac) (v : val)
-  | pred_label (i : thread_id) (x : string) (v : val)
-.
-
-Definition state_sat : state → gmap thread_id expr → state_pred → Prop :=
-  λ σ Θ π, match π with
-           | pred_pointsto l dq v =>
-               (heap σ) !! l = Some (Some v)
-           | pred_label i t v =>
-               ∃ (K : expr → expr), Θ !! i = Some (K (Label t (of_val v)))
-           end.
-
 (** Equality and other typeclass stuff *)
 Lemma to_of_val v : to_val (of_val v) = Some v.
 Proof. by destruct v. Qed.
@@ -518,6 +504,18 @@ Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
   | ResolveRCtx ex e1 => Resolve ex e1 e
   | LabelCtx t => Label t e
   end.
+
+(** State predicates retain the exact caller context. The fold below is
+    definitionally the evaluation-context language's [fill]. *)
+Variant state_pred : Type :=
+  | pred_pointsto (l : loc) (dq : dfrac) (v : val)
+  | pred_expr (i : thread_id) (C : list ectx_item) (e : expr).
+
+Definition state_sat : state → gmap thread_id expr → state_pred → Prop :=
+  λ σ Θ π, match π with
+           | pred_pointsto l dq v => heap σ !! l = Some (Some v)
+           | pred_expr i C e => Θ !! i = Some (foldl (flip fill_item) e C)
+           end.
 
 (** Substitution *)
 Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=

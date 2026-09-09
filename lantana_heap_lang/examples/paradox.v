@@ -259,8 +259,8 @@ Section proof.
 
   (** Receives later credits via px_inv *)
   Lemma px_loop1_spec :
-    ⊢ ∀ i g z r rm ci cj,
-    l{{{ thP_carriers i ({[g]}) ∗
+    ⊢ ∀ i g z r rm ci cj C,
+    l{{{ thread_expr i C (loop #()) ∗ thP_carriers i ({[g]}) ∗
          crP_obls g 1 {[z]} ∗
          ⟦tf_until N1 z false 1 (⌜ True ⌝) (⌜ False ⌝)⟧ₗ ∗
          £ (10)%ord ∗
@@ -269,10 +269,10 @@ Section proof.
               ∃ ck, witP_layer ck 0 ∗ n ↪[rm]□ ck
       }}}
       loop #() @ i
-    l{{{ RET #(); lift_term i fork_post #() }}}.
+    l{{{ RET #(); thread_expr i C #() ∗ lift_term i fork_post #() }}}.
   Proof using Type*.
-    iIntros (i g z r rm ci cj).
-    iIntros (Φ) "!> (TG& Gg& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Wckn& #Mn) HΦ".
+    iIntros (i g z r rm ci cj C).
+    iIntros (Φ) "!> (TE& TG& Gg& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Wckn& #Mn) HΦ".
     (** Lob induction *)
     iRevert (n ck) "Cljn Wckn Mn Cai". iLöb as "IH".
     iIntros (n ck) "#Cljn #Wckn #Mn Cai".
@@ -282,6 +282,9 @@ Section proof.
     iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
     iIntros "Wfs".
     iEval (rewrite /loop).
+    (* This particular step returns to exactly the same expression, so TE
+       stays unchanged. The conditional no-credit rule above is not extended
+       with a new generic expression-transport assumption. *)
     lwp_lam_no_lc. simpl. iExists ⊤, ({[ck]}). iSplitR.
     { rewrite big_sepS_singleton. auto. }
     iIntros "!> Wcs !> !>".
@@ -289,7 +292,7 @@ Section proof.
     iEval (rewrite big_sepS_singleton) in "Wcs". iDestruct "Wcs" as "[Wc | #Gdckn]".
     - (** Witness induction *)
       iMod (wit_fuels_decr with "Wfs Wc") as "(%& %LTw& #Wfs'& _)".
-      iPoseProof ("IHα" $! _ LTw with "TG Gg TUz LC HΦ Cai Wfs'") as "LWP".
+      iPoseProof ("IHα" $! _ LTw with "TE TG Gg TUz LC HΦ Cai Wfs'") as "LWP".
       eauto.
     - (** Counter is at least n; fetch next count and use Löb induction *)
       iApply lwpupd_fupd_l. iInv "Ipx" as "H".
@@ -315,21 +318,21 @@ Section proof.
       { iFrame. iFrame "Clbj1". eauto. }
       iModIntro. iSplitL "Ca GMA HM".
       { iFrame. }
-      iIntros "!> !>". iApply ("IH" with "TG Gg TUz LC1 HΦ Cljn1 Wckn1 Mn1 Cai").
+      iIntros "!> !>". iApply ("IH" with "TE TG Gg TUz LC1 HΦ Cljn1 Wckn1 Mn1 Cai").
   Qed.
 
   Lemma px_loop2_spec :
-    ⊢ ∀ j n r rm ci cj ck,
-    l{{{ ∃ g, thP_carriers j {[g]} ∗
+    ⊢ ∀ j n r rm ci cj ck C,
+    l{{{ thread_expr j C (loop #()) ∗ ∃ g, thP_carriers j {[g]} ∗
               crP_obls g 0 {[ck]} ∗
               ⟦tf_finally Nu ck false (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
               crP_fuel g 0 10 ∗
               px r rm ci cj ∗
               cnt_auth r cj n (1/2) ∗ n ↪[rm]□ ck }}}
       loop #() @ j
-    l{{{ RET #(); lift_term j fork_post #() }}}.
+    l{{{ RET #(); thread_expr j C #() ∗ lift_term j fork_post #() }}}.
   Proof using Type*.
-    iIntros (j n r rm ci cj ck) "!> %Φ (%& TG& Gg& Uck& Gf& #Ipx& Caj& #Mn) HΦ".
+    iIntros (j n r rm ci cj ck C) "!> %Φ (TE& %& TG& Gg& Uck& Gf& #Ipx& Caj& #Mn) HΦ".
     (** Lob induction *)
     iRevert (n g ck) "TG Gg Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n g ck) "TG Gg Uck Gf Caj #Mn".
@@ -337,7 +340,7 @@ Section proof.
     iPoseProof (crP_fuels_init {[g]} with "[Gf]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
+    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC TE".
     iEval (rewrite -/loop).
     iPoseProof (tlc_split_nat 90 10 with "LC") as "[LC LC']".
     (** TODO: better interface for sfmupd-fupd access patterns *)
@@ -400,7 +403,7 @@ Section proof.
     replace ({[g'; g]} ∖ {[g]}) with ({[g']} : gset _) by set_solver.
     rewrite union_empty_r_L.
     iModIntro. iMod "mask" as "_". iIntros "!> !>".
-    iApply ("IH" with "HΦ TG Gg' [Unew] Gf' Caj Mn1").
+    iApply ("IH" with "TE HΦ TG Gg' [Unew] Gf' Caj Mn1").
     replace (n + 1 + 1) with (n + 2) by lia. iFrame.
   Qed.
 
@@ -450,12 +453,12 @@ Section proof.
               thP_carriers i {[g1]} ∗ crP_obls g1 1 {[z]} ∗
               thP_carriers j {[g2]} ∗ crP_obls g2 0 {[ck]} ∗ crP_fuel g2 0 10⟩)%F) →
     Ψs = ({[i := fork_post; j := fork_post]}) →
-    (£ (10)%ord -∗
+    (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ £ (10)%ord -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m (⟦Φ⟧ₗ ∗
               (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof using H.
-    iIntros (Hij HT HP HQ) "LC TGs".
+    iIntros (Hij HT HP HQ) "TEs LC TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     iPoseProof (big_sepS_union with "TGs") as "[TG1 TG2]".
     { set_solver. }
@@ -468,7 +471,7 @@ Section proof.
     iMod ("ACC" $! _ N1 (⌜ True ⌝)%F (⌜ False ⌝)%F with "[//]") as "HFz".
     rewrite !union_empty_r_L.
     iMod (px_init with "Gg2") as "(%&%&%&%&%&%& Gg2& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)".
-    iModIntro. iSplitL.
+    iModIntro. iSplitR "TEs".
     { subst Φ.
       tf_red. iExists g1. tf_red. iExists g2.
       tf_red. iExists z. tf_red. iExists ck. tf_red. iExists r. tf_red. iExists rm.
@@ -487,16 +490,19 @@ Section proof.
     iEval (tf_red) in "HP". iDestruct "HP" as "(%n& HP)".
     iEval (tf_red) in "HP".
     iDestruct "HP" as "(HFz& HFck& LC& #px& CAi& CAj& #Clj& #GMe& #Wl& TG1& Cg1& TG2& Cg2& Gf)".
-    iPoseProof ("px_loop1_spec" $! i g1 z r rm ci cj (λ v, lift_term i fork_post v)
-                 with "[$TG1 $Cg1 $HFz $LC $px $CAi $Clj $Wl $GMe]") as "WP1".
-    iPoseProof ("px_loop2_spec" $! j n r rm ci cj ck (λ v, lift_term j fork_post v)
-                 with "[$TG2 $Cg2 $HFck $Gf $px $CAj $GMe]") as "WP2".
+    iEval (rewrite HT big_sepM_insert; last by rewrite lookup_singleton_ne) in "TEs".
+    iDestruct "TEs" as "[TEi TEs]".
+    iEval (rewrite big_sepM_singleton) in "TEs". iRename "TEs" into "TEj".
+    iPoseProof ("px_loop1_spec" $! i g1 z r rm ci cj [] (λ v, lift_term i fork_post v)
+                 with "[$TEi $TG1 $Cg1 $HFz $LC $px $CAi $Clj $Wl $GMe]") as "WP1".
+    iPoseProof ("px_loop2_spec" $! j n r rm ci cj ck [] (λ v, lift_term j fork_post v)
+                 with "[$TEj $TG2 $Cg2 $HFck $Gf $px $CAj $GMe]") as "WP2".
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { rewrite lookup_insert_ne; auto. }
     { rewrite lookup_insert_ne; auto. }
     iSplitL "WP1".
-    { iApply "WP1". iModIntro. eauto. }
-    rewrite big_sepM2_singleton. iApply "WP2". iModIntro. eauto.
+    { iApply "WP1". iModIntro. iIntros "[_ $]". }
+    rewrite big_sepM2_singleton. iApply "WP2". iModIntro. iIntros "[_ $]".
   Qed.
 
 End proof.
@@ -579,15 +585,15 @@ Section adequacy.
     iExists (lantana_state_interp_class), (@fork_post Σ), (@Ψs Σ).
     iSplitL "HI TI PI".
     { by iFrame. }
-    iSplitL "Tis".
-    { by iFrame. }
+    iSplitR; first done.
     iModIntro. iIntros "LC TGs".
     (* Set Printing All. *)
-    iMod (px_loop_pre Θ0 i j with "[$LC] [TGs]") as "H".
+    iMod (px_loop_pre Θ0 i j with "[Tis] [$LC] [TGs]") as "H".
     { subst i j. lia. }
     { done. }
     { reflexivity. }
     { reflexivity. }
+    { rewrite /thread_expr /=. iFrame. }
     { iFrame. }
     iDestruct "H" as "(HP& H)".
     iModIntro. iExists (Φ_tf). iFrame "HP". iSplit.

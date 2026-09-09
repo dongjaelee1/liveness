@@ -151,7 +151,16 @@ Section ectx_language.
     - intros. inv H. eapply ectx_language_mixin; eauto.
   Qed.
 
-  Canonical Structure ectx_lang : language := Language (state_sat:=state_sat) ectx_lang_mixin.
+  Definition ectx_lang_ctx_mixin :
+    LanguageCtxMixin (@fill Λ) (@empty_ectx Λ) (@comp_ectx Λ).
+  Proof.
+    split.
+    - apply fill_empty.
+    - intros. symmetry. apply fill_comp.
+  Qed.
+
+  Canonical Structure ectx_lang : language :=
+    Language (state_sat:=state_sat) ectx_lang_mixin ectx_lang_ctx_mixin.
 
   Definition base_atomic (a : atomicity) (e : expr Λ) : Prop :=
     ∀ i σ Θ κ e' σ' efs,
@@ -281,7 +290,7 @@ Section ectx_language.
   Qed.
 
   (* Every evaluation context is a context. *)
-  Global Instance ectx_lang_ctx K : LanguageCtx (fill K).
+  Global Instance ectx_lang_ctx K : @LanguageCtx ectx_lang K.
   Proof.
     split; simpl.
     - eauto using fill_not_val.
@@ -316,7 +325,7 @@ Section ectx_language.
   Lemma pure_exec_fill K φ n e1 e2 :
     PureExec φ n e1 e2 →
     PureExec φ n (fill K e1) (fill K e2).
-  Proof. apply: pure_exec_ctx. Qed.
+  Proof. apply: (pure_exec_ctx K). Qed.
 End ectx_language.
 
 Global Arguments ectx_lang : clear implicits.
@@ -332,7 +341,8 @@ Note that this trick no longer works when we switch to canonical projections
 because then the pattern match [let '...] will be desugared into projections. *)
 Definition LanguageOfEctx (Λ : ectxLanguage) : language :=
   let '@EctxLanguage E V C St K Π of_val to_val empty comp fill base sat mix := Λ in
-  @Language E V St K Π of_val to_val _ sat
-    (@ectx_lang_mixin (@EctxLanguage E V C St K Π of_val to_val empty comp fill base sat mix)).
+  @Language E V St K Π C of_val to_val _ sat fill empty comp
+    (@ectx_lang_mixin (@EctxLanguage E V C St K Π of_val to_val empty comp fill base sat mix))
+    (@ectx_lang_ctx_mixin (@EctxLanguage E V C St K Π of_val to_val empty comp fill base sat mix)).
 
 Global Arguments LanguageOfEctx : simpl never.

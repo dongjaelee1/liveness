@@ -82,13 +82,13 @@ Section proof.
   Context `{!heapGS Σ, !ticket_lockG Σ}.
 
   Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
+    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
 
   Ltac lwp_pure_one := (iModIntro; lwp_pure; post_lwp).
   Ltac lwp_pures := repeat (lwp_pure_one).
 
   Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
+    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
 
   Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
@@ -179,24 +179,24 @@ Section proof.
 
   (** ** Program proofs *)
   Lemma TicketLock_init_spec :
-    ⊢ ∃ m, ∀ lc ℓ i G,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m) }}}
+    ⊢ ∃ m, ∀ lc ℓ i G C,
+    l{{{ thread_expr i C (TicketLock.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m) }}}
       TicketLock.init #() @ i
-    l{{{ tl γ, RET tl; £ lc ∗ thP_carriers i G ∗ γ ↪LOCK ℓ ∗ (∀ E R, R ={E}=∗ is_fair_lock tl γ R) }}}.
+    l{{{ tl γ, RET tl; thread_expr i C (of_val tl) ∗ £ lc ∗ thP_carriers i G ∗ γ ↪LOCK ℓ ∗ (∀ E R, R ={E}=∗ is_fair_lock tl γ R) }}}.
   Proof.
     iExists 4.
-    iIntros (lc ℓ i G) "!> %Φ (TG& GF) HΦ".
+    iIntros (lc ℓ i G C) "!> %Φ (TE& TG& GF) HΦ".
     rewrite /TicketLock.init.
     lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
     lwp_bind (AllocN _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
-    iModIntro. iIntros (curr) "((_& TG& _)& Ptr_curr& _)".
+    iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
+    iModIntro. iIntros (curr) "[TE ((_& TG& _)& Ptr_curr& _)]".
     lwp_bind (AllocN _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
-    iModIntro. iIntros (next) "((_& TG& _)& Ptr_next& _)".
+    iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
+    iModIntro. iIntros (next) "[TE ((_& TG& _)& Ptr_next& _)]".
     lwp_pure_lc lc. iRename "LC" into "QLC".
     iMod (obl_alloc_discharged _ (ℓ ⊕ Z.to_nat 0)%ordi 0) as "(%κu& #Ofk& _& #Wlk& OAcc)".
     iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
@@ -212,7 +212,7 @@ Section proof.
       rewrite -own_op -auth_mra_auth_know_op. done. }
     iModIntro. lwp_finish.
     iModIntro.
-    iApply ("HΦ" $! _ (TicketLockName γt γa γc)). iFrame "TG QLC CF".
+    iApply ("HΦ" $! _ (TicketLockName γt γa γc)). iFrame "TE TG QLC CF".
     iIntros (??) "HR".
     iMod (inv_alloc N_inv _ (lock_inv γt γa γc next curr R) with "[Ptr_next Ptr_curr0 Ptr_curr GMAt GMAa HR]") as "#Ak".
     { iNext. rewrite /lock_inv. iExists 0, 0, {[0%Z := (κu)]}, {[0%Z := true]}.
@@ -230,12 +230,12 @@ Section proof.
 
   (** FIXME: ordi notation levels *)
   Lemma TicketLock_acquire_spec :
-    ⊢ ∃ m, ∀ lc μ i G tl γ dq ℓ R,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ ℵ)%ordi m) ∗
+    ⊢ ∃ m, ∀ lc μ i G tl γ dq ℓ R C,
+    l{{{ thread_expr i C (TicketLock.acquire (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ ℵ)%ordi m) ∗
          γ ↪LOCK{dq} ℓ ∗
          is_fair_lock tl γ R }}}
       TicketLock.acquire tl @ i
-    l{{{ gu κu, RET #();
+    l{{{ gu κu, RET #(); thread_expr i C (#()) ∗
          £ lc ∗
          (⌜ gu ∉ G ⌝) ∗
          thP_carriers i ({[gu]} ∪ G) ∗
@@ -245,7 +245,7 @@ Section proof.
          γ ↪LOCK{dq} ℓ ∗ lock_token tl γ κu R ∗ R }}}.
   Proof.
     iExists 1.
-    iIntros (lc μ i G tl γ dq ℓ R) "!> % (TG& Fs& CF& #IFL) HΦ".
+    iIntros (lc μ i G tl γ dq ℓ R C) "!> % (TE& TG& Fs& CF& #IFL) HΦ".
     rewrite /TicketLock.acquire.
     iAssert (|==>[∗ set] g ∈ G, crP_fuel g (ℓ ⊕ ω)%ordi (100 ⊕ 1)%M)%I with "[Fs]" as ">Fs".
     { rewrite -big_sepS_bupd. iApply (big_sepS_impl with "Fs"). iIntros "!> %% GF".
@@ -255,7 +255,7 @@ Section proof.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     (* argument *)
     lwp_lam. simpl.
-    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
+    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC TE".
     (* get fst and snd of the argument *)
     iDestruct "IFL" as "(%&%& %& #INV)". subst tl.
     (* fst *)
@@ -271,8 +271,8 @@ Section proof.
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
-    iApply (lwp_faa _ ∅ 0 with "[$TG $GF1 $PtrNext]"). 1: done.
-    iIntros "((_& TG& _)& PtrNext)".
+    iApply (lwp_faa _ ∅ 0 with "[$TE $TG $GF1 $PtrNext]"). 1: done.
+    iIntros "[TE ((_& TG& _)& PtrNext)]".
     (** Alloc a new ghost lock for eventual unlock *)
     (* Temporary carrier for the loop *)
     iMod (carrier_alloc _ _ _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (50 ⊕ (50 × ▽))%M with "TG")
@@ -345,7 +345,7 @@ Section proof.
     iPoseProof (crP_fuels_add 42 50 with "GF") as "[_ GF]".
     iPoseProof (crP_fuels_add_carrier with "GF' GF") as "GF".
     lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
     do 2 lwp_pure_one.
     (** Set up induction. *)
     iModIntro.
@@ -376,12 +376,12 @@ Section proof.
     { unshelve eapply ord.le_lt_lt. 1: exact (ℓ ⊕ Z.to_nat my)%ordi.
       - apply hessenberg.le_add_l. auto.
       - apply hessenberg.lt_add_r. apply ordArith.lt_from_nat. lia. }
-    iClear "WFs0". rewrite map_union_empty. iRevert "WFs".
+    iClear "WFs0". rewrite map_union_empty. iRevert "WFs TE".
     iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
-    iIntros "WFs".
+    iIntros "WFs TE".
     (* Execute loop body. *)
     lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
     lwp_bind (Load _).
     (* Atomic step of Load, *)
     iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
@@ -392,9 +392,9 @@ Section proof.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iApply (lwp_load _ {[κp]} 98%ord with "[$TG $GF1 $PtrCurr]").
+    iApply (lwp_load _ {[κp]} 98%ord with "[$TE $TG $GF1 $PtrCurr]").
     { rewrite big_sepS_singleton. eauto. }
-    iIntros "((LC'& TG& Wc)& PtrCurr)". iEval (rewrite big_sepS_singleton) in "Wc".
+    iIntros "[TE ((LC'& TG& Wc)& PtrCurr)]". iEval (rewrite big_sepS_singleton) in "Wc".
     (* Two cases: it's my turn, or not. *)
     destruct (decide (my = c)).
     - iClear "Wlkp Mtkp IHα WFs LC' Wc". clear dependent κp. subst c.
@@ -423,10 +423,10 @@ Section proof.
       clear dependent tickets acks n α.
       iModIntro.
       iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
       rewrite bool_decide_eq_true_2; last done.
       iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ QLC".
+      iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ QLC TE".
       iModIntro. lwp_finish.
       subst G'.
       (* Create a new carrier and offload the unlock obligation to it. *)
@@ -436,7 +436,7 @@ Section proof.
       rewrite union_empty_l_L.
       iMod (carrier_delete with "TG Gg0") as "TG". 1: set_solver.
       replace (({[gu]} ∪ ({[gu0]} ∪ G)) ∖ {[gu0]}) with ({[gu]} ∪ G) by set_solver.
-      iApply ("HΦ" with "[$TG $Gg $QGF' $QGF PtrCurr $HR GUku $QLC $CF]"). iSplit. 1: set_solver.
+      iApply ("HΦ" with "[$TE $TG $Gg $QGF' $QGF PtrCurr $HR GUku $QLC $CF]"). iSplit. 1: set_solver.
       rewrite lock_token_unseal /lock_token_def. iFrame "PtrCurr GUku". eauto.
     - (* Not my turn, proceed to induction. *)
       iDestruct "Wc" as "[Wc | #Gfkp]"; cycle 1.
@@ -456,11 +456,11 @@ Section proof.
       { iNext. iFrame. iSplitR. 1: auto. iSplitR; auto. }
       iModIntro.
       iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
       rewrite bool_decide_eq_false_2; cycle 1.
       { intro. inv H. }
       iModIntro. lwp_pure. simpl.
-      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+      iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
       iMod (wit_fuels_decr with "WFs Wc") as "(%& %LTα& WFs& Fs')".
       iClear "GF LC". iAssert (|==> ([∗ set] k ∈ G', crP_fuel k 0 47))%I with "[Fs']" as ">Fs".
       { rewrite -big_sepS_bupd big_sepM_gset_to_gmap. iApply (big_sepS_impl with "Fs'").
@@ -468,26 +468,26 @@ Section proof.
         - apply ord.O_bot.
         - rewrite !measure_rep_nat. apply OrdArith.le_from_nat. lia. }
       iPoseProof (crP_fuels_init with "Fs") as "Fs".
-      iApply ("IHα" $! α0 LTα with "CF HΦ Gg0 GUku GGF QGF GMEaku TG Fs LC' WFs").
+      iApply ("IHα" $! α0 LTα with "CF HΦ Gg0 GUku GGF QGF GMEaku TG Fs LC' WFs TE").
   Qed.
 
   Lemma TicketLock_release_spec :
-    ⊢ ∃ m, ∀ lc i G tl γ R κu gu ℓu K,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m) ∗
+    ⊢ ∃ m, ∀ lc i G tl γ R κu gu ℓu K C,
+    l{{{ thread_expr i C (TicketLock.release (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m) ∗
          crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token tl γ κu R ∗ R ∗
          is_fair_lock tl γ R }}}
       TicketLock.release tl @ i
-    l{{{ RET #();
+    l{{{ RET #(); thread_expr i C (#()) ∗
          £ lc ∗
          thP_carriers i G ∗
          crP_obls gu ℓu (K ∖ {[κu]}) }}}.
   Proof.
     iExists 100.
-    iIntros (lc i G tl γ R κu gu ℓu K) "!> % (TG& GF& Gg& %LUkl& LT& HR& #IFL) HΦ".
+    iIntros (lc i G tl γ R κu gu ℓu K C) "!> % (TE& TG& GF& Gg& %LUkl& LT& HR& #IFL) HΦ".
     rewrite /TicketLock.release.
     lwp_lam. simpl.
-    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC".
+    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC TE".
     rewrite lock_token_unseal /lock_token_def.
     iDestruct "LT" as "(%& %& %& %& PtrCurr0& #GMEtku& GEku)".
     subst tl.
@@ -495,10 +495,10 @@ Section proof.
     lwp_bind (Load _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    iApply (lwp_load _ ∅ 0 with "[$TG $GF1 $PtrCurr0]"). 1: done.
-    iIntros "((_& TG& _)& PtrCurr0)".
+    iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $PtrCurr0]"). 1: done.
+    iIntros "[TE ((_& TG& _)& PtrCurr0)]".
     iModIntro. lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _".
+    iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
     (* Update curr and unlock κl. *)
     iDestruct "IFL" as "(%&%& %& #INV)". symmetry in H. inv H.
     (* Atomic step of Store, *)
@@ -513,9 +513,9 @@ Section proof.
     (* FIXME: does not combine the dfrac part. *)
     (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iApply (lwp_store _ ∅ lc with "[$TG $GF1 PtrCurr PtrCurr0]").
+    iApply (lwp_store _ ∅ lc with "[$TE $TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iSplitL "PtrCurr"; iFrame. }
-    iIntros "((QLC& TG& _)& [PtrCurr PtrCurr0])".
+    iIntros "[TE ((QLC& TG& _)& [PtrCurr PtrCurr0])]".
     iPoseProof (ghost_map_lookup with "GMAt GMEtku") as "%LUt".
     iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[Hmt HMt]".
     iDestruct "Hmt" as "(Hmt1& [Hmt2 | Hmt2])".
@@ -575,7 +575,7 @@ Section proof.
               lia. }
         iRight. iSplit. 1: iPureIntro; lia.
         iLeft. replace (c + 1 + 1)%Z with (c + 2)%Z by lia. iFrame. }
-    iApply ("HΦ" with "[$TG $Gg $QLC]").
+    iApply ("HΦ" with "[$TE $TG $Gg $QLC]").
   Qed.
 
 End proof.

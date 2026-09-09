@@ -114,7 +114,9 @@ Section lwpupd.
     LanguageCtx K →
     (lwpupd i E e P) ⊢ lwpupd i E (K e) P.
   Proof.
-    unfold_lwpupd. iIntros (HK) "H %%%%%% %% SI". iPoseProof ("H" $! (K0 ∘ K) with "[] [] SI") as "H".
+    unfold_lwpupd. iIntros (HK) "H %%%%%% %% SI".
+    iSpecialize ("H" $! (ctx_comp K0 K)). iEval (rewrite !ctx_comp_apply) in "H".
+    iPoseProof ("H" with "[] [] SI") as "H".
     { iPureIntro. apply _. }
     { done. }
     done.
@@ -212,7 +214,9 @@ Section lwpupd.
     (P ∗ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
      ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
-    iIntros (HTh LB) "HP HI MI". unfold_lwpupd. iPoseProof ("HP" $! id with "[] [//] HI") as ">HP".
+    iIntros (HTh LB) "HP HI MI". unfold_lwpupd.
+    iSpecialize ("HP" $! ctx_id). iEval (rewrite !ctx_id_apply) in "HP".
+    iPoseProof ("HP" with "[] [//] HI") as ">HP".
     { iPureIntro. apply _. }
     iMod (model_interp_mupd_steps with "HP MI") as "(>($& $)& $)"; auto.
     split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub].
@@ -880,13 +884,16 @@ Section lwp.
       apply of_to_val in He as <-. by iFrame. }
     rewrite fill_not_val; last auto.
     iModIntro.
-    iIntros (K1 ?????? HK1 LU1) "SI". iMod ("IH" $! (K1 ∘ K) with "[] [//] SI") as "IH".
+    iIntros (K1 ?????? HK1 LU1) "SI".
+    iSpecialize ("IH" $! (ctx_comp K1 K)). iEval (rewrite !ctx_comp_apply) in "IH".
+    iMod ("IH" with "[] [//] SI") as "IH".
     { iPureIntro. apply _. }
     iModIntro. iMod "IH" as "(%& IH)". iModIntro. iSplit.
     { iPureIntro. destruct s; last done. unfold reducible in *. naive_solver eauto using fill_step. }
     iIntros (e2 σ2 efs Hstep).
     destruct (fill_step_inv (K:=K) i e σ1 (dom Θ) κ e2 σ2 efs) as (e2'&->&?); auto.
     iDestruct ("IH" $! _ _ _ H0) as ">IH".
+    iEval (rewrite !ctx_comp_apply) in "IH".
     iMod "IH" as ">>IH". iMod "IH". iDestruct "IH" as "(SI& IH& Efs)".
     rewrite (bi.sep_assoc). iSplitR "Efs"; cycle 1.
     { iModIntro. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done. }
@@ -911,13 +918,16 @@ Section lwp.
     iIntros "!#" (i e E1 Φ') "IH". iIntros (He Φ) "HΦ".
     rewrite lwp_unfold /lwp_pre /lwp_step. inv He. rename H0 into He. rewrite !He.
     rewrite fill_not_val; last auto.
-    iIntros (K1 ?????? HK1 LU1) "SI". iMod ("IH" $! (K1 ∘ K) with "[] [//] SI") as "IH".
+    iIntros (K1 ?????? HK1 LU1) "SI".
+    iSpecialize ("IH" $! (ctx_comp K1 K)). iEval (rewrite !ctx_comp_apply) in "IH".
+    iMod ("IH" with "[] [//] SI") as "IH".
     { iPureIntro. apply _. }
     iModIntro. iMod "IH" as "(%& IH)". iModIntro. iSplit.
     { iPureIntro. destruct s; last done. unfold reducible in *. naive_solver eauto using fill_step. }
     iIntros (e2 σ2 efs Hstep).
     destruct (fill_step_inv (K:=K) i e σ1 (dom Θ) κ e2 σ2 efs) as (e2'&->&?); auto.
     iDestruct ("IH" $! _ _ _ H0) as ">IH".
+    iEval (rewrite !ctx_comp_apply) in "IH".
     iMod "IH" as ">>IH". iMod "IH". iDestruct "IH" as "(SI& IH& Efs)".
     rewrite (bi.sep_assoc). iSplitR "Efs"; cycle 1.
     { iModIntro. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done. }
@@ -941,9 +951,10 @@ Section lwp.
     lWP e @ s; i; E {{ v, lwpupd i E (of_val v) (Φ v) }}
     ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof.
-    iIntros (He) "H". iApply (lwp_bind_step id).
+    iIntros (He) "H".
+    iEval (rewrite -(ctx_id_apply e)). iApply (lwp_bind_step ctx_id).
     iApply (lwp_strong_mono with "H"). 1,2: done.
-    iIntros (?) "H". iModIntro. iMod "H".
+    iIntros (?) "H". rewrite !ctx_id_apply. iModIntro. iMod "H".
     rewrite lwp_value_sfgupd'. by iFrame.
   Qed.
 
@@ -977,13 +988,16 @@ Section lwp.
       apply of_to_val in He as <-. iFrame. }
     rewrite fill_not_val; last auto.
     iModIntro.
-    iIntros (K1 ?????? HK1 LU1) "SI". iMod ("IH" $! (K1 ∘ K) with "[] [//] SI") as "IH".
+    iIntros (K1 ?????? HK1 LU1) "SI".
+    iSpecialize ("IH" $! (ctx_comp K1 K)). iEval (rewrite !ctx_comp_apply) in "IH".
+    iMod ("IH" with "[] [//] SI") as "IH".
     { iPureIntro. apply _. }
     iModIntro. iMod "IH" as "(%& IH)". iModIntro. iSplit.
     { iPureIntro. destruct s; last done. unfold reducible in *. naive_solver eauto using fill_step. }
     iIntros (e2 σ2 efs Hstep).
     destruct (fill_step_inv (K:=K) i e σ1 (dom Θ) κ e2 σ2 efs) as (e2'&->&?); auto.
     iDestruct ("IH" $! _ _ _ H0) as ">IH".
+    iEval (rewrite !ctx_comp_apply) in "IH".
     iMod "IH" as ">>IH". iMod "IH". iDestruct "IH" as "(SI& IH& Efs)".
     rewrite (bi.sep_assoc). iSplitR "Efs"; cycle 1.
     { iModIntro. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done. }
@@ -1000,10 +1014,11 @@ Section lwp.
     (lwpupd i E e (lWP e @ s; i; E {{ v, lwpupd i E (of_val v) (Φ v) }} ))
     ⊢ lwpupd i E e (lWP e @ s; i; E {{ Φ }}).
   Proof.
-    iIntros "H". iApply (lwp_bind_lwpupd id).
+    iIntros "H".
+    iEval (rewrite -(ctx_id_apply e)). iApply (lwp_bind_lwpupd ctx_id).
     iMod "H". iModIntro.
     iApply (lwp_strong_mono with "H"). 1,2: done.
-    iIntros (?) "H". iModIntro. iMod "H".
+    iIntros (?) "H". rewrite !ctx_id_apply. iModIntro. iMod "H".
     rewrite lwp_value_sfgupd'. by iFrame.
   Qed.
 

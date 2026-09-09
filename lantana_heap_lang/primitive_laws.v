@@ -66,32 +66,38 @@ Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%F
 Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%P
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tp_scope.
 
-(** Predicates for label invocations. *)
-Definition thread_expr `{heap_stateGS Σ} (i : thread_id) (e : expr) : iProp Σ :=
-  (thread i true e 1).
+(** Exact ownership of a thread's expression in its caller context. *)
+Definition thread_expr `{heap_stateGS Σ}
+    (i : thread_id) (C : list ectx_item) (e : expr) : iProp Σ :=
+  thread i true (fill C e) 1.
 
-Local Definition label_def `{heap_stateGS Σ}
-  (i : thread_id) (x : string) (v : val) : iProp Σ :=
-  (∃ (K : ctx heap_lang), ⌜ LanguageCtx K ⌝ ∧ thread_expr i (K (Label x (of_val v)))).
-Local Definition label_aux : seal (@label_def). Proof. by eexists. Qed.
-Definition label := label_aux.(unseal).
-Local Definition label_unseal :
-  @label = @label_def := label_aux.(seal_eq).
-Global Arguments label {Σ _}.
+(** Thread [i] has reached final value [v] at the empty context, not merely
+    returned from a function within a larger thread expression. *)
+Notation "'exits' v @ i" := (thread_expr i [] (of_val v))%I
+  (at level 20, v, i at level 1, format "exits  v @ i") : bi_scope.
+Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%F
+  (at level 20, v, i at level 1, format "exits  v @ i") : tf_scope.
+Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%P
+  (at level 20, v, i at level 1, format "exits  v @ i") : tp_scope.
 
-Notation "i ⤉ t , v " := (label i t v)
-                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : bi_scope.
-Notation "i ⤉ t , v" := (➢ (pred_label i t v))%F
-                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : tf_scope.
-Notation "i ⤉ t , v" := (➢ (pred_label i t v))%P
-                         (at level 20, t, v at level 1, format "i  ⤉  t , v") : tp_scope.
-
-Notation "'exit' v @ i" := (label i "exit" v)%I
-                         (at level 20, v, i at level 1, format "exit  v @ i") : bi_scope.
-Notation "'exit' v @ i" := (➢ (pred_label i "exit" v))%F
-                         (at level 20, v, i at level 1, format "exit  v @ i") : tf_scope.
-Notation "'exit' v @ i" := (➢ (pred_label i "exit" v))%P
-                         (at level 20, v, i at level 1, format "exit  v @ i") : tp_scope.
+(** The terminal atom means actual value reachability, with no hidden context.
+    This equivalence is purely semantic; clients establish its left-hand side
+    under the behavior and fair-scheduling premises of adequacy. *)
+Lemma exits_finally_iff (τ : trace heap_lang) i v :
+  tp_trace (tp_finally (exits v@i))%P τ ↔
+  ∃ n, τ.1 ≤ n ∧ (τ.2 n).1.1.1 !! i = Some (of_val v).
+Proof.
+  destruct τ as [m τf].
+  change ((∃ n, m ≤ n ∧
+    (let '((Θ, σ), _, _) := τf n in state_sat σ Θ (pred_expr i [] (of_val v))) ∧
+    (∀ l, m ≤ l < n → True)) ↔
+    ∃ n, m ≤ n ∧ (τf n).1.1.1 !! i = Some (of_val v)).
+  split.
+  - intros (n & Hn & H & _). exists n. split; first done.
+    destruct (τf n) as [[[Θ σ] j] κ]. exact H.
+  - intros (n & Hn & H). exists n. split; first done.
+    split; last done. destruct (τf n) as [[[Θ σ] j] κ]. exact H.
+Qed.
 
 Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
@@ -99,22 +105,22 @@ Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_
    proph_map_interp κs σ.(used_proph_id))%I.
 
 Definition state_interp_aux `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
-  ([∗ map] i ↦ e ∈ Θ, thread_expr i e)%I.
+  True%I.
 
 (** State predicate. *)
 Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
   match π with
   | pred_pointsto l dq v =>
       pointsto l dq v
-  | pred_label i t v =>
-      label i t v
+  | pred_expr i C e =>
+      thread_expr i C e
   end.
 
 Lemma thread_expr_read `{!heap_stateGS Σ} :
-  ∀ (Θ : thread_pool heap_lang) i e,
-  thread_map_interp (dom Θ) Θ -∗ thread_expr i e -∗ ⌜Θ !! i = Some e⌝.
+  ∀ (Θ : thread_pool heap_lang) i C e,
+  thread_map_interp (dom Θ) Θ -∗ thread_expr i C e -∗ ⌜Θ !! i = Some (fill C e)⌝.
 Proof.
-  iIntros (???) "TI Ti".
+  iIntros (????) "TI Ti".
   iPoseProof (thread_map_thread_read with "TI Ti") as "%". eauto.
 Qed.
 
@@ -124,8 +130,7 @@ Lemma state_interp_wf `{!heap_stateGS Σ} :
 Proof.
   iIntros (????) "[(HI& TI& PI) SP]". destruct π; simpl.
   - rewrite pointsto_unseal /pointsto_def. iPoseProof (gen_heap_valid with "HI SP") as "%". eauto.
-  - rewrite label_unseal /label_def. iDestruct "SP" as "(%&%& Ti)".
-    iPoseProof (thread_expr_read with "TI Ti") as "%". eauto.
+  - iPoseProof (thread_expr_read with "TI SP") as "%". eauto.
 Qed.
 
 (** We don't want this to be an instance, which can break iMod. *)
@@ -225,36 +230,42 @@ Implicit Types l : loc.
 Implicit Types e : expr.
 Implicit Types v : val.
 
-(** thread_expr *)
-Local Ltac unfold_defs :=
-  (* try rewrite thread_term_unseal /thread_term_def; *)
-  try rewrite label_unseal /label_def.
-
-Global Instance thread_expr_timeless i e : Timeless (thread_expr i e).
+(** Thread-expression ownership and context agreement. *)
+Global Instance thread_expr_timeless i C e : Timeless (thread_expr i C e).
 Proof. apply _. Qed.
-Global Instance label_timeless i t v : Timeless (label i t v).
-Proof. rewrite label_unseal /label_def. apply _. Qed.
 
-Lemma thread_exprs_update_one Θ i e :
-  is_Some (Θ !! i) →
-  thread_map_interp (dom Θ) Θ -∗ ([∗ map] i↦e ∈ Θ, thread_expr i e) ==∗
-  (thread_map_interp (dom (<[i:=e]> Θ)) (<[i:=e]> Θ) ∗ ([∗ map] i↦e ∈ (<[i:=e]> Θ), thread_expr i e)).
+Lemma thread_expr_fill i C D e :
+  thread_expr i C (fill D e) ⊣⊢ thread_expr i (D ++ C) e.
+Proof. by rewrite /thread_expr fill_app. Qed.
+
+Lemma thread_expr_ctx Θ i C D e σ κ e' σ' efs :
+  Θ !! i = Some (fill D e) →
+  prim_step i e σ (dom Θ) κ e' σ' efs →
+  thread_map_interp (dom Θ) Θ -∗ thread_expr i C e -∗ ⌜C = D⌝.
 Proof.
-  iIntros ([? HT]) "TI SIa".
-  iPoseProof (big_sepM_delete _ _ _ _ HT with "SIa") as "[Ti SIa]".
-  iMod (thread_map_thread_update _ _ e with "[$TI $Ti]") as "[TI Ti]".
-  rewrite dom_insert_lookup_L; last eauto. iFrame "TI". iModIntro.
-  iApply (big_sepM_insert_delete). iFrame.
+  iIntros (HT HS) "TI TE".
+  iPoseProof (thread_expr_read with "TI TE") as "%HC".
+  iPureIntro. eapply fill_ctx_step_inj; first exact HS. congruence.
 Qed.
 
-(** Pure steps *)
-Definition trivial_cond : thread_id → iProp Σ := λ _, True%I.
-
-Global Instance trivial_pure_exec_si i : PureExecSI (trivial_cond) i.
+Lemma thread_expr_update Θ i C e e' :
+  thread_map_interp (dom Θ) Θ -∗ thread_expr i C e ==∗
+  thread_map_interp (dom (<[i:=fill C e']> Θ)) (<[i:=fill C e']> Θ) ∗
+  thread_expr i C e'.
 Proof.
-  repeat intro. iIntros "(_& SI& SIa)".
-  iDestruct "SI" as "(HI& TI& PI)".
-  iMod (thread_exprs_update_one with "TI SIa") as "[TI SIa]". 1: eauto.
+  iIntros "TI TE".
+  iPoseProof (thread_expr_read with "TI TE") as "%HT".
+  iMod (thread_map_thread_update _ _ (fill C e') with "[$TI $TE]") as "[TI TE]".
+  rewrite dom_insert_lookup_L; last eauto. by iFrame.
+Qed.
+
+(** Pure steps transport the client's single expression fragment. *)
+Global Instance thread_expr_pure_exec_si C i :
+  PureExecSI (λ i e, thread_expr i C e) i.
+Proof.
+  intros D e1 e2 σ Θ κ HD HT HS. iIntros "(TE& (HI& TI& PI)& _)".
+  iPoseProof (thread_expr_ctx with "TI TE") as "%Heq"; [exact HT|exact HS|].
+  subst D. iMod (thread_expr_update with "TI TE") as "[TI TE]".
   by iFrame.
 Qed.
 
@@ -268,33 +279,29 @@ Proof.
 Qed.
 
 (** pure steps *)
-Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ :
+Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ {C} :
   PureExec φ n e1 e2 →
   φ →
-  Nat.iter n
+  (thread_expr i C e1 ∗ Nat.iter n
     (λ P,
        |={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
                  ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (thP_carriers i G -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                   ALC (£ o ={E',E}=∗ |={E}=>m P)))
-    (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
+    (thread_expr i C e2 -∗ lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }})))
   ⊢ (lWP e1 @ s; i; E {{ Φ }}).
 Proof.
-  iIntros (Hexec Hp) "H". iApply (lwp_pure_step); eauto.
-  iApply iter_modal_mono_modal. 3: iApply "H".
-  - simpl. iIntros "%% HAB >H". iDestruct "H" as "(%& $& $& %& $& H)".
-    iIntros "!> TG Crs". iMod ("H" with "TG Crs") as "H".
-    iIntros "LC". iMod ("H" with "LC") as "H". by iApply "HAB".
-  - simpl. iIntros "% >H". iModIntro. iSplitR; first done.
-    iDestruct "H" as "(%& $& $& %& $& H)". iIntros "_ TG Crs".
-    iMod ("H" with "TG Crs") as "H". iIntros "LC". iMod ("H" with "LC") as "$". done.
+  intros Hexec Hp. apply (lifting.lwp_pure_step n o s i E E' e1 e2 φ Φ
+    (λ i e, thread_expr i C e)); auto; apply _.
 Qed.
 
-Lemma lwp_fork_step s i E E' e Φ :
-  (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+Lemma lwp_fork_step s i E E' e Φ {C} :
+  (|={E,E'}=> thread_expr i C (Fork e) ∗
+             ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
              ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-             (∀ j, thP_carriers i G -∗
+             (∀ j, thread_expr i C #() -∗ thread_expr j [] e -∗
+                   thP_carriers i G -∗
                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                    thP_carriers j ∅ -∗
                    ALC (|={E',E}=>
@@ -303,248 +310,142 @@ Lemma lwp_fork_step s i E E' e Φ :
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "I". iMod "H" as "(%&$&$& %&$& H)".
+  iIntros (K h n σ1 Θ κ κs HK HT) "I".
+  iMod "H" as "(TE& %&$&$& %&$& H)".
   iModIntro. iModIntro. iSplit; first eauto with base_step.
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iIntros (v2 σ2 efs Hstep).
   iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
+  iPoseProof (thread_expr_ctx with "It TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   iMod (thread_map_new_thread j e with "It") as "[It Tj]"; first eapply H0.
-  iIntros "!> Tb Wcs Efs". iMod ("H" $! j with "Tb Wcs [Efs]") as "H".
+  iMod (thread_map_thread_update _ _ (fill K #()) with "[$It $TE]") as "[It TE]".
+  replace (<[i:=fill K #()]> (<[j:=e]> Θ)) with (<[i:=fill K #()]> Θ ∪ {[j := e]}); cycle 1.
+  { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
+  iIntros "!> Tb Wcs Efs".
+  iMod ("H" $! j with "TE Tj Tb Wcs [Efs]") as "H".
   { rewrite dom_singleton_L big_sepS_singleton. eauto. }
   iMod "H" as "HE".
   iMod (hG_history_auth_app with "Ha") as "Ha".
   rewrite big_sepM_singleton. iFrame.
-  replace (dom (<[i:=K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
+  replace (dom (<[i:=fill K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
   { rewrite dom_union_L dom_insert_lookup_L; eauto. rewrite dom_singleton_L. auto. }
-  iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
-  iMod (thread_map_thread_update _ _ (K #()) with "[$It $Ti]") as "[It Ti]".
-  replace (<[i:=K #()]> (<[j:=e]> Θ)) with (<[i:=K #()]> Θ ∪ {[j := e]}); cycle 1.
-  { rewrite -insert_union_l. f_equal. rewrite insert_union_singleton_r; auto. apply not_elem_of_dom. auto. }
   iFrame. iModIntro. iSplitR "HE"; cycle 1.
-  { iMod "HE". iDestruct "HE" as "[>H $]". by iFrame. }
-  iSplitR.
-  { iPureIntro. destruct HI. split.
-    - rewrite length_app H. simpl. lia.
-    - rewrite last_app. simpl. auto. }
-  iApply (big_sepM_union).
-  { apply map_disjoint_singleton_r_2, not_elem_of_dom. rewrite dom_insert_lookup; eauto. }
-  rewrite big_sepM_singleton. iFrame "Tj".
-  iApply (big_sepM_insert_delete). iFrame.
+  { iMod "HE". iDestruct "HE" as "[>H HE]".
+    iModIntro. iSplitL "H"; first by iFrame.
+    iApply (lwpupd_mono with "HE").
+    apply lwp_mono. intros v. by rewrite /lift_term /= right_id. }
+  iPureIntro. destruct HI. split.
+  - rewrite length_app H. simpl. lia.
+  - rewrite last_app. simpl. auto.
 Qed.
 
-Lemma lwp_fork ℓ μ K P G R o s i E e g1 K1 :
+Lemma lwp_fork ℓ μ K P G R o s i E e g1 K1 {C} :
   K ⊆ K1 →
-  (∀ j g2, l{{{ thP_carriers j {[g2]} ∗ ([∗ set] g ∈ {[g2]}, crP_fuel g ℓ μ) ∗ crP_obls g2 ℓ K ∗ P }}}
+  (∀ j g2, l{{{ thread_expr j [] e ∗ thP_carriers j {[g2]} ∗ ([∗ set] g ∈ {[g2]}, crP_fuel g ℓ μ) ∗ crP_obls g2 ℓ K ∗ P }}}
              e @ s; j; ⊤ l{{{ v, RET v; lift_term j (λ _ _, True) v }}})%I
   ⊢
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ crP_obls g1 ℓ K1 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) ∗ P }}}
+  l{{{ thread_expr i C (Fork e) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ crP_obls g1 ℓ K1 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) ∗ P }}}
     Fork e @ s; i; E
-                     l{{{ RET #(); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ crP_obls g1 ℓ (K1 ∖ K)}}}.
+                     l{{{ RET #(); thread_expr i C #() ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ crP_obls g1 ℓ (K1 ∖ K)}}}.
 Proof.
-  iIntros (HK) "#Hfork !> %Φ ((TG& GF& Rs)& Cg& OF& HP) HΦ".
-  iApply lwp_fork_step. iModIntro. iFrame "TG GF Rs".
-  iIntros (j) "TG Ws TGj". iApply (ALC_credits _ _ o). iIntros "!> LC !>".
+  iIntros (HK) "#Hfork !> %Φ (TE& (TG& GF& Rs)& Cg& OF& HP) HΦ".
+  iApply lwp_fork_step. iModIntro. iFrame "TE TG GF Rs".
+  iIntros (j) "TE TEj TG Ws TGj". iApply (ALC_credits _ _ o). iIntros "!> LC !>".
   iMod (carrier_alloc _ _ _ ℓ μ with "TGj") as "(%g2& _& TGj& Cg2& GF2)".
   iMod (obl_offload_set with "Cg Cg2 OF") as "(Cg& Cg2& _)". 1: set_solver. 1: done.
-  rewrite union_empty_l_L union_empty_r_L. iModIntro. iSplitR "HP TGj GF2 Cg2".
-  - iApply ("HΦ" with "[$LC $TG $Ws $Cg]").
-  - iModIntro. iApply ("Hfork" with "[$TGj GF2 $Cg2 $HP]").
+  rewrite union_empty_l_L union_empty_r_L. iModIntro. iSplitR "TEj HP TGj GF2 Cg2".
+  - iApply ("HΦ" with "[$TE $LC $TG $Ws $Cg]").
+  - iModIntro. iApply ("Hfork" with "[$TEj $TGj GF2 $Cg2 $HP]").
     { iApply big_sepS_singleton. iFrame. }
     auto.
 Qed.
 
-(** Label *)
-(** We don't need to take an actual step.
-    "label i t v" means that thread i executes "Label t v" in some context,
-    and "Label t v" is a pure step.
- *)
-Lemma lwpupd_label i E t e v (P : iProp Σ) :
-  TCEq (to_val e) (Some v) →
-  (label i t v -∗ |={E}=>m (label i t v ∗ lwpupd i E (Label t e) P)) -∗
-  lwpupd i E (Label t e) P.
+(** Discharge at the actual final value, using credits from earlier steps. *)
+Lemma thread_expr_terminate i E v g ℓ k N :
+  ↑N ⊆ E →
+  thread_expr i [] (of_val v) -∗ £ (2 : Ord.t) -∗
+  thP_carriers i {[g]} -∗ crP_obls g ℓ {[k]} -∗
+  ⟦finallyP N k 1 (exits v@i)⟧ₗ -∗ |={E}=>m
+  thread_expr i [] (of_val v) ∗ thP_done i.
 Proof.
-  unfold_lwpupd. iIntros (He) "H %%%%%% %HK %HT I".
-  iDestruct "I" as "[HI Ia]".
-  iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
-  inv He. apply of_to_val in H0. subst e.
-  iEval (unfold_sfmupd) in "H". iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& H)".
-  { rewrite label_unseal /label_def. iFrame. eauto. }
-  rewrite label_unseal /label_def. iDestruct "Ti" as "(%&%& Ti)".
-  clear dependent K.
-  iDestruct "HI" as "(%HI& Ha& (Ih& It& Ip))".
-  iPoseProof (thread_expr_read with "It Ti") as "%HT".
-  iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H".
-  { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. }
-  by iFrame.
-Qed.
-
-(** Exit *)
-Lemma lwp_exit G s i E e v g ℓ K k N :
-  TCEq (to_val e) (Some v) →
-  G = {[g]} → K = {[k]} → ↑N ⊆ E →
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1)) ∗ crP_obls g ℓ K ∗ ⟦finallyP N k 1 (exit v@i)⟧ₗ }}}
-    Exit e @ s; i; E
-  l{{{ v', RET v'; ⌜v' = v⌝ ∗ lift_term i fork_post v}}}.
-Proof.
-  intros H -> -> Hmask. inv H. apply of_to_val in H1. subst.
-  rewrite unfold_Exit.
-  iIntros (Φ) "[(TG& GF) (Cg& HF)] HΦ".
-  iApply (lwp_pure_step _ (10)%ord). 1: done. simpl. iModIntro.
-  iFrame "TG GF". iExists ∅. iSplitR; first done. iIntros "TG _ !> LC".
-  do 2 iModIntro.
-  iApply lwpupd_label. iIntros "PL".
-  iMod (tf_until_discharge with "HF") as "HF". 1: set_solver.
-  iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+  iIntros (Hmask) "TE LC TG Cg HF".
+  iMod (tf_until_discharge with "HF") as "HF"; first set_solver.
+  iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
   iApply (lc_sfmupd_add_later with "LC1"). iNext.
   iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
-  iMod ("HF" with "[PL]") as "HF".
+  iMod ("HF" with "[TE]") as "HF".
   { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
   iPoseProof ("HF" with "[] Cg") as "HF".
   { iPureIntro. set_solver. }
-  iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+  iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
   iApply (lc_sfmupd_add_later with "LC1"). iNext.
-  iMod ("HF" $! _) as "HF". iMod "HF" as "(PL& Gg& #Odkl)".
-  iModIntro. iFrame "PL".
+  iMod ("HF" $! _) as "HF". iMod "HF" as "(TE& Gg& #Odkl)".
   replace ({[k]} ∖ {[k]} : gset _) with (∅ : oids) by set_solver.
-  iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
+  iMod (carrier_delete with "TG Gg") as "TG"; first set_solver.
   replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
-  iModIntro.
-  iApply (lwp_pure_step _ (0)%ord). 1: done. simpl. iModIntro.
-  iFrame "TG". iSplitR; first done. iExists ∅. iSplitR; first done. iIntros "TG _ !> _".
-  do 2 iModIntro. iApply lwp_value_sfgupd.
-  iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$".
-  by iModIntro.
+  iMod (thread_terminate with "TG") as "$". by iFrame.
 Qed.
 
-
-(* Lemma lwp_label_step o s i E E' t e v Φ : *)
-(*   TCEq (to_val e) (Some v) → *)
-(*   (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ *)
-(*                   ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗ *)
-(*                        (thP_carriers i G -∗ *)
-(*                         ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗ *)
-(*                         label i t v -∗ *)
-(*                         ALC (£ o -∗ |={E',E}=>m (label i t v ∗ Φ v)))) -∗ *)
-(*                         (* ALC (£ o ={E',E}=∗ (|={E}=>m label i t v ∗ Φ v)))) -∗ *) *)
-(*   lWP (Label t e) @ s; i; E {{ Φ }}. *)
-(* Proof. *)
-(*   iIntros (He) "H". inv He. apply of_to_val in H0. subst e. *)
-(*   iApply lwp_lift_atomic_base_step_no_fork. *)
-(*   iIntros (K h n σ1 Θ κ κs HK HT) "I". iMod "H" as "(%&$&$& %&$& H)". *)
-(*   iModIntro. iSplit; first eauto with base_step. *)
-(*   iIntros (e2 σ2 efs Hstep); inv_base_step. *)
-(*   iDestruct "I" as "[HI Ia]". *)
-(*   (* iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]". *) *)
-(*   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]". *)
-(*   iIntros "!> Tb Wcs". iPoseProof ("H" with "Tb Wcs [Ti]") as "H". *)
-(*   { rewrite label_unseal /label_def. iFrame. eauto. } *)
-(*   iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC". *)
-(*   iPoseProof (tlc_split with "LC") as "[LC LC2]". *)
-(*   iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H". *)
-(*   iEval (unfold_sfmupd) in "H". *)
-
-(*   iPoseProof ("H" with "HI") as ">(HI& Ti& H)". *)
-
-(*   TODO *)
-
-(*   iMod "H" as "HE". *)
-(*   iMod (hG_history_auth_app with "Ha") as "Ha". *)
-(*   rewrite !map_union_empty. iFrame. *)
-(*   replace (dom (<[i:=K v]> Θ)) with (dom Θ); cycle 1. *)
-(*   { rewrite dom_insert_lookup_L; eauto. } *)
-(*   iPoseProof (thread_expr_read with "It Ti") as "%HT". *)
-(*   iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H". *)
-(*   { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. } *)
-
-
-(*   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]". *)
-(*   iMod (thread_map_thread_update _ _ (K #n0) with "[$It $Ti]") as "[It Ti]". *)
-(*   iFrame. iModIntro. iSplit; first done. *)
-(*   iSplitR "HE"; cycle 1. *)
-(*   { iMod "HE". iModIntro. iFrame. } *)
-(*   iSplit. *)
-(*   { iPureIntro. destruct HI. split. *)
-(*     - rewrite length_app H. simpl. lia. *)
-(*     - rewrite last_app. simpl. auto. } *)
-(*   iApply (big_sepM_insert_delete _ _ i). iFrame.  *)
-(* Qed. *)
-(*   TCEq (to_val e) (Some v) → *)
-(*   (label i t v -∗ |={E}=>m (label i t v ∗ lwpupd i E (Label t e) P)) -∗ *)
-(*   lwpupd i E (Label t e) P. *)
-(* Proof. *)
-(*   unfold_lwpupd. iIntros (He) "H %%%%%% %HK %HT I". *)
-(*   iDestruct "I" as "[HI Ia]". *)
-(*   iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]". *)
-(*   inv He. apply of_to_val in H0. subst e. *)
-(*   iEval (unfold_sfmupd) in "H". iPoseProof ("H" with "[Ti] HI") as ">(HI& Ti& H)". *)
-(*   { rewrite label_unseal /label_def. iFrame. eauto. } *)
-(*   rewrite label_unseal /label_def. iDestruct "Ti" as "(%&%& Ti)". *)
-(*   clear dependent K. *)
-(*   iDestruct "HI" as "(%HI& Ha& (Ih& It& Ip))". *)
-(*   iPoseProof (thread_expr_read with "It Ti") as "%HT". *)
-(*   iMod ("H" $! K0 with "[//] [//] [Ia $Ha $Ih $It $Ip Ti]") as "H". *)
-(*   { iSplitR; first eauto. iApply (big_sepM_delete _ _ _ _ HT). iFrame. } *)
-(*   by iFrame. *)
-(* Qed. *)
-
 (** ChooseNat *)
-Lemma lwp_choosenat_step o s i E E' Φ :
-  (|={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+Lemma lwp_choosenat_step o s i E E' Φ {C} :
+  (|={E,E'}=> thread_expr i C ChooseNat ∗
+                  ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
                   ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                       (∀ (n : nat), thP_carriers i G -∗
+                       (∀ (n : nat), thread_expr i C #n -∗ thP_carriers i G -∗
                                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                    ALC (£ o ={E',E}=∗ (|={E}=>m Φ (#n))))) -∗
   lWP ChooseNat @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "I". iMod "H" as "(%&$&$& %&$& H)".
+  iIntros (K h n σ1 Θ κ κs HK HT) "I".
+  iMod "H" as "(TE& %&$&$& %&$& H)".
   iModIntro. iModIntro. iSplit; first eauto with base_step.
-  (** FIXME: evar nat *)
   Unshelve. 2: exact 0.
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iIntros (v2 σ2 efs Hstep).
   iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
-  iIntros "!> Tb Wcs". iPoseProof ("H" $! n0 with "Tb Wcs") as "H".
+  iPoseProof (thread_expr_ctx with "It TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
+  iMod (thread_expr_update _ _ _ _ #n0 with "It TE") as "[It TE]".
+  iIntros "!> Tb Wcs". iPoseProof ("H" $! n0 with "TE Tb Wcs") as "H".
   iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
   iPoseProof (tlc_split with "LC") as "[LC LC2]".
   iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H".
   iMod "H" as "HE".
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  rewrite !map_union_empty. iFrame.
-  replace (dom (<[i:=K #n0]> Θ)) with (dom Θ); cycle 1.
-  { rewrite dom_insert_lookup_L; eauto. }
-  iPoseProof (big_sepM_delete _ _ _ _ HT with "Ia") as "[Ti Ia]".
-  iMod (thread_map_thread_update _ _ (K #n0) with "[$It $Ti]") as "[It Ti]".
-  replace (dom (<[i:=K #n0]> Θ)) with (dom Θ); cycle 1.
-  { rewrite dom_insert_lookup_L; eauto. }
-  iFrame. iModIntro. iSplit; first done.
+  rewrite !map_union_empty. iFrame. iModIntro. iSplit; first done.
   iSplitR "HE"; cycle 1.
   { iMod "HE". iModIntro. iFrame. }
-  iSplit.
-  { iPureIntro. destruct HI. split.
-    - rewrite length_app H. simpl. lia.
-    - rewrite last_app. simpl. auto. }
-  iApply (big_sepM_insert_delete _ _ i). iFrame. 
+  iPureIntro. destruct HI. split.
+  - rewrite length_app H. simpl. lia.
+  - rewrite last_app. simpl. auto.
 Qed.
 
-Lemma lwp_choosenat G R o s i E :
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+Lemma lwp_choosenat G R o s i E {C} :
+  l{{{ thread_expr i C ChooseNat ∗
+       (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     ChooseNat @ s; i; E
   l{{{ (n : nat), RET LitV (LitInt n);
-                (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+       thread_expr i C #n ∗
+       (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
-  iIntros (Φ) "(TG& GF& Rs) HΦ".
-  iApply (lwp_choosenat_step o with "[$TG $GF $Rs HΦ]").
-  iIntros "!> % TG RC !> LC !> !>".
-  iApply ("HΦ" with "[$TG $RC $LC]").
+  iIntros (Φ) "(TE& TG& GF& Rs) HΦ".
+  iApply (lwp_choosenat_step o with "[$TE $TG $GF $Rs HΦ]").
+  iIntros "!> % TE TG RC !> LC !> !>".
+  iApply ("HΦ" with "[$TE $TG $RC $LC]").
 Qed.
 
-Local Remark lwp_choosez_exists G R o s i E :
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+Local Remark lwp_choosez_exists G R o s i E {C} :
+  l{{{ thread_expr i C ChooseNat ∗
+       (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     ChooseNat @ s; i; E
   l{{{ v, RET v; ∃ (n : nat), ⌜v = #n⌝ ∧
-                (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+       (thread_expr i C (of_val v) ∗
+        (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r))) }}}.
 Proof.
-  iIntros (Φ) "(TG& GF& Rs) HΦ".
-  iPoseProof (lwp_choosenat with "[$TG $GF $Rs]") as "H".
+  iIntros (Φ) "P HΦ".
+  iPoseProof (lwp_choosenat with "P") as "H".
   iApply "H". iIntros (?) "H".
   iApply "HΦ". iExists n. iFrame. auto.
 Qed.
@@ -704,27 +605,29 @@ Qed.
 Global Instance state_pred_interp_timesless π : Timeless (state_pred_interp π).
 Proof. destruct π; simpl; apply _. Qed.
 
-Lemma lwp_allocN_seq G R o s i E v n :
+Lemma lwp_allocN_seq G R o s i E v n {C} :
   (0 < n)%Z →
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+  l{{{ thread_expr i C (AllocN #n (Val v)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
-  l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
+  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
           [∗ list] i ∈ seq 0 (Z.to_nat n), (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
-  iIntros (Hn Φ) "(Tb& Gfs& Rs) HP".
+  iIntros (Hn Φ) "[TE (Tb& Gfs& Rs)] HP".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h ? σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs & Ht & Hk) Ia] !> !>". iSplit.
   { iPureIntro. split; first done. destruct n; auto with lia base_step. }
-  iFrame "Tb Gfs Rs". iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iFrame "Tb Gfs Rs". iIntros (v2 σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   iMod (gen_heap_alloc_big _ (heap_array _ (replicate (Z.to_nat n) v)) with "Hs")
     as "(Hs & Hl & Hm)".
   { apply heap_array_map_disjoint. rewrite length_replicate Z2Nat.id; auto with lia. }
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iFrame "Ha Hs Ht Hk Ia". iModIntro. iSplitR; first done. iSplitR.
+  iFrame "Ha Hs Ht Hk". iModIntro. iSplitR; first done. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H. split; auto. lia. }
   iModIntro. iApply "HP". iFrame.
   iApply big_sepL_sep. iSplitL "Hl".
@@ -732,191 +635,213 @@ Proof.
   - iApply (heap_array_to_seq_meta with "Hm"). by rewrite length_replicate.
 Qed.
 
-Lemma lwp_alloc G R o s i E v :
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+Lemma lwp_alloc G R o s i E v {C} :
+  l{{{ thread_expr i C (Alloc (Val v)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     Alloc (Val v) @ s; i; E
-  l{{{ l, RET LitV (LitLoc l);
-          (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
+  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
           l ↦ v ∗ meta_token l ⊤ }}}.
 Proof.
   iIntros (Φ) "P HΦ".
   iApply (lwp_allocN_seq with "P"); [auto with lia..|].
-  iIntros (l) "/= ((?&?&?)&?&?)". rewrite Loc.add_0. iApply "HΦ"; iFrame.
+  iIntros (l) "/= (TE& (?&?&?)&?&?)". rewrite Loc.add_0. iApply "HΦ"; iFrame.
 Qed.
 
-Lemma lwp_free G R o s i E l v :
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
+Lemma lwp_free G R o s i E l v {C} :
+  l{{{ thread_expr i C (Free #l) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
     Free (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET LitV LitUnit;
-          (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
-  iIntros (Φ) "((Tb& Gfs& Rs)& Hl) HΦ".
+  iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iIntros (v2 σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
   iModIntro. iSplit; first done. iFrame. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
-Lemma lwp_load G R o s i E l dq v :
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v }}}
+Lemma lwp_load G R o s i E l dq v {C} :
+  l{{{ thread_expr i C (Load #l) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v }}}
     Load (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET v; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
+  l{{{ RET v; thread_expr i C (Val v) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
 Proof.
-  iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
+  iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iIntros (v2 σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
   iModIntro. iSplit; first done. iFrame. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
-Lemma lwp_store G R o s i E l v' v :
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+Lemma lwp_store G R o s i E l v' v {C} :
+  l{{{ thread_expr i C (Store #l (Val v)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET LitV LitUnit; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
+  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
-  iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
+  iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iIntros (v2 σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
   iModIntro. iSplit; first done. iFrame. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
-Lemma lwp_xchg G R o s i E l v' v :
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+Lemma lwp_xchg G R o s i E l v' v {C} :
+  l{{{ thread_expr i C (Xchg #l (Val v)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET v'; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
+  l{{{ RET v'; thread_expr i C (Val v') ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
-  iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
+  iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iIntros (v2 σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
   iModIntro. iSplit; first done. iFrame. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
-Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 :
+Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 {C} :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v' }}}
+  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool false); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
+  l{{{ RET PairV v' (LitV $ LitBool false); thread_expr i C (Val (PairV v' (LitV (LitBool false)))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
 Proof.
-  iIntros (?? Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
+  iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
-  iIntros (v2' σ2 efs Hstep); inv_base_step.
+  iIntros (v2' σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   rewrite bool_decide_false //.
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
   iModIntro. iSplit; first done. iFrame. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H2. split; auto. lia. }
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
-Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' :
+Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' {C} :
   v' = v1 → vals_compare_safe v' v1 →
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool true); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
+  l{{{ RET PairV v' (LitV $ LitBool true); thread_expr i C (Val (PairV v' (LitV (LitBool true)))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
 Proof.
-  iIntros (?? Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
+  iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
-  iIntros (v2' σ2 efs Hstep); inv_base_step.
+  iIntros (v2' σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   rewrite bool_decide_true //.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
   iModIntro. iSplit; first done. iFrame. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H. split; auto. lia. }
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
-Lemma lwp_faa G R o s i E l i1 i2 :
-  l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ LitV (LitInt i1) }}}
+Lemma lwp_faa G R o s i E l (i1 i2 : Z) {C} :
+  l{{{ thread_expr i C (FAA #l #i2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ LitV (LitInt i1) }}}
     FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
-  l{{{ RET LitV (LitInt i1); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
+  l{{{ RET LitV (LitInt i1); thread_expr i C (#i1) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
-  iIntros (Φ) "[(Tb& Gfs& Rs) Hl] HΦ".
+  iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
-  iIntros (v2' σ2 efs Hstep); inv_base_step.
+  iIntros (v2' σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
   iModIntro. iSplit; first done. iFrame. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
-Lemma lwp_new_proph G R o s i E :
-  l{{{thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
+Lemma lwp_new_proph G R o s i E {C} :
+  l{{{ thread_expr i C (NewProph) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
     NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
+  l{{{ pvs p, RET (LitV (LitProphecy p)); thread_expr i C (Val (LitV (LitProphecy p))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
 Proof.
-  iIntros (Φ) "(Tb& Gfs& Rs) HΦ".
+  iIntros (Φ) "[TE (Tb& Gfs& Rs)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
   iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
-  iIntros (v2 σ2 efs Hstep); inv_base_step.
+  iIntros (v2 σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
   rename select proph_id into p.
   iMod (proph_map_new_proph p with "Hk") as "[Hk Hp]"; first done.
   rewrite !map_union_empty.
   iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_exprs_update_one with "Ht Ia") as "[Ht Ia]"; first eauto.
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
   iModIntro. iSplit; first done. iFrame. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }

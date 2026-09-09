@@ -5,11 +5,12 @@ From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export weakestpre.
 From lantana.algebra Require Import ordinal_wfocm.
 
-Class PureExecSI `{SI : indexT} `{!lantanaGS Λ Σ} (ς : thread_id → iProp Σ) i :=
+Class PureExecSI `{SI : indexT} `{!lantanaGS Λ Σ}
+    (ς : thread_id → expr Λ → iProp Σ) i :=
   pure_exec_si : ∀ K e1 e2 σ Θ κ,
   LanguageCtx K → Θ !! i = Some (K e1) → prim_step i e1 σ (dom Θ) [] e2 σ ∅ →
-  ((ς i ∗ state_interp σ Θ κ ∗ state_interp_aux σ Θ κ)
-   ⊢ |==> (ς i ∗ state_interp σ (<[i:=K e2]>Θ) κ ∗ state_interp_aux σ (<[i:=K e2]>Θ) κ)).
+  ((ς i e1 ∗ state_interp σ Θ κ ∗ state_interp_aux σ Θ κ)
+   ⊢ |==> (ς i e2 ∗ state_interp σ (<[i:=K e2]>Θ) κ ∗ state_interp_aux σ (<[i:=K e2]>Θ) κ)).
 
 Section lifting.
   Context `{SI : indexT} `{!lantanaGS Λ Σ}.
@@ -109,15 +110,14 @@ Section lifting.
     (∀ κ σ1 Θ e2 σ2 efs, prim_step i e1 σ1 Θ κ e2 σ2 efs → κ = [] ∧ σ2 = σ1 ∧ efs = ∅) →
     PureExecSI ς i →
     (|={E,E'}=>
-       ς i ∗
+       ς i e1 ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
        ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-         (ς i -∗
+         (∀ σ Θ κ e2 efs, ⌜prim_step i e1 σ Θ κ e2 σ efs⌝ -∗
+          ς i e2 -∗
           thP_carriers i G -∗
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-          ALC (|={E',E}=>
-                 ∀ σ Θ κ e2 efs, (⌜prim_step i e1 σ Θ κ e2 σ efs⌝) -∗
-                 lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
+          ALC (|={E',E}=> lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hsafe Hstep HCS) "H".
@@ -137,7 +137,7 @@ Section lifting.
     iPoseProof (history_interp_step _ _ _ σ2 _ (<[i:=K e2]> Θ) with "HI") as "(SI& ACC)".
     iMod (pure_exec_si _ _ _ _ _ _ HK HΘ H with "[$Hc $SI $SIa]") as "(Hc& SI& SIa)".
     iMod ("ACC" with "[$SI]") as "$".
-    iIntros "!> Tb Wcs Efs". iMod ("H" with "Hc Tb Wcs [//]") as "H".
+    iIntros "!> Tb Wcs Efs". iMod ("H" with "[//] Hc Tb Wcs") as "H".
     iMod "Hclose" as "_". iMod "H". iModIntro. rewrite big_sepM_empty. iFrame.
     iMod "H". iModIntro. by iFrame.
   Qed.
@@ -195,10 +195,10 @@ Section lifting.
     (∀ σ1 κ Θ e2' σ2 efs', prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
     PureExecSI ς i →
     (|={E,E'}=>
-       ς i ∗
+       ς i e1 ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
        ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-         (ς i -∗
+         (ς i e2 -∗
           thP_carriers i G -∗
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
           ALC (|={E',E}=> lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
@@ -207,26 +207,25 @@ Section lifting.
     iIntros (? Hpuredet HCS) "H". iApply (lwp_lift_pure_step_no_fork s i E E'); eauto.
     { naive_solver. }
     iMod "H" as "($& %& $& $& %& $& H)". iModIntro.
-    iIntros "Hc Tb Wcs". iMod ("H" with "Hc Tb Wcs") as ">H".
-    iIntros "!> % % % % % %". edestruct Hpuredet as (?&?&?&?); eauto. by subst.
+    iIntros (σ Θ κ e2' efs Hstep) "Hc Tb Wcs".
+    destruct (Hpuredet σ κ Θ e2' σ efs Hstep) as (_ & _ & -> & _).
+    iApply ("H" with "Hc Tb Wcs").
   Qed.
 
   Lemma lwp_pure_step `{!Inhabited (state Λ)} (n : nat) (o : Ord.t) s i E E' e1 e2 φ Φ ς :
     PureExec φ n e1 e2 →
     φ →
     PureExecSI ς i →
-    (Nat.iter n (λ P, |={E,E'}=>
-                   ς i ∗
+    (ς i e1 ∗ Nat.iter n (λ P, |={E,E'}=>
                    ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                   (ς i -∗
-                    thP_carriers i G -∗
+                   (thP_carriers i G -∗
                     ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                     ALC (£ o ={E',E}=∗ |={E}=>m P)))
-       (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
+       (ς i e2 -∗ lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
-    iIntros (Hexec Hφ HCS) "Hlwp". specialize (Hexec Hφ). destruct Hexec as [Hn Hexec].
+    iIntros (Hexec Hφ HCS) "[Hc Hlwp]". specialize (Hexec Hφ). destruct Hexec as [Hn Hexec].
     iInduction Hexec as [e|n e1 e2 e3 [Hsafe ?] ? IH]; simpl.
     { lia. }
     destruct (gt_dec n 0); cycle 1.
@@ -234,41 +233,42 @@ Section lifting.
       simpl in *. inv Hexec. iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
       - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
       - eauto.
-      - iDestruct "Hlwp" as ">($& %& $& $& %& $& H)".
-        iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Hc Gb Wcs") as "H".
+      - iDestruct "Hlwp" as ">(%& $& $& %& $& H)". iFrame "Hc".
+        iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Gb Wcs") as "H".
         iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
         iPoseProof (tlc_split with "LC") as "[LC LC2]".
         iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H".
-        iMod "H". iModIntro. iMod "H". auto. }
+        iMod "H". iModIntro. iMod "H". by iApply "H". }
     iApply (lwp_lift_pure_det_step_no_fork (E':=E')).
     - intros σ Θ. specialize (Hsafe i σ Θ). destruct s; eauto using reducible_not_val.
     - eauto.
-    - iDestruct "Hlwp" as ">($& %& $& $& %& $& H)".
-      iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Hc Gb Wcs") as "H".
+    - iDestruct "Hlwp" as ">(%& $& $& %& $& H)". iFrame "Hc".
+      iModIntro. iIntros "Hc Gb Wcs". iDestruct ("H" with "Gb Wcs") as "H".
       iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
       iPoseProof (tlc_split with "LC") as "[LC LC2]".
       iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H".
-      iMod "H". iModIntro. iMod "H". iApply "IH"; auto.
+      iMod "H". iModIntro. iMod "H". iApply ("IH" with "[//] Hc H").
   Qed.
 
   Lemma lwp_pure_step_alt `{!Inhabited (state Λ)} (n : nat) G R (o : Ord.t) s i E E' e1 e2 φ Φ ς :
     PureExec φ n e1 e2 →
     φ →
     PureExecSI ς i →
-    ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-    (Nat.iter n (λ P, |={E,E'}=> ς i ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
-                                (ς i -∗ thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+    ς i e1 ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
+    (Nat.iter n (λ P, |={E,E'}=> thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+                                (thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                  ALC (£ o ={E',E}=∗ |={E}=>m P)))
-       (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
+       (ς i e2 -∗ lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
-    iIntros (Hexec HΦ HCS) "(#Rs& LWP)".
+    iIntros (Hexec HΦ HCS) "(Hc& #Rs& LWP)".
     iApply (lwp_pure_step n o _ _ E E'). 1: auto.
+    iFrame "Hc".
     iStopProof. clear Hexec. pattern n. induction n.
     { simpl. iIntros "(#Rs& LWP)". auto. }
     simpl. iIntros "(#Rs& LWP)".
-    iMod "LWP" as "($& $& $& LWP)". iFrame "Rs".
-    iIntros "!> Hc TG Wcs". iMod ("LWP" with "Hc TG Wcs") as "LWP". iIntros "LC".
+    iMod "LWP" as "($& $& LWP)". iFrame "Rs".
+    iIntros "!> TG Wcs". iMod ("LWP" with "TG Wcs") as "LWP". iIntros "LC".
     iApply IHn. iFrame "Rs". iPoseProof ("LWP" with "LC") as "LWP".
     iMod "LWP". iModIntro. iFrame "LWP".
   Qed.
@@ -277,29 +277,30 @@ Section lifting.
     PureExec φ n e1 e2 →
     φ →
     PureExecSI ς i →
-    (ς i ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-     (ς i -∗ thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_discharged r) -∗
+    (ς i e1 ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
+     (ς i e2 -∗ thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_discharged r) -∗
       £ (o × n)%ord -∗ lwpupd i E e2 (lWP e2 @ s; i ; E {{ Φ }})))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
     iIntros (Hexec HΦ HCS) "(Hc& TG& Gfs& #Rs& Hlwp)".
     iApply (lwp_pure_step n o _ _ E E). 1: auto.
+    iFrame "Hc".
     iStopProof. clear Hexec. pattern n. induction n.
-    { iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
+    { iIntros "(#Rs& TG& Gfs& IH)". simpl. iIntros "Hc".
       iMod tlc_zero as "Hz". iPoseProof (tlc_equiv Ord.O (o × 0)%ord with "Hz") as "Hz".
       { by rewrite Jacobsthal.mult_O_r. }
       iMod (obl_check_witnesses with "Rs") as "Ws".
       iApply ("IH" with "Hc TG [Ws] Hz").
       unfold_opreds.
       rewrite Ord.from_nat_O. done. }
-    iIntros "(#Rs& Hc& TG& Gfs& IH)". simpl.
+    iIntros "(#Rs& TG& Gfs& IH)". simpl.
     iAssert (([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
     { iApply big_sepS_sep. iApply (big_sepS_impl with "Gfs"). iIntros "!> %% (%& F)".
       rewrite (crP_fuel_eq _ _ (S n)%M (n ⊕ 1)%M); cycle 1.
       { rewrite measure_rep_nat_S measure_rep_add. by rewrite Hessenberg.add_comm. }
       iPoseProof (crP_fuel_add with "F") as "($& $)". }
-    iModIntro. iFrame "Hc TG Gf Rs". iIntros "Hc TG RWs".
-    iIntros "!> LC !>". iApply IHn. iFrame "Rs Hc TG Gfs".
+    iModIntro. iFrame "TG Gf Rs". iIntros "TG RWs".
+    iIntros "!> LC !>". iApply IHn. iFrame "Rs TG Gfs".
     iIntros "!> Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").
     { iCombine "Ws RWs" as "Ws". rewrite -big_sepS_sep. iApply (big_sepS_impl with "Ws").
       iIntros "!> %% [[Wc1 | #Gd1] [Wc2 | #Gd2]]"; auto.

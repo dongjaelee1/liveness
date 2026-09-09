@@ -6,6 +6,44 @@ From lantana.heap_lang Require Import notation.
 From iris.prelude Require Import options.
 Import uPred.
 
+(** Focus and unfocus the linear expression token without changing its
+    filled expression. Context items are innermost first. *)
+Lemma thread_expr_focus_eq `{!heapGS Σ} i C D e e' :
+  e = fill D e' →
+  thread_expr i C e ⊢ thread_expr i (D ++ C) e'.
+Proof. intros ->. by rewrite thread_expr_fill. Qed.
+
+Lemma thread_expr_cons `{!heapGS Σ} i C Ki e :
+  thread_expr i (Ki :: C) e ⊣⊢ thread_expr i C (fill_item Ki e).
+Proof. by rewrite /thread_expr /=. Qed.
+
+Ltac thread_expr_focus H efoc :=
+  lazymatch iTypeOf H with
+  | Some (false, thread_expr ?i ?C ?e) =>
+      let e := eval simpl in e in
+      first
+        [ unify e efoc
+        | reshape_expr e ltac:(fun D e' =>
+            unify e' efoc;
+            iPoseProof (thread_expr_focus_eq i C D e e' with H) as H;
+            [reflexivity|])
+        | lazymatch eval hnf in C with
+          | ?Ki :: ?D =>
+              iEval (rewrite (thread_expr_cons i D Ki e)) in H;
+              thread_expr_focus H efoc
+          end ]
+  | _ => fail "thread_expr_focus: expected a spatial thread_expr hypothesis"
+  end.
+
+Tactic Notation "thread_expr_focus" constr(H) open_constr(efoc) :=
+  thread_expr_focus H efoc.
+
+Ltac thread_expr_focus_goal :=
+  lazymatch goal with
+  | |- envs_entails _ (lwp _ _ _ ?e _) => thread_expr_focus "TE" e
+  | |- envs_entails _ (lwpupd _ _ ?e _) => thread_expr_focus "TE" e
+  end.
+
 Lemma tac_lwp_expr_eval `{!heapGS Σ} Δ s i E Φ e e' :
   (∀ (e'':=e'), e = e'') →
   envs_entails Δ (lWP e' @ s; i; E {{ Φ }}) →
@@ -22,37 +60,36 @@ Tactic Notation "lwp_expr_eval" tactic3(t) :=
   end.
 Ltac lwp_expr_simpl := lwp_expr_eval simpl.
 
-Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
+Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E
+    (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) {C} :
   PureExec φ n e1 e2 →
   φ →
-  envs_entails Δ (∃ E' G R (o : Ord.t),
+  envs_entails Δ (thread_expr i C (fill K e1) ∗ ∃ E' G R (o : Ord.t),
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
                        thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
                        (thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                         ALC (£ o ={E',E}=∗ |={E}=>m P)))
-           (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
+           (thread_expr i C (fill K e2) -∗
+            lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
-  (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "(%&%&%&%& #Rs& Iter)". iApply lifting.lwp_pure_step_alt. 1: auto.
-  iFrame "Rs". iApply (iter_modal_mono_modal with "Iter").
-  { iIntros (??) "Hab >($& $& H)". iIntros "!> TG Rs". iMod ("H" with "TG Rs") as "H".
-    iIntros "LC". iMod ("H" with "LC") as "H". iModIntro. by iApply "Hab". }
-  { iIntros (?) ">($& $& H)". iIntros "!> _ TG Rs". iMod ("H" with "TG Rs") as "H".
-    iIntros "LC". iMod ("H" with "LC") as "H". iModIntro. by iApply "H". }
+  iIntros "(TE& %&%&%&%& #Rs& Iter)".
+  iApply (lifting.lwp_pure_step_alt _ _ _ _ _ _ _ _ _ _ _ _
+    (λ i e, thread_expr i C e)); first auto.
+  iFrame "∗ #".
 Qed.
 
 (** FIXME: better way to handle this condition *)
-Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ :
+Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ {C} :
   PureExec φ n e1 e2 →
   φ →
   0 < n →
   (* m = n + m' → *)
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
-  envs_entails Δ (∃ G (m : nat) R (o : Ord.t),
+  envs_entails Δ (thread_expr i C (fill K e1) ∗ ∃ G (m : nat) R (o : Ord.t),
         (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m) ∗
          (** FIXME: nat add notation not working? *)
          ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∧ ⌜ (m = n + m')%nat ⌝) ∗
@@ -60,21 +97,24 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ :
          ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m') -∗
          ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r) -∗
          £ (o)%ord -∗
+         thread_expr i C (fill K e2) -∗
          lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ? ->.
   (* We want [pure_exec_fill] to be available to TC search locally. *)
   pose proof @pure_exec_fill.
-  iIntros "(%&%&%&%& T& H)".
-  iApply (lifting.lwp_pure_step_simple _ _ _ o). 1: auto.
+  iIntros "(TE& %&%&%&%& T& H)".
+  iApply (lifting.lwp_pure_step_simple _ _ _ o _ _ _ _ _ _ _
+    (λ i e, thread_expr i C e)). 1: auto.
+  iFrame "TE".
   iDestruct "T" as "($& Fs& $& %)". subst.
   iAssert (([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m'))%I with "[Fs]" as "[$ Fs]".
   { iApply big_sepS_sep. iApply (big_sepS_impl with "Fs"). iIntros "!> %% (%& H)".
     rewrite (crP_fuel_eq _ _ _ (n ⊕ m')%M).
     - iPoseProof (crP_fuel_add with "H") as "[$ $]".
     - rewrite measure_rep_add !measure_rep_nat Hessenberg.add_from_nat. done. }
-  iIntros "_ TG Ws LC".
+  iIntros "TE TG Ws LC".
   iAssert (|==> ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r))%I with "[Ws]" as ">Ws".
   { iApply big_sepS_bupd. iApply (big_sepS_impl with "Ws"). iIntros "!> %% [H | H]". 2: by iFrame.
     iMod (witP_cred_lt with "H") as "[_ H]".
@@ -84,7 +124,7 @@ Proof.
   { unshelve etransitivity. 1: exact (o × 1)%ord.
     - rewrite Jacobsthal.mult_1_r. done.
     - apply Jacobsthal.le_mult_r, OrdArith.le_from_nat. lia. }
-  iApply ("H" with "TG Fs Ws LC").
+  iApply ("H" with "TG Fs Ws LC TE").
 Qed.
 
 Lemma tac_lwp_value_nofupd `{!heapGS Σ} Δ s i E Φ v :
@@ -111,6 +151,7 @@ Ltac lwp_value_head :=
 
 Ltac lwp_finish :=
   lwp_expr_simpl;      (* simplify occurrences of subst/fill *)
+  try thread_expr_focus_goal;
   try lwp_value_head;  (* in case we have reached a value, get rid of the WP *)
   pm_prettify.        (* prettify ▷s caused by [MaybeIntoLaterNEnvs] and
                          λs caused by lwp_value *)
@@ -133,6 +174,7 @@ Tactic Notation "lwp_pure" open_constr(efoc) :=
   lazymatch goal with
   | |- envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
     let e := eval simpl in e in
+    thread_expr_focus "TE" e;
     reshape_expr e ltac:(fun K e' =>
       unify e' efoc;
       (* eapply (tac_lwp_pure _ _ _ _ K e'); *)
@@ -142,7 +184,7 @@ Tactic Notation "lwp_pure" open_constr(efoc) :=
          handles trivial goals, including [vals_compare_safe] *)
       (* |tc_solve                       (* IntoLaters *) *)
       |try lia (* must take at least one step *)
-      |idtac (* new goal *)
+      |iFrame "TE" (* reserve the pre-step token *)
       (* |idtac "use lwp_finish to cleanup new lwp"    (* new goal *) *)
       (* |lwp_finish                      (* new goal *) *)
       ])
@@ -216,7 +258,7 @@ Proof. intros He. rewrite envs_entails_unseal=> -> ->. by apply: lwp_bind_step. 
 Ltac lwp_bind_step_core K :=
   lazymatch eval hnf in K with
   | [] => idtac
-  | _ => eapply (tac_lwp_bind_step K); [tc_solve|simpl; reflexivity|reduction.pm_prettify]
+  | _ => eapply (tac_lwp_bind_step K); [tc_solve|simpl; reflexivity|reduction.pm_prettify; thread_expr_focus_goal]
   end.
 
 Tactic Notation "lwp_bind_step" open_constr(efoc) :=
@@ -237,7 +279,7 @@ Proof. rewrite envs_entails_unseal=> -> ->. by apply: lwp_bind_lwpupd. Qed.
 Ltac lwp_bind_gen_core K :=
   lazymatch eval hnf in K with
   | [] => idtac
-  | _ => eapply (tac_lwp_bind_gen K); [simpl; reflexivity|reduction.pm_prettify]
+  | _ => eapply (tac_lwp_bind_gen K); [simpl; reflexivity|reduction.pm_prettify; thread_expr_focus_goal]
   end.
 
 Tactic Notation "lwp_bind" open_constr(efoc) :=
@@ -268,7 +310,7 @@ Ltac lwp_expr_simpl_upd := lwp_expr_eval_upd simpl.
 
 (* simplify occurrences of subst/fill *)
 Ltac lwp_finish_upd :=
-  lwp_expr_simpl_upd.
+  lwp_expr_simpl_upd; try thread_expr_focus_goal.
 
 
 (* FIXME: TODO *)

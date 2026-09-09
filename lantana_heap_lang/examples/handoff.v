@@ -49,13 +49,13 @@ Section proof.
   Context `{!heapGS Σ, !handoffG Σ}.
 
   Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
+    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
 
   Ltac lwp_pure_one := (lwp_pure; post_lwp).
   Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
 
   Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
+    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
@@ -73,11 +73,11 @@ Section proof.
     λ f a K, (∃ ℓt (P : iProp Σ),
                ⌜(ℓt < ℓ)%ordi⌝ ∧
                P ∗
-               ∃ μ, ∀ lc i G g K' ℓg,
-               l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓt μ) ∗
+               ∃ μ, ∀ lc i G g K' ℓg C,
+               l{{{ thread_expr i C (f a) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g ℓt μ) ∗
                     crP_obls g ℓg K' ∗ ⌜ K ⊆ K' ⌝ ∗ P }}}
                 f a @ i
-              l{{{ rv, RET rv; £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}})%I.
+              l{{{ rv, RET rv; thread_expr i C (of_val rv) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}})%I.
 
   Definition handoff_inv (b : loc) γd ℓ : iProp Σ :=
     ∃ g, (b ↦{#(1/2)} NONEV ∗ ghost_var γd (1/2)%Qp g ∗ crP_obls g ℓ ∅) ∨
@@ -106,16 +106,16 @@ Section proof.
   Qed.
 
   Lemma Handoff_send_spec :
-    ⊢ ∃ μ, ∀ lc i (b : loc) (f a : val) G g K K' γ ℓ ℓg,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
+    ⊢ ∃ μ, ∀ lc i (b : loc) (f a : val) G g K K' γ ℓ ℓg C,
+    l{{{ thread_expr i C (Handoff.send #b f a) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls g ℓg K' ∗ ⌜ K ⊆ K' ⌝ ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ%ordi 1) ∗
          b ↦{#(1/2)} NONEV ∗
          is_task ℓ f a K ∗ is_handoff b γ ℓ }}}
       Handoff.send #b f a @ i
-    l{{{ RET #(); £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}}.
+    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}}.
   Proof.
-    iExists 20. iIntros (lc i b f a G g K K' γ ℓ ℓg Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Cg& %SubK& OFK& Ptrb& is_task& #handoff_inv)".
+    iExists 20. iIntros (lc i b f a G g K K' γ ℓ ℓg C Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& Cg& %SubK& OFK& Ptrb& is_task& #handoff_inv)".
     rewrite /is_handoff. iEval (do 2 tf_red) in "handoff_inv".
     rewrite /Handoff.send.
     iPoseProof (crP_fuels_init with "GF") as "GF".
@@ -132,10 +132,10 @@ Section proof.
     - iDestruct "inv" as "(Ptrb0& Gv& Cg0)".
       iApply lwp_sfmupd.
       iCombine "Ptrb Ptrb0" as "Ptrb".
-      iApply (lwp_store _ ∅ 0 with "[$Ptrb $TG $GF1]"). 1: done.
-      iIntros "((_& TG& _)& Ptrb)".
+      iApply (lwp_store _ ∅ 0 with "[$TE $Ptrb $TG $GF1]"). 1: done.
+      iIntros "(TE& (_& TG& _)& Ptrb)".
       iMod (obl_offload_set with "Cg Cg0 OFK") as "(Cg& Cg0& %DisjK)". 1: auto. 1: done.
-      rewrite union_empty_l_L. iModIntro. iModIntro. iSplitR "HΦ Q_LC TG Cg".
+      rewrite union_empty_l_L. iModIntro. iModIntro. iSplitR "TE HΦ Q_LC TG Cg".
       { iNext. iExists _. iRight. iLeft. iFrame. }
       iApply "HΦ". iFrame.
     - iDestruct "inv" as "(%&%&%& Ptrb0& _)". iCombine "Ptrb Ptrb0" gives %?. destruct H. done.
@@ -143,21 +143,21 @@ Section proof.
   Qed.
 
   Lemma Handoff_receive_spec :
-    ⊢ ∃ μ, ∀ lc i b g γ ℓ,
-    l{{{ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g ℓ μ) ∗
+    ⊢ ∃ μ, ∀ lc i b g γ ℓ C,
+    l{{{ thread_expr i C (Handoff.receive #(b : loc)) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g ℓ μ) ∗
          ghost_var (handoff_γd γ) (1/2)%Qp g ∗
          is_handoff b γ ℓ }}}
       Handoff.receive #b @ i
-    l{{{ v, RET v; £ lc ∗ thP_carriers i ∅ }}}.
+    l{{{ v, RET v; thread_expr i C (of_val v) ∗ £ lc ∗ thP_carriers i ∅ }}}.
   Proof.
     (** For internal steps and executing run_task *)
-    iExists (10 ⊕ 1)%M. iIntros (lc i b g γ ℓ Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gv& #handoff_inv)".
+    iExists (10 ⊕ 1)%M. iIntros (lc i b g γ ℓ C Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& Gv& #handoff_inv)".
     rewrite /Handoff.receive.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_task]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     (** Lob (co-)induction *)
-    iRevert (g) "TG GF Gv F_task". iLöb as "IH". iIntros (g) "TG GF Gv F_task".
+    iRevert (g) "TE TG GF Gv F_task". iLöb as "IH". iIntros (g) "TE TG GF Gv F_task".
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
     lwp_bind (Load _).
@@ -171,8 +171,8 @@ Section proof.
     iDestruct "inv" as "(%& [inv | [inv | inv]])".
     - iDestruct "inv" as "(Ptrb& Gv0& Cg)".
       iApply lwp_sfmupd.
-      iApply (lwp_load _ ∅ 0 with "[$Ptrb $TG $GF1]"). 1: done.
-      iIntros "((_& TG& _)& Ptrb)".
+      iApply (lwp_load _ ∅ 0 with "[$TE $Ptrb $TG $GF1]"). 1: done.
+      iIntros "(TE& (_& TG& _)& Ptrb)".
       iCombine "Gv Gv0" gives %H. destruct H as [_ <-]. subst.
       iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
       replace ({[g]} ∖ {[g]}) with (∅ : gset ocid) by set_solver.
@@ -188,10 +188,10 @@ Section proof.
       { iNext. iExists _. iLeft. iFrame. }
       do 3 (iModIntro; lwp_pure_one).
       iPoseProof (crP_fuels_add 2 with "GF") as "[_ GF]".
-      iModIntro. iApply ("IH" with "HΦ TG GF Gv F_task").
+      iModIntro. iApply ("IH" with "HΦ TE TG GF Gv F_task").
     - iDestruct "inv" as "(%&%&%& Ptrb& Gv0& Cg& is_task)".
-      iApply (lwp_load _ ∅ 0 with "[$Ptrb $TG $GF1]"). 1: done.
-      iIntros "((_& TG& _)& Ptrb)".
+      iApply (lwp_load _ ∅ 0 with "[$TE $Ptrb $TG $GF1]"). 1: done.
+      iIntros "(TE& (_& TG& _)& Ptrb)".
       iCombine "Gv Gv0" as "Gv" gives %H. destruct H as [_ <-]. subst.
       iModIntro. iSplitL "Ptrb Gv".
       { iNext. iExists _. iRight. iRight. iFrame. }
@@ -202,11 +202,11 @@ Section proof.
       iMod (crP_fuel_extend_set _ ℓt _ μ with "F_task") as "F_task". 1: eauto.
       iApply lwp_sfgupd.
       (* iApply lwp_sfmupd. *)
-      iApply ("task" $! 0 with "[$TG $F_task $Cg $HP]"). 1: eauto.
-      iIntros (?) "(_& TG& Cg)". replace (K ∖ K) with (∅ : gset ocid) by set_solver.
+      iApply ("task" $! 0 with "[$TE $TG $F_task $Cg $HP]"). 1: eauto.
+      iIntros (?) "(TE& _& TG& Cg)". replace (K ∖ K) with (∅ : gset ocid) by set_solver.
       iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
       replace ({[g]} ∖ {[g]}) with (∅ : gset ocid) by set_solver.
-      iApply ("HΦ" with "[$Q_LC $TG]").
+      iApply ("HΦ" with "[$TE $Q_LC $TG]").
     - iDestruct "inv" as "(%&%& _& Gv0)".
       iCombine "Gv Gv0" gives %H. destruct H as [? _]. done.
   Qed.

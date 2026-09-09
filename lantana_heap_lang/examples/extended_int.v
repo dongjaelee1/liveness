@@ -43,24 +43,26 @@ Section proof.
   Context `{!heapGS Σ}.
 
   Ltac post_wp :=
-    iFrame; iExists ∅, 0; iSplitR; [by eauto | iIntros "Hg Hfuel _ _"; iModIntro; simpl].
+    iFrame; iExists ∅, 0; iSplitR; [by eauto | iIntros "Hg Hfuel _ _ TE"; iModIntro; simpl].
 
   Ltac lwp_pures := repeat (lwp_pure; post_wp).
 
   Lemma lwp_lt :
-    ⊢ ∃ m, ∀ x y i G,
-    l{{{ thP_carriers i G ∗ crP_fuels G m }}}
+    ⊢ ∃ m, ∀ x y i G C,
+    l{{{ thread_expr i C (lt (into_val x) (into_val y)) ∗
+         thP_carriers i G ∗ crP_fuels G m }}}
       lt (into_val x) (into_val y) @ i
-    l{{{ RET #(bool_decide (lt_rel x y)); thP_carriers i G }}}.
+    l{{{ RET #(bool_decide (lt_rel x y));
+         thread_expr i C #(bool_decide (lt_rel x y)) ∗ thP_carriers i G }}}.
   Proof.
-    iExists 100. iIntros. iIntros (?) "!# [Htg Hfuel] HΦ".
+    iExists 100. iIntros. iIntros (?) "!# (TE& Htg& Hfuel) HΦ".
 
     lwp_lam. post_wp.
     lwp_pures.
 
     destruct x as [|a|], y as [|b|]; simpl; lwp_pures; lwp_finish; iModIntro;
       rewrite ?bool_decide_decide;
-      repeat destruct decide; (try by iApply "HΦ"); lia.
+      repeat destruct decide; (try by iApply "HΦ"; iFrame); lia.
   Qed.
 
 End proof.

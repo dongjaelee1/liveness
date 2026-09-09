@@ -26,13 +26,13 @@ Section proof.
   Context `{!heapGS Σ}.
 
   Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
+    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
 
   Ltac lwp_pure_one := (lwp_pure; post_lwp).
   Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
 
   Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
+    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
@@ -83,45 +83,45 @@ Section proof.
   Qed.
 
   Lemma Flag_init_spec :
-    ⊢ ∃ μ, ∀ lc i G g K ℓ m,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
+    ⊢ ∃ μ, ∀ lc i G g K ℓ m C,
+    l{{{ thread_expr i C (Flag.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls g ℓ K }}}
       Flag.init #() @ i
-    l{{{ x k, RET #x; £ lc ∗ thP_carriers i G ∗
+    l{{{ (x : loc) k, RET #x; thread_expr i C (#x) ∗ £ lc ∗ thP_carriers i G ∗
                       (⌜k ∉ K⌝) ∗
                       crP_obls g ℓ ({[k]} ∪ K) ∗
                       oblP_fuel k ℓ m ∗
                       flag_tk x k ∗ is_flag x k ℓ }}}.
   Proof.
-    iExists 10. iIntros (lc i G g K ℓ m Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Cg)".
+    iExists 10. iIntros (lc i G g K ℓ m C Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& Cg)".
     rewrite /Flag.init.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc (lc)%ord.
     iApply lwpupd_lwp_sfmupd.
     lwp_bind (AllocN _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iApply (lwp_alloc _ ∅ 0 with "[$TG $GF1]"). 1: done.
-    iModIntro. iIntros (ptrx) "((_& TG& _)& Ptrx& _)".
+    iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
+    iModIntro. iIntros (ptrx) "[TE ((_& TG& _)& Ptrx& _)]".
     iMod (is_flag_init _ ptrx _ _ (ℓ) _ m with "Ptrx Cg") as "(%k& %Hk& Cg& Of& Ftk& #is_flag)".
     1: done.
-    iApply ("HΦ" with "[$LC $TG $Cg $Of $Ftk $is_flag]").
+    iApply ("HΦ" with "[$TE $LC $TG $Cg $Of $Ftk $is_flag]").
     iPureIntro. auto.
   Qed.
 
   Lemma Flag_set_spec :
-    ⊢ ∃ μ, ∀ lc i l G g K k ℓ ℓg,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
+    ⊢ ∃ μ, ∀ lc i l G g K k ℓ ℓg C,
+    l{{{ thread_expr i C (Flag.set #(l : loc)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
          (* The other half of the until ownership for the pointsto. *)
          flag_tk l k ∗
          is_flag l k ℓ }}}
       Flag.set #l @ i
-    l{{{ RET #(); £ lc ∗ thP_carriers i G ∗
+    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗
                   crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}}.
   Proof.
-    iExists 10. iIntros (lc i l G g K k ℓ ℓg Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gg& %Ink& HU& #is_flag)".
+    iExists 10. iIntros (lc i l G g K k ℓ ℓg C Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& Gg& %Ink& HU& #is_flag)".
     iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.set.
     iPoseProof (crP_fuels_init with "GF") as "GF".
@@ -144,8 +144,8 @@ Section proof.
     iDestruct "inv" as "[Ptrl ACCinv]".
     iApply lwp_sfmupd.
     iEval (rewrite tf_atomic_logic) in "Ptrl".
-    iApply (lwp_store _ ∅ 0 with "[$Ptrl $TG $GF1]"). 1: done.
-    iIntros "((_& TG& _)& Ptrl)".
+    iApply (lwp_store _ ∅ 0 with "[$TE $Ptrl $TG $GF1]"). 1: done.
+    iIntros "[TE ((_& TG& _)& Ptrl)]".
     iMod ("ACCinv" $! _) as "ACCinv".
     iApply sfmupd_fupd_acc. iMod ("ACCinv" with "Ptrl") as "ACCinv".
     iModIntro. 
@@ -156,18 +156,18 @@ Section proof.
     iMod ("ACCinv" $! _) as "ACCinv". iIntros "!> !>". iMod "ACCinv" as "(Ptrl& Gg& #Odk)".
     iIntros "!> !>". iSplitL "Ptrl".
     { iNext. iRight. iFrame. eauto. }
-    iApply ("HΦ" with "[$Q_LC $TG $Gg $Odk]").
+    iApply ("HΦ" with "[$TE $Q_LC $TG $Gg $Odk]").
   Qed.
 
   Lemma Flag_wait_spec :
-    ⊢ ∃ μ, ∀ lc i l G k ℓ,
-    l{{{ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
+    ⊢ ∃ μ, ∀ lc i l G k ℓ C,
+    l{{{ thread_expr i C (Flag.wait #(l : loc)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
          is_flag l k ℓ }}}
       Flag.wait #l @ i
-    l{{{ RET #1; £ lc ∗ thP_carriers i G ∗ oblP_discharged k }}}.
+    l{{{ RET #1; thread_expr i C (#1) ∗ £ lc ∗ thP_carriers i G ∗ oblP_discharged k }}}.
   Proof.
-    iExists ((5 × ▽) ⊕ 5)%M. iIntros (lc i l G k ℓ Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& #is_flag)".
+    iExists ((5 × ▽) ⊕ 5)%M. iIntros (lc i l G k ℓ C Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& #is_flag)".
     iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.wait.
     iPoseProof (crP_fuel_add_set with "GF") as "[W_GF GF]".
@@ -177,10 +177,10 @@ Section proof.
     (* { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. } *)
     (* iClear "Wf0". *)
     (* iInduction α as [α IH] using WFOCM.ind. *)
-    iRevert "TG HΦ GF". iPoseProof (wit_layer_ind with "[$Wlk $W_GF]") as ">H".
+    iRevert "TE TG HΦ GF". iPoseProof (wit_layer_ind with "[$Wlk $W_GF]") as ">H".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
     2:{ iApply "H". }
-    iIntros "!> IH !> TG HΦ GF".
+    iIntros "!> IH !> TE TG HΦ GF".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc 100.
     lwp_bind (Load _).
@@ -196,9 +196,9 @@ Section proof.
       iDestruct "inv" as "(Ptrl& inv_acc)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
       iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-      iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TG $Ptrl $GF1]").
+      iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TE $TG $Ptrl $GF1]").
       { iApply big_sepS_singleton. eauto. }
-      iIntros "[(_& TG& Rs) Ptrl]".
+      iIntros "[TE [(_& TG& Rs) Ptrl]]".
       iEval (rewrite big_sepS_singleton) in "Rs". iDestruct "Rs" as "[Wck | #Odk]"; cycle 1.
       { iMod ("inv_acc" with "[Ptrl]") as "H".
         { iNext. iFrame. }
@@ -215,7 +215,7 @@ Section proof.
       (* rewrite bool_decide_true; cycle 1. *)
       (* iModIntro; lwp_pure_one. *)
       iModIntro.
-      iMod ("IH" with "Wck") as "[GF' IH]". iApply ("IH" with "TG HΦ GF'").
+      iMod ("IH" with "Wck") as "[GF' IH]". iApply ("IH" with "TE TG HΦ GF'").
       (* iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')". *)
       (* iApply ("IH" $! α0 LTα with "TG HΦ [Fkl'] Wf'"). *)
       (* rewrite map_union_empty. iPoseProof (big_sepM_gset_to_gmap with "Fkl'") as "H". iFrame. *)
@@ -223,8 +223,8 @@ Section proof.
       iDestruct "inv" as ">(#Odk& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
       iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-      iApply (lwp_load _ ∅ 0 with "[$TG $Ptrl $GF1]"). 1: done.
-      iIntros "[(_& TG& _) Ptrl]".
+      iApply (lwp_load _ ∅ 0 with "[$TE $TG $Ptrl $GF1]"). 1: done.
+      iIntros "[TE [(_& TG& _) Ptrl]]".
       iModIntro. iSplitL "Ptrl".
       { iNext. iRight. iFrame. eauto. }
       iClear "LC". iModIntro. lwp_pure_lc lc.

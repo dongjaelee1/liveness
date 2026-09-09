@@ -33,6 +33,16 @@ Section language_mixin.
   }.
 End language_mixin.
 
+(** A language chooses its context representation. Only application of the
+    identity and composition is prescribed; contexts need not be injective,
+    and a language may provide only the identity context. *)
+Record LanguageCtxMixin {C E : Type}
+    (apply_ctx : C → E → E) (id_ctx : C) (comp_ctx : C → C → C) : Prop := {
+  mixin_ctx_id e : apply_ctx id_ctx e = e;
+  mixin_ctx_comp K1 K2 e :
+    apply_ctx (comp_ctx K1 K2) e = apply_ctx K1 (apply_ctx K2 e)
+}.
+
 Structure language :=
   Language {
       expr : Type;
@@ -40,28 +50,41 @@ Structure language :=
       state : Type;
       observation : Type;
       state_pred : Type;
+      ctx : Type;
       of_val : val → expr;
       to_val : expr → option val;
       prim_step : thread_id → expr → state → thread_ids → list observation →
                   expr → state → gmap thread_id expr → Prop;
       state_sat : state → gmap thread_id expr → state_pred → Prop;
-      language_mixin : LanguageMixin of_val to_val prim_step
+      ctx_apply : ctx → expr → expr;
+      ctx_id : ctx;
+      ctx_comp : ctx → ctx → ctx;
+      language_mixin : LanguageMixin of_val to_val prim_step;
+      language_ctx_mixin : LanguageCtxMixin ctx_apply ctx_id ctx_comp
     }.
 
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments Language {_ _ _ _ _ _ _ _ _} _.
+Global Arguments Language {_ _ _ _ _ _ _ _ _ _ _ _ _} _ _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
 Global Arguments prim_step {_} _ _ _ _ _ _ _ _.
 Global Arguments state_sat {_} _ _ _.
+Global Arguments ctx_apply {_} _ _.
+Global Arguments ctx_id {_}.
+Global Arguments ctx_comp {_} _ _.
+Coercion ctx_apply : ctx >-> Funclass.
 
 Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
 Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
 Canonical Structure exprO `{SI : indexT} Λ := leibnizO (expr Λ).
 
-Definition ctx (Λ : language) := expr Λ → expr Λ.
+Lemma ctx_id_apply {Λ : language} (e : expr Λ) : ctx_id e = e.
+Proof. apply language_ctx_mixin. Qed.
+Lemma ctx_comp_apply {Λ : language} (K1 K2 : ctx Λ) e :
+  ctx_comp K1 K2 e = K1 (K2 e).
+Proof. apply language_ctx_mixin. Qed.
 
 Class LanguageCtx {Λ : language} (K : ctx Λ) := {
   fill_not_val e :
@@ -74,20 +97,26 @@ Class LanguageCtx {Λ : language} (K : ctx Λ) := {
     ∃ e2', e2 = K e2' ∧ prim_step i e1' σ1 Θ1 κ e2' σ2 efs
 }.
 
-Global Instance language_ctx_id Λ : LanguageCtx (@id (expr Λ)).
-Proof. constructor; naive_solver. Qed.
+Global Instance language_ctx_id Λ : LanguageCtx (@ctx_id Λ).
+Proof.
+  constructor.
+  - intros e He. by rewrite ctx_id_apply.
+  - intros i e1 σ1 Θ1 κ e2 σ2 efs HS. by rewrite !ctx_id_apply.
+  - intros i e1 σ1 Θ1 κ e2 σ2 efs Hnv HS.
+    rewrite ctx_id_apply in HS. exists e2. by rewrite ctx_id_apply.
+Qed.
 
 Global Instance language_ctx_compose Λ (K1 K2 : ctx Λ) :
-  LanguageCtx K1 → LanguageCtx K2 → LanguageCtx (K2 ∘ K1).
+  LanguageCtx K1 → LanguageCtx K2 → LanguageCtx (ctx_comp K2 K1).
 Proof.
   intros. constructor.
-  - simpl. intros. do 2 apply fill_not_val. auto.
-  - simpl. intros. apply (fill_step _ (K1 e1)). apply fill_step. auto.
-  - simpl. intros. apply fill_step_inv in H2.
+  - intros. rewrite ctx_comp_apply. do 2 apply fill_not_val. auto.
+  - intros. rewrite !ctx_comp_apply. apply (fill_step _ (K1 e1)). apply fill_step. auto.
+  - intros. rewrite ctx_comp_apply in H2. apply fill_step_inv in H2.
     2:{ apply fill_not_val. auto. }
     destruct H2 as (?&?&?). apply (fill_step_inv) in H3.
     2:{ auto. }
-    subst. destruct H3 as (?&?&?). subst. eexists. split; eauto.
+    subst. destruct H3 as (?&?&?). subst. eexists. rewrite ctx_comp_apply. split; eauto.
 Qed.
 
 Notation thread_pool Λ := (gmap thread_id (expr Λ)).

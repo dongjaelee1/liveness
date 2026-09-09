@@ -15,11 +15,11 @@ Section code.
 
   Definition writer : val :=
     λ: <>, let: "v" := Flag.set X in
-          Label "exit" "v".
+          "v".
 
   Definition reader : val :=
     λ: <>, let: "v" := Flag.wait X in
-          Label "exit" "v".
+          "v".
 
 End code.
 
@@ -27,13 +27,13 @@ Section proof.
   Context `{!heapGS Σ}.
 
   Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _"].
+    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
 
   Ltac lwp_pure_one := (lwp_pure; post_lwp).
   Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
 
   Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC"].
+    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
@@ -41,25 +41,25 @@ Section proof.
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
 
-  Let Nl := nroot.@ "writer_label".
+  Let Nl := nroot.@ "writer_return".
 
   Let l := X_loc.
 
   (** The main proofs. *)
   Lemma writer_spec :
     ⊢ ∃ μ, ∀ i g k kl,
-    l{{{ thP_carriers i {[g]} ∗ crP_fuel g 0 μ ∗
+    l{{{ thread_expr i [] (writer #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 0 μ ∗
          crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
          (* Start with the other half of the until ownership for the pointsto. *)
          flag_tk l k ∗
-         ⟦finallyP Nl kl 1 (i ⤉ "exit", #())⟧ₗ ∗
+         ⟦finallyP Nl kl 1 (exits #()@i)⟧ₗ ∗
          is_flag l k 0 }}}
       writer #() @ i
-    l{{{ v, RET v; lift_term i fork_post v }}}.
+    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
   Proof.
     iPoseProof (Flag_set_spec) as (μ_s) "Flag_set_spec".
     iExists (4 ⊕ μ_s)%M. iIntros (i g k kl Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gg& %Neqk& HU& HE& #is_flag)".
+    iDestruct "HP" as "(TE& TG& GF& Gg& %Neqk& HU& HE& #is_flag)".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_s]".
     iPoseProof (crP_fuels_init {[g]} with "[GF]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
@@ -67,81 +67,47 @@ Section proof.
     lwp_pure_one.
     lwp_bind (Flag.set X).
     iModIntro.
-    iApply ("Flag_set_spec" $! 10 with "[$TG GF_s $Gg $HU $is_flag]").
+    iApply ("Flag_set_spec" $! 10 with "[$TE $TG GF_s $Gg $HU $is_flag]").
     { iSplit; last (iPureIntro; set_solver).
       iApply big_sepS_singleton. iFrame. }
-    iIntros "(LC& TG& Gg& #Od)".
+    iIntros "(TE& LC& TG& Gg& #Od)".
     replace ({[k; kl]} ∖ {[k]}) with ({[kl]} : gset _) by set_solver.
     do 2 (iModIntro; lwp_pure_one).
-    iApply lwpupd_label. iIntros "PL".
-    iApply sfmupd_fupd_acc.
-    iMod (tf_until_discharge with "HE") as "HE". 1: set_solver.
-    iModIntro.
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iDestruct "HE" as "[_ HE]". iMod ("HE" $! _) as "HE".
-    iMod ("HE" with "[PL]") as "HE".
-    { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
-    iPoseProof ("HE" with "[] Gg") as "HE".
-    { iPureIntro. set_solver. }
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iMod ("HE" $! _) as "HE". iModIntro. iMod "HE" as "(PL& Gg& #Odkl)".
-    iModIntro. iFrame "PL".
-    replace ({[kl]} ∖ {[kl]} : gset _) with (∅ : oids) by set_solver.
-    iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g with "GF") as "GF".
-    replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
-    lwp_pures.
+    iApply lwpupd_lwp_sfmupd.
+    iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
+    iMod (thread_expr_terminate with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
-    iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$". by iModIntro.
+    iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
   Qed.
 
   Lemma reader_spec :
     ⊢ ∃ μ, ∀ i g k kl,
-    l{{{ thP_carriers i {[g]} ∗ crP_fuel g 1 μ ∗
+    l{{{ thread_expr i [] (reader #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 1 μ ∗
          crP_obls g 1 {[kl]} ∗
-         ⟦finallyP Nl kl 1 (i ⤉ "exit", #1)⟧ₗ ∗
+         ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ∗
          is_flag l k 0 }}}
       reader #() @ i
-    l{{{ v, RET v; lift_term i fork_post v }}}.
+    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
   Proof.
     iPoseProof (Flag_wait_spec) as (μ_w) "Flag_wait_spec".
     iExists (10 ⊕ μ_w)%M. iIntros (i g k kl Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TG& GF& Gg& HE& #is_flag)".
+    iDestruct "HP" as "(TE& TG& GF& Gg& HE& #is_flag)".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_w]".
     iPoseProof (crP_fuels_init {[g]} with "[GF]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     rewrite /reader /=.
     lwp_pure_one.
     lwp_bind (Flag.wait X).
-    iModIntro. iApply ("Flag_wait_spec" $! 10 with "[$TG GF_w $is_flag]").
+    iModIntro. iApply ("Flag_wait_spec" $! 10 with "[$TE $TG GF_w $is_flag]").
     { iApply big_sepS_singleton. erewrite crP_fuel_layer_eq. 1: iFrame.
       rewrite hessenberg.add_O_l. done. }
-    iIntros "(LC& TG& #Od)".
+    iIntros "(TE& LC& TG& #Od)".
     do 2 (iModIntro; lwp_pure_one).
-    iApply lwpupd_label. iIntros "PL".
-    iApply sfmupd_fupd_acc.
-    iMod (tf_until_discharge with "HE") as "HE". 1: set_solver.
-    iModIntro.
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iDestruct "HE" as "[_ HE]". iMod ("HE" $! _) as "HE".
-    iMod ("HE" with "[PL]") as "HE".
-    { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
-    iPoseProof ("HE" with "[] Gg") as "HE".
-    { iPureIntro. set_solver. }
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iMod ("HE" $! _) as "HE". iModIntro. iMod "HE" as "(PL& Gg& #Odkl)".
-    iModIntro. iFrame "PL".
-    replace ({[kl]} ∖ {[kl]} : gset _) with (∅ : oids) by set_solver.
-    iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g with "GF") as "GF".
-    replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
-    lwp_pures.
+    iApply lwpupd_lwp_sfmupd.
+    iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
+    iMod (thread_expr_terminate with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
-    iApply "HΦ". rewrite /lift_term. iMod (thread_terminate with "TG") as "$". by iModIntro.
+    iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
   Qed.
 
   Lemma flag_client_pre Θ i j Φ Ψs :
@@ -150,18 +116,18 @@ Section proof.
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
                       ⌜ k ≠ kl1 ⌝ ∗ is_flag_tf l k 0 ∗
                       untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
-                      finallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
-                      finallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
+                      finallyP Nl kl1 1 (exits #()@i) ∗
+                      finallyP Nl kl2 1 (exits #1@j) ∗
                       ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                        thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
                        crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F) →
     Ψs = ({[i := fork_post; j := fork_post]}) →
-    ((l ↦ #0) -∗
+    (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ (l ↦ #0) -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ1 μ2, (⟦Φ μ1 μ2⟧ₗ ∗
                        (⟦Φ μ1 μ2⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof.
-    iIntros (Hij HT HP HQ) "Ptrl TGs".
+    iIntros (Hij HT HP HQ) "TEs Ptrl TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     iPoseProof (big_sepS_union with "TGs") as "[TG1 TG2]".
     { set_solver. }
@@ -171,11 +137,11 @@ Section proof.
     iMod (carrier_alloc _ _ _ 0 μ1 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (is_flag_init _ _ _ _ 0 _ μ1 with "Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #is_flag)". 1: done.
     iMod (tf_until_alloc _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (i ⤉ "exit",#())%F with "[]") as "Ukl1".
+    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (exits #()@i)%F with "[]") as "Ukl1".
     { tf_red. done. }
     iMod (carrier_alloc _ _ _ 1 μ2 with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
     iMod (tf_until_alloc _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
-    iMod ("Akl2" $! _ Nl (⌜True⌝)%F (j ⤉ "exit",#1)%F with "[]") as "Ukl2".
+    iMod ("Akl2" $! _ Nl (⌜True⌝)%F (exits #1@j)%F with "[]") as "Ukl2".
     { tf_red. done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
     { subst Φ.
@@ -194,16 +160,19 @@ Section proof.
     iEval (tf_red) in "HP". iDestruct "HP" as "(%kl1& HP)".
     iEval (tf_red) in "HP". iDestruct "HP" as "(%kl2& HP)".
     iEval (tf_red) in "HP". iDestruct "HP" as "(%Hkne& #is_flag& Uk& Ukl1& Ukl2& TG1& Gg1& TG2& Gg2& Gf1& Gf2)".
-    iPoseProof ("writer_spec" $! i g1 k kl1 (λ v, lift_term i fork_post v) with "[Uk Ukl1 TG1 Gg1 Gf1]") as "WP1".
+    iEval (rewrite HT big_sepM_insert; last by rewrite lookup_singleton_ne) in "TEs".
+    iDestruct "TEs" as "[TEi TEs]".
+    iEval (rewrite big_sepM_singleton) in "TEs". iRename "TEs" into "TEj".
+    iPoseProof ("writer_spec" $! i g1 k kl1 (λ v, lift_term i fork_post v) with "[TEi Uk Ukl1 TG1 Gg1 Gf1]") as "WP1".
     { iFrame. iSplit; eauto. }
-    iPoseProof ("reader_spec" $! j g2 k kl2 (λ v, lift_term j fork_post v) with "[Ukl2 TG2 Gg2 Gf2]") as "WP2".
+    iPoseProof ("reader_spec" $! j g2 k kl2 (λ v, lift_term j fork_post v) with "[TEj Ukl2 TG2 Gg2 Gf2]") as "WP2".
     { iFrame. eauto. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { rewrite lookup_insert_ne; auto. }
     { rewrite lookup_insert_ne; auto. }
     iSplitL "WP1".
-    { iApply "WP1". iModIntro. eauto. }
-    rewrite big_sepM2_singleton. iApply "WP2". iModIntro. eauto.
+    { iApply "WP1". iModIntro. iIntros (?) "[_ $]". }
+    rewrite big_sepM2_singleton. iApply "WP2". iModIntro. iIntros (?) "[_ $]".
   Qed.
 
 End proof.
@@ -219,15 +188,15 @@ Section adequacy.
   Let Φ : tp :=
         (is_flag_tp l ∧
          tp_until (l ↦ #0) (l ↦ #1) ∧
-         tp_finally (i ⤉ "exit", #()) ∧
-         tp_finally (j ⤉ "exit", #1))%P.
+         tp_finally (exits #()@i) ∧
+         tp_finally (exits #1@j))%P.
 
   Let Φ' : tp :=
         (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
             ⌜ k ≠ kl1 ⌝ ∧ is_flag_tp' l ∧
             tp_until (l ↦ #0) (l ↦ #1) ∧
-            tp_finally (i ⤉ "exit", #()) ∧
-            tp_finally (j ⤉ "exit", #1) ∧
+            tp_finally (exits #()@i) ∧
+            tp_finally (exits #1@j) ∧
             tp_true)%P.
 
   Remark Φ_impl :
@@ -244,15 +213,15 @@ Section adequacy.
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
 
-  Let Nl := nroot.@ "writer_label".
+  Let Nl := nroot.@ "writer_return".
 
   Let Φ_tf `{!heapGS Σ} : _ → _ → tf Σ :=
         λ μ1 μ2,
           (∃ g1 g2 k kl1 kl2,
               ⌜ k ≠ kl1 ⌝ ∗ is_flag_tf l k 0 ∗
               untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
-              finallyP Nl kl1 1 (i ⤉ "exit", #()) ∗
-              finallyP Nl kl2 1 (j ⤉ "exit", #1) ∗
+              finallyP Nl kl1 1 (exits #()@i) ∗
+              finallyP Nl kl2 1 (exits #1@j) ∗
               ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
                crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F.
@@ -293,15 +262,15 @@ Section adequacy.
     iExists (lantana_state_interp_class), (@fork_post Σ), (@Ψs Σ).
     iSplitL "HI TI PI".
     { by iFrame. }
-    iSplitL "Tis".
-    { by iFrame. }
+    iSplitR; first done.
     iModIntro. iIntros "LC TGs".
     (* Set Printing All. *)
-    iMod (flag_client_pre Θ0 i j with "[Ptrs] [TGs]") as "H".
+    iMod (flag_client_pre Θ0 i j with "[Tis] [Ptrs] [TGs]") as "H".
     { subst i j. lia. }
     { done. }
     { reflexivity. }
     { reflexivity. }
+    { rewrite /thread_expr /=. iFrame. }
     { subst σ0. rewrite big_sepM_singleton.
       by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
     { iFrame. }
