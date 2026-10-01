@@ -1,6 +1,5 @@
 From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
@@ -52,7 +51,7 @@ Section proof.
          crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
          (* Start with the other half of the until ownership for the pointsto. *)
          flag_tk l k ∗
-         ⟦finallyP Nl kl 1 (exits #()@i)⟧ₗ ∗
+         finallyT Nl kl 1 (exits #()@i) ∗
          is_flag l k 0 }}}
       writer #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
@@ -75,7 +74,7 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply lwpupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminateT with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
   Qed.
@@ -84,7 +83,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i g k kl,
     l{{{ thread_expr i [] (reader #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 1 μ ∗
          crP_obls g 1 {[kl]} ∗
-         ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ∗
+         finallyT Nl kl 1 (exits #1@i) ∗
          is_flag l k 0 }}}
       reader #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
@@ -105,7 +104,7 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply lwpupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminateT with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
   Qed.
@@ -114,18 +113,17 @@ Section proof.
     i ≠ j →
     Θ = {[i := writer #(); j := reader #() ]} →
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
-                      ⌜ k ≠ kl1 ⌝ ∗ is_flag_tf l k 0 ∗
-                      untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
-                      finallyP Nl kl1 1 (exits #()@i) ∗
-                      finallyP Nl kl2 1 (exits #1@j) ∗
-                      ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
+                      ⌜ k ≠ kl1 ⌝ ∗ is_flag l k 0 ∗ flag_tk l k ∗
+                      finallyT Nl kl1 1 (exits #()@i) ∗
+                      finallyT Nl kl2 1 (exits #1@j) ∗
+                      (thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                        thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
-                       crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F) →
+                       crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2))%I) →
     Ψs = ({[i := fork_post; j := fork_post]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ (l ↦ #0) -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
-     |={⊤}=>m ∃ μ1 μ2, (⟦Φ μ1 μ2⟧ₗ ∗
-                       (⟦Φ μ1 μ2⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+     |={⊤}=>m ∃ μ1 μ2, (Φ μ1 μ2 ∗
+                       (Φ μ1 μ2 -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof.
     iIntros (Hij HT HP HQ) "TEs Ptrl TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
@@ -136,30 +134,22 @@ Section proof.
     iPoseProof (reader_spec) as (μ2) "reader_spec".
     iMod (carrier_alloc _ _ _ 0 μ1 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (is_flag_init _ _ _ _ 0 _ μ1 with "Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #is_flag)". 1: done.
-    iMod (tf_until_alloc _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nl (⌜True⌝)%F (exits #()@i)%F with "[]") as "Ukl1".
-    { tf_red. done. }
+    iMod (untilI_alloc _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
+    iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I (tsem (exits #()@i)%I) with "[]") as "Ukl1".
+    { done. }
     iMod (carrier_alloc _ _ _ 1 μ2 with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
-    iMod (tf_until_alloc _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
-    iMod ("Akl2" $! _ Nl (⌜True⌝)%F (exits #1@j)%F with "[]") as "Ukl2".
-    { tf_red. done. }
+    iMod (untilI_alloc _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
+    iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I (tsem (exits #1@j)%I) with "[]") as "Ukl2".
+    { done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
     { subst Φ.
-      tf_red. iExists g1. tf_red. iExists g2.
-      tf_red. iExists k. tf_red. iExists kl1. tf_red. iExists kl2.
-      rewrite -is_flag_tf_red.
-      tf_red. iSplit.
+      iExists g1, g2, k, kl1, kl2. iSplit.
       { iPureIntro. intros <-. set_solver. }
       iFrame "is_flag Uk".
       replace ({[kl1]} ∪ ({[k]} ∪ ∅)) with ({[k; kl1]} : gset _) by set_solver. rewrite !union_empty_r_L. iFrame. }
     iClear "is_flag Wlkl1 Wlkl2". clear dependent g1 g2 k kl1 kl2.
     iIntros "HP". subst Φ.
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%g1& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%g2& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%k& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%kl1& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%kl2& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%Hkne& #is_flag& Uk& Ukl1& Ukl2& TG1& Gg1& TG2& Gg2& Gf1& Gf2)".
+    iDestruct "HP" as (g1 g2 k kl1 kl2) "(%Hkne& #is_flag& Uk& Ukl1& Ukl2& TG1& Gg1& TG2& Gg2& Gf1& Gf2)".
     iEval (rewrite HT big_sepM_insert; last by rewrite lookup_singleton_ne) in "TEs".
     iDestruct "TEs" as "[TEi TEs]".
     iEval (rewrite big_sepM_singleton) in "TEs". iRename "TEs" into "TEj".
@@ -191,44 +181,37 @@ Section adequacy.
          tp_finally (exits #()@i) ∧
          tp_finally (exits #1@j))%P.
 
-  Let Φ' : tp :=
-        (∃ (g1 g2 : ocid) (k kl1 kl2 : oid),
-            ⌜ k ≠ kl1 ⌝ ∧ is_flag_tp' l ∧
-            tp_until (l ↦ #0) (l ↦ #1) ∧
-            tp_finally (exits #()@i) ∧
-            tp_finally (exits #1@j) ∧
-            tp_true)%P.
-
-  Remark Φ_impl :
-    ∀ τ, tp_trace Φ' τ → tp_trace Φ τ.
-  Proof.
-    Local Opaque is_flag_tp' is_flag_tp.
-    simpl. unfold_trProp. intros. destruct τ. destruct H as (?&?&?&?&?&?&?&?).
-    split. 1: apply is_flag_tp_impl; auto.
-    firstorder.
-    Local Transparent is_flag_tp' is_flag_tp.
-  Qed.
-
   Let N := nroot.@ "flag".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
 
   Let Nl := nroot.@ "writer_return".
 
-  Let Φ_tf `{!heapGS Σ} : _ → _ → tf Σ :=
+  (** The final resources. *)
+  Let Φ_P `{!heapGS Σ} : _ → _ → iProp Σ :=
         λ μ1 μ2,
           (∃ g1 g2 k kl1 kl2,
-              ⌜ k ≠ kl1 ⌝ ∗ is_flag_tf l k 0 ∗
-              untilP Np k (1/2) (l ↦ #0) (l ↦ #1) ∗
-              finallyP Nl kl1 1 (exits #()@i) ∗
-              finallyP Nl kl2 1 (exits #1@j) ∗
-              ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
+              ⌜ k ≠ kl1 ⌝ ∗ is_flag l k 0 ∗ flag_tk l k ∗
+              finallyT Nl kl1 1 (exits #()@i) ∗
+              finallyT Nl kl2 1 (exits #1@j) ∗
+              (thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
-               crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F.
+               crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2))%I.
 
-  Lemma tf_to_tp_Φ `{!heapGS Σ} m1 m2 :
-    tf_to_tp (Φ_tf m1 m2) = Φ'.
-  Proof. done. Qed.
+  (** What they guarantee: the pure and ghost parts guarantee nothing, and the quantified
+      names do not show. *)
+  Let G_client {Σ} : tps heap_lang Σ :=
+        (tps_true ∧ flag_tps l ∧ tps_until (l ↦ #0) (l ↦ #1) ∧
+         tps_finally (exits #()@i) ∧ tps_finally (exits #1@j) ∧ tps_true)%S.
+
+  Lemma Φ_P_temporal `{!heapGS Σ} m1 m2 : ⊢ Φ_P m1 m2 ⊨ₜ G_client.
+  Proof. apply (into_temporal _ _). Qed.
+
+  Remark G_client_impl {Σ} τ : tps_tr (G_client (Σ:=Σ)) τ → tp_trace Φ τ.
+  Proof.
+    intros (_& Hflag& Hu& Hf1& Hf2& _).
+    split; [exact (flag_tps_impl l τ Hflag)|]. split; [exact Hu|]. split; [exact Hf1|exact Hf2].
+  Qed.
 
   Let Σ : gFunctors :=
         #[mupdΣ;
@@ -248,8 +231,8 @@ Section adequacy.
     tp_trace Φ τ.
   Proof.
     intros τ Beh FS Init1 Init2.
-    apply Φ_impl.
-    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ').
+    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_client (tp_trace Φ)).
+    { apply G_client_impl. }
     1,2,3,4: eauto.
     iIntros (?). exists 0%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
@@ -265,7 +248,7 @@ Section adequacy.
     iSplitR; first done.
     iModIntro. iIntros "LC TGs".
     (* Set Printing All. *)
-    iMod (flag_client_pre (heapGS0:=HHeapGS) Θ0 i j with "[Tis] [Ptrs] [TGs]") as "H".
+    iMod (flag_client_pre (heapGS0:=HHeapGS) Θ0 i j (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [Ptrs] [TGs]") as "H".
     { subst i j. lia. }
     { done. }
     { reflexivity. }
@@ -275,9 +258,7 @@ Section adequacy.
       by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
     { iFrame. }
     iDestruct "H" as (m1 m2) "(HP& H)".
-    iModIntro. iExists (Φ_tf m1 m2). iFrame "HP". iSplit.
-    { iPureIntro. apply tf_to_tp_Φ. }
-    iFrame.
+    iModIntro. iExists (Φ_P m1 m2). iFrame "HP H". iApply Φ_P_temporal.
   Qed.
 
 End adequacy.

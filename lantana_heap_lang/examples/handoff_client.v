@@ -116,7 +116,7 @@ Section proof.
       { iPureIntro. set_solver. }
       iSplitL "Of".
       { iApply big_sepS_singleton. iFrame. }
-      iFrame "Ptrb". iExists 0. iExists (⟦untilP (nroot.@"flag".@"pointsto") k (1 / 2) (ptrx ↦ #0) (ptrx ↦ #1)⟧ₗ)%I.
+      iFrame "Ptrb". iExists 0. iExists (flag_tk ptrx k).
       iSplit.
       { iPureIntro. apply ordArith.lt_from_nat. lia. }
       iFrame "HU". iExists μ_fs. iIntros (?????? ??) "!> (TE& TG& GF& Cg& %INk& HU) HΦ".

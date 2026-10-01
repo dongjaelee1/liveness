@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.program_logic Require Export temporal_logic.
+From lantana.heap_lang Require Export temporal_laws.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
@@ -45,24 +45,29 @@ Section proof.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
-  Definition flag_inv_tf (l : loc) k : tf Σ :=
-    ((untilP Np k (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))).
-
-  Definition is_flag_tf (l : loc) k ℓ : tf Σ :=
-    ⟨witP_layer k ℓ⟩ ∗ alwaysP Na (flag_inv_tf l k).
+  (** The flag is [0] until it is [1], after which it stays [1]. *)
+  Definition flag_inv (l : loc) k : iProp Σ :=
+    untilT Np k (1/2) (l ↦ #0) (l ↦ #1) ∨ (oblP_discharged k ∗ l ↦ #1).
 
   Definition is_flag (l : loc) k ℓ : iProp Σ :=
-    (witP_layer k ℓ) ∗ ⟦alwaysP Na (flag_inv_tf l k)⟧ₗ.
+    witP_layer k ℓ ∗ inv Na (flag_inv l k).
 
   Definition flag_tk (l : loc) k : iProp Σ :=
-    ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ.
+    untilT Np k (1/2) (l ↦ #0) (l ↦ #1).
+
+  (** The trace properties guaranteed by the flag. *)
+  Definition flag_tps (l : loc) : tps heap_lang Σ :=
+    (tps_true ∧ tps_always (tps_until (l ↦ #0) (l ↦ #1) ∨ (tps_true ∧ l ↦ #1)))%S.
+
+  Lemma is_flag_temporal l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_tps l.
+  Proof. apply (into_temporal _ _). Qed.
+
+  Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ tps_until (l ↦ #0) (l ↦ #1).
+  Proof. apply (into_temporal _ _). Qed.
 
   (** The main proofs. *)
   Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).
-  Proof. rewrite /is_flag. tf_red. apply _. Qed.
-
-  Lemma is_flag_tf_red l k ℓ : ⟦is_flag_tf l k ℓ⟧ₗ = is_flag l k ℓ.
-  Proof. rewrite /is_flag /is_flag_tf. tf_red. auto. Qed.
+  Proof. apply _. Qed.
 
   (** until-alloc-flag version **)
   Lemma is_flag_init E l g K ℓ ℓg μ :
@@ -72,12 +77,11 @@ Section proof.
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ crP_obls g ℓg ({[k]} ∪ K) ∗ oblP_fuel k ℓ μ ∗
                  flag_tk l k ∗ is_flag l k ℓ.
   Proof.
-    iIntros (Hle) "Ptr Gg". rewrite /is_flag.
-    iMod (tf_until_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
-    iMod ("H" $! _ Np (l ↦ #0)%F (l ↦ #1)%F with "[Ptr]") as "H".
+    iIntros (Hle) "Ptr Gg". rewrite /is_flag /flag_tk /flag_inv.
+    iMod (untilI_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
+    iMod ("H" $! _ Np (l ↦ #0)%I (l ↦ #1)%I (tsem (l ↦ #1)%I) with "[Ptr]") as "H".
     { iNext. iFrame. }
     iDestruct "H" as "[H1 H2]".
-    do 2 tf_red.
     iMod (inv_alloc with "[H1]") as "$". 2: by iFrame.
     iNext. by iLeft.
   Qed.
@@ -122,7 +126,7 @@ Section proof.
   Proof.
     iExists 10. iIntros (lc i l G g K k ℓ ℓg C Φ) "!> HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Gg& %Ink& HU& #is_flag)".
-    iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
+    iDestruct "is_flag" as "(#Wlk& HA)".
     rewrite /Flag.set.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc (lc ⊕ 10)%ord.
@@ -132,18 +136,18 @@ Section proof.
     iModIntro.
     iInv "HA" as "inv". iDestruct "inv" as "[inv | inv]"; cycle 1.
     { iDestruct "inv" as "[>inv _]".
-      iEval (rewrite /flag_tk tf_until_logic) in "HU". iDestruct "HU" as "[Oak _]".
+      iEval (rewrite /flag_tk /untilI) in "HU". iDestruct "HU" as "[Oak _]".
       iPoseProof (oblP_assigned_discharged_false with "Oak inv") as "%". done. }
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iCombine "HU inv" as "inv".
-    iMod (tf_until_discharge with "inv") as "inv".
+    iMod (untilI_discharge with "[] inv") as "inv".
     { apply N_subseteq_1. }
+    { iApply (tsem_temporal (l ↦ #1)%I). }
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "inv" as "[Ptrl ACCinv]".
     iApply lwp_sfmupd.
-    iEval (rewrite tf_atomic_logic) in "Ptrl".
     iApply (lwp_store _ ∅ 0 with "[$TE $Ptrl $TG $GF1]"). 1: done.
     iIntros "[TE ((_& TG& _)& Ptrl)]".
     iMod ("ACCinv" $! _) as "ACCinv".
@@ -168,7 +172,7 @@ Section proof.
   Proof.
     iExists ((5 × ▽) ⊕ 5)%M. iIntros (lc i l G k ℓ C Φ) "!> HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& #is_flag)".
-    iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
+    iDestruct "is_flag" as "(#Wlk& HA)".
     rewrite /Flag.wait.
     iPoseProof (crP_fuel_add_set with "GF") as "[W_GF GF]".
     (* Liveness induction *)
@@ -189,20 +193,19 @@ Section proof.
     - (* Induction case. *)
       iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
       iApply (lwp_lc_later with "LC1"). iNext.
-      iMod (tf_until_acc with "inv") as "inv".
+      iMod (untilI_acc with "inv") as "inv".
       1: apply N_subseteq_1.
       iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
       iApply (lwp_lc_later with "LC1"). iNext.
       iDestruct "inv" as "(Ptrl& inv_acc)".
-      iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+        iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
       iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TE $TG $Ptrl $GF1]").
       { iApply big_sepS_singleton. eauto. }
       iIntros "[TE [(_& TG& Rs) Ptrl]]".
       iEval (rewrite big_sepS_singleton) in "Rs". iDestruct "Rs" as "[Wck | #Odk]"; cycle 1.
       { iMod ("inv_acc" with "[Ptrl]") as "H".
         { iNext. iFrame. }
-        iPoseProof (tf_until_discharged_false with "H Odk") as "%". done. }
+        iPoseProof (untilI_discharged_false with "H Odk") as "%". done. }
       iMod ("inv_acc" with "[Ptrl]") as "inv".
       { iNext. iFrame. }
       iModIntro. iModIntro. iSplitL "inv".
@@ -221,8 +224,7 @@ Section proof.
       (* rewrite map_union_empty. iPoseProof (big_sepM_gset_to_gmap with "Fkl'") as "H". iFrame. *)
     - (* k is discharged. *)
       iDestruct "inv" as ">(#Odk& Ptrl)".
-      iEval (rewrite tf_atomic_logic) in "Ptrl".
-      iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+        iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
       iApply (lwp_load _ ∅ 0 with "[$TE $TG $Ptrl $GF1]"). 1: done.
       iIntros "[TE [(_& TG& _) Ptrl]]".
       iModIntro. iSplitL "Ptrl".
@@ -241,16 +243,9 @@ Section trace.
   Definition is_flag_tp (l : loc) : tp :=
     (tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (l ↦ #1))))%P.
 
-  (** TODO: weaken the strict equality to semantics equivalence/implication. *)
-  Definition is_flag_tp' (l : loc) : tp :=
-    (tp_true ∧ tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
-
-  Remark is_flag_tf_to_tp' `{!heapGS Σ} l k ℓ :
-    tf_to_tp (is_flag_tf l k ℓ) = is_flag_tp' l.
-  Proof. done. Qed.
-
-  Remark is_flag_tp_impl l :
-    ∀ τ, tp_trace (is_flag_tp' l) τ → tp_trace (is_flag_tp l) τ.
+  (** The guaranteed trace property implies [is_flag_tp]. *)
+  Lemma flag_tps_impl {Σ : gFunctors} l :
+    ∀ τ, tps_tr (flag_tps (Σ:=Σ) l) τ → tp_trace (is_flag_tp l) τ.
   Proof.
     simpl. unfold_trProp. intros. destruct τ. destruct H. intros. specialize (H0 _ H1).
     destruct H0.
