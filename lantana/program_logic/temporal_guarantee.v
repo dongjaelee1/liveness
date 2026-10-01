@@ -1349,6 +1349,11 @@ Global Arguments tsem {_ _ _} _ {_ _}.
 Notation untilT N k q P Q := (untilI N k false q P%I Q%I (tsem Q%I)).
 Notation finallyT N k q Q := (finallyI N k false q Q%I (tsem Q%I)).
 
+(** The inferred trace property of [P], computed so that it no longer mentions ghost-state
+    instances: [Definition G : tps Λ Σ := ltac:(tps_of P).] in a section with the instances
+    yields a [G] that can be used in an adequacy statement. *)
+Ltac tps_of P := let G := eval cbv [tsem] in (tsem P%I) in exact G.
+
 (* A family may mention its argument only through [tsem]s that compute away. *)
 Global Hint Extern 0 (SimplExist _ _) => progress unfold tsem : typeclass_instances.
 
@@ -1507,6 +1512,13 @@ Section examples.
   Local Lemma ex_visible_inferred N (f : nat → Prop) :
     ⊢ (∃ n : nat, inv N ⌜f n⌝) ⊨ₜ tps_exist (λ n : nat, tps_always (tps_pure (f n))).
   Proof. apply (into_temporal _ _). Qed.
+
+  (** The inferred trace property as a closed term. *)
+  Local Definition ex_tps_of N1 N2 k : tps Λ Σ :=
+    ltac:(tps_of ((∃ Ψ : iProp Σ, inv N1 Ψ ∗ finallyT N2 k 1 Ψ)%I)).
+  Local Lemma ex_tps_of_eq N1 N2 k :
+    ex_tps_of N1 N2 k = (tps_always tps_true ∧ tps_until (tps_pure True) tps_true)%S.
+  Proof. done. Qed.
 
   (** Quantification over guaranteed iProps in a hypothesis, as in a higher-order spec. *)
   Local Lemma ex_higher_order N G (P : iProp Σ) : P ⊨ₜ G -∗ inv N P ⊨ₜ tps_always G.
