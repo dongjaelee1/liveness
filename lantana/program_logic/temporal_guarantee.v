@@ -1070,6 +1070,30 @@ Section until_rules.
 
 End until_rules.
 
+Section until_derived.
+  Context `{!lantanaGS Λ Σ}.
+
+  (** Discharge a finally with its right formula at hand, using two later credits. *)
+  Lemma finallyI_discharge E N k g ℓ K Q G2 :
+    ↑N ⊆ E → k ∈ K →
+    Q ⊨ₜ G2 -∗ £ (2 : Ord.t) -∗ crP_obls g ℓ K -∗ finallyI N k false 1 Q G2 -∗ Q -∗
+    |={E}=>m Q ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k.
+  Proof.
+    iIntros (Hmask Hk) "#HG LC Cg HF HQ".
+    iMod (untilI_discharge with "HG HF") as "HF"; first set_solver.
+    iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
+    iApply (lc_sfmupd_add_later with "LC1"). iNext.
+    iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
+    iMod ("HF" with "[HQ]") as "HF".
+    { iNext. iFrame. }
+    iPoseProof ("HF" with "[//] Cg") as "HF".
+    iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
+    iApply (lc_sfmupd_add_later with "LC1"). iNext.
+    iMod ("HF" $! _) as "HF". iMod "HF" as "($& $& $)". done.
+  Qed.
+
+End until_derived.
+
 (** ** Semantic state atoms
 
     Any predicate on the current state can be an atom, provided some iProp ensures it
@@ -1229,14 +1253,54 @@ Qed.
 
 (** ** Inferring guarantees
 
-    [IntoTemporal P G] computes a guarantee [G] for [P] from its shape. Existentials are
-    first tried as ghost quantifiers (the guarantee of the body must not depend on the
-    witness), then as trace-visible ones (for types with the existential property); any
-    iProp at all guarantees [tps_true], which is the fallback. *)
+    [IntoTemporal P G] computes a guarantee [G] for [P] from its shape; any iProp at all
+    guarantees [tps_true], which is the fallback for leaves without an instance. For an
+    existential, the strongest guarantee of the body is inferred first; if it does not
+    depend on the witness the quantifier is a ghost one, otherwise it is trace-visible
+    (types with the existential property). Only for other types does the search weaken
+    the body until its guarantee no longer depends on the witness. *)
 Class IntoTemporal `{!lantanaGS Λ Σ} (P : iProp Σ) (G : tps Λ Σ) :=
   into_temporal : ⊢ P ⊨ₜ G.
 Global Arguments into_temporal {_ _ _} _ _ {_}.
 Global Hint Mode IntoTemporal - - - ! - : typeclass_instances.
+
+(** Big separating conjunctions guarantee the guarded family of their elements' guarantees. *)
+Section big_op_rules.
+  Context `{!lantanaGS Λ Σ}.
+
+  Lemma temporal_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ) (G : K → A → tps Λ Σ) :
+    (∀ k x, Φ k x ⊨ₜ G k x) -∗
+    ([∗ map] k ↦ x ∈ m, Φ k x) ⊨ₜ tps_forall (λ k, tps_forall (λ x, tps_impl (m !! k = Some x) (G k x))).
+  Proof.
+    iIntros "#HG". iApply (temporal_mono (∀ k x, ⌜m !! k = Some x⌝ → Φ k x)%I with "[]").
+    { iIntros "!> H" (k x Hk). by iApply (big_sepM_lookup with "H"). }
+    iApply temporal_forall. iIntros (k). iApply temporal_forall. iIntros (x). iApply temporal_impl. iApply "HG".
+  Qed.
+
+  Lemma temporal_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → tps Λ Σ) :
+    (∀ k x, Φ k x ⊨ₜ G k x) -∗
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊨ₜ tps_forall (λ k, tps_forall (λ x, tps_impl (l !! k = Some x) (G k x))).
+  Proof.
+    iIntros "#HG". iApply (temporal_mono (∀ k x, ⌜l !! k = Some x⌝ → Φ k x)%I with "[]").
+    { iIntros "!> H" (k x Hk). by iApply (big_sepL_lookup with "H"). }
+    iApply temporal_forall. iIntros (k). iApply temporal_forall. iIntros (x). iApply temporal_impl. iApply "HG".
+  Qed.
+
+  Lemma temporal_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → tps Λ Σ) :
+    (∀ x, Φ x ⊨ₜ G x) -∗
+    ([∗ set] x ∈ X, Φ x) ⊨ₜ tps_forall (λ x, tps_impl (x ∈ X) (G x)).
+  Proof.
+    iIntros "#HG". iApply (temporal_mono (∀ x, ⌜x ∈ X⌝ → Φ x)%I with "[]").
+    { iIntros "!> H" (x Hx). by iApply (big_sepS_elem_of with "H"). }
+    iApply temporal_forall. iIntros (x). iApply temporal_impl. iApply "HG".
+  Qed.
+
+End big_op_rules.
+
+(** How an existential over a family of guarantees is guaranteed. *)
+Class SimplExist `{!lantanaGS Λ Σ} {X : Type} (G : X → tps Λ Σ) (G' : tps Λ Σ) :=
+  simpl_exist (P : X → iProp Σ) : (∀ x, P x ⊨ₜ G x) ⊢ (∃ x, P x) ⊨ₜ G'.
+Global Hint Mode SimplExist - - - - ! - : typeclass_instances.
 
 (** The trace property inferred for [Q], e.g. to annotate an until. *)
 Definition tsem `{!lantanaGS Λ Σ} (Q : iProp Σ) {G : tps Λ Σ} `{!IntoTemporal Q G} : tps Λ Σ := G.
@@ -1245,6 +1309,9 @@ Global Arguments tsem {_ _ _} _ {_ _}.
 (** [P] until [Q], with the trace property of [Q] inferred. *)
 Notation untilT N k q P Q := (untilI N k false q P%I Q%I (tsem Q%I)).
 Notation finallyT N k q Q := (finallyI N k false q Q%I (tsem Q%I)).
+
+(* A family may mention its argument only through [tsem]s that compute away. *)
+Global Hint Extern 0 (SimplExist _ _) => progress unfold tsem : typeclass_instances.
 
 Section into_temporal.
   Context `{!lantanaGS Λ Σ}.
@@ -1263,12 +1330,14 @@ Section into_temporal.
   Global Instance into_temporal_or P Q G1 G2 :
     IntoTemporal P G1 → IntoTemporal Q G2 → IntoTemporal (P ∨ Q) (G1 ∨ G2) | 10.
   Proof. intros H1 H2. unfold IntoTemporal in *. iApply temporal_or; [iApply H1|iApply H2]. Qed.
-  Global Instance into_temporal_exist_ghost {X} (P : X → iProp Σ) G :
-    (∀ x, IntoTemporal (P x) G) → IntoTemporal (∃ x, P x) G | 10.
-  Proof. intros H. unfold IntoTemporal in *. iApply temporal_exist_ghost. iIntros (x). iApply H. Qed.
-  Global Instance into_temporal_exist {X} `{!TypeExistentialProperty X ordI} (P : X → iProp Σ) (G : X → tps Λ Σ) :
-    (∀ x, IntoTemporal (P x) (G x)) → IntoTemporal (∃ x, P x) (tps_exist G) | 20.
-  Proof. intros H. unfold IntoTemporal in *. iApply temporal_exist. iIntros (x). iApply H. Qed.
+  Global Instance simpl_exist_ghost {X} G : SimplExist (λ _ : X, G) G | 0.
+  Proof. intros P. iIntros "H". by iApply temporal_exist_ghost. Qed.
+  Global Instance simpl_exist_visible {X} `{!TypeExistentialProperty X ordI} (G : X → tps Λ Σ) :
+    SimplExist G (tps_exist G) | 10.
+  Proof. intros P. iIntros "H". by iApply temporal_exist. Qed.
+  Global Instance into_temporal_exist {X} (P : X → iProp Σ) (Gx : X → tps Λ Σ) G :
+    (∀ x, IntoTemporal (P x) (Gx x)) → SimplExist Gx G → IntoTemporal (∃ x, P x) G | 10.
+  Proof. intros H HS. unfold IntoTemporal in *. iApply HS. iIntros (x). iApply H. Qed.
   Global Instance into_temporal_forall {X} (P : X → iProp Σ) (G : X → tps Λ Σ) :
     (∀ x, IntoTemporal (P x) (G x)) → IntoTemporal (∀ x, P x) (tps_forall G) | 10.
   Proof. intros H. unfold IntoTemporal in *. iApply temporal_forall. iIntros (x). iApply H. Qed.
@@ -1283,6 +1352,22 @@ Section into_temporal.
   Proof. intros H1 H2. unfold IntoTemporal in *. iApply temporal_until; [iApply H1|iApply H2]. Qed.
   Global Instance into_temporal_state_pred π : IntoTemporal (state_pred_interp π) (tps_atomic π) | 10.
   Proof. apply temporal_atomic. Qed.
+
+  Global Instance into_temporal_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ)
+    (G : K → A → tps Λ Σ) :
+    (∀ k x, IntoTemporal (Φ k x) (G k x)) →
+    IntoTemporal ([∗ map] k ↦ x ∈ m, Φ k x)
+      (tps_forall (λ k, tps_forall (λ x, tps_impl (m !! k = Some x) (G k x)))) | 10.
+  Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepM. iIntros (k x). iApply HG. Qed.
+  Global Instance into_temporal_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → tps Λ Σ) :
+    (∀ k x, IntoTemporal (Φ k x) (G k x)) →
+    IntoTemporal ([∗ list] k ↦ x ∈ l, Φ k x)
+      (tps_forall (λ k, tps_forall (λ x, tps_impl (l !! k = Some x) (G k x)))) | 10.
+  Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepL. iIntros (k x). iApply HG. Qed.
+  Global Instance into_temporal_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → tps Λ Σ) :
+    (∀ x, IntoTemporal (Φ x) (G x)) →
+    IntoTemporal ([∗ set] x ∈ X, Φ x) (tps_forall (λ x, tps_impl (x ∈ X) (G x))) | 10.
+  Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepS. iIntros (x). iApply HG. Qed.
 
   Lemma tsem_temporal (Q : iProp Σ) G `{!IntoTemporal Q G} : ⊢ Q ⊨ₜ tsem Q.
   Proof. done. Qed.
@@ -1299,6 +1384,11 @@ Section embed.
     iIntros "!>" (s h' TQ g v2 Ω2 W' τf γ (BEH& FS& LEv& LEO& LB& HIST& EQTQ)) "([HI SIa]& MI& WPs)".
     rewrite /threads_run. iApply (lwp_fix_ti_logic with "[-]"); eauto. iExists Φ. iSplit; first done. iFrame "HI SIa MI WPs TF".
   Qed.
+
+  (** Old formulas keep their trace content when mixed with new ones. *)
+  Global Instance into_temporal_tf_logic (Φ : tf (Π:=state_pred Λ) Σ) :
+    IntoTemporal ⟦Φ⟧ₗ (tps_of_tp (tf_to_tp Φ)) | 10.
+  Proof. apply tf_temporal. Qed.
 
 End embed.
 
