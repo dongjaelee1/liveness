@@ -32,12 +32,17 @@ From lantana.prelude Require Import axioms.
 Notation snapT Λ Σ :=
   (nat → state Λ → thread_pool Λ → list (observation Λ) → nat → obls → iProp Σ) (only parsing).
 
-Section laws.
-  Context `{!lantanaGS Λ Σ}.
+Section snap_law.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Definition snap_intro_law (L : iProp Σ) (I : snapT Λ Σ) : Prop :=
     ∀ h n σ Θ κs m i Ω W,
       history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ L ⊢ I n σ Θ κs i Ω.
+
+End snap_law.
+
+Section laws.
+  Context `{!lantanaGS Λ Σ}.
 
   (** The running system: every thread runs its [lwp_fix]. *)
   Definition threads_run (s : stuckness)
@@ -62,19 +67,22 @@ Section laws.
 
 End laws.
 
-Record tfProp {Λ Σ} `{!lantanaGS Λ Σ} := TfProp {
+(** The soundness law must hold whatever the postcondition of forked threads is, so that
+    [tfProp] depends on the same ghost state as [tf_logic]. *)
+Record tfProp {Λ Σ} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} := TfProp {
   tfp_skel : @tp (state_pred Λ);
   tfp_logic : iProp Σ;
   tfp_snap : snapT Λ Σ;
   tfp_snap_persistent n σ Θ κs i Ω : Persistent (tfp_snap n σ Θ κs i Ω);
   tfp_snap_intro : snap_intro_law tfp_logic tfp_snap;
-  tfp_sound : sound_law tfp_snap tfp_skel;
+  tfp_sound fork_post : sound_law (lantanaGS0 := LantanaG _ _ fork_post) tfp_snap tfp_skel;
 }.
-Global Arguments tfProp Λ Σ {_}.
-Global Arguments TfProp {Λ Σ _}.
-Global Arguments tfp_skel {Λ Σ _}.
-Global Arguments tfp_logic {Λ Σ _}.
-Global Arguments tfp_snap {Λ Σ _}.
+Global Arguments tfProp Λ Σ {_ _}.
+Global Arguments TfProp {Λ Σ _ _}.
+Global Arguments tfp_skel {Λ Σ _ _}.
+Global Arguments tfp_logic {Λ Σ _ _}.
+Global Arguments tfp_snap {Λ Σ _ _}.
+Global Arguments tfp_sound {Λ Σ _ _}.
 Global Existing Instance tfp_snap_persistent.
 
 Declare Scope tfp_scope.
@@ -85,13 +93,13 @@ Notation "'⟦' Φ '⟧ₛ'" := (tfp_logic Φ%T) (format "'⟦' Φ '⟧ₛ'").
 
 (** ** Connectives *)
 Section connectives.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Implicit Types A B : tfProp Λ Σ.
 
   Program Definition tfp_emp : tfProp Λ Σ :=
     {| tfp_skel := tp_true; tfp_logic := (emp)%I; tfp_snap _ _ _ _ _ _ := (emp)%I |}.
   Next Obligation. iIntros (?????????) "_". done. Qed.
-  Next Obligation. iIntros (??????????????????????) "_". done. Qed.
+  Next Obligation. iIntros (???????????????????????) "_". done. Qed.
 
   Program Definition tfp_atomic (π : state_pred Λ) : tfProp Λ Σ :=
     {| tfp_skel := tp_atomic π; tfp_logic := (state_pred_interp π)%I;
@@ -103,7 +111,7 @@ Section connectives.
     rewrite /history_interp. iFrame.
   Qed.
   Next Obligation.
-    iIntros (π s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
+    iIntros (π fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
     unfold ti_atomic. iPoseProof (event_pred_history_interp_lookup with "[$HI $TF]") as "%H".
     destruct H as [H ?]. simpl. apply HIST in H. destruct H as [? H]. rewrite H. auto.
   Qed.
@@ -111,13 +119,13 @@ Section connectives.
   Program Definition tfp_pure (p : Prop) : tfProp Λ Σ :=
     {| tfp_skel := tp_pure p; tfp_logic := (⌜p⌝)%I; tfp_snap _ _ _ _ _ _ := (⌜p⌝)%I |}.
   Next Obligation. iIntros (??????????) "(_& _& $)". Qed.
-  Next Obligation. iIntros (???????????????????????) "(_& _& _& $)". Qed.
+  Next Obligation. iIntros (????????????????????????) "(_& _& _& $)". Qed.
 
   (** Pure ghost: resources that are invisible in the trace. *)
   Program Definition tfp_ghost (P : iProp Σ) : tfProp Λ Σ :=
     {| tfp_skel := tp_true; tfp_logic := (P)%I; tfp_snap _ _ _ _ _ _ := (True)%I |}.
   Next Obligation. iIntros (??????????) "_". done. Qed.
-  Next Obligation. iIntros (???????????????????????) "_". done. Qed.
+  Next Obligation. iIntros (????????????????????????) "_". done. Qed.
 
   Program Definition tfp_and A B : tfProp Λ Σ :=
     {| tfp_skel := tp_and (tfp_skel A) (tfp_skel B);
@@ -129,7 +137,7 @@ Section connectives.
     - iDestruct "TL" as "[_ TL]". iApply tfp_snap_intro. iFrame.
   Qed.
   Next Obligation.
-    iIntros (A B s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
+    iIntros (A B fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
     unfold ti_and. iSplit.
     + iDestruct "TF" as "[TF _]". iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF]"); eauto.
     + iDestruct "TF" as "[_ TF]". iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF]"); eauto.
@@ -145,7 +153,7 @@ Section connectives.
     - iRight. iApply tfp_snap_intro. iFrame.
   Qed.
   Next Obligation.
-    iIntros (A B s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
+    iIntros (A B fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
     unfold ti_or. iDestruct "TF" as "[TF | TF]".
     + iLeft. iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF]"); eauto.
     + iRight. iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF]"); eauto.
@@ -160,7 +168,7 @@ Section connectives.
     iIntros (p B ?????????) "(HI& MI& TL) %Hp". iApply tfp_snap_intro. iFrame. by iApply "TL".
   Qed.
   Next Obligation.
-    iIntros (p B s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
+    iIntros (p B fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
     unfold ti_impl. iIntros "%Hp". iPoseProof ("TF" with "[//]") as "#TF'".
     iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF']"); eauto.
   Qed.
@@ -174,7 +182,7 @@ Section connectives.
     iIntros (X Φ ?????????) "(HI& MI& TL) %x". iApply tfp_snap_intro. iFrame. iApply "TL".
   Qed.
   Next Obligation.
-    iIntros (X Φ s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
+    iIntros (X Φ fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
     unfold ti_forall. iIntros (x). iSpecialize ("TF" $! x).
     iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF]"); eauto.
   Qed.
@@ -187,7 +195,7 @@ Section connectives.
     iIntros (X Φ ?????????) "(HI& MI& [%x TL])". iExists x. iApply tfp_snap_intro. iFrame.
   Qed.
   Next Obligation.
-    iIntros (X Φ s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
+    iIntros (X Φ fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)". simpl.
     unfold ti_exist. iDestruct "TF" as (x) "TF". iExists x.
     iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF]"); eauto.
   Qed.
@@ -202,7 +210,7 @@ Section connectives.
     iPoseProof (tfp_snap_intro B with "[$HI $MI $TL2]") as "#$".
   Qed.
   Next Obligation.
-    iIntros (A B s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF1& #TF2)". simpl.
+    iIntros (A B fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF1& #TF2)". simpl.
     unfold ti_and. iSplit.
     + iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF1]"); eauto.
     + iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF2]"); eauto.
@@ -221,7 +229,7 @@ Section connectives.
     iApply tfp_snap_intro. iFrame.
   Qed.
   Next Obligation.
-    iIntros (X Φ t s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)".
+    iIntros (X Φ t fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)".
     iDestruct "TF" as (x <-) "TF". iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF]"); eauto.
   Qed.
 
@@ -234,7 +242,7 @@ Section connectives.
     iIntros (X Φ t ?????????) "(HI& MI& TL) %x %Ht". iApply tfp_snap_intro. iFrame. by iApply "TL".
   Qed.
   Next Obligation.
-    iIntros (X Φ t s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)".
+    iIntros (X Φ t fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "([HI SIa]& MI& WPs& #TF)".
     simpl. unfold ti_impl. iIntros ([x Ht]). iPoseProof ("TF" $! x with "[//]") as "#TF'".
     rewrite -Ht. iApply (tfp_sound with "[$HI $SIa $MI $WPs $TF']"); eauto.
   Qed.
@@ -766,14 +774,15 @@ Section temporal.
 End temporal.
 
 Section temporal_connectives.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Implicit Types A B : tfProp Λ Σ.
 
   Program Definition tfp_always N A : tfProp Λ Σ :=
     {| tfp_skel := tp_always (tfp_skel A);
        tfp_logic := inv N ⟦A⟧ₛ;
        tfp_snap _ _ _ _ _ _ := inv N ⟦A⟧ₛ;
-       tfp_sound := sound_always N _ _ _ _ (tfp_snap_intro A) (tfp_sound A) |}.
+       tfp_sound fp := sound_always (lantanaGS0 := LantanaG _ _ fp) N _ _ _ _
+                         (tfp_snap_intro A) (tfp_sound A fp) |}.
   Next Obligation. iIntros (N A ?????????) "(_& _& $)". Qed.
 
   (** [A] until [B], using namespace [N] and obligation [k]. *)
@@ -782,8 +791,8 @@ Section temporal_connectives.
        tfp_logic := (oblP_assigned k b (q/2)%Qp ∗ oblP_inv N k ⟦A⟧ₛ ⟦B⟧ₛ (until_disch k (tfp_snap B)))%I;
        tfp_snap n σ Θ κs i Ω := ((∃ f o, event_obl i (n, Ω) k (obl_assigned f o)) ∗
                                  oblP_inv N k ⟦A⟧ₛ ⟦B⟧ₛ (until_disch k (tfp_snap B)))%I;
-       tfp_sound := sound_until N k _ _ _ _ _ _ _ _ (tfp_snap_intro A) (tfp_sound A)
-                      (tfp_snap_intro B) (tfp_sound B) |}.
+       tfp_sound fp := sound_until (lantanaGS0 := LantanaG _ _ fp) N k _ _ _ _ _ _ _ _
+                         (tfp_snap_intro A) (tfp_sound A fp) (tfp_snap_intro B) (tfp_sound B fp) |}.
   Next Obligation.
     iIntros (N k b q A B h n σ Θ κs m i Ω W) "(HI& MI& [OA #TL])". iFrame "TL".
     iDestruct "MI" as "(MI& S& MI2)".
@@ -814,7 +823,7 @@ Notation "'∀ˢ' x , P '@' t" := (tfp_gforall (λ x, P%T) t)
 
 (** ** Embedding of the syntactic [tf] *)
 Section embed.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Program Definition tf_sem (Φ : tf (Π:=state_pred Λ) Σ) : tfProp Λ Σ :=
     {| tfp_skel := tf_to_tp Φ;
@@ -822,8 +831,8 @@ Section embed.
        tfp_snap n σ Θ κs i Ω := tf_intuit n σ Θ κs i Ω Φ |}.
   Next Obligation. intros Φ ?????????. apply tf_logic_tf_intuit. Qed.
   Next Obligation.
-    iIntros (Φ s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "(HI& MI& WPs& TF)".
-    iApply (lwp_fix_ti_logic with "[-]"); eauto. iExists Φ. iSplit; first done. iFrame.
+    iIntros (Φ fp s h n σ Θ TQ κs g v1 v2 Ω1 Ω2 W τf γ BEH FS LEv LEO LB HIST EQTQ) "(HI& MI& WPs& TF)".
+    iApply (lwp_fix_ti_logic (lantanaGS0 := LantanaG _ _ fp) with "[-]"); eauto. iExists Φ. iSplit; first done. iFrame.
   Qed.
 
   Lemma tf_sem_logic Φ : ⟦tf_sem Φ⟧ₛ = ⟦Φ⟧ₗ.
@@ -877,7 +886,9 @@ Section adequacy.
     { auto. }
     destruct H as [LEO3 LB3].
     rewrite -HΦ. iModIntro.
-    iApply (tfp_sound Φ' with "[$HI $MI $WPs $TF]").
+    (* Make the instance a constructor application, as in the soundness law of [tfProp]. *)
+    destruct lantanaGS0 as [Htemp Hsic fp].
+    iApply (tfp_sound Φ' fp with "[$HI $MI $WPs $TF]").
     1,2: eauto. 1: lia. all: eauto. etrans; eauto.
   Qed.
 
@@ -989,11 +1000,11 @@ Qed.
 
     The connectives compute: [⟦·⟧ₛ] of each connective is its iProp counterpart by
     [reflexivity], so no [tf_red]-style rewriting is needed. *)
-Definition tfp_discharged `{!lantanaGS Λ Σ} k (B : tfProp Λ Σ) : iProp Σ :=
+Definition tfp_discharged `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} k (B : tfProp Λ Σ) : iProp Σ :=
   until_disch k (tfp_snap B).
 
 Section reduction.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Implicit Types A B : tfProp Λ Σ.
 
   Lemma tfp_until_logic N k b q A B :
@@ -1026,7 +1037,7 @@ Section reduction.
 End reduction.
 
 Section proof.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   (** Always *)
   Global Instance tfp_always_persistent N P : Persistent (⟦tfp_always N P⟧ₛ).
@@ -1240,8 +1251,11 @@ End proof.
     [tf_to_tp], [tf_logic] and [tf_intuit], so the connectives above faithfully implement
     the old semantics (compare [tf_sem], which reuses the old proofs as they are). *)
 Section native.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Local Transparent tf_logic tf_intuit.
+  (* [simpl] exposes some of these projections on one side of the equivalences only. *)
+  Local Transparent temporal_mupdGS temporal_histGS mupd_invGS mupd_osatGS mupd_othreadGS
+    mupd_ocarrierGS mupd_owitGS mupd_mhistGS.
 
   Fixpoint tf_native (Φ : tf (Π:=state_pred Λ) Σ) : tfProp Λ Σ :=
     match Φ with
@@ -1275,8 +1289,12 @@ Section native.
     all: try (by f_equiv; apply IHQ1).
     all: try (by f_equiv; apply IHQ2).
     all: try (by f_equiv; intros a; apply IH).
+    (* always (snapshot): the instances of [inv] differ syntactically, so apply properness
+       by unification rather than by type-class search *)
+    all: try (by apply inv_proper).
     (* until: logic and snapshot *)
-    all: f_equiv; etrans; [apply oblP_inv_proper_1, IHP1|]; etrans; [apply oblP_inv_proper_2, IHQ1|].
+    all: apply bi.sep_proper; [reflexivity|].
+    all: etrans; [apply oblP_inv_proper_1, IHP1|]; etrans; [apply oblP_inv_proper_2, IHQ1|].
     all: apply oblP_inv_proper_3; repeat f_equiv; apply IHQ2.
   Qed.
 
@@ -1284,3 +1302,42 @@ Section native.
   Proof. apply (tf_native_logic_snap Φ). Qed.
 
 End native.
+
+(** ** Examples: ghost quantifiers over large types
+
+    None of these can be written with [tf]: [tf_exist (tf Σ) _] and [tf_exist (iProp Σ) _]
+    are universe inconsistencies. They live in the same file as [lwp_adequacy_tfp], so the
+    universe constraints of the adequacy proof are checked together with them. *)
+Section examples.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+
+  (** Quantification over temporal formulas, ... *)
+  Local Definition ex_self N (t : @tp (state_pred Λ)) : tfProp Λ Σ :=
+    (∃ˢ R : tfProp Λ Σ, tfp_always N R @ tp_always t)%T.
+  (** ... over families of them, ... *)
+  Local Definition ex_family (t : @tp (state_pred Λ)) : tfProp Λ Σ :=
+    (∃ˢ F : nat → tfProp Λ Σ, F 0 @ t)%T.
+  (** ... an invariant whose temporal content may change over time, ... *)
+  Local Definition ex_inv N (t : @tp (state_pred Λ)) : tfProp Λ Σ :=
+    tfp_always N (∃ˢ R : tfProp Λ Σ, R @ t)%T.
+  (** ... and over iProp, scoping over two temporal operators (pushing the quantifier into
+      a single [⟨_⟩] is not possible here). *)
+  Local Definition ex_iprop N1 N2 k : tfProp Λ Σ :=
+    (∃ˢ Ψ : iProp Σ, tfp_always N1 ⟨Ψ⟩ ∗ tfp_finally N2 k false 1 ⟨Ψ⟩
+      @ tp_and (tp_always tp_true) (tp_until (tp_pure True) tp_true))%T.
+
+  Local Lemma ex_self_skel N t : tfp_skel (ex_self N t) = tp_always t.
+  Proof. done. Qed.
+  Local Lemma ex_self_logic N t :
+    ⟦ex_self N t⟧ₛ ⊣⊢ ∃ R : tfProp Λ Σ, ⌜tp_always (tfp_skel R) = tp_always t⌝ ∗ inv N ⟦R⟧ₛ.
+  Proof. done. Qed.
+  Local Lemma ex_iprop_logic N1 N2 k :
+    ⟦ex_iprop N1 N2 k⟧ₛ ⊣⊢ ∃ Ψ : iProp Σ, inv N1 Ψ ∗ ⟦tfp_finally N2 k false 1 ⟨Ψ⟩⟧ₛ.
+  Proof. rewrite tfp_gexist_logic_uniform //. Qed.
+
+  (** A temporal formula can be made abstract, keeping only its skeleton. *)
+  Lemma tfp_always_abstract N (R : tfProp Λ Σ) :
+    ⟦tfp_always N R⟧ₛ ⊢ ⟦∃ˢ R' : tfProp Λ Σ, tfp_always N R' @ tp_always (tfp_skel R)⟧ₛ.
+  Proof. iIntros "H". iExists R. by iFrame. Qed.
+
+End examples.
