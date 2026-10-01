@@ -416,7 +416,7 @@ Section proof.
     - iLeft. iFrame.
   Qed.
 
-  Lemma px_loop_pre Θ i j Φ Ψs :
+  Lemma px_loop_pre Θ i j (Φ : iProp Σ) Ψs :
     i ≠ j →
     Θ = {[i := loop #(); j := loop #() ]} →
     Φ = ((∃ g1 g2 z ck r rm ci cj n,
