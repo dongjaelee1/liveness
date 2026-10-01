@@ -1,5 +1,6 @@
 From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat.
-From iris.bi.lib Require Import cmra fractional.
+From iris.bi Require Import cmra.
+From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From lantana.algebra Require Export wfocm.
@@ -9,7 +10,7 @@ From lantana.base_logic Require Export osat.
 Module othreadGS.
 
   (* Assumes thread ids are positive *)
-  Class othreadGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class othreadGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
     OthreadGpreS {
         othreadGpreS_owns : inG Σ (reservation_mapUR (gmap_viewR oid (unitUR)));
         othreadGpreS_obls : inG Σ (gmap_viewR positive (gsetUR oid));
@@ -17,7 +18,7 @@ Module othreadGS.
         othreadGpreS_elem : inG Σ (gmap_viewR positive unitUR);
       }.
 
-  Class othreadGS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class othreadGS `{SI : sidx} (Σ : gFunctors) : Set :=
     OthreadG {
         othread_inG : othreadGpreS Σ;
         owns_name : gname;
@@ -26,14 +27,14 @@ Module othreadGS.
         elem_name : gname;
       }.
 
-  Definition othreadΣ `{SI : indexT} : gFunctors :=
+  Definition othreadΣ `{SI : sidx} : gFunctors :=
     #[GFunctor (reservation_mapUR (gmap_viewR oid (unitUR)));
       GFunctor (gmap_viewR positive (gsetUR oid));
       GFunctor (reservation_mapUR mono_natUR);
       GFunctor (gmap_viewR positive unitUR)
       ].
 
-  Global Instance subG_othreadΣ `{SI : indexT} {Σ} : subG (othreadΣ) Σ → (othreadGpreS Σ).
+  Global Instance subG_othreadΣ `{SI : sidx} {Σ} : subG (othreadΣ) Σ → (othreadGpreS Σ).
   Proof. solve_inG. Qed.
 
 End othreadGS.
@@ -45,59 +46,59 @@ Import othreadGS.
 Local Existing Instances othread_inG othreadGpreS_owns othreadGpreS_obls othreadGpreS_exec othreadGpreS_elem.
 
 (* Owns: thread currently has this obl *)
-Definition othreadG_owns `{SI : indexT} `{!othreadGS Σ} (i : positive) (k : oid) (q : Qp) : iProp Σ :=
+Definition othreadG_owns `{SI : sidx} `{!othreadGS Σ} (i : positive) (k : oid) (q : Qp) : iProp Σ :=
   own owns_name (reservation_map_data i (gmap_view_frag k (DfracOwn q) ())).
 Global Typeclasses Opaque othreadG_owns.
 Global Instance: Params (@othreadG_owns) 3 := {}.
 
-Local Definition othreadG_owns_token_id `{SI : indexT} `{!othreadGS Σ} TP : iProp Σ :=
+Local Definition othreadG_owns_token_id `{SI : sidx} `{!othreadGS Σ} TP : iProp Σ :=
   (own owns_name (reservation_map_token (A:=gmap_viewR oid (unitUR)) (⊤ ∖ gset_to_coPset TP))).
 
-Local Definition othreadG_owns_auth_obls `{SI : indexT} `{!othreadGS Σ}
+Local Definition othreadG_owns_auth_obls `{SI : sidx} `{!othreadGS Σ}
   i (TObls : gmap oid unit) : iProp Σ :=
   (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (TObls)))).
 
 (* Obls: live obls assigned to this thread, also fix to empty when thread terminates *)
-Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : oids) : iProp Σ :=
+Definition othreadG_obls `{SI : sidx} `{!othreadGS Σ} (i : positive) (G : oids) : iProp Σ :=
   own obls_name (gmap_view_frag i (DfracOwn 1) (G)).
 Global Typeclasses Opaque othreadG_obls.
 Global Instance: Params (@othreadG_obls) 3 := {}.
 
-Local Definition othreadG_obls_auth_id `{SI : indexT} `{!othreadGS Σ}
+Local Definition othreadG_obls_auth_id `{SI : sidx} `{!othreadGS Σ}
   (Tgls : gmap positive (gmap oid unit)) : iProp Σ :=
   (own obls_name (gmap_view_auth (DfracOwn 1) (dom <$> Tgls))).
 
 (* Exec: tracks whether thread is executing or terminated *)
-Definition othreadG_exec `{SI : indexT} `{!othreadGS Σ} (i : positive) (q : Qp) : iProp Σ :=
+Definition othreadG_exec `{SI : sidx} `{!othreadGS Σ} (i : positive) (q : Qp) : iProp Σ :=
   own exec_name (reservation_map_data i (●MN{#q} 0)).
 Global Typeclasses Opaque othreadG_exec.
 Global Instance: Params (@othreadG_exec) 3 := {}.
 
-Definition othreadG_done_auth `{SI : indexT} `{!othreadGS Σ} (i : positive) : iProp Σ :=
+Definition othreadG_done_auth `{SI : sidx} `{!othreadGS Σ} (i : positive) : iProp Σ :=
   own exec_name (reservation_map_data i (●MN 1)).
 Global Typeclasses Opaque othreadG_done_auth.
 Global Instance: Params (@othreadG_done_auth) 3 := {}.
 
-Definition othreadG_done `{SI : indexT} `{!othreadGS Σ} (i : positive) : iProp Σ :=
+Definition othreadG_done `{SI : sidx} `{!othreadGS Σ} (i : positive) : iProp Σ :=
   own exec_name (reservation_map_data i (◯MN 1)).
 Global Typeclasses Opaque othreadG_done.
 Global Instance: Params (@othreadG_done) 3 := {}.
 
-Local Definition othreadG_exec_token_id `{SI : indexT} `{!othreadGS Σ} TP : iProp Σ :=
+Local Definition othreadG_exec_token_id `{SI : sidx} `{!othreadGS Σ} TP : iProp Σ :=
   (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))).
 
 (* Elem: keeps the fact that a key is inside a map *)
-Definition othreadG_elem `{SI : indexT} `{!othreadGS Σ} (i : positive) : iProp Σ :=
+Definition othreadG_elem `{SI : sidx} `{!othreadGS Σ} (i : positive) : iProp Σ :=
   own elem_name (gmap_view_frag i DfracDiscarded ()).
 Global Typeclasses Opaque othreadG_elem.
 Global Instance: Params (@othreadG_elem) 3 := {}.
 
-Local Definition othreadG_elem_auth_id `{SI : indexT} `{!othreadGS Σ}
+Local Definition othreadG_elem_auth_id `{SI : sidx} `{!othreadGS Σ}
   (Tgls : gmap positive (gmap oid unit)) : iProp Σ :=
   (own elem_name (gmap_view_auth (DfracOwn 1) ((λ _, ()) <$> Tgls))).
 
 (* Global invariant for threads' obligations. *)
-Definition othread `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
+Definition othread `{SI : sidx} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (TP : gset positive) : iProp Σ :=
   locked
     (∃ (Tgls : gmap positive (gmap oid unit)),
@@ -114,7 +115,7 @@ Definition othread `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
     )%I.
 
 (* Global invariant that relates obligations to the thread pool. *)
-Definition oassigned `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
+Definition oassigned `{SI : sidx} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (Gls : oids) : iProp Σ :=
   locked
     ([∗ set] k ∈ Gls,
@@ -123,7 +124,7 @@ Definition oassigned `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ
           (oblG_discharged k)))%I.
 
 Section othread.
-  Context `{SI : indexT} `{OSAT : !osatGS.osatGS Σ} `{!othreadGS Σ} `{OMF : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{OSAT : !osatGS.osatGS Σ} `{!othreadGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (* Owns *)
   Global Instance othreadG_owns_timeless i k q : Timeless (othreadG_owns i k q).
@@ -689,7 +690,7 @@ Section othread.
 End othread.
 
 (* Allocation of initial invariant. *)
-Lemma othread_alloc `{SI : indexT} {Σ}
+Lemma othread_alloc `{SI : sidx} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGpreS Σ} :
   ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ oassigned ∅.
 Proof.

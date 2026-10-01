@@ -1,6 +1,6 @@
 From iris.algebra Require Import gmap_view reservation_map.
 (* From iris.algebra Require Import gmap_view reservation_map dfrac_agree mono_nat. *)
-From iris.bi.lib Require Import cmra.
+From iris.bi Require Import cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
@@ -11,22 +11,22 @@ From lantana.base_logic Require Export witness osat.
 (** The ghost state for liveness obls *)
 Module owitGS.
 
-  Class owitGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class owitGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
     OwitGpreS {
         owitGpreS_witness : inG Σ (reservation_mapUR (bcredUR));
       }.
 
-  Class owitGS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class owitGS `{SI : sidx} (Σ : gFunctors) : Set :=
     OwitG {
         owit_inG : owitGpreS Σ;
         witness_name : gname;
       }.
 
-  Definition owitΣ `{SI : indexT} : gFunctors :=
+  Definition owitΣ `{SI : sidx} : gFunctors :=
     #[GFunctor (reservation_mapUR (bcredUR))
       ].
 
-  Global Instance subG_owitΣ `{SI : indexT} {Σ} : subG (owitΣ) Σ → (owitGpreS Σ).
+  Global Instance subG_owitΣ `{SI : sidx} {Σ} : subG (owitΣ) Σ → (owitGpreS Σ).
   Proof. solve_inG. Qed.
 
 End owitGS.
@@ -38,24 +38,24 @@ Import owitGS.
 Local Existing Instances owit_inG owitGpreS_witness.
 
 (* Witness: manage credits for an obl's witness progress *)
-Definition witG_bound `{SI : indexT} `{!owitGS Σ}
+Definition witG_bound `{SI : sidx} `{!owitGS Σ}
   (k : oid) (ℵ : obl_fuel) : iProp Σ :=
   own witness_name (reservation_map_data (A:=bcredUR) k (credit_bound ℵ)).
 Global Typeclasses Opaque witG_bound.
 Global Instance: Params (@witG_bound) 3 := {}.
 
-Definition witG_witness `{SI : indexT} `{!owitGS Σ}
+Definition witG_witness `{SI : sidx} `{!owitGS Σ}
   (k : oid) (a : obl_fuel) : iProp Σ :=
   own witness_name (reservation_map_data (A:=bcredUR) k (credit a)).
 Global Typeclasses Opaque witG_witness.
 Global Instance: Params (@witG_witness) 3 := {}.
 
-Local Definition witG_bound_token_id `{SI : indexT} `{!owitGS Σ}
+Local Definition witG_bound_token_id `{SI : sidx} `{!owitGS Σ}
   (E : coPset) : iProp Σ :=
   own witness_name (reservation_map_token (A:=bcredUR) E).
 
 (* Global invariant for the witness ghost state *)
-Definition owit `{SI : indexT} {Σ}
+Definition owit `{SI : sidx} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!owitGS Σ}
   (W : witnesses) : iProp Σ :=
   locked
@@ -82,7 +82,7 @@ Definition owit_inv `{!ord_mono_fun_class}
 
 (** Properties *)
 Section owit.
-  Context `{SI : indexT} `{OSAT : !osatGS.osatGS Σ} `{!owitGS Σ} `{OMF : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{OSAT : !osatGS.osatGS Σ} `{!owitGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (* witness *)
   Global Instance witG_bound_persistent k ℵ : Persistent (witG_bound k ℵ).
@@ -559,7 +559,7 @@ Section owit.
 End owit.
 
 (* Allocation of the initial witness protocol. *)
-Lemma owit_alloc `{SI : indexT} {Σ}
+Lemma owit_alloc `{SI : sidx} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!owitGpreS Σ} :
   ⊢ |==> ∃ _ : owitGS Σ, owit ∅.
 Proof.

@@ -1,4 +1,4 @@
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import proofmode.
 From stdpp Require Import fin_maps.
 
 Definition union_sets `{!EqDecision K} `{!Countable K} `{!EqDecision E} `{!Countable E} (M : gmap K (gset E)) : gset E :=

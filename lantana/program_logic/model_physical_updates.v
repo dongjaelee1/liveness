@@ -4,7 +4,7 @@ From lantana.base_logic Require Export opreds.
 Import uPred.
 
 (* Ensure progress of thread i's obligations and every live witnesses. *)
-Definition mprog `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ i : iPropO Σ -d> iPropO Σ :=
+Definition mprog `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ i : iPropO Σ -d> iPropO Σ :=
   (λ P,
      ∀ h a Ω1 W1,
      (model_interp h a Ω1 W1 n Θ) ={∅}=∗
@@ -15,7 +15,7 @@ Definition mprog `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ i : iP
 Notation "'@={' n , Θ , i '}=↓' P" := (mprog n Θ i P) (at level 99, P at level 200, format "@={ n , Θ , i }=↓  P").
 
 Section mprog.
-  Context `{SI : indexT} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
 
   Global Instance mprog_ne n Θ i : NonExpansive (mprog n Θ i).
   Proof. intros ? P1 P2 HP. rewrite /mprog. do 20 (f_equiv || done). Qed.
@@ -169,7 +169,7 @@ Section mprog.
 End mprog.
 
 (* Update physical states. *)
-Definition mphys `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n1 n2 Θ1 Θ2 : iPropO Σ -d> iPropO Σ :=
+Definition mphys `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n1 n2 Θ1 Θ2 : iPropO Σ -d> iPropO Σ :=
   (λ P,
      ∀ h a Ω W,
      (model_interp h a Ω W n1 Θ1) ={∅}=∗
@@ -178,7 +178,7 @@ Definition mphys `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n1 n2 Θ1 �
 Notation "'@={' n1 , n2 , Θ1 , Θ2 '}=>' P" := (mphys n1 n2 Θ1 Θ2 P) (at level 99, P at level 200, format "@={ n1 , n2 , Θ1 , Θ2 }=>  P").
 
 Section mphys.
-  Context `{SI : indexT} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
 
   Global Instance mphys_ne n1 n2 Θ1 Θ2 : NonExpansive (mphys n1 n2 Θ1 Θ2).
   Proof. intros ? P1 P2 HP. rewrite /mphys. do 20 (f_equiv || done). Qed.

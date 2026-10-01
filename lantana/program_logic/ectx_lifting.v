@@ -5,7 +5,7 @@ From iris.prelude Require Import options.
 From lantana Require Import ordinal_wfocm.
 
 Section wp.
-  Context {Λ : ectxLanguage} `{SI : indexT} `{!lantanaGS Λ Σ} {Hinh : Inhabited (state Λ)}.
+  Context {Λ : ectxLanguage} `{SI : sidx} `{!lantanaGS Λ Σ} {Hinh : Inhabited (state Λ)}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
   Implicit Types P : iProp Σ.

@@ -1,5 +1,6 @@
 From iris.algebra Require Import gmap_view gset coPset reservation_map dfrac_agree mono_nat.
-From iris.bi.lib Require Import cmra fractional.
+From iris.bi Require Import cmra.
+From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
@@ -8,19 +9,19 @@ From lantana.algebra Require Export ordinal_wfocm layer.
 From lantana.base_logic Require Export osat invariants.
 
 (* Each obl has this variant as an invariant: P until (Q and always R). *)
-Definition oblG_variant `{SI : indexT} `{!osatGS.osatGS Σ}
+Definition oblG_variant `{SI : sidx} `{!osatGS.osatGS Σ}
   (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
   (oblG_assigned k false q ∗ P) ∨
     (oblG_assigned k true q ∗ Q) ∨
     (oblG_discharged k ∗ R).
 
-Definition oblG_inv `{SI : indexT} `{!osatGS.osatGS Σ} `{!invGS Σ}
+Definition oblG_inv `{SI : sidx} `{!osatGS.osatGS Σ} `{!invGS Σ}
   (N : namespace) (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
   inv N (oblG_variant k q P Q R).
 
 (** Properties *)
 Section oinv.
-  Context `{SI : indexT} `{!osatGS.osatGS Σ} `{!invGS Σ} `{OMF : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{!osatGS.osatGS Σ} `{!invGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (** Instances *)
   (* Variant *)

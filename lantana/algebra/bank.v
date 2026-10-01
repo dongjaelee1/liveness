@@ -19,7 +19,7 @@ Definition bank_unit `{OCM.t A leR addO} : @bank A leR addO _ :=
   cash OCM.unit.
 
 Section bank.
-  Context `{SI : indexT}.
+  Context `{SI : sidx}.
   Context `{OCM : OCM.t A leR addO}.
 
   Canonical Structure bankO := leibnizO bank.

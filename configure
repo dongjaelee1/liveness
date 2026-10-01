@@ -1,30 +1,38 @@
 #!/bin/bash
-set -e
+# Install Lantana's opam dependencies into the current opam switch.
+# Requires rocq-core 9.0 -- 9.3.
+set -euo pipefail
 
+# Parallelism for building the opam packages (e.g. `NJOBS=4 ./configure`).
 NJOBS="${NJOBS:-8}"
+export OPAMJOBS="$NJOBS"
 
-# Opam repository for Coq packages.
+TRANSFINITE_REPO=${TRANSFINITE_REPO:-https://github.com/dongjaelee1/transfinite-iris.git}
+TRANSFINITE_REF=${TRANSFINITE_REF:-c335eb917535aa84a5771ff829d8c4a0de9d0d34}
+
+# Iris for rocq-iris and rocq-iris-heap-lang: branch dongjae/transfinite-base, i.e. upstream
+# master 8e490959 plus the `robbert/transfinite` commits (BI later laws for transfinite
+# step-indexing, `Timeless P := <only0> P ⊢ P`) and a monPred_lc_mixin fix.
+# Keep in sync with the `pin-depends` of transfinite-iris's opam file, which pins rocq-iris to
+# exactly this version and URL. rocq-iris-heap-lang requires the same version as rocq-iris,
+# so both are pinned here with that version, making transfinite-iris's own pin a no-op.
+IRIS_URL=git+https://gitlab.mpi-sws.org/dongjae/iris.git#ad972179779ed8afe530a70e4ef90f18bed28508
+IRIS_VERSION=dev.2026-09-24.0.8e490959+transfinite.ad972179
+
+# coq-released: rocq-elpi, coq-ordinal. iris-dev: rocq-stdpp dev versions.
 opam repo add coq-released https://coq.inria.fr/opam/released
+opam repo add iris-dev https://gitlab.mpi-sws.org/iris/opam.git
+opam update
 
-# Coq (Rocq) and the Ordinal library.
-opam remote add coq-sf -k git --rank=1 https://github.com/snu-sf/sf-opam-coq-archive
-opam install -y coq.9.0.0 coq-ordinal.0.5.6
+opam pin add -n -y --with-version="$IRIS_VERSION" rocq-iris "$IRIS_URL"
+opam pin add -n -y --with-version="$IRIS_VERSION" rocq-iris-heap-lang "$IRIS_URL"
+opam pin add -n -y --with-version=dev rocq-iris-transfinite "git+$TRANSFINITE_REPO#$TRANSFINITE_REF"
 
-# Build and install the bundled std++, parametric Iris, and transfinite Iris
-# developments (shipped as zip files in the repository root). These are built
-# from the bundled sources so that no access to their upstream repositories is
-# needed.
-rm -rf vendor
-mkdir -p vendor
-unzip -q stdpp.zip -d vendor
-unzip -q iris-parametric-index.zip -d vendor
-unzip -q transfinite-parametric-index.zip -d vendor
+# coq-core provides the legacy `coq_makefile` used by the Makefile of transfinite-iris
+# (which does not declare it), so it must be in place before transfinite-iris builds.
+opam install -y rocq-stdlib coq-core
 
-make -C vendor/stdpp -j"$NJOBS"
-make -C vendor/stdpp install
-
-make -C vendor/iris-parametric-index -j"$NJOBS"
-make -C vendor/iris-parametric-index install
-
-make -C vendor/transfinite-parametric-index -j"$NJOBS"
-make -C vendor/transfinite-parametric-index install
+opam install -y \
+  rocq-stdpp.dev.2026-09-17.0.d510b616 \
+  rocq-iris rocq-iris-heap-lang rocq-iris-transfinite \
+  coq-ordinal.0.5.6

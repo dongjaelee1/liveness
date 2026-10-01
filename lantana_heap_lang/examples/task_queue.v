@@ -141,14 +141,14 @@ Section proof.
       iPoseProof (crP_fuel_add with "Fg") as "[_ Fg]".
       iPoseProof (crP_fuel_add_nat 99 1 with "Fg") as "[Fg' Fg]". 1: lia.
       iPoseProof (crP_fuels_add_carrier with "Fg' GF") as "GF".
-      iPoseProof (big_sepS_union _ {[g]} with "[Fg $F_task]") as "F_task". 1: set_solver.
+      iPoseProof (big_sepS_union _ {[g]} G with "[Fg $F_task]") as "F_task". 1: set_solver.
       { iApply big_sepS_singleton. iFrame. }
       destruct b.
       + iDestruct "HW" as "(%& TG& %HG& Qw& Gwg& Fng)". destruct HG as (Ninng& Neq).
         iPoseProof (crP_fuel_add with "Fng") as "[Fng_Q Fng]".
         iPoseProof (crP_fuel_add_nat 99 1 with "Fng") as "[Fng' Fng]". 1: lia.
         iPoseProof (crP_fuels_add_carrier with "Fng' GF") as "GF".
-        iPoseProof (big_sepS_union _ {[ng]} with "[Fng $F_task]") as "F_task". 1: set_solver.
+        iPoseProof (big_sepS_union _ {[ng]} ({[g]} ∪ G) with "[Fng $F_task]") as "F_task". 1: set_solver.
         { iApply big_sepS_singleton. iFrame. }
         replace ({[ng]} ∪ ({[g]} ∪ G)) with ({[g; ng]} ∪ G) by set_solver.
         subst v.

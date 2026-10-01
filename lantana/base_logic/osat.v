@@ -1,5 +1,6 @@
 From iris.algebra Require Import gmap_view gset coPset reservation_map dfrac_agree mono_nat.
-From iris.bi.lib Require Import cmra fractional.
+From iris.bi Require Import cmra.
+From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
@@ -10,7 +11,7 @@ From lantana.base_logic Require Export obligation.
 
 (* FIXME: move to somewhere *)
 Section aux.
-  Context `{SI : indexT} {Σ : gFunctors} {A : cmra} {GA : inG Σ A} {GR : inG Σ (reservation_mapR A)}.
+  Context `{SI : sidx} {Σ : gFunctors} {A : cmra} {GA : inG Σ A} {GR : inG Σ (reservation_mapR A)}.
 
   Lemma reservation_map_token_alloc_singleton (name : gname) D k a :
     k ∉ D →
@@ -47,7 +48,7 @@ Global Instance ord_obl_class : obl_class :=
 (** The ghost state for obls *)
 Module osatGS.
 
-  Class osatGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class osatGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
     OsatGpreS {
         osatGpreS_bound : inG Σ (gmap_viewR oid (agreeR (Ord.t)));
         osatGpreS_state : inG Σ (reservation_mapUR (mono_natUR));
@@ -56,7 +57,7 @@ Module osatGS.
         osatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO obl_owner)));
       }.
 
-  Class osatGS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class osatGS `{SI : sidx} (Σ : gFunctors) : Set :=
     OsatG {
         osat_inG : osatGpreS Σ;
         bound_name : gname;
@@ -65,14 +66,14 @@ Module osatGS.
         owner_name : gname;
       }.
 
-  Definition osatΣ `{SI : indexT} : gFunctors :=
+  Definition osatΣ `{SI : sidx} : gFunctors :=
     #[GFunctor (gmap_viewR oid (agreeR (Ord.t)));
       GFunctor (reservation_mapUR (mono_natUR));
       GFunctor (reservation_mapUR bankUR);
       GFunctor (reservation_mapUR (dfrac_agreeR $ (leibnizO obl_owner)))
       ].
 
-  Global Instance subG_osatΣ `{SI : indexT} {Σ} : subG (osatΣ) Σ → (osatGpreS Σ).
+  Global Instance subG_osatΣ `{SI : sidx} {Σ} : subG (osatΣ) Σ → (osatGpreS Σ).
   Proof. solve_inG. Qed.
 
 End osatGS.
@@ -85,69 +86,69 @@ Local Existing Instances osat_inG
   osatGpreS_bound osatGpreS_state osatGpreS_fuel osatGpreS_owner.
 
 (* Bound: bound of an obl *)
-Definition oblG_bound `{SI : indexT} `{!osatGS Σ}
+Definition oblG_bound `{SI : sidx} `{!osatGS Σ}
   (k : oid) (β : Ord.t) : iProp Σ :=
   own bound_name (gmap_view_frag k DfracDiscarded (to_agree (β))).
 Global Typeclasses Opaque oblG_bound.
 Global Instance: Params (@oblG_bound) 3 := {}.
 
-Definition oblG_elem `{SI : indexT} `{!osatGS Σ}
+Definition oblG_elem `{SI : sidx} `{!osatGS Σ}
   (k : oid) : iProp Σ :=
   ∃ β, oblG_bound k β.
 Global Typeclasses Opaque oblG_elem.
 Global Instance: Params (@oblG_elem) 3 := {}.
 
-Local Definition oblG_bound_auth_id `{SI : indexT} `{!osatGS Σ}
+Local Definition oblG_bound_auth_id `{SI : sidx} `{!osatGS Σ}
   (m : gmap oid Ord.t) : iProp Σ :=
   own bound_name (gmap_view_auth (V:=agreeR (Ord.t)) (DfracOwn 1) (to_agree <$> m)).
 
 (* Caputres P Until Q, need two states: in P and in Q. *)
-Definition oblG_assigned `{SI : indexT} `{!osatGS Σ}
+Definition oblG_assigned `{SI : sidx} `{!osatGS Σ}
   (k : oid) (b : bool) (q : Qp) : iProp Σ :=
   own state_name (reservation_map_data k (●MN{#q} (Nat.b2n b))).
 Global Typeclasses Opaque oblG_assigned.
 Global Instance: Params (@oblG_assigned) 3 := {}.
 
-Definition oblG_discharged `{SI : indexT} `{!osatGS Σ}
+Definition oblG_discharged `{SI : sidx} `{!osatGS Σ}
   (k : oid) : iProp Σ :=
   own state_name (reservation_map_data k (●MN□ 2)).
 Global Typeclasses Opaque oblG_discharged.
 Global Instance: Params (@oblG_discharged) 3 := {}.
 
-Local Definition oblG_state_token_id `{SI : indexT} `{!osatGS Σ}
+Local Definition oblG_state_token_id `{SI : sidx} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own state_name (reservation_map_token (A:=(mono_natUR)) E).
 
 (* Fuel: manage credits for an obl's fuel *)
-Definition oblG_fuel `{SI : indexT} `{!osatGS Σ}
+Definition oblG_fuel `{SI : sidx} `{!osatGS Σ}
   (k : oid) (a : obl_fuel) : iProp Σ :=
   own fuel_name (reservation_map_data (A:=bankUR) k (cash a)).
 Global Typeclasses Opaque oblG_fuel.
 Global Instance: Params (@oblG_fuel) 3 := {}.
 
-Definition oblG_fuel_supply `{SI : indexT} `{!osatGS Σ}
+Definition oblG_fuel_supply `{SI : sidx} `{!osatGS Σ}
   (k : oid) (a : obl_fuel) (q : Qp) : iProp Σ :=
   own fuel_name (reservation_map_data (A:=bankUR) k (debt a q)).
 Global Typeclasses Opaque oblG_fuel_supply.
 Global Instance: Params (@oblG_fuel_supply) 3 := {}.
 
-Local Definition oblG_fuel_token_id `{SI : indexT} `{!osatGS Σ}
+Local Definition oblG_fuel_token_id `{SI : sidx} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own fuel_name (reservation_map_token (A:=bankUR) E).
 
 (* Owner: tracks the owner thread of an obl *)
-Definition oblG_owner `{SI : indexT} `{!osatGS Σ}
+Definition oblG_owner `{SI : sidx} `{!osatGS Σ}
   (k : oid) (t : obl_owner) (q : Qp) : iProp Σ :=
   own owner_name (reservation_map_data k (to_frac_agree q (t : leibnizO obl_owner))).
 Global Typeclasses Opaque oblG_owner.
 Global Instance: Params (@oblG_owner) 3 := {}.
 
-Local Definition oblG_owner_token_id `{SI : indexT} `{!osatGS Σ}
+Local Definition oblG_owner_token_id `{SI : sidx} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO obl_owner)) E).
 
 (* Global protocol to manage obls. *)
-Definition osat `{SI : indexT} `{!osatGS Σ} `{!ord_mono_fun_class}
+Definition osat `{SI : sidx} `{!osatGS Σ} `{!ord_mono_fun_class}
   (Ω : obls) : iProp Σ :=
   locked
     ((∃ (Ls : gmap oid Ord.t), (⌜ dom Ω = dom Ls ⌝) ∗ oblG_bound_auth_id Ls) ∗
@@ -170,7 +171,7 @@ Definition osat `{SI : indexT} `{!osatGS Σ} `{!ord_mono_fun_class}
 
 (** Properties *)
 Section osat.
-  Context `{SI : indexT} `{!osatGS Σ} `{OMF : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{!osatGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (** Instances *)
   (* Bound *)
@@ -479,8 +480,7 @@ Section osat.
     ⊢ ∃ b, oblG_fuel_supply k b (q0 + q1) ∗ ⌜ b w≤ a0 ∧ b w≤ a1 ⌝.
   Proof.
     rewrite /oblG_fuel_supply. iIntros "[H1 H2]".
-    iPoseProof (own_op with "[H1 H2]") as "H"; first (iSplitL "H1"; iFrame).
-    iEval (rewrite -!reservation_map_data_op) in "H".
+    iCombine "H1 H2" as "H".
     destruct (debt_add a0 a1 q0 q1) as (b&Heq&Hle0&Hle1). rewrite Heq.
     iExists _. iSplitL; done.
   Qed.
@@ -930,7 +930,7 @@ Section osat.
 End osat.
 
 (* Allocation of an initial obl protocol. *)
-Lemma osat_alloc `{SI : indexT} `{!osatGpreS Σ} `{!ord_mono_fun_class} :
+Lemma osat_alloc `{SI : sidx} `{!osatGpreS Σ} `{!ord_mono_fun_class} :
   ⊢ |==> ∃ _ : osatGS Σ, osat ∅.
 Proof.
   iIntros.

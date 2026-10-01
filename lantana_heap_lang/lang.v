@@ -420,10 +420,10 @@ Global Instance state_inhabited : Inhabited state :=
 Global Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
 Global Instance expr_inhabited : Inhabited expr := populate (Val inhabitant).
 
-Canonical Structure stateO `{SI : indexT} := leibnizO state.
-Canonical Structure locO `{SI : indexT} := leibnizO loc.
-Canonical Structure valO `{SI : indexT} := leibnizO val.
-Canonical Structure exprO `{SI : indexT} := leibnizO expr.
+Canonical Structure stateO `{SI : sidx} := leibnizO state.
+Canonical Structure locO `{SI : sidx} := leibnizO loc.
+Canonical Structure valO `{SI : sidx} := leibnizO val.
+Canonical Structure exprO `{SI : sidx} := leibnizO expr.
 
 (** Evaluation contexts *)
 (** Note that [ResolveLCtx] is not by itself an evaluation context item: we do

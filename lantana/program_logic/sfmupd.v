@@ -3,25 +3,25 @@ From iris.prelude Require Import options.
 From lantana.program_logic Require Export sfgupd.
 Import uPred.
 
-Local Definition sfmupd_def `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
+Local Definition sfmupd_def `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   E1 E2 : iPropO Σ -d> iPropO Σ :=
   (λ P, ∀ h n σ Θ κs, (history_interp h n σ Θ κs) -∗ |={E1,E2:n,dom Θ}=>m (history_interp h n σ Θ κs) ∗ P)%I.
 Local Definition sfmupd_aux : seal (@sfmupd_def). Proof. by eexists. Qed.
 Definition sfmupd := sfmupd_aux.(unseal).
 Global Arguments sfmupd {SI Λ Σ _ _ _ _}.
-Local Lemma sfmupd_unseal `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
+Local Lemma sfmupd_unseal `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} :
   sfmupd = @sfmupd_def SI Λ Σ _ _ _ _.
 Proof. rewrite -sfmupd_aux.(seal_eq) //. Qed.
 
 Ltac unfold_sfmupd := rewrite sfmupd_unseal /sfmupd_def.
 
-Notation "'|={' E1 , E2 '}=>m' P" := (sfmupd E1 E2 P) (at level 99, P at level 200, format "|={ E1 , E2 }=>m  P").
-Notation "'|={' E '}=>m' P" := (sfmupd E E P) (at level 99, P at level 200, format "|={ E }=>m  P").
+Notation "'|={' E1 , E2 '}=>m' P" := (sfmupd E1 E2 P) (at level 20, P at level 200, format "|={ E1 , E2 }=>m  P").
+Notation "'|={' E '}=>m' P" := (sfmupd E E P) (at level 20, P at level 200, format "|={ E }=>m  P").
 
 Section sfmupd.
-  Context `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
+  Context `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
   Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}.
 
   Global Instance sfmupd_ne E1 E2 : NonExpansive (sfmupd E1 E2).
@@ -266,13 +266,13 @@ Section sfmupd.
   Lemma lc_sfmupd_add_later E1 E2 P :
     £n 1 -∗ ▷ (|={E1,E2}=>m P) -∗ |={E1,E2}=>m P.
   Proof.
-    iIntros "LC H". iApply fupd_sfmupd_elim. by iApply (lc_fupd_elim_later with "LC").
+    iIntros "LC H". iApply fupd_sfmupd_elim. by iApply (lantana.base_logic.fancy_updates.lc_fupd_elim_later with "LC").
   Qed.
 
   Lemma lc_sfmupd_add_laterN E1 E2 P n :
     £n n -∗ ▷^n (|={E1,E2}=>m P) -∗ |={E1,E2}=>m P.
   Proof.
-    iIntros "LC H". iApply fupd_sfmupd_elim. iApply (lc_fupd_add_laterN with "LC"). iNext. auto.
+    iIntros "LC H". iApply fupd_sfmupd_elim. iApply (lantana.base_logic.fancy_updates.lc_fupd_add_laterN with "LC"). iNext. auto.
   Qed.
 
   Global Instance elim_sfgupd_sfmupd (p : bool) E1 E2 E3 P Q :

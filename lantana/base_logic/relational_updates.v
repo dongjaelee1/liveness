@@ -4,7 +4,7 @@
  *)
 
 From iris.prelude Require Import options.
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Import iprop.
 Import uPred.
 
@@ -59,7 +59,7 @@ End aux.
   - a well-frounded relation [rupd_rel_wf: X → X → Prop]
   - a predicate [rupd_pred: X → iProp] *)
 
-Class rupdG `{SI : indexT} (Σ : gFunctors) (X : Type) :=
+Class rupdG `{SI : sidx} (Σ : gFunctors) (X : Type) :=
   RelG {
       rupd_pred : X → iProp Σ;
       rupd_rel : relation X;
@@ -80,18 +80,18 @@ Class rupdG `{SI : indexT} (Σ : gFunctors) (X : Type) :=
    We define the actual relational update [rupd] as the fixpoint of [rupd_pre].
 *)
 
-Definition rupd_pre `{SI : indexT} {Σ : gFunctors} {X} `{!rupdG Σ X} (rupd : iPropO Σ -d> iPropO Σ) :
+Definition rupd_pre `{SI : sidx} {Σ : gFunctors} {X} `{!rupdG Σ X} (rupd : iPropO Σ -d> iPropO Σ) :
   iProp Σ -d> iPropO Σ :=
   λ P, (∀ x : X, rupd_pred x -∗
         |==> ((rupd_pred x ∗ P) ∨
                 (∃ x' : X, ⌜tc rupd_rel x' x⌝ ∗ rupd_pred x' ∗ ▷ rupd P)))%I.
 
-Local Instance rupd_pre_contractive `{SI : indexT} {Σ: gFunctors} {X} `{!rupdG Σ X} : Contractive rupd_pre.
+Local Instance rupd_pre_contractive `{SI : sidx} {Σ: gFunctors} {X} `{!rupdG Σ X} : Contractive rupd_pre.
 Proof.
   rewrite /rupd_pre=> n rupd rupd' Hrupd P.
   do 9 f_equiv. f_contractive. apply Hrupd.
 Qed.
-Definition rupd_def `{SI : indexT} {Σ : gFunctors} {X} `{!rupdG Σ X} :
+Definition rupd_def `{SI : sidx} {Σ : gFunctors} {X} `{!rupdG Σ X} :
   iProp Σ -d> iPropO Σ := fixpoint rupd_pre.
 Definition rupd_aux : seal (@rupd_def). Proof. by eexists. Qed.
 Definition rupd := rupd_aux.(unseal).
@@ -99,7 +99,7 @@ Arguments rupd {SI Σ X rupdG} P : rename.
 Local Definition rupd_eq : @rupd = @rupd_def := rupd_aux.(seal_eq).
 Notation "'|==>r' P" := (rupd P) (at level 99, P at level 200, format "|==>r  P").
 
-Lemma rupd_unfold `{SI : indexT} {Σ: gFunctors} {X} `{!rupdG Σ X} P :
+Lemma rupd_unfold `{SI : sidx} {Σ: gFunctors} {X} `{!rupdG Σ X} P :
   (|==>r P) ⊣⊢
   ∀ x : X, rupd_pred x -∗ |==> (rupd_pred x ∗ P) ∨ (∃ x' : X, ⌜tc rupd_rel x' x⌝ ∗ rupd_pred x' ∗ ▷ rupd P).
 Proof.
@@ -112,17 +112,17 @@ Qed.
    The actual rules for finite and transfinite later credits are then derived
    later on from these rules. *)
 Section rupd_lemmas.
-  Context `{SI : indexT} {Σ : gFunctors} {X} `{rG : !rupdG Σ X}.
+  Context `{SI : sidx} {Σ : gFunctors} {X} `{rG : !rupdG Σ X}.
   Implicit Types (P Q : iProp Σ).
 
   Global Instance rupd_ne : NonExpansive rupd.
   Proof.
-    intros n P Q Heq; induction (index_lt_wf n) as [n _ IH].
+    intros n P Q Heq; induction (SIdx.lt_wf n) as [n _ IH].
     rewrite (rupd_unfold P) (rupd_unfold Q).
     do 6 f_equiv.
     - done.
     - do 3 f_equiv. f_contractive. eapply IH, dist_le; eauto.
-      eapply index_lt_le_subrel; auto.
+      eapply SIdx.lt_le_incl; auto.
   Qed.
 
   (** A standard update can be turned into a relational update. *)
@@ -357,11 +357,11 @@ End rupd_lemmas.
   the meta logic. That's exactly what the existential property allows us to do.
  *)
 
-Class SatisfiableRUpd `{SI : indexT} {X : Type} {Σ : gFunctors} `{!rupdG Σ X} (sat : iProp Σ → Prop) := {
+Class SatisfiableRUpd `{SI : sidx} {X : Type} {Σ : gFunctors} `{!rupdG Σ X} (sat : iProp Σ → Prop) := {
     sat_rupd P : sat (|==>r P) → sat P
   }.
 
-Class SatisfiableRUpdUpdate `{SI : indexT} {X: Type} {Σ : gFunctors} `{!rupdG Σ X} (sat : iProp Σ → Prop) := {
+Class SatisfiableRUpdUpdate `{SI : sidx} {X: Type} {Σ : gFunctors} `{!rupdG Σ X} (sat : iProp Σ → Prop) := {
     sat_pred_upd P Q :
     (∀ x, rupd_pred x -∗ |==> ∃ y, rupd_pred y ∗ Q) →
     sat P →
@@ -369,7 +369,7 @@ Class SatisfiableRUpdUpdate `{SI : indexT} {X: Type} {Σ : gFunctors} `{!rupdG �
   }.
 
 Section rupd_satisfiable.
-  Context `{SI : indexT} {X : Type} {Σ : gFunctors} `{!rupdG Σ X}.
+  Context `{SI : sidx} {X : Type} {Σ : gFunctors} `{!rupdG Σ X}.
   Context (sat : iProp Σ → Prop) `{S : !Satisfiable sat} `{SL : !SatisfiableLater sat}.
   Context `{SU : !SatisfiableBUpd sat}.
   Context `{SE1 : !SatisfiableExists X sat} `{SE2 : !SatisfiableExists bool sat}.

@@ -7,7 +7,7 @@ From lantana.base_logic Require Import obligation.
 From lantana.program_logic Require Export weakestpre.
 
 (** Syntax for writing temporal formulae; cf., LTL, CTL*. *)
-Inductive tf `{SI : indexT} {Π : Type} `{Σ : gFunctors} :=
+Inductive tf `{SI : sidx} {Π : Type} `{Σ : gFunctors} :=
 | tf_emp
 | tf_atomic (π : Π)
 | tf_pure (p : Prop)
@@ -53,31 +53,31 @@ Infix "∗" := (tf_sep) : tf_scope.
 
 (** Define patterns corresponding to LTL temporal properties. *)
 (* Eventually P *)
-Definition tf_finally `{SI : indexT} {Π} {Σ} N k b q (P : @tf SI Π Σ) : tf Σ :=
+Definition tf_finally `{SI : sidx} {Π} {Σ} N k b q (P : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q ⌜ True ⌝ P)%F.
 Global Arguments tf_finally {SI Π Σ}.
 
 (* P Weak until Q *)
-Definition tf_weakuntil `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
+Definition tf_weakuntil `{SI : sidx} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q P (Q ∨ tf_always N P))%F.
 (*   (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
 Global Arguments tf_weakuntil {SI Π Σ}.
 
 (* P Release Q *)
-Definition tf_release `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
+Definition tf_release `{SI : sidx} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
   (tf_weakuntil N k b q Q (Q ∗ P))%F.
 Global Arguments tf_release {SI Π Σ}.
 
 (* P Strong release Q *)
-Definition tf_strongrelease `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
+Definition tf_strongrelease `{SI : sidx} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q Q (Q ∗ P))%F.
 Global Arguments tf_strongrelease {SI Π Σ}.
 
 (* FIXME: more to somewhere else. *)
 Section aux.
-  Context `{SI : indexT}.
+  Context `{SI : sidx}.
 
-  Global Instance big_opL_proper_eq {M : ofe} (o : M → M → M) `{!Monoid o} {A : Type} :
+  Global Instance big_opL_proper_eq {M : ofe} (o : M → M → M) `{!Monoid o u} {A : Type} :
     Proper (pointwise_relation nat (pointwise_relation A eq) ==> eq ==> eq) (big_opL o).
   Proof.
     repeat intro. subst y0. revert x y H. rename x0 into l. induction l; intros f1 f2 Hf; simpl; auto.
@@ -88,7 +88,7 @@ Section aux.
 
 End aux.
 
-Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+Fixpoint tf_logic `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (Φ : @tf SI (state_pred Λ) Σ) : iProp Σ :=
   match Φ with
   | tf_emp => emp%I
@@ -110,7 +110,7 @@ Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ �
                                 hG_event n' (σ', Θ', κs') ∗
                                 tf_intuit n' σ' Θ' κs' i' Ω' Q)%I)%I
   end
-with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+with tf_intuit `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
        n σ Θ κs i Ω (Φ : @tf SI (state_pred Λ) Σ) : iProp Σ :=
        match Φ with
        | tf_emp => emp%I
@@ -136,7 +136,7 @@ with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
 Global Arguments tf_logic {SI Λ Σ _ _}.
 Global Arguments tf_intuit {SI Λ Σ _ _}.
 
-Local Definition tf_discharged_def `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+Local Definition tf_discharged_def `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   k (Q : tf Σ) : iProp Σ :=
   (∃ n' σ' Θ' κs' i' Ω', event_obl i' (n', Ω') k obl_discharged ∗
                          hG_event n' (σ', Θ', κs') ∗
@@ -144,12 +144,12 @@ Local Definition tf_discharged_def `{SI : indexT} `{!temporalGS Λ Σ} `{!state_
 Local Definition tf_discharged_aux : seal (@tf_discharged_def). Proof. by eexists. Qed.
 Definition tf_discharged := tf_discharged_aux.(unseal).
 Global Arguments tf_discharged {SI Λ Σ _ _}.
-Local Lemma tf_discharged_unseal `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} :
+Local Lemma tf_discharged_unseal `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} :
   tf_discharged = @tf_discharged_def SI Λ Σ _ _.
 Proof. rewrite -tf_discharged_aux.(seal_eq) //. Qed.
 
 Section proof.
-  Context `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Global Instance tf_atomic_timeless π : Timeless (state_pred_interp π) → Timeless (tf_logic (tf_atomic π)).
   Proof. intros. simpl. auto. Qed.
@@ -204,7 +204,7 @@ End proof.
 Notation "'⟦' Φ '⟧ₗ'" := (tf_logic Φ%F) (format "'⟦' Φ '⟧ₗ'").
 
 Section reduction.
-  Context `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Lemma tf_emp_logic :
     ⟦tf_emp⟧ₗ = emp%I.
@@ -271,28 +271,28 @@ Global Notation untilP N k q P Q := (tf_until N k false q P%F Q%F)%F.
 Global Notation finallyP N k q Q := (tf_finally N k false q Q%F)%F.
 
 (** Ofe and Monoid structure. *)
-Global Instance tf_equiv `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : Equiv (tf Σ) :=
+Global Instance tf_equiv `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : Equiv (tf Σ) :=
   λ Φ1 Φ2, ⟦Φ1⟧ₗ ≡ ⟦Φ2⟧ₗ.
-Global Instance tf_equiv_Equivalence `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : Equivalence tf_equiv.
+Global Instance tf_equiv_Equivalence `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : Equivalence tf_equiv.
 Proof.
   unfold tf_equiv. econstructor.
   - repeat intro. done.
   - repeat intro. rewrite H. done.
   - repeat intro. etrans; eauto.
 Qed.
-Canonical Structure tfO `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : ofe :=
+Canonical Structure tfO `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : ofe :=
   (Ofe (tf Σ) (discrete_ofe_mixin tf_equiv_Equivalence)).
 
-Class tf_op_interp_comm `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+Class tf_op_interp_comm `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (tf_o : tf Σ → tf Σ → tf Σ) (iProp_o : iProp Σ → iProp Σ → iProp Σ) :=
   tf_op_interp_comm_intro : ∀ (P Q : tf Σ), ⟦tf_o P Q⟧ₗ = (iProp_o ⟦P⟧ₗ ⟦Q⟧ₗ)%I.
 
-Class tf_monoid_unit_interp_eq `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
-  (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o} (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o} :=
-  tf_monoid_unit_interp_eq_intro : ⟦ monoid_unit ⟧ₗ = monoid_unit.
+Class tf_monoid_unit_interp_eq `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+  (tf_o : tf Σ → tf Σ → tf Σ) {tf_u : tf Σ} `{!Monoid tf_o tf_u} (iProp_o : iProp Σ → iProp Σ → iProp Σ) {iProp_u : iProp Σ} `{!Monoid iProp_o iProp_u} :=
+  tf_monoid_unit_interp_eq_intro : ⟦ tf_u ⟧ₗ = iProp_u.
 
 Section instances.
-  Context `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Global Instance tf_and_interp_comm : tf_op_interp_comm tf_and bi_and.
   Proof. econstructor. Qed.
@@ -301,19 +301,19 @@ Section instances.
   Global Instance tf_sep_interp_comm : tf_op_interp_comm tf_sep bi_sep.
   Proof. econstructor. Qed.
 
-  Program Global Instance tf_and_monoid : Monoid tf_and := Build_Monoid _ _ _ tf_emp _ _ _ _.
+  Program Global Instance tf_and_monoid : Monoid tf_and tf_emp := Build_Monoid _ _ _ _ _ _ _ _.
   Next Obligation. repeat intro. do 5 red. do 5 red in H, H0. rewrite !tf_and_logic H H0. done. Qed.
   Next Obligation. repeat intro. do 3 red. rewrite !tf_and_logic assoc. done. Qed.
   Next Obligation. repeat intro. do 3 red. rewrite !tf_and_logic comm. done. Qed.
   Next Obligation. repeat intro. do 3 red. rewrite !tf_and_logic tf_emp_logic left_id. done. Qed.
 
-  Program Global Instance tf_or_monoid : Monoid tf_or := Build_Monoid _ _ _ (⌜ False ⌝)%F _ _ _ _.
+  Program Global Instance tf_or_monoid : Monoid tf_or (⌜ False ⌝)%F := Build_Monoid _ _ _ _ _ _ _ _.
   Next Obligation. repeat intro. do 5 red. do 5 red in H, H0. rewrite !tf_or_logic H H0. done. Qed.
   Next Obligation. repeat intro. do 3 red. rewrite !tf_or_logic assoc. done. Qed.
   Next Obligation. repeat intro. do 3 red. rewrite !tf_or_logic comm. done. Qed.
   Next Obligation. repeat intro. do 3 red. rewrite !tf_or_logic tf_pure_logic left_id. done. Qed.
 
-  Program Global Instance tf_sep_monoid : Monoid tf_sep := Build_Monoid _ _ _ tf_emp _ _ _ _.
+  Program Global Instance tf_sep_monoid : Monoid tf_sep tf_emp := Build_Monoid _ _ _ _ _ _ _ _.
   Next Obligation. repeat intro. do 5 red. do 5 red in H, H0. rewrite !tf_sep_logic H H0. done. Qed.
   Next Obligation. repeat intro. do 3 red. rewrite !tf_sep_logic assoc. done. Qed.
   Next Obligation. repeat intro. do 3 red. rewrite !tf_sep_logic comm. done. Qed.
@@ -329,11 +329,11 @@ Section instances.
 End instances.
 
 Section big_op.
-  Context `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Lemma tf_big_opL_interp
-    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o}
-    (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o}
+    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o tf_u}
+    (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o iProp_u}
     `{!tf_op_interp_comm tf_o iProp_o}
     `{!tf_monoid_unit_interp_eq tf_o iProp_o}
     A (P : nat → A → tf Σ) (l : list A) :
@@ -351,8 +351,8 @@ Section big_op.
   Qed.
 
   Lemma tf_big_opM_interp
-    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o}
-    (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o}
+    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o tf_u}
+    (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o iProp_u}
     `{!tf_op_interp_comm tf_o iProp_o}
     `{!tf_monoid_unit_interp_eq tf_o iProp_o}
     K `{!EqDecision K} `{!Countable K} A
@@ -368,8 +368,8 @@ Section big_op.
   Qed.
 
   Lemma tf_big_opS_interp
-    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o}
-    (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o}
+    (tf_o : tf Σ → tf Σ → tf Σ) `{!Monoid tf_o tf_u}
+    (iProp_o : iProp Σ → iProp Σ → iProp Σ) `{!Monoid iProp_o iProp_u}
     `{!tf_op_interp_comm tf_o iProp_o}
     `{!tf_monoid_unit_interp_eq tf_o iProp_o}
     A `{!EqDecision A} `{!Countable A}
@@ -387,7 +387,7 @@ Section big_op.
 End big_op.
 
 Section proof.
-  Context `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   (** Always *)
   Global Instance tf_always_persistent N P : Persistent (⟦tf_always N P⟧ₗ).

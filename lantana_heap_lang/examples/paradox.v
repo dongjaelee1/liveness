@@ -10,7 +10,9 @@ From lantana.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_map.
 
-From iris.proofmode Require Import coq_tactics reduction spec_patterns.
+From iris.proofmode Require Import rocq_tactics reduction spec_patterns.
+(* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
+From lantana.base_logic Require Import later_credits.
 
 (** "pure" steps that are reducible with the thread_exec predicate, without submitting fuels. *)
 Class lantanaGS_no_lc `(HGS : lantanaGS Λ Σ) := {
@@ -163,7 +165,7 @@ Section proof.
       cnt_base γ ⊢ |==> cnt_base γ ∗ ∃ i, cnt_auth γ i n 1.
     Proof.
       rewrite /cnt_base /cnt_auth. iIntros "B".
-      iMod (own_updateP (λ m', ∃ i, m' = <[i:=●MN n]> ∅ ∧ ∅ !! i = None) with "B") as "(%&%& B)".
+      iMod (own_updateP (λ m' : gmapUR positive mono_natUR, ∃ i, m' = <[i:=●MN n]> ∅ ∧ (∅ : gmap positive mono_natUR) !! i = None) with "B") as "(%&%& B)".
       { eapply @alloc_updateP'. 1: apply _. apply mono_nat_auth_valid. }
       destruct H0 as (?&?&?). subst. rewrite insert_singleton_op; last auto.
       iDestruct "B" as "[$ $]". auto.
@@ -216,7 +218,7 @@ Section proof.
   Definition px_inv_tf r rm i j : tf Σ :=
     (∃ n (os : gmap nat oid),
         ⟨cnt_auth r j n (1/2)%Qp ∗
-         ghost_map_auth rm 1 os⟩ ∗
+         ghost_map_auth_frac rm 1 os⟩ ∗
         ([^tf_sep map] a ↦ k ∈ os,
            ⟨(£ (10)%ord ∨ cnt_lb r i a) ∗
             a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0⟩ ∗
@@ -229,7 +231,7 @@ Section proof.
   Definition px_inv r rm i j : iProp Σ :=
     ∃ n (os : gmap nat oid),
       (cnt_auth r j n (1/2)%Qp ∗
-       ghost_map_auth rm 1 os) ∗
+       ghost_map_auth_frac rm 1 os) ∗
       ([∗ map] a ↦ k ∈ os,
          ((£ (10)%ord ∨ cnt_lb r i a) ∗
           a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0) ∗
@@ -298,7 +300,7 @@ Section proof.
       iApply lwpupd_fupd_l. iInv "Ipx" as "H".
       iPoseProof (tlc_split_nat 9 1 with "LC") as "[LC LCw]".
       (** TODO: make interface defs and lemmas for tlc *)
-      iApply (lc_fupd_add_later with "LCw"). iNext.
+      iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LCw"). iNext.
       iDestruct "H" as "(%& %& (Ca& GMA)& HM)".
       iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
       iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
@@ -349,7 +351,7 @@ Section proof.
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
     iPoseProof (tlc_split_nat 89 1 with "LC") as "[LC LC1]".
     (** TODO: make interface defs and lemmas for tlc *)
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%& %& (Ca& GMA)& HM)".
     iAssert (⌜ os !! (n + 1)%nat = None ⌝)%I as "%Nin".
     { destruct (os !! (n + 1)) eqn:LU1; last auto.
@@ -378,7 +380,7 @@ Section proof.
     iMod (tf_until_discharge with "Uck") as "H". 1: set_solver.
     iPoseProof (tlc_split_nat 88 1 with "LC") as "[LC LC1]".
     (** TODO: make interface defs and lemmas for tlc *)
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(_& H)".
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim. iMod "mask" as "_".
@@ -388,7 +390,7 @@ Section proof.
     { iPureIntro. set_solver. }
     iPoseProof (tlc_split_nat 87 1 with "LC") as "[LC LC1]".
     (** TODO: make interface defs and lemmas for tlc *)
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim. iMod "mask" as "_".
     iMod "H" as "(_& Gg& #Ofck)".
@@ -584,11 +586,11 @@ Section adequacy.
     set (HlantanaGS := @heapGS_lantanaGS Σ HHeapGS).
     iExists (lantana_state_interp_class), (@fork_post Σ), (@Ψs Σ).
     iSplitL "HI TI PI".
-    { by iFrame. }
+    { iDestruct "PI" as "[PI _]". by iFrame. }
     iSplitR; first done.
     iModIntro. iIntros "LC TGs".
     (* Set Printing All. *)
-    iMod (px_loop_pre Θ0 i j with "[Tis] [$LC] [TGs]") as "H".
+    iMod (px_loop_pre (heapGS0:=HHeapGS) Θ0 i j with "[Tis] [$LC] [TGs]") as "H".
     { subst i j. lia. }
     { done. }
     { reflexivity. }

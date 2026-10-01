@@ -7,7 +7,7 @@ From lantana.prelude Require Export ordinal_facts.
 
 Definition thread_id := positive.
 Global Instance thread_id_inhabited : Inhabited thread_id := Pos.inhabited.
-Canonical Structure thread_idO `{SI : indexT} := leibnizO thread_id.
+Canonical Structure thread_idO `{SI : sidx} := leibnizO thread_id.
 
 Notation thread_ids := (gset thread_id).
 
@@ -76,9 +76,9 @@ Global Arguments ctx_id {_}.
 Global Arguments ctx_comp {_} _ _.
 Coercion ctx_apply : ctx >-> Funclass.
 
-Canonical Structure stateO `{SI : indexT} Λ := leibnizO (state Λ).
-Canonical Structure valO `{SI : indexT} Λ := leibnizO (val Λ).
-Canonical Structure exprO `{SI : indexT} Λ := leibnizO (expr Λ).
+Canonical Structure stateO `{SI : sidx} Λ := leibnizO (state Λ).
+Canonical Structure valO `{SI : sidx} Λ := leibnizO (val Λ).
+Canonical Structure exprO `{SI : sidx} Λ := leibnizO (expr Λ).
 
 Lemma ctx_id_apply {Λ : language} (e : expr Λ) : ctx_id e = e.
 Proof. apply language_ctx_mixin. Qed.

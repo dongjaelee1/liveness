@@ -343,7 +343,7 @@ Proof.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
   (* FIXME: just HI not working. *)
-  iApply (lwp_safety_iris_tiProp with "[$HI $SIa $MHI $S $T $A $G $MI $WPs]").
+  iApply (lwp_safety_iris_tiProp (lantanaGS0:=Hlantana) with "[$HI $SIa $MHI $S $T $A $G $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
   { intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto. }
   eauto.

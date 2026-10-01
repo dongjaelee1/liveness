@@ -1,5 +1,6 @@
 From iris.algebra Require Import mono_list.
-From iris.bi.lib Require Import cmra fractional.
+From iris.bi Require Import cmra.
+From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
@@ -8,22 +9,22 @@ From lantana.program_logic Require Export language.
 (** The ghost state for history. *)
 Module histGS.
 
-  Class histGpreS `{SI : indexT} (Σ : gFunctors) (St : Type) : Set :=
+  Class histGpreS `{SI : sidx} (Σ : gFunctors) (St : Type) : Set :=
     HistGpreS {
         histGpreS_hist : inG Σ (mono_listUR (leibnizO St));
       }.
 
-  Class histGS `{SI : indexT} (Σ : gFunctors) (St : Type) : Set :=
+  Class histGS `{SI : sidx} (Σ : gFunctors) (St : Type) : Set :=
     HistG {
         hist_inG : histGpreS Σ St;
         hist_name : gname;
       }.
 
-  Definition histΣ `{SI : indexT} (St : Type) : gFunctors :=
+  Definition histΣ `{SI : sidx} (St : Type) : gFunctors :=
     #[GFunctor (mono_listUR (leibnizO St))
       ].
 
-  Global Instance subG_histΣ `{SI : indexT} {Σ} {St} : subG (histΣ St) Σ → (histGpreS Σ St).
+  Global Instance subG_histΣ `{SI : sidx} {Σ} {St} : subG (histΣ St) Σ → (histGpreS Σ St).
   Proof. solve_inG. Qed.
 
 End histGS.
@@ -34,7 +35,7 @@ Import histGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances hist_inG histGpreS_hist.
 
-Local Definition hG_history_auth_def `{SI : indexT} `{@histGS SI Σ St}
+Local Definition hG_history_auth_def `{SI : sidx} `{@histGS SI Σ St}
   (h : list St) : iProp Σ :=
   (own hist_name (●ML (h : list (leibnizO _))))%I.
 Local Definition hG_history_auth_aux : seal (@hG_history_auth_def). Proof. by eexists. Qed.
@@ -43,7 +44,7 @@ Local Definition hG_history_auth_unseal :
   @hG_history_auth = @hG_history_auth_def := hG_history_auth_aux.(seal_eq).
 Global Arguments hG_history_auth {SI Σ St _}.
 
-Local Definition hG_event_def `{SI : indexT} `{@histGS SI Σ St}
+Local Definition hG_event_def `{SI : sidx} `{@histGS SI Σ St}
   (n : nat) (e : St) : iProp Σ :=
   (∃ (h : list St), (⌜ length h = (S n) ∧ last h = Some e ⌝) ∧ own hist_name (◯ML (h : list (leibnizO _))))%I.
 Local Definition hG_event_aux : seal (@hG_event_def). Proof. by eexists. Qed.
@@ -54,7 +55,7 @@ Global Arguments hG_event {SI Σ St _}.
 
 (** Properties *)
 Section proof.
-  Context `{SI : indexT} `{HIST : !histGS Σ St}.
+  Context `{SI : sidx} `{HIST : !histGS Σ St}.
 
   Global Instance hG_history_auth_timeless h : Timeless (hG_history_auth h).
   Proof. rewrite hG_history_auth_unseal /hG_history_auth_def. apply _. Qed.
@@ -98,7 +99,7 @@ End proof.
 
 (** State interpretation and predicates defined by the language,
     with the thread ids to connect to the obligation model. *)
-Class state_interp_class `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
+Class state_interp_class `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
   { state_interp : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
     (** Auxiliary data about the state.
         For example, we might want to hold some of state_pred_interp inside the lwp. *)
@@ -107,14 +108,14 @@ Class state_interp_class `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
     state_interp_wf : (∀ σ Θ κs π, (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ π ⌝);
   }.
 
-Definition history_interp `{SI : indexT} `{@state_interp_class SI Λ Σ}
+Definition history_interp `{SI : sidx} `{@state_interp_class SI Λ Σ}
   `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   (h : list ((state Λ) * (thread_pool Λ) * (list (observation Λ))))
   (n : nat) σ Θ κs : iProp Σ :=
   (⌜ length h = (S n) ∧ last h = Some ((σ, Θ), κs) ⌝ ∗ hG_history_auth h ∗ state_interp σ Θ κs)%I.
 Global Instance: Params (@history_interp) 5 := {}.
 
-Local Definition event_pred_def `{SI : indexT} `{@state_interp_class SI Λ Σ}
+Local Definition event_pred_def `{SI : sidx} `{@state_interp_class SI Λ Σ}
   `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   (n : nat) σ Θ κs (π : state_pred Λ) : iProp Σ :=
   (hG_event n (σ, Θ, κs) ∗ ⌜ state_sat σ Θ π ⌝)%I.
@@ -126,7 +127,7 @@ Global Arguments event_pred {SI Λ Σ _ _}.
 
 (** Properties *)
 Section hist.
-  Context `{SI : indexT} `{SIC : @state_interp_class SI Λ Σ}.
+  Context `{SI : sidx} `{SIC : @state_interp_class SI Λ Σ}.
   Context `{HIST : @histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}.
 
   Global Instance event_pred_persistent n σ Θ κs π : Persistent (event_pred n σ Θ κs π).
@@ -200,7 +201,7 @@ End hist.
 
 (* Allocation of a history interpretation;
    state_interp_class is user given, and we want it to come later. *)
-Lemma history_interp_init `{SI : indexT}
+Lemma history_interp_init `{SI : sidx}
   `{HIST : !histGpreS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   σ Θ κs :
   ⊢ |==> ∃ _ : histGS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ))),

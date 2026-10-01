@@ -95,22 +95,22 @@ End proof.
 
 Module uchainGS.
 
-  Class uchainGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class uchainGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
     UchainGpreS {
         uchainGpreS_log : inG Σ (mono_listUR (prod oid Ord.t));
       }.
 
-  Class uchainGS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class uchainGS `{SI : sidx} (Σ : gFunctors) : Set :=
     UchainG {
         uchain_inG : uchainGpreS Σ;
         log_name : gname;
       }.
 
-  Definition uchainΣ `{SI : indexT} : gFunctors :=
+  Definition uchainΣ `{SI : sidx} : gFunctors :=
     #[GFunctor (mono_listUR (prod oid Ord.t))
       ].
 
-  Global Instance subG_uchainΣ `{SI : indexT} {Σ} : subG (uchainΣ) Σ → (uchainGpreS Σ).
+  Global Instance subG_uchainΣ `{SI : sidx} {Σ} : subG (uchainΣ) Σ → (uchainGpreS Σ).
   Proof. solve_inG. Qed.
 
 End uchainGS.
@@ -121,7 +121,7 @@ Import uchainGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances uchain_inG uchainGpreS_log.
 
-Local Definition uchain_auth_def `{SI : indexT} `{@uchainGS SI Σ}
+Local Definition uchain_auth_def `{SI : sidx} `{@uchainGS SI Σ}
   (q : Qp) (l : list (oid * Ord.t)) : iProp Σ :=
   (⌜ uchain_log_wf l ⌝ ∗ own log_name (●ML{#q} l))%I.
 Local Definition uchain_auth_aux : seal (@uchain_auth_def). Proof. by eexists. Qed.
@@ -130,7 +130,7 @@ Local Definition uchain_auth_unseal :
   @uchain_auth = @uchain_auth_def := uchain_auth_aux.(seal_eq).
 Global Arguments uchain_auth {SI Σ _}.
 
-Local Definition uchain_pin_def `{SI : indexT} `{@uchainGS SI Σ}
+Local Definition uchain_pin_def `{SI : sidx} `{@uchainGS SI Σ}
   (e : oid * Ord.t) : iProp Σ :=
   (∃ (l : list (oid * Ord.t)),
       (⌜ last l = Some e ∧ uchain_log_wf l ⌝) ∧ own log_name (◯ML l))%I.
@@ -140,14 +140,14 @@ Local Definition uchain_pin_unseal :
   @uchain_pin = @uchain_pin_def := uchain_pin_aux.(seal_eq).
 Global Arguments uchain_pin {SI Σ _}.
 
-Fixpoint tf_until_chain_rec `{SI : indexT} {Π} {Σ}
+Fixpoint tf_until_chain_rec `{SI : sidx} {Π} {Σ}
   (N : namespace) k (o : Ord.t) (P Q : @tf SI Π Σ) (ACC : Acc Ord.lt o) {struct ACC} : tf Σ :=
   (tf_until N k false (1/2) P (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), tf_until_chain_rec N k' o' P Q (Acc_inv ACC LTo))))%F.
 
-Definition tf_until_chain `{SI : indexT} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) : tf Σ :=
+Definition tf_until_chain `{SI : sidx} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) : tf Σ :=
   tf_until_chain_rec N k o P Q (Ord.lt_well_founded o).
 
-Lemma tf_until_chain_rec_proof_irrelevance `{SI : indexT} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) ACC1 ACC2 :
+Lemma tf_until_chain_rec_proof_irrelevance `{SI : sidx} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) ACC1 ACC2 :
   tf_until_chain_rec N k o P Q ACC1 = tf_until_chain_rec N k o P Q ACC2.
 Proof.
   revert k ACC1 ACC2. induction o as [o IH] using (well_founded_ind Ord.lt_well_founded).
@@ -156,7 +156,7 @@ Proof.
   eapply IH. auto.
 Qed.
 
-Lemma tf_until_chain_unfold `{SI : indexT} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) :
+Lemma tf_until_chain_unfold `{SI : sidx} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) :
   tf_until_chain N k o P Q = 
   (tf_until N k false (1/2) P (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), tf_until_chain N k' o' P Q)))%F.
 Proof.
@@ -165,7 +165,7 @@ Proof.
   apply tf_until_chain_rec_proof_irrelevance.
 Qed.
 
-Definition tf_until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ}
+Definition tf_until_chain_log `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ}
   (N : namespace) (P Q R : tf Σ) : tf Σ :=
   locked
     (∃ (l : list (oid * Ord.t)) k o,
@@ -176,7 +176,7 @@ Definition tf_until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_inter
            (⟨uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_discharged k⟩ ∗ R))
     )%F.
 
-Definition until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ}
+Definition until_chain_log `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ}
   (N : namespace) (P Q R : tf Σ) : iProp Σ :=
   locked
     (∃ (l : list (oid * Ord.t)) k o,
@@ -187,7 +187,7 @@ Definition until_chain_log `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_c
                   ((uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_discharged k) ∗ ⟦R⟧ₗ))
     )%I.
 
-Lemma tf_until_chain_log_red `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ} N P Q R :
+Lemma tf_until_chain_log_red `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ} N P Q R :
   ⟦tf_until_chain_log N P Q R⟧ₗ ⊣⊢ until_chain_log N P Q R.
 Proof.
   rewrite /tf_until_chain_log /until_chain_log -!lock.

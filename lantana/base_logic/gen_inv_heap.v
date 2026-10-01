@@ -23,34 +23,34 @@ keep all the other proofs that do not need it conservative.  *)
 Definition inv_heapN: namespace := nroot .@ "inv_heap".
 Local Notation "l ↦ v" := (pointsto l (DfracOwn 1) v) (at level 20) : bi_scope.
 
-Definition inv_heap_mapUR `{SI: indexT} (L V : Type) `{Countable L} : ucmra := gmapUR L $ prodR
+Definition inv_heap_mapUR `{SI: sidx} (L V : Type) `{Countable L} : ucmra := gmapUR L $ prodR
   (optionR $ exclR $ leibnizO V)
   (agreeR (V -d> PropO)).
 
-Definition to_inv_heap `{SI: indexT} {L V : Type} `{Countable L}
+Definition to_inv_heap `{SI: sidx} {L V : Type} `{Countable L}
     (h: gmap L (V * (V -d> PropO))) : inv_heap_mapUR L V :=
   prod_map (λ x, Excl' x) to_agree <$> h.
 
-Class inv_heapGpreS `{SI: indexT} (L V : Type) (Σ : gFunctors) `{Countable L} := {
+Class inv_heapGpreS `{SI: sidx} (L V : Type) (Σ : gFunctors) `{Countable L} := {
   #[local] inv_heapGpreS_inG :: inG Σ (authR (inv_heap_mapUR L V))
 }.
 
-Class inv_heapGS `{SI: indexT} (L V : Type) (Σ : gFunctors) `{Countable L} := Inv_HeapG {
+Class inv_heapGS `{SI: sidx} (L V : Type) (Σ : gFunctors) `{Countable L} := Inv_HeapG {
   #[local] inv_heap_inG :: inv_heapGpreS L V Σ;
   inv_heap_name : gname
 }.
 Global Arguments Inv_HeapG {_} _ _ {_ _ _ _}.
 Global Arguments inv_heap_name {_ _ _ _ _ _} _ : assert.
 
-Definition inv_heapΣ `{SI: indexT} (L V : Type) `{Countable L} : gFunctors :=
+Definition inv_heapΣ `{SI: sidx} (L V : Type) `{Countable L} : gFunctors :=
   #[ GFunctor (authR (inv_heap_mapUR L V)) ].
 
-Global Instance subG_inv_heapGpreS `{SI: indexT} (L V : Type) `{Countable L} {Σ} :
+Global Instance subG_inv_heapGpreS `{SI: sidx} (L V : Type) `{Countable L} {Σ} :
   subG (inv_heapΣ L V) Σ → inv_heapGpreS L V Σ.
 Proof. solve_inG. Qed.
 
 Section definitions.
-  Context `{SI: indexT} {L V : Type} `{Countable L}.
+  Context `{SI: sidx} {L V : Type} `{Countable L}.
   Context `{!invGS Σ, !gen_heapGS L V Σ, gG: !inv_heapGS L V Σ}.
 
   Definition inv_heap_inv_P : iProp Σ :=
@@ -82,7 +82,7 @@ Global Instance: Params (@inv_pointsto_own) 8 := {}.
 Global Instance: Params (@inv_pointsto) 7 := {}.
 
 Section to_inv_heap.
-  Context `{SI: indexT} {L V : Type} `{Countable L}.
+  Context `{SI: sidx} {L V : Type} `{Countable L}.
   Implicit Types (h : gmap L (V * (V -d> PropO))).
 
   Lemma to_inv_heap_valid h : ✓ to_inv_heap h.
@@ -113,7 +113,7 @@ Section to_inv_heap.
   Qed.
 End to_inv_heap.
 
-Lemma inv_heap_init `{SI: indexT} (L V : Type) `{Countable L, !invGS Σ, !gen_heapGS L V Σ, !inv_heapGpreS L V Σ} E :
+Lemma inv_heap_init `{SI: sidx} (L V : Type) `{Countable L, !invGS Σ, !gen_heapGS L V Σ, !inv_heapGpreS L V Σ} E :
   ⊢ |==> ∃ _ : inv_heapGS L V Σ, |={E}=> inv_heap_inv L V.
 Proof.
   iMod (own_alloc (● (to_inv_heap ∅))) as (γ) "H●".
@@ -126,7 +126,7 @@ Proof.
 Qed.
 
 Section inv_heap.
-  Context `{SI: indexT} {L V : Type} `{Countable L}.
+  Context `{SI: sidx} {L V : Type} `{Countable L}.
   Context `{!invGS Σ, !gen_heapGS L V Σ, gG: !inv_heapGS L V Σ}.
   Implicit Types (l : L) (v : V) (I : V → Prop).
   Implicit Types (h : gmap L (V * (V -d> PropO))).

@@ -8,6 +8,8 @@ From lantana.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 From iris.algebra.lib Require Import dfrac_agree.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map.
+(* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
+From lantana.base_logic Require Import later_credits.
 
 (** FIXME: move to more general directory *)
 Section FIXME.
@@ -75,7 +77,7 @@ Class ticket_lockG Σ :=
       #[local] tlock_oblG :: ghost_mapG Σ Z (option oid);
       #[local] tlock_tokenG :: ghost_varG Σ (Z);
       #[local] tlock_config_inG :: inG Σ (auth_mraUR (ord.le));
-      (* FIXME: update ghost_var in param Iris and use that. *)
+      (* FIXME: update ghost_var_frac in param Iris and use that. *)
       #[local] tlock_alive_inG :: inG Σ (dfrac_agreeR unit);
     }.
 
@@ -145,8 +147,8 @@ Section proof.
 
   Local Definition lock_token_inv γo γk (curr : loc) (R : tf Σ) : iProp Σ :=
     ∃ (c : Z),
-      (ghost_var γk 1 (c)) ∨
-        (∃ κ, ghost_var γk (1/2) (c) ∗
+      (ghost_var_frac γk 1 (c)) ∨
+        (∃ κ, ghost_var_frac γk (1/2) (c) ∗
               (curr ↦{#(1/2 + 1/2/2)} #c) ∗
               ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
               ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ).
@@ -158,8 +160,8 @@ Section proof.
          (obls : gmap Z (option oid)),
           next ↦ #n ∗
           curr ↦{#(1/2/2)} #c ∗
-          ghost_map_auth γt 1 tickets ∗
-          ghost_map_auth γo 1 obls ∗
+          ghost_map_auth_frac γt 1 tickets ∗
+          ghost_map_auth_frac γo 1 obls ∗
           (⌜(dom tickets = dom obls)%Z⌝) ∗
           (⌜(0 ≤ c ≤ n)%Z⌝) ∗
           (⌜ ∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z ⌝) ∗
@@ -194,7 +196,7 @@ Section proof.
       inv N_tk (lock_token_inv (ticketlock_γo γ) (ticketlock_γk γ) curr R).
 
   Local Definition lock_token_def (γ : ticketlock_γ) κu : iProp Σ :=
-    ∃ (c : Z), ghost_var (ticketlock_γk γ) (1/2) (c) ∗
+    ∃ (c : Z), ghost_var_frac (ticketlock_γk γ) (1/2) (c) ∗
                ((c + 1)%Z ↪[(ticketlock_γt γ)]□ (None : option (ocid * ord.t * measure))) ∗
                ((c + 1)%Z ↪[(ticketlock_γo γ)]□ (Some κu)).
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
@@ -424,7 +426,7 @@ Section proof.
       iApply sfgupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
-      iApply (lc_fupd_add_later with "LC1"). iNext.
+      iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
       iDestruct "H" as "(%& [GV | (%& GV& PtrCurr1& GMEo1& HE1)])"; cycle 1.
       { iCombine "PtrCurr0 PtrCurr1" gives %HPC. destruct HPC. done. }
       iMod (ghost_var_update (my) with "GV") as "[GV0 GV]".
@@ -472,7 +474,7 @@ Section proof.
     iModIntro.
     iApply fupd_lwp. iInv "INV" as "H".
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "[H | H]".
     { iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL. destruct HAL.
       apply dfrac_valid_own_r in H. done. }
@@ -539,7 +541,7 @@ Section proof.
       iApply sfgupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
-      iApply (lc_fupd_add_later with "LC1"). iNext.
+      iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
       iDestruct "H" as "(%& [GV | (%& GV& PtrCurr1& GMEo1& HE1)])"; cycle 1.
       { iCombine "PtrCurr0 PtrCurr1" gives %HPC. destruct HPC. done. }
       iMod (ghost_var_update (my) with "GV") as "[GV GV0]".
@@ -650,7 +652,7 @@ Section proof.
       iApply sfgupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
-      iApply (lc_fupd_add_later with "LC1"). iNext.
+      iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
       iDestruct "H" as "(%& [GV | (%& GV& PtrCurr1& GMEo1& HE1)])"; cycle 1.
       { iCombine "PtrCurr0 PtrCurr1" gives %HPC. destruct HPC. done. }
       iMod (ghost_var_update (my) with "GV") as "[GV GV0]".
@@ -798,7 +800,7 @@ Section proof.
     (** Exchange token. *)
     iApply lwpupd_fupd_l. iInv "ITK" as "H".
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%& [TK | (%& GV0& PtrCurr0& #GMEo0& GEku)])".
     { iCombine "GV TK" gives %HTK. destruct HTK. done. }
     iCombine "GV0 GV" as "GV" gives %?. destruct H as [_ ->].
@@ -848,13 +850,13 @@ Section proof.
     iMod (tf_until_discharge with "GEku") as "H".
     { apply N_subseteq_1. set_solver. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
     { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
     iModIntro.
     iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
@@ -928,7 +930,7 @@ Section proof.
     (** Exchange token. *)
     iApply lwpupd_fupd_l. iInv "ITK" as "H".
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%& [TK | (%& GV0& PtrCurr0& #GMEo0& GEku)])".
     { iCombine "GV TK" gives %HTK. destruct HTK. done. }
     iCombine "GV0 GV" as "GV" gives %?. destruct H as [_ ->].
@@ -979,13 +981,13 @@ Section proof.
     iMod (tf_until_discharge with "GEku") as "H".
     { apply N_subseteq_1. set_solver. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
     { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
     iModIntro.
     iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".

@@ -1,19 +1,19 @@
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export lifting temporal_logic.
 
-Definition fuel_burning_triple `{SI : indexT} `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+Definition fuel_burning_triple `{SI : sidx} `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,
     (∀ (Φ : val Λ → iPropI Σ),
        (thP_carriers i G ∗ P) -∗
        (∀ v, thP_carriers i G' ∗ Q v -∗ Φ v) -∗
        lWP e @ s; i; E {{ v, Φ v }})%I.
 
-Definition fuel_burning_triple_persistent `{SI : indexT} `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+Definition fuel_burning_triple_persistent `{SI : sidx} `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,
     l{{{ thP_carriers i G ∗ P }}} e @ s; i; E l{{{v, RET v; thP_carriers i G' ∗ Q v }}}%I.
 
 Section proof.
-  Context `{SI : indexT} `{!lantanaGS Λ Σ}.
+  Context `{SI : sidx} `{!lantanaGS Λ Σ}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
   Implicit Types e : expr Λ.

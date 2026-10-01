@@ -170,7 +170,7 @@ Lemma lwp_store_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v {
   l{{{ thread_expr i C (#(l +ₗ off) <- v) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
-  l{{{ RET #(); thread_expr i C (of_val (#())%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ vinsert off v vs }}}.
+  l{{{ RET #(); thread_expr i C (of_val (#())%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v]> vs }}}.
 Proof.
   setoid_rewrite vec_to_list_insert. apply lwp_store_offset.
   eexists. by apply vlookup_lookup.
@@ -193,7 +193,7 @@ Lemma lwp_xchg_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v {C
   l{{{ thread_expr i C (Xchg #(l +ₗ off) v) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v @ s; i; E
-  l{{{ RET (vs !!! off); thread_expr i C (of_val ((vs !!! off))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ vinsert off v vs }}}.
+  l{{{ RET (vs !!! off); thread_expr i C (of_val ((vs !!! off))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v]> vs }}}.
 Proof.
   setoid_rewrite vec_to_list_insert. apply lwp_xchg_offset.
   by apply vlookup_lookup.
@@ -220,7 +220,7 @@ Lemma lwp_cmpxchg_suc_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val s
   l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
-  l{{{ RET (vs !!! off, #true); thread_expr i C (of_val ((vs !!! off, #true))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ vinsert off v2 vs }}}.
+  l{{{ RET (vs !!! off, #true); thread_expr i C (of_val ((vs !!! off, #true))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v2]> vs }}}.
 Proof.
   intros. setoid_rewrite vec_to_list_insert.
   apply lwp_cmpxchg_suc_offset; [|done..].
@@ -274,7 +274,7 @@ Lemma lwp_faa_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) (i1 i
   l{{{ thread_expr i C (FAA #(l +ₗ off) #i2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
-  l{{{ RET LitV (LitInt i1); thread_expr i C (of_val (LitV (LitInt i1))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ vinsert off #(i1 + i2) vs }}}.
+  l{{{ RET LitV (LitInt i1); thread_expr i C (of_val (LitV (LitInt i1))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
 Proof.
   intros. setoid_rewrite vec_to_list_insert. apply lwp_faa_offset.
   by apply vlookup_lookup.

@@ -17,7 +17,7 @@ Definition bcred_unit `{OCM.t A leR addO} : bcred :=
   BCred partition.top quotient.unit.
 
 Section bcred.
-  Context `{SI : indexT}.
+  Context `{SI : sidx}.
   Context `{OCM : OCM.t A leR addO}.
 
   Canonical Structure bcredO := leibnizO bcred.

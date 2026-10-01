@@ -1,5 +1,5 @@
 From iris.proofmode Require Import base proofmode classes.
-From iris.bi Require Export fixpoint.
+From iris.bi.lib Require Export fixpoint_mono.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.algebra Require Import ordinal_wfocm.
@@ -8,10 +8,10 @@ From transfinite.base_logic.lib Require Import ghost_map.
 
 (** All Local Definitions are only for internal uses and users should not need them. *)
 (** ** Obl predicates. *)
-Local Definition oblP_id `{SI : indexT} `{@mupdGS SI Σ} k : iProp Σ :=
+Local Definition oblP_id `{SI : sidx} `{@mupdGS SI Σ} k : iProp Σ :=
   oblG_elem k.
 
-Local Definition oblP_assigned_def `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition oblP_assigned_def `{SI : sidx} `{@mupdGS SI Σ}
   k b q : iProp Σ :=
   oblP_id k ∗ oblG_assigned k b  (q/2 + q/2/2)%Qp.
 Local Definition oblP_assigned_aux : seal (@oblP_assigned_def). Proof. by eexists. Qed.
@@ -20,7 +20,7 @@ Local Definition oblP_assigned_unseal :
   @oblP_assigned = @oblP_assigned_def := oblP_assigned_aux.(seal_eq).
 Global Arguments oblP_assigned {SI Σ _}.
 
-Local Definition oblP_discharged_def `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition oblP_discharged_def `{SI : sidx} `{@mupdGS SI Σ}
   k : iProp Σ :=
   oblP_id k ∗ oblG_discharged k.
 Local Definition oblP_discharged_aux : seal (@oblP_discharged_def). Proof. by eexists. Qed.
@@ -29,11 +29,11 @@ Local Definition oblP_discharged_unseal :
   @oblP_discharged = @oblP_discharged_def := oblP_discharged_aux.(seal_eq).
 Global Arguments oblP_discharged {SI Σ _}.
 
-Local Definition oblP_fuel_val `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition oblP_fuel_val `{SI : sidx} `{@mupdGS SI Σ}
   k α : iProp Σ :=
   oblP_id k ∗ oblG_fuel k α.
 
-Local Definition oblP_fuel_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition oblP_fuel_def `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   k ℓ μ : iProp Σ :=
   oblP_fuel_val k (measure_rep (ℓ, 1) ((1 ⊕ ▽) × μ)%M).
 Local Definition oblP_fuel_aux : seal (@oblP_fuel_def). Proof. by eexists. Qed.
@@ -42,7 +42,7 @@ Local Definition oblP_fuel_unseal :
   @oblP_fuel = @oblP_fuel_def := oblP_fuel_aux.(seal_eq).
 Global Arguments oblP_fuel {SI Σ _ _}.
 
-Local Definition oblP_variant_def `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition oblP_variant_def `{SI : sidx} `{@mupdGS SI Σ}
   k (P Q R : iProp Σ) : iProp Σ :=
   ((oblP_assigned k false (1/2)%Qp ∗ P) ∨
      (oblP_assigned k true (1/2)%Qp ∗ Q) ∨
@@ -53,7 +53,7 @@ Local Definition oblP_variant_unseal :
   @oblP_variant = @oblP_variant_def := oblP_variant_aux.(seal_eq).
 Global Arguments oblP_variant {SI Σ _}.
 
-Local Definition oblP_inv_def `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition oblP_inv_def `{SI : sidx} `{@mupdGS SI Σ}
   N k (P Q R : iProp Σ) : iProp Σ :=
   oblP_id k ∗ oblG_inv N k ((1/2)/2 + (1/2)/2/2)%Qp P Q R.
 Local Definition oblP_inv_aux : seal (@oblP_inv_def). Proof. by eexists. Qed.
@@ -63,11 +63,11 @@ Local Definition oblP_inv_unseal :
 Global Arguments oblP_inv {SI Σ _}.
 
 (** ** Witness predicates *)
-Local Definition witP_bound_val `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition witP_bound_val `{SI : sidx} `{@mupdGS SI Σ}
   k α : iProp Σ :=
   oblP_id k ∗ witG_bound k α.
 
-Local Definition witP_layer_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition witP_layer_def `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   k ℓ : iProp Σ :=
   ∃ μ, witP_bound_val k (η (measure_rep (ℓ, 1) μ)).
 Local Definition witP_layer_aux : seal (@witP_layer_def). Proof. by eexists. Qed.
@@ -76,7 +76,7 @@ Local Definition witP_layer_unseal :
   @witP_layer = @witP_layer_def := witP_layer_aux.(seal_eq).
 Global Arguments witP_layer {SI Σ _ _}.
 
-Local Definition witP_cred_def `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition witP_cred_def `{SI : sidx} `{@mupdGS SI Σ}
   k a : iProp Σ :=
   oblP_id k ∗ witG_witness k a.
 Local Definition witP_cred_aux : seal (@witP_cred_def). Proof. by eexists. Qed.
@@ -86,15 +86,15 @@ Local Definition witP_cred_unseal :
 Global Arguments witP_cred {SI Σ _}.
 
 (** ** Obligation carrier predicates *)
-Local Definition crP_bound `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition crP_bound `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   g ℓ μ : iProp Σ :=
   ocarrierG_bound g (measure_rep (ℓ, 0) μ).
 
-Local Definition crP_fuel_val `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition crP_fuel_val `{SI : sidx} `{@mupdGS SI Σ}
   s α : iProp Σ :=
   ocarrierG_fuel s α.
 
-Local Definition crP_fuel_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition crP_fuel_def `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   s ℓ μ : iProp Σ :=
   crP_fuel_val s (measure_rep (ℓ, 0) ((1 ⊕ ▽) × μ)%M).
 Local Definition crP_fuel_aux : seal (@crP_fuel_def). Proof. by eexists. Qed.
@@ -106,7 +106,7 @@ Global Arguments crP_fuel {SI Σ _ _}.
 (** Useful pattern for burning fules when taking a step *)
 Global Notation crP_fuels G n := ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n)%I.
 
-Local Definition crP_obls_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition crP_obls_def `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   g ℓ (K : oids) : iProp Σ :=
   ∃ i, othreadG_elem i ∗ ocarrierG_carrier i g K ∗ ocarrierG_thread i g ∗ ocarrierG_owned g i (1/2) ∗ (∃ μ, crP_bound g ℓ μ) ∗
   ([∗ set] k ∈ K, oblP_id k ∗ oblG_owner k i (1/2 + 1/2/2/2)%Qp ∗ othreadG_owns i k (1/2 + 1/2/2)%Qp).
@@ -117,7 +117,7 @@ Local Definition crP_obls_unseal :
 Global Arguments crP_obls {SI Σ _ _}.
 
 (** ** Thread predicates *)
-Local Definition thP_carriers_def `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition thP_carriers_def `{SI : sidx} `{@mupdGS SI Σ}
   i G : iProp Σ :=
   othreadG_elem i ∗ othreadG_exec i (1/2)%Qp ∗ ocarrierG_thread_auth i G (1/2)%Qp ∗
   ([∗ set] g ∈ G, ocarrierG_owned g i (1/2)).
@@ -127,7 +127,7 @@ Local Definition thP_carriers_unseal :
   @thP_carriers = @thP_carriers_def := thP_carriers_aux.(seal_eq).
 Global Arguments thP_carriers {SI Σ _}.
 
-Local Definition thP_done_def `{SI : indexT} `{@mupdGS SI Σ}
+Local Definition thP_done_def `{SI : sidx} `{@mupdGS SI Σ}
   i : iProp Σ :=
   othreadG_elem i ∗ othreadG_done i.
 Local Definition thP_done_aux : seal (@thP_done_def). Proof. by eexists. Qed.
@@ -137,11 +137,11 @@ Local Definition thP_done_unseal :
 Global Arguments thP_done {SI Σ _}.
 
 (** ** Additional definitions for managing collection of fules for convenient induction *)
-Local Definition collect_fuels `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition collect_fuels `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   α (F : gmap ocid (ord.t * measure)) : iProp Σ :=
   ([∗ map] s ↦ '(l, m) ∈ F, crP_fuel_val s ((measure_rep (l, 0) ((1 ⊕ ▽) × m)%M) × α)%ord).
 
-Local Definition embed_fuels_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition embed_fuels_def `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
   (a : A) (F : gmap ocid (ord.t * measure)) : iProp Σ :=
   collect_fuels (measure_rep (0 : ord.t, 0) (⟪wf_ltA, a⟫)%M) F.
@@ -151,7 +151,7 @@ Local Definition embed_fuels_unseal :
   @embed_fuels = @embed_fuels_def := embed_fuels_aux.(seal_eq).
 Global Arguments embed_fuels {SI Σ _ _ A ltA}.
 
-Local Definition wit_fuels_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+Local Definition wit_fuels_def `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   k ℓ α (F : gmap ocid (ord.t * measure)) : iProp Σ :=
   ∃ μ, ⌜ (α <= η (measure_rep (ℓ, 1) μ))%ord ⌝ ∗ witP_bound_val k α ∗ collect_fuels α F.
 Local Definition wit_fuels_aux : seal (@wit_fuels_def). Proof. by eexists. Qed.
@@ -187,7 +187,7 @@ Ltac unfold_crP_fuel :=
   try rewrite !crP_fuel_unseal /crP_fuel_def.
 
 Section preds.
-  Context `{SI : indexT} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
 
   Section liveness_preds.
 

@@ -1,10 +1,15 @@
 ### Installation
 
-The development depends on std++ (version `dev.2025-07-31.0.8c814126`, i.e.,
-upstream commit `8c814126`), parametric Iris, and transfinite Iris, whose
-sources are bundled in this repository as `stdpp.zip`,
-`iris-parametric-index.zip`, and `transfinite-parametric-index.zip`, so no
-access to their upstream repositories is needed.
+The development depends on the following opam packages:
+
+* Rocq 9.0 -- 9.3 (`rocq-core`, `rocq-stdlib`)
+* std++ `dev.2026-09-17.0.d510b616` (`rocq-stdpp`)
+* Iris (`rocq-iris`, `rocq-iris-heap-lang`) from the branch
+  [`dongjae/transfinite-base`](https://gitlab.mpi-sws.org/dongjae/iris/-/tree/dongjae/transfinite-base),
+  which is upstream Iris master (commit `8e490959`) plus the commits of the Iris branch
+  `robbert/transfinite` that change the BI laws to support transfinite step-indexing
+* [Transfinite Iris](https://github.com/dongjaelee1/transfinite-iris) (`rocq-iris-transfinite`)
+* The Ordinal library `coq-ordinal.0.5.6`
 
 1. Set up a new opam switch and switch to it:
   ```
@@ -17,10 +22,12 @@ access to their upstream repositories is needed.
   ```
   ./configure
   ```
-  This installs Coq 9.0.0 and the Ordinal library via opam, and then unpacks
-  the bundled zip files into `vendor/` and builds and installs std++,
-  parametric Iris, and transfinite Iris from them. Set `NJOBS` to control
-  build parallelism (default 8), e.g. `NJOBS=4 ./configure`.
+  This adds the `coq-released` and `iris-dev` opam repositories, pins Iris and
+  Transfinite Iris to the commits listed at the top of `configure`, and installs
+  all of the packages above. Set `NJOBS` to control build parallelism (default 8),
+  e.g. `NJOBS=4 ./configure`. To use another commit of Transfinite Iris, set
+  `TRANSFINITE_REPO`/`TRANSFINITE_REF`; the Iris commit in `configure` must match the
+  one that Transfinite Iris's opam file pins in its `pin-depends`.
 
 3. Run `make -jN` to build the full development, where `N` is the number of
    threads to use for the build process.

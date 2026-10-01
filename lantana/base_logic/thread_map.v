@@ -7,30 +7,30 @@ Import uPred.
 Local Notation thread_map P V := (gmap P V).
 
 (** The CMRA we need. *)
-Class thread_mapGpreS `{SI: indexT} (P V : Type) (Σ : gFunctors) `{Countable P} := {
+Class thread_mapGpreS `{SI: sidx} (P V : Type) (Σ : gFunctors) `{Countable P} := {
   #[local] thread_map_GpreS_inG :: ghost_mapG Σ P V
 }.
 
-Class thread_mapGS `{SI: indexT} (P V : Type) (Σ : gFunctors) `{Countable P} := ThreadMapGS {
+Class thread_mapGS `{SI: sidx} (P V : Type) (Σ : gFunctors) `{Countable P} := ThreadMapGS {
   #[local] thread_map_inG :: thread_mapGpreS P V Σ;
   thread_map_name : gname
 }.
 Global Arguments thread_map_name {_ _ _ _ _ _} _ : assert.
 
-Definition thread_mapΣ `{SI: indexT} (P V : Type) `{Countable P} : gFunctors :=
+Definition thread_mapΣ `{SI: sidx} (P V : Type) `{Countable P} : gFunctors :=
   #[ghost_mapΣ P V].
 
-Global Instance subG_thread_mapGpreS `{SI: indexT} {Σ P V} `{Countable P} :
+Global Instance subG_thread_mapGpreS `{SI: sidx} {Σ P V} `{Countable P} :
   subG (thread_mapΣ P V) Σ → thread_mapGpreS P V Σ.
 Proof. solve_inG. Qed.
 
 Section definitions.
-  Context `{SI: indexT} `{tG : thread_mapGS P V Σ}.
+  Context `{SI: sidx} `{tG : thread_mapGS P V Σ}.
   Implicit Types R : thread_map P V.
   Implicit Types p : P.
 
   Definition thread_map_interp (Θ : gset P) R : iProp Σ :=
-    (⌜dom R = Θ⌝ ∗ ghost_map_auth (thread_map_name tG) 1 R)%I.
+    (⌜dom R = Θ⌝ ∗ ghost_map_auth_frac (thread_map_name tG) 1 R)%I.
 
   Local Definition thread_def (p : P) (b : bool) (v : V) (q : Qp) : iProp Σ :=
     (if b then p ↪[thread_map_name tG]{#q} v else p ↪[thread_map_name tG]□ v)%I.
@@ -39,7 +39,7 @@ Section definitions.
   Local Definition thread_unseal : @thread = @thread_def := thread_aux.(seal_eq).
 End definitions.
 
-Lemma thread_map_init `{SI: indexT} `{Countable P, !thread_mapGpreS P V Σ} τs :
+Lemma thread_map_init `{SI: sidx} `{Countable P, !thread_mapGpreS P V Σ} τs :
   ⊢ |==> ∃ _ : thread_mapGS P V Σ, thread_map_interp (dom τs) τs ∗ ([∗ map] p↦v ∈ τs, thread p true v 1).
 Proof.
   iMod (ghost_map_alloc τs) as (γ) "[Hh M]".

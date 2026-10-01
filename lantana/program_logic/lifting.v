@@ -5,7 +5,7 @@ From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export weakestpre.
 From lantana.algebra Require Import ordinal_wfocm.
 
-Class PureExecSI `{SI : indexT} `{!lantanaGS Λ Σ}
+Class PureExecSI `{SI : sidx} `{!lantanaGS Λ Σ}
     (ς : thread_id → expr Λ → iProp Σ) i :=
   pure_exec_si : ∀ K e1 e2 σ Θ κ,
   LanguageCtx K → Θ !! i = Some (K e1) → prim_step i e1 σ (dom Θ) [] e2 σ ∅ →
@@ -13,7 +13,7 @@ Class PureExecSI `{SI : indexT} `{!lantanaGS Λ Σ}
    ⊢ |==> (ς i e2 ∗ state_interp σ (<[i:=K e2]>Θ) κ ∗ state_interp_aux σ (<[i:=K e2]>Θ) κ)).
 
 Section lifting.
-  Context `{SI : indexT} `{!lantanaGS Λ Σ}.
+  Context `{SI : sidx} `{!lantanaGS Λ Σ}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
   Implicit Types e : expr Λ.
@@ -135,7 +135,7 @@ Section lifting.
     rewrite !map_union_empty. rewrite app_nil_l.
     iDestruct "Hσ" as "[HI SIa]".
     iPoseProof (history_interp_step _ _ _ σ2 _ (<[i:=K e2]> Θ) with "HI") as "(SI& ACC)".
-    iMod (pure_exec_si _ _ _ _ _ _ HK HΘ H with "[$Hc $SI $SIa]") as "(Hc& SI& SIa)".
+    iMod (pure_exec_si (ς:=ς) _ _ _ _ _ _ HK HΘ H with "[$Hc $SI $SIa]") as "(Hc& SI& SIa)".
     iMod ("ACC" with "[$SI]") as "$".
     iIntros "!> Tb Wcs Efs". iMod ("H" with "[//] Hc Tb Wcs") as "H".
     iMod "Hclose" as "_". iMod "H". iModIntro. rewrite big_sepM_empty. iFrame.

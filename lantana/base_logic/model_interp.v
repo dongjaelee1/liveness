@@ -1,31 +1,32 @@
 From iris.algebra Require Import mono_list.
-From iris.bi.lib Require Import cmra fractional.
+From iris.bi Require Import cmra.
+From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From lantana.base_logic Require Export obligation.
 
-Canonical Structure oblO `{SI : indexT} `{OC : obl_class} := leibnizO obl.
+Canonical Structure oblO `{SI : sidx} `{OC : obl_class} := leibnizO obl.
 
 (** The ghost state for model history. *)
 Module mhistGS.
 
-  Class mhistGpreS `{SI : indexT} (Σ : gFunctors) `{OC : obl_class} : Set :=
+  Class mhistGpreS `{SI : sidx} (Σ : gFunctors) `{OC : obl_class} : Set :=
     MhistGpreS {
         mhistGpreS_hist : inG Σ (mono_listUR (prod nat obls));
       }.
 
-  Class mhistGS `{SI : indexT} (Σ : gFunctors) `{OC : obl_class} : Set :=
+  Class mhistGS `{SI : sidx} (Σ : gFunctors) `{OC : obl_class} : Set :=
     MhistG {
         mhist_inG : mhistGpreS Σ;
         hist_name : gname;
       }.
 
-  Definition mhistΣ `{SI : indexT} `{OC : obl_class} : gFunctors :=
+  Definition mhistΣ `{SI : sidx} `{OC : obl_class} : gFunctors :=
     #[GFunctor (mono_listUR (prod nat obls))
       ].
 
-  Global Instance subG_mhistΣ `{SI : indexT} {Σ} `{OC : obl_class} : subG (mhistΣ) Σ → (mhistGpreS Σ).
+  Global Instance subG_mhistΣ `{SI : sidx} {Σ} `{OC : obl_class} : subG (mhistΣ) Σ → (mhistGpreS Σ).
   Proof. solve_inG. Qed.
 
 End mhistGS.
@@ -119,7 +120,7 @@ Section proof.
 
 End proof.
 
-Local Definition mhG_history_auth_def `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
+Local Definition mhG_history_auth_def `{SI : sidx} `{OC : obl_class} `{@mhistGS SI Σ OC}
   (h : list (nat * obls)) : iProp Σ :=
   (⌜ model_history_wf h ⌝ ∗ own hist_name (●ML h))%I.
 Local Definition mhG_history_auth_aux : seal (@mhG_history_auth_def). Proof. by eexists. Qed.
@@ -128,7 +129,7 @@ Local Definition mhG_history_auth_unseal :
   @mhG_history_auth = @mhG_history_auth_def := mhG_history_auth_aux.(seal_eq).
 Global Arguments mhG_history_auth {SI OC Σ _}.
 
-Local Definition mhG_event_def `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
+Local Definition mhG_event_def `{SI : sidx} `{OC : obl_class} `{@mhistGS SI Σ OC}
   (i : nat) (e : nat * obls)  : iProp Σ :=
   (∃ (h : list (nat * obls)),
       (⌜ length h = (S i) ∧ last h = Some e ∧ model_history_wf h ⌝) ∧ own hist_name (◯ML h))%I.
@@ -140,7 +141,7 @@ Global Arguments mhG_event {SI OC Σ _}.
 
 (** Properties *)
 Section proof.
-  Context `{SI : indexT} `{OC : obl_class} `{HIST : !mhistGS Σ}.
+  Context `{SI : sidx} `{OC : obl_class} `{HIST : !mhistGS Σ}.
 
   Global Instance mhG_history_auth_timeless h : Timeless (mhG_history_auth h).
   Proof. rewrite mhG_history_auth_unseal /mhG_history_auth_def. apply _. Qed.
@@ -207,13 +208,13 @@ Section proof.
 
 End proof.
 
-Definition model_history_interp `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
+Definition model_history_interp `{SI : sidx} `{OC : obl_class} `{@mhistGS SI Σ OC}
   (h : list (prod nat obls)) (i n : nat) (Ω : obls) : iProp Σ :=
   locked (⌜ length h = (S i) ∧ last h = Some (n, Ω) ⌝ ∗ mhG_history_auth h)%I.
 Global Typeclasses Opaque model_history_interp.
 Global Instance: Params (@model_history_interp) 4 := {}.
 
-Local Definition event_obl_def `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
+Local Definition event_obl_def `{SI : sidx} `{OC : obl_class} `{@mhistGS SI Σ OC}
   (i : nat) (e : nat * obls) (k : oid) (o : obl) : iProp Σ :=
   (mhG_event i e ∗ ⌜ e.2 !! k = Some o ⌝)%I.
 Local Definition event_obl_aux : seal (@event_obl_def). Proof. by eexists. Qed.
@@ -223,13 +224,13 @@ Local Definition event_obl_unseal :
 Global Arguments event_obl {SI OC Σ _}.
 
 (* We use this to record that Until was alive at this point of execution. *)
-Definition event_obl_alive `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
+Definition event_obl_alive `{SI : sidx} `{OC : obl_class} `{@mhistGS SI Σ OC}
   (i : nat) (e : nat * obls) (k : oid) : iProp Σ :=
   (∃ o, event_obl i e k o ∧ ⌜ obl_le o obl_discharged ⌝).
 
 (** Properties *)
 Section hist.
-  Context `{SI : indexT} `{OC : obl_class} `{HIST : !mhistGS Σ}.
+  Context `{SI : sidx} `{OC : obl_class} `{HIST : !mhistGS Σ}.
 
   Global Instance model_history_interp_timeless h i n Ω : Timeless (model_history_interp h i n Ω).
   Proof. rewrite /model_history_interp -lock. apply _. Qed.
@@ -315,7 +316,7 @@ Section hist.
 End hist.
 
 (* Allocation of a history interpretation. *)
-Lemma model_history_interp_init `{SI : indexT} `{OC : obl_class} `{!mhistGpreS Σ} n Ω :
+Lemma model_history_interp_init `{SI : sidx} `{OC : obl_class} `{!mhistGpreS Σ} n Ω :
   ⊢ |==> ∃ _ : mhistGS Σ, model_history_interp [(n, Ω)] 0 n Ω.
 Proof.
   iMod (own_alloc (●ML ([(n, Ω)]) : mono_listUR (prod nat obls))) as (γH) "HH";

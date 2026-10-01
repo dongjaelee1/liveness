@@ -252,10 +252,10 @@ Section adequacy.
     set (HlantanaGS := @heapGS_lantanaGS Σ HHeapGS).
     iExists (lantana_state_interp_class), (@fork_post Σ), (@Ψs Σ).
     iSplitL "HI TI PI".
-    { by iFrame. }
+    { iDestruct "PI" as "[PI _]". by iFrame. }
     iSplitR; first done.
     iModIntro. iIntros "LC TGs".
-    iMod (main_pre Θ0 i with "[Tis] [TGs]") as "H".
+    iMod (main_pre (heapGS0:=HHeapGS) (handoffG0:=HandoffG Σ _) Θ0 i with "[Tis] [TGs]") as "H".
     { done. }
     { reflexivity. }
     { reflexivity. }
@@ -265,8 +265,6 @@ Section adequacy.
     iModIntro. iExists (Φ_tf μ). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
-    (* TODO: FIXME? *)
-    Unshelve. apply HandoffG. apply _.
   Qed.
 
 End adequacy.

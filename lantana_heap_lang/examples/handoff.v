@@ -6,6 +6,8 @@ From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_var.
+(* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
+From lantana.base_logic Require Import later_credits.
 
 Module Handoff.
 
@@ -80,10 +82,10 @@ Section proof.
               l{{{ rv, RET rv; thread_expr i C (of_val rv) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}})%I.
 
   Definition handoff_inv (b : loc) γd ℓ : iProp Σ :=
-    ∃ g, (b ↦{#(1/2)} NONEV ∗ ghost_var γd (1/2)%Qp g ∗ crP_obls g ℓ ∅) ∨
-           (∃ (f a : val) K, b ↦ SOMEV (f, a) ∗ ghost_var γd (1/2)%Qp (g) ∗
+    ∃ g, (b ↦{#(1/2)} NONEV ∗ ghost_var_frac γd (1/2)%Qp g ∗ crP_obls g ℓ ∅) ∨
+           (∃ (f a : val) K, b ↦ SOMEV (f, a) ∗ ghost_var_frac γd (1/2)%Qp (g) ∗
                              crP_obls g ℓ K ∗ is_task ℓ f a K) ∨
-           (∃ (f a : val), b ↦ SOMEV (f, a) ∗ ghost_var γd (1)%Qp g).
+           (∃ (f a : val), b ↦ SOMEV (f, a) ∗ ghost_var_frac γd (1)%Qp g).
 
   Definition is_handoff (b : loc) (γ : handoff_γ) ℓ : iProp Σ :=
     ⟦alwaysP Na (⟨handoff_inv b (handoff_γd γ) ℓ⟩)⟧ₗ.
@@ -94,7 +96,7 @@ Section proof.
 
   Lemma is_handoff_initialize E b ℓ g :
      b ↦{#(1/2)} NONEV -∗ crP_obls g ℓ ∅
-    ={E}=∗ ∃ γ, is_handoff b γ ℓ ∗ ghost_var (handoff_γd γ) (1/2)%Qp g.
+    ={E}=∗ ∃ γ, is_handoff b γ ℓ ∗ ghost_var_frac (handoff_γd γ) (1/2)%Qp g.
   Proof.
     iIntros "Ptr Co".
     iMod (ghost_var_alloc g) as "(%& [Gv Gv0])".
@@ -145,7 +147,7 @@ Section proof.
   Lemma Handoff_receive_spec :
     ⊢ ∃ μ, ∀ lc i b g γ ℓ C,
     l{{{ thread_expr i C (Handoff.receive #(b : loc)) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g ℓ μ) ∗
-         ghost_var (handoff_γd γ) (1/2)%Qp g ∗
+         ghost_var_frac (handoff_γd γ) (1/2)%Qp g ∗
          is_handoff b γ ℓ }}}
       Handoff.receive #b @ i
     l{{{ v, RET v; thread_expr i C (of_val v) ∗ £ lc ∗ thP_carriers i ∅ }}}.

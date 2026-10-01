@@ -1,4 +1,4 @@
-From iris.proofmode Require Import tactics.
+From iris.proofmode Require Import proofmode.
 From stdpp Require Import fin_maps.
 
 Notation tree V := (gmap V (gset V)).

@@ -109,7 +109,7 @@ Section proof.
     own γ (to_dfrac_agree (DfracOwn q) l).
 
   Definition queue_worker γ (g : ocid) : iProp Σ :=
-    ghost_var (queue_γd γ) (1/2)%Qp (g).
+    ghost_var_frac (queue_γd γ) (1/2)%Qp (g).
 
   Local Fixpoint queue_contents (lh lt : loc) (vs : list (val * oids)) (φ : val → oids → iProp Σ) : iProp Σ :=
     match vs with
@@ -121,7 +121,7 @@ Section proof.
   Local Definition queue_inv (ℓ : ord.t) γq γd : iProp Σ :=
     (∃ (vs : list (val * oids)) (g : ocid),
         qG_queue γq vs (1/2)%Qp ∗
-        ghost_var γd (1/2)%Qp (g) ∗
+        ghost_var_frac γd (1/2)%Qp (g) ∗
         ⌜ disjoint_list_of_sets (vs.*2) ⌝ ∗
         crP_obls g ℓ (union_list_of_sets (vs.*2)) ∗
         ([∗ list] n ↦ B ∈ (vs.*2), [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (S n)%M))%I.
@@ -148,7 +148,7 @@ Section proof.
     (∃ (lhptr ltptr : loc) (tl : val),
         ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
         qG_queue (queue_γq γ) [] (1/2)%Qp ∗
-        ghost_var (queue_γd γ) 1 (inhabitant : ocid) ∗
+        ghost_var_frac (queue_γd γ) 1 (inhabitant : ocid) ∗
         (queue_ticketlock_γ γ) ↪LOCK_AL□ ∗
         (queue_ticketlock_γ γ) ↪LOCK_CF□ 0 ∗
         is_fair_lock tl (queue_ticketlock_γ γ) (⟨queue_lock φ (queue_γq γ) lhptr ltptr⟩))%I.

@@ -7,6 +7,8 @@ From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_map.
+(* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
+From lantana.base_logic Require Import later_credits.
 
 (** FIXME: move to more general directory *)
 Section FIXME.
@@ -109,7 +111,7 @@ Section proof.
     ∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
       next ↦ #n ∗
       curr ↦{#(1/2)} #c ∗
-      (ghost_map_auth γt 1 tickets ∗ ghost_map_auth γa 1 acks) ∗
+      (ghost_map_auth_frac γt 1 tickets ∗ ghost_map_auth_frac γa 1 acks) ∗
       (⌜(dom tickets = dom acks)%Z⌝) ∗
       (⌜(0 ≤ c ≤ n)%Z⌝) ∗
       (⌜ ∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z ⌝) ∗
@@ -351,7 +353,7 @@ Section proof.
     iModIntro.
     iApply fupd_lwp. iInv "INV" as "H".
     iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
     iPoseProof (ghost_map_lookup with "GMAt GMEtku") as "%LUt".
     (* Retrieve previous witness *)
@@ -525,13 +527,13 @@ Section proof.
     iMod (tf_until_discharge with "GEku") as "H".
     1: apply N_subseteq_1.
     iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
     { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
     iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
-    iApply (lc_fupd_add_later with "LC1"). iNext.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
     iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
     iModIntro. iMod ("ACCinv" with "[$PtrNext $GMAt $GMAa HMa Hc PtrCurr0 $PtrCurr Hmt1 HMt HR]") as "_".

@@ -5,7 +5,7 @@
 
 From iris.prelude Require Import options.
 From iris.algebra Require Export auth.
-From iris.bi Require Import lib.cmra.
+From iris.bi Require Import cmra.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Export own.
 From transfinite.stepindex Require Export utils.
@@ -17,7 +17,7 @@ From lantana.base_logic Require Export relational_updates.
 Section aux.
 
   (* existential property preserved over injections *)
-  Lemma type_inj_existential@{i j} (X : Type@{i}) (Y : Type@{j}) (SI : indexT) (f : X → Y) :
+  Lemma type_inj_existential@{i j} (X : Type@{i}) (Y : Type@{j}) (SI : sidx) (f : X → Y) :
     TypeExistentialProperty Y SI →
     Inj eq eq f →
     TypeExistentialProperty X SI.
@@ -27,7 +27,7 @@ Section aux.
     - intros y a b Hlt [x [fx HP]]. exists x; split; eauto.
     - intros n; destruct (Hwit n) as [x HP]. exists (f x), x.
       by split.
-    - specialize (Hy index_zero) as Hzero.
+    - specialize (Hy 0ᵢ) as Hzero.
       destruct Hzero as [x [fx HP]].
       exists x. intros n. destruct (Hy n) as [x' [fx' HP']].
       rewrite -fx' in fx. by rewrite (inj f x x' fx).
@@ -52,7 +52,7 @@ End aux.
    [auth_rupd_next], a number of compatibility properties.
 *)
 
-Class auth_rupd `{SI : indexT} (A : ucmra) := {
+Class auth_rupd `{SI : sidx} (A : ucmra) := {
     auth_rupd_discrete :: CmraDiscrete A;
     auth_rupd_rel : relation A;
     auth_rupd_next : A → A;
@@ -64,26 +64,26 @@ Class auth_rupd `{SI : indexT} (A : ucmra) := {
     auth_valid_trivial (x : A) : ✓ x
   }.
 
-Class auth_rupd_GpreS `{SI : indexT} (Σ : gFunctors) (A : ucmra) := {
+Class auth_rupd_GpreS `{SI : sidx} (Σ : gFunctors) (A : ucmra) := {
     #[global] auth_rupd_GpreS_auth :: inG Σ (authR A);
   }.
 
-Class auth_rupdGS `{SI : indexT} (Σ : gFunctors) (A : ucmra) :=
+Class auth_rupdGS `{SI : sidx} (Σ : gFunctors) (A : ucmra) :=
   Auth_rupdG {
       #[global] auth_rupd_inG :: auth_rupd_GpreS Σ A;
       auth_rupd_name : gname;
     }.
 
-Definition auth_rupdΣ `{SI : indexT} (A : ucmra): gFunctors :=
+Definition auth_rupdΣ `{SI : sidx} (A : ucmra): gFunctors :=
   #[GFunctor (authR A)].
 
-Global Instance subG_auth_rupdΣ `{SI : indexT} {Σ : gFunctors} {A : ucmra} : subG (auth_rupdΣ A) Σ → auth_rupd_GpreS Σ A.
+Global Instance subG_auth_rupdΣ `{SI : sidx} {Σ : gFunctors} {A : ucmra} : subG (auth_rupdΣ A) Σ → auth_rupd_GpreS Σ A.
 Proof. solve_inG. Qed.
 
 (** In the following section, we prove abstractly the properties of finite and
    transfinite later credits. To do so, we assume an instance of [auth_rupd]. *)
 Section auth_rupd.
-  Context `{SI : indexT} (Σ : gFunctors) (X : ucmra) `{!auth_rupd X}.
+  Context `{SI : sidx} (Σ : gFunctors) (X : ucmra) `{!auth_rupd X}.
 
   (** We instantiate the relational updates with the relation from [auth_rupd]. *)
   Global Instance auth_rupdGS_instance `{!auth_rupdGS Σ X} : rupdG Σ X :=
@@ -137,7 +137,7 @@ Section auth_rupd.
     iCombine "Hx Hf" as "Hown".
     iPoseProof (own_valid_l with "Hown") as (Hv) "Hown".
     apply auth_both_valid in Hv as [Hincl Hv].
-    specialize (Hincl stepindex.zero). apply cmra_discrete_included_iff in Hincl.
+    specialize (Hincl 0ᵢ). apply cmra_discrete_included_iff in Hincl.
     eapply auth_rupd_rel_update in Hv as [x' [Hl Hstep']]; [| apply Hincl | apply Hstep].
     iMod (own_update _ _ (● x' ⋅ ◯ a') with "Hown") as "Hown"; first by apply auth_update.
     iModIntro. iExists (x'). iDestruct "Hown" as "($ & Hf)".
@@ -388,7 +388,7 @@ Section auth_rupd.
     iFrame. iNext. iApply "Hl".
   Qed.
 
-  Global Instance exists_credit_exchange `{@FiniteIndex SI} `{!auth_rupdGS Σ X} {Y} `{!Inhabited Y} (Φ : Y → iProp Σ) :
+  Global Instance exists_credit_exchange `{@SIdxFinite SI} `{!auth_rupdGS Σ X} {Y} `{!Inhabited Y} (Φ : Y → iProp Σ) :
     (∀ x, CreditExchange (Φ x)) → (CreditExchange (∃ x, Φ x)).
   Proof.
     intros HC. econstructor. iIntros "[Hc Hl]".
@@ -410,7 +410,7 @@ Section auth_rupd.
     (CreditExchange P) → (CreditExchange Q) → CreditExchange (P ∨ Q).
   Proof.
     intros HP HQ. destruct HP as [HP0], HQ as [HQ0]. econstructor.
-    rewrite bi.later_or_1. iIntros "[Hc [HP|HQ]]".
+    rewrite uPred.later_or. iIntros "[Hc [HP|HQ]]".
     - iLeft. iApply (HP0 with "[Hc HP]"). iFrame.
     - iRight. iApply (HQ0 with "[Hc HQ]"). iFrame.
   Qed.
@@ -433,8 +433,15 @@ End auth_rupd.
 Global Arguments rupdF {SI Σ X _} a.
 Global Arguments rupdA {SI Σ X _} a.
 
-(** The notation for later credits that we use in the rest of this developemnt. *)
-Notation "£ a" := (rupdF a) (at level 60).
+(** The notation for later credits that we use in the rest of this developemnt.
+
+    Remark: this overrides upstream Iris's notation ['£' n] (reserved at level 1 in
+    [iris.bi.notation], used by [iris.bi.later_credits] for its natural-number credits
+    [lc]). The two notations coexist and the most recently imported one wins, so a file
+    that imports Iris or Transfinite Iris modules after Lantana's may need to re-import
+    [lantana.base_logic.later_credits] last. Getting this wrong fails to type-check
+    (Lantana provides no [LaterCredits] instance for upstream's [lc]). *)
+Notation "£ a" := (rupdF a).
 Notation "●£ a" := (rupdA a) (at level 60).
 
 Global Arguments ALC {SI Σ X _ _} P.
@@ -442,12 +449,12 @@ Global Arguments sat_ALC {_ _ _ _ _ _ _ _ _ _} P.
 Notation "'ALC?' p P" := (Nat.iter (Nat.b2n p) ALC P) (at level 20, p at level 9, P at level 20) : bi_scope.
 
 
-Lemma auth_rupd_rel_irrefl `{SI : indexT} {M: ucmra} `{!auth_rupd M} x: ¬ auth_rupd_rel x x.
+Lemma auth_rupd_rel_irrefl `{SI : sidx} {M: ucmra} `{!auth_rupd M} x: ¬ auth_rupd_rel x x.
 Proof.
   intros Hlt. induction (auth_rupd_rel_wf x); eauto.
 Qed.
 
-Global Instance rupd_type_exists_finite `{SI : indexT} {M: ucmra}
+Global Instance rupd_type_exists_finite `{SI : sidx} {M: ucmra}
   `{!auth_rupd M} `{!TypeExistentialProperty M SI}: FiniteExistential SI.
 Proof.
   eapply (type_inj_existential bool M) with (f := λ b: bool, if b then ε else auth_rupd_next ε); first done.
@@ -457,7 +464,7 @@ Proof.
 Qed.
 
 (* Initial allocation *)
-Lemma auth_rupd_alloc `{SI : indexT} {Σ : gFunctors} M `{!auth_rupd M} `{!auth_rupd_GpreS Σ M} k :
+Lemma auth_rupd_alloc `{SI : sidx} {Σ : gFunctors} M `{!auth_rupd M} `{!auth_rupd_GpreS Σ M} k :
   ⊢ |==> ∃ _ : auth_rupdGS Σ M, (●£ k ∗ £ k).
 Proof.
   iIntros.
@@ -477,7 +484,7 @@ Notation "'£ω'" := (£ ω%ord) (at level 60).
 Notation "'£n' a" := (£ (Ord.from_nat a)) (at level 60).
 
 Section transfinite_lc.
-  Context `{SI : indexT} `{!tlcGS Σ}.
+  Context `{SI : sidx} `{!tlcGS Σ}.
   Local Open Scope ord.
 
   Lemma ord_auth_step_frame (a a' f : OrdR) :

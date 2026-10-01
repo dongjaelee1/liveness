@@ -7,7 +7,7 @@ From iris.prelude Require Import options.
 Import uPred.
 
 (** Semantic Invariants *)
-Local Definition inv_def `{SI : indexT} `{!invGS Σ} (N : namespace) (P : iProp Σ) : iProp Σ :=
+Local Definition inv_def `{SI : sidx} `{!invGS Σ} (N : namespace) (P : iProp Σ) : iProp Σ :=
   □ ∀ E, ⌜↑N ⊆ E⌝ → |={E,E ∖ ↑N}=> ▷ P ∗ (▷ P ={E ∖ ↑N,E}=∗ True).
 Local Definition inv_aux : seal (@inv_def). Proof. by eexists. Qed.
 Definition inv := inv_aux.(unseal).
@@ -17,7 +17,7 @@ Global Instance: Params (@inv) 3 := {}.
 
 (** * Invariants *)
 Section inv.
-  Context `{SI : indexT} `{!invGS Σ}.
+  Context `{SI : sidx} `{!invGS Σ}.
   Implicit Types i : positive.
   Implicit Types N : namespace.
   Implicit Types E : coPset.
@@ -43,10 +43,9 @@ Section inv.
   Lemma fresh_inv_name (E : gset positive) N : ∃ i, i ∉ E ∧ i ∈ (↑N:coPset).
   Proof.
     exists (coPpick (↑ N ∖ gset_to_coPset E)).
-    rewrite -elem_of_gset_to_coPset (comm and) -elem_of_difference.
-    apply coPpick_elem_of=> Hfin.
-    eapply nclose_infinite, (difference_finite_inv _ _), Hfin.
-    apply gset_to_coPset_finite.
+    opose proof (coPpick_elem_of (↑ N ∖ gset_to_coPset E) _); last set_solver.
+    apply set_infinite_non_empty, difference_infinite, gset_to_coPset_finite.
+    apply nclose_infinite.
   Qed.
 
   Lemma own_inv_alloc N E P : ▷ P ={E}=∗ own_inv N P.
@@ -100,7 +99,7 @@ Section inv.
   Global Instance inv_persistent N P : Persistent (inv N P).
   Proof. rewrite inv_unseal. apply _. Qed.
 
-  Lemma inv_alter `{!FiniteIndex SI} N P Q : inv N P -∗ ▷ □ (P -∗ Q ∗ (Q -∗ P)) -∗ inv N Q.
+  Lemma inv_alter `{!SIdxFinite SI} N P Q : inv N P -∗ ▷ □ (P -∗ Q ∗ (Q -∗ P)) -∗ inv N Q.
   Proof.
     rewrite inv_unseal. iIntros "#HI #HPQ !>" (E H).
     iMod ("HI" $! E H) as "[HP Hclose]".
@@ -135,7 +134,7 @@ Section inv.
     rewrite inv_unseal /inv_def; iIntros (?) "#HI". by iApply "HI".
   Qed.
 
-  Lemma inv_combine `{!FiniteIndex SI} N1 N2 N P Q :
+  Lemma inv_combine `{!SIdxFinite SI} N1 N2 N P Q :
     N1 ## N2 →
     ↑N1 ∪ ↑N2 ⊆@{coPset} ↑N →
     inv N1 P -∗ inv N2 Q -∗ inv N (P ∗ Q).
@@ -148,7 +147,7 @@ Section inv.
     iMod "Hclose" as % _. iMod ("HcloseQ" with "HQ") as % _. by iApply "HcloseP".
   Qed.
 
-  Lemma inv_combine_dup_l `{!FiniteIndex SI} N P Q :
+  Lemma inv_combine_dup_l `{!SIdxFinite SI} N P Q :
     □ (P -∗ P ∗ P) -∗
     inv N P -∗ inv N Q -∗ inv N (P ∗ Q).
   Proof.
@@ -202,16 +201,16 @@ Section inv.
     iIntros "!> {$HP} HP". iApply "Hclose"; auto.
   Qed.
 
-  Lemma inv_split_l `{!FiniteIndex SI} N P Q : inv N (P ∗ Q) -∗ inv N P.
+  Lemma inv_split_l `{!SIdxFinite SI} N P Q : inv N (P ∗ Q) -∗ inv N P.
   Proof.
     iIntros "#HI". iApply inv_alter; eauto.
     iIntros "!> !> [$ $] $".
   Qed.
-  Lemma inv_split_r `{!FiniteIndex SI} N P Q : inv N (P ∗ Q) -∗ inv N Q.
+  Lemma inv_split_r `{!SIdxFinite SI} N P Q : inv N (P ∗ Q) -∗ inv N Q.
   Proof.
     rewrite (comm _ P Q). eapply inv_split_l.
   Qed.
-  Lemma inv_split `{!FiniteIndex SI} N P Q : inv N (P ∗ Q) -∗ inv N P ∗ inv N Q.
+  Lemma inv_split `{!SIdxFinite SI} N P Q : inv N (P ∗ Q) -∗ inv N P ∗ inv N Q.
   Proof.
     iIntros "#H".
     iPoseProof (inv_split_l with "H") as "$".

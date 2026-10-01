@@ -35,7 +35,7 @@ End facts.
 
 (** Ordinals *)
 Section ordinals.
-  Context `{SI : indexT}.
+  Context `{SI : sidx}.
 
   Local Open Scope ord.
   Global Instance ord_eq_Equiv : Equiv Ord.t := Ord.eq.

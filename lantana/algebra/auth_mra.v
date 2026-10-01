@@ -4,7 +4,7 @@ From iris.prelude Require Import options.
 
 Section mra_aux.
 
-  Context `{SI : indexT} {A} {R : relation A}.
+  Context `{SI : sidx} {A} {R : relation A}.
   Implicit Types a b : A.
 
   (* FIXME: what's wrong here? *)
@@ -27,13 +27,13 @@ Section mra_aux.
 
 End mra_aux.
 
-Definition auth_mra `{SI : indexT} {A : Type} (R : relation A) := auth (mraUR R).
-Definition auth_mraR `{SI : indexT} {A : Type} (R : relation A) := authR (mraUR R).
-Definition auth_mraUR `{SI : indexT} {A : Type} (R : relation A) := authUR (mraUR R).
+Definition auth_mra `{SI : sidx} {A : Type} (R : relation A) := auth (mraUR R).
+Definition auth_mraR `{SI : sidx} {A : Type} (R : relation A) := authR (mraUR R).
+Definition auth_mraUR `{SI : sidx} {A : Type} (R : relation A) := authUR (mraUR R).
 
-Definition auth_mra_auth `{SI : indexT} {A : Type} (R : relation A) (dq : dfrac) (a : A) : auth_mra R :=
+Definition auth_mra_auth `{SI : sidx} {A : Type} (R : relation A) (dq : dfrac) (a : A) : auth_mra R :=
   ●{dq} to_mra a ⋅ ◯ to_mra a.
-Definition auth_mra_know `{SI : indexT} {A : Type} (R : relation A) (a : A) : auth_mra R :=
+Definition auth_mra_know `{SI : sidx} {A : Type} (R : relation A) (a : A) : auth_mra R :=
   ◯ to_mra a.
 
 Notation "●AM dq [ R ] a" := (auth_mra_auth R dq a)
@@ -42,7 +42,7 @@ Notation "◯AM [ R ] a" := (auth_mra_know R a)
   (at level 20, format "◯AM [ R ]  a").
 
 Section auth_mra.
-  Context `{SI : indexT} {A : Type} (R : relation A).
+  Context `{SI : sidx} {A : Type} (R : relation A).
   Implicit Types (a : A).
 
   Global Instance auth_mra_know_core_id a : CoreId (◯AM[R] a).

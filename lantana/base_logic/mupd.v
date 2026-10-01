@@ -1,5 +1,5 @@
 From iris.proofmode Require Import base proofmode classes.
-From iris.bi Require Export fixpoint.
+From iris.bi.lib Require Export fixpoint_mono.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.algebra Require Import ordinal_wfocm.
@@ -7,7 +7,7 @@ From lantana.base_logic Require Export owit ocarrier model_interp invariants.
 (* From lantana.base_logic Require Export history_interp invariants. *)
 Import uPred.
 
-Class mupdGpreS `{SI : indexT} (Σ : gFunctors) :=
+Class mupdGpreS `{SI : sidx} (Σ : gFunctors) :=
   MupdGpreS {
       #[local] mupdGpreS_inv :: invGpreS Σ;
       #[local] mupdGpreS_osat :: osatGS.osatGpreS Σ;
@@ -17,7 +17,7 @@ Class mupdGpreS `{SI : indexT} (Σ : gFunctors) :=
       #[local] mupdGpreS_mhist :: mhistGS.mhistGpreS Σ;
     }.
 
-Class mupdGS `{SI : indexT} (Σ : gFunctors) :=
+Class mupdGS `{SI : sidx} (Σ : gFunctors) :=
   MupdG {
       (** Invariants. *)
       #[global] mupd_invGS :: invGS Σ;
@@ -35,17 +35,17 @@ Class mupdGS `{SI : indexT} (Σ : gFunctors) :=
 Global Opaque mupd_invGS mupd_osatGS mupd_othreadGS mupd_ocarrierGS mupd_owitGS mupd_mhistGS.
 Global Arguments MupdG {SI Σ}.
 
-Definition mupdΣ `{SI : indexT} : gFunctors :=
+Definition mupdΣ `{SI : sidx} : gFunctors :=
   #[invΣ; osatGS.osatΣ; othreadGS.othreadΣ; ocarrierGS.ocarrierΣ; owitGS.owitΣ; mhistGS.mhistΣ].
-Global Instance subG_mupdΣ `{SI : indexT} {Σ} : subG mupdΣ Σ → mupdGpreS Σ.
+Global Instance subG_mupdΣ `{SI : sidx} {Σ} : subG mupdΣ Σ → mupdGpreS Σ.
 Proof. solve_inG. Qed.
 
-Definition model_interp `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
+Definition model_interp `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}
   h i Ω W n Θ : iProp Σ :=
   (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ ocarrier Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
 
 (** ** Modality for updating obls. *)
-Definition mupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
+Definition mupd_pre `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (mupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
     ((|={∅}=> P) ∨
@@ -55,7 +55,7 @@ Definition mupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
                 ∀ W2, (⌜ (W1 ↓∘ W2) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗
                       (model_interp (h ++ [(n, Ω2)]) (S i) Ω2 W2 n Θ) ∗ mupd P))%I.
 
-Lemma mupd_pre_mono `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
+Lemma mupd_pre_mono `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (mupd1 mupd2 : iPropO Σ -d> iPropO Σ) :
   ⊢ ((□ ∀ P, mupd1 P -∗ mupd2 P) →
      ∀ P, mupd_pre n Θ mupd1 P -∗ mupd_pre n Θ mupd2 P)%I.
@@ -68,7 +68,7 @@ Proof.
   iMod ("H" with "[//]") as "[$ H]". by iApply "Hmono".
 Qed.
 
-Local Instance mupd_pre_mono' `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ :
+Local Instance mupd_pre_mono' `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ :
   BiMonoPred (mupd_pre n Θ).
 Proof.
   constructor.
@@ -78,7 +78,7 @@ Proof.
 Qed.
 
 (* take the least fixpoint of the above definition *)
-Local Definition mupd_def `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ : iProp Σ → iProp Σ :=
+Local Definition mupd_def `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ : iProp Σ → iProp Σ :=
   λ P, ((bi_least_fixpoint (mupd_pre n Θ)) P)%I.
 Local Definition mupd_aux : seal (@mupd_def). by eexists. Qed.
 Definition mupd := mupd_aux.(unseal).
@@ -87,7 +87,7 @@ Local Definition mupd_unseal : @mupd = @mupd_def := mupd_aux.(seal_eq).
 Notation "'|=[' n , Θ ']=>m' P" := (mupd n Θ P) (at level 99, P at level 200, format "|=[ n , Θ ]=>m  P").
 
 Section mupd.
-  Context `{SI : indexT} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
   Implicit Type Θ : (gset positive).
 
   Lemma mupd_unfold n Θ P :
@@ -440,13 +440,13 @@ Section mupd.
 End mupd.
 
 (* Wrapper to use fupd. *)
-Definition fmupd `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} E1 E2 n Θ : iPropO Σ -d> iPropO Σ :=
+Definition fmupd `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} E1 E2 n Θ : iPropO Σ -d> iPropO Σ :=
   (λ P, |={E1,∅}=> |=[n,Θ]=>m |={∅,E2}=> P)%I.
-Notation "'|={' E1 , E2 : n , Θ '}=>m' P" := (fmupd E1 E2 n Θ P) (at level 99, P at level 200, format "|={ E1 , E2 : n , Θ }=>m  P").
-Notation "'|={' E : n , Θ '}=>m' P" := (fmupd E E n Θ P) (at level 99, P at level 200, format "|={ E : n , Θ }=>m  P").
+Notation "'|={' E1 , E2 : n , Θ '}=>m' P" := (fmupd E1 E2 n Θ P) (at level 20, P at level 200, format "|={ E1 , E2 : n , Θ }=>m  P").
+Notation "'|={' E : n , Θ '}=>m' P" := (fmupd E E n Θ P) (at level 20, P at level 200, format "|={ E : n , Θ }=>m  P").
 
 Section fmupd.
-  Context `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}.
+  Context `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}.
   Implicit Type Θ : (gset positive).
 
   Global Instance fmupd_ne E1 E2 n Θ : NonExpansive (fmupd E1 E2 n Θ).
@@ -695,7 +695,7 @@ Section fmupd.
 End fmupd.
 
 (* Allocation of model_interp. *)
-Lemma model_interp_alloc `{SI : indexT} `{!ord_mono_fun_class} `{!mupdGpreS Σ}
+Lemma model_interp_alloc `{SI : sidx} `{!ord_mono_fun_class} `{!mupdGpreS Σ}
   (n : nat) :
   ⊢ |==> ∃ _ : mupdGS Σ, (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
                       wsat.wsat ∗ wsat.ownE ⊤ ∗

@@ -1,5 +1,5 @@
 From iris.algebra Require Import agree gset gmap gmap_view reservation_map mono_nat.
-From iris.bi Require Import lib.cmra lib.fractional.
+From iris.bi Require Import cmra lib.fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From lantana.algebra Require Import map_of_sets bcred ordinal_ucmra.
@@ -12,7 +12,7 @@ Definition ocid := positive.
 Module ocarrierGS.
 
   (* Assumes thread ids are positive *)
-  Class ocarrierGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class ocarrierGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
     OcarrierGpreS {
         ocarrierGpreS_thread : inG Σ (reservation_mapUR (gmap_viewR ocid unit));
         ocarrierGpreS_carrier : inG Σ (reservation_mapUR (gmap_viewR ocid (gsetUR oid)));
@@ -20,7 +20,7 @@ Module ocarrierGS.
         #[local] ocarrierGpreS_owned :: ghost_mapG Σ ocid positive;
       }.
 
-  Class ocarrierGS `{SI : indexT} (Σ : gFunctors) : Set :=
+  Class ocarrierGS `{SI : sidx} (Σ : gFunctors) : Set :=
     OcarrierG {
         ocarrier_inG : ocarrierGpreS Σ;
         thread_name : gname;
@@ -29,14 +29,14 @@ Module ocarrierGS.
         owned_name : gname;
       }.
 
-  Definition ocarrierΣ `{SI : indexT} : gFunctors :=
+  Definition ocarrierΣ `{SI : sidx} : gFunctors :=
     #[GFunctor (reservation_mapUR (gmap_viewR ocid unit));
       GFunctor (reservation_mapUR (gmap_viewR ocid (gsetUR oid)));
       GFunctor (reservation_mapUR bcredUR);
       ghost_mapΣ ocid positive
       ].
 
-  Global Instance subG_ocarrierΣ `{SI : indexT} {Σ} : subG (ocarrierΣ) Σ → (ocarrierGpreS Σ).
+  Global Instance subG_ocarrierΣ `{SI : sidx} {Σ} : subG (ocarrierΣ) Σ → (ocarrierGpreS Σ).
   Proof. solve_inG. Qed.
 
 End ocarrierGS.
@@ -48,62 +48,62 @@ Import ocarrierGS.
 Local Existing Instances ocarrier_inG ocarrierGpreS_thread ocarrierGpreS_owned ocarrierGpreS_carrier ocarrierGpreS_fuel.
 
 (* Thread *)
-Definition ocarrierG_thread `{SI : indexT} `{!ocarrierGS Σ} (i : positive) (g : ocid) : iProp Σ :=
+Definition ocarrierG_thread `{SI : sidx} `{!ocarrierGS Σ} (i : positive) (g : ocid) : iProp Σ :=
   own thread_name (reservation_map_data (A:=(gmap_viewR ocid (unit)))
                      i (gmap_view_frag g (DfracOwn 1) (tt))).
 Global Typeclasses Opaque ocarrierG_thread.
 Global Instance: Params (@ocarrierG_thread) 3 := {}.
 
-Definition ocarrierG_thread_auth `{SI : indexT} `{!ocarrierGS Σ} (i : positive) (G : gset ocid) (q : Qp) : iProp Σ :=
+Definition ocarrierG_thread_auth `{SI : sidx} `{!ocarrierGS Σ} (i : positive) (G : gset ocid) (q : Qp) : iProp Σ :=
   own thread_name (reservation_map_data (A:=(gmap_viewR ocid (unit)))
                      i (gmap_view_auth (DfracOwn q) (gset_to_gmap tt G))).
 Global Typeclasses Opaque ocarrierG_thread_auth.
 Global Instance: Params (@ocarrierG_thread_auth) 3 := {}.
 
-Local Definition ocarrierG_thread_token `{SI : indexT} `{!ocarrierGS Σ} TP : iProp Σ :=
+Local Definition ocarrierG_thread_token `{SI : sidx} `{!ocarrierGS Σ} TP : iProp Σ :=
   (own thread_name (reservation_map_token (A:=gmap_viewR ocid (unit)) (⊤ ∖ gset_to_coPset TP))).
 
 (* Owned *)
-Definition ocarrierG_owned `{SI : indexT} `{!ocarrierGS Σ} (g : ocid) (i : positive) q : iProp Σ :=
+Definition ocarrierG_owned `{SI : sidx} `{!ocarrierGS Σ} (g : ocid) (i : positive) q : iProp Σ :=
   ghost_map_elem owned_name g (DfracOwn q) i.
 Global Typeclasses Opaque ocarrierG_owned.
 Global Instance: Params (@ocarrierG_owned) 3 := {}.
 
-Definition ocarrierG_owned_auth `{SI : indexT} `{!ocarrierGS Σ} (G : gmap ocid positive) : iProp Σ :=
-  ghost_map_auth owned_name 1 G.
+Definition ocarrierG_owned_auth `{SI : sidx} `{!ocarrierGS Σ} (G : gmap ocid positive) : iProp Σ :=
+  ghost_map_auth_frac owned_name 1 G.
 Global Typeclasses Opaque ocarrierG_owned_auth.
 Global Instance: Params (@ocarrierG_owned_auth) 3 := {}.
 
 (* Carrier *)
-Definition ocarrierG_carrier `{SI : indexT} `{!ocarrierGS Σ} (i : positive) (g : ocid) (K : oids) : iProp Σ :=
+Definition ocarrierG_carrier `{SI : sidx} `{!ocarrierGS Σ} (i : positive) (g : ocid) (K : oids) : iProp Σ :=
   own carrier_name (reservation_map_data (A:=(gmap_viewR ocid (gsetUR oid)))
                     i (gmap_view_frag g (DfracOwn 1) K)).
 Global Typeclasses Opaque ocarrierG_carrier.
 Global Instance: Params (@ocarrierG_carrier) 3 := {}.
 
-Local Definition ocarrierG_carrier_token `{SI : indexT} `{!ocarrierGS Σ} TP : iProp Σ :=
+Local Definition ocarrierG_carrier_token `{SI : sidx} `{!ocarrierGS Σ} TP : iProp Σ :=
   (own carrier_name (reservation_map_token (A:=gmap_viewR ocid (gsetUR oid)) (⊤ ∖ gset_to_coPset TP))).
 
-Local Definition ocarrierG_carrier_auth `{SI : indexT} `{!ocarrierGS Σ} i (KM : gmap ocid oids) : iProp Σ :=
+Local Definition ocarrierG_carrier_auth `{SI : sidx} `{!ocarrierGS Σ} i (KM : gmap ocid oids) : iProp Σ :=
   (own carrier_name (reservation_map_data (A:=(gmap_viewR ocid (gsetUR oid)))
                      i (gmap_view_auth (DfracOwn 1) (KM)))).
 
 (* Fuel: manage fuels for ocarriers *)
-Definition ocarrierG_bound `{SI : indexT} `{!ocarrierGS Σ} (g : ocid) (β : obl_fuel) : iProp Σ :=
+Definition ocarrierG_bound `{SI : sidx} `{!ocarrierGS Σ} (g : ocid) (β : obl_fuel) : iProp Σ :=
   own fuel_name (reservation_map_data (A:=bcredUR) g (credit_bound β)).
 Global Typeclasses Opaque ocarrierG_bound.
 Global Instance: Params (@ocarrierG_bound) 3 := {}.
 
-Definition ocarrierG_fuel `{SI : indexT} `{!ocarrierGS Σ} (g : ocid) (a : obl_fuel) : iProp Σ :=
+Definition ocarrierG_fuel `{SI : sidx} `{!ocarrierGS Σ} (g : ocid) (a : obl_fuel) : iProp Σ :=
   own fuel_name (reservation_map_data (A:=bcredUR) g (credit a)).
 Global Typeclasses Opaque ocarrierG_fuel.
 Global Instance: Params (@ocarrierG_fuel) 3 := {}.
 
-Local Definition ocarrierG_fuel_token_id `{SI : indexT} `{!ocarrierGS Σ} (E : coPset) : iProp Σ :=
+Local Definition ocarrierG_fuel_token_id `{SI : sidx} `{!ocarrierGS Σ} (E : coPset) : iProp Σ :=
   own fuel_name (reservation_map_token (A:=bcredUR) E).
 
 (* Global invariant for the obligation carriers. *)
-Definition ocarrier `{SI : indexT} `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!ocarrierGS Σ}
+Definition ocarrier `{SI : sidx} `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!ocarrierGS Σ}
   (TP : gset positive) : iProp Σ :=
   locked
     (∃ (Dg : gmap ocid positive),
@@ -124,7 +124,7 @@ Definition ocarrier `{SI : indexT} `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadG
     )%I.
 
 Section ocarrier.
-  Context `{SI : indexT} `{OSAT : !osatGS.osatGS Σ} `{OTH : !othreadGS.othreadGS Σ} `{!ocarrierGS Σ} `{OMF : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{OSAT : !osatGS.osatGS Σ} `{OTH : !othreadGS.othreadGS Σ} `{!ocarrierGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (* Thread *)
   Global Instance ocarrierG_thread_timeless i g : Timeless (ocarrierG_thread i g).
@@ -771,7 +771,7 @@ Section ocarrier.
 End ocarrier.
 
 (* Allocation of an initial ocarrier protocol. *)
-Definition ocarrier_alloc `{SI : indexT} {Σ}
+Definition ocarrier_alloc `{SI : sidx} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!ocarrierGpreS Σ} :
   ⊢ |==> ∃ _ : ocarrierGS Σ, ocarrier ∅.
 Proof.

@@ -1,5 +1,5 @@
 From iris.proofmode Require Import base proofmode classes.
-From iris.bi Require Export fixpoint.
+From iris.bi.lib Require Export fixpoint_mono.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.algebra Require Import ordinal_wfocm.
@@ -7,7 +7,7 @@ From lantana.base_logic Require Export mupd.
 Import uPred.
 
 (** ** Modality for non-discharging (ghost) updates to obls. *)
-Definition gupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
+Definition gupd_pre `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (gupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
     ((|={∅}=> P) ∨
@@ -18,7 +18,7 @@ Definition gupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
                 ∀ W2, (⌜ (W1 ↓ₙ∘ W2) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗
                       (model_interp (h ++ [(n, Ω2)]) (S i) Ω2 W2 n Θ) ∗ gupd P))%I.
 
-Lemma gupd_pre_mono `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
+Lemma gupd_pre_mono `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (gupd1 gupd2 : iPropO Σ -d> iPropO Σ) :
   ⊢ ((□ ∀ P, gupd1 P -∗ gupd2 P) →
      ∀ P, gupd_pre n Θ gupd1 P -∗ gupd_pre n Θ gupd2 P)%I.
@@ -31,7 +31,7 @@ Proof.
   iMod ("H" with "[//]") as "[$ H]". by iApply "Hmono".
 Qed.
 
-Local Instance gupd_pre_mono' `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ :
+Local Instance gupd_pre_mono' `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ :
   BiMonoPred (gupd_pre n Θ).
 Proof.
   constructor.
@@ -41,7 +41,7 @@ Proof.
 Qed.
 
 (* take the least fixpoint of the above definition *)
-Local Definition gupd_def `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ : iProp Σ → iProp Σ :=
+Local Definition gupd_def `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ : iProp Σ → iProp Σ :=
   λ P, ((bi_least_fixpoint (gupd_pre n Θ)) P)%I.
 Local Definition gupd_aux : seal (@gupd_def). by eexists. Qed.
 Definition gupd := gupd_aux.(unseal).
@@ -50,7 +50,7 @@ Local Definition gupd_unseal : @gupd = @gupd_def := gupd_aux.(seal_eq).
 Notation "'|=[' n , Θ ']=>g' P" := (gupd n Θ P) (at level 99, P at level 200, format "|=[ n , Θ ]=>g  P").
 
 Section gupd.
-  Context `{SI : indexT} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
+  Context `{SI : sidx} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
   Implicit Type Θ : (gset positive).
 
   Lemma gupd_unfold n Θ P :
@@ -420,13 +420,13 @@ Section gupd.
 End gupd.
 
 (* Wrapper to use fupd. *)
-Definition fgupd `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} E1 E2 n Θ : iPropO Σ -d> iPropO Σ :=
+Definition fgupd `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} E1 E2 n Θ : iPropO Σ -d> iPropO Σ :=
   (λ P, |={E1,∅}=> |=[n,Θ]=>g |={∅,E2}=> P)%I.
-Notation "'|={' E1 , E2 : n , Θ '}=>g' P" := (fgupd E1 E2 n Θ P) (at level 99, P at level 200, format "|={ E1 , E2 : n , Θ }=>g  P").
-Notation "'|={' E : n , Θ '}=>g' P" := (fgupd E E n Θ P) (at level 99, P at level 200, format "|={ E : n , Θ }=>g  P").
+Notation "'|={' E1 , E2 : n , Θ '}=>g' P" := (fgupd E1 E2 n Θ P) (at level 20, P at level 200, format "|={ E1 , E2 : n , Θ }=>g  P").
+Notation "'|={' E : n , Θ '}=>g' P" := (fgupd E E n Θ P) (at level 20, P at level 200, format "|={ E : n , Θ }=>g  P").
 
 Section fgupd.
-  Context `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}.
+  Context `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}.
   Implicit Type Θ : (gset positive).
 
   Global Instance fgupd_ne E1 E2 n Θ : NonExpansive (fgupd E1 E2 n Θ).
