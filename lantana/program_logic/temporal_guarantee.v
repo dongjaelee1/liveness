@@ -1413,6 +1413,23 @@ Section into_temporal.
 
 End into_temporal.
 
+Section until_inferred.
+  Context `{!lantanaGS Λ Σ}.
+
+  (** [finallyI_discharge] for an inferred trace property, with the obligation set split. *)
+  Lemma finallyT_discharge E N k g ℓ K (Q : iProp Σ) G2 `{!IntoTemporal Q G2} :
+    ↑N ⊆ E → k ∉ K →
+    £ (2 : Ord.t) -∗ crP_obls g ℓ ({[k]} ∪ K) -∗ finallyI N k false 1 Q (tsem Q) -∗ Q -∗
+    |={E}=>m Q ∗ crP_obls g ℓ K ∗ oblP_discharged k.
+  Proof.
+    iIntros (HN Hk) "LC Cg HF HQ".
+    iMod (finallyI_discharge with "[] LC Cg HF HQ") as "($& Cg& $)";
+      [done|set_solver|by iApply tsem_temporal|].
+    assert (({[k]} ∪ K) ∖ {[k]} = K) as -> by set_solver. done.
+  Qed.
+
+End until_inferred.
+
 (** ** The syntactic [tf] *)
 Section embed.
   Context `{!lantanaGS Λ Σ}.
