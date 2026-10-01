@@ -104,8 +104,8 @@ Section proof.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
   (** ** Definitions *)
-  (** We can define the tf counterparts for these definitions
-      if we want to extract top level trace properties of library functions. *)
+  (** The trace properties these definitions guarantee are inferred below
+      ([is_fair_lock_temporal], [lock_token_temporal]); see also section [trace]. *)
 
   Local Definition lock_inv γt γa γc (next curr : loc) (R : iProp Σ) : iProp Σ :=
     ∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
@@ -610,6 +610,18 @@ Section proof.
     IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
   Proof. apply is_fair_lock_temporal. Qed.
 
+  (** The trace property guaranteed by a lock token: the holder releases the lock. *)
+  Definition lock_token_tps (tl : val) : tps heap_lang Σ :=
+    (∃ (next curr : loc) (u : Z), ⌜tl = (#next, #curr)%V⌝ ∧ curr ↦{#1/2} #u ∧ tps_true ∧
+       tps_finally (curr ↦{#1/2} #(u + 1) ∧ tps_true))%S.
+
+  Lemma lock_token_temporal tl γ κu R : ⊢ lock_token tl γ κu R ⊨ₜ lock_token_tps tl.
+  Proof. rewrite lock_token_unseal. apply (into_temporal _ _). Qed.
+
+  Global Instance lock_token_into_temporal tl γ κu R :
+    IntoTemporal (lock_token tl γ κu R) (lock_token_tps tl) | 0.
+  Proof. apply lock_token_temporal. Qed.
+
 End proof.
 
 (** ** Starvation freedom, at the level of traces *)
@@ -650,6 +662,17 @@ Section trace.
   Proof.
     intros (next & curr & Htl & Hal). exists next, curr. split; first done.
     by eapply (lock_inv_tps_starvation_free (Σ:=Σ)).
+  Qed.
+
+  (** The holder of a lock token (serving ticket [u]) eventually releases the lock. *)
+  Lemma lock_token_releases {Σ} tl τ :
+    tps_tr (lock_token_tps (Σ:=Σ) tl) τ →
+    ∃ (next curr : loc) (u : Z), tl = (#next, #curr)%V ∧ tr_pointsto curr #u τ ∧
+      tr_eventually (tr_pointsto curr #(u + 1)) τ.
+  Proof.
+    intros (next & curr & u & Htl & Hu & _ & Hf). exists next, curr, u. split_and!; [done|done|].
+    destruct τ as [k τf]. destruct Hf as (m & Hm & [Hc _] & _). exists m. split_and!; [done|done|].
+    intros. done.
   Qed.
 
 End trace.
