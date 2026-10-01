@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From lantana.algebra Require Import auth_mra.
 From lantana.base_logic Require Export invariants.
-From lantana.program_logic Require Export temporal_logic.
+From lantana.heap_lang Require Export temporal_laws.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
@@ -120,7 +120,7 @@ Section proof.
          (** We need auth_mra_know to sync what other threads know about the configuration *)
          (∃ ℓ, t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi ∗ (own γc (◯AM[ord.le] ℓ))) ∗
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_discharged κ) ∨
-            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ ⟦tf_finally N_eventually κ false (1/2) (curr ↦{#(1/2)} #t%Z ∗ ⟨R⟩)⟧ₗ))) ∗
+            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ finallyT N_eventually κ (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)))) ∗
       (** Acknowledgement *)
       ([∗ map] t ↦ a ∈ acks,
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ t ↪[γa]□ true) ∨
@@ -133,7 +133,7 @@ Section proof.
     ∃ (next curr : loc) (u : Z),
       (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗
       ((u + 1)%Z ↪[(ticketlock_γt γ)]□ (κu)) ∗
-      ⟦tf_finally N_eventually κu false (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ ⟨R⟩)⟧ₗ.
+      finallyT N_eventually κu (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R).
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
   Definition lock_token := lock_token_aux.(unseal).
   Local Definition lock_token_unseal :
@@ -280,9 +280,9 @@ Section proof.
     iMod (carrier_alloc _ _ _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (50 ⊕ (50 × ▽))%M with "TG")
       as "(%gu0& %Ningu0& TG& Gg0& GF')".
     (* Unlock obligation *)
-    iMod (tf_until_alloc _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
+    iMod (untilI_alloc _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
       as "(%κu& %LUku& Gg0& OGF& #Wlku& ALLOC)". 1: done.
-    iMod ("ALLOC" $! _ N_eventually ⌜True⌝%F (curr ↦{#1 / 2} #(n + 1) ∗ ⟨R⟩)%F with "[//]") as "[GUku GUku1]".
+    iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ R)%I (tsem (curr ↦{#1 / 2} #(n + 1) ∗ R)%I) with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ 1 with "GGF") as "GGF".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
@@ -445,7 +445,7 @@ Section proof.
       { iPoseProof (ghost_map_lookup with "GMAt Mtkp") as "%LUt".
         iExFalso. iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[Hmt _]".
         iDestruct "Hmt" as "(_& [Hmt | Hmt])"; cycle 1.
-        { iDestruct "Hmt" as "(_& Ukp)". iEval (rewrite /tf_finally tf_until_logic) in "Ukp".
+        { iDestruct "Hmt" as "(_& Ukp)". iEval (rewrite /finallyI /untilI) in "Ukp".
           iDestruct "Ukp" as "(Oa& _)". iPoseProof (oblP_assigned_discharged_false with "Oa Gfkp")as "%". done. }
         iDestruct "Hmt" as "(%Boundmy& _)". assert (Boundmy1 : (0 ≤ my < c)%Z) by lia.
         iPoseProof (ghost_map_lookup with "GMAa GMEaku") as "%LUa".
@@ -524,18 +524,19 @@ Section proof.
     { iDestruct "Hmt2" as "(%& #Of)". lia. }
     iDestruct "Hmt2" as "(%Boundc1& GEku1)". iCombine "GEku GEku1" as "GEku".
     iApply sfmupd_fupd_acc.
-    iMod (tf_until_discharge with "GEku") as "H".
+    iMod (untilI_discharge with "[] GEku") as "H".
     1: apply N_subseteq_1.
+    { iApply tsem_temporal. }
     iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
-    { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
+    { iNext. iFrame. }
     iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
-    iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
+    iDestruct "H" as "(PtrCurr0& HR)".
     iModIntro. iMod ("ACCinv" with "[$PtrNext $GMAt $GMAa HMa Hc PtrCurr0 $PtrCurr Hmt1 HMt HR]") as "_".
     { iNext. iSplitR. 1: auto. iSplitR. 1: iPureIntro; lia. iSplitR. 1: auto. iSplitL "Hmt1 HMt".
       { iApply (big_sepM_delete _ _ _ _ LUt). iSplitR "HMt".
@@ -580,7 +581,78 @@ Section proof.
     iApply ("HΦ" with "[$TE $TG $Gg $QLC]").
   Qed.
 
+  (** ** Temporal guarantees *)
+  (** The trace property guaranteed by [lock_inv], as inferred by [IntoTemporal]: it mirrors
+      [lock_inv], with [tps_true] for ghost state and [R]. The pending tickets
+      [c + 1 ≤ t ≤ n] carry [finally curr ↦ t]. *)
+  Definition lock_inv_tps (next curr : loc) : tps heap_lang Σ :=
+    (∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
+       next ↦ #n ∧ curr ↦{#1/2} #c ∧ (tps_true ∧ tps_true) ∧
+       ⌜dom tickets = dom acks⌝ ∧ ⌜(0 ≤ c ≤ n)%Z⌝ ∧ ⌜∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z⌝ ∧
+       (∀ (t : Z) (κ : oid), tickets !! t = Some κ →
+          (tps_true ∧ tps_true ∧ tps_true) ∧
+          (⌜(0 ≤ t ≤ c)%Z⌝ ∧ tps_true ∨
+           ⌜(c + 1 ≤ t ≤ n)%Z⌝ ∧ tps_finally (curr ↦{#1/2} #t ∧ tps_true))) ∧
+       (∀ (t : Z) (a : bool), acks !! t = Some a →
+          ⌜(0 ≤ t ≤ c)%Z⌝ ∧ tps_true ∨ ⌜t = (c + 1)%Z⌝ ∨ ⌜(c + 1 < t ≤ n)%Z⌝ ∧ tps_true) ∧
+       (⌜c = n⌝ ∧ curr ↦{#1/2} #c ∧ tps_true ∨
+        ⌜(c < n)%Z⌝ ∧ (tps_true ∧ curr ↦{#1/2} #c ∧ tps_true ∨ tps_true)))%S.
+
+  (** The trace property guaranteed by [is_fair_lock]. *)
+  Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
+    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_tps next curr))%S.
+
+  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tps tl.
+  Proof. apply (into_temporal _ _). Qed.
+
+  (** Clients see the lock's guarantee, not its invariant. *)
+  Global Instance is_fair_lock_into_temporal tl γ R :
+    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
+  Proof. apply is_fair_lock_temporal. Qed.
+
 End proof.
+
+(** ** Starvation freedom, at the level of traces *)
+Section trace.
+
+  (** [l ↦ v] in the current state of the trace. *)
+  Definition tr_pointsto (l : loc) (v : val) : trProp heap_lang :=
+    tr_atomic (pred_pointsto l (DfracOwn 1) v).
+
+  (** Starvation freedom of the ticket lock [(next, curr)]: at any time, if [n] tickets have
+      been handed out ([next ↦ n]) and ticket [c] is being served ([curr ↦ c]), then every
+      [t] with [c < t ≤ n] will eventually be served. In particular the holder of ticket
+      [n - 1] eventually releases the lock ([curr ↦ n]). *)
+  Definition starvation_free (next curr : loc) : trProp heap_lang :=
+    tr_always (λ τ, ∀ n c t : Z,
+      tr_pointsto next #n τ → tr_pointsto curr #c τ → (c < t ≤ n)%Z →
+      tr_eventually (tr_pointsto curr #t) τ).
+
+  Lemma lock_inv_tps_starvation_free {Σ} next curr τ :
+    tps_tr (tps_always (lock_inv_tps (Σ:=Σ) next curr)) τ → starvation_free next curr τ.
+  Proof.
+    destruct τ as [k τf]. intros Hal m Hm n c t Hn Hc Ht.
+    destruct (Hal m Hm) as (n' & c' & tickets & acks & Hn' & Hc' & _ & _ & Hb & Hdom & Htk & _).
+    simpl in *. unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic, tr_pure in *. simpl in *.
+    destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *.
+    rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
+    assert (is_Some (tickets !! t)) as [κ Hκ].
+    { apply elem_of_dom, Hdom. lia. }
+    destruct (Htk t κ Hκ) as [_ [[? _] | [_ Hfin]]]; [lia|].
+    destruct Hfin as (m' & Hm' & [Hcur _] & _). exists m'. split_and!; [done|done|].
+    intros. done.
+  Qed.
+
+  (** A fair lock is starvation free. *)
+  Lemma fair_lock_starvation_free {Σ} tl τ :
+    tps_tr (fair_lock_tps (Σ:=Σ) tl) τ →
+    ∃ next curr : loc, tl = (#next, #curr)%V ∧ starvation_free next curr τ.
+  Proof.
+    intros (next & curr & Htl & Hal). exists next, curr. split; first done.
+    by eapply (lock_inv_tps_starvation_free (Σ:=Σ)).
+  Qed.
+
+End trace.
 
 Global Notation "γ ↪LOCK dq l" :=
   (own_fair_lock_level γ l dq)%I
