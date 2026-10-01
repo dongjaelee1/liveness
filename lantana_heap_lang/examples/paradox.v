@@ -3,7 +3,7 @@ From iris.algebra Require Import gmap mono_nat.
 From iris.proofmode Require Import proofmode.
 (* From transfinite.base_logic Require Import lib.ghost_map. *)
 From lantana.base_logic Require Export invariants.
-From lantana.program_logic Require Export temporal_logic.
+From lantana.heap_lang Require Export temporal_laws.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
@@ -215,19 +215,6 @@ Section proof.
   Let Nu := nroot .@ "paradox_until".
   Let N1 := nroot .@ "paradox_false".
 
-  Definition px_inv_tf r rm i j : tf Σ :=
-    (∃ n (os : gmap nat oid),
-        ⟨cnt_auth r j n (1/2)%Qp ∗
-         ghost_map_auth_frac rm 1 os⟩ ∗
-        ([^tf_sep map] a ↦ k ∈ os,
-           ⟨(£ (10)%ord ∨ cnt_lb r i a) ∗
-            a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0⟩ ∗
-           ((tf_finally Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩) ∨
-              (⟨oblP_discharged k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩))))%F.
-
-  Definition px_tf r rm i j : tf Σ :=
-    tf_always N (px_inv_tf r rm i j).
-
   Definition px_inv r rm i j : iProp Σ :=
     ∃ n (os : gmap nat oid),
       (cnt_auth r j n (1/2)%Qp ∗
@@ -235,25 +222,11 @@ Section proof.
       ([∗ map] a ↦ k ∈ os,
          ((£ (10)%ord ∨ cnt_lb r i a) ∗
           a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0) ∗
-         ((⟦tf_finally Nu k false (1/2) ⟨(cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')⟩⟧ₗ) ∨
+         ((finallyT Nu k (1/2) (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')) ∨
             (oblP_discharged k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
 
   Definition px r rm i j : iProp Σ :=
     inv N (px_inv r rm i j).
-
-  Lemma px_inv_red r rm i j :
-    ⟦px_inv_tf r rm i j⟧ₗ ⊣⊢ px_inv r rm i j.
-  Proof.
-    rewrite /px_inv_tf /px_inv. 
-    tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. f_equiv.
-    rewrite tf_big_opM_interp. do 3 f_equiv. tf_red. f_equiv. done.
-  Qed.
-
-  Lemma px_red r rm i j :
-    ⟦px_tf r rm i j⟧ₗ ⊣⊢ px r rm i j.
-  Proof.
-    rewrite /px_tf /px. tf_red. f_equiv. apply px_inv_red.
-  Qed.
 
   (** The main proofs. *)
   Global Instance px_persistent r i j k : Persistent (px r i j k).
@@ -264,7 +237,7 @@ Section proof.
     ⊢ ∀ i g z r rm ci cj C,
     l{{{ thread_expr i C (loop #()) ∗ thP_carriers i ({[g]}) ∗
          crP_obls g 1 {[z]} ∗
-         ⟦tf_until N1 z false 1 (⌜ True ⌝) (⌜ False ⌝)⟧ₗ ∗
+         untilT N1 z 1 True False ∗
          £ (10)%ord ∗
          px r rm ci cj ∗
          ∃ n, cnt_auth r ci n 1%Qp ∗ cnt_lb r cj n ∗
@@ -305,7 +278,7 @@ Section proof.
       iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
       iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
       iDestruct "Hm" as "(Hm& [F | (_& (#Cljn1& %& #Mn1))])".
-      { rewrite /tf_finally tf_until_logic. iDestruct "F" as "(Ga& _)".
+      { rewrite /finallyI !untilI_unfold. iDestruct "F" as "(Ga& _)".
         iPoseProof (oblP_assigned_discharged_false with "Ga Gdckn") as "%". done. }
       iPoseProof (big_sepM_delete _ _ _ _ LU with "[Hm $HM]") as "HM".
       { iFrame. iRight. eauto. }
@@ -327,7 +300,7 @@ Section proof.
     ⊢ ∀ j n r rm ci cj ck C,
     l{{{ thread_expr j C (loop #()) ∗ ∃ g, thP_carriers j {[g]} ∗
               crP_obls g 0 {[ck]} ∗
-              ⟦tf_finally Nu ck false (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
+              finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
               crP_fuel g 0 10 ∗
               px r rm ci cj ∗
               cnt_auth r cj n (1/2) ∗ n ↪[rm]□ ck }}}
@@ -361,9 +334,9 @@ Section proof.
     iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
     iPoseProof (big_sepM_delete _ _ _ _ LU with "HM") as "[Hm HM]".
     iDestruct "Hm" as "(Hm& [Uck1 | (#F& _)])"; cycle 1.
-    { rewrite /tf_finally tf_until_logic. iDestruct "Uck" as "(Ga& _)".
+    { rewrite /finallyI !untilI_unfold. iDestruct "Uck" as "(Ga& _)".
       iPoseProof (oblP_assigned_discharged_false with "Ga F") as "%". done. }
-    iPoseProof (tf_until_frac_add with "Uck Uck1") as "Uck".
+    iPoseProof (untilI_frac_add with "Uck Uck1") as "Uck".
     { rewrite Qp.div_2. reflexivity. }
     iPoseProof (cnt_auth_op_valid with "Caj Ca") as "%". destruct H0 as [? _]. subst n0.
     iCombine "Ca Caj" as "Caj".
@@ -371,13 +344,14 @@ Section proof.
     iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     iMod (carrier_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
-    iMod (tf_until_alloc _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
+    iMod (untilI_alloc _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
     iApply fupd_sfmupd_elim. iMod "mask" as "_".
-    iMod ("A" $! _ Nu ⌜True⌝%F ⟨ cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k' ⟩%F with "[//]") as "Unew".
+    iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I
+            (tsem (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I) with "[//]") as "Unew".
     iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.
     assert (NDisj : N ## Nu).
     { subst N Nu. apply ndot_ne_disjoint. done. }
-    iMod (tf_until_discharge with "Uck") as "H". 1: set_solver.
+    iMod (untilI_discharge with "[] Uck") as "H"; [set_solver|iApply tsem_temporal|].
     iPoseProof (tlc_split_nat 88 1 with "LC") as "[LC LC1]".
     (** TODO: make interface defs and lemmas for tlc *)
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
@@ -385,7 +359,7 @@ Section proof.
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim. iMod "mask" as "_".
     iMod ("H" with "[]") as "H".
-    { iNext. tf_red. eauto. }
+    { iNext. eauto. }
     iPoseProof ("H" with "[] Gg") as "H".
     { iPureIntro. set_solver. }
     iPoseProof (tlc_split_nat 87 1 with "LC") as "[LC LC1]".
@@ -413,7 +387,7 @@ Section proof.
     crP_obls g 0 ∅
     ⊢ |={E}=>g ∃ ck r rm ci cj n,
                 crP_obls g 0 {[ck]} ∗
-                ⟦finallyP Nu ck (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩⟧ₗ ∗
+                finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
                 witP_layer ck 0 ∗
                 px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
                 cnt_lb r cj n ∗  n ↪[rm]□ ck.
@@ -426,10 +400,10 @@ Section proof.
     iMod (alloc_cnt_auth _ 0 with "CB") as "(CB& %cj& CAj)".
     iPoseProof (get_cnt_lb with "CAj") as "#Clj". 1: reflexivity.
     iMod (ghost_map_alloc (∅ : gmap nat oid)) as "(%rm& GM& _)".
-    iMod (tf_until_alloc _ _ _ false _ _ 10 with "Cg") as "(%ck& _& Cg& Gf& #Wl& ACC)".
+    iMod (untilI_alloc _ _ _ false _ _ 10 with "Cg") as "(%ck& _& Cg& Gf& #Wl& ACC)".
     1: reflexivity. rewrite union_empty_r_L.
-    iMod ("ACC" $! _ Nu (⌜True⌝)%F ⟨(cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')⟩%F
-           with "[//]") as "HF".
+    iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I
+           (tsem (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I) with "[//]") as "HF".
     iMod (ghost_map_insert_persist 0 ck with "GM") as "(GM& #GMe)". 1: done.
     iExists ck, r, rm, ci, cj, 0.
     iDestruct "HF" as "[HF HF0]". iDestruct "CAj" as "[CAj CAj0]".
@@ -446,19 +420,19 @@ Section proof.
     i ≠ j →
     Θ = {[i := loop #(); j := loop #() ]} →
     Φ = ((∃ g1 g2 z ck r rm ci cj n,
-             untilP N1 z 1 (⌜ True ⌝) (⌜ False ⌝) ∗
-             finallyP Nu ck (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩ ∗
-             ⟨£ (10)%ord ∗
+             untilT N1 z 1 True False ∗
+             finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
+             (£ (10)%ord ∗
               px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
               cnt_lb r cj n ∗  n ↪[rm]□ ck ∗
               witP_layer ck 0 ∗
               thP_carriers i {[g1]} ∗ crP_obls g1 1 {[z]} ∗
-              thP_carriers j {[g2]} ∗ crP_obls g2 0 {[ck]} ∗ crP_fuel g2 0 10⟩)%F) →
+              thP_carriers j {[g2]} ∗ crP_obls g2 0 {[ck]} ∗ crP_fuel g2 0 10))%I) →
     Ψs = ({[i := fork_post; j := fork_post]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ £ (10)%ord -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
-     |={⊤}=>m (⟦Φ⟧ₗ ∗
-              (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+     |={⊤}=>m (Φ ∗
+              (Φ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof using H.
     iIntros (Hij HT HP HQ) "TEs LC TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
@@ -469,29 +443,16 @@ Section proof.
     iPoseProof (px_loop2_spec) as "px_loop2_spec".
     iMod (carrier_alloc _ _ _ 1 0 with "TG1") as "(%g1& _& TG1& Gg1& _)".
     iMod (carrier_alloc _ _ _ 0 10 with "TG2") as "(%g2& _& TG2& Gg2& Gf2)".
-    iMod (tf_until_alloc _ _ _ false _ _ 0 with "Gg1") as "(%z& _& Gg1& _& _& ACC)". 1: reflexivity.
-    iMod ("ACC" $! _ N1 (⌜ True ⌝)%F (⌜ False ⌝)%F with "[//]") as "HFz".
+    iMod (untilI_alloc _ _ _ false _ _ 0 with "Gg1") as "(%z& _& Gg1& _& _& ACC)". 1: reflexivity.
+    iMod ("ACC" $! _ N1 True%I False%I (tsem False%I) with "[//]") as "HFz".
     rewrite !union_empty_r_L.
     iMod (px_init with "Gg2") as "(%&%&%&%&%&%& Gg2& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)".
     iModIntro. iSplitR "TEs".
     { subst Φ.
-      tf_red. iExists g1. tf_red. iExists g2.
-      tf_red. iExists z. tf_red. iExists ck. tf_red. iExists r. tf_red. iExists rm.
-      tf_red. iExists ci. tf_red. iExists cj. tf_red. iExists n.
-      tf_red. iFrame. iFrame "px Clj GMe Wl". }
+      iExists g1, g2, z, ck, r, rm, ci, cj, n. iFrame. iFrame "px Clj GMe Wl". }
     iClear "Wl px Clj GMe". clear dependent g1 g2 z ck r rm ci cj n.
     iIntros "HP". subst Φ.
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%g1& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%g2& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%z& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%ck& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%r& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%rm& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%ci& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%cj& HP)".
-    iEval (tf_red) in "HP". iDestruct "HP" as "(%n& HP)".
-    iEval (tf_red) in "HP".
-    iDestruct "HP" as "(HFz& HFck& LC& #px& CAi& CAj& #Clj& #GMe& #Wl& TG1& Cg1& TG2& Cg2& Gf)".
+    iDestruct "HP" as (g1 g2 z ck r rm ci cj n) "(HFz& HFck& LC& #px& CAi& CAj& #Clj& #GMe& #Wl& TG1& Cg1& TG2& Cg2& Gf)".
     iEval (rewrite HT big_sepM_insert; last by rewrite lookup_singleton_ne) in "TEs".
     iDestruct "TEs" as "[TEi TEs]".
     iEval (rewrite big_sepM_singleton) in "TEs". iRename "TEs" into "TEj".
@@ -520,37 +481,35 @@ Section adequacy.
         (tp_finally (⌜ False ⌝) ∧
          tp_finally (⌜ True ⌝))%P.
 
-  Let Φ' : tp (Π:=state_pred) :=
-        (∃ (g1 g2 : ocid) (z ck : oid) (r rm: gname) (ci cj : positive) (n :nat),
-            tp_finally (⌜ False ⌝) ∧
-            tp_finally (⌜ True ⌝) ∧
-            tp_true)%P.
-
-  Remark Φ_impl :
-    ∀ τ, tp_trace Φ' τ → tp_trace Φ τ.
-  Proof.
-    simpl. unfold_trProp. intros. destruct τ. destruct H as (?&?&?&?&?&?&?&?&?&?&?&?).
-    firstorder.
-  Qed.
-
   Let N := nroot .@ "paradox_inv".
   Let Nu := nroot .@ "paradox_until".
   Let N1 := nroot .@ "paradox_false".
 
-  Let Φ_tf `{!heapGS Σ} `{!mcntsG Σ} : tf (Π:=state_pred) Σ :=
+  Let Φ_P `{!heapGS Σ} `{!mcntsG Σ} : iProp Σ :=
         (∃ g1 g2 z ck r rm ci cj n,
-            untilP N1 z 1 (⌜ True ⌝) (⌜ False ⌝) ∗
-            finallyP Nu ck (1/2) ⟨(cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k')⟩ ∗
-            ⟨£ (10 : Ord.t)%ord ∗
+            untilT N1 z 1 True False ∗
+            finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
+            (£ (10 : Ord.t)%ord ∗
              px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
              cnt_lb r cj n ∗  n ↪[rm]□ ck ∗
              witP_layer ck 0 ∗
              thP_carriers i {[g1]} ∗ crP_obls g1 1 {[z]} ∗
-             thP_carriers j {[g2]} ∗ crP_obls g2 0 {[ck]} ∗ crP_fuel g2 0 10⟩)%F.
+             thP_carriers j {[g2]} ∗ crP_obls g2 0 {[ck]} ∗ crP_fuel g2 0 10))%I.
 
-  Lemma tf_to_tp_Φ `{!heapGS Σ} `{!mcntsG Σ} :
-    tf_to_tp (Φ_tf) = Φ'.
-  Proof. done. Qed.
+  (** The trace property guaranteed by the final resources, as inferred. *)
+  Section G_main.
+    Context `{!heapGS Σ} `{!mcntsG Σ}.
+    Definition G_main : tps heap_lang Σ := ltac:(tps_of Φ_P).
+  End G_main.
+
+  Lemma Φ_P_temporal `{!heapGS Σ} `{!mcntsG Σ} : ⊢ Φ_P ⊨ₜ G_main.
+  Proof. apply (into_temporal _ _). Qed.
+
+  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → tp_trace Φ τ.
+  Proof.
+    destruct τ as [n τf]. intros (Hf& (m& Hm& _& Hb)& _). split; first exact Hf.
+    exists m. split_and!; [done|done|]. intros. done.
+  Qed.
 
   Let Σ : gFunctors :=
         #[mupdΣ;
@@ -573,8 +532,8 @@ Section adequacy.
     tp_trace Φ τ.
   Proof.
     intros LNLC τ Beh FS Init1 Init2.
-    apply Φ_impl.
-    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ').
+    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main (tp_trace Φ)).
+    { apply G_main_impl. }
     1,2,3,4: eauto.
     iIntros (?). exists 10%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
@@ -590,7 +549,7 @@ Section adequacy.
     iSplitR; first done.
     iModIntro. iIntros "LC TGs".
     (* Set Printing All. *)
-    iMod (px_loop_pre (heapGS0:=HHeapGS) Θ0 i j with "[Tis] [$LC] [TGs]") as "H".
+    iMod (px_loop_pre (heapGS0:=HHeapGS) Θ0 i j (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [$LC] [TGs]") as "H".
     { subst i j. lia. }
     { done. }
     { reflexivity. }
@@ -598,9 +557,7 @@ Section adequacy.
     { rewrite /thread_expr /=. iFrame. }
     { iFrame. }
     iDestruct "H" as "(HP& H)".
-    iModIntro. iExists (Φ_tf). iFrame "HP". iSplit.
-    { iPureIntro. apply tf_to_tp_Φ. }
-    iFrame.
+    iModIntro. iExists Φ_P. iFrame "HP H". iApply Φ_P_temporal.
   Qed.
 
 End adequacy.
