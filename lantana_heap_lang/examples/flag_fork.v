@@ -68,10 +68,9 @@ Section proof.
     rewrite union_empty_r_L.
     (* Keep the commitment: the flag exists. *)
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LCc LC]".
-    iMod (finallyI_discharge with "[] LCc Cg HC [is_flag]") as "(_& Cg& _)".
+    iMod (finallyI_discharge with "LCc Cg HC [is_flag]") as "(_& Cg& _)".
     { set_solver. }
     { set_solver. }
-    { iApply tsem_temporal. }
     { iExists x, k, 0%ordi. iFrame "is_flag". }
     replace ({[kr; kc]} ∖ {[kc]}) with ({[kr]} : gset oid) by set_solver.
     iPoseProof (crP_fuels_add_carrier with "Cf0 GF") as "GF".
@@ -136,10 +135,10 @@ Section proof.
     iPoseProof (FlagFork_main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ 1 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (untilI_alloc _ _ _ false 1 1 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nr True%I (exits #42@i)%I (tsem (exits #42@i)%I) with "[]") as "Ukl1".
+    iMod ("Akl1" $! _ Nr True%I (exits #42@i)%I with "[]") as "Ukl1".
     { done. }
     iMod (untilI_alloc _ _ _ false 1 1 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
-    iMod ("Akc" $! _ Nc True%I (∃ x k ℓ, is_flag x k ℓ)%I (tsem (∃ x k ℓ, is_flag x k ℓ)%I) with "[]") as "Ukc".
+    iMod ("Akc" $! _ Nc True%I (∃ x k ℓ, is_flag x k ℓ)%I with "[]") as "Ukc".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Gg1 Gf1 Ofkl1 Ofkc".
     { subst Φ. rewrite !union_empty_r_L.

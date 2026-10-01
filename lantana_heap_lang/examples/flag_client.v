@@ -135,11 +135,11 @@ Section proof.
     iMod (carrier_alloc _ _ _ 0 μ1 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (is_flag_init _ _ _ _ 0 _ μ1 with "Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #is_flag)". 1: done.
     iMod (untilI_alloc _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I (tsem (exits #()@i)%I) with "[]") as "Ukl1".
+    iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I with "[]") as "Ukl1".
     { done. }
     iMod (carrier_alloc _ _ _ 1 μ2 with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
     iMod (untilI_alloc _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
-    iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I (tsem (exits #1@j)%I) with "[]") as "Ukl2".
+    iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I with "[]") as "Ukl2".
     { done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
     { subst Φ.

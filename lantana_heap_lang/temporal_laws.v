@@ -33,7 +33,7 @@ Section laws.
     thread_expr i [] (of_val v) ∗ thP_done i.
   Proof.
     iIntros (Hmask) "TE LC TG Cg HF".
-    iMod (untilI_discharge with "[] HF") as "HF"; [set_solver|iApply tsem_temporal|].
+    iMod (untilI_discharge with "HF") as "HF"; first set_solver.
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
     iApply (lc_sfmupd_add_later with "LC1"). iNext.
     iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".

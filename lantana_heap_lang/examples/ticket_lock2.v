@@ -282,7 +282,7 @@ Section proof.
     (* Unlock obligation *)
     iMod (untilI_alloc _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
       as "(%κu& %LUku& Gg0& OGF& #Wlku& ALLOC)". 1: done.
-    iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ R)%I (tsem (curr ↦{#1 / 2} #(n + 1) ∗ R)%I) with "[//]") as "[GUku GUku1]".
+    iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ 1 with "GGF") as "GGF".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
@@ -524,9 +524,8 @@ Section proof.
     { iDestruct "Hmt2" as "(%& #Of)". lia. }
     iDestruct "Hmt2" as "(%Boundc1& GEku1)". iCombine "GEku GEku1" as "GEku".
     iApply sfmupd_fupd_acc.
-    iMod (untilI_discharge with "[] GEku") as "H".
+    iMod (untilI_discharge with "GEku") as "H".
     1: apply N_subseteq_1.
-    { iApply tsem_temporal. }
     iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.

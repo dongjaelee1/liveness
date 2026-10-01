@@ -79,7 +79,7 @@ Section proof.
   Proof.
     iIntros (Hle) "Ptr Gg". rewrite /is_flag /flag_tk /flag_inv.
     iMod (untilI_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
-    iMod ("H" $! _ Np (l ↦ #0)%I (l ↦ #1)%I (tsem (l ↦ #1)%I) with "[Ptr]") as "H".
+    iMod ("H" $! _ Np (l ↦ #0)%I (l ↦ #1)%I with "[Ptr]") as "H".
     { iNext. iFrame. }
     iDestruct "H" as "[H1 H2]".
     iMod (inv_alloc with "[H1]") as "$". 2: by iFrame.
@@ -141,9 +141,8 @@ Section proof.
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iCombine "HU inv" as "inv".
-    iMod (untilI_discharge with "[] inv") as "inv".
+    iMod (untilI_discharge with "inv") as "inv".
     { apply N_subseteq_1. }
-    { iApply (tsem_temporal (l ↦ #1)%I). }
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "inv" as "[Ptrl ACCinv]".

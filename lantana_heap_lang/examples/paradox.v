@@ -346,12 +346,11 @@ Section proof.
     iMod (carrier_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
     iMod (untilI_alloc _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
     iApply fupd_sfmupd_elim. iMod "mask" as "_".
-    iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I
-            (tsem (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I) with "[//]") as "Unew".
+    iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I with "[//]") as "Unew".
     iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.
     assert (NDisj : N ## Nu).
     { subst N Nu. apply ndot_ne_disjoint. done. }
-    iMod (untilI_discharge with "[] Uck") as "H"; [set_solver|iApply tsem_temporal|].
+    iMod (untilI_discharge with "Uck") as "H"; first set_solver.
     iPoseProof (tlc_split_nat 88 1 with "LC") as "[LC LC1]".
     (** TODO: make interface defs and lemmas for tlc *)
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
@@ -402,8 +401,7 @@ Section proof.
     iMod (ghost_map_alloc (∅ : gmap nat oid)) as "(%rm& GM& _)".
     iMod (untilI_alloc _ _ _ false _ _ 10 with "Cg") as "(%ck& _& Cg& Gf& #Wl& ACC)".
     1: reflexivity. rewrite union_empty_r_L.
-    iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I
-           (tsem (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I) with "[//]") as "HF".
+    iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I with "[//]") as "HF".
     iMod (ghost_map_insert_persist 0 ck with "GM") as "(GM& #GMe)". 1: done.
     iExists ck, r, rm, ci, cj, 0.
     iDestruct "HF" as "[HF HF0]". iDestruct "CAj" as "[CAj CAj0]".
@@ -444,7 +442,7 @@ Section proof.
     iMod (carrier_alloc _ _ _ 1 0 with "TG1") as "(%g1& _& TG1& Gg1& _)".
     iMod (carrier_alloc _ _ _ 0 10 with "TG2") as "(%g2& _& TG2& Gg2& Gf2)".
     iMod (untilI_alloc _ _ _ false _ _ 0 with "Gg1") as "(%z& _& Gg1& _& _& ACC)". 1: reflexivity.
-    iMod ("ACC" $! _ N1 True%I False%I (tsem False%I) with "[//]") as "HFz".
+    iMod ("ACC" $! _ N1 True%I False%I with "[//]") as "HFz".
     rewrite !union_empty_r_L.
     iMod (px_init with "Gg2") as "(%&%&%&%&%&%& Gg2& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)".
     iModIntro. iSplitR "TEs".
