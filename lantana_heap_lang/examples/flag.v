@@ -136,7 +136,7 @@ Section proof.
     iModIntro.
     iInv "HA" as "inv". iDestruct "inv" as "[inv | inv]"; cycle 1.
     { iDestruct "inv" as "[>inv _]".
-      iEval (rewrite /flag_tk /untilI) in "HU". iDestruct "HU" as "[Oak _]".
+      iEval (rewrite /flag_tk !untilI_unfold) in "HU". iDestruct "HU" as "[Oak _]".
       iPoseProof (oblP_assigned_discharged_false with "Oak inv") as "%". done. }
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.

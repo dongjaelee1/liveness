@@ -272,12 +272,19 @@ Notation until_disch k G2 :=
 
 (** [P] until [Q] using namespace [N] and obligation [k]; [G2] is the trace property that
     [Q] guarantees (it is stored at the discharge event). *)
-Definition untilI `{!lantanaGS Λ Σ} N k (b : bool) (q : Qp) (P Q : iProp Σ) (G2 : tps Λ Σ) : iProp Σ :=
+Local Definition untilI_def `{!lantanaGS Λ Σ} N k (b : bool) (q : Qp) (P Q : iProp Σ) (G2 : tps Λ Σ) :
+  iProp Σ :=
   oblP_assigned k b (q/2)%Qp ∗ oblP_inv N k P Q (until_disch k G2).
-
-(* Keep the proof mode from splitting it as a separating conjunction: it is split by
-   fractions. *)
-Global Typeclasses Opaque untilI.
+(* Sealed: the proof mode splits it by fractions, and unification (e.g. in [iFrame]) does not
+   unfold it. *)
+Local Definition untilI_aux : seal (@untilI_def). Proof. by eexists. Qed.
+Definition untilI := untilI_aux.(unseal).
+Global Arguments untilI {Λ Σ _} N k b q P Q G2.
+Local Lemma untilI_unseal : @untilI = @untilI_def.
+Proof. rewrite -untilI_aux.(seal_eq) //. Qed.
+Lemma untilI_unfold `{!lantanaGS Λ Σ} N k b q P Q G2 :
+  untilI N k b q P Q G2 = (oblP_assigned k b (q/2)%Qp ∗ oblP_inv N k P Q (until_disch k G2))%I.
+Proof. by rewrite untilI_unseal. Qed.
 
 Definition finallyI `{!lantanaGS Λ Σ} N k (b : bool) (q : Qp) (Q : iProp Σ) (G2 : tps Λ Σ) : iProp Σ :=
   untilI N k b q True Q G2.
@@ -551,7 +558,7 @@ Section rules.
   Lemma temporal_until_later N k b q L1 L2 G1 G2 :
     ▷ (L1 ⊨ₜ G1) -∗ ▷ (L2 ⊨ₜ G2) -∗ untilI N k b q L1 L2 G2 ⊨ₜ tps_until G1 G2.
   Proof.
-    iIntros "#HG1 #HG2 !>" (h0 n σ Θ κs m0 v1 Ω1 W0) "(HI0& MI0& HU)". rewrite /untilI. iDestruct "HU" as "[OA #TF]".
+    iIntros "#HG1 #HG2 !>" (h0 n σ Θ κs m0 v1 Ω1 W0) "(HI0& MI0& HU)". rewrite !untilI_unfold. iDestruct "HU" as "[OA #TF]".
     iDestruct "MI0" as "(MI0& S& _)".
     iEval (unfold_opreds) in "OA". iDestruct "OA" as "(#OE& OA)".
     iPoseProof (osat_lookup_assigned with "[$S $OE $OA]") as "%Hk". destruct Hk as (f& o& Hk).
@@ -914,21 +921,21 @@ Section until_rules.
     (q = q1 + q2)%Qp →
     ⊢ untilI N k b q P Q G2 -∗ (untilI N k b q1 P Q G2 ∗ untilI N k b q2 P Q G2).
   Proof.
-    iIntros (He) "U". rewrite /untilI He Qp.div_add_distr. iDestruct "U" as "([$ $]& #U)". auto.
+    iIntros (He) "U". rewrite !untilI_unfold He Qp.div_add_distr. iDestruct "U" as "([$ $]& #U)". auto.
   Qed.
   Lemma untilI_frac_add N k b1 b2 q1 q2 q P Q G2 P' Q' G2' :
     (q = q1 + q2)%Qp →
     untilI N k b1 q1 P Q G2 -∗ untilI N k b2 q2 P' Q' G2' -∗ untilI N k b1 q P Q G2.
   Proof.
     intros Hq. subst q.
-    rewrite /untilI Qp.div_add_distr. iIntros "[Oa1 $] [Oa2 _]".
+    rewrite !untilI_unfold Qp.div_add_distr. iIntros "[Oa1 $] [Oa2 _]".
     iPoseProof (oblP_assigned_agree with "Oa1 Oa2") as "%". subst.
     by iCombine "Oa1 Oa2" as "Oa".
   Qed.
 
   Global Instance untilI_fractional N k b P Q G2 : Fractional (λ q, untilI N k b q P Q G2).
   Proof.
-    intros p q. rewrite /untilI. iSplit.
+    intros p q. rewrite !untilI_unfold. iSplit.
     - iIntros "(Oa& #OI)". iFrame "OI". rewrite !Qp.div_add_distr. iDestruct "Oa" as "[Oa Oa']". iFrame.
     - iIntros "((Oa1& #Oi)& Oa2& _)". iFrame "Oi". rewrite !Qp.div_add_distr. iCombine "Oa1 Oa2" as "$".
   Qed.
@@ -944,7 +951,7 @@ Section until_rules.
                  ∀ E' N (P Q : iProp Σ) G2, ▷ (if b then Q else P) ={E'}=∗ (untilI N k b 1 P Q G2).
   Proof.
     iIntros (Ltl) "TG". iMod (obl_alloc_assigned with "TG") as "(%& $& $& Oa& $& $& ACC)". 1: auto.
-    iIntros "!> %%%%% H". rewrite /untilI. iMod ("ACC" with "H") as "ACC". iFrame. done.
+    iIntros "!> %%%%% H". rewrite !untilI_unfold. iMod ("ACC" with "H") as "ACC". iFrame. done.
   Qed.
 
   Lemma untilI_discharged_alloc E ℓ μ (Q : iProp Σ) G2 :
@@ -999,7 +1006,7 @@ Section until_rules.
     untilI N k false 1 P Q G2 ={E,E ∖ ↑N}=∗
     ▷ (P ∗ ∀ E', |={E'}=>g ((▷ Q) ={E ∖ ↑N,E}=∗ untilI N k true 1 P Q G2)).
   Proof.
-    rewrite /untilI. iIntros (HM) "(Oa& #Oi)".
+    rewrite !untilI_unfold. iIntros (HM) "(Oa& #Oi)".
     iMod (obl_assigned_to_true with "Oi Oa") as "[H ACC]". 1: auto.
     iModIntro. iNext. iDestruct "H" as "[Oa $]".
     iIntros "%". iPoseProof ("ACC" with "Oa") as "ACC". iMod ("ACC" $! E') as "[Oa ACC]".
@@ -1014,7 +1021,7 @@ Section until_rules.
     (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
     ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (Q ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)).
   Proof.
-    rewrite /untilI. iIntros (HMask) "#HG2 (Oa& #OI)".
+    rewrite !untilI_unfold. iIntros (HMask) "#HG2 (Oa& #OI)".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
     iIntros "!> %%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
     iNext. iDestruct "H" as "(Oa1& Oa2& HQ)". iCombine "Oa1 Oa2" as "Oa".
@@ -1088,7 +1095,7 @@ Section until_rules.
   Lemma untilI_discharged_false N k b q P Q G2 :
     untilI N k b q P Q G2 -∗ oblP_discharged k -∗ False.
   Proof.
-    rewrite /untilI. iIntros "[Oa _] #Of".
+    rewrite !untilI_unfold. iIntros "[Oa _] #Of".
     iPoseProof (oblP_assigned_discharged_false with "Oa Of") as "%". done.
   Qed.
 
@@ -1097,7 +1104,7 @@ Section until_rules.
     untilI N k b q P Q G2 ={E,E ∖ ↑N}=∗
     ▷ ((if b then Q else P) ∗ ((▷ if b then Q else P) ={E ∖ ↑N,E}=∗ untilI N k b q P Q G2)).
   Proof.
-    rewrite /untilI. iIntros (Hmask) "(Oa& #OI)".
+    rewrite !untilI_unfold. iIntros (Hmask) "(Oa& #OI)".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: set_solver.
     iPoseProof ("H" with "Oa") as "[H ACC]".
     iModIntro. iNext. iDestruct "H" as "(Oa& H)". destruct b.
@@ -1361,7 +1368,8 @@ Section into_temporal.
   Context `{!lantanaGS Λ Σ}.
   Implicit Types G : tps Λ Σ.
 
-  Global Instance into_temporal_default P : IntoTemporal P tps_true | 100.
+  (** The fallback, used through the hint below. *)
+  Lemma into_temporal_default P : IntoTemporal P tps_true.
   Proof. apply temporal_true. Qed.
   Global Instance into_temporal_pure φ : IntoTemporal (⌜φ⌝ : iProp Σ) (tps_pure φ) | 10.
   Proof. apply temporal_pure. Qed.
@@ -1417,6 +1425,12 @@ Section into_temporal.
   Proof. done. Qed.
 
 End into_temporal.
+
+(* The fallback applies only to formulas without evars: while a statement is elaborated its
+   types may still contain evars, and the fallback would then win over the precise instances
+   (resolution is retried once the evars are solved). *)
+Global Hint Extern 100 (IntoTemporal ?P _) =>
+  assert_fails (has_evar P); notypeclasses refine (into_temporal_default P) : typeclass_instances.
 
 Section until_inferred.
   Context `{!lantanaGS Λ Σ}.
