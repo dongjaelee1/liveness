@@ -445,7 +445,7 @@ Section proof.
       { iPoseProof (ghost_map_lookup with "GMAt Mtkp") as "%LUt".
         iExFalso. iPoseProof (big_sepM_delete _ _ _ _ LUt with "HMt") as "[Hmt _]".
         iDestruct "Hmt" as "(_& [Hmt | Hmt])"; cycle 1.
-        { iDestruct "Hmt" as "(_& Ukp)". iEval (rewrite /finallyI /untilI) in "Ukp".
+        { iDestruct "Hmt" as "(_& Ukp)". iEval (rewrite /finallyI untilI_unfold) in "Ukp".
           iDestruct "Ukp" as "(Oa& _)". iPoseProof (oblP_assigned_discharged_false with "Oa Gfkp")as "%". done. }
         iDestruct "Hmt" as "(%Boundmy& _)". assert (Boundmy1 : (0 ≤ my < c)%Z) by lia.
         iPoseProof (ghost_map_lookup with "GMAa GMEaku") as "%LUa".
