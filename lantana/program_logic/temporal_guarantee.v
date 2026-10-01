@@ -1426,10 +1426,11 @@ Section into_temporal.
 
 End into_temporal.
 
-(* The fallback applies only to formulas without evars: while a statement is elaborated its
-   types may still contain evars, and the fallback would then win over the precise instances
-   (resolution is retried once the evars are solved). *)
-Global Hint Extern 100 (IntoTemporal ?P _) =>
+(* The fallback applies only when the formula and the ghost-state instance contain no evars:
+   while a statement is elaborated they may still, and the fallback would then win over the
+   precise instances (resolution is retried once the evars are solved). *)
+Global Hint Extern 100 (@IntoTemporal ?Λ ?Σ ?H ?P _) =>
+  assert_fails (has_evar Λ); assert_fails (has_evar Σ); assert_fails (has_evar H);
   assert_fails (has_evar P); notypeclasses refine (into_temporal_default P) : typeclass_instances.
 
 Section until_inferred.
