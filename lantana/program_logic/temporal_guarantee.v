@@ -17,7 +17,21 @@ From lantana.prelude Require Import axioms.
 
     Trace properties are semantic ([tps]): a step-indexed trace predicate [tps_ti], which is
     what the program logic establishes, together with a trace property [tps_tr] that it
-    soundly approximates. Adequacy concludes [tps_tr G], and hence anything it implies. *)
+    soundly approximates. Adequacy concludes [tps_tr G], and hence anything it implies.
+
+    Limitations, by design:
+    - A quantifier can be trace-visible ([tps_exist]) only over types with the existential
+      property of the step index (nat, Z, loc, gname, ...): over larger types (iProp, tps) no
+      sound adequacy could read the witness off the trace. Over those, existentials are ghost
+      ([temporal_exist_ghost]): the guarantee of the body must not depend on the witness.
+    - The trace property [G] of the adequacy is fixed at the meta level; dynamically created
+      names reach it through trace-visible existentials, typically under a [finally]
+      allocated at time 0 (see lantana_heap_lang/examples/flag_fork.v).
+    - [tguar] mentions the running system ([lwp_fix]), so this layer is specific to Lantana's
+      weakest precondition and to [ordSI].
+    - Recursion through trace-visible positions (e.g. an until whose right side refers to the
+      formula itself) has no fixed trace property; guarded recursion is supported when the
+      guarantee is fixed ([temporal_always_later], [temporal_until_later], Löb). *)
 
 (** ** Semantic trace properties *)
 
