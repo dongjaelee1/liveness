@@ -155,6 +155,23 @@ Section tps_connectives.
   Proof. intros H1 H2 ??. by rewrite H1 H2. Qed.
   Lemma tps_le_true G : tps_le G tps_true.
   Proof. intros ??. by iIntros "_". Qed.
+  Lemma tps_and_elim_l G1 G2 : tps_le (tps_and G1 G2) G1.
+  Proof. intros ??. rewrite /= /ti_and. by iIntros "[$ _]". Qed.
+  Lemma tps_and_elim_r G1 G2 : tps_le (tps_and G1 G2) G2.
+  Proof. intros ??. rewrite /= /ti_and. by iIntros "[_ $]". Qed.
+
+  Lemma tps_always_mono G G' : tps_le G G' → tps_le (tps_always G) (tps_always G').
+  Proof.
+    intros Hle H τ. cbn. iIntros "H".
+    iAssert (∀ τ, ti_always (tps_ti G) (ti_pure True) τ -∗ ti_always (tps_ti G') (ti_pure True) τ)%I
+      with "[]" as "Hal"; last by iApply "Hal".
+    iLöb as "IH". iIntros (τ') "H". rewrite !ti_always_unfold /ti_always_pre.
+    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iSplit.
+    - iDestruct "H" as "[H _]". by iApply Hle.
+    - iDestruct "H" as "[_ H]". iMod "H". iModIntro. iSplit; first by iDestruct "H" as "[$ _]".
+      iDestruct "H" as "[_ H]". iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
+      by iApply "IH".
+  Qed.
 
 End tps_connectives.
 
@@ -362,7 +379,8 @@ Section rules.
     iIntros "#HG !>" (?????????) "(HI& MI& #HP)". iApply (temporal_elim with "HG"). iFrame "HI MI HP".
   Qed.
 
-  Lemma temporal_always N P G : P ⊨ₜ G -∗ inv N P ⊨ₜ tps_always G.
+  (** The guarantee of the content is only needed after a step, so it may be guarded. *)
+  Lemma temporal_always_later N P G : ▷ (P ⊨ₜ G) -∗ inv N P ⊨ₜ tps_always G.
   Proof.
     iIntros "#HG !>" (h0 n σ Θ κs m0 v1 Ω1 W0) "(_& _& #TF) !>".
     iIntros (s h TQ g v2 Ω2 W τf γ (BEH& FS& LEv& LEO& LB& HIST& EQTQ)) "([HI SIa]& MI& WPs)".
@@ -513,8 +531,11 @@ Section rules.
       iModIntro. iMod "close" as "_". iModIntro. iFrame.
   Qed.
 
-  Lemma temporal_until N k b q L1 L2 G1 G2 :
-    L1 ⊨ₜ G1 -∗ L2 ⊨ₜ G2 -∗ untilI N k b q L1 L2 G2 ⊨ₜ tps_until G1 G2.
+  Lemma temporal_always N P G : P ⊨ₜ G -∗ inv N P ⊨ₜ tps_always G.
+  Proof. iIntros "#HG". iApply temporal_always_later. by iNext. Qed.
+
+  Lemma temporal_until_later N k b q L1 L2 G1 G2 :
+    ▷ (L1 ⊨ₜ G1) -∗ ▷ (L2 ⊨ₜ G2) -∗ untilI N k b q L1 L2 G2 ⊨ₜ tps_until G1 G2.
   Proof.
     iIntros "#HG1 #HG2 !>" (h0 n σ Θ κs m0 v1 Ω1 W0) "(HI0& MI0& HU)". rewrite /untilI. iDestruct "HU" as "[OA #TF]".
     iDestruct "MI0" as "(MI0& S& _)".
@@ -865,6 +886,10 @@ Section rules.
       1: eauto. 1: eauto. 1: done.
       iFrame.
   Qed.
+
+  Lemma temporal_until N k b q L1 L2 G1 G2 :
+    L1 ⊨ₜ G1 -∗ L2 ⊨ₜ G2 -∗ untilI N k b q L1 L2 G2 ⊨ₜ tps_until G1 G2.
+  Proof. iIntros "#HG1 #HG2". iApply temporal_until_later; by iNext. Qed.
 
 End rules.
 Section until_rules.

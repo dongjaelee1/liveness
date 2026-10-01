@@ -75,3 +75,31 @@ Section registry.
   Qed.
 
 End registry.
+
+(** * Guarded recursion
+
+    Temporal formulas can be defined by guarded recursion like any iProp, and their
+    guarantees proven by Löb induction: the rules for invariants and untils only need the
+    guarantee of their content later. *)
+Section recursion.
+  Context `{!lantanaGS Λ Σ}.
+
+  (** Invariants nested forever: each content holds [Q] and the next invariant. *)
+  Definition nest_pre N (Q : iProp Σ) (X : iPropO Σ) : iPropO Σ := inv N (Q ∗ X).
+  Local Instance nest_pre_contractive N Q : Contractive (nest_pre N Q).
+  Proof. solve_contractive. Qed.
+  Definition nest N Q : iProp Σ := fixpoint (nest_pre N Q).
+  Lemma nest_unfold N Q : nest N Q ≡ inv N (Q ∗ nest N Q).
+  Proof. apply (fixpoint_unfold (nest_pre N Q)). Qed.
+
+  Lemma nest_temporal N Q (G : tps Λ Σ) : Q ⊨ₜ G -∗ nest N Q ⊨ₜ tps_always G.
+  Proof.
+    iIntros "#HQ". iLöb as "IH".
+    iApply (temporal_mono (inv N (Q ∗ nest N Q)) with "[]").
+    { iIntros "!> H". iEval (rewrite nest_unfold) in "H". done. }
+    iApply (temporal_weaken _ (tps_always (tps_and G (tps_always G)))).
+    { apply tps_always_mono, tps_and_elim_l. }
+    iApply temporal_always_later. iNext. iApply (temporal_sep with "HQ IH").
+  Qed.
+
+End recursion.
