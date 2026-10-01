@@ -605,6 +605,11 @@ Section proof.
   Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tps tl.
   Proof. apply (into_temporal _ _). Qed.
 
+  (** Clients see the lock's guarantee, not its invariant. *)
+  Global Instance is_fair_lock_into_temporal tl γ R :
+    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
+  Proof. apply is_fair_lock_temporal. Qed.
+
 End proof.
 
 (** ** Starvation freedom, at the level of traces *)
