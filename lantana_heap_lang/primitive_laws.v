@@ -61,8 +61,6 @@ Global Arguments pointsto {Σ _}.
 
 Notation "l ↦ dq v" := (pointsto l dq v)
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
-Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%P
-                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tp_scope.
 
 (** Exact ownership of a thread's expression in its caller context. *)
 Definition thread_expr `{heap_stateGS Σ}
@@ -73,8 +71,6 @@ Definition thread_expr `{heap_stateGS Σ}
     returned from a function within a larger thread expression. *)
 Notation "'exits' v @ i" := (thread_expr i [] (of_val v))%I
   (at level 20, v, i at level 1, format "exits  v @ i") : bi_scope.
-Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%P
-  (at level 20, v, i at level 1, format "exits  v @ i") : tp_scope.
 Notation "l ↦ dq v" := (tr_atomic (pred_pointsto l dq v))
   (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tr_scope.
 Notation "'exits' v @ i" := (tr_atomic (pred_expr i [] (of_val v)))
@@ -83,9 +79,6 @@ Notation "'exits' v @ i" := (tr_atomic (pred_expr i [] (of_val v)))
 (** The terminal atom means actual value reachability, with no hidden context.
     This equivalence is purely semantic; clients establish its left-hand side
     under the behavior and fair-scheduling premises of adequacy. *)
-Lemma exits_finally_preserved (τ : trace heap_lang) i v :
-  tp_trace (tp_finally (exits v@i))%P τ ↔ tr_eventually (exits v@i)%R τ.
-Proof. reflexivity. Qed.
 Lemma exits_finally_iff (τ : trace heap_lang) i v :
   tr_eventually (exits v@i)%R τ ↔
   ∃ n, τ.1 ≤ n ∧ (τ.2 n).1.1.1 !! i = Some (of_val v).

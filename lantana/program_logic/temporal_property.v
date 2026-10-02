@@ -2,66 +2,11 @@ From iris.prelude Require Import options.
 From lantana.program_logic Require Export language.
 From lantana.prelude Require Import axioms.
 
-(** ** Syntax for writing temporal formulae; cf., LTL, CTL*. *)
-Inductive tp {Π : Type} :=
-| tp_atomic (π : Π)
-| tp_pure (p : Prop)
-| tp_and (P Q : tp)
-| tp_or (P Q : tp)
-(** Implication with any trace property on the left. (Its meaning is plain implication of
-    trace properties; the program logic can establish it, see [tps_impl].) *)
-| tp_impl (P Q : tp)
-| tp_forall (A : Type) (P : A → tp)
-| tp_exist (A : Type) (P : A → tp)
-| tp_always (P : tp)
-| tp_until (P Q : tp)
-.
+(** * Trace predicates
 
-Global Arguments tp : clear implicits.
-Global Arguments tp {Π}.
+    Properties of executions ([trProp]), with the LTL connectives. The program logic's
+    trace properties ([tps], temporal_guarantee.v) have these as their trace readings. *)
 
-(** Notations *)
-
-Declare Scope tp_scope.
-Delimit Scope tp_scope with P.
-Bind Scope tp_scope with tp.
-
-Notation "➢ π" := (tp_atomic π) (at level 50, π at level 1) : tp_scope.
-Notation "'⌜' p '⌝'" := (tp_pure p) (at level 0, p at level 200) : tp_scope.
-Infix "∧" := (tp_and) : tp_scope.
-Infix "∨" := (tp_or) : tp_scope.
-Infix "→" := (tp_impl) : tp_scope.
-Notation f_forall A := (tp_forall A).
-Notation "∀'" := (f_forall _) (only parsing) : tp_scope.
-Notation "∀ a .. z , P" := (f_forall _ (λ a, .. (f_forall _ (λ z, P%P)) ..)) : tp_scope.
-Notation f_exist A := (tp_exist A).
-Notation "∃'" := (f_exist _) (only parsing) : tp_scope.
-Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%P)) ..)) : tp_scope.
-
-(** Define patterns corresponding to LTL temporal properties. *)
-(* Eventually P *)
-Definition tp_finally {Π} (P : @tp Π) : tp :=
-  (tp_until ⌜ True ⌝ P)%P.
-Global Arguments tp_finally {Π}.
-
-(* P Weak until Q *)
-Definition tp_weakuntil {Π} (P Q : @tp Π) : tp :=
-  (tp_until P (Q ∨ tp_always P))%P.
-Global Arguments tp_weakuntil {Π}.
-
-(* P Release Q *)
-Definition tp_release {Π} (P Q : @tp Π) : tp :=
-  (tp_weakuntil Q (Q ∧ P))%P.
-Global Arguments tp_release {Π}.
-
-(* P Strong release Q *)
-Definition tp_strongrelease {Π} (P Q : @tp Π) : tp :=
-  (tp_until Q (Q ∧ P))%P.
-Global Arguments tp_strongrelease {Π}.
-
-Definition tp_true {Π} : @tp Π := ⌜ True ⌝%P.
-
-(** ** Semantics. *)
 (** trace_state properties *)
 Definition tsProp (Λ : language) := trace_state Λ → Prop.
 
@@ -135,23 +80,42 @@ Notation r_exist A := (tr_exist A).
 Notation "∃'" := (r_exist _) (only parsing) : tr_scope.
 Notation "∃ a .. z , P" := (r_exist _ (λ a, .. (r_exist _ (λ z, P%R)) ..)) : tr_scope.
 
-(** ** Interpretation *)
-Fixpoint tp_trace {Λ : language} (Φ : @tp (state_pred Λ)) : trProp Λ :=
-  match Φ with
-  | tp_atomic π => tr_atomic π
-  | tp_pure p => (⌜p⌝)%R
-  | tp_and P Q => (tp_trace P ∧ tp_trace Q)%R
-  | tp_or P Q => (tp_trace P ∨ tp_trace Q)%R
-  | tp_impl P Q => (tp_trace P → tp_trace Q)%R
-  | tp_forall A P => (∀ (a : A), tp_trace (P a))%R
-  | tp_exist A P => (∃ (a : A), tp_trace (P a))%R
-  | tp_always P => tr_always (tp_trace P)
-  | tp_until P Q => tr_until (tp_trace P) (tp_trace Q)
-  end.
-
 (** Useful patterns *)
 Definition tr_eventually {Λ : language} : trProp Λ → trProp Λ :=
   λ Q, tr_until (⌜ True ⌝)%R Q.
+
+(** ** Fixpoints of trace predicates *)
+Section tr_fixpoints.
+  Context {Λ : language}.
+  Implicit Types R : trProp Λ.
+  Implicit Types Φ : trProp Λ → trProp Λ.
+
+  Definition tr_mono Φ : Prop := ∀ R R', (∀ τ, R τ → R' τ) → ∀ τ, Φ R τ → Φ R' τ.
+  Definition tr_gfp Φ : trProp Λ := λ τ, ∃ R, (∀ τ', R τ' → Φ R τ') ∧ R τ.
+  Definition tr_lfp Φ : trProp Λ := λ τ, ∀ R, (∀ τ', Φ R τ' → R τ') → R τ.
+
+  Lemma tr_gfp_coind Φ R : (∀ τ, R τ → Φ R τ) → ∀ τ, R τ → tr_gfp Φ τ.
+  Proof. intros HR τ Hτ. by exists R. Qed.
+  Lemma tr_gfp_unfold_l Φ : tr_mono Φ → ∀ τ, tr_gfp Φ τ → Φ (tr_gfp Φ) τ.
+  Proof.
+    intros Hm τ (R & HR & Hτ). eapply Hm; last by apply HR. intros τ' Hτ'. by exists R.
+  Qed.
+  Lemma tr_gfp_unfold_r Φ : tr_mono Φ → ∀ τ, Φ (tr_gfp Φ) τ → tr_gfp Φ τ.
+  Proof.
+    intros Hm τ Hτ. exists (Φ (tr_gfp Φ)). split; last done.
+    intros τ' Hτ'. eapply Hm; [|exact Hτ']. by apply tr_gfp_unfold_l.
+  Qed.
+
+  Lemma tr_lfp_ind Φ R : (∀ τ, Φ R τ → R τ) → ∀ τ, tr_lfp Φ τ → R τ.
+  Proof. intros HR τ H. by apply H. Qed.
+  Lemma tr_lfp_unfold_r Φ : tr_mono Φ → ∀ τ, Φ (tr_lfp Φ) τ → tr_lfp Φ τ.
+  Proof. intros Hm τ Hτ R HR. apply HR. eapply Hm; [|exact Hτ]. intros τ' H'. by apply H'. Qed.
+  Lemma tr_lfp_unfold_l Φ : tr_mono Φ → ∀ τ, tr_lfp Φ τ → Φ (tr_lfp Φ) τ.
+  Proof.
+    intros Hm τ H. apply H. intros τ' H'. eapply Hm; [|exact H']. intros τ'' H''.
+    by apply tr_lfp_unfold_r.
+  Qed.
+End tr_fixpoints.
 
 (** ** Define fair scheduling as a property of a trace. *)
 

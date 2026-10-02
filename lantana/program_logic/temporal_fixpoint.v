@@ -27,38 +27,6 @@ From lantana.prelude Require Import axioms.
     step built into [tps_always] and [tps_until]; with them, [tps_always G] is
     [ν X. ⊳(G ∧ ○X)] and [tps_until G1 G2] is below [μ X. ⊳(G2 ∨ (G1 ∧ ○X))]. *)
 
-(** ** Fixpoints of trace predicates *)
-Section tr_fixpoints.
-  Context {Λ : language}.
-  Implicit Types R : trProp Λ.
-  Implicit Types Φ : trProp Λ → trProp Λ.
-
-  Definition tr_mono Φ : Prop := ∀ R R', (∀ τ, R τ → R' τ) → ∀ τ, Φ R τ → Φ R' τ.
-  Definition tr_gfp Φ : trProp Λ := λ τ, ∃ R, (∀ τ', R τ' → Φ R τ') ∧ R τ.
-  Definition tr_lfp Φ : trProp Λ := λ τ, ∀ R, (∀ τ', Φ R τ' → R τ') → R τ.
-
-  Lemma tr_gfp_coind Φ R : (∀ τ, R τ → Φ R τ) → ∀ τ, R τ → tr_gfp Φ τ.
-  Proof. intros HR τ Hτ. by exists R. Qed.
-  Lemma tr_gfp_unfold_l Φ : tr_mono Φ → ∀ τ, tr_gfp Φ τ → Φ (tr_gfp Φ) τ.
-  Proof.
-    intros Hm τ (R & HR & Hτ). eapply Hm; last by apply HR. intros τ' Hτ'. by exists R.
-  Qed.
-  Lemma tr_gfp_unfold_r Φ : tr_mono Φ → ∀ τ, Φ (tr_gfp Φ) τ → tr_gfp Φ τ.
-  Proof.
-    intros Hm τ Hτ. exists (Φ (tr_gfp Φ)). split; last done.
-    intros τ' Hτ'. eapply Hm; [|exact Hτ']. by apply tr_gfp_unfold_l.
-  Qed.
-
-  Lemma tr_lfp_ind Φ R : (∀ τ, Φ R τ → R τ) → ∀ τ, tr_lfp Φ τ → R τ.
-  Proof. intros HR τ H. by apply H. Qed.
-  Lemma tr_lfp_unfold_r Φ : tr_mono Φ → ∀ τ, Φ (tr_lfp Φ) τ → tr_lfp Φ τ.
-  Proof. intros Hm τ Hτ R HR. apply HR. eapply Hm; [|exact Hτ]. intros τ' H'. by apply H'. Qed.
-  Lemma tr_lfp_unfold_l Φ : tr_mono Φ → ∀ τ, tr_lfp Φ τ → Φ (tr_lfp Φ) τ.
-  Proof.
-    intros Hm τ H. apply H. intros τ' H'. eapply Hm; [|exact H']. intros τ'' H''.
-    by apply tr_lfp_unfold_r.
-  Qed.
-End tr_fixpoints.
 
 (** ** Trace predicates, the in-logic step, and the next position *)
 Section connectives.

@@ -260,15 +260,9 @@ End proof.
 
 Section trace.
 
-  (** Export to trace properties *)
-  Definition is_flag_tp (l : loc) : tp :=
-    (tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (l ↦ #1))))%P.
-
+  (** The flag at the level of traces: [0] until [1], and [1] from then on. *)
   Definition is_flag_tr (l : loc) : trProp heap_lang :=
     tr_always (tr_until (l ↦ #0) (l ↦ #1) ∨ (l ↦ #1))%R.
-  Lemma is_flag_tr_preserved l τ : tp_trace (is_flag_tp l) τ ↔ is_flag_tr l τ.
-  Proof. reflexivity. Qed.
-
   (** The guaranteed trace property implies [is_flag_tr]. *)
   Lemma flag_tps_impl {Σ : gFunctors} l :
     ∀ τ, tps_tr (flag_tps (Σ:=Σ) l) τ → is_flag_tr l τ.

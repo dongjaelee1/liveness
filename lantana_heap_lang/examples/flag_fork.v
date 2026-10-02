@@ -169,13 +169,8 @@ Section adequacy.
 
   (** The main thread returns 42, and a flag gets created that is [0] until it is [1] and
       then stays [1]; in particular, the forked thread sets it. *)
-  Let Φ : tp :=
-        (tp_finally (exits #42@i) ∧ tp_finally (∃ x : loc, is_flag_tp x))%P.
-
   Let R_main : trProp heap_lang :=
         (tr_eventually (exits #42@i) ∧ tr_eventually (∃ x : loc, is_flag_tr x))%R.
-  Remark R_main_preserved τ : tp_trace Φ τ ↔ R_main τ.
-  Proof. reflexivity. Qed.
 
   Let Nr := nroot.@ "flag_fork_ret".
   Let Nc := nroot.@ "flag_fork_flag".

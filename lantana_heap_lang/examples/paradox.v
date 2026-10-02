@@ -475,14 +475,8 @@ Section adequacy.
   Let Θ0 : thread_pool heap_lang := {[i := loop #(); j := loop #()]}.
   Let σ0 : gmap loc (option val) := ∅.
 
-  Let Φ : tp (Π:=state_pred) :=
-        (tp_finally (⌜ False ⌝) ∧
-         tp_finally (⌜ True ⌝))%P.
-
   Let R_main : trProp heap_lang :=
         (tr_eventually ⌜ False ⌝ ∧ tr_eventually ⌜ True ⌝)%R.
-  Remark R_main_preserved τ : tp_trace Φ τ ↔ R_main τ.
-  Proof. reflexivity. Qed.
 
   Let N := nroot .@ "paradox_inv".
   Let Nu := nroot .@ "paradox_until".

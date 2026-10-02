@@ -175,17 +175,9 @@ Section adequacy.
   Let Θ0 : thread_pool heap_lang := {[i := writer #(); j := reader #()]}.
   Let σ0 : gmap loc (option val) := {[l := Some #0]}.
 
-  Let Φ : tp :=
-        (is_flag_tp l ∧
-         tp_until (l ↦ #0) (l ↦ #1) ∧
-         tp_finally (exits #()@i) ∧
-         tp_finally (exits #1@j))%P.
-
   Let R_main : trProp heap_lang :=
         (is_flag_tr l ∧ tr_until (l ↦ #0) (l ↦ #1) ∧
          tr_eventually (exits #()@i) ∧ tr_eventually (exits #1@j))%R.
-  Remark R_main_preserved τ : tp_trace Φ τ ↔ R_main τ.
-  Proof. reflexivity. Qed.
 
   Let N := nroot.@ "flag".
   Let Na := N.@ "always".

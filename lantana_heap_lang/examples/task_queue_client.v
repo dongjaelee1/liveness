@@ -278,13 +278,8 @@ Section adequacy.
 
   (** The main thread returns 1, and a flag gets created that is [0] until it is [1] and
       then stays [1]; in particular, the task chain run by the worker sets it. *)
-  Let Φ : tp :=
-        (tp_finally (exits #1@i) ∧ tp_finally (∃ x : loc, is_flag_tp x))%P.
-
   Let R_main : trProp heap_lang :=
         (tr_eventually (exits #1@i) ∧ tr_eventually (∃ x : loc, is_flag_tr x))%R.
-  Remark R_main_preserved τ : tp_trace Φ τ ↔ R_main τ.
-  Proof. reflexivity. Qed.
 
   (** Moreover, a task queue gets created whose lock makes release progress: whenever its
       lock is held, it is eventually released. *)
