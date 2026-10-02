@@ -77,7 +77,7 @@ Section proof2.
       iMod ("WP" with "[] [//] [$HI $SIa]") as "WP".
       { iPureIntro. apply _. }
       iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
-      iMod (model_interp_gupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
+      iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
       2: eapply LB.
       { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
       destruct H as [OND LB0].
@@ -114,8 +114,7 @@ Section proof2.
                                                           end))%I with "[Efs]" as "Efs".
       { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
         destruct (to_val x) eqn:EQx.
-        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. iMod "WP".
-          iApply sfmupd_lwpupd. iMod "WP". by iModIntro.
+        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. by iApply lwpupd_trans.
         - iApply "WP". }
       iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
       { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
@@ -123,10 +122,11 @@ Section proof2.
         apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
       1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2.
       * rewrite lwp_fix_unfold_fix /lwp_pre He2.
-        iDestruct "HI" as "[HI SIa]".
-        iMod (all_interp_sfgupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)".
-        2: eapply LB4.
-        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+        iMod (all_interp_lwpupd_steps γ2 with "WP HI MI") as "(WP& [HI SIa]& %g3& %v3& %Ω5& %W5& %& MI)".
+        { subst Θ2. rewrite lookup_union_l.
+          - apply lookup_insert_eq.
+          - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+        1: eapply LB4.
         destruct H as [LEO3 LB5].
         iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                    (match to_val e with
@@ -260,7 +260,7 @@ Section proof2.
     { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
       rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
       simpl. destruct (to_val e) eqn:He.
-      - iMod "H". iApply sfmupd_lwpupd. iMod "H". by iModIntro.
+      - by iApply lwpupd_trans.
       - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
     iMod (all_interp_lwpupd_steps_gmap γ with "WPs [$HI $SIa] MI") as "(WPs& HI& %&%&%&%& %& MI)".
     { subst Θ. done. }
