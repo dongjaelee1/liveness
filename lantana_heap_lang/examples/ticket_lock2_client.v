@@ -160,8 +160,12 @@ Section adequacy.
 
   (** The main thread returns 42, and a ticket lock gets created that is starvation free. *)
   Definition client_spec : trProp heap_lang :=
-    tr_and (tp_trace (tp_finally (exits #42@i)))
+    tr_and (tr_eventually (exits #42@i)%R)
            (tr_eventually (λ τ, ∃ next curr : loc, starvation_free next curr τ)).
+  Remark client_spec_preserved τ :
+    tr_and (tp_trace (tp_finally (exits #42@i)))
+           (tr_eventually (λ τ, ∃ next curr : loc, starvation_free next curr τ)) τ ↔ client_spec τ.
+  Proof. reflexivity. Qed.
 
   Let Nr := nroot.@ "tl_client_ret".
   Let Nc := nroot.@ "tl_client_lock".

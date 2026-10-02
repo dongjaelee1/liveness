@@ -281,6 +281,11 @@ Section adequacy.
   Let Φ : tp :=
         (tp_finally (exits #1@i) ∧ tp_finally (∃ x : loc, is_flag_tp x))%P.
 
+  Let R_main : trProp heap_lang :=
+        (tr_eventually (exits #1@i) ∧ tr_eventually (∃ x : loc, is_flag_tr x))%R.
+  Remark R_main_preserved τ : tp_trace Φ τ ↔ R_main τ.
+  Proof. reflexivity. Qed.
+
   (** Moreover, a task queue gets created whose lock makes release progress: whenever its
       lock is held, it is eventually released. *)
   Let R_queue : trProp heap_lang :=
@@ -306,7 +311,7 @@ Section adequacy.
   Lemma Φ_P_temporal `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → tp_trace Φ τ ∧ R_queue τ.
+  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → R_main τ ∧ R_queue τ.
   Proof.
     intros (Hr& Hf& _). destruct τ as [n τf]. destruct Hf as (m& Hm& [[x Hx] [ql Hq]]& Hb).
     split; [split; first exact Hr|].
@@ -334,11 +339,11 @@ Section adequacy.
     fair_scheduling τ →
     (τ.1 = 0) →
     (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
-    tp_trace Φ τ ∧ R_queue τ.
+    R_main τ ∧ R_queue τ.
   Proof.
     intros τ Beh FS Init1 Init2.
     eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main
-              (λ τ, tp_trace Φ τ ∧ R_queue τ)).
+              (λ τ, R_main τ ∧ R_queue τ)).
     { apply G_main_impl. }
     1,2,3,4: eauto.
     iIntros (?). exists 0%ord.

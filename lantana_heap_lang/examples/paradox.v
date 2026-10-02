@@ -479,6 +479,11 @@ Section adequacy.
         (tp_finally (⌜ False ⌝) ∧
          tp_finally (⌜ True ⌝))%P.
 
+  Let R_main : trProp heap_lang :=
+        (tr_eventually ⌜ False ⌝ ∧ tr_eventually ⌜ True ⌝)%R.
+  Remark R_main_preserved τ : tp_trace Φ τ ↔ R_main τ.
+  Proof. reflexivity. Qed.
+
   Let N := nroot .@ "paradox_inv".
   Let Nu := nroot .@ "paradox_until".
   Let N1 := nroot .@ "paradox_false".
@@ -503,7 +508,7 @@ Section adequacy.
   Lemma Φ_P_temporal `{!heapGS Σ} `{!mcntsG Σ} : ⊢ Φ_P ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → tp_trace Φ τ.
+  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → R_main τ.
   Proof.
     destruct τ as [n τf]. intros (Hf& (m& Hm& _& Hb)& _). split; first exact Hf.
     exists m. split_and!; [done|done|]. intros. done.
@@ -527,10 +532,10 @@ Section adequacy.
     fair_scheduling τ →
     (τ.1 = 0) →
     (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
-    tp_trace Φ τ.
+    R_main τ.
   Proof.
     intros LNLC τ Beh FS Init1 Init2.
-    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main (tp_trace Φ)).
+    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main (R_main)).
     { apply G_main_impl. }
     1,2,3,4: eauto.
     iIntros (?). exists 10%ord.

@@ -181,6 +181,12 @@ Section adequacy.
          tp_finally (exits #()@i) ∧
          tp_finally (exits #1@j))%P.
 
+  Let R_main : trProp heap_lang :=
+        (is_flag_tr l ∧ tr_until (l ↦ #0) (l ↦ #1) ∧
+         tr_eventually (exits #()@i) ∧ tr_eventually (exits #1@j))%R.
+  Remark R_main_preserved τ : tp_trace Φ τ ↔ R_main τ.
+  Proof. reflexivity. Qed.
+
   Let N := nroot.@ "flag".
   Let Na := N.@ "always".
   Let Np := N.@ "pointsto".
@@ -207,7 +213,7 @@ Section adequacy.
   Lemma Φ_P_temporal `{!heapGS Σ} m1 m2 : ⊢ Φ_P m1 m2 ⊨ₜ G_client.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_client_impl {Σ} τ : tps_tr (G_client (Σ:=Σ)) τ → tp_trace Φ τ.
+  Remark G_client_impl {Σ} τ : tps_tr (G_client (Σ:=Σ)) τ → R_main τ.
   Proof.
     intros (_& Hflag& Hu& Hf1& Hf2& _).
     split; [exact (flag_tps_impl l τ Hflag)|]. split; [exact Hu|]. split; [exact Hf1|exact Hf2].
@@ -228,10 +234,10 @@ Section adequacy.
     fair_scheduling τ →
     (τ.1 = 0) →
     (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
-    tp_trace Φ τ.
+    R_main τ.
   Proof.
     intros τ Beh FS Init1 Init2.
-    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_client (tp_trace Φ)).
+    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_client (R_main)).
     { apply G_client_impl. }
     1,2,3,4: eauto.
     iIntros (?). exists 0%ord.
