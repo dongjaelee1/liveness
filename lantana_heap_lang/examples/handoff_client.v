@@ -36,7 +36,8 @@ Section proof.
   Let Nl := nroot.@ "return".
   Let Nc := nroot.@ "handoff_client_flag".
 
-  (** The main proofs. Besides returning, the main thread commits to creating a flag. *)
+  (** The main proofs. Besides returning, the main thread commits to creating a flag and a
+      handoff cell. *)
 
   (** layers: set = 0 → task = 1 → flag obl = 1 → return obl = flag commitment = 2 *)
   Lemma main_spec :
@@ -44,7 +45,7 @@ Section proof.
     l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 2 μ ∗
          crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
          finallyT Nl kl 1 (exits #1@i) ∗
-         finallyT Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) }}}
+         finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) }}}
       main #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
   Proof using handoffG0.
@@ -101,10 +102,10 @@ Section proof.
     rewrite union_empty_r_L.
     (* Keep the commitment: the flag exists. *)
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LCc LC]".
-    iMod (finallyI_discharge with "LCc Cg HC [is_flag]") as "(_& Cg& _)".
+    iMod (finallyI_discharge with "LCc Cg HC []") as "(_& Cg& _)".
     { set_solver. }
     { set_solver. }
-    { iExists ptrx, k, 1%ordi. iFrame "is_flag". }
+    { iSplit; [iExists ptrx, k, 1%ordi; iFrame "is_flag"|iExists ptrb, γh, 1%ordi; iFrame "is_handoff"]. }
     replace ({[kl; kc]} ∖ {[kc]}) with ({[kl]} : gset oid) by set_solver.
     iPoseProof (crP_fuels_add_carrier with "GF00 GF") as "GF".
     lwp_pures.
@@ -157,7 +158,7 @@ Section proof.
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := main #() ]} →
     Φ = (λ μ, (∃ g kl kc, finallyT Nl kl 1 (exits #1@i) ∗
-                          finallyT Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) ∗
+                          finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
                           (thP_carriers i {[g]} ∗ crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
                            crP_fuel g 2 μ))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #1⌝)%I]}) →
@@ -175,7 +176,7 @@ Section proof.
     iMod ("Akl1" $! _ Nl True%I (exits #1@i)%I with "[]") as "Ukl1".
     { done. }
     iMod (untilI_alloc _ _ _ false 2 2 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
-    iMod ("Akc" $! _ Nc True%I (∃ x k ℓ, is_flag x k ℓ)%I with "[]") as "Ukc".
+    iMod ("Akc" $! _ Nc True%I ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ))%I with "[]") as "Ukc".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Gg1 Gf1 Ofkl1 Ofkc".
     { subst Φ. rewrite !union_empty_r_L.
@@ -210,27 +211,33 @@ Section adequacy.
   Let Φ : tp :=
         (tp_finally (exits #1@i) ∧ tp_finally (∃ x : loc, is_flag_tp x))%P.
 
+  (** Moreover, a handoff cell gets created that from then on always holds [NONE] or a task. *)
+  Let R_handoff : trProp heap_lang := tr_eventually (λ τ, ∃ b : loc, handoff_tr b τ).
+
   Let Nl := nroot.@ "return".
   Let Nc := nroot.@ "handoff_client_flag".
 
-  Let Φ_P `{!heapGS Σ} : _ → iProp Σ :=
+  Let Φ_P `{!heapGS Σ} `{!handoffG Σ} : _ → iProp Σ :=
         λ μ,
           (∃ g kl kc,
               finallyT Nl kl 1 (exits #1@i) ∗
-              finallyT Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) ∗
+              finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
               (thP_carriers i {[g]} ∗ crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗ crP_fuel g 2 μ))%I.
 
   Let G_main {Σ} : tps heap_lang Σ :=
-        (tps_finally (exits #1@i) ∧ tps_finally (tps_exist (λ x : loc, flag_tps x)) ∧ tps_true)%S.
+        (tps_finally (exits #1@i) ∧
+         tps_finally (tps_exist (λ x : loc, flag_tps x) ∧
+                      tps_exist (λ b : loc, tps_always (handoff_inv_tps b))) ∧ tps_true)%S.
 
-  Lemma Φ_P_temporal `{!heapGS Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
+  Lemma Φ_P_temporal `{!heapGS Σ} `{!handoffG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → tp_trace Φ τ.
+  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → tp_trace Φ τ ∧ R_handoff τ.
   Proof.
-    intros (Hr& Hf& _). split; first exact Hr.
-    destruct τ as [n τf]. destruct Hf as (m& Hm& [x Hx]& Hb).
-    exists m. split_and!; [done| |done]. exists x. exact (flag_tps_impl x (m, τf) Hx).
+    intros (Hr& Hf& _). destruct τ as [n τf]. destruct Hf as (m& Hm& [[x Hx] [b Hh]]& Hb).
+    split; [split; first exact Hr|].
+    - exists m. split_and!; [done| |done]. exists x. exact (flag_tps_impl x (m, τf) Hx).
+    - exists m. split_and!; [done| |done]. exists b. exact (handoff_inv_tps_tr b (m, τf) Hh).
   Qed.
 
   Let Σ : gFunctors :=
@@ -250,10 +257,11 @@ Section adequacy.
     fair_scheduling τ →
     (τ.1 = 0) →
     (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
-    tp_trace Φ τ.
+    tp_trace Φ τ ∧ R_handoff τ.
   Proof.
     intros τ Beh FS Init1 Init2.
-    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main (tp_trace Φ)).
+    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main
+              (λ τ, tp_trace Φ τ ∧ R_handoff τ)).
     { apply G_main_impl. }
     1,2,3,4: eauto.
     iIntros (?). exists 0%ord.
@@ -269,14 +277,15 @@ Section adequacy.
     { iDestruct "PI" as "[PI _]". by iFrame. }
     iSplitR; first done.
     iModIntro. iIntros "LC TGs".
-    iMod (main_pre (heapGS0:=HHeapGS) (handoffG0:=HandoffG Σ _) Θ0 i (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [TGs]") as "H".
+    iMod (main_pre (heapGS0:=HHeapGS) (handoffG0:=HandoffG Σ _) Θ0 i (Φ_P (heapGS0:=HHeapGS) (handoffG0:=HandoffG Σ _)) with "[Tis] [TGs]") as "H".
     { done. }
     { reflexivity. }
     { reflexivity. }
     { rewrite /thread_expr /=. iFrame. }
     { iFrame. }
     iDestruct "H" as (μ) "(HP& H)".
-    iModIntro. iExists (Φ_P μ). iFrame "HP H". iApply Φ_P_temporal.
+    iModIntro. iExists (Φ_P (heapGS0:=HHeapGS) (handoffG0:=HandoffG Σ _) μ). iFrame "HP H".
+    iApply Φ_P_temporal.
   Qed.
 
 End adequacy.
