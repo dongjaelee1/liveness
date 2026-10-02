@@ -4,13 +4,17 @@ From lantana.program_logic Require Export language weakestpre.
 From lantana.program_logic Require Export temporal_property.
 
 From transfinite.stepindex Require Import ordinals.
-(* From transfinite.base_logic Require Import satisfiable. *)
 From lantana.base_logic Require Import satisfiable.
 From lantana.algebra Require Import ordinal_existential_properties.
 
 From lantana.prelude Require Import axioms.
 
-(** Trace properties in iProp, intermediate representation for the adequacy proof. *)
+(** * Step-indexed trace connectives
+
+    The in-logic readings of trace properties (temporal_tps.v) are built from these: [ti_always]
+    and [ti_until] are guarded fixpoints, the until with a decreasing measure. The second half
+    of the file proves the facts about one step of the running system that the guarantee rules
+    and the adequacy theorem (temporal_guarantee.v) use. *)
 Notation tiProp Λ Σ := (trace Λ → iProp Σ).
 
 Definition ti_atomic `{SI : sidx} {Λ} {Σ} (π : state_pred Λ) : tiProp Λ Σ :=
@@ -37,7 +41,6 @@ Definition ti_exist `{SI : sidx} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ Σ
   λ A P, (λ τ, ∃ (a : A), (P a τ))%I.
 
 (** 'Always' is a co-inductive fixpoint. *)
-(* We need to use ∧ here for the proof. *)
 Definition ti_always_pre `{SI : sidx} `{!temporalGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
@@ -75,7 +78,6 @@ Local Instance ti_until_pre_contractive `{SI : sidx} `{!temporalGS Λ Σ} E
   : Contractive (ti_until_pre E ltA).
 Proof.
   rewrite /ti_until_pre. repeat intro. do 9 (f_equiv).
-  (* FIXME: f_equiv not working. *)
   f_contractive. do 1 (f_equiv). eapply dist_ne.
   { eapply H. }
   1,2: reflexivity.
@@ -139,73 +141,10 @@ Proof.
   change (ordinal_ucmra.OrdUR: Type) with Ord.t. apply iProp_sat_exists_instance.
 Qed.
 
-(* Global Instance iProp_sat_lc_at_SatisfiableAtFupd {Σ} `{!invGS Σ} : SatisfiableAtFupd (iProp_sat_lc_at). *)
-(* Proof. *)
-(*   apply sat_at_satisfiable_at_fupd. *)
-(* Qed. *)
-
-(* Global Instance iProp_sat_lc_at_frame_SatisfiableAtFupd {Σ} `{!invGS Σ} (F : iProp Σ) : SatisfiableAtFupd (iProp_sat_lc_at_frame F). *)
-(* Proof. *)
-(*   apply sat_at_frame_satisfiable_at_fupd. *)
-(* Qed. *)
-
-(* Print Universes. *)
-
-(* uPred_primitive.uPred_sat_exists.u0 = temporal_logic.ordSI.u0 *)
-(* tf_depth.u2 < uPred_primitive.uPred_sat_exists.u0 *)
-
-(* ordExistential_instance.u0 < uPred_primitive.uPred_sat_exists.u0 *)
-(* uPred_primitive.uPred_sat_exists.u0 = ordExistential_instance .u1 *)
-(* uPred_primitive.uPred_sat_exists.u0 = ordExistential_instance.u1 *)
-(* ucmra.u0 = cmra.u0 *)
-(* Ord.TYPE.u0 < cmra.u0 *)
-(* obl_class.u0 <= cmra.u0 *)
-(* indexT.u0 <= cmra.u0 *)
-(* ofe.u0 = cmra.u0 *)
-(* universes.Logic = cmra.u0 *)
-
-
-(* Unable to unify "?X" with "ucmra_car ordinal_ucmra.OrdUR" *)
-(* (unable to find a well-typed instantiation for "?X": cannot ensure that "Type@{ucmra.u0}" is a *)
-(* subtype of "Type@{uPred_primitive.uPred_sat_exists.u0}"). *)
-
-(* Global Instance ord_satisfiable_exists {Σ : gFunctors} : SatisfiableExists Ord.t (iProp_sat (Σ:=Σ)). *)
-(* Proof. apply iProp_sat_exists_instance. Qed. *)
-
-
-(* Global Instance iProp_sat_lc_satisfiable_rupd {Σ : gFunctors} `{!invGS Σ} : *)
-(*   SatisfiableRUpd (iProp_sat_lc). *)
-(* Proof. *)
-(*   apply sat_lc_satisfiable_rupd; try apply _. *)
-(*   apply iProp_sat_exists_instance. *)
-
-(*     econstructor. intros.  apply sat_exists in H. *)
-
-(* Unable to unify "?X" with "ucmra_car ordinal_ucmra.OrdUR" *)
-(* (unable to find a well-typed instantiation for "?X": cannot ensure that "Type@{ucmra.u0}" is a *)
-(* subtype of "Type@{uPred_primitive.uPred_sat_exists.u0}"). *)
-
-(* subtype of "Type@{uPred_primitive.uPred_sat_exists .u0}"). *)
-
-
 Section proof1.
   Context `{!temporalGS Λ Σ}.
   Context {A : Type} {ltA : A → A → Prop}.
   Implicit Type F : iProp Σ.
-
-  (* Lemma test1 (Ω1 : obls) i : *)
-  (*   iProp_sat (Σ:=Σ) (∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | obl_cond_owner i)⌝)) *)
-  (*   → (∃ Ω2, (Ω1 ↪ₚ Ω2 | obl_cond_owner i)). *)
-  (* Proof. *)
-  (*   intros. apply sat_exists in H. destruct H. apply sat_elim in H. eauto. *)
-  (* Qed. *)
-
-  (* Lemma test2 : *)
-  (*   iProp_sat (∃ (o : obl_fuel) k ℓ μ, oblP_fuel k ℓ μ ∗ witP_cred k o) *)
-  (*   → ∃ (o : obl_fuel) k ℓ μ, iProp_sat (oblP_fuel k ℓ μ ∗ witP_cred k o). *)
-  (* Proof. *)
-  (*   intros. do 4 (apply sat_exists in H; destruct H). eauto. *)
-  (* Qed. *)
 
   Lemma ti_always_trace_next F P1 P2 τ :
     iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 τ) →
@@ -252,10 +191,6 @@ End proof1.
 
 Section proof2.
   Context `{!lantanaGS Λ Σ}.
-
-  (* Local Definition D : Type := (prod obl_fuel nat). *)
-  (* Local Definition ltD : D → D → Prop := (prod_lt WFOCM.ltR lt). *)
-  (* Local Definition wf_ltD : well_founded ltD := (prod_lt_well_founded _ _ _ _ WFOCM.lt_wf Nat.lt_wf_0). *)
 
   Definition obls_thread_active (Ω : obls) (τ : trace Λ) :=
     map_Forall (λ _ o, match o with
@@ -332,7 +267,6 @@ Section proof2.
     - simpl in Stepk. destruct Stepk as [Turn | NoTurn].
       + destruct Turn as [-> Stepk]. simpl in Keepk. destruct o2; last done. clear Keepk.
         inv Stepk; cycle 1. 1: inv H.
-        (* FIXME: type checking fails without OC. *)
         inv H. simpl in *. exists (witness_assigned (OC:=ord_obl_class) (fair_sched_fun γ2 owner fuel0)).
         split_and !; auto.
         * left. split; auto. econstructor. econstructor. eapply (Ord.lt_le_lt); last eapply LBk.

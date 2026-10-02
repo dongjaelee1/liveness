@@ -213,7 +213,7 @@ Notation "l '↦_' I □" := (inv_pointsto l I%stdpp%type)
 Notation "l ↦_ I v" := (inv_pointsto_own l v I%stdpp%type)
                          (at level 20, I at level 9, format "l  ↦_ I  v") : bi_scope.
 
-(* TODO: define tf representations for inv_heap *)
+(* TODO: temporal guarantees (IntoTemporal instances) for inv_heap *)
 
 Section lifting.
 Context `{!heapGS Σ}.
