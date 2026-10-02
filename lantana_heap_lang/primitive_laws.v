@@ -61,8 +61,6 @@ Global Arguments pointsto {Σ _}.
 
 Notation "l ↦ dq v" := (pointsto l dq v)
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : bi_scope.
-Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%F
-                         (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tf_scope.
 Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%P
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tp_scope.
 
@@ -75,8 +73,6 @@ Definition thread_expr `{heap_stateGS Σ}
     returned from a function within a larger thread expression. *)
 Notation "'exits' v @ i" := (thread_expr i [] (of_val v))%I
   (at level 20, v, i at level 1, format "exits  v @ i") : bi_scope.
-Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%F
-  (at level 20, v, i at level 1, format "exits  v @ i") : tf_scope.
 Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%P
   (at level 20, v, i at level 1, format "exits  v @ i") : tp_scope.
 
@@ -359,32 +355,6 @@ Proof.
   - iModIntro. iApply ("Hfork" with "[$TEj $TGj GF2 $Cg2 $HP]").
     { iApply big_sepS_singleton. iFrame. }
     auto.
-Qed.
-
-(** Discharge at the actual final value, using credits from earlier steps. *)
-Lemma thread_expr_terminate i E v g ℓ k N :
-  ↑N ⊆ E →
-  thread_expr i [] (of_val v) -∗ £ (2 : Ord.t) -∗
-  thP_carriers i {[g]} -∗ crP_obls g ℓ {[k]} -∗
-  ⟦finallyP N k 1 (exits v@i)⟧ₗ -∗ |={E}=>m
-  thread_expr i [] (of_val v) ∗ thP_done i.
-Proof.
-  iIntros (Hmask) "TE LC TG Cg HF".
-  iMod (tf_until_discharge with "HF") as "HF"; first set_solver.
-  iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
-  iApply (lc_sfmupd_add_later with "LC1"). iNext.
-  iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
-  iMod ("HF" with "[TE]") as "HF".
-  { iNext. iEval (rewrite tf_atomic_logic). iFrame. }
-  iPoseProof ("HF" with "[] Cg") as "HF".
-  { iPureIntro. set_solver. }
-  iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
-  iApply (lc_sfmupd_add_later with "LC1"). iNext.
-  iMod ("HF" $! _) as "HF". iMod "HF" as "(TE& Gg& #Odkl)".
-  replace ({[k]} ∖ {[k]} : gset _) with (∅ : oids) by set_solver.
-  iMod (carrier_delete with "TG Gg") as "TG"; first set_solver.
-  replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
-  iMod (thread_terminate with "TG") as "$". by iFrame.
 Qed.
 
 (** ChooseNat *)

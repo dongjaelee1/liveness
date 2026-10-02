@@ -36,8 +36,8 @@ From lantana.prelude Require Import axioms.
 (** ** Semantic trace properties *)
 
 (** [tps_ti] is the trace predicate that the running system establishes inside the logic
-    (cf. [ti_logic]); [tps_good] says that its satisfiability implies [tps_tr]
-    (cf. [ti_logic_tp_trace]). *)
+    (step-indexed, with ordinal measures for eventualities); [tps_good] says that its
+    satisfiability implies [tps_tr], the trace property proper. *)
 Record tps {Λ : language} {Σ : gFunctors} := Tps {
   tps_ti : ∀ `{!temporalGS Λ Σ}, trace Λ → iProp Σ;
   tps_tr : trace Λ → Prop;
@@ -158,11 +158,6 @@ Section tps_connectives.
 
   Definition tps_finally G : tps Λ Σ := tps_until tps_true G.
 
-  (** Syntactic trace properties are a fragment. *)
-  Program Definition tps_of_tp (t : @tp (state_pred Λ)) : tps Λ Σ :=
-    {| tps_ti _ := ti_logic Ord.lt t; tps_tr := tp_trace t |}.
-  Next Obligation. intros t ? F τ H. by eapply (ti_logic_tp_trace Ord.lt_well_founded). Qed.
-
   Lemma tps_le_refl G : tps_le G G.
   Proof. intros ??. done. Qed.
   Lemma tps_le_trans G1 G2 G3 : tps_le G1 G2 → tps_le G2 G3 → tps_le G1 G3.
@@ -242,7 +237,7 @@ Section guarantee.
   (** [tguar G e]: from the event [e] (history index [n] with state [σ], pool [Θ] and
       observations [κs]; model-history index [v1] with obligations [Ω1]) on, every running
       system consistent with the history up to [e] establishes the step-indexed part of [G]
-      on the trace. (This is the induction hypothesis of [lwp_fix_ti_logic].) *)
+      on the trace. *)
   Definition tguar G n σ Θ κs v1 Ω1 : iProp Σ :=
     □ ∀ s h TQ g v2 Ω2 W τf γ,
       ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ v1 ≤ v2 ∧ obls_le Ω1 Ω2 ∧
@@ -1392,7 +1387,7 @@ Global Typeclasses Opaque temporal.
 (* Likewise for the connectives, which are records ([tps_true] and [tps_finally] stay
    abbreviations). User definitions of trace properties are still unfolded. *)
 Global Typeclasses Opaque tps_pure tps_atomic tps_and tps_or tps_impl tps_forall tps_exist
-  tps_always tps_until tps_of_tp tps_state.
+  tps_always tps_until tps_state.
 
 (** Big separating conjunctions guarantee the guarded family of their elements' guarantees. *)
 Section big_op_rules.
@@ -1559,54 +1554,6 @@ Global Hint Extern 100 (@IntoTemporal ?Λ ?Σ ?H ?P ?G) =>
   assert_fails (has_evar P);
   first [evar_headed G | unify G (@tps_true Λ Σ)];
   notypeclasses refine (into_temporal_default P) : typeclass_instances.
-
-(** ** The syntactic [tf] *)
-Section embed.
-  Context `{!lantanaGS Λ Σ}.
-
-  Lemma tf_temporal (Φ : tf (Π:=state_pred Λ) Σ) : ⊢ ⟦Φ⟧ₗ ⊨ₜ tps_of_tp (tf_to_tp Φ).
-  Proof.
-    rewrite /temporal. iIntros "!>" (h n σ Θ κs m i Ω W) "H". iPoseProof (tf_logic_tf_intuit with "H") as "#TF".
-    iIntros "!>" (s h' TQ g v2 Ω2 W' τf γ (BEH& FS& LEv& LEO& LB& HIST& EQTQ)) "([HI SIa]& MI& WPs)".
-    rewrite /threads_run. iApply (lwp_fix_ti_logic with "[-]"); eauto. iExists Φ. iSplit; first done. iFrame "HI SIa MI WPs TF".
-  Qed.
-
-  (** Old formulas keep their trace content when mixed with new ones. *)
-  Global Instance into_temporal_tf_logic (Φ : tf (Π:=state_pred Λ) Σ) :
-    IntoTemporal ⟦Φ⟧ₗ (tps_of_tp (tf_to_tp Φ)) | 10.
-  Proof. apply tf_temporal. Qed.
-
-End embed.
-
-(** The old adequacy theorem is the case of [tf] formulas. *)
-Corollary lwp_adequacy_via_temporal (Σ : gFunctors) (Λ : language)
-  `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
-  s σ Θ i κs (Φ : tp) :
-  ∀ (τ : trace Λ),
-  behavior τ →
-  fair_scheduling τ →
-  (τ.1 = 0) →
-  (τ.2 0 = (Θ, σ, i, κs)) →
-  (∀ `{Htemporal : !temporalGS Λ Σ},
-     ∃ (c : Ord.t),
-     ⊢ |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
-                (fork_post : thread_id → val Λ → iProp Σ)
-                (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
-     let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
-     state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
-      |={⊤}=>m (∃ (Φ' : tf Σ),
-                  (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
-                  (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
-  tp_trace Φ τ.
-Proof.
-  intros τ BEH FS INIT1 INIT2 Hwp.
-  eapply (lwp_adequacy_temporal _ _ s σ Θ i κs (tps_of_tp Φ)); [done..|].
-  intros Htemp. destruct (Hwp Htemp) as [c Hc]. exists c.
-  iMod Hc as (Hsic fork_post Ψs) "(SI& SIa& H)". iModIntro. iExists Hsic, fork_post, Ψs.
-  iFrame "SI SIa". iIntros "LC Ths". iMod ("H" with "LC Ths") as (Φ' <-) "[HΦ' H]".
-  iModIntro. iExists ⟦Φ'⟧ₗ. iFrame. iApply tf_temporal.
-Qed.
 
 (** ** Examples *)
 Section examples.
