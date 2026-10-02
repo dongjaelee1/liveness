@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.program_logic Require Export temporal_logic.
+From lantana.heap_lang Require Export temporal_laws.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
@@ -141,7 +141,7 @@ Section proof.
       inv Ni (queue_inv ℓ (queue_γq γ) (queue_γd γ)) ∗
       (queue_ticketlock_γ γ) ↪LOCK_AL□ ∗
       (queue_ticketlock_γ γ) ↪LOCK_CF□ 0 ∗
-      is_fair_lock tl (queue_ticketlock_γ γ) (⟨queue_lock φ (queue_γq γ) lhptr ltptr⟩).
+      is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr).
 
   (** Enables delayed initialization after picking a worker thread. *)
   Definition is_queue_init (ql :val) (γ : queue_γ) (φ : val → oids → iProp Σ) : iProp Σ :=
@@ -151,7 +151,7 @@ Section proof.
         ghost_var_frac (queue_γd γ) 1 (inhabitant : ocid) ∗
         (queue_ticketlock_γ γ) ↪LOCK_AL□ ∗
         (queue_ticketlock_γ γ) ↪LOCK_CF□ 0 ∗
-        is_fair_lock tl (queue_ticketlock_γ γ) (⟨queue_lock φ (queue_γq γ) lhptr ltptr⟩))%I.
+        is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I.
 
   (** ** Lemmas *)
 
@@ -214,8 +214,8 @@ Section proof.
     iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
     iModIntro. iIntros (lhptr) "[TE ((_& TG& _)& Ptr_hd& _)]".
     lwp_pures.
-    iMod ("IFL" $! _ (⟨queue_lock φ γq lhptr ltptr⟩)%F with "[Ptr_node Ptr_hd Ptr_tl HQvs0]") as "#IFL".
-    { tf_red. iFrame. eauto. }
+    iMod ("IFL" $! _ (queue_lock φ γq lhptr ltptr) with "[Ptr_node Ptr_hd Ptr_tl HQvs0]") as "#IFL".
+    { iFrame. eauto. }
     iModIntro. lwp_finish.
     iMod (ghost_var_alloc (inhabitant : ocid)) as (γd) "Gv".
     iApply ("HΦ" $! _ (QueueName γtl γq γd)).
@@ -283,7 +283,7 @@ Section proof.
     lwp_pures.
     lwp_bind (Load _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iEval (tf_red) in "R". iDestruct "R" as "(%&%&%& Ptr_lh& Ptr_lt& Queue& QC)".    
+    iDestruct "R" as "(%&%&%& Ptr_lh& Ptr_lt& Queue& QC)".    
     iModIntro.
     iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $Ptr_lt]"). 1: done.
     iIntros "[TE ((_& TG& _)& Ptr_lt)]".
@@ -341,7 +341,7 @@ Section proof.
     iDestruct "IFL" as "(AL& CF& IFL)".
     iApply ("TicketLock_release_spec" with "[] [$TE $TG $F_mr $Ggu $Lock $IFL Ptr_lh Ptr_lt Queue QC]").
     { iPureIntro. set_solver. }
-    { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. eauto. }
+    { iSplit. 1: iPureIntro; set_solver. iFrame. eauto. }
     (* FIXME: it would be nice if we don't get this evar *)
     Unshelve. 2: exact 0.
     iIntros "(TE& _& TG& Ggu& _)".
@@ -412,7 +412,7 @@ Section proof.
     lwp_pures.
     lwp_bind (Load _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
-    iEval (tf_red) in "R". iDestruct "R" as "(%&%&%& Ptr_lh& Ptr_lt& Queue& QC)".    
+    iDestruct "R" as "(%&%&%& Ptr_lh& Ptr_lt& Queue& QC)".    
     iModIntro.
     iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $Ptr_lh]"). 1: done.
     iIntros "[TE ((_& TG& _)& Ptr_lh)]".
@@ -451,7 +451,7 @@ Section proof.
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TE $TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
         { iPureIntro. set_solver. }
-        { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. simpl. iFrame. eauto. }
+        { iSplit. 1: iPureIntro; set_solver. iFrame. simpl. iFrame. eauto. }
         iIntros "(TE& _& TG& Ggu& _)".
         replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
         iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
@@ -468,7 +468,7 @@ Section proof.
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TE $TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
         { iPureIntro. set_solver. }
-        { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. simpl. iFrame. eauto. }
+        { iSplit. 1: iPureIntro; set_solver. iFrame. simpl. iFrame. eauto. }
         iIntros "(TE& _& TG& Ggu& _)".
         replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
         iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
@@ -552,7 +552,7 @@ Section proof.
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TE $TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
         { iPureIntro. set_solver. }
-        { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. eauto. }
+        { iSplit. 1: iPureIntro; set_solver. iFrame. eauto. }
         iIntros "(TE& _& TG& Ggu& _)".
         replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
         iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
@@ -598,7 +598,7 @@ Section proof.
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TE $TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
         { iPureIntro. set_solver. }
-        { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. eauto. }
+        { iSplit. 1: iPureIntro; set_solver. iFrame. eauto. }
         iIntros "(TE& _& TG& Ggu& _)".
         replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
         iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
@@ -611,4 +611,54 @@ Section proof.
         iExists g. iFrame. iPureIntro. set_solver.
   Qed.
 
+  (** ** Temporal guarantees *)
+  (** The queue has no trace content beyond its lock's: [queue_inv] is ghost state, and the
+      lock resource [queue_lock] is the [R] of the lock, to which the lock's guarantee gives
+      [tps_true]. Since [is_queue] keeps [γ ↪LOCK_AL□], its lock cannot be deleted, so the
+      queue guarantees what a lock that cannot be deleted guarantees
+      ([is_fair_lock_alive_temporal]). *)
+  Definition queue_tps (ql : val) : tps heap_lang Σ :=
+    (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧ alive_fair_lock_tps tl)%S.
+
+  Lemma is_queue_temporal ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_tps ql.
+  Proof.
+    iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
+      (is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr) ∗
+       (queue_ticketlock_γ γ) ↪LOCK_AL□))%I with "[]").
+    { iIntros "!> (%&%&%& %& _& #AL& _& #IFL)". iExists _, _, _. iSplit; first done.
+      iFrame "#". }
+    iApply (into_temporal _ _).
+  Qed.
+
+  Global Instance is_queue_into_temporal ql γ ℓ φ :
+    IntoTemporal (is_queue ql γ ℓ φ) (queue_tps ql) | 0.
+  Proof. apply is_queue_temporal. Qed.
+
+  Lemma is_queue_init_temporal ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_tps ql.
+  Proof.
+    iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
+      (is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr) ∗
+       (queue_ticketlock_γ γ) ↪LOCK_AL□))%I with "[]").
+    { iIntros "!> (%&%&%& %& _& _& #AL& _& #IFL)". iExists _, _, _. iSplit; first done.
+      iFrame "#". }
+    iApply (into_temporal _ _).
+  Qed.
+
 End proof.
+
+(** ** Progress of the queue's lock, at the level of traces *)
+Section trace.
+
+  (** The queue's lock makes release progress ([release_progress]): every [enqueue] or
+      [dequeue] that takes the lock eventually releases it. *)
+  Lemma queue_release_progress {Σ} ql τ :
+    tps_tr (queue_tps (Σ:=Σ) ql) τ →
+    ∃ lhptr ltptr next curr : loc,
+      ql = (#lhptr, #ltptr, (#next, #curr))%V ∧ release_progress next curr τ.
+  Proof.
+    intros (lhptr & ltptr & tl & -> & Htl).
+    destruct (alive_fair_lock_release_progress (Σ:=Σ) tl τ Htl) as (next & curr & -> & Hrp).
+    by exists lhptr, ltptr, next, curr.
+  Qed.
+
+End trace.

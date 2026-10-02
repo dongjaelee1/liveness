@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From lantana.algebra Require Import auth_mra.
 From lantana.base_logic Require Export invariants.
-From lantana.program_logic Require Export temporal_logic.
+From lantana.heap_lang Require Export temporal_laws.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
@@ -101,6 +101,24 @@ Record ticketlock_γ :=
       ticketlock_γa : gname;
     }.
 
+(** A general guarantee rule (local to this file): an invariant [A ∨ B] whose left disjunct
+    is excluded by a persistent [C] guarantees, together with [C], what [B] guarantees. *)
+Section temporal_excl.
+  Context `{!lantanaGS Λ Σ}.
+
+  Lemma temporal_inv_or_excl N (A B C : iProp Σ) `{!Persistent C} G :
+    (C ∗ A ⊢ False) → B ⊨ₜ G ⊢ (inv N (A ∨ B) ∗ C) ⊨ₜ tps_always G.
+  Proof.
+    iIntros (Hexcl) "#HB".
+    iApply (temporal_mono (inv N B) with "[]").
+    { iIntros "!> [#I #C]". iApply (inv_iff with "I"). iIntros "!> !>". iSplit.
+      - iIntros "[HA | $]". iExFalso. iApply Hexcl. iFrame "C HA".
+      - iIntros "H". by iRight. }
+    by iApply temporal_always.
+  Qed.
+
+End temporal_excl.
+
 Section proof.
   Context `{!heapGS Σ, !ticket_lockG Σ}.
 
@@ -128,8 +146,8 @@ Section proof.
   Proof. intros. etrans; last eapply H. apply nclose_subseteq. Qed.
 
   (** ** Definitions *)
-  (** We can define the tf counterparts for these definitions
-      if we want to extract top level trace properties of library functions. *)
+  (** The trace properties these definitions guarantee are inferred below
+      ([is_fair_lock_temporal]); see also section [trace]. *)
 
   Definition own_fair_lock_alive (γ : ticketlock_γ) (dq : dfrac) :=
     own (ticketlock_γa γ) (to_dfrac_agree dq tt).
@@ -145,15 +163,15 @@ Section proof.
     (own_fair_lock_layer γ l dq)%I
       (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_CF dq  l") : bi_scope.
 
-  Local Definition lock_token_inv γo γk (curr : loc) (R : tf Σ) : iProp Σ :=
+  Local Definition lock_token_inv γo γk (curr : loc) (R : iProp Σ) : iProp Σ :=
     ∃ (c : Z),
       (ghost_var_frac γk 1 (c)) ∨
         (∃ κ, ghost_var_frac γk (1/2) (c) ∗
               (curr ↦{#(1/2 + 1/2/2)} #c) ∗
               ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
-              ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ).
+              finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)).
 
-  Local Definition lock_inv γt γo γc γa (next curr : loc) (R : tf Σ) : iProp Σ :=
+  Local Definition lock_inv γt γo γc γa (next curr : loc) (R : iProp Σ) : iProp Σ :=
     (own γa (to_dfrac_agree (DfracOwn 1) tt)) ∨
       (∃ (n c : Z)
          (tickets : gmap Z (option (ocid * ord.t * measure)))
@@ -177,19 +195,19 @@ Section proof.
                             t ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
                             t ↪[γo] (None : option oid) ∗
                             (own γc (◯AM[ord.le] ℓ)) ∗ crP_obls g ℓ ∅))) ∗
-          ((⌜(c = n)⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
+          ((⌜(c = n)⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ R) ∨
              (⌜(c < n)%Z⌝ ∧
               (* Allocates new obligation on behalf of next owner. *)
               ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗ (c + 1)%Z ↪[γo]□ (Some κ) ∗
-                     ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
+                     finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R) ∗
                      ((∃ g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
-                                ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
+                                finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R) ∗
                                 crP_obls g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
-                                curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
+                                curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ R) ∨
                         (* Current owner acquired the lock. *)
                         ((c + 1)%Z ↪[γt]□ (None : option (ocid * ord.t * measure))))))).
 
-  Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : tf Σ) : iProp Σ :=
+  Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : iProp Σ) : iProp Σ :=
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
       inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R) ∗
@@ -254,7 +272,7 @@ Section proof.
       TicketLock.init #() @ i; E
     l{{{ tl γ, RET tl; thread_expr i C (of_val tl) ∗ £ lc ∗
                        thP_carriers i G ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
-                       (∀ E R, ⟦R⟧ₗ ={E}=∗ is_fair_lock tl γ R) }}}.
+                       (∀ E R, R ={E}=∗ is_fair_lock tl γ R) }}}.
   Proof.
     iExists 10.
     iIntros (lc ℓ i G E C) "!> %Φ (TE& TG& GF) HΦ".
@@ -319,7 +337,7 @@ Section proof.
          crP_obls gu ℓ {[κu]} ∗
          crP_fuel gu ℓ m ∗
          oblP_fuel κu ℓ m ∗
-         γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ }}}.
+         γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ R }}}.
   Proof.
     iExists (100 ⊕ (((50 ⊕ (50 × ▽)) × ℵ) ⊕ (50 × ▽)))%M.
     iIntros (lc m i G tl γ dq1 dq2 ℓ R E MASK C) "!> % (TE& TG& Fs& AL& CF& #IFL) HΦ".
@@ -365,9 +383,9 @@ Section proof.
     { (* My turn *)
       iDestruct "Hc" as "(%& PtrCurr0& HR)". subst c.
       (* Unlock obligation *)
-      iMod (tf_until_alloc _ _ _ false _ (ℓ)%ordi (m)%M with "Gg")
+      iMod (untilI_alloc _ _ _ false _ (ℓ)%ordi (m)%M with "Gg")
         as "(%κu& %LUku& Gg& OGF& #Wlku& ALLOC)". 1: done.
-      iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%F with "[//]") as "[GUku GUku0]".
+      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
       iMod (ghost_map_update (None) with "GMAt GMEt") as "[GMAt GMEt]".
       iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
@@ -722,7 +740,7 @@ Section proof.
             { subst n. lia. }
             iDestruct "Hc" as "(%& %&%& _& _& #GMEo1& HE& _)".
             iPoseProof (ghost_map_elem_agree with "GMEo0 GMEo1") as "%". simplify_eq.
-            iPoseProof (tf_until_discharged_false with "HE Gdk") as "%". done. }
+            iPoseProof (untilI_discharged_false with "HE Gdk") as "%". done. }
           assert (Elemp : (prev + 1)%Z ∈ (dom tickets ∖ {[(my + 1)%Z]})).
           { apply elem_of_dom_2 in LUp. rewrite -EqDom in LUp.
             assert ((prev + 1)%Z ≠ (my + 1)%Z) by lia. set_solver. }
@@ -778,7 +796,7 @@ Section proof.
     ⊢ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.release (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
-         lock_token γ κu ∗ ⟦R⟧ₗ ∗
+         lock_token γ κu ∗ R ∗
          γ ↪LOCK_AL{dq} ∗
          is_fair_lock tl γ R }}}
       TicketLock.release tl @ i; E
@@ -847,19 +865,19 @@ Section proof.
     (** We need a sfmupd later. *)
     iApply sfmupd_trans.
     iApply sfmupd_fupd_acc.
-    iMod (tf_until_discharge with "GEku") as "H".
+    iMod (untilI_discharge with "GEku") as "H".
     { apply N_subseteq_1. set_solver. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
-    { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
+    { iNext. iFrame. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
     iModIntro.
-    iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
+    iDestruct "H" as "(PtrCurr0& HR)".
     (** Two cases: there is a waiting thread, or not. *)
     destruct (decide (c + 1 = n)%Z).
     - (* No waiting thread. *)
@@ -882,9 +900,9 @@ Section proof.
       { lia. }
       iDestruct "H" as "(%&%&%& %Hc1& GMEt1& GMEo1& #CFl1& Gg1)".
       (* Unlock obligation *)
-      iMod (tf_until_alloc _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
+      iMod (untilI_alloc _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
         as "(%κu1& %LUku1& Gg1& OGF1& #Wlku1& ALLOC)". 1: done.
-      iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%F with "[//]") as "[GUku GUku0]".
+      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%I with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
       iMod (ghost_map_update (Some κu1) with "GMAo GMEo1") as "[GMAo GMEo1]".
       iMod (ghost_map_elem_persist with "GMEo1") as "#GMEo1".
@@ -912,11 +930,11 @@ Section proof.
     ⊢ ∃ μ, ∀ lc i G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.delete (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
-         lock_token γ κu ∗ ⟦R⟧ₗ ∗
+         lock_token γ κu ∗ R ∗
          γ ↪LOCK_AL ∗
          is_fair_lock tl γ R }}}
       TicketLock.delete tl @ i; E
-    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ ⟦R⟧ₗ }}}.
+    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ R }}}.
   Proof.
     iExists 100.
     iIntros (lc i G tl γ R κu gu ℓu K E MASK C) "!> % (TE& TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
@@ -978,23 +996,22 @@ Section proof.
     (** We need a sfmupd later. *)
     iApply sfmupd_trans.
     iApply sfmupd_fupd_acc.
-    iMod (tf_until_discharge with "GEku") as "H".
+    iMod (untilI_discharge with "GEku") as "H".
     { apply N_subseteq_1. set_solver. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
-    { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
+    { iNext. iFrame. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
     iModIntro.
-    iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
+    iDestruct "H" as "(PtrCurr0& HR)".
     (** Return full CF to the invariant. *)
     iModIntro. iMod ("ACCinv" with "[AL]") as "_".
     { iNext. iLeft. iFrame. }
-    rewrite tf_atomic_logic.
     iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]". iCombine "PtrCurr1 PtrCurr PtrCurr0" as "PtrCurr".
     iClear "HMt GMAt GMAo". clear dependent tickets obls.
     iModIntro.
@@ -1013,7 +1030,159 @@ Section proof.
     iApply ("HΦ" with "[$]").
   Qed.
 
+  (** ** Temporal guarantees *)
+  (** The trace property guaranteed by the right disjunct of [lock_inv] (the lock is alive),
+      as inferred by [IntoTemporal]: [tps_true] for ghost state, [R] and the ghost facts
+      about the ticket maps (whose quantifiers are therefore ghost). If a ticket is pending
+      ([c < n]), the until allocated on behalf of the next owner carries
+      [finally curr ↦ c + 1]. *)
+  Definition lock_inv_alive_tps (next curr : loc) : tps heap_lang Σ :=
+    (∃ n c : Z,
+       next ↦ #n ∧ curr ↦{#(1/2/2)} #c ∧ tps_true ∧ tps_true ∧ tps_true ∧
+       ⌜(0 ≤ c ≤ n)%Z⌝ ∧ tps_true ∧ tps_true ∧
+       (⌜c = n⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true ∨
+        ⌜(c < n)%Z⌝ ∧
+          (tps_true ∧ tps_true ∧ tps_true ∧
+           tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true) ∧
+           ((tps_true ∧ tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true) ∧
+             tps_true ∧ tps_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true) ∨ tps_true))))%S.
+
+  (** The trace property guaranteed by [lock_inv]. Its left disjunct (the lock has been
+      deleted) is ghost state, so this property alone says nothing about the trace. *)
+  Definition lock_inv_tps (next curr : loc) : tps heap_lang Σ :=
+    (tps_true ∨ lock_inv_alive_tps next curr)%S.
+
+  (** The trace property guaranteed by [lock_token_inv]: either nobody holds the lock (ghost
+      state), or its holder will increment [curr]. As it stands, it says nothing about the
+      trace either (the left disjunct). *)
+  Definition lock_token_inv_tps (curr : loc) : tps heap_lang Σ :=
+    (∃ c : Z, tps_true ∨
+       tps_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true ∧
+       tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true))%S.
+
+  (** The trace property guaranteed by [is_fair_lock]. Since the lock can be deleted
+      ([TicketLock_delete_spec]), it is vacuous at the level of traces; see
+      [is_fair_lock_alive_temporal] for a lock that cannot be deleted. *)
+  Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
+    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
+       tps_always (lock_inv_tps next curr) ∧ tps_always (lock_token_inv_tps curr))%S.
+
+  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tps tl.
+  Proof. apply (into_temporal _ _). Qed.
+
+  (** Clients see the lock's guarantee, not its invariant. *)
+  Global Instance is_fair_lock_into_temporal tl γ R :
+    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
+  Proof. apply is_fair_lock_temporal. Qed.
+
+  (** The trace property guaranteed by a lock that cannot be deleted. *)
+  Definition alive_fair_lock_tps (tl : val) : tps heap_lang Σ :=
+    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
+       tps_always (lock_inv_alive_tps next curr) ∧ tps_always (lock_token_inv_tps curr))%S.
+
+  (** A persistent [γ ↪LOCK_AL□] (as the queue keeps) rules out deletion, hence the left
+      disjunct of [lock_inv]. *)
+  Lemma is_fair_lock_alive_temporal tl γ R :
+    ⊢ (is_fair_lock tl γ R ∗ γ ↪LOCK_AL□) ⊨ₜ alive_fair_lock_tps tl.
+  Proof.
+    iApply (temporal_mono (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
+      (inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ)
+                    (ticketlock_γa γ) next curr R) ∗ γ ↪LOCK_AL□) ∗
+      inv N_tk (lock_token_inv (ticketlock_γo γ) (ticketlock_γk γ) curr R))%I with "[]").
+    { iIntros "!> [(%next& %curr& %Htl& #I& #K) #AL]". iExists next, curr.
+      iSplit; first done. iFrame "#". }
+    iApply temporal_exist. iIntros (next). iApply temporal_exist. iIntros (curr).
+    iApply temporal_and; first iApply temporal_pure.
+    iApply temporal_sep; last iApply (into_temporal _ _).
+    iApply temporal_inv_or_excl.
+    { iIntros "[AL H]". iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL.
+      destruct HAL as [H _]. apply dfrac_valid_own_r in H. done. }
+    iApply (into_temporal _ _).
+  Qed.
+
+  Global Instance is_fair_lock_alive_into_temporal tl γ R :
+    IntoTemporal (is_fair_lock tl γ R ∗ γ ↪LOCK_AL□) (alive_fair_lock_tps tl) | 0.
+  Proof. apply is_fair_lock_alive_temporal. Qed.
+
+  (** [lock_token] is ghost state: the holder's [finally] lives in [lock_token_inv]. *)
+
 End proof.
+
+(** ** Progress of the lock, at the level of traces *)
+Section trace.
+
+  (** [l ↦ v] in the current state of the trace. *)
+  Definition tr_pointsto (l : loc) (v : val) : trProp heap_lang :=
+    tr_atomic (pred_pointsto l (DfracOwn 1) v).
+
+  (** Release progress of the ticket lock [(next, curr)]: at any time, if a ticket is taken
+      but not yet served out ([curr ↦ c], [next ↦ n], [c < n]: the lock is held, or about to
+      be taken by the next ticket), then [curr] is eventually incremented. In particular,
+      every holder of the lock eventually releases it. *)
+  Definition release_progress (next curr : loc) : trProp heap_lang :=
+    tr_always (λ τ, ∀ n c : Z,
+      tr_pointsto next #n τ → tr_pointsto curr #c τ → (c < n)%Z →
+      tr_eventually (tr_pointsto curr #(c + 1)) τ).
+
+  Lemma lock_inv_alive_tps_release_progress {Σ} next curr τ :
+    tps_tr (tps_always (lock_inv_alive_tps (Σ:=Σ) next curr)) τ → release_progress next curr τ.
+  Proof.
+    destruct τ as [k τf]. intros Hal m Hm n c Hn Hc Hlt.
+    destruct (Hal m Hm) as (n' & c' & Hn' & Hc' & _ & _ & _ & Hb & _ & _ & Hcase).
+    simpl in *. unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic, tr_pure in *. simpl in *.
+    destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *.
+    rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
+    destruct Hcase as [[? _] | [_ (_ & _ & _ & Hfin & _)]]; [lia|].
+    destruct Hfin as (m' & Hm' & [Hcur _] & _). exists m'. split_and!; [done|done|].
+    intros. done.
+  Qed.
+
+  (** A lock that cannot be deleted makes release progress. *)
+  Lemma alive_fair_lock_release_progress {Σ} tl τ :
+    tps_tr (alive_fair_lock_tps (Σ:=Σ) tl) τ →
+    ∃ next curr : loc, tl = (#next, #curr)%V ∧ release_progress next curr τ.
+  Proof.
+    intros (next & curr & Htl & Hal & _). exists next, curr. split; first done.
+    by eapply (lock_inv_alive_tps_release_progress (Σ:=Σ)).
+  Qed.
+
+  (** Unlike [ticket_lock2], only the next ticket carries a [finally] here (its obligation is
+      allocated by the releasing thread), so starvation freedom of every pending ticket
+      needs in addition that [next] does not decrease, which the code ensures (only [FAA]
+      writes it) but the trace property does not record. Given that, release progress
+      implies starvation freedom. *)
+  Definition next_monotone (next : loc) : trProp heap_lang :=
+    tr_always (λ τ, ∀ n : Z, tr_pointsto next #n τ →
+      tr_always (λ τ', ∃ n' : Z, tr_pointsto next #n' τ' ∧ (n ≤ n')%Z) τ).
+
+  (** Starvation freedom (as in [ticket_lock2]): [curr] eventually reaches every [t] with
+      [c < t ≤ n], i.e. every pending ticket is eventually served. *)
+  Definition starvation_free (next curr : loc) : trProp heap_lang :=
+    tr_always (λ τ, ∀ n c t : Z,
+      tr_pointsto next #n τ → tr_pointsto curr #c τ → (c < t ≤ n)%Z →
+      tr_eventually (tr_pointsto curr #t) τ).
+
+  Lemma release_progress_starvation_free next curr τ :
+    release_progress next curr τ → next_monotone next τ → starvation_free next curr τ.
+  Proof.
+    destruct τ as [k τf]. intros Hrp Hmon m Hm n c t Hn Hc Ht.
+    (* By induction on [t - c0], from any time at which [curr ↦ c0 < t ≤ next]. *)
+    cut (∀ d m0 (c0 : Z), Z.to_nat (t - c0) = d → k ≤ m0 → tr_pointsto curr #c0 (m0, τf) →
+           (c0 < t)%Z → (∃ n0 : Z, tr_pointsto next #n0 (m0, τf) ∧ (t ≤ n0)%Z) →
+           ∃ m', m0 ≤ m' ∧ tr_pointsto curr #t (m', τf)).
+    { intros H. destruct (H _ m c eq_refl Hm Hc ltac:(lia) ltac:(exists n; split; [done|lia]))
+        as (m' & Hm' & Ht'). exists m'. split_and!; [done|done|]. intros. done. }
+    intros d. induction d as [d IH] using (well_founded_induction lt_wf).
+    intros m0 c0 Hd Hm0 Hc0 Hlt (n0 & Hn0 & Htn0).
+    destruct (Hrp m0 Hm0 n0 c0 Hn0 Hc0 ltac:(lia)) as (m1 & Hm1 & Hc1 & _).
+    destruct (decide (c0 + 1 = t)%Z) as [<-|Hne]; first by exists m1.
+    destruct (Hmon m0 Hm0 n0 Hn0 m1 Hm1) as (n1 & Hn1 & Hle).
+    destruct (IH (Z.to_nat (t - (c0 + 1))) ltac:(lia) m1 (c0 + 1)%Z eq_refl ltac:(lia) Hc1 ltac:(lia))
+      as (m' & Hm' & Ht'); first (exists n1; split; [done|lia]).
+    exists m'. split; [lia|done].
+  Qed.
+
+End trace.
 
 Global Notation "γ ↪LOCK_AL dq" :=
   (own_fair_lock_alive γ dq)%I
