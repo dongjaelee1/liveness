@@ -1105,7 +1105,7 @@ End adequacy.
 
 (** The program logic establishes [G]; anything implied by its trace property holds. *)
 Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
-  `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
+  `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS.tregGpreS Λ Σ}
   s σ Θ i κs (G : tps Λ Σ) (R : trProp Λ) :
   (∀ τ, tps_tr G τ → R τ) →
   ∀ (τ : trace Λ),
@@ -1127,13 +1127,13 @@ Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
 Proof.
   intros HR τ BEH FS INIT1 INIT2 Hwp. apply HR.
   assert (iProp_sat
-            (|==> ∃ (Hmupd : mupdGS Σ) (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))),
-                let _ : temporalGS Λ Σ := TemporalG Hmupd Hhist in
+            (|==> ∃ (Hmupd : mupdGS Σ) (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))) (Htreg : tregGS.tregGS Λ Σ),
+                let _ : temporalGS Λ Σ := TemporalG Hmupd Hhist Htreg in
                 (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
                 wsat.wsat ∗ wsat.ownE ⊤ ∗
                 |={⊤}=> tps_ti G τ)) as Hsat; cycle 1.
-  { apply sat_bupd, sat_exists in Hsat. destruct Hsat as (Hmupd& Hsat). apply sat_exists in Hsat. destruct Hsat as (Hhist& Hsat).
-    set (Htemp := TemporalG Hmupd Hhist : temporalGS Λ Σ).
+  { apply sat_bupd, sat_exists in Hsat. destruct Hsat as (Hmupd& Hsat). apply sat_exists in Hsat. destruct Hsat as (Hhist& Hsat). apply sat_exists in Hsat. destruct Hsat as (Htreg& Hsat).
+    set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
     apply (tps_good G (temporalGS0:=Htemp) emp). apply (sat_fupd ⊤).
     unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
     eapply sat_mono. 2: eapply Hsat. simpl. iIntros "($& $& $& $)". }
@@ -1155,8 +1155,9 @@ Proof.
   iIntros "_ H".
   iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& MI)".
   iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
-  iExists Hmupd, Hhist.
-  set (Htemp := TemporalG Hmupd Hhist : temporalGS Λ Σ).
+  iMod (treg_alloc (Λ:=Λ)) as "(%Htreg& TR)".
+  iExists Hmupd, Hhist, Htreg.
+  set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
   iDestruct ("H" $! Htemp) as "(%c& H)".
   iDestruct "R" as "(%x& R)".
   iMod (own_update _ (● x) with "R") as "[R LC]".
@@ -1173,7 +1174,7 @@ Proof.
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
   iApply (lwp_ti_logic_temporal (lantanaGS0:=Hlantana) with "[$HI $SIa $MHI $S $T $A $G $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
-  { intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto. }
+  { intros n' σ' Θ' κs' Hlu. rewrite lookup_cons in Hlu. destruct n'; last done. inv Hlu. rewrite INIT2. eauto. }
 Qed.
 
 (** ** Inferring guarantees

@@ -5,7 +5,7 @@ From lantana.program_logic Require Export language.
 From iris.bi.lib Require Export fixpoint_mono.
 From lantana.bi Require Export weakestpre.
 From iris.prelude Require Import options.
-From lantana.program_logic Require Export sfmupd model_physical_updates.
+From lantana.program_logic Require Export temporal_registry sfmupd model_physical_updates.
 Import uPred.
 
 (* TODO: move to somewhere else *)
@@ -43,6 +43,7 @@ Class temporalGpreS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
   TemporalGpreS {
       #[local] temporalGpreS_mupd :: mupdGpreS Σ;
       #[local] temporal_histGpreS :: histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ));
+      #[local] temporal_tregGpreS :: tregGS.tregGpreS Λ Σ;
     }.
 
 Class temporalGS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
@@ -50,12 +51,14 @@ Class temporalGS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
       (** Obligation model protocol, including invariants. *)
       #[global] temporal_mupdGS :: mupdGS Σ;
       #[global] temporal_histGS :: histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ));
+      (** The registry of trace-visible structures (alwaysI, untilI). *)
+      #[global] temporal_tregGS :: tregGS.tregGS Λ Σ;
     }.
-Global Opaque temporal_mupdGS temporal_histGS.
+Global Opaque temporal_mupdGS temporal_histGS temporal_tregGS.
 Global Arguments TemporalG {SI Λ Σ}.
 
 Definition temporalΣ `{SI : sidx} (Λ : language) : gFunctors :=
-  #[mupdΣ; histGS.histΣ (state Λ * thread_pool Λ * list (observation Λ))].
+  #[mupdΣ; histGS.histΣ (state Λ * thread_pool Λ * list (observation Λ)); tregGS.tregΣ Λ].
 Global Instance subG_temporalΣ `{SI : sidx} {Λ} {Σ} : subG (temporalΣ Λ) Σ → temporalGpreS Λ Σ.
 Proof. solve_inG. Qed.
 

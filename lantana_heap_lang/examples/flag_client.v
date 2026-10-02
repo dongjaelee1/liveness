@@ -214,6 +214,7 @@ Section adequacy.
   Let Σ : gFunctors :=
         #[mupdΣ;
           histGS.histΣ (state * thread_pool heap_lang * list (observation));
+          tregGS.tregΣ heap_lang;
           heap_stateΣ].
 
   Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
