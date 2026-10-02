@@ -1,7 +1,7 @@
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export language weakestpre.
-From lantana.program_logic Require Export temporal_logic temporal_property.
+From lantana.program_logic Require Export temporal_property.
 From lantana.program_logic Require Export adequacy.
 
 From transfinite.stepindex Require Import ordinals.
