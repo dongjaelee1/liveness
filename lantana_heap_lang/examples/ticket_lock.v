@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From lantana.algebra Require Import auth_mra.
 From lantana.base_logic Require Export invariants.
-From lantana.program_logic Require Export temporal_logic.
+From lantana.heap_lang Require Export temporal_laws.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
@@ -128,8 +128,8 @@ Section proof.
   Proof. intros. etrans; last eapply H. apply nclose_subseteq. Qed.
 
   (** ** Definitions *)
-  (** We can define the tf counterparts for these definitions
-      if we want to extract top level trace properties of library functions. *)
+  (** The trace properties these definitions guarantee are inferred below
+      ([is_fair_lock_temporal]); see also section [trace]. *)
 
   Definition own_fair_lock_alive (γ : ticketlock_γ) (dq : dfrac) :=
     own (ticketlock_γa γ) (to_dfrac_agree dq tt).
@@ -145,15 +145,15 @@ Section proof.
     (own_fair_lock_layer γ l dq)%I
       (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_CF dq  l") : bi_scope.
 
-  Local Definition lock_token_inv γo γk (curr : loc) (R : tf Σ) : iProp Σ :=
+  Local Definition lock_token_inv γo γk (curr : loc) (R : iProp Σ) : iProp Σ :=
     ∃ (c : Z),
       (ghost_var_frac γk 1 (c)) ∨
         (∃ κ, ghost_var_frac γk (1/2) (c) ∗
               (curr ↦{#(1/2 + 1/2/2)} #c) ∗
               ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
-              ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ).
+              finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)).
 
-  Local Definition lock_inv γt γo γc γa (next curr : loc) (R : tf Σ) : iProp Σ :=
+  Local Definition lock_inv γt γo γc γa (next curr : loc) (R : iProp Σ) : iProp Σ :=
     (own γa (to_dfrac_agree (DfracOwn 1) tt)) ∨
       (∃ (n c : Z)
          (tickets : gmap Z (option (ocid * ord.t * measure)))
@@ -177,19 +177,19 @@ Section proof.
                             t ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
                             t ↪[γo] (None : option oid) ∗
                             (own γc (◯AM[ord.le] ℓ)) ∗ crP_obls g ℓ ∅))) ∗
-          ((⌜(c = n)⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
+          ((⌜(c = n)⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ R) ∨
              (⌜(c < n)%Z⌝ ∧
               (* Allocates new obligation on behalf of next owner. *)
               ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗ (c + 1)%Z ↪[γo]□ (Some κ) ∗
-                     ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
+                     finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R) ∗
                      ((∃ g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
-                                ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
+                                finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R) ∗
                                 crP_obls g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
-                                curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
+                                curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ R) ∨
                         (* Current owner acquired the lock. *)
                         ((c + 1)%Z ↪[γt]□ (None : option (ocid * ord.t * measure))))))).
 
-  Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : tf Σ) : iProp Σ :=
+  Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : iProp Σ) : iProp Σ :=
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
       inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R) ∗
@@ -254,7 +254,7 @@ Section proof.
       TicketLock.init #() @ i; E
     l{{{ tl γ, RET tl; thread_expr i C (of_val tl) ∗ £ lc ∗
                        thP_carriers i G ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
-                       (∀ E R, ⟦R⟧ₗ ={E}=∗ is_fair_lock tl γ R) }}}.
+                       (∀ E R, R ={E}=∗ is_fair_lock tl γ R) }}}.
   Proof.
     iExists 10.
     iIntros (lc ℓ i G E C) "!> %Φ (TE& TG& GF) HΦ".
@@ -319,7 +319,7 @@ Section proof.
          crP_obls gu ℓ {[κu]} ∗
          crP_fuel gu ℓ m ∗
          oblP_fuel κu ℓ m ∗
-         γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ }}}.
+         γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ R }}}.
   Proof.
     iExists (100 ⊕ (((50 ⊕ (50 × ▽)) × ℵ) ⊕ (50 × ▽)))%M.
     iIntros (lc m i G tl γ dq1 dq2 ℓ R E MASK C) "!> % (TE& TG& Fs& AL& CF& #IFL) HΦ".
@@ -365,9 +365,9 @@ Section proof.
     { (* My turn *)
       iDestruct "Hc" as "(%& PtrCurr0& HR)". subst c.
       (* Unlock obligation *)
-      iMod (tf_until_alloc _ _ _ false _ (ℓ)%ordi (m)%M with "Gg")
+      iMod (untilI_alloc _ _ _ false _ (ℓ)%ordi (m)%M with "Gg")
         as "(%κu& %LUku& Gg& OGF& #Wlku& ALLOC)". 1: done.
-      iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%F with "[//]") as "[GUku GUku0]".
+      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
       iMod (ghost_map_update (None) with "GMAt GMEt") as "[GMAt GMEt]".
       iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
@@ -722,7 +722,7 @@ Section proof.
             { subst n. lia. }
             iDestruct "Hc" as "(%& %&%& _& _& #GMEo1& HE& _)".
             iPoseProof (ghost_map_elem_agree with "GMEo0 GMEo1") as "%". simplify_eq.
-            iPoseProof (tf_until_discharged_false with "HE Gdk") as "%". done. }
+            iPoseProof (untilI_discharged_false with "HE Gdk") as "%". done. }
           assert (Elemp : (prev + 1)%Z ∈ (dom tickets ∖ {[(my + 1)%Z]})).
           { apply elem_of_dom_2 in LUp. rewrite -EqDom in LUp.
             assert ((prev + 1)%Z ≠ (my + 1)%Z) by lia. set_solver. }
@@ -778,7 +778,7 @@ Section proof.
     ⊢ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.release (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
-         lock_token γ κu ∗ ⟦R⟧ₗ ∗
+         lock_token γ κu ∗ R ∗
          γ ↪LOCK_AL{dq} ∗
          is_fair_lock tl γ R }}}
       TicketLock.release tl @ i; E
@@ -847,19 +847,19 @@ Section proof.
     (** We need a sfmupd later. *)
     iApply sfmupd_trans.
     iApply sfmupd_fupd_acc.
-    iMod (tf_until_discharge with "GEku") as "H".
+    iMod (untilI_discharge with "GEku") as "H".
     { apply N_subseteq_1. set_solver. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
-    { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
+    { iNext. iFrame. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
     iModIntro.
-    iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
+    iDestruct "H" as "(PtrCurr0& HR)".
     (** Two cases: there is a waiting thread, or not. *)
     destruct (decide (c + 1 = n)%Z).
     - (* No waiting thread. *)
@@ -882,9 +882,9 @@ Section proof.
       { lia. }
       iDestruct "H" as "(%&%&%& %Hc1& GMEt1& GMEo1& #CFl1& Gg1)".
       (* Unlock obligation *)
-      iMod (tf_until_alloc _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
+      iMod (untilI_alloc _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
         as "(%κu1& %LUku1& Gg1& OGF1& #Wlku1& ALLOC)". 1: done.
-      iMod ("ALLOC" $! _ N_ev ⌜True⌝%F (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%F with "[//]") as "[GUku GUku0]".
+      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%I with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
       iMod (ghost_map_update (Some κu1) with "GMAo GMEo1") as "[GMAo GMEo1]".
       iMod (ghost_map_elem_persist with "GMEo1") as "#GMEo1".
@@ -912,11 +912,11 @@ Section proof.
     ⊢ ∃ μ, ∀ lc i G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.delete (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
-         lock_token γ κu ∗ ⟦R⟧ₗ ∗
+         lock_token γ κu ∗ R ∗
          γ ↪LOCK_AL ∗
          is_fair_lock tl γ R }}}
       TicketLock.delete tl @ i; E
-    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ ⟦R⟧ₗ }}}.
+    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ R }}}.
   Proof.
     iExists 100.
     iIntros (lc i G tl γ R κu gu ℓu K E MASK C) "!> % (TE& TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
@@ -978,23 +978,22 @@ Section proof.
     (** We need a sfmupd later. *)
     iApply sfmupd_trans.
     iApply sfmupd_fupd_acc.
-    iMod (tf_until_discharge with "GEku") as "H".
+    iMod (untilI_discharge with "GEku") as "H".
     { apply N_subseteq_1. set_solver. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro.
     iDestruct "H" as "(_& H)". iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim.
     iMod ("H" with "[PtrCurr0 HR] [//] Gg") as "H".
-    { iNext. tf_red. rewrite tf_atomic_logic. iFrame. }
+    { iNext. iFrame. }
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
     iModIntro.
-    iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
+    iDestruct "H" as "(PtrCurr0& HR)".
     (** Return full CF to the invariant. *)
     iModIntro. iMod ("ACCinv" with "[AL]") as "_".
     { iNext. iLeft. iFrame. }
-    rewrite tf_atomic_logic.
     iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]". iCombine "PtrCurr1 PtrCurr PtrCurr0" as "PtrCurr".
     iClear "HMt GMAt GMAo". clear dependent tickets obls.
     iModIntro.
