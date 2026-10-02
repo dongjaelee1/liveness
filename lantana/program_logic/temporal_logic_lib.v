@@ -4,7 +4,7 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import iprop.
 From stdpp Require Import namespaces.
 From lantana.base_logic Require Import obligation.
-From lantana.program_logic Require Export temporal_logic.
+From lantana.program_logic Require Export temporal_guarantee.
 From lantana.algebra Require Import ordinal_ucmra.
 From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat mono_list.
 From transfinite.base_logic.lib Require Import ghost_map.
@@ -140,15 +140,18 @@ Local Definition uchain_pin_unseal :
   @uchain_pin = @uchain_pin_def := uchain_pin_aux.(seal_eq).
 Global Arguments uchain_pin {SI Σ _}.
 
-Fixpoint tf_until_chain_rec `{SI : sidx} {Π} {Σ}
-  (N : namespace) k (o : Ord.t) (P Q : @tf SI Π Σ) (ACC : Acc Ord.lt o) {struct ACC} : tf Σ :=
-  (tf_until N k false (1/2) P (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), tf_until_chain_rec N k' o' P Q (Acc_inv ACC LTo))))%F.
+(** A chain of untils: [P] until [Q], or until the next link, whose ordinal is smaller.
+    Defined by well-founded recursion on the ordinal, so it is a plain iProp. *)
+Fixpoint untilI_chain_rec `{!lantanaGS Λ Σ}
+  (N : namespace) k (o : Ord.t) (P Q : iProp Σ) (ACC : Acc Ord.lt o) {struct ACC} : iProp Σ :=
+  untilI N k false (1/2) P
+    (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), untilI_chain_rec N k' o' P Q (Acc_inv ACC LTo)))%I.
 
-Definition tf_until_chain `{SI : sidx} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) : tf Σ :=
-  tf_until_chain_rec N k o P Q (Ord.lt_well_founded o).
+Definition untilI_chain `{!lantanaGS Λ Σ} (N : namespace) k o (P Q : iProp Σ) : iProp Σ :=
+  untilI_chain_rec N k o P Q (Ord.lt_well_founded o).
 
-Lemma tf_until_chain_rec_proof_irrelevance `{SI : sidx} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) ACC1 ACC2 :
-  tf_until_chain_rec N k o P Q ACC1 = tf_until_chain_rec N k o P Q ACC2.
+Lemma untilI_chain_rec_proof_irrelevance `{!lantanaGS Λ Σ} (N : namespace) k o (P Q : iProp Σ) ACC1 ACC2 :
+  untilI_chain_rec N k o P Q ACC1 = untilI_chain_rec N k o P Q ACC2.
 Proof.
   revert k ACC1 ACC2. induction o as [o IH] using (well_founded_ind Ord.lt_well_founded).
   intros. destruct ACC1, ACC2. simpl.
@@ -156,42 +159,22 @@ Proof.
   eapply IH. auto.
 Qed.
 
-Lemma tf_until_chain_unfold `{SI : sidx} {Π} {Σ} (N : namespace) k o (P Q : @tf SI Π Σ) :
-  tf_until_chain N k o P Q = 
-  (tf_until N k false (1/2) P (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), tf_until_chain N k' o' P Q)))%F.
+Lemma untilI_chain_unfold `{!lantanaGS Λ Σ} (N : namespace) k o (P Q : iProp Σ) :
+  untilI_chain N k o P Q =
+  untilI N k false (1/2) P (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), untilI_chain N k' o' P Q))%I.
 Proof.
-  unfold tf_until_chain. destruct (Ord.lt_well_founded o). simpl.
+  unfold untilI_chain. destruct (Ord.lt_well_founded o). simpl.
   do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.
-  apply tf_until_chain_rec_proof_irrelevance.
+  apply untilI_chain_rec_proof_irrelevance.
 Qed.
 
-Definition tf_until_chain_log `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ}
-  (N : namespace) (P Q R : tf Σ) : tf Σ :=
-  locked
-    (∃ (l : list (oid * Ord.t)) k o,
-        ⌜ ∃ m, (o <= measure_rep (ord.O, 1) m)%ord ⌝ ∗
-        ⟨uchain_auth (1/2) (l ++ [(k, o)])⟩ ∗
-        ([^tf_sep list] ko ∈ l, ⟨oblP_discharged ko.1⟩ ∗ ⌜ ∃ m, (ko.2 <= measure_rep (ord.O, 1) m)%ord ⌝) ∗
-        (tf_until_chain N k o P Q ∨
-           (⟨uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_discharged k⟩ ∗ R))
-    )%F.
-
-Definition until_chain_log `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ}
-  (N : namespace) (P Q R : tf Σ) : iProp Σ :=
+Definition until_chain_log `{!lantanaGS Λ Σ} `{!uchainGS Σ}
+  (N : namespace) (P Q R : iProp Σ) : iProp Σ :=
   locked
     (∃ (l : list (oid * Ord.t)) k o,
         ⌜ ∃ m, (o <= measure_rep (ord.O, 1) m)%ord ⌝ ∗
                (uchain_auth (1/2) (l ++ [(k, o)])) ∗
                ([∗ list] ko ∈ l, (oblP_discharged ko.1) ∗ ⌜ ∃ m, (ko.2 <= measure_rep (ord.O, 1) m)%ord ⌝) ∗
-               (⟦tf_until_chain N k o P Q⟧ₗ ∨
-                  ((uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_discharged k) ∗ ⟦R⟧ₗ))
+               (untilI_chain N k o P Q ∨
+                  ((uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_discharged k) ∗ R))
     )%I.
-
-Lemma tf_until_chain_log_red `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ} N P Q R :
-  ⟦tf_until_chain_log N P Q R⟧ₗ ⊣⊢ until_chain_log N P Q R.
-Proof.
-  rewrite /tf_until_chain_log /until_chain_log -!lock.
-  tf_red. do 2 f_equiv. tf_red. do 2 f_equiv. tf_red. do 2 f_equiv.
-  tf_red. f_equiv. tf_red. f_equiv. f_equiv.
-  rewrite tf_big_opL_interp. done.
-Qed.

@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.program_logic Require Export temporal_logic.
+From lantana.heap_lang Require Export temporal_laws.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
@@ -88,11 +88,21 @@ Section proof.
            (∃ (f a : val), b ↦ SOMEV (f, a) ∗ ghost_var_frac γd (1)%Qp g).
 
   Definition is_handoff (b : loc) (γ : handoff_γ) ℓ : iProp Σ :=
-    ⟦alwaysP Na (⟨handoff_inv b (handoff_γd γ) ℓ⟩)⟧ₗ.
+    inv Na (handoff_inv b (handoff_γd γ) ℓ).
+
+  (** What the handoff exports: the cell always holds [NONE] or a task [SOME (f, a)]; the
+      task's resources and the carriers have no trace content. *)
+  Definition handoff_inv_tps (b : loc) : tps heap_lang Σ :=
+    ((b ↦{#1/2} NONEV ∧ tps_true) ∨
+     (∃ f a : val, b ↦ SOMEV (f, a) ∧ tps_true) ∨
+     (∃ f a : val, b ↦ SOMEV (f, a) ∧ tps_true))%S.
+
+  Lemma is_handoff_temporal b γ ℓ : ⊢ is_handoff b γ ℓ ⊨ₜ tps_always (handoff_inv_tps b).
+  Proof. apply (into_temporal _ _). Qed.
 
   (** The main proofs. *)
   Global Instance handoff_inv_persistent b γ ℓ : Persistent (is_handoff b γ ℓ).
-  Proof. rewrite /is_handoff. tf_red. apply _. Qed.
+  Proof. rewrite /is_handoff. apply _. Qed.
 
   Lemma is_handoff_initialize E b ℓ g :
      b ↦{#(1/2)} NONEV -∗ crP_obls g ℓ ∅
@@ -118,8 +128,7 @@ Section proof.
   Proof.
     iExists 20. iIntros (lc i b f a G g K K' γ ℓ ℓg C Φ) "!> HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Cg& %SubK& OFK& Ptrb& is_task& #handoff_inv)".
-    rewrite /is_handoff. iEval (do 2 tf_red) in "handoff_inv".
-    rewrite /Handoff.send.
+    rewrite /is_handoff /Handoff.send.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
@@ -166,7 +175,7 @@ Section proof.
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     (** Cases. *)
-    rewrite /is_handoff. iEval (do 2 tf_red) in "handoff_inv".
+    rewrite /is_handoff.
     iInv "handoff_inv" as "inv".
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -214,3 +223,25 @@ Section proof.
   Qed.
 
 End proof.
+
+(** ** The handoff cell, at the level of traces *)
+Section trace.
+
+  (** The cell [b] holds [v] in the current state of the trace (any fraction). *)
+  Definition tr_cell (b : loc) (v : val) : trProp heap_lang :=
+    λ τ, ∃ dq, tr_atomic (pred_pointsto b dq v) τ.
+
+  (** At all times the cell is empty or holds a task. *)
+  Definition handoff_tr (b : loc) : trProp heap_lang :=
+    tr_always (λ τ, tr_cell b NONEV τ ∨ ∃ f a : val, tr_cell b (SOMEV (f, a)) τ).
+
+  Lemma handoff_inv_tps_tr {Σ} b τ :
+    tps_tr (tps_always (handoff_inv_tps (Σ:=Σ) b)) τ → handoff_tr b τ.
+  Proof.
+    destruct τ as [k τf]. intros Hal m Hm. destruct (Hal m Hm) as [[Hb _]|[(f & a & Hb & _)|(f & a & Hb & _)]].
+    - left. exists (DfracOwn (1/2)). exact Hb.
+    - right. exists f, a, (DfracOwn 1). exact Hb.
+    - right. exists f, a, (DfracOwn 1). exact Hb.
+  Qed.
+
+End trace.
