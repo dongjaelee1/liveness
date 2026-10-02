@@ -65,6 +65,28 @@ Section proof.
   Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ tps_until (l ↦ #0) (l ↦ #1).
   Proof. apply (into_temporal _ _). Qed.
 
+  (** A response property: whenever the flag holds 0, it eventually holds 1. The
+      condition "the flag holds 0 now" is a fact about the current state; the proof uses it
+      to rule out the invariant's other branch (the cell cannot hold 0 and 1 at once). *)
+  Definition flag_response_tps (l : loc) : tps heap_lang Σ :=
+    tps_always (l ↦ #0 → tps_finally (l ↦ #1))%S.
+
+  Lemma flag_tps_response l : tps_le (flag_tps l) (flag_response_tps l).
+  Proof.
+    eapply tps_le_trans; first apply tps_and_elim_r. apply tps_always_mono.
+    assert (Hu := tps_until_mono (Λ:=heap_lang) (Σ:=Σ) (l ↦ #0)%S (l ↦ #1)%S tps_true (l ↦ #1)%S
+                    (tps_le_true _) (tps_le_refl _)).
+    rewrite /tps_le in Hu. intros ? τ. cbn [tps_ti tps_or tps_and tps_impl].
+    unfold ti_or, ti_and, ti_impl. iIntros "[H|[_ H1]] %H0".
+    - by iApply Hu.
+    - iDestruct (tps_instant_atomic with "H1") as %H1. exfalso. destruct τ as [n τf].
+      revert H0 H1. cbn [tps_tr tps_atomic]. unfold tr_atomic, ts_emb, ts_atomic, trace_now. simpl.
+      destruct (τf n) as [[[??] ?] ?]. simpl. intros -> ?. by simplify_eq.
+  Qed.
+
+  Lemma is_flag_response l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_response_tps l.
+  Proof. iApply temporal_weaken; [apply flag_tps_response|iApply is_flag_temporal]. Qed.
+
   (** The main proofs. *)
   Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).
   Proof. apply _. Qed.
@@ -250,6 +272,42 @@ Section trace.
     destruct H0.
     - destruct H0 as (?&?&?&?). left. eexists. split_and !; eauto.
     - destruct H0. right. eauto.
+  Qed.
+
+  (** What the guarantee does not say: "once the flag is 1, it stays 1". The run in which
+      the flag holds 0, 1, 0, 1, 1, ... satisfies the flag's guarantee, yet goes back from 1
+      to 0. (The program never does that, but its invariant only describes each state, not
+      the history; a proof of "stays 1" needs an invariant that says so.) *)
+  Definition flag_run (l : loc) : nat → trace_state heap_lang :=
+    λ n, ((∅, {| heap := {[l := Some (if decide (n = 0 ∨ n = 2) then #0 else #1)]};
+                 used_proph_id := ∅ |}), 1%positive, []).
+
+  Lemma flag_run_at l m v :
+    tr_atomic (pred_pointsto l (DfracOwn 1) v) (m, flag_run l) ↔
+    v = (if decide (m = 0 ∨ m = 2) then #0 else #1).
+  Proof.
+    rewrite /tr_atomic /ts_emb /ts_atomic /trace_now /flag_run /= lookup_insert_eq.
+    split; [by intros [= ->]|by intros ->].
+  Qed.
+
+  Lemma flag_run_satisfies_guarantee {Σ : gFunctors} l : tps_tr (flag_tps (Σ:=Σ) l) (0, flag_run l).
+  Proof.
+    split; first done. intros m _. cbn [tps_tr tps_or tps_and tps_until tps_atomic tps_pure].
+    rewrite /tps_true. cbn [tps_tr tps_pure]. unfold tr_or, tr_and, tr_pure, tr_until. cbv beta iota.
+    destruct (decide (m = 0 ∨ m = 2)) as [Hm|Hm].
+    - left. exists (S m). split_and!; [lia| |].
+      + apply flag_run_at. rewrite decide_False; [done|lia].
+      + intros l' Hl'. apply flag_run_at. rewrite decide_True; [done|lia].
+    - right. split; first done. apply flag_run_at. by rewrite decide_False.
+  Qed.
+
+  Lemma flag_run_goes_back l : ¬ tr_always (λ τ, tr_atomic (pred_pointsto l (DfracOwn 1) #1) τ →
+      tr_always (tr_atomic (pred_pointsto l (DfracOwn 1) #1)) τ) (0, flag_run l).
+  Proof.
+    intros H. unfold tr_always in H. cbv beta iota in H. specialize (H 1 ltac:(lia)).
+    assert (H1 : tr_atomic (pred_pointsto l (DfracOwn 1) #1) (1, flag_run l)).
+    { apply flag_run_at. case_decide; [lia|done]. }
+    specialize (H H1 2 ltac:(lia)). apply flag_run_at in H. case_decide; [done|lia].
   Qed.
 
 End trace.
