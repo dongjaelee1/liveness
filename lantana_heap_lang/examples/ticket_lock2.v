@@ -588,11 +588,11 @@ Section proof.
     (∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
        next ↦ #n ∧ curr ↦{#1/2} #c ∧ (tps_true ∧ tps_true) ∧
        ⌜dom tickets = dom acks⌝ ∧ ⌜(0 ≤ c ≤ n)%Z⌝ ∧ ⌜∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z⌝ ∧
-       (∀ (t : Z) (κ : oid), tickets !! t = Some κ →
+       (∀ (t : Z) (κ : oid), ⌜tickets !! t = Some κ⌝ →
           (tps_true ∧ tps_true ∧ tps_true) ∧
           (⌜(0 ≤ t ≤ c)%Z⌝ ∧ tps_true ∨
            ⌜(c + 1 ≤ t ≤ n)%Z⌝ ∧ tps_finally (curr ↦{#1/2} #t ∧ tps_true))) ∧
-       (∀ (t : Z) (a : bool), acks !! t = Some a →
+       (∀ (t : Z) (a : bool), ⌜acks !! t = Some a⌝ →
           ⌜(0 ≤ t ≤ c)%Z⌝ ∧ tps_true ∨ ⌜t = (c + 1)%Z⌝ ∨ ⌜(c + 1 < t ≤ n)%Z⌝ ∧ tps_true) ∧
        (⌜c = n⌝ ∧ curr ↦{#1/2} #c ∧ tps_true ∨
         ⌜(c < n)%Z⌝ ∧ (tps_true ∧ curr ↦{#1/2} #c ∧ tps_true ∨ tps_true)))%S.
@@ -608,6 +608,39 @@ Section proof.
   Global Instance is_fair_lock_into_temporal tl γ R :
     IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
   Proof. apply is_fair_lock_temporal. Qed.
+
+  (** Starvation freedom as a guarantee, with a state fact as antecedent: whenever [n]
+      tickets are out and ticket [c] is served, every pending ticket [t] is eventually
+      served. The logic uses the antecedent to pick the right ticket of [lock_inv_tps]. *)
+  Definition starvation_free_tps (next curr : loc) : tps heap_lang Σ :=
+    tps_always (∀ n c t : Z,
+      (next ↦ #n ∧ curr ↦{#1/2} #c ∧ ⌜(c < t ≤ n)%Z⌝) →
+      tps_finally (curr ↦{#1/2} #t ∧ tps_true))%S.
+
+  Lemma lock_inv_tps_starvation_free_le next curr :
+    tps_le (tps_always (lock_inv_tps next curr)) (starvation_free_tps next curr).
+  Proof.
+    apply tps_always_mono. intros ? [k τf].
+    rewrite /= /ti_exist /ti_forall /ti_and /ti_or /ti_impl /ti_pure /ti_atomic.
+    rewrite /tr_and /tr_atomic /tr_pure /ts_emb /ts_atomic /trace_now /=.
+    destruct (τf k) as (((Θ&σ)&i0)&κs0).
+    iIntros "(%n' & %c' & %tickets & %acks & %Hn' & %Hc' & _ & %Hdom & %Hcn & %Hdomt & Htk & _)".
+    iIntros (n c t (Hn & Hc & Ht)). rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
+    assert (is_Some (tickets !! t)) as [κ Hκ] by (apply elem_of_dom, Hdomt; lia).
+    iDestruct ("Htk" $! t κ with "[//]") as "[_ [[%Hle _]|[_ Hf]]]"; first lia.
+    iExact "Hf".
+  Qed.
+
+  (** The trace property of a fair lock, starvation freedom included. *)
+  Definition fair_lock_sf_tps (tl : val) : tps heap_lang Σ :=
+    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ starvation_free_tps next curr)%S.
+
+  Lemma is_fair_lock_starvation_free tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_sf_tps tl.
+  Proof.
+    iApply temporal_weaken; last iApply is_fair_lock_temporal.
+    apply tps_exist_mono => next. apply tps_exist_mono => curr.
+    apply tps_and_mono; [apply tps_le_refl|apply lock_inv_tps_starvation_free_le].
+  Qed.
 
   (** The trace property guaranteed by a lock token: the holder releases the lock. *)
   Definition lock_token_tps (tl : val) : tps heap_lang Σ :=
@@ -661,6 +694,19 @@ Section trace.
   Proof.
     intros (next & curr & Htl & Hal). exists next, curr. split; first done.
     by eapply (lock_inv_tps_starvation_free (Σ:=Σ)).
+  Qed.
+
+  (** The guarantee [starvation_free_tps] means [starvation_free]. *)
+  Lemma starvation_free_tps_tr {Σ} next curr τ :
+    tps_tr (starvation_free_tps (Σ:=Σ) next curr) τ → starvation_free next curr τ.
+  Proof.
+    destruct τ as [k τf]. intros Hal m Hm n c t Hn Hc Ht.
+    unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic, trace_now in *. simpl in *.
+    destruct (Hal m Hm n c t) as (m' & Hm' & [Hcur _] & _).
+    { rewrite /tr_and /tr_atomic /tr_pure /ts_emb /ts_atomic /trace_now /=.
+      destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *. split_and!; [done|done|lia|lia]. }
+    exists m'. split_and!; [done| |done]. revert Hcur.
+    rewrite /tr_atomic /ts_emb /ts_atomic /trace_now /=. destruct (τf m') as [[[Θ σ] ?] ?]. done.
   Qed.
 
   (** The holder of a lock token (serving ticket [u]) eventually releases the lock. *)

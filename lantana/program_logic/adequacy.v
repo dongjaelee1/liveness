@@ -25,8 +25,10 @@ Definition ti_and `{SI : sidx} {Λ} {Σ} : tiProp Λ Σ → tiProp Λ Σ → tiP
 Definition ti_or `{SI : sidx} {Λ} {Σ} : tiProp Λ Σ → tiProp Λ Σ → tiProp Λ Σ :=
   λ P Q, (λ τ, (P τ) ∨ (Q τ))%I.
 
-Definition ti_impl `{SI : sidx} {Λ} {Σ} : Prop → tiProp Λ Σ → tiProp Λ Σ :=
-  λ P Q, (λ τ, ⌜P⌝ → (Q τ))%I.
+(** The antecedent is a trace property proper: the step-indexed reading of an implication
+    assumes the antecedent at the level of traces. *)
+Definition ti_impl `{SI : sidx} {Λ} {Σ} : trProp Λ → tiProp Λ Σ → tiProp Λ Σ :=
+  λ P Q, (λ τ, ⌜P τ⌝ → (Q τ))%I.
 
 Definition ti_forall `{SI : sidx} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ Σ) → tiProp Λ Σ :=
   λ A P, (λ τ, ∀ (a : A), (P a τ))%I.

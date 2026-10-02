@@ -8,9 +8,9 @@ Inductive tp {Π : Type} :=
 | tp_pure (p : Prop)
 | tp_and (P Q : tp)
 | tp_or (P Q : tp)
-(** For impl and wnad, we only allow pure Prop in the left side.
-    This makes the wand just an impl, so we omit the wand. *)
-| tp_impl (P : Prop) (Q : tp)
+(** Implication with any trace property on the left. (Its meaning is plain implication of
+    trace properties; the program logic can establish it, see [tps_impl].) *)
+| tp_impl (P Q : tp)
 | tp_forall (A : Type) (P : A → tp)
 | tp_exist (A : Type) (P : A → tp)
 | tp_always (P : tp)
@@ -88,8 +88,8 @@ Definition tr_and {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
 Definition tr_or {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
   λ P Q, (λ τ, (P τ) ∨ (Q τ)).
 
-Definition tr_impl {Λ : language} : Prop → trProp Λ → trProp Λ :=
-  λ P Q, (λ τ, P → (Q τ)).
+Definition tr_impl {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
+  λ P Q, (λ τ, P τ → (Q τ)).
 
 Definition tr_forall {Λ : language} : ∀ (A : Type), (A → trProp Λ) → trProp Λ :=
   λ A P, (λ τ, ∀ (a : A), (P a τ)).
@@ -142,7 +142,7 @@ Fixpoint tp_trace {Λ : language} (Φ : @tp (state_pred Λ)) : trProp Λ :=
   | tp_pure p => (⌜p⌝)%R
   | tp_and P Q => (tp_trace P ∧ tp_trace Q)%R
   | tp_or P Q => (tp_trace P ∨ tp_trace Q)%R
-  | tp_impl P Q => (P → tp_trace Q)%R
+  | tp_impl P Q => (tp_trace P → tp_trace Q)%R
   | tp_forall A P => (∀ (a : A), tp_trace (P a))%R
   | tp_exist A P => (∃ (a : A), tp_trace (P a))%R
   | tp_always P => tr_always (tp_trace P)

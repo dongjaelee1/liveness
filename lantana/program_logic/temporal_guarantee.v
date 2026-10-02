@@ -114,10 +114,13 @@ Section tps_connectives.
     - right. by eapply tps_good.
   Qed.
 
-  Program Definition tps_impl (p : Prop) G : tps Λ Σ :=
-    {| tps_ti _ := ti_impl p (tps_ti G); tps_tr := tr_impl p (tps_tr G) |}.
+  (** Implication, with any trace property as antecedent. Both readings assume the
+      antecedent at the level of traces, so agreement needs nothing about it (in contrast
+      to an induction on syntax, which would need the antecedent's agreement backwards). *)
+  Program Definition tps_impl (A G : tps Λ Σ) : tps Λ Σ :=
+    {| tps_ti _ := ti_impl (tps_tr A) (tps_ti G); tps_tr := tr_impl (tps_tr A) (tps_tr G) |}.
   Next Obligation.
-    intros p G ? F τ H Hp. unfold ti_impl in H. eapply tps_good. eapply sat_impl; [apply H|].
+    intros A G ? F τ H HA. unfold ti_impl in H. eapply tps_good. eapply sat_impl; [apply H|].
     iIntros "_". by iPureIntro.
   Qed.
 
@@ -173,8 +176,12 @@ Section tps_connectives.
   Proof. intros H1 H2 ??. rewrite /= /ti_or. by rewrite H1 H2. Qed.
   Lemma tps_and_mono G1 G2 G1' G2' : tps_le G1 G1' → tps_le G2 G2' → tps_le (tps_and G1 G2) (tps_and G1' G2').
   Proof. intros H1 H2 ??. rewrite /= /ti_and. by rewrite H1 H2. Qed.
-  Lemma tps_impl_mono (φ : Prop) G G' : tps_le G G' → tps_le (tps_impl φ G) (tps_impl φ G').
-  Proof. intros H ??. rewrite /= /ti_impl. by rewrite H. Qed.
+  (** Antecedents are compared as trace properties. *)
+  Lemma tps_impl_mono A A' G G' :
+    (∀ τ, tps_tr A' τ → tps_tr A τ) → tps_le G G' → tps_le (tps_impl A G) (tps_impl A' G').
+  Proof. intros HA HG ??. rewrite /= /ti_impl. iIntros "H %H'". iApply HG. iApply "H". eauto. Qed.
+  Lemma tps_impl_intro_le A G : tps_le G (tps_impl A G).
+  Proof. intros ??. rewrite /= /ti_impl. by iIntros "H _". Qed.
   Lemma tps_forall_mono {X} (G G' : X → tps Λ Σ) : (∀ x, tps_le (G x) (G' x)) → tps_le (tps_forall G) (tps_forall G').
   Proof. intros H ??. rewrite /= /ti_forall. iIntros "H %x". iApply H. iApply "H". Qed.
   Lemma tps_exist_mono {X} `{!TypeExistentialProperty X ordI} (G G' : X → tps Λ Σ) :
@@ -381,7 +388,7 @@ Section rules.
       iIntros "!>" (?????????) "%H W". iRight. by iApply ("T2" with "[//] W").
   Qed.
 
-  Lemma temporal_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (φ → G).
+  Lemma temporal_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (⌜φ⌝ → G).
   Proof.
     iIntros "#HG !>" (?????????) "(HI& MI& HP)".
     destruct (Classical_Prop.classic φ) as [Hφ|Hφ].
@@ -1222,6 +1229,143 @@ Section state_atoms.
 
 End state_atoms.
 
+(** ** Complete and instant trace properties
+
+    An implication [A → G] assumes [A] at the level of traces. Inside the logic that
+    assumption can be used when [A] is complete (its real reading gives its in-logic reading):
+    then [A → G] is introduced from [A ∧ H ⊑ G]. It can be eliminated when [A] is instant (its
+    in-logic reading gives its real reading). Everything built from pure facts and state atoms
+    is complete, including always and until; the non-temporal part is also instant. *)
+Section complete.
+  Context {Λ : language} {Σ : gFunctors}.
+  Implicit Types G A : tps Λ Σ.
+
+  Definition tps_complete G : Prop :=
+    ∀ (H : temporalGS Λ Σ) τ, tps_tr G τ → ⊢ @tps_ti _ _ G H τ.
+  Definition tps_instant G : Prop :=
+    ∀ (H : temporalGS Λ Σ) τ, @tps_ti _ _ G H τ ⊢ ⌜tps_tr G τ⌝.
+
+  Lemma tps_impl_intro A H G : tps_complete A → tps_le (tps_and A H) G → tps_le H (tps_impl A G).
+  Proof.
+    intros HA HG ? τ. rewrite /= /ti_impl. iIntros "H %Hτ". iApply HG.
+    rewrite /= /ti_and. iSplit; last done. by iApply HA.
+  Qed.
+
+  Lemma tps_impl_elim A G : tps_instant A → tps_le (tps_and A (tps_impl A G)) G.
+  Proof.
+    intros HA ? τ. rewrite /= /ti_and /ti_impl. iIntros "H".
+    iAssert ⌜tps_tr A τ⌝%I as %Hτ; first by iApply HA; iDestruct "H" as "[$ _]".
+    iDestruct "H" as "[_ H]". by iApply "H".
+  Qed.
+
+  (** Completeness. *)
+  Lemma tps_complete_pure φ : tps_complete (tps_pure φ).
+  Proof. intros ? τ H. rewrite /= /ti_pure. by iPureIntro. Qed.
+  Lemma tps_complete_atomic π : tps_complete (tps_atomic π).
+  Proof.
+    intros ? [n τf]. rewrite /= /ti_atomic /tr_atomic /ts_emb /ts_atomic /trace_now /=.
+    destruct (τf n) as (((Θ&σ)&?)&?). intros Hπ. iPureIntro. exact Hπ.
+  Qed.
+  Lemma tps_complete_and G1 G2 : tps_complete G1 → tps_complete G2 → tps_complete (tps_and G1 G2).
+  Proof. intros H1 H2 ? τ [??]. rewrite /= /ti_and. iSplit; [by iApply H1|by iApply H2]. Qed.
+  Lemma tps_complete_or G1 G2 : tps_complete G1 → tps_complete G2 → tps_complete (tps_or G1 G2).
+  Proof. intros H1 H2 ? τ [?|?]; rewrite /= /ti_or; [iLeft; by iApply H1|iRight; by iApply H2]. Qed.
+  Lemma tps_complete_impl A G : tps_complete G → tps_complete (tps_impl A G).
+  Proof. intros HG ? τ H. rewrite /= /ti_impl. iIntros (HA). iApply HG. by apply H. Qed.
+  Lemma tps_complete_forall {X} (G : X → tps Λ Σ) :
+    (∀ x, tps_complete (G x)) → tps_complete (tps_forall G).
+  Proof. intros HG ? τ H. rewrite /= /ti_forall. iIntros (x). iApply HG. apply H. Qed.
+  Lemma tps_complete_exist {X} `{!TypeExistentialProperty X ordI} (G : X → tps Λ Σ) :
+    (∀ x, tps_complete (G x)) → tps_complete (tps_exist G).
+  Proof. intros HG ? τ [x H]. rewrite /= /ti_exist. iExists x. by iApply HG. Qed.
+
+  Lemma tps_complete_always G : tps_complete G → tps_complete (tps_always G).
+  Proof.
+    intros HG ? τ Hτ. rewrite /=.
+    iAssert (□ ∀ τ, ⌜tr_always (tps_tr G) τ⌝ → ti_always (tps_ti G) (ti_pure True) τ)%I as "#H";
+      last by iApply "H".
+    iLöb as "IH". iIntros "!>" ([n τf] Hal). rewrite ti_always_unfold /ti_always_pre.
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iNext. iMod "Hclose" as "_".
+    iModIntro. iSplit.
+    { iApply HG. apply (Hal n). lia. }
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit; first by rewrite /ti_pure.
+    iApply ALC_intro. iMod "Hclose" as "_". iModIntro. iApply "IH". iPureIntro.
+    intros m Hm. apply Hal. simpl in Hm. lia.
+  Qed.
+
+  Lemma tps_complete_until G1 G2 :
+    tps_complete G1 → tps_complete G2 → tps_complete (tps_until G1 G2).
+  Proof.
+    intros H1 H2 ? [n τf] (m & Hnm & HQ & HP). rewrite /= /ti_exist.
+    (* The measure is the number of steps to the right formula. *)
+    assert (∀ d n', m - n' = d → n' ≤ m → (∀ l, n' ≤ l < m → tps_tr G1 (l, τf)) →
+              ⊢ ti_until Ord.lt (Ord.from_nat d) (tps_ti G1) (tps_ti G2) (n', τf)) as Hu.
+    { induction d as [|d IH]; intros n' Hd Hn' HP'; rewrite ti_until_unfold /ti_until_pre;
+        iApply fupd_mask_intro; try set_solver; iIntros "Hclose"; iNext; iMod "Hclose" as "_"; iModIntro.
+      - assert (m = n') as -> by lia. iLeft. by iApply H2.
+      - iRight. iSplit; first (iApply H1; apply HP'; lia).
+        iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iExists (Ord.from_nat d).
+        iSplit; first (iPureIntro; rewrite Ord.from_nat_S; apply Ord.S_lt).
+        iApply ALC_intro. iMod "Hclose" as "_". iModIntro.
+        iApply (IH (S n')); [simpl; lia|simpl; lia|]. intros l Hl. apply HP'. lia. }
+    iExists (Ord.from_nat (m - n)). iApply (Hu _ n eq_refl Hnm). intros l Hl. apply HP. lia.
+  Qed.
+
+  Lemma tps_complete_finally G : tps_complete G → tps_complete (tps_finally G).
+  Proof. intros HG. apply tps_complete_until; [apply tps_complete_pure|done]. Qed.
+
+  (** Instantness. *)
+  Lemma tps_instant_pure φ : tps_instant (tps_pure φ).
+  Proof. intros ? τ. rewrite /= /ti_pure. by iIntros "%". Qed.
+  Lemma tps_instant_atomic π : tps_instant (tps_atomic π).
+  Proof.
+    intros ? [n τf]. rewrite /= /ti_atomic /tr_atomic /ts_emb /ts_atomic /trace_now /=.
+    destruct (τf n) as (((Θ&σ)&?)&?). by iIntros "%".
+  Qed.
+  Lemma tps_instant_and G1 G2 : tps_instant G1 → tps_instant G2 → tps_instant (tps_and G1 G2).
+  Proof.
+    intros H1 H2 ? τ. rewrite /= /ti_and. iIntros "H".
+    iAssert ⌜tps_tr G1 τ⌝%I as %?; first by iApply H1; iDestruct "H" as "[$ _]".
+    iAssert ⌜tps_tr G2 τ⌝%I as %?; first by iApply H2; iDestruct "H" as "[_ $]".
+    by iPureIntro.
+  Qed.
+  Lemma tps_instant_or G1 G2 : tps_instant G1 → tps_instant G2 → tps_instant (tps_or G1 G2).
+  Proof.
+    intros H1 H2 ? τ. rewrite /= /ti_or. iIntros "[H|H]".
+    - iDestruct (H1 with "H") as %?. iPureIntro. by left.
+    - iDestruct (H2 with "H") as %?. iPureIntro. by right.
+  Qed.
+  Lemma tps_instant_impl A G : tps_instant G → tps_instant (tps_impl A G).
+  Proof.
+    intros HG ? τ. rewrite /= /ti_impl. iIntros "H".
+    destruct (Classical_Prop.classic (tps_tr A τ)) as [HA|HA].
+    - iDestruct (HG with "(H [//])") as %?. iPureIntro. by intros _.
+    - iPureIntro. by intros ?.
+  Qed.
+  Lemma tps_instant_forall {X} (G : X → tps Λ Σ) :
+    (∀ x, tps_instant (G x)) → tps_instant (tps_forall G).
+  Proof.
+    intros HG ? τ. rewrite /= /ti_forall /tr_forall.
+    destruct (Classical_Prop.classic (∀ x, tps_tr (G x) τ)) as [Hall|Hn]; first by iIntros "_".
+    apply Classical_Pred_Type.not_all_ex_not in Hn as [x Hx].
+    iIntros "H". iSpecialize ("H" $! x). iDestruct (HG with "H") as %?. done.
+  Qed.
+  Lemma tps_instant_exist {X} `{!TypeExistentialProperty X ordI} (G : X → tps Λ Σ) :
+    (∀ x, tps_instant (G x)) → tps_instant (tps_exist G).
+  Proof.
+    intros HG ? τ. rewrite /= /ti_exist. iIntros "[%x H]". iDestruct (HG with "H") as %?.
+    iPureIntro. by exists x.
+  Qed.
+
+  Lemma tps_complete_state φ : tps_complete (tps_state φ).
+  Proof.
+    intros ? [n τf]. rewrite /=. destruct (τf n) as (((Θ&σ)&?)&?). intros Hφ. by iPureIntro.
+  Qed.
+  Lemma tps_instant_state φ : tps_instant (tps_state φ).
+  Proof. intros ? [n τf]. rewrite /=. destruct (τf n) as (((Θ&σ)&?)&?). by iIntros "%". Qed.
+
+End complete.
+
 Section state_rules.
   Context `{!lantanaGS Λ Σ}.
 
@@ -1238,6 +1382,20 @@ Section state_rules.
   Qed.
 
 End state_rules.
+
+Section impl_rules.
+  Context `{!lantanaGS Λ Σ}.
+
+  (** A guarantee extends to an implication whose complete antecedent, together with it,
+      entails the consequent. With a pure antecedent this is [temporal_impl] weakened. *)
+  Lemma temporal_impl_intro P A H G :
+    tps_complete A → tps_le (tps_and A H) G → P ⊨ₜ H ⊢ P ⊨ₜ tps_impl A G.
+  Proof. intros HA HG. by apply temporal_weaken, tps_impl_intro. Qed.
+
+  Lemma temporal_impl_weaken P A G : P ⊨ₜ G ⊢ P ⊨ₜ tps_impl A G.
+  Proof. apply temporal_weaken, tps_impl_intro_le. Qed.
+
+End impl_rules.
 
 (** ** Adequacy, up to trace implication *)
 Section adequacy.
@@ -1395,7 +1553,7 @@ Section big_op_rules.
 
   Lemma temporal_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ) (G : K → A → tps Λ Σ) :
     (∀ k x, Φ k x ⊨ₜ G k x) -∗
-    ([∗ map] k ↦ x ∈ m, Φ k x) ⊨ₜ tps_forall (λ k, tps_forall (λ x, tps_impl (m !! k = Some x) (G k x))).
+    ([∗ map] k ↦ x ∈ m, Φ k x) ⊨ₜ tps_forall (λ k, tps_forall (λ x, tps_impl ⌜m !! k = Some x⌝ (G k x))).
   Proof.
     iIntros "#HG". iApply (temporal_mono (∀ k x, ⌜m !! k = Some x⌝ → Φ k x)%I with "[]").
     { iIntros "!> H" (k x Hk). by iApply (big_sepM_lookup with "H"). }
@@ -1404,7 +1562,7 @@ Section big_op_rules.
 
   Lemma temporal_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → tps Λ Σ) :
     (∀ k x, Φ k x ⊨ₜ G k x) -∗
-    ([∗ list] k ↦ x ∈ l, Φ k x) ⊨ₜ tps_forall (λ k, tps_forall (λ x, tps_impl (l !! k = Some x) (G k x))).
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊨ₜ tps_forall (λ k, tps_forall (λ x, tps_impl ⌜l !! k = Some x⌝ (G k x))).
   Proof.
     iIntros "#HG". iApply (temporal_mono (∀ k x, ⌜l !! k = Some x⌝ → Φ k x)%I with "[]").
     { iIntros "!> H" (k x Hk). by iApply (big_sepL_lookup with "H"). }
@@ -1413,7 +1571,7 @@ Section big_op_rules.
 
   Lemma temporal_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → tps Λ Σ) :
     (∀ x, Φ x ⊨ₜ G x) -∗
-    ([∗ set] x ∈ X, Φ x) ⊨ₜ tps_forall (λ x, tps_impl (x ∈ X) (G x)).
+    ([∗ set] x ∈ X, Φ x) ⊨ₜ tps_forall (λ x, tps_impl ⌜x ∈ X⌝ (G x)).
   Proof.
     iIntros "#HG". iApply (temporal_mono (∀ x, ⌜x ∈ X⌝ → Φ x)%I with "[]").
     { iIntros "!> H" (x Hx). by iApply (big_sepS_elem_of with "H"). }
@@ -1500,7 +1658,7 @@ Section into_temporal.
   Proof. intros H. constructor. unfold IntoTemporal in *. iApply temporal_exist_ghost. iIntros (x). iApply H. Qed.
 
   Global Instance into_temporal_impl (φ : Prop) P G :
-    IntoTemporal P G → IntoTemporal (⌜φ⌝ → P) (φ → G) | 10.
+    IntoTemporal P G → IntoTemporal (⌜φ⌝ → P) (⌜φ⌝ → G) | 10.
   Proof. intros H. unfold IntoTemporal in *. iApply temporal_impl. iApply H. Qed.
   Global Instance into_temporal_forall {X} (P : X → iProp Σ) (G : X → tps Λ Σ) :
     (∀ x, IntoTemporal (P x) (G x)) → IntoTemporal (∀ x, P x) (tps_forall G) | 10.
@@ -1521,16 +1679,16 @@ Section into_temporal.
     (G : K → A → tps Λ Σ) :
     (∀ k x, IntoTemporal (Φ k x) (G k x)) →
     IntoTemporal ([∗ map] k ↦ x ∈ m, Φ k x)
-      (tps_forall (λ k, tps_forall (λ x, tps_impl (m !! k = Some x) (G k x)))) | 10.
+      (tps_forall (λ k, tps_forall (λ x, tps_impl ⌜m !! k = Some x⌝ (G k x)))) | 10.
   Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepM. iIntros (k x). iApply HG. Qed.
   Global Instance into_temporal_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → tps Λ Σ) :
     (∀ k x, IntoTemporal (Φ k x) (G k x)) →
     IntoTemporal ([∗ list] k ↦ x ∈ l, Φ k x)
-      (tps_forall (λ k, tps_forall (λ x, tps_impl (l !! k = Some x) (G k x)))) | 10.
+      (tps_forall (λ k, tps_forall (λ x, tps_impl ⌜l !! k = Some x⌝ (G k x)))) | 10.
   Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepL. iIntros (k x). iApply HG. Qed.
   Global Instance into_temporal_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → tps Λ Σ) :
     (∀ x, IntoTemporal (Φ x) (G x)) →
-    IntoTemporal ([∗ set] x ∈ X, Φ x) (tps_forall (λ x, tps_impl (x ∈ X) (G x))) | 10.
+    IntoTemporal ([∗ set] x ∈ X, Φ x) (tps_forall (λ x, tps_impl ⌜x ∈ X⌝ (G x))) | 10.
   Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepS. iIntros (x). iApply HG. Qed.
 
   Lemma tsem_temporal (Q : iProp Σ) G `{!IntoTemporal Q G} : ⊢ Q ⊨ₜ tsem Q.
@@ -1595,5 +1753,31 @@ Section examples.
   (** Quantification over guaranteed iProps in a hypothesis, as in a higher-order spec. *)
   Local Lemma ex_higher_order N G (P : iProp Σ) : P ⊨ₜ G -∗ inv N P ⊨ₜ tps_always G.
   Proof. iApply temporal_always. Qed.
+
+  (** A temporal antecedent used inside the logic: assuming that the run eventually reaches
+      [π], the in-logic reading of that eventuality (with its measure) is available by
+      completeness, here to strengthen a guarantee. *)
+  Local Lemma ex_impl_temporal P π G :
+    P ⊨ₜ G ⊢ P ⊨ₜ tps_impl (tps_finally (tps_atomic π)) (tps_and (tps_finally (tps_atomic π)) G).
+  Proof.
+    apply temporal_impl_intro; [apply tps_complete_finally, tps_complete_atomic|apply tps_le_refl].
+  Qed.
+
+  (** The rule one might hope for, an iProp implication guaranteeing the implication of the
+      guarantees, is unsound: it guarantees a trace property that no trace has. (The
+      antecedent's resources are not determined by the trace.) *)
+  Local Lemma naive_impl_rule_unsound :
+    (∀ (P1 P2 : iProp Σ) G1 G2, (⊢ P1 ⊨ₜ G1) → (⊢ P2 ⊨ₜ G2) → ⊢ (P1 → P2) ⊨ₜ tps_impl G1 G2) →
+    ⊢ True ⊨ₜ tps_impl tps_true (tps_pure False).
+  Proof.
+    intros Hrule.
+    assert (HF : ∀ G, ⊢ (False : iProp Σ) ⊨ₜ G).
+    { intros G. rewrite /temporal. iIntros "!>" (?????????) "(_& _& [])". }
+    iApply (temporal_mono (False → False)%I with "[]"); first by iIntros "!> _ []".
+    iApply Hrule; [apply temporal_true|apply HF].
+  Qed.
+
+  Local Lemma tps_impl_true_false_empty τ : ¬ tps_tr (tps_impl (Λ:=Λ) (Σ:=Σ) tps_true (tps_pure False)) τ.
+  Proof. intros H. by apply H. Qed.
 
 End examples.

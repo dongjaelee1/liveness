@@ -62,7 +62,7 @@ Section registry.
   Lemma registry_temporal N γm G :
     ⊢ inv N (registry_inv γm G) ⊨ₜ
       tps_always (tps_exist (λ m : gmap nat gname,
-        tps_true ∧ tps_forall (λ r, tps_forall (λ γr, tps_impl (m !! r = Some γr) (G r))))).
+        tps_true ∧ tps_forall (λ r, tps_forall (λ γr, tps_impl ⌜m !! r = Some γr⌝ (G r))))).
   Proof. apply (into_temporal _ _). Qed.
 
   (** Allocation, with no request registered yet. *)
