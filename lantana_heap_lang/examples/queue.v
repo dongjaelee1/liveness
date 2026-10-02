@@ -611,4 +611,54 @@ Section proof.
         iExists g. iFrame. iPureIntro. set_solver.
   Qed.
 
+  (** ** Temporal guarantees *)
+  (** The queue has no trace content beyond its lock's: [queue_inv] is ghost state, and the
+      lock resource [queue_lock] is the [R] of the lock, to which the lock's guarantee gives
+      [tps_true]. Since [is_queue] keeps [γ ↪LOCK_AL□], its lock cannot be deleted, so the
+      queue guarantees what a lock that cannot be deleted guarantees
+      ([is_fair_lock_alive_temporal]). *)
+  Definition queue_tps (ql : val) : tps heap_lang Σ :=
+    (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧ alive_fair_lock_tps tl)%S.
+
+  Lemma is_queue_temporal ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_tps ql.
+  Proof.
+    iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
+      (is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr) ∗
+       (queue_ticketlock_γ γ) ↪LOCK_AL□))%I with "[]").
+    { iIntros "!> (%&%&%& %& _& #AL& _& #IFL)". iExists _, _, _. iSplit; first done.
+      iFrame "#". }
+    iApply (into_temporal _ _).
+  Qed.
+
+  Global Instance is_queue_into_temporal ql γ ℓ φ :
+    IntoTemporal (is_queue ql γ ℓ φ) (queue_tps ql) | 0.
+  Proof. apply is_queue_temporal. Qed.
+
+  Lemma is_queue_init_temporal ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_tps ql.
+  Proof.
+    iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
+      (is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr) ∗
+       (queue_ticketlock_γ γ) ↪LOCK_AL□))%I with "[]").
+    { iIntros "!> (%&%&%& %& _& _& #AL& _& #IFL)". iExists _, _, _. iSplit; first done.
+      iFrame "#". }
+    iApply (into_temporal _ _).
+  Qed.
+
 End proof.
+
+(** ** Progress of the queue's lock, at the level of traces *)
+Section trace.
+
+  (** The queue's lock makes release progress ([release_progress]): every [enqueue] or
+      [dequeue] that takes the lock eventually releases it. *)
+  Lemma queue_release_progress {Σ} ql τ :
+    tps_tr (queue_tps (Σ:=Σ) ql) τ →
+    ∃ lhptr ltptr next curr : loc,
+      ql = (#lhptr, #ltptr, (#next, #curr))%V ∧ release_progress next curr τ.
+  Proof.
+    intros (lhptr & ltptr & tl & -> & Htl).
+    destruct (alive_fair_lock_release_progress (Σ:=Σ) tl τ Htl) as (next & curr & -> & Hrp).
+    by exists lhptr, ltptr, next, curr.
+  Qed.
+
+End trace.
