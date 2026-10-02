@@ -50,12 +50,11 @@ Proof.
   unfold ti_exist in H. apply sat_exists in H. destruct H as [x H].
   revert n τf H. induction x as [a IHa] using (well_founded_ind Ord.lt_well_founded). intros.
   rewrite ti_until_unfold /ti_until_pre in H.
-  apply sat_fupd, sat_later, sat_fupd in H. apply sat_or in H. destruct H as [H|H].
+  apply sat_fupd, sat_later, sat_fupd, sat_fupd, sat_ALC, sat_fupd in H. apply sat_or in H. destruct H as [H|H].
   { apply IH2 in H. exists n. split_and !; eauto. intros. lia. }
   apply iProp_sat_lc_at_frame_and in H. destruct H as [HP H].
-  apply sat_fupd, sat_exists in H. destruct H as [b H].
+  apply sat_exists in H. destruct H as [b H].
   apply iProp_sat_lc_at_frame_and in H. destruct H as [Hlt H]. apply sat_elim in Hlt.
-  apply sat_ALC, sat_fupd in H.
   specialize (IHa _ Hlt _ _ H). simpl in IHa. destruct IHa as (m'& Hm'& Htr& Hp).
   destruct Hm' as [|m Hm'].
   { exists (S n). split_and !; eauto. intros l [Hl1 Hl2]. inversion Hl1; subst; eauto. apply Hp. lia. }
@@ -177,11 +176,11 @@ Section tps_connectives.
     iAssert (∀ τ, ti_always (tps_ti G) (ti_pure True) τ -∗ ti_always (tps_ti G') (ti_pure True) τ)%I
       with "[]" as "Hal"; last by iApply "Hal".
     iLöb as "IH". iIntros (τ') "H". rewrite !ti_always_unfold /ti_always_pre.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iSplit.
-    - iDestruct "H" as "[H _]". by iApply Hle.
-    - iDestruct "H" as "[_ H]". iMod "H". iModIntro. iSplit; first by iDestruct "H" as "[$ _]".
-      iDestruct "H" as "[_ H]". iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
-      by iApply "IH".
+    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
+    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
+    iSplit; first (iDestruct "H" as "[H _]"; by iApply Hle).
+    iSplit; first by iDestruct "H" as "[_ [$ _]]".
+    iDestruct "H" as "[_ [_ H]]". by iApply "IH".
   Qed.
 
   Lemma tps_until_mono G1 G2 G1' G2' :
@@ -192,12 +191,11 @@ Section tps_connectives.
                     ti_until Ord.lt a (tps_ti G1') (tps_ti G2') τ)%I with "[]" as "Hu";
       last by iApply "Hu".
     iLöb as "IH". iIntros (a' τ') "H". rewrite !ti_until_unfold /ti_until_pre.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iDestruct "H" as "[H|H]".
+    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
+    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. iDestruct "H" as "[H|H]".
     - iLeft. by iApply H2.
     - iRight. iSplit; first (iDestruct "H" as "[H _]"; by iApply H1).
-      iDestruct "H" as "[_ H]". iMod "H" as (a'') "[%Hlt H]". iModIntro. iExists a''.
-      iSplit; first done. iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
-      by iApply "IH".
+      iDestruct "H" as "[_ (%a''& %Hlt& H)]". iExists a''. iSplit; first done. by iApply "IH".
   Qed.
 
 End tps_connectives.
@@ -282,12 +280,12 @@ Section complete.
     iAssert (□ ∀ τ, ⌜tr_always (tps_tr G) τ⌝ → ti_always (tps_ti G) (ti_pure True) τ)%I as "#H";
       last by iApply "H".
     iLöb as "IH". iIntros "!>" ([n τf] Hal). rewrite ti_always_unfold /ti_always_pre.
-    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iNext. iMod "Hclose" as "_".
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iNext. iMod "Hclose" as "_". iModIntro.
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iApply ALC_intro. iMod "Hclose" as "_".
     iModIntro. iSplit.
     { iApply HG. apply (Hal n). lia. }
-    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit; first by rewrite /ti_pure.
-    iApply ALC_intro. iMod "Hclose" as "_". iModIntro. iApply "IH". iPureIntro.
-    intros m Hm. apply Hal. simpl in Hm. lia.
+    iSplit; first by rewrite /ti_pure.
+    iApply "IH". iPureIntro. intros m Hm. apply Hal. simpl in Hm. lia.
   Qed.
 
   Global Instance tps_complete_until G1 G2 :
@@ -298,12 +296,11 @@ Section complete.
     assert (∀ d n', m - n' = d → n' ≤ m → (∀ l, n' ≤ l < m → tps_tr G1 (l, τf)) →
               ⊢ ti_until Ord.lt (Ord.from_nat d) (tps_ti G1) (tps_ti G2) (n', τf)) as Hu.
     { induction d as [|d IH]; intros n' Hd Hn' HP'; rewrite ti_until_unfold /ti_until_pre;
-        iApply fupd_mask_intro; try set_solver; iIntros "Hclose"; iNext; iMod "Hclose" as "_"; iModIntro.
+        iApply fupd_mask_intro; try set_solver; iIntros "Hclose"; iNext; iMod "Hclose" as "_"; iModIntro;
+        iApply fupd_mask_intro; try set_solver; iIntros "Hclose"; iApply ALC_intro; iMod "Hclose" as "_"; iModIntro.
       - assert (m = n') as -> by lia. iLeft. by iApply H2.
       - iRight. iSplit; first (iApply H1; apply HP'; lia).
-        iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iExists (Ord.from_nat d).
-        iSplit; first (iPureIntro; rewrite Ord.from_nat_S; apply Ord.S_lt).
-        iApply ALC_intro. iMod "Hclose" as "_". iModIntro.
+        iExists (Ord.from_nat d). iSplit; first (iPureIntro; rewrite Ord.from_nat_S; apply Ord.S_lt).
         iApply (IH (S n')); [simpl; lia|simpl; lia|]. intros l Hl. apply HP'. lia. }
     iExists (Ord.from_nat (m - n)). iApply (Hu _ n eq_refl Hnm). intros l Hl. apply HP. lia.
   Qed.

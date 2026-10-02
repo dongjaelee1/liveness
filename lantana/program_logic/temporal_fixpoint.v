@@ -49,6 +49,17 @@ Section connectives.
        tps_tr τ := tps_tr G (trace_next τ) |}.
   Next Obligation. intros G ? F τ H. apply sat_fupd, sat_ALC, sat_fupd in H. by eapply tps_good. Qed.
 
+  (** [⊚ G]: [G] after the step taken at the current position. In the logic this is the
+      step's credits and mask change; at the level of traces it is just [G]. *)
+  Program Definition tps_step G : tps Λ Σ :=
+    {| tps_ti _ τ := (|={⊤,∅}=> ALC (|={∅,⊤}=> tps_ti G τ))%I; tps_tr := tps_tr G |}.
+  Next Obligation. intros G ? F τ H. apply sat_fupd, sat_ALC, sat_fupd in H. by eapply tps_good. Qed.
+
+  (** [○' G]: [G] read at the next position, with no modality; [○ G] is [⊚ ○' G]. *)
+  Program Definition tps_shift G : tps Λ Σ :=
+    {| tps_ti _ τ := tps_ti G (trace_next τ); tps_tr τ := tps_tr G (trace_next τ) |}.
+  Next Obligation. intros G ? F τ H. by eapply tps_good. Qed.
+
   Lemma tps_later_mono G G' : tps_le G G' → tps_le (tps_later G) (tps_later G').
   Proof.
     intros HG ? τ. rewrite /=. iIntros "H". iMod "H". iModIntro. iNext. iMod "H". iModIntro.
@@ -59,6 +70,13 @@ Section connectives.
     intros HG ? τ. rewrite /=. iIntros "H". iMod "H". iModIntro.
     iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. by iApply HG.
   Qed.
+  Lemma tps_step_mono G G' : tps_le G G' → tps_le (tps_step G) (tps_step G').
+  Proof.
+    intros HG ? τ. rewrite /=. iIntros "H". iMod "H". iModIntro.
+    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. by iApply HG.
+  Qed.
+  Lemma tps_shift_mono G G' : tps_le G G' → tps_le (tps_shift G) (tps_shift G').
+  Proof. intros HG ? τ. rewrite /=. by iApply HG. Qed.
 
   Lemma tps_exist_lub {X} `{!TypeExistentialProperty X ordI} (G : X → tps Λ Σ) G' :
     (∀ x, tps_le (G x) G') → tps_le (tps_exist G) G'.
@@ -130,6 +148,18 @@ Section mono_instances.
   Proof.
     intros HF. split.
     - intros. apply tps_next_mono. by apply tps_mono_le.
+    - intros X Y HXY τ H. simpl in *. by apply (tps_mono_tr (F:=F) X Y).
+  Qed.
+  Global Instance tps_mono_step F : TpsMono F → TpsMono (λ X, tps_step (F X)).
+  Proof.
+    intros HF. split.
+    - intros. apply tps_step_mono. by apply tps_mono_le.
+    - intros X Y HXY τ H. simpl in *. by apply (tps_mono_tr (F:=F) X Y).
+  Qed.
+  Global Instance tps_mono_shift F : TpsMono F → TpsMono (λ X, tps_shift (F X)).
+  Proof.
+    intros HF. split.
+    - intros. apply tps_shift_mono. by apply tps_mono_le.
     - intros X Y HXY τ H. simpl in *. by apply (tps_mono_tr (F:=F) X Y).
   Qed.
   Global Instance tps_mono_always F : TpsMono F → TpsMono (λ X, tps_always (F X)).
@@ -298,30 +328,35 @@ Section ltl.
   Context {Λ : language} {Σ : gFunctors}.
   Implicit Types G : tps Λ Σ.
 
-  Definition F_always G : tps Λ Σ → tps Λ Σ := λ X, tps_later (tps_and G (tps_next X)).
+  (** The step-indexed readings decide a position after the step taken there, so the
+      bodies are [⊳ ⊚ (G ∧ ○'X)] and [⊳ ⊚ (G2 ∨ (G1 ∧ ○'X))]; on traces these read as
+      [G ∧ ○X] and [G2 ∨ (G1 ∧ ○X)]. *)
+  Definition F_always G : tps Λ Σ → tps Λ Σ := λ X, tps_later (tps_step (tps_and G (tps_shift X))).
   Definition F_until G1 G2 : tps Λ Σ → tps Λ Σ :=
-    λ X, tps_later (tps_or G2 (tps_and G1 (tps_next X))).
+    λ X, tps_later (tps_step (tps_or G2 (tps_and G1 (tps_shift X)))).
   Global Instance F_always_mono G : TpsMono (F_always G).
   Proof.
-    apply (tps_mono_later (λ X, tps_and G (tps_next X))), (tps_mono_and (λ _, G) (λ X, tps_next X)).
+    apply (tps_mono_later (λ X, tps_step (tps_and G (tps_shift X)))),
+      (tps_mono_step (λ X, tps_and G (tps_shift X))), (tps_mono_and (λ _, G) (λ X, tps_shift X)).
     - apply tps_mono_const.
-    - apply (tps_mono_next (λ X, X)), tps_mono_id.
+    - apply (tps_mono_shift (λ X, X)), tps_mono_id.
   Qed.
   Global Instance F_until_mono G1 G2 : TpsMono (F_until G1 G2).
   Proof.
-    apply (tps_mono_later (λ X, tps_or G2 (tps_and G1 (tps_next X)))),
-      (tps_mono_or (λ _, G2) (λ X, tps_and G1 (tps_next X))); first apply tps_mono_const.
-    apply (tps_mono_and (λ _, G1) (λ X, tps_next X)); first apply tps_mono_const.
-    apply (tps_mono_next (λ X, X)), tps_mono_id.
+    apply (tps_mono_later (λ X, tps_step (tps_or G2 (tps_and G1 (tps_shift X))))),
+      (tps_mono_step (λ X, tps_or G2 (tps_and G1 (tps_shift X)))),
+      (tps_mono_or (λ _, G2) (λ X, tps_and G1 (tps_shift X))); first apply tps_mono_const.
+    apply (tps_mono_and (λ _, G1) (λ X, tps_shift X)); first apply tps_mono_const.
+    apply (tps_mono_shift (λ X, X)), tps_mono_id.
   Qed.
 
-  (** [□ G] is [ν X. ⊳(G ∧ ○X)], in both directions. *)
+  (** [□ G] is [ν X. ⊳ ⊚ (G ∧ ○'X)], in both directions. *)
   Lemma tps_always_le_nu G : tps_le (tps_always G) (tps_nu (F_always G)).
   Proof.
     apply tps_nu_coind. intros ? τ. rewrite /F_always /= ti_always_unfold /ti_always_pre /ti_and /ti_pure.
-    iIntros "H". iMod "H". iModIntro. iNext. iMod "H". iModIntro.
-    iSplit; first by iDestruct "H" as "[$ _]".
-    iDestruct "H" as "[_ H]". iMod "H" as "[_ H]". by iModIntro.
+    iIntros "H". iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
+    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
+    iSplit; first by iDestruct "H" as "[$ _]". by iDestruct "H" as "[_ [_ $]]".
   Qed.
 
   Lemma tps_nu_le_always G : tps_le (tps_nu (F_always G)) (tps_always G).
@@ -330,10 +365,10 @@ Section ltl.
     iRevert (τ) "H". iLöb as "IH". iIntros (τ) "H".
     iPoseProof (HX _ τ with "H") as "H". rewrite /F_always. iSimpl in "H".
     rewrite ti_always_unfold /ti_always_pre /ti_and /ti_pure.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro.
-    iSplit; first by iDestruct "H" as "[$ _]".
-    iDestruct "H" as "[_ H]". iMod "H". iModIntro. iSplit; first done.
-    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. by iApply "IH".
+    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
+    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
+    iSplit; first by iDestruct "H" as "[$ _]". iSplit; first done.
+    iDestruct "H" as "[_ H]". by iApply "IH".
   Qed.
 
   Lemma tps_nu_always_tr G τ : tps_tr (tps_nu (F_always G)) τ ↔ tr_always (tps_tr G) τ.
@@ -363,11 +398,11 @@ Section ltl.
     eapply tps_le_trans; [|apply tps_exist_lub; intros a; apply (tps_mu_intro _ (tps_until_at G1 G2))].
     - intros ? τ. rewrite /= /ti_exist. iIntros "[%a H]". by iExists a.
     - intros α ? τ. rewrite /F_until /= ti_until_unfold /ti_until_pre /ti_or /ti_and /ti_exist.
-      iIntros "H". iMod "H". iModIntro. iNext. iMod "H". iModIntro.
+      iIntros "H". iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
+      iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
       iDestruct "H" as "[H|H]"; first by iLeft. iRight.
       iSplit; first by iDestruct "H" as "[$ _]".
-      iDestruct "H" as "[_ H]". iMod "H" as (a') "[%Hlt H]". iModIntro.
-      iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. by iExists (a' ↾ Hlt).
+      iDestruct "H" as "[_ (%a'& %Hlt& H)]". by iExists (a' ↾ Hlt).
   Qed.
 
   Lemma tps_mu_until_tr G1 G2 τ :
@@ -380,13 +415,15 @@ Section ltl.
       intros l Hl. destruct (decide (l = n)) as [->|Hne]; first done. apply HPs. simpl. lia.
   Qed.
 
-  (** Beyond LTL: [G] at every even position, [ν X. ⊳(G ∧ ○○X)] (not expressible in LTL). *)
-  Definition F_even G : tps Λ Σ → tps Λ Σ := λ X, tps_later (tps_and G (tps_next (tps_next X))).
+  (** Beyond LTL: [G] at every even position, [ν X. ⊳ ⊚ (G ∧ ○' ○ X)] (not expressible in LTL). *)
+  Definition F_even G : tps Λ Σ → tps Λ Σ :=
+    λ X, tps_later (tps_step (tps_and G (tps_shift (tps_next X)))).
   Global Instance F_even_mono G : TpsMono (F_even G).
   Proof.
-    apply (tps_mono_later (λ X, tps_and G (tps_next (tps_next X)))),
-      (tps_mono_and (λ _, G) (λ X, tps_next (tps_next X))); first apply tps_mono_const.
-    apply (tps_mono_next (λ X, tps_next X)), (tps_mono_next (λ X, X)), tps_mono_id.
+    apply (tps_mono_later (λ X, tps_step (tps_and G (tps_shift (tps_next X))))),
+      (tps_mono_step (λ X, tps_and G (tps_shift (tps_next X)))),
+      (tps_mono_and (λ _, G) (λ X, tps_shift (tps_next X))); first apply tps_mono_const.
+    apply (tps_mono_shift (λ X, tps_next X)), (tps_mono_next (λ X, X)), tps_mono_id.
   Qed.
 
   Lemma tps_nu_even_tr G n τf :

@@ -44,13 +44,15 @@ Definition ti_exist `{SI : sidx} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ Σ
 Definition ti_always_pre `{SI : sidx} `{!temporalGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
-  λ P1 P2 τ, (|={E,∅}=> ▷ |={∅,E}=> ((P1 τ) ∧ |={E,∅}=> (P2 τ) ∧ ALC (|={∅,E}=> ti_always P1 P2 (trace_next τ))))%I.
+  (** Deferred shape: the first fancy update with the later is the check at [τ] (the
+      adequacy reads and certifies invariants there), the second with the credits is the
+      step; both formulas at [τ] are established after the step, from the certificates. *)
+  λ P1 P2 τ, (|={E,∅}=> ▷ |={∅,E}=> |={E,∅}=> ALC (|={∅,E}=>
+               ((P1 τ) ∧ (P2 τ) ∧ ti_always P1 P2 (trace_next τ))))%I.
 
-(** FIXME: hacky proof*)
 Local Instance ti_always_pre_contractive `{SI : sidx} `{!temporalGS Λ Σ} E : Contractive (ti_always_pre E).
 Proof.
-  rewrite /ti_always_pre. repeat intro. do 6 (f_equiv).
-  f_contractive. do 1 (f_equiv). repeat red. repeat red in H. eauto.
+  rewrite /ti_always_pre. repeat intro. do 1 (f_equiv). f_contractive. do 4 f_equiv. f_equiv. f_equiv. apply H.
 Qed.
 
 Local Definition ti_always_def `{SI : sidx} `{!temporalGS Λ Σ} : tiProp Λ Σ → tiProp Λ Σ → tiProp Λ Σ :=
@@ -70,17 +72,17 @@ Definition ti_until_pre `{SI : sidx} `{!temporalGS Λ Σ} E
   {A : Type} (ltA : A → A → Prop)
   (ti_until : A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
+  (** Deferred shape, as for always: the decision about [τ] is made after the step, and
+      the measure for the continuation is chosen then. *)
   λ a P Q τ,
-    (|={E,∅}=> ▷ |={∅,E}=> ((Q τ) ∨ ((P τ) ∧ |={E,∅}=> ∃ a', (⌜ltA a' a⌝) ∧ ALC (|={∅,E}=> ti_until a' P Q (trace_next τ)))))%I.
+    (|={E,∅}=> ▷ |={∅,E}=> |={E,∅}=> ALC (|={∅,E}=>
+       ((Q τ) ∨ ((P τ) ∧ ∃ a', (⌜ltA a' a⌝) ∧ ti_until a' P Q (trace_next τ)))))%I.
 
 Local Instance ti_until_pre_contractive `{SI : sidx} `{!temporalGS Λ Σ} E
   {A : Type} {ltA : A → A → Prop}
   : Contractive (ti_until_pre E ltA).
 Proof.
-  rewrite /ti_until_pre. repeat intro. do 9 (f_equiv).
-  f_contractive. do 1 (f_equiv). eapply dist_ne.
-  { eapply H. }
-  1,2: reflexivity.
+  rewrite /ti_until_pre. repeat intro. do 1 (f_equiv). f_contractive. repeat f_equiv. apply H.
 Qed.
 
 Local Definition ti_until_def `{SI : sidx} `{!temporalGS Λ Σ}
@@ -151,9 +153,9 @@ Section proof1.
     iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 (trace_next τ)).
   Proof.
     intros. rewrite ti_always_unfold /ti_always_pre in H.
-    apply sat_fupd, sat_later, sat_fupd in H. apply iProp_sat_lc_at_frame_and in H. destruct H.
-    apply sat_fupd in H0. apply iProp_sat_lc_at_frame_and in H0. destruct H0.
-    apply sat_ALC, sat_fupd in H1. auto.
+    apply sat_fupd, sat_later, sat_fupd, sat_fupd, sat_ALC, sat_fupd in H.
+    apply iProp_sat_lc_at_frame_and in H. destruct H as [_ H].
+    apply iProp_sat_lc_at_frame_and in H. destruct H as [_ H]. auto.
   Qed.
 
   Lemma ti_always_trace_later F P1 P2 n x τf :
@@ -167,7 +169,7 @@ Section proof1.
 
   Lemma ti_always_tr_always F (P1 P2 : tiProp Λ Σ) (R1 R2 : trProp Λ) :
     (∀ τ, iProp_sat_lc_at_frame F ⊤ (P1 τ) → R1 τ) →
-    (∀ τ, iProp_sat_lc_at_frame F ∅ (P2 τ) → R2 τ) →
+    (∀ τ, iProp_sat_lc_at_frame F ⊤ (P2 τ) → R2 τ) →
     ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 τ) → (tr_always (R1 ∧ R2))%R τ.
   Proof.
     intros IH1 IH2 τ H. unfold tr_always. destruct τ as (n&τf).
@@ -176,15 +178,11 @@ Section proof1.
     intros ?. destruct H0. apply Classical_Prop.imply_to_and in H0. destruct H0.
     apply H1. clear H1.
     eapply ti_always_trace_later in H. 2: eauto.
-    split.
-    - eapply IH1. rewrite ti_always_unfold /ti_always_pre in H.
-      apply sat_fupd, sat_later, sat_fupd in H.
-      apply iProp_sat_lc_at_frame_and in H. destruct H. auto.
-    - eapply IH2. rewrite ti_always_unfold /ti_always_pre in H.
-      apply sat_fupd, sat_later, sat_fupd in H.
-      apply iProp_sat_lc_at_frame_and in H. destruct H.
-      apply sat_fupd in H1. apply iProp_sat_lc_at_frame_and in H1. destruct H1.      
-      auto.
+    rewrite ti_always_unfold /ti_always_pre in H.
+    apply sat_fupd, sat_later, sat_fupd, sat_fupd, sat_ALC, sat_fupd in H.
+    apply iProp_sat_lc_at_frame_and in H. destruct H as [H1 H].
+    apply iProp_sat_lc_at_frame_and in H. destruct H as [H2 _].
+    split; eauto.
   Qed.
 
 End proof1.
