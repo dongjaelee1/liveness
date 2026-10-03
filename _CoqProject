@@ -125,4 +125,5 @@ lantana_heap_lang/examples/ticket_lock2_client.v
 lantana_heap_lang/examples/queue.v
 lantana_heap_lang/examples/task_queue.v
 lantana_heap_lang/examples/task_queue_client.v
+lantana_heap_lang/examples/cert_discharge.v
 lantana_heap_lang/examples/extended_int.v

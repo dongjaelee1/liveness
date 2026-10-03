@@ -131,7 +131,7 @@ Section proof.
     l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (ℓq ⊕ 2)%ordi μ) ∗
          crP_obls g (ℓq ⊕ 2)%ordi {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
          finallyT Nl kl 1 (exits #1@i) ∗
-         finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ)) }}}
+         finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ)) ∗ treg }}}
       main #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
   Proof using queueG0 ticket_lockG0.
@@ -141,7 +141,7 @@ Section proof.
     iPoseProof (decr_reentrant_spec) as (μ_d) "decr_reentrant_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
     (* Internal steps, func calls, wait *)
-    iExists (100 ⊕ μ_ti ⊕ μ_fi ⊕ μ_d ⊕ μ_fw)%M. iIntros (i g kl kc) "!> % (TE& TG& GF& Cg& %Hklc& HF& HC) HΦ".
+    iExists (100 ⊕ μ_ti ⊕ μ_fi ⊕ μ_d ⊕ μ_fw)%M. iIntros (i g kl kc) "!> % (TE& TG& GF& Cg& %Hklc& HF& HC& #TR) HΦ".
     iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
     iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_ti GF_m]".
     iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fi GF_m]".
@@ -152,7 +152,7 @@ Section proof.
     lwp_bind (TaskQueue.init _).
     iMod (crP_fuel_layer_mon_set _ (0)%ordi with "GF_ti") as "GF_ti".
     { apply ord.O_bot. }
-    iModIntro. iApply ("TaskQueue_init_spec" $! 0 _ _ ℓq with "[$TE $TG $GF_ti]").
+    iModIntro. iApply ("TaskQueue_init_spec" $! 0 _ _ ℓq with "[$TE $TG $GF_ti $TR]").
     { iPureIntro. apply ord.lt_le, ℓq_cond. }
     iClear "TaskQueue_init_spec".
     iIntros (ql qγ) "(TE& _& TG& #ITQ)".
@@ -167,7 +167,7 @@ Section proof.
     iMod (crP_fuel_layer_mon _ 0 with "F_init0") as "F_init0".
     { apply ord.O_bot. }
     iModIntro.
-    iApply ("Flag_init_spec" $! 0 _ _ _ _ _ (ℵ)%M with "[$TE $TG F_init F_init0 $Cg0]").
+    iApply ("Flag_init_spec" $! 0 _ _ _ _ _ (ℵ)%M with "[$TE $TG F_init F_init0 $Cg0 $TR]").
     { iApply big_sepS_union. 1: set_solver. rewrite !big_sepS_singleton. iFrame. }
     iIntros "%ptrx %k (TE& _& TG& _& Cg0& Of0& Ftk& #is_flag)".
     rewrite union_empty_r_L.
@@ -234,21 +234,24 @@ Section proof.
                            crP_fuel g (ℓq ⊕ 2)%ordi μ))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #1⌝)%I]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗
-     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗ treg -∗ £n 2 -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
                    (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof using queueG0 ticket_lockG0.
-    iIntros (HT HP HQ) "TEs TGs".
+    iIntros (HT HP HQ) "TEs TGs #TR LC".
+    iPoseProof (tlc_split_nat 1 1 with "LC") as "[LC1 LC2]".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     rewrite !big_sepS_singleton.
     iPoseProof (main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ (ℓq ⊕ 2)%ordi μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (untilI_alloc _ _ _ false (ℓq ⊕ 2)%ordi (ℓq ⊕ 2)%ordi 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nl True%I (exits #1@i)%I with "[]") as "Ukl1".
+    iMod ("Akl1" $! _ Nl True%I (exits #1@i)%I with "[] TR LC1 []") as "Ukl1".
+    { iPureIntro. split; [set_solver|solve_ndisj]. }
     { done. }
     iMod (untilI_alloc _ _ _ false (ℓq ⊕ 2)%ordi (ℓq ⊕ 2)%ordi 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
     iMod ("Akc" $! _ Nc True%I ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ))%I
-            with "[]") as "Ukc".
+            with "[] TR LC2 []") as "Ukc".
+    { iPureIntro. split; [set_solver|solve_ndisj]. }
     { done. }
     iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Gg1 Gf1 Ofkl1 Ofkc".
     { subst Φ. rewrite !union_empty_r_L.
@@ -259,7 +262,7 @@ Section proof.
     iDestruct "HP" as (g1 kl1 kc) "(HF& HC& TG& Cg& %Hklc& GF)".
     iEval (rewrite HT big_sepM_singleton) in "TEs".
     iPoseProof ("main_spec" $! i g1 kl1 kc (λ v, lift_term i (λ _ v, ⌜v = #1⌝)%I v) with "[TEs TG Cg GF HF HC]") as "WP".
-    { iFrame. iSplitL; [by iApply big_sepS_singleton|done]. }
+    { iFrame "∗ #". iSplitL; [by iApply big_sepS_singleton|done]. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { done. }
     { done. }
@@ -342,7 +345,7 @@ Section adequacy.
               (λ τ, R_main τ ∧ R_queue τ)).
     { apply G_main_impl. }
     1,2,3,4: eauto.
-    iIntros (?). exists 0%ord.
+    iIntros (?). exists (Ord.from_nat 2).
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
     iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
     iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
@@ -354,8 +357,8 @@ Section adequacy.
     iSplitL "HI TI PI".
     { iDestruct "PI" as "[PI _]". by iFrame. }
     iSplitR; first done.
-    iModIntro. iIntros "LC TGs".
-    iMod (main_pre (heapGS0:=HHeapGS) (queueG0:=QueueG Σ _) Θ0 i (Φ_P (heapGS0:=HHeapGS) (queueG0:=QueueG Σ _)) with "[Tis] [TGs]") as "H".
+    iModIntro. iIntros "#TR LC TGs".
+    iMod (main_pre (heapGS0:=HHeapGS) (queueG0:=QueueG Σ _) Θ0 i (Φ_P (heapGS0:=HHeapGS) (queueG0:=QueueG Σ _)) with "[Tis] [TGs] TR LC") as "H".
     { done. }
     { reflexivity. }
     { reflexivity. }

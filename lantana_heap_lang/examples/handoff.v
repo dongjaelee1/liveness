@@ -69,6 +69,8 @@ Section proof.
   Proof. by apply ndot_ne_disjoint. Qed.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
+  Remark Na_disj_treg : Na ## tregN.
+  Proof. solve_ndisj. Qed.
 
   (** ** Definitions *)
   Definition is_task (ℓ : ord.t) : val → val → oids → iProp Σ :=
@@ -88,7 +90,7 @@ Section proof.
            (∃ (f a : val), b ↦ SOMEV (f, a) ∗ ghost_var_frac γd (1)%Qp g).
 
   Definition is_handoff (b : loc) (γ : handoff_γ) ℓ : iProp Σ :=
-    inv Na (handoff_inv b (handoff_γd γ) ℓ).
+    alwaysI Na (handoff_inv b (handoff_γd γ) ℓ).
 
   (** What the handoff exports: the cell always holds [NONE] or a task [SOME (f, a)]; the
       task's resources and the carriers have no trace content. *)
@@ -104,15 +106,17 @@ Section proof.
   Global Instance handoff_inv_persistent b γ ℓ : Persistent (is_handoff b γ ℓ).
   Proof. rewrite /is_handoff. apply _. Qed.
 
+  (** The invariant is registered: a model update, with the registry and a credit. *)
   Lemma is_handoff_initialize E b ℓ g :
-     b ↦{#(1/2)} NONEV -∗ crP_obls g ℓ ∅
-    ={E}=∗ ∃ γ, is_handoff b γ ℓ ∗ ghost_var_frac (handoff_γd γ) (1/2)%Qp g.
+    ↑tregN ⊆ E →
+    treg -∗ £n 1 -∗ b ↦{#(1/2)} NONEV -∗ crP_obls g ℓ ∅ -∗
+    |={E}=>g ∃ γ, is_handoff b γ ℓ ∗ ghost_var_frac (handoff_γd γ) (1/2)%Qp g.
   Proof.
-    iIntros "Ptr Co".
+    iIntros (HE) "#TR LC Ptr Co".
     iMod (ghost_var_alloc g) as "(%& [Gv Gv0])".
     iExists (HandoffName γ). iFrame "Gv0".
     rewrite /is_handoff. simpl.
-    iMod (inv_alloc Na _ (handoff_inv b γ ℓ) with "[Ptr Co Gv]") as "#Inv".
+    iMod (alwaysI_alloc E Na (handoff_inv b γ ℓ) with "TR LC [Ptr Co Gv]") as "#Inv"; [done|apply Na_disj_treg| |].
     { iNext. rewrite /handoff_inv. iExists g. iLeft. iFrame. }
     eauto.
   Qed.

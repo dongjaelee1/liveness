@@ -214,6 +214,14 @@ Section guarantee.
     ▷ P ∗ history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) -∗ ▷ tguar G n.
   Proof. iIntros "#HG (HP& HI& MI)". iNext. iApply ("HG" with "[$HI $MI $HP]"). Qed.
 
+  (** The same through a persistent view of the content. *)
+  Lemma temporal_elim_later_view P V G h n σ Θ κs m i Ω W :
+    temporal V G -∗ □ (P -∗ V) -∗
+    ▷ P ∗ history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) -∗ ▷ tguar G n.
+  Proof.
+    iIntros "#HG #HPV (HP& HI& MI)". iNext. iApply ("HG" with "[$HI $MI HP]"). by iApply "HPV".
+  Qed.
+
   Lemma tguar_mono G G' n : tps_le G G' → tguar G n ⊢ tguar G' n.
   Proof.
     iIntros (Hle) "#HG". iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W".
@@ -244,20 +252,24 @@ Notation until_disch k G2 :=
 Definition treg_handle `{!lantanaGS Λ Σ} (e : rentry) : iProp Σ :=
   match e with
   | RMark => True
-  | RAlways N γ => ⌜N ## tregN⌝ ∗ ∃ P : iProp Σ, saved_ti γ (tps_ti (tps_sem P)) ∗ inv N P
+  | RAlways N γ => ⌜N ## tregN⌝ ∗ ∃ P V : iProp Σ, saved_ti γ (tps_ti (tps_sem V)) ∗ inv N P ∗ □ (P -∗ V)
   | RUntil N k γP γQ =>
       ⌜N ## tregN⌝ ∗ ∃ P Q : iProp Σ, saved_ti γP (tps_ti (tps_sem P)) ∗ saved_ti γQ (tps_ti (tps_sem Q)) ∗
         oblP_inv N k P Q (until_disch k (tps_sem Q))
   end.
 Definition treg `{!lantanaGS Λ Σ} : iProp Σ := treg_inv treg_handle.
 
-(** An invariant whose content is trace-visible: an invariant, registered, with the record
-    of its content at its allocation position. *)
-Definition alwaysI `{!lantanaGS Λ Σ} (N : namespace) (P : iProp Σ) : iProp Σ :=
+(** An invariant whose content is trace-visible through a view [V] of its content [P]
+    (a persistent weakening, [□ (P -∗ V)]): the invariant, registered with the reading of
+    [V], and the record of [V] at its registration position. The common case is [V = P]
+    ([alwaysI]); a view lets a client export a stronger property than the content alone,
+    e.g. rule out a disjunct of the content with a persistent fact of its own. *)
+Definition alwaysI_view `{!lantanaGS Λ Σ} (N : namespace) (P V : iProp Σ) : iProp Σ :=
   ∃ j r γ st, ⌜N ## tregN⌝ ∗ reg_idx j r (RAlways N γ) ∗ hG_event r st ∗
-              saved_ti γ (tps_ti (tps_sem P)) ∗ inv N P ∗ treg ∗ ▷ tguar (tps_sem P) r.
+              saved_ti γ (tps_ti (tps_sem V)) ∗ inv N P ∗ □ (P -∗ V) ∗ treg ∗ ▷ tguar (tps_sem V) r.
+Definition alwaysI `{!lantanaGS Λ Σ} (N : namespace) (P : iProp Σ) : iProp Σ := alwaysI_view N P P.
 (* Opaque for the proof mode: [iNext] must not unfold a structure to strip its inner later. *)
-Global Typeclasses Opaque alwaysI.
+Global Typeclasses Opaque alwaysI_view alwaysI.
 
 (** The persistent part of an until: its obligation invariant, registered, with the records
     of its contents at its allocation position, where its obligation was assigned. *)
@@ -441,16 +453,28 @@ Section gupd_read.
     iModIntro. iFrame. iSplit; first done. by iApply gupd_intro.
   Qed.
 
-  (** The same at the level of [sfgupd]: reading the history too, which the final fancy
-      update may still use. *)
+  (** The same at the level of [sfgupd], with the history: fancy updates may happen before
+      and after reading the model. *)
+  Lemma sfgupd_read_fupd E (P : iProp Σ) :
+    (∀ h n σ Θ κs,
+      history_interp h n σ Θ κs -∗ |={E,∅}=> ∀ g i Ω W,
+        model_interp g i Ω W n (dom Θ) -∗
+        model_interp g i Ω W n (dom Θ) ∗ |={∅,E}=> history_interp h n σ Θ κs ∗ P) ⊢ |={E}=>g P.
+  Proof.
+    iIntros "H". unfold_sfgupd. iIntros (h n σ Θ κs) "HI". rewrite /fgupd.
+    iMod ("H" with "HI") as "H". iModIntro.
+    iApply gupd_read. iIntros (g i Ω W) "MI". iDestruct ("H" with "MI") as "($& HP)".
+    iMod "HP" as "[HI HP]". iModIntro. iFrame.
+  Qed.
+
   Lemma sfgupd_read E (P : iProp Σ) :
     (∀ h n σ Θ κs g i Ω W,
       history_interp h n σ Θ κs -∗ model_interp g i Ω W n (dom Θ) -∗
       model_interp g i Ω W n (dom Θ) ∗ |={E}=> history_interp h n σ Θ κs ∗ P) ⊢ |={E}=>g P.
   Proof.
-    iIntros "H". unfold_sfgupd. iIntros (h n σ Θ κs) "HI". rewrite /fgupd.
+    iIntros "H". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI".
     iApply fupd_mask_intro; first set_solver. iIntros "close".
-    iApply gupd_read. iIntros (g i Ω W) "MI". iDestruct ("H" with "HI MI") as "($& HP)".
+    iIntros (g i Ω W) "MI". iDestruct ("H" with "HI MI") as "($& HP)".
     iMod "close" as "_". iMod "HP" as "[HI HP]". iModIntro. iFrame.
   Qed.
 
@@ -460,6 +484,8 @@ End gupd_read.
 Section always_rules.
   Context `{!lantanaGS Λ Σ}.
 
+  Global Instance alwaysI_view_persistent N P V : Persistent (alwaysI_view N P V).
+  Proof. rewrite /alwaysI_view. apply _. Qed.
   Global Instance alwaysI_persistent N P : Persistent (alwaysI N P).
   Proof. rewrite /alwaysI. apply _. Qed.
   Global Instance treg_handle_persistent e : Persistent (treg_handle e).
@@ -467,17 +493,63 @@ Section always_rules.
   Global Instance treg_persistent : Persistent treg.
   Proof. apply _. Qed.
 
+  Lemma alwaysI_view_inv N P V : alwaysI_view N P V ⊢ inv N P.
+  Proof. rewrite /alwaysI_view. iIntros "(%&%&%&%& _& _& _& _& $& _)". Qed.
+  Lemma alwaysI_view_treg N P V : alwaysI_view N P V ⊢ treg.
+  Proof. rewrite /alwaysI_view. iIntros "(%&%&%&%& _& _& _& _& _& _& $& _)". Qed.
   Lemma alwaysI_inv N P : alwaysI N P ⊢ inv N P.
-  Proof. rewrite /alwaysI. iIntros "(%&%&%&%& _& _& _& _& $& _)". Qed.
+  Proof. apply alwaysI_view_inv. Qed.
   Lemma alwaysI_treg N P : alwaysI N P ⊢ treg.
-  Proof. rewrite /alwaysI. iIntros "(%&%&%&%& _& _& _& _& _& $& _)". Qed.
+  Proof. apply alwaysI_view_treg. Qed.
 
+  Lemma alwaysI_view_acc E N P V :
+    ↑N ⊆ E → alwaysI_view N P V ={E,E∖↑N}=∗ ▷ P ∗ (▷ P ={E∖↑N,E}=∗ True).
+  Proof. iIntros (?) "#H". iApply inv_acc; first done. by iApply alwaysI_view_inv. Qed.
   Lemma alwaysI_acc E N P :
     ↑N ⊆ E → alwaysI N P ={E,E∖↑N}=∗ ▷ P ∗ (▷ P ={E∖↑N,E}=∗ True).
-  Proof. iIntros (?) "#H". iApply inv_acc; first done. by iApply alwaysI_inv. Qed.
+  Proof. apply alwaysI_view_acc. Qed.
 
-  (** Allocation registers the invariant and records its content at the current position:
-      a model update, reading the model. *)
+  (** Proof mode integration: [iInv] opens these like invariants. *)
+  Global Instance into_inv_alwaysI_view N P V : IntoInv (alwaysI_view N P V) N := {}.
+  Global Instance into_acc_alwaysI_view N P V E :
+    IntoAcc (X := unit) (alwaysI_view N P V)
+            (↑N ⊆ E) True (fupd E (E ∖ ↑N)) (fupd (E ∖ ↑N) E)
+            (λ _ : (), (▷ P)%I) (λ _ : (), (▷ P)%I) (λ _ : (), None).
+  Proof.
+    rewrite /IntoAcc /accessor bi.exist_unit.
+    iIntros (?) "#Hinv _". by iApply alwaysI_view_acc.
+  Qed.
+  Global Instance into_inv_alwaysI N P : IntoInv (alwaysI N P) N := {}.
+  Global Instance into_acc_alwaysI N P E :
+    IntoAcc (X := unit) (alwaysI N P)
+            (↑N ⊆ E) True (fupd E (E ∖ ↑N)) (fupd (E ∖ ↑N) E)
+            (λ _ : (), (▷ P)%I) (λ _ : (), (▷ P)%I) (λ _ : (), None).
+  Proof.
+    rewrite /IntoAcc /accessor bi.exist_unit.
+    iIntros (?) "#Hinv _". by iApply alwaysI_acc.
+  Qed.
+
+  (** Registering an existing invariant under a view: a model update (it records the view
+      at the current position), consuming the registry and a later credit. *)
+  Lemma alwaysI_register E N P V :
+    ↑tregN ⊆ E → ↑N ⊆ E → N ## tregN →
+    inv N P -∗ □ (P -∗ V) -∗ treg -∗ £n 1 -∗ |={E}=>g alwaysI_view N P V.
+  Proof.
+    iIntros (HE HNE HN) "#Hinv #HPV #TR LC". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI".
+    iMod (inv_acc with "Hinv") as "[HP Hclose]"; first done.
+    iApply fupd_mask_intro; first set_solver. iIntros "close".
+    iIntros (g i Ω W) "MI".
+    iPoseProof (temporal_elim_later_view P V (tps_sem V) with "[] HPV [$HP $HI $MI]") as "#C";
+      first iApply temporal_sem.
+    iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
+    iFrame "MI". iMod "close" as "_". iMod ("Hclose" with "HP") as "_".
+    iMod (saved_ti_alloc (tps_ti (tps_sem V))) as (γ) "#Hγ".
+    iMod (treg_register treg_handle E (RAlways N γ) with "LC TR [] HI") as "[HI (%j& #Hj)]"; first done.
+    { iIntros (st) "_". simpl. iSplit; first done. iExists P, V. iFrame "Hγ Hinv HPV". }
+    iModIntro. iFrame "HI". rewrite /alwaysI_view. iExists j, n, γ, _. iFrame "#". done.
+  Qed.
+
+  (** Allocation registers the invariant and records its content at the current position. *)
   Lemma alwaysI_alloc E N P :
     ↑tregN ⊆ E → N ## tregN →
     treg -∗ £n 1 -∗ ▷ P -∗ |={E}=>g alwaysI N P.
@@ -489,8 +561,9 @@ Section always_rules.
     iMod (saved_ti_alloc (tps_ti (tps_sem P))) as (γ) "#Hγ".
     iMod (inv_alloc N _ P with "HP") as "#Hinv".
     iMod (treg_register treg_handle E (RAlways N γ) with "LC TR [] HI") as "[HI (%j& #Hj)]"; first done.
-    { iIntros (st) "_". simpl. iSplit; first done. iExists P. iFrame "Hγ Hinv". }
-    iModIntro. iFrame "HI". rewrite /alwaysI. iExists j, n, γ, _. iFrame "#". done.
+    { iIntros (st) "_". simpl. iSplit; first done. iExists P, P. iFrame "Hγ Hinv". by iIntros "!> $". }
+    iModIntro. iFrame "HI". rewrite /alwaysI /alwaysI_view. iExists j, n, γ, _. iFrame "#".
+    iSplit; first done. by iIntros "!> $".
   Qed.
 
 End always_rules.
@@ -839,9 +912,10 @@ Section certification.
   Proof.
     iIntros "#Hd HI MI". destruct e; simpl.
     - by iFrame.
-    - iDestruct "Hd" as "(%HN& %P& #SP& #Hinv)".
+    - iDestruct "Hd" as "(%HN& %P& %V& #SP& #Hinv& #HPV)".
       iMod (inv_acc with "Hinv") as "[HP Hclose]"; first solve_ndisj.
-      iPoseProof (temporal_elim_later with "[] [$HP $HI $MI]") as "#C"; first iApply temporal_sem.
+      iPoseProof (temporal_elim_later_view P V (tps_sem V) with "[] HPV [$HP $HI $MI]") as "#C";
+        first iApply temporal_sem.
       iMod ("Hclose" with "HP") as "_". iModIntro. iFrame "HI MI". iExists _. iFrame "SP C".
     - iDestruct "Hd" as "(%HN& %P& %Q& #SP& #SQ& #OI)".
       iAssert (⌜∃ o, Ω !! k = Some o⌝)%I as %[o Hk].
@@ -1123,23 +1197,24 @@ Section adequacy.
       From a consistent system at [n]: certify every registered item (the shape's later
       strips the registry list and the content of this invariant), step, and decide [n]
       with the record of the content, then continue. *)
-  Lemma always_run N P :
-    ⌜N ## tregN⌝ -∗ treg -∗ inv N P -∗
+  Lemma always_run N P V :
+    ⌜N ## tregN⌝ -∗ treg -∗ inv N P -∗ □ (P -∗ V) -∗
     ∀ s h n σ Θ TQ κs g v Ω W τf γ,
       ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
        hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
       (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
-      ti_always (tps_ti (tps_sem P)) (ti_pure True) (n, τf).
+      ti_always (tps_ti (tps_sem V)) (ti_pure True) (n, τf).
   Proof.
-    iIntros "%HN #TR #Hinv". iIntros (s h n σ Θ TQ κs g v Ω W τf γ) "%H ([HI SIa]& MI& WPs)".
+    iIntros "%HN #TR #Hinv #HPV". iIntros (s h n σ Θ TQ κs g v Ω W τf γ) "%H ([HI SIa]& MI& WPs)".
     iLöb as "IH" forall (s h n σ Θ TQ κs g v Ω W τf γ H).
     destruct H as (BEH& FS& LB& HIST& EQTQ).
     rewrite ti_always_unfold /ti_always_pre.
     iMod (inv_acc with "TR") as "[R HcloseR]"; first solve_ndisj.
     iMod (inv_acc with "Hinv") as "[HP HcloseP]"; first solve_ndisj.
+    iPoseProof (temporal_elim_later_view P V (tps_sem V) with "[] HPV [$HP $HI $MI]") as "#Trec";
+      first iApply temporal_sem.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext.
     iDestruct "R" as (l) "[Ha #Hl]". iMod "close" as "_".
-    iPoseProof (temporal_elim P (tps_sem P) with "[] [$HI $MI $HP]") as "#Trec"; first iApply temporal_sem.
     iMod ("HcloseP" with "HP") as "_".
     iMod (certify n l with "Ha Hl HI MI") as "(HI& MI& Ha& #Hl'& #B)".
     iMod ("HcloseR" with "[Ha]") as "_".
@@ -1156,17 +1231,17 @@ Section adequacy.
 
   (** The registered structures guarantee the always and until of the canonical trace
       properties of their contents. *)
-  Lemma temporal_always N P : ⊢ alwaysI N P ⊨ₜ tps_always (tps_sem P).
+  Lemma temporal_always_view N P V : ⊢ alwaysI_view N P V ⊨ₜ tps_always (tps_sem V).
   Proof.
-    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& #A)". rewrite /alwaysI.
-    iDestruct "A" as (j r γ st) "(%HN& #Hj& #HE& #Hγ& #Hinv& #TR& #AC)".
+    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& #A)". rewrite /alwaysI_view.
+    iDestruct "A" as (j r γ st) "(%HN& #Hj& #HE& #Hγ& #Hinv& #HPV& #TR& #AC)".
     iDestruct (history_interp_hG_event_lookup with "[$HI $HE]") as %Hr.
     iDestruct (history_interp_wf with "HI") as %[Hlen _].
     assert (Hrn : r ≤ n) by (apply lookup_lt_Some in Hr; lia).
     iApply tguar_intro.
     iIntros "!>" (l s h' TQ g v' Ω' W' τf γ' σ' Θ' κs' (BEH& FS& LB& HIST& EQTQ)) "#B Sys".
     (* the certificate of this invariant for [n]: from the bundle, or its allocation record *)
-    iAssert (▷ tguar (tps_sem P) n)%I as "#C".
+    iAssert (▷ tguar (tps_sem V) n)%I as "#C".
     { rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
       iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
       - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. simpl.
@@ -1178,9 +1253,12 @@ Section adequacy.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_". iModIntro.
     iSplit; [|iSplit; first done].
     - iApply (tguar_elim with "C [%] B Sys"). split_and!; done.
-    - iApply (always_run with "[//] TR Hinv [%] Sys"). simpl.
+    - iApply (always_run with "[//] TR Hinv HPV [%] Sys"). simpl.
       split_and!; [by apply behavior_S|exact FS|done|done|done].
   Qed.
+
+  Lemma temporal_always N P : ⊢ alwaysI N P ⊨ₜ tps_always (tps_sem P).
+  Proof. apply temporal_always_view. Qed.
 
   Local Lemma model_interp_event_obl k o g v Ω W n D :
     Ω !! k = Some o → model_interp g v Ω W n D ⊢ event_obl v (n, Ω) k o.
@@ -1411,12 +1489,14 @@ Section adequacy.
   Qed.
 
   (** With valid guarantees of the contents. *)
-  Lemma temporal_always_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ tps_always G.
+  Lemma temporal_always_view_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_view N P V ⊨ₜ tps_always G.
   Proof.
-    intros HG. iApply (temporal_weaken _ (tps_always (tps_sem P))).
+    intros HG. iApply (temporal_weaken _ (tps_always (tps_sem V))).
     { apply tps_always_mono. by apply tps_sem_le. }
-    iApply temporal_always.
+    iApply temporal_always_view.
   Qed.
+  Lemma temporal_always_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ tps_always G.
+  Proof. apply temporal_always_view_valid. Qed.
   Lemma temporal_until_valid N k b q P Q G1 G2 :
     (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k b q P Q ⊨ₜ tps_until G1 G2.
   Proof.
@@ -1704,6 +1784,9 @@ Section into_temporal.
   Global Instance into_temporal_persistently P G :
     IntoTemporal P G → IntoTemporal (□ P) G | 10.
   Proof. intros H. unfold IntoTemporal in *. iApply temporal_persistently. iApply H. Qed.
+  Global Instance into_temporal_alwaysI_view N P V G :
+    IntoTemporal V G → IntoTemporal (alwaysI_view N P V) (tps_always G) | 10.
+  Proof. intros H. unfold IntoTemporal in *. by apply temporal_always_view_valid. Qed.
   Global Instance into_temporal_alwaysI N P G :
     IntoTemporal P G → IntoTemporal (alwaysI N P) (tps_always G) | 10.
   Proof. intros H. unfold IntoTemporal in *. by apply temporal_always_valid. Qed.

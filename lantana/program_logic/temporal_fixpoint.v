@@ -442,24 +442,6 @@ Section ltl.
 
 End ltl.
 
-(** ** A recursive formula: the nested invariant guarantees [ν X. □(G ∧ X)] *)
-Section recursion.
-  Context `{!lantanaGS Λ Σ}.
-
-  Definition F_nest (G : tps Λ Σ) : tps Λ Σ → tps Λ Σ := λ X, tps_always (tps_and G X).
-  Global Instance F_nest_mono G : TpsMono (F_nest G).
-  Proof.
-    apply (tps_mono_always (λ X, tps_and G X)), (tps_mono_and (λ _, G) (λ X, X)).
-    - apply tps_mono_const.
-    - apply tps_mono_id.
-  Qed.
-
-  Lemma nest_temporal_nu N Q (G : tps Λ Σ) : (⊢ Q ⊨ₜ G) → ⊢ nest N Q ⊨ₜ tps_nu (F_nest G).
-  Proof.
-    intros HQ. apply temporal_nu_sem. rewrite /F_nest.
-    iApply (temporal_mono (inv N (Q ∗ nest N Q)) with "[]").
-    { iIntros "!> H". by iEval (rewrite nest_unfold) in "H". }
-    iApply temporal_always. iApply temporal_sep; [iApply HQ|iApply temporal_sem].
-  Qed.
-
-End recursion.
+(** A recursive formula through a registered invariant ([ν X. □(G ∧ X)] for nested
+    invariants) is no longer expressible: [alwaysI] stores the canonical trace property of
+    its content and is not contractive in it (see temporal_saved.v). *)

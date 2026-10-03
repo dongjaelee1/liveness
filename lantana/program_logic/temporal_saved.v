@@ -60,46 +60,25 @@ Section registry.
 
   (** Inferred: the requests' names are ghost (they do not show), the map is trace-visible. *)
   Lemma registry_temporal N γm G :
-    ⊢ inv N (registry_inv γm G) ⊨ₜ
+    ⊢ alwaysI N (registry_inv γm G) ⊨ₜ
       tps_always (tps_exist (λ m : gmap nat gname,
         tps_true ∧ tps_forall (λ r, tps_forall (λ γr, tps_impl ⌜m !! r = Some γr⌝ (G r))))).
   Proof. apply (into_temporal _ _). Qed.
 
-  (** Allocation, with no request registered yet. *)
+  (** Allocation, with no request registered yet: a registered invariant. *)
   Lemma registry_alloc E N G :
-    ⊢ |={E}=> ∃ γm, inv N (registry_inv γm G).
+    ↑tregN ⊆ E → N ## tregN →
+    treg -∗ £n 1 -∗ |={E}=>g ∃ γm, alwaysI N (registry_inv γm G).
   Proof.
+    iIntros (??) "#TR LC".
     iMod (ghost_map_alloc_empty (K:=nat) (V:=gname)) as (γm) "Ha".
-    iMod (inv_alloc N _ (registry_inv γm G) with "[Ha]") as "$"; last done.
+    iMod (alwaysI_alloc E N (registry_inv γm G) with "TR LC [Ha]") as "$"; [done..| |done].
     iNext. iExists ∅. iFrame. by rewrite big_sepM_empty.
   Qed.
 
 End registry.
 
-(** * Guarded recursion
-
-    Temporal formulas can be defined by guarded recursion like any iProp, and their
-    guarantees proven by Löb induction: the rules for invariants and untils only need the
-    guarantee of their content later. *)
-Section recursion.
-  Context `{!lantanaGS Λ Σ}.
-
-  (** Invariants nested forever: each content holds [Q] and the next invariant. *)
-  Definition nest_pre N (Q : iProp Σ) (X : iPropO Σ) : iPropO Σ := inv N (Q ∗ X).
-  Local Instance nest_pre_contractive N Q : Contractive (nest_pre N Q).
-  Proof. solve_contractive. Qed.
-  Definition nest N Q : iProp Σ := fixpoint (nest_pre N Q).
-  Lemma nest_unfold N Q : nest N Q ≡ inv N (Q ∗ nest N Q).
-  Proof. apply (fixpoint_unfold (nest_pre N Q)). Qed.
-
-  Lemma nest_temporal N Q (G : tps Λ Σ) : Q ⊨ₜ G -∗ nest N Q ⊨ₜ tps_always G.
-  Proof.
-    iIntros "#HQ". iLöb as "IH".
-    iApply (temporal_mono (inv N (Q ∗ nest N Q)) with "[]").
-    { iIntros "!> H". iEval (rewrite nest_unfold) in "H". done. }
-    iApply (temporal_weaken _ (tps_always (tps_and G (tps_always G)))).
-    { apply tps_always_mono, tps_and_elim_l. }
-    iApply temporal_always_later. iNext. iApply (temporal_sep with "HQ IH").
-  Qed.
-
-End recursion.
+(** Recursion through a registered structure ([alwaysI], [untilI]) is not available: they
+    store the canonical trace properties of their contents, which are not contractive.
+    Guarded recursion remains available for trace properties (temporal_fixpoint.v) and for
+    iProps whose guarantee does not go through a registered structure. *)

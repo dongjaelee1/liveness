@@ -121,11 +121,13 @@ Section proof.
                        crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2))%I) →
     Ψs = ({[i := fork_post; j := fork_post]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ (l ↦ #0) -∗
-     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗ treg -∗ £n 4 -∗
      |={⊤}=>m ∃ μ1 μ2, (Φ μ1 μ2 ∗
                        (Φ μ1 μ2 -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof.
-    iIntros (Hij HT HP HQ) "TEs Ptrl TGs".
+    iIntros (Hij HT HP HQ) "TEs Ptrl TGs #TR LC".
+    iPoseProof (tlc_split_nat 2 2 with "LC") as "[LC2 LC]".
+    iPoseProof (tlc_split_nat 1 1 with "LC") as "[LC1 LC1']".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     iPoseProof (big_sepS_union with "TGs") as "[TG1 TG2]".
     { set_solver. }
@@ -133,13 +135,16 @@ Section proof.
     iPoseProof (writer_spec) as (μ1) "writer_spec".
     iPoseProof (reader_spec) as (μ2) "reader_spec".
     iMod (carrier_alloc _ _ _ 0 μ1 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (is_flag_init _ _ _ _ 0 _ μ1 with "Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #is_flag)". 1: done.
+    iMod (is_flag_init _ _ _ _ 0 _ μ1 with "TR LC2 Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #is_flag)".
+    1: done. 1: set_solver.
     iMod (untilI_alloc _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I with "[]") as "Ukl1".
+    iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I with "[] TR LC1 []") as "Ukl1".
+    { iPureIntro. split; [set_solver|solve_ndisj]. }
     { done. }
     iMod (carrier_alloc _ _ _ 1 μ2 with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
     iMod (untilI_alloc _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
-    iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I with "[]") as "Ukl2".
+    iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I with "[] TR LC1' []") as "Ukl2".
+    { iPureIntro. split; [set_solver|solve_ndisj]. }
     { done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
     { subst Φ.
@@ -233,7 +238,7 @@ Section adequacy.
     eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_client (R_main)).
     { apply G_client_impl. }
     1,2,3,4: eauto.
-    iIntros (?). exists 0%ord.
+    iIntros (?). exists (Ord.from_nat 4).
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
     iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
     iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
@@ -245,9 +250,8 @@ Section adequacy.
     iSplitL "HI TI PI".
     { iDestruct "PI" as "[PI _]". by iFrame. }
     iSplitR; first done.
-    iModIntro. iIntros "LC TGs".
-    (* Set Printing All. *)
-    iMod (flag_client_pre (heapGS0:=HHeapGS) Θ0 i j (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [Ptrs] [TGs]") as "H".
+    iModIntro. iIntros "#TR LC TGs".
+    iMod (flag_client_pre (heapGS0:=HHeapGS) Θ0 i j (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [Ptrs] [TGs] TR LC") as "H".
     { subst i j. lia. }
     { done. }
     { reflexivity. }

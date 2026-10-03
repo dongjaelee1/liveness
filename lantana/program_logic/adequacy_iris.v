@@ -55,8 +55,7 @@ Section proof2.
     rewrite /safety_iris_tiProp ti_always_unfold /ti_always_pre.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
     iMod "close" as "_". iModIntro.
-    iSplit. 1: done.
-    (** Fetch the scheduled thread and take a step. *)
+    (** Fetch the scheduled thread and take a step; the position is decided after it. *)
     inversion BEH. clear BEH. subst n0 τf0.
     iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
     rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
@@ -93,8 +92,8 @@ Section proof2.
       iMod ("WP" $! W2 with "[]") as "[MI WP]".
       { iPureIntro. split; auto. }
       rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro.
-      iSplit.
-      { iPureIntro. rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split; eauto.
+      assert (SAFE : (ts_emb not_stuck ∧ ts_emb (if_term_val i Φ))%R (n, τf)).
+      { rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split; eauto.
         - eexists. split; eauto. rewrite He1. auto.
         - destruct (decide (i = i1)); auto. subst i1. eexists. split; eauto. rewrite He1. auto. }
       iMod "WP". simpl.
@@ -152,7 +151,7 @@ Section proof2.
             rewrite LUTQi1 in POSTLU. simplify_eq. eauto.
           - rewrite -insert_union_l lookup_insert_ne; auto. exists x, x0. split; eauto.
             simplify_eq. apply lookup_union_Some_l. auto. }
-        iModIntro. iFrame.
+        iModIntro. iSplit; first done. iSplit; first done. iFrame.
       * iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                    (match to_val e with
                     | Some v => lift_term j Q v
@@ -178,7 +177,7 @@ Section proof2.
             rewrite LUTQi1 in POSTLU. simplify_eq. eauto.
           - rewrite -insert_union_l lookup_insert_ne; auto. exists x, x0. split; eauto.
             simplify_eq. apply lookup_union_Some_l. auto. }
-        iModIntro. iFrame.
+        iModIntro. iSplit; first done. iSplit; first done. iFrame.
     + iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
       inversion TDone. clear TDone. inversion H. clear H. subst Θ0 σ1 ρ2.
       destruct H1 as (He1&<-&<-&->&->). destruct He1 as [v1 He1]. simpl in *.
@@ -211,11 +210,12 @@ Section proof2.
             destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
             rewrite H2 TRn1. eauto. }
         1: eauto. 1: eauto.
-        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iSplit.
+        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_".
+        iModIntro. iSplit; first done. iSplit.
         { iPureIntro. rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split; eauto.
           - eexists. split; eauto. rewrite He1. auto.
           - rewrite decide_True; auto. eexists. split; eauto. rewrite He1. auto. }
-        iModIntro. iMod "close" as "_". iModIntro. iFrame.
+        iFrame.
       * iPoseProof ("IH" with "[] [] [] [] [] [] HI SIa [$MHI $MI] WPs") as "H".
         1: eauto. 1: eauto. 1: eauto.
         { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
@@ -225,11 +225,12 @@ Section proof2.
             destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
             rewrite H2 TRn1. eauto. }
         1: eauto. 1: eauto.
-        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iSplit.
+        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_".
+        iModIntro. iSplit; first done. iSplit.
         { iPureIntro. rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split; eauto.
           - eexists. split; eauto. rewrite He1. auto.
           - rewrite decide_False; auto. }
-        iModIntro. iMod "close" as "_". iModIntro. iFrame.
+        iFrame.
   Qed.
 
   Lemma lwp_safety_iris_tiProp h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ

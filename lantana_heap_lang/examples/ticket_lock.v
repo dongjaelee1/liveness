@@ -106,16 +106,9 @@ Record ticketlock_γ :=
 Section temporal_excl.
   Context `{!lantanaGS Λ Σ}.
 
-  Lemma temporal_inv_or_excl N (A B C : iProp Σ) `{!Persistent C} G :
-    (C ∗ A ⊢ False) → B ⊨ₜ G ⊢ (inv N (A ∨ B) ∗ C) ⊨ₜ tps_always G.
-  Proof.
-    iIntros (Hexcl) "#HB".
-    iApply (temporal_mono (inv N B) with "[]").
-    { iIntros "!> [#I #C]". iApply (inv_iff with "I"). iIntros "!> !>". iSplit.
-      - iIntros "[HA | $]". iExFalso. iApply Hexcl. iFrame "C HA".
-      - iIntros "H". by iRight. }
-    by iApply temporal_always.
-  Qed.
+  (** [main]'s [temporal_inv_or_excl] (ruling out a disjunct of an invariant's content with a
+      persistent fact) is replaced by registering the invariant under a view
+      ([alwaysI_register]); see [is_fair_lock_register_alive]. *)
 
 End temporal_excl.
 
@@ -137,6 +130,12 @@ Section proof.
   Let N_inv := N.@"inv".
   Let N_ev := N.@"ev".
   Let N_tk := N.@"token".
+  Remark N_inv_disj_treg : N_inv ## tregN.
+  Proof. solve_ndisj. Qed.
+  Remark N_ev_disj_treg : N_ev ## tregN.
+  Proof. solve_ndisj. Qed.
+  Remark N_tk_disj_treg : N_tk ## tregN.
+  Proof. solve_ndisj. Qed.
 
   Remark N_disj_1 : N_ev ## N_inv.
   Proof. by apply ndot_ne_disjoint. Qed.
@@ -171,9 +170,10 @@ Section proof.
               ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
               finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)).
 
-  Local Definition lock_inv γt γo γc γa (next curr : loc) (R : iProp Σ) : iProp Σ :=
-    (own γa (to_dfrac_agree (DfracOwn 1) tt)) ∨
-      (∃ (n c : Z)
+  (** The alive branch of the lock invariant, as a notation (so that proofs about the
+      invariant's content are unchanged). *)
+  Local Notation lock_inv_alive γt γo γc next curr R :=
+    ((∃ (n c : Z)
          (tickets : gmap Z (option (ocid * ord.t * measure)))
          (obls : gmap Z (option oid)),
           next ↦ #n ∗
@@ -205,13 +205,30 @@ Section proof.
                                 crP_obls g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
                                 curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ R) ∨
                         (* Current owner acquired the lock. *)
-                        ((c + 1)%Z ↪[γt]□ (None : option (ocid * ord.t * measure))))))).
+                        ((c + 1)%Z ↪[γt]□ (None : option (ocid * ord.t * measure))))))))%I.
+
+  Local Definition lock_inv γt γo γc γa (next curr : loc) (R : iProp Σ) : iProp Σ :=
+    (own γa (to_dfrac_agree (DfracOwn 1) tt)) ∨ lock_inv_alive γt γo γc next curr R.
 
   Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : iProp Σ) : iProp Σ :=
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
-      inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R) ∗
-      inv N_tk (lock_token_inv (ticketlock_γo γ) (ticketlock_γk γ) curr R).
+      alwaysI N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R) ∗
+      alwaysI N_tk (lock_token_inv (ticketlock_γo γ) (ticketlock_γk γ) curr R) ∗ treg.
+
+  (** A lock that cannot be deleted (its holder keeps [γ ↪LOCK_AL□]): the lock invariant is
+      registered under its alive branch, so that the trace sees it. *)
+  Definition is_fair_lock_alive (tl : val) (γ : ticketlock_γ) (R : iProp Σ) : iProp Σ :=
+    is_fair_lock tl γ R ∗
+    ∃ (next curr : loc),
+      (⌜tl = (#next, #curr)%V⌝) ∧
+      alwaysI_view N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R)
+        (lock_inv_alive (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) next curr R).
+
+  (** The alive lock is the lock. (Use this rather than framing the one against the other:
+      unifying the two definitions' bodies does not terminate in reasonable time.) *)
+  Lemma is_fair_lock_alive_is_fair_lock tl γ R : is_fair_lock_alive tl γ R ⊢ is_fair_lock tl γ R.
+  Proof. iIntros "[$ _]". Qed.
 
   Local Definition lock_token_def (γ : ticketlock_γ) κu : iProp Σ :=
     ∃ (c : Z), ghost_var_frac (ticketlock_γk γ) (1/2) (c) ∗
@@ -272,7 +289,7 @@ Section proof.
       TicketLock.init #() @ i; E
     l{{{ tl γ, RET tl; thread_expr i C (of_val tl) ∗ £ lc ∗
                        thP_carriers i G ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
-                       (∀ E R, R ={E}=∗ is_fair_lock tl γ R) }}}.
+                       (∀ E R, ⌜↑tregN ⊆ E⌝ -∗ treg -∗ £n 2 -∗ R -∗ |={E}=>g is_fair_lock tl γ R) }}}.
   Proof.
     iExists 10.
     iIntros (lc ℓ i G E C) "!> %Φ (TE& TG& GF) HΦ".
@@ -307,8 +324,10 @@ Section proof.
     iModIntro. lwp_finish.
     iModIntro.
     iApply ("HΦ" $! _ (TicketLockName γt γo γk γc γa)). iFrame "TE TG QLC AL CF".
-    iIntros (??) "HR".
-    iMod (inv_alloc N_inv _ (lock_inv γt γo γc γa next curr R) with "[Ptr_next Ptr_curr Ptr_curr0 GMAt GMAo HR]") as "#Ak".
+    iIntros (??) "%HE #TR LC HR".
+    iPoseProof (tlc_split_one 2 1 with "LC") as "[LC LC1]"; first done.
+    iMod (alwaysI_alloc _ N_inv (lock_inv γt γo γc γa next curr R) with "TR LC1 [Ptr_next Ptr_curr Ptr_curr0 GMAt GMAo HR]") as "#Ak";
+      [done|apply N_inv_disj_treg| |].
     { iNext. rewrite /lock_inv. iRight. iExists 0, 0, {[0%Z := (None)]}, {[0%Z := (Some κu)]}.
       iFrame "Ptr_next Ptr_curr GMAt GMAo". iSplit. 1: done. iSplit. 1: done. iSplit.
       { iPureIntro. intros. rewrite dom_singleton_L elem_of_singleton. split; intros.
@@ -317,14 +336,15 @@ Section proof.
       iSplitR.
       { rewrite dom_singleton_L big_sepS_singleton. iLeft. eauto. }
       iLeft. iFrame. iPureIntro. lia. }
-    iMod (inv_alloc N_tk _ (lock_token_inv γo γk curr R) with "[$GV]") as "#IK".
-    iModIntro. rewrite /is_fair_lock. iExists next, curr. iSplitR; first done. eauto.
+    iMod (alwaysI_alloc _ N_tk (lock_token_inv γo γk curr R) with "TR LC [$GV]") as "#IK";
+      [done|apply N_tk_disj_treg|].
+    iModIntro. rewrite /is_fair_lock. iExists next, curr. iSplitR; first done. iFrame "#".
   Qed.
 
   (** FIXME: ordi notation levels *)
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_acquire_spec :
-    ⊢ ∃ μ, ∀ lc m i G tl γ dq1 dq2 ℓ R (E : coPset) (MASK : ↑N ⊆ E) C,
+    ⊢ ∃ μ, ∀ lc m i G tl γ dq1 dq2 ℓ R (E : coPset) (MASK : ↑N ⊆ E ∧ ↑tregN ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.acquire (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
          γ ↪LOCK_AL{dq1} ∗
          γ ↪LOCK_CF{dq2} ℓ ∗
@@ -340,26 +360,26 @@ Section proof.
          γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ R }}}.
   Proof.
     iExists (100 ⊕ (((50 ⊕ (50 × ▽)) × ℵ) ⊕ (50 × ▽)))%M.
-    iIntros (lc m i G tl γ dq1 dq2 ℓ R E MASK C) "!> % (TE& TG& Fs& AL& CF& #IFL) HΦ".
+    iIntros (lc m i G tl γ dq1 dq2 ℓ R E [MASK MASKT] C) "!> % (TE& TG& Fs& AL& CF& #IFL) HΦ".
     iPoseProof (crP_fuel_add_set with "Fs") as "[GF Fsloop]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     rewrite /TicketLock.acquire.
     (* argument *)
     lwp_pure_lc 100.
     (* get fst and snd of the argument *)
-    iDestruct "IFL" as "(%&%& %& #INV& #ITK)". subst tl.
+    iDestruct "IFL" as "(%&%& %& #INV& #ITK& #TR)". subst tl.
     (* fst *)
     lwp_pures.
     (* FAA *)
     lwp_bind (FAA _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     (* Atomic step of FAA, *)
-    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]".
+    iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     (** FIXME: better rules for tlc / later credits. *)
-    iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]". 1: eauto.
+    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "[H | H]".
     { iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL. destruct HAL.
@@ -385,7 +405,9 @@ Section proof.
       (* Unlock obligation *)
       iMod (untilI_alloc _ _ _ false _ (ℓ)%ordi (m)%M with "Gg")
         as "(%κu& %LUku& Gg& OGF& #Wlku& ALLOC)". 1: done.
-      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku0]".
+      iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%I with "[] TR LC1 [//]") as "[GUku GUku0]".
+      { iPureIntro. pose proof N_inv_disj_treg. split; [set_solver|apply N_ev_disj_treg]. }
       rewrite union_empty_r_L.
       iMod (ghost_map_update (None) with "GMAt GMEt") as "[GMAt GMEt]".
       iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
@@ -615,7 +637,7 @@ Section proof.
     lwp_pure_one.
     lwp_bind (Load _).
     (* Atomic step of Load, *)
-    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]".
+    iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
@@ -793,7 +815,7 @@ Section proof.
 
   (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_release_spec :
-    ⊢ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
+    ⊢ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E ∧ ↑tregN ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.release (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
          crP_obls gu ℓu K ∗ ⌜ κu ∈ K ⌝ ∗
          lock_token γ κu ∗ R ∗
@@ -807,13 +829,13 @@ Section proof.
          γ ↪LOCK_AL{dq} }}}.
   Proof.
     iExists 100.
-    iIntros (lc i G tl γ dq R κu gu ℓu K E MASK C) "!> % (TE& TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
+    iIntros (lc i G tl γ dq R κu gu ℓu K E [MASK MASKT] C) "!> % (TE& TG& GF& Gg& %LUkl& LT& HR& AL& #IFL) HΦ".
     rewrite /TicketLock.release.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc 100.
     rewrite lock_token_unseal /lock_token_def.
     iDestruct "LT" as "(%& GV& #GMEtku& #GMEo)".
-    iDestruct "IFL" as "(%&%& %& #INV& #ITK)".
+    iDestruct "IFL" as "(%&%& %& #INV& #ITK& #TR)".
     subst tl.
     (** Exchange token. *)
     iApply lwpupd_fupd_l. iInv "ITK" as "H".
@@ -835,7 +857,7 @@ Section proof.
     lwp_pures.
     (* Atomic step of Store, *)
     iModIntro.
-    iMod (inv_acc with "INV") as "[H ACCinv]".
+    iMod (alwaysI_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
@@ -902,7 +924,9 @@ Section proof.
       (* Unlock obligation *)
       iMod (untilI_alloc _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
         as "(%κu1& %LUku1& Gg1& OGF1& #Wlku1& ALLOC)". 1: done.
-      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%I with "[//]") as "[GUku GUku0]".
+      iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%I with "[] TR LC1 [//]") as "[GUku GUku0]".
+      { iPureIntro. pose proof N_inv_disj_treg. split; [set_solver|apply N_ev_disj_treg]. }
       rewrite union_empty_r_L.
       iMod (ghost_map_update (Some κu1) with "GMAo GMEo1") as "[GMAo GMEo1]".
       iMod (ghost_map_elem_persist with "GMEo1") as "#GMEo1".
@@ -943,7 +967,7 @@ Section proof.
     lwp_pure_lc 100.
     rewrite lock_token_unseal /lock_token_def.
     iDestruct "LT" as "(%& GV& #GMEtku& #GMEo)".
-    iDestruct "IFL" as "(%&%& %& #INV& #ITK)".
+    iDestruct "IFL" as "(%&%& %& #INV& #ITK& #TR)".
     subst tl.
     (** Exchange token. *)
     iApply lwpupd_fupd_l. iInv "ITK" as "H".
@@ -966,7 +990,7 @@ Section proof.
     (* Atomic step of Store, *)
     lwp_bind (Store _ _).
     iModIntro.
-    iMod (inv_acc with "INV") as "[H ACCinv]".
+    iMod (alwaysI_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
@@ -1065,7 +1089,7 @@ Section proof.
       [is_fair_lock_alive_temporal] for a lock that cannot be deleted. *)
   Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
-       tps_always (lock_inv_tps next curr) ∧ tps_always (lock_token_inv_tps curr))%S.
+       tps_always (lock_inv_tps next curr) ∧ tps_always (lock_token_inv_tps curr) ∧ tps_true)%S.
 
   Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tps tl.
   Proof. apply (into_temporal _ _). Qed.
@@ -1077,31 +1101,33 @@ Section proof.
 
   (** The trace property guaranteed by a lock that cannot be deleted. *)
   Definition alive_fair_lock_tps (tl : val) : tps heap_lang Σ :=
-    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
-       tps_always (lock_inv_alive_tps next curr) ∧ tps_always (lock_token_inv_tps curr))%S.
+    (fair_lock_tps tl ∧
+     ∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_alive_tps next curr))%S.
 
   (** A persistent [γ ↪LOCK_AL□] (as the queue keeps) rules out deletion, hence the left
-      disjunct of [lock_inv]. *)
-  Lemma is_fair_lock_alive_temporal tl γ R :
-    ⊢ (is_fair_lock tl γ R ∗ γ ↪LOCK_AL□) ⊨ₜ alive_fair_lock_tps tl.
+      disjunct of [lock_inv]: the lock invariant is registered under its alive branch. *)
+  Lemma is_fair_lock_register_alive E tl γ R :
+    ↑tregN ⊆ E → ↑N_inv ⊆ E →
+    is_fair_lock tl γ R -∗ γ ↪LOCK_AL□ -∗ £n 1 -∗ |={E}=>g is_fair_lock_alive tl γ R.
   Proof.
-    iApply (temporal_mono (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
-      (inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ)
-                    (ticketlock_γa γ) next curr R) ∗ γ ↪LOCK_AL□) ∗
-      inv N_tk (lock_token_inv (ticketlock_γo γ) (ticketlock_γk γ) curr R))%I with "[]").
-    { iIntros "!> [(%next& %curr& %Htl& #I& #K) #AL]". iExists next, curr.
-      iSplit; first done. iFrame "#". }
-    iApply temporal_exist. iIntros (next). iApply temporal_exist. iIntros (curr).
-    iApply temporal_and; first iApply temporal_pure.
-    iApply temporal_sep; last iApply (into_temporal _ _).
-    iApply temporal_inv_or_excl.
-    { iIntros "[AL H]". iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL.
+    iIntros (HE HN) "(%next& %curr& %Htl& #I& #K& #TR) #AL LC".
+    iMod (alwaysI_register E N_inv _
+            (lock_inv_alive (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) next curr R)%I
+            with "[] [] TR LC") as "#IA"; [done|done|apply N_inv_disj_treg| | |].
+    { by iApply alwaysI_inv. }
+    { iIntros "!> [H|$]". iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL.
       destruct HAL as [H _]. apply dfrac_valid_own_r in H. done. }
-    iApply (into_temporal _ _).
+    iModIntro. iSplitR.
+    { iExists next, curr. iSplit; first done. iFrame "I K TR". }
+    iExists next, curr. iSplit; first done. iFrame "IA".
   Qed.
 
+  Lemma is_fair_lock_alive_temporal tl γ R :
+    ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_tps tl.
+  Proof. apply (into_temporal _ _). Qed.
+
   Global Instance is_fair_lock_alive_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock tl γ R ∗ γ ↪LOCK_AL□) (alive_fair_lock_tps tl) | 0.
+    IntoTemporal (is_fair_lock_alive tl γ R) (alive_fair_lock_tps tl) | 0.
   Proof. apply is_fair_lock_alive_temporal. Qed.
 
   (** [lock_token] is ghost state: the holder's [finally] lives in [lock_token_inv]. *)
@@ -1142,7 +1168,7 @@ Section trace.
     tps_tr (alive_fair_lock_tps (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ release_progress next curr τ.
   Proof.
-    intros (next & curr & Htl & Hal & _). exists next, curr. split; first done.
+    intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
     by eapply (lock_inv_alive_tps_release_progress (Σ:=Σ)).
   Qed.
 

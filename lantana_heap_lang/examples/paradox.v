@@ -226,7 +226,7 @@ Section proof.
             (oblP_discharged k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
 
   Definition px r rm i j : iProp Σ :=
-    inv N (px_inv r rm i j).
+    inv N (px_inv r rm i j) ∗ treg.
 
   (** The main proofs. *)
   Global Instance px_persistent r i j k : Persistent (px r i j k).
@@ -248,6 +248,7 @@ Section proof.
   Proof using Type*.
     iIntros (i g z r rm ci cj C).
     iIntros (Φ) "!> (TE& TG& Gg& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Wckn& #Mn) HΦ".
+    iDestruct "Ipx" as "#[Ipx TR]".
     (** Lob induction *)
     iRevert (n ck) "Cljn Wckn Mn Cai". iLöb as "IH".
     iIntros (n ck) "#Cljn #Wckn #Mn Cai".
@@ -308,6 +309,7 @@ Section proof.
     l{{{ RET #(); thread_expr j C #() ∗ lift_term j fork_post #() }}}.
   Proof using Type*.
     iIntros (j n r rm ci cj ck C) "!> %Φ (TE& %& TG& Gg& Uck& Gf& #Ipx& Caj& #Mn) HΦ".
+    iDestruct "Ipx" as "#[Ipx TR]".
     (** Lob induction *)
     iRevert (n g ck) "TG Gg Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n g ck) "TG Gg Uck Gf Caj #Mn".
@@ -315,11 +317,18 @@ Section proof.
     iPoseProof (crP_fuels_init {[g]} with "[Gf]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
     lwp_pure. simpl.
-    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC TE".
+    iFrame "TG GF". iExists ∅, 101. iSplitR; first eauto. iIntros "TG GF _ LC TE".
     iEval (rewrite -/loop).
-    iPoseProof (tlc_split_nat 90 10 with "LC") as "[LC LC']".
+    iPoseProof (tlc_split_nat 91 10 with "LC") as "[LC LC']".
     (** TODO: better interface for sfmupd-fupd access patterns *)
     iApply (sfmupd_lwpupd_elim).
+    (* The next until is allocated and registered before the invariant is opened: the
+       registration is a model update at a mask containing [tregN]. *)
+    iMod (carrier_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
+    iMod (untilI_alloc _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
+    iPoseProof (tlc_split_nat 1 90 with "LC") as "[LCr LC]".
+    iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I with "[] TR LCr [//]") as "Unew".
+    { iPureIntro. split; [set_solver|solve_ndisj]. }
     iApply (sfmupd_fupd_acc _ ∅).
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
     iPoseProof (tlc_split_nat 89 1 with "LC") as "[LC LC1]".
@@ -342,11 +351,6 @@ Section proof.
     iCombine "Ca Caj" as "Caj".
     iMod (cnt_auth_update _ _ _ (n + 1) with "Caj") as "[Caj Caj2]". 1: lia.
     iPoseProof (get_cnt_lb _ _ _ (n + 1) (n + 1) with "Caj") as "#Cljn1". 1: lia.
-    iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
-    iMod (carrier_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
-    iMod (untilI_alloc _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
-    iApply fupd_sfmupd_elim. iMod "mask" as "_".
-    iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I with "[//]") as "Unew".
     iMod (ghost_map_insert_persist (n + 1) ck1 with "GMA") as "[GMA #Mn1]". 1: auto.
     assert (NDisj : N ## Nu).
     { subst N Nu. apply ndot_ne_disjoint. done. }
@@ -383,15 +387,16 @@ Section proof.
   Qed.
 
   Lemma px_init E g :
-    crP_obls g 0 ∅
-    ⊢ |={E}=>g ∃ ck r rm ci cj n,
+    ↑tregN ⊆ E →
+    treg -∗ £n 1 -∗ crP_obls g 0 ∅
+    -∗ |={E}=>g ∃ ck r rm ci cj n,
                 crP_obls g 0 {[ck]} ∗
                 finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
                 witP_layer ck 0 ∗
                 px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
                 cnt_lb r cj n ∗  n ↪[rm]□ ck.
   Proof.
-    iIntros "Cg".
+    iIntros (HE) "#TR LC Cg".
     set (r := inhabitant : gname).
     iMod (alloc_cnt_base r) as "CB".
     iMod (alloc_cnt_auth _ 0 with "CB") as "(CB& %ci& CAi)".
@@ -401,14 +406,15 @@ Section proof.
     iMod (ghost_map_alloc (∅ : gmap nat oid)) as "(%rm& GM& _)".
     iMod (untilI_alloc _ _ _ false _ _ 10 with "Cg") as "(%ck& _& Cg& Gf& #Wl& ACC)".
     1: reflexivity. rewrite union_empty_r_L.
-    iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I with "[//]") as "HF".
+    iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I with "[] TR LC [//]") as "HF".
+    { iPureIntro. split; [done|solve_ndisj]. }
     iMod (ghost_map_insert_persist 0 ck with "GM") as "(GM& #GMe)". 1: done.
     iExists ck, r, rm, ci, cj, 0.
     iDestruct "HF" as "[HF HF0]". iDestruct "CAj" as "[CAj CAj0]".
     iFrame. iFrame "Wl Clj GMe".
-    rewrite /px /px_inv.
-    iMod (inv_alloc with "[-]") as "H". 2: by iFrame "H".
-    iNext. iExists 0, {[0 := ck]}.
+    rewrite /px.
+    iMod (inv_alloc N _ (px_inv r rm ci cj) with "[-]") as "#H". 2: iModIntro; iFrame "H TR".
+    iNext. rewrite /px_inv. iExists 0, {[0 := ck]}.
     iFrame. iApply big_sepM_singleton. iSplitR "HF".
     - iFrame "GMe Clj Wl". iRight. eauto.
     - iLeft. iFrame.
@@ -428,11 +434,12 @@ Section proof.
               thP_carriers j {[g2]} ∗ crP_obls g2 0 {[ck]} ∗ crP_fuel g2 0 10))%I) →
     Ψs = ({[i := fork_post; j := fork_post]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ £ (10)%ord -∗
-     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗ treg -∗ £n 2 -∗
      |={⊤}=>m (Φ ∗
               (Φ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof using H.
-    iIntros (Hij HT HP HQ) "TEs LC TGs".
+    iIntros (Hij HT HP HQ) "TEs LC TGs #TR LCn".
+    iPoseProof (tlc_split_nat 1 1 with "LCn") as "[LC1 LC2]".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     iPoseProof (big_sepS_union with "TGs") as "[TG1 TG2]".
     { set_solver. }
@@ -442,9 +449,10 @@ Section proof.
     iMod (carrier_alloc _ _ _ 1 0 with "TG1") as "(%g1& _& TG1& Gg1& _)".
     iMod (carrier_alloc _ _ _ 0 10 with "TG2") as "(%g2& _& TG2& Gg2& Gf2)".
     iMod (untilI_alloc _ _ _ false _ _ 0 with "Gg1") as "(%z& _& Gg1& _& _& ACC)". 1: reflexivity.
-    iMod ("ACC" $! _ N1 True%I False%I with "[//]") as "HFz".
+    iMod ("ACC" $! _ N1 True%I False%I with "[] TR LC1 [//]") as "HFz".
+    { iPureIntro. split; [set_solver|solve_ndisj]. }
     rewrite !union_empty_r_L.
-    iMod (px_init with "Gg2") as "(%&%&%&%&%&%& Gg2& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)".
+    iMod (px_init ⊤ with "TR LC2 Gg2") as "(%&%&%&%&%&%& Gg2& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)"; first set_solver.
     iModIntro. iSplitR "TEs".
     { subst Φ.
       iExists g1, g2, z, ck, r, rm, ci, cj, n. iFrame. iFrame "px Clj GMe Wl". }
@@ -533,7 +541,7 @@ Section adequacy.
     eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main (R_main)).
     { apply G_main_impl. }
     1,2,3,4: eauto.
-    iIntros (?). exists 10%ord.
+    iIntros (?). exists (10 ⊕ Ord.from_nat 2)%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
     iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
     iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
@@ -545,9 +553,9 @@ Section adequacy.
     iSplitL "HI TI PI".
     { iDestruct "PI" as "[PI _]". by iFrame. }
     iSplitR; first done.
-    iModIntro. iIntros "LC TGs".
-    (* Set Printing All. *)
-    iMod (px_loop_pre (heapGS0:=HHeapGS) Θ0 i j (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [$LC] [TGs]") as "H".
+    iModIntro. iIntros "#TR LC TGs".
+    iPoseProof (tlc_split with "LC") as "[LC LCn]".
+    iMod (px_loop_pre (heapGS0:=HHeapGS) Θ0 i j (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [$LC] [TGs] TR LCn") as "H".
     { subst i j. lia. }
     { done. }
     { reflexivity. }

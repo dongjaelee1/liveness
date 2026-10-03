@@ -102,6 +102,10 @@ Section proof.
   Proof. by apply ndot_ne_disjoint. Qed.
   Remark N_subseteq_1 : ↑N_eventually ⊆ (⊤ : coPset) ∖ ↑N_inv.
   Proof. pose proof N_disj_1. set_solver. Qed.
+  Remark N_inv_disj_treg : N_inv ## tregN.
+  Proof. solve_ndisj. Qed.
+  Remark N_ev_disj_treg : N_eventually ## tregN.
+  Proof. solve_ndisj. Qed.
 
   (** ** Definitions *)
   (** The trace properties these definitions guarantee are inferred below
@@ -142,7 +146,7 @@ Section proof.
   Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : iProp Σ) : iProp Σ :=
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
-      inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γa γ) (ticketlock_γc γ) next curr R).
+      alwaysI N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γa γ) (ticketlock_γc γ) next curr R) ∗ treg.
 
   Definition own_fair_lock_level (γ : ticketlock_γ) (ℓ : ord.t) (dq : dfrac) :=
     own (ticketlock_γc γ) (auth_mra_auth ord.le dq ℓ).
@@ -184,7 +188,8 @@ Section proof.
     ⊢ ∃ m, ∀ lc ℓ i G C,
     l{{{ thread_expr i C (TicketLock.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m) }}}
       TicketLock.init #() @ i
-    l{{{ tl γ, RET tl; thread_expr i C (of_val tl) ∗ £ lc ∗ thP_carriers i G ∗ γ ↪LOCK ℓ ∗ (∀ E R, R ={E}=∗ is_fair_lock tl γ R) }}}.
+    l{{{ tl γ, RET tl; thread_expr i C (of_val tl) ∗ £ lc ∗ thP_carriers i G ∗ γ ↪LOCK ℓ ∗
+                       (∀ E R, ⌜↑tregN ⊆ E⌝ -∗ treg -∗ £n 1 -∗ R -∗ |={E}=>g is_fair_lock tl γ R) }}}.
   Proof.
     iExists 4.
     iIntros (lc ℓ i G C) "!> %Φ (TE& TG& GF) HΦ".
@@ -215,8 +220,9 @@ Section proof.
     iModIntro. lwp_finish.
     iModIntro.
     iApply ("HΦ" $! _ (TicketLockName γt γa γc)). iFrame "TE TG QLC CF".
-    iIntros (??) "HR".
-    iMod (inv_alloc N_inv _ (lock_inv γt γa γc next curr R) with "[Ptr_next Ptr_curr0 Ptr_curr GMAt GMAa HR]") as "#Ak".
+    iIntros (??) "%HE #TR LC HR".
+    iMod (alwaysI_alloc _ N_inv (lock_inv γt γa γc next curr R) with "TR LC [Ptr_next Ptr_curr0 Ptr_curr GMAt GMAa HR]") as "#Ak";
+      [done|apply N_inv_disj_treg| |].
     { iNext. rewrite /lock_inv. iExists 0, 0, {[0%Z := (κu)]}, {[0%Z := true]}.
       iFrame "Ptr_next Ptr_curr0 GMAt GMAa". iSplit. 1: done. iSplit. 1: iPureIntro; lia. iSplit.
       { iPureIntro. intros. rewrite dom_singleton_L elem_of_singleton. split; intros.
@@ -227,7 +233,7 @@ Section proof.
       iSplitR.
       { rewrite big_sepM_singleton. iLeft. iFrame "GMEa". iPureIntro. lia. }
       iLeft. iFrame. done. }
-    iModIntro. rewrite /is_fair_lock. iExists next, curr. iSplitR; first done. eauto.
+    iModIntro. rewrite /is_fair_lock. iExists next, curr. iSplitR; first done. iFrame "#".
   Qed.
 
   (** FIXME: ordi notation levels *)
@@ -257,20 +263,20 @@ Section proof.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     (* argument *)
     lwp_lam. simpl.
-    iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC TE".
+    iFrame "TG GF". iExists ∅, 101. iSplitR; first eauto. iIntros "TG GF _ LC TE".
     (* get fst and snd of the argument *)
-    iDestruct "IFL" as "(%&%& %& #INV)". subst tl.
+    iDestruct "IFL" as "(%&%& %& #INV& #TR)". subst tl.
     (* fst *)
     lwp_pures.
     (* FAA *)
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     lwp_bind (FAA _ _).
     (* Atomic step of FAA, *)
-    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
+    iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]". 1: set_solver.
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     (** FIXME: better rules for tlc / later credits. *)
-    iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
+    iPoseProof (tlc_split_nat 1 100 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
     iApply (lwp_faa _ ∅ 0 with "[$TE $TG $GF1 $PtrNext]"). 1: done.
@@ -282,7 +288,9 @@ Section proof.
     (* Unlock obligation *)
     iMod (untilI_alloc _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
       as "(%κu& %LUku& Gg0& OGF& #Wlku& ALLOC)". 1: done.
-    iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku1]".
+    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+    iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ R)%I with "[] TR LC1 [//]") as "[GUku GUku1]".
+    { iPureIntro. split; [solve_ndisj|apply N_ev_disj_treg]. }
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ 1 with "GGF") as "GGF".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
@@ -386,7 +394,7 @@ Section proof.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
     lwp_bind (Load _).
     (* Atomic step of Load, *)
-    iModIntro. iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
+    iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]". 1: set_solver.
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     (** TODO: better rules for tlc / later credits. *)
@@ -502,10 +510,10 @@ Section proof.
     iModIntro. lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
     (* Update curr and unlock κl. *)
-    iDestruct "IFL" as "(%&%& %& #INV)". symmetry in H. inv H.
+    iDestruct "IFL" as "(%&%& %& #INV& #TR)". symmetry in H. inv H.
     (* Atomic step of Store, *)
     iModIntro.
-    iMod (inv_acc with "INV") as "[H ACCinv]". 1: set_solver.
+    iMod (alwaysI_acc with "INV") as "[H ACCinv]". 1: set_solver.
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
@@ -599,7 +607,7 @@ Section proof.
 
   (** The trace property guaranteed by [is_fair_lock]. *)
   Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
-    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_tps next curr))%S.
+    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_tps next curr) ∧ tps_true)%S.
 
   Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tps tl.
   Proof. apply (into_temporal _ _). Qed.
@@ -639,7 +647,8 @@ Section proof.
   Proof.
     iApply temporal_weaken; last iApply is_fair_lock_temporal.
     apply tps_exist_mono => next. apply tps_exist_mono => curr.
-    apply tps_and_mono; [apply tps_le_refl|apply lock_inv_tps_starvation_free_le].
+    apply tps_and_mono; [apply tps_le_refl|].
+    eapply tps_le_trans; [apply tps_and_elim_l|apply lock_inv_tps_starvation_free_le].
   Qed.
 
   (** The trace property guaranteed by a lock token: the holder releases the lock. *)
@@ -692,7 +701,7 @@ Section trace.
     tps_tr (fair_lock_tps (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ starvation_free next curr τ.
   Proof.
-    intros (next & curr & Htl & Hal). exists next, curr. split; first done.
+    intros (next & curr & Htl & Hal & _). exists next, curr. split; first done.
     by eapply (lock_inv_tps_starvation_free (Σ:=Σ)).
   Qed.
 

@@ -141,7 +141,7 @@ Section proof.
       inv Ni (queue_inv ℓ (queue_γq γ) (queue_γd γ)) ∗
       (queue_ticketlock_γ γ) ↪LOCK_AL□ ∗
       (queue_ticketlock_γ γ) ↪LOCK_CF□ 0 ∗
-      is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr).
+      is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr).
 
   (** Enables delayed initialization after picking a worker thread. *)
   Definition is_queue_init (ql :val) (γ : queue_γ) (φ : val → oids → iProp Σ) : iProp Σ :=
@@ -151,7 +151,7 @@ Section proof.
         ghost_var_frac (queue_γd γ) 1 (inhabitant : ocid) ∗
         (queue_ticketlock_γ γ) ↪LOCK_AL□ ∗
         (queue_ticketlock_γ γ) ↪LOCK_CF□ 0 ∗
-        is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I.
+        is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I.
 
   (** ** Lemmas *)
 
@@ -175,17 +175,19 @@ Section proof.
   (** FIXME: better notation for triples with this pattern *)
   Lemma Queue_init_spec :
     ⊢ ∃ μ, ∀ lc φ i G C,
-    l{{{ thread_expr i C (Queue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) }}}
+    l{{{ thread_expr i C (Queue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗ treg }}}
       Queue.init #() @ i
     l{{{ ql γ, RET ql; thread_expr i C (of_val ql) ∗ £ lc ∗ thP_carriers i G ∗ is_queue_init ql γ φ }}}.
   Proof.
     iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
-    iExists (20 ⊕ m)%M. iIntros (lc φ i G C) "!> % (TE& TG& GF) HΦ".
+    iExists (20 ⊕ m)%M. iIntros (lc φ i G C) "!> % (TE& TG& GF& #TR) HΦ".
     rewrite /Queue.init.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_TicketLock]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_lam. simpl.
-    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
+    iFrame "TG GF". iExists ∅, (lc ⊕ Ord.from_nat 3)%ord. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
+    iPoseProof (tlc_split with "Q_LC") as "[Q_LC LC]".
+    iPoseProof (tlc_split_one 3 2 with "LC") as "[LC LC1]"; first done.
     lwp_pures.
     (** Alloc node ptr *)
     lwp_bind (AllocN _ _).
@@ -214,13 +216,16 @@ Section proof.
     iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
     iModIntro. iIntros (lhptr) "[TE ((_& TG& _)& Ptr_hd& _)]".
     lwp_pures.
-    iMod ("IFL" $! _ (queue_lock φ γq lhptr ltptr) with "[Ptr_node Ptr_hd Ptr_tl HQvs0]") as "#IFL".
+    iApply lwp_sfmupd.
+    iMod ("IFL" $! _ (queue_lock φ γq lhptr ltptr) with "[] TR LC [Ptr_node Ptr_hd Ptr_tl HQvs0]") as "#IFL".
+    { iPureIntro. set_solver. }
     { iFrame. eauto. }
+    iMod (is_fair_lock_register_alive ⊤ with "IFL AL LC1") as "#IFLA"; [set_solver|set_solver|].
     iModIntro. lwp_finish.
     iMod (ghost_var_alloc (inhabitant : ocid)) as (γd) "Gv".
     iApply ("HΦ" $! _ (QueueName γtl γq γd)).
     iModIntro. iFrame "TE TG Q_LC".
-    rewrite /is_queue_init. iFrame "HQvs Gv IFL". eauto.
+    rewrite /is_queue_init. iFrame "HQvs Gv IFLA". iModIntro. eauto.
   Qed.
 
   Lemma queue_contents_enqueue lh lt vs φ :
@@ -259,7 +264,10 @@ Section proof.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     lwp_pures.
     (** Need ql *)
-    iDestruct "IQ" as "(%&%&%& %Hql& #IQ& #IFL)". simplify_eq.
+    iDestruct "IQ" as "(%lhptr&%ltptr&%tl& %Hql& #IQ& #IFLA)". simplify_eq.
+    iAssert (queue_ticketlock_γ γ ↪LOCK_AL□ ∗ queue_ticketlock_γ γ ↪LOCK_CF□ 0 ∗
+             is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I as "#IFL".
+    { iDestruct "IFLA" as "($& $& IFLA)". iApply (is_fair_lock_alive_is_fair_lock with "IFLA"). }
     lwp_pures.
     (** Acquire lock *)
     lwp_bind (TicketLock.acquire tl).
@@ -388,7 +396,10 @@ Section proof.
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     (** Need ql *)
-    iDestruct "IQ" as "(%&%&%& %Hql& #IQ& #IFL)". simplify_eq.
+    iDestruct "IQ" as "(%lhptr&%ltptr&%tl& %Hql& #IQ& #IFLA)". simplify_eq.
+    iAssert (queue_ticketlock_γ γ ↪LOCK_AL□ ∗ queue_ticketlock_γ γ ↪LOCK_CF□ 0 ∗
+             is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I as "#IFL".
+    { iDestruct "IFLA" as "($& $& IFLA)". iApply (is_fair_lock_alive_is_fair_lock with "IFLA"). }
     lwp_pures.
     (** Acquire lock *)
     lwp_bind (TicketLock.acquire tl).
@@ -623,9 +634,8 @@ Section proof.
   Lemma is_queue_temporal ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_tps ql.
   Proof.
     iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
-      (is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr) ∗
-       (queue_ticketlock_γ γ) ↪LOCK_AL□))%I with "[]").
-    { iIntros "!> (%&%&%& %& _& #AL& _& #IFL)". iExists _, _, _. iSplit; first done.
+      is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I with "[]").
+    { iIntros "!> (%&%&%& %& _& _& _& #IFL)". iExists _, _, _. iSplit; first done.
       iFrame "#". }
     iApply (into_temporal _ _).
   Qed.
@@ -637,9 +647,8 @@ Section proof.
   Lemma is_queue_init_temporal ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_tps ql.
   Proof.
     iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
-      (is_fair_lock tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr) ∗
-       (queue_ticketlock_γ γ) ↪LOCK_AL□))%I with "[]").
-    { iIntros "!> (%&%&%& %& _& _& #AL& _& #IFL)". iExists _, _, _. iSplit; first done.
+      is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I with "[]").
+    { iIntros "!> (%&%&%& %& _& _& _& _& #IFL)". iExists _, _, _. iSplit; first done.
       iFrame "#". }
     iApply (into_temporal _ _).
   Qed.
