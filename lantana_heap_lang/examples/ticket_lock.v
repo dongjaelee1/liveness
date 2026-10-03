@@ -327,7 +327,7 @@ Section proof.
     iIntros (??) "%HE #TR LC HR".
     iPoseProof (tlc_split_one 2 1 with "LC") as "[LC LC1]"; first done.
     iMod (alwaysI_alloc _ N_inv (lock_inv γt γo γc γa next curr R) with "TR LC1 [Ptr_next Ptr_curr Ptr_curr0 GMAt GMAo HR]") as "#Ak";
-      [done|apply N_inv_disj_treg| |].
+      [done| |].
     { iNext. rewrite /lock_inv. iRight. iExists 0, 0, {[0%Z := (None)]}, {[0%Z := (Some κu)]}.
       iFrame "Ptr_next Ptr_curr GMAt GMAo". iSplit. 1: done. iSplit. 1: done. iSplit.
       { iPureIntro. intros. rewrite dom_singleton_L elem_of_singleton. split; intros.
@@ -337,7 +337,7 @@ Section proof.
       { rewrite dom_singleton_L big_sepS_singleton. iLeft. eauto. }
       iLeft. iFrame. iPureIntro. lia. }
     iMod (alwaysI_alloc _ N_tk (lock_token_inv γo γk curr R) with "TR LC [$GV]") as "#IK";
-      [done|apply N_tk_disj_treg|].
+      [done|].
     iModIntro. rewrite /is_fair_lock. iExists next, curr. iSplitR; first done. iFrame "#".
   Qed.
 
@@ -407,7 +407,7 @@ Section proof.
         as "(%κu& %LUku& Gg& OGF& #Wlku& ALLOC)". 1: done.
       iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
       iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%I with "[] TR LC1 [//]") as "[GUku GUku0]".
-      { iPureIntro. pose proof N_inv_disj_treg. split; [set_solver|apply N_ev_disj_treg]. }
+      { iPureIntro. pose proof N_inv_disj_treg. set_solver. }
       rewrite union_empty_r_L.
       iMod (ghost_map_update (None) with "GMAt GMEt") as "[GMAt GMEt]".
       iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
@@ -926,7 +926,7 @@ Section proof.
         as "(%κu1& %LUku1& Gg1& OGF1& #Wlku1& ALLOC)". 1: done.
       iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
       iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%I with "[] TR LC1 [//]") as "[GUku GUku0]".
-      { iPureIntro. pose proof N_inv_disj_treg. split; [set_solver|apply N_ev_disj_treg]. }
+      { iPureIntro. pose proof N_inv_disj_treg. set_solver. }
       rewrite union_empty_r_L.
       iMod (ghost_map_update (Some κu1) with "GMAo GMEo1") as "[GMAo GMEo1]".
       iMod (ghost_map_elem_persist with "GMEo1") as "#GMEo1".
@@ -1113,7 +1113,7 @@ Section proof.
     iIntros (HE HN) "(%next& %curr& %Htl& #I& #K& #TR) #AL LC".
     iMod (alwaysI_register E N_inv _
             (lock_inv_alive (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) next curr R)%I
-            with "[] [] TR LC") as "#IA"; [done|done|apply N_inv_disj_treg| | |].
+            with "[] [] TR LC") as "#IA"; [done|done| | |].
     { by iApply alwaysI_inv. }
     { iIntros "!> [H|$]". iCombine "AL H" gives %HAL. rewrite dfrac_agree_op_valid in HAL.
       destruct HAL as [H _]. apply dfrac_valid_own_r in H. done. }

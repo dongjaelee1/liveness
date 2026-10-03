@@ -442,6 +442,91 @@ Section ltl.
 
 End ltl.
 
-(** A recursive formula through a registered invariant ([ν X. □(G ∧ X)] for nested
-    invariants) is no longer expressible: [alwaysI] stores the canonical trace property of
-    its content and is not contractive in it (see temporal_saved.v). *)
+(** ** A recursive structure: invariants nested forever
+
+    A registered structure is contractive in its content ([alwaysI_guar_contractive]), so
+    structures can be defined by guarded recursion. The reading stored with [nest] is
+    [G ∧ ν X. □(G ∧ X)], and the proof that its content guarantees it is closed
+    ([nest_content_temporal]): no Löb hypothesis is needed, the recursion is in the
+    structure, not in the proof. Allocation ([nest_alloc]) is the two-phase allocation of a
+    self-referential invariant: the invariant is allocated open and registered, the record
+    of its content at the current position is obtained by Löb induction (the content holds
+    the structure, whose own record is later-guarded), then the invariant is closed. *)
+Section recursion.
+  Context `{!lantanaGS Λ Σ}.
+
+  Definition F_nest (G : tps Λ Σ) : tps Λ Σ → tps Λ Σ := λ X, tps_always (tps_and G X).
+  Global Instance F_nest_mono G : TpsMono (F_nest G).
+  Proof.
+    apply (tps_mono_always (λ X, tps_and G X)), (tps_mono_and (λ _, G) (λ X, X)).
+    - apply tps_mono_const.
+    - apply tps_mono_id.
+  Qed.
+
+  (** The reading of a nested invariant. *)
+  Definition nest_tps G : tps Λ Σ := tps_and G (tps_nu (F_nest G)).
+
+  Definition nest_pre N (Q : iProp Σ) G (X : iPropO Σ) : iPropO Σ := alwaysI_guar N (Q ∗ X) (nest_tps G).
+  Local Instance nest_pre_contractive N Q G : Contractive (nest_pre N Q G).
+  Proof.
+    intros n X X' HX. rewrite /nest_pre. apply alwaysI_guar_contractive.
+    eapply (ne_dist_later (λ Y : iPropO Σ, (Q ∗ Y)%I)); [solve_proper|exact HX].
+  Qed.
+  Definition nest N Q G : iProp Σ := fixpoint (nest_pre N Q G).
+  Lemma nest_unfold N Q G : nest N Q G ≡ alwaysI_guar N (Q ∗ nest N Q G) (nest_tps G).
+  Proof. apply (fixpoint_unfold (nest_pre N Q G)). Qed.
+  Global Instance nest_persistent N Q G : Persistent (nest N Q G).
+  Proof. rewrite /Persistent nest_unfold. apply persistent, _. Qed.
+
+  Lemma nest_temporal N Q G : ⊢ nest N Q G ⊨ₜ tps_nu (F_nest G).
+  Proof.
+    iApply (temporal_weaken _ (tps_always (nest_tps G))).
+    { apply (tps_nu_unfold_r (F_nest G)). }
+    iApply (temporal_mono (alwaysI_guar N (Q ∗ nest N Q G) (nest_tps G)) with "[]").
+    { iIntros "!> H". by iEval (rewrite nest_unfold) in "H". }
+    iApply temporal_always_guar.
+  Qed.
+
+  (** The content's guarantee, a closed proof. *)
+  Lemma nest_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ nest N Q G) ⊨ₜ nest_tps G.
+  Proof. intros HQ. iApply temporal_sep; [iApply HQ|iApply nest_temporal]. Qed.
+
+  (** Allocation. The registry is opened while the new invariant is allocated open, so the
+      two namespaces must be disjoint. *)
+  Lemma nest_alloc E N Q G :
+    ↑tregN ⊆ E → ↑N ⊆ E → N ## tregN → (⊢ Q ⊨ₜ G) →
+    treg -∗ £n 1 -∗ ▷ Q -∗ |={E}=>g nest N Q G.
+  Proof.
+    iIntros (HE HN HD HQ) "#TR LC HQ". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI".
+    iMod (saved_ti_alloc (tps_ti (nest_tps G))) as (γ) "#Hγ".
+    iMod (inv_alloc_open N E (Q ∗ nest N Q G)) as "[#Hinv Hclose]"; first done.
+    iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
+    iMod (treg_register treg_handle (E ∖ ↑N) (RAlways N γ) with "LC TR [] HI") as "[HI (%j& #Hj)]";
+      first set_solver.
+    { iIntros (st) "_". simpl. iExists (Q ∗ nest N Q G)%I, (nest_tps G). iFrame "Hγ Hinv".
+      iNext. iApply (nest_content_temporal _ _ _ HQ). }
+    iApply fupd_mask_intro; first set_solver. iIntros "close".
+    iIntros (g i Ω W) "MI".
+    (* the record of the content at [n], by Löb: the content holds the structure, whose own
+       record is later-guarded *)
+    iAssert (□ (▷ Q -∗ history_interp h n σ Θ κs -∗ model_interp g i Ω W n (dom Θ) -∗
+                ▷ tguar (nest_tps G) n))%I with "[]" as "#R".
+    { iLöb as "IH". iIntros "!> HQ HI MI".
+      iAssert (▷ nest N Q G)%I as "#Hnest".
+      { iNext. iEval (rewrite nest_unfold alwaysI_guar_unfold). iExists j, n, γ, _.
+        iFrame "Hj HE Hγ Hinv TR". iSplitR; first (iNext; iApply (nest_content_temporal _ _ _ HQ)).
+        iApply ("IH" with "[HQ] HI MI"). by iNext. }
+      iApply (temporal_elim_later_guar (Q ∗ nest N Q G) (nest_tps G) with "[] [$HI $MI HQ]").
+      { iNext. iApply (nest_content_temporal _ _ _ HQ). }
+      iNext. iFrame "HQ Hnest". }
+    iPoseProof ("R" with "HQ HI MI") as "#T".
+    iFrame "MI". iMod "close" as "_".
+    iMod ("Hclose" with "[HQ]") as "_".
+    { iNext. iFrame "HQ". iEval (rewrite nest_unfold alwaysI_guar_unfold). iExists j, n, γ, _.
+      iFrame "Hj HE Hγ Hinv TR". iSplitR; [iNext; iApply (nest_content_temporal _ _ _ HQ)|].
+      iNext. iExact "T". }
+    iModIntro. iFrame "HI". iEval (rewrite nest_unfold alwaysI_guar_unfold). iExists j, n, γ, _.
+    iFrame "Hj HE Hγ Hinv TR T". iNext. iApply (nest_content_temporal _ _ _ HQ).
+  Qed.
+
+End recursion.

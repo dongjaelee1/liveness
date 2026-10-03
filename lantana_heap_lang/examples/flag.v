@@ -107,10 +107,10 @@ Section proof.
     iPoseProof (tlc_split_one 2 1 with "LC") as "[LC LC1]"; first done.
     iMod (untilI_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
     iMod ("H" $! _ Np (l ↦ #0)%I (l ↦ #1)%I with "[] TR LC1 [Ptr]") as "H".
-    { iPureIntro. split; [done|apply Np_disj_treg]. }
+    { iPureIntro. done. }
     { iNext. iFrame. }
     iDestruct "H" as "[H1 H2]".
-    iMod (alwaysI_alloc E Na _ with "TR LC [H1]") as "$"; [done|apply Na_disj_treg| |by iFrame].
+    iMod (alwaysI_alloc E Na _ with "TR LC [H1]") as "$"; [done| |by iFrame].
     iNext. by iLeft.
   Qed.
 

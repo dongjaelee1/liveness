@@ -129,11 +129,11 @@ Section proof.
     iMod (carrier_alloc _ _ _ ℵ%ordi μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (untilI_alloc _ _ _ false ℵ%ordi ℵ%ordi 0 with "Gg1") as "(%kr& %Hkr& Gg1& Ofkr& #Wlkr& Akr)". 1: done.
     iMod ("Akr" $! _ Nr True%I (exits #42@i)%I with "[] TR LC1 []") as "Ukr".
-    { iPureIntro. split; [set_solver|solve_ndisj]. }
+    { iPureIntro. set_solver. }
     { done. }
     iMod (untilI_alloc _ _ _ false ℵ%ordi ℵ%ordi 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
     iMod ("Akc" $! _ Nc True%I (∃ tl γ, is_fair_lock tl γ True)%I with "[] TR LC2 []") as "Ukc".
-    { iPureIntro. split; [set_solver|solve_ndisj]. }
+    { iPureIntro. set_solver. }
     { done. }
     iModIntro. iExists μ. iSplitL "Ukr Ukc TG1 Gg1 Gf1 Ofkr Ofkc".
     { subst Φ. rewrite !union_empty_r_L.

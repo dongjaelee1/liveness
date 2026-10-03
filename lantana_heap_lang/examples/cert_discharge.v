@@ -89,7 +89,7 @@ Section proof.
     iApply sfmupd_lwp.
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
     iMod (alwaysI_alloc _ Na (y ↦ #7)%I with "TR LC1 [Ptry]") as "#HA";
-      [set_solver|solve_ndisj|by iFrame|].
+      [set_solver|by iFrame|].
     iPoseProof (tlc_split_nat 2 97 with "LC") as "[LC2 LC]".
     iMod (finallyI_discharge with "LC2 Cg HQ [Ptrx HF]") as "(HQ& Cg& #Odq)".
     1: solve_ndisj. 1: set_solver.
@@ -133,11 +133,11 @@ Section proof.
     iMod (carrier_alloc _ _ _ 0 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (untilI_alloc _ _ _ false 0 0 0 with "Gg1") as "(%kf& %Hkf& Gg1& Ofkf& #Wlkf& Akf)". 1: done.
     iMod ("Akf" $! _ Nf True%I (x ↦ #2)%I with "[] TR LC1 []") as "Ukf".
-    { iPureIntro. split; [set_solver|solve_ndisj]. }
+    { iPureIntro. set_solver. }
     { done. }
     iMod (untilI_alloc _ _ _ false 0 0 0 with "Gg1") as "(%kq& %Hkq& Gg1& Ofkq& #Wlkq& Akq)". 1: done.
     iMod ("Akq" $! _ Nq True%I (cd_Q x y kf) with "[] TR LC2 []") as "Ukq".
-    { iPureIntro. split; [set_solver|solve_ndisj]. }
+    { iPureIntro. set_solver. }
     { done. }
     iModIntro. iExists μ. iSplitL "Ukq Ukf Ptrx Ptry TG1 Gg1 Gf1 Ofkq Ofkf".
     { subst Φ. rewrite !union_empty_r_L.

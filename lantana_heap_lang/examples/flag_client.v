@@ -139,12 +139,12 @@ Section proof.
     1: done. 1: set_solver.
     iMod (untilI_alloc _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I with "[] TR LC1 []") as "Ukl1".
-    { iPureIntro. split; [set_solver|solve_ndisj]. }
+    { iPureIntro. set_solver. }
     { done. }
     iMod (carrier_alloc _ _ _ 1 μ2 with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
     iMod (untilI_alloc _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
     iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I with "[] TR LC1' []") as "Ukl2".
-    { iPureIntro. split; [set_solver|solve_ndisj]. }
+    { iPureIntro. set_solver. }
     { done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
     { subst Φ.

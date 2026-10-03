@@ -67,18 +67,17 @@ Section registry.
 
   (** Allocation, with no request registered yet: a registered invariant. *)
   Lemma registry_alloc E N G :
-    ↑tregN ⊆ E → N ## tregN →
+    ↑tregN ⊆ E →
     treg -∗ £n 1 -∗ |={E}=>g ∃ γm, alwaysI N (registry_inv γm G).
   Proof.
-    iIntros (??) "#TR LC".
+    iIntros (?) "#TR LC".
     iMod (ghost_map_alloc_empty (K:=nat) (V:=gname)) as (γm) "Ha".
-    iMod (alwaysI_alloc E N (registry_inv γm G) with "TR LC [Ha]") as "$"; [done..| |done].
+    iMod (alwaysI_alloc E N (registry_inv γm G) with "TR LC [Ha]") as "$"; [done| |done].
     iNext. iExists ∅. iFrame. by rewrite big_sepM_empty.
   Qed.
 
 End registry.
 
-(** Recursion through a registered structure ([alwaysI], [untilI]) is not available: they
-    store the canonical trace properties of their contents, which are not contractive.
-    Guarded recursion remains available for trace properties (temporal_fixpoint.v) and for
-    iProps whose guarantee does not go through a registered structure. *)
+(** Recursion through a registered structure: [alwaysI_guar] is contractive in its content,
+    so structures can be defined by guarded recursion; the stored guarantee is a fixpoint
+    trace property and its proof is closed. See temporal_fixpoint.v ([nest]). *)

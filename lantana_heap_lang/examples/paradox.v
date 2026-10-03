@@ -328,7 +328,7 @@ Section proof.
     iMod (untilI_alloc _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
     iPoseProof (tlc_split_nat 1 90 with "LC") as "[LCr LC]".
     iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I with "[] TR LCr [//]") as "Unew".
-    { iPureIntro. split; [set_solver|solve_ndisj]. }
+    { iPureIntro. set_solver. }
     iApply (sfmupd_fupd_acc _ ∅).
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
     iPoseProof (tlc_split_nat 89 1 with "LC") as "[LC LC1]".
@@ -407,7 +407,7 @@ Section proof.
     iMod (untilI_alloc _ _ _ false _ _ 10 with "Cg") as "(%ck& _& Cg& Gf& #Wl& ACC)".
     1: reflexivity. rewrite union_empty_r_L.
     iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I with "[] TR LC [//]") as "HF".
-    { iPureIntro. split; [done|solve_ndisj]. }
+    { iPureIntro. done. }
     iMod (ghost_map_insert_persist 0 ck with "GM") as "(GM& #GMe)". 1: done.
     iExists ck, r, rm, ci, cj, 0.
     iDestruct "HF" as "[HF HF0]". iDestruct "CAj" as "[CAj CAj0]".
@@ -450,7 +450,7 @@ Section proof.
     iMod (carrier_alloc _ _ _ 0 10 with "TG2") as "(%g2& _& TG2& Gg2& Gf2)".
     iMod (untilI_alloc _ _ _ false _ _ 0 with "Gg1") as "(%z& _& Gg1& _& _& ACC)". 1: reflexivity.
     iMod ("ACC" $! _ N1 True%I False%I with "[] TR LC1 [//]") as "HFz".
-    { iPureIntro. split; [set_solver|solve_ndisj]. }
+    { iPureIntro. set_solver. }
     rewrite !union_empty_r_L.
     iMod (px_init ⊤ with "TR LC2 Gg2") as "(%&%&%&%&%&%& Gg2& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)"; first set_solver.
     iModIntro. iSplitR "TEs".

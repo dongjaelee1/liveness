@@ -198,6 +198,41 @@ Section tps_connectives.
       iDestruct "H" as "[_ (%a''& %Hlt& H)]". iExists a''. iSplit; first done. by iApply "IH".
   Qed.
 
+  (** In-logic monotonicity of always and until: the implication between the readings is
+      an iProp hypothesis, available one step later. These give the hypothesis forms of
+      the structure rules (temporal_guarantee.v). *)
+  Lemma ti_always_mono_i `{!temporalGS Λ Σ} (P1 P1' P2 : tiProp Λ Σ) :
+    ▷ □ (∀ τ, P1 τ -∗ P1' τ) -∗ ∀ τ, ti_always P1 P2 τ -∗ ti_always P1' P2 τ.
+  Proof.
+    iIntros "#W". iLöb as "IH". iIntros (τ) "H". rewrite !ti_always_unfold /ti_always_pre.
+    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
+    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
+    iSplit; first (iDestruct "H" as "[H _]"; by iApply "W").
+    iSplit; first by iDestruct "H" as "[_ [$ _]]".
+    iDestruct "H" as "[_ [_ H]]". by iApply "IH".
+  Qed.
+  Lemma tps_always_mono_i `{!temporalGS Λ Σ} (G G' : tps Λ Σ) :
+    ▷ □ (∀ τ, tps_ti G τ -∗ tps_ti G' τ) -∗ ∀ τ, tps_ti (tps_always G) τ -∗ tps_ti (tps_always G') τ.
+  Proof. iIntros "#W" (τ). cbn. by iApply (ti_always_mono_i with "W"). Qed.
+  Lemma ti_until_mono_i `{!temporalGS Λ Σ} (P1 P2 P1' P2' : tiProp Λ Σ) :
+    ▷ □ (∀ τ, P1 τ -∗ P1' τ) -∗ ▷ □ (∀ τ, P2 τ -∗ P2' τ) -∗
+    ∀ (a : Ord.t) τ, ti_until Ord.lt a P1 P2 τ -∗ ti_until Ord.lt a P1' P2' τ.
+  Proof.
+    iIntros "#W1 #W2". iLöb as "IH". iIntros (a τ) "H". rewrite !ti_until_unfold /ti_until_pre.
+    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
+    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. iDestruct "H" as "[H|H]".
+    - iLeft. by iApply "W2".
+    - iRight. iSplit; first (iDestruct "H" as "[H _]"; by iApply "W1").
+      iDestruct "H" as "[_ (%a'& %Hlt& H)]". iExists a'. iSplit; first done. by iApply "IH".
+  Qed.
+  Lemma tps_until_mono_i `{!temporalGS Λ Σ} (G1 G2 G1' G2' : tps Λ Σ) :
+    ▷ □ (∀ τ, tps_ti G1 τ -∗ tps_ti G1' τ) -∗ ▷ □ (∀ τ, tps_ti G2 τ -∗ tps_ti G2' τ) -∗
+    ∀ τ, tps_ti (tps_until G1 G2) τ -∗ tps_ti (tps_until G1' G2') τ.
+  Proof.
+    iIntros "#W1 #W2" (τ). cbn. rewrite /ti_exist. iIntros "[%a H]". iExists a.
+    by iApply (ti_until_mono_i with "W1 W2").
+  Qed.
+
 End tps_connectives.
 
 Notation "⌜ p ⌝" := (tps_pure p) : tps_scope.

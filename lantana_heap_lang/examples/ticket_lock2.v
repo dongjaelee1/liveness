@@ -222,7 +222,7 @@ Section proof.
     iApply ("HΦ" $! _ (TicketLockName γt γa γc)). iFrame "TE TG QLC CF".
     iIntros (??) "%HE #TR LC HR".
     iMod (alwaysI_alloc _ N_inv (lock_inv γt γa γc next curr R) with "TR LC [Ptr_next Ptr_curr0 Ptr_curr GMAt GMAa HR]") as "#Ak";
-      [done|apply N_inv_disj_treg| |].
+      [done| |].
     { iNext. rewrite /lock_inv. iExists 0, 0, {[0%Z := (κu)]}, {[0%Z := true]}.
       iFrame "Ptr_next Ptr_curr0 GMAt GMAa". iSplit. 1: done. iSplit. 1: iPureIntro; lia. iSplit.
       { iPureIntro. intros. rewrite dom_singleton_L elem_of_singleton. split; intros.
@@ -290,7 +290,7 @@ Section proof.
       as "(%κu& %LUku& Gg0& OGF& #Wlku& ALLOC)". 1: done.
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ R)%I with "[] TR LC1 [//]") as "[GUku GUku1]".
-    { iPureIntro. split; [solve_ndisj|apply N_ev_disj_treg]. }
+    { iPureIntro. solve_ndisj. }
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".
     iMod (oblP_fuel_extend _ ℓ _ 1 with "GGF") as "GGF".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }

@@ -173,13 +173,13 @@ Section until.
              untilT N k 1 Φ Ψ ∗ witP_layer k ℓ2 ∗ oblP_fuel k ℓ2 μ)
             e
             Q)
-      ∧ ⌜(ℓ1 <= ℓ2)%ordi ∧ ↑tregN ⊆ E ∧ N ## tregN⌝
+      ∧ ⌜(ℓ1 <= ℓ2)%ordi ∧ ↑tregN ⊆ E⌝
     ⊢ fuel_burning_triple s i E G G
         (P ∗ crP_obls g ℓ1 K ∗ Φ ∗ treg ∗ £n 1)
         e
         Q.
   Proof.
-    iIntros "(H& %LEl& %HE& %HN) % (TG& HP) POST".
+    iIntros "(H& %LEl& %HE) % (TG& HP) POST".
     iDestruct "HP" as "(HP& Cg& HΦ& #TR& LC)".
     iMod (untilI_alloc _ _ _ false _ ℓ2 μ with "Cg") as "(%& %& Cg& Of& #Wl& Acc)". 1: auto.
     iMod ("Acc" $! _ N Φ Ψ with "[] TR LC HΦ") as "HU".

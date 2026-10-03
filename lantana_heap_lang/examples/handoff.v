@@ -116,7 +116,7 @@ Section proof.
     iMod (ghost_var_alloc g) as "(%& [Gv Gv0])".
     iExists (HandoffName γ). iFrame "Gv0".
     rewrite /is_handoff. simpl.
-    iMod (alwaysI_alloc E Na (handoff_inv b γ ℓ) with "TR LC [Ptr Co Gv]") as "#Inv"; [done|apply Na_disj_treg| |].
+    iMod (alwaysI_alloc E Na (handoff_inv b γ ℓ) with "TR LC [Ptr Co Gv]") as "#Inv"; [done| |].
     { iNext. rewrite /handoff_inv. iExists g. iLeft. iFrame. }
     eauto.
   Qed.
