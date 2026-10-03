@@ -69,8 +69,6 @@ Section proof.
   Proof. by apply ndot_ne_disjoint. Qed.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
-  Remark Na_disj_treg : Na ## tregN.
-  Proof. solve_ndisj. Qed.
 
   (** ** Definitions *)
   Definition is_task (ℓ : ord.t) : val → val → oids → iProp Σ :=
@@ -106,17 +104,16 @@ Section proof.
   Global Instance handoff_inv_persistent b γ ℓ : Persistent (is_handoff b γ ℓ).
   Proof. rewrite /is_handoff. apply _. Qed.
 
-  (** The invariant is registered: a model update, with the registry and a credit. *)
+  (** The invariant is registered: a model update. *)
   Lemma is_handoff_initialize E b ℓ g :
-    ↑tregN ⊆ E →
-    treg -∗ £n 1 -∗ b ↦{#(1/2)} NONEV -∗ crP_obls g ℓ ∅ -∗
+    b ↦{#(1/2)} NONEV -∗ crP_obls g ℓ ∅ -∗
     |={E}=>g ∃ γ, is_handoff b γ ℓ ∗ ghost_var_frac (handoff_γd γ) (1/2)%Qp g.
   Proof.
-    iIntros (HE) "#TR LC Ptr Co".
+    iIntros "Ptr Co".
     iMod (ghost_var_alloc g) as "(%& [Gv Gv0])".
     iExists (HandoffName γ). iFrame "Gv0".
     rewrite /is_handoff. simpl.
-    iMod (alwaysI_alloc E Na (handoff_inv b γ ℓ) with "TR LC [Ptr Co Gv]") as "#Inv"; [done| |].
+    iMod (alwaysI_alloc E Na (handoff_inv b γ ℓ) with "[Ptr Co Gv]") as "#Inv".
     { iNext. rewrite /handoff_inv. iExists g. iLeft. iFrame. }
     eauto.
   Qed.

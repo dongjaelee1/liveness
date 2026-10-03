@@ -3,6 +3,7 @@ From iris.prelude Require Import options.
 From lantana.program_logic Require Export language weakestpre.
 From lantana.program_logic Require Export temporal_property.
 From lantana.program_logic Require Export adequacy.
+From lantana.program_logic Require Import temporal_guarantee.
 
 From transfinite.stepindex Require Import ordinals.
 (* From transfinite.base_logic Require Import satisfiable. *)
@@ -41,17 +42,17 @@ Section proof2.
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     Θ = fst <$> TQ →
     (∃ e Q, TQ !! i = Some (e, Q) ∧ ∀ v, (Q i v ⊢ ⌜Φ i v⌝)) →
-    ((history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω2 W n (dom Θ) ∗
+    ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω2 W n (dom Θ) ∗
      ([∗ map] i ↦ '(e, Q) ∈ TQ, match to_val e with
                                 | Some v => (lift_term i Q) v
                                 | None => lwp_fix NotStuck i ⊤ e (lift_term i Q)
                                 end))
     ⊢ safety_iris_tiProp i Φ (n, τf).
   Proof.
-    iIntros (BEH FS LEO LB HIST EQTQ POST) "([HI SIa]& MI& WPs)".
+    iIntros (BEH FS LEO LB HIST EQTQ POST) "([[HI TI] SIa]& MI& WPs)".
     clear dependent Ω1. rename Ω2 into Ω.
-    iRevert (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ POST) "HI SIa MI WPs".
-    iLöb as "IH". iIntros (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ POST) "HI SIa MI WPs".
+    iRevert (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ POST) "HI TI SIa MI WPs".
+    iLöb as "IH". iIntros (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ POST) "HI TI SIa MI WPs".
     rewrite /safety_iris_tiProp ti_always_unfold /ti_always_pre.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
     iMod "close" as "_". iModIntro.
@@ -73,7 +74,7 @@ Section proof2.
       pose proof (val_stuck _ _ _ _ _ _ _ _ PStep) as He1. rewrite He1.
       iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
       iSpecialize ("WP" $! ctx_id). iEval (rewrite !ctx_id_apply) in "WP".
-      iMod ("WP" with "[] [//] [$HI $SIa]") as "WP".
+      iMod ("WP" with "[] [//] [$HI $TI $SIa]") as "WP".
       { iPureIntro. apply _. }
       iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
       iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
@@ -121,7 +122,7 @@ Section proof2.
         apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
       1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2.
       * rewrite lwp_fix_unfold_fix /lwp_pre He2.
-        iMod (all_interp_lwpupd_steps γ2 with "WP HI MI") as "(WP& [HI SIa]& %g3& %v3& %Ω5& %W5& %& MI)".
+        iMod (all_interp_lwpupd_steps γ2 with "WP HI MI") as "(WP& [[HI TI] SIa]& %g3& %v3& %Ω5& %W5& %& MI)".
         { subst Θ2. rewrite lookup_union_l.
           - apply lookup_insert_eq.
           - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
@@ -137,7 +138,7 @@ Section proof2.
             apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
           iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
         iPoseProof (history_interp_wf with "HI") as "%HistWF".
-        iPoseProof ("IH" with "[] [] [] [] [] [] HI SIa MI WPs") as "H".
+        iPoseProof ("IH" with "[] [] [] [] [] [] HI TI SIa MI WPs") as "H".
         1: eauto. 1: eauto. 1: eauto.
         { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
           - inv H. eapply HIST in LUh. eauto.
@@ -161,9 +162,9 @@ Section proof2.
           { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
             apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
           iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
-        iDestruct "HI" as "[HI SIa]".
+        iDestruct "HI" as "[[HI TI] SIa]".
         iPoseProof (history_interp_wf with "HI") as "%HistWF".
-        iPoseProof ("IH" with "[] [] [] [] [] [] HI SIa MI WPs") as "H".
+        iPoseProof ("IH" with "[] [] [] [] [] [] HI TI SIa MI WPs") as "H".
         1: eauto. 1: eauto. 1: eauto.
         { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
           - inv H. eapply HIST in LUh. eauto.
@@ -201,7 +202,7 @@ Section proof2.
         iPoseProof (POST v1 with "[WPs]") as "%POSTval".
         { iPoseProof (big_sepM_delete _ _ _ _ LUTQi1 with "WPs") as "[WP WPs]".
           rewrite He1. iDestruct "WP" as "[_ $]". }
-        iPoseProof ("IH" with "[] [] [] [] [] [] HI SIa [$MHI $MI] WPs") as "H".
+        iPoseProof ("IH" with "[] [] [] [] [] [] HI TI SIa [$MHI $MI] WPs") as "H".
         1: eauto. 1: eauto. 1: eauto.
         { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
           - inv H. eapply HIST in LUh. eauto.
@@ -216,7 +217,7 @@ Section proof2.
           - eexists. split; eauto. rewrite He1. auto.
           - rewrite decide_True; auto. eexists. split; eauto. rewrite He1. auto. }
         iFrame.
-      * iPoseProof ("IH" with "[] [] [] [] [] [] HI SIa [$MHI $MI] WPs") as "H".
+      * iPoseProof ("IH" with "[] [] [] [] [] [] HI TI SIa [$MHI $MI] WPs") as "H".
         1: eauto. 1: eauto. 1: eauto.
         { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
           - inv H. eapply HIST in LUh. eauto.
@@ -240,7 +241,7 @@ Section proof2.
     owit_inv_lb (fair_sched_fun γ) Ω W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     (∃ Q, Ψs !! i = Some Q ∧ ∀ v, (Q i v ⊢ ⌜Φ i v⌝)) →
-    ((history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
+    ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
      model_interp g v Ω W n (dom Θ) ∗
      (|={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ v, lift_term i Ψ v }})))
     ⊢ |={⊤}=> safety_iris_tiProp i Φ (n, τf).
@@ -345,8 +346,8 @@ Proof.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
-  (* FIXME: just HI not working. *)
-  iApply (lwp_safety_iris_tiProp (lantanaGS0:=Hlantana) with "[$HI $SIa $MHI $S $T $A $G $MI $WPs]").
+  iPoseProof (treg_st_init (treg_handle (temporalGS0:=Htemp)) with "TR") as "TI".
+  iApply (lwp_safety_iris_tiProp (lantanaGS0:=Hlantana) with "[$HI $TI $SIa $MHI $S $T $A $G $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
   { intros n' σ' Θ' κs' Hlu. rewrite lookup_cons in Hlu. destruct n'; last done. inv Hlu. rewrite INIT2. eauto. }
   eauto.

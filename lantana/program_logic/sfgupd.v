@@ -1,18 +1,17 @@
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
-From lantana.base_logic Require Export opreds.
-From lantana.program_logic Require Export history_interp.
+From lantana.program_logic Require Export temporal_class.
 Import uPred.
 
-Local Definition sfgupd_def `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
-  `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
+Local Definition sfgupd_def `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
+  `{!TemporalInterp Λ Σ}
   E1 E2 : iPropO Σ -d> iPropO Σ :=
-  (λ P, ∀ h n σ Θ κs, (history_interp h n σ Θ κs) -∗ |={E1,E2:n,dom Θ}=>g (history_interp h n σ Θ κs) ∗ P)%I.
+  (λ P, ∀ h n σ Θ κs, history_tinterp h n σ Θ κs -∗ |={E1,E2:n,dom Θ}=>g history_tinterp h n σ Θ κs ∗ P)%I.
 Local Definition sfgupd_aux : seal (@sfgupd_def). Proof. by eexists. Qed.
 Definition sfgupd := sfgupd_aux.(unseal).
 Global Arguments sfgupd {SI Λ Σ _ _ _ _}.
-Local Lemma sfgupd_unseal `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
-  `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} :
+Local Lemma sfgupd_unseal `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
+  `{!TemporalInterp Λ Σ} :
   sfgupd = @sfgupd_def SI Λ Σ _ _ _ _.
 Proof. rewrite -sfgupd_aux.(seal_eq) //. Qed.
 
@@ -22,8 +21,8 @@ Notation "'|={' E1 , E2 '}=>g' P" := (sfgupd E1 E2 P) (at level 20, P at level 2
 Notation "'|={' E '}=>g' P" := (sfgupd E E P) (at level 20, P at level 200, format "|={ E }=>g  P").
 
 Section sfgupd.
-  Context `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
-  Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
+  Context `{!TemporalInterp Λ Σ}.
 
   Global Instance sfgupd_ne E1 E2 : NonExpansive (sfgupd E1 E2).
   Proof. intros n P1 P2 HP. rewrite sfgupd_unseal /sfgupd_def. do 14 (f_equiv || done). Qed.
@@ -249,8 +248,8 @@ Section sfgupd.
   Lemma all_interp_sfgupd_steps γ E1 E2 h n σ Θ κs g v Ω W (P : iProp Σ) :
     owit_inv_lb_mon γ →
     owit_inv_lb γ Ω W →
-    (|={E1,E2}=>g P) -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E1,E2}=∗
-    (P ∗ history_interp h n σ Θ κs ∗
+    (|={E1,E2}=>g P) -∗ history_tinterp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E1,E2}=∗
+    (P ∗ history_tinterp h n σ Θ κs ∗
      ∃ g' v' Ω' W', ⌜ obls_nd Ω Ω' ∧ owit_inv_lb γ Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
     iIntros (MON LB) "HP HI MI". unfold_sfgupd. iPoseProof ("HP" with "HI") as ">HP".

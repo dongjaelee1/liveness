@@ -72,8 +72,6 @@ End tregGS.
 Import tregGS.
 Local Existing Instances treg_inG tregGpreS_list tregGpreS_pred.
 
-Definition tregN : namespace := nroot .@ "treg".
-
 Section registry.
   Context `{SI : sidx} `{!tregGS Λ Σ}.
 
@@ -199,28 +197,25 @@ Proof.
   iModIntro. iExists (TregG _ _ _ _ γ). rewrite /reg_auth. iFrame. iPureIntro. apply treg_wf_nil.
 Qed.
 
-(** ** The registry invariant
+(** ** The registry state
 
-    It holds the list, and for every entry a history event at its registration position
-    (which bounds the position by the current history index) and the entry's handle, whose
-    meaning [H] is supplied by the temporal layer. *)
-Section registry_inv.
+    The list, and for every entry a history event at its registration position (which
+    bounds the position by the current history index) and the entry's handle, whose
+    meaning [Hd] is supplied by the temporal layer. The state is part of the interpretation
+    that the program logic threads between steps (temporal_class.v), so registering is a
+    plain ghost update. *)
+Section registry_state.
   Context `{SI : sidx} `{!invGS Σ} `{!state_interp_class Λ Σ}
     `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS Λ Σ}.
 
   Definition treg_entries (Hd : rentry → iProp Σ) (l : list (nat * rentry)) : iProp Σ :=
     [∗ list] pe ∈ l, (∃ st, hG_event pe.1 st) ∗ Hd pe.2.
 
-  Definition treg_inv (Hd : rentry → iProp Σ) : iProp Σ :=
-    inv tregN (∃ l, reg_auth l ∗ treg_entries Hd l).
+  Definition treg_st (Hd : rentry → iProp Σ) : iProp Σ :=
+    ∃ l, reg_auth l ∗ treg_entries Hd l.
 
-  Global Instance treg_inv_persistent Hd : Persistent (treg_inv Hd).
-  Proof. apply _. Qed.
-
-  Lemma treg_inv_alloc Hd E : reg_auth [] ={E}=∗ treg_inv Hd.
-  Proof.
-    iIntros "Ha". iApply inv_alloc. iNext. iExists []. iFrame. by rewrite /treg_entries big_sepL_nil.
-  Qed.
+  Lemma treg_st_init Hd : reg_auth [] ⊢ treg_st Hd.
+  Proof. iIntros "Ha". iExists []. iFrame. by rewrite /treg_entries big_sepL_nil. Qed.
 
   (** Every registered position is bounded by the current history index. *)
   Lemma treg_entries_bound Hd l h n σ Θ κs :
@@ -233,23 +228,18 @@ Section registry_inv.
     apply lookup_lt_Some in Hh. lia.
   Qed.
 
-  (** Register an entry at the current position. Opening the registry costs a later
-      credit, as every invariant opening does in Lantana. *)
-  Lemma treg_register Hd E e h n σ Θ κs :
-    ↑tregN ⊆ E →
-    £n 1 -∗ treg_inv Hd -∗ (∀ st, hG_event n st -∗ Hd e) -∗
-    history_interp h n σ Θ κs ={E}=∗ history_interp h n σ Θ κs ∗ ∃ j, reg_idx j n e.
+  (** Register an entry at the current position. *)
+  Lemma treg_st_register Hd e h n σ Θ κs :
+    treg_st Hd -∗ (∀ st, hG_event n st -∗ Hd e) -∗
+    history_interp h n σ Θ κs ==∗ history_interp h n σ Θ κs ∗ treg_st Hd ∗ ∃ j, reg_idx j n e.
   Proof.
-    iIntros (?) "LC #Hinv He HI".
-    iInv "Hinv" as "Hl" "Hclose".
-    iMod (lantana.base_logic.fancy_updates.lc_fupd_elim_later with "LC Hl") as (l) "[Ha Hl]".
+    iIntros "(%l& Ha& Hl) He HI".
     iDestruct (treg_entries_bound with "Hl HI") as %Hb.
     iDestruct (history_interp_hG_event_now with "HI") as "#Hnow".
     iMod (reg_auth_append l n e with "Ha") as "[Ha #Hj]"; first done.
-    iMod ("Hclose" with "[Ha Hl He]") as "_".
-    { iNext. iExists _. iFrame "Ha". rewrite /treg_entries big_sepL_app big_sepL_singleton. iFrame "Hl".
-      iSplitR; first by iExists _. by iApply "He". }
-    iModIntro. iFrame. by iExists _.
+    iModIntro. iFrame "HI". iSplitL; last by iExists _.
+    iExists _. iFrame "Ha". rewrite /treg_entries big_sepL_app big_sepL_singleton. iFrame "Hl".
+    iSplitR; first by iExists _. by iApply "He".
   Qed.
 
-End registry_inv.
+End registry_state.

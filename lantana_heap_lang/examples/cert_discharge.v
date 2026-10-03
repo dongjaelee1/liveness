@@ -65,12 +65,12 @@ Section proof.
          ([∗ set] g ∈ {[g]}, crP_fuel g 0 μ) ∗
          crP_obls g 0 {[kq; kf]} ∗ ⌜kq ≠ kf⌝ ∗
          x ↦ #0 ∗ y ↦ #7 ∗
-         finallyT Nq kq 1 (cd_Q x y kf) ∗ finallyT Nf kf 1 (x ↦ #2) ∗ treg }}}
+         finallyT Nq kq 1 (cd_Q x y kf) ∗ finallyT Nf kf 1 (x ↦ #2) }}}
       CertDischarge.main #x #y @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
   Proof.
     iExists 10. iIntros (i g kq kf x y Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TE& TG& GF& Cg& %Hkqf& Ptrx& Ptry& HQ& HF& #TR)".
+    iDestruct "HP" as "(TE& TG& GF& Cg& %Hkqf& Ptrx& Ptry& HQ& HF)".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     rewrite /CertDischarge.main /=.
     lwp_pure_lc 100.
@@ -87,10 +87,8 @@ Section proof.
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iApply sfmupd_lwp.
-    iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-    iMod (alwaysI_alloc _ Na (y ↦ #7)%I with "TR LC1 [Ptry]") as "#HA";
-      [set_solver|by iFrame|].
-    iPoseProof (tlc_split_nat 2 97 with "LC") as "[LC2 LC]".
+    iMod (alwaysI_alloc _ Na (y ↦ #7)%I with "[Ptry]") as "#HA"; first by iFrame.
+    iPoseProof (tlc_split_nat 2 98 with "LC") as "[LC2 LC]".
     iMod (finallyI_discharge with "LC2 Cg HQ [Ptrx HF]") as "(HQ& Cg& #Odq)".
     1: solve_ndisj. 1: set_solver.
     { rewrite /cd_Q. iFrame "Ptrx HF HA". }
@@ -101,7 +99,7 @@ Section proof.
     lwp_pures.
     (* The nested commitment, then termination. *)
     iApply lwpupd_lwp_sfmupd.
-    iPoseProof (tlc_split_nat 2 95 with "LC") as "[LC2 _]".
+    iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC2 _]".
     replace ({[kq; kf]} ∖ {[kq]}) with ({[kf]} : gset oid) by set_solver.
     iMod (finallyI_discharge with "LC2 Cg HF Ptrx") as "(Ptrx& Cg& #Odf)".
     1: solve_ndisj. 1: set_solver.
@@ -121,23 +119,20 @@ Section proof.
                            crP_fuel g 0 μ))%I) →
     Ψs = ({[i := fork_post]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ x ↦ #0 -∗ y ↦ #7 -∗
-     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗ treg -∗ £n 2 -∗
+     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
                    (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof.
-    iIntros (HT HP HQ) "TEs Ptrx Ptry TGs #TR LC".
-    iPoseProof (tlc_split_nat 1 1 with "LC") as "[LC1 LC2]".
+    iIntros (HT HP HQ) "TEs Ptrx Ptry TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     rewrite !big_sepS_singleton.
     iPoseProof (main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ 0 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (untilI_alloc _ _ _ false 0 0 0 with "Gg1") as "(%kf& %Hkf& Gg1& Ofkf& #Wlkf& Akf)". 1: done.
-    iMod ("Akf" $! _ Nf True%I (x ↦ #2)%I with "[] TR LC1 []") as "Ukf".
-    { iPureIntro. set_solver. }
+    iMod ("Akf" $! _ Nf True%I (x ↦ #2)%I with "[]") as "Ukf".
     { done. }
     iMod (untilI_alloc _ _ _ false 0 0 0 with "Gg1") as "(%kq& %Hkq& Gg1& Ofkq& #Wlkq& Akq)". 1: done.
-    iMod ("Akq" $! _ Nq True%I (cd_Q x y kf) with "[] TR LC2 []") as "Ukq".
-    { iPureIntro. set_solver. }
+    iMod ("Akq" $! _ Nq True%I (cd_Q x y kf) with "[]") as "Ukq".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukq Ukf Ptrx Ptry TG1 Gg1 Gf1 Ofkq Ofkf".
     { subst Φ. rewrite !union_empty_r_L.
@@ -149,7 +144,7 @@ Section proof.
     iEval (rewrite HT big_sepM_singleton) in "TEs".
     iPoseProof ("main_spec" $! i g1 kq kf x y (λ v, lift_term i fork_post v)
                  with "[TEs TG Cg GF Ptrx Ptry HQ HF]") as "WP".
-    { iFrame "TEs TG Cg Ptrx Ptry HQ HF TR". iSplitL; [by iApply big_sepS_singleton|done]. }
+    { iFrame "TEs TG Cg Ptrx Ptry HQ HF". iSplitL; [by iApply big_sepS_singleton|done]. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { done. }
     { done. }
@@ -233,12 +228,12 @@ Section adequacy.
     iSplitL "HI TI PI".
     { iDestruct "PI" as "[PI _]". by iFrame. }
     iSplitR; first done.
-    iModIntro. iIntros "#TR LC TGs".
+    iModIntro. iIntros "LC TGs".
     iAssert (x ↦ #0 ∗ y ↦ #7)%I with "[Ptrs]" as "[Ptrx Ptry]".
     { subst σ0. rewrite big_sepM_insert; last done. rewrite big_sepM_singleton.
       rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. iFrame. }
     iMod (main_pre (heapGS0:=HHeapGS) Θ0 i x y (Φ_P (heapGS0:=HHeapGS))
-           with "[Tis] Ptrx Ptry [TGs] TR LC") as "H".
+           with "[Tis] Ptrx Ptry [TGs]") as "H".
     { done. }
     { reflexivity. }
     { reflexivity. }

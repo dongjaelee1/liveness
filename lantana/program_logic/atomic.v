@@ -54,7 +54,7 @@ example where we want it to be anything else.
 For the non-atomic post-condition, we use an [option PROP], combined with a
 [-∗?]. This is to avoid introducing spurious [True -∗] into proofs that do not
 need a non-atomic post-condition (which is most of them). *)
-Definition atomic_lwp `{SI : sidx} `{!lantanaGS Λ Σ} {TA TB TP : tele}
+Definition atomic_lwp `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} {TA TB TP : tele}
   (i : thread_id)
   (e : expr Λ) (* expression *)
   (E : coPset) (* *implementation* mask *)
@@ -263,7 +263,7 @@ Notation "'<<{' α '}>>' e @ i ; E '<<{' β '|' 'RET' v '}>>'" :=
 
 (** Theory *)
 Section lemmas.
-  Context `{SI : sidx} `{!lantanaGS Λ Σ} {TA TB TP : tele}.
+  Context `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} {TA TB TP : tele}.
   Notation iProp := (iProp Σ).
   Implicit Types (α : TA → iProp) (β : TA → TB → iProp) (POST : TA → TB → TP → option iProp) (f : TA → TB → TP → val Λ).
 

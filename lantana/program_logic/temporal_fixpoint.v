@@ -491,18 +491,16 @@ Section recursion.
   Lemma nest_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ nest N Q G) ⊨ₜ nest_tps G.
   Proof. intros HQ. iApply temporal_sep; [iApply HQ|iApply nest_temporal]. Qed.
 
-  (** Allocation. The registry is opened while the new invariant is allocated open, so the
-      two namespaces must be disjoint. *)
+  (** Allocation: the new invariant is registered while it is allocated open. *)
   Lemma nest_alloc E N Q G :
-    ↑tregN ⊆ E → ↑N ⊆ E → N ## tregN → (⊢ Q ⊨ₜ G) →
-    treg -∗ £n 1 -∗ ▷ Q -∗ |={E}=>g nest N Q G.
+    ↑N ⊆ E → (⊢ Q ⊨ₜ G) →
+    ▷ Q -∗ |={E}=>g nest N Q G.
   Proof.
-    iIntros (HE HN HD HQ) "#TR LC HQ". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI".
+    iIntros (HN HQ) "HQ". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
     iMod (saved_ti_alloc (tps_ti (nest_tps G))) as (γ) "#Hγ".
     iMod (inv_alloc_open N E (Q ∗ nest N Q G)) as "[#Hinv Hclose]"; first done.
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
-    iMod (treg_register treg_handle (E ∖ ↑N) (RAlways N γ) with "LC TR [] HI") as "[HI (%j& #Hj)]";
-      first set_solver.
+    iMod (treg_st_register treg_handle (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists (Q ∗ nest N Q G)%I, (nest_tps G). iFrame "Hγ Hinv".
       iNext. iApply (nest_content_temporal _ _ _ HQ). }
     iApply fupd_mask_intro; first set_solver. iIntros "close".
@@ -514,7 +512,7 @@ Section recursion.
     { iLöb as "IH". iIntros "!> HQ HI MI".
       iAssert (▷ nest N Q G)%I as "#Hnest".
       { iNext. iEval (rewrite nest_unfold alwaysI_guar_unfold). iExists j, n, γ, _.
-        iFrame "Hj HE Hγ Hinv TR". iSplitR; first (iNext; iApply (nest_content_temporal _ _ _ HQ)).
+        iFrame "Hj HE Hγ Hinv". iSplitR; first (iNext; iApply (nest_content_temporal _ _ _ HQ)).
         iApply ("IH" with "[HQ] HI MI"). by iNext. }
       iApply (temporal_elim_later_guar (Q ∗ nest N Q G) (nest_tps G) with "[] [$HI $MI HQ]").
       { iNext. iApply (nest_content_temporal _ _ _ HQ). }
@@ -523,10 +521,10 @@ Section recursion.
     iFrame "MI". iMod "close" as "_".
     iMod ("Hclose" with "[HQ]") as "_".
     { iNext. iFrame "HQ". iEval (rewrite nest_unfold alwaysI_guar_unfold). iExists j, n, γ, _.
-      iFrame "Hj HE Hγ Hinv TR". iSplitR; [iNext; iApply (nest_content_temporal _ _ _ HQ)|].
+      iFrame "Hj HE Hγ Hinv". iSplitR; [iNext; iApply (nest_content_temporal _ _ _ HQ)|].
       iNext. iExact "T". }
-    iModIntro. iFrame "HI". iEval (rewrite nest_unfold alwaysI_guar_unfold). iExists j, n, γ, _.
-    iFrame "Hj HE Hγ Hinv TR T". iNext. iApply (nest_content_temporal _ _ _ HQ).
+    iModIntro. iFrame "HI TI". iEval (rewrite nest_unfold alwaysI_guar_unfold). iExists j, n, γ, _.
+    iFrame "Hj HE Hγ Hinv T". iNext. iApply (nest_content_temporal _ _ _ HQ).
   Qed.
 
 End recursion.

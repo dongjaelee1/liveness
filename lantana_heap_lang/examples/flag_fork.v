@@ -42,7 +42,7 @@ Section proof.
     l{{{ thread_expr i [] (FlagFork.main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (1)%ordi μ) ∗
          crP_obls g 1 {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗
          finallyT Nr kr 1 (exits #42@i) ∗
-         finallyT Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) ∗ treg }}}
+         finallyT Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) }}}
       FlagFork.main #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ ⌜v = #42⌝ ∗ lift_term i fork_post v }}}.
   Proof.
@@ -50,7 +50,7 @@ Section proof.
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
     iExists (10 ⊕ μ_fi ⊕ μ_fw)%M. iIntros (i g kr kc Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TE& TG& GF& Cg& %Hkrc& HF& HC& #TR)".
+    iDestruct "HP" as "(TE& TG& GF& Cg& %Hkrc& HF& HC)".
     iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
     iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fi GF_fw]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
@@ -62,7 +62,7 @@ Section proof.
     iMod (carrier_alloc _ _ _ 0 (μ_fi ⊕ 9)%M with "TG") as "(%& %Ning& TG& Cg0& Cf0)".
     iPoseProof (crP_fuel_add with "Cf0") as "[Cf_fi Cf0]".
     iModIntro.
-    iApply ("Flag_init_spec" $! 0 _ _ _ _ 0 9 with "[$TE $TG GF_fi Cf_fi $Cg0 $TR]").
+    iApply ("Flag_init_spec" $! 0 _ _ _ _ 0 9 with "[$TE $TG GF_fi Cf_fi $Cg0]").
     { iApply big_sepS_union. 1: set_solver. rewrite !big_sepS_singleton. iFrame. }
     iIntros "% % (TE& _& TG& _& Cg0& Of0& Ftk& #is_flag)".
     rewrite union_empty_r_L.
@@ -125,23 +125,20 @@ Section proof.
                            crP_fuel g 1 μ))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #42⌝)%I]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗
-     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗ treg -∗ £n 2 -∗
+     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
                    (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof.
-    iIntros (HT HP HQ) "TEs TGs #TR LC".
-    iPoseProof (tlc_split_nat 1 1 with "LC") as "[LC1 LC2]".
+    iIntros (HT HP HQ) "TEs TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     rewrite !big_sepS_singleton.
     iPoseProof (FlagFork_main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ 1 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (untilI_alloc _ _ _ false 1 1 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
-    iMod ("Akl1" $! _ Nr True%I (exits #42@i)%I with "[] TR LC1 []") as "Ukl1".
-    { iPureIntro. set_solver. }
+    iMod ("Akl1" $! _ Nr True%I (exits #42@i)%I with "[]") as "Ukl1".
     { done. }
     iMod (untilI_alloc _ _ _ false 1 1 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
-    iMod ("Akc" $! _ Nc True%I (∃ x k ℓ, is_flag x k ℓ)%I with "[] TR LC2 []") as "Ukc".
-    { iPureIntro. set_solver. }
+    iMod ("Akc" $! _ Nc True%I (∃ x k ℓ, is_flag x k ℓ)%I with "[]") as "Ukc".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Gg1 Gf1 Ofkl1 Ofkc".
     { subst Φ. rewrite !union_empty_r_L.
@@ -233,8 +230,8 @@ Section adequacy.
     iSplitL "HI TI PI".
     { iDestruct "PI" as "[PI _]". by iFrame. }
     iSplitR; first done.
-    iModIntro. iIntros "#TR LC TGs".
-    iMod (main_pre (heapGS0:=HHeapGS) Θ0 i (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [TGs] TR LC") as "H".
+    iModIntro. iIntros "LC TGs".
+    iMod (main_pre (heapGS0:=HHeapGS) Θ0 i (Φ_P (heapGS0:=HHeapGS)) with "[Tis] [TGs]") as "H".
     { done. }
     { reflexivity. }
     { reflexivity. }

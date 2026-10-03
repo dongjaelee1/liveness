@@ -9,6 +9,7 @@ From transfinite.base_logic.lib Require Export gen_heap proph_map.
 From lantana.base_logic Require Export thread_map gen_inv_heap.
 (** adequacy fixes step index to ordinals *)
 From lantana.program_logic Require Export atomic adequacy.
+From lantana.program_logic Require Export temporal_guarantee.
 From lantana.program_logic Require Import ectx_lifting.
 From lantana.heap_lang Require Export class_instances.
 From lantana.heap_lang Require Import tactics notation.
@@ -310,7 +311,7 @@ Proof.
   iMod "H" as "(TE& %&$&$& %&$& H)".
   iModIntro. iModIntro. iSplit; first eauto with base_step.
   iIntros (v2 σ2 efs Hstep).
-  iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
+  iDestruct "I" as "[[(%HI& Ha& (Ih& It& Ip)) TI] Ia]".
   iPoseProof (thread_expr_ctx with "It TE") as "%HC".
   { exact HT. } { by apply base_prim_step. }
   subst C. inv_base_step.
@@ -373,7 +374,7 @@ Proof.
   iModIntro. iModIntro. iSplit; first eauto with base_step.
   Unshelve. 2: exact 0.
   iIntros (v2 σ2 efs Hstep).
-  iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
+  iDestruct "I" as "[[(%HI& Ha& (Ih& It& Ip)) TI] Ia]".
   iPoseProof (thread_expr_ctx with "It TE") as "%HC".
   { exact HT. } { by apply base_prim_step. }
   subst C. inv_base_step.
@@ -584,7 +585,7 @@ Lemma lwp_allocN_seq G R o s i E v n {C} :
 Proof.
   iIntros (Hn Φ) "[TE (Tb& Gfs& Rs)] HP".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h ? σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs & Ht & Hk) Ia] !> !>". iSplit.
+  iIntros (K h ? σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs & Ht & Hk) TI] Ia] !> !>". iSplit.
   { iPureIntro. split; first done. destruct n; auto with lia base_step. }
   iFrame "Tb Gfs Rs". iIntros (v2 σ2 efs Hstep).
   iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
@@ -597,7 +598,7 @@ Proof.
   iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iFrame "Ha Hs Ht Hk". iModIntro. iSplitR; first done. iSplitR.
+  iFrame "Ha Hs Ht Hk TI". iModIntro. iSplitR; first done. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H. split; auto. lia. }
   iModIntro. iApply "HP". iFrame.
   iApply big_sepL_sep. iSplitL "Hl".
@@ -623,7 +624,7 @@ Lemma lwp_free G R o s i E l v {C} :
 Proof.
   iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -648,7 +649,7 @@ Lemma lwp_load G R o s i E l dq v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -672,7 +673,7 @@ Lemma lwp_store G R o s i E l v' v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -697,7 +698,7 @@ Lemma lwp_xchg G R o s i E l v' v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -723,7 +724,7 @@ Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 {C} :
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -749,7 +750,7 @@ Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' {C} :
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -775,7 +776,7 @@ Lemma lwp_faa G R o s i E l (i1 i2 : Z) {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -800,7 +801,7 @@ Lemma lwp_new_proph G R o s i E {C} :
 Proof.
   iIntros (Φ) "[TE (Tb& Gfs& Rs)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
   iIntros (v2 σ2 efs Hstep).

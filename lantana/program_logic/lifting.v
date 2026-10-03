@@ -13,7 +13,7 @@ Class PureExecSI `{SI : sidx} `{!lantanaGS Λ Σ}
    ⊢ |==> (ς i e2 ∗ state_interp σ (<[i:=K e2]>Θ) κ ∗ state_interp_aux σ (<[i:=K e2]>Θ) κ)).
 
 Section lifting.
-  Context `{SI : sidx} `{!lantanaGS Λ Σ}.
+  Context `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
   Implicit Types e : expr Λ.
@@ -25,7 +25,7 @@ Section lifting.
   Lemma lwp_step_step s i E e1 ν :
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
-       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
+       (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        |=[n,dom Θ]=>g
        (⌜ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
@@ -35,7 +35,7 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       (lwpupd i E e2 (ν e2 efs)))))
     ⊢ lwp_step s i E e1 ν.
@@ -63,7 +63,7 @@ Section lifting.
     to_val e1 = None →
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
-       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
+       (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        |=[n,dom Θ]=>g
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
@@ -73,7 +73,7 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       lwpupd i E e2 ((lWP e2 @ s; i; E {{ Φ }}) ∗
                                                      ([∗ map] j ↦ ef ∈ efs,
@@ -95,7 +95,7 @@ Section lifting.
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
     (∀ K h n σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →
-                    (history_interp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗ ⌜ stuck i e σ (dom Θ) ⌝)
+                    (history_tinterp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗ ⌜ stuck i e σ (dom Θ) ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
     rewrite lwp_unfold /lwp_pre /lwp_step =>->.
@@ -133,10 +133,10 @@ Section lifting.
     iIntros (e2 σ2 efs ?).
     destruct (Hstep κ σ1 (dom Θ) e2 σ2 efs) as (-> & <- & ->); auto.
     rewrite !map_union_empty. rewrite app_nil_l.
-    iDestruct "Hσ" as "[HI SIa]".
+    iDestruct "Hσ" as "[[HI TI] SIa]".
     iPoseProof (history_interp_step _ _ _ σ2 _ (<[i:=K e2]> Θ) with "HI") as "(SI& ACC)".
     iMod (pure_exec_si (ς:=ς) _ _ _ _ _ _ HK HΘ H with "[$Hc $SI $SIa]") as "(Hc& SI& SIa)".
-    iMod ("ACC" with "[$SI]") as "$".
+    iMod ("ACC" with "[$SI]") as "HI". iFrame "HI TI".
     iIntros "!> Tb Wcs Efs". iMod ("H" with "[//] Hc Tb Wcs") as "H".
     iMod "Hclose" as "_". iMod "H". iModIntro. rewrite big_sepM_empty. iFrame.
     iMod "H". iModIntro. by iFrame.
@@ -156,7 +156,7 @@ Section lifting.
     to_val e1 = None →
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
-       (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
+       (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        |=[n,dom Θ]=>g
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
@@ -166,7 +166,7 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
                                ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                      (history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       |={E1}=>m
                                                (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗

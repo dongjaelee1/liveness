@@ -175,19 +175,17 @@ Section proof.
   (** FIXME: better notation for triples with this pattern *)
   Lemma Queue_init_spec :
     ⊢ ∃ μ, ∀ lc φ i G C,
-    l{{{ thread_expr i C (Queue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗ treg }}}
+    l{{{ thread_expr i C (Queue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) }}}
       Queue.init #() @ i
     l{{{ ql γ, RET ql; thread_expr i C (of_val ql) ∗ £ lc ∗ thP_carriers i G ∗ is_queue_init ql γ φ }}}.
   Proof.
     iPoseProof (TicketLock_init_spec) as (m) "TicketLock_init_spec".
-    iExists (20 ⊕ m)%M. iIntros (lc φ i G C) "!> % (TE& TG& GF& #TR) HΦ".
+    iExists (20 ⊕ m)%M. iIntros (lc φ i G C) "!> % (TE& TG& GF) HΦ".
     rewrite /Queue.init.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_TicketLock]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_lam. simpl.
-    iFrame "TG GF". iExists ∅, (lc ⊕ Ord.from_nat 3)%ord. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
-    iPoseProof (tlc_split with "Q_LC") as "[Q_LC LC]".
-    iPoseProof (tlc_split_one 3 2 with "LC") as "[LC LC1]"; first done.
+    iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     lwp_pures.
     (** Alloc node ptr *)
     lwp_bind (AllocN _ _).
@@ -217,10 +215,9 @@ Section proof.
     iModIntro. iIntros (lhptr) "[TE ((_& TG& _)& Ptr_hd& _)]".
     lwp_pures.
     iApply lwp_sfmupd.
-    iMod ("IFL" $! _ (queue_lock φ γq lhptr ltptr) with "[] TR LC [Ptr_node Ptr_hd Ptr_tl HQvs0]") as "#IFL".
-    { iPureIntro. set_solver. }
+    iMod ("IFL" $! _ (queue_lock φ γq lhptr ltptr) with "[Ptr_node Ptr_hd Ptr_tl HQvs0]") as "#IFL".
     { iFrame. eauto. }
-    iMod (is_fair_lock_register_alive ⊤ with "IFL AL LC1") as "#IFLA"; [set_solver|set_solver|].
+    iMod (is_fair_lock_register_alive ⊤ with "IFL AL") as "#IFLA"; first set_solver.
     iModIntro. lwp_finish.
     iMod (ghost_var_alloc (inhabitant : ocid)) as (γd) "Gv".
     iApply ("HΦ" $! _ (QueueName γtl γq γd)).

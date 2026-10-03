@@ -57,7 +57,7 @@ Section proof.
     l{{{ thread_expr i C (Nondet.nest #x #n) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (Z.to_nat n)%ordi μ) ∗
          crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗
          flag_tk x k ∗
-         is_flag x k (Z.to_nat n) ∗ treg }}}
+         is_flag x k (Z.to_nat n) }}}
       Nondet.nest #x #n @ i
     l{{{ RET #(); thread_expr i C #() ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}}.
   Proof.
@@ -69,7 +69,7 @@ Section proof.
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
     iExists (100 ⊕ μ_fi ⊕ μ_fs ⊕ μ_fw)%M.
-    iIntros (lc i x n G g K k ℓg C) "!> % (TE& TG& GF& Gg& %Ink& Ftk& #is_flag& #TR) HΦ".
+    iIntros (lc i x n G g K k ℓg C) "!> % (TE& TG& GF& Gg& %Ink& Ftk& #is_flag) HΦ".
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_set]".
     iPoseProof (crP_fuel_add_set with "F_set") as "[F_init F_set]".
     iPoseProof (crP_fuel_add_set with "F_set") as "[F_set F_wait]".
@@ -97,7 +97,7 @@ Section proof.
       iMod (crP_fuel_layer_mon _ 0 with "F_init0") as "F_init0".
       { apply ordArith.le_from_nat. lia. }
       iModIntro.
-      iApply ("Flag_init_spec" $! 0 _ _ _ _ _ 1 with "[$TE $TG F_init F_init0 $Cg0 $TR]").
+      iApply ("Flag_init_spec" $! 0 _ _ _ _ _ 1 with "[$TE $TG F_init F_init0 $Cg0]").
       { iApply big_sepS_union. 1: set_solver. rewrite big_sepS_singleton. iFrame. }
       iIntros "%ptry %k0 (TE& _& TG& _& Cg0& Of0& Ftk0& #is_flag0)".
       rewrite union_empty_r_L.
@@ -118,7 +118,7 @@ Section proof.
         iPoseProof (crP_fuels_init with "GF") as "GF".
         lwp_pure_one.
         iModIntro.
-        iPoseProof ("NEST" $! 0 with "[$TE $TG $GFj $Cgj $Ftk0 $is_flag0 $TR]") as "H".
+        iPoseProof ("NEST" $! 0 with "[$TE $TG $GFj $Cgj $Ftk0 $is_flag0]") as "H".
         { iPureIntro. set_solver. }
         iApply lwp_sfmupd. iApply "H". iIntros "(TE& _& TG& Cg& #Od)".
         replace ({[k0]} ∖ {[k0]}) with (∅ : gset oid) by set_solver.
@@ -150,7 +150,7 @@ Section proof.
   (** nondet always terminates, but because nest's layer depends on nondeterministically chosen n, we need ω for precondition. *)
   Lemma Nondet_nondet_spec :
     ⊢ ∃ μ, ∀ i G C,
-    l{{{ thread_expr i C (Nondet.nondet #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ω)%ordi μ) ∗ treg }}}
+    l{{{ thread_expr i C (Nondet.nondet #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ω)%ordi μ) }}}
       Nondet.nondet #() @ i
     l{{{ v, RET v; thread_expr i C (of_val v) ∗ ⌜v = #1⌝ }}}.
   Proof.
@@ -158,7 +158,7 @@ Section proof.
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
     iPoseProof (Nondet_nest_spec) as (μ_nn) "Nondet_nest_spec".
     iExists (100 ⊕ μ_fi ⊕ μ_fw ⊕ μ_nn)%M. iIntros (i G C Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TE& TG& GF& #TR)".
+    iDestruct "HP" as "(TE& TG& GF)".
     iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
     iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fi GF_m]".
     iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fw GF_nn]".
@@ -180,7 +180,7 @@ Section proof.
     iMod (crP_fuel_layer_mon _ 0 with "F_init0") as "F_init0".
     { apply ordArith.le_from_nat. lia. }
     iModIntro.
-    iApply ("Flag_init_spec" $! 0 _ _ _ _ _ 1 with "[$TE $TG F_init F_init0 $Cg0 $TR]").
+    iApply ("Flag_init_spec" $! 0 _ _ _ _ _ 1 with "[$TE $TG F_init F_init0 $Cg0]").
     { iApply big_sepS_union. 1: set_solver. rewrite big_sepS_singleton. iFrame. }
     iIntros "%ptrx %k (TE& _& TG& _& Cg0& Of0& Ftk& #is_flag)".
     rewrite union_empty_r_L.
@@ -195,7 +195,7 @@ Section proof.
         - iApply "Ftk". }
     { iIntros (j ? ?) "!> (TE& TGj& GFj& Cgj& Ftk) HΦ".
       iApply lwp_sfmupd.
-      iApply ("Nondet_nest_spec" $! 0 with "[$TE $TGj $GFj $Cgj $Ftk $is_flag $TR]").
+      iApply ("Nondet_nest_spec" $! 0 with "[$TE $TGj $GFj $Cgj $Ftk $is_flag]").
       { iPureIntro. set_solver. }
       iIntros "(TE& _& TG& Cg& #Od)".
       replace ({[k]} ∖ {[k]}) with (∅ : gset oid) by set_solver.

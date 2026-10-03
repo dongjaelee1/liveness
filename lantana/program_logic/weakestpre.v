@@ -5,7 +5,7 @@ From lantana.program_logic Require Export language.
 From iris.bi.lib Require Export fixpoint_mono.
 From lantana.bi Require Export weakestpre.
 From iris.prelude Require Import options.
-From lantana.program_logic Require Export temporal_registry sfmupd model_physical_updates.
+From lantana.program_logic Require Export temporal_class sfmupd model_physical_updates.
 Import uPred.
 
 (* TODO: move to somewhere else *)
@@ -39,46 +39,24 @@ Section curry5.
   Proof. intros. apply uncurry5_proper. Qed.
 End curry5.
 
-Class temporalGpreS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
-  TemporalGpreS {
-      #[local] temporalGpreS_mupd :: mupdGpreS Σ;
-      #[local] temporal_histGpreS :: histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ));
-      #[local] temporal_tregGpreS :: tregGS.tregGpreS Λ Σ;
-    }.
 
-Class temporalGS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
-  TemporalG {
-      (** Obligation model protocol, including invariants. *)
-      #[global] temporal_mupdGS :: mupdGS Σ;
-      #[global] temporal_histGS :: histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ));
-      (** The registry of trace-visible structures (alwaysI, untilI). *)
-      #[global] temporal_tregGS :: tregGS.tregGS Λ Σ;
-    }.
-Global Opaque temporal_mupdGS temporal_histGS temporal_tregGS.
-Global Arguments TemporalG {SI Λ Σ}.
-
-Definition temporalΣ `{SI : sidx} (Λ : language) : gFunctors :=
-  #[mupdΣ; histGS.histΣ (state Λ * thread_pool Λ * list (observation Λ)); tregGS.tregΣ Λ].
-Global Instance subG_temporalΣ `{SI : sidx} {Λ} {Σ} : subG (temporalΣ Λ) Σ → temporalGpreS Λ Σ.
-Proof. solve_inG. Qed.
-
-Local Definition lwpupd_def `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+Local Definition lwpupd_def `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!TemporalInterp Λ Σ}
   i E e : iPropO Σ -d> iPropO Σ :=
   (λ P, ∀ K h n σ Θ κs,
      (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e))⌝) →
-     (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗
-     |={E:n,dom Θ}=>m (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ P)%I.
+     (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗
+     |={E:n,dom Θ}=>m (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ P)%I.
 Local Definition lwpupd_aux : seal (@lwpupd_def). Proof. by eexists. Qed.
 Definition lwpupd := lwpupd_aux.(unseal).
-Global Arguments lwpupd {SI Λ Σ _ _}.
-Local Lemma lwpupd_unseal `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} :
-  lwpupd = @lwpupd_def SI Λ Σ _ _.
+Global Arguments lwpupd {SI Λ Σ _ _ _}.
+Local Lemma lwpupd_unseal `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!TemporalInterp Λ Σ} :
+  lwpupd = @lwpupd_def SI Λ Σ _ _ _.
 Proof. rewrite -lwpupd_aux.(seal_eq) //. Qed.
 
 Ltac unfold_lwpupd := rewrite lwpupd_unseal /lwpupd_def.
 
 Section lwpupd.
-  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!TemporalInterp Λ Σ}.
 
   Global Instance lwpupd_ne i E e : NonExpansive (lwpupd i E e).
   Proof. intros n P1 P2 HP. unfold_lwpupd. do 18 (f_equiv || done). Qed.
@@ -213,8 +191,8 @@ Section lwpupd.
   Lemma all_interp_lwpupd_steps (γ : thread_id → nat) i E e h n σ Θ κs g v Ω W (P : iProp Σ) :
     (Θ !! i = Some e) →
     (owit_inv_lb (fair_sched_fun γ) Ω W) →
-    (lwpupd i E e P) -∗ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
-    (P ∗ (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
+    (lwpupd i E e P) -∗ (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
+    (P ∗ (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
      ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
     iIntros (HTh LB) "HP HI MI". unfold_lwpupd.
@@ -230,9 +208,9 @@ Section lwpupd.
     (fst <$> TQ) ⊆ Θ →
     (owit_inv_lb (fair_sched_fun γ) Ω W) →
     ([∗ map] i ↦ '(e, a) ∈ TQ, lwpupd i E e (P i e a)) -∗
-    (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
+    (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
     (([∗ map] i ↦ '(e, a) ∈ TQ, (P i e a)) ∗
-     (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
+     (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
      ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
     revert h n σ Θ κs g v Ω W. induction TQ using map_ind; iIntros (h n σ Θ κs g v Ω W EQTQ LB) "PS HI MI".
@@ -287,12 +265,12 @@ Global Arguments LantanaG {SI Λ Σ}.
 (** Predicates we take the fixpoint of in order to define the lWP. *)
 (* Ω must make strict progress for every step (to bound step-index) *)
 (* W witnesses progress of obligations; it relies on the fair scheduler for soundness *)
-Definition lwp_step `{SI : sidx} `{!lantanaGS Λ Σ}
+Definition lwp_step `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}
   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ K h n σ1 Θ κ κs,
      (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
-     (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
+     (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
       (** ** Model update (discharge allowed) for the pre-state; the adequacy proof
           handles a discharge here through the deep records of the until (see
           temporal_guarantee.v, [tguar_next]). *)
@@ -302,12 +280,12 @@ Definition lwp_step `{SI : sidx} `{!lantanaGS Λ Σ}
       @={n,(dom Θ),i}=↓ (@={n,(S n),(dom Θ),(dom (<[i:=K e2]>Θ) ∪ dom efs)}=>
       (** ** Discharge allowed for post-state *)
       (ALC (|=[(S n),(dom (<[i:=K e2]>Θ) ∪ dom efs)]=>m |={∅,E}=>
-              ((history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
+              ((history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
               ν e2 efs))))%I.
 
 Section lwp_step.
-  Context `{SI : sidx} `{!lantanaGS Λ Σ}.
+  Context `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}.
 
   Global Instance lwp_step_ne s i E e n :
     Proper (pointwise_relation _ (dist n) ==> dist n) (lwp_step s i E e).
@@ -377,7 +355,7 @@ End lwp_step.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{SI : sidx} `{!lantanaGS Λ Σ}.
+  Context `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}.
   Implicit Types i : thread_id.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
@@ -520,7 +498,7 @@ Definition lift_term `{SI : sidx} `{!lantanaGS Λ Σ} (i :thread_id) (Φ : threa
 
 (* pre-definition of lwp of which we take a least fixpoint *)
 (* For soundness of Lantana, postcondition of a thread i must include othreadG_term i. *)
-Definition lwp_pre `{SI : sidx} `{!lantanaGS Λ Σ} (s : stuckness)
+Definition lwp_pre `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} (s : stuckness)
   (lwp : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
   thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=
   λ i E e1 Φ,
@@ -530,7 +508,7 @@ Definition lwp_pre `{SI : sidx} `{!lantanaGS Λ Σ} (s : stuckness)
          (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lwp j ⊤ ef (lift_term j fork_post))))
      end)%I.
 
-Lemma lwp_pre_mono `{SI : sidx} `{!lantanaGS Λ Σ} s
+Lemma lwp_pre_mono `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} s
   (lwp1 lwp2 : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
   ⊢ ((□ ∀ i E e Φ, lwp1 i E e Φ -∗ lwp2 i E e Φ) →
      ∀ i E e Φ, lwp_pre s lwp1 i E e Φ -∗ lwp_pre s lwp2 i E e Φ)%I.
@@ -544,12 +522,12 @@ Proof.
 Qed.
 
 (* Uncurry [lwp_pre] and equip its type with an OFE structure *)
-Definition lwp_pre' `{SI : sidx} `{!lantanaGS Λ Σ} (s : stuckness) :
+Definition lwp_pre' `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} (s : stuckness) :
   (prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ) →
   (prodO (prodO (prodO (leibnizO thread_id) (leibnizO coPset)) (exprO Λ)) (val Λ -d> iProp Σ) → iProp Σ)
   := uncurry4 ∘ lwp_pre s ∘ curry4.
 
-Local Instance lwp_pre_mono' `{SI : sidx} `{!lantanaGS Λ Σ} s :
+Local Instance lwp_pre_mono' `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} s :
   BiMonoPred (lwp_pre' s).
 Proof.
   constructor.
@@ -562,20 +540,20 @@ Proof.
 Qed.
 
 (* take the least fixpoint of the above definition; we can also just take fixpoint. *)
-Definition lwp_fix `{SI : sidx} `{!lantanaGS Λ Σ} : stuckness -> thread_id -> coPset -> expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+Definition lwp_fix `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} : stuckness -> thread_id -> coPset -> expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E e Φ, ((bi_least_fixpoint (lwp_pre' s)) (i,E,e,Φ))%I.
 
-Local Definition lwp_def `{SI : sidx} `{!lantanaGS Λ Σ} : Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
+Local Definition lwp_def `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} : Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
   λ s i E e Φ, (lwp_fix s i E e Φ)%I.
 Local Definition lwp_aux : seal (@lwp_def). by eexists. Qed.
 Definition lwp' := lwp_aux.(unseal).
-Global Arguments lwp' {SI Λ Σ _}.
+Global Arguments lwp' {SI Λ Σ _ _}.
 Global Existing Instance lwp'.
-Local Lemma lwp_unseal `{SI : sidx} `{!lantanaGS Λ Σ} : lwp = @lwp_def SI Λ Σ _.
+Local Lemma lwp_unseal `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} : lwp = @lwp_def SI Λ Σ _ _.
 Proof. rewrite -lwp_aux.(seal_eq) //. Qed.
 
 Section lwp.
-  Context `{SI : sidx} `{!lantanaGS Λ Σ}.
+  Context `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
   Implicit Types P : iProp Σ.
@@ -1119,7 +1097,7 @@ End lwp.
 
 (** Proofmode class instances *)
 Section proofmode_classes.
-  Context `{SI : sidx} `{!lantanaGS Λ Σ}.
+  Context `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}.
   Implicit Types i : thread_id.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.

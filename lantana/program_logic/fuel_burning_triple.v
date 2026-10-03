@@ -1,19 +1,19 @@
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export lifting temporal_guarantee.
 
-Definition fuel_burning_triple `{SI : sidx} `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+Definition fuel_burning_triple `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,
     (∀ (Φ : val Λ → iPropI Σ),
        (thP_carriers i G ∗ P) -∗
        (∀ v, thP_carriers i G' ∗ Q v -∗ Φ v) -∗
        lWP e @ s; i; E {{ v, Φ v }})%I.
 
-Definition fuel_burning_triple_persistent `{SI : sidx} `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+Definition fuel_burning_triple_persistent `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset ocid → gset ocid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,
     l{{{ thP_carriers i G ∗ P }}} e @ s; i; E l{{{v, RET v; thP_carriers i G' ∗ Q v }}}%I.
 
 Section proof.
-  Context `{SI : sidx} `{!lantanaGS Λ Σ}.
+  Context `{!lantanaGS Λ Σ}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
   Implicit Types e : expr Λ.
@@ -166,24 +166,23 @@ Section until.
     iApply ("POST" with "[$TG $HQ $HΨ $Cg]"). eauto.
   Qed.
 
-  (** Allocating an until registers it: the registry and a later credit are consumed. *)
+  (** Allocating an until registers it. *)
   Lemma fuel_burning_triple_until_alloc s i E G P e Q g K ℓ1 ℓ2 μ N Φ Ψ :
     (∀ k, fuel_burning_triple s i E G G
             (P ∗ ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
              untilT N k 1 Φ Ψ ∗ witP_layer k ℓ2 ∗ oblP_fuel k ℓ2 μ)
             e
             Q)
-      ∧ ⌜(ℓ1 <= ℓ2)%ordi ∧ ↑tregN ⊆ E⌝
+      ∧ ⌜(ℓ1 <= ℓ2)%ordi⌝
     ⊢ fuel_burning_triple s i E G G
-        (P ∗ crP_obls g ℓ1 K ∗ Φ ∗ treg ∗ £n 1)
+        (P ∗ crP_obls g ℓ1 K ∗ Φ)
         e
         Q.
   Proof.
-    iIntros "(H& %LEl& %HE) % (TG& HP) POST".
-    iDestruct "HP" as "(HP& Cg& HΦ& #TR& LC)".
+    iIntros "(H& %LEl) % (TG& HP) POST".
+    iDestruct "HP" as "(HP& Cg& HΦ)".
     iMod (untilI_alloc _ _ _ false _ ℓ2 μ with "Cg") as "(%& %& Cg& Of& #Wl& Acc)". 1: auto.
-    iMod ("Acc" $! _ N Φ Ψ with "[] TR LC HΦ") as "HU".
-    { iPureIntro. done. }
+    iMod ("Acc" $! _ N Φ Ψ with "HΦ") as "HU".
     iPoseProof ("H" with "[$TG $HP $Cg $HU $Wl $Of]") as "WP". 1: auto.
     iApply ("WP" with "POST").
   Qed.

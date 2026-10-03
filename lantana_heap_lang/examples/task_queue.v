@@ -254,14 +254,14 @@ Section proof.
 
   Lemma TaskQueue_init_spec :
     ⊢ ∃ μ, ∀ (lc : Ord.t) i G ℓ C,
-    l{{{ thread_expr i C (TaskQueue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗ ⌜(1 <= ℓ)%ordi⌝ ∗ treg }}}
+    l{{{ thread_expr i C (TaskQueue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗ ⌜(1 <= ℓ)%ordi⌝ }}}
       TaskQueue.init #() @ i
     l{{{ ql γ, RET ql; thread_expr i C (of_val ql) ∗ £ lc ∗ thP_carriers i G ∗ is_task_queue ql γ ℓ }}}.
   Proof.
     iPoseProof (Queue_init_spec) as (mqi) "Queue_init_spec".
     iPoseProof (TaskQueue_worker_spec) as (mtw) "TaskQueue_worker_spec".
     (** For internal steps and function calls *)
-    iExists (100%nat ⊕ mqi)%M. iIntros (lc i G ℓ C) "!> % (TE& TG& GF& %Hlayer& #TR) HΦ".
+    iExists (100%nat ⊕ mqi)%M. iIntros (lc i G ℓ C) "!> % (TE& TG& GF& %Hlayer) HΦ".
     rewrite /TaskQueue.init.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_qi]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
@@ -269,7 +269,7 @@ Section proof.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     lwp_bind (Queue.init _).
     iModIntro.
-    iApply ("Queue_init_spec" $! 0 (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I with "[$TE $TG $GF_qi $TR]").
+    iApply ("Queue_init_spec" $! 0 (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I with "[$TE $TG $GF_qi]").
     iIntros (??) "(TE& _& TG& IQI)".
     lwp_pures.
     lwp_bind (Fork _).

@@ -188,7 +188,7 @@ Section proof1.
 End proof1.
 
 Section proof2.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}.
 
   Definition obls_thread_active (Ω : obls) (τ : trace Λ) :=
     map_Forall (λ _ o, match o with

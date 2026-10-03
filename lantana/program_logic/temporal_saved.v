@@ -67,12 +67,10 @@ Section registry.
 
   (** Allocation, with no request registered yet: a registered invariant. *)
   Lemma registry_alloc E N G :
-    ↑tregN ⊆ E →
-    treg -∗ £n 1 -∗ |={E}=>g ∃ γm, alwaysI N (registry_inv γm G).
+    ⊢ |={E}=>g ∃ γm, alwaysI N (registry_inv γm G).
   Proof.
-    iIntros (?) "#TR LC".
     iMod (ghost_map_alloc_empty (K:=nat) (V:=gname)) as (γm) "Ha".
-    iMod (alwaysI_alloc E N (registry_inv γm G) with "TR LC [Ha]") as "$"; [done| |done].
+    iMod (alwaysI_alloc E N (registry_inv γm G) with "[Ha]") as "$"; last done.
     iNext. iExists ∅. iFrame. by rewrite big_sepM_empty.
   Qed.
 

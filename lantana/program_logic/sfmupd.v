@@ -3,15 +3,15 @@ From iris.prelude Require Import options.
 From lantana.program_logic Require Export sfgupd.
 Import uPred.
 
-Local Definition sfmupd_def `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
-  `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
+Local Definition sfmupd_def `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
+  `{!TemporalInterp Λ Σ}
   E1 E2 : iPropO Σ -d> iPropO Σ :=
-  (λ P, ∀ h n σ Θ κs, (history_interp h n σ Θ κs) -∗ |={E1,E2:n,dom Θ}=>m (history_interp h n σ Θ κs) ∗ P)%I.
+  (λ P, ∀ h n σ Θ κs, history_tinterp h n σ Θ κs -∗ |={E1,E2:n,dom Θ}=>m history_tinterp h n σ Θ κs ∗ P)%I.
 Local Definition sfmupd_aux : seal (@sfmupd_def). Proof. by eexists. Qed.
 Definition sfmupd := sfmupd_aux.(unseal).
 Global Arguments sfmupd {SI Λ Σ _ _ _ _}.
-Local Lemma sfmupd_unseal `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
-  `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} :
+Local Lemma sfmupd_unseal `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
+  `{!TemporalInterp Λ Σ} :
   sfmupd = @sfmupd_def SI Λ Σ _ _ _ _.
 Proof. rewrite -sfmupd_aux.(seal_eq) //. Qed.
 
@@ -21,8 +21,8 @@ Notation "'|={' E1 , E2 '}=>m' P" := (sfmupd E1 E2 P) (at level 20, P at level 2
 Notation "'|={' E '}=>m' P" := (sfmupd E E P) (at level 20, P at level 200, format "|={ E }=>m  P").
 
 Section sfmupd.
-  Context `{SI : sidx} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
-  Context `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
+  Context `{!TemporalInterp Λ Σ}.
 
   Global Instance sfmupd_ne E1 E2 : NonExpansive (sfmupd E1 E2).
   Proof. intros n P1 P2 HP. rewrite sfmupd_unseal /sfmupd_def. do 14 (f_equiv || done). Qed.
@@ -254,8 +254,8 @@ Section sfmupd.
   Lemma all_interp_sfmupd_steps γ E1 E2 h n σ Θ κs g v Ω W (P : iProp Σ) :
     owit_inv_lb_mon γ →
     owit_inv_lb γ Ω W →
-    (|={E1,E2}=>m P) -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E1,E2}=∗
-    (P ∗ history_interp h n σ Θ κs ∗
+    (|={E1,E2}=>m P) -∗ history_tinterp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E1,E2}=∗
+    (P ∗ history_tinterp h n σ Θ κs ∗
      ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb γ Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
     iIntros (MON LB) "HP HI MI". unfold_sfmupd. iPoseProof ("HP" with "HI") as ">HP".

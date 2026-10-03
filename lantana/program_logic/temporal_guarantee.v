@@ -21,15 +21,24 @@ From lantana.prelude Require Import axioms.
     the run has made the step from [n] to [S n]. A record may be written by a thread in the
     pre-step model update of step [n] (e.g. by discharging an until), so it can only be
     eliminated afterwards, against the system at [S n] and a bundle of certificates for [n]:
-    the adequacy proof registers every trace-visible structure ([alwaysI], [untilI]) in the
-    registry (temporal_registry.v) and, at every position, certifies the content of each
-    registered item as a later-guarded record. The step-indexed readings of always and until
-    (adequacy.v) decide a position only after the step from it, so that a pre-step discharge
-    at [n] is read off the obligation invariant at [S n].
+    every trace-visible structure ([alwaysI], [untilI]) is registered (temporal_registry.v)
+    and, at every position, the content of each registered item is certified as a
+    later-guarded record. The step-indexed readings of always and until (adequacy.v) decide
+    a position only after the step from it, so that a pre-step discharge at [n] is read off
+    the obligation invariant at [S n].
+
+    The running system is abstract in a record: a record is valid for any system that
+    satisfies the one-step axiom [run_axiom] (certify the registry, then step fairly, giving
+    the bundle of the position, the interpretations after the step and later credits). The
+    temporal layer therefore does not depend on the weakest precondition; Lantana's [lWP]
+    is one system satisfying the axiom ([run_axiom_lwp], at the end of this file), and the
+    state of the registry is the interpretation of the temporal layer that the program logic
+    threads ([TemporalInterp], temporal_class.v). Registration is a plain model update.
 
     Contents: guarantees and records ([tguar]); the registered structures [alwaysI] and
-    [untilI]; rules for the connectives; rules for [alwaysI] and [untilI]; adequacy;
-    inference of guarantees ([IntoTemporal]).
+    [untilI]; rules for the connectives; rules for [alwaysI] and [untilI]; the loops that
+    read the registered structures off a run; inference of guarantees ([IntoTemporal]);
+    adequacy for [lWP].
 
     Limitations, by design:
     - A quantifier can be trace-visible ([tps_exist]) only over types with the existential
@@ -39,37 +48,34 @@ From lantana.prelude Require Import axioms.
     - The trace property [G] of the adequacy is fixed at the meta level; dynamically created
       names reach it through trace-visible existentials, typically under a [finally]
       allocated at time 0 (see lantana_heap_lang/examples/flag_fork.v).
-    - [tguar] mentions the running system ([lwp_fix]), so this layer is specific to Lantana's
-      weakest precondition and to [ordSI].
-    - [alwaysI] and [untilI] store the canonical trace properties [tps_sem] of their contents,
-      so they are not contractive in them: recursion through a registered structure cannot be
-      defined, and their rules take validity premises [(⊢ P ⊨ₜ G) → ...] rather than
-      hypotheses [▷ (P ⊨ₜ G)]. Guarded recursion on trace properties is supported
-      (temporal_fixpoint.v).
+    - The step-indexed readings are specific to [ordSI].
+    - A registered structure stores the reading of its content when it is registered
+      ([alwaysI] the canonical one, [alwaysI_guar] a given one); recursion through a
+      registered structure goes through [alwaysI_guar] (temporal_fixpoint.v, [nest]).
     - Allocating an [alwaysI] or an [untilI] registers it: the allocation rules are model
-      updates ([|={E}=>g]) that take the registry [treg] and a later credit. *)
+      updates ([|={E}=>g]), which read the position of the run. *)
 
 (** ** Guarantees *)
 
 Section guarantee.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Implicit Types G : tps Λ Σ.
   Implicit Types P Q : iProp Σ.
-
-  (** The running system: every thread runs its [lwp_fix]. *)
-  Definition threads_run (s : stuckness)
-    (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) : iProp Σ :=
-    [∗ map] i ↦ '(e, Q) ∈ TQ, match to_val e with
-                              | Some v => (lift_term i Q) v
-                              | None => lwp_fix s i ⊤ e (lift_term i Q)
-                              end.
 
   (** The history [h] is the one of the trace [τf]. *)
   Definition hist_trace (h : list (state Λ * thread_pool Λ * list (observation Λ)))
     (τf : nat → (thread_pool Λ * state Λ) * thread_id * list (observation Λ)) : Prop :=
     ∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → ∃ i', τf n' = ((Θ', σ'), i', κs').
 
+  (** The fairness measure drops across a step, for every obligation assigned before and
+      after it. *)
+  Definition obls_drop (m m' : thread_id → Ord.t → Ord.t) (Ω Ω' : obls) : Prop :=
+    ∀ k fu o fu' o', Ω !! k = Some (obl_assigned fu o) → Ω' !! k = Some (obl_assigned fu' o') →
+      (m' o' fu' < m o fu)%ord.
+
   Local Notation tgT := ((trace Λ -d> iPropO Σ) -d> nat -d> iPropO Σ).
+  (** A running system: a resource indexed by the position and the configuration. *)
+  Local Notation sysT := (nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ).
 
   (** The certificate of a registered item at position [n]: a later-guarded record of its
       content at [n] ([tg f n] is the record for the step-indexed reading [f]). For an until,
@@ -90,15 +96,31 @@ Section guarantee.
   Definition bundle_pre (tg : tgT) (l : list (nat * rentry)) (n : nat) : iProp Σ :=
     reg_lb l ∗ ⌜last l = Some (n, RMark)⌝ ∗ [∗ list] pe ∈ l, cert_pre tg n pe.2.
 
-  (** A record for [f] at [n]: given the bundle for [n] and a running system at [S n]
-      consistent with the trace, [f] holds at [n] on the trace. *)
+  (** The one-step axiom of a system [Sys]: from a consistent system at [n], the bundle for
+      [n] (the check), then, after the step, the system at [S n] with the facts about the
+      step and later credits for the continuation. The modalities are those of the
+      step-indexed readings (adequacy.v): the check is the first fancy update with the later,
+      the step the second with the credits. *)
+  Definition run_axiom_pre (tg : tgT) (Sys : sysT) : iProp Σ :=
+    □ ∀ (c : nat) h n σ Θ κs g v Ω W τf γ,
+      ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
+      history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
+      |={⊤,∅}=> ∃ l, bundle_pre tg l n ∗ ▷ |={∅,⊤}=> |={⊤,∅}=> ALC (|={∅,⊤}=>
+        ∃ σ' Θ' κs' g' v' Ω' W' γ',
+          ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω' W' ∧
+           hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ obls_drop (fair_sched_fun γ) (fair_sched_fun γ') Ω Ω'⌝ ∗
+          £n c ∗ history_interp (h ++ [(σ', Θ', κs')]) (S n) σ' Θ' κs' ∗
+          model_interp g' v' Ω' W' (S n) (dom Θ') ∗ Sys (S n) σ' Θ' κs').
+
+  (** A record for [f] at [n]: for any system satisfying the one-step axiom, given the
+      bundle for [n] and the system at [S n] consistent with the trace, [f] holds at [n] on
+      the trace. *)
   Definition tguar_pre (tg : tgT) : tgT :=
-    λ f n, (□ ∀ l s h TQ g v Ω W τf γ σ Θ κs,
-      ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-       hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+    λ f n, (□ ∀ (Sys : sysT) l h g v Ω W τf γ σ Θ κs,
+      run_axiom_pre tg Sys -∗
+      ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
       bundle_pre tg l n -∗
-      (history_interp h (S n) σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W (S n) (dom Θ) ∗
-      threads_run s TQ -∗
+      history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
       f (n, τf))%I.
 
   Local Instance cert_pre_contractive n e : Contractive (λ tg : tgT, cert_pre tg n e).
@@ -116,10 +138,17 @@ Section guarantee.
     apply big_sepL_ne. intros ???. by apply cert_pre_contractive.
   Qed.
 
+  Local Instance run_axiom_pre_contractive Sys : Contractive (λ tg : tgT, run_axiom_pre tg Sys).
+  Proof.
+    intros m tg1 tg2 Htg. rewrite /run_axiom_pre.
+    do 31 f_equiv. by apply bundle_pre_contractive.
+  Qed.
+
   Local Instance tguar_pre_contractive : Contractive tguar_pre.
   Proof.
-    intros m tg1 tg2 Htg f n. rewrite /tguar_pre.
-    do 29 f_equiv. by apply bundle_pre_contractive.
+    intros m tg1 tg2 Htg f n. rewrite /tguar_pre. f_equiv. do 12 (f_equiv=> ?).
+    f_equiv; first by apply run_axiom_pre_contractive.
+    do 2 f_equiv. by apply bundle_pre_contractive.
   Qed.
 
   Definition tguar_ti : tgT := fixpoint tguar_pre.
@@ -138,12 +167,13 @@ Section guarantee.
   Lemma tguar_ti_eq (f g : trace Λ -d> iPropO Σ) n : f ≡ g -∗ tguar_ti f n -∗ tguar_ti g n.
   Proof. iIntros "Heq H". iApply (internal_eq_rewrite f g (λ f, tguar_ti f n) with "Heq H"). Qed.
 
-  (** Records of a trace property, the bundle and the certificates. *)
+  (** Records of a trace property, the bundle, the certificates and the axiom. *)
   Definition tguar G n : iProp Σ := tguar_ti (tps_ti G) n.
   Definition bundle l n : iProp Σ := bundle_pre tguar_ti l n.
   Definition cert n e : iProp Σ := cert_pre tguar_ti n e.
+  Definition run_axiom (Sys : sysT) : iProp Σ := run_axiom_pre tguar_ti Sys.
   (* Opaque for the proof mode: [iNext] must not strip the laters of the certificates. *)
-  Global Typeclasses Opaque bundle cert.
+  Global Typeclasses Opaque bundle cert run_axiom.
 
   (** [P ⊨ₜ G]: whenever [P] holds, the rest of the execution satisfies [G]. *)
   Definition temporal P G : iProp Σ :=
@@ -158,47 +188,45 @@ Section guarantee.
   Proof. rewrite /cert. apply _. Qed.
   Global Instance bundle_persistent l n : Persistent (bundle l n).
   Proof. rewrite /bundle /bundle_pre. apply _. Qed.
+  Global Instance run_axiom_persistent Sys : Persistent (run_axiom Sys).
+  Proof. rewrite /run_axiom /run_axiom_pre. apply _. Qed.
   Global Instance temporal_persistent P G : Persistent (temporal P G).
   Proof. apply _. Qed.
 
   Lemma tguar_ti_intro f n :
-    (□ ∀ l s h TQ g v Ω W τf γ σ Θ κs,
-      ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-       hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+    (□ ∀ (Sys : sysT) l h g v Ω W τf γ σ Θ κs,
+      run_axiom Sys -∗
+      ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
       bundle l n -∗
-      (history_interp h (S n) σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W (S n) (dom Θ) ∗
-      threads_run s TQ -∗
+      history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
       f (n, τf)) ⊢ tguar_ti f n.
   Proof. by rewrite tguar_ti_unfold. Qed.
 
-  Lemma tguar_ti_elim f l s h n TQ g v Ω W τf γ σ Θ κs :
+  Lemma tguar_ti_elim f (Sys : sysT) l h n g v Ω W τf γ σ Θ κs :
     tguar_ti f n -∗
-    ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-     hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+    run_axiom Sys -∗
+    ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
     bundle l n -∗
-    (history_interp h (S n) σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W (S n) (dom Θ) ∗
-    threads_run s TQ -∗
+    history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
     f (n, τf).
-  Proof. rewrite tguar_ti_unfold. iIntros "#HG H #B W". by iApply ("HG" with "H B W"). Qed.
+  Proof. rewrite tguar_ti_unfold. iIntros "#HG #AX H #B W". by iApply ("HG" with "AX H B W"). Qed.
 
   Lemma tguar_intro G n :
-    (□ ∀ l s h TQ g v Ω W τf γ σ Θ κs,
-      ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-       hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+    (□ ∀ (Sys : sysT) l h g v Ω W τf γ σ Θ κs,
+      run_axiom Sys -∗
+      ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
       bundle l n -∗
-      (history_interp h (S n) σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W (S n) (dom Θ) ∗
-      threads_run s TQ -∗
+      history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
       tps_ti G (n, τf)) ⊢ tguar G n.
   Proof. apply tguar_ti_intro. Qed.
 
   (** Eliminating a record: against the bundle of its position and the system after the step. *)
-  Lemma tguar_elim G l s h n TQ g v Ω W τf γ σ Θ κs :
+  Lemma tguar_elim G (Sys : sysT) l h n g v Ω W τf γ σ Θ κs :
     tguar G n -∗
-    ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-     hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+    run_axiom Sys -∗
+    ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
     bundle l n -∗
-    (history_interp h (S n) σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W (S n) (dom Θ) ∗
-    threads_run s TQ -∗
+    history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
     tps_ti G (n, τf).
   Proof. apply tguar_ti_elim. Qed.
 
@@ -230,8 +258,8 @@ Section guarantee.
 
   Lemma tguar_mono G G' n : tps_le G G' → tguar G n ⊢ tguar G' n.
   Proof.
-    iIntros (Hle) "#HG". iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W".
-    iApply Hle. by iApply (tguar_elim with "HG [//] B W").
+    iIntros (Hle) "#HG". iApply tguar_intro. iIntros "!>" (????????????) "#AX %H #B W".
+    iApply Hle. by iApply (tguar_elim with "HG AX [//] B W").
   Qed.
 
 End guarantee.
@@ -242,7 +270,7 @@ Notation "P ⊨ₜ G" := (temporal P%I G%S) (at level 70, format "P  ⊨ₜ  G")
     validly guarantees. Every iProp guarantees it ([temporal_sem]), and it implies each of
     them ([tps_sem_le]). The registered structures store it for their contents, so temporal
     formulas carry no trace-property annotations. *)
-Definition tps_sem `{!lantanaGS Λ Σ} (Q : iProp Σ) : tps Λ Σ :=
+Definition tps_sem `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (Q : iProp Σ) : tps Λ Σ :=
   tps_forall (λ G : {G : tps Λ Σ | ⊢ Q ⊨ₜ G}, proj1_sig G).
 (* Opaque for the proof mode: unification must not compare two [tps_sem] through their
    bodies (the index type is a proposition about the argument). *)
@@ -253,12 +281,13 @@ Global Typeclasses Opaque tps_sem.
 Notation until_disch k G2 :=
   (∃ n' i' Ω', event_obl i' (n', Ω') k obl_discharged ∗ tguar G2 n')%I (only parsing).
 
-(** ** The registered structures
+(** ** The registry and the registered structures
 
-    The registry invariant [treg] holds, for every registered item, its handle: the saved
-    step-indexed readings of its contents and its invariant, which the adequacy proof opens
-    at every position to certify the content. *)
-Definition treg_handle `{!lantanaGS Λ Σ} (e : rentry) : iProp Σ :=
+    The registry state holds, for every registered item, its handle: the saved
+    step-indexed readings of its contents and its invariant, which a run opens at every
+    position to certify the content. The state is the interpretation of the temporal layer
+    ([TemporalInterp]), threaded by the program logic with the history interpretation. *)
+Definition treg_handle `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (e : rentry) : iProp Σ :=
   match e with
   | RMark => True
   | RAlways N γ => ∃ (P : iProp Σ) (G : tps Λ Σ), saved_ti γ (tps_ti G) ∗ inv N P ∗ ▷ (P ⊨ₜ G)
@@ -266,7 +295,11 @@ Definition treg_handle `{!lantanaGS Λ Σ} (e : rentry) : iProp Σ :=
       ∃ P Q : iProp Σ, saved_ti γP (tps_ti (tps_sem P)) ∗ saved_ti γQ (tps_ti (tps_sem Q)) ∗
         oblP_inv N k P Q (until_disch k (tps_sem Q))
   end.
-Definition treg `{!lantanaGS Λ Σ} : iProp Σ := treg_inv treg_handle.
+Definition treg_state `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : iProp Σ := treg_st treg_handle.
+Global Instance treg_temporal_interp `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : TemporalInterp Λ Σ :=
+  treg_state.
+Lemma temporal_interp_treg `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : temporal_interp = treg_state.
+Proof. done. Qed.
 
 (** An invariant whose content is trace-visible through a guarantee [G] of its content [P]:
     the invariant, registered with the reading [G] and a (later-guarded) proof that the
@@ -276,55 +309,57 @@ Definition treg `{!lantanaGS Λ Σ} : iProp Σ := treg_inv treg_handle.
     (temporal_fixpoint.v). The common cases: [alwaysI N P] reads as the canonical trace
     property of [P]; a view [V] of [P] ([alwaysI_view], from [□ (P -∗ V)]) reads as that of
     [V]. Sealed: the proof mode must not unify two structures through their bodies. *)
-Local Definition alwaysI_guar_def `{!lantanaGS Λ Σ} (N : namespace) (P : iProp Σ) (G : tps Λ Σ) : iProp Σ :=
+Local Definition alwaysI_guar_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+  (N : namespace) (P : iProp Σ) (G : tps Λ Σ) : iProp Σ :=
   ∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hG_event r st ∗
-              saved_ti γ (tps_ti G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ treg ∗ ▷ tguar G r.
+              saved_ti γ (tps_ti G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ ▷ tguar G r.
 Local Definition alwaysI_guar_aux : seal (@alwaysI_guar_def). Proof. by eexists. Qed.
 Definition alwaysI_guar := alwaysI_guar_aux.(unseal).
-Global Arguments alwaysI_guar {Λ Σ _} N P G.
+Global Arguments alwaysI_guar {Λ Σ _ _} N P G.
 Local Lemma alwaysI_guar_unseal : @alwaysI_guar = @alwaysI_guar_def.
 Proof. rewrite -alwaysI_guar_aux.(seal_eq) //. Qed.
-Lemma alwaysI_guar_unfold `{!lantanaGS Λ Σ} N P G :
+Lemma alwaysI_guar_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N P G :
   alwaysI_guar N P G = (∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hG_event r st ∗
-                        saved_ti γ (tps_ti G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ treg ∗ ▷ tguar G r)%I.
+                        saved_ti γ (tps_ti G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ ▷ tguar G r)%I.
 Proof. by rewrite alwaysI_guar_unseal. Qed.
-Definition alwaysI_view `{!lantanaGS Λ Σ} (N : namespace) (P V : iProp Σ) : iProp Σ :=
+Definition alwaysI_view `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (P V : iProp Σ) : iProp Σ :=
   alwaysI_guar N P (tps_sem V).
-Definition alwaysI `{!lantanaGS Λ Σ} (N : namespace) (P : iProp Σ) : iProp Σ := alwaysI_view N P P.
+Definition alwaysI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (P : iProp Σ) : iProp Σ :=
+  alwaysI_view N P P.
 (* Opaque for the proof mode: [iNext] must not unfold a structure to strip its inner later. *)
 Global Typeclasses Opaque alwaysI_view alwaysI.
 
 (** The persistent part of an until: its obligation invariant, registered, with the records
     of its contents at its allocation position, where its obligation was assigned. *)
-Definition untilI_pers `{!lantanaGS Λ Σ} (N : namespace) (k : positive) (P Q : iProp Σ) : iProp Σ :=
+Definition untilI_pers `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (k : positive) (P Q : iProp Σ) : iProp Σ :=
   ∃ j r γP γQ st v Ω fu o,
     reg_idx j r (RUntil N k γP γQ) ∗ hG_event r st ∗
     saved_ti γP (tps_ti (tps_sem P)) ∗ saved_ti γQ (tps_ti (tps_sem Q)) ∗
-    oblP_inv N k P Q (until_disch k (tps_sem Q)) ∗ treg ∗
+    oblP_inv N k P Q (until_disch k (tps_sem Q)) ∗
     event_obl v (r, Ω) k (obl_assigned fu o) ∗ ▷ (tguar (tps_sem P) r ∨ tguar (tps_sem Q) r).
 Global Typeclasses Opaque untilI_pers.
 
 (** [P] until [Q] using namespace [N] and obligation [k]. *)
-Local Definition untilI_def `{!lantanaGS Λ Σ} N k (b : bool) (q : Qp) (P Q : iProp Σ) : iProp Σ :=
+Local Definition untilI_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (b : bool) (q : Qp) (P Q : iProp Σ) : iProp Σ :=
   oblP_assigned k b (q/2)%Qp ∗ untilI_pers N k P Q.
 (* Sealed: the proof mode splits it by fractions, and unification (e.g. in [iFrame]) does not
    unfold it. *)
 Local Definition untilI_aux : seal (@untilI_def). Proof. by eexists. Qed.
 Definition untilI := untilI_aux.(unseal).
-Global Arguments untilI {Λ Σ _} N k b q P Q.
+Global Arguments untilI {Λ Σ _ _} N k b q P Q.
 Local Lemma untilI_unseal : @untilI = @untilI_def.
 Proof. rewrite -untilI_aux.(seal_eq) //. Qed.
-Lemma untilI_unfold `{!lantanaGS Λ Σ} N k b q P Q :
+Lemma untilI_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k b q P Q :
   untilI N k b q P Q = (oblP_assigned k b (q/2)%Qp ∗ untilI_pers N k P Q)%I.
 Proof. by rewrite untilI_unseal. Qed.
 
-Definition finallyI `{!lantanaGS Λ Σ} N k (b : bool) (q : Qp) (Q : iProp Σ) : iProp Σ :=
+Definition finallyI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (b : bool) (q : Qp) (Q : iProp Σ) : iProp Σ :=
   untilI N k b q True Q.
 
 (** ** Rules *)
 
 Section rules.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Implicit Types G : tps Λ Σ.
 
   Lemma temporal_weaken P G G' : tps_le G G' → P ⊨ₜ G ⊢ P ⊨ₜ G'.
@@ -339,12 +374,12 @@ Section rules.
 
   Lemma temporal_true P : ⊢ P ⊨ₜ tps_true.
   Proof.
-    iIntros "!>" (?????????) "_". iApply tguar_intro. iIntros "!>" (?????????????) "_ _ _". done.
+    iIntros "!>" (?????????) "_". iApply tguar_intro. iIntros "!>" (????????????) "_ _ _ _". done.
   Qed.
 
   Lemma temporal_pure (φ : Prop) : ⊢ ⌜φ⌝ ⊨ₜ tps_pure φ.
   Proof.
-    iIntros "!>" (?????????) "(_& _& %Hφ)". iApply tguar_intro. iIntros "!>" (?????????????) "_ _ _". done.
+    iIntros "!>" (?????????) "(_& _& %Hφ)". iApply tguar_intro. iIntros "!>" (????????????) "_ _ _ _". done.
   Qed.
 
   Lemma temporal_atomic π : ⊢ state_pred_interp π ⊨ₜ tps_atomic π.
@@ -355,7 +390,8 @@ Section rules.
     iPoseProof (history_interp_event_pred_now with "[HI1 HI2 SI]") as "#TF". 1: done.
     { rewrite /history_interp. iFrame. }
     iApply tguar_intro.
-    iIntros "!>" (l s h' TQ g v2 Ω2 W' τf γ σ' Θ' κs' (BEH& FS& LB& HIST& EQTQ)) "_ ([HI' SIa]& MI& WPs)".
+    iIntros "!>" (Sys l h' g v2 Ω2 W' τf γ σ' Θ' κs') "_ %Hf _ (HI'& MI& Sys)".
+    destruct Hf as (BEH& FS& LB& HIST).
     simpl. unfold ti_atomic. iPoseProof (event_pred_history_interp_lookup with "[$HI' $TF]") as "%H'".
     destruct H' as [H' ?]. simpl. apply HIST in H'. destruct H' as [? H']. rewrite H'. auto.
   Qed.
@@ -365,9 +401,9 @@ Section rules.
     iIntros "#HG1 #HG2 !>" (?????????) "(HI& MI& HPQ)".
     iPoseProof (temporal_elim with "HG1 [$HI $MI HPQ]") as "#T1"; first by iDestruct "HPQ" as "[$ _]".
     iPoseProof (temporal_elim with "HG2 [$HI $MI HPQ]") as "#T2"; first by iDestruct "HPQ" as "[_ $]".
-    iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W". iSplit.
-    - by iApply (tguar_elim with "T1 [//] B W").
-    - by iApply (tguar_elim with "T2 [//] B W").
+    iApply tguar_intro. iIntros "!>" (????????????) "#AX %H #B W". iSplit.
+    - by iApply (tguar_elim with "T1 AX [//] B W").
+    - by iApply (tguar_elim with "T2 AX [//] B W").
   Qed.
 
   Lemma temporal_sep P Q G1 G2 : P ⊨ₜ G1 -∗ Q ⊨ₜ G2 -∗ (P ∗ Q) ⊨ₜ (G1 ∧ G2).
@@ -375,20 +411,20 @@ Section rules.
     iIntros "#HG1 #HG2 !>" (?????????) "(HI& MI& HP& HQ)".
     iPoseProof (temporal_elim with "HG1 [$HI $MI $HP]") as "#T1".
     iPoseProof (temporal_elim with "HG2 [$HI $MI $HQ]") as "#T2".
-    iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W". iSplit.
-    - by iApply (tguar_elim with "T1 [//] B W").
-    - by iApply (tguar_elim with "T2 [//] B W").
+    iApply tguar_intro. iIntros "!>" (????????????) "#AX %H #B W". iSplit.
+    - by iApply (tguar_elim with "T1 AX [//] B W").
+    - by iApply (tguar_elim with "T2 AX [//] B W").
   Qed.
 
   Lemma temporal_or P Q G1 G2 : P ⊨ₜ G1 -∗ Q ⊨ₜ G2 -∗ (P ∨ Q) ⊨ₜ (G1 ∨ G2).
   Proof.
     iIntros "#HG1 #HG2 !>" (?????????) "(HI& MI& [HP | HQ])".
     - iPoseProof (temporal_elim with "HG1 [$HI $MI $HP]") as "#T1".
-      iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W". iLeft.
-      by iApply (tguar_elim with "T1 [//] B W").
+      iApply tguar_intro. iIntros "!>" (????????????) "#AX %H #B W". iLeft.
+      by iApply (tguar_elim with "T1 AX [//] B W").
     - iPoseProof (temporal_elim with "HG2 [$HI $MI $HQ]") as "#T2".
-      iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W". iRight.
-      by iApply (tguar_elim with "T2 [//] B W").
+      iApply tguar_intro. iIntros "!>" (????????????) "#AX %H #B W". iRight.
+      by iApply (tguar_elim with "T2 AX [//] B W").
   Qed.
 
   Lemma temporal_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (⌜φ⌝ → G).
@@ -396,9 +432,9 @@ Section rules.
     iIntros "#HG !>" (?????????) "(HI& MI& HP)".
     destruct (Classical_Prop.classic φ) as [Hφ|Hφ].
     - iPoseProof (temporal_elim with "HG [$HI $MI HP]") as "#T"; first by iApply "HP".
-      iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W". rewrite /= /ti_impl. iIntros (_).
-      by iApply (tguar_elim with "T [//] B W").
-    - iApply tguar_intro. iIntros "!>" (?????????????) "_ _ _". rewrite /= /ti_impl. by iIntros (?).
+      iApply tguar_intro. iIntros "!>" (????????????) "#AX %H #B W". rewrite /= /ti_impl. iIntros (_).
+      by iApply (tguar_elim with "T AX [//] B W").
+    - iApply tguar_intro. iIntros "!>" (????????????) "_ _ _ _". rewrite /= /ti_impl. by iIntros (?).
   Qed.
 
   (** Universal quantification over any type. *)
@@ -408,8 +444,8 @@ Section rules.
     iIntros "#HG !>" (?????????) "(HI& MI& HP)".
     iAssert (∀ x, tguar (G x) _)%I with "[-]" as "#T".
     { iIntros (x). iApply (temporal_elim with "HG"). iFrame. iApply "HP". }
-    iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W". iIntros (x).
-    by iApply (tguar_elim with "T [//] B W").
+    iApply tguar_intro. iIntros "!>" (????????????) "#AX %H #B W". iIntros (x).
+    by iApply (tguar_elim with "T AX [//] B W").
   Qed.
 
   Lemma temporal_sem Q : ⊢ Q ⊨ₜ tps_sem Q.
@@ -431,8 +467,8 @@ Section rules.
   Proof.
     iIntros "#HG !>" (?????????) "(HI& MI& [%x HP])".
     iPoseProof (temporal_elim with "HG [$HI $MI $HP]") as "#T".
-    iApply tguar_intro. iIntros "!>" (?????????????) "%H #B W". iExists x.
-    by iApply (tguar_elim with "T [//] B W").
+    iApply tguar_intro. iIntros "!>" (????????????) "#AX %H #B W". iExists x.
+    by iApply (tguar_elim with "T AX [//] B W").
   Qed.
 
   (** Ghost existential quantification, over any type: the witness does not show in the
@@ -471,9 +507,9 @@ End rules.
 (** ** Reading the model under a ghost update
 
     Allocation of a registered structure reads the history and the model (to produce the
-    record of the content at the current position) without changing them. *)
+    record of the content at the current position) and updates the registry state. *)
 Section gupd_read.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Lemma gupd_read n D (P : iProp Σ) :
     (∀ g i Ω W, model_interp g i Ω W n D -∗ model_interp g i Ω W n D ∗ P) ⊢ |=[n,D]=>g P.
@@ -487,36 +523,36 @@ Section gupd_read.
     iModIntro. iFrame. iSplit; first done. by iApply gupd_intro.
   Qed.
 
-  (** The same at the level of [sfgupd], with the history: fancy updates may happen before
-      and after reading the model. *)
+  (** The same at the level of [sfgupd], with the history and the registry: fancy updates
+      may happen before and after reading the model. *)
   Lemma sfgupd_read_fupd E (P : iProp Σ) :
     (∀ h n σ Θ κs,
-      history_interp h n σ Θ κs -∗ |={E,∅}=> ∀ g i Ω W,
+      history_interp h n σ Θ κs -∗ treg_state -∗ |={E,∅}=> ∀ g i Ω W,
         model_interp g i Ω W n (dom Θ) -∗
-        model_interp g i Ω W n (dom Θ) ∗ |={∅,E}=> history_interp h n σ Θ κs ∗ P) ⊢ |={E}=>g P.
+        model_interp g i Ω W n (dom Θ) ∗ |={∅,E}=> history_interp h n σ Θ κs ∗ treg_state ∗ P) ⊢ |={E}=>g P.
   Proof.
-    iIntros "H". unfold_sfgupd. iIntros (h n σ Θ κs) "HI". rewrite /fgupd.
-    iMod ("H" with "HI") as "H". iModIntro.
+    iIntros "H". unfold_sfgupd. iIntros (h n σ Θ κs) "[HI TI]". rewrite /fgupd.
+    iMod ("H" with "HI TI") as "H". iModIntro.
     iApply gupd_read. iIntros (g i Ω W) "MI". iDestruct ("H" with "MI") as "($& HP)".
-    iMod "HP" as "[HI HP]". iModIntro. iFrame.
+    iMod "HP" as "(HI& TI& HP)". iModIntro. iFrame.
   Qed.
 
   Lemma sfgupd_read E (P : iProp Σ) :
     (∀ h n σ Θ κs g i Ω W,
-      history_interp h n σ Θ κs -∗ model_interp g i Ω W n (dom Θ) -∗
-      model_interp g i Ω W n (dom Θ) ∗ |={E}=> history_interp h n σ Θ κs ∗ P) ⊢ |={E}=>g P.
+      history_interp h n σ Θ κs -∗ treg_state -∗ model_interp g i Ω W n (dom Θ) -∗
+      model_interp g i Ω W n (dom Θ) ∗ |={E}=> history_interp h n σ Θ κs ∗ treg_state ∗ P) ⊢ |={E}=>g P.
   Proof.
-    iIntros "H". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI".
+    iIntros "H". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
     iApply fupd_mask_intro; first set_solver. iIntros "close".
-    iIntros (g i Ω W) "MI". iDestruct ("H" with "HI MI") as "($& HP)".
-    iMod "close" as "_". iMod "HP" as "[HI HP]". iModIntro. iFrame.
+    iIntros (g i Ω W) "MI". iDestruct ("H" with "HI TI MI") as "($& HP)".
+    iMod "close" as "_". iMod "HP" as "(HI& TI& HP)". iModIntro. iFrame.
   Qed.
 
 End gupd_read.
 
 (** ** Rules for [alwaysI] *)
 Section always_rules.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Global Instance alwaysI_guar_persistent N P G : Persistent (alwaysI_guar N P G).
   Proof. rewrite alwaysI_guar_unfold. apply _. Qed.
@@ -526,8 +562,6 @@ Section always_rules.
   Proof. rewrite /alwaysI. apply _. Qed.
   Global Instance treg_handle_persistent e : Persistent (treg_handle e).
   Proof. destruct e; apply _. Qed.
-  Global Instance treg_persistent : Persistent treg.
-  Proof. apply _. Qed.
 
   (** The structure is contractive in its content, which occurs only in the invariant and
       in the stored guarantee: structures can be defined by guarded recursion
@@ -537,18 +571,12 @@ Section always_rules.
 
   Lemma alwaysI_guar_inv N P G : alwaysI_guar N P G ⊢ inv N P.
   Proof. rewrite alwaysI_guar_unfold. iIntros "(%&%&%&%& _& _& _& $& _)". Qed.
-  Lemma alwaysI_guar_treg N P G : alwaysI_guar N P G ⊢ treg.
-  Proof. rewrite alwaysI_guar_unfold. iIntros "(%&%&%&%& _& _& _& _& _& $& _)". Qed.
   Lemma alwaysI_guar_temporal N P G : alwaysI_guar N P G ⊢ ▷ (P ⊨ₜ G).
   Proof. rewrite alwaysI_guar_unfold. iIntros "(%&%&%&%& _& _& _& _& $& _)". Qed.
   Lemma alwaysI_view_inv N P V : alwaysI_view N P V ⊢ inv N P.
   Proof. apply alwaysI_guar_inv. Qed.
-  Lemma alwaysI_view_treg N P V : alwaysI_view N P V ⊢ treg.
-  Proof. apply alwaysI_guar_treg. Qed.
   Lemma alwaysI_inv N P : alwaysI N P ⊢ inv N P.
   Proof. apply alwaysI_view_inv. Qed.
-  Lemma alwaysI_treg N P : alwaysI N P ⊢ treg.
-  Proof. apply alwaysI_view_treg. Qed.
 
   Lemma alwaysI_guar_acc E N P G :
     ↑N ⊆ E → alwaysI_guar N P G ={E,E∖↑N}=∗ ▷ P ∗ (▷ P ={E∖↑N,E}=∗ True).
@@ -591,12 +619,12 @@ Section always_rules.
 
   (** Registering an existing invariant with a guarantee of its content (an iProp
       hypothesis, later-guarded): a model update that records the content at the current
-      position, consuming the registry and a later credit. *)
+      position. *)
   Lemma alwaysI_register_guar E N P G :
-    ↑tregN ⊆ E → ↑N ⊆ E →
-    inv N P -∗ ▷ (P ⊨ₜ G) -∗ treg -∗ £n 1 -∗ |={E}=>g alwaysI_guar N P G.
+    ↑N ⊆ E →
+    inv N P -∗ ▷ (P ⊨ₜ G) -∗ |={E}=>g alwaysI_guar N P G.
   Proof.
-    iIntros (HE HNE) "#Hinv #HG #TR LC". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI".
+    iIntros (HNE) "#Hinv #HG". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
     iMod (inv_acc with "Hinv") as "[HP Hclose]"; first done.
     iApply fupd_mask_intro; first set_solver. iIntros "close".
     iIntros (g i Ω W) "MI".
@@ -604,40 +632,38 @@ Section always_rules.
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
     iFrame "MI". iMod "close" as "_". iMod ("Hclose" with "HP") as "_".
     iMod (saved_ti_alloc (tps_ti G)) as (γ) "#Hγ".
-    iMod (treg_register treg_handle E (RAlways N γ) with "LC TR [] HI") as "[HI (%j& #Hj)]"; first done.
+    iMod (treg_st_register treg_handle (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, G. iFrame "Hγ Hinv HG". }
-    iModIntro. iFrame "HI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG TR C".
+    iModIntro. iFrame "HI TI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG C".
   Qed.
   (** The same under a view [V] of the content. *)
   Lemma alwaysI_register E N P V :
-    ↑tregN ⊆ E → ↑N ⊆ E →
-    inv N P -∗ □ (P -∗ V) -∗ treg -∗ £n 1 -∗ |={E}=>g alwaysI_view N P V.
+    ↑N ⊆ E →
+    inv N P -∗ □ (P -∗ V) -∗ |={E}=>g alwaysI_view N P V.
   Proof.
-    iIntros (HE HNE) "#Hinv #HPV #TR LC".
-    iApply (alwaysI_register_guar with "Hinv [] TR LC"); [done..|].
+    iIntros (HNE) "#Hinv #HPV".
+    iApply (alwaysI_register_guar with "Hinv []"); first done.
     iNext. iApply (temporal_mono with "HPV"). iApply temporal_sem.
   Qed.
 
   (** Allocation registers the invariant and records its content at the current position. *)
   Lemma alwaysI_alloc_guar E N P G :
-    ↑tregN ⊆ E →
-    ▷ (P ⊨ₜ G) -∗ treg -∗ £n 1 -∗ ▷ P -∗ |={E}=>g alwaysI_guar N P G.
+    ▷ (P ⊨ₜ G) -∗ ▷ P -∗ |={E}=>g alwaysI_guar N P G.
   Proof.
-    iIntros (HE) "#HG #TR LC HP". iApply sfgupd_read. iIntros (h n σ Θ κs g i Ω W) "HI MI".
+    iIntros "#HG HP". iApply sfgupd_read. iIntros (h n σ Θ κs g i Ω W) "HI TI MI".
     iPoseProof (temporal_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
     iFrame "MI".
     iMod (saved_ti_alloc (tps_ti G)) as (γ) "#Hγ".
     iMod (inv_alloc N _ P with "HP") as "#Hinv".
-    iMod (treg_register treg_handle E (RAlways N γ) with "LC TR [] HI") as "[HI (%j& #Hj)]"; first done.
+    iMod (treg_st_register treg_handle (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, G. iFrame "Hγ Hinv HG". }
-    iModIntro. iFrame "HI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG TR C".
+    iModIntro. iFrame "HI TI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG C".
   Qed.
   Lemma alwaysI_alloc E N P :
-    ↑tregN ⊆ E →
-    treg -∗ £n 1 -∗ ▷ P -∗ |={E}=>g alwaysI N P.
+    ▷ P -∗ |={E}=>g alwaysI N P.
   Proof.
-    iIntros (HE) "#TR LC HP". iApply (alwaysI_alloc_guar with "[] TR LC HP"); first done.
+    iIntros "HP". iApply (alwaysI_alloc_guar with "[] HP").
     iNext. iApply temporal_sem.
   Qed.
 
@@ -645,17 +671,13 @@ End always_rules.
 
 (** ** Rules for [untilI] *)
 Section until_rules.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Global Instance untilI_pers_persistent N k P Q : Persistent (untilI_pers N k P Q).
   Proof. rewrite /untilI_pers. apply _. Qed.
 
   Lemma untilI_pers_inv N k P Q : untilI_pers N k P Q ⊢ oblP_inv N k P Q (until_disch k (tps_sem Q)).
   Proof. rewrite /untilI_pers. iIntros "(%&%&%&%&%&%&%&%&%& _& _& _& _& $& _)". Qed.
-  Lemma untilI_pers_treg N k P Q : untilI_pers N k P Q ⊢ treg.
-  Proof. rewrite /untilI_pers. iIntros "(%&%&%&%&%&%&%&%&%& _& _& _& _& _& $& _)". Qed.
-  Lemma untilI_treg N k b q P Q : untilI N k b q P Q ⊢ treg.
-  Proof. rewrite untilI_unfold. iIntros "[_ U]". by iApply untilI_pers_treg. Qed.
 
   (** Until *)
   Lemma untilI_frac_split N k b q q1 q2 P Q :
@@ -689,12 +711,11 @@ Section until_rules.
     crP_obls g ℓ1 K -∗
     |={E}=>g ∃ k, ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
                  oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
-                 ∀ E' N (P Q : iProp Σ), ⌜↑tregN ⊆ E'⌝ -∗ treg -∗ £n 1 -∗
-                   ▷ (if b then Q else P) -∗ |={E'}=>g untilI N k b 1 P Q.
+                 ∀ E' N (P Q : iProp Σ), ▷ (if b then Q else P) -∗ |={E'}=>g untilI N k b 1 P Q.
   Proof.
     iIntros (Ltl) "TG". iMod (obl_alloc_assigned with "TG") as "(%k& $& $& Oa& $& $& ACC)". 1: auto.
-    iIntros "!> %E' %N %P %Q %HE #TR LC HC".
-    iApply sfgupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI MI".
+    iIntros "!> %E' %N %P %Q HC".
+    iApply sfgupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI TI MI".
     iAssert (▷ (tguar (tps_sem P) n ∨ tguar (tps_sem Q) n))%I as "#C".
     { destruct b.
       - iPoseProof (temporal_elim_later with "[] [$HC $HI $MI]") as "#C"; first iApply temporal_sem.
@@ -709,11 +730,11 @@ Section until_rules.
     iMod ("ACC" $! E' N P Q (until_disch k (tps_sem Q)) with "HC") as "#OI".
     iMod (saved_ti_alloc (tps_ti (tps_sem P))) as (γP) "#HγP".
     iMod (saved_ti_alloc (tps_ti (tps_sem Q))) as (γQ) "#HγQ".
-    iMod (treg_register treg_handle E' (RUntil N k γP γQ) with "LC TR [] HI") as "[HI (%j& #Hj)]"; first done.
+    iMod (treg_st_register treg_handle (RUntil N k γP γQ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, Q. iFrame "HγP HγQ OI". }
-    iModIntro. iFrame "HI". rewrite untilI_unfold /untilI_pers. iSplitL "Oa".
+    iModIntro. iFrame "HI TI". rewrite untilI_unfold /untilI_pers. iSplitL "Oa".
     { iEval (unfold_opreds). iFrame "OE Oa". }
-    iExists j, n, γP, γQ, _, i, Ω, fu, o. iFrame "Hj HE HγP HγQ OI TR EA C".
+    iExists j, n, γP, γQ, _, i, Ω, fu, o. iFrame "Hj HE HγP HγQ OI EA C".
   Qed.
 
   (** An already discharged obligation invariant, with the record of [Q] at the current
@@ -725,7 +746,7 @@ Section until_rules.
                         oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "HQ". iPoseProof (temporal_sem Q) as "#HG2".
-    unfold_sfgupd. rewrite /fgupd. iIntros (?????) "SI".
+    unfold_sfgupd. rewrite /fgupd. iIntros (?????) "[SI TI]".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     unfold_opreds. iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
     assert (NEW : ∃ k, Ω1 !! k = None).
@@ -752,7 +773,7 @@ Section until_rules.
     { subst Ω2. rewrite dom_insert_L. iFrame. }
     iPoseProof (temporal_elim with "HG2 [$SI $HI $S $O $A $G $W $HQ]") as "#HQi". 1: eauto.
     rewrite /model_interp. iFrame "HI S O A G W". iSplitR; first eauto.
-    iModIntro. iMod "close" as "_". iModIntro. iFrame "SI HQ". iExists k. iFrame "Ge Ww Gf Gu".
+    iModIntro. iMod "close" as "_". iModIntro. iFrame "SI TI HQ". iExists k. iFrame "Ge Ww Gf Gu".
     iIntros (E' N P).
     iMod (oblG_inv_alloc_discharged _ N _ _ P Q with "[$Gu]") as "#GVar"; cycle 1.
     { iFrame "GVar". done. }
@@ -785,7 +806,7 @@ Section until_rules.
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
     iIntros "!> %%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
     iNext. iDestruct "H" as "(Oa1& Oa2& HQ)". iCombine "Oa1 Oa2" as "Oa".
-    unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI".
+    unfold_sfmupd. rewrite /fmupd. iIntros (?????) "[SI TI]".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     (* FIXME: it would be better if we don't need to unfold everything and re-do the proof here... *)
     unfold_opreds. iDestruct "TG" as "(%& #Oe& Gg& Gt& Gw& #Gb& OS)".
@@ -828,7 +849,7 @@ Section until_rules.
       apply elem_of_dom_2 in LUO1l. rewrite -union_difference_L; set_solver. }
     iPoseProof (temporal_elim with "HG2 [$SI $HI $S $O $A $G $W $HQ]") as "#HQi". 1: eauto.
     rewrite /model_interp. iFrame "HI S O W A G".
-    iApply fupd_intro. iSplitR; first eauto. iIntros "!>". iFrame "Oe Ge Gb Gu Gg Gt SI".
+    iApply fupd_intro. iSplitR; first eauto. iIntros "!>". iFrame "Oe Ge Gb Gu Gg Gt SI TI".
     iMod "close" as "_". iModIntro. iMod ("ACC" with "[]") as "_".
     { iNext. iRight. iRight. iFrame "Ge Gu Eo HQi". }
     iModIntro. iFrame.
@@ -876,7 +897,7 @@ Section until_rules.
 End until_rules.
 
 Section until_derived.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   (** Discharge a finally with its right formula at hand, using two later credits. *)
   Lemma finallyI_discharge E N k g ℓ K Q :
@@ -911,7 +932,7 @@ Section until_derived.
 End until_derived.
 
 Section state_rules.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Lemma temporal_state (φ : state Λ → thread_pool Λ → Prop) (P : iProp Σ) :
     (∀ σ Θ κs, state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝) → ⊢ P ⊨ₜ tps_state φ.
@@ -921,7 +942,8 @@ Section state_rules.
     iAssert (⌜φ σ Θ⌝)%I with "[HI HP]" as %Hs.
     { rewrite /history_interp. iDestruct "HI" as "(_& _& SI)". iApply Hφ. iFrame. }
     iApply tguar_intro.
-    iIntros "!>" (l s h' TQ g v2 Ω2 W' τf γ σ' Θ' κs' (BEH& FS& LB& HIST& EQTQ)) "_ ([HI' SIa]& MI& WPs)".
+    iIntros "!>" (Sys l h' g v2 Ω2 W' τf γ σ' Θ' κs') "_ %H _ (HI'& MI& Sys)".
+    destruct H as (BEH& FS& LB& HIST).
     iPoseProof (history_interp_hG_event_lookup with "[$HI' $HE]") as "%Hh".
     apply HIST in Hh as [? Hτ]. simpl. rewrite Hτ. done.
   Qed.
@@ -929,7 +951,7 @@ Section state_rules.
 End state_rules.
 
 Section impl_rules.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   (** A guarantee extends to an implication whose complete antecedent, together with it,
       entails the consequent. With a pure antecedent this is [temporal_impl] weakened. *)
@@ -944,10 +966,10 @@ End impl_rules.
 
 (** ** Certification
 
-    At a position, the adequacy proof opens the registry and every registered item, and
-    produces a later-guarded record of each content. The contents stay in their invariants. *)
+    At a position, a run opens every registered item and produces a later-guarded record of
+    each content. The contents stay in their invariants. *)
 Section certification.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Local Lemma until_cert_assigned k (P Q R : iProp Σ) h n σ Θ κs g v Ω W fu o :
     Ω !! k = Some (obl_assigned fu o) →
@@ -980,7 +1002,7 @@ Section certification.
       iExists n', i', Ω'. iFrame "EF TF". done.
   Qed.
 
-  (** The certificate of one registered item, with the registry closed. *)
+  (** The certificate of one registered item. *)
   Lemma cert_of_handle n e h σ Θ κs g v Ω W :
     treg_handle e -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ cert n e.
@@ -1018,9 +1040,9 @@ Section certification.
       iMod ("IH" with "Hl' HI MI") as "($& $& #Cs)". iModIntro. iFrame "C Cs".
   Qed.
 
-  (** The check at position [n]: the marker is appended to the registry (which is then
-      closed again), and every entry is certified. The lower bound of the marked registry
-      and the certificates form the bundle for [n]. *)
+  (** The check at position [n]: the marker is appended to the registry and every entry is
+      certified. The lower bound of the marked registry and the certificates form the
+      bundle for [n]. *)
   Lemma treg_mark n l h σ Θ κs :
     reg_auth l -∗ treg_entries treg_handle l -∗ history_interp h n σ Θ κs ==∗
     history_interp h n σ Θ κs ∗ reg_auth (l ++ [(n, RMark)]) ∗
@@ -1043,272 +1065,124 @@ Section certification.
     iFrame "Hlb". iSplit; first done. iFrame "Cs".
   Qed.
 
+  (** The check as a whole: from the registry state and the interpretations at [n], the
+      bundle for [n] and the state back. *)
+  Lemma treg_check n h σ Θ κs g v Ω W :
+    treg_state -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
+    treg_state ∗ history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ ∃ l, bundle l n.
+  Proof.
+    iIntros "(%l& Ha& #Hl) HI MI".
+    iMod (treg_mark n l with "Ha Hl HI") as "(HI& Ha& #Hl'& #Hlb)".
+    iMod (certify_entries n _ with "Hl' HI MI") as "(HI& MI& #Cs)".
+    iPoseProof (bundle_intro n _ with "Hlb Cs") as "#B"; first by rewrite last_snoc.
+    iModIntro. iFrame "HI MI B". iExists _. iFrame "Ha Hl'".
+  Qed.
+
 End certification.
 
-(** ** Adequacy, up to trace implication *)
-Section adequacy.
-  Context `{!lantanaGS Λ Σ}.
+(** ** Reading the registered structures off a run
+
+    For any system satisfying the one-step axiom: the always of a registered invariant and
+    the until of a registered obligation invariant. The loops take the certificate of the
+    structure they read from the bundle of each position. *)
+Section loops.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+  Local Notation sysT := (nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ).
 
   Lemma behavior_S n (τf : nat → trace_state Λ) : behavior (n, τf) → behavior (S n, τf).
   Proof. intros BEH. inversion BEH. by subst. Qed.
 
-  (** *** The fairness measure drops across a step
+  Local Lemma model_interp_event_obl k o g v Ω W n D :
+    Ω !! k = Some o → model_interp g v Ω W n D ⊢ event_obl v (n, Ω) k o.
+  Proof. iIntros (Hk) "(MHI& _)". by iApply model_history_interp_event_obl_now. Qed.
 
-      For every obligation assigned before and after the step. *)
-  Definition obls_drop (m m' : thread_id → Ord.t → Ord.t) (Ω Ω' : obls) : Prop :=
-    ∀ k fu o fu' o', Ω !! k = Some (obl_assigned fu o) → Ω' !! k = Some (obl_assigned fu' o') →
-      (m' o' fu' < m o fu)%ord.
-
-  Local Lemma obl_le_measure γ fu o fu' o' :
-    obl_le (obl_assigned fu o) (obl_assigned fu' o') →
-    (fair_sched_fun γ o' fu' <= fair_sched_fun γ o fu)%ord.
+  (** The certificate of a registered always at a position [n] after its registration
+      position [r]: from the bundle, or, at [r] itself, the allocation record. *)
+  Lemma bundle_always_cert l n j r N γ G :
+    r ≤ n →
+    bundle l n -∗ reg_idx j r (RAlways N γ) -∗ saved_ti γ (tps_ti G) -∗
+    (⌜r = n⌝ -∗ ▷ tguar G n) -∗ ▷ tguar G n.
   Proof.
-    intros [[Hle <-]|Hlt].
-    - apply Hessenberg.le_add_l, Jacobsthal.le_mult_r. done.
-    - apply Ord.lt_le, fair_sched_fun_mon_gen. done.
+    iIntros (Hrn) "#B #Hj #Hγ AC". rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
+    iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
+    - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. simpl.
+      iDestruct "Cj" as (f) "[#Hf #Cj]". iDestruct (saved_ti_agree_fun with "Hf Hγ") as "#Heq".
+      iNext. rewrite /tguar. iApply (tguar_ti_eq with "Heq Cj").
+    - iApply "AC". iPureIntro. lia.
   Qed.
 
-  (** Under [obls_le], an assigned obligation comes from an assigned one. *)
-  Local Lemma obls_le_assigned_inv Ω Ω' k x fu' o' :
-    obls_le Ω Ω' → Ω !! k = Some x → Ω' !! k = Some (obl_assigned fu' o') →
-    ∃ fu o, x = obl_assigned fu o ∧ obl_le (obl_assigned fu o) (obl_assigned fu' o').
+  (** The same for an until. *)
+  Lemma bundle_until_cert l n j r N k γP γQ (P Q : iProp Σ) :
+    r ≤ n →
+    bundle l n -∗ reg_idx j r (RUntil N k γP γQ) -∗
+    saved_ti γP (tps_ti (tps_sem P)) -∗ saved_ti γQ (tps_ti (tps_sem Q)) -∗
+    (⌜r = n⌝ -∗ ▷ (tguar (tps_sem P) n ∨ tguar (tps_sem Q) n)) -∗
+    ▷ (tguar (tps_sem P) n ∨ tguar (tps_sem Q) n) ∨
+    ▷ (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ tguar (tps_sem Q) n').
   Proof.
-    intros [_ H] Hk Hk'. specialize (H _ _ _ Hk Hk'). destruct x as [fu o|]; [eauto|done].
+    iIntros (Hrn) "#B #Hj #HγP #HγQ AC". rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
+    iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
+    - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. iEval (simpl) in "Cj".
+      iDestruct "Cj" as (fP fQ) "(#HfP& #HfQ& [Cj|Cj])".
+      + iLeft. iDestruct (saved_ti_agree_fun with "HfP HγP") as "#HeqP".
+        iDestruct (saved_ti_agree_fun with "HfQ HγQ") as "#HeqQ".
+        iNext. rewrite /tguar. iDestruct "Cj" as "[Cj|Cj]".
+        * iLeft. iApply (tguar_ti_eq with "HeqP Cj").
+        * iRight. iApply (tguar_ti_eq with "HeqQ Cj").
+      + iRight. iDestruct (saved_ti_agree_fun with "HfQ HγQ") as "#HeqQ".
+        iNext. iDestruct "Cj" as (n' i' Ω'') "(%& #EF& Cj)". iExists n', i', Ω''. iFrame "EF".
+        iSplit; first done. rewrite /tguar. iApply (tguar_ti_eq with "HeqQ Cj").
+    - iLeft. iApply "AC". iPureIntro. lia.
   Qed.
 
-  (** A step of the scheduled thread [i1]: its obligations lose fuel, the counters of the
-      other active threads drop. *)
-  Lemma obls_drop_step γ γ2 i1 (τ : trace Λ) Ω Ω0 Ω2 Ω' :
-    obls_le Ω Ω0 → (Ω0 ↪ₚ Ω2 | obl_cond_owner i1) → obls_le Ω2 Ω' →
-    obls_thread_active Ω2 τ → trace_thread τ = i1 → fscnt_next_rel τ γ γ2 →
-    obls_drop (fair_sched_fun γ) (fair_sched_fun γ2) Ω Ω'.
-  Proof.
-    intros LEO0 [StepO _] LEO' OTA Hi FSrel k fu o fu' o' Hk Hk'.
-    assert (Hk0 : ∃ x0, Ω0 !! k = Some x0).
-    { destruct LEO0 as [Hdom _]. apply elem_of_dom, Hdom, elem_of_dom. eauto. }
-    destruct Hk0 as [x0 Hk0].
-    destruct LEO0 as [_ Hle0]. specialize (Hle0 _ _ _ Hk Hk0).
-    specialize (StepO k). rewrite Hk0 in StepO.
-    destruct (Ω2 !! k) as [x2|] eqn:Hk2; last by inv StepO.
-    pose proof (obls_le_assigned_inv _ _ _ _ _ _ LEO' Hk2 Hk') as (fu2& o2& ->& Hle2).
-    apply (obl_le_measure γ2) in Hle2.
-    destruct x0 as [fu0 o0|]; last first.
-    { inv StepO. match goal with H : _ ∨ _ |- _ => destruct H as [[HC _]|[_ Heq]]; [simpl in HC; done|done] end. }
-    apply (obl_le_measure γ) in Hle0.
-    inv StepO. match goal with H : _ ∨ _ |- _ => destruct H as [[HC Hstep]|[HC Heq]] end.
-    - simpl in HC. subst o0.
-      inv Hstep; match goal with H : obl_progress _ _ |- _ => inv H | H : obl_discharge _ _ |- _ => inv H end.
-      eapply Ord.le_lt_lt; first exact Hle2. eapply Ord.lt_le_lt; last exact Hle0.
-      apply fair_sched_fun_mon_gen. done.
-    - inv Heq. simpl in HC.
-      pose proof (OTA k _ Hk2) as TA. simpl in TA.
-      specialize (FSrel o2). unfold fscnt_next_rel_th in FSrel.
-      rewrite decide_False in FSrel; last by intros ->.
-      rewrite decide_False in FSrel; last by intros F; eapply thread_active_and_not_false.
-      eapply Ord.le_lt_lt; first exact Hle2. eapply Ord.lt_le_lt; last exact Hle0.
-      apply Hessenberg.lt_add_r, OrdArith.lt_from_nat. done.
-  Qed.
-
-  (** A step of a finished thread: it owns nothing, every counter drops. *)
-  Lemma obls_drop_na γ γ2 (τ : trace Λ) Ω :
-    ts_emb (thread_na (trace_thread τ)) τ → obls_thread_active Ω τ → fscnt_next_rel τ γ γ2 →
-    obls_drop (fair_sched_fun γ) (fair_sched_fun γ2) Ω Ω.
-  Proof.
-    intros TNA OTA FSrel k fu o fu' o' Hk Hk'. rewrite Hk in Hk'. inv Hk'.
-    pose proof (OTA k _ Hk) as TA. simpl in TA.
-    specialize (FSrel o'). unfold fscnt_next_rel_th in FSrel.
-    rewrite decide_False in FSrel; last by intros ->; eapply thread_active_and_not_false.
-    rewrite decide_False in FSrel; last by intros F; eapply thread_active_and_not_false.
-    apply Hessenberg.lt_add_r, OrdArith.lt_from_nat. done.
-  Qed.
-
-  (** *** One step of the run
-
-      From a consistent system at [n]: the system at [S n], the facts about the step, and
-      later credits for the continuation (which may use fancy updates). *)
-  Lemma run_step (c : nat) s h n σ Θ TQ κs g v Ω W τf γ (Φ : iProp Σ) :
-    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-     hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
-    (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
-    (∀ σ' Θ' κs' TQ' g' v' Ω' W' γ',
+  (** One iteration of a loop, in the shape of the step-indexed readings: the check gives
+      the bundle, from which the certificate [C] of the structure being read is taken; the
+      shape's later strips its later; the step gives the system at [S n], the facts about
+      the step and [c] later credits to the continuation. *)
+  Lemma run_axiom_step (Sys : sysT) (c : nat) h n σ Θ κs g v Ω W τf γ (C Φ : iProp Σ) :
+    run_axiom Sys -∗
+    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
+    history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
+    (∀ l, bundle l n -∗ ▷ C) -∗
+    ▷ (∀ l σ' Θ' κs' g' v' Ω' W' γ',
        ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω' W' ∧
-        hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ Θ' = fst <$> TQ' ∧
-        obls_drop (fair_sched_fun γ) (fair_sched_fun γ') Ω Ω'⌝ -∗
-       £n c -∗
-       (history_interp (h ++ [(σ', Θ', κs')]) (S n) σ' Θ' κs' ∗ state_interp_aux σ' Θ' κs') ∗
-       model_interp g' v' Ω' W' (S n) (dom Θ') ∗ threads_run s TQ' -∗
+        hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ obls_drop (fair_sched_fun γ) (fair_sched_fun γ') Ω Ω'⌝ -∗
+       bundle l n -∗ C -∗ £n c -∗
+       history_interp (h ++ [(σ', Θ', κs')]) (S n) σ' Θ' κs' ∗ model_interp g' v' Ω' W' (S n) (dom Θ') ∗
+       Sys (S n) σ' Θ' κs' -∗
        |={⊤}=> Φ) -∗
-    |={⊤,∅}=> ALC (|={∅,⊤}=> Φ).
+    |={⊤,∅}=> ▷ |={∅,⊤}=> |={⊤,∅}=> ALC (|={∅,⊤}=> Φ).
   Proof.
-    iIntros "%H ([HI SIa]& MI& WPs) K". destruct H as (BEH& FS& LB& HIST& EQTQ). rewrite /threads_run.
-    inversion BEH. clear BEH. subst n0 τf0.
-    iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
-    rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
-    rename κs0 into κs, H1 into TRn, H3 into TRn1, H4 into BEH'.
-    iAssert ([∗ map] i ↦ e ∈ Θ, match to_val e with | Some _ => (thP_done i) | None => True end)%I as "#THs".
-    { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
-      iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
-    iPoseProof (history_interp_lookup with "HI") as "%Hlu".
-    destruct H2 as [TStep | TDone].
-    - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
-      inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
-      assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
-      { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
-      destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_delete _ _ _ _ LUTQi1 with "WPs") as "[WP WPs]".
-      pose proof (val_stuck _ _ _ _ _ _ _ _ PStep) as He1. rewrite He1.
-      iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
-      iSpecialize ("WP" $! ctx_id). iEval (rewrite !ctx_id_apply) in "WP".
-      iMod ("WP" with "[] [//] [$HI $SIa]") as "WP".
-      { iPureIntro. apply _. }
-      iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
-      iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
-      2: eapply LB.
-      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
-      destruct H as [LEO0 LB0].
-      iPoseProof (model_interp_owit_inv with "MI") as "%OWinv0".
-      iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA0". 1,2: eauto.
-      iDestruct "WP" as "[%NStuck WP]".
-      iPoseProof ("WP" with "[//]") as "WP".
-      iEval (rewrite !ctx_id_apply) in "WP". rewrite /mprog.
-      iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
-      assert (TNow : trace_thread (n, τf) = i1).
-      { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
-      pose proof (mprog_exists_step i1 Ω0 Ω2 W0 (n, τf) γ (eq_sym TNow) OTA0 OWinv0 LB0 FS ProgO) as H.
-      destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
-      iMod ("WP" $! W2 with "[]") as "[MI WP]".
-      { iPureIntro. split; auto. }
-      iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA2". 1,2: eauto.
-      rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro.
-      rewrite (ALC_credits _ _ (Ord.from_nat c) (|={∅,⊤}=> Φ)%I). iMod "WP". iIntros "LC". simpl.
-      iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g'& %v'& %Ω3& %W3& %& MI)".
-      2: eapply LB2.
-      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
-      destruct H as [LEO LB3]. iMod "WP" as "(HI& WP& Efs)".
-      unfold trace_next in *. simpl in *. assert (TDisj : Θ ##ₘ efs).
-      { eapply map_disjoint_dom_2, fork_thread_ids; eauto. }
-      remember ((<[i1:=e2]> Θ) ∪ efs) as Θ2.
-      replace (dom (<[i1:=e2]> Θ) ∪ dom efs) with (dom Θ2); cycle 1.
-      { subst Θ2. rewrite dom_union_L. auto. }
-      remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
-      iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, lwpupd j ⊤ e (match to_val e with
-                                                          | Some v => lift_term j Q v
-                                                          | None => lwp_fix s j ⊤ e (lift_term j Q)
-                                                          end))%I with "[Efs]" as "Efs".
-      { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
-        destruct (to_val x) eqn:EQx.
-        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. iApply lwpupd_trans. iApply "WP".
-        - iApply "WP". }
-      iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
-      { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
-        apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom.
-        apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
-      1: auto. destruct H as [LEO2 LB4].
-      assert (EQTQ2 : Θ2 = fst <$> (<[i1:=(e2, Q)]> TQ ∪ TQefs)).
-      { subst. rewrite map_fmap_union fmap_insert -map_fmap_compose /compose map_fmap_id. done. }
-      assert (TQDisj : <[i1:=(e2, Q)]> TQ ##ₘ TQefs).
-      { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
-        apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
-      iDestruct "HI" as "[HI SIa]".
-      iPoseProof (history_interp_wf with "HI") as "%HistWF".
-      assert (HIST' : hist_trace (h ++ [(σ2, Θ2, κs)]) τf).
-      { intros n' σ' Θ' κs' H. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
-        - inv H. eapply HIST in LUh. eauto.
-        - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
-          inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
-          destruct HistWF as [Hlen _]. rewrite length_app in Hlen. simpl in Hlen.
-          assert (Hh : length h = S n) by lia. rewrite Hh TRn1. eauto. }
-      destruct (to_val e2) eqn:He2.
-      + rewrite lwp_fix_unfold_fix /lwp_pre He2.
-        iMod (all_interp_lwpupd_steps γ2 with "WP [$HI $SIa] MI") as "(WP& [HI SIa]& %g3& %v3& %Ω5& %W5& %& MI)".
-        { subst Θ2. rewrite lookup_union_l; first apply lookup_insert_eq.
-          apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
-        1: eapply LB4. destruct H as [LEO3 LB5].
-        iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
-                   (match to_val e with
-                    | Some v => lift_term j Q v
-                    | None => lwp_fix s j ⊤ e (lift_term j Q)
-                    end))%I with "[WPs WP Efs]" as "WPs".
-        { iApply big_sepM_union; first done.
-          iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
-        iApply ("K" with "[%] LC [$HI $SIa $MI $WPs]"). split_and!; eauto.
-        eapply (obls_drop_step _ _ i1 (n, τf) _ Ω0 Ω2); eauto.
-        etrans; first exact LEO. etrans; [exact LEO2|exact LEO3].
-      + iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
-                   (match to_val e with
-                    | Some v => lift_term j Q v
-                    | None => lwp_fix s j ⊤ e (lift_term j Q)
-                    end))%I with "[WPs WP Efs]" as "WPs".
-        { iApply big_sepM_union; first done.
-          iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
-        iApply ("K" with "[%] LC [$HI $SIa $MI $WPs]"). split_and!; eauto.
-        eapply (obls_drop_step _ _ i1 (n, τf) _ Ω0 Ω2); eauto.
-        etrans; [exact LEO|exact LEO2].
-    - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
-      inversion TDone. clear TDone. inversion H. clear H. subst Θ0 σ1 ρ2.
-      destruct H1 as (He1&<-&<-&->&->). destruct He1 as [v1 He1]. simpl in *.
-      rewrite map_union_empty insert_id in TRn1. 2: auto.
-      iPoseProof (history_interp_step with "HI") as "[SI ACC]". iMod ("ACC" with "SI") as "HI".
-      pose proof (exists_fscnt_next _ _ FS). destruct H as (γ2& FS2& FSrel).
-      unfold trace_next in *. simpl in *.
-      assert (TNow : trace_thread (n, τf) = i1).
-      { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
-      assert (TNA : ts_emb (thread_na i1) (n, τf)).
-      { unfold ts_emb, thread_na. simpl. rewrite TRn. right. eauto. }
-      rewrite -TNow in TNA. pose proof (owit_inv_lb_step_na_turn _ _ _ _ _ TNA OTA LB FSrel) as LB2.
-      iDestruct "MI" as "[MHI MI]". iMod (model_history_interp_step _ _ _ (S n) with "MHI") as "MHI".
-      1: lia. 1: reflexivity.
-      iPoseProof (history_interp_wf with "HI") as "%HistWF".
-      assert (HIST' : hist_trace (h ++ [(σ, Θ, κs)]) τf).
-      { intros n' σ' Θ' κs' H. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
-        - inv H. eapply HIST in LUh. eauto.
-        - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
-          inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
-          destruct HistWF as [Hlen _]. rewrite length_app in Hlen. simpl in Hlen.
-          assert (Hh : length h = S n) by lia. rewrite Hh TRn1. eauto. }
-      iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-      rewrite (ALC_credits _ _ (Ord.from_nat c) (|={∅,⊤}=> Φ)%I). iApply ALC_intro. iIntros "LC". iMod "close" as "_".
-      iApply ("K" with "[%] LC [$HI $SIa $MHI $MI $WPs]"). split_and!; eauto.
-      eapply obls_drop_na; eauto.
+    iIntros "#AX %H Sys HC K". rewrite /run_axiom /run_axiom_pre.
+    iMod ("AX" $! c with "[//] Sys") as (l) "[#B Step]".
+    iDestruct ("HC" with "B") as "C".
+    iModIntro. iNext. iMod "Step". iModIntro. iMod "Step". iModIntro.
+    iApply (ALC_wand with "[K C] Step").
+    iIntros ">(%σ'& %Θ'& %κs'& %g'& %v'& %Ω'& %W'& %γ'& %Hf& LC& HI& MI& Sys)".
+    iApply ("K" with "[//] B C LC [$HI $MI $Sys]").
   Qed.
 
-  (** *** The always loop
-
-      From a consistent system at [n]: certify every registered item (the shape's later
-      strips the registry list and the content of this invariant), step, and decide [n]
-      with the record of the content, then continue. *)
-  Lemma always_run N P G :
-    treg -∗ inv N P -∗ ▷ (P ⊨ₜ G) -∗
-    ∀ s h n σ Θ TQ κs g v Ω W τf γ,
-      ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-       hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
-      £n 1 -∗
-      (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+  (** *** The always loop *)
+  Lemma always_run (Sys : sysT) N γ G j r :
+    run_axiom Sys -∗ reg_idx j r (RAlways N γ) -∗ saved_ti γ (tps_ti G) -∗
+    ∀ h n σ Θ κs g v Ω W τf γ',
+      ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω W ∧ hist_trace h τf⌝ -∗
+      history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
       ti_always (tps_ti G) (ti_pure True) (n, τf).
   Proof.
-    iIntros "#TR #Hinv #HG". iIntros (s h n σ Θ TQ κs g v Ω W τf γ) "%H LC ([HI SIa]& MI& WPs)".
-    iLöb as "IH" forall (s h n σ Θ TQ κs g v Ω W τf γ H).
-    destruct H as (BEH& FS& LB& HIST& EQTQ).
+    iIntros "#AX #Hj #Hγ" (h n σ Θ κs g v Ω W τf γ') "%H Sys".
+    iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ' H).
+    destruct H as (Hrn& BEH& FS& LB& HIST).
     rewrite ti_always_unfold /ti_always_pre.
-    (* the record of this invariant's content at [n] *)
-    iMod (inv_acc with "Hinv") as "[HP HcloseP]"; first done.
-    iPoseProof (temporal_elim_later_guar P G with "HG [$HP $HI $MI]") as "#Trec".
-    iMod ("HcloseP" with "HP") as "_".
-    (* the check: mark the registry (with the credit) and certify *)
-    iMod (inv_acc with "TR") as "[R HcloseR]"; first done.
-    iMod (lc_fupd_elim_later with "LC R") as (l) "[Ha #Hl]".
-    iMod (treg_mark n l with "Ha Hl HI") as "(HI& Ha& #Hl'& #Hlb)".
-    iMod ("HcloseR" with "[Ha]") as "_".
-    { iNext. iExists _. iFrame "Ha Hl'". }
-    iMod (certify_entries n _ with "Hl' HI MI") as "(HI& MI& #Cs)".
-    iPoseProof (bundle_intro n _ with "Hlb Cs") as "#B"; first by rewrite last_snoc.
-    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
-    iApply (run_step 1 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
-    iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC Sys".
-    destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
+    iApply (run_axiom_step Sys 0 _ _ _ _ _ _ _ _ _ _ _ (tguar G n) with "AX [%] Sys [] []").
+    { split_and!; done. }
+    { iIntros (l) "#B". iApply (bundle_always_cert with "B Hj Hγ []"); first lia.
+      iIntros (?). lia. }
+    iIntros "!>" (l σ' Θ' κs' g' v' Ω' W' γ'') "%Hstep #B #C _ Sys".
+    destruct Hstep as (BEH'& FS'& LB'& HIST'& DROP).
     iModIntro. iSplit; [|iSplit; first done].
-    - iApply (tguar_elim with "Trec [%] B Sys"). split_and!; done.
-    - iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
-      iApply ("IH" with "[%] LC HI' SIa' MI' WPs'"). split_and!; done.
+    - iApply (tguar_elim with "C AX [%] B Sys"). split_and!; done.
+    - unfold trace_next. simpl. iApply ("IH" with "[%] Sys"). split_and!; [lia|done..].
   Qed.
 
   (** The registered structures guarantee the always of their stored reading, and the until
@@ -1316,29 +1190,22 @@ Section adequacy.
   Lemma temporal_always_guar N P G : ⊢ alwaysI_guar N P G ⊨ₜ tps_always G.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& #A)". rewrite alwaysI_guar_unfold.
-    iDestruct "A" as (j r γ st) "(#Hj& #HE& #Hγ& #Hinv& #HG& #TR& #AC)".
+    iDestruct "A" as (j r γ st) "(#Hj& #HE& #Hγ& #Hinv& #HG& #AC)".
     iDestruct (history_interp_hG_event_lookup with "[$HI $HE]") as %Hr.
     iDestruct (history_interp_wf with "HI") as %[Hlen _].
     assert (Hrn : r ≤ n) by (apply lookup_lt_Some in Hr; lia).
     iApply tguar_intro.
-    iIntros "!>" (l s h' TQ g v' Ω' W' τf γ' σ' Θ' κs' (BEH& FS& LB& HIST& EQTQ)) "#B Sys".
-    (* the certificate of this invariant for [n]: from the bundle, or its allocation record *)
-    iAssert (▷ tguar G n)%I as "#C".
-    { rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
-      iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
-      - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. simpl.
-        iDestruct "Cj" as (f) "[#Hf #Cj]". iDestruct (saved_ti_agree_fun with "Hf Hγ") as "#Heq".
-        iNext. rewrite /tguar. iApply (tguar_ti_eq with "Heq Cj").
-      - assert (r = n) as -> by lia. done. }
+    iIntros "!>" (Sys l h' g v' Ω' W' τf γ' σ' Θ' κs') "#AX %Hf #B Sys".
+    destruct Hf as (BEH& FS& LB& HIST).
+    iDestruct (bundle_always_cert with "B Hj Hγ []") as "#C"; first done.
+    { iIntros (->). done. }
     rewrite /= ti_always_unfold /ti_always_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
-    iApply fupd_mask_intro; first set_solver. iIntros "close".
-    rewrite (ALC_credits _ _ (Ord.from_nat 1) (|={∅,⊤}=> _)%I). iApply ALC_intro. iIntros "LC".
-    iMod "close" as "_". iModIntro.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_". iModIntro.
     iSplit; [|iSplit; first done].
-    - iApply (tguar_elim with "C [%] B Sys"). split_and!; done.
-    - iApply (always_run with "TR Hinv HG [%] LC Sys"). simpl.
-      split_and!; [by apply behavior_S|exact FS|done|done|done].
+    - iApply (tguar_elim with "C AX [%] B Sys"). split_and!; done.
+    - iApply (always_run with "AX Hj Hγ [%] Sys"). simpl.
+      split_and!; [lia|by apply behavior_S|exact FS|done|done].
   Qed.
 
   Lemma temporal_always_view N P V : ⊢ alwaysI_view N P V ⊨ₜ tps_always (tps_sem V).
@@ -1346,93 +1213,60 @@ Section adequacy.
   Lemma temporal_always N P : ⊢ alwaysI N P ⊨ₜ tps_always (tps_sem P).
   Proof. apply temporal_always_view. Qed.
 
-  Local Lemma model_interp_event_obl k o g v Ω W n D :
-    Ω !! k = Some o → model_interp g v Ω W n D ⊢ event_obl v (n, Ω) k o.
-  Proof. iIntros (Hk) "(MHI& _)". by iApply model_history_interp_event_obl_now. Qed.
-
   (** *** The until loop
 
       Once the obligation is discharged, the record of the right formula at the current
-      position is at hand: certify, step, and decide with it. *)
-  Lemma until_run_discharged (fP : tiProp Λ Σ) (Q : iProp Σ) a s h n σ Θ TQ κs g v Ω W τf γ :
-    treg -∗ tguar (tps_sem Q) n -∗
-    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-     hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
-    £n 1 -∗
-    (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+      position is at hand: step, and decide with it. *)
+  Lemma until_run_discharged (Sys : sysT) (fP : tiProp Λ Σ) (Q : iProp Σ) a h n σ Θ κs g v Ω W τf γ :
+    run_axiom Sys -∗ tguar (tps_sem Q) n -∗
+    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
+    history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
     ti_until Ord.lt a fP (tps_ti (tps_sem Q)) (n, τf).
   Proof.
-    iIntros "#TR #TQ %H LC ([HI SIa]& MI& WPs)". destruct H as (BEH& FS& LB& HIST& EQTQ).
+    iIntros "#AX #TQ %H Sys". destruct H as (BEH& FS& LB& HIST).
     rewrite ti_until_unfold /ti_until_pre.
-    iMod (inv_acc with "TR") as "[R HcloseR]"; first done.
-    iMod (lc_fupd_elim_later with "LC R") as (l) "[Ha #Hl]".
-    iMod (treg_mark n l with "Ha Hl HI") as "(HI& Ha& #Hl'& #Hlb)".
-    iMod ("HcloseR" with "[Ha]") as "_".
-    { iNext. iExists _. iFrame "Ha Hl'". }
-    iMod (certify_entries n _ with "Hl' HI MI") as "(HI& MI& #Cs)".
-    iPoseProof (bundle_intro n _ with "Hlb Cs") as "#B"; first by rewrite last_snoc.
-    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
-    iApply (run_step 0 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
-    iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC Sys".
-    destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
-    iModIntro. iLeft. iApply (tguar_elim with "TQ [%] B Sys"). split_and!; done.
+    iApply (run_axiom_step Sys 0 _ _ _ _ _ _ _ _ _ _ _ True%I with "AX [%] Sys [] []").
+    { split_and!; done. }
+    { by iIntros (l) "_". }
+    iIntros "!>" (l σ' Θ' κs' g' v' Ω' W' γ') "%Hstep #B _ _ Sys".
+    destruct Hstep as (BEH'& FS'& LB'& HIST'& DROP).
+    iModIntro. iLeft. iApply (tguar_elim with "TQ AX [%] B Sys"). split_and!; done.
   Qed.
 
-  (** While the obligation is assigned, with the measure of its state at the check: mark
-      the registry (with a credit of the previous step), read the obligation invariant with
-      the shape's later, certify, step, read the obligation at [S n] with a credit of the
-      step, decide. *)
-  Lemma until_run N k (P Q : iProp Σ) :
-    treg -∗ oblP_inv N k P Q (until_disch k (tps_sem Q)) -∗
-    ∀ s h n σ Θ TQ κs g v Ω W τf γ fu o,
-      ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
-       hist_trace h τf ∧ Θ = fst <$> TQ ∧ Ω !! k = Some (obl_assigned fu o)⌝ -∗
-      £n 1 -∗
-      (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+  (** While the obligation is assigned, with the measure of its state at the check: the
+      bundle decides which content holds at [n]; the obligation at [S n], read with a credit
+      of the step, decides the continuation. *)
+  Lemma until_run (Sys : sysT) N k γP γQ j r (P Q : iProp Σ) :
+    run_axiom Sys -∗ reg_idx j r (RUntil N k γP γQ) -∗
+    saved_ti γP (tps_ti (tps_sem P)) -∗ saved_ti γQ (tps_ti (tps_sem Q)) -∗
+    oblP_inv N k P Q (until_disch k (tps_sem Q)) -∗
+    ∀ h n σ Θ κs g v Ω W τf γ fu o,
+      ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
+       hist_trace h τf ∧ Ω !! k = Some (obl_assigned fu o)⌝ -∗
+      history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
       ti_until Ord.lt (Ord.S (fair_sched_fun γ o fu)) (tps_ti (tps_sem P)) (tps_ti (tps_sem Q)) (n, τf).
   Proof.
-    iIntros "#TR #OI". iIntros (s h n σ Θ TQ κs g v Ω W τf γ fu o) "%H LC ([HI SIa]& MI& WPs)".
-    iLöb as "IH" forall (s h n σ Θ TQ κs g v Ω W τf γ fu o H).
-    destruct H as (BEH& FS& LB& HIST& EQTQ& Hk).
-    iPoseProof (model_interp_event_obl with "MI") as "#EA"; first exact Hk.
+    iIntros "#AX #Hj #HγP #HγQ #OI". iIntros (h n σ Θ κs g v Ω W τf γ fu o) "%H Sys".
+    iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ fu o H).
+    destruct H as (Hrn& BEH& FS& LB& HIST& Hk).
+    iAssert (event_obl v (n, Ω) k (obl_assigned fu o))%I as "#EA".
+    { iDestruct "Sys" as "(_& MI& _)". by iApply (model_interp_event_obl with "MI"). }
     rewrite ti_until_unfold /ti_until_pre.
-    (* the check: mark the registry, with the credit *)
-    iMod (inv_acc with "TR") as "[R HcloseR]"; first done.
-    iMod (lc_fupd_elim_later with "LC R") as (l) "[Ha #Hl]".
-    iMod (treg_mark n l with "Ha Hl HI") as "(HI& Ha& #Hl'& #Hlb)".
-    iMod ("HcloseR" with "[Ha]") as "_".
-    { iNext. iExists _. iFrame "Ha Hl'". }
-    (* the obligation invariant at [n], with the shape's later *)
-    iMod (oblP_inv_acc with "OI") as "[Var ACC]"; first done.
-    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_".
-    iDestruct "Var" as "[[Oa HP]|[[Oa HQ]|[Of _]]]"; last first.
-    { iDestruct "MI" as "(_& S& _)". iEval (unfold_opreds) in "Of". iDestruct "Of" as "[#Oe #Of]".
-      iDestruct (osat_lookup_discharged with "[$S $Oe $Of]") as %H. rewrite Hk in H. done. }
-    - (* [Q] holds at [n] *)
-      iPoseProof (temporal_elim Q (tps_sem Q) with "[] [$HI $MI $HQ]") as "#TrecQ"; first iApply temporal_sem.
-      iMod ("ACC" with "[Oa HQ]") as "_".
-      { iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame. }
-      iMod (certify_entries n _ with "Hl' HI MI") as "(HI& MI& #Cs)".
-      iPoseProof (bundle_intro n _ with "Hlb Cs") as "#B"; first by rewrite last_snoc.
-      iModIntro.
-      iApply (run_step 0 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
-      iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC Sys".
-      destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
-      iModIntro. iLeft. iApply (tguar_elim with "TrecQ [%] B Sys"). split_and!; done.
-    - (* [P] holds at [n] *)
-      iPoseProof (temporal_elim P (tps_sem P) with "[] [$HI $MI $HP]") as "#TrecP"; first iApply temporal_sem.
-      iMod ("ACC" with "[Oa HP]") as "_".
-      { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
-      iMod (certify_entries n _ with "Hl' HI MI") as "(HI& MI& #Cs)".
-      iPoseProof (bundle_intro n _ with "Hlb Cs") as "#B"; first by rewrite last_snoc.
-      iModIntro.
-      iApply (run_step 2 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
-      iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC Sys".
-      destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
-      iPoseProof (tlc_split_one 2 1 with "LC") as "[LC LC1]"; first done.
-      (* the obligation at [S n] *)
+    iApply (run_axiom_step Sys 1 _ _ _ _ _ _ _ _ _ _ _
+              ((tguar (tps_sem P) n ∨ tguar (tps_sem Q) n) ∨
+               (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ tguar (tps_sem Q) n'))%I
+              with "AX [%] Sys [] []").
+    { split_and!; done. }
+    { iIntros (l) "#B". iDestruct (bundle_until_cert with "B Hj HγP HγQ []") as "[C|C]"; first lia.
+      - iIntros (?). lia.
+      - iNext. by iLeft.
+      - iNext. by iRight. }
+    iIntros "!>" (l σ' Θ' κs' g' v' Ω' W' γ') "%Hstep #B #C LC Sys".
+    destruct Hstep as (BEH'& FS'& LB'& HIST'& DROP).
+    iDestruct "C" as "[[TrecP|TrecQ]|(%n'& %i'& %Ω''& %Hn'& EF& TQ')]".
+    - (* [P] holds at [n]: the obligation at [S n] decides *)
       iMod (oblP_inv_acc with "OI") as "[Var ACC]"; first solve_ndisj.
-      iMod (lc_fupd_elim_later with "LC1 Var") as "Var".
+      iMod (lc_fupd_elim_later with "LC Var") as "Var".
       iDestruct "Var" as "[[Oa' HP']|[[Oa' HQ']|[Of R]]]".
       + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
         { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
@@ -1440,22 +1274,22 @@ Section adequacy.
         iMod ("ACC" with "[Oa' HP']") as "_".
         { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
         iModIntro. iRight. iSplit.
-        { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+        { iApply (tguar_elim with "TrecP AX [%] B Sys"). split_and!; done. }
         iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
         { iPureIntro. apply Ord.lt_S. eapply DROP; eauto. }
-        iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
-        iApply ("IH" with "[%] LC HI' SIa' MI' WPs'"). split_and!; done.
+        unfold trace_next. simpl.
+        iApply ("IH" with "[%] Sys"). split_and!; [lia|done..].
       + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
         { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
           iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
         iMod ("ACC" with "[Oa' HQ']") as "_".
         { iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame. }
         iModIntro. iRight. iSplit.
-        { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+        { iApply (tguar_elim with "TrecP AX [%] B Sys"). split_and!; done. }
         iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
         { iPureIntro. apply Ord.lt_S. eapply DROP; eauto. }
-        iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
-        iApply ("IH" with "[%] LC HI' SIa' MI' WPs'"). split_and!; done.
+        unfold trace_next. simpl.
+        iApply ("IH" with "[%] Sys"). split_and!; [lia|done..].
       + (* discharged during the step, at [n] (before the step) or at [S n] (after) *)
         iDestruct "R" as "(%n'& %i'& %Ω''& #EF& #TQ')".
         iAssert (⌜n' ≤ S n⌝)%I as %Hn'.
@@ -1468,20 +1302,29 @@ Section adequacy.
         iMod ("ACC" with "[Of]") as "_".
         { iNext. iApply oblP_variant_unfold. iRight. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
         iModIntro. destruct (decide (n' = n)) as [->|Hne].
-        * iLeft. iApply (tguar_elim with "TQ' [%] B Sys"). split_and!; done.
+        * iLeft. iApply (tguar_elim with "TQ' AX [%] B Sys"). split_and!; done.
         * assert (n' = S n) as -> by lia.
           iRight. iSplit.
-          { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+          { iApply (tguar_elim with "TrecP AX [%] B Sys"). split_and!; done. }
           iExists Ord.O. iSplit; first (iPureIntro; apply Ord.S_pos).
           unfold trace_next. simpl.
-          iApply (until_run_discharged with "TR TQ' [%] LC Sys"). split_and!; done.
+          iApply (until_run_discharged with "AX TQ' [%] Sys"). split_and!; [by apply behavior_S|done..].
+    - (* [Q] holds at [n] *)
+      iModIntro. iLeft. iApply (tguar_elim with "TrecQ AX [%] B Sys"). split_and!; done.
+    - (* discharged before the check: the discharge was at [n] *)
+      iAssert (⌜n ≤ n'⌝)%I as %Hn.
+      { destruct (le_gt_dec i' v) as [Hle|Hlt].
+        - iDestruct (event_obl_compare i' v with "[$EF $EA]") as %(_& _& Hle'); first done. done.
+        - iDestruct (event_obl_compare v i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
+      assert (n' = n) as -> by lia.
+      iModIntro. iLeft. iApply (tguar_elim with "TQ' AX [%] B Sys"). split_and!; done.
   Qed.
 
   Lemma temporal_until N k b q P Q : ⊢ untilI N k b q P Q ⊨ₜ tps_until (tps_sem P) (tps_sem Q).
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_unfold /untilI_pers.
     iDestruct "U" as "[Oa #U]".
-    iDestruct "U" as (j r γP γQ st v Ω1 fu1 o1) "(#Hj& #HE& #HγP& #HγQ& #OI& #TR& #EA1& #AC)".
+    iDestruct "U" as (j r γP γQ st v Ω1 fu1 o1) "(#Hj& #HE& #HγP& #HγQ& #OI& #EA1& #AC)".
     iAssert (⌜∃ fu o, Ω !! k = Some (obl_assigned fu o)⌝)%I as %(fu& o& Hk).
     { iDestruct "MI" as "(_& S& _)". iEval (unfold_opreds) in "Oa". iDestruct "Oa" as "[#Oe Oa]".
       iDestruct (osat_lookup_assigned with "[$S $Oe $Oa]") as %(?&?&?). eauto. }
@@ -1490,34 +1333,21 @@ Section adequacy.
     iDestruct (history_interp_wf with "HI") as %[Hlen _].
     assert (Hrn : r ≤ n) by (apply lookup_lt_Some in Hr; lia).
     iApply tguar_intro.
-    iIntros "!>" (l s h' TQ g v' Ω' W' τf γ' σ' Θ' κs' (BEH& FS& LB& HIST& EQTQ)) "#B Sys".
+    iIntros "!>" (Sys l h' g v' Ω' W' τf γ' σ' Θ' κs') "#AX %Hf #B Sys".
+    destruct Hf as (BEH& FS& LB& HIST).
     (* the certificate of this until for [n]: from the bundle, or its allocation records *)
-    iAssert (▷ (tguar (tps_sem P) n ∨ tguar (tps_sem Q) n) ∨
-             ▷ (∃ n' i' Ω'', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω'') k obl_discharged ∗ tguar (tps_sem Q) n'))%I as "#C".
-    { rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
-      iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
-      - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. iEval (simpl) in "Cj".
-        iDestruct "Cj" as (fP fQ) "(#HfP& #HfQ& [Cj|Cj])".
-        + iLeft. iDestruct (saved_ti_agree_fun with "HfP HγP") as "#HeqP".
-          iDestruct (saved_ti_agree_fun with "HfQ HγQ") as "#HeqQ".
-          iNext. rewrite /tguar. iDestruct "Cj" as "[Cj|Cj]".
-          * iLeft. iApply (tguar_ti_eq with "HeqP Cj").
-          * iRight. iApply (tguar_ti_eq with "HeqQ Cj").
-        + iRight. iDestruct (saved_ti_agree_fun with "HfQ HγQ") as "#HeqQ".
-          iNext. iDestruct "Cj" as (n' i' Ω'') "(%& #EF& Cj)". iExists n', i', Ω''. iFrame "EF".
-          iSplit; first done. rewrite /tguar. iApply (tguar_ti_eq with "HeqQ Cj").
-      - assert (r = n) as -> by lia. by iLeft. }
+    iDestruct (bundle_until_cert with "B Hj HγP HγQ []") as "#C"; first done.
+    { iIntros (->). done. }
     rewrite /= /ti_exist. iExists (Ord.S (Ord.S (fair_sched_ub fu))).
     rewrite ti_until_unfold /ti_until_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "close".
-    rewrite (ALC_credits _ _ (Ord.from_nat 2) (|={∅,⊤}=> _)%I). iApply ALC_intro. iIntros "LC".
-    iPoseProof (tlc_split_one 2 1 with "LC") as "[LC LC1]"; first done.
+    rewrite (ALC_credits _ _ (Ord.from_nat 1) (|={∅,⊤}=> _)%I). iApply ALC_intro. iIntros "LC".
     iMod "close" as "_".
     iDestruct "C" as "[[TrecP|TrecQ]|(%n'& %i'& %Ω''& %Hn'& #EF& #TQ')]".
     - (* [P] at [n]: the obligation at [S n] decides *)
       iMod (oblP_inv_acc with "OI") as "[Var ACC]"; first solve_ndisj.
-      iMod (lc_fupd_elim_later with "LC1 Var") as "Var".
+      iMod (lc_fupd_elim_later with "LC Var") as "Var".
       iDestruct "Var" as "[[Oa' HP']|[[Oa' HQ']|[Of R]]]".
       + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
         { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
@@ -1529,13 +1359,13 @@ Section adequacy.
         iMod ("ACC" with "[Oa' HP']") as "_".
         { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
         iModIntro. iRight. iSplit.
-        { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+        { iApply (tguar_elim with "TrecP AX [%] B Sys"). split_and!; done. }
         iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
         { iPureIntro. apply Ord.lt_S. eapply Ord.le_lt_lt; first apply fair_sched_fun_ub.
           eapply Ord.le_lt_lt; [by apply fair_sched_ub_le_proper|apply Ord.S_lt]. }
-        iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
-        iApply (until_run with "TR OI [%] LC [$HI' $SIa' $MI' $WPs']").
-        split_and!; [by apply behavior_S|done|done|done|done|done].
+        unfold trace_next. simpl.
+        iApply (until_run with "AX Hj HγP HγQ OI [%] Sys").
+        split_and!; [lia|by apply behavior_S|done|done|done|done].
       + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
         { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
           iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
@@ -1546,13 +1376,13 @@ Section adequacy.
         iMod ("ACC" with "[Oa' HQ']") as "_".
         { iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame. }
         iModIntro. iRight. iSplit.
-        { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+        { iApply (tguar_elim with "TrecP AX [%] B Sys"). split_and!; done. }
         iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
         { iPureIntro. apply Ord.lt_S. eapply Ord.le_lt_lt; first apply fair_sched_fun_ub.
           eapply Ord.le_lt_lt; [by apply fair_sched_ub_le_proper|apply Ord.S_lt]. }
-        iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
-        iApply (until_run with "TR OI [%] LC [$HI' $SIa' $MI' $WPs']").
-        split_and!; [by apply behavior_S|done|done|done|done|done].
+        unfold trace_next. simpl.
+        iApply (until_run with "AX Hj HγP HγQ OI [%] Sys").
+        split_and!; [lia|by apply behavior_S|done|done|done|done].
       + iDestruct "R" as "(%n'& %i'& %Ω''& #EF& #TQ')".
         iAssert (⌜n' ≤ S n⌝)%I as %Hn'.
         { iDestruct "Sys" as "(_& (MHI'& _)& _)".
@@ -1564,23 +1394,23 @@ Section adequacy.
         iMod ("ACC" with "[Of]") as "_".
         { iNext. iApply oblP_variant_unfold. iRight. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
         iModIntro. destruct (decide (n' = n)) as [->|Hne].
-        * iLeft. iApply (tguar_elim with "TQ' [%] B Sys"). split_and!; done.
+        * iLeft. iApply (tguar_elim with "TQ' AX [%] B Sys"). split_and!; done.
         * assert (n' = S n) as -> by lia.
           iRight. iSplit.
-          { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+          { iApply (tguar_elim with "TrecP AX [%] B Sys"). split_and!; done. }
           iExists Ord.O. iSplit; first (iPureIntro; apply Ord.S_pos).
           unfold trace_next. simpl.
-          iApply (until_run_discharged with "TR TQ' [%] LC Sys").
-          split_and!; [by apply behavior_S|done|done|done|done].
+          iApply (until_run_discharged with "AX TQ' [%] Sys").
+          split_and!; [by apply behavior_S|done|done|done].
     - (* [Q] at [n] *)
-      iModIntro. iLeft. iApply (tguar_elim with "TrecQ [%] B Sys"). split_and!; done.
+      iModIntro. iLeft. iApply (tguar_elim with "TrecQ AX [%] B Sys"). split_and!; done.
     - (* discharged before the check: the discharge was at [n] *)
       iAssert (⌜n ≤ n'⌝)%I as %Hn.
       { destruct (le_gt_dec i' i) as [Hle|Hlt].
         - iDestruct (event_obl_compare i' i with "[$EF $EA]") as %(_& _& Hle'); first done. done.
         - iDestruct (event_obl_compare i i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
       assert (n' = n) as -> by lia.
-      iModIntro. iLeft. iApply (tguar_elim with "TQ' [%] B Sys"). split_and!; done.
+      iModIntro. iLeft. iApply (tguar_elim with "TQ' AX [%] B Sys"). split_and!; done.
   Qed.
 
   (** With valid guarantees of the contents. *)
@@ -1600,141 +1430,7 @@ Section adequacy.
     iApply temporal_until.
   Qed.
 
-  (** The program logic from position [n]: certify, step, and eliminate the record of the
-      initial formula. *)
-  Lemma lwp_ti_logic_temporal s h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
-    (G : tps Λ Σ) :
-    behavior (n, τf) →
-    beh_fscnt (n, τf) γ →
-    owit_inv_lb (fair_sched_fun γ) Ω W →
-    hist_trace h τf →
-    (£n 1 ∗ treg ∗
-     (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
-      model_interp g v Ω W n (dom Θ) ∗
-      (|={⊤}=>m ∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                  (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }}))))
-      ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> tps_ti G (n, τf)).
-  Proof.
-    iIntros (BEH FS LB HIST) "(LC& #TR& [HI SIa]& MI& WPs)".
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((%P& #HG& HP& WPs)& HI& %&%&%&%& %H& MI)".
-    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
-    1: auto.
-    destruct H as [LEO1 LB1].
-    iPoseProof (temporal_elim with "HG [$HI $MI $HP]") as "#TF".
-    iPoseProof ("WPs" with "HP") as "WPs".
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "(WPs& HI& %&%&%&%& %H& MI)".
-    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
-    1: auto.
-    destruct H as [LEO2 LB2].
-    iPoseProof (big_sepM2_alt with "WPs") as "[%Dom WPs]".
-    remember (map_zip Θ Ψs) as TQ. assert (EQTQ : Θ = fst <$> TQ).
-    { subst. rewrite fst_map_zip; auto. intro k. rewrite -!elem_of_dom Dom. auto. }
-    iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
-               lwpupd i ⊤ e (match to_val e with
-                             | Some v => (lift_term i Q) v
-                             | None => lwp_fix s i ⊤ e (lift_term i Q)
-                             end))%I with "[WPs]" as "WPs".
-    { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
-      rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
-      simpl. destruct (to_val e) eqn:He.
-      - iApply lwpupd_trans. iApply "H".
-      - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
-    iMod (all_interp_lwpupd_steps_gmap γ with "WPs [$HI $SIa] MI") as "(WPs& HI& %&%&%&%& %H& MI)".
-    { subst Θ. done. }
-    { auto. }
-    destruct H as [LEO3 LB3]. iDestruct "HI" as "[HI SIa]".
-    (* the check at [n], with the later credit *)
-    iMod (inv_acc with "TR") as "[R HcloseR]"; first solve_ndisj.
-    iMod (lc_fupd_elim_later with "LC R") as (l) "[Ha #Hl]".
-    iMod (treg_mark n l with "Ha Hl HI") as "(HI& Ha& #Hl'& #Hlb)".
-    iMod ("HcloseR" with "[Ha]") as "_".
-    { iNext. iExists _. iFrame "Ha Hl'". }
-    iMod (certify_entries n _ with "Hl' HI MI") as "(HI& MI& #Cs)".
-    iPoseProof (bundle_intro n _ with "Hlb Cs") as "#B"; first by rewrite last_snoc.
-    iApply (run_step 0 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
-    iIntros (σ2 Θ2 κs2 TQ2 g2 v2 Ω2 W2 γ2) "%Hstep LC' Sys".
-    destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
-    iModIntro. iApply (tguar_elim with "TF [%] B Sys"). split_and!; done.
-  Qed.
-
-End adequacy.
-
-(** The program logic establishes [G]; anything implied by its trace property holds. *)
-Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
-  `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS.tregGpreS Λ Σ}
-  s σ Θ i κs (G : tps Λ Σ) (R : trProp Λ) :
-  (∀ τ, tps_tr G τ → R τ) →
-  ∀ (τ : trace Λ),
-  behavior τ →
-  fair_scheduling τ →
-  (τ.1 = 0) →
-  (τ.2 0 = (Θ, σ, i, κs)) →
-  (∀ `{Htemporal : !temporalGS Λ Σ},
-     ∃ (c : Ord.t),
-     ⊢ |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
-                (fork_post : thread_id → val Λ → iProp Σ)
-                (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
-     let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
-     state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-     (treg -∗ £ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
-      |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                  (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
-  R τ.
-Proof.
-  intros HR τ BEH FS INIT1 INIT2 Hwp. apply HR.
-  assert (iProp_sat
-            (|==> ∃ (Hmupd : mupdGS Σ) (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))) (Htreg : tregGS.tregGS Λ Σ),
-                let _ : temporalGS Λ Σ := TemporalG Hmupd Hhist Htreg in
-                (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
-                wsat.wsat ∗ wsat.ownE ⊤ ∗
-                |={⊤,∅}=> ALC (|={∅,⊤}=> tps_ti G τ))) as Hsat; cycle 1.
-  { apply sat_bupd, sat_exists in Hsat. destruct Hsat as (Hmupd& Hsat). apply sat_exists in Hsat. destruct Hsat as (Hhist& Hsat). apply sat_exists in Hsat. destruct Hsat as (Htreg& Hsat).
-    set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
-    apply (tps_good G (temporalGS0:=Htemp) emp).
-    apply (sat_fupd ∅), sat_ALC, (sat_fupd ⊤).
-    unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
-    eapply sat_mono. 2: eapply Hsat. simpl. iIntros "($& $& $& $)". }
-  assert (Hwp' : ⊢ ∀ Htemporal : temporalGS Λ Σ,
-            ∃ (c : Ord.t),
-            |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
-                     (fork_post : thread_id → val Λ → iProp Σ)
-                     (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
-            let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
-            state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-            (treg -∗ £ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
-             |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                         (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
-  { iIntros (Htemp). destruct (Hwp Htemp) as [x Hx]. iExists x. iApply Hx. }
-  eapply sat_wand; cycle 1.
-  { eapply Hwp'. }
-  apply (sat_mono True); cycle 1.
-  { apply iProp_sat_intro. }
-  iIntros "_ H".
-  iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& MI)".
-  iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
-  iMod (treg_alloc (Λ:=Λ)) as "(%Htreg& TR)".
-  iExists Hmupd, Hhist, Htreg.
-  set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
-  iDestruct ("H" $! Htemp) as "(%c& H)".
-  iDestruct "R" as "(%x& R)".
-  iMod (own_update _ (● x) with "R") as "[R LC]".
-  { apply (auth_update_alloc x (((c ⋅ Ord.from_nat 1) : ordinal_ucmra.OrdUR) ⋅ x)).
-    apply (op_local_update_discrete x ε (c ⋅ Ord.from_nat 1)).
-    intros ?. apply auth_valid_trivial. }
-  iModIntro. iFrame "R W WOE". rewrite (right_id ε).
-  iDestruct (rupdF_split with "LC") as "[LC LC1]".
-  iMod "H" as "(%Hsic& %fork_post& %Ψs& SI& SIa& WPs)".
-  iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& A& G& MI)".
-  iMod (thP_carriers_alloc_threads (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
-  set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
-  iMod (treg_inv_alloc (treg_handle (lantanaGS0:=Hlantana)) with "TR") as "#TR".
-  iPoseProof ("WPs" with "TR LC Ths") as "WPs". rewrite union_empty_l_L.
-  destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
-  apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
-  iApply (lwp_ti_logic_temporal (lantanaGS0:=Hlantana) with "[$LC1 $TR $HI $SIa $MHI $S $T $A $G $MI $WPs]").
-  1,2: eauto. 1: apply map_Forall2_empty.
-  { intros n' σ' Θ' κs' Hlu. rewrite lookup_cons in Hlu. destruct n'; last done. inv Hlu. rewrite INIT2. eauto. }
-Qed.
+End loops.
 
 (** ** Inferring guarantees
 
@@ -1750,10 +1446,10 @@ Qed.
       property) or the existential is dropped ([tps_true]);
     - checking against a given [G] ([into_temporal P G]), where an existential is
       trace-visible exactly when [G] is a [tps_exist] over the same type. *)
-Class IntoTemporal `{!lantanaGS Λ Σ} (P : iProp Σ) (G : tps Λ Σ) :=
+Class IntoTemporal `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (P : iProp Σ) (G : tps Λ Σ) :=
   into_temporal : ⊢ P ⊨ₜ G.
-Global Arguments into_temporal {_ _ _} _ _ {_}.
-Global Hint Mode IntoTemporal - - - ! - : typeclass_instances.
+Global Arguments into_temporal {_ _ _ _} _ _ {_}.
+Global Hint Mode IntoTemporal - - - - ! - : typeclass_instances.
 (* The search compares guarantees by their formula and trace property: unfolding [temporal]
    when an instance does not match makes the failure very slow. *)
 Global Typeclasses Opaque temporal.
@@ -1764,7 +1460,7 @@ Global Typeclasses Opaque tps_pure tps_atomic tps_and tps_or tps_impl tps_forall
 
 (** Big separating conjunctions guarantee the guarded family of their elements' guarantees. *)
 Section big_op_rules.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Lemma temporal_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ) (G : K → A → tps Λ Σ) :
     (∀ k x, Φ k x ⊨ₜ G k x) -∗
@@ -1796,24 +1492,24 @@ Section big_op_rules.
 End big_op_rules.
 
 (** How an existential over a family of guarantees is guaranteed, when inferring. *)
-Class SimplExist `{!lantanaGS Λ Σ} {X : Type} (G : X → tps Λ Σ) (G' : tps Λ Σ) :=
+Class SimplExist `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (G : X → tps Λ Σ) (G' : tps Λ Σ) :=
   simpl_exist (P : X → iProp Σ) : (∀ x, P x ⊨ₜ G x) ⊢ (∃ x, P x) ⊨ₜ G'.
-Global Hint Mode SimplExist - - - - ! - : typeclass_instances.
+Global Hint Mode SimplExist - - - - - ! - : typeclass_instances.
 
 (** Existentials, dispatched on whether the target is known (hints after [into_temporal]).
     Records, so that a failing unification does not unfold them. *)
-Class IntoTemporalExist `{!lantanaGS Λ Σ} {X : Type} (P : X → iProp Σ) (G : tps Λ Σ) :=
+Class IntoTemporalExist `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (P : X → iProp Σ) (G : tps Λ Σ) :=
   { into_temporal_exist_body : ⊢ (∃ x, P x) ⊨ₜ G }.
-Global Hint Mode IntoTemporalExist - - - - ! - : typeclass_instances.
+Global Hint Mode IntoTemporalExist - - - - - ! - : typeclass_instances.
 (** Against a known target: trace-visible if the target is a [tps_exist] (possibly behind
     definitions), ghost otherwise. *)
-Class IntoTemporalExistCheck `{!lantanaGS Λ Σ} {X : Type} (P : X → iProp Σ) (G : tps Λ Σ) :=
+Class IntoTemporalExistCheck `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (P : X → iProp Σ) (G : tps Λ Σ) :=
   { into_temporal_exist_check_body : ⊢ (∃ x, P x) ⊨ₜ G }.
-Global Hint Mode IntoTemporalExistCheck - - - - ! ! : typeclass_instances.
+Global Hint Mode IntoTemporalExistCheck - - - - - ! ! : typeclass_instances.
 
 (** The trace property inferred for [P]. *)
-Definition tsem `{!lantanaGS Λ Σ} (P : iProp Σ) {G : tps Λ Σ} `{!IntoTemporal P G} : tps Λ Σ := G.
-Global Arguments tsem {_ _ _} _ {_ _}.
+Definition tsem `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (P : iProp Σ) {G : tps Λ Σ} `{!IntoTemporal P G} : tps Λ Σ := G.
+Global Arguments tsem {_ _ _ _} _ {_ _}.
 
 (** [P] until [Q], and finally [Q]. *)
 Notation untilT N k q P Q := (untilI N k false q P%I Q%I).
@@ -1828,7 +1524,7 @@ Ltac tps_of P := let G := eval cbv [tsem] in (tsem P%I) in exact G.
 Ltac evar_headed t := idtac; lazymatch t with ?f _ => evar_headed f | _ => is_evar t end.
 
 Section into_temporal.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Implicit Types G : tps Λ Σ.
 
   (** The fallback, used through the hint below. *)
@@ -1927,16 +1623,398 @@ Global Hint Extern 0 (IntoTemporalExist _ ?G) =>
   notypeclasses refine (into_temporal_exist_check _ _ _) : typeclass_instances.
 
 (* The fallback, for an unknown target or [tps_true], and only once the formula and the
-   ghost-state instance contain no evars (resolution is retried once they are solved). *)
-Global Hint Extern 100 (@IntoTemporal ?Λ ?Σ ?H ?P ?G) =>
-  assert_fails (has_evar Λ); assert_fails (has_evar Σ); assert_fails (has_evar H);
+   ghost-state instances contain no evars (resolution is retried once they are solved). *)
+Global Hint Extern 100 (@IntoTemporal ?Λ ?Σ ?Ht ?Hs ?P ?G) =>
+  assert_fails (has_evar Λ); assert_fails (has_evar Σ); assert_fails (has_evar Ht); assert_fails (has_evar Hs);
   assert_fails (has_evar P);
   first [evar_headed G | unify G (@tps_true Λ Σ)];
   notypeclasses refine (into_temporal_default P) : typeclass_instances.
 
+(** ** Adequacy for [lWP]
+
+    Lantana's weakest precondition is a system satisfying the one-step axiom: at a position,
+    the registry is checked, then a thread takes a step. *)
+Section adequacy.
+  Context `{!lantanaGS Λ Σ}.
+
+  (** The running system: every thread runs its [lwp_fix]. *)
+  Definition threads_run (s : stuckness)
+    (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) : iProp Σ :=
+    [∗ map] i ↦ '(e, Q) ∈ TQ, match to_val e with
+                              | Some v => (lift_term i Q) v
+                              | None => lwp_fix s i ⊤ e (lift_term i Q)
+                              end.
+
+  (** *** The fairness measure drops across a step *)
+  Local Lemma obl_le_measure γ fu o fu' o' :
+    obl_le (obl_assigned fu o) (obl_assigned fu' o') →
+    (fair_sched_fun γ o' fu' <= fair_sched_fun γ o fu)%ord.
+  Proof.
+    intros [[Hle <-]|Hlt].
+    - apply Hessenberg.le_add_l, Jacobsthal.le_mult_r. done.
+    - apply Ord.lt_le, fair_sched_fun_mon_gen. done.
+  Qed.
+
+  (** Under [obls_le], an assigned obligation comes from an assigned one. *)
+  Local Lemma obls_le_assigned_inv Ω Ω' k x fu' o' :
+    obls_le Ω Ω' → Ω !! k = Some x → Ω' !! k = Some (obl_assigned fu' o') →
+    ∃ fu o, x = obl_assigned fu o ∧ obl_le (obl_assigned fu o) (obl_assigned fu' o').
+  Proof.
+    intros [_ H] Hk Hk'. specialize (H _ _ _ Hk Hk'). destruct x as [fu o|]; [eauto|done].
+  Qed.
+
+  (** A step of the scheduled thread [i1]: its obligations lose fuel, the counters of the
+      other active threads drop. *)
+  Lemma obls_drop_step γ γ2 i1 (τ : trace Λ) Ω Ω0 Ω2 Ω' :
+    obls_le Ω Ω0 → (Ω0 ↪ₚ Ω2 | obl_cond_owner i1) → obls_le Ω2 Ω' →
+    obls_thread_active Ω2 τ → trace_thread τ = i1 → fscnt_next_rel τ γ γ2 →
+    obls_drop (fair_sched_fun γ) (fair_sched_fun γ2) Ω Ω'.
+  Proof.
+    intros LEO0 [StepO _] LEO' OTA Hi FSrel k fu o fu' o' Hk Hk'.
+    assert (Hk0 : ∃ x0, Ω0 !! k = Some x0).
+    { destruct LEO0 as [Hdom _]. apply elem_of_dom, Hdom, elem_of_dom. eauto. }
+    destruct Hk0 as [x0 Hk0].
+    destruct LEO0 as [_ Hle0]. specialize (Hle0 _ _ _ Hk Hk0).
+    specialize (StepO k). rewrite Hk0 in StepO.
+    destruct (Ω2 !! k) as [x2|] eqn:Hk2; last by inv StepO.
+    pose proof (obls_le_assigned_inv _ _ _ _ _ _ LEO' Hk2 Hk') as (fu2& o2& ->& Hle2).
+    apply (obl_le_measure γ2) in Hle2.
+    destruct x0 as [fu0 o0|]; last first.
+    { inv StepO. match goal with H : _ ∨ _ |- _ => destruct H as [[HC _]|[_ Heq]]; [simpl in HC; done|done] end. }
+    apply (obl_le_measure γ) in Hle0.
+    inv StepO. match goal with H : _ ∨ _ |- _ => destruct H as [[HC Hstep]|[HC Heq]] end.
+    - simpl in HC. subst o0.
+      inv Hstep; match goal with H : obl_progress _ _ |- _ => inv H | H : obl_discharge _ _ |- _ => inv H end.
+      eapply Ord.le_lt_lt; first exact Hle2. eapply Ord.lt_le_lt; last exact Hle0.
+      apply fair_sched_fun_mon_gen. done.
+    - inv Heq. simpl in HC.
+      pose proof (OTA k _ Hk2) as TA. simpl in TA.
+      specialize (FSrel o2). unfold fscnt_next_rel_th in FSrel.
+      rewrite decide_False in FSrel; last by intros ->.
+      rewrite decide_False in FSrel; last by intros F; eapply thread_active_and_not_false.
+      eapply Ord.le_lt_lt; first exact Hle2. eapply Ord.lt_le_lt; last exact Hle0.
+      apply Hessenberg.lt_add_r, OrdArith.lt_from_nat. done.
+  Qed.
+
+  (** A step of a finished thread: it owns nothing, every counter drops. *)
+  Lemma obls_drop_na γ γ2 (τ : trace Λ) Ω :
+    ts_emb (thread_na (trace_thread τ)) τ → obls_thread_active Ω τ → fscnt_next_rel τ γ γ2 →
+    obls_drop (fair_sched_fun γ) (fair_sched_fun γ2) Ω Ω.
+  Proof.
+    intros TNA OTA FSrel k fu o fu' o' Hk Hk'. rewrite Hk in Hk'. inv Hk'.
+    pose proof (OTA k _ Hk) as TA. simpl in TA.
+    specialize (FSrel o'). unfold fscnt_next_rel_th in FSrel.
+    rewrite decide_False in FSrel; last by intros ->; eapply thread_active_and_not_false.
+    rewrite decide_False in FSrel; last by intros F; eapply thread_active_and_not_false.
+    apply Hessenberg.lt_add_r, OrdArith.lt_from_nat. done.
+  Qed.
+
+  (** *** One step of the run
+
+      From a consistent system at [n]: the system at [S n], the facts about the step, and
+      later credits for the continuation (which may use fancy updates). *)
+  Lemma run_step (c : nat) s h n σ Θ TQ κs g v Ω W τf γ (Φ : iProp Σ) :
+    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
+     hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+    (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+    (∀ σ' Θ' κs' TQ' g' v' Ω' W' γ',
+       ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω' W' ∧
+        hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ Θ' = fst <$> TQ' ∧
+        obls_drop (fair_sched_fun γ) (fair_sched_fun γ') Ω Ω'⌝ -∗
+       £n c -∗
+       (history_tinterp (h ++ [(σ', Θ', κs')]) (S n) σ' Θ' κs' ∗ state_interp_aux σ' Θ' κs') ∗
+       model_interp g' v' Ω' W' (S n) (dom Θ') ∗ threads_run s TQ' -∗
+       |={⊤}=> Φ) -∗
+    |={⊤,∅}=> ALC (|={∅,⊤}=> Φ).
+  Proof.
+    iIntros "%H ([[HI TI] SIa]& MI& WPs) K". destruct H as (BEH& FS& LB& HIST& EQTQ). rewrite /threads_run.
+    inversion BEH. clear BEH. subst n0 τf0.
+    iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
+    rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
+    rename κs0 into κs, H1 into TRn, H3 into TRn1, H4 into BEH'.
+    iAssert ([∗ map] i ↦ e ∈ Θ, match to_val e with | Some _ => (thP_done i) | None => True end)%I as "#THs".
+    { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
+      iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
+    iPoseProof (history_interp_lookup with "HI") as "%Hlu".
+    destruct H2 as [TStep | TDone].
+    - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
+      inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
+      assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
+      { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
+      destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_delete _ _ _ _ LUTQi1 with "WPs") as "[WP WPs]".
+      pose proof (val_stuck _ _ _ _ _ _ _ _ PStep) as He1. rewrite He1.
+      iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
+      iSpecialize ("WP" $! ctx_id). iEval (rewrite !ctx_id_apply) in "WP".
+      iMod ("WP" with "[] [//] [$HI $TI $SIa]") as "WP".
+      { iPureIntro. apply _. }
+      iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
+      iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
+      2: eapply LB.
+      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      destruct H as [LEO0 LB0].
+      iPoseProof (model_interp_owit_inv with "MI") as "%OWinv0".
+      iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA0". 1,2: eauto.
+      iDestruct "WP" as "[%NStuck WP]".
+      iPoseProof ("WP" with "[//]") as "WP".
+      iEval (rewrite !ctx_id_apply) in "WP". rewrite /mprog.
+      iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
+      assert (TNow : trace_thread (n, τf) = i1).
+      { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
+      pose proof (mprog_exists_step i1 Ω0 Ω2 W0 (n, τf) γ (eq_sym TNow) OTA0 OWinv0 LB0 FS ProgO) as H.
+      destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
+      iMod ("WP" $! W2 with "[]") as "[MI WP]".
+      { iPureIntro. split; auto. }
+      iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA2". 1,2: eauto.
+      rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro.
+      rewrite (ALC_credits _ _ (Ord.from_nat c) (|={∅,⊤}=> Φ)%I). iMod "WP". iIntros "LC". simpl.
+      iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g'& %v'& %Ω3& %W3& %& MI)".
+      2: eapply LB2.
+      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      destruct H as [LEO LB3]. iMod "WP" as "(HI& WP& Efs)".
+      unfold trace_next in *. simpl in *. assert (TDisj : Θ ##ₘ efs).
+      { eapply map_disjoint_dom_2, fork_thread_ids; eauto. }
+      remember ((<[i1:=e2]> Θ) ∪ efs) as Θ2.
+      replace (dom (<[i1:=e2]> Θ) ∪ dom efs) with (dom Θ2); cycle 1.
+      { subst Θ2. rewrite dom_union_L. auto. }
+      remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
+      iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, lwpupd j ⊤ e (match to_val e with
+                                                          | Some v => lift_term j Q v
+                                                          | None => lwp_fix s j ⊤ e (lift_term j Q)
+                                                          end))%I with "[Efs]" as "Efs".
+      { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
+        destruct (to_val x) eqn:EQx.
+        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. iApply lwpupd_trans. iApply "WP".
+        - iApply "WP". }
+      iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
+      { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
+        apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom.
+        apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+      1: auto. destruct H as [LEO2 LB4].
+      assert (EQTQ2 : Θ2 = fst <$> (<[i1:=(e2, Q)]> TQ ∪ TQefs)).
+      { subst. rewrite map_fmap_union fmap_insert -map_fmap_compose /compose map_fmap_id. done. }
+      assert (TQDisj : <[i1:=(e2, Q)]> TQ ##ₘ TQefs).
+      { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
+        apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
+      iDestruct "HI" as "[[HI TI] SIa]".
+      iPoseProof (history_interp_wf with "HI") as "%HistWF".
+      assert (HIST' : hist_trace (h ++ [(σ2, Θ2, κs)]) τf).
+      { intros n' σ' Θ' κs' H. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
+        - inv H. eapply HIST in LUh. eauto.
+        - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
+          inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
+          destruct HistWF as [Hlen _]. rewrite length_app in Hlen. simpl in Hlen.
+          assert (Hh : length h = S n) by lia. rewrite Hh TRn1. eauto. }
+      destruct (to_val e2) eqn:He2.
+      + rewrite lwp_fix_unfold_fix /lwp_pre He2.
+        iMod (all_interp_lwpupd_steps γ2 with "WP [$HI $TI $SIa] MI") as "(WP& [[HI TI] SIa]& %g3& %v3& %Ω5& %W5& %& MI)".
+        { subst Θ2. rewrite lookup_union_l; first apply lookup_insert_eq.
+          apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+        1: eapply LB4. destruct H as [LEO3 LB5].
+        iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
+                   (match to_val e with
+                    | Some v => lift_term j Q v
+                    | None => lwp_fix s j ⊤ e (lift_term j Q)
+                    end))%I with "[WPs WP Efs]" as "WPs".
+        { iApply big_sepM_union; first done.
+          iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
+        iApply ("K" with "[%] LC [$HI $TI $SIa $MI $WPs]"). split_and!; eauto.
+        eapply (obls_drop_step _ _ i1 (n, τf) _ Ω0 Ω2); eauto.
+        etrans; first exact LEO. etrans; [exact LEO2|exact LEO3].
+      + iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
+                   (match to_val e with
+                    | Some v => lift_term j Q v
+                    | None => lwp_fix s j ⊤ e (lift_term j Q)
+                    end))%I with "[WPs WP Efs]" as "WPs".
+        { iApply big_sepM_union; first done.
+          iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
+        iApply ("K" with "[%] LC [$HI $TI $SIa $MI $WPs]"). split_and!; eauto.
+        eapply (obls_drop_step _ _ i1 (n, τf) _ Ω0 Ω2); eauto.
+        etrans; [exact LEO|exact LEO2].
+    - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
+      inversion TDone. clear TDone. inversion H. clear H. subst Θ0 σ1 ρ2.
+      destruct H1 as (He1&<-&<-&->&->). destruct He1 as [v1 He1]. simpl in *.
+      rewrite map_union_empty insert_id in TRn1. 2: auto.
+      iPoseProof (history_interp_step with "HI") as "[SI ACC]". iMod ("ACC" with "SI") as "HI".
+      pose proof (exists_fscnt_next _ _ FS). destruct H as (γ2& FS2& FSrel).
+      unfold trace_next in *. simpl in *.
+      assert (TNow : trace_thread (n, τf) = i1).
+      { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
+      assert (TNA : ts_emb (thread_na i1) (n, τf)).
+      { unfold ts_emb, thread_na. simpl. rewrite TRn. right. eauto. }
+      rewrite -TNow in TNA. pose proof (owit_inv_lb_step_na_turn _ _ _ _ _ TNA OTA LB FSrel) as LB2.
+      iDestruct "MI" as "[MHI MI]". iMod (model_history_interp_step _ _ _ (S n) with "MHI") as "MHI".
+      1: lia. 1: reflexivity.
+      iPoseProof (history_interp_wf with "HI") as "%HistWF".
+      assert (HIST' : hist_trace (h ++ [(σ, Θ, κs)]) τf).
+      { intros n' σ' Θ' κs' H. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
+        - inv H. eapply HIST in LUh. eauto.
+        - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
+          inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
+          destruct HistWF as [Hlen _]. rewrite length_app in Hlen. simpl in Hlen.
+          assert (Hh : length h = S n) by lia. rewrite Hh TRn1. eauto. }
+      iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+      rewrite (ALC_credits _ _ (Ord.from_nat c) (|={∅,⊤}=> Φ)%I). iApply ALC_intro. iIntros "LC". iMod "close" as "_".
+      iApply ("K" with "[%] LC [$HI $TI $SIa $MHI $MI $WPs]"). split_and!; eauto.
+      eapply obls_drop_na; eauto.
+  Qed.
+
+  (** *** The one-step axiom for [lWP]
+
+      Lantana's system: the auxiliary state interpretation, the registry state and the
+      running threads. A step: the check (mark the registry, certify every entry), then
+      [run_step]. *)
+  Definition sys_lwp (s : stuckness) : nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ :=
+    λ _ σ Θ κs, (state_interp_aux σ Θ κs ∗ treg_state ∗ ∃ TQ, ⌜Θ = fst <$> TQ⌝ ∗ threads_run s TQ)%I.
+
+  Lemma run_axiom_lwp s : ⊢ run_axiom (sys_lwp s).
+  Proof.
+    rewrite /run_axiom /run_axiom_pre.
+    iIntros "!>" (c h n σ Θ κs g v Ω W τf γ) "%H (HI& MI& SIa& TI& %TQ& %EQTQ& WPs)".
+    destruct H as (BEH& FS& LB& HIST).
+    iMod (treg_check n with "TI HI MI") as "(TI& HI& MI& %l& #B)".
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iExists l. iFrame "B".
+    iNext. iMod "close" as "_". iModIntro.
+    iApply (run_step c s with "[%] [$HI $TI $SIa $MI $WPs]"); first by split_and!.
+    iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC ([[HI TI] SIa]& MI& WPs)".
+    destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
+    iModIntro. iExists σ', Θ', κs', g', v', Ω', W', γ'. rewrite /sys_lwp.
+    iFrame "LC HI MI SIa TI". iSplit; first (iPureIntro; split_and!; done). iExists TQ'. by iFrame.
+  Qed.
+
+  (** The program logic from position [n]: check, step, and eliminate the record of the
+      initial formula. *)
+  Lemma lwp_ti_logic_temporal s h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
+    (G : tps Λ Σ) :
+    behavior (n, τf) →
+    beh_fscnt (n, τf) γ →
+    owit_inv_lb (fair_sched_fun γ) Ω W →
+    hist_trace h τf →
+    ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
+      model_interp g v Ω W n (dom Θ) ∗
+      (|={⊤}=>m ∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
+                  (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }}))))
+      ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> tps_ti G (n, τf)).
+  Proof.
+    iIntros (BEH FS LB HIST) "([HI SIa]& MI& WPs)".
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((%P& #HG& HP& WPs)& [HI TI]& %&%&%&%& %H& MI)".
+    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    1: auto.
+    destruct H as [LEO1 LB1].
+    iPoseProof (temporal_elim with "HG [$HI $MI $HP]") as "#TF".
+    iPoseProof ("WPs" with "HP") as "WPs".
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs [$HI $TI] MI") as "(WPs& [HI TI]& %&%&%&%& %H& MI)".
+    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    1: auto.
+    destruct H as [LEO2 LB2].
+    iPoseProof (big_sepM2_alt with "WPs") as "[%Dom WPs]".
+    remember (map_zip Θ Ψs) as TQ. assert (EQTQ : Θ = fst <$> TQ).
+    { subst. rewrite fst_map_zip; auto. intro k. rewrite -!elem_of_dom Dom. auto. }
+    iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
+               lwpupd i ⊤ e (match to_val e with
+                             | Some v => (lift_term i Q) v
+                             | None => lwp_fix s i ⊤ e (lift_term i Q)
+                             end))%I with "[WPs]" as "WPs".
+    { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
+      rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
+      simpl. destruct (to_val e) eqn:He.
+      - iApply lwpupd_trans. iApply "H".
+      - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
+    iMod (all_interp_lwpupd_steps_gmap γ with "WPs [$HI $TI $SIa] MI") as "(WPs& [[HI TI] SIa]& %&%&%&%& %H& MI)".
+    { subst Θ. done. }
+    { auto. }
+    destruct H as [LEO3 LB3].
+    (* the check at [n] *)
+    iMod (treg_check n with "TI HI MI") as "(TI& HI& MI& %l& #B)".
+    iApply (run_step 0 s with "[%] [$HI $TI $SIa $MI $WPs]"); first by split_and!.
+    iIntros (σ2 Θ2 κs2 TQ2 g2 v2 Ω2 W2 γ2) "%Hstep LC' ([[HI TI] SIa]& MI& WPs)".
+    destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
+    iModIntro. iApply (tguar_elim _ (sys_lwp s) with "TF [] [%] B [$HI $MI SIa TI WPs]").
+    { iApply run_axiom_lwp. }
+    { split_and!; done. }
+    rewrite /sys_lwp. iFrame "SIa TI". iExists TQ2. by iFrame.
+  Qed.
+
+End adequacy.
+
+(** The program logic establishes [G]; anything implied by its trace property holds. *)
+Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
+  `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS.tregGpreS Λ Σ}
+  s σ Θ i κs (G : tps Λ Σ) (R : trProp Λ) :
+  (∀ τ, tps_tr G τ → R τ) →
+  ∀ (τ : trace Λ),
+  behavior τ →
+  fair_scheduling τ →
+  (τ.1 = 0) →
+  (τ.2 0 = (Θ, σ, i, κs)) →
+  (∀ `{Htemporal : !temporalGS Λ Σ},
+     ∃ (c : Ord.t),
+     ⊢ |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
+                (fork_post : thread_id → val Λ → iProp Σ)
+                (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
+     let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
+     state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
+     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+      |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
+                  (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
+  R τ.
+Proof.
+  intros HR τ BEH FS INIT1 INIT2 Hwp. apply HR.
+  assert (iProp_sat
+            (|==> ∃ (Hmupd : mupdGS Σ) (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))) (Htreg : tregGS.tregGS Λ Σ),
+                let _ : temporalGS Λ Σ := TemporalG Hmupd Hhist Htreg in
+                (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
+                wsat.wsat ∗ wsat.ownE ⊤ ∗
+                |={⊤,∅}=> ALC (|={∅,⊤}=> tps_ti G τ))) as Hsat; cycle 1.
+  { apply sat_bupd, sat_exists in Hsat. destruct Hsat as (Hmupd& Hsat). apply sat_exists in Hsat. destruct Hsat as (Hhist& Hsat). apply sat_exists in Hsat. destruct Hsat as (Htreg& Hsat).
+    set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
+    apply (tps_good G (temporalGS0:=Htemp) emp).
+    apply (sat_fupd ∅), sat_ALC, (sat_fupd ⊤).
+    unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
+    eapply sat_mono. 2: eapply Hsat. simpl. iIntros "($& $& $& $)". }
+  assert (Hwp' : ⊢ ∀ Htemporal : temporalGS Λ Σ,
+            ∃ (c : Ord.t),
+            |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
+                     (fork_post : thread_id → val Λ → iProp Σ)
+                     (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
+            let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
+            state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
+            (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+             |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
+                         (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
+  { iIntros (Htemp). destruct (Hwp Htemp) as [x Hx]. iExists x. iApply Hx. }
+  eapply sat_wand; cycle 1.
+  { eapply Hwp'. }
+  apply (sat_mono True); cycle 1.
+  { apply iProp_sat_intro. }
+  iIntros "_ H".
+  iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& MI)".
+  iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
+  iMod (treg_alloc (Λ:=Λ)) as "(%Htreg& TR)".
+  iExists Hmupd, Hhist, Htreg.
+  set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
+  iDestruct ("H" $! Htemp) as "(%c& H)".
+  iDestruct "R" as "(%x& R)".
+  iMod (own_update _ (● x) with "R") as "[R LC]".
+  { apply (auth_update_alloc x (c ⋅ x)).
+    apply (op_local_update_discrete x ε c).
+    intros ?. apply auth_valid_trivial. }
+  iModIntro. iFrame "R W WOE". rewrite (right_id ε).
+  iMod "H" as "(%Hsic& %fork_post& %Ψs& SI& SIa& WPs)".
+  iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& A& G& MI)".
+  iMod (thP_carriers_alloc_threads (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
+  set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
+  iPoseProof (treg_st_init (treg_handle (temporalGS0:=Htemp)) with "TR") as "TI".
+  iPoseProof ("WPs" with "LC Ths") as "WPs". rewrite union_empty_l_L.
+  destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
+  apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
+  iApply (lwp_ti_logic_temporal (lantanaGS0:=Hlantana) with "[$HI $TI $SIa $MHI $S $T $A $G $MI $WPs]").
+  1,2: eauto. 1: apply map_Forall2_empty.
+  { intros n' σ' Θ' κs' Hlu. rewrite lookup_cons in Hlu. destruct n'; last done. inv Hlu. rewrite INIT2. eauto. }
+Qed.
+
 (** ** Examples *)
 Section examples.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   (** Ghost quantification over iProp, scoping over two temporal operators. *)
   Local Lemma ex_iprop N1 N2 k :
