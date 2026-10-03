@@ -23,7 +23,7 @@ From lantana.program_logic Require Export history_interp.
 Inductive rentry :=
   | RMark
   | RAlways (N : namespace) (γ : gname)
-  | RUntil (N : namespace) (k : positive) (γP γQ γR : gname).
+  | RUntil (N : namespace) (k : positive) (γP γQ : gname).
 
 Definition treg_wf (l : list (nat * rentry)) : Prop :=
   ∀ i j pe_i pe_j, i ≤ j → l !! i = Some pe_i → l !! j = Some pe_j → pe_i.1 ≤ pe_j.1.
@@ -55,7 +55,6 @@ Module tregGS.
   Class tregGpreS `{SI : sidx} (Λ : language) (Σ : gFunctors) := TregGpreS {
       #[local] tregGpreS_list :: inG Σ (mono_listUR (leibnizO (nat * rentry)));
       #[local] tregGpreS_pred :: savedPredG Σ (trace Λ);
-      #[local] tregGpreS_prop :: savedPropG Σ;
     }.
 
   Class tregGS `{SI : sidx} (Λ : language) (Σ : gFunctors) := TregG {
@@ -64,14 +63,14 @@ Module tregGS.
     }.
 
   Definition tregΣ `{SI : sidx} (Λ : language) : gFunctors :=
-    #[GFunctor (mono_listUR (leibnizO (nat * rentry))); savedAnythingΣ (trace Λ -d> ▶ ∙); savedPropΣ].
+    #[GFunctor (mono_listUR (leibnizO (nat * rentry))); savedAnythingΣ (trace Λ -d> ▶ ∙)].
 
   Global Instance subG_tregΣ `{SI : sidx} {Λ} {Σ} : subG (tregΣ Λ) Σ → tregGpreS Λ Σ.
   Proof. solve_inG. Qed.
 
 End tregGS.
 Import tregGS.
-Local Existing Instances treg_inG tregGpreS_list tregGpreS_pred tregGpreS_prop.
+Local Existing Instances treg_inG tregGpreS_list tregGpreS_pred.
 
 Definition tregN : namespace := nroot .@ "treg".
 
@@ -182,14 +181,14 @@ Section registry.
   Proof. by apply saved_pred_alloc. Qed.
   Lemma saved_ti_agree γ f g τ : saved_ti γ f -∗ saved_ti γ g -∗ ▷ (f τ ≡ g τ).
   Proof. apply saved_pred_agree. Qed.
-
-  Definition saved_rec (γ : gname) (R : iProp Σ) : iProp Σ := saved_prop_own γ DfracDiscarded R.
-  Global Instance saved_rec_persistent γ R : Persistent (saved_rec γ R).
-  Proof. rewrite /saved_rec. apply _. Qed.
-  Lemma saved_rec_alloc R : ⊢ |==> ∃ γ, saved_rec γ R.
-  Proof. by apply saved_prop_alloc. Qed.
-  Lemma saved_rec_agree γ R R' : saved_rec γ R -∗ saved_rec γ R' -∗ ▷ (R ≡ R').
-  Proof. apply saved_prop_agree. Qed.
+  (** Agreement of the predicates themselves (in [trace Λ -d> iPropO Σ]). *)
+  Lemma saved_ti_agree_fun γ (f g : trace Λ -d> iPropO Σ) : saved_ti γ f -∗ saved_ti γ g -∗ ▷ (f ≡ g).
+  Proof.
+    iIntros "H1 H2". rewrite /saved_ti /saved_pred_own.
+    iDestruct (saved_anything_agree with "H1 H2") as "Heq".
+    rewrite discrete_fun_equivI. iEval (rewrite discrete_fun_equivI) in "Heq". rewrite bi.later_forall. iIntros (τ).
+    iSpecialize ("Heq" $! τ). by rewrite /= later_equivI.
+  Qed.
 
 End registry.
 
