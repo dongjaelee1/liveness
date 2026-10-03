@@ -134,11 +134,16 @@ Section guarantee.
   Qed.
   Global Instance tguar_ti_proper n : Proper ((≡) ==> (⊣⊢)) (λ f, tguar_ti f n).
   Proof. apply ne_proper, _. Qed.
+  (** Records of internally equal readings (the agreement of saved readings is internal). *)
+  Lemma tguar_ti_eq (f g : trace Λ -d> iPropO Σ) n : f ≡ g -∗ tguar_ti f n -∗ tguar_ti g n.
+  Proof. iIntros "Heq H". iApply (internal_eq_rewrite f g (λ f, tguar_ti f n) with "Heq H"). Qed.
 
   (** Records of a trace property, the bundle and the certificates. *)
   Definition tguar G n : iProp Σ := tguar_ti (tps_ti G) n.
   Definition bundle l n : iProp Σ := bundle_pre tguar_ti l n.
   Definition cert n e : iProp Σ := cert_pre tguar_ti n e.
+  (* Opaque for the proof mode: [iNext] must not strip the laters of the certificates. *)
+  Global Typeclasses Opaque bundle cert.
 
   (** [P ⊨ₜ G]: whenever [P] holds, the rest of the execution satisfies [G]. *)
   Definition temporal P G : iProp Σ :=
@@ -147,10 +152,12 @@ Section guarantee.
 
   Global Instance tguar_persistent G n : Persistent (tguar G n).
   Proof. apply _. Qed.
+  Global Instance cert_pre_persistent n e : Persistent (cert_pre tguar_ti n e).
+  Proof. destruct e; apply _. Qed.
   Global Instance cert_persistent n e : Persistent (cert n e).
-  Proof. rewrite /cert. destruct e; apply _. Qed.
+  Proof. rewrite /cert. apply _. Qed.
   Global Instance bundle_persistent l n : Persistent (bundle l n).
-  Proof. apply _. Qed.
+  Proof. rewrite /bundle /bundle_pre. apply _. Qed.
   Global Instance temporal_persistent P G : Persistent (temporal P G).
   Proof. apply _. Qed.
 
@@ -889,15 +896,519 @@ End certification.
 Section adequacy.
   Context `{!lantanaGS Λ Σ}.
 
+  Lemma behavior_S n (τf : nat → trace_state Λ) : behavior (n, τf) → behavior (S n, τf).
+  Proof. intros BEH. inversion BEH. by subst. Qed.
+
+  (** *** The fairness measure drops across a step
+
+      For every obligation assigned before and after the step. *)
+  Definition obls_drop (m m' : thread_id → Ord.t → Ord.t) (Ω Ω' : obls) : Prop :=
+    ∀ k fu o fu' o', Ω !! k = Some (obl_assigned fu o) → Ω' !! k = Some (obl_assigned fu' o') →
+      (m' o' fu' < m o fu)%ord.
+
+  Local Lemma obl_le_measure γ fu o fu' o' :
+    obl_le (obl_assigned fu o) (obl_assigned fu' o') →
+    (fair_sched_fun γ o' fu' <= fair_sched_fun γ o fu)%ord.
+  Proof.
+    intros [[Hle <-]|Hlt].
+    - apply Hessenberg.le_add_l, Jacobsthal.le_mult_r. done.
+    - apply Ord.lt_le, fair_sched_fun_mon_gen. done.
+  Qed.
+
+  (** Under [obls_le], an assigned obligation comes from an assigned one. *)
+  Local Lemma obls_le_assigned_inv Ω Ω' k x fu' o' :
+    obls_le Ω Ω' → Ω !! k = Some x → Ω' !! k = Some (obl_assigned fu' o') →
+    ∃ fu o, x = obl_assigned fu o ∧ obl_le (obl_assigned fu o) (obl_assigned fu' o').
+  Proof.
+    intros [_ H] Hk Hk'. specialize (H _ _ _ Hk Hk'). destruct x as [fu o|]; [eauto|done].
+  Qed.
+
+  (** A step of the scheduled thread [i1]: its obligations lose fuel, the counters of the
+      other active threads drop. *)
+  Lemma obls_drop_step γ γ2 i1 (τ : trace Λ) Ω Ω0 Ω2 Ω' :
+    obls_le Ω Ω0 → (Ω0 ↪ₚ Ω2 | obl_cond_owner i1) → obls_le Ω2 Ω' →
+    obls_thread_active Ω2 τ → trace_thread τ = i1 → fscnt_next_rel τ γ γ2 →
+    obls_drop (fair_sched_fun γ) (fair_sched_fun γ2) Ω Ω'.
+  Proof.
+    intros LEO0 [StepO _] LEO' OTA Hi FSrel k fu o fu' o' Hk Hk'.
+    assert (Hk0 : ∃ x0, Ω0 !! k = Some x0).
+    { destruct LEO0 as [Hdom _]. apply elem_of_dom, Hdom, elem_of_dom. eauto. }
+    destruct Hk0 as [x0 Hk0].
+    destruct LEO0 as [_ Hle0]. specialize (Hle0 _ _ _ Hk Hk0).
+    specialize (StepO k). rewrite Hk0 in StepO.
+    destruct (Ω2 !! k) as [x2|] eqn:Hk2; last by inv StepO.
+    pose proof (obls_le_assigned_inv _ _ _ _ _ _ LEO' Hk2 Hk') as (fu2& o2& ->& Hle2).
+    apply (obl_le_measure γ2) in Hle2.
+    destruct x0 as [fu0 o0|]; last first.
+    { inv StepO. match goal with H : _ ∨ _ |- _ => destruct H as [[HC _]|[_ Heq]]; [simpl in HC; done|done] end. }
+    apply (obl_le_measure γ) in Hle0.
+    inv StepO. match goal with H : _ ∨ _ |- _ => destruct H as [[HC Hstep]|[HC Heq]] end.
+    - simpl in HC. subst o0.
+      inv Hstep; match goal with H : obl_progress _ _ |- _ => inv H | H : obl_discharge _ _ |- _ => inv H end.
+      eapply Ord.le_lt_lt; first exact Hle2. eapply Ord.lt_le_lt; last exact Hle0.
+      apply fair_sched_fun_mon_gen. done.
+    - inv Heq. simpl in HC.
+      pose proof (OTA k _ Hk2) as TA. simpl in TA.
+      specialize (FSrel o2). unfold fscnt_next_rel_th in FSrel.
+      rewrite decide_False in FSrel; last by intros ->.
+      rewrite decide_False in FSrel; last by intros F; eapply thread_active_and_not_false.
+      eapply Ord.le_lt_lt; first exact Hle2. eapply Ord.lt_le_lt; last exact Hle0.
+      apply Hessenberg.lt_add_r, OrdArith.lt_from_nat. done.
+  Qed.
+
+  (** A step of a finished thread: it owns nothing, every counter drops. *)
+  Lemma obls_drop_na γ γ2 (τ : trace Λ) Ω :
+    ts_emb (thread_na (trace_thread τ)) τ → obls_thread_active Ω τ → fscnt_next_rel τ γ γ2 →
+    obls_drop (fair_sched_fun γ) (fair_sched_fun γ2) Ω Ω.
+  Proof.
+    intros TNA OTA FSrel k fu o fu' o' Hk Hk'. rewrite Hk in Hk'. inv Hk'.
+    pose proof (OTA k _ Hk) as TA. simpl in TA.
+    specialize (FSrel o'). unfold fscnt_next_rel_th in FSrel.
+    rewrite decide_False in FSrel; last by intros ->; eapply thread_active_and_not_false.
+    rewrite decide_False in FSrel; last by intros F; eapply thread_active_and_not_false.
+    apply Hessenberg.lt_add_r, OrdArith.lt_from_nat. done.
+  Qed.
+
+  (** *** One step of the run
+
+      From a consistent system at [n]: the system at [S n], the facts about the step, and
+      later credits for the continuation (which may use fancy updates). *)
+  Lemma run_step (c : nat) s h n σ Θ TQ κs g v Ω W τf γ (Φ : iProp Σ) :
+    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
+     hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+    (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+    (∀ σ' Θ' κs' TQ' g' v' Ω' W' γ',
+       ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω' W' ∧
+        hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ Θ' = fst <$> TQ' ∧
+        obls_drop (fair_sched_fun γ) (fair_sched_fun γ') Ω Ω'⌝ -∗
+       £n c -∗
+       (history_interp (h ++ [(σ', Θ', κs')]) (S n) σ' Θ' κs' ∗ state_interp_aux σ' Θ' κs') ∗
+       model_interp g' v' Ω' W' (S n) (dom Θ') ∗ threads_run s TQ' -∗
+       |={⊤}=> Φ) -∗
+    |={⊤,∅}=> ALC (|={∅,⊤}=> Φ).
+  Proof.
+    iIntros "%H ([HI SIa]& MI& WPs) K". destruct H as (BEH& FS& LB& HIST& EQTQ). rewrite /threads_run.
+    inversion BEH. clear BEH. subst n0 τf0.
+    iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
+    rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
+    rename κs0 into κs, H1 into TRn, H3 into TRn1, H4 into BEH'.
+    iAssert ([∗ map] i ↦ e ∈ Θ, match to_val e with | Some _ => (thP_done i) | None => True end)%I as "#THs".
+    { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
+      iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
+    iPoseProof (history_interp_lookup with "HI") as "%Hlu".
+    destruct H2 as [TStep | TDone].
+    - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
+      inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
+      assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
+      { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
+      destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_delete _ _ _ _ LUTQi1 with "WPs") as "[WP WPs]".
+      pose proof (val_stuck _ _ _ _ _ _ _ _ PStep) as He1. rewrite He1.
+      iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
+      iSpecialize ("WP" $! ctx_id). iEval (rewrite !ctx_id_apply) in "WP".
+      iMod ("WP" with "[] [//] [$HI $SIa]") as "WP".
+      { iPureIntro. apply _. }
+      iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
+      iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
+      2: eapply LB.
+      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      destruct H as [LEO0 LB0].
+      iPoseProof (model_interp_owit_inv with "MI") as "%OWinv0".
+      iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA0". 1,2: eauto.
+      iDestruct "WP" as "[%NStuck WP]".
+      iPoseProof ("WP" with "[//]") as "WP".
+      iEval (rewrite !ctx_id_apply) in "WP". rewrite /mprog.
+      iMod ("WP" with "MI") as "(%Ω2& %ProgO& WP)".
+      assert (TNow : trace_thread (n, τf) = i1).
+      { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
+      pose proof (mprog_exists_step i1 Ω0 Ω2 W0 (n, τf) γ (eq_sym TNow) OTA0 OWinv0 LB0 FS ProgO) as H.
+      destruct H as (W2& γ2& ProgW& OWinv2& LB2& FS2& FSrel).
+      iMod ("WP" $! W2 with "[]") as "[MI WP]".
+      { iPureIntro. split; auto. }
+      iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA2". 1,2: eauto.
+      rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro.
+      rewrite (ALC_credits _ _ (Ord.from_nat c) (|={∅,⊤}=> Φ)%I). iMod "WP". iIntros "LC". simpl.
+      iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g'& %v'& %Ω3& %W3& %& MI)".
+      2: eapply LB2.
+      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      destruct H as [LEO LB3]. iMod "WP" as "(HI& WP& Efs)".
+      unfold trace_next in *. simpl in *. assert (TDisj : Θ ##ₘ efs).
+      { eapply map_disjoint_dom_2, fork_thread_ids; eauto. }
+      remember ((<[i1:=e2]> Θ) ∪ efs) as Θ2.
+      replace (dom (<[i1:=e2]> Θ) ∪ dom efs) with (dom Θ2); cycle 1.
+      { subst Θ2. rewrite dom_union_L. auto. }
+      remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
+      iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, lwpupd j ⊤ e (match to_val e with
+                                                          | Some v => lift_term j Q v
+                                                          | None => lwp_fix s j ⊤ e (lift_term j Q)
+                                                          end))%I with "[Efs]" as "Efs".
+      { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
+        destruct (to_val x) eqn:EQx.
+        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. iApply lwpupd_trans. iApply "WP".
+        - iApply "WP". }
+      iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
+      { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
+        apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom.
+        apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+      1: auto. destruct H as [LEO2 LB4].
+      assert (EQTQ2 : Θ2 = fst <$> (<[i1:=(e2, Q)]> TQ ∪ TQefs)).
+      { subst. rewrite map_fmap_union fmap_insert -map_fmap_compose /compose map_fmap_id. done. }
+      assert (TQDisj : <[i1:=(e2, Q)]> TQ ##ₘ TQefs).
+      { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
+        apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
+      iDestruct "HI" as "[HI SIa]".
+      iPoseProof (history_interp_wf with "HI") as "%HistWF".
+      assert (HIST' : hist_trace (h ++ [(σ2, Θ2, κs)]) τf).
+      { intros n' σ' Θ' κs' H. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
+        - inv H. eapply HIST in LUh. eauto.
+        - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
+          inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
+          destruct HistWF as [Hlen _]. rewrite length_app in Hlen. simpl in Hlen.
+          assert (Hh : length h = S n) by lia. rewrite Hh TRn1. eauto. }
+      destruct (to_val e2) eqn:He2.
+      + rewrite lwp_fix_unfold_fix /lwp_pre He2.
+        iMod (all_interp_lwpupd_steps γ2 with "WP [$HI $SIa] MI") as "(WP& [HI SIa]& %g3& %v3& %Ω5& %W5& %& MI)".
+        { subst Θ2. rewrite lookup_union_l; first apply lookup_insert_eq.
+          apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+        1: eapply LB4. destruct H as [LEO3 LB5].
+        iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
+                   (match to_val e with
+                    | Some v => lift_term j Q v
+                    | None => lwp_fix s j ⊤ e (lift_term j Q)
+                    end))%I with "[WPs WP Efs]" as "WPs".
+        { iApply big_sepM_union; first done.
+          iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
+        iApply ("K" with "[%] LC [$HI $SIa $MI $WPs]"). split_and!; eauto.
+        eapply (obls_drop_step _ _ i1 (n, τf) _ Ω0 Ω2); eauto.
+        etrans; first exact LEO. etrans; [exact LEO2|exact LEO3].
+      + iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
+                   (match to_val e with
+                    | Some v => lift_term j Q v
+                    | None => lwp_fix s j ⊤ e (lift_term j Q)
+                    end))%I with "[WPs WP Efs]" as "WPs".
+        { iApply big_sepM_union; first done.
+          iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
+        iApply ("K" with "[%] LC [$HI $SIa $MI $WPs]"). split_and!; eauto.
+        eapply (obls_drop_step _ _ i1 (n, τf) _ Ω0 Ω2); eauto.
+        etrans; [exact LEO|exact LEO2].
+    - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
+      inversion TDone. clear TDone. inversion H. clear H. subst Θ0 σ1 ρ2.
+      destruct H1 as (He1&<-&<-&->&->). destruct He1 as [v1 He1]. simpl in *.
+      rewrite map_union_empty insert_id in TRn1. 2: auto.
+      iPoseProof (history_interp_step with "HI") as "[SI ACC]". iMod ("ACC" with "SI") as "HI".
+      pose proof (exists_fscnt_next _ _ FS). destruct H as (γ2& FS2& FSrel).
+      unfold trace_next in *. simpl in *.
+      assert (TNow : trace_thread (n, τf) = i1).
+      { unfold trace_thread, trace_now. simpl. rewrite TRn. done. }
+      assert (TNA : ts_emb (thread_na i1) (n, τf)).
+      { unfold ts_emb, thread_na. simpl. rewrite TRn. right. eauto. }
+      rewrite -TNow in TNA. pose proof (owit_inv_lb_step_na_turn _ _ _ _ _ TNA OTA LB FSrel) as LB2.
+      iDestruct "MI" as "[MHI MI]". iMod (model_history_interp_step _ _ _ (S n) with "MHI") as "MHI".
+      1: lia. 1: reflexivity.
+      iPoseProof (history_interp_wf with "HI") as "%HistWF".
+      assert (HIST' : hist_trace (h ++ [(σ, Θ, κs)]) τf).
+      { intros n' σ' Θ' κs' H. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
+        - inv H. eapply HIST in LUh. eauto.
+        - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
+          inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
+          destruct HistWF as [Hlen _]. rewrite length_app in Hlen. simpl in Hlen.
+          assert (Hh : length h = S n) by lia. rewrite Hh TRn1. eauto. }
+      iApply fupd_mask_intro. 1: set_solver. iIntros "close".
+      rewrite (ALC_credits _ _ (Ord.from_nat c) (|={∅,⊤}=> Φ)%I). iApply ALC_intro. iIntros "LC". iMod "close" as "_".
+      iApply ("K" with "[%] LC [$HI $SIa $MHI $MI $WPs]"). split_and!; eauto.
+      eapply obls_drop_na; eauto.
+  Qed.
+
+  (** *** The always loop
+
+      From a consistent system at [n]: certify every registered item (the shape's later
+      strips the registry list and the content of this invariant), step, and decide [n]
+      with the record of the content, then continue. *)
+  Lemma always_run N P :
+    ⌜N ## tregN⌝ -∗ treg -∗ inv N P -∗
+    ∀ s h n σ Θ TQ κs g v Ω W τf γ,
+      ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
+       hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+      (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+      ti_always (tps_ti (tps_sem P)) (ti_pure True) (n, τf).
+  Proof.
+    iIntros "%HN #TR #Hinv". iIntros (s h n σ Θ TQ κs g v Ω W τf γ) "%H ([HI SIa]& MI& WPs)".
+    iLöb as "IH" forall (s h n σ Θ TQ κs g v Ω W τf γ H).
+    destruct H as (BEH& FS& LB& HIST& EQTQ).
+    rewrite ti_always_unfold /ti_always_pre.
+    iMod (inv_acc with "TR") as "[R HcloseR]"; first solve_ndisj.
+    iMod (inv_acc with "Hinv") as "[HP HcloseP]"; first solve_ndisj.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext.
+    iDestruct "R" as (l) "[Ha #Hl]". iMod "close" as "_".
+    iPoseProof (temporal_elim P (tps_sem P) with "[] [$HI $MI $HP]") as "#Trec"; first iApply temporal_sem.
+    iMod ("HcloseP" with "HP") as "_".
+    iMod (certify n l with "Ha Hl HI MI") as "(HI& MI& Ha& #Hl'& #B)".
+    iMod ("HcloseR" with "[Ha]") as "_".
+    { iNext. iExists _. iFrame "Ha Hl'". }
+    iModIntro.
+    iApply (run_step 0 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
+    iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC Sys".
+    destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
+    iModIntro. iSplit; [|iSplit; first done].
+    - iApply (tguar_elim with "Trec [%] B Sys"). split_and!; done.
+    - iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
+      iApply ("IH" with "[%] HI' SIa' MI' WPs'"). split_and!; done.
+  Qed.
+
   (** The registered structures guarantee the always and until of the canonical trace
       properties of their contents. *)
   Lemma temporal_always N P : ⊢ alwaysI N P ⊨ₜ tps_always (tps_sem P).
   Proof.
-  Admitted. (* LOOP-ADMIT: M5, the always loop (certify, step, decide). *)
+    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& #A)". rewrite /alwaysI.
+    iDestruct "A" as (j r γ st) "(%HN& #Hj& #HE& #Hγ& #Hinv& #TR& #AC)".
+    iDestruct (history_interp_hG_event_lookup with "[$HI $HE]") as %Hr.
+    iDestruct (history_interp_wf with "HI") as %[Hlen _].
+    assert (Hrn : r ≤ n) by (apply lookup_lt_Some in Hr; lia).
+    iApply tguar_intro.
+    iIntros "!>" (l s h' TQ g v' Ω' W' τf γ' σ' Θ' κs' (BEH& FS& LB& HIST& EQTQ)) "#B Sys".
+    (* the certificate of this invariant for [n]: from the bundle, or its allocation record *)
+    iAssert (▷ tguar (tps_sem P) n)%I as "#C".
+    { rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
+      iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
+      - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. simpl.
+        iDestruct "Cj" as (f) "[#Hf #Cj]". iDestruct (saved_ti_agree_fun with "Hf Hγ") as "#Heq".
+        iNext. rewrite /tguar. iApply (tguar_ti_eq with "Heq Cj").
+      - assert (r = n) as -> by lia. done. }
+    rewrite /= ti_always_unfold /ti_always_pre.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_". iModIntro.
+    iSplit; [|iSplit; first done].
+    - iApply (tguar_elim with "C [%] B Sys"). split_and!; done.
+    - iApply (always_run with "[//] TR Hinv [%] Sys"). simpl.
+      split_and!; [by apply behavior_S|exact FS|done|done|done].
+  Qed.
+
+  Local Lemma model_interp_event_obl k o g v Ω W n D :
+    Ω !! k = Some o → model_interp g v Ω W n D ⊢ event_obl v (n, Ω) k o.
+  Proof. iIntros (Hk) "(MHI& _)". by iApply model_history_interp_event_obl_now. Qed.
+
+  (** *** The until loop
+
+      Once the obligation is discharged, the record of the right formula at the current
+      position is at hand: certify, step, and decide with it. *)
+  Lemma until_run_discharged (fP : tiProp Λ Σ) (Q : iProp Σ) a s h n σ Θ TQ κs g v Ω W τf γ :
+    treg -∗ tguar (tps_sem Q) n -∗
+    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
+     hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
+    (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+    ti_until Ord.lt a fP (tps_ti (tps_sem Q)) (n, τf).
+  Proof.
+    iIntros "#TR #TQ %H ([HI SIa]& MI& WPs)". destruct H as (BEH& FS& LB& HIST& EQTQ).
+    rewrite ti_until_unfold /ti_until_pre.
+    iMod (inv_acc with "TR") as "[R HcloseR]"; first solve_ndisj.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext.
+    iDestruct "R" as (l) "[Ha #Hl]". iMod "close" as "_".
+    iMod (certify n l with "Ha Hl HI MI") as "(HI& MI& Ha& #Hl'& #B)".
+    iMod ("HcloseR" with "[Ha]") as "_".
+    { iNext. iExists _. iFrame "Ha Hl'". }
+    iModIntro.
+    iApply (run_step 0 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
+    iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC Sys".
+    destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
+    iModIntro. iLeft. iApply (tguar_elim with "TQ [%] B Sys"). split_and!; done.
+  Qed.
+
+  (** While the obligation is assigned, with the measure of its state at the check: certify
+      (the shape's later strips the registry list and the obligation invariant), step, read
+      the obligation at [S n] with a credit of the step, decide. *)
+  Lemma until_run N k (P Q : iProp Σ) :
+    ⌜N ## tregN⌝ -∗ treg -∗ oblP_inv N k P Q (until_disch k (tps_sem Q)) -∗
+    ∀ s h n σ Θ TQ κs g v Ω W τf γ fu o,
+      ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
+       hist_trace h τf ∧ Θ = fst <$> TQ ∧ Ω !! k = Some (obl_assigned fu o)⌝ -∗
+      (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+      ti_until Ord.lt (Ord.S (fair_sched_fun γ o fu)) (tps_ti (tps_sem P)) (tps_ti (tps_sem Q)) (n, τf).
+  Proof.
+    iIntros "%HN #TR #OI". iIntros (s h n σ Θ TQ κs g v Ω W τf γ fu o) "%H ([HI SIa]& MI& WPs)".
+    iLöb as "IH" forall (s h n σ Θ TQ κs g v Ω W τf γ fu o H).
+    destruct H as (BEH& FS& LB& HIST& EQTQ& Hk).
+    iPoseProof (model_interp_event_obl with "MI") as "#EA"; first exact Hk.
+    rewrite ti_until_unfold /ti_until_pre.
+    iMod (inv_acc with "TR") as "[R HcloseR]"; first solve_ndisj.
+    iMod (oblP_inv_acc with "OI") as "[Var ACC]"; first solve_ndisj.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext.
+    iDestruct "R" as (l) "[Ha #Hl]". iMod "close" as "_".
+    iDestruct "Var" as "[[Oa HP]|[[Oa HQ]|[Of _]]]"; last first.
+    { iDestruct "MI" as "(_& S& _)". iEval (unfold_opreds) in "Of". iDestruct "Of" as "[#Oe #Of]".
+      iDestruct (osat_lookup_discharged with "[$S $Oe $Of]") as %H. rewrite Hk in H. done. }
+    - (* [Q] holds at [n] *)
+      iPoseProof (temporal_elim Q (tps_sem Q) with "[] [$HI $MI $HQ]") as "#TrecQ"; first iApply temporal_sem.
+      iMod ("ACC" with "[Oa HQ]") as "_".
+      { iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame. }
+      iMod (certify n l with "Ha Hl HI MI") as "(HI& MI& Ha& #Hl'& #B)".
+      iMod ("HcloseR" with "[Ha]") as "_".
+      { iNext. iExists _. iFrame "Ha Hl'". }
+      iModIntro.
+      iApply (run_step 0 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
+      iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC Sys".
+      destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
+      iModIntro. iLeft. iApply (tguar_elim with "TrecQ [%] B Sys"). split_and!; done.
+    - (* [P] holds at [n] *)
+      iPoseProof (temporal_elim P (tps_sem P) with "[] [$HI $MI $HP]") as "#TrecP"; first iApply temporal_sem.
+      iMod ("ACC" with "[Oa HP]") as "_".
+      { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
+      iMod (certify n l with "Ha Hl HI MI") as "(HI& MI& Ha& #Hl'& #B)".
+      iMod ("HcloseR" with "[Ha]") as "_".
+      { iNext. iExists _. iFrame "Ha Hl'". }
+      iModIntro.
+      iApply (run_step 1 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
+      iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC Sys".
+      destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
+      (* the obligation at [S n] *)
+      iMod (oblP_inv_acc with "OI") as "[Var ACC]"; first solve_ndisj.
+      iMod (lc_fupd_elim_later with "LC Var") as "Var".
+      iDestruct "Var" as "[[Oa' HP']|[[Oa' HQ']|[Of R]]]".
+      + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
+        { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
+          iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
+        iMod ("ACC" with "[Oa' HP']") as "_".
+        { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
+        iModIntro. iRight. iSplit.
+        { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+        iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
+        { iPureIntro. apply Ord.lt_S. eapply DROP; eauto. }
+        iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
+        iApply ("IH" with "[%] HI' SIa' MI' WPs'"). split_and!; done.
+      + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
+        { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
+          iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
+        iMod ("ACC" with "[Oa' HQ']") as "_".
+        { iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame. }
+        iModIntro. iRight. iSplit.
+        { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+        iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
+        { iPureIntro. apply Ord.lt_S. eapply DROP; eauto. }
+        iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
+        iApply ("IH" with "[%] HI' SIa' MI' WPs'"). split_and!; done.
+      + (* discharged during the step, at [n] (before the step) or at [S n] (after) *)
+        iDestruct "R" as "(%n'& %i'& %Ω''& #EF& #TQ')".
+        iAssert (⌜n' ≤ S n⌝)%I as %Hn'.
+        { iDestruct "Sys" as "(_& (MHI'& _)& _)".
+          iDestruct (event_obl_model_history_interp_lookup with "[$MHI' $EF]") as %(_& _& _& ?& _). done. }
+        iAssert (⌜n ≤ n'⌝)%I as %Hn.
+        { destruct (le_gt_dec i' v) as [Hle|Hlt].
+          - iDestruct (event_obl_compare i' v with "[$EF $EA]") as %(_& _& Hle'); first done. done.
+          - iDestruct (event_obl_compare v i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
+        iMod ("ACC" with "[Of]") as "_".
+        { iNext. iApply oblP_variant_unfold. iRight. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
+        iModIntro. destruct (decide (n' = n)) as [->|Hne].
+        * iLeft. iApply (tguar_elim with "TQ' [%] B Sys"). split_and!; done.
+        * assert (n' = S n) as -> by lia.
+          iRight. iSplit.
+          { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+          iExists Ord.O. iSplit; first (iPureIntro; apply Ord.S_pos).
+          unfold trace_next. simpl.
+          iApply (until_run_discharged with "TR TQ' [%] Sys"). split_and!; done.
+  Qed.
 
   Lemma temporal_until N k b q P Q : ⊢ untilI N k b q P Q ⊨ₜ tps_until (tps_sem P) (tps_sem Q).
   Proof.
-  Admitted. (* LOOP-ADMIT: M5, the until loop (certify, step, read the obligation at S n, decide). *)
+    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_unfold /untilI_pers.
+    iDestruct "U" as "[Oa #U]".
+    iDestruct "U" as (j r γP γQ st v Ω1 fu1 o1) "(%HN& #Hj& #HE& #HγP& #HγQ& #OI& #TR& #EA1& #AC)".
+    iAssert (⌜∃ fu o, Ω !! k = Some (obl_assigned fu o)⌝)%I as %(fu& o& Hk).
+    { iDestruct "MI" as "(_& S& _)". iEval (unfold_opreds) in "Oa". iDestruct "Oa" as "[#Oe Oa]".
+      iDestruct (osat_lookup_assigned with "[$S $Oe $Oa]") as %(?&?&?). eauto. }
+    iPoseProof (model_interp_event_obl with "MI") as "#EA"; first exact Hk.
+    iDestruct (history_interp_hG_event_lookup with "[$HI $HE]") as %Hr.
+    iDestruct (history_interp_wf with "HI") as %[Hlen _].
+    assert (Hrn : r ≤ n) by (apply lookup_lt_Some in Hr; lia).
+    iApply tguar_intro.
+    iIntros "!>" (l s h' TQ g v' Ω' W' τf γ' σ' Θ' κs' (BEH& FS& LB& HIST& EQTQ)) "#B Sys".
+    (* the certificate of this until for [n]: from the bundle, or its allocation records *)
+    iAssert (▷ (tguar (tps_sem P) n ∨ tguar (tps_sem Q) n) ∨
+             ▷ (∃ n' i' Ω'', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω'') k obl_discharged ∗ tguar (tps_sem Q) n'))%I as "#C".
+    { rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
+      iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
+      - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. iEval (simpl) in "Cj".
+        iDestruct "Cj" as (fP fQ) "(#HfP& #HfQ& [Cj|Cj])".
+        + iLeft. iDestruct (saved_ti_agree_fun with "HfP HγP") as "#HeqP".
+          iDestruct (saved_ti_agree_fun with "HfQ HγQ") as "#HeqQ".
+          iNext. rewrite /tguar. iDestruct "Cj" as "[Cj|Cj]".
+          * iLeft. iApply (tguar_ti_eq with "HeqP Cj").
+          * iRight. iApply (tguar_ti_eq with "HeqQ Cj").
+        + iRight. iDestruct (saved_ti_agree_fun with "HfQ HγQ") as "#HeqQ".
+          iNext. iDestruct "Cj" as (n' i' Ω'') "(%& #EF& Cj)". iExists n', i', Ω''. iFrame "EF".
+          iSplit; first done. rewrite /tguar. iApply (tguar_ti_eq with "HeqQ Cj").
+      - assert (r = n) as -> by lia. by iLeft. }
+    rewrite /= /ti_exist. iExists (Ord.S (Ord.S (fair_sched_ub fu))).
+    rewrite ti_until_unfold /ti_until_pre.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
+    iApply fupd_mask_intro; first set_solver. iIntros "close".
+    rewrite (ALC_credits _ _ (Ord.from_nat 1) (|={∅,⊤}=> _)%I). iApply ALC_intro. iIntros "LC".
+    iMod "close" as "_".
+    iDestruct "C" as "[[TrecP|TrecQ]|(%n'& %i'& %Ω''& %Hn'& #EF& #TQ')]".
+    - (* [P] at [n]: the obligation at [S n] decides *)
+      iMod (oblP_inv_acc with "OI") as "[Var ACC]"; first solve_ndisj.
+      iMod (lc_fupd_elim_later with "LC Var") as "Var".
+      iDestruct "Var" as "[[Oa' HP']|[[Oa' HQ']|[Of R]]]".
+      + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
+        { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
+          iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
+        iAssert (⌜(fu' w≤ fu)⌝)%I as %Hfu.
+        { iDestruct "Sys" as "(_& (MHI'& _)& _)".
+          iDestruct (event_obl_model_history_interp_lookup with "[$MHI' $EA]") as %(_& _& _& _& [_ Hle]).
+          iPureIntro. specialize (Hle _ _ _ Hk Hk'). destruct Hle as [[? _]|?]; [done|by apply WFOCM.lt_le]. }
+        iMod ("ACC" with "[Oa' HP']") as "_".
+        { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
+        iModIntro. iRight. iSplit.
+        { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+        iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
+        { iPureIntro. apply Ord.lt_S. eapply Ord.le_lt_lt; first apply fair_sched_fun_ub.
+          eapply Ord.le_lt_lt; [by apply fair_sched_ub_le_proper|apply Ord.S_lt]. }
+        iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
+        iApply (until_run with "[//] TR OI [%] [$HI' $SIa' $MI' $WPs']").
+        split_and!; [by apply behavior_S|done|done|done|done|done].
+      + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
+        { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
+          iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
+        iAssert (⌜(fu' w≤ fu)⌝)%I as %Hfu.
+        { iDestruct "Sys" as "(_& (MHI'& _)& _)".
+          iDestruct (event_obl_model_history_interp_lookup with "[$MHI' $EA]") as %(_& _& _& _& [_ Hle]).
+          iPureIntro. specialize (Hle _ _ _ Hk Hk'). destruct Hle as [[? _]|?]; [done|by apply WFOCM.lt_le]. }
+        iMod ("ACC" with "[Oa' HQ']") as "_".
+        { iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame. }
+        iModIntro. iRight. iSplit.
+        { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+        iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
+        { iPureIntro. apply Ord.lt_S. eapply Ord.le_lt_lt; first apply fair_sched_fun_ub.
+          eapply Ord.le_lt_lt; [by apply fair_sched_ub_le_proper|apply Ord.S_lt]. }
+        iDestruct "Sys" as "([HI' SIa']& MI'& WPs')". unfold trace_next. simpl.
+        iApply (until_run with "[//] TR OI [%] [$HI' $SIa' $MI' $WPs']").
+        split_and!; [by apply behavior_S|done|done|done|done|done].
+      + iDestruct "R" as "(%n'& %i'& %Ω''& #EF& #TQ')".
+        iAssert (⌜n' ≤ S n⌝)%I as %Hn'.
+        { iDestruct "Sys" as "(_& (MHI'& _)& _)".
+          iDestruct (event_obl_model_history_interp_lookup with "[$MHI' $EF]") as %(_& _& _& ?& _). done. }
+        iAssert (⌜n ≤ n'⌝)%I as %Hn.
+        { destruct (le_gt_dec i' i) as [Hle|Hlt].
+          - iDestruct (event_obl_compare i' i with "[$EF $EA]") as %(_& _& Hle'); first done. done.
+          - iDestruct (event_obl_compare i i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
+        iMod ("ACC" with "[Of]") as "_".
+        { iNext. iApply oblP_variant_unfold. iRight. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
+        iModIntro. destruct (decide (n' = n)) as [->|Hne].
+        * iLeft. iApply (tguar_elim with "TQ' [%] B Sys"). split_and!; done.
+        * assert (n' = S n) as -> by lia.
+          iRight. iSplit.
+          { iApply (tguar_elim with "TrecP [%] B Sys"). split_and!; done. }
+          iExists Ord.O. iSplit; first (iPureIntro; apply Ord.S_pos).
+          unfold trace_next. simpl.
+          iApply (until_run_discharged with "TR TQ' [%] Sys").
+          split_and!; [by apply behavior_S|done|done|done|done].
+    - (* [Q] at [n] *)
+      iModIntro. iLeft. iApply (tguar_elim with "TrecQ [%] B Sys"). split_and!; done.
+    - (* discharged before the check: the discharge was at [n] *)
+      iAssert (⌜n ≤ n'⌝)%I as %Hn.
+      { destruct (le_gt_dec i' i) as [Hle|Hlt].
+        - iDestruct (event_obl_compare i' i with "[$EF $EA]") as %(_& _& Hle'); first done. done.
+        - iDestruct (event_obl_compare i i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
+      assert (n' = n) as -> by lia.
+      iModIntro. iLeft. iApply (tguar_elim with "TQ' [%] B Sys"). split_and!; done.
+  Qed.
 
   (** With valid guarantees of the contents. *)
   Lemma temporal_always_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ tps_always G.
@@ -929,7 +1440,45 @@ Section adequacy.
                   (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }}))))
       ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> tps_ti G (n, τf)).
   Proof.
-  Admitted. (* LOOP-ADMIT: M5, one iteration of the run at the initial position. *)
+    iIntros (BEH FS LB HIST) "(LC& #TR& [HI SIa]& MI& WPs)".
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((%P& #HG& HP& WPs)& HI& %&%&%&%& %H& MI)".
+    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    1: auto.
+    destruct H as [LEO1 LB1].
+    iPoseProof (temporal_elim with "HG [$HI $MI $HP]") as "#TF".
+    iPoseProof ("WPs" with "HP") as "WPs".
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "(WPs& HI& %&%&%&%& %H& MI)".
+    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    1: auto.
+    destruct H as [LEO2 LB2].
+    iPoseProof (big_sepM2_alt with "WPs") as "[%Dom WPs]".
+    remember (map_zip Θ Ψs) as TQ. assert (EQTQ : Θ = fst <$> TQ).
+    { subst. rewrite fst_map_zip; auto. intro k. rewrite -!elem_of_dom Dom. auto. }
+    iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
+               lwpupd i ⊤ e (match to_val e with
+                             | Some v => (lift_term i Q) v
+                             | None => lwp_fix s i ⊤ e (lift_term i Q)
+                             end))%I with "[WPs]" as "WPs".
+    { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
+      rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
+      simpl. destruct (to_val e) eqn:He.
+      - iApply lwpupd_trans. iApply "H".
+      - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
+    iMod (all_interp_lwpupd_steps_gmap γ with "WPs [$HI $SIa] MI") as "(WPs& HI& %&%&%&%& %H& MI)".
+    { subst Θ. done. }
+    { auto. }
+    destruct H as [LEO3 LB3]. iDestruct "HI" as "[HI SIa]".
+    (* the check at [n], with the later credit *)
+    iMod (inv_acc with "TR") as "[R HcloseR]"; first solve_ndisj.
+    iMod (lc_fupd_elim_later with "LC R") as (l) "[Ha #Hl]".
+    iMod (certify n l with "Ha Hl HI MI") as "(HI& MI& Ha& #Hl'& #B)".
+    iMod ("HcloseR" with "[Ha]") as "_".
+    { iNext. iExists _. iFrame "Ha Hl'". }
+    iApply (run_step 0 with "[%] [$HI $SIa $MI $WPs]"); first by split_and!.
+    iIntros (σ2 Θ2 κs2 TQ2 g2 v2 Ω2 W2 γ2) "%Hstep LC' Sys".
+    destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
+    iModIntro. iApply (tguar_elim with "TF [%] B Sys"). split_and!; done.
+  Qed.
 
 End adequacy.
 
