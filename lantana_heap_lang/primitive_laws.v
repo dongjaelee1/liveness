@@ -303,7 +303,7 @@ Lemma lwp_fork_step s i E E' e Φ {C} :
                    thP_carriers j ∅ -∗
                    ALC (|={E',E}=>
                         |={E}=>m (|={E}=>m Φ (LitV LitUnit)) ∗
-                                ((|={⊤}=>m (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }})))))) -∗
+                                (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }})))) -∗
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step. 1: eauto.
@@ -349,7 +349,7 @@ Proof.
   iMod (obl_offload_set with "Cg Cg2 OF") as "(Cg& Cg2& _)". 1: set_solver. 1: done.
   rewrite union_empty_l_L union_empty_r_L. iModIntro. iSplitR "TEj HP TGj GF2 Cg2".
   - iApply ("HΦ" with "[$TE $LC $TG $Ws $Cg]").
-  - iModIntro. iApply ("Hfork" with "[$TEj $TGj GF2 $Cg2 $HP]").
+  - iApply ("Hfork" with "[$TEj $TGj GF2 $Cg2 $HP]").
     { iApply big_sepS_singleton. iFrame. }
     auto.
 Qed.

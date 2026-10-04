@@ -34,7 +34,7 @@ Section wp.
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       (|={E}=>m ((lWP e2 @ s; i; E {{ Φ }}) ∗
                                                      ([∗ map] j ↦ ef ∈ efs,
-                                                        (|={⊤}=>m (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))))
+                                                        lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (He) "H". iApply (lwp_lift_step s i E e1 Φ). 1: auto. iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
@@ -84,7 +84,7 @@ Section wp.
                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                      |={E1}=>m
                                               (from_option (λ v, (|={E1}=>m (Φ v))) False (to_val e2)) ∗
-                                            [∗ map] j ↦ ef ∈ efs, (|={⊤}=>m (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))
+                                            [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros (He) "H". iApply lwp_lift_atomic_step. 1: auto.

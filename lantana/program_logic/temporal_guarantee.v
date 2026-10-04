@@ -1890,7 +1890,7 @@ Section adequacy.
     ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
       model_interp g v Ω W n (dom Θ) ∗
       (|={⊤}=>m ∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                  (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }})))))
+                  (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }})))
       ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> tps_ti G (n, τf)).
   Proof.
     iIntros (BEH FS LB HIST) "([HI SIa]& MI& WPs)".
@@ -1912,11 +1912,10 @@ Section adequacy.
                              | Some v => (lift_term i Q) v
                              | None => lwp_fix s i ⊤ e (lift_term i Q)
                              end)))%I with "[WPs]" as "WPs".
-    { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
-      rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
-      simpl. destruct (to_val e) eqn:He.
-      - iApply sfmupd_trans. iApply "H".
-      - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
+    { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x as [e Q]. simpl.
+      rewrite lwp_unfold_fix. destruct (to_val e) eqn:He.
+      - by iEval (rewrite lwp_fix_unfold_fix /lwp_pre He) in "H".
+      - by iApply sfmupd_intro. }
     iMod (all_interp_sfmupd_steps_gmap γ with "WPs [$HI $TI] MI") as "(WPs& [HI TI]& %&%&%&%& %H& MI)".
     { auto. }
     destruct H as [LEO3 LB3].
@@ -1952,7 +1951,7 @@ Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
      (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
       |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                  (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))))) →
+                  (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))) →
   R τ.
 Proof.
   intros HR τ BEH FS INIT1 INIT2 Hwp. apply HR.
@@ -1977,7 +1976,7 @@ Proof.
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
              |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                         (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))))).
+                         (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))).
   { iIntros (Htemp). destruct (Hwp Htemp) as [x Hx]. iExists x. iApply Hx. }
   eapply sat_wand; cycle 1.
   { eapply Hwp'. }

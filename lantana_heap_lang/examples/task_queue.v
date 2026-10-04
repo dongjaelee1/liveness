@@ -283,7 +283,7 @@ Section proof.
     - iModIntro. lwp_pures.
       iModIntro. lwp_finish.
       rewrite /is_task_queue. iApply ("HΦ" with "[$TE $Q_LC $TG $IQ]").
-    - iModIntro. rewrite /is_task_queue.
+    - rewrite /is_task_queue.
       iApply ("TaskQueue_worker_spec" $! true with "[$TEj $TGj $Fg $Qw $IQ]").
       { iPureIntro. split; auto. set_solver. }
       iIntros "%". done.

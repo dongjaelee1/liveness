@@ -178,7 +178,7 @@ Definition lwp_pre `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} (s 
     (match to_val e1 with
      | Some v => |={E}=>m (Φ v)
      | None =>
-         (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, |={⊤}=>m (lwp j ⊤ ef (lift_term j fork_post))))
+         (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, lwp j ⊤ ef (lift_term j fork_post)))
      end)%I.
 
 Lemma lwp_pre_mono `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} s
@@ -191,7 +191,7 @@ Proof.
   iApply (lwp_step_mono with "[] Hlwp"). iModIntro.
   iIntros (e efs) "[Hlwp Hefs]". iSplitR "Hefs"; first by iApply "Hmono".
   iApply (@big_sepM_impl with "Hefs"); iIntros "!#" (k e' _) "Hlwp".
-  iApply (sfmupd_wand_l with "[$Hlwp]"). iApply "Hmono".
+  by iApply "Hmono".
 Qed.
 
 (* Uncurry [lwp_pre] and equip its type with an OFE structure *)
@@ -364,7 +364,7 @@ Section lwp.
     iMod "IH" as "IH". iModIntro.
     iMod "IH" as "($& [IH Efs])". iDestruct "IH" as "[IH _]".
     iModIntro. iFrame.
-    iApply (big_sepM_impl with "Efs"). iIntros "!>" (k ef _). iIntros ">[H _]". done.
+    iApply (big_sepM_impl with "Efs"). iIntros "!>" (k ef _). iIntros "[H _]". done.
   Qed.
 
   Lemma lwp_strong_mono_sfmupd s1 s2 i E1 E2 e Φ Ψ :
@@ -391,7 +391,7 @@ Section lwp.
     iSplitR "Efs".
     + by iApply "IH".
     + iApply (big_sepM_impl with "Efs"); iIntros "!>" (k ef _).
-      iIntros ">[_ H]". by iApply (lwp_stuckness_mono with "H").
+      iIntros "[_ H]". by iApply (lwp_stuckness_mono with "H").
   Qed.
   Lemma lwp_strong_mono s1 s2 i E1 E2 e Φ Ψ :
     s1 ⊑ s2 → E1 ⊆ E2 →
@@ -509,7 +509,7 @@ Section lwp.
     iEval (rewrite !ctx_comp_apply) in "IH".
     iMod "IH" as ">>IH". iMod "IH". iDestruct "IH" as "(SI& IH& Efs)".
     rewrite (bi.sep_assoc). iSplitR "Efs"; cycle 1.
-    { iModIntro. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done. }
+    { iModIntro. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% [_ H]". done. }
     iDestruct "IH" as "[IH _]". iPoseProof ("IH" with "HΦ") as "IH".
     by iFrame.
   Qed.

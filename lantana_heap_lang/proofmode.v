@@ -288,7 +288,12 @@ Tactic Notation "lwp_bind" open_constr(efoc) :=
   | |- envs_entails _ ((|={?E}=>m (lwp ?s ?i ?E ?e ?Q))) =>
     first [ reshape_expr e ltac:(fun K e' => unify e' efoc; lwp_bind_gen_core K)
           | fail 1 "lwp_bind: cannot find" efoc "in" e ]
-  | _ => fail "lwp_bind: not a '|={E}=>m lWP'"
+  | |- envs_entails _ (lwp ?s ?i ?E ?e ?Q) =>
+    (* a plain [lWP] goal absorbs a model update ([sfmupd_lwp]) *)
+    iApply sfmupd_lwp;
+    first [ reshape_expr e ltac:(fun K e' => unify e' efoc; lwp_bind_gen_core K)
+          | fail 1 "lwp_bind: cannot find" efoc "in" e ]
+  | _ => fail "lwp_bind: not a 'lWP' or '|={E}=>m lWP'"
   end.
 
 (** Tactics for goals of the form [|={E}=>m lWP e @ s; i; E {{ Φ }}]. *)

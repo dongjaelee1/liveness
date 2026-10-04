@@ -127,7 +127,7 @@ Section proof.
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
-                   (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ i; ⊤ {{ lift_term i Ψ }}))))).
+                   (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ i; ⊤ {{ lift_term i Ψ }}))).
   Proof.
     iIntros (HT HP HQ) "TEs TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
@@ -154,7 +154,7 @@ Section proof.
     { done. }
     { done. }
     iSplitL "WP".
-    { iApply "WP". iModIntro. eauto. iIntros (?) "(_& %& H)". rewrite /lift_term.
+    { iApply "WP". iIntros (?) "(_& %& H)". rewrite /lift_term.
       iDestruct "H" as "[$ _]". eauto. }
     done.
   Qed.
