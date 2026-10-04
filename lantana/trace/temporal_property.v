@@ -4,14 +4,12 @@ From lantana.algebra Require Import axioms.
 
 (** * Trace predicates
 
-    Properties of executions ([trProp]), with the LTL connectives. The program logic's
-    trace properties ([tps], temporal_guarantee.v) have these as their trace readings. *)
+    Properties of executions ([trProp]), with the LTL connectives, their fixpoints, fair
+    scheduling and Iris-style safety. The program logic's trace properties ([tps],
+    temporal_tps.v) have these as their trace readings. *)
 
-(** trace_state properties *)
+(** ** Predicates on a trace state and on a trace *)
 Definition tsProp (Λ : language) := trace_state Λ → Prop.
-
-Definition ts_and {Λ : language} : tsProp Λ → tsProp Λ → tsProp Λ :=
-  λ P Q, (λ ξ, (P ξ) ∧ (Q ξ)).
 
 Definition ts_atomic {Λ : language} (π : state_pred Λ) : tsProp Λ :=
   λ ξ, let '((Θ, σ), _, _) := ξ in state_sat σ Θ π.
@@ -54,17 +52,11 @@ Proof.
   intros. unfold ts_emb. destruct τ as (n& τf). simpl. eauto.
 Qed.
 
-Lemma ts_emb_and_comm {Λ : language} (P Q : tsProp Λ) :
-  ∀ τ, ts_emb (ts_and P Q) τ ↔ (tr_and (ts_emb P) (ts_emb Q)) τ.
-Proof.
-  intros. unfold ts_emb, ts_and, trace_now, tr_and. auto.
-Qed.
-
-(** TODO: better tactic for solving trProp implications. *)
+(** Unfolds the trace connectives. *)
 Ltac unfold_trProp :=
   unfold tr_until, tr_always, tr_exist, tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_atomic.
 
-(** Notations *)
+(** ** Notations *)
 
 Declare Scope tr_scope.
 Delimit Scope tr_scope with R.
@@ -80,7 +72,6 @@ Notation r_exist A := (tr_exist A).
 Notation "∃'" := (r_exist _) (only parsing) : tr_scope.
 Notation "∃ a .. z , P" := (r_exist _ (λ a, .. (r_exist _ (λ z, P%R)) ..)) : tr_scope.
 
-(** Useful patterns *)
 Definition tr_eventually {Λ : language} : trProp Λ → trProp Λ :=
   λ Q, tr_until (⌜ True ⌝)%R Q.
 
@@ -117,7 +108,10 @@ Section tr_fixpoints.
   Qed.
 End tr_fixpoints.
 
-(** ** Define fair scheduling as a property of a trace. *)
+(** ** Fair scheduling
+
+    Every thread that is active is eventually scheduled. The fairness counter ([fscnt])
+    bounds, for every thread, the steps of other threads until its next turn. *)
 
 Definition thread_active {Λ : language} (i : thread_id) : tsProp Λ :=
   λ ξ, let '((Θ, σ), _, _) := ξ in ∃ e, Θ !! i = Some e ∧ to_val e = None.
@@ -129,9 +123,10 @@ Definition thread_turn {Λ : language} (i : thread_id) : tsProp Λ :=
   λ ξ, let '(_, j, _) := ξ in i = j.
 
 Definition fair_scheduling {Λ : language} : trProp Λ :=
-  tr_always (∀ i, (ts_emb (thread_na i)) ∨ ((ts_emb (thread_active i)) ∧ tr_eventually (ts_emb (thread_turn i))))%R.
+  tr_always (∀ i, (ts_emb (thread_na i)) ∨
+                  ((ts_emb (thread_active i)) ∧ tr_eventually (ts_emb (thread_turn i))))%R.
 
-Section proof.
+Section thread_status.
   Context {Λ : language}.
   Implicit Type ξ : trace_state Λ.
   Implicit Type τ : trace Λ.
@@ -170,7 +165,8 @@ Section proof.
       * destruct H; [done |]. destruct H as (?&?&?). inv H. rewrite EQe in H1. done.
     + destruct H0 as (?&?&?). done.
   Qed.
-  Lemma ts_emb_thread_active_and_not_false i τ : (ts_emb (thread_na i)) τ → (ts_emb (thread_active i)) τ → False.
+  Lemma ts_emb_thread_active_and_not_false i τ :
+    (ts_emb (thread_na i)) τ → (ts_emb (thread_active i)) τ → False.
   Proof.
     destruct τ as (n&τf). unfold ts_emb. simpl. apply thread_active_and_not_false.
   Qed.
@@ -187,7 +183,7 @@ Section proof.
     destruct τ as (n&τf). unfold ts_emb. simpl. apply thread_active_or_not.
   Qed.
 
-End proof.
+End thread_status.
 
 Section fair_sched_cnt.
   Context {Λ : language}.
@@ -206,24 +202,14 @@ Section fair_sched_cnt.
   Definition beh_fscnt (τ : trace Λ) (γ : fscnt) : Prop :=
     ∀ (i : thread_id), beh_fscnt_th τ i (γ i).
 
-  Lemma beh_fscnt_th_upto_le (τ : trace Λ) i (c1 c2 : nat) :
-    beh_fscnt_th τ i c1 →
-    c1 ≤ c2 →
-    beh_fscnt_th τ i c2.
-  Proof.
-    intros BEH LEc. inv BEH.
-    eapply (beh_fscnt_th_step _ _ _ _ _ c'); eauto.
-    destruct H1; auto. right. destruct H. split; auto.
-    destruct (decide (i = trace_thread τ)); auto. eapply Nat.lt_le_trans; eauto.
-  Qed.
-
   (** We use choice here. *)
   Lemma fair_scheduling_fscnt (τ : trace Λ) :
     fair_scheduling τ → ∃ (γ : fscnt), beh_fscnt τ γ.
   Proof.
     intros FS. unfold beh_fscnt. apply choice. intros i. destruct τ as (n&τf).
     assert (∀ (s : nat),
-              (((ts_emb (thread_na i) (n, τf))) ∨ ((ts_emb (thread_active i) (n, τf)) ∧ (ts_emb (thread_turn i) (s + n, τf))))
+              (((ts_emb (thread_na i) (n, τf))) ∨
+               ((ts_emb (thread_active i) (n, τf)) ∧ (ts_emb (thread_turn i) (s + n, τf))))
               → beh_fscnt_th (n, τf) i s); cycle 1.
     { destruct (ts_emb_thread_active_or_not i (n, τf)) as [TH | TH].
       - exists 0. specialize (H 0). apply H. left. auto.
@@ -247,7 +233,7 @@ Section fair_sched_cnt.
         * apply fair_scheduling_next; auto.
         * right. eauto.
     - destruct TH as [TA TTurn]. destruct s.
-      (* Induction on s breask Guarded check? *)
+      (* A case split on [s], not an induction (which may break the guard condition). *)
       { simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
         unfold ts_emb, thread_turn in TTurn. simpl in TTurn. rewrite Htrn in TTurn. subst j.
         destruct (ts_emb_thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
@@ -314,7 +300,10 @@ Section fair_sched_cnt.
 
 End fair_sched_cnt.
 
-(** ** Define not_stuck & if_term_val (= Iris safety) as a property of a trace. *)
+(** ** Iris-style safety
+
+    The scheduled thread is not stuck, and a terminated thread [i] satisfies its
+    postcondition. This [not_stuck] (a [tsProp]) shadows [language.not_stuck]. *)
 Definition not_stuck {Λ : language} : tsProp Λ :=
   λ ξ, let '((Θ, σ), i, _) := ξ in
        ∃ e, Θ !! i = Some e ∧

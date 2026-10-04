@@ -1,22 +1,19 @@
-From iris.proofmode Require Import base proofmode classes.
-From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From transfinite.base_logic.lib Require Import iprop.
-From stdpp Require Import namespaces.
-From lantana.base_logic Require Import obligation.
 From lantana.trace Require Export temporal_guarantee.
-From lantana.algebra Require Import ordinal_ucmra.
-From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat mono_list.
-From transfinite.base_logic.lib Require Import ghost_map.
-(** For func_ext. *)
-From lantana.algebra Require Import axioms.
+From iris.algebra Require Import mono_list.
+From lantana.algebra Require Import axioms. (* func_ext *)
+
+(** * Chains of untils
+
+    [untilI_chain]: [P] until [Q] or until the next link of the chain, whose ordinal is
+    smaller, so every chain is finite. [until_chain_log] keeps the discharged links of a
+    chain in a monotone ghost log ([uchain_auth], [uchain_pin]). *)
 
 Definition uchain_log_wf (l : list (oid * Ord.t)) : Prop :=
   ∀ i (e1 e2 : oid * Ord.t),
   (l !! i = Some e1) → (l !! (S i) = Some e2) → (e1.2 < e2.2)%ord.
 
-(** Properties of wf. *)
-Section proof.
+Section uchain_log_wf_facts.
 
   Lemma uchain_log_wf_lookup_1 l i j e1 e2 :
     uchain_log_wf l → l !! i = Some e1 → l !! j = Some e2 → i < j → (e1.2 < e2.2)%ord.
@@ -91,8 +88,9 @@ Section proof.
       pose proof (IHl _ _ _ _ H H0 H1 H2). lia.
   Qed.
 
-End proof.
+End uchain_log_wf_facts.
 
+(** ** Ghost state: the log of a chain *)
 Module uchainGS.
 
   Class uchainGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
@@ -116,9 +114,8 @@ Module uchainGS.
 End uchainGS.
 Import uchainGS.
 
-(** User interface *)
-(* Make the instances local to this file. We cannot use #[local] in the code *)
-(* above, as that would make the instances local to the module. *)
+(* The instances are local to this file ([#[local]] in the module would make them local
+   to the module). *)
 Local Existing Instances uchain_inG uchainGpreS_log.
 
 Local Definition uchain_auth_def `{SI : sidx} `{@uchainGS SI Σ}
@@ -140,7 +137,9 @@ Local Definition uchain_pin_unseal :
   @uchain_pin = @uchain_pin_def := uchain_pin_aux.(seal_eq).
 Global Arguments uchain_pin {SI Σ _}.
 
-(** A chain of untils: [P] until [Q], or until the next link, whose ordinal is smaller.
+(** ** Chains
+
+    A chain of untils: [P] until [Q], or until the next link, whose ordinal is smaller.
     Defined by well-founded recursion on the ordinal, so it is a plain iProp. *)
 Fixpoint untilI_chain_rec `{!lantanaGS Λ Σ}
   (N : namespace) k (o : Ord.t) (P Q : iProp Σ) (ACC : Acc Ord.lt o) {struct ACC} : iProp Σ :=

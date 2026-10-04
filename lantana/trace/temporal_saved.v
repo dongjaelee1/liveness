@@ -7,7 +7,8 @@ From lantana.trace Require Export temporal_guarantee.
 
     Temporal formulas are iProps and their guarantees are persistent iProps, so both can be
     stored in ghost state with the usual Iris constructions. A saved proposition names a
-    temporal formula; storing its guarantee next to it makes the pair self-certifying. *)
+    temporal formula; storing its guarantee next to it makes the pair self-certifying.
+    Recursion through a registered structure is in temporal_fixpoint.v ([nest]). *)
 
 Section saved.
   Context `{!lantanaGS Λ Σ, !savedPropG Σ}.
@@ -50,7 +51,7 @@ End saved.
 
 (** A registry of temporal formulas, one per request, chosen at runtime. Its invariant
     guarantees, at all times, the trace property of every registered request. *)
-Section registry.
+Section request_registry.
   Context `{!lantanaGS Λ Σ, !savedPropG Σ, !ghost_mapG Σ nat gname}.
   Implicit Types G : nat → tps Λ Σ.
 
@@ -74,8 +75,5 @@ Section registry.
     iNext. iExists ∅. iFrame. by rewrite big_sepM_empty.
   Qed.
 
-End registry.
+End request_registry.
 
-(** Recursion through a registered structure: [alwaysI_guar] is contractive in its content,
-    so structures can be defined by guarded recursion; the stored guarantee is a fixpoint
-    trace property and its proof is closed. See temporal_fixpoint.v ([nest]). *)

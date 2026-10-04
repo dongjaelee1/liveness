@@ -1,21 +1,19 @@
-From iris.proofmode Require Import base proofmode classes.
+From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.program_logic Require Export language weakestpre.
-From lantana.trace Require Export temporal_property.
-From lantana.trace Require Export adequacy.
-From lantana.trace Require Import temporal_guarantee.
-
-From transfinite.stepindex Require Import ordinals.
-(* From transfinite.base_logic Require Import satisfiable. *)
+From lantana.trace Require Import adequacy temporal_guarantee.
 From lantana.base_logic Require Import satisfiable.
-From lantana.algebra Require Import ordinal_existential_properties.
 
-From lantana.algebra Require Import axioms.
+(** * Adequacy of [lWP] for Iris-style safety
+
+    A program verified with [lWP] (at [NotStuck]) is safe on every fair run: no thread gets
+    stuck and the thread [j] satisfies its postcondition once it terminates ([safety_iris]).
+    The proof reads the always of the step-indexed reading off the run directly, without
+    temporal guarantees. *)
 
 Local Definition safety_iris_tiProp `{!temporalGS Λ Σ} i Φ : tiProp Λ Σ :=
   ti_always (ti_pure True) (λ τ, (⌜ (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R τ ⌝)%I).
 
-Section proof1.
+Section safety_trace.
   Context `{!temporalGS Λ Σ}.
   Implicit Type F : iProp Σ.
 
@@ -27,9 +25,9 @@ Section proof1.
     eapply ti_always_tr_always; eauto. 1: done. simpl. intros. apply sat_elim in H0. auto.
   Qed.
 
-End proof1.
+End safety_trace.
 
-Section proof2.
+Section safety_lwp.
   Context `{!lantanaGS Λ Σ}.
 
   Lemma lwp_fix_safety_iris_tiProp
@@ -269,7 +267,7 @@ Section proof2.
     destruct H. exists x0, x. split; eauto. subst. eapply map_lookup_zip_Some; auto.
   Qed.
 
-End proof2.
+End safety_lwp.
 
 Theorem lwp_adequacy_safety_iris (Σ : gFunctors) (Λ : language)
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS.tregGpreS Λ Σ}
@@ -283,7 +281,7 @@ Theorem lwp_adequacy_safety_iris (Σ : gFunctors) (Λ : language)
      ∃ (c : Ord.t),
        ⊢ |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
                   (fork_post : thread_id → val Λ → iProp Σ)
-                  (* FIXME: cannot unify pos_countable for some reason *)
+                  (* explicit: unification does not find [pos_countable] here *)
                   (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
      let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
      ⌜(∃ Q, Ψs !! j = Some Q ∧ ∀ v, (Q j v ⊢ ⌜Φ j v⌝))⌝ ∧
@@ -294,12 +292,14 @@ Theorem lwp_adequacy_safety_iris (Σ : gFunctors) (Λ : language)
 Proof.
   intros τ BEH FS INIT1 INIT2 Hwp.
   assert (iProp_sat
-            (|==> ∃ (Hmupd : mupdGS Σ) (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))) (Htreg : tregGS.tregGS Λ Σ),
+            (|==> ∃ (Hmupd : mupdGS Σ) (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ)))
+                    (Htreg : tregGS.tregGS Λ Σ),
                 let _ : temporalGS Λ Σ := TemporalG Hmupd Hhist Htreg in
                 (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
                 wsat.wsat ∗ wsat.ownE ⊤ ∗
                 |={⊤}=> safety_iris_tiProp j Φ τ)) as Hsat; cycle 1.
-  { apply sat_bupd, sat_exists in Hsat. destruct Hsat as (Hmupd& Hsat). apply sat_exists in Hsat. destruct Hsat as (Hhist& Hsat).
+  { apply sat_bupd, sat_exists in Hsat. destruct Hsat as (Hmupd& Hsat).
+    apply sat_exists in Hsat. destruct Hsat as (Hhist& Hsat).
     apply sat_exists in Hsat. destruct Hsat as (Htreg& Hsat).
     set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
     apply (safety_iris_tiProp_trProp emp). apply (sat_fupd ⊤).
@@ -347,4 +347,3 @@ Proof.
   eauto.
 Qed.
 
-(* Print Assumptions lwp_adequacy_safety_iris. *)

@@ -85,3 +85,33 @@ Section sat_at_frame.
 End sat_at_frame.
 
 Notation iProp_sat_lc_at_frame := (sat_at_frame (sat_at := iProp_sat_lc_at)).
+
+(** Satisfiability of a conjunction gives that of each conjunct. *)
+Section sat_and.
+  Context `{SI : sidx} `{!invGS Σ}.
+
+  Lemma iProp_sat_lc_and (P Q : iProp Σ) :
+    iProp_sat_lc (P ∧ Q) → (iProp_sat_lc P ∧ iProp_sat_lc Q).
+  Proof.
+    intros H. split; revert H; apply sat_mono.
+    - iIntros "[$ _]".
+    - iIntros "[_ $]".
+  Qed.
+
+  Lemma iProp_sat_lc_at_and `{!invGS Σ} E (P Q : iProp Σ) :
+    iProp_sat_lc_at E (P ∧ Q) → (iProp_sat_lc_at E P ∧ iProp_sat_lc_at E Q).
+  Proof.
+    intros H. split; revert H; apply sat_mono.
+    - iIntros "[$ _]".
+    - iIntros "[_ $]".
+  Qed.
+
+  Lemma iProp_sat_lc_at_frame_and `{!invGS Σ} E (F P Q : iProp Σ) :
+    iProp_sat_lc_at_frame F E (P ∧ Q) → (iProp_sat_lc_at_frame F E P ∧ iProp_sat_lc_at_frame F E Q).
+  Proof.
+    intros H. split; revert H; apply sat_mono.
+    - iIntros "[$ _]".
+    - iIntros "[_ $]".
+  Qed.
+
+End sat_and.

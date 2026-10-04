@@ -1,31 +1,30 @@
 From iris.proofmode Require Import proofmode.
-From lantana.program_logic Require Export lifting.
 From lantana.trace Require Export temporal_guarantee.
 
-Definition fuel_burning_triple `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset oid → gset oid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+(** * Fuel-burning triples
+
+    [fuel_burning_triple s i E G G' P e Q]: thread [i] runs [e] from [P] to [Q], with child
+    obligations [G] before and [G'] after ([thP_kids]). Rules for witness induction and for
+    allocating and discharging untils at the level of triples. *)
+
+Definition fuel_burning_triple `{!lantanaGS Λ Σ} :
+  stuckness → thread_id → coPset -> gset oid → gset oid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,
     (∀ (Φ : val Λ → iPropI Σ),
        (thP_kids i G ∗ P) -∗
        (∀ v, thP_kids i G' ∗ Q v -∗ Φ v) -∗
        lWP e @ s; i; E {{ v, Φ v }})%I.
 
-Definition fuel_burning_triple_persistent `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset oid → gset oid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+Definition fuel_burning_triple_persistent `{!lantanaGS Λ Σ} :
+  stuckness → thread_id → coPset -> gset oid → gset oid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,
     l{{{ thP_kids i G ∗ P }}} e @ s; i; E l{{{v, RET v; thP_kids i G' ∗ Q v }}}%I.
 
-Section proof.
+Section triples.
   Context `{!lantanaGS Λ Σ}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
   Implicit Types e : expr Λ.
-
-  Local Lemma entails_persistent {A B : Type} (P : A → B → iProp Σ) :
-    (⊢ (∃ (a : A), ∀ (b : B), P a b)%I) →
-    Persistent (∃ (a : A), ∀ (b : B), P a b)%I.
-  Proof.
-    intros H. rewrite /Persistent. iIntros "_".
-    iModIntro. eauto.
-  Qed.
 
   Lemma fuel_burning_triple_entails_to_persistent s i E G1 G2 P e Q :
     (⊢ fuel_burning_triple s i E G1 G2 P e Q) →
@@ -72,7 +71,8 @@ Section proof.
     iIntros "(#H& #Wl& %LTl) % (TG& HP) POST".
     iDestruct "HP" as "[HP FS]".
     iRevert (Φ) "TG HP POST".
-    iAssert (|==> ∀ Φ, (thP_kids i G -∗ P -∗ (∀ v : val Λ, thP_kids i G ∗ Q v -∗ Φ v) -∗ lWP e @ s; i; E {{ v, Φ v }}))%I with "[-]" as "HA"; cycle 1.
+    iAssert (|==> ∀ Φ, (thP_kids i G -∗ P -∗ (∀ v : val Λ, thP_kids i G ∗ Q v -∗ Φ v) -∗
+                         lWP e @ s; i; E {{ v, Φ v }}))%I with "[-]" as "HA"; cycle 1.
     { iMod "HA" as "HA". eauto. }
     iApply (wit_layer_ind with "[$Wl $FS]"). 1: auto.
     iIntros "!> IH !> % TG HP POST".
@@ -82,16 +82,9 @@ Section proof.
     iIntros "% (TG& HP) POST". iApply ("IH" with "TG HP POST").
   Qed.
 
-End proof.
-
-(** Untils are specific to ordinal step indices. *)
-Section until.
-  Context `{!lantanaGS Λ Σ}.
-  Implicit Types s : stuckness.
-  Implicit Types i : thread_id.
-  Implicit Types e : expr Λ.
-
-  Lemma fuel_burning_triple_until_discharge s i E G P e Q N k (Φ Ψ : iProp Σ) `{!Atomic (stuckness_to_atomicity s) e} p K :
+  (** ** Untils *)
+  Lemma fuel_burning_triple_until_discharge s i E G P e Q N k (Φ Ψ : iProp Σ)
+    `{!Atomic (stuckness_to_atomicity s) e} p K :
     TCEq (to_val e) None →
     ↑N ⊆ E →
     fuel_burning_triple s i (E ∖ ↑N) G G
@@ -119,7 +112,8 @@ Section until.
     iApply ("POST" with "[$TG $HQ $HΨ $Kp]"). eauto.
   Qed.
 
-  Lemma fuel_burning_triple_until_discharge_ex s i E G P e Q N k (Φ Ψ : iProp Σ) `{!Atomic (stuckness_to_atomicity s) e} :
+  Lemma fuel_burning_triple_until_discharge_ex s i E G P e Q N k (Φ Ψ : iProp Σ)
+    `{!Atomic (stuckness_to_atomicity s) e} :
     TCEq (to_val e) None →
     ↑N ⊆ E →
     fuel_burning_triple s i (E ∖ ↑N) G G
@@ -167,4 +161,4 @@ Section until.
     iApply ("WP" with "POST").
   Qed.
 
-End until.
+End triples.

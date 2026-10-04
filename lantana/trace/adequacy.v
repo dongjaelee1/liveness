@@ -1,20 +1,16 @@
-From iris.proofmode Require Import base proofmode classes.
+From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.program_logic Require Export language weakestpre.
+From lantana.program_logic Require Export weakestpre.
 From lantana.trace Require Export temporal_property.
-
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
-From lantana.algebra Require Import ordinal_existential_properties.
-
-From lantana.algebra Require Import axioms.
 
 (** * Step-indexed trace connectives
 
     The in-logic readings of trace properties (temporal_tps.v) are built from these: [ti_always]
-    and [ti_until] are guarded fixpoints, the until with a decreasing measure. The second half
-    of the file proves the facts about one step of the running system that the guarantee rules
-    and the adequacy theorem (temporal_guarantee.v) use. *)
+    and [ti_until] are guarded fixpoints, the until with a decreasing measure. The last section
+    proves the facts about one step of [lWP] that the adequacy theorems (guarantee_adequacy.v,
+    adequacy_iris.v) use. *)
 Notation tiProp Λ Σ := (trace Λ → iProp Σ).
 
 Definition ti_atomic `{SI : sidx} {Λ} {Σ} (π : state_pred Λ) : tiProp Λ Σ :=
@@ -103,38 +99,7 @@ Lemma ti_until_unfold `{SI : sidx} `{!temporalGS Λ Σ}
   ti_until ltA a P Q τ ⊣⊢ ti_until_pre ⊤ ltA (ti_until ltA) a P Q τ.
 Proof. rewrite ti_until_unseal. apply (fixpoint_unfold (ti_until_pre ⊤ ltA)). Qed.
 
-(** FIXME: move this to a more general location. *)
-Section aux.
-  Context `{SI : sidx} `{!invGS Σ}.
-
-  Import uPred.
-
-  Lemma iProp_sat_lc_and (P Q : iProp Σ) :
-    iProp_sat_lc (P ∧ Q) → (iProp_sat_lc P ∧ iProp_sat_lc Q).
-  Proof.
-    intros H. split; revert H; apply sat_mono.
-    - iIntros "[$ _]".
-    - iIntros "[_ $]".
-  Qed.
-
-  Lemma iProp_sat_lc_at_and `{!invGS Σ} E (P Q : iProp Σ) :
-    iProp_sat_lc_at E (P ∧ Q) → (iProp_sat_lc_at E P ∧ iProp_sat_lc_at E Q).
-  Proof.
-    intros H. split; revert H; apply sat_mono.
-    - iIntros "[$ _]".
-    - iIntros "[_ $]".
-  Qed.
-
-  Lemma iProp_sat_lc_at_frame_and `{!invGS Σ} E (F P Q : iProp Σ) :
-    iProp_sat_lc_at_frame F E (P ∧ Q) → (iProp_sat_lc_at_frame F E P ∧ iProp_sat_lc_at_frame F E Q).
-  Proof.
-    intros H. split; revert H; apply sat_mono.
-    - iIntros "[$ _]".
-    - iIntros "[_ $]".
-  Qed.
-
-End aux.
-
+(** ** The ordinal step index *)
 Global Instance ordSI : sidx := ordI.
 
 (** This cast using 'change' avoids universe inconsistency. *)
@@ -143,7 +108,8 @@ Proof.
   change (ordinal_ucmra.OrdUR: Type) with Ord.t. apply iProp_sat_exists_instance.
 Qed.
 
-Section proof1.
+(** ** Reading [ti_always] off a trace *)
+Section ti_always_trace.
   Context `{!temporalGS Λ Σ}.
   Context {A : Type} {ltA : A → A → Prop}.
   Implicit Type F : iProp Σ.
@@ -185,9 +151,10 @@ Section proof1.
     split; eauto.
   Qed.
 
-End proof1.
+End ti_always_trace.
 
-Section proof2.
+(** ** One step of [lWP]: obligations, witnesses and the fairness counter *)
+Section lwp_step.
   Context `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}.
 
   Definition obls_thread_active (Ω : obls) (τ : trace Λ) :=
@@ -287,7 +254,8 @@ Section proof2.
         exists (witness_discharged). split_and !; auto.
   Qed.
 
-  Lemma get_obls_thread_active_gen (h : list _) n (σ : state Λ) (Θ : thread_pool Λ) (κs : list (observation Λ)) g v Ω W τf :
+  Lemma get_obls_thread_active_gen (h : list _) n (σ : state Λ) (Θ : thread_pool Λ) (κs : list (observation Λ))
+    g v Ω W τf :
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     h !! n = Some (σ, Θ, κs) →
     model_interp g v Ω W n (dom Θ) ∗
@@ -343,4 +311,4 @@ Section proof2.
     rewrite decide_False in H2; first lia. intros F. eapply thread_active_and_not_false; eauto.
   Qed.
 
-End proof2.
+End lwp_step.

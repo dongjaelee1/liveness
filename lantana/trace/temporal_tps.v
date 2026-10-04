@@ -1,10 +1,8 @@
-From iris.proofmode Require Import base proofmode classes.
+From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From lantana.trace Require Export adequacy.
 From transfinite.stepindex Require Import ordinals.
-From lantana.base_logic Require Import satisfiable later_credits.
-From lantana.algebra Require Import ordinal_existential_properties.
-From lantana.algebra Require Import axioms.
+From lantana.base_logic Require Import satisfiable.
 
 (** * Semantic trace properties
 
@@ -154,9 +152,11 @@ Section tps_connectives.
   Lemma tps_and_elim_r G1 G2 : tps_le (tps_and G1 G2) G2.
   Proof. intros ??. rewrite /= /ti_and. by iIntros "[_ $]". Qed.
 
-  Lemma tps_or_mono G1 G2 G1' G2' : tps_le G1 G1' → tps_le G2 G2' → tps_le (tps_or G1 G2) (tps_or G1' G2').
+  Lemma tps_or_mono G1 G2 G1' G2' :
+    tps_le G1 G1' → tps_le G2 G2' → tps_le (tps_or G1 G2) (tps_or G1' G2').
   Proof. intros H1 H2 ??. rewrite /= /ti_or. by rewrite H1 H2. Qed.
-  Lemma tps_and_mono G1 G2 G1' G2' : tps_le G1 G1' → tps_le G2 G2' → tps_le (tps_and G1 G2) (tps_and G1' G2').
+  Lemma tps_and_mono G1 G2 G1' G2' :
+    tps_le G1 G1' → tps_le G2 G2' → tps_le (tps_and G1 G2) (tps_and G1' G2').
   Proof. intros H1 H2 ??. rewrite /= /ti_and. by rewrite H1 H2. Qed.
   (** Antecedents are compared as trace properties. *)
   Lemma tps_impl_mono A A' G G' :
@@ -164,7 +164,8 @@ Section tps_connectives.
   Proof. intros HA HG ??. rewrite /= /ti_impl. iIntros "H %H'". iApply HG. iApply "H". eauto. Qed.
   Lemma tps_impl_intro_le A G : tps_le G (tps_impl A G).
   Proof. intros ??. rewrite /= /ti_impl. by iIntros "H _". Qed.
-  Lemma tps_forall_mono {X} (G G' : X → tps Λ Σ) : (∀ x, tps_le (G x) (G' x)) → tps_le (tps_forall G) (tps_forall G').
+  Lemma tps_forall_mono {X} (G G' : X → tps Λ Σ) :
+    (∀ x, tps_le (G x) (G' x)) → tps_le (tps_forall G) (tps_forall G').
   Proof. intros H ??. rewrite /= /ti_forall. iIntros "H %x". iApply H. iApply "H". Qed.
   Lemma tps_exist_mono {X} `{!TypeExistentialProperty X ordI} (G G' : X → tps Λ Σ) :
     (∀ x, tps_le (G x) (G' x)) → tps_le (tps_exist G) (tps_exist G').
@@ -199,8 +200,7 @@ Section tps_connectives.
   Qed.
 
   (** In-logic monotonicity of always and until: the implication between the readings is
-      an iProp hypothesis, available one step later. These give the hypothesis forms of
-      the structure rules (temporal_guarantee.v). *)
+      an iProp hypothesis, available one step later. *)
   Lemma ti_always_mono_i `{!temporalGS Λ Σ} (P1 P1' P2 : tiProp Λ Σ) :
     ▷ □ (∀ τ, P1 τ -∗ P1' τ) -∗ ∀ τ, ti_always P1 P2 τ -∗ ti_always P1' P2 τ.
   Proof.
@@ -212,7 +212,8 @@ Section tps_connectives.
     iDestruct "H" as "[_ [_ H]]". by iApply "IH".
   Qed.
   Lemma tps_always_mono_i `{!temporalGS Λ Σ} (G G' : tps Λ Σ) :
-    ▷ □ (∀ τ, tps_ti G τ -∗ tps_ti G' τ) -∗ ∀ τ, tps_ti (tps_always G) τ -∗ tps_ti (tps_always G') τ.
+    ▷ □ (∀ τ, tps_ti G τ -∗ tps_ti G' τ) -∗
+    ∀ τ, tps_ti (tps_always G) τ -∗ tps_ti (tps_always G') τ.
   Proof. iIntros "#W" (τ). cbn. by iApply (ti_always_mono_i with "W"). Qed.
   Lemma ti_until_mono_i `{!temporalGS Λ Σ} (P1 P2 P1' P2' : tiProp Λ Σ) :
     ▷ □ (∀ τ, P1 τ -∗ P1' τ) -∗ ▷ □ (∀ τ, P2 τ -∗ P2' τ) -∗

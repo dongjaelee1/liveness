@@ -1,11 +1,9 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From lantana.trace Require Export temporal_guarantee.
-From lantana.trace Require Import temporal_saved.
 From transfinite.stepindex Require Import ordinals.
-From lantana.base_logic Require Import satisfiable later_credits.
-From lantana.algebra Require Import ordinal_existential_properties.
-From lantana.algebra Require Import axioms.
+From lantana.base_logic Require Import satisfiable.
+From lantana.algebra Require Import ordinal_existential_properties axioms.
 
 (** * Least and greatest fixpoints of trace properties
 
@@ -26,7 +24,6 @@ From lantana.algebra Require Import axioms.
     The in-logic step [tps_later] and next position [tps_next] are the two halves of the
     step built into [tps_always] and [tps_until]; with them, [tps_always G] is
     [ν X. ⊳(G ∧ ○X)] and [tps_until G1 G2] is below [μ X. ⊳(G2 ∨ (G1 ∧ ○X))]. *)
-
 
 (** ** Trace predicates, the in-logic step, and the next position *)
 Section connectives.
@@ -300,7 +297,7 @@ Section mu.
 End mu.
 
 (** ** Guarantees *)
-Section rules.
+Section fixpoint_guarantees.
   Context `{!lantanaGS Λ Σ}.
 
   Lemma temporal_nu_coind (F : tps Λ Σ → tps Λ Σ) `{!TpsMono F} P H :
@@ -321,7 +318,7 @@ Section rules.
     P ⊨ₜ H α ⊢ P ⊨ₜ tps_mu F.
   Proof. intros HH. by apply temporal_weaken, tps_mu_intro. Qed.
 
-End rules.
+End fixpoint_guarantees.
 
 (** ** Always and until as fixpoints *)
 Section ltl.
@@ -452,7 +449,7 @@ End ltl.
     self-referential invariant: the invariant is allocated open and registered, the record
     of its content at the current position is obtained by Löb induction (the content holds
     the structure, whose own record is later-guarded), then the invariant is closed. *)
-Section recursion.
+Section nest.
   Context `{!lantanaGS Λ Σ}.
 
   Definition F_nest (G : tps Λ Σ) : tps Λ Σ → tps Λ Σ := λ X, tps_always (tps_and G X).
@@ -527,4 +524,4 @@ Section recursion.
     iFrame "Hj HE Hγ Hinv T". iNext. iApply (nest_content_temporal _ _ _ HQ).
   Qed.
 
-End recursion.
+End nest.

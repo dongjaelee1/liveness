@@ -92,6 +92,7 @@ lantana/trace/adequacy.v
 lantana/trace/adequacy_iris.v
 lantana/trace/temporal_tps.v
 lantana/trace/temporal_guarantee.v
+lantana/trace/guarantee_adequacy.v
 lantana/trace/temporal_saved.v
 lantana/trace/temporal_fixpoint.v
 lantana/trace/fuel_burning_triple.v
