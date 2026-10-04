@@ -39,13 +39,13 @@ Section proof.
   Let Nr := nroot.@ "tl_client_ret".
   Let Nc := nroot.@ "tl_client_lock".
 
-  (** Besides returning, the main thread commits to creating a fair lock. Its carrier lives
-      at layer [ℵ], above the lock's waiting ([TicketLock_acquire_spec] at lock level 0). *)
+  (** Besides returning, the main thread commits to creating a fair lock. Its obligations
+      live at layer [ℵ], above the lock's waiting ([TicketLock_acquire_spec] at lock level 0). *)
   Lemma TicketLockClient_main_spec :
-    ⊢ ∃ μ, ∀ i g kr kc,
-    l{{{ thread_expr i [] (TicketLockClient.main #()) ∗ thP_carriers i {[g]} ∗
-         ([∗ set] g ∈ {[g]}, crP_fuel g ℵ%ordi μ) ∗
-         crP_obls g ℵ%ordi {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗
+    ⊢ ∃ μ, ∀ i kr kc,
+    l{{{ thread_expr i [] (TicketLockClient.main #()) ∗ thP_kids i {[kr; kc]} ∗
+         ([∗ set] g ∈ {[kr; kc]}, oblP_fuel g ℵ%ordi μ) ∗
+         ⌜kr ≠ kc⌝ ∗ oblP_kids kr ∅ ∗ oblP_kids kc ∅ ∗
          finallyI Nr kr 1 (exits #42@i) ∗
          finallyI Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) }}}
       TicketLockClient.main #() @ i
@@ -54,12 +54,12 @@ Section proof.
     iPoseProof (TicketLock_init_spec) as (μ_i) "TicketLock_init_spec".
     iPoseProof (TicketLock_acquire_spec) as (μ_a) "TicketLock_acquire_spec".
     iPoseProof (TicketLock_release_spec) as (μ_r) "TicketLock_release_spec".
-    iExists (100 ⊕ μ_i ⊕ μ_a ⊕ μ_r)%M. iIntros (i g kr kc Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TE& TG& GF& Cg& %Hkrc& HF& HC)".
-    iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
-    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_i GF_m]".
-    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_a GF_r]".
-    iPoseProof (crP_fuels_init with "GF") as "GF".
+    iExists (100 ⊕ μ_i ⊕ μ_a ⊕ μ_r)%M. iIntros (i kr kc Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& %Hkrc& Kkr& Kkc& HF& HC)".
+    iPoseProof (oblP_fuel_add_set with "GF") as "[GF GF_m]".
+    iPoseProof (oblP_fuel_add_set with "GF_m") as "[GF_i GF_m]".
+    iPoseProof (oblP_fuel_add_set with "GF_m") as "[GF_a GF_r]".
+    iPoseProof (oblP_fuels_init with "GF") as "GF".
     rewrite /TicketLockClient.main /=.
     lwp_pure_lc 100.
     lwp_bind (TicketLock.init _).
@@ -70,52 +70,52 @@ Section proof.
     iMod ("Hmk" $! ⊤ True%I with "[//]") as "#IFL".
     (* Keep the commitment: the lock exists. *)
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LCc LC]".
-    replace ({[kr; kc]} : gset oid) with ({[kc]} ∪ {[kr]} : gset oid) by set_solver.
-    iMod (finallyI_discharge' with "LCc Cg HC [IFL]") as "(_& Cg& _)".
+    iMod (finallyI_discharge with "LCc TG Kkc HC [IFL]") as "(_& TG& _)".
     { set_solver. }
     { set_solver. }
     { iExists tl, γ. iFrame "IFL". }
+    iPoseProof (oblP_fuels_remove_obl kc with "GF") as "GF".
+    iPoseProof (big_sepS_delete _ _ kc with "GF_a") as "[_ GF_a]"; first set_solver.
+    iPoseProof (big_sepS_delete _ _ kc with "GF_r") as "[_ GF_r]"; first set_solver.
+    replace ({[kr; kc]} ∖ {[kc]}) with ({[kr]} : gset oid) by set_solver.
     lwp_pures.
     (* Acquire. *)
     lwp_bind (TicketLock.acquire _).
     iModIntro.
     iApply ("TicketLock_acquire_spec" $! 0 (10 ⊕ μ_r)%M with "[$TE $TG GF_a $CF $IFL]").
-    { iApply crP_fuel_layer_eq_set. 2: iFrame. by rewrite hessenberg.add_O_l. }
-    iIntros (gu κu) "(TE& _& %Hgu& TG& Cgu& Fgu& _& CF& Tok& _)".
-    iPoseProof (crP_fuel_add with "Fgu") as "[Fgu Fgu_r]".
-    iPoseProof (crP_fuels_add 87 10 with "GF") as "[_ GF]".
-    iPoseProof (crP_fuels_add_carrier with "Fgu GF") as "GF".
+    { iApply oblP_fuel_layer_eq_set. 2: iFrame. by rewrite hessenberg.add_O_l. }
+    iIntros (κu) "(TE& _& %Hku& TG& Kku& Fku& CF& Tok& _)".
+    iPoseProof (oblP_fuel_add with "Fku") as "[Fku Fku_r]".
+    iPoseProof (oblP_fuels_add 87 10 with "GF") as "[_ GF]".
+    iPoseProof (oblP_fuels_add_obl with "Fku GF") as "GF".
     lwp_pures.
     (* Release. *)
-    iPoseProof (crP_fuels_init with "GF_r") as "GF_r".
-    iPoseProof (crP_fuels_add_carrier with "Fgu_r GF_r") as "GF_r".
+    iPoseProof (oblP_fuels_init with "GF_r") as "GF_r".
+    iPoseProof (oblP_fuels_add_obl with "Fku_r GF_r") as "GF_r".
     lwp_bind (TicketLock.release _).
     iModIntro.
-    iApply ("TicketLock_release_spec" $! 0 with "[$TE $TG $GF_r $Cgu $Tok $IFL]").
+    iApply ("TicketLock_release_spec" $! 0 with "[$TE $TG $GF_r $Kku $Tok $IFL]").
     { iPureIntro. set_solver. }
-    iIntros "(TE& _& TG& Cgu)".
-    replace ({[κu]} ∖ {[κu]}) with (∅ : gset oid) by set_solver.
-    iMod (carrier_delete with "TG Cgu") as "TG". 1: set_solver.
-    replace ({[gu; g]} ∖ {[gu]}) with ({[g]} : gset ocid) by set_solver.
-    iPoseProof (crP_fuels_remove_carrier gu with "GF") as "GF".
-    replace ({[gu; g]} ∖ {[gu]}) with ({[g]} : gset ocid) by set_solver.
+    iIntros "(TE& _& TG)".
+    iPoseProof (oblP_fuels_remove_obl κu with "GF") as "GF".
+    replace (({[κu]} ∪ {[kr]}) ∖ {[κu]}) with ({[kr]} : gset oid) by set_solver.
     lwp_pures.
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate_finally with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminate_finally with "TE LC TG Kkr HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := TicketLockClient.main #() ]} →
-    Φ = (λ μ, (∃ g kr kc, finallyI Nr kr 1 (exits #42@i) ∗
-                          finallyI Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) ∗
-                          (thP_carriers i {[g]} ∗ crP_obls g ℵ%ordi {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗
-                           crP_fuel g ℵ%ordi μ))%I) →
+    Φ = (λ μ, (∃ kr kc, finallyI Nr kr 1 (exits #42@i) ∗
+                        finallyI Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) ∗
+                        (thP_kids i {[kr; kc]} ∗ oblP_kids kr ∅ ∗ oblP_kids kc ∅ ∗ ⌜kr ≠ kc⌝ ∗
+                         ([∗ set] g ∈ {[kr; kc]}, oblP_fuel g ℵ%ordi μ)))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #42⌝)%I]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗
-     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     ([∗ set] i ∈ dom Θ, thP_kids i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
                    (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ i; ⊤ {{ lift_term i Ψ }}))).
   Proof.
@@ -123,24 +123,27 @@ Section proof.
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     rewrite !big_sepS_singleton.
     iPoseProof (TicketLockClient_main_spec) as (μ) "main_spec".
-    iMod (carrier_alloc _ _ _ ℵ%ordi μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (untilI_alloc _ _ _ ℵ%ordi ℵ%ordi 0 with "Gg1") as "(%kr& %Hkr& Gg1& Ofkr& #Wlkr& Akr)". 1: done.
+    iMod (untilI_alloc _ _ _ ℵ%ordi μ with "[] TGs") as "(%kr& %Hkr& TG1& Kkr& Ofkr& #Wlkr& Akr)".
+    { iApply parP_below_thread. }
     iMod ("Akr" $! _ Nr True%I (exits #42@i)%I with "[]") as "Ukr".
     { done. }
-    iMod (untilI_alloc _ _ _ ℵ%ordi ℵ%ordi 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
+    iMod (untilI_alloc _ _ _ ℵ%ordi μ with "[] TG1") as "(%kc& %Hkc& TG1& Kkc& Ofkc& #Wlkc& Akc)".
+    { iApply parP_below_thread. }
     iMod ("Akc" $! _ Nc True%I (∃ tl γ, is_fair_lock tl γ True)%I with "[]") as "Ukc".
     { done. }
-    iModIntro. iExists μ. iSplitL "Ukr Ukc TG1 Gg1 Gf1 Ofkr Ofkc".
+    iModIntro. iExists μ. iSplitL "Ukr Ukc TG1 Kkr Kkc Ofkr Ofkc".
     { subst Φ. rewrite !union_empty_r_L.
       replace ({[kc]} ∪ {[kr]}) with ({[kr; kc]} : gset oid) by set_solver.
-      iExists g1, kr, kc. iFrame "Ukr Ukc TG1 Gf1 Gg1". iPureIntro. set_solver. }
-    iClear "Wlkr Wlkc". clear dependent g1 kr kc.
+      iExists kr, kc. iFrame "Ukr Ukc TG1 Kkr Kkc".
+      rewrite (big_sepS_union _ {[kr]} {[kc]}); last set_solver. rewrite !big_sepS_singleton.
+      iFrame "Ofkr Ofkc". iPureIntro. set_solver. }
+    iClear "Wlkr Wlkc". clear dependent kr kc.
     iIntros "HP". subst Φ.
-    iDestruct "HP" as (g1 kr kc) "(HF& HC& TG& Cg& %Hkrc& GF)".
+    iDestruct "HP" as (kr kc) "(HF& HC& TG& Kkr& Kkc& %Hkrc& GF)".
     iEval (rewrite HT big_sepM_singleton) in "TEs".
-    iPoseProof ("main_spec" $! i g1 kr kc (λ v, lift_term i (λ _ v, ⌜v = #42⌝)%I v)
-                 with "[TEs TG Cg GF HF HC]") as "WP".
-    { iFrame "∗ #". iSplitL; [by iApply big_sepS_singleton|done]. }
+    iPoseProof ("main_spec" $! i kr kc (λ v, lift_term i (λ _ v, ⌜v = #42⌝)%I v)
+                 with "[TEs TG Kkr Kkc GF HF HC]") as "WP".
+    { iFrame "∗ #". iPureIntro. done. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { done. }
     { done. }
@@ -168,10 +171,11 @@ Section adequacy.
 
   Let Φ_P `{!heapGS Σ, !ticket_lockG Σ} : _ → iProp Σ :=
         λ μ,
-          (∃ g kr kc,
+          (∃ kr kc,
               finallyI Nr kr 1 (exits #42@i) ∗
               finallyI Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) ∗
-              (thP_carriers i {[g]} ∗ crP_obls g ℵ%ordi {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗ crP_fuel g ℵ%ordi μ))%I.
+              (thP_kids i {[kr; kc]} ∗ oblP_kids kr ∅ ∗ oblP_kids kc ∅ ∗ ⌜kr ≠ kc⌝ ∗
+               ([∗ set] g ∈ {[kr; kc]}, oblP_fuel g ℵ%ordi μ)))%I.
 
   Let G_main {Σ} : tps heap_lang Σ :=
         (tps_finally (exits #42@i) ∧ tps_finally (tps_exist (λ tl : val, fair_lock_tps tl)) ∧
