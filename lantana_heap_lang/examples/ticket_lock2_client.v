@@ -46,8 +46,8 @@ Section proof.
     l{{{ thread_expr i [] (TicketLockClient.main #()) ∗ thP_carriers i {[g]} ∗
          ([∗ set] g ∈ {[g]}, crP_fuel g ℵ%ordi μ) ∗
          crP_obls g ℵ%ordi {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗
-         finallyT Nr kr 1 (exits #42@i) ∗
-         finallyT Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) }}}
+         finallyI Nr kr 1 (exits #42@i) ∗
+         finallyI Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) }}}
       TicketLockClient.main #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ ⌜v = #42⌝ ∗ lift_term i fork_post v }}}.
   Proof.
@@ -71,7 +71,7 @@ Section proof.
     (* Keep the commitment: the lock exists. *)
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LCc LC]".
     replace ({[kr; kc]} : gset oid) with ({[kc]} ∪ {[kr]} : gset oid) by set_solver.
-    iMod (finallyT_discharge with "LCc Cg HC [IFL]") as "(_& Cg& _)".
+    iMod (finallyI_discharge' with "LCc Cg HC [IFL]") as "(_& Cg& _)".
     { set_solver. }
     { set_solver. }
     { iExists tl, γ. iFrame "IFL". }
@@ -102,15 +102,15 @@ Section proof.
     lwp_pures.
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
-    iMod (thread_expr_terminateT with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminate_finally with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := TicketLockClient.main #() ]} →
-    Φ = (λ μ, (∃ g kr kc, finallyT Nr kr 1 (exits #42@i) ∗
-                          finallyT Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) ∗
+    Φ = (λ μ, (∃ g kr kc, finallyI Nr kr 1 (exits #42@i) ∗
+                          finallyI Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) ∗
                           (thP_carriers i {[g]} ∗ crP_obls g ℵ%ordi {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗
                            crP_fuel g ℵ%ordi μ))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #42⌝)%I]}) →
@@ -124,10 +124,10 @@ Section proof.
     rewrite !big_sepS_singleton.
     iPoseProof (TicketLockClient_main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ ℵ%ordi μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (untilI_alloc _ _ _ false ℵ%ordi ℵ%ordi 0 with "Gg1") as "(%kr& %Hkr& Gg1& Ofkr& #Wlkr& Akr)". 1: done.
+    iMod (untilI_alloc _ _ _ ℵ%ordi ℵ%ordi 0 with "Gg1") as "(%kr& %Hkr& Gg1& Ofkr& #Wlkr& Akr)". 1: done.
     iMod ("Akr" $! _ Nr True%I (exits #42@i)%I with "[]") as "Ukr".
     { done. }
-    iMod (untilI_alloc _ _ _ false ℵ%ordi ℵ%ordi 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
+    iMod (untilI_alloc _ _ _ ℵ%ordi ℵ%ordi 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
     iMod ("Akc" $! _ Nc True%I (∃ tl γ, is_fair_lock tl γ True)%I with "[]") as "Ukc".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukr Ukc TG1 Gg1 Gf1 Ofkr Ofkc".
@@ -169,8 +169,8 @@ Section adequacy.
   Let Φ_P `{!heapGS Σ, !ticket_lockG Σ} : _ → iProp Σ :=
         λ μ,
           (∃ g kr kc,
-              finallyT Nr kr 1 (exits #42@i) ∗
-              finallyT Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) ∗
+              finallyI Nr kr 1 (exits #42@i) ∗
+              finallyI Nc kc 1 (∃ tl γ, is_fair_lock tl γ True) ∗
               (thP_carriers i {[g]} ∗ crP_obls g ℵ%ordi {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗ crP_fuel g ℵ%ordi μ))%I.
 
   Let G_main {Σ} : tps heap_lang Σ :=

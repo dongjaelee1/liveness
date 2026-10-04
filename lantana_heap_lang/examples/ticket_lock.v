@@ -152,7 +152,7 @@ Section proof.
         (∃ κ, ghost_var_frac γk (1/2) (c) ∗
               (curr ↦{#(1/2 + 1/2/2)} #c) ∗
               ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
-              finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)).
+              finallyI N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)).
 
   (** The alive branch of the lock invariant, as a notation (so that proofs about the
       invariant's content are unchanged). *)
@@ -183,9 +183,9 @@ Section proof.
              (⌜(c < n)%Z⌝ ∧
               (* Allocates new obligation on behalf of next owner. *)
               ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗ (c + 1)%Z ↪[γo]□ (Some κ) ∗
-                     finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R) ∗
+                     finallyI N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R) ∗
                      ((∃ g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
-                                finallyT N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R) ∗
+                                finallyI N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R) ∗
                                 crP_obls g ℓ {[κ]} ∗ oblP_fuel κ ℓ μ ∗
                                 curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ R) ∨
                         (* Current owner acquired the lock. *)
@@ -384,7 +384,7 @@ Section proof.
     { (* My turn *)
       iDestruct "Hc" as "(%& PtrCurr0& HR)". subst c.
       (* Unlock obligation *)
-      iMod (untilI_alloc _ _ _ false _ (ℓ)%ordi (m)%M with "Gg")
+      iMod (untilI_alloc _ _ _ _ (ℓ)%ordi (m)%M with "Gg")
         as "(%κu& %LUku& Gg& OGF& #Wlku& ALLOC)". 1: done.
       iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
@@ -901,7 +901,7 @@ Section proof.
       { lia. }
       iDestruct "H" as "(%&%&%& %Hc1& GMEt1& GMEo1& #CFl1& Gg1)".
       (* Unlock obligation *)
-      iMod (untilI_alloc _ _ _ false _ (ℓ0)%ordi (μ)%M with "Gg1")
+      iMod (untilI_alloc _ _ _ _ (ℓ0)%ordi (μ)%M with "Gg1")
         as "(%κu1& %LUku1& Gg1& OGF1& #Wlku1& ALLOC)". 1: done.
       iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%I with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.

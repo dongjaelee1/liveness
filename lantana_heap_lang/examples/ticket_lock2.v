@@ -120,7 +120,7 @@ Section proof.
          (** We need auth_mra_know to sync what other threads know about the configuration *)
          (∃ ℓ, t ↪[γt]□ κ ∗ witP_layer κ (ℓ ⊕ (Z.to_nat t%Z))%ordi ∗ (own γc (◯AM[ord.le] ℓ))) ∗
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ oblP_discharged κ) ∨
-            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ finallyT N_eventually κ (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)))) ∗
+            (⌜((c + 1)%Z ≤ t ≤ n)%Z⌝ ∧ finallyI N_eventually κ (1/2) (curr ↦{#(1/2)} #t%Z ∗ R)))) ∗
       (** Acknowledgement *)
       ([∗ map] t ↦ a ∈ acks,
          ((⌜(0 ≤ t ≤ c)%Z⌝ ∧ t ↪[γa]□ true) ∨
@@ -133,7 +133,7 @@ Section proof.
     ∃ (next curr : loc) (u : Z),
       (⌜tl = (#next, #curr)%V⌝) ∧ (curr ↦{#(1/2)} #u%Z) ∗
       ((u + 1)%Z ↪[(ticketlock_γt γ)]□ (κu)) ∗
-      finallyT N_eventually κu (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R).
+      finallyI N_eventually κu (1/2) (curr ↦{#(1/2)} #(u + 1)%Z ∗ R).
   Local Definition lock_token_aux : seal (@lock_token_def). Proof. by eexists. Qed.
   Definition lock_token := lock_token_aux.(unseal).
   Local Definition lock_token_unseal :
@@ -281,7 +281,7 @@ Section proof.
     iMod (carrier_alloc _ _ _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (50 ⊕ (50 × ▽))%M with "TG")
       as "(%gu0& %Ningu0& TG& Gg0& GF')".
     (* Unlock obligation *)
-    iMod (untilI_alloc _ _ _ false _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
+    iMod (untilI_alloc _ _ _ _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi (1 ⊕ 1)%M with "Gg0")
       as "(%κu& %LUku& Gg0& OGF& #Wlku& ALLOC)". 1: done.
     iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "OGF") as "[GGF QGF]".

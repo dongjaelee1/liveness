@@ -330,32 +330,35 @@ Definition alwaysI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namesp
 (* Opaque for the proof mode: [iNext] must not unfold a structure to strip its inner later. *)
 Global Typeclasses Opaque alwaysI_as alwaysI.
 
-(** The persistent part of an until: its obligation invariant, registered, with the records
-    of its contents at its allocation position, where its obligation was assigned. *)
+(** The persistent part of an until: its obligation invariant, registered, with the record
+    of its left formula at its allocation position, where its obligation was assigned. *)
 Definition untilI_pers `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (k : positive) (P Q : iProp Σ) : iProp Σ :=
   ∃ j r γP γQ st v Ω fu o,
     reg_idx j r (RUntil N k γP γQ) ∗ hG_event r st ∗
     saved_ti γP (tps_ti (tps_sem P)) ∗ saved_ti γQ (tps_ti (tps_sem Q)) ∗
     oblP_inv N k P Q (until_disch k (tps_sem Q)) ∗
-    event_obl v (r, Ω) k (obl_assigned fu o) ∗ ▷ (tguar (tps_sem P) r ∨ tguar (tps_sem Q) r).
+    event_obl v (r, Ω) k (obl_assigned fu o) ∗ ▷ tguar (tps_sem P) r.
 Global Typeclasses Opaque untilI_pers.
 
-(** [P] until [Q] using namespace [N] and obligation [k]. *)
-Local Definition untilI_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (b : bool) (q : Qp) (P Q : iProp Σ) : iProp Σ :=
-  oblP_assigned k b (q/2)%Qp ∗ untilI_pers N k P Q.
+(** [P] until [Q] using namespace [N] and obligation [k]: the token of the assigned
+    obligation with the registered invariant. The intermediate state of the obligation
+    invariant ([Q] established, obligation not yet discharged) is internal to
+    [untilI_discharge]. *)
+Local Definition untilI_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (q : Qp) (P Q : iProp Σ) : iProp Σ :=
+  oblP_assigned k false (q/2)%Qp ∗ untilI_pers N k P Q.
 (* Sealed: the proof mode splits it by fractions, and unification (e.g. in [iFrame]) does not
    unfold it. *)
 Local Definition untilI_aux : seal (@untilI_def). Proof. by eexists. Qed.
 Definition untilI := untilI_aux.(unseal).
-Global Arguments untilI {Λ Σ _ _} N k b q P Q.
+Global Arguments untilI {Λ Σ _ _} N k q P Q.
 Local Lemma untilI_unseal : @untilI = @untilI_def.
 Proof. rewrite -untilI_aux.(seal_eq) //. Qed.
-Lemma untilI_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k b q P Q :
-  untilI N k b q P Q = (oblP_assigned k b (q/2)%Qp ∗ untilI_pers N k P Q)%I.
+Lemma untilI_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k q P Q :
+  untilI N k q P Q = (oblP_assigned k false (q/2)%Qp ∗ untilI_pers N k P Q)%I.
 Proof. by rewrite untilI_unseal. Qed.
 
-Definition finallyI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (b : bool) (q : Qp) (Q : iProp Σ) : iProp Σ :=
-  untilI N k b q True Q.
+Definition finallyI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (q : Qp) (Q : iProp Σ) : iProp Σ :=
+  untilI N k q True Q.
 
 (** ** Rules *)
 
@@ -681,48 +684,42 @@ Section until_rules.
   Proof. rewrite /untilI_pers. iIntros "(%&%&%&%&%&%&%&%&%& _& _& _& _& $& _)". Qed.
 
   (** Until *)
-  Lemma untilI_frac_split N k b q q1 q2 P Q :
+  Lemma untilI_frac_split N k q q1 q2 P Q :
     (q = q1 + q2)%Qp →
-    ⊢ untilI N k b q P Q -∗ (untilI N k b q1 P Q ∗ untilI N k b q2 P Q).
+    ⊢ untilI N k q P Q -∗ (untilI N k q1 P Q ∗ untilI N k q2 P Q).
   Proof.
     iIntros (He) "U". rewrite !untilI_unfold He Qp.div_add_distr. iDestruct "U" as "([$ $]& #U)". auto.
   Qed.
-  Lemma untilI_frac_add N k b1 b2 q1 q2 q P Q P' Q' :
+  Lemma untilI_frac_add N k q1 q2 q P Q P' Q' :
     (q = q1 + q2)%Qp →
-    untilI N k b1 q1 P Q -∗ untilI N k b2 q2 P' Q' -∗ untilI N k b1 q P Q.
+    untilI N k q1 P Q -∗ untilI N k q2 P' Q' -∗ untilI N k q P Q.
   Proof.
     intros Hq. subst q.
     rewrite !untilI_unfold Qp.div_add_distr. iIntros "[Oa1 $] [Oa2 _]".
-    iPoseProof (oblP_assigned_agree with "Oa1 Oa2") as "%". subst.
     by iCombine "Oa1 Oa2" as "Oa".
   Qed.
 
-  Global Instance untilI_fractional N k b P Q : Fractional (λ q, untilI N k b q P Q).
+  Global Instance untilI_fractional N k P Q : Fractional (λ q, untilI N k q P Q).
   Proof.
     intros p q. rewrite !untilI_unfold. iSplit.
     - iIntros "(Oa& #OI)". iFrame "OI". rewrite !Qp.div_add_distr. iDestruct "Oa" as "[Oa Oa']". iFrame.
     - iIntros "((Oa1& #Oi)& Oa2& _)". iFrame "Oi". rewrite !Qp.div_add_distr. iCombine "Oa1 Oa2" as "$".
   Qed.
-  Global Instance untilI_as_fractional N k b q P Q : AsFractional (untilI N k b q P Q) (λ q, untilI N k b q P Q) q.
+  Global Instance untilI_as_fractional N k q P Q : AsFractional (untilI N k q P Q) (λ q, untilI N k q P Q) q.
   Proof. split; [auto|apply _]. Qed.
 
   (** Update rules. Allocation of the until registers it (a model update, reading the model). *)
-  Lemma untilI_alloc E g K (b : bool) ℓ1 ℓ2 μ :
+  Lemma untilI_alloc E g K ℓ1 ℓ2 μ :
     (ℓ1 <= ℓ2)%ordi →
     crP_obls g ℓ1 K -∗
     |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
                  oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
-                 ∀ E' N (P Q : iProp Σ), ▷ (if b then Q else P) -∗ |={E'}=>m untilI N k b 1 P Q.
+                 ∀ E' N (P Q : iProp Σ), ▷ P -∗ |={E'}=>m untilI N k 1 P Q.
   Proof.
-    iIntros (Ltl) "TG". iMod (obl_alloc_assigned with "TG") as "(%k& $& $& Oa& $& $& ACC)". 1: auto.
+    iIntros (Ltl) "TG". iMod (obl_alloc_assigned _ _ _ false with "TG") as "(%k& $& $& Oa& $& $& ACC)". 1: auto.
     iIntros "!> %E' %N %P %Q HC".
     iApply sfmupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI TI MI".
-    iAssert (▷ (tguar (tps_sem P) n ∨ tguar (tps_sem Q) n))%I as "#C".
-    { destruct b.
-      - iPoseProof (temporal_elim_later with "[] [$HC $HI $MI]") as "#C"; first iApply temporal_sem.
-        iNext. by iRight.
-      - iPoseProof (temporal_elim_later with "[] [$HC $HI $MI]") as "#C"; first iApply temporal_sem.
-        iNext. by iLeft. }
+    iPoseProof (temporal_elim_later with "[] [$HC $HI $MI]") as "#C"; first iApply temporal_sem.
     iDestruct "MI" as "(MHI& S& MI)". iEval (unfold_opreds) in "Oa". iDestruct "Oa" as "(#OE& Oa)".
     iPoseProof (osat_lookup_assigned with "[$S $OE $Oa]") as "%Hk". destruct Hk as (fu& o& Hk).
     iPoseProof (model_history_interp_event_obl_now with "MHI") as "#EA". 1: eauto.
@@ -781,11 +778,14 @@ Section until_rules.
     iFrame "Eo HQi".
   Qed.
 
+  (** The two phases of a discharge. First [Q] is established and the obligation invariant
+      moves to its intermediate state (the token turns [true]); then, with the carrier, the
+      obligation is discharged. The intermediate state does not appear in an [untilI]. *)
   (** TODO: Timeless version *)
-  Lemma untilI_to_true E N k (P Q : iProp Σ) :
+  Local Lemma untilI_to_true E N k (P Q : iProp Σ) :
     ↑N ⊆ E →
-    untilI N k false 1 P Q ={E,E ∖ ↑N}=∗
-    ▷ (P ∗ ∀ E', |={E'}=>m ((▷ Q) ={E ∖ ↑N,E}=∗ untilI N k true 1 P Q)).
+    untilI N k 1 P Q ={E,E ∖ ↑N}=∗
+    ▷ (P ∗ ∀ E', |={E'}=>m ((▷ Q) ={E ∖ ↑N,E}=∗ oblP_assigned k true (1/2)%Qp ∗ untilI_pers N k P Q)).
   Proof.
     rewrite !untilI_unfold. iIntros (HM) "(Oa& #U)". iPoseProof (untilI_pers_inv with "U") as "#Oi".
     iMod (obl_assigned_to_true with "Oi Oa") as "[H ACC]". 1: auto.
@@ -795,14 +795,14 @@ Section until_rules.
   Qed.
 
   (** TODO: Timeless version *)
-  Lemma untilI_true_to_discharge E N k (P Q : iProp Σ) :
+  Local Lemma untilI_true_to_discharge E N k (P Q : iProp Σ) :
     ↑N ⊆ E →
-    untilI N k true 1 P Q ={E,E ∖ ↑N}=∗
+    oblP_assigned k true (1/2)%Qp ∗ untilI_pers N k P Q ={E,E ∖ ↑N}=∗
     ∀ g ℓ K,
     (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
     ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (Q ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)).
   Proof.
-    rewrite !untilI_unfold. iIntros (HMask) "(Oa& #U)". iPoseProof (untilI_pers_inv with "U") as "#OI".
+    iIntros (HMask) "(Oa& #U)". iPoseProof (untilI_pers_inv with "U") as "#OI".
     iPoseProof (temporal_sem Q) as "#HG2".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
     iIntros "!> %%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
@@ -858,7 +858,7 @@ Section until_rules.
 
   Lemma untilI_discharge E N k (P Q : iProp Σ) :
     ↑N ⊆ E →
-    untilI N k false 1 P Q ={E,E ∖ ↑N}=∗
+    untilI N k 1 P Q ={E,E ∖ ↑N}=∗
     ▷ (P ∗
        ∀ E', |={E'}=>m ((▷ Q) ={E ∖ ↑N}=∗
                        ∀ g ℓ K, (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
@@ -873,26 +873,23 @@ Section until_rules.
   Qed.
 
   (** Access rules *)
-  Lemma untilI_discharged_false N k b q P Q :
-    untilI N k b q P Q -∗ oblP_discharged k -∗ False.
+  Lemma untilI_discharged_false N k q P Q :
+    untilI N k q P Q -∗ oblP_discharged k -∗ False.
   Proof.
     rewrite !untilI_unfold. iIntros "[Oa _] #Of".
     iPoseProof (oblP_assigned_discharged_false with "Oa Of") as "%". done.
   Qed.
 
-  Lemma untilI_acc E N k b q P Q :
+  Lemma untilI_acc E N k q P Q :
     ↑N ⊆ E →
-    untilI N k b q P Q ={E,E ∖ ↑N}=∗
-    ▷ ((if b then Q else P) ∗ ((▷ if b then Q else P) ={E ∖ ↑N,E}=∗ untilI N k b q P Q)).
+    untilI N k q P Q ={E,E ∖ ↑N}=∗
+    ▷ (P ∗ (▷ P ={E ∖ ↑N,E}=∗ untilI N k q P Q)).
   Proof.
     rewrite !untilI_unfold. iIntros (Hmask) "(Oa& #U)". iPoseProof (untilI_pers_inv with "U") as "#OI".
     iMod (oblP_inv_acc_assigned with "OI") as "H". 1: set_solver.
     iPoseProof ("H" with "Oa") as "[H ACC]".
-    iModIntro. iNext. iDestruct "H" as "(Oa& H)". destruct b.
-    - iDestruct "H" as "(Oa2& $)". iIntros "HQ". iFrame "Oa U". iApply "ACC".
-      iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame.
-    - iDestruct "H" as "(Oa2& $)". iIntros "HP". iFrame "Oa U". iApply "ACC".
-      iNext. iApply oblP_variant_unfold. iLeft. iFrame.
+    iModIntro. iNext. iDestruct "H" as "(Oa& Oa2& $)". iIntros "HP". iFrame "Oa U". iApply "ACC".
+    iNext. iApply oblP_variant_unfold. iLeft. iFrame.
   Qed.
 
 End until_rules.
@@ -903,7 +900,7 @@ Section until_derived.
   (** Discharge a finally with its right formula at hand, using two later credits. *)
   Lemma finallyI_discharge E N k g ℓ K Q :
     ↑N ⊆ E → k ∈ K →
-    £ (2 : Ord.t) -∗ crP_obls g ℓ K -∗ finallyI N k false 1 Q -∗ Q -∗
+    £ (2 : Ord.t) -∗ crP_obls g ℓ K -∗ finallyI N k 1 Q -∗ Q -∗
     |={E}=>m Q ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k.
   Proof.
     iIntros (Hmask Hk) "LC Cg HF HQ".
@@ -919,10 +916,10 @@ Section until_derived.
     iMod ("HF" $! _) as "HF". iMod "HF" as "($& $& $)". done.
   Qed.
 
-  (** The same, with the obligation set split. *)
-  Lemma finallyT_discharge E N k g ℓ K (Q : iProp Σ) :
+  (** The same, with the obligation set as [untilI_alloc] returns it. *)
+  Lemma finallyI_discharge' E N k g ℓ K (Q : iProp Σ) :
     ↑N ⊆ E → k ∉ K →
-    £ (2 : Ord.t) -∗ crP_obls g ℓ ({[k]} ∪ K) -∗ finallyI N k false 1 Q -∗ Q -∗
+    £ (2 : Ord.t) -∗ crP_obls g ℓ ({[k]} ∪ K) -∗ finallyI N k 1 Q -∗ Q -∗
     |={E}=>m Q ∗ crP_obls g ℓ K ∗ oblP_discharged k.
   Proof.
     iIntros (HN Hk) "LC Cg HF HQ".
@@ -1321,7 +1318,7 @@ Section loops.
       iModIntro. iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
   Qed.
 
-  Lemma temporal_until N k b q P Q : ⊢ untilI N k b q P Q ⊨ₜ tps_until (tps_sem P) (tps_sem Q).
+  Lemma temporal_until N k q P Q : ⊢ untilI N k q P Q ⊨ₜ tps_until (tps_sem P) (tps_sem Q).
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_unfold /untilI_pers.
     iDestruct "U" as "[Oa #U]".
@@ -1338,7 +1335,7 @@ Section loops.
     destruct Hf as (BEH& FS& LB& HIST).
     (* the certificate of this until for [n]: from the bundle, or its allocation records *)
     iDestruct (bundle_until_cert with "B Hj HγP HγQ []") as "#C"; first done.
-    { iIntros (->). done. }
+    { iIntros (->). iNext. by iLeft. }
     rewrite /= /ti_exist. iExists (Ord.S (Ord.S (fair_sched_ub fu))).
     rewrite ti_until_unfold /ti_until_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
@@ -1423,8 +1420,8 @@ Section loops.
   Qed.
   Lemma temporal_always_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ tps_always G.
   Proof. apply temporal_always_as_valid. Qed.
-  Lemma temporal_until_valid N k b q P Q G1 G2 :
-    (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k b q P Q ⊨ₜ tps_until G1 G2.
+  Lemma temporal_until_valid N k q P Q G1 G2 :
+    (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k q P Q ⊨ₜ tps_until G1 G2.
   Proof.
     intros HG1 HG2. iApply (temporal_weaken _ (tps_until (tps_sem P) (tps_sem Q))).
     { apply tps_until_mono; by apply tps_sem_le. }
@@ -1512,10 +1509,6 @@ Global Hint Mode IntoTemporalExistCheck - - - - - ! ! : typeclass_instances.
 Definition tsem `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (P : iProp Σ) {G : tps Λ Σ} `{!IntoTemporal P G} : tps Λ Σ := G.
 Global Arguments tsem {_ _ _ _} _ {_ _}.
 
-(** [P] until [Q], and finally [Q]. *)
-Notation untilT N k q P Q := (untilI N k false q P%I Q%I).
-Notation finallyT N k q Q := (finallyI N k false q Q%I).
-
 (** The inferred trace property of [P], computed so that it no longer mentions ghost-state
     instances: [Definition G : tps Λ Σ := ltac:(tps_of P).] in a section with the instances
     yields a [G] that can be used in an adequacy statement. *)
@@ -1587,8 +1580,8 @@ Section into_temporal.
   Global Instance into_temporal_alwaysI N P G :
     IntoTemporal P G → IntoTemporal (alwaysI N P) (tps_always G) | 10.
   Proof. intros H. unfold IntoTemporal in *. by apply temporal_always_valid. Qed.
-  Global Instance into_temporal_untilI N k b q P Q G1 G2 :
-    IntoTemporal P G1 → IntoTemporal Q G2 → IntoTemporal (untilI N k b q P Q) (tps_until G1 G2) | 10.
+  Global Instance into_temporal_untilI N k q P Q G1 G2 :
+    IntoTemporal P G1 → IntoTemporal Q G2 → IntoTemporal (untilI N k q P Q) (tps_until G1 G2) | 10.
   Proof. intros H1 H2. unfold IntoTemporal in *. by apply temporal_until_valid. Qed.
   Global Instance into_temporal_state_pred π : IntoTemporal (state_pred_interp π) (tps_atomic π) | 10.
   Proof. apply temporal_atomic. Qed.
@@ -2014,7 +2007,7 @@ Section examples.
 
   (** Ghost quantification over iProp, scoping over two temporal operators. *)
   Local Lemma ex_iprop N1 N2 k :
-    ⊢ (∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k false 1 Ψ) ⊨ₜ
+    ⊢ (∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k 1 Ψ) ⊨ₜ
       (tps_always tps_true ∧ tps_finally tps_true).
   Proof.
     iApply temporal_exist_ghost. iIntros (Ψ).
@@ -2028,7 +2021,7 @@ Section examples.
 
   (** The same guarantee, inferred. *)
   Local Lemma ex_iprop_inferred N1 N2 k :
-    ⊢ (∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyT N2 k 1 Ψ) ⊨ₜ
+    ⊢ (∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k 1 Ψ) ⊨ₜ
       (tps_always tps_true ∧ tps_until (tps_pure True) tps_true).
   Proof. apply (into_temporal _ _). Qed.
 
@@ -2040,7 +2033,7 @@ Section examples.
 
   (** The inferred trace property as a closed term. *)
   Local Definition ex_tps_of N1 N2 k : tps Λ Σ :=
-    ltac:(tps_of ((∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyT N2 k 1 Ψ)%I)).
+    ltac:(tps_of ((∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k 1 Ψ)%I)).
   Local Lemma ex_tps_of_eq N1 N2 k :
     ex_tps_of N1 N2 k = (tps_always tps_true ∧ tps_until (tps_pure True) tps_true)%S.
   Proof. done. Qed.

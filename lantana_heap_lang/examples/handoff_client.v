@@ -44,8 +44,8 @@ Section proof.
     ⊢ ∃ μ, ∀ i g kl kc,
     l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 2 μ ∗
          crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
-         finallyT Nl kl 1 (exits #1@i) ∗
-         finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) }}}
+         finallyI Nl kl 1 (exits #1@i) ∗
+         finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) }}}
       main #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
   Proof using handoffG0.
@@ -148,7 +148,7 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
-    iMod (thread_expr_terminateT with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminate_finally with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td".
     (* A bare [done] on this goal takes ~12s. *)
@@ -157,8 +157,8 @@ Section proof.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := main #() ]} →
-    Φ = (λ μ, (∃ g kl kc, finallyT Nl kl 1 (exits #1@i) ∗
-                          finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
+    Φ = (λ μ, (∃ g kl kc, finallyI Nl kl 1 (exits #1@i) ∗
+                          finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
                           (thP_carriers i {[g]} ∗ crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
                            crP_fuel g 2 μ))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #1⌝)%I]}) →
@@ -172,10 +172,10 @@ Section proof.
     rewrite !big_sepS_singleton.
     iPoseProof (main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ 2 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (untilI_alloc _ _ _ false 2 2 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
+    iMod (untilI_alloc _ _ _ 2 2 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nl True%I (exits #1@i)%I with "[]") as "Ukl1".
     { done. }
-    iMod (untilI_alloc _ _ _ false 2 2 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
+    iMod (untilI_alloc _ _ _ 2 2 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
     iMod ("Akc" $! _ Nc True%I ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ))%I with "[]") as "Ukc".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Gg1 Gf1 Ofkl1 Ofkc".
@@ -188,7 +188,7 @@ Section proof.
     iEval (rewrite HT big_sepM_singleton) in "TEs".
     iPoseProof ("main_spec" $! i g1 kl1 kc (λ v, lift_term i (λ _ v, ⌜v = #1⌝)%I v) with "[TEs TG Cg GF HF HC]") as "WP".
     (* Frame by name, [HF] before [HC]: a bare [iFrame] tries [HC] against [HF]'s conjunct
-       first, and that failing unification of two different [finallyT]s takes ~19s. *)
+       first, and that failing unification of two different [finallyI]s takes ~19s. *)
     { iFrame "TEs TG Cg GF HF HC". done. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { done. }
@@ -220,8 +220,8 @@ Section adequacy.
   Let Φ_P `{!heapGS Σ} `{!handoffG Σ} : _ → iProp Σ :=
         λ μ,
           (∃ g kl kc,
-              finallyT Nl kl 1 (exits #1@i) ∗
-              finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
+              finallyI Nl kl 1 (exits #1@i) ∗
+              finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
               (thP_carriers i {[g]} ∗ crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗ crP_fuel g 2 μ))%I.
 
   Let G_main {Σ} : tps heap_lang Σ :=

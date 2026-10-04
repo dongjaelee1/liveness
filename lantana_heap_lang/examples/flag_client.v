@@ -51,7 +51,7 @@ Section proof.
          crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
          (* Start with the other half of the until ownership for the pointsto. *)
          flag_tk l k ∗
-         finallyT Nl kl 1 (exits #()@i) ∗
+         finallyI Nl kl 1 (exits #()@i) ∗
          is_flag l k 0 }}}
       writer #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
@@ -74,7 +74,7 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
-    iMod (thread_expr_terminateT with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminate_finally with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
   Qed.
@@ -83,7 +83,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i g k kl,
     l{{{ thread_expr i [] (reader #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 1 μ ∗
          crP_obls g 1 {[kl]} ∗
-         finallyT Nl kl 1 (exits #1@i) ∗
+         finallyI Nl kl 1 (exits #1@i) ∗
          is_flag l k 0 }}}
       reader #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
@@ -104,7 +104,7 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
-    iMod (thread_expr_terminateT with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminate_finally with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
   Qed.
@@ -114,8 +114,8 @@ Section proof.
     Θ = {[i := writer #(); j := reader #() ]} →
     Φ = (λ μ1 μ2, (∃ g1 g2 k kl1 kl2,
                       ⌜ k ≠ kl1 ⌝ ∗ is_flag l k 0 ∗ flag_tk l k ∗
-                      finallyT Nl kl1 1 (exits #()@i) ∗
-                      finallyT Nl kl2 1 (exits #1@j) ∗
+                      finallyI Nl kl1 1 (exits #()@i) ∗
+                      finallyI Nl kl2 1 (exits #1@j) ∗
                       (thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                        thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
                        crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2))%I) →
@@ -135,11 +135,11 @@ Section proof.
     iMod (carrier_alloc _ _ _ 0 μ1 with "TG1") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (is_flag_init _ _ _ _ 0 _ μ1 with "Ptrl Gg1") as "(%k& %Hk& Gg1& Ofk& Uk& #is_flag)".
     1: done.
-    iMod (untilI_alloc _ _ _ false 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
+    iMod (untilI_alloc _ _ _ 0 0 μ1 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I with "[]") as "Ukl1".
     { done. }
     iMod (carrier_alloc _ _ _ 1 μ2 with "TG2") as "(%g2& %Ning2& TG2& Gg2& Gf2)".    
-    iMod (untilI_alloc _ _ _ false 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
+    iMod (untilI_alloc _ _ _ 1 1 1 with "Gg2") as "(%kl2& %Hkl2& Gg2& Ofkl2& #Wlkl2& Akl2)". 1: done.
     iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I with "[]") as "Ukl2".
     { done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Gg1 TG2 Gg2 Gf1 Gf2 Ofk Ofkl1 Ofkl2".
@@ -191,8 +191,8 @@ Section adequacy.
         λ μ1 μ2,
           (∃ g1 g2 k kl1 kl2,
               ⌜ k ≠ kl1 ⌝ ∗ is_flag l k 0 ∗ flag_tk l k ∗
-              finallyT Nl kl1 1 (exits #()@i) ∗
-              finallyT Nl kl2 1 (exits #1@j) ∗
+              finallyI Nl kl1 1 (exits #()@i) ∗
+              finallyI Nl kl2 1 (exits #1@j) ∗
               (thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
                crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2))%I.

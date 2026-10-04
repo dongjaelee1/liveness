@@ -25,11 +25,11 @@ Section laws.
   Proof. exact (temporal_atomic (pred_expr i C e)). Qed.
 
   (** Discharge at the actual final value, using credits from earlier steps. *)
-  Lemma thread_expr_terminateT i E v g ℓ k N :
+  Lemma thread_expr_terminate_finally i E v g ℓ k N :
     ↑N ⊆ E →
     thread_expr i [] (of_val v) -∗ £ (2 : Ord.t) -∗
     thP_carriers i {[g]} -∗ crP_obls g ℓ {[k]} -∗
-    finallyT N k 1 (thread_expr i [] (of_val v)) -∗ |={E}=>m
+    finallyI N k 1 (thread_expr i [] (of_val v)) -∗ |={E}=>m
     thread_expr i [] (of_val v) ∗ thP_done i.
   Proof.
     iIntros (Hmask) "TE LC TG Cg HF".

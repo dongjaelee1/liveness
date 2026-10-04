@@ -52,7 +52,7 @@ Section proof.
   (** The right formula of the first commitment: the state at the discharge, a trace-visible
       invariant allocated in the same pre-step modality, and the second commitment. *)
   Definition cd_Q (x y : loc) kf : iProp Σ :=
-    x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ finallyT Nf kf 1 (x ↦ #2).
+    x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ finallyI Nf kf 1 (x ↦ #2).
 
   (** What it guarantees, inferred. *)
   Lemma cd_Q_temporal x y kf :
@@ -65,7 +65,7 @@ Section proof.
          ([∗ set] g ∈ {[g]}, crP_fuel g 0 μ) ∗
          crP_obls g 0 {[kq; kf]} ∗ ⌜kq ≠ kf⌝ ∗
          x ↦ #0 ∗ y ↦ #7 ∗
-         finallyT Nq kq 1 (cd_Q x y kf) ∗ finallyT Nf kf 1 (x ↦ #2) }}}
+         finallyI Nq kq 1 (cd_Q x y kf) ∗ finallyI Nf kf 1 (x ↦ #2) }}}
       CertDischarge.main #x #y @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
   Proof.
@@ -113,7 +113,7 @@ Section proof.
 
   Lemma main_pre Θ i (x y : loc) Φ Ψs :
     Θ = {[i := CertDischarge.main #x #y]} →
-    Φ = (λ μ, (∃ g kq kf, finallyT Nq kq 1 (cd_Q x y kf) ∗ finallyT Nf kf 1 (x ↦ #2) ∗
+    Φ = (λ μ, (∃ g kq kf, finallyI Nq kq 1 (cd_Q x y kf) ∗ finallyI Nf kf 1 (x ↦ #2) ∗
                           x ↦ #0 ∗ y ↦ #7 ∗
                           (thP_carriers i {[g]} ∗ crP_obls g 0 {[kq; kf]} ∗ ⌜kq ≠ kf⌝ ∗
                            crP_fuel g 0 μ))%I) →
@@ -128,10 +128,10 @@ Section proof.
     rewrite !big_sepS_singleton.
     iPoseProof (main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ 0 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (untilI_alloc _ _ _ false 0 0 0 with "Gg1") as "(%kf& %Hkf& Gg1& Ofkf& #Wlkf& Akf)". 1: done.
+    iMod (untilI_alloc _ _ _ 0 0 0 with "Gg1") as "(%kf& %Hkf& Gg1& Ofkf& #Wlkf& Akf)". 1: done.
     iMod ("Akf" $! _ Nf True%I (x ↦ #2)%I with "[]") as "Ukf".
     { done. }
-    iMod (untilI_alloc _ _ _ false 0 0 0 with "Gg1") as "(%kq& %Hkq& Gg1& Ofkq& #Wlkq& Akq)". 1: done.
+    iMod (untilI_alloc _ _ _ 0 0 0 with "Gg1") as "(%kq& %Hkq& Gg1& Ofkq& #Wlkq& Akq)". 1: done.
     iMod ("Akq" $! _ Nq True%I (cd_Q x y kf) with "[]") as "Ukq".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukq Ukf Ptrx Ptry TG1 Gg1 Gf1 Ofkq Ofkf".
@@ -171,7 +171,7 @@ Section adequacy.
   Let Φ_P `{!heapGS Σ} : _ → iProp Σ :=
         λ μ,
           (∃ g kq kf,
-              finallyT Nq kq 1 (cd_Q x y kf) ∗ finallyT Nf kf 1 (x ↦ #2) ∗
+              finallyI Nq kq 1 (cd_Q x y kf) ∗ finallyI Nf kf 1 (x ↦ #2) ∗
               x ↦ #0 ∗ y ↦ #7 ∗
               (thP_carriers i {[g]} ∗ crP_obls g 0 {[kq; kf]} ∗ ⌜kq ≠ kf⌝ ∗
                crP_fuel g 0 μ))%I.

@@ -47,13 +47,13 @@ Section proof.
 
   (** The flag is [0] until it is [1], after which it stays [1]. *)
   Definition flag_inv (l : loc) k : iProp Σ :=
-    untilT Np k (1/2) (l ↦ #0) (l ↦ #1) ∨ (oblP_discharged k ∗ l ↦ #1).
+    untilI Np k (1/2) (l ↦ #0) (l ↦ #1) ∨ (oblP_discharged k ∗ l ↦ #1).
 
   Definition is_flag (l : loc) k ℓ : iProp Σ :=
     witP_layer k ℓ ∗ alwaysI Na (flag_inv l k).
 
   Definition flag_tk (l : loc) k : iProp Σ :=
-    untilT Np k (1/2) (l ↦ #0) (l ↦ #1).
+    untilI Np k (1/2) (l ↦ #0) (l ↦ #1).
 
   (** The trace properties guaranteed by the flag. *)
   Definition flag_tps (l : loc) : tps heap_lang Σ :=
@@ -100,7 +100,7 @@ Section proof.
                  flag_tk l k ∗ is_flag l k ℓ.
   Proof.
     iIntros (Hle) "Ptr Gg". rewrite /is_flag /flag_tk /flag_inv.
-    iMod (untilI_alloc _ _ _ false _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
+    iMod (untilI_alloc _ _ _ _ ℓ μ with "Gg") as "(%& $& $& $& $& H)". 1: auto.
     iMod ("H" $! _ Np (l ↦ #0)%I (l ↦ #1)%I with "[Ptr]") as "H".
     { iNext. iFrame. }
     iDestruct "H" as "[H1 H2]".

@@ -114,7 +114,7 @@ Section until.
       e
       (λ v, Q v ∗ Ψ ∗ crP_obls g ℓ K ∗ ⌜k ∈ K⌝)%I
     ⊢ fuel_burning_triple s i E G G
-        (P ∗ untilT N k 1 Φ Ψ ∗ £ 2)%I
+        (P ∗ untilI N k 1 Φ Ψ ∗ £ 2)%I
         e
         (λ v, Q v ∗ Ψ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)%I.
   Proof.
@@ -144,7 +144,7 @@ Section until.
       e
       (λ v, ∃ g ℓ K, Q v ∗ Ψ ∗ crP_obls g ℓ K ∗ ⌜k ∈ K⌝)%I
     ⊢ fuel_burning_triple s i E G G
-        (P ∗ untilT N k 1 Φ Ψ ∗ £ 2)%I
+        (P ∗ untilI N k 1 Φ Ψ ∗ £ 2)%I
         e
         (λ v, ∃ g ℓ K, Q v ∗ Ψ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)%I.
   Proof.
@@ -170,7 +170,7 @@ Section until.
   Lemma fuel_burning_triple_until_alloc s i E G P e Q g K ℓ1 ℓ2 μ N Φ Ψ :
     (∀ k, fuel_burning_triple s i E G G
             (P ∗ ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
-             untilT N k 1 Φ Ψ ∗ witP_layer k ℓ2 ∗ oblP_fuel k ℓ2 μ)
+             untilI N k 1 Φ Ψ ∗ witP_layer k ℓ2 ∗ oblP_fuel k ℓ2 μ)
             e
             Q)
       ∧ ⌜(ℓ1 <= ℓ2)%ordi⌝
@@ -181,7 +181,7 @@ Section until.
   Proof.
     iIntros "(H& %LEl) % (TG& HP) POST".
     iDestruct "HP" as "(HP& Cg& HΦ)".
-    iMod (untilI_alloc _ _ _ false _ ℓ2 μ with "Cg") as "(%& %& Cg& Of& #Wl& Acc)". 1: auto.
+    iMod (untilI_alloc _ _ _ _ ℓ2 μ with "Cg") as "(%& %& Cg& Of& #Wl& Acc)". 1: auto.
     iMod ("Acc" $! _ N Φ Ψ with "HΦ") as "HU".
     iPoseProof ("H" with "[$TG $HP $Cg $HU $Wl $Of]") as "WP". 1: auto.
     iApply ("WP" with "POST").

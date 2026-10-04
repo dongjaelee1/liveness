@@ -130,8 +130,8 @@ Section proof.
     ⊢ ∃ μ, ∀ i g kl kc,
     l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (ℓq ⊕ 2)%ordi μ) ∗
          crP_obls g (ℓq ⊕ 2)%ordi {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
-         finallyT Nl kl 1 (exits #1@i) ∗
-         finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ)) }}}
+         finallyI Nl kl 1 (exits #1@i) ∗
+         finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ)) }}}
       main #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
   Proof using queueG0 ticket_lockG0.
@@ -221,15 +221,15 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
-    iMod (thread_expr_terminateT with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminate_finally with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := main #() ]} →
-    Φ = (λ μ, (∃ g kl kc, finallyT Nl kl 1 (exits #1@i) ∗
-                          finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ)) ∗
+    Φ = (λ μ, (∃ g kl kc, finallyI Nl kl 1 (exits #1@i) ∗
+                          finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ)) ∗
                           (thP_carriers i {[g]} ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
                            crP_fuel g (ℓq ⊕ 2)%ordi μ))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #1⌝)%I]}) →
@@ -243,10 +243,10 @@ Section proof.
     rewrite !big_sepS_singleton.
     iPoseProof (main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ (ℓq ⊕ 2)%ordi μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (untilI_alloc _ _ _ false (ℓq ⊕ 2)%ordi (ℓq ⊕ 2)%ordi 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
+    iMod (untilI_alloc _ _ _ (ℓq ⊕ 2)%ordi (ℓq ⊕ 2)%ordi 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nl True%I (exits #1@i)%I with "[]") as "Ukl1".
     { done. }
-    iMod (untilI_alloc _ _ _ false (ℓq ⊕ 2)%ordi (ℓq ⊕ 2)%ordi 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
+    iMod (untilI_alloc _ _ _ (ℓq ⊕ 2)%ordi (ℓq ⊕ 2)%ordi 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
     iMod ("Akc" $! _ Nc True%I ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ))%I
             with "[]") as "Ukc".
     { done. }
@@ -293,8 +293,8 @@ Section adequacy.
   Let Φ_P `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ} : _ → iProp Σ :=
         λ μ,
           (∃ g kl kc,
-              finallyT Nl kl 1 (exits #1@i) ∗
-              finallyT Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ)) ∗
+              finallyI Nl kl 1 (exits #1@i) ∗
+              finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ ql γ ℓ, is_task_queue ql γ ℓ)) ∗
               (thP_carriers i {[g]} ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
                crP_fuel g (ℓq ⊕ 2)%ordi μ))%I.
 

@@ -144,7 +144,7 @@ Global Arguments uchain_pin {SI Σ _}.
     Defined by well-founded recursion on the ordinal, so it is a plain iProp. *)
 Fixpoint untilI_chain_rec `{!lantanaGS Λ Σ}
   (N : namespace) k (o : Ord.t) (P Q : iProp Σ) (ACC : Acc Ord.lt o) {struct ACC} : iProp Σ :=
-  untilI N k false (1/2) P
+  untilI N k (1/2) P
     (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), untilI_chain_rec N k' o' P Q (Acc_inv ACC LTo)))%I.
 
 Definition untilI_chain `{!lantanaGS Λ Σ} (N : namespace) k o (P Q : iProp Σ) : iProp Σ :=
@@ -161,7 +161,7 @@ Qed.
 
 Lemma untilI_chain_unfold `{!lantanaGS Λ Σ} (N : namespace) k o (P Q : iProp Σ) :
   untilI_chain N k o P Q =
-  untilI N k false (1/2) P (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), untilI_chain N k' o' P Q))%I.
+  untilI N k (1/2) P (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), untilI_chain N k' o' P Q))%I.
 Proof.
   unfold untilI_chain. destruct (Ord.lt_well_founded o). simpl.
   do 3 f_equal. apply func_ext. intros. f_equal. apply func_ext. intros. f_equal. apply func_ext. intros.

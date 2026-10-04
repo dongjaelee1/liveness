@@ -222,7 +222,7 @@ Section proof.
       ([∗ map] a ↦ k ∈ os,
          ((£ (10)%ord ∨ cnt_lb r i a) ∗
           a ↪[rm]□ k ∗ cnt_lb r j a ∗ witP_layer k 0) ∗
-         ((finallyT Nu k (1/2) (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')) ∨
+         ((finallyI Nu k (1/2) (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')) ∨
             (oblP_discharged k ∗ (cnt_lb r j (a + 1) ∗ ∃ k', (a + 1) ↪[rm]□ k')))).
 
   Definition px r rm i j : iProp Σ :=
@@ -237,7 +237,7 @@ Section proof.
     ⊢ ∀ i g z r rm ci cj C,
     l{{{ thread_expr i C (loop #()) ∗ thP_carriers i ({[g]}) ∗
          crP_obls g 1 {[z]} ∗
-         untilT N1 z 1 True False ∗
+         untilI N1 z 1 True False ∗
          £ (10)%ord ∗
          px r rm ci cj ∗
          ∃ n, cnt_auth r ci n 1%Qp ∗ cnt_lb r cj n ∗
@@ -301,7 +301,7 @@ Section proof.
     ⊢ ∀ j n r rm ci cj ck C,
     l{{{ thread_expr j C (loop #()) ∗ ∃ g, thP_carriers j {[g]} ∗
               crP_obls g 0 {[ck]} ∗
-              finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
+              finallyI Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
               crP_fuel g 0 10 ∗
               px r rm ci cj ∗
               cnt_auth r cj n (1/2) ∗ n ↪[rm]□ ck }}}
@@ -324,7 +324,7 @@ Section proof.
     (* The next until is allocated and registered (a model update) before the invariant is
        opened. *)
     iMod (carrier_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
-    iMod (untilI_alloc _ _ _ false 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
+    iMod (untilI_alloc _ _ _ 0 0 10 with "Gg'") as "(%ck1& %Nin1& Gg'& Of1& #Wlk1& A)". 1: done.
     iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I with "[//]") as "Unew".
     iApply (sfmupd_fupd_acc _ ∅).
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
@@ -387,7 +387,7 @@ Section proof.
     crP_obls g 0 ∅
     -∗ |={E}=>m ∃ ck r rm ci cj n,
                 crP_obls g 0 {[ck]} ∗
-                finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
+                finallyI Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
                 witP_layer ck 0 ∗
                 px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
                 cnt_lb r cj n ∗  n ↪[rm]□ ck.
@@ -400,7 +400,7 @@ Section proof.
     iMod (alloc_cnt_auth _ 0 with "CB") as "(CB& %cj& CAj)".
     iPoseProof (get_cnt_lb with "CAj") as "#Clj". 1: reflexivity.
     iMod (ghost_map_alloc (∅ : gmap nat oid)) as "(%rm& GM& _)".
-    iMod (untilI_alloc _ _ _ false _ _ 10 with "Cg") as "(%ck& _& Cg& Gf& #Wl& ACC)".
+    iMod (untilI_alloc _ _ _ _ _ 10 with "Cg") as "(%ck& _& Cg& Gf& #Wl& ACC)".
     1: reflexivity. rewrite union_empty_r_L.
     iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I with "[//]") as "HF".
     iMod (ghost_map_insert_persist 0 ck with "GM") as "(GM& #GMe)". 1: done.
@@ -419,8 +419,8 @@ Section proof.
     i ≠ j →
     Θ = {[i := loop #(); j := loop #() ]} →
     Φ = ((∃ g1 g2 z ck r rm ci cj n,
-             untilT N1 z 1 True False ∗
-             finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
+             untilI N1 z 1 True False ∗
+             finallyI Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
              (£ (10)%ord ∗
               px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
               cnt_lb r cj n ∗  n ↪[rm]□ ck ∗
@@ -442,7 +442,7 @@ Section proof.
     iPoseProof (px_loop2_spec) as "px_loop2_spec".
     iMod (carrier_alloc _ _ _ 1 0 with "TG1") as "(%g1& _& TG1& Gg1& _)".
     iMod (carrier_alloc _ _ _ 0 10 with "TG2") as "(%g2& _& TG2& Gg2& Gf2)".
-    iMod (untilI_alloc _ _ _ false _ _ 0 with "Gg1") as "(%z& _& Gg1& _& _& ACC)". 1: reflexivity.
+    iMod (untilI_alloc _ _ _ _ _ 0 with "Gg1") as "(%z& _& Gg1& _& _& ACC)". 1: reflexivity.
     iMod ("ACC" $! _ N1 True%I False%I with "[//]") as "HFz".
     rewrite !union_empty_r_L.
     iMod (px_init ⊤ with "Gg2") as "(%&%&%&%&%&%& Gg2& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)".
@@ -485,8 +485,8 @@ Section adequacy.
 
   Let Φ_P `{!heapGS Σ} `{!mcntsG Σ} : iProp Σ :=
         (∃ g1 g2 z ck r rm ci cj n,
-            untilT N1 z 1 True False ∗
-            finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
+            untilI N1 z 1 True False ∗
+            finallyI Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
             (£ (10 : Ord.t)%ord ∗
              px r rm ci cj ∗ cnt_auth r ci n 1%Qp ∗ cnt_auth r cj n (1/2) ∗
              cnt_lb r cj n ∗  n ↪[rm]□ ck ∗

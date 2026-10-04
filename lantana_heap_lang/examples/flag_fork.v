@@ -41,8 +41,8 @@ Section proof.
     ⊢ ∃ μ, ∀ i g kr kc,
     l{{{ thread_expr i [] (FlagFork.main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (1)%ordi μ) ∗
          crP_obls g 1 {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗
-         finallyT Nr kr 1 (exits #42@i) ∗
-         finallyT Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) }}}
+         finallyI Nr kr 1 (exits #42@i) ∗
+         finallyI Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) }}}
       FlagFork.main #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ ⌜v = #42⌝ ∗ lift_term i fork_post v }}}.
   Proof.
@@ -112,15 +112,15 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
-    iMod (thread_expr_terminateT with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminate_finally with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := FlagFork.main #() ]} →
-    Φ = (λ μ, (∃ g kr kc, finallyT Nr kr 1 (exits #42@i) ∗
-                          finallyT Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) ∗
+    Φ = (λ μ, (∃ g kr kc, finallyI Nr kr 1 (exits #42@i) ∗
+                          finallyI Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) ∗
                           (thP_carriers i {[g]} ∗ crP_obls g 1 {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗
                            crP_fuel g 1 μ))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #42⌝)%I]}) →
@@ -134,10 +134,10 @@ Section proof.
     rewrite !big_sepS_singleton.
     iPoseProof (FlagFork_main_spec) as (μ) "main_spec".
     iMod (carrier_alloc _ _ _ 1 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (untilI_alloc _ _ _ false 1 1 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
+    iMod (untilI_alloc _ _ _ 1 1 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nr True%I (exits #42@i)%I with "[]") as "Ukl1".
     { done. }
-    iMod (untilI_alloc _ _ _ false 1 1 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
+    iMod (untilI_alloc _ _ _ 1 1 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
     iMod ("Akc" $! _ Nc True%I (∃ x k ℓ, is_flag x k ℓ)%I with "[]") as "Ukc".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Gg1 Gf1 Ofkl1 Ofkc".
@@ -178,8 +178,8 @@ Section adequacy.
   Let Φ_P `{!heapGS Σ} : _ → iProp Σ :=
         λ μ,
           (∃ g kr kc,
-              finallyT Nr kr 1 (exits #42@i) ∗
-              finallyT Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) ∗
+              finallyI Nr kr 1 (exits #42@i) ∗
+              finallyI Nc kc 1 (∃ x k ℓ, is_flag x k ℓ) ∗
               (thP_carriers i {[g]} ∗ crP_obls g 1 {[kr; kc]} ∗ ⌜kr ≠ kc⌝ ∗ crP_fuel g 1 μ))%I.
 
   Let G_main {Σ} : tps heap_lang Σ :=
