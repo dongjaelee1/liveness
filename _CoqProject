@@ -110,6 +110,7 @@ lantana_heap_lang/proofmode.v
 lantana_heap_lang/temporal_laws.v
 
 
+lantana_heap_lang/examples/step_tactics.v
 lantana_heap_lang/examples/flag.v
 lantana_heap_lang/examples/flag_client.v
 lantana_heap_lang/examples/flag_fork.v

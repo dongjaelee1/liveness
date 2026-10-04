@@ -1,11 +1,11 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Export temporal_laws lang.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Export flag.
+From lantana.heap_lang.examples Require Import step_tactics.
+
+(** * Nested waits on flags, to a nondeterministically chosen depth *)
 
 Module Nondet.
 
@@ -36,23 +36,10 @@ End Nondet.
 Section proof.
   Context `{!heapGS Σ}.
 
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
-
-  Let Nl := nroot.@ "label".
-
   (** The main proofs. *)
 
-  (** Because the blocking function wait increases the layer by 1, the layer grows with the nested wait calls.
-      The obligation [k] of the flag [x] is a child of the running thread. *)
+  (** Because the blocking function [wait] increases the layer by 1, the layer grows with the
+      nested [wait] calls. The obligation [k] of the flag [x] is a child of the running thread. *)
   Lemma Nondet_nest_spec :
     ⊢ ∃ μ, ∀ lc i (x : loc) (n : Z) G k C,
     l{{{ thread_expr i C (Nondet.nest #x #n) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g (Z.to_nat n)%ordi μ) ∗
@@ -144,7 +131,8 @@ Section proof.
       iIntros "(TE& _& TG& #Od)". iApply ("HΦ" with "[$]").
   Qed.
 
-  (** nondet always terminates, but because nest's layer depends on nondeterministically chosen n, we need ω for precondition. *)
+  (** [nondet] always terminates; since the layer of [nest] depends on the nondeterministically
+      chosen [n], the precondition needs layer [ω]. *)
   Lemma Nondet_nondet_spec :
     ⊢ ∃ μ, ∀ i G C,
     l{{{ thread_expr i C (Nondet.nondet #()) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g (ω)%ordi μ) }}}

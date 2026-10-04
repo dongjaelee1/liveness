@@ -1,14 +1,11 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Export temporal_laws lang.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
-From iris.algebra Require Import reservation_map dfrac_agree mono_list gset.
-From transfinite.base_logic.lib Require Import ghost_var ghost_map.
-From lantana.algebra Require Import list_of_sets.
 From lantana.heap_lang.examples Require Export queue handoff.
+From lantana.heap_lang.examples Require Import step_tactics.
+
+(** * A task queue: a queue of tasks [f a] (as in the handoff), run by a forked worker thread *)
 
 Module TaskQueue.
 
@@ -24,13 +21,13 @@ Module TaskQueue.
           (Fst "fa") (Snd "fa")
       end.
 
-  (** Infinite loop *)
+  (** The worker: an infinite loop of [run_task]. *)
   Definition worker : val :=
     rec: "loop" "q" :=
       run_task "q";;
       "loop" "q".
 
-  (** Initializes a queue and Forks one worker thread *)
+  (** Initialize a queue and fork one worker thread. *)
   Definition init : val :=
     λ: <>,
       let: "q" := Queue.init #() in
@@ -42,29 +39,16 @@ End TaskQueue.
 Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (iModIntro; lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
-
   (** ** Definitions *)
   (** The invariant *)
   Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) : iProp Σ :=
     is_queue ql γ ℓ (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I.
-    (* is_queue ql γ ℓ (is_task ℓ). *)
 
   (** ** Lemmas *)
   Global Instance is_task_queue_persistent ql γ ℓ : Persistent (is_task_queue ql γ ℓ).
   Proof. rewrite /is_task_queue. apply _. Qed.
 
   (** ** Program proofs *)
-  (** FIXME: better notation for triples with this pattern *)
   Lemma TaskQueue_put_task_spec :
     ⊢ ∃ μ, ∀ lc i G p K B γ ℓ (ql task_f task_a : val) C,
     l{{{ thread_expr i C (TaskQueue.put_task ql task_f task_a) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g 1%ordi μ) ∗
@@ -137,7 +121,6 @@ Section proof.
     - destruct Hcase as (v& Hcase). subst x.
       iDestruct "Hx" as "(%&%& Htask& Gg& Ag& Fg& %Ning& HW)".
       iDestruct "Htask" as "(%&%&%& (%&%& %Htask& HP& %mt& TASK))".
-      (* iDestruct "Htask" as "(%&%&%&%& %Htask& HP& %mt& TASK)". *)
       iPoseProof (oblP_fuel_add with "Fg") as "[_ Fg]".
       iPoseProof (oblP_fuel_add_nat 99 1 with "Fg") as "[Fg' Fg]". 1: lia.
       iPoseProof (oblP_fuels_add_obl with "Fg' GF") as "GF".
@@ -152,7 +135,6 @@ Section proof.
         { iApply big_sepS_singleton. iFrame. }
         replace ({[ng]} ∪ ({[g]} ∪ G)) with ({[g; ng]} ∪ G) by set_solver.
         subst v.
-        (* destruct Htask as (->& Hltask). *)
         lwp_pures.
         lwp_bind (f a).
         iMod (oblP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
@@ -167,7 +149,6 @@ Section proof.
         iModIntro. iApply "HΦ". iFrame "TE Q_LC". iExists ng. iFrame. iPureIntro. set_solver.
       + iRename "HW" into "TG".
         subst v.
-        (* destruct Htask as (->& Hltask). *)
         lwp_pures.
         lwp_bind (f a).
         iMod (oblP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
@@ -193,7 +174,7 @@ Section proof.
       l{{{ RET #(); False }}}.
   Proof.
     iPoseProof (TaskQueue_run_task_spec) as (mr) "TaskQueue_run_task_spec".
-    (** For internal steps and executing run_task *)
+    (** For internal steps and executing [run_task] *)
     iExists (100 ⊕ mr ⊕ 1)%M. iIntros (b i G γ ℓ ql C) "!> % (TE& TG& HW& #ITQ) HΦ".
     iClear "HΦ".
     rewrite /TaskQueue.worker.
@@ -203,7 +184,7 @@ Section proof.
       { iApply big_sepS_singleton. iFrame. }
       iPoseProof (oblP_fuel_add_set with "GF") as "[GF F_mr]".
       iPoseProof (oblP_fuels_init with "GF") as "GF".
-      (** Lob (co-)induction *)
+      (** Löb induction *)
       iRevert (g) "Qw F_mr TG GF TE". iLöb as "IH". iIntros (g) "HW F_mr TG GF TE".
       lwp_pure. simpl.
       iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
@@ -223,12 +204,12 @@ Section proof.
       { iApply big_sepS_singleton. iFrame. }
       iPoseProof (oblP_fuel_add_set with "GF") as "[GF F_mr]".
       iPoseProof (oblP_fuels_init with "GF") as "GF".
-      do 2 lwp_pure_one.
+      do 2 (iModIntro; lwp_pure_one).
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
       iApply (lc_sfmupd_add_later with "LC1"). iNext.
       iModIntro. iApply ("IH" with "Qw F_mr TG GF TE").
     - iDestruct "HW" as "%". subst G.
-      (** Lob (co-)induction *)
+      (** Löb induction *)
       iRevert "TG TE". iLöb as "IH". iIntros "TG TE".
       iAssert ([∗ set] g ∈ ∅, oblP_fuel g 0 100)%I as "GF''". 1: done.
       iPoseProof (oblP_fuels_init with "GF''") as "GF'".
@@ -246,7 +227,7 @@ Section proof.
       iModIntro. lwp_pure. simpl.
       iFrame "TG GF'". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
       iClear "GF' GF''".
-      do 1 lwp_pure_one.
+      do 1 (iModIntro; lwp_pure_one).
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
       iApply (lc_sfmupd_add_later with "LC1"). iNext.
       iApply ("IH" with "TG TE").

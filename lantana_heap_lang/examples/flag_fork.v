@@ -1,17 +1,17 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
 From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
-
 From lantana.heap_lang.examples Require Export flag.
+From lantana.heap_lang.examples Require Import step_tactics.
+
+(** * A flag set by a forked thread: the main thread waits for it and returns [42] *)
 
 Module FlagFork.
 
   Definition main : val :=
     λ: <>,
-      (* alloc a flag x and forks a set-thread and wait *)
+      (* Allocate a flag [x], fork a thread that sets it, and wait for it. *)
       let: "x" := Flag.init #() in
       Fork (Flag.set "x");;
       Flag.wait "x";;
@@ -21,17 +21,6 @@ End FlagFork.
 
 Section proof.
   Context `{!heapGS Σ}.
-
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
   Let Nr := nroot.@ "flag_fork_ret".
   Let Nc := nroot.@ "flag_fork_flag".
@@ -240,5 +229,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions main_adequacy. *)

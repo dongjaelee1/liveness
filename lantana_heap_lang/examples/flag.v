@@ -1,10 +1,13 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Export temporal_laws lang.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
+From lantana.heap_lang.examples Require Import step_tactics.
+
+(** * A flag: [set] writes [1] and [wait] spins until it reads [1]
+
+    The cell is "[0] until [1]" (an until on the flag's obligation), so [wait] terminates;
+    [flag_tps] is the flag's trace guarantee. *)
 
 Module Flag.
 
@@ -14,7 +17,7 @@ Module Flag.
   Definition set : val :=
     λ: "x", "x" <- #1.
 
-  Definition wait : val := 
+  Definition wait : val :=
     rec: "wait" "x" :=
       if: !"x" ≠ #1
       then "wait" "x"
@@ -24,17 +27,6 @@ End Flag.
 
 Section proof.
   Context `{!heapGS Σ}.
-
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
   Let N := nroot.@ "flag".
   Let Na := N.@ "always".
@@ -261,11 +253,6 @@ Section proof.
     rewrite /Flag.wait.
     iPoseProof (oblP_fuel_add_set with "GF") as "[W_GF GF]".
     (* Liveness induction *)
-    (* iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)". *)
-    (* iMod (wit_fuels_add_map with "Wf0 W_GF") as "Wf". *)
-    (* { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. } *)
-    (* iClear "Wf0". *)
-    (* iInduction α as [α IH] using WFOCM.ind. *)
     iRevert "TE TG HΦ GF". iPoseProof (wit_layer_ind with "[$Wlk $W_GF]") as ">H".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
     2:{ iApply "H". }
@@ -283,7 +270,7 @@ Section proof.
       iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
       iApply (lwp_lc_later with "LC1"). iNext.
       iDestruct "inv" as "(Ptrl& inv_acc)".
-        iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
+      iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
       iApply (lwp_load _ ({[k]} : gset _) 0 with "[$TE $TG $Ptrl $GF1]").
       { iApply big_sepS_singleton. eauto. }
       iIntros "[TE [(_& TG& Rs) Ptrl]]".
@@ -296,20 +283,13 @@ Section proof.
       iModIntro. iModIntro. iSplitL "inv".
       { iFrame. }
       iModIntro; lwp_pure_one.
-      (* rewrite bool_decide_false; cycle 1. *)
-      (* { intro F. simplify_eq /=. } *)
       iModIntro; lwp_pure_one.
       iModIntro; lwp_pure_one.
-      (* rewrite bool_decide_true; cycle 1. *)
-      (* iModIntro; lwp_pure_one. *)
       iModIntro.
       iMod ("IH" with "Wck") as "[GF' IH]". iApply ("IH" with "TE TG HΦ GF'").
-      (* iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')". *)
-      (* iApply ("IH" $! α0 LTα with "TG HΦ [Fkl'] Wf'"). *)
-      (* rewrite map_union_empty. iPoseProof (big_sepM_gset_to_gmap with "Fkl'") as "H". iFrame. *)
     - (* k is discharged. *)
       iDestruct "inv" as ">(#Odk& Ptrl)".
-        iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
+      iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
       iApply (lwp_load _ ∅ 0 with "[$TE $TG $Ptrl $GF1]"). 1: done.
       iIntros "[TE [(_& TG& _) Ptrl]]".
       iModIntro. iSplitL "Ptrl".

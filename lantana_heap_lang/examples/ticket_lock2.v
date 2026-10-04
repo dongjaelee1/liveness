@@ -1,40 +1,17 @@
-From iris.proofmode Require Import proofmode.
 From lantana.algebra Require Import auth_mra.
 From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Export temporal_laws lang.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_map.
+From lantana.heap_lang.examples Require Import step_tactics.
 (* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
 From lantana.base_logic Require Import later_credits.
 
-(** FIXME: move to more general directory *)
-Section FIXME.
+(** * A starvation-free ticket lock
 
-  Global Program Instance ordinal_auth_mra_class : auth_mra_class ord.le ord.eq :=
-    Build_auth_mra_class ord.t _ _ _ _ _ _.
-  Next Obligation.
-    repeat intro. split; auto.
-  Qed.
-
-  Definition dfrac_div (dq : dfrac) (q : Qp) : dfrac :=
-    match dq with
-    | DfracOwn p => DfracOwn (p / q)
-    | DfracDiscarded => DfracDiscarded
-    | DfracBoth p => DfracBoth (p / q)
-    end.
-
-  Lemma dfrac_div_half dq : dq = (dfrac_div dq 2) ⋅ (dfrac_div dq 2).
-  Proof.
-    destruct dq; simpl.
-    - by rewrite dfrac_op_own Qp.div_2.
-    - done.
-    - unfold op. unfold cmra_op. simpl. rewrite Qp.div_2. auto.
-  Qed.
-
-End FIXME.
+    Each ticket comes with an unlock obligation, allocated by its acquiring thread, so that
+    every pending ticket is eventually served ([fair_lock_starvation_free]). *)
 
 Module TicketLock.
   (** https://en.wikipedia.org/wiki/Ticket_lock *)
@@ -82,17 +59,6 @@ Record ticketlock_γ :=
 
 Section proof.
   Context `{!heapGS Σ, !ticket_lockG Σ}.
-
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (iModIntro; lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
   Let N := nroot.@"ticket_lock".
   Let N_inv := N.@"inv".
@@ -160,24 +126,13 @@ Section proof.
     γ ↪LOCK ℓ1 ==∗ γ ↪LOCK ℓ2.
   Proof.
     iIntros (LE). iIntros "H". iApply (own_update with "H").
-    (* FIXME: typeclass not solved *)
+    (* FIXME: [apply] leaves the class argument of [auth_mra_update] as a goal. *)
     apply auth_mra_update; auto. apply _.
   Qed.
 
   Lemma lock_config_persist γ dq ℓ :
     (γ ↪LOCK{dq} ℓ) ==∗ γ ↪LOCK□ ℓ.
   Proof. iIntros "H". iApply (own_update with "H"). apply auth_mra_auth_persist. Qed.
-
-  (** ** Remark: Properties we want from a modular spec with liveness:
-         1. Hide implementation details, e.g., # of lines, internal data structure.
-         2. Robust against implementation changes, especially # of fuels.
-         3. Consistent format for different libraries.
-
-         'oblP_fuel g 1 1' is a good abstraction for trivially terminating functions.
-         ord.large is a good abstraction for more complex functions.
-         Ref: https://en.wikipedia.org/wiki/Hartogs_number *)
-  (** ** Remark: Spec we want for a function that trivially terminates (w/o witness induction):
-         "flat layer"=0. A possible format is ∃ μ in front of the spec, as in TicketLock_init_sepc. *)
 
   (** ** Program proofs *)
   Lemma TicketLock_init_spec :
@@ -200,7 +155,7 @@ Section proof.
     iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
     iModIntro. iIntros (next) "[TE ((_& TG& _)& Ptr_next& _)]".
-    lwp_pure_lc lc. iRename "LC" into "QLC".
+    iModIntro; lwp_pure_lc lc. iRename "LC" into "QLC".
     iMod (obl_alloc_discharged _ (ℓ ⊕ Z.to_nat 0)%ordi) as "(%κu& #Ofk& #Wlk& OAcc)".
     iDestruct "Ptr_curr" as "[Ptr_curr Ptr_curr0]".
     iMod (ghost_map_alloc ({[0%Z := (κu)]} : gmap Z (oid))) as "(%γt& GMAt& GMEt)".
@@ -269,7 +224,6 @@ Section proof.
     iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]". 1: set_solver.
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
-    (** FIXME: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
@@ -344,7 +298,7 @@ Section proof.
     iPoseProof (oblP_fuels_add_obl with "GF' GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
-    do 2 lwp_pure_one.
+    do 2 (iModIntro; lwp_pure_one).
     (** Set up induction. *)
     iModIntro.
     iApply fupd_lwp. iInv "INV" as "H".
@@ -384,7 +338,6 @@ Section proof.
     iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]". 1: set_solver.
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
-    (** TODO: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
@@ -499,8 +452,7 @@ Section proof.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& (GMAt& GMAa)& %EqDom& %Boundc& %Domt& HMt& HMa& Hc)".
     iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". inversion H. subst u. clear H.
-    (* FIXME: does not combine the dfrac part. *)
-    (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
+    (* FIXME: [iCombine] does not combine the dfrac parts here, hence [pointsto_agree]. *)
     iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_store _ ∅ lc with "[$TE $TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iSplitL "PtrCurr"; iFrame. }

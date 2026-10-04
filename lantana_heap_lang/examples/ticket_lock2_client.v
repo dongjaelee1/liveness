@@ -1,11 +1,9 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
 From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
-
 From lantana.heap_lang.examples Require Export ticket_lock2.
+From lantana.heap_lang.examples Require Import step_tactics.
 
 (** A client that creates a ticket lock at runtime, acquires and releases it. Its adequacy
     theorem exports, besides termination, the starvation freedom of that lock, which comes
@@ -24,17 +22,6 @@ End TicketLockClient.
 
 Section proof.
   Context `{!heapGS Σ, !ticket_lockG Σ}.
-
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
   Let Nr := nroot.@ "tl_client_ret".
   Let Nc := nroot.@ "tl_client_lock".
@@ -241,5 +228,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions ticket_lock_client_adequacy. *)

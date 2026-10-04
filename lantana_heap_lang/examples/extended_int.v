@@ -1,9 +1,9 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export notation.
+From lantana.heap_lang Require Export temporal_laws notation.
 From lantana.heap_lang Require Import proofmode.
 From iris.prelude Require Import options.
+
+(** * Integers extended with [±∞], as heap_lang values, and the spec of their comparison *)
 
 Module Int.
 

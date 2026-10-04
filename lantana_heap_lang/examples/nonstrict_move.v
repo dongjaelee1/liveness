@@ -1,17 +1,15 @@
+From lantana.base_logic Require Export invariants.
+From lantana.heap_lang Require Export temporal_laws lang.
+From lantana.heap_lang Require Import notation proofmode.
+From iris.prelude Require Import options.
+
 (** * A move below an obligation of the same layer is unsound
 
     Assume the non-strict variant of [obl_move] (the new parent's layer may equal the payment
-    layer). A single looping thread then keeps an obligation alive forever: at every iteration
-    it creates a fresh root at layer 0, moves the old root below it (paying the old root's last
-    unit, at the new root's own layer), and pays the step with the new root. Adequacy then
-    gives "eventually False" for the obligation's until. *)
-From iris.proofmode Require Import proofmode.
-From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
-From iris.prelude Require Import options.
+    layer). Then a looping thread keeps an obligation alive forever: each iteration creates a
+    fresh root at layer 0, moves the old root below it (paying the old root's last unit at the
+    new root's own layer), and pays the step with the new root. Adequacy then gives
+    "eventually False" for the obligation's until. *)
 
 Class obl_move_nonstrict `(HGS : lantanaGS Λ Σ) `{!TemporalInterp Λ Σ} := {
     obl_move_le E p1 q K1 K2 k (ℓ ℓq : ord.t) :
@@ -173,5 +171,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions nonstrict_move_absurd. *)

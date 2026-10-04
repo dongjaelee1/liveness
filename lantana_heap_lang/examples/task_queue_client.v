@@ -1,10 +1,12 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
 From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Export flag task_queue.
+From lantana.heap_lang.examples Require Import step_tactics.
+
+(** * A client of the task queue: a reentrant task that puts itself back [n] times before
+    setting a flag, which the main thread waits on *)
 
 Definition decr_reentrant : val :=
   (rec: "f" "a" :=
@@ -27,21 +29,10 @@ Definition main : val :=
 Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
-
   Let Nl := nroot.@ "return".
   Let Nc := nroot.@ "flag".
 
-  (** 1 < ℓq (by TaskQueue_put_task_spec, is_task *)
+  (** The layer of the task queue: [is_task] in [TaskQueue_put_task_spec] needs [1 < ℓq]. *)
   Let ℓq : ord.t := (1 ⊕ 1)%ordi.
   Remark ℓq_cond : (1 < ℓq)%ordi.
   Proof. apply hessenberg.add_lt_l. apply ord.S_lt. Qed.
@@ -110,9 +101,7 @@ Section proof.
         rewrite /is_task_queue. iFrame "is_task_queue".
         rewrite /is_task. iDestruct "TASK" as (mt) "TASK".
         iExists 1%ordi, _. iSplit.
-        (* iExists _, _, 1%ordi, _. iSplit. *)
         { iPureIntro. apply ℓq_cond. }
-        (* { iPureIntro. split; first eauto. apply ℓq_cond. } *)
         iSplitL.
         { iCombine "Of Ftk Kk" as "H". iApply "H". }
         iExists mt. iIntros (??????) "!> % (TE& TG& GF& Gg& %Hsub& OF& Ftk& Kk) HΦ".
@@ -158,7 +147,7 @@ Section proof.
     iIntros (ql qγ) "(TE& _& TG& #ITQ)".
     lwp_pures.
     lwp_bind (Flag.init _).
-    (* A carrier obligation for the flag's obligation, at the flag's layer. *)
+    (* A container for the flag's obligation, at the flag's layer. *)
     iMod (obl_new _ (PThread i) _ (ℓq ⊕ 2)%ordi (μ_fi ⊕ μ_d ⊕ 97)%M with "[] TG")
       as "(%g0& %NinG& TG& Cg0& Ag0& GF0& #Wg0)".
     { iApply parP_le_thread. }
@@ -378,5 +367,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions task_queue_client_adequacy. *)

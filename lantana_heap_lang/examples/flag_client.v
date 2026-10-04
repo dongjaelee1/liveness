@@ -1,11 +1,11 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
 From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
-
 From lantana.heap_lang.examples Require Export flag.
+From lantana.heap_lang.examples Require Import step_tactics.
+
+(** * A client of the flag: one thread sets it, another waits for it *)
 
 Section code.
 
@@ -24,21 +24,6 @@ End code.
 
 Section proof.
   Context `{!heapGS Σ}.
-
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
-
-  Let N := nroot.@ "flag".
-  Let Na := N.@ "always".
-  Let Np := N.@ "pointsto".
 
   Let Nl := nroot.@ "writer_return".
 
@@ -180,10 +165,6 @@ Section adequacy.
         (is_flag_tr l ∧ tr_until (l ↦ #0) (l ↦ #1) ∧
          tr_eventually (exits #()@i) ∧ tr_eventually (exits #1@j))%R.
 
-  Let N := nroot.@ "flag".
-  Let Na := N.@ "always".
-  Let Np := N.@ "pointsto".
-
   Let Nl := nroot.@ "writer_return".
 
   (** The final resources. *)
@@ -261,5 +242,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions flag_client_adequacy. *)

@@ -1,25 +1,14 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Export temporal_laws lang.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
+From lantana.heap_lang.examples Require Import step_tactics.
 
 (** * Test: a discharge in the pre-step modality, with nested structures
 
-    The thread owns [x ↦ #0] and [y ↦ #7] and commits to
-
-      ◇ (x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ ◇ (x ↦ #2)).
-
-    It writes [x <- #1]; then, in the pre-step modality before [x <- #2] (a bare [lWP],
-    entered through [sfmupd_lwp]), it allocates the trace-visible invariant on [y] and
-    discharges the commitment with [x ↦ #1] at hand; the step then overwrites [x]. The
-    nested commitment is discharged after that step.
-
-    The right formula of the discharge is a state fact that the next step destroys, and it
-    nests an always and an until: the certificate-based adequacy records their readings at
-    the discharge position ([cert_discharge_adequacy]). *)
+    The thread commits to [◇ (x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ ◇ (x ↦ #2))] and discharges it in
+    the pre-step modality of [x <- #2], a step that destroys [x ↦ #1]. The certificate-based
+    adequacy records the readings of the nested always and until at the discharge position. *)
 
 Module CertDischarge.
 
@@ -33,17 +22,6 @@ End CertDischarge.
 
 Section proof.
   Context `{!heapGS Σ}.
-
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
   Let Nq := nroot.@ "cert_discharge_q".
   Let Nf := nroot.@ "cert_discharge_f".
@@ -168,7 +146,6 @@ Section adequacy.
 
   Let Nq := nroot.@ "cert_discharge_q".
   Let Nf := nroot.@ "cert_discharge_f".
-  Let Na := nroot.@ "cert_discharge_always".
 
   (** The final resources. *)
   Let Φ_P `{!heapGS Σ} : _ → iProp Σ :=

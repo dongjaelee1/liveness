@@ -1,22 +1,23 @@
-From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Export temporal_laws lang.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_var.
+From lantana.heap_lang.examples Require Import step_tactics.
 (* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
 From lantana.base_logic Require Import later_credits.
 
+(** * A handoff cell: [send] puts a task [f a] into the cell, and [receive] waits for a task
+    and runs it. A task comes with the obligations it discharges. *)
+
 Module Handoff.
 
-  (** Put x at buffer b *)
+  (** Put the task [f a] into the buffer [b]. *)
   Definition send : val :=
     λ: "b" "f" "a", "b" <- SOME ("f", "a").
 
-  (** Checks until the buffer b contains SOME x *)
-  Definition receive : val := 
+  (** Spin until the buffer [b] holds a task, then run it. *)
+  Definition receive : val :=
     rec: "loop" "b" :=
       match: !"b" with
         NONE => "loop" "b"
@@ -50,25 +51,8 @@ Record handoff_γ :=
 Section proof.
   Context `{!heapGS Σ, !handoffG Σ}.
 
-  Ltac post_lwp :=
-    simpl; iFrame "TG GF"; iExists ∅, 0; iSplitR; [by eauto | iIntros "TG GF _ _ TE"].
-
-  Ltac lwp_pure_one := (lwp_pure; post_lwp).
-  Ltac lwp_pures := repeat (iModIntro; lwp_pure_one).
-
-  Ltac post_lwp_lc n :=
-    simpl; iFrame "TG GF"; iExists ∅, n; iSplitR; [by eauto | iIntros "TG GF _ LC TE"].
-
-  Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
-
   Let N := nroot.@ "handoff".
   Let Na := N.@ "always".
-  Let Np := N.@ "pointsto".
-
-  Remark N_disj_1 : Na ## Np.
-  Proof. by apply ndot_ne_disjoint. Qed.
-  Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
-  Proof. pose proof N_disj_1. set_solver. Qed.
 
   (** ** Definitions *)
   (** A task [f a] that discharges the obligations [K], using fuel at layer [ℓt] for the
@@ -186,7 +170,7 @@ Section proof.
     iDestruct "HP" as "(TE& TG& GF& Ag& Gv& #handoff_inv)".
     rewrite /Handoff.receive.
     iPoseProof (oblP_fuels_init with "GF") as "GF".
-    (** Lob (co-)induction *)
+    (** Löb induction *)
     iRevert (g) "TE TG GF Gv Ag". iLöb as "IH". iIntros (g) "TE TG GF Gv Ag".
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".

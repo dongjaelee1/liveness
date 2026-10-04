@@ -1,20 +1,22 @@
 From iris.bi Require Import lib.fractional.
 From iris.algebra Require Import gmap mono_nat.
-From iris.proofmode Require Import proofmode.
-(* From transfinite.base_logic Require Import lib.ghost_map. *)
 From lantana.base_logic Require Export invariants.
-From lantana.heap_lang Require Export temporal_laws.
-From lantana.heap_lang Require Export lang.
-From lantana.heap_lang Require Import notation.
-From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Export temporal_laws lang.
+From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_map.
-
-From iris.proofmode Require Import rocq_tactics reduction spec_patterns.
+From iris.proofmode Require Import rocq_tactics.
 (* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
 From lantana.base_logic Require Import later_credits.
 
-(** "pure" steps that are reducible with the thread_exec predicate, without submitting fuels. *)
+(** * The no-credit rule is unsound
+
+    [lantanaGS_no_lc] assumes a rule for pure steps that pays no fuel. With it, two looping
+    threads prove "eventually False" ([loop_paradox]), and a fair run of the loops refutes the
+    rule ([no_lc_absurd]). *)
+
+(** The assumed rule: a pure step that pays no fuel (and gives no later credits), yet yields
+    a witness credit for each obligation of [R] that is not discharged. *)
 Class lantanaGS_no_lc `(HGS : lantanaGS Λ Σ) `{!TemporalInterp Λ Σ} := {
     lwp_pure_step_no_lc :
     ∀ n s i E E' e1 e2 φ Φ,
@@ -26,7 +28,7 @@ Class lantanaGS_no_lc `(HGS : lantanaGS Λ Σ) `{!TemporalInterp Λ Σ} := {
                           (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                            (|={E',E}=> |={E}=>m P)))
         ((|={E}=>m (lWP e2 @ s; i; E {{ v, Φ v }})))
-      ⊢ lWP e1 @ s; i; E {{ Φ }};    
+      ⊢ lWP e1 @ s; i; E {{ Φ }};
   }.
 
 Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _ _} (n : nat) R s i E E' e1 e2 φ Φ :
@@ -77,10 +79,7 @@ Tactic Notation "lwp_pure_no_lc" open_constr(efoc) :=
                                [tc_solve                       (* PureExec *)
                                |try solve_vals_compare_safe    (* The pure condition for PureExec --
          handles trivial goals, including [vals_compare_safe] *)
-                               (* |tc_solve                       (* IntoLaters *) *)
                                |idtac (* new goal *)
-                                  (* |idtac "use lwp_finish to cleanup new lwp"    (* new goal *) *)
-                                  (* |lwp_finish                      (* new goal *) *)
                             ])
         || fail "lwp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
   | _ => fail "lwp_pure: not a 'lwp'"
@@ -94,23 +93,10 @@ Tactic Notation "lwp_rec_no_lc" :=
   lwp_pure_no_lc (App _ _);
   clear H.
 
-Tactic Notation "lwp_if_no_lc" := lwp_pure_no_lc (If _ _ _).
-Tactic Notation "lwp_if_true_no_lc" := lwp_pure_no_lc (If (LitV (LitBool true)) _ _).
-Tactic Notation "lwp_if_false_no_lc" := lwp_pure_no_lc (If (LitV (LitBool false)) _ _).
-Tactic Notation "lwp_unop_no_lc" := lwp_pure_no_lc (UnOp _ _).
-Tactic Notation "lwp_binop_no_lc" := lwp_pure_no_lc (BinOp _ _ _).
-Tactic Notation "lwp_op_no_lc" := lwp_unop_no_lc || lwp_binop_no_lc.
 Tactic Notation "lwp_lam_no_lc" := lwp_rec_no_lc.
-Tactic Notation "lwp_let_no_lc" := lwp_pure_no_lc (Rec BAnon (BNamed _) _).
-Tactic Notation "lwp_seq_no_lc" := lwp_pure_no_lc (Rec BAnon BAnon _).
-Tactic Notation "lwp_proj_no_lc" := lwp_pure_no_lc (Fst _) || lwp_pure_no_lc (Snd _).
-Tactic Notation "lwp_case_no_lc" := lwp_pure_no_lc (Case _ _ _).
-Tactic Notation "lwp_inj_no_lc" := lwp_pure_no_lc (InjL _) || lwp_pure_no_lc (InjR _).
-Tactic Notation "lwp_pair_no_lc" := lwp_pure_no_lc (Pair _ _).
-Tactic Notation "lwp_closure_no_lc" := lwp_pure_no_lc (Rec _ _ _).
 
 (** The program. *)
-Definition loop : val := 
+Definition loop : val :=
   rec: "loop" <> :=
     "loop" #().
 
@@ -248,7 +234,7 @@ Section proof.
     iIntros (i z r rm ci cj C).
     iIntros (Φ) "!> (TE& TG& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Wckn& #Mn) HΦ".
     iEval (rewrite /px) in "Ipx".
-    (** Lob induction *)
+    (** Löb induction *)
     iRevert (n ck) "Cljn Wckn Mn Cai". iLöb as "IH".
     iIntros (n ck) "#Cljn #Wckn #Mn Cai".
     (** Witness induction *)
@@ -272,7 +258,7 @@ Section proof.
     - (** Counter is at least n; fetch next count and use Löb induction *)
       iApply sfmupd_fupd_l. iInv "Ipx" as "H".
       iPoseProof (tlc_split_nat 9 1 with "LC") as "[LC LCw]".
-      (** TODO: make interface defs and lemmas for tlc *)
+      (** TODO: interface lemmas for [tlc]; this uses the model's [lc_fupd_add_later]. *)
       iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LCw"). iNext.
       iDestruct "H" as "(%& %& (Ca& GMA)& HM)".
       iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
@@ -308,7 +294,7 @@ Section proof.
   Proof using Type*.
     iIntros (j n r rm ci cj ck C) "!> %Φ (TE& TG& Kck& Uck& Gf& #Ipx& Caj& #Mn) HΦ".
     iEval (rewrite /px) in "Ipx".
-    (** Lob induction *)
+    (** Löb induction *)
     iRevert (n ck) "TG Kck Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n ck) "TG Kck Uck Gf Caj #Mn".
     iEval (rewrite /loop).
@@ -327,7 +313,6 @@ Section proof.
     iApply (sfmupd_fupd_acc _ ∅).
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
     iPoseProof (tlc_split_nat 89 1 with "LC") as "[LC LC1]".
-    (** TODO: make interface defs and lemmas for tlc *)
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%& %& (Ca& GMA)& HM)".
     iAssert (⌜ os !! (n + 1)%nat = None ⌝)%I as "%Nin".
@@ -351,7 +336,6 @@ Section proof.
     { subst N Nu. apply ndot_ne_disjoint. done. }
     iMod (untilI_discharge with "Uck") as "H"; first set_solver.
     iPoseProof (tlc_split_nat 88 1 with "LC") as "[LC LC1]".
-    (** TODO: make interface defs and lemmas for tlc *)
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(_& H)".
     iPoseProof ("H" $! (PThread j) ({[ck1]} ∪ {[ck]}) with "[] TG Kck []") as "H".
@@ -468,7 +452,6 @@ Section adequacy.
   Let R_main : trProp heap_lang :=
         (tr_eventually ⌜ False ⌝ ∧ tr_eventually ⌜ True ⌝)%R.
 
-  Let N := nroot .@ "paradox_inv".
   Let Nu := nroot .@ "paradox_until".
   Let N1 := nroot .@ "paradox_false".
 
@@ -600,5 +583,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions no_lc_absurd. *)
