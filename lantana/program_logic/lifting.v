@@ -3,7 +3,6 @@ semantics to the program logic. *)
 
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export weakestpre.
-From lantana.algebra Require Import ordinal_wfocm.
 
 Class PureExecSI `{SI : sidx} `{!lantanaGS Λ Σ}
     (ς : thread_id → expr Λ → iProp Σ) i :=
@@ -35,7 +34,8 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)])
+                                                       (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       ((|={E}=>m (ν e2 efs))))))
     ⊢ lwp_step s i E e1 ν.
@@ -69,7 +69,8 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)])
+                                                       (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       (|={E}=>m ((lWP e2 @ s; i; E {{ Φ }}) ∗
                                                      ([∗ map] j ↦ ef ∈ efs,
@@ -91,7 +92,8 @@ Section lifting.
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
     (∀ K h n σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →
-                    (history_tinterp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗ ⌜ stuck i e σ (dom Θ) ⌝)
+                    (history_tinterp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗
+                    ⌜ stuck i e σ (dom Θ) ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
     rewrite lwp_unfold /lwp_pre /lwp_step =>->.
@@ -162,7 +164,8 @@ Section lifting.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                                ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)])
+                                                       (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       |={E1}=>m
                                                (from_option (λ v, (|={E1}=>m (Φ v))) False (to_val e2)) ∗
@@ -188,7 +191,8 @@ Section lifting.
 
   Lemma lwp_lift_pure_det_step_no_fork `{!Inhabited (state Λ)} {s i E E' Φ ς} e1 e2 :
     (∀ σ1 Θ, if s is NotStuck then reducible i e1 σ1 Θ else to_val e1 = None) →
-    (∀ σ1 κ Θ e2' σ2 efs', prim_step i e1 σ1 Θ κ e2' σ2 efs' → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
+    (∀ σ1 κ Θ e2' σ2 efs', prim_step i e1 σ1 Θ κ e2' σ2 efs' →
+                           κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs' = ∅) →
     PureExecSI ς i →
     (|={E,E'}=>
        ς i e1 ∗
@@ -246,34 +250,12 @@ Section lifting.
       iMod "H". iModIntro. iMod "H". iApply ("IH" with "[//] Hc H").
   Qed.
 
-  Lemma lwp_pure_step_alt `{!Inhabited (state Λ)} (n : nat) G R (o : Ord.t) s i E E' e1 e2 φ Φ ς :
-    PureExec φ n e1 e2 →
-    φ →
-    PureExecSI ς i →
-    ς i e1 ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-    (Nat.iter n (λ P, |={E,E'}=> thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
-                                (thP_kids i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                                 ALC (£ o ={E',E}=∗ |={E}=>m P)))
-       (ς i e2 -∗ (|={E}=>m (lWP e2 @ s; i; E {{ Φ }}))))
-    ⊢ (lWP e1 @ s; i; E {{ Φ }}).
-  Proof.
-    iIntros (Hexec HΦ HCS) "(Hc& #Rs& LWP)".
-    iApply (lwp_pure_step n o _ _ E E'). 1: auto.
-    iFrame "Hc".
-    iStopProof. clear Hexec. pattern n. induction n.
-    { simpl. iIntros "(#Rs& LWP)". auto. }
-    simpl. iIntros "(#Rs& LWP)".
-    iMod "LWP" as "($& $& LWP)". iFrame "Rs".
-    iIntros "!> TG Wcs". iMod ("LWP" with "TG Wcs") as "LWP". iIntros "LC".
-    iApply IHn. iFrame "Rs". iPoseProof ("LWP" with "LC") as "LWP".
-    iMod "LWP". iModIntro. iFrame "LWP".
-  Qed.
-
   Lemma lwp_pure_step_simple `{!Inhabited (state Λ)} n G R (o : Ord.t) s i E e1 e2 φ Φ ς :
     PureExec φ n e1 e2 →
     φ →
     PureExecSI ς i →
-    (ς i e1 ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
+    (ς i e1 ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ n) ∗
+     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
      (ς i e2 -∗ thP_kids i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_discharged r) -∗
       £ (o × n)%ord -∗ (|={E}=>m (lWP e2 @ s; i ; E {{ Φ }}))))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
@@ -290,7 +272,8 @@ Section lifting.
       unfold_opreds.
       rewrite Ord.from_nat_O. done. }
     iIntros "(#Rs& TG& Gfs& IH)". simpl.
-    iAssert (([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
+    iAssert (([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1))%I
+      with "[Gfs]" as "[Gfs Gf]".
     { iApply big_sepS_sep. iApply (big_sepS_impl with "Gfs"). iIntros "!> %% (%& F)".
       rewrite (oblP_fuel_eq _ _ (S n)%M (n ⊕ 1)%M); cycle 1.
       { rewrite measure_rep_nat_S measure_rep_add. by rewrite Hessenberg.add_comm. }

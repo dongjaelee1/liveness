@@ -1,3 +1,7 @@
+(** The model update of the program logic, [|={E1,E2}=>m P] ([sfmupd]): a fancy model update
+    that keeps the history interpretation ([history_tinterp]). Its proof-mode instances, and
+    the obligation rules of [opreds.v] stated as such updates. *)
+
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export temporal_class.
@@ -6,7 +10,8 @@ Import uPred.
 Local Definition sfmupd_def `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
   `{!TemporalInterp Λ Σ}
   E1 E2 : iPropO Σ -d> iPropO Σ :=
-  (λ P, ∀ h n σ Θ κs, history_tinterp h n σ Θ κs -∗ |={E1,E2:n,dom Θ}=>m history_tinterp h n σ Θ κs ∗ P)%I.
+  (λ P, ∀ h n σ Θ κs, history_tinterp h n σ Θ κs -∗
+                      |={E1,E2:n,dom Θ}=>m history_tinterp h n σ Θ κs ∗ P)%I.
 Local Definition sfmupd_aux : seal (@sfmupd_def). Proof. by eexists. Qed.
 Definition sfmupd := sfmupd_aux.(unseal).
 Global Arguments sfmupd {SI Λ Σ _ _ _ _}.
@@ -245,12 +250,14 @@ Section sfmupd.
     Frame p R P Q → Frame p R (|={E1,E2}=>m P) (|={E1,E2}=>m Q).
   Proof. rewrite /Frame=><-. by rewrite sfmupd_frame_l. Qed.
 
+  (** Running an m-update against the model, as the adequacy proofs do. *)
   Lemma all_interp_sfmupd_steps γ E1 E2 h n σ Θ κs g v Ω W (P : iProp Σ) :
     owit_inv_lb_mon γ →
     owit_inv_lb γ Ω W →
     (|={E1,E2}=>m P) -∗ history_tinterp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E1,E2}=∗
     (P ∗ history_tinterp h n σ Θ κs ∗
-     ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb γ Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
+     ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb γ Ω' W' ⌝ ∗
+                    model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
     iIntros (MON LB) "HP HI MI". unfold_sfmupd. iPoseProof ("HP" with "HI") as ">HP".
     iMod (model_interp_mupd_steps γ with "HP MI") as "(>($& $)& $)"; done.
@@ -266,7 +273,8 @@ Section sfmupd.
   Lemma lc_sfmupd_add_laterN E1 E2 P n :
     £n n -∗ ▷^n (|={E1,E2}=>m P) -∗ |={E1,E2}=>m P.
   Proof.
-    iIntros "LC H". iApply fupd_sfmupd_elim. iApply (lantana.base_logic.fancy_updates.lc_fupd_add_laterN with "LC"). iNext. auto.
+    iIntros "LC H". iApply fupd_sfmupd_elim.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_laterN with "LC"). iNext. auto.
   Qed.
 
   (** ** Obligation rules
@@ -492,3 +500,27 @@ Section sfmupd.
   Qed.
 
 End sfmupd.
+
+(** Running the m-updates of several threads, with the fair scheduler. *)
+Section run_sfmupd.
+  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!TemporalInterp Λ Σ}.
+
+  Lemma all_interp_sfmupd_steps_gmap (γ : thread_id → nat) E h n σ Θ κs g v Ω W
+    (A : Type) (TQ : gmap thread_id ((expr Λ) * A)) (P : thread_id → (expr Λ) → A → iProp Σ) :
+    (owit_inv_lb (fair_sched_fun γ) Ω W) →
+    ([∗ map] i ↦ '(e, a) ∈ TQ, |={E}=>m (P i e a)) -∗
+    history_tinterp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
+    (([∗ map] i ↦ '(e, a) ∈ TQ, (P i e a)) ∗ history_tinterp h n σ Θ κs ∗
+     ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗
+                    model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
+  Proof.
+    iIntros (LB) "PS HI MI".
+    iAssert (|={E}=>m [∗ map] i ↦ '(e, a) ∈ TQ, P i e a)%I with "[PS]" as "PS".
+    { iApply big_sepM_sfmupd. iApply (big_sepM_impl with "PS"). iIntros "!>" (k [e a] _) "H". done. }
+    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "PS HI MI") as "$".
+    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    { done. }
+    done.
+  Qed.
+
+End run_sfmupd.

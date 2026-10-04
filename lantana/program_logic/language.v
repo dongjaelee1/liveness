@@ -1,3 +1,6 @@
+(** Languages with thread ids and forking ([language]): contexts, pure steps, atomicity,
+    traces and behaviors, and the ordinal bound [fair_sched_ub] of the fair scheduler. *)
+
 From stdpp Require Export gmap.
 From iris.algebra Require Export ofe.
 From lantana.program_logic Require Export lwp_notation.
@@ -145,7 +148,7 @@ Section language.
 
   Definition reducible i (e : expr Λ) (σ : state Λ) Θ :=
     ∃ κ e' σ' efs, prim_step i e σ Θ κ e' σ' efs.
-  (* Total WP only permits reductions without observations *)
+  (** Reducible without observations, as for pure steps. *)
   Definition reducible_no_obs i (e : expr Λ) (σ : state Λ) Θ :=
     ∃ e' σ' efs, prim_step i e σ Θ [] e' σ' efs.
   Definition irreducible i (e : expr Λ) (σ : state Λ) Θ :=
@@ -184,36 +187,6 @@ Section language.
     ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
     thread_step i ρ1 κ ρ2.
   Local Hint Constructors thread_step : core.
-
-  Definition erased_thread_step i (ρ1 ρ2 : cfg Λ) := ∃ κ, thread_step i ρ1 κ ρ2.
-
-  (** TODO: Probably need to define trace and a Coinductive behavior for adequacy *)
-  Definition step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
-    ∃ i, thread_step i ρ1 κ ρ2.
-  Local Hint Unfold step : core.
-
-  Inductive nsteps : nat → cfg Λ → list (observation Λ) → cfg Λ → Prop :=
-    | nsteps_refl ρ :
-       nsteps 0 ρ [] ρ
-    | nsteps_l n ρ1 ρ2 ρ3 κ κs :
-       step ρ1 κ ρ2 →
-       nsteps n ρ2 κs ρ3 →
-       nsteps (S n) ρ1 (κ ++ κs) ρ3.
-  Local Hint Constructors nsteps : core.
-
-  Definition erased_step (ρ1 ρ2 : cfg Λ) := ∃ κ, step ρ1 κ ρ2.
-
-  (** [rtc erased_step] and [nsteps] encode the same thing, just packaged
-      in a different way. *)
-  Lemma erased_steps_nsteps ρ1 ρ2 :
-    rtc erased_step ρ1 ρ2 ↔ ∃ n κs, nsteps n ρ1 κs ρ2.
-  Proof.
-    split.
-    - induction 1; firstorder eauto. eexists. eexists. econstructor 2; eauto.
-    - intros (n & κs & Hsteps). unfold erased_step.
-      induction Hsteps; eauto using rtc_refl, rtc_l.
-  Qed.
-  (** TODO: and above definitions are maybe not needed *)
 
   Lemma of_to_val_flip v e : of_val v = e → to_val e = Some v.
   Proof. intros <-. by rewrite to_of_val. Qed.
@@ -282,8 +255,6 @@ Section language.
       prim_step i e1 σ1 Θ κ e2' σ2 efs → κ = [] ∧ σ2 = σ1 ∧ e2' = e2 ∧ efs = ∅
   }.
 
-  Notation pure_steps_tp := (map_Forall2 (λ _, rtc (pure_step))).
-
   Class PureExec (φ : Prop) (n : nat) (e1 e2 : expr Λ) :=
     pure_exec : φ → (n > 0 ∧ relations.nsteps (pure_step) n e1 e2).
 
@@ -345,61 +316,10 @@ Section language.
     by rewrite to_of_val in Hval.
   Qed.
 
-  (** Let thread pools [t1] and [t3] be such that each thread in [t1] makes
-   (zero or more) pure steps to the corresponding thread in [t3]. Furthermore,
-   let [t2] be a thread pool such that [t1] under state [σ1] makes a (single)
-   step to thread pool [t2] and state [σ2]. In this situation, either the step
-   from [t1] to [t2] corresponds to one of the pure steps between [t1] and [t3],
-   or, there is an [i] such that [i]th thread does not participate in the
-   pure steps between [t1] and [t3] and [t2] corresponds to taking a step in
-   the [i]th thread starting from [t1]. *)
-  Lemma erased_thread_step_pure_step_tp i t1 σ1 t2 σ2 t3 :
-    erased_thread_step i (t1, σ1) (t2, σ2) →
-    pure_steps_tp t1 t3 →
-    (σ1 = σ2 ∧ pure_steps_tp t2 t3) ∨
-    (∃ i e efs e' κ,
-      t1 !! i = Some e ∧ t3 !! i = Some e ∧
-      t2 = <[i:=e']>t1 ∪ efs ∧
-      prim_step i e σ1 (dom t1) κ e' σ2 efs).
-  Proof.
-    intros [κ [e σ e' σ' efs ths t11 Hi t12 Hstep]] Hps; simplify_eq/=.
-    assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None).
-    { exists (delete i ths). split; [rewrite insert_delete_id | apply lookup_delete_eq]; auto. }
-    destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi.
-    apply map_Forall2_insert_inv_l in Hps as (e'' & t31 & -> & Ht31 & Hsteps & Hps); [| done].
-    destruct Hsteps as [e|e1 e2 e3 Hpstep Hprs].
-    - right. exists i, e, efs, e', κ. split_and!. 1,2: by apply lookup_insert_eq. all: done.
-    - edestruct Hpstep as (?&?&?&?); try done. destruct H1. simplify_eq.
-      left. split; first done. rewrite insert_insert_eq right_id_L.
-      by eapply map_Forall2_insert.
-  Qed.
-
-  (* Lemma erased_step_pure_step_tp t1 σ1 t2 σ2 t3 : *)
-  (*   erased_step (t1, σ1) (t2, σ2) → *)
-  (*   pure_steps_tp t1 t3 → *)
-  (*   (σ1 = σ2 ∧ pure_steps_tp t2 t3) ∨ *)
-  (*   (∃ i e efs e' κ, *)
-  (*     t1 !! i = Some e ∧ t3 !! i = Some e ∧ *)
-  (*     t2 = <[i:=e']>t1 ∪ efs ∧ *)
-  (*     prim_step i e σ1 (dom t1) κ e' σ2 efs). *)
-  (* Proof. *)
-  (*   intros [κ [i [e σ e' σ' efs ths t11 t12 Hi Hstep]]] Hps; simplify_eq/=. *)
-  (*   assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None). *)
-  (*   { exists (delete i ths). split; [rewrite insert_delete_id | apply lookup_delete_eq]; auto. } *)
-  (*   destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi. *)
-  (*   apply map_Forall2_insert_inv_l in Hps as (e'' & t31 & -> & Ht31 & Hsteps & Hps); [| done]. *)
-  (*   destruct Hsteps as [e|e1 e2 e3 Hpstep Hprs]. *)
-  (*   - right. exists i, e, efs, e', κ. split_and!. 1,2: by apply lookup_insert_eq. all: done. *)
-  (*   - edestruct Hpstep as (?&?&?&?); first done. destruct H1. simplify_eq. *)
-  (*     left. split; first done. rewrite insert_insert_eq right_id_L. *)
-  (*     by eapply map_Forall2_insert. *)
-  (* Qed. *)
-
 End language.
 
 Global Hint Mode PureExec + - - ! - : typeclass_instances.
 Global Arguments thread_step_atomic {Λ i ρ1 κ ρ2}.
-Notation pure_steps_tp := (map_Forall2 (λ _, rtc (pure_step))).
 
 (** Trace and behavior. *)
 Definition trace_state (Λ : language) : Type := (cfg Λ * thread_id * list (observation Λ)).
@@ -411,7 +331,8 @@ Definition trace_next {Λ} : trace Λ → trace Λ := λ τ, (S τ.1, τ.2).
 Definition trace_now {Λ} : trace Λ → trace_state Λ := λ τ, (τ.2 τ.1).
 Definition trace_thread {Λ} : trace Λ → (thread_id) := λ τ, (trace_now τ).1.2.
 
-Inductive thread_done {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
+Inductive thread_done {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ))
+    (ρ2 : cfg Λ) : Prop :=
 | thread_done_intro e1 σ1 e2 σ2 efs Θ :
   ρ1 = (Θ, σ1) →
   Θ !! i = Some e1 →

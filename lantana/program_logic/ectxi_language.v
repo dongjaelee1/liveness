@@ -31,7 +31,8 @@ Section ectxi_language_mixin.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
   Context (fill_item : ectx_item → expr → expr).
-  Context (base_step : thread_id → expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop).
+  Context (base_step : thread_id → expr → state → thread_ids → list observation →
+                       expr → state → gmap thread_id expr → Prop).
   Context (state_sat : state → gmap thread_id expr → state_pred → Prop).
 
   Record EctxiLanguageMixin := {
@@ -71,7 +72,8 @@ Structure ectxiLanguage := EctxiLanguage {
   of_val : val → expr;
   to_val : expr → option val;
   fill_item : ectx_item → expr → expr;
-  base_step : thread_id → expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop;
+  base_step : thread_id → expr → state → thread_ids → list observation →
+              expr → state → gmap thread_id expr → Prop;
   state_sat : state → gmap thread_id expr → state_pred → Prop;
 
   ectxi_language_mixin :

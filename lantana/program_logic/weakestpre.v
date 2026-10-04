@@ -1,68 +1,16 @@
+(** The liveness weakest precondition [lWP]: the least fixpoint of one step ([lwp_step]) of
+    the program logic, with its structural rules and proof-mode instances. *)
+
 From iris.proofmode Require Import base proofmode classes.
 From lantana.program_logic Require Export language.
-(* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
-   get pretty-printed correctly. *)
+(* Import order as in Iris, where importing the WP notations before [fixpoint_mono] breaks
+   the printing of texan triples. *)
 From iris.bi.lib Require Export fixpoint_mono.
 From lantana.program_logic Require Export lwp_notation.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export temporal_class sfmupd.
 From lantana.base_logic Require Export model_physical_updates.
 Import uPred.
-
-(* TODO: move to somewhere else *)
-Section curry5.
-  Definition curry5 {A B C D E F : Type} (f : A * B * C * D * E → F) (a : A) (b : B) (c : C) (d : D) (e : E) : F :=
-    f (a, b, c, d, e).
-  Definition uncurry5 {A B C D E F : Type} (f : A → B → C → D → E → F) : (A * B * C * D * E) → F :=
-    λ '(a, b, c, d, e), f a b c d e.
-
-  Lemma curry5_uncurry5 : ∀ {A B C D E F : Type} (f : A → B → C → D → E → F), curry5 (uncurry5 f) = f.
-  Proof. done. Qed.
-  Lemma uncurry5_curry5 : ∀ {A B C D E F : Type} (f : A * B * C * D * E → F) (p : A * B * C * D * E), uncurry5 (curry5 f) p = f p.
-  Proof. intros. destruct p as [[[[a b] c] d] e]. done. Qed.
-
-  Global Instance uncurry5_proper' : ∀ {A : Type} {RA : relation A} {B : Type} {RB : relation B} {C : Type} {RC : relation C} {D : Type} {RD : relation D} {E : Type} {RE : relation E} {F : Type} {RF : relation F},
-    Proper
-      ((RA ==> RB ==> RC ==> RD ==> RE ==> RF) ==>
-         prod_relation (prod_relation (prod_relation (prod_relation RA RB) RC) RD) RE ==> RF)
-      (@uncurry5 A B C D E F).
-  Proof.
-    intros. repeat intro.
-    destruct x0 as [[[[a0 b0] c0] d0] e0], y0 as [[[[a1 b1] c1] d1] e1].
-    simpl. destruct H0 as [[[[? ?] ?] ?] ?]. simpl in *. by eapply H.
-  Qed.
-  Global Instance uncurry5_proper : ∀ {A : Type} {H : Equiv A} {B : Type} {H0 : Equiv B} {C : Type} {H1 : Equiv C} {D : Type} {H2 : Equiv D} {E : Type} {H3 : Equiv E} {F : Type} {H4 : Equiv F},
-    Proper ((equiv ==> equiv ==> equiv ==> equiv ==> equiv ==> equiv) ==> equiv ==> equiv) (@uncurry5 A B C D E F).
-  Proof. intros. eapply uncurry5_proper'. Qed.
-
-  Global Instance uncurry5_ne : ∀ {SI : sidx} {A B C D E F : ofe} (n : SI),
-    Proper ((dist n ==> dist n ==> dist n ==> dist n ==> dist n ==> dist n) ==> dist n ==> dist n) (@uncurry5 A B C D E F).
-  Proof. intros. apply uncurry5_proper. Qed.
-End curry5.
-
-
-(** Running the m-updates of several threads, as the adequacy proofs do. *)
-Section run_sfmupd.
-  Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!TemporalInterp Λ Σ}.
-
-  Lemma all_interp_sfmupd_steps_gmap (γ : thread_id → nat) E h n σ Θ κs g v Ω W
-    (A : Type) (TQ : gmap thread_id ((expr Λ) * A)) (P : thread_id → (expr Λ) → A → iProp Σ) :
-    (owit_inv_lb (fair_sched_fun γ) Ω W) →
-    ([∗ map] i ↦ '(e, a) ∈ TQ, |={E}=>m (P i e a)) -∗
-    history_tinterp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
-    (([∗ map] i ↦ '(e, a) ∈ TQ, (P i e a)) ∗ history_tinterp h n σ Θ κs ∗
-     ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗ model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
-  Proof.
-    iIntros (LB) "PS HI MI".
-    iAssert (|={E}=>m [∗ map] i ↦ '(e, a) ∈ TQ, P i e a)%I with "[PS]" as "PS".
-    { iApply big_sepM_sfmupd. iApply (big_sepM_impl with "PS"). iIntros "!>" (k [e a] _) "H". done. }
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "PS HI MI") as "$".
-    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
-    { done. }
-    done.
-  Qed.
-
-End run_sfmupd.
 
 Class lantanaGS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
   LantanaG {
@@ -84,25 +32,25 @@ Class lantanaGS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
 Global Opaque lantana_temporalGS lantana_state_interp_class.
 Global Arguments LantanaG {SI Λ Σ}.
 
-(** Predicates we take the fixpoint of in order to define the lWP. *)
-(* Ω must make strict progress for every step (to bound step-index) *)
-(* W witnesses progress of obligations; it relies on the fair scheduler for soundness *)
+(** One step of [lWP] for thread [i] running [K e1]: a model update before the step, the
+    progress update ([mprog]) of [i] and the physical update ([mphys]) of the step, and a
+    model update after it; [ν e2 efs] holds after a step to [e2] that forks [efs]. *)
 Definition lwp_step `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}
   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ K h n σ1 Θ κ κs,
      (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
      (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
-      (** ** Model update (discharge allowed) for the pre-state; the adequacy proof
-          handles a discharge here through the deep records of the until (see
-          temporal_guarantee.v, [tguar]). *)
+      (* Model update before the step. It may discharge an until: the adequacy proof
+         handles this through the records of temporal_guarantee.v ([tguar]). *)
       |=[n,dom Θ]=>m
       (⌜if s is NotStuck then reducible i e1 σ1 (dom Θ) else True⌝) ∗
       ∀ e2 σ2 (efs : thread_pool Λ), (⌜ prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
       @={n,(dom Θ),i}=↓ (@={n,(S n),(dom Θ),(dom (<[i:=K e2]>Θ) ∪ dom efs)}=>
-      (** ** Discharge allowed for post-state *)
+      (* Model update after the step (it may also discharge). *)
       (ALC (|=[(S n),(dom (<[i:=K e2]>Θ) ∪ dom efs)]=>m |={∅,E}=>
-              ((history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
+              ((history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)])
+                                (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
               ν e2 efs))))%I.
 
@@ -167,11 +115,12 @@ Section lwp_step.
 End lwp_step.
 
 (** Wrapper for the termination condition for soundness. *)
-Definition lift_term `{SI : sidx} `{!lantanaGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
+Definition lift_term `{SI : sidx} `{!lantanaGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) :
+  val Λ → iProp Σ :=
   λ v, (thP_done i ∗ Φ i v)%I.
 
-(* pre-definition of lwp of which we take a least fixpoint *)
-(* For soundness of Lantana, postcondition of a thread i must include othreadG_term i. *)
+(** [lWP] is the least fixpoint of [lwp_pre]. A forked thread [j] has the postcondition
+    [lift_term j fork_post], which includes [thP_done j]. *)
 Definition lwp_pre `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} (s : stuckness)
   (lwp : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
   thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=
@@ -179,7 +128,8 @@ Definition lwp_pre `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} (s 
     (match to_val e1 with
      | Some v => |={E}=>m (Φ v)
      | None =>
-         (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗ [∗ map] j ↦ ef ∈ efs, lwp j ⊤ ef (lift_term j fork_post)))
+         (lwp_step s i E e1 (λ e2 efs, (lwp i E e2 Φ) ∗
+                                       [∗ map] j ↦ ef ∈ efs, lwp j ⊤ ef (lift_term j fork_post)))
      end)%I.
 
 Lemma lwp_pre_mono `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} s
@@ -213,11 +163,13 @@ Proof.
     do 36 (f_equiv || done). by apply pair_ne.
 Qed.
 
-(* take the least fixpoint of the above definition; we can also just take fixpoint. *)
-Definition lwp_fix `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} : stuckness -> thread_id -> coPset -> expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
+(** The least fixpoint, sealed below as the [Lwp] instance. *)
+Definition lwp_fix `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} :
+  stuckness -> thread_id -> coPset -> expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E e Φ, ((bi_least_fixpoint (lwp_pre' s)) (i,E,e,Φ))%I.
 
-Local Definition lwp_def `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} : Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
+Local Definition lwp_def `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} :
+  Lwp (iProp Σ) (expr Λ) (val Λ) stuckness thread_id :=
   λ s i E e Φ, (lwp_fix s i E e Φ)%I.
 Local Definition lwp_aux : seal (@lwp_def). by eexists. Qed.
 Definition lwp' := lwp_aux.(unseal).
@@ -274,7 +226,8 @@ Section lwp.
 
   Lemma lwp_ind_strong s Ψ :
     (∀ n i E e, Proper (pointwise_relation _ (dist n) ==> dist n) (Ψ i E e))
-    → ⊢ (□ (∀ i e E Φ, lwp_pre s (λ i E e Φ, Ψ i E e Φ ∧ lWP e @ s; i; E {{ Φ }}) i E e Φ -∗ Ψ i E e Φ)
+    → ⊢ (□ (∀ i e E Φ, lwp_pre s (λ i E e Φ, Ψ i E e Φ ∧ lWP e @ s; i; E {{ Φ }}) i E e Φ -∗
+                        Ψ i E e Φ)
          → ∀ i e E Φ, lWP e @ s; i; E {{ Φ }} -∗ Ψ i E e Φ)%I.
   Proof.
     iIntros (HΨ). iIntros "#IH" (i e E Φ) "H". rewrite lwp_unseal.
@@ -519,7 +472,8 @@ Section lwp.
     lWP e @ s; i; E {{ v, |={E}=>m (lWP K (of_val v) @ s; i; E {{ Φ }}) }}
     ⊢ lWP K e @ s; i; E {{ Φ }}.
   Proof.
-    iIntros "H". iApply lwp_bind. iApply (lwp_strong_mono with "H"); [done..|]. iIntros (v) "H !>". by iApply sfmupd_lwp.
+    iIntros "H". iApply lwp_bind. iApply (lwp_strong_mono with "H"); [done..|].
+    iIntros (v) "H !>". by iApply sfmupd_lwp.
   Qed.
 
   Lemma lwp_sfmupd s i E e Φ :
@@ -536,29 +490,6 @@ Section lwp.
     (|={E}=>m lWP e @ s; i; E {{ v, |={E}=>m (Φ v) }})
     ⊢ |={E}=>m lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iMod "H". iModIntro. by iApply lwp_sfmupd. Qed.
-
-  (** FIXME: does this hold when we have ∀ K in lwp? Just remove this if this is not used anywhere else. *)
-  (* Lemma lwp_bind_inv K `{!LanguageCtx K} s i E e Φ : *)
-  (*   lWP K e @ s; i; E {{ Φ }} ⊢ lWP e @ s; i; E {{ v, lWP K (of_val v) @ s; i; E {{ Φ }} }}. *)
-  (* Proof. *)
-  (*   iIntros "H". remember (K e) as e' eqn:He'. *)
-  (*   iRevert (e He'). iRevert (i e' E Φ) "H". iApply lwp_ind_strong; first solve_proper. *)
-  (*   iIntros "!#" (i e' E1 Φ) "IH". iIntros (e ->). *)
-  (*   rewrite !lwp_unfold {2}/lwp_pre. *)
-  (*   destruct (to_val e) as [v|] eqn:He. *)
-  (*   { apply of_to_val in He as <-. iModIntro. rewrite !lwp_unfold. *)
-  (*     iApply (lwp_pre_mono with "[] IH"). by iIntros "!#" (i' E e Φ') "[_ ?]". } *)
-  (*   rewrite /lwp_pre fill_not_val; [|done]. *)
-  (*   iIntros (K1 ?????? HK1 LU1) "SI". iMod ("IH" $! (K1 ∘ K) with "[] [//] SI") as "IH". *)
-  (*   iModIntro. iPoseProof "IH" as "(%& IH)". iSplitR. *)
-  (*   { destruct s; eauto using reducible_fill_inv. } *)
-  (*   iIntros (e2 σ2 efs Hstep). iDestruct ("IH" with "[]") as ">IH". *)
-  (*   { eauto using fill_step. } *)
-  (*   iMod "IH" as ">>IH". iModIntro. iMod "IH" as "(SI& IH& Efs)". *)
-  (*   iModIntro. iFrame. iSplitR "Efs". *)
-  (*   - iDestruct "IH" as "[IH _]". by iApply "IH". *)
-  (*   - iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done. *)
-  (* Qed. *)
 
   (** * Derived rules *)
   Lemma lwp_mono s i E e Φ Ψ : (∀ v, Φ v ⊢ Ψ v) → lWP e @ s; i; E {{ Φ }} ⊢ lWP e @ s; i; E {{ Ψ }}.
@@ -666,7 +597,8 @@ Section lwp.
   Lemma lwp_lc_laterN n s i E e Φ :
     £n n -∗ (▷^n lWP e @ s; i; E {{ Φ }}) -∗ lWP e @ s; i; E {{ Φ }}.
   Proof.
-    iIntros "LC H". iApply fupd_lwp. iApply (lantana.base_logic.fancy_updates.lc_fupd_add_laterN E E with "LC"). iNext. by iModIntro.
+    iIntros "LC H". iApply fupd_lwp.
+    iApply (lantana.base_logic.fancy_updates.lc_fupd_add_laterN E E with "LC"). iNext. by iModIntro.
   Qed.
 
 End lwp.

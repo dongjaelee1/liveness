@@ -1,8 +1,8 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From iris.algebra Require Import mono_list.
-From transfinite.base_logic.lib Require Import own saved_prop.
-From lantana.base_logic Require Import invariants fancy_updates later_credits.
+From transfinite.base_logic.lib Require Import saved_prop.
+From lantana.base_logic Require Import invariants.
 From lantana.program_logic Require Export history_interp.
 
 (** * The temporal registry
@@ -41,9 +41,6 @@ Proof.
   - apply list_lookup_singleton_Some in Li as [? _]. apply lookup_lt_Some in Lj. lia.
   - apply list_lookup_singleton_Some in Li as [_ <-]. apply list_lookup_singleton_Some in Lj as [_ <-]. done.
 Qed.
-
-Lemma treg_wf_prefix l l' : l `prefix_of` l' → treg_wf l' → treg_wf l.
-Proof. intros Hpre WF i j ?? Hij Li Lj. eapply WF; [done|by eapply prefix_lookup_Some..]. Qed.
 
 Lemma treg_wf_lookup_pos l i j pi pj :
   treg_wf l → i ≤ j → l !! i = Some pi → l !! j = Some pj → pi.1 ≤ pj.1.
@@ -177,9 +174,7 @@ Section registry.
   Proof. rewrite /saved_ti. apply _. Qed.
   Lemma saved_ti_alloc f : ⊢ |==> ∃ γ, saved_ti γ f.
   Proof. by apply saved_pred_alloc. Qed.
-  Lemma saved_ti_agree γ f g τ : saved_ti γ f -∗ saved_ti γ g -∗ ▷ (f τ ≡ g τ).
-  Proof. apply saved_pred_agree. Qed.
-  (** Agreement of the predicates themselves (in [trace Λ -d> iPropO Σ]). *)
+  (** Agreement of the predicates (in [trace Λ -d> iPropO Σ]). *)
   Lemma saved_ti_agree_fun γ (f g : trace Λ -d> iPropO Σ) : saved_ti γ f -∗ saved_ti γ g -∗ ▷ (f ≡ g).
   Proof.
     iIntros "H1 H2". rewrite /saved_ti /saved_pred_own.

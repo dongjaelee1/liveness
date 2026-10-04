@@ -1,47 +1,9 @@
-(** This file declares notation for logically atomic Hoare triples, and some
-generic lemmas about them. To enable the definition of a shared theory applying
-to triples with any number of binders, the triples themselves are defined via telescopes, but as a user
-you need not be concerned with that. You can just use the following notation:
+(** Logically atomic triples for [lWP] ([atomic_lwp], via telescopes), their notations and
+    generic lemmas, as in Iris' [program_logic/atomic.v]:
+      <<{ ∀∀ x, α }>> e @ i; E <<{ ∃∃ y, β | z, RET v; POST }>>
+    [x] is bound in everything after it, [y] in [β], [v] and [POST], [z] in [v] and [POST].
+    [∀∀], [∃∃] and [POST] may be omitted, except that binders [z] require all of them. *)
 
-  <<{ ∀∀ x, atomic_precondition }>>
-    code @ E
-  <<{ ∃∃ y, atomic_postcondition | z, RET return_value; private_postcondition }>>
-
-Here, [x] (which can be any number of binders, including 0) is bound in all of
-the atomic pre- and postcondition and the private (non-atomic) postcondition and
-the return value, [y] (which can be any number of binders, including 0) is bound
-in both postconditions and the return value, and [z] (which can be any number of
-binders, including 0) is bound in the return value and the private
-postcondition.
-
-Note that atomic triples are *not* implicitly persistent, unlike Texan triples.
-If you need a private (non-atomic) precondition, you can use a magic wand:
-
-  private_precondition -∗
-  <<{ ∀∀ x, atomic_precondition }>>
-    code @ E
-  <<{ ∃∃ y, atomic_postcondition
-    | z, RET return_value; private_postcondition }>>
-
-If you don't need a private postcondition, you can leave it away, e.g.:
-
-  <<{ ∀∀ x, atomic_precondition }>>
-    code @ E
-  <<{ ∃∃ y, atomic_postcondition | RET return_value }>>
-
-Note that due to combinatorial explosion and because Coq does not have a
-facility to declare such notation in a compositional way, not *all* variants of
-this notation exist: if you have binders before the [RET] (which is very
-uncommon), you must have a private postcondition (it can be [True]), and you
-must have [∀∀] and [∃∃] binders (they can be [_: ()]).
-
-For an example for how to prove and use logically atomic specifications, see
-[iris_heap_lang/lib/increment.v].
-
-*)
-
-From stdpp Require Import namespaces.
-From iris.bi Require Import telescopes.
 From iris.proofmode Require Import proofmode classes.
 From iris.bi.lib Require Export atomic.
 From lantana.base_logic Require Import invariants.
@@ -290,22 +252,13 @@ Section lemmas.
     rewrite ->!tele_app_bind. iApply "HΦ". done.
   Qed.
 
-  (* Lemma atomic_seq_wp_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} : *)
-  (*   (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ lWP e @ i; ∅ {{ Φ }}) -∗ *)
-  (*   atomic_lwp i e E α β POST f. *)
-  (* Proof. *)
-  (*   iIntros "Hwp" (Φ) "AU". iMod "AU" as (x) "[Hα [_ Hclose]]". *)
-  (*   iApply ("Hwp" with "Hα"). iIntros "%y Hβ %z Hpost". *)
-  (*   iMod ("Hclose" with "Hβ") as "HΦ". *)
-  (*   rewrite ->!tele_app_bind. iApply "HΦ". done. *)
-  (* Qed. *)
-
   (** Sequential triples with a persistent precondition and no initial quantifier
   are atomic. *)
   Lemma persistent_seq_lwp_atomic i e E (α : [tele] → iProp) (β : [tele] → TB → iProp)
       (POST : [tele] → TB → TP → option iProp) (f : [tele] → TB → TP → val Λ)
       {HP : Persistent (α [tele_arg])} :
-    (∀ Φ, α [tele_arg] -∗ (∀.. y, β [tele_arg] y -∗ ∀.. z, POST [tele_arg] y z -∗? Φ (f [tele_arg] y z)) -∗ lWP e @ i {{ Φ }}) -∗
+    (∀ Φ, α [tele_arg] -∗ (∀.. y, β [tele_arg] y -∗ ∀.. z, POST [tele_arg] y z -∗? Φ (f [tele_arg] y z)) -∗
+          lWP e @ i {{ Φ }}) -∗
     atomic_lwp i e E α β POST f.
   Proof.
     simpl in HP. iIntros "Hwp" (Φ) "HΦ". iApply fupd_lwp.

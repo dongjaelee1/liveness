@@ -1,6 +1,7 @@
+(** The history of configurations as ghost state ([hG_history_auth], [hG_event]), the state
+    interpretation class of a language, and the history interpretation built from both. *)
+
 From iris.algebra Require Import mono_list.
-From iris.bi Require Import cmra.
-From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
@@ -46,7 +47,8 @@ Global Arguments hG_history_auth {SI Σ St _}.
 
 Local Definition hG_event_def `{SI : sidx} `{@histGS SI Σ St}
   (n : nat) (e : St) : iProp Σ :=
-  (∃ (h : list St), (⌜ length h = (S n) ∧ last h = Some e ⌝) ∧ own hist_name (◯ML (h : list (leibnizO _))))%I.
+  (∃ (h : list St), (⌜ length h = (S n) ∧ last h = Some e ⌝) ∧
+                     own hist_name (◯ML (h : list (leibnizO _))))%I.
 Local Definition hG_event_aux : seal (@hG_event_def). Proof. by eexists. Qed.
 Definition hG_event := hG_event_aux.(unseal).
 Local Definition hG_event_unseal :
@@ -54,7 +56,7 @@ Local Definition hG_event_unseal :
 Global Arguments hG_event {SI Σ St _}.
 
 (** Properties *)
-Section proof.
+Section history_ghost.
   Context `{SI : sidx} `{HIST : !histGS Σ St}.
 
   Global Instance hG_history_auth_timeless h : Timeless (hG_history_auth h).
@@ -95,7 +97,7 @@ Section proof.
     rewrite last_lookup H in H1. simpl in H1. rewrite lookup_app_l; auto. rewrite H. lia.
   Qed.
 
-End proof.
+End history_ghost.
 
 (** State interpretation and predicates defined by the language,
     with the thread ids to connect to the obligation model. *)
@@ -105,7 +107,8 @@ Class state_interp_class `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
         For example, we might want to hold some of state_pred_interp inside the lwp. *)
     state_interp_aux : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
     state_pred_interp : state_pred Λ → iProp Σ;
-    state_interp_wf : (∀ σ Θ κs π, (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ π ⌝);
+    state_interp_wf : (∀ σ Θ κs π,
+                         (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ π ⌝);
   }.
 
 Definition history_interp `{SI : sidx} `{@state_interp_class SI Λ Σ}
@@ -176,7 +179,8 @@ Section hist.
   Qed.
 
   Lemma event_pred_history_interp_lookup n σ Θ κs π h n' σ' Θ' κs' :
-    history_interp h n' σ' Θ' κs' ∗ event_pred n σ Θ κs π ⊢ ⌜ h !! n = Some (σ, Θ, κs) ∧ state_sat σ Θ π ⌝.
+    history_interp h n' σ' Θ' κs' ∗ event_pred n σ Θ κs π ⊢
+    ⌜ h !! n = Some (σ, Θ, κs) ∧ state_sat σ Θ π ⌝.
   Proof.
     rewrite /history_interp event_pred_unseal /event_pred_def. iIntros "((%& Ha& SI)& (#He& %))".
     destruct H. iPoseProof (hG_event_history_lookup with "[$Ha $He]") as "%". eauto.

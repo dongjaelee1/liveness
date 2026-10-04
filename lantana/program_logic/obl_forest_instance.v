@@ -6,7 +6,6 @@
 
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
-From lantana.algebra Require Import ordinal_wfocm.
 From lantana.program_logic Require Export obl_forest.
 
 Section instance.

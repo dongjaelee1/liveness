@@ -1,41 +1,16 @@
-(** * An obligation-forest rule interface for Lantana
+(** * The obligation-forest interface
 
-    The class [oblf.obl_forest_interface] gives the signatures of the obligation predicates
-    and their core rules for a logic in which obligations form a forest. There are no
-    carriers: a *parent* is either a thread or an obligation, and every live obligation is
-    a child of exactly one parent.
-
-    - [parP_kids p K]: the children of parent [p] are the obligations [K]. For a thread
-      ([thP_kids i K]) this also says that the thread is running; for an obligation
-      ([oblP_kids k K]) it exists exactly while [k] is live and in the forest.
-    - [oblP_fuel k ℓ μ]: fuel of obligation [k] at layer [ℓ]. It is the only kind of fuel.
-    - A step of thread [i] burns one unit of fuel of each child of [i] ([step_progress]).
-      All other obligations below [i] burn a unit automatically: this is the job of the
-      model, which keeps the fuel of every obligation above the fuel of its parent.
-    - [obl_move]: an obligation changes its parent (thread or obligation, in any of the four
-      combinations) by burning one unit of its own fuel, and its whole subtree moves with
-      it. Below an obligation [q] the unit must be at a layer above a witness layer of [q]
-      ([parP_below]); below a thread any layer works.
-    - [obl_move_up]: a child of [k] moves up to the parent of [k] for free: it keeps its
-      owner, and the fuel the model keeps for it already dominates its new parent.
-    - [obl_new] creates a live obligation below a parent; below an obligation [q] its layer
-      must be at least a witness layer of [q] ([parP_le]): unlike a move, a new obligation may
-      sit at its parent's own layer.
-    - [obl_discharge] removes a childless obligation from the forest; its children must have
-      moved to another parent before.
-
-    The rules are stated with the modalities of the program logic: the model update
-    [|={E}=>m] (sfmupd.v) and the step modalities of [model_physical_updates.v]. The model
-    behind the rules is the forest invariant of [oforest.v] (fifth conjunct of
-    [model_interp]); the instance is [obl_forest_lantana] in [obl_forest_instance.v]. An
-    obligation invariant [oblP_inv N k P R] holds [P] while [k] is live and [R] once it is
-    discharged. Derived rules follow the class; [obl_forest_derived.v] re-derives the
+    [oblf.obl_forest_interface] gives the obligation predicates and rules of a logic in which
+    the live obligations form a forest: a parent is a thread or an obligation, and every live
+    obligation is a child of exactly one parent ([parP_kids p K]).
+    The rules are model updates [|={E}=>m] (sfmupd.v) and the step modalities of
+    [model_physical_updates.v]. Derived rules follow the class. The instance is
+    [obl_forest_lantana] (obl_forest_instance.v); obl_forest_derived.v re-derives the
     obligation-related lifting lemmas of [lWP] from the class. *)
 
 From iris.proofmode Require Import base proofmode classes.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From lantana.algebra Require Import ordinal_wfocm.
 From lantana.algebra Require Export layer.
 From lantana.program_logic Require Export sfmupd.
 From lantana.base_logic Require Export model_physical_updates.
@@ -45,7 +20,8 @@ Module oblf.
 
 (** * The class
 
-    The model ([oforest.v]). The obligation model [Ω] and the witnesses [W] are those of
+    The model behind the rules is the forest invariant of [oforest.v] (part of
+    [model_interp]). The obligation model [Ω] and the witnesses [W] are those of
     Lantana; the forest is a parent map in a ghost invariant. The owner of an obligation in
     [Ω] is the thread at the root of its tree. Every obligation [d] whose parent is an
     obligation [c] has a fuel piece [π d] stored in the invariant with [π d > fuel c] (the
@@ -64,7 +40,8 @@ Module oblf.
 Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   `{!ord_mono_fun_class} `{!TemporalInterp Λ Σ} := {
   (** ** Predicates *)
-  (** The children of parent [p] are [K]; for a thread, the thread is also running. *)
+  (** The children of parent [p] are [K]. For a thread, the thread is also running; for an
+      obligation, it exists exactly while the obligation is live and in the forest. *)
   parP_kids : parent → oids → iProp Σ;
   (** Thread [i] has terminated. *)
   thP_done : positive → iProp Σ;
@@ -162,7 +139,9 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
   (** ** Model updates that keep every obligation live *)
   thread_terminate E i :
     parP_kids (PThread i) ∅ -∗ |={E}=>m thP_done i;
-  (** A new live obligation [k] below [p], without children, at layer [ℓ]. *)
+  (** A new live obligation [k] below [p], without children, at layer [ℓ]. Below an
+      obligation [q], [ℓ] is at least a witness layer of [q]: unlike a move, a new obligation
+      may sit at its parent's own layer. *)
   obl_new E p K ℓ μ :
     parent_le witP_layer p ℓ -∗
     parP_kids p K -∗
@@ -172,13 +151,15 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
   obl_new_discharged E ℓ :
     ⊢ |={E}=>m ∃ k, oblP_discharged k ∗ witP_layer k ℓ;
   (** [k] moves, with its whole subtree, from parent [p1] to parent [p2], burning one unit
-      of its fuel at a layer [ℓ] large enough for [p2]. *)
+      of its fuel at a layer [ℓ] large enough for [p2]: any layer below a thread, a layer above
+      a witness layer of [q] below an obligation [q]. *)
   obl_move E p1 p2 K1 K2 k ℓ :
     k ∈ K1 →
     parent_below witP_layer p2 ℓ -∗
     parP_kids p1 K1 -∗ parP_kids p2 K2 -∗ oblP_fuel k ℓ 1 -∗
     |={E}=>m ⌜ k ∉ K2 ⌝ ∗ parP_kids p1 (K1 ∖ {[k]}) ∗ parP_kids p2 ({[k]} ∪ K2);
-  (** [x], a child of [k], moves with its subtree up to the parent [p] of [k], for free. *)
+  (** [x], a child of [k], moves with its subtree up to the parent [p] of [k], for free: it
+      keeps its owner, and the fuel the model keeps for it already dominates [p]. *)
   obl_move_up E p K k Kk x :
     k ∈ K → x ∈ Kk →
     parP_kids p K -∗ parP_kids (PObl k) Kk -∗
@@ -187,7 +168,8 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
     witP_layer r ℓ -∗ |={E}=>m (witP_cred r Ord.O ∨ oblP_discharged r);
 
   (** ** Discharge *)
-  (** A childless obligation [k] below [p] is discharged and leaves the forest. *)
+  (** A childless obligation [k] below [p] is discharged and leaves the forest (its children
+      must have moved to another parent before). *)
   obl_discharge E p K k :
     k ∈ K →
     parP_kids p K -∗ parP_kids (PObl k) ∅ -∗ oblP_assigned k 1 -∗
@@ -237,7 +219,6 @@ Section derived.
   Context `{!TemporalInterp Λ Σ}.
   Context `{!@obl_forest_interface SI Λ Σ _ _ _ _}.
 
-  (* BEGIN derived *)
   (** ** Obligation predicates and invariants *)
   Global Instance oblP_assigned_as_fractional k q :
     AsFractional (oblP_assigned k q) (oblP_assigned k) q.
@@ -299,7 +280,7 @@ Section derived.
     rewrite oblP_variant_unfold. iRight. eauto.
   Qed.
 
-  (** ** Witness induction (as in [obli]) *)
+  (** ** Witness induction *)
   Lemma wit_fuels_add_map_gen k ℓ α F (G : gmap oid (ord.t * measure)) :
     wit_fuels k ℓ α F -∗
     ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in ⌜ (ℓ < l)%ordi ⌝ ∗ oblP_fuel g l (m × ▽)%M) ==∗
@@ -375,24 +356,6 @@ Section derived.
   Qed.
 
   (** ** Ghost updates in their usual shapes *)
-  Lemma obl_new_thread E i K ℓ μ :
-    thP_kids i K -∗
-    |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ thP_kids i ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
-                 oblP_assigned k 1 ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
-  Proof.
-    iIntros "T". iPoseProof (parP_le_thread i ℓ) as "B". iApply (obl_new with "B T").
-  Qed.
-
-  Lemma obl_new_obl E q K ℓq ℓ μ :
-    (ℓq <= ℓ)%ordi →
-    witP_layer q ℓq -∗ oblP_kids q K -∗
-    |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ oblP_kids q ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
-                 oblP_assigned k 1 ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
-  Proof.
-    iIntros (Hl) "W C". iPoseProof (parP_le_obl q ℓq ℓ Hl with "W") as "B".
-    iApply (obl_new with "B C").
-  Qed.
-
   Lemma obl_alloc_assigned E p K ℓ μ :
     parP_le p ℓ -∗ parP_kids p K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
@@ -402,41 +365,6 @@ Section derived.
     iIntros "B C". iMod (obl_new with "B C") as (k) "(%Hk& C& Ck& [A1 A2]& F& W)".
     iModIntro. iExists k. iFrame "C Ck A1 F W". iSplit; first done.
     iIntros (E' N P R) "H". iApply (oblP_inv_alloc_assigned with "A2 H").
-  Qed.
-
-  Lemma obl_move_thread E p1 j K1 K2 k ℓ :
-    k ∈ K1 →
-    parP_kids p1 K1 -∗ thP_kids j K2 -∗ oblP_fuel k ℓ 1 -∗
-    |={E}=>m ⌜ k ∉ K2 ⌝ ∗ parP_kids p1 (K1 ∖ {[k]}) ∗ thP_kids j ({[k]} ∪ K2).
-  Proof.
-    iIntros (Hk) "P1 P2 F". iPoseProof (parP_below_thread j ℓ) as "B".
-    iApply (obl_move with "B P1 P2 F"). done.
-  Qed.
-
-  Lemma obl_move_obl E p1 q K1 K2 k ℓq ℓ :
-    k ∈ K1 →
-    (ℓq < ℓ)%ordi →
-    witP_layer q ℓq -∗ parP_kids p1 K1 -∗ oblP_kids q K2 -∗ oblP_fuel k ℓ 1 -∗
-    |={E}=>m ⌜ k ∉ K2 ⌝ ∗ parP_kids p1 (K1 ∖ {[k]}) ∗ oblP_kids q ({[k]} ∪ K2).
-  Proof.
-    iIntros (Hk Hl) "W P1 P2 F". iPoseProof (parP_below_obl q ℓq ℓ Hl with "W") as "B".
-    iApply (obl_move with "B P1 P2 F"). done.
-  Qed.
-
-  (** Moving a set [X] of children of [p1] to [p2], one unit each. *)
-  Lemma obl_move_set E p1 p2 K1 K2 X ℓ :
-    X ⊆ K1 →
-    parP_below p2 ℓ -∗ parP_kids p1 K1 -∗ parP_kids p2 K2 -∗ ([∗ set] k ∈ X, oblP_fuel k ℓ 1) -∗
-    |={E}=>m ⌜ X ## K2 ⌝ ∗ parP_kids p1 (K1 ∖ X) ∗ parP_kids p2 (X ∪ K2).
-  Proof.
-    induction X as [|x X Hx IH] using set_ind_L; iIntros (HX) "#B P1 P2 Fs".
-    { rewrite difference_empty_L left_id_L. iModIntro. iFrame. iPureIntro. set_solver. }
-    iPoseProof (big_sepS_insert with "Fs") as "[Fx Fs]"; first done.
-    iMod (IH with "B P1 P2 Fs") as "(%Hdis& P1& P2)"; first set_solver.
-    iMod (obl_move _ _ _ _ _ x with "B P1 P2 Fx") as "(%Hx2& P1& P2)"; first set_solver.
-    replace (K1 ∖ X ∖ {[x]}) with (K1 ∖ ({[x]} ∪ X)) by set_solver.
-    replace ({[x]} ∪ (X ∪ K2)) with ({[x]} ∪ X ∪ K2) by set_solver.
-    iModIntro. iFrame. iPureIntro. set_solver.
   Qed.
 
   (** Moving a set [X] of children of [p1] to [p2], one unit each, each at its own layer. *)
@@ -566,7 +494,6 @@ Section derived.
   Proof.
     iIntros (???) "H". iApply fupd_mphys. iMod "H". iModIntro. by iApply (step_fork with "H").
   Qed.
-  (* END derived *)
 
 End derived.
 
@@ -576,7 +503,6 @@ Section fuel.
   Context `{!TemporalInterp Λ Σ}.
   Context `{!@obl_forest_interface SI Λ Σ _ _ _ _}.
 
-  (* BEGIN fuel *)
   Local Open Scope ord.
 
   (** ** oblP_fuel rules *)
@@ -756,7 +682,8 @@ Section fuel.
   Qed.
 
   Lemma oblP_fuel_add_list K ℓ μ1 μ2 :
-    ([∗ list] k ∈ K, oblP_fuel k ℓ (μ1 ⊕ μ2)%M) ⊣⊢ ([∗ list] k ∈ K, oblP_fuel k ℓ μ1) ∗ ([∗ list] k ∈ K, oblP_fuel k ℓ μ2).
+    ([∗ list] k ∈ K, oblP_fuel k ℓ (μ1 ⊕ μ2)%M)
+    ⊣⊢ ([∗ list] k ∈ K, oblP_fuel k ℓ μ1) ∗ ([∗ list] k ∈ K, oblP_fuel k ℓ μ2).
   Proof.
     rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply oblP_fuel_add.
   Qed.
@@ -902,7 +829,6 @@ Section fuel.
     iIntros "H". iPoseProof (big_sepS_union with "H") as "[H1 H2]". 1: set_solver.
     rewrite (difference_union_intersection_L K1 K2). iFrame.
   Qed.
-  (* END fuel *)
 
 End fuel.
 

@@ -1,10 +1,9 @@
-(** Some derived lemmas for ectx-based languages *)
+(** Lifting lemmas of [lWP] for ectx-based languages, stated with base steps. *)
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export ectx_language lifting.
 From iris.prelude Require Import options.
-From lantana.algebra Require Import ordinal_wfocm.
 
-Section wp.
+Section ectx_lifting.
   Context {Λ : ectxLanguage} `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} {Hinh : Inhabited (state Λ)}.
   Implicit Types s : stuckness.
   Implicit Types i : thread_id.
@@ -30,7 +29,8 @@ Section wp.
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)])
+                                                       (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       (|={E}=>m ((lWP e2 @ s; i; E {{ Φ }}) ∗
                                                      ([∗ map] j ↦ ef ∈ efs,
@@ -48,7 +48,8 @@ Section wp.
     to_val e = None →
     sub_redexes_are_values e →
     (∀ K h n σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →
-                    (history_tinterp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗ ⌜ base_stuck i e σ (dom Θ) ⌝)
+                    (history_tinterp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗
+                    ⌜ base_stuck i e σ (dom Θ) ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
     iIntros (??) "H". iApply lwp_lift_stuck; first done.
@@ -80,7 +81,8 @@ Section wp.
                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                               ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                               ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                     (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                     (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)])
+                                                      (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                      |={E1}=>m
                                               (from_option (λ v, (|={E1}=>m (Φ v))) False (to_val e2)) ∗
@@ -108,7 +110,8 @@ Section wp.
                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                               ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                      ⌜efs = ∅⌝ ∗
-                                     (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                     (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)])
+                                                      (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                      (from_option (λ v, (|={E1}=>m (Φ v))) False (to_val e2))))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
@@ -141,4 +144,4 @@ Section wp.
     destruct s; by auto.
   Qed.
 
-End wp.
+End ectx_lifting.

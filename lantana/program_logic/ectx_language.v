@@ -68,7 +68,8 @@ Structure ectxLanguage := EctxLanguage {
   empty_ectx : ectx;
   comp_ectx : ectx → ectx → ectx;
   fill : ectx → expr → expr;
-  base_step : thread_id → expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop;
+  base_step : thread_id → expr → state → thread_ids → list observation →
+              expr → state → gmap thread_id expr → Prop;
   state_sat : state → gmap thread_id expr → state_pred → Prop;
 
   ectx_language_mixin :
