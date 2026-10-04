@@ -1,10 +1,11 @@
+(** Invariants [inv N P] for the fancy updates of [fancy_updates.v], adapted from Transfinite
+    Iris, with rules for allocating, opening, splitting and changing them. *)
+
 From stdpp Require Export namespaces.
-From iris.algebra Require Import gmap.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Import wsat.
 From lantana.base_logic Require Export fancy_updates.
 From iris.prelude Require Import options.
-Import uPred.
 
 (** Semantic Invariants *)
 Local Definition inv_def `{SI : sidx} `{!invGS Σ} (N : namespace) (P : iProp Σ) : iProp Σ :=

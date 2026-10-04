@@ -1,14 +1,14 @@
-(** From the artifact of
-    Later Credits: Resourceful Reasoning for the Later Modality
-    by Spies et al. 2022
- *)
+(** Relational updates [|==>r P]: the later-elimination update of "Later Credits" (Spies et al.
+    2022), generalized from natural numbers to any type with a well-founded relation, and their
+    elimination in adequacy proofs. Adapted from the artifact of the paper. *)
 
 From iris.prelude Require Import options.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Import iprop.
 Import uPred.
 
-Section aux.
+(** Well-foundedness of the transitive closure. *)
+Section tc_well_founded.
 
   Lemma rtc_acc {X} (R : X → X → Prop) x y : rtc R y x → Acc R x → Acc R y.
   Proof.
@@ -36,28 +36,12 @@ Section aux.
     eapply rtc_acc; last apply IH; eauto. by eapply rtc_embed_tc.
   Qed.
 
-End aux.
-
-
-(** In this file, we define the later elimination update from the paper. The
-   definition that is given here is a generalization of the definition shown in
-   the paper: instead of defining the update just on natural numbers, we define
-   it parametrically over a type and a well-founded relation. The added
-   generality allows us to use the later elimination update both with natural
-   numbers in standard Iris and to use it with ordinal later credits in
-   Transfinite Iris. The more general version is called "relational update"
-   in this file.
-
-   This file exists in both the finite Iris and Transfinite Iris development of
-   later credits. The only interesting difference is that the file for Transfinite
-   Iris, this file, provides more support for proving adequacy when we use relational updates.
-*)
-
+End tc_well_founded.
 
 (** Relational updates are defined parametrically over:
   - a type [X],
-  - a well-frounded relation [rupd_rel_wf: X → X → Prop]
-  - a predicate [rupd_pred: X → iProp] *)
+  - a well-founded relation [rupd_rel : X → X → Prop],
+  - a predicate [rupd_pred : X → iProp] for the total credit supply. *)
 
 Class rupdG `{SI : sidx} (Σ : gFunctors) (X : Type) :=
   RelG {
@@ -106,11 +90,8 @@ Proof.
   by rewrite rupd_eq /rupd_def {1}(fixpoint_unfold rupd_pre P) {1}/rupd_pre.
 Qed.
 
-
-(** The following section contains the rules for the later elimination update
-   from the paper, but phrased in terms of the more general relational update.
-   The actual rules for finite and transfinite later credits are then derived
-   later on from these rules. *)
+(** The rules of the later-elimination update from the paper, for the general relational
+   update. The rules of later credits are derived from them in [later_credits.v]. *)
 Section rupd_lemmas.
   Context `{SI : sidx} {Σ : gFunctors} {X} `{rG : !rupdG Σ X}.
   Implicit Types (P Q : iProp Σ).
@@ -343,19 +324,11 @@ Section rupd_lemmas.
 
 End rupd_lemmas.
 
+(** * Eliminating relational updates in adequacy proofs
 
-(**
-  Below we define some machinery for the adequacy proof of later credits in
-  Transfinite Iris. Intuitively, the goal of this machinery is that if we have
-  proven |==>r P in Iris, then we can get rid of the relational update to access
-  P. That way, we can, for example, access the postcondition of a weakest
-  precondition in the adequacy proof.
-
-  In Transfinite Iris, the adequacy proof for the later elimination update
-  crucially relies on the existential property: As part of getting rid of |==>r,
-  we have to lift the existential quantifier inside of |==>r out of Iris into
-  the meta logic. That's exactly what the existential property allows us to do.
- *)
+  If [|==>r P] is satisfiable, then so is [P]; e.g., to access the postcondition of a weakest
+  precondition. Getting rid of [|==>r] lifts the existential quantifier over the credit supply
+  out of the logic, which relies on the existential property of Transfinite Iris. *)
 
 Class SatisfiableRUpd `{SI : sidx} {X : Type} {Σ : gFunctors} `{!rupdG Σ X} (sat : iProp Σ → Prop) := {
     sat_rupd P : sat (|==>r P) → sat P
@@ -379,7 +352,8 @@ Section rupd_satisfiable.
     induction (tc_wf _ rupd_rel_wf x) as [x _ IH].
     rewrite rupd_unfold.
     intros Hsat. eapply sat_mono
-      with (Q := (|==> ∃ x' : X, (⌜rtc rupd_rel x' x⌝ ∗ rupd_pred x' ∗ P) ∨ ▷ (⌜tc rupd_rel x' x⌝ ∗ rupd_pred x' ∗ |==>r P))%I) in Hsat; last first.
+      with (Q := (|==> ∃ x' : X, (⌜rtc rupd_rel x' x⌝ ∗ rupd_pred x' ∗ P) ∨
+                                 ▷ (⌜tc rupd_rel x' x⌝ ∗ rupd_pred x' ∗ |==>r P))%I) in Hsat; last first.
     - iIntros "[Hpr Hupd]". iMod ("Hupd" with "Hpr") as "[Hupd|Hupd]".
       + iModIntro. iExists x. iLeft. iDestruct "Hupd" as "[$ $]". by iPureIntro.
       + iModIntro. iDestruct "Hupd" as (x') "H". iExists _. iRight.
@@ -395,7 +369,7 @@ Section rupd_satisfiable.
         etrans; eauto using tc_rtc.
   Qed.
 
-  (* FIXME?: need to fix transfinite.bi.satisfiable.v *)
+  (** Satisfiability framed with some credit supply. *)
   Definition sat_lc := sat_frame (sat:=sat) (∃ x : X, rupd_pred x)%I.
 
   Global Instance sat_lc_satisfiable_rupd : SatisfiableRUpd sat_lc.

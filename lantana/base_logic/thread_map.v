@@ -1,8 +1,11 @@
+(** The thread map: ghost state for a map from thread ids to values, with an authoritative
+    part [thread_map_interp Θ R] and per-thread fragments [thread p b v q] (owned with fraction
+    [q] if [b], persistent otherwise). *)
+
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Export own.
 From transfinite.base_logic.lib Require Import ghost_map.
 From iris.prelude Require Import options.
-Import uPred.
 
 Local Notation thread_map P V := (gmap P V).
 
@@ -54,7 +57,7 @@ Section thread_map.
   Implicit Types R : thread_map P V.
   Implicit Types Θ : gset P.
 
-  (** General properties of pointsto *)
+  (** General properties of [thread] *)
   Global Instance thread_timeless p b v q : Timeless (thread p b v q).
   Proof. rewrite thread_unseal /thread_def. apply _. Qed.
   Global Instance thread_false_persistent p v q : Persistent (thread p false v q).
@@ -62,7 +65,8 @@ Section thread_map.
 
   Global Instance thread_true_fractional p v : fractional.Fractional (λ q, thread p true v q).
   Proof. rewrite thread_unseal /thread_def. apply _. Qed.
-  Global Instance thread_true_as_fractional p v q : fractional.AsFractional (thread p true v q) (λ q0, thread p true v q0) q.
+  Global Instance thread_true_as_fractional p v q :
+    fractional.AsFractional (thread p true v q) (λ q0, thread p true v q0) q.
   Proof. rewrite thread_unseal /thread_def. apply _. Qed.
 
   Lemma thread_true_frac_ne p1 p2 v1 v2 q1 q2 :

@@ -1,17 +1,14 @@
-(** Transfinite later credit version *)
+(** Fancy updates [|={E1,E2}=> P] on top of the relational update of transfinite later credits
+    (instead of the basic update), and the rules for spending credits at fancy updates. *)
 
 From stdpp Require Export coPset.
-From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.proofmode Require Import proofmode.
-(* From transfinite.stepindex Require Import ordinal_arith. *)
-(* From transfinite.algebra Require Import ordinals. *)
 From transfinite.base_logic.lib Require Export own.
 From transfinite.base_logic.lib Require Import wsat.
 From lantana.algebra Require Import ordinal_ucmra.
 From lantana.base_logic Require Export later_credits.
 From iris.prelude Require Import options.
 Export wsatGS.
-Import uPred.
 
 Class invGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
   InvGpreS {
@@ -19,9 +16,8 @@ Class invGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
       #[local] invGpreS_lc :: tlcGpreS Σ;
     }.
 
-(* [invGS_lc] needs to be global in order to enable the use of lemmas like
-[lc_split] that require [lcGS], and not [invGS]. [invGS_wsat] also needs to be
-global as the lemmas in [invariants.v] require it. *)
+(* [invGS_lc] and [invGS_wsat] are global so that the lemmas about credits (which require
+[tlcGS]) and the lemmas in [invariants.v] (which require [wsatGS]) apply under [invGS]. *)
 Class invGS `{SI : sidx} (Σ : gFunctors) : Set := InvG {
   #[global] invGS_wsat :: wsatGS Σ;
   #[global] invGS_lc :: tlcGS Σ;
@@ -77,23 +73,7 @@ Global Instance uPred_bi_fupd `{SI : sidx} `{!invGS Σ} : BiFUpd (uPredI (iResUR
 Global Instance uPred_bi_bupd_fupd `{SI : sidx} `{!invGS Σ} : BiBUpdFUpd (uPredI (iResUR Σ)).
 Proof. rewrite /BiBUpdFUpd uPred_fupd_unseal. by iIntros (E P) ">? [$ $] !> !>". Qed.
 
-
-(** Additional lemmas *)
-Lemma fupd_step `{SI : sidx} {Σ : gFunctors} `{!invGS Σ} P E1 E2:
-  (∀ (x : Ord.t), ●£ x -∗ |==> (∃ y, ⌜(y < x)%ord⌝ ∗ ●£ y ∗ ▷ |={E1, E2}=> P)) -∗ |={E1, E2}=> P.
-Proof.
-  rewrite uPred_fupd_unseal /uPred_fupd_def. iIntros "Hupd Hwsat".
-  rewrite /bupd /bi_bupd_bupd; simpl.
-  iApply rupd_step; iIntros (x) "Hpr".
-  iSpecialize ("Hupd" with "Hpr").
-  pose (@uPred_bi_bupd SI (iResUR Σ)).
-  iApply (bupd_wand_l with "[Hupd Hwsat]"). iSplitR "Hupd"; last iApply "Hupd".
-  iIntros "Hupd". iDestruct "Hupd" as (y Htc) "[Hpr Hupd]".
-  iExists y. iFrame. iSplit.
-  { iPureIntro. by econstructor. }
-  iNext. by iApply "Hupd".
-Qed.
-
+(** A relational update is a fancy update. *)
 Lemma rupd_fupd `{SI : sidx} {Σ : gFunctors} `{!invGS Σ} P E:
   (|==>r P) -∗ |={E}=> P.
 Proof.
@@ -101,8 +81,7 @@ Proof.
   by iMod "Hupd" as "$".
 Qed.
 
-
-(** Later credits *)
+(** * Later credits at fancy updates *)
 
 (** [lc_fupd_elim_later] allows to eliminate a later from a hypothesis at an update.
   This is typically used as [iMod (lc_fupd_elim_later with "Hcredit HP") as "HP".],

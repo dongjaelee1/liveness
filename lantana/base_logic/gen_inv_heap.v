@@ -1,24 +1,13 @@
-From iris.algebra Require Import auth excl gmap.
-From transfinite.base_logic.lib Require Import own gen_heap.
+(** Invariant locations (Iris' [gen_inv_heap], for the invariants of [invariants.v]): locations
+    with an invariant on their value that are never deallocated. [inv_pointsto] is a persistent
+    witness that allows reading the location and guarantees that the value satisfies the
+    invariant; [inv_pointsto_own] also owns the location. *)
+
+From iris.algebra Require Import excl gmap.
+From transfinite.base_logic.lib Require Import gen_heap.
 From lantana.base_logic Require Import invariants.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-
-(** An "invariant" location is a location that has some invariant about its
-value attached to it, and that can never be deallocated explicitly by the
-program.  It provides a persistent witness that will always allow reading the
-location, guaranteeing that the value read will satisfy the invariant.
-
-This is useful for data structures like RDCSS that need to read locations long
-after their ownership has been passed back to the client, but do not care *what*
-it is that they are reading in that case. In that extreme case, the invariant
-may just be [True].
-
-Since invariant locations cannot be deallocated, they only make sense when
-modeling languages with garbage collection.  HeapLang can be used to model
-either language by choosing whether or not to use the [Free] operation.  By
-using a separate assertion [inv_pointsto_own] for "invariant" locations, we can
-keep all the other proofs that do not need it conservative.  *)
 
 Definition inv_heapN: namespace := nroot .@ "inv_heap".
 Local Notation "l ↦ v" := (pointsto l (DfracOwn 1) v) (at level 20) : bi_scope.
@@ -161,9 +150,7 @@ Section inv_heap.
 
   (** * Typeclass instances *)
 
-  (* FIXME(Coq #6294): needs new unification
-  The uses of [apply:] and [move: ..; rewrite ..] (by lack of [apply: .. in ..])
-  in this file are needed because Coq's default unification algorithm fails. *)
+  (* FIXME(Coq #6294): [apply:] and [move: ..; rewrite ..] work around Coq's unification. *)
   Global Instance inv_pointsto_own_proper l v :
     Proper (pointwise_relation _ iff ==> (≡)) (inv_pointsto_own l v).
   Proof.
