@@ -504,23 +504,23 @@ Section rules.
 
 End rules.
 
-(** ** Reading the model under a ghost update
+(** ** Reading the model under a model update
 
     Allocation of a registered structure reads the history and the model (to produce the
     record of the content at the current position) and updates the registry state. *)
-Section gupd_read.
+Section mupd_read.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
-  Lemma gupd_read n D (P : iProp Σ) :
-    (∀ g i Ω W, model_interp g i Ω W n D -∗ model_interp g i Ω W n D ∗ P) ⊢ |=[n,D]=>g P.
+  Lemma mupd_read n D (P : iProp Σ) :
+    (∀ g i Ω W, model_interp g i Ω W n D -∗ model_interp g i Ω W n D ∗ P) ⊢ |=[n,D]=>m P.
   Proof.
-    iIntros "H". iApply gupd_unfold. iRight. iIntros (g i Ω W) "MI".
+    iIntros "H". iApply mupd_nd_step. iIntros (g i Ω W) "MI".
     iDestruct ("H" with "MI") as "[MI HP]". iModIntro. iExists Ω. iSplit; first (iPureIntro; by left).
     iIntros (W2 [WS OI2]). rewrite /model_interp. iDestruct "MI" as "(MHI& S& T& A& G& W& %OI)".
     iMod (model_history_interp_step _ _ n n _ Ω with "MHI") as "MHI"; [done|done|].
     iPoseProof (owit_mon W W2 with "W") as "W".
     { eapply owit_inv_rc_step_same_gls; [done| |done]. by apply wits_nd_step_wits_step_o. }
-    iModIntro. iFrame. iSplit; first done. by iApply gupd_intro.
+    iModIntro. iFrame. iSplit; first done. by iApply mupd_intro.
   Qed.
 
   (** The same at the level of [sfmupd], with the history and the registry: fancy updates
@@ -533,7 +533,7 @@ Section gupd_read.
   Proof.
     iIntros "H". unfold_sfmupd. iIntros (h n σ Θ κs) "[HI TI]". rewrite /fmupd.
     iMod ("H" with "HI TI") as "H". iModIntro.
-    iApply gupd_mupd. iApply gupd_read. iIntros (g i Ω W) "MI". iDestruct ("H" with "MI") as "($& HP)".
+    iApply mupd_read. iIntros (g i Ω W) "MI". iDestruct ("H" with "MI") as "($& HP)".
     iMod "HP" as "(HI& TI& HP)". iModIntro. iFrame.
   Qed.
 
@@ -548,7 +548,7 @@ Section gupd_read.
     iMod "close" as "_". iMod "HP" as "(HI& TI& HP)". iModIntro. iFrame.
   Qed.
 
-End gupd_read.
+End mupd_read.
 
 (** ** Rules for [alwaysI] *)
 Section always_rules.
@@ -748,7 +748,7 @@ Section until_rules.
     iIntros "HQ". iPoseProof (temporal_sem Q) as "#HG2".
     unfold_sfmupd. rewrite /fmupd. iIntros (?????) "[SI TI]".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    unfold_opreds. iApply gupd_mupd. iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
+    unfold_opreds. iApply mupd_nd_step. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
     assert (NEW : ∃ k, Ω1 !! k = None).
     { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
     destruct NEW as (k& NEWk).

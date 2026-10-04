@@ -437,6 +437,51 @@ Section mupd.
     Frame p R P Q → Frame p R (|=[n,Θ]=>m P) (|=[n,Θ]=>m Q).
   Proof. rewrite /Frame=><-. by rewrite mupd_frame_l. Qed.
 
+  (** ** Non-discharging steps
+
+      A model update may take a non-discharging step of the obligations ([Ω1 ↪ₙ∘ Ω2]),
+      along which the witnesses take a non-discharging step too. The obligation rules
+      (opreds.v) are proved through [mupd_nd_step]. *)
+  Lemma obls_nd_step_owit_inv_wits_nd_step Ω1 Ω2 W1 W2 :
+    owit_inv Ω1 W1 →
+    Ω1 ↪ₙ∘ Ω2 →
+    W1 ↓∘ W2 →
+    owit_inv Ω2 W2 →
+    W1 ↓ₙ∘ W2.
+  Proof.
+    intros OI1 OS WS OI2. inv WS. 1: done. inv H.
+    - destruct H0 as (?&?&?&?&?&?). inv H0.
+      + econstructor 2. econstructor. do 3 eexists. split_and !; eauto.
+      + inv H2. specialize (OI2 x). rewrite lookup_insert_eq in OI2. inv OI2. destruct x0; try done.
+        specialize (OI1 x). rewrite H in OI1. inv OI1. destruct x0; try done. inv OS.
+        { by rewrite -H0 in H1. }
+        inv H3.
+        { destruct H5 as (?&?&?&?&?&?). inv H5. destruct (decide (x = x0)).
+          - subst. rewrite lookup_insert_eq in H0. inv H0.
+          - rewrite lookup_insert_ne in H0; auto. rewrite -H0 in H1. done. }
+        { destruct H5 as (?&?&?&?). destruct (decide (x = x0)).
+          - subst. rewrite H3 in H1. done.
+          - subst. rewrite lookup_insert_ne in H0; auto. rewrite -H0 in H1. done. }
+    - econstructor 2. econstructor 2. auto.
+  Qed.
+
+  Lemma mupd_nd_step n Θ P :
+    (∀ h i Ω1 W1,
+       model_interp h i Ω1 W1 n Θ ={∅}=∗
+       ∃ Ω2, ⌜ Ω1 ↪ₙ∘ Ω2 ⌝ ∗
+             ∀ W2, ⌜ (W1 ↓ₙ∘ W2) ∧ owit_inv Ω2 W2 ⌝ ={∅}=∗
+                   model_interp (h ++ [(n, Ω2)]) (S i) Ω2 W2 n Θ ∗ |=[n,Θ]=>m P)
+    ⊢ |=[n,Θ]=>m P.
+  Proof.
+    iIntros "IH". iApply mupd_unfold. iRight. iIntros (????) "I".
+    iPoseProof (model_interp_owit_inv with "I") as "%Hinv".
+    iMod ("IH" with "I") as "(%&%& IH)".
+    iModIntro. iExists _. iSplit.
+    { iPureIntro. inv H. 1: done. econstructor 2. by apply obls_nd_step_obls_step. }
+    iIntros (??). destruct H0. pose proof (obls_nd_step_owit_inv_wits_nd_step _ _ _ _ Hinv H H0 H1).
+    by iMod ("IH" with "[//]") as "[$ $]".
+  Qed.
+
 End mupd.
 
 (* Wrapper to use fupd. *)

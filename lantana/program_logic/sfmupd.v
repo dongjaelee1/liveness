@@ -269,11 +269,11 @@ Section sfmupd.
     iIntros "LC H". iApply fupd_sfmupd_elim. iApply (lantana.base_logic.fancy_updates.lc_fupd_add_laterN with "LC"). iNext. auto.
   Qed.
 
-  (** ** Obligation rules (non-discharging steps of the model, usable as model updates) *)
+  (** ** Obligation rules *)
   Lemma thread_terminate E i :
     thP_carriers i ∅ -∗ |={E}=>m thP_done i.
   Proof.
-    unfold_sfmupd. iIntros "Tb %%%%% $". iMod (thread_terminate_gupd with "Tb") as "#Tt". auto.
+    unfold_sfmupd. iIntros "Tb %%%%% $". iMod (thread_terminate_mupd with "Tb") as "#Tt". auto.
   Qed.
 
   Lemma carrier_alloc E i G ℓ μ :
@@ -282,7 +282,7 @@ Section sfmupd.
                  thP_carriers i ({[g]} ∪ G) ∗ crP_obls g ℓ ∅ ∗ crP_fuel g ℓ μ.
   Proof.
     unfold_sfmupd. iIntros "Tb %%%%% $".
-    iMod (carrier_alloc_gupd with "Tb") as "(%& %& $& $& $)". auto.
+    iMod (carrier_alloc_mupd with "Tb") as "(%& %& $& $& $)". auto.
   Qed.
 
   Lemma carrier_delete E i G g ℓ :
@@ -292,7 +292,7 @@ Section sfmupd.
     |={E}=>m thP_carriers i (G ∖ {[g]}).
   Proof.
     unfold_sfmupd. iIntros (Ing) "Tb Gg %%%%% $".
-    iMod (carrier_delete_gupd with "Tb Gg") as "$"; auto.
+    iMod (carrier_delete_mupd with "Tb Gg") as "$"; auto.
   Qed.
 
   Lemma obl_alloc_assigned E g K b ℓ1 ℓ2 μ :
@@ -306,7 +306,7 @@ Section sfmupd.
                  (∀ E N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E}=∗ oblP_inv N k P Q R).
   Proof.
     unfold_sfmupd. iIntros (Ltl) "Tb %%%%% $".
-    iMod (obl_alloc_assigned_gupd with "Tb") as "(%& %& $& $& $& $& $)"; auto.
+    iMod (obl_alloc_assigned_mupd with "Tb") as "(%& %& $& $& $& $& $)"; auto.
   Qed.
 
   Lemma obl_alloc_discharged E ℓ μ :
@@ -314,7 +314,7 @@ Section sfmupd.
                    (∀ E N (P Q R : iProp Σ), (▷ R) ={E}=∗ oblP_inv N k P Q R).
   Proof.
     unfold_sfmupd. iIntros "%%%%% $".
-    iMod (obl_alloc_discharged_gupd) as "(%& $& $& $& $)"; auto.
+    iMod (obl_alloc_discharged_mupd) as "(%& $& $& $& $)"; auto.
   Qed.
 
   Lemma obl_assigned_to_true E N k P Q R :
@@ -326,7 +326,7 @@ Section sfmupd.
                          ∀ E', |={E'}=>m (oblP_assigned k true (1/2)%Qp) ∗
                                       ((▷ Q) ={E ∖ ↑N,E}=∗ True))).
   Proof.
-    iIntros (MASK) "#Gv". iMod (obl_assigned_to_true_gupd with "Gv") as "H". 1: auto.
+    iIntros (MASK) "#Gv". iMod (obl_assigned_to_true_mupd with "Gv") as "H". 1: auto.
     iIntros "!> Ga". iPoseProof ("H" with "Ga") as "[$ ACC]". iIntros "% Ga". iPoseProof ("ACC" with "Ga") as "H".
     unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
   Qed.
@@ -341,7 +341,7 @@ Section sfmupd.
   Proof.
     iIntros (Ink Ltl) "Gg1 Gg2 Of".
     unfold_sfmupd. iIntros "%%%%% $".
-    iMod (obl_offload_gupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
+    iMod (obl_offload_mupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
   Qed.
 
   Lemma obl_offload_set E g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
@@ -354,14 +354,14 @@ Section sfmupd.
   Proof.
     iIntros (Ink Ltl) "Gg1 Gg2 Of".
     unfold_sfmupd. iIntros "%%%%% $".
-    iMod (obl_offload_set_gupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
+    iMod (obl_offload_set_mupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
   Qed.
 
   Lemma obl_check_witnesses E (R : oids) :
     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
     |={E}=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_discharged r).
   Proof.
-    unfold_sfmupd. iIntros "Rs %%%%% $". iMod (obl_check_witnesses_gupd with "Rs") as "H". auto.
+    unfold_sfmupd. iIntros "Rs %%%%% $". iMod (obl_check_witnesses_mupd with "Rs") as "H". auto.
   Qed.
 
 

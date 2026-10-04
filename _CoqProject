@@ -72,7 +72,6 @@ lantana/base_logic/othread.v
 lantana/base_logic/ocarrier.v
 lantana/base_logic/model_interp.v
 lantana/base_logic/mupd.v
-lantana/base_logic/gupd.v
 lantana/base_logic/oinv.v
 lantana/base_logic/opreds.v
 
