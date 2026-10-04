@@ -24,29 +24,18 @@ Section laws.
     IntoTemporal (thread_expr i C e) (tps_atomic (pred_expr i C e)) | 10.
   Proof. exact (temporal_atomic (pred_expr i C e)). Qed.
 
-  (** Discharge at the actual final value, using credits from earlier steps. *)
-  Lemma thread_expr_terminate_finally i E v g ℓ k N :
+  (** Discharge at the actual final value, using credits from earlier steps: the thread's
+      only child is the obligation of the finally. *)
+  Lemma thread_expr_terminate_finally i E v k N :
     ↑N ⊆ E →
     thread_expr i [] (of_val v) -∗ £ (2 : Ord.t) -∗
-    thP_carriers i {[g]} -∗ crP_obls g ℓ {[k]} -∗
+    thP_kids i {[k]} -∗ oblP_kids k ∅ -∗
     finallyI N k 1 (thread_expr i [] (of_val v)) -∗ |={E}=>m
     thread_expr i [] (of_val v) ∗ thP_done i.
   Proof.
-    iIntros (Hmask) "TE LC TG Cg HF".
-    iMod (untilI_discharge with "HF") as "HF"; first set_solver.
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
-    iMod ("HF" with "[TE]") as "HF".
-    { iNext. iFrame. }
-    iPoseProof ("HF" with "[] Cg") as "HF".
-    { iPureIntro. set_solver. }
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iMod ("HF" $! _) as "HF". iMod "HF" as "(TE& Gg& #Odkl)".
+    iIntros (Hmask) "TE LC TG Kk HF".
+    iMod (finallyI_discharge with "LC TG Kk HF TE") as "(TE& TG& #Od)"; [done|set_solver|].
     replace ({[k]} ∖ {[k]} : gset _) with (∅ : oids) by set_solver.
-    iMod (carrier_delete with "TG Gg") as "TG"; first set_solver.
-    replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
     iMod (thread_terminate with "TG") as "$". by iFrame.
   Qed.
 

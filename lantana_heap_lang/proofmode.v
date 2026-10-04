@@ -67,8 +67,8 @@ Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E
   envs_entails Δ (thread_expr i C (fill K e1) ∗ ∃ E' G R (o : Ord.t),
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
-                       thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
-                       (thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+                       thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+                       (thP_kids i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                         ALC (£ o ={E',E}=∗ |={E}=>m P)))
            (thread_expr i C (fill K e2) -∗
             (|={E}=>m (lWP (fill K e2) @ s; i; E {{ Φ }})))))%I →
@@ -90,11 +90,11 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ {C} 
   (* m = n + m' → *)
   (* MaybeIntoLaterNEnvs n Δ Δ' → *)
   envs_entails Δ (thread_expr i C (fill K e1) ∗ ∃ G (m : nat) R (o : Ord.t),
-        (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m) ∗
+        (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ m) ∗
          (** FIXME: nat add notation not working? *)
          ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∧ ⌜ (m = n + m')%nat ⌝) ∗
-        (thP_carriers i G -∗
-         ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m') -∗
+        (thP_kids i G -∗
+         ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ m') -∗
          ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r) -∗
          £ (o)%ord -∗
          thread_expr i C (fill K e2) -∗
@@ -109,10 +109,10 @@ Proof.
     (λ i e, thread_expr i C e)). 1: auto.
   iFrame "TE".
   iDestruct "T" as "($& Fs& $& %)". subst.
-  iAssert (([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m'))%I with "[Fs]" as "[$ Fs]".
+  iAssert (([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ m'))%I with "[Fs]" as "[$ Fs]".
   { iApply big_sepS_sep. iApply (big_sepS_impl with "Fs"). iIntros "!> %% (%& H)".
-    rewrite (crP_fuel_eq _ _ _ (n ⊕ m')%M).
-    - iPoseProof (crP_fuel_add with "H") as "[$ $]".
+    rewrite (oblP_fuel_eq _ _ _ (n ⊕ m')%M).
+    - iPoseProof (oblP_fuel_add with "H") as "[$ $]".
     - rewrite measure_rep_add !measure_rep_nat Hessenberg.add_from_nat. done. }
   iIntros "TE TG Ws LC".
   iAssert (|==> ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r))%I with "[Ws]" as ">Ws".

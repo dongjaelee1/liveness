@@ -360,6 +360,85 @@ Section sfmupd.
     iMod (obl_discharge_mupd with "Kp Kk Ga") as "[$ $]"; auto.
   Qed.
 
+  (** ** Moving sets of obligations *)
+  Lemma parP_below_thread i ℓ : ⊢ parP_below (PThread i) ℓ.
+  Proof. done. Qed.
+
+  Lemma parP_below_obl q ℓq ℓ :
+    (ℓq < ℓ)%ordi → witP_layer q ℓq -∗ parP_below (PObl q) ℓ.
+  Proof. iIntros (Hl) "W". iExists ℓq. by iFrame. Qed.
+
+  (** Moving a set [X] of children of [p1] to [p2], one unit each, each at its own layer. *)
+  Lemma obl_move_set_gen E p1 p2 K1 K2 X :
+    X ⊆ K1 →
+    parP_kids p1 K1 -∗ parP_kids p2 K2 -∗
+    ([∗ set] k ∈ X, ∃ ℓ, parP_below p2 ℓ ∗ oblP_fuel k ℓ 1) -∗
+    |={E}=>m ⌜ X ## K2 ⌝ ∗ parP_kids p1 (K1 ∖ X) ∗ parP_kids p2 (X ∪ K2).
+  Proof.
+    induction X as [|x X Hx IH] using set_ind_L; iIntros (HX) "P1 P2 Fs".
+    { rewrite difference_empty_L left_id_L. iModIntro. iFrame. iPureIntro. set_solver. }
+    iPoseProof (big_sepS_insert with "Fs") as "[(%ℓ& B& Fx) Fs]"; first done.
+    iMod (IH with "P1 P2 Fs") as "(%Hdis& P1& P2)"; first set_solver.
+    iMod (obl_move _ _ _ _ _ x with "B P1 P2 Fx") as "(%Hx2& P1& P2)"; first set_solver.
+    replace (K1 ∖ X ∖ {[x]}) with (K1 ∖ ({[x]} ∪ X)) by set_solver.
+    replace ({[x]} ∪ (X ∪ K2)) with ({[x]} ∪ X ∪ K2) by set_solver.
+    iModIntro. iFrame. iPureIntro. set_solver.
+  Qed.
+
+  (** Moving a set [X] of children of [p1] below the thread [j]: one unit each, at any
+      layer. *)
+  Lemma obl_move_thread_set E p1 j K1 K2 X :
+    X ⊆ K1 →
+    parP_kids p1 K1 -∗ thP_kids j K2 -∗ ([∗ set] k ∈ X, ∃ ℓ, oblP_fuel k ℓ 1) -∗
+    |={E}=>m ⌜ X ## K2 ⌝ ∗ parP_kids p1 (K1 ∖ X) ∗ thP_kids j (X ∪ K2).
+  Proof.
+    iIntros (HX) "P1 P2 Fs". iApply (obl_move_set_gen with "P1 P2"); first done.
+    iApply (big_sepS_impl with "Fs"). iIntros "!> %k _ [%ℓ F]". iExists ℓ. iFrame "F".
+    iApply parP_below_thread.
+  Qed.
+
+  (** Moving a set [X] of children of [p1] below the obligation [q]: one unit each, each at
+      a layer above the witness layer [ℓq] of [q]. *)
+  Lemma obl_move_obl_set E p1 q K1 K2 X ℓq :
+    X ⊆ K1 →
+    witP_layer q ℓq -∗ parP_kids p1 K1 -∗ oblP_kids q K2 -∗
+    ([∗ set] k ∈ X, ∃ ℓ, ⌜ (ℓq < ℓ)%ordi ⌝ ∗ oblP_fuel k ℓ 1) -∗
+    |={E}=>m ⌜ X ## K2 ⌝ ∗ parP_kids p1 (K1 ∖ X) ∗ oblP_kids q (X ∪ K2).
+  Proof.
+    iIntros (HX) "#W P1 P2 Fs". iApply (obl_move_set_gen with "P1 P2"); first done.
+    iApply (big_sepS_impl with "Fs"). iIntros "!> %k _ (%ℓ& %Hl& F)". iExists ℓ. iFrame "F".
+    by iApply (parP_below_obl q ℓq ℓ Hl).
+  Qed.
+
+  (** Moving a set [X] of children of [k] up to the parent [p] of [k], for free. *)
+  Lemma obl_move_up_set E p K k Kk X :
+    k ∈ K → X ⊆ Kk →
+    parP_kids p K -∗ oblP_kids k Kk -∗
+    |={E}=>m ⌜ X ## K ⌝ ∗ parP_kids p (X ∪ K) ∗ oblP_kids k (Kk ∖ X).
+  Proof.
+    induction X as [|x X Hx IH] using set_ind_L; iIntros (Hk HX) "P Ck".
+    { rewrite difference_empty_L left_id_L. iModIntro. iFrame. iPureIntro. set_solver. }
+    iMod (IH with "P Ck") as "(%Hdis& P& Ck)"; [done|set_solver|].
+    iMod (obl_move_up _ _ _ k _ x with "P Ck") as "(%Hx2& P& Ck)"; [set_solver|set_solver|].
+    replace (Kk ∖ X ∖ {[x]}) with (Kk ∖ ({[x]} ∪ X)) by set_solver.
+    replace ({[x]} ∪ (X ∪ K)) with ({[x]} ∪ X ∪ K) by set_solver.
+    iModIntro. iFrame. iPureIntro. set_solver.
+  Qed.
+
+  (** Discharging [k] after moving its children up to its parent [p] (for free). *)
+  Lemma obl_discharge_lift_kids E p K k Kk :
+    k ∈ K →
+    parP_kids p K -∗ oblP_kids k Kk -∗ oblP_assigned k 1 -∗
+    |={E}=>m parP_kids p (Kk ∪ (K ∖ {[k]})) ∗ oblP_discharged k.
+  Proof.
+    iIntros (Hk) "P Ck A".
+    iMod (obl_move_up_set _ p K k Kk Kk with "P Ck") as "(%Hdis& P& Ck)"; [done|done|].
+    rewrite difference_diag_L.
+    iMod (obl_discharge_leaf with "P Ck A") as "[P D]"; first set_solver.
+    replace ((Kk ∪ K) ∖ {[k]}) with (Kk ∪ (K ∖ {[k]})) by set_solver.
+    by iFrame.
+  Qed.
+
   (** ** Obligations with an invariant *)
   Lemma obl_alloc_assigned E p K ℓ μ :
     parP_below p ℓ -∗ parP_kids p K -∗

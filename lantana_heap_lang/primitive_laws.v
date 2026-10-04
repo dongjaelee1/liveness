@@ -281,9 +281,9 @@ Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ {C} :
   φ →
   (thread_expr i C e1 ∗ Nat.iter n
     (λ P,
-       |={E,E'}=> ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       |={E,E'}=> ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
                  ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                 (thP_carriers i G -∗
+                 (thP_kids i G -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                   ALC (£ o ={E',E}=∗ |={E}=>m P)))
     (thread_expr i C e2 -∗ (|={E}=>m (lWP e2 @ s; i; E {{ v, Φ v }}))))
@@ -295,12 +295,12 @@ Qed.
 
 Lemma lwp_fork_step s i E E' e Φ {C} :
   (|={E,E'}=> thread_expr i C (Fork e) ∗
-             ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+             ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
              ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
              (∀ j, thread_expr i C #() -∗ thread_expr j [] e -∗
-                   thP_carriers i G -∗
+                   thP_kids i G -∗
                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                   thP_carriers j ∅ -∗
+                   thP_kids j ∅ -∗
                    ALC (|={E',E}=>
                         |={E}=>m (|={E}=>m Φ (LitV LitUnit)) ∗
                                 (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }})))) -∗
@@ -333,33 +333,32 @@ Proof.
   - rewrite last_app. simpl. auto.
 Qed.
 
-Lemma lwp_fork ℓ μ K P G R o s i E e g1 K1 {C} :
-  K ⊆ K1 →
-  (∀ j g2, l{{{ thread_expr j [] e ∗ thP_carriers j {[g2]} ∗ ([∗ set] g ∈ {[g2]}, crP_fuel g ℓ μ) ∗ crP_obls g2 ℓ K ∗ P }}}
-             e @ s; j; ⊤ l{{{ v, RET v; lift_term j (λ _ _, True) v }}})%I
+(** The forked thread [j] takes the children [K] of the forking thread, each paying one
+    unit of fuel (at any layer) to change owner. *)
+Lemma lwp_fork K P G R o s i E e {C} :
+  K ⊆ G →
+  (∀ j, l{{{ thread_expr j [] e ∗ thP_kids j K ∗ P }}}
+          e @ s; j; ⊤ l{{{ v, RET v; lift_term j (λ _ _, True) v }}})%I
   ⊢
-  l{{{ thread_expr i C (Fork e) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ crP_obls g1 ℓ K1 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) ∗ P }}}
+  l{{{ thread_expr i C (Fork e) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ ([∗ set] k ∈ K, ∃ ℓ, oblP_fuel k ℓ 1) ∗ P }}}
     Fork e @ s; i; E
-                     l{{{ RET #(); thread_expr i C #() ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ crP_obls g1 ℓ (K1 ∖ K)}}}.
+  l{{{ RET #(); thread_expr i C #() ∗ (£ o ∗ thP_kids i (G ∖ K) ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
-  iIntros (HK) "#Hfork !> %Φ (TE& (TG& GF& Rs)& Cg& OF& HP) HΦ".
+  iIntros (HK) "#Hfork !> %Φ (TE& (TG& GF& Rs)& OF& HP) HΦ".
   iApply lwp_fork_step. iModIntro. iFrame "TE TG GF Rs".
   iIntros (j) "TE TEj TG Ws TGj". iApply (ALC_credits _ _ o). iIntros "!> LC !>".
-  iMod (carrier_alloc _ _ _ ℓ μ with "TGj") as "(%g2& _& TGj& Cg2& GF2)".
-  iMod (obl_offload_set with "Cg Cg2 OF") as "(Cg& Cg2& _)". 1: set_solver. 1: done.
-  rewrite union_empty_l_L union_empty_r_L. iModIntro. iSplitR "TEj HP TGj GF2 Cg2".
-  - iApply ("HΦ" with "[$TE $LC $TG $Ws $Cg]").
-  - iApply ("Hfork" with "[$TEj $TGj GF2 $Cg2 $HP]").
-    { iApply big_sepS_singleton. iFrame. }
-    auto.
+  iMod (obl_move_thread_set _ (PThread i) j G ∅ K with "TG TGj OF") as "(_& TG& TGj)"; first done.
+  rewrite union_empty_r_L. iModIntro. iSplitR "TEj HP TGj".
+  - iApply ("HΦ" with "[$TE $LC $TG $Ws]").
+  - iApply ("Hfork" with "[$TEj $TGj $HP]"). auto.
 Qed.
 
 (** ChooseNat *)
 Lemma lwp_choosenat_step o s i E E' Φ {C} :
   (|={E,E'}=> thread_expr i C ChooseNat ∗
-                  ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+                  ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
                   ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                       (∀ (n : nat), thread_expr i C #n -∗ thP_carriers i G -∗
+                       (∀ (n : nat), thread_expr i C #n -∗ thP_kids i G -∗
                                    ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                    ALC (£ o ={E',E}=∗ (|={E}=>m Φ (#n))))) -∗
   lWP ChooseNat @ s; i; E {{ Φ }}.
@@ -389,11 +388,11 @@ Qed.
 
 Lemma lwp_choosenat G R o s i E {C} :
   l{{{ thread_expr i C ChooseNat ∗
-       (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+       (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     ChooseNat @ s; i; E
   l{{{ (n : nat), RET LitV (LitInt n);
        thread_expr i C #n ∗
-       (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+       (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
   iIntros (Φ) "(TE& TG& GF& Rs) HΦ".
   iApply (lwp_choosenat_step o with "[$TE $TG $GF $Rs HΦ]").
@@ -403,11 +402,11 @@ Qed.
 
 Local Remark lwp_choosez_exists G R o s i E {C} :
   l{{{ thread_expr i C ChooseNat ∗
-       (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+       (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     ChooseNat @ s; i; E
   l{{{ v, RET v; ∃ (n : nat), ⌜v = #n⌝ ∧
        (thread_expr i C (of_val v) ∗
-        (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r))) }}}.
+        (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r))) }}}.
 Proof.
   iIntros (Φ) "P HΦ".
   iPoseProof (lwp_choosenat with "P") as "H".
@@ -572,9 +571,9 @@ Proof. destruct π; simpl; apply _. Qed.
 
 Lemma lwp_allocN_seq G R o s i E v n {C} :
   (0 < n)%Z →
-  l{{{ thread_expr i C (AllocN #n (Val v)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+  l{{{ thread_expr i C (AllocN #n (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
-  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
+  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
           [∗ list] i ∈ seq 0 (Z.to_nat n), (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
   iIntros (Hn Φ) "[TE (Tb& Gfs& Rs)] HP".
@@ -601,9 +600,9 @@ Proof.
 Qed.
 
 Lemma lwp_alloc G R o s i E v {C} :
-  l{{{ thread_expr i C (Alloc (Val v)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+  l{{{ thread_expr i C (Alloc (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     Alloc (Val v) @ s; i; E
-  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
+  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
           l ↦ v ∗ meta_token l ⊤ }}}.
 Proof.
   iIntros (Φ) "P HΦ".
@@ -612,9 +611,9 @@ Proof.
 Qed.
 
 Lemma lwp_free G R o s i E l v {C} :
-  l{{{ thread_expr i C (Free #l) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
+  l{{{ thread_expr i C (Free #l) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
     Free (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
   iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -637,9 +636,9 @@ Proof.
 Qed.
 
 Lemma lwp_load G R o s i E l dq v {C} :
-  l{{{ thread_expr i C (Load #l) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v }}}
+  l{{{ thread_expr i C (Load #l) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v }}}
     Load (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET v; thread_expr i C (Val v) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
+  l{{{ RET v; thread_expr i C (Val v) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -661,9 +660,9 @@ Proof.
 Qed.
 
 Lemma lwp_store G R o s i E l v' v {C} :
-  l{{{ thread_expr i C (Store #l (Val v)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ thread_expr i C (Store #l (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
+  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -686,9 +685,9 @@ Proof.
 Qed.
 
 Lemma lwp_xchg G R o s i E l v' v {C} :
-  l{{{ thread_expr i C (Xchg #l (Val v)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ thread_expr i C (Xchg #l (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET v'; thread_expr i C (Val v') ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
+  l{{{ RET v'; thread_expr i C (Val v') ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -712,9 +711,9 @@ Qed.
 
 Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 {C} :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v' }}}
+  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool false); thread_expr i C (Val (PairV v' (LitV (LitBool false)))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
+  l{{{ RET PairV v' (LitV $ LitBool false); thread_expr i C (Val (PairV v' (LitV (LitBool false)))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -738,9 +737,9 @@ Qed.
 
 Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' {C} :
   v' = v1 → vals_compare_safe v' v1 →
-  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool true); thread_expr i C (Val (PairV v' (LitV (LitBool true)))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
+  l{{{ RET PairV v' (LitV $ LitBool true); thread_expr i C (Val (PairV v' (LitV (LitBool true)))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -764,9 +763,9 @@ Proof.
 Qed.
 
 Lemma lwp_faa G R o s i E l (i1 i2 : Z) {C} :
-  l{{{ thread_expr i C (FAA #l #i2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ LitV (LitInt i1) }}}
+  l{{{ thread_expr i C (FAA #l #i2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ LitV (LitInt i1) }}}
     FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
-  l{{{ RET LitV (LitInt i1); thread_expr i C (#i1) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
+  l{{{ RET LitV (LitInt i1); thread_expr i C (#i1) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -789,9 +788,9 @@ Proof.
 Qed.
 
 Lemma lwp_new_proph G R o s i E {C} :
-  l{{{ thread_expr i C (NewProph) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
+  l{{{ thread_expr i C (NewProph) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
     NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); thread_expr i C (Val (LitV (LitProphecy p))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
+  l{{{ pvs p, RET (LitV (LitProphecy p)); thread_expr i C (Val (LitV (LitProphecy p))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
 Proof.
   iIntros (Φ) "[TE (Tb& Gfs& Rs)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.

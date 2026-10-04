@@ -103,10 +103,10 @@ Qed.
 
 Lemma lwp_allocN G R o s i E v n {C} :
   (0 < n)%Z →
-  l{{{ thread_expr i C (AllocN (Val $ LitV $ LitInt $ n) (Val v)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (AllocN (Val $ LitV $ LitInt $ n) (Val v)) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
-  l{{{ l, RET LitV (LitLoc l); thread_expr i C (of_val (LitV (LitLoc l))%V) ∗ (£ o ∗ thP_carriers i G ∗
+  l{{{ l, RET LitV (LitLoc l); thread_expr i C (of_val (LitV (LitLoc l))%V) ∗ (£ o ∗ thP_kids i G ∗
          ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
          l ↦∗ replicate (Z.to_nat n) v ∗
          [∗ list] i ∈ seq 0 (Z.to_nat n), meta_token (l +ₗ (i : nat)) ⊤ }}}.
@@ -119,10 +119,10 @@ Qed.
 
 Lemma lwp_allocN_vec G R o s i E v n {C} :
   (0 < n)%Z →
-  l{{{ thread_expr i C (AllocN #n v) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (AllocN #n v) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) }}}
     AllocN #n v @ s; i; E
-  l{{{ l, RET #l; thread_expr i C (of_val (#l)%V) ∗ (£ o ∗ thP_carriers i G ∗
+  l{{{ l, RET #l; thread_expr i C (of_val (#l)%V) ∗ (£ o ∗ thP_kids i G ∗
          ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
          l ↦∗ vreplicate (Z.to_nat n) v ∗
          [∗ list] i ∈ seq 0 (Z.to_nat n), meta_token (l +ₗ (i : nat)) ⊤ }}}.
@@ -134,10 +134,10 @@ Qed.
 (** * Rules for accessing array elements *)
 Lemma lwp_load_offset G R o s i E l dq off vs v {C} :
   vs !! off = Some v →
-  l{{{ thread_expr i C (! #(l +ₗ off)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (! #(l +ₗ off)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗{dq} vs }}}
     ! #(l +ₗ off) @ s; i; E
-  l{{{ RET v; thread_expr i C (of_val (v)%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗{dq} vs }}}.
+  l{{{ RET v; thread_expr i C (of_val (v)%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗{dq} vs }}}.
 Proof.
   iIntros (Hlookup Φ) "(TE& T& Hl) HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
@@ -147,18 +147,18 @@ Proof.
 Qed.
 
 Lemma lwp_load_offset_vec G R o s i E l dq sz (off : fin sz) (vs : vec val sz) {C} :
-  l{{{ thread_expr i C (! #(l +ₗ off)) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (! #(l +ₗ off)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗{dq} vs }}}
     ! #(l +ₗ off) @ s; i; E
-  l{{{ RET vs !!! off; thread_expr i C (of_val (vs !!! off)%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗{dq} vs }}}.
+  l{{{ RET vs !!! off; thread_expr i C (of_val (vs !!! off)%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗{dq} vs }}}.
 Proof. apply lwp_load_offset. by apply vlookup_lookup. Qed.
 
 Lemma lwp_store_offset G R o s i E l off (vs : list val) (v : val) {C} :
   is_Some (vs !! off) →
-  l{{{ thread_expr i C (#(l +ₗ off) <- v) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (#(l +ₗ off) <- v) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
-  l{{{ RET #(); thread_expr i C (of_val (#())%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ (l ↦∗ (<[off:=v]> vs)) }}}.
+  l{{{ RET #(); thread_expr i C (of_val (#())%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ (l ↦∗ (<[off:=v]> vs)) }}}.
 Proof.
   iIntros ([w Hlookup] Φ) "(TE& T& Hl) HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
@@ -167,10 +167,10 @@ Proof.
 Qed.
 
 Lemma lwp_store_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v {C} :
-  l{{{ thread_expr i C (#(l +ₗ off) <- v) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (#(l +ₗ off) <- v) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     #(l +ₗ off) <- v @ s; i; E
-  l{{{ RET #(); thread_expr i C (of_val (#())%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v]> vs }}}.
+  l{{{ RET #(); thread_expr i C (of_val (#())%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v]> vs }}}.
 Proof.
   setoid_rewrite vec_to_list_insert. apply lwp_store_offset.
   eexists. by apply vlookup_lookup.
@@ -178,10 +178,10 @@ Qed.
 
 Lemma lwp_xchg_offset G R o s i E l off (vs : list val) (v v' : val) {C} :
   vs !! off = Some v →
-  l{{{ thread_expr i C (Xchg #(l +ₗ off) v') ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (Xchg #(l +ₗ off) v') ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v' @ s; i; E
-  l{{{ RET v; thread_expr i C (of_val (v)%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v']> vs }}}.
+  l{{{ RET v; thread_expr i C (of_val (v)%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v']> vs }}}.
 Proof.
   iIntros (Hlookup Φ) "(TE& T& Hl) HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
@@ -190,10 +190,10 @@ Proof.
 Qed.
 
 Lemma lwp_xchg_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v {C} :
-  l{{{ thread_expr i C (Xchg #(l +ₗ off) v) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (Xchg #(l +ₗ off) v) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     Xchg #(l +ₗ off) v @ s; i; E
-  l{{{ RET (vs !!! off); thread_expr i C (of_val ((vs !!! off))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v]> vs }}}.
+  l{{{ RET (vs !!! off); thread_expr i C (of_val ((vs !!! off))%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v]> vs }}}.
 Proof.
   setoid_rewrite vec_to_list_insert. apply lwp_xchg_offset.
   by apply vlookup_lookup.
@@ -203,10 +203,10 @@ Lemma lwp_cmpxchg_suc_offset G R o s i E l off vs (v' v1 v2 : val) {C} :
   vs !! off = Some v' →
   v' = v1 →
   vals_compare_safe v' v1 →
-  l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
-  l{{{ RET (v', #true); thread_expr i C (of_val ((v', #true))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v2]> vs }}}.
+  l{{{ RET (v', #true); thread_expr i C (of_val ((v', #true))%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v2]> vs }}}.
 Proof.
   iIntros (Hlookup ?? Φ) "(TE& T& Hl) HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
@@ -217,10 +217,10 @@ Qed.
 Lemma lwp_cmpxchg_suc_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) v1 v2 {C} :
   vs !!! off = v1 →
   vals_compare_safe (vs !!! off) v1 →
-  l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
-  l{{{ RET (vs !!! off, #true); thread_expr i C (of_val ((vs !!! off, #true))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v2]> vs }}}.
+  l{{{ RET (vs !!! off, #true); thread_expr i C (of_val ((vs !!! off, #true))%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=v2]> vs }}}.
 Proof.
   intros. setoid_rewrite vec_to_list_insert.
   apply lwp_cmpxchg_suc_offset; [|done..].
@@ -231,10 +231,10 @@ Lemma lwp_cmpxchg_fail_offset G R o s i E l dq off vs (v0 v1 v2 : val) {C} :
   vs !! off = Some v0 →
   v0 ≠ v1 →
   vals_compare_safe v0 v1 →
-  l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗{dq} vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
-  l{{{ RET (v0, #false); thread_expr i C (of_val ((v0, #false))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗{dq} vs }}}.
+  l{{{ RET (v0, #false); thread_expr i C (of_val ((v0, #false))%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗{dq} vs }}}.
 Proof.
   iIntros (Hlookup HNEq Hcmp Φ) "(TE& T& Hl) HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
@@ -247,10 +247,10 @@ Qed.
 Lemma lwp_cmpxchg_fail_offset_vec G R o s i E l dq sz (off : fin sz) (vs : vec val sz) (v1 v2 : val) {C} :
   vs !!! off ≠ v1 →
   vals_compare_safe (vs !!! off) v1 →
-  l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (CmpXchg #(l +ₗ off) v1 v2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗{dq} vs }}}
     CmpXchg #(l +ₗ off) v1 v2 @ s; i; E
-  l{{{ RET (vs !!! off, #false); thread_expr i C (of_val ((vs !!! off, #false))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗{dq} vs }}}.
+  l{{{ RET (vs !!! off, #false); thread_expr i C (of_val ((vs !!! off, #false))%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗{dq} vs }}}.
 Proof.
   intros. apply lwp_cmpxchg_fail_offset; [|done..].
   by apply vlookup_lookup.
@@ -258,10 +258,10 @@ Qed.
 
 Lemma lwp_faa_offset G R o s i E l off vs (i1 i2 : Z) {C} :
   vs !! off = Some #i1 →
-  l{{{ thread_expr i C (FAA #(l +ₗ off) #i2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (FAA #(l +ₗ off) #i2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
-  l{{{ RET LitV (LitInt i1); thread_expr i C (of_val (LitV (LitInt i1))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
+  l{{{ RET LitV (LitInt i1); thread_expr i C (of_val (LitV (LitInt i1))%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
 Proof.
   iIntros (Hlookup Φ) "(TE& T& Hl) HΦ".
   iDestruct (update_array l _ _ _ _ Hlookup with "Hl") as "[Hl1 Hl2]".
@@ -271,10 +271,10 @@ Qed.
 
 Lemma lwp_faa_offset_vec G R o s i E l sz (off : fin sz) (vs : vec val sz) (i1 i2 : Z) {C} :
   vs !!! off = #i1 →
-  l{{{ thread_expr i C (FAA #(l +ₗ off) #i2) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+  l{{{ thread_expr i C (FAA #(l +ₗ off) #i2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦∗ vs }}}
     FAA #(l +ₗ off) #i2 @ s; i; E
-  l{{{ RET LitV (LitInt i1); thread_expr i C (of_val (LitV (LitInt i1))%V) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
+  l{{{ RET LitV (LitInt i1); thread_expr i C (of_val (LitV (LitInt i1))%V) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦∗ <[off:=#(i1 + i2)]> vs }}}.
 Proof.
   intros. setoid_rewrite vec_to_list_insert. apply lwp_faa_offset.
   by apply vlookup_lookup.
@@ -284,10 +284,10 @@ Qed.
 
 (* (** Lemmas for some particular expression inside the [Resolve]. *) *)
 (* Lemma lwp_resolve_proph G R o s i E (p : proph_id) (pvs : list (val * val)) v : *)
-(*   l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 1) ∗ *)
+(*   l{{{ (thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ *)
 (*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs }}} *)
 (*     ResolveProph (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E *)
-(*   l{{{ pvs', RET (LitV LitUnit); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ⌜pvs = (LitV LitUnit, v)::pvs'⌝ ∗ proph p pvs' }}}. *)
+(*   l{{{ pvs', RET (LitV LitUnit); (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ⌜pvs = (LitV LitUnit, v)::pvs'⌝ ∗ proph p pvs' }}}. *)
 (* Proof. *)
 (*   iIntros (Φ) "[[Tx T] Hp] HΦ". iApply (lwp_resolve with "Hp Tx"); first done. *)
 (*   iIntros "Tx". iApply lifting.lwp_pure_step; first done. simpl. *)
@@ -298,10 +298,10 @@ Qed.
 
 (* Lemma lwp_resolve_cmpxchg_suc G R o s i E l (p : proph_id) (pvs : list (val * val)) (v1 v2 v : val) : *)
 (*   vals_compare_safe v1 v1 → *)
-(*   l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 1) ∗ *)
+(*   l{{{ (thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ *)
 (*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs ∗ ▷ l ↦ v1 }}} *)
 (*     Resolve (CmpXchg #l v1 v2) #p v @ s; i; E *)
-(*   l{{{ RET (v1, #true) ; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ∃ pvs', ⌜pvs = ((v1, #true)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦ v2 }}}. *)
+(*   l{{{ RET (v1, #true) ; (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ∃ pvs', ⌜pvs = ((v1, #true)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦ v2 }}}. *)
 (* Proof. *)
 (*   iIntros (Hcmp Φ) "[[Tx T] [Hp >Hl]] HΦ". *)
 (*   iApply (lwp_resolve with "Hp Tx"); first done. iIntros "Tx". *)
@@ -312,10 +312,10 @@ Qed.
 
 (* Lemma lwp_resolve_cmpxchg_fail G R o s i E l (p : proph_id) (pvs : list (val * val)) dq (v' v1 v2 v : val) : *)
 (*   v' ≠ v1 → vals_compare_safe v' v1 → *)
-(*   l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 1) ∗ *)
+(*   l{{{ (thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g 0 1) ∗ *)
 (*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs ∗ ▷ l ↦{dq} v' }}} *)
 (*     Resolve (CmpXchg #l v1 v2) #p v @ s; i; E *)
-(*   l{{{ RET (v', #false) ; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ∃ pvs', ⌜pvs = ((v', #false)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦{dq} v' }}}. *)
+(*   l{{{ RET (v', #false) ; (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ∃ pvs', ⌜pvs = ((v', #false)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦{dq} v' }}}. *)
 (* Proof. *)
 (*   iIntros (NEq Hcmp Φ) "[[Tx T] [Hp >Hl]] HΦ". *)
 (*   iApply (lwp_resolve with "Hp Tx"); first done. iIntros "Tx". *)
