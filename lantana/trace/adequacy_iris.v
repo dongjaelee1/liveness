@@ -1,16 +1,16 @@
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export language weakestpre.
-From lantana.program_logic Require Export temporal_property.
-From lantana.program_logic Require Export adequacy.
-From lantana.program_logic Require Import temporal_guarantee.
+From lantana.trace Require Export temporal_property.
+From lantana.trace Require Export adequacy.
+From lantana.trace Require Import temporal_guarantee.
 
 From transfinite.stepindex Require Import ordinals.
 (* From transfinite.base_logic Require Import satisfiable. *)
 From lantana.base_logic Require Import satisfiable.
 From lantana.algebra Require Import ordinal_existential_properties.
 
-From lantana.prelude Require Import axioms.
+From lantana.algebra Require Import axioms.
 
 Local Definition safety_iris_tiProp `{!temporalGS Λ Σ} i Φ : tiProp Λ Σ :=
   ti_always (ti_pure True) (λ τ, (⌜ (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R τ ⌝)%I).

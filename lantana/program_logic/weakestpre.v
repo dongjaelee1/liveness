@@ -3,9 +3,10 @@ From lantana.program_logic Require Export language.
 (* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
    get pretty-printed correctly. *)
 From iris.bi.lib Require Export fixpoint_mono.
-From lantana.bi Require Export weakestpre.
+From lantana.program_logic Require Export lwp_notation.
 From iris.prelude Require Import options.
-From lantana.program_logic Require Export temporal_class sfmupd model_physical_updates.
+From lantana.program_logic Require Export temporal_class sfmupd.
+From lantana.base_logic Require Export model_physical_updates.
 Import uPred.
 
 (* TODO: move to somewhere else *)

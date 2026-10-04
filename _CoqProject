@@ -34,23 +34,18 @@ lantana/ordinal/wf_rel.v
 lantana/ordinal/zorn.v
 lantana/ordinal/ordinal_facts.v
 
-lantana/prelude/axioms.v
-lantana/prelude/wf_structs.v
-lantana/prelude/ordinal_facts.v
+lantana/algebra/axioms.v
+lantana/algebra/wf_structs.v
+lantana/algebra/ordinal_facts.v
 
-lantana/bi/weakestpre.v
+lantana/program_logic/lwp_notation.v
 
 lantana/algebra/list_of_sets.v
-lantana/algebra/map_of_sets.v
-lantana/algebra/forest.v
-lantana/algebra/map_of_forests.v
 lantana/algebra/ocm.v
 lantana/algebra/wfocm.v
 lantana/algebra/ordinal_wfocm.v
-lantana/algebra/nat_wfocm.v
 lantana/algebra/measure.v
 lantana/algebra/layer.v
-lantana/algebra/execution.v
 lantana/algebra/bank.v
 lantana/algebra/bcred.v
 lantana/algebra/auth_mra.v
@@ -72,7 +67,7 @@ lantana/base_logic/othread.v
 lantana/base_logic/parent.v
 lantana/base_logic/model_rel.v
 lantana/base_logic/oforest.v
-lantana/base_logic/model_interp.v
+lantana/base_logic/model_history.v
 lantana/base_logic/mupd.v
 lantana/base_logic/oinv.v
 lantana/base_logic/opreds.v
@@ -82,7 +77,7 @@ lantana/program_logic/history_interp.v
 lantana/program_logic/temporal_registry.v
 lantana/program_logic/temporal_class.v
 lantana/program_logic/sfmupd.v
-lantana/program_logic/model_physical_updates.v
+lantana/base_logic/model_physical_updates.v
 lantana/program_logic/obl_forest.v
 lantana/program_logic/obl_forest_instance.v
 lantana/program_logic/weakestpre.v
@@ -91,15 +86,15 @@ lantana/program_logic/ectx_language.v
 lantana/program_logic/ectx_lifting.v
 lantana/program_logic/ectxi_language.v
 lantana/program_logic/atomic.v
-lantana/program_logic/until_chain.v
-lantana/program_logic/temporal_property.v
-lantana/program_logic/adequacy.v
-lantana/program_logic/adequacy_iris.v
-lantana/program_logic/temporal_tps.v
-lantana/program_logic/temporal_guarantee.v
-lantana/program_logic/temporal_saved.v
-lantana/program_logic/temporal_fixpoint.v
-lantana/program_logic/fuel_burning_triple.v
+lantana/trace/until_chain.v
+lantana/trace/temporal_property.v
+lantana/trace/adequacy.v
+lantana/trace/adequacy_iris.v
+lantana/trace/temporal_tps.v
+lantana/trace/temporal_guarantee.v
+lantana/trace/temporal_saved.v
+lantana/trace/temporal_fixpoint.v
+lantana/trace/fuel_burning_triple.v
 lantana/program_logic/obl_forest_derived.v
 
 lantana_heap_lang/locations.v
@@ -114,7 +109,6 @@ lantana_heap_lang/derived_laws.v
 lantana_heap_lang/proofmode.v
 lantana_heap_lang/temporal_laws.v
 
-lantana_heap_lang/lib/array.v
 
 lantana_heap_lang/examples/flag.v
 lantana_heap_lang/examples/flag_client.v

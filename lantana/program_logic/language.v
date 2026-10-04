@@ -1,9 +1,8 @@
 From stdpp Require Export gmap.
 From iris.algebra Require Export ofe.
-From lantana.bi Require Export weakestpre.
+From lantana.program_logic Require Export lwp_notation.
 From iris.prelude Require Import options.
-From lantana Require Export wfocm.
-From lantana.prelude Require Export ordinal_facts.
+From lantana.algebra Require Export wfocm ordinal_facts.
 
 Definition thread_id := positive.
 Global Instance thread_id_inhabited : Inhabited thread_id := Pos.inhabited.

@@ -2,7 +2,7 @@
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export ectx_language lifting.
 From iris.prelude Require Import options.
-From lantana Require Import ordinal_wfocm.
+From lantana.algebra Require Import ordinal_wfocm.
 
 Section wp.
   Context {Λ : ectxLanguage} `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} {Hinh : Inhabited (state Λ)}.

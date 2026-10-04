@@ -3,7 +3,7 @@ From iris.bi.lib Require Export fixpoint_mono.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.algebra Require Import ordinal_wfocm.
-From lantana.base_logic Require Export owit othread oforest model_rel model_interp invariants.
+From lantana.base_logic Require Export owit othread oforest model_rel model_history invariants.
 (* From lantana.base_logic Require Export history_interp invariants. *)
 Import uPred.
 

@@ -1,5 +1,5 @@
 From stdpp Require Import base.
-From lantana Require Export ocm.
+From lantana.algebra Require Export ocm.
 
 Module WFOCM.
   Class t {A : Type} (leR : A -> A -> Prop) (addO : A -> A -> A) (ltR : A -> A -> Prop) := {

@@ -8,8 +8,9 @@ From transfinite.base_logic.lib Require Export gen_heap proph_map.
 (* From transfinite.base_logic.lib Require Export gen_heap proph_map gen_inv_heap. *)
 From lantana.base_logic Require Export thread_map gen_inv_heap.
 (** adequacy fixes step index to ordinals *)
-From lantana.program_logic Require Export atomic adequacy.
-From lantana.program_logic Require Export temporal_guarantee.
+From lantana.program_logic Require Export atomic.
+From lantana.trace Require Export adequacy.
+From lantana.trace Require Export temporal_guarantee.
 From lantana.program_logic Require Import ectx_lifting.
 From lantana.heap_lang Require Export class_instances.
 From lantana.heap_lang Require Import tactics notation.

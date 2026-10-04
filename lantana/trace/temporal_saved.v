@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import saved_prop ghost_map.
-From lantana.program_logic Require Export temporal_guarantee.
+From lantana.trace Require Export temporal_guarantee.
 
 (** * Temporal formulas in ghost state
 

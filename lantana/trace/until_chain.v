@@ -4,12 +4,12 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import iprop.
 From stdpp Require Import namespaces.
 From lantana.base_logic Require Import obligation.
-From lantana.program_logic Require Export temporal_guarantee.
+From lantana.trace Require Export temporal_guarantee.
 From lantana.algebra Require Import ordinal_ucmra.
 From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat mono_list.
 From transfinite.base_logic.lib Require Import ghost_map.
 (** For func_ext. *)
-From lantana.prelude Require Import axioms.
+From lantana.algebra Require Import axioms.
 
 Definition uchain_log_wf (l : list (oid * Ord.t)) : Prop :=
   ∀ i (e1 e2 : oid * Ord.t),

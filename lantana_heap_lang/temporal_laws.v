@@ -1,5 +1,5 @@
 From iris.proofmode Require Import proofmode.
-From lantana.program_logic Require Export temporal_guarantee.
+From lantana.trace Require Export temporal_guarantee.
 From lantana.heap_lang Require Export primitive_laws.
 From iris.prelude Require Import options.
 

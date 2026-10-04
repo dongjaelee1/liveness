@@ -1,6 +1,6 @@
 From stdpp Require Import base.
-From lantana.prelude Require Import axioms.
-From lantana.prelude Require Export wf_structs ordinal_facts.
+From lantana.algebra Require Import axioms.
+From lantana.algebra Require Export wf_structs ordinal_facts.
 
 Class layer_class (L : Type) := {
     ltL : L -> L -> Prop;

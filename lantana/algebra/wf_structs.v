@@ -1,4 +1,4 @@
-From lantana Require Import axioms.
+From lantana.algebra Require Import axioms.
 From Coq Require Export Relations.Relation_Operators.
 From Coq Require Import RelationClasses Relations.Operators_Properties.
 

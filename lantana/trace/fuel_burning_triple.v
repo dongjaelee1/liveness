@@ -1,5 +1,6 @@
 From iris.proofmode Require Import proofmode.
-From lantana.program_logic Require Export lifting temporal_guarantee.
+From lantana.program_logic Require Export lifting.
+From lantana.trace Require Export temporal_guarantee.
 
 Definition fuel_burning_triple `{!lantanaGS Λ Σ} : stuckness → thread_id → coPset -> gset oid → gset oid → iProp Σ → expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E G G' P e Q,

@@ -1,11 +1,11 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.program_logic Require Export temporal_guarantee.
-From lantana.program_logic Require Import temporal_saved.
+From lantana.trace Require Export temporal_guarantee.
+From lantana.trace Require Import temporal_saved.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable later_credits.
 From lantana.algebra Require Import ordinal_existential_properties.
-From lantana.prelude Require Import axioms.
+From lantana.algebra Require Import axioms.
 
 (** * Least and greatest fixpoints of trace properties
 

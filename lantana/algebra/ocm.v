@@ -1,5 +1,5 @@
 From stdpp Require Import base.
-From lantana Require Import axioms.
+From lantana.algebra Require Import axioms.
 From Coq Require Import Program.
 
 (** The less-than-or-equal-to-based Ordered Commutative Monoid class. *)

@@ -1,5 +1,5 @@
 From stdpp Require Import base.
-From lantana.prelude Require Export ordinal_facts.
+From lantana.algebra Require Export ordinal_facts.
 From lantana.algebra Require Export wfocm.
 
 Global Program Instance ord_OCM : OCM.t Ord.le Hessenberg.add :=

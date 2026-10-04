@@ -1,13 +1,13 @@
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export language weakestpre.
-From lantana.program_logic Require Export temporal_property.
+From lantana.trace Require Export temporal_property.
 
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
 From lantana.algebra Require Import ordinal_existential_properties.
 
-From lantana.prelude Require Import axioms.
+From lantana.algebra Require Import axioms.
 
 (** * Step-indexed trace connectives
 

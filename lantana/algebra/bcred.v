@@ -2,7 +2,7 @@ From stdpp Require Import base.
 From iris.algebra Require Export cmra.
 From iris.algebra Require Import proofmode_classes updates.
 From iris.prelude Require Import options.
-From lantana Require Import ocm.
+From lantana.algebra Require Import ocm.
 
 (** Bounded credit. *)
 (** Reference: "Module CounterRA" in Lilo and FOS. *)

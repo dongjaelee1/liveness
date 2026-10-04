@@ -37,7 +37,8 @@ From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.algebra Require Import ordinal_wfocm.
 From lantana.algebra Require Export layer.
-From lantana.program_logic Require Export sfmupd model_physical_updates.
+From lantana.program_logic Require Export sfmupd.
+From lantana.base_logic Require Export model_physical_updates.
 Import uPred.
 
 Module oblf.
