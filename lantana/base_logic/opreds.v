@@ -141,6 +141,17 @@ Global Arguments parP_kids {SI Σ _}.
 Notation thP_kids i K := (parP_kids (PThread i) K).
 Notation oblP_kids k K := (parP_kids (PObl k) K).
 
+(** One unit of fuel at layer [ℓ] is enough to hang below [p]: always below a thread; below an
+    obligation [q], [ℓ] must be above a witness layer of [q] (given by [wl], instantiated with
+    [witP_layer]). *)
+Definition parent_below `{SI : sidx} {Σ : gFunctors} (wl : oid → ord.t → iProp Σ)
+    (p : parent) (ℓ : ord.t) : iProp Σ :=
+  match p with
+  | PThread _ => True
+  | PObl q => ∃ ℓq, ⌜ (ℓq < ℓ)%ordi ⌝ ∗ wl q ℓq
+  end%I.
+Notation parP_below p ℓ := (parent_below witP_layer p ℓ).
+
 Ltac unfold_opreds :=
   try rewrite !wit_fuels_unseal /wit_fuels_def;
   try rewrite /collect_fuels;
@@ -1375,6 +1386,54 @@ Section rules.
     iIntros (PR HE) "#I #D". iMod (oblP_inv_acc_discharged with "I D") as "[H ACC]"; first done.
     iModIntro. iNext. iPoseProof "H" as "#H". iFrame "H". iApply "ACC".
     rewrite oblP_variant_unfold. iRight. eauto.
+  Qed.
+
+  (** ** Witness induction over obligation fuel *)
+  Lemma wit_fuels_add_map_gen k ℓ α F (G : gmap oid (ord.t * measure)) :
+    wit_fuels k ℓ α F -∗
+    ([∗ map] g ↦ lm ∈ G, let '(l, m) := lm in ⌜ (ℓ < l)%ordi ⌝ ∗ oblP_fuel g l (m × ▽)%M) ==∗
+    wit_fuels k ℓ α (G ∪ F).
+  Proof.
+    revert F. induction G as [|f x G Hf IH] using map_ind; iIntros (F) "W Fs".
+    { rewrite left_id_L. by iFrame. }
+    destruct x as [l m]. rewrite big_sepM_insert; last done.
+    iDestruct "Fs" as "((%Hl& Ff)& Fs)".
+    iMod (IH with "W Fs") as "W". rewrite -insert_union_l.
+    iApply (wit_fuels_add with "W Ff"). done.
+  Qed.
+
+  Lemma wit_fuels_add_map k ℓ α F G l m :
+    (ℓ < l)%ordi →
+    wit_fuels k ℓ α F -∗
+    ([∗ set] g ∈ G, oblP_fuel g l (m × ▽)%M) ==∗
+    wit_fuels k ℓ α ((gset_to_gmap (l, m) G) ∪ F).
+  Proof.
+    iIntros (Hl) "W Fs". iApply (wit_fuels_add_map_gen with "W").
+    rewrite big_sepM_gset_to_gmap. iApply (big_sepS_impl with "Fs"). iIntros "!> %% $". done.
+  Qed.
+
+  Lemma wit_fuels_ind k ℓ α F (P : iProp Σ) :
+    □ ((witP_cred k Ord.one ==∗ ([∗ map] f ↦ '(l, m) ∈ F, oblP_fuel f l m) ∗ P) ==∗ P) ∗
+    wit_fuels k ℓ α F
+    ⊢ |==> P.
+  Proof.
+    iIntros "[#H WF]". iInduction α as [α IH] using (well_founded_ind WFOCM.lt_wf).
+    iApply "H". iIntros "Wc". iMod (wit_fuels_decr with "WF Wc") as "(%&%& WF& Fs)".
+    iFrame "Fs". iApply ("IH" with "[//] WF").
+  Qed.
+
+  Lemma wit_layer_ind k ℓ G l m (P : iProp Σ) :
+    (ℓ < l)%ordi →
+    □ ((witP_cred k Ord.one ==∗ ([∗ set] g ∈ G, oblP_fuel g l m) ∗ P) ==∗ P) ∗
+    witP_layer k ℓ ∗
+    ([∗ set] g ∈ G, oblP_fuel g l (m × ▽)%M)
+    ⊢ |==> P.
+  Proof.
+    iIntros (LT) "(#IND& #Wl& FG)". iPoseProof (wit_fuels_init with "Wl") as "[% Wf0]".
+    iMod (wit_fuels_add_map with "Wf0 FG") as "WF". 1: auto.
+    iApply (wit_fuels_ind with "[IND $WF]").
+    iIntros "!> H". rewrite map_union_empty big_sepM_gset_to_gmap.
+    iApply ("IND" with "H").
   Qed.
 
 End rules.

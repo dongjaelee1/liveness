@@ -23,12 +23,12 @@ Section wp.
        (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        |=[n,dom Θ]=>m
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜base_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
-                               thP_carriers i G -∗
+                               thP_kids i G -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                               ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
+                               ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
@@ -73,12 +73,12 @@ Section wp.
        (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        |=[n,dom Θ]=>m
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  ∀ e2 σ2 efs, (⌜base_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
-                              thP_carriers i G -∗
+                              thP_kids i G -∗
                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                              ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
+                              ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                               ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
@@ -101,10 +101,10 @@ Section wp.
        (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        |=[n,dom Θ]=>m
        (⌜ to_val e1 = None ∧ base_reducible i e1 σ1 (dom Θ) ⌝) ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  ∀ e2 σ2 efs, (⌜base_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
-                              thP_carriers i G -∗
+                              thP_kids i G -∗
                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                               ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                      ⌜efs = ∅⌝ ∗
@@ -129,10 +129,10 @@ Section wp.
     PureExecSI ς i →
     (|={E,E'}=>
        ς i e1 ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (ς i e2 -∗
-                  thP_carriers i G -∗
+                  thP_kids i G -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                   ALC (|={E',E}=> (|={E}=>m (lWP e2 @ s; i; E {{ Φ }})))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.

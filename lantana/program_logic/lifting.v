@@ -28,12 +28,12 @@ Section lifting.
        (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        |=[n,dom Θ]=>m
        (⌜ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
-                               thP_carriers i G -∗
+                               thP_kids i G -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                               ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
+                               ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
@@ -62,12 +62,12 @@ Section lifting.
        (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
        |=[n,dom Θ]=>m
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
-                               thP_carriers i G -∗
+                               thP_kids i G -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                               ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
+                               ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
@@ -107,11 +107,11 @@ Section lifting.
     PureExecSI ς i →
     (|={E,E'}=>
        ς i e1 ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
        ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
          (∀ σ Θ κ e2 efs, ⌜prim_step i e1 σ Θ κ e2 σ efs⌝ -∗
           ς i e2 -∗
-          thP_carriers i G -∗
+          thP_kids i G -∗
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
           ALC (|={E',E}=> (|={E}=>m (lWP e2 @ s; i; E {{ Φ }})))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
@@ -155,12 +155,12 @@ Section lifting.
        (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        |=[n,dom Θ]=>m
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                  (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
-                               thP_carriers i G -∗
+                               thP_kids i G -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                               ([∗ set] j ∈ dom efs, thP_carriers j ∅) -∗
+                               ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
                                ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
@@ -192,10 +192,10 @@ Section lifting.
     PureExecSI ς i →
     (|={E,E'}=>
        ς i e1 ∗
-       ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
        ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
          (ς i e2 -∗
-          thP_carriers i G -∗
+          thP_kids i G -∗
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
           ALC (|={E',E}=> (|={E}=>m (lWP e2 @ s; i; E {{ Φ }})))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
@@ -213,9 +213,9 @@ Section lifting.
     φ →
     PureExecSI ς i →
     (ς i e1 ∗ Nat.iter n (λ P, |={E,E'}=>
-                   ∃ G, thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
+                   ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                   (thP_carriers i G -∗
+                   (thP_kids i G -∗
                     ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                     ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (ς i e2 -∗ (|={E}=>m (lWP e2 @ s; i; E {{ Φ }}))))
@@ -251,8 +251,8 @@ Section lifting.
     φ →
     PureExecSI ς i →
     ς i e1 ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-    (Nat.iter n (λ P, |={E,E'}=> thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
-                                (thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+    (Nat.iter n (λ P, |={E,E'}=> thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+                                (thP_kids i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                  ALC (£ o ={E',E}=∗ |={E}=>m P)))
        (ς i e2 -∗ (|={E}=>m (lWP e2 @ s; i; E {{ Φ }}))))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
@@ -273,8 +273,8 @@ Section lifting.
     PureExec φ n e1 e2 →
     φ →
     PureExecSI ς i →
-    (ς i e1 ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-     (ς i e2 -∗ thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_discharged r) -∗
+    (ς i e1 ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
+     (ς i e2 -∗ thP_kids i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_discharged r) -∗
       £ (o × n)%ord -∗ (|={E}=>m (lWP e2 @ s; i ; E {{ Φ }}))))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
@@ -290,11 +290,11 @@ Section lifting.
       unfold_opreds.
       rewrite Ord.from_nat_O. done. }
     iIntros "(#Rs& TG& Gfs& IH)". simpl.
-    iAssert (([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
+    iAssert (([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1))%I with "[Gfs]" as "[Gfs Gf]".
     { iApply big_sepS_sep. iApply (big_sepS_impl with "Gfs"). iIntros "!> %% (%& F)".
-      rewrite (crP_fuel_eq _ _ (S n)%M (n ⊕ 1)%M); cycle 1.
+      rewrite (oblP_fuel_eq _ _ (S n)%M (n ⊕ 1)%M); cycle 1.
       { rewrite measure_rep_nat_S measure_rep_add. by rewrite Hessenberg.add_comm. }
-      iPoseProof (crP_fuel_add with "F") as "($& $)". }
+      iPoseProof (oblP_fuel_add with "F") as "($& $)". }
     iModIntro. iFrame "TG Gf Rs". iIntros "TG RWs".
     iIntros "!> LC !>". iApply IHn. iFrame "Rs TG Gfs".
     iIntros "!> Hc TG Ws LC2". iApply ("IH" with "Hc TG [Ws RWs] [LC LC2]").

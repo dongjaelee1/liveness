@@ -100,6 +100,7 @@ lantana/program_logic/temporal_guarantee.v
 lantana/program_logic/temporal_saved.v
 lantana/program_logic/temporal_fixpoint.v
 lantana/program_logic/fuel_burning_triple.v
+lantana/program_logic/obl_forest_derived.v
 
 lantana_heap_lang/locations.v
 lantana_heap_lang/lang.v

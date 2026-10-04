@@ -293,7 +293,7 @@ Definition treg_handle `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (e : re
   | RAlways N γ => ∃ (P : iProp Σ) (G : tps Λ Σ), saved_ti γ (tps_ti G) ∗ inv N P ∗ ▷ (P ⊨ₜ G)
   | RUntil N k γP γQ =>
       ∃ P Q : iProp Σ, saved_ti γP (tps_ti (tps_sem P)) ∗ saved_ti γQ (tps_ti (tps_sem Q)) ∗
-        oblP_inv N k P Q (until_disch k (tps_sem Q))
+        oblP_inv N k P (until_disch k (tps_sem Q))
   end.
 Definition treg_state `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : iProp Σ := treg_st treg_handle.
 Global Instance treg_temporal_interp `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : TemporalInterp Λ Σ :=
@@ -336,16 +336,15 @@ Definition untilI_pers `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : na
   ∃ j r γP γQ st v Ω fu o,
     reg_idx j r (RUntil N k γP γQ) ∗ hG_event r st ∗
     saved_ti γP (tps_ti (tps_sem P)) ∗ saved_ti γQ (tps_ti (tps_sem Q)) ∗
-    oblP_inv N k P Q (until_disch k (tps_sem Q)) ∗
+    oblP_inv N k P (until_disch k (tps_sem Q)) ∗
     event_obl v (r, Ω) k (obl_assigned fu o) ∗ ▷ tguar (tps_sem P) r.
 Global Typeclasses Opaque untilI_pers.
 
 (** [P] until [Q] using namespace [N] and obligation [k]: the token of the assigned
-    obligation with the registered invariant. The intermediate state of the obligation
-    invariant ([Q] established, obligation not yet discharged) is internal to
-    [untilI_discharge]. *)
+    obligation with the registered invariant, which holds [P] while [k] is live and the
+    record of [Q] at the discharge once [k] is discharged. *)
 Local Definition untilI_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (q : Qp) (P Q : iProp Σ) : iProp Σ :=
-  oblP_assigned k false (q/2)%Qp ∗ untilI_pers N k P Q.
+  oblP_assigned k (q/2)%Qp ∗ untilI_pers N k P Q.
 (* Sealed: the proof mode splits it by fractions, and unification (e.g. in [iFrame]) does not
    unfold it. *)
 Local Definition untilI_aux : seal (@untilI_def). Proof. by eexists. Qed.
@@ -354,7 +353,7 @@ Global Arguments untilI {Λ Σ _ _} N k q P Q.
 Local Lemma untilI_unseal : @untilI = @untilI_def.
 Proof. rewrite -untilI_aux.(seal_eq) //. Qed.
 Lemma untilI_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k q P Q :
-  untilI N k q P Q = (oblP_assigned k false (q/2)%Qp ∗ untilI_pers N k P Q)%I.
+  untilI N k q P Q = (oblP_assigned k (q/2)%Qp ∗ untilI_pers N k P Q)%I.
 Proof. by rewrite untilI_unseal. Qed.
 
 Definition finallyI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (q : Qp) (Q : iProp Σ) : iProp Σ :=
@@ -519,11 +518,12 @@ Section mupd_read.
     (∀ g i Ω W, model_interp g i Ω W n D -∗ model_interp g i Ω W n D ∗ P) ⊢ |=[n,D]=>m P.
   Proof.
     iIntros "H". iApply mupd_nd_step. iIntros (g i Ω W) "MI".
-    iDestruct ("H" with "MI") as "[MI HP]". iModIntro. iExists Ω. iSplit; first (iPureIntro; by left).
+    iDestruct ("H" with "MI") as "[MI HP]". iModIntro. iExists Ω.
+    iSplit; first (iPureIntro; apply obls_ndf_refl).
     iIntros (W2 [WS OI2]). rewrite /model_interp. iDestruct "MI" as "(MHI& S& T& A& G& W& %OI)".
     iMod (model_history_interp_step _ _ n n _ Ω with "MHI") as "MHI"; [done|done|].
     iPoseProof (owit_mon W W2 with "W") as "W".
-    { eapply owit_inv_rc_step_same_gls; [done| |done]. by apply wits_nd_step_wits_step_o. }
+    { eapply wits_lef_same_wits_mon; [done| |done]. by apply wits_ndf_wits_lef. }
     iModIntro. iFrame. iSplit; first done. by iApply mupd_intro.
   Qed.
 
@@ -680,7 +680,7 @@ Section until_rules.
   Global Instance untilI_pers_persistent N k P Q : Persistent (untilI_pers N k P Q).
   Proof. rewrite /untilI_pers. apply _. Qed.
 
-  Lemma untilI_pers_inv N k P Q : untilI_pers N k P Q ⊢ oblP_inv N k P Q (until_disch k (tps_sem Q)).
+  Lemma untilI_pers_inv N k P Q : untilI_pers N k P Q ⊢ oblP_inv N k P (until_disch k (tps_sem Q)).
   Proof. rewrite /untilI_pers. iIntros "(%&%&%&%&%&%&%&%&%& _& _& _& _& $& _)". Qed.
 
   (** Until *)
@@ -709,14 +709,13 @@ Section until_rules.
   Proof. split; [auto|apply _]. Qed.
 
   (** Update rules. Allocation of the until registers it (a model update, reading the model). *)
-  Lemma untilI_alloc E g K ℓ1 ℓ2 μ :
-    (ℓ1 <= ℓ2)%ordi →
-    crP_obls g ℓ1 K -∗
-    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
-                 oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
+  Lemma untilI_alloc E p K ℓ μ :
+    parP_below p ℓ -∗ parP_kids p K -∗
+    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
+                 oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                  ∀ E' N (P Q : iProp Σ), ▷ P -∗ |={E'}=>m untilI N k 1 P Q.
   Proof.
-    iIntros (Ltl) "TG". iMod (obl_alloc_assigned _ _ _ false with "TG") as "(%k& $& $& Oa& $& $& ACC)". 1: auto.
+    iIntros "B Kp". iMod (obl_alloc_assigned with "B Kp") as "(%k& $& $& $& Oa& $& $& ACC)".
     iIntros "!> %E' %N %P %Q HC".
     iApply sfmupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI TI MI".
     iPoseProof (temporal_elim_later with "[] [$HC $HI $MI]") as "#C"; first iApply temporal_sem.
@@ -725,7 +724,7 @@ Section until_rules.
     iPoseProof (model_history_interp_event_obl_now with "MHI") as "#EA". 1: eauto.
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
     iFrame "MHI S MI".
-    iMod ("ACC" $! E' N P Q (until_disch k (tps_sem Q)) with "HC") as "#OI".
+    iMod ("ACC" $! E' N P (until_disch k (tps_sem Q)) with "HC") as "#OI".
     iMod (saved_ti_alloc (tps_ti (tps_sem P))) as (γP) "#HγP".
     iMod (saved_ti_alloc (tps_ti (tps_sem Q))) as (γQ) "#HγQ".
     iMod (treg_st_register treg_handle (RUntil N k γP γQ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
@@ -740,7 +739,7 @@ Section until_rules.
   Lemma untilI_discharged_alloc E ℓ μ (Q : iProp Σ) :
     Q -∗
     |={E}=>m Q ∗ ∃ k, oblP_discharged k ∗
-                        (∀ E' N (P : iProp Σ), |={E'}=> oblP_inv N k P Q (until_disch k (tps_sem Q))) ∗
+                        (∀ E' N (P : iProp Σ), |={E'}=> oblP_inv N k P (until_disch k (tps_sem Q))) ∗
                         oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "HQ". iPoseProof (temporal_sem Q) as "#HG2".
@@ -756,120 +755,58 @@ Section until_rules.
     { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
     iPoseProof (oassigned_add_obl with "[$A $Ge Gu]") as "A".
     { iRight. iFrame "Gu". }
+    iPoseProof (oforest_alloc_discharged _ _ k with "G") as "G"; first done.
     set (Ω2:=(<[k:=(obl_discharged)]> Ω1)).
     iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
-    { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 2. eauto. }
+    { apply obls_lef_obls_le, obls_ndf_obls_lef. by apply obls_ndf_insert_fresh. }
     iPoseProof (model_history_interp_event_obl_now k with "HI") as "#Eo".
     { subst Ω2. apply lookup_insert_eq. }
     iModIntro. iExists Ω2. iSplitR.
-    { iPureIntro. econstructor 2. econstructor 2. auto. }
-    iIntros (? [WStep GWI2]) "!>".
-    unshelve epose proof (owit_inv_alloc_discharged Ω1 k W1 NinOk1 GWI W2 _ GWI2) as (NinWk1& WMon).
-    { inv WStep; eauto. econstructor 2. apply wits_nd_step_wits_step. auto. }
-    iPoseProof (owit_mon _ _ WMon with "W") as "W".
+    { iPureIntro. by apply obls_ndf_insert_fresh. }
+    iIntros (W2 [WStep GWI2]) "!>".
+    iPoseProof (owit_mon _ W2 with "W") as "W".
+    { eapply wits_ndf_insert_wits_mon; [exact GWI|exact NEWk|exact WStep|exact GWI2|].
+      intros w2 Hw2. specialize (GWI2 k). rewrite lookup_insert_eq Hw2 in GWI2.
+      inversion GWI2; subst. by destruct w2. }
     iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
     { subst Ω2. rewrite dom_insert_L. iFrame. }
     iPoseProof (temporal_elim with "HG2 [$SI $HI $S $O $A $G $W $HQ]") as "#HQi". 1: eauto.
     rewrite /model_interp. iFrame "HI S O A G W". iSplitR; first eauto.
     iModIntro. iMod "close" as "_". iModIntro. iFrame "SI TI HQ". iExists k. iFrame "Ge Ww Gf Gu".
+    iSplitR; last (iExists _; iFrame "Gwf").
     iIntros (E' N P).
-    iMod (oblG_inv_alloc_discharged _ N _ _ P Q with "[$Gu]") as "#GVar"; cycle 1.
+    iMod (oblG_inv_alloc_discharged _ N _ _ P False with "[$Gu]") as "#GVar"; cycle 1.
     { iFrame "GVar". done. }
     iFrame "Eo HQi".
   Qed.
 
-  (** The two phases of a discharge. First [Q] is established and the obligation invariant
-      moves to its intermediate state (the token turns [true]); then, with the carrier, the
-      obligation is discharged. The intermediate state does not appear in an [untilI]. *)
-  (** TODO: Timeless version *)
-  Local Lemma untilI_to_true E N k (P Q : iProp Σ) :
-    ↑N ⊆ E →
-    untilI N k 1 P Q ={E,E ∖ ↑N}=∗
-    ▷ (P ∗ ∀ E', |={E'}=>m ((▷ Q) ={E ∖ ↑N,E}=∗ oblP_assigned k true (1/2)%Qp ∗ untilI_pers N k P Q)).
-  Proof.
-    rewrite !untilI_unfold. iIntros (HM) "(Oa& #U)". iPoseProof (untilI_pers_inv with "U") as "#Oi".
-    iMod (obl_assigned_to_true with "Oi Oa") as "[H ACC]". 1: auto.
-    iModIntro. iNext. iDestruct "H" as "[Oa $]".
-    iIntros "%". iPoseProof ("ACC" with "Oa") as "ACC". iMod ("ACC" $! E') as "[Oa ACC]".
-    iIntros "!> HQ". iMod ("ACC" with "HQ") as "_". iFrame "Oa U". done.
-  Qed.
-
-  (** TODO: Timeless version *)
-  Local Lemma untilI_true_to_discharge E N k (P Q : iProp Σ) :
-    ↑N ⊆ E →
-    oblP_assigned k true (1/2)%Qp ∗ untilI_pers N k P Q ={E,E ∖ ↑N}=∗
-    ∀ g ℓ K,
-    (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
-    ∀ E', ▷ (|={E'}=>m |={E ∖ ↑N,E}=> (Q ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)).
-  Proof.
-    iIntros (HMask) "(Oa& #U)". iPoseProof (untilI_pers_inv with "U") as "#OI".
-    iPoseProof (temporal_sem Q) as "#HG2".
-    iMod (oblP_inv_acc_assigned with "OI") as "H". 1: auto.
-    iIntros "!> %%% %LUGk TG %". iDestruct ("H" with "Oa") as "[H ACC]".
-    iNext. iDestruct "H" as "(Oa1& Oa2& HQ)". iCombine "Oa1 Oa2" as "Oa".
-    unfold_sfmupd. rewrite /fmupd. iIntros (?????) "[SI TI]".
-    iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    (* FIXME: it would be better if we don't need to unfold everything and re-do the proof here... *)
-    unfold_opreds. iDestruct "TG" as "(%& #Oe& Gg& Gt& Gw& #Gb& OS)".
-    iDestruct "OI" as "(#Ge& Gvar)". iDestruct "Oa" as "(_& Gl)".
-    iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
-    iPoseProof (big_sepS_delete _ _ _ LUGk with "OS") as "[(_& Go& Oo) OS]".
-    iPoseProof (osat_lookup_assigned with "[$S $Ge $Gl]") as "%LUO1l".
-    iPoseProof (osat_lookup_owner with "[$S $Ge $Go]") as "%LUO1o".
-    destruct LUO1l as (?&?&LUO1l). destruct LUO1o as (?&LUO1o).
-    rewrite LUO1l in LUO1o. inv LUO1o. rename x1 into a.
-    iPoseProof (oassigned_delete_obl _ k with "A") as "(A& _& [(%& Go1& Oo1& _) | #Gu])".
-    { apply elem_of_dom. eauto. }
-    2:{ iExFalso. iPoseProof (oblG_assigned_discharged_false with "[$Gl $Gu]") as "%". done. }
-    iPoseProof (oblG_owner_agree _ i i1 with "[$Go $Go1]") as "%". destruct H as [<- _].
-    iDestruct "Oo" as "[Oo Oo']". iCombine "Oo1 Oo'" as "Oo'". iCombine "Oo Oo'" as "Oo".
-    iPoseProof (othread_elem with "[$O $Oe]") as "%Ini".
-    iMod (ocarrier_delete_obl with "[$O $G $Gg $Oo]") as "(O& G& Gg& Go2)". 1,2: auto.
-    iDestruct "Go" as "[Go Go']". iCombine "Go1 Go2" as "Go1". iCombine "Go' Go1" as "Go'". iCombine "Go Go'" as "Go".
-    iMod (osat_discharge with "[$S $Ge $Gl $Go]") as "(S& #Gu& %Gstep)".
-    assert (LUW : ∃ b, W1 !! k = Some (witness_assigned b) ∧ (b <= η a)%ord).
-    { specialize (GWI k). rewrite LUO1l in GWI. inv GWI. destruct y; try done. eauto. }
-    destruct LUW as (b&LUW1& LEab).
-    iPoseProof (owit_discharge with "[$W $Gu]") as "W". 1: eauto.
-    iPoseProof (oassigned_add_obl _ k with "[$A $Ge]") as "A".
-    { iRight. eauto. }
-    set (Ω2:=(<[k:=(obl_discharged)]> Ω1)).
-    assert (Gstep' : obl_step (obl_assigned a i) obl_discharged) by (by econstructor 2).
-    iMod (model_history_interp_step _ _ n n _ Ω2 with "HI") as "HI". 1: auto.
-    { subst Ω2. apply obls_step_rc_obls_le. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
-    iPoseProof (model_history_interp_event_obl_now k with "HI") as "#Eo".
-    { subst Ω2. apply lookup_insert_eq. }
-    iModIntro. iExists Ω2. iSplitR.
-    { iPureIntro. econstructor 2. econstructor 1. exists k. do 2 eexists. split_and !; eauto. }
-    iIntros (? [WStep GWI2]).
-    pose proof (owit_inv_discharge _ _ _ _ _ LUO1l GWI Gstep' W2 WStep GWI2) as (?& LUW& WMon).
-    rewrite LUW1 in LUW. inv LUW.
-    iPoseProof (owit_mon _ _ WMon with "W") as "W".
-    iAssert (oassigned (dom Ω2))%I with "[A]" as "A".
-    { subst Ω2. rewrite dom_insert_L. replace ({[k]} ∪ dom Ω1 ∖ {[k]}) with (({[k]} ∪ dom Ω1)). 1: iFrame.
-      apply elem_of_dom_2 in LUO1l. rewrite -union_difference_L; set_solver. }
-    iPoseProof (temporal_elim with "HG2 [$SI $HI $S $O $A $G $W $HQ]") as "#HQi". 1: eauto.
-    rewrite /model_interp. iFrame "HI S O W A G".
-    iApply fupd_intro. iSplitR; first eauto. iIntros "!>". iFrame "Oe Ge Gb Gu Gg Gt SI TI".
-    iMod "close" as "_". iModIntro. iMod ("ACC" with "[]") as "_".
-    { iNext. iRight. iRight. iFrame "Ge Gu Eo HQi". }
-    iModIntro. iFrame.
-  Qed.
-
+  (** Discharge: [P] is taken out of the until; once [Q] holds, the obligation [k] (a
+      childless child of [p]) is discharged, and the record of [Q] at the discharge position
+      is left in the invariant. *)
   Lemma untilI_discharge E N k (P Q : iProp Σ) :
     ↑N ⊆ E →
     untilI N k 1 P Q ={E,E ∖ ↑N}=∗
-    ▷ (P ∗
-       ∀ E', |={E'}=>m ((▷ Q) ={E ∖ ↑N}=∗
-                       ∀ g ℓ K, (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
-                                ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (Q ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)))).
+    ▷ (P ∗ ∀ p K, ⌜k ∈ K⌝ → parP_kids p K -∗ oblP_kids k ∅ -∗ Q -∗
+         ∀ E', |={E'}=>m |={E ∖ ↑N,E}=> (Q ∗ parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k)).
   Proof.
-    iIntros (HN) "Uk". iMod (untilI_to_true with "Uk") as "H". 1: auto.
-    iModIntro. iNext. iDestruct "H" as "($& H)". iIntros (?).
-    iMod ("H" $! E') as "H". iIntros "!> HQ". iMod ("H" with "HQ") as "H".
-    iMod (untilI_true_to_discharge with "H") as "H". 1: auto.
-    iIntros "!> %%% % TG". iPoseProof ("H" with "[//] TG") as "H".
-    iIntros (?). iNext. iMod ("H" $! E'') as "H". iModIntro. iFrame.
+    rewrite untilI_unfold. iIntros (HN) "(Oa& #U)". iPoseProof (untilI_pers_inv with "U") as "#OI".
+    iMod (oblP_inv_acc_assigned with "OI") as "H"; first done.
+    iDestruct ("H" with "Oa") as "[H ACC]".
+    iModIntro. iNext. iDestruct "H" as "(Oa1& Oa2& $)". iCombine "Oa1 Oa2" as "Oa".
+    iIntros (p K Hk) "Kp Kk HQ %E'".
+    iMod (obl_discharge_leaf with "Kp Kk Oa") as "[$ #D]"; first done.
+    iDestruct (oblP_discharged_unfold with "D") as "[#Oe #Od]".
+    iMod (sfmupd_read _ (Q ∗ until_disch k (tps_sem Q)) with "[HQ]") as "[HQ #R]".
+    { iIntros (h n σ Θ κs g i Ω W) "HI TI MI".
+      iPoseProof (temporal_sem Q) as "#HG2".
+      iPoseProof (temporal_elim with "HG2 [$HI $MI $HQ]") as "#TQ".
+      iDestruct "MI" as "(MHI& S& MI)".
+      iDestruct (osat_lookup_discharged with "[$S $Oe $Od]") as %Hkd.
+      iPoseProof (model_history_interp_event_obl_now with "MHI") as "#EF"; first exact Hkd.
+      iFrame "MHI S MI". iModIntro. iFrame "HI TI HQ". iExists n, i, Ω. iFrame "EF TQ". }
+    iModIntro. iMod ("ACC" with "[]") as "_".
+    { iNext. rewrite oblP_variant_unfold. iRight. iFrame "D R". }
+    iModIntro. iFrame "HQ D".
   Qed.
 
   (** Access rules *)
@@ -897,33 +834,29 @@ End until_rules.
 Section until_derived.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
-  (** Discharge a finally with its right formula at hand, using two later credits. *)
-  Lemma finallyI_discharge E N k g ℓ K Q :
+  (** Discharge a finally with its right formula at hand, using a later credit. *)
+  Lemma finallyI_discharge E N k p K Q :
     ↑N ⊆ E → k ∈ K →
-    £ (2 : Ord.t) -∗ crP_obls g ℓ K -∗ finallyI N k 1 Q -∗ Q -∗
-    |={E}=>m Q ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k.
+    £ (2 : Ord.t) -∗ parP_kids p K -∗ oblP_kids k ∅ -∗ finallyI N k 1 Q -∗ Q -∗
+    |={E}=>m Q ∗ parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k.
   Proof.
-    iIntros (Hmask Hk) "LC Cg HF HQ".
+    iIntros (Hmask Hk) "LC Kp Kk HF HQ".
     iMod (untilI_discharge with "HF") as "HF"; first set_solver.
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
+    iPoseProof (tlc_split_one with "LC") as "[_ LC1]"; first eauto.
     iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iDestruct "HF" as "[_ HF]". iMod ("HF" $! _) as "HF".
-    iMod ("HF" with "[HQ]") as "HF".
-    { iNext. iFrame. }
-    iPoseProof ("HF" with "[//] Cg") as "HF".
-    iPoseProof (tlc_split_one with "LC") as "[LC LC1]"; first eauto.
-    iApply (lc_sfmupd_add_later with "LC1"). iNext.
-    iMod ("HF" $! _) as "HF". iMod "HF" as "($& $& $)". done.
+    iDestruct "HF" as "[_ HF]". iPoseProof ("HF" $! p K Hk with "Kp Kk HQ") as "HF".
+    iMod ("HF" $! (E ∖ ↑N)) as "HF".
+    iMod "HF" as "($& $& $)". done.
   Qed.
 
-  (** The same, with the obligation set as [untilI_alloc] returns it. *)
-  Lemma finallyI_discharge' E N k g ℓ K (Q : iProp Σ) :
+  (** The same, with the children as [untilI_alloc] returns them. *)
+  Lemma finallyI_discharge' E N k p K (Q : iProp Σ) :
     ↑N ⊆ E → k ∉ K →
-    £ (2 : Ord.t) -∗ crP_obls g ℓ ({[k]} ∪ K) -∗ finallyI N k 1 Q -∗ Q -∗
-    |={E}=>m Q ∗ crP_obls g ℓ K ∗ oblP_discharged k.
+    £ (2 : Ord.t) -∗ parP_kids p ({[k]} ∪ K) -∗ oblP_kids k ∅ -∗ finallyI N k 1 Q -∗ Q -∗
+    |={E}=>m Q ∗ parP_kids p K ∗ oblP_discharged k.
   Proof.
-    iIntros (HN Hk) "LC Cg HF HQ".
-    iMod (finallyI_discharge with "LC Cg HF HQ") as "($& Cg& $)"; [done|set_solver|].
+    iIntros (HN Hk) "LC Kp Kk HF HQ".
+    iMod (finallyI_discharge with "LC Kp Kk HF HQ") as "($& Kp& $)"; [done|set_solver|].
     assert (({[k]} ∪ K) ∖ {[k]} = K) as -> by set_solver. done.
   Qed.
 
@@ -971,28 +904,24 @@ Section certification.
 
   Local Lemma until_cert_assigned k (P Q R : iProp Σ) h n σ Θ κs g v Ω W fu o :
     Ω !! k = Some (obl_assigned fu o) →
-    ▷ ((oblP_assigned k false (1/2) ∗ P) ∨ (oblP_assigned k true (1/2) ∗ Q) ∨ (oblP_discharged k ∗ R)) ∗
+    ▷ ((oblP_assigned k (1/2) ∗ P) ∨ (oblP_discharged k ∗ R)) ∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) -∗
     ▷ (tguar (tps_sem P) n ∨ tguar (tps_sem Q) n).
   Proof.
-    iIntros (Hk) "(Var& HI& MI)". iNext. iDestruct "Var" as "[[_ HP]|[[_ HQ]|[Of _]]]".
+    iIntros (Hk) "(Var& HI& MI)". iNext. iDestruct "Var" as "[[_ HP]|[Of _]]".
     - iLeft. iApply (temporal_elim P (tps_sem P) with "[] [$HI $MI $HP]"). iApply temporal_sem.
-    - iRight. iApply (temporal_elim Q (tps_sem Q) with "[] [$HI $MI $HQ]"). iApply temporal_sem.
     - iDestruct "MI" as "(_& S& _)". iEval (unfold_opreds) in "Of". iDestruct "Of" as "[#Oe #Of]".
       iDestruct (osat_lookup_discharged with "[$S $Oe $Of]") as %H. rewrite Hk in H. done.
   Qed.
 
   Local Lemma until_cert_discharged k (P Q : iProp Σ) h n σ Θ κs g v Ω W :
     Ω !! k = Some obl_discharged →
-    ▷ ((oblP_assigned k false (1/2) ∗ P) ∨ (oblP_assigned k true (1/2) ∗ Q) ∨
-       (oblP_discharged k ∗ until_disch k (tps_sem Q))) ∗
+    ▷ ((oblP_assigned k (1/2) ∗ P) ∨ (oblP_discharged k ∗ until_disch k (tps_sem Q))) ∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) -∗
     ▷ (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ tguar (tps_sem Q) n').
   Proof.
     iIntros (Hk) "(Var& HI& MI)". iNext. iDestruct "MI" as "(MHI& S& _)".
-    iDestruct "Var" as "[[Oa _]|[[Oa _]|[_ R]]]".
-    - iEval (unfold_opreds) in "Oa". iDestruct "Oa" as "[#Oe Oa]".
-      iDestruct (osat_lookup_assigned with "[$S $Oe $Oa]") as %(?&?&H). rewrite Hk in H. done.
+    iDestruct "Var" as "[[Oa _]|[_ R]]".
     - iEval (unfold_opreds) in "Oa". iDestruct "Oa" as "[#Oe Oa]".
       iDestruct (osat_lookup_assigned with "[$S $Oe $Oa]") as %(?&?&H). rewrite Hk in H. done.
     - iDestruct "R" as "(%n'& %i'& %Ω'& #EF& #TF)".
@@ -1237,7 +1166,7 @@ Section loops.
   Lemma until_run (Sys : sysT) N k γP γQ j r (P Q : iProp Σ) :
     sys_step Sys -∗ reg_idx j r (RUntil N k γP γQ) -∗
     saved_ti γP (tps_ti (tps_sem P)) -∗ saved_ti γQ (tps_ti (tps_sem Q)) -∗
-    oblP_inv N k P Q (until_disch k (tps_sem Q)) -∗
+    oblP_inv N k P (until_disch k (tps_sem Q)) -∗
     ∀ h n σ Θ κs g v Ω W τf γ fu o,
       ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
        hist_trace h τf ∧ Ω !! k = Some (obl_assigned fu o)⌝ -∗
@@ -1265,23 +1194,12 @@ Section loops.
     - (* [P] holds at [n]: the obligation at [S n] decides *)
       iMod (oblP_inv_acc with "OI") as "[Var ACC]"; first solve_ndisj.
       iMod (lc_fupd_elim_later with "LC Var") as "Var".
-      iDestruct "Var" as "[[Oa' HP']|[[Oa' HQ']|[Of R]]]".
+      iDestruct "Var" as "[[Oa' HP']|[Of R]]".
       + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
         { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
           iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
         iMod ("ACC" with "[Oa' HP']") as "_".
         { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
-        iModIntro. iRight. iSplit.
-        { iApply (tguar_elim with "TrecP ST [%] B Sys"). split_and!; done. }
-        iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
-        { iPureIntro. apply Ord.lt_S. eapply DROP; eauto. }
-        unfold trace_next. simpl.
-        iApply ("IH" with "[%] Sys"). split_and!; [lia|done..].
-      + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
-        { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
-          iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
-        iMod ("ACC" with "[Oa' HQ']") as "_".
-        { iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame. }
         iModIntro. iRight. iSplit.
         { iApply (tguar_elim with "TrecP ST [%] B Sys"). split_and!; done. }
         iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
@@ -1298,7 +1216,7 @@ Section loops.
           - iDestruct (event_obl_compare i' v with "[$EF $EA]") as %(_& _& Hle'); first done. done.
           - iDestruct (event_obl_compare v i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
         iMod ("ACC" with "[Of]") as "_".
-        { iNext. iApply oblP_variant_unfold. iRight. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
+        { iNext. iApply oblP_variant_unfold. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
         iModIntro. destruct (decide (n' = n)) as [->|Hne].
         * iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
         * assert (n' = S n) as -> by lia.
@@ -1346,7 +1264,7 @@ Section loops.
     - (* [P] at [n]: the obligation at [S n] decides *)
       iMod (oblP_inv_acc with "OI") as "[Var ACC]"; first solve_ndisj.
       iMod (lc_fupd_elim_later with "LC Var") as "Var".
-      iDestruct "Var" as "[[Oa' HP']|[[Oa' HQ']|[Of R]]]".
+      iDestruct "Var" as "[[Oa' HP']|[Of R]]".
       + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
         { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
           iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
@@ -1364,23 +1282,6 @@ Section loops.
         unfold trace_next. simpl.
         iApply (until_run with "ST Hj HγP HγQ OI [%] Sys").
         split_and!; [lia|by apply behavior_S|done|done|done|done].
-      + iAssert (⌜∃ fu' o', Ω' !! k = Some (obl_assigned fu' o')⌝)%I as %(fu'& o'& Hk').
-        { iDestruct "Sys" as "(_& (_& S& _)& _)". iEval (unfold_opreds) in "Oa'". iDestruct "Oa'" as "[#Oe Oa']".
-          iDestruct (osat_lookup_assigned with "[$S $Oe $Oa']") as %(?&?&?). eauto. }
-        iAssert (⌜(fu' w≤ fu)⌝)%I as %Hfu.
-        { iDestruct "Sys" as "(_& (MHI'& _)& _)".
-          iDestruct (event_obl_model_history_interp_lookup with "[$MHI' $EA]") as %(_& _& _& _& [_ Hle]).
-          iPureIntro. specialize (Hle _ _ _ Hk Hk'). destruct Hle as [[? _]|?]; [done|by apply WFOCM.lt_le]. }
-        iMod ("ACC" with "[Oa' HQ']") as "_".
-        { iNext. iApply oblP_variant_unfold. iRight. iLeft. iFrame. }
-        iModIntro. iRight. iSplit.
-        { iApply (tguar_elim with "TrecP ST [%] B Sys"). split_and!; done. }
-        iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
-        { iPureIntro. apply Ord.lt_S. eapply Ord.le_lt_lt; first apply fair_sched_fun_ub.
-          eapply Ord.le_lt_lt; [by apply fair_sched_ub_le_proper|apply Ord.S_lt]. }
-        unfold trace_next. simpl.
-        iApply (until_run with "ST Hj HγP HγQ OI [%] Sys").
-        split_and!; [lia|by apply behavior_S|done|done|done|done].
       + iDestruct "R" as "(%n'& %i'& %Ω''& #EF& #TQ')".
         iAssert (⌜n' ≤ S n⌝)%I as %Hn'.
         { iDestruct "Sys" as "(_& (MHI'& _)& _)".
@@ -1390,7 +1291,7 @@ Section loops.
           - iDestruct (event_obl_compare i' i with "[$EF $EA]") as %(_& _& Hle'); first done. done.
           - iDestruct (event_obl_compare i i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
         iMod ("ACC" with "[Of]") as "_".
-        { iNext. iApply oblP_variant_unfold. iRight. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
+        { iNext. iApply oblP_variant_unfold. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
         iModIntro. destruct (decide (n' = n)) as [->|Hne].
         * iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
         * assert (n' = S n) as -> by lia.
@@ -1942,7 +1843,7 @@ Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
                 (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
      let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     (£ c -∗ ([∗ set] i ∈ dom Θ, thP_kids i ∅) -∗
       |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
                   (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))) →
   R τ.
@@ -1967,7 +1868,7 @@ Proof.
                      (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)),
             let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
-            (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+            (£ c -∗ ([∗ set] i ∈ dom Θ, thP_kids i ∅) -∗
              |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
                          (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))).
   { iIntros (Htemp). destruct (Hwp Htemp) as [x Hx]. iExists x. iApply Hx. }
@@ -1990,7 +1891,7 @@ Proof.
   iModIntro. iFrame "R W WOE". rewrite (right_id ε).
   iMod "H" as "(%Hsic& %fork_post& %Ψs& SI& SIa& WPs)".
   iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& A& G& MI)".
-  iMod (thP_carriers_alloc_threads (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
+  iMod (thP_kids_alloc_threads _ (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
   iPoseProof (treg_st_init (treg_handle (temporalGS0:=Htemp)) with "TR") as "TI".
   iPoseProof ("WPs" with "LC Ths") as "WPs". rewrite union_empty_l_L.
