@@ -60,38 +60,41 @@ Section proof.
   Proof. apply (into_temporal _ _). Qed.
 
   Lemma main_spec :
-    ⊢ ∃ μ, ∀ i g kq kf (x y : loc),
-    l{{{ thread_expr i [] (CertDischarge.main #x #y) ∗ thP_carriers i {[g]} ∗
-         ([∗ set] g ∈ {[g]}, crP_fuel g 0 μ) ∗
-         crP_obls g 0 {[kq; kf]} ∗ ⌜kq ≠ kf⌝ ∗
+    ⊢ ∃ μ, ∀ i kq kf (x y : loc),
+    l{{{ thread_expr i [] (CertDischarge.main #x #y) ∗ thP_kids i {[kq; kf]} ∗
+         ([∗ set] g ∈ {[kq; kf]}, oblP_fuel g 0 μ) ∗
+         ⌜kq ≠ kf⌝ ∗ oblP_kids kq ∅ ∗ oblP_kids kf ∅ ∗
          x ↦ #0 ∗ y ↦ #7 ∗
          finallyI Nq kq 1 (cd_Q x y kf) ∗ finallyI Nf kf 1 (x ↦ #2) }}}
       CertDischarge.main #x #y @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
   Proof.
-    iExists 10. iIntros (i g kq kf x y Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TE& TG& GF& Cg& %Hkqf& Ptrx& Ptry& HQ& HF)".
-    iPoseProof (crP_fuels_init with "GF") as "GF".
+    iExists 10. iIntros (i kq kf x y Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& %Hkqf& Kkq& Kkf& Ptrx& Ptry& HQ& HF)".
+    iPoseProof (oblP_fuels_init with "GF") as "GF".
     rewrite /CertDischarge.main /=.
     lwp_pure_lc 100.
     lwp_pures.
     (* x <- #1 *)
     lwp_bind (Store _ _).
-    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iApply (lwp_store _ ∅ 0 with "[$TE $Ptrx $TG $GF1]"). 1: done.
     iIntros "[TE ((_& TG& _)& Ptrx)]".
     lwp_pures.
     (* x <- #2: the discharge happens in the pre-step modality of this bare lWP. *)
     lwp_bind (Store _ _).
-    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
     iApply sfmupd_lwp.
     iMod (alwaysI_alloc _ Na (y ↦ #7)%I with "[Ptry]") as "#HA"; first by iFrame.
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LC2 LC]".
-    iMod (finallyI_discharge with "LC2 Cg HQ [Ptrx HF]") as "(HQ& Cg& #Odq)".
+    iMod (finallyI_discharge with "LC2 TG Kkq HQ [Ptrx HF]") as "(HQ& TG& #Odq)".
     1: solve_ndisj. 1: set_solver.
     { rewrite /cd_Q. iFrame "Ptrx HF HA". }
+    iPoseProof (oblP_fuels_remove_obl kq with "GF1") as "GF1".
+    iPoseProof (oblP_fuels_remove_obl kq with "GF") as "GF".
+    replace ({[kq; kf]} ∖ {[kq]}) with ({[kf]} : gset oid) by set_solver.
     iDestruct "HQ" as "(Ptrx& _& HF)".
     iModIntro.
     iApply (lwp_store _ ∅ 0 with "[$TE $Ptrx $TG $GF1]"). 1: done.
@@ -100,12 +103,9 @@ Section proof.
     (* The nested commitment, then termination. *)
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC2 _]".
-    replace ({[kq; kf]} ∖ {[kq]}) with ({[kf]} : gset oid) by set_solver.
-    iMod (finallyI_discharge with "LC2 Cg HF Ptrx") as "(Ptrx& Cg& #Odf)".
+    iMod (finallyI_discharge with "LC2 TG Kkf HF Ptrx") as "(Ptrx& TG& #Odf)".
     1: solve_ndisj. 1: set_solver.
     replace ({[kf]} ∖ {[kf]}) with (∅ : gset oid) by set_solver.
-    iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
-    replace ({[g]} ∖ {[g]}) with (∅ : gset ocid) by set_solver.
     iMod (thread_terminate with "TG") as "#Td".
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
@@ -113,13 +113,13 @@ Section proof.
 
   Lemma main_pre Θ i (x y : loc) Φ Ψs :
     Θ = {[i := CertDischarge.main #x #y]} →
-    Φ = (λ μ, (∃ g kq kf, finallyI Nq kq 1 (cd_Q x y kf) ∗ finallyI Nf kf 1 (x ↦ #2) ∗
-                          x ↦ #0 ∗ y ↦ #7 ∗
-                          (thP_carriers i {[g]} ∗ crP_obls g 0 {[kq; kf]} ∗ ⌜kq ≠ kf⌝ ∗
-                           crP_fuel g 0 μ))%I) →
+    Φ = (λ μ, (∃ kq kf, finallyI Nq kq 1 (cd_Q x y kf) ∗ finallyI Nf kf 1 (x ↦ #2) ∗
+                        x ↦ #0 ∗ y ↦ #7 ∗
+                        (thP_kids i {[kq; kf]} ∗ oblP_kids kq ∅ ∗ oblP_kids kf ∅ ∗ ⌜kq ≠ kf⌝ ∗
+                         ([∗ set] g ∈ {[kq; kf]}, oblP_fuel g 0 μ)))%I) →
     Ψs = ({[i := fork_post]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ x ↦ #0 -∗ y ↦ #7 -∗
-     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     ([∗ set] i ∈ dom Θ, thP_kids i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
                    (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ i; ⊤ {{ lift_term i Ψ }}))).
   Proof.
@@ -127,24 +127,27 @@ Section proof.
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     rewrite !big_sepS_singleton.
     iPoseProof (main_spec) as (μ) "main_spec".
-    iMod (carrier_alloc _ _ _ 0 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (untilI_alloc _ _ _ 0 0 0 with "Gg1") as "(%kf& %Hkf& Gg1& Ofkf& #Wlkf& Akf)". 1: done.
+    iMod (untilI_alloc _ _ _ 0 μ with "[] TGs") as "(%kf& %Hkf& TG1& Kkf& Ofkf& #Wlkf& Akf)".
+    { iApply parP_below_thread. }
     iMod ("Akf" $! _ Nf True%I (x ↦ #2)%I with "[]") as "Ukf".
     { done. }
-    iMod (untilI_alloc _ _ _ 0 0 0 with "Gg1") as "(%kq& %Hkq& Gg1& Ofkq& #Wlkq& Akq)". 1: done.
+    iMod (untilI_alloc _ _ _ 0 μ with "[] TG1") as "(%kq& %Hkq& TG1& Kkq& Ofkq& #Wlkq& Akq)".
+    { iApply parP_below_thread. }
     iMod ("Akq" $! _ Nq True%I (cd_Q x y kf) with "[]") as "Ukq".
     { done. }
-    iModIntro. iExists μ. iSplitL "Ukq Ukf Ptrx Ptry TG1 Gg1 Gf1 Ofkq Ofkf".
+    iModIntro. iExists μ. iSplitL "Ukq Ukf Ptrx Ptry TG1 Kkq Kkf Ofkq Ofkf".
     { subst Φ. rewrite !union_empty_r_L.
       replace ({[kq]} ∪ {[kf]}) with ({[kq; kf]} : gset oid) by set_solver.
-      iExists g1, kq, kf. iFrame "Ukq Ukf Ptrx Ptry TG1 Gf1 Gg1". iPureIntro. set_solver. }
-    iClear "Wlkq Wlkf". clear dependent g1 kq kf.
+      iExists kq, kf. iFrame "Ukq Ukf Ptrx Ptry TG1 Kkq Kkf".
+      rewrite (big_sepS_union _ {[kq]} {[kf]}); last set_solver. rewrite !big_sepS_singleton.
+      iFrame "Ofkq Ofkf". iPureIntro. set_solver. }
+    iClear "Wlkq Wlkf". clear dependent kq kf.
     iIntros "HP". subst Φ.
-    iDestruct "HP" as (g1 kq kf) "(HQ& HF& Ptrx& Ptry& TG& Cg& %Hkqf& GF)".
+    iDestruct "HP" as (kq kf) "(HQ& HF& Ptrx& Ptry& TG& Kkq& Kkf& %Hkqf& GF)".
     iEval (rewrite HT big_sepM_singleton) in "TEs".
-    iPoseProof ("main_spec" $! i g1 kq kf x y (λ v, lift_term i fork_post v)
-                 with "[TEs TG Cg GF Ptrx Ptry HQ HF]") as "WP".
-    { iFrame "TEs TG Cg Ptrx Ptry HQ HF". iSplitL; [by iApply big_sepS_singleton|done]. }
+    iPoseProof ("main_spec" $! i kq kf x y (λ v, lift_term i fork_post v)
+                 with "[TEs TG Kkq Kkf GF Ptrx Ptry HQ HF]") as "WP".
+    { iFrame "TEs TG Kkq Kkf GF Ptrx Ptry HQ HF". iPureIntro. done. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { done. }
     { done. }
@@ -170,11 +173,11 @@ Section adequacy.
   (** The final resources. *)
   Let Φ_P `{!heapGS Σ} : _ → iProp Σ :=
         λ μ,
-          (∃ g kq kf,
+          (∃ kq kf,
               finallyI Nq kq 1 (cd_Q x y kf) ∗ finallyI Nf kf 1 (x ↦ #2) ∗
               x ↦ #0 ∗ y ↦ #7 ∗
-              (thP_carriers i {[g]} ∗ crP_obls g 0 {[kq; kf]} ∗ ⌜kq ≠ kf⌝ ∗
-               crP_fuel g 0 μ))%I.
+              (thP_kids i {[kq; kf]} ∗ oblP_kids kq ∅ ∗ oblP_kids kf ∅ ∗ ⌜kq ≠ kf⌝ ∗
+               ([∗ set] g ∈ {[kq; kf]}, oblP_fuel g 0 μ)))%I.
 
   (** What they guarantee: the nested structures of the first commitment show in its
       right formula. *)
