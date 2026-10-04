@@ -1,22 +1,20 @@
-(** This file proves the basic laws of the HeapLang program logic by applying
-the Iris lifting lemmas. *)
-
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
-From transfinite.base_logic.lib Require Import mono_nat.
 From transfinite.base_logic.lib Require Export gen_heap proph_map.
-(* From transfinite.base_logic.lib Require Export gen_heap proph_map gen_inv_heap. *)
 From lantana.base_logic Require Export thread_map gen_inv_heap.
-(** adequacy fixes step index to ordinals *)
 From lantana.program_logic Require Export atomic.
-From lantana.trace Require Export adequacy.
-From lantana.trace Require Export temporal_guarantee.
+From lantana.trace Require Export adequacy temporal_guarantee.
 From lantana.program_logic Require Import ectx_lifting.
 From lantana.heap_lang Require Export class_instances.
 From lantana.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 From lantana.algebra Require Export ordinal_wfocm.
 
+(** The heap_lang instance of the Lantana program logic: the ghost state ([heapGS]), the
+    points-to and thread-expression assertions, and the primitive lWP laws, proved from the
+    lifting lemmas. *)
+
+(** * Ghost state and assertions *)
 Class heap_stateGS Σ :=
   HeapStateGS {
       #[global] heap_stateGS_gen_heap_stateGS :: gen_heapGS loc (option val) Σ;
@@ -97,15 +95,18 @@ Proof.
     split; last done. destruct (τf n) as [[[Θ σ] j] κ]. exact H.
 Qed.
 
-Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
+(** * State interpretation *)
+Definition state_interp `{!heap_stateGS Σ}
+    (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
    thread_map_interp (dom Θ) Θ ∗
    proph_map_interp κs σ.(used_proph_id))%I.
 
-Definition state_interp_aux `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
+Definition state_interp_aux `{!heap_stateGS Σ}
+    (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   True%I.
 
-(** State predicate. *)
+(** The state predicates as assertions. *)
 Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
   match π with
   | pred_pointsto l dq v =>
@@ -135,59 +136,12 @@ Qed.
 Definition heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ :=
   Build_state_interp_class _ _ _ state_interp state_interp_aux state_pred_interp state_interp_wf.
 
-(* Global Instance heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ := { *)
-(*     state_interp := state_interp; *)
-(*     state_interp_aux := state_interp_aux; *)
-(*     state_pred_interp := state_pred_interp; *)
-(*     state_interp_wf := state_interp_wf; *)
-(*   }. *)
-
+(** * The program-logic instance *)
 Class heapGS Σ :=
   HeapGS {
       heapGS_temporalGS : temporalGS heap_lang Σ;
-      (* heapGS_mupdGS : mupdGS Σ; *)
-      (* heapGS_histGS : histGS.histGS Σ (state * thread_pool heap_lang * list (observation)); *)
       #[global] heapGS_heap_stateGS :: heap_stateGS Σ;
     }.
-
-(* Definition heapΣ : gFunctors := *)
-(*   #[mupdΣ; *)
-(*     histGS.histΣ (state * thread_pool heap_lang * list (observation)); *)
-(*     heap_stateΣ]. *)
-
-(* Global Instance subG_heapΣ {Σ} : subG heapΣ Σ → heapGS Σ. *)
-(* Proof. *)
-(*   intros. econstructor. *)
-(*   - apply subG_inv in H. destruct H. apply subG_inv in s. destruct s. apply subG_inv in s. destruct s. *)
-(*     econstructor. *)
-(*     + econstructor. *)
-(*       * econstructor. *)
-(*         { eapply subG_wsatΣ. auto. } *)
-(*         all: exact inhabitant. *)
-(*       * econstructor. *)
-(*         { eapply subG_auth_rupdΣ. auto. } *)
-(*         all: exact inhabitant. *)
-(*     + econstructor. *)
-(*       { eapply osatGS.subG_osatΣ. solve_inG. } *)
-(*       all: exact inhabitant. *)
-(*     + econstructor. *)
-(*       { eapply othreadGS.subG_othreadΣ. solve_inG. } *)
-(*       all: exact inhabitant. *)
-(*     + econstructor. *)
-(*       { eapply owitGS.subG_owitΣ. solve_inG. } *)
-(*       all: exact inhabitant. *)
-(*     + econstructor. *)
-(*       { eapply mhistGS.subG_mhistΣ. solve_inG. } *)
-(*       all: exact inhabitant. *)
-(*   - econstructor. *)
-(*     { eapply histGS.subG_histΣ. solve_inG. } *)
-(*     all: exact inhabitant. *)
-(*   - apply subG_heap_stateΣ. solve_inG. *)
-(* Qed. *)
-
-(* (** We don't want this to be an instance, which can break iMod. *) *)
-(* Definition heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ := *)
-(*   TemporalG heapGS_mupdGS heapGS_histGS. *)
 
 Global Instance heapGS_lantanaGS `{!heapGS Σ} : lantanaGS heap_lang Σ := {
     lantana_temporalGS := heapGS_temporalGS;
@@ -195,16 +149,17 @@ Global Instance heapGS_lantanaGS `{!heapGS Σ} : lantanaGS heap_lang Σ := {
     fork_post i v := (True)%I;
   }.
 
+(** * The invariant heap *)
 (** [gen_inv_heap]: Similar to pointsto,
 except that these are higher-order notations so to
 make setoid rewriting in the predicate [I] work we need actual definitions here. *)
-Section definitions.
+Section inv_heap.
   Context `{!heapGS Σ}.
   Definition inv_pointsto_own (l : loc) (v : val) (I : val → Prop) : iProp Σ :=
     inv_pointsto_own l (Some v) (from_option I False).
   Definition inv_pointsto (l : loc) (I : val → Prop) : iProp Σ :=
     inv_pointsto l (from_option I False).
-End definitions.
+End inv_heap.
 
 Global Instance: Params (@inv_pointsto_own) 5 := {}.
 Global Instance: Params (@inv_pointsto) 4 := {}.
@@ -215,8 +170,7 @@ Notation "l '↦_' I □" := (inv_pointsto l I%stdpp%type)
 Notation "l ↦_ I v" := (inv_pointsto_own l v I%stdpp%type)
                          (at level 20, I at level 9, format "l  ↦_ I  v") : bi_scope.
 
-(* TODO: temporal guarantees (IntoTemporal instances) for inv_heap *)
-
+(** * Lifting lemmas *)
 Section lifting.
 Context `{!heapGS Σ}.
 Implicit Types P Q : iProp Σ.
@@ -228,7 +182,7 @@ Implicit Types l : loc.
 Implicit Types e : expr.
 Implicit Types v : val.
 
-(** Thread-expression ownership and context agreement. *)
+(** ** Thread expressions: ownership and context agreement *)
 Global Instance thread_expr_timeless i C e : Timeless (thread_expr i C e).
 Proof. apply _. Qed.
 
@@ -267,16 +221,7 @@ Proof.
   by iFrame.
 Qed.
 
-Lemma iter_modal_mono_modal M1 M2 P n :
-  (∀ A B, (A -∗ B) -∗ (M1 A -∗ M1 B)) →
-  (∀ A, M1 A -∗ M2 A) →
-  (Nat.iter n M1 P -∗ Nat.iter n M2 P).
-Proof.
-  intros. revert P. induction n; intros; simpl; eauto.
-  iIntros "H". iApply H0. iApply (H with "[] H"). iApply IHn.
-Qed.
-
-(** pure steps *)
+(** ** Pure steps *)
 Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ {C} :
   PureExec φ n e1 e2 →
   φ →
@@ -294,6 +239,7 @@ Proof.
     (λ i e, thread_expr i C e)); auto; apply _.
 Qed.
 
+(** ** Fork *)
 Lemma lwp_fork_step s i E E' e Φ {C} :
   (|={E,E'}=> thread_expr i C (Fork e) ∗
              ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
@@ -341,9 +287,11 @@ Lemma lwp_fork K P G R o s i E e {C} :
   (∀ j, l{{{ thread_expr j [] e ∗ thP_kids j K ∗ P }}}
           e @ s; j; ⊤ l{{{ v, RET v; lift_term j (λ _ _, True) v }}})%I
   ⊢
-  l{{{ thread_expr i C (Fork e) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ ([∗ set] k ∈ K, ∃ ℓ, oblP_fuel k ℓ 1) ∗ P }}}
+  l{{{ thread_expr i C (Fork e) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ ([∗ set] k ∈ K, ∃ ℓ, oblP_fuel k ℓ 1) ∗ P }}}
     Fork e @ s; i; E
-  l{{{ RET #(); thread_expr i C #() ∗ (£ o ∗ thP_kids i (G ∖ K) ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+  l{{{ RET #(); thread_expr i C #() ∗ (£ o ∗ thP_kids i (G ∖ K) ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
   iIntros (HK) "#Hfork !> %Φ (TE& (TG& GF& Rs)& OF& HP) HΦ".
   iApply lwp_fork_step. iModIntro. iFrame "TE TG GF Rs".
@@ -354,7 +302,7 @@ Proof.
   - iApply ("Hfork" with "[$TEj $TGj $HP]"). auto.
 Qed.
 
-(** ChooseNat *)
+(** ** ChooseNat *)
 Lemma lwp_choosenat_step o s i E E' Φ {C} :
   (|={E,E'}=> thread_expr i C ChooseNat ∗
                   ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
@@ -401,21 +349,7 @@ Proof.
   iApply ("HΦ" with "[$TE $TG $RC $LC]").
 Qed.
 
-Local Remark lwp_choosez_exists G R o s i E {C} :
-  l{{{ thread_expr i C ChooseNat ∗
-       (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
-    ChooseNat @ s; i; E
-  l{{{ v, RET v; ∃ (n : nat), ⌜v = #n⌝ ∧
-       (thread_expr i C (of_val v) ∗
-        (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r))) }}}.
-Proof.
-  iIntros (Φ) "P HΦ".
-  iPoseProof (lwp_choosenat with "P") as "H".
-  iApply "H". iIntros (?) "H".
-  iApply "HΦ". iExists n. iFrame. auto.
-Qed.
-
-(** Heap *)
+(** ** Heap *)
 
 (** We need to adjust the [gen_heap] and [gen_inv_heap] lemmas because of our
 value type being [option val] (and sealing). *)
@@ -430,7 +364,10 @@ Proof. rewrite pointsto_unseal. apply _. Qed.
 Global Instance pointsto_persistent l v : Persistent (l ↦□ v).
 Proof. rewrite pointsto_unseal. apply _. Qed.
 
-Global Instance pointsto_combine_sep_gives l dq1 dq2 v1 v2 : 
+Global Instance state_pred_interp_timesless π : Timeless (state_pred_interp π).
+Proof. destruct π; simpl; apply _. Qed.
+
+Global Instance pointsto_combine_sep_gives l dq1 dq2 v1 v2 :
   CombineSepGives (l ↦{dq1} v1) (l ↦{dq2} v2) ⌜✓ (dq1 ⋅ dq2) ∧ v1 = v2⌝.
 Proof.
   rewrite pointsto_unseal /CombineSepGives. iIntros "[H1 H2]".
@@ -532,8 +469,7 @@ Proof.
   iIntros "!>". iExists (v). iFrame "%∗".
 Qed.
 
-(** The usable rules for [allocN] stated in terms of the [array] proposition
-are derived in te file [array]. *)
+(** The rules for [allocN] stated with the [array] connective are in derived_laws.v. *)
 Lemma heap_array_to_seq_meta l vs (n : nat) :
   length vs = n →
   ([∗ map] l' ↦ _ ∈ heap_array l vs, meta_token l' ⊤) -∗
@@ -567,14 +503,13 @@ Proof.
   iDestruct "Hvs" as "[$ Hvs]". by iApply "IH".
 Qed.
 
-Global Instance state_pred_interp_timesless π : Timeless (state_pred_interp π).
-Proof. destruct π; simpl; apply _. Qed.
-
 Lemma lwp_allocN_seq G R o s i E v n {C} :
   (0 < n)%Z →
-  l{{{ thread_expr i C (AllocN #n (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+  l{{{ thread_expr i C (AllocN #n (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     AllocN (Val $ LitV $ LitInt $ n) (Val v) @ s; i; E
-  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
+  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
           [∗ list] i ∈ seq 0 (Z.to_nat n), (l +ₗ (i : nat)) ↦ v ∗ meta_token (l +ₗ (i : nat)) ⊤ }}}.
 Proof.
   iIntros (Hn Φ) "[TE (Tb& Gfs& Rs)] HP".
@@ -601,9 +536,11 @@ Proof.
 Qed.
 
 Lemma lwp_alloc G R o s i E v {C} :
-  l{{{ thread_expr i C (Alloc (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
+  l{{{ thread_expr i C (Alloc (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) }}}
     Alloc (Val v) @ s; i; E
-  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
+  l{{{ l, RET LitV (LitLoc l); thread_expr i C (Val (LitV (LitLoc l))) ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗
           l ↦ v ∗ meta_token l ⊤ }}}.
 Proof.
   iIntros (Φ) "P HΦ".
@@ -612,9 +549,11 @@ Proof.
 Qed.
 
 Lemma lwp_free G R o s i E l v {C} :
-  l{{{ thread_expr i C (Free #l) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
+  l{{{ thread_expr i C (Free #l) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
     Free (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
 Proof.
   iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -637,9 +576,11 @@ Proof.
 Qed.
 
 Lemma lwp_load G R o s i E l dq v {C} :
-  l{{{ thread_expr i C (Load #l) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v }}}
+  l{{{ thread_expr i C (Load #l) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v }}}
     Load (Val $ LitV $ LitLoc l) @ s; i; E
-  l{{{ RET v; thread_expr i C (Val v) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
+  l{{{ RET v; thread_expr i C (Val v) ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v }}}.
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -661,9 +602,11 @@ Proof.
 Qed.
 
 Lemma lwp_store G R o s i E l v' v {C} :
-  l{{{ thread_expr i C (Store #l (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ thread_expr i C (Store #l (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     Store (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
+  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -686,9 +629,11 @@ Proof.
 Qed.
 
 Lemma lwp_xchg G R o s i E l v' v {C} :
-  l{{{ thread_expr i C (Xchg #l (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ thread_expr i C (Xchg #l (Val v)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     Xchg (Val $ LitV $ LitLoc l) (Val v) @ s; i; E
-  l{{{ RET v'; thread_expr i C (Val v') ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
+  l{{{ RET v'; thread_expr i C (Val v') ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v }}}.
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -712,9 +657,11 @@ Qed.
 
 Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 {C} :
   v' ≠ v1 → vals_compare_safe v' v1 →
-  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v' }}}
+  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦{dq} v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool false); thread_expr i C (Val (PairV v' (LitV (LitBool false)))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
+  l{{{ RET PairV v' (LitV $ LitBool false); thread_expr i C (Val (PairV v' (LitV (LitBool false)))) ∗ (£ o ∗
+       thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦{dq} v' }}}.
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -738,9 +685,11 @@ Qed.
 
 Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' {C} :
   v' = v1 → vals_compare_safe v' v1 →
-  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
+  l{{{ thread_expr i C (CmpXchg #l (Val v1) (Val v2)) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v' }}}
     CmpXchg (Val $ LitV $ LitLoc l) (Val v1) (Val v2) @ s; i; E
-  l{{{ RET PairV v' (LitV $ LitBool true); thread_expr i C (Val (PairV v' (LitV (LitBool true)))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
+  l{{{ RET PairV v' (LitV $ LitBool true); thread_expr i C (Val (PairV v' (LitV (LitBool true)))) ∗ (£ o ∗
+       thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ v2 }}}.
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -764,9 +713,11 @@ Proof.
 Qed.
 
 Lemma lwp_faa G R o s i E l (i1 i2 : Z) {C} :
-  l{{{ thread_expr i C (FAA #l #i2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ LitV (LitInt i1) }}}
+  l{{{ thread_expr i C (FAA #l #i2) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ LitV (LitInt i1) }}}
     FAA (Val $ LitV $ LitLoc l) (Val $ LitV $ LitInt i2) @ s; i; E
-  l{{{ RET LitV (LitInt i1); thread_expr i C (#i1) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
+  l{{{ RET LitV (LitInt i1); thread_expr i C (#i1) ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ l ↦ LitV (LitInt (i1 + i2)) }}}.
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -788,10 +739,13 @@ Proof.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
+(** ** Prophecies *)
 Lemma lwp_new_proph G R o s i E {C} :
-  l{{{ thread_expr i C (NewProph) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
+  l{{{ thread_expr i C (NewProph) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
     NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); thread_expr i C (Val (LitV (LitProphecy p))) ∗ (£ o ∗ thP_kids i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
+  l{{{ pvs p, RET (LitV (LitProphecy p)); thread_expr i C (Val (LitV (LitProphecy p))) ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
 Proof.
   iIntros (Φ) "[TE (Tb& Gfs& Rs)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
@@ -855,56 +809,7 @@ Proof.
       apply to_val_fill_some in Hfillvt as [-> ->]. inv_base_step.
 Qed.
 
-(** FIXME: ectxi does not allow empty context, which seems necessary to compose with ResolveLCtx.
-           Can we prove this without changing this constraint? *)
-(* Lemma lwp_resolve s i E e Φ (p : proph_id) v (pvs : list (val * val)) : *)
-(*   Atomic StronglyAtomic e → *)
-(*   to_val e = None → *)
-(*   proph p pvs -∗ *)
-(*   (* (lwp_fix s i E e (λ r, ∀ pvs', ⌜pvs = (r, v)::pvs'⌝ -∗ proph p pvs' -∗ Φ r)) -∗ *) *)
-(*   lWP e @ s; i; E {{ Φ }} -∗ *)
-(*   lWP Resolve e (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E {{ Φ }}. *)
-(* Proof. *)
-(*   (* TODO we should try to use a generic lifting lemma (and avoid [lwp_unfold]) *) *)
-(* (*      here, since this breaks the lWP abstraction. *) *)
-(*   iIntros (A He0) "Hp lWPe". assert (He : to_val (fill_item K e) = None). *)
-(*   { destruct (to_val (fill_item K e)) eqn:CASE; auto. assert (is_Some (to_val (fill_item K e))) by eauto. *)
-(*     apply fill_item_val in H. rewrite He0 in H. done. } *)
-(*   rewrite !lwp_unfold /lwp_pre /= He0. *)
-(*   replace (Resolve (fill_item K e) #p v) with (fill_item (ResolveLCtx K #p v) e); cycle 1. *)
-(*   { done. } *)
-(*   iPoseProof (lwpupd_ctx with "lWPe") as "lWPe". iMod "lWPe". *)
-(*   iModIntro. *)
-(*   iIntros (K' h n σ1 Θ κ κs HK' HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia]". *)
-(*   destruct κ as [|[p' [w' v']] κ' _] using rev_ind. *)
-(*   - iMod ("lWPe" $! (λ e', K' (fill_item (ResolveLCtx K #p v) e')) with "[] [] [$Ha $Hs $Ht $Hk $Ia]") as "lWPe". *)
-(*     { iPureIntro. simpl. eapply language_ctx_compose; eauto. *)
-(*       replace (λ e', Resolve (fill_item K e') #p v) with (fill_item (ResolveLCtx K #p v)); cycle 1. *)
-(*       { done. } *)
-(*       apply _. } *)
-(*     { iPureIntro. simpl in *. apply HT. } *)
-(*     { eauto. } *)
-(*     iModIntro. iDestruct "lWPe" as "(%Hs& lWPe)". iSplit. *)
-(*     { iPureIntro. destruct s; last auto. apply reducible_fill. auto. } *)
-(*     iIntros (e2 σ2 efs step). exfalso. simpl in step. apply step_resolve in step; cycle 1. *)
-(*     { unfold Atomic. simpl. intros. inv H. simpl in *. eapply base_ctx_step_val. eapply H2. *)
-(*     last done. *)
-(*     inv_base_step. match goal with H: ?κs ++ [_] = [] |- _ => by destruct κs end. *)
-(*   - iSpecialize ("lWPe" with "T"). *)
-(*     rewrite -assoc. *)
-(*     iMod ("lWPe" $! Θ σ1 _ _ with "[$Ht $Hσ $Hκ]") as "H". *)
-(*     iModIntro. iMod "H" as "(%Hs& lWPe)". *)
-(*     iModIntro. iSplit. *)
-(*     { iPureIntro. destruct s; [ by apply resolve_reducible | done]. } *)
-(*     iIntros (e2 σ2 efs step). apply step_resolve in step; last done. *)
-(*     inv_base_step; simplify_list_eq. *)
-(*     iMod ("lWPe" $! (Val w') σ2 efs with "[%]") as ">lWPe". *)
-(*     { by eexists [] _ _. } *)
-(*     iMod "lWPe" as ">(($& $& Hκ)& lWPe& Efs)". *)
-(*     iMod (proph_map_resolve_proph p' (w',v') κs with "[$Hκ $Hp]") as (vs' ->) "[$ HPost]". *)
-(*     iModIntro. iFrame. *)
-(*     rewrite !lwp_unfold /lwp_pre /=. *)
-(*     iApply ("lWPe" with "[] HPost"). eauto. *)
-(* Qed. *)
+(** FIXME: no [lwp_resolve] yet: composing with [ResolveLCtx] seems to need an empty
+    context item, which [ectxi_language] does not allow. *)
 
 End lifting.

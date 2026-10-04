@@ -1,11 +1,12 @@
 From stdpp Require Export binders strings.
-From stdpp Require Import gmap.
 From iris.algebra Require Export ofe dfrac.
 From lantana.program_logic Require Export language ectx_language ectxi_language.
 From lantana.heap_lang Require Export locations.
 From iris.prelude Require Import options.
 
-(** heap_lang.  A fairly simple language used for common Iris examples.
+(** heap_lang for Lantana: Iris' heap_lang where a step knows its thread id and the ids in use
+    (forked threads get fresh ids), with labels [Label t e], nondeterministic [ChooseNat], and
+    the state predicates ([state_pred]) that atomic temporal formulas observe.
 
 Noteworthy design choices:
 
@@ -122,8 +123,7 @@ Inductive expr :=
   | Resolve (e0 : expr) (e1 : expr) (e2 : expr) (* wrapped expr, proph, val *)
   (* Label *)
   | Label (t : string) (e : expr)
-  (* Non-determinism *)
-  (* Reference: trillium/fairis *)
+  (* Non-determinism, as in Trillium/Fairis *)
   | ChooseNat
 with val :=
   | LitV (l : base_lit)
@@ -203,14 +203,10 @@ Definition vals_compare_safe (vl v1 : val) : Prop :=
   val_is_unboxed vl ∨ val_is_unboxed v1.
 Global Arguments vals_compare_safe !_ !_ /.
 
-(** The state:
-    heaps of [option val]s, with [None] representing deallocated locations.
-    (* history of labels from some thread_id. *)
- *)
+(** The state: heaps of [option val]s, with [None] representing deallocated locations. *)
 Record state : Type := {
     heap : gmap loc (option val);
     used_proph_id : gset proph_id;
-    (* labels : list (thread_id * string * val); *)
   }.
 
 (** Equality and other typeclass stuff *)
@@ -416,7 +412,6 @@ Proof. refine (inj_countable of_val to_val _); auto using to_of_val. Qed.
 
 Global Instance state_inhabited : Inhabited state :=
   populate {| heap := inhabitant; used_proph_id := inhabitant |}.
-  (* populate {| heap := inhabitant; used_proph_id := inhabitant; labels := [] |}. *)
 Global Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
 Global Instance expr_inhabited : Inhabited expr := populate (Val inhabitant).
 
@@ -585,7 +580,7 @@ Definition bin_op_eval_bool (op : bin_op) (b1 b2 : bool) : option base_lit :=
   | OrOp => Some (LitBool (b1 || b2))
   | XorOp => Some (LitBool (xorb b1 b2))
   | ShiftLOp | ShiftROp => None (* Shifts *)
-  | LeOp | LtOp => None (* InEquality *)
+  | LeOp | LtOp => None (* Inequality *)
   | EqOp => Some (LitBool (bool_decide (b1 = b2)))
   | OffsetOp => None (* Pointer arithmetic *)
   end.
@@ -615,17 +610,11 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
 
 Definition state_upd_heap (f: gmap loc (option val) → gmap loc (option val)) (σ: state) : state :=
   {| heap := f σ.(heap); used_proph_id := σ.(used_proph_id) |}.
-  (* {| heap := f σ.(heap); used_proph_id := σ.(used_proph_id); labels := σ.(labels) |}. *)
 Global Arguments state_upd_heap _ !_ /.
 
 Definition state_upd_used_proph_id (f: gset proph_id → gset proph_id) (σ: state) : state :=
   {| heap := σ.(heap); used_proph_id := f σ.(used_proph_id); |}.
-  (* {| heap := σ.(heap); used_proph_id := f σ.(used_proph_id); labels := σ.(labels) |}. *)
 Global Arguments state_upd_used_proph_id _ !_ /.
-
-(* Definition state_upd_labels (f: list (thread_id * string * val) → list (thread_id * string * val)) (σ: state) : state := *)
-(*   {| heap := σ.(heap); used_proph_id := σ.(used_proph_id); labels := f σ.(labels) |}. *)
-(* Global Arguments state_upd_labels _ !_ /. *)
 
 Fixpoint heap_array (l : loc) (vs : list val) : gmap loc (option val) :=
   match vs with
@@ -677,7 +666,8 @@ Proof.
   rewrite right_id insert_union_singleton_l. done.
 Qed.
 
-Inductive base_step (i : thread_id) : expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop :=
+Inductive base_step (i : thread_id) :
+    expr → state → thread_ids → list observation → expr → state → gmap thread_id expr → Prop :=
   | RecS f x e σ Θ :
      base_step i (Rec f x e) σ Θ [] (Val $ RecV f x e) σ ∅
   | PairS v1 v2 σ Θ :
@@ -770,7 +760,6 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
     base_step i (Label t (Val v)) σ Θ
               []
               (of_val v) σ
-              (* (of_val v) (state_upd_labels (λ ls, ls ++ [(i, l, v)]) σ) *)
               ∅
   | ChooseNatS (n : nat) σ Θ :
     base_step i ChooseNat σ Θ
@@ -834,7 +823,8 @@ Qed.
 End heap_lang.
 
 (** Language *)
-Canonical Structure heap_ectxi_lang := EctxiLanguage (state_sat:=heap_lang.state_sat) heap_lang.heap_lang_mixin.
+Canonical Structure heap_ectxi_lang :=
+  EctxiLanguage (state_sat:=heap_lang.state_sat) heap_lang.heap_lang_mixin.
 Canonical Structure heap_ectx_lang := EctxLanguageOfEctxi heap_ectxi_lang.
 Canonical Structure heap_lang := LanguageOfEctx heap_ectx_lang.
 

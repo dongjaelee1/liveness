@@ -2,6 +2,8 @@ From stdpp Require Import countable numbers gmap.
 From iris.prelude Require Export prelude.
 From iris.prelude Require Import options.
 
+(** Heap locations: integers with offsets ([l +ₗ off]), an order, and fresh locations. *)
+
 Record loc := Loc { loc_car : Z }.
 
 Add Printing Constructor loc.

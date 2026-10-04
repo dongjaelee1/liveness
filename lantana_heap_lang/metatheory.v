@@ -1,9 +1,9 @@
-From stdpp Require Import gmap stringmap.
+From stdpp Require Import stringmap.
 From lantana.heap_lang Require Export lang.
 From iris.prelude Require Import options.
 
-(* This file contains some metatheory about the heap_lang language,
-  which is not needed for verifying programs. *)
+(** Metatheory of heap_lang (closedness, parallel substitution), not needed for verifying
+    programs. *)
 
 (* Adding a binder to a set of identifiers. *)
 Local Definition set_binder_insert (x : binder) (X : stringset) : stringset :=

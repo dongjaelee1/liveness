@@ -23,6 +23,7 @@ Section laws.
   Global Instance into_temporal_thread_expr i C e :
     IntoTemporal (thread_expr i C e) (tps_atomic (pred_expr i C e)) | 10.
   Proof. exact (temporal_atomic (pred_expr i C e)). Qed.
+  (* TODO: [IntoTemporal] instances for the invariant heap ([l ↦_I v]). *)
 
   (** Discharge at the actual final value, using credits from earlier steps: the thread's
       only child is the obligation of the finally. *)

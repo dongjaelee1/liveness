@@ -1,6 +1,7 @@
-From lantana.program_logic Require Import language.
 From lantana.heap_lang Require Export lang.
 From iris.prelude Require Import options.
+
+(** Notations and coercions for writing heap_lang programs. *)
 
 (** Coercions to make programs easier to type. *)
 Coercion LitInt : Z >-> base_lit.
@@ -63,7 +64,8 @@ Moreover, if the branches do not fit on a single line, it will be printed as:
 Notation "'match:' e0 'with' 'InjL' x1 => e1 | 'InjR' x2 => e2 'end'" :=
   (Match e0 x1%binder e1 x2%binder e2)
   (e0, x1, e1, x2, e2 at level 200,
-   format "'[hv' 'match:'  e0  'with'  '/  ' '[' 'InjL'  x1  =>  '/  ' e1 ']'  '/' '[' |  'InjR'  x2  =>  '/  ' e2 ']'  '/' 'end' ']'") : expr_scope.
+   format "'[hv' 'match:'  e0  'with'  '/  ' '[' 'InjL'  x1  =>  '/  ' e1 ']'  '/' '[' |  'InjR'  x2  =>  '/  ' e2 ']'  '/' 'end' ']'")
+  : expr_scope.
 Notation "'match:' e0 'with' 'InjR' x1 => e1 | 'InjL' x2 => e2 'end'" :=
   (Match e0 x2%binder e2 x1%binder e1)
   (e0, x1, e1, x2, e2 at level 200, only parsing) : expr_scope.

@@ -1,7 +1,9 @@
-From stdpp Require Import fin_maps.
 From lantana.heap_lang Require Export lang.
 From iris.prelude Require Import options.
 Import heap_lang.
+
+(** Tactics on heap_lang's operational semantics: [reshape_expr], [inv_base_step], and the
+    [base_step] hint database. *)
 
 (** The tactic [reshape_expr e tac] decomposes the expression [e] into an
 evaluation context [K] and a subexpression [e']. It calls the tactic [tac K e']
