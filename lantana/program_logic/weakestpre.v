@@ -273,7 +273,7 @@ Definition lwp_step `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}
      (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
       (** ** Model update (discharge allowed) for the pre-state; the adequacy proof
           handles a discharge here through the deep records of the until (see
-          temporal_guarantee.v, [tguar_next]). *)
+          temporal_guarantee.v, [tguar]). *)
       |=[n,dom Θ]=>m
       (⌜if s is NotStuck then reducible i e1 σ1 (dom Θ) else True⌝) ∗
       ∀ e2 σ2 (efs : thread_pool Λ), (⌜ prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
