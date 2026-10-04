@@ -140,6 +140,8 @@ Global Arguments parP_kids {SI Σ _}.
 (** Children of a thread and of an obligation. *)
 Notation thP_kids i K := (parP_kids (PThread i) K).
 Notation oblP_kids k K := (parP_kids (PObl k) K).
+(** [n] units of fuel of each obligation of a set, at any layers. *)
+Notation oblP_fuels K n := ([∗ set] k ∈ K, ∃ ℓ, oblP_fuel k ℓ n)%I.
 
 (** One unit of fuel at layer [ℓ] is enough to hang below [p]: always below a thread; below an
     obligation [q], [ℓ] must be above a witness layer of [q] (given by [wl], instantiated with
@@ -1386,6 +1388,64 @@ Section rules.
     iIntros (PR HE) "#I #D". iMod (oblP_inv_acc_discharged with "I D") as "[H ACC]"; first done.
     iModIntro. iNext. iPoseProof "H" as "#H". iFrame "H". iApply "ACC".
     rewrite oblP_variant_unfold. iRight. eauto.
+  Qed.
+
+  (** ** Fuel of sets of obligations *)
+  Lemma oblP_fuel_add_nat m1 m2 n k ℓ :
+    (n = m1 + m2)%nat →
+    oblP_fuel k ℓ n ⊣⊢ (oblP_fuel k ℓ m1 ∗ oblP_fuel k ℓ m2)%I.
+  Proof.
+    intros ->. rewrite -oblP_fuel_add. erewrite oblP_fuel_eq. 1: reflexivity.
+    rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat. done.
+  Qed.
+
+  Lemma oblP_fuels_add_gen m1 m2 K :
+    oblP_fuels K (m1 ⊕ m2)%M ⊢ oblP_fuels K m1 ∗ oblP_fuels K m2.
+  Proof.
+    rewrite -big_sepS_sep. iIntros "H"; iApply (big_sepS_impl with "H"); iIntros "!> %% H".
+    iDestruct "H" as "(%& H)". iPoseProof (oblP_fuel_add with "H") as "[$ $]".
+  Qed.
+
+  Lemma oblP_fuels_add (n m : nat) K :
+    oblP_fuels K (n + m)%nat ⊢ oblP_fuels K n ∗ oblP_fuels K m.
+  Proof.
+    rewrite -big_sepS_sep. iIntros "H"; iApply (big_sepS_impl with "H"); iIntros "!> %% H".
+    iDestruct "H" as "(%& H)". iPoseProof (oblP_fuel_add_nat with "H") as "[H F]". 1: eauto. iFrame.
+  Qed.
+
+  Lemma oblP_fuels_add_nat (m1 m2 n : nat) K :
+    (n = m1 + m2)%nat →
+    oblP_fuels K n ⊢ oblP_fuels K m1 ∗ oblP_fuels K m2.
+  Proof. intros ->. apply oblP_fuels_add. Qed.
+
+  Lemma oblP_fuels_init K m ℓ :
+    ([∗ set] k ∈ K, oblP_fuel k ℓ m)%I ⊢ oblP_fuels K m.
+  Proof. iIntros "H". iApply (big_sepS_impl with "H"). iIntros "!> %% $". Qed.
+
+  Lemma oblP_fuels_add_obl K k ℓ n :
+    oblP_fuel k ℓ n -∗ oblP_fuels K n -∗ oblP_fuels ({[k]} ∪ K) n.
+  Proof.
+    iIntros "H2 H1". iApply (big_sepS_union_2 with "[H2] H1"). iApply big_sepS_singleton. iFrame.
+  Qed.
+
+  Lemma oblP_fuels_add_obls K1 K2 n :
+    oblP_fuels K1 n -∗ oblP_fuels K2 n -∗ oblP_fuels (K1 ∪ K2) n.
+  Proof. iIntros "H1 H2". iApply (big_sepS_union_2 with "H1 H2"). Qed.
+
+  Lemma oblP_fuels_remove_obl k K n :
+    oblP_fuels K n -∗ oblP_fuels (K ∖ {[k]}) n.
+  Proof.
+    iIntros "H". destruct (decide (k ∈ K)); cycle 1.
+    { replace (K ∖ {[k]}) with K by set_solver. auto. }
+    iPoseProof (big_sepS_delete _ _ k with "H") as "[_ $]". auto.
+  Qed.
+
+  Lemma oblP_fuels_remove_obls K2 K1 n :
+    oblP_fuels K1 n -∗ oblP_fuels (K1 ∖ K2) n.
+  Proof.
+    rewrite -(difference_union_intersection_L K1 K2).
+    iIntros "H". iPoseProof (big_sepS_union with "H") as "[H1 H2]". 1: set_solver.
+    rewrite (difference_union_intersection_L K1 K2). iFrame.
   Qed.
 
   (** ** Witness induction over obligation fuel *)
