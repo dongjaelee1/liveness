@@ -8,11 +8,10 @@
       [mupd_nd_step]);
     - [obls_lef]: the same, and obligations may also be discharged (every round of [mupd]);
     - [wits_ndf] / [wits_lef]: witnesses do not increase (and may be discharged for [lef]).
-    They imply the coarse relations [obls_nd] / [obls_le] seen by adequacy. *)
+    [obls_lef] implies the coarse relation [obls_le] seen by adequacy. *)
 
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.algebra Require Import ordinal_wfocm.
 From lantana.base_logic Require Export owit.
 
 Section rels.
@@ -57,17 +56,6 @@ Section rels.
     exists g2. split; first done. right. by constructor.
   Qed.
 
-  Lemma obls_ndf_obls_nd Ω1 Ω2 : obls_ndf Ω1 Ω2 → obls_nd Ω1 Ω2.
-  Proof.
-    intros H. split.
-    - intros k Hk. apply elem_of_dom in Hk as [g1 Hk].
-      destruct (H k g1 Hk) as (g2& Hg2& _). apply elem_of_dom. eauto.
-    - intros k o1 o2 H1 H2. destruct (H k o1 H1) as (g2& Hg2& Hrel).
-      rewrite H2 in Hg2. injection Hg2 as <-. destruct Hrel as [->|Hp].
-      + destruct o1; simpl; auto. left. split; [reflexivity|done].
-      + inversion Hp; subst. simpl. by right.
-  Qed.
-
   Lemma obls_lef_obls_le Ω1 Ω2 : obls_lef Ω1 Ω2 → obls_le Ω1 Ω2.
   Proof.
     intros H. split.
@@ -95,12 +83,6 @@ Section rels.
     - destruct (W2 !! k) as [w2|] eqn:E2; last constructor.
       exfalso. assert (k ∈ dom W1) as Hk; last by apply not_elem_of_dom in E1.
       apply Hdom. apply elem_of_dom. eauto.
-  Qed.
-
-  Lemma obls_ndf_dom Ω1 Ω2 : obls_ndf Ω1 Ω2 → dom Ω1 ⊆ dom Ω2.
-  Proof.
-    intros H k Hk. apply elem_of_dom in Hk as [g1 Hk].
-    destruct (H k g1 Hk) as (g2& Hg2& _). apply elem_of_dom. eauto.
   Qed.
 
 End rels.
@@ -158,7 +140,6 @@ Section owit_rels.
         destruct (Ω1 !! x); inversion Ix; inversion Ix1.
   Qed.
 
-
   Lemma obls_lef_insert_step (Ω : obls) k g1 g2 :
     Ω !! k = Some g1 → obl_step g1 g2 → obls_lef Ω (<[k:=g2]> Ω).
   Proof.
@@ -190,3 +171,107 @@ Section owit_rels.
   Qed.
 
 End owit_rels.
+
+(** * Choice of witnesses
+
+    [owit_inv_lb γ Ω W]: the witness of every assigned obligation (fuel [a], owner [i]) is at
+    least [γ i a]. After a round [obls_lef Ω1 Ω2], witnesses that keep the invariants exist. *)
+Section witness_choice.
+  Context `{OMC : !ord_mono_fun_class}.
+
+  Definition owit_inv_lb (γ : obl_owner → obl_fuel → obl_fuel) (Ω : obls) (W : witnesses) : Prop :=
+    map_Forall2
+      (λ (_ : oid) (g : obl) (w : witness),
+         match g with
+         | obl_assigned a i => match w with
+                              | witness_assigned b => (γ i a) w≤ b
+                              | witness_discharged => False
+                              end
+         | obl_discharged => match w with
+                           | witness_assigned _ => False
+                           | witness_discharged => True
+                           end
+         end)
+      Ω W.
+
+  Definition owit_inv_lb_mon (γ : obl_owner → obl_fuel → obl_fuel) : Prop :=
+    (∀ a b i j, (a w< b) → (γ i a w< γ j b)) ∧ (∀ i a, γ i a w≤ η a).
+
+  (** Choosing a map pointwise. *)
+  Lemma map_Forall2_choice {A B : Type} (Ω2 : gmap oid A) (P : oid → A → B → Prop) :
+    (∀ k a, Ω2 !! k = Some a → ∃ b, P k a b) → ∃ W2 : gmap oid B, map_Forall2 P Ω2 W2.
+  Proof.
+    induction Ω2 as [|k a Ω2 Hk IH] using map_ind; intros HP.
+    { exists ∅. intros i. rewrite !lookup_empty. constructor. }
+    destruct IH as [W2 HW2].
+    { intros i b Hi. apply HP. rewrite lookup_insert_ne; first done. intros ->. by rewrite Hk in Hi. }
+    destruct (HP k a) as [b Hb]; first by rewrite lookup_insert_eq.
+    exists (<[k:=b]> W2). intros i. destruct (decide (i = k)) as [->|Hne].
+    - rewrite !lookup_insert_eq. by constructor.
+    - rewrite !lookup_insert_ne; auto.
+  Qed.
+
+  (** The witness chosen for an obligation that changed. *)
+  Definition wit_of (γ : obl_owner → obl_fuel → obl_fuel) (g : obl (OC:=ord_obl_class)) :
+    witness (OC:=ord_obl_class) :=
+    match g with
+    | obl_assigned a i => witness_assigned (γ i a)
+    | obl_discharged => witness_discharged
+    end.
+
+  Lemma owit_inv_exists_witnesses γ Ω1 Ω2 W1 :
+    owit_inv_lb_mon γ →
+    obls_lef Ω1 Ω2 →
+    owit_inv Ω1 W1 →
+    owit_inv_lb γ Ω1 W1 →
+    ∃ W2, wits_lef W1 W2 ∧ owit_inv Ω2 W2 ∧ owit_inv_lb γ Ω2 W2.
+  Proof.
+    intros [GMon GSched] Step Inv LB.
+    destruct (map_Forall2_choice Ω2
+      (λ k g2 w2,
+         (match (g2 : obl (OC:=ord_obl_class)), (w2 : witness (OC:=ord_obl_class)) with
+          | obl_assigned a _, witness_assigned b => b w≤ η a
+          | obl_discharged, witness_discharged => True
+          | _, _ => False
+          end) ∧
+         (match (g2 : obl (OC:=ord_obl_class)) with
+          | obl_assigned a i => match (w2 : witness (OC:=ord_obl_class)) with
+                               | witness_assigned b => γ i a w≤ b
+                               | witness_discharged => False
+                               end
+          | obl_discharged => match (w2 : witness (OC:=ord_obl_class)) with
+                             | witness_assigned _ => False
+                             | witness_discharged => True
+                             end
+          end) ∧
+         (∀ w1, W1 !! k = Some w1 → wit_le w1 w2))) as [W2 HW2].
+    { intros k g2 Hg2. destruct (Classical_Prop.classic (Ω1 !! k = Some g2)) as [Hsame|Hdiff].
+      - pose proof (Inv k) as Ik. pose proof (LB k) as Lk. rewrite Hsame in Ik, Lk.
+        destruct (W1 !! k) as [w1|] eqn:Hw1; inversion Ik as [? ? Hm|]; subst.
+        inversion Lk as [? ? Hl|]; subst.
+        exists w1. split_and!; [done|done|]. intros w1' [=<-].
+        destruct g2, w1; simpl in *; try done; reflexivity.
+      - exists (wit_of γ g2). split_and!.
+        + destruct g2; simpl; [apply GSched|done].
+        + destruct g2; simpl; [reflexivity|done].
+        + intros w1 Hw1. pose proof (Inv k) as Ik. rewrite Hw1 in Ik.
+          destruct (Ω1 !! k) as [g1|] eqn:Hg1; inversion Ik as [? ? Hm|]; subst.
+          destruct (Step k g1 Hg1) as (g2'& Hg2'& Hrel). rewrite Hg2 in Hg2'.
+          injection Hg2' as <-. destruct Hrel as [->|Hs]; first done.
+          pose proof (LB k) as Lk. rewrite Hg1 Hw1 in Lk. inversion Lk as [? ? Hl|]; subst.
+          inversion Hs as [? ? Hp| ? ? Hd]; subst.
+          * inversion Hp; subst. destruct w1; simpl in *; try done.
+            apply WFOCM.lt_le. eapply WFOCM.lt_le_lt; last done. by apply GMon.
+          * inversion Hd; subst. destruct w1; simpl in *; done. }
+    exists W2. split_and!.
+    - intros k w1 Hw1. pose proof (Inv k) as Ik. rewrite Hw1 in Ik.
+      destruct (Ω1 !! k) as [g1|] eqn:Hg1; inversion Ik; subst.
+      destruct (Step k g1 Hg1) as (g2& Hg2& _).
+      pose proof (HW2 k) as Hk. rewrite Hg2 in Hk.
+      destruct (W2 !! k) as [w2|] eqn:Hw2; inversion Hk as [? ? (_& _& Hle)|]; subst.
+      exists w2. split; first done. by apply Hle.
+    - eapply map_Forall2_impl; first done. by intros ??? (?&_&_).
+    - eapply map_Forall2_impl; first done. by intros ??? (_&?&_).
+  Qed.
+
+End witness_choice.

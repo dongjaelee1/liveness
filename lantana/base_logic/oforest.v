@@ -1,8 +1,9 @@
 (** * Ghost state of obligation forests
 
-    The invariant [oforest Ω Θ] is the fifth conjunct of [model_interp]. Every live obligation of [Ω] is a node of the forest and has a parent: a thread or
-    another obligation ([Par]). The children of each parent are kept in a ghost map ([Kids])
-    whose fragments are the children predicates of the logic.
+    The invariant [oforest Ω Θ] is the fifth conjunct of [model_interp]. Every live obligation
+    of [Ω] is a node of the forest and has a parent: a thread or another obligation ([Par]).
+    The children of each parent are kept in a ghost map ([Kids]) whose fragments are the
+    children predicates of the logic.
 
     - The owner of an obligation (in [Ω]) is the owner of its parent; children of a thread are
       owned by that thread.
@@ -12,13 +13,11 @@
       of an obligation burn fuel together with it, without any user resource.
     - The fuel of every obligation stays below its initial fuel ([oblG_bound]). *)
 
-From iris.algebra Require Import gset gmap reservation_map.
-From iris.bi.lib Require Import fractional.
+From iris.algebra Require Import reservation_map.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.algebra Require Import ordinal_wfocm bank.
-From lantana.base_logic Require Export osat othread.
-From lantana.base_logic Require Export parent model_rel.
+From lantana.algebra Require Import bank.
+From lantana.base_logic Require Export osat othread parent model_rel.
 From transfinite.base_logic.lib Require Import ghost_map.
 
 Module oforestGS.
@@ -144,9 +143,6 @@ Section forest_pure.
     - done.
     - set_solver.
   Qed.
-
-  Lemma forest_owned_empty_set Ω i : forest_owned Ω ∅ i = ∅.
-  Proof. by rewrite /forest_owned filter_empty_L. Qed.
 
   (** A thread without children owns no node (every node has a chain of parents ending at
       its owner, by well-founded induction on the fuel). *)
@@ -462,11 +458,6 @@ Section forest_pure.
   Lemma kids_of_dom Par X : kids_of Par X ⊆ dom Par.
   Proof. intros x (c& Hc& _)%elem_of_kids_of. by eapply elem_of_dom_2. Qed.
 
-  Lemma kids_step_mono Par Y1 Y2 : Y1 ⊆ Y2 → kids_step Par Y1 ⊆ kids_step Par Y2.
-  Proof.
-    intros H x. rewrite /kids_step !elem_of_union !elem_of_kids_of. naive_solver.
-  Qed.
-
   Lemma iter_kids_step_sub Par n k :
     Nat.iter n (kids_step Par) {[k]} ⊆ {[k]} ∪ dom Par.
   Proof.
@@ -544,9 +535,6 @@ Section forest_pure.
         + right. exists c. split; first done. set_solver. }
     destruct (Hgen _ Hx) as [->|(c& Hc& Hin)]; [by left|right]. eauto.
   Qed.
-
-  Lemma subtree_dom Par k : subtree Par k ⊆ {[k]} ∪ dom Par.
-  Proof. apply iter_kids_step_sub. Qed.
 
   (** All nodes of the subtree of a node [k] are nodes with the owner of [k]. *)
   Lemma subtree_owner Ω Θ Par Kids k x :
@@ -793,6 +781,7 @@ Section oforest.
     iApply (ghost_map_lookup with "A F").
   Qed.
 
+  (** ** Threads: allocation and termination *)
   Lemma oforest_alloc_thread Ω Θ i :
     i ∉ Θ →
     oforest Ω Θ ∗ othreadG_elem i ∗ othreadG_exec i (1/2/2) ∗ othreadG_obls i ∅
@@ -842,6 +831,7 @@ Section oforest.
     iApply (big_sepS_delete _ _ _ Hi). iFrame "Ts Ei". iRight. by iFrame "Td Ki".
   Qed.
 
+  (** ** Obligations: allocation, steps of a thread and discharge *)
   (** A new obligation [k] (already allocated in the model) becomes a leaf below [p]. *)
   Lemma oforest_alloc_obl Ω Θ p K k a i β :
     Ω !! k = None →
@@ -1000,7 +990,6 @@ Section oforest.
       apply (fwf_kids_dom _ _ _ _ WF (PObl c)). eauto. }
     by rewrite obl_fuel_of_insert_ne.
   Qed.
-
 
   (** A step of thread [i]: the children of [i] spend the units given by the user; every
       other node owned by [i] splits one unit off its stored piece, keeping exactly the fuel
@@ -1176,7 +1165,6 @@ Section oforest.
     assert (c ≠ k) by (intros ->; by apply (Hnochild x)).
     by rewrite obl_fuel_of_insert_ne.
   Qed.
-
 
   (** ** Owner change of obligations *)
   (** Obligation [x], owned by [t], gets the new owner [j] and burns [c]. *)
@@ -1453,7 +1441,6 @@ Section oforest.
       assert (HcS : c ∉ S) by (intros HcS; by apply HxS, (subtree_closed _ _ _ c)).
       rewrite (chown_rel_fuel_out _ _ _ _ _ _ Hrel) //.
   Qed.
-
 
   (** ** Moving a grandchild up: [x], a child of [k], moves to the parent [p] of [k]
 

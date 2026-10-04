@@ -1,9 +1,16 @@
+(** * Model rounds of physical steps
+
+    The model rounds taken by the program logic at a physical step: [mprog] for the step of a
+    thread (progress of its obligations, credits for witnesses) and [mphys] for the change of
+    the physical state and thread pool (forked threads). *)
+
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
 From lantana.base_logic Require Export opreds.
 Import uPred.
 
-(* Ensure progress of thread i's obligations and every live witnesses. *)
+(** [mprog n Θ i P]: the model round of a step of thread [i]. The obligations of [i] make
+    progress and the assigned witnesses make progress. *)
 Definition mprog `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ i : iPropO Σ -d> iPropO Σ :=
   (λ P,
      ∀ h a Ω1 W1,
@@ -12,7 +19,8 @@ Definition mprog `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ i : iPro
      ∀ W2, (⌜(W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗
            (model_interp (h ++ [(n, Ω2)]) (S a) Ω2 W2 n Θ) ∗ P)%I.
 
-Notation "'@={' n , Θ , i '}=↓' P" := (mprog n Θ i P) (at level 99, P at level 200, format "@={ n , Θ , i }=↓  P").
+Notation "'@={' n , Θ , i '}=↓' P" := (mprog n Θ i P)
+  (at level 99, P at level 200, format "@={ n , Θ , i }=↓  P").
 
 Section mprog.
   Context `{SI : sidx} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.
@@ -189,14 +197,16 @@ Section mprog.
 
 End mprog.
 
-(* Update physical states. *)
+(** [mphys n1 n2 Θ1 Θ2 P]: a model round without change of the obligations, from the
+    physical state [n1] with thread pool [Θ1] to [n2] with [Θ2]. *)
 Definition mphys `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n1 n2 Θ1 Θ2 : iPropO Σ -d> iPropO Σ :=
   (λ P,
      ∀ h a Ω W,
      (model_interp h a Ω W n1 Θ1) ={∅}=∗
      (model_interp (h ++ [(n2, Ω)]) (S a) Ω W n2 Θ2) ∗ P)%I.
 
-Notation "'@={' n1 , n2 , Θ1 , Θ2 '}=>' P" := (mphys n1 n2 Θ1 Θ2 P) (at level 99, P at level 200, format "@={ n1 , n2 , Θ1 , Θ2 }=>  P").
+Notation "'@={' n1 , n2 , Θ1 , Θ2 '}=>' P" := (mphys n1 n2 Θ1 Θ2 P)
+  (at level 99, P at level 200, format "@={ n1 , n2 , Θ1 , Θ2 }=>  P").
 
 Section mphys.
   Context `{SI : sidx} `{!mupdGS Σ} `{OMC : !ord_mono_fun_class}.

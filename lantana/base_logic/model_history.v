@@ -1,6 +1,10 @@
+(** * History of the model
+
+    The model history is a list of events [(n, Ω)]: a physical step index and the obligations.
+    It grows monotonically ([event_le]); [model_history_interp] holds its authoritative part and
+    [event_obl] records that an obligation had some state at some event. *)
+
 From iris.algebra Require Import mono_list.
-From iris.bi Require Import cmra.
-From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
@@ -44,8 +48,8 @@ Definition model_history_wf `{OC : obl_class} (h : list (nat * obls)) : Prop :=
   ∀ i (e1 e2 : nat * obls),
   (h !! i = Some e1) → (h !! (S i) = Some e2) → event_le e1 e2.
 
-(** Properties of wf. *)
-Section proof.
+(** Properties of well-formed histories *)
+Section history_wf.
   Context `{OC : obl_class}.
 
   Global Instance event_le_reflexive : Reflexive event_le.
@@ -80,7 +84,8 @@ Section proof.
   Qed.
 
   Lemma model_history_wf_app h1 h2 :
-    (model_history_wf h1 ∧ model_history_wf h2 ∧ (∀ i e a, h1 !! i = Some e → head h2 = Some a → event_le e a))
+    (model_history_wf h1 ∧ model_history_wf h2 ∧
+       (∀ i e a, h1 !! i = Some e → head h2 = Some a → event_le e a))
     ↔ model_history_wf (h1 ++ h2).
   Proof.
     rewrite head_lookup. split; intros.
@@ -106,19 +111,7 @@ Section proof.
         * apply lookup_lt_Some in H0. lia.
   Qed.
 
-  Lemma model_history_wf_lookup_2 h i j e1 e2 :
-    model_history_wf h → h !! i = Some e1 → h !! j = Some e2 → event_le e1 e2 →
-    (i ≤ j ∨ (e1.1 = e2.1 ∧ obls_keep e1.2 e2.2)).
-  Proof.
-    revert i j e1 e2. induction h; intros. 1: done.
-    destruct i, j; simpl in *; auto. 1: lia.
-    - right. inv H1. apply model_history_wf_cons in H. destruct H. apply H1 in H0.
-      destruct H0, H2. destruct e1, e2. split; first lia. apply obls_le_antisymmetric; eauto.
-    - apply model_history_wf_cons in H. destruct H.
-      pose proof (IHh _ _ _ _ H H0 H1 H2). destruct H4; eauto. left. lia.
-  Qed.
-
-End proof.
+End history_wf.
 
 Local Definition mhG_history_auth_def `{SI : sidx} `{OC : obl_class} `{@mhistGS SI Σ OC}
   (h : list (nat * obls)) : iProp Σ :=
@@ -139,8 +132,8 @@ Local Definition mhG_event_unseal :
   @mhG_event = @mhG_event_def := mhG_event_aux.(seal_eq).
 Global Arguments mhG_event {SI OC Σ _}.
 
-(** Properties *)
-Section proof.
+(** Rules of the history ghost state *)
+Section history_ghost.
   Context `{SI : sidx} `{OC : obl_class} `{HIST : !mhistGS Σ}.
 
   Global Instance mhG_history_auth_timeless h : Timeless (mhG_history_auth h).
@@ -206,7 +199,7 @@ Section proof.
     - rewrite last_lookup H0 in H3. done.
   Qed.
 
-End proof.
+End history_ghost.
 
 Definition model_history_interp `{SI : sidx} `{OC : obl_class} `{@mhistGS SI Σ OC}
   (h : list (prod nat obls)) (i n : nat) (Ω : obls) : iProp Σ :=
@@ -223,13 +216,8 @@ Local Definition event_obl_unseal :
   @event_obl = @event_obl_def := event_obl_aux.(seal_eq).
 Global Arguments event_obl {SI OC Σ _}.
 
-(* We use this to record that Until was alive at this point of execution. *)
-Definition event_obl_alive `{SI : sidx} `{OC : obl_class} `{@mhistGS SI Σ OC}
-  (i : nat) (e : nat * obls) (k : oid) : iProp Σ :=
-  (∃ o, event_obl i e k o ∧ ⌜ obl_le o obl_discharged ⌝).
-
-(** Properties *)
-Section hist.
+(** Rules of the history interpretation and of events *)
+Section history_interp.
   Context `{SI : sidx} `{OC : obl_class} `{HIST : !mhistGS Σ}.
 
   Global Instance model_history_interp_timeless h i n Ω : Timeless (model_history_interp h i n Ω).
@@ -313,7 +301,7 @@ Section hist.
     destruct H2. eapply H3; eauto.
   Qed.
 
-End hist.
+End history_interp.
 
 (* Allocation of a history interpretation. *)
 Lemma model_history_interp_init `{SI : sidx} `{OC : obl_class} `{!mhistGpreS Σ} n Ω :

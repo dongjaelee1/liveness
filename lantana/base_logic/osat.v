@@ -1,16 +1,20 @@
-From iris.algebra Require Import gmap_view gset coPset reservation_map dfrac_agree mono_nat.
-From iris.bi Require Import cmra.
+(** * Ghost state of obligations
+
+    The invariant [osat Ω] ties the obligation map [Ω] (with ordinal fuel) to per-obligation
+    ghost state: a fuel bound, the state (assigned or discharged), fuel credits and the owner.
+    Rules for progress, owner change and discharge of obligations. *)
+
+From iris.algebra Require Import gmap_view reservation_map dfrac_agree mono_nat.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From lantana.algebra Require Import bank.
 From lantana.algebra Require Export ordinal_wfocm ordinal_ucmra.
-(* From lantana.algebra Require Export ordinal_wfocm layer. *)
 From lantana.base_logic Require Export obligation.
 
-(* FIXME: move to somewhere *)
-Section aux.
+(** Allocation of a fresh key of a reservation map. *)
+Section reservation_map_alloc.
   Context `{SI : sidx} {Σ : gFunctors} {A : cmra} {GA : inG Σ A} {GR : inG Σ (reservation_mapR A)}.
 
   Lemma reservation_map_token_alloc_singleton (name : gname) D k a :
@@ -38,12 +42,11 @@ Section aux.
     by iFrame.
   Qed.
 
-End aux.
+End reservation_map_alloc.
 
+(** Obligations with ordinal fuel. *)
 Global Instance ord_obl_class : obl_class :=
   Build_obl_class Ord.t ord_wfocm_pack.
-
-(* Canonical Structure layerO `{SI : indexT} := leibnizO layer. *)
 
 (** The ghost state for obls *)
 Module osatGS.
@@ -102,7 +105,7 @@ Local Definition oblG_bound_auth_id `{SI : sidx} `{!osatGS Σ}
   (m : gmap oid Ord.t) : iProp Σ :=
   own bound_name (gmap_view_auth (V:=agreeR (Ord.t)) (DfracOwn 1) (to_agree <$> m)).
 
-(* Caputres P Until Q, need two states: in P and in Q. *)
+(* State: assigned with a boolean flag (two sub-states), or discharged (persistent). *)
 Definition oblG_assigned `{SI : sidx} `{!osatGS Σ}
   (k : oid) (b : bool) (q : Qp) : iProp Σ :=
   own state_name (reservation_map_data k (●MN{#q} (Nat.b2n b))).
@@ -413,12 +416,14 @@ Section osat.
     - iEval (rewrite -cash_add). iSplitL "H1"; iFrame.
   Qed.
   Lemma oblG_fuel_split_list L a0 a1 :
-    ([∗ list] k ∈ L, oblG_fuel k (a0 w+ a1)) ⊣⊢ ([∗ list] k ∈ L, oblG_fuel k a0) ∗ ([∗ list] k ∈ L, oblG_fuel k a1).
+    ([∗ list] k ∈ L, oblG_fuel k (a0 w+ a1))
+    ⊣⊢ ([∗ list] k ∈ L, oblG_fuel k a0) ∗ ([∗ list] k ∈ L, oblG_fuel k a1).
   Proof.
     rewrite -big_sepL_sep. iApply big_sepL_proper; intros. apply oblG_fuel_split.
   Qed.
   Lemma oblG_fuel_split_set L a0 a1 :
-    ([∗ set] k ∈ L, oblG_fuel k (a0 w+ a1)) ⊣⊢ ([∗ set] k ∈ L, oblG_fuel k a0) ∗ ([∗ set] k ∈ L, oblG_fuel k a1).
+    ([∗ set] k ∈ L, oblG_fuel k (a0 w+ a1))
+    ⊣⊢ ([∗ set] k ∈ L, oblG_fuel k a0) ∗ ([∗ set] k ∈ L, oblG_fuel k a1).
   Proof.
     rewrite -big_sepS_sep. iApply big_sepS_proper; intros. apply oblG_fuel_split.
   Qed.
@@ -431,14 +436,16 @@ Section osat.
   Qed.
   Lemma oblG_fuel_mon_split_list L a0 a1 a2 :
     a0 w+ a1 w≤ a2 →
-    ([∗ list] k ∈ L, oblG_fuel k a2) ⊢ |==> ([∗ list] k ∈ L, oblG_fuel k a0) ∗ ([∗ list] k ∈ L, oblG_fuel k a1).
+    ([∗ list] k ∈ L, oblG_fuel k a2)
+    ⊢ |==> ([∗ list] k ∈ L, oblG_fuel k a0) ∗ ([∗ list] k ∈ L, oblG_fuel k a1).
   Proof.
     iIntros (LE) "H". iPoseProof (oblG_fuel_mon_list with "H") as ">H"; first done.
     by iApply oblG_fuel_split_list.
   Qed.
   Lemma oblG_fuel_mon_split_set L a0 a1 a2 :
     a0 w+ a1 w≤ a2 →
-    ([∗ set] k ∈ L, oblG_fuel k a2) ⊢ |==> ([∗ set] k ∈ L, oblG_fuel k a0) ∗ ([∗ set] k ∈ L, oblG_fuel k a1).
+    ([∗ set] k ∈ L, oblG_fuel k a2)
+    ⊢ |==> ([∗ set] k ∈ L, oblG_fuel k a0) ∗ ([∗ set] k ∈ L, oblG_fuel k a1).
   Proof.
     iIntros (LE) "H". iPoseProof (oblG_fuel_mon_set with "H") as ">H"; first done.
     by iApply oblG_fuel_split_set.
@@ -454,14 +461,16 @@ Section osat.
   Qed.
   Lemma oblG_fuel_lt_list L a0 a1 :
     a0 w< a1 →
-    ([∗ list] k ∈ L, oblG_fuel k a1) ⊢ |==> ([∗ list] k ∈ L, oblG_fuel k a0) ∗ ([∗ list] k ∈ L, ∃ c, ⌜ wzero w< c ⌝ ∗ oblG_fuel k c).
+    ([∗ list] k ∈ L, oblG_fuel k a1)
+    ⊢ |==> ([∗ list] k ∈ L, oblG_fuel k a0) ∗ ([∗ list] k ∈ L, ∃ c, ⌜ wzero w< c ⌝ ∗ oblG_fuel k c).
   Proof.
     iIntros (LT) "H". rewrite -big_sepL_sep. iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
     iModIntro. iIntros. by iApply oblG_fuel_lt.
   Qed.
   Lemma oblG_fuel_lt_set L a0 a1 :
     a0 w< a1 →
-    ([∗ set] k ∈ L, oblG_fuel k a1) ⊢ |==> ([∗ set] k ∈ L, oblG_fuel k a0) ∗ ([∗ set] k ∈ L, ∃ c, ⌜ wzero w< c ⌝ ∗ oblG_fuel k c).
+    ([∗ set] k ∈ L, oblG_fuel k a1)
+    ⊢ |==> ([∗ set] k ∈ L, oblG_fuel k a0) ∗ ([∗ set] k ∈ L, ∃ c, ⌜ wzero w< c ⌝ ∗ oblG_fuel k c).
   Proof.
     iIntros (LE) "H". rewrite -big_sepS_sep. iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
     iModIntro. iIntros. by iApply oblG_fuel_lt.
@@ -722,7 +731,7 @@ Section osat.
     iApply big_sepM_insert; first auto. iFrame. iFrame "Gwf Gl". eauto.
   Qed.
 
-  (** ghost lock step rules: progress, unlock, retire *)
+  (** Progress, owner change and discharge *)
   Lemma osat_progress_one Ω k a t c :
     (Ω !! k = Some (obl_assigned a t)) →
     (Ord.O < c)%ord →
@@ -751,7 +760,8 @@ Section osat.
   Lemma osat_progress Ω (C : obl_cond) :
     (∀ k g, C k g → ∃ a o, g = (obl_assigned a o)) →
     osat Ω ∗
-    ([∗ map] k ↦ g ∈ Ω, (⌜ C k g ⌝ ∗ ∃ c, ⌜ (Ord.O < c)%ord ⌝ ∗ oblG_fuel k c) ∨ (⌜ ¬ C k g ⌝))
+    ([∗ map] k ↦ g ∈ Ω, (⌜ C k g ⌝ ∗ ∃ c, ⌜ (Ord.O < c)%ord ⌝ ∗ oblG_fuel k c) ∨
+                        (⌜ ¬ C k g ⌝))
     ⊢ |==> ∃ Ω', osat Ω' ∗ (⌜ Ω ↪ₚ Ω' | C ⌝).
   Proof.
     iIntros (HC) "(Hsat & Cs)".
@@ -825,7 +835,7 @@ Section osat.
         { subst. rewrite LUi2. rewrite lookup_insert_eq. econstructor. done. }
         rewrite lookup_insert_ne; auto. done.
     }
-    (* Disjoint gl_conds *)
+    (* Disjoint conditions *)
     destruct Prog1 as [Prog1 Hkeep1], Prog2 as [Prog2 Hkeep2]. split; last (etrans; eauto).
     eapply obls_cond_rel_split_cond. 4,5: eauto. all: simpl.
     - intros. rewrite dom_insert_L. set_solver.

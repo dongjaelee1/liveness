@@ -1,14 +1,15 @@
-From iris.algebra Require Import gmap_view gset coPset reservation_map dfrac_agree mono_nat.
-From iris.bi Require Import cmra.
-From iris.bi.lib Require Import fractional.
+(** * Invariants of obligations
+
+    [oblG_inv N k q P Q R]: an invariant that holds [P] or [Q] while the obligation [k] is
+    assigned (depending on its flag) and [R] once it is discharged. *)
+
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
-From lantana.algebra Require Import bank.
 From lantana.algebra Require Export ordinal_wfocm layer.
 From lantana.base_logic Require Export osat invariants.
 
-(* Each obl has this variant as an invariant: P until (Q and always R). *)
+(* The three states of the invariant. *)
 Definition oblG_variant `{SI : sidx} `{!osatGS.osatGS Σ}
   (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
   (oblG_assigned k false q ∗ P) ∨

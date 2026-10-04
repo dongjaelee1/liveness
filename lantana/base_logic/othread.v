@@ -1,5 +1,10 @@
-From iris.algebra Require Import agree gset gmap_view reservation_map mono_nat.
-From iris.bi Require Import cmra.
+(** * Ghost state of threads
+
+    The invariant [othread TP] tracks, for every thread of the pool [TP], whether it runs or
+    has terminated and which obligations it owns; [oassigned] relates every obligation to its
+    owner thread. *)
+
+From iris.algebra Require Import gset gmap_view reservation_map mono_nat.
 From iris.bi.lib Require Import fractional.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -87,7 +92,7 @@ Global Instance: Params (@othreadG_done) 3 := {}.
 Local Definition othreadG_exec_token_id `{SI : sidx} `{!othreadGS Σ} TP : iProp Σ :=
   (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))).
 
-(* Elem: keeps the fact that a key is inside a map *)
+(* Elem: the thread is in the pool *)
 Definition othreadG_elem `{SI : sidx} `{!othreadGS Σ} (i : positive) : iProp Σ :=
   own elem_name (gmap_view_frag i DfracDiscarded ()).
 Global Typeclasses Opaque othreadG_elem.
@@ -600,7 +605,8 @@ Section othread.
   (** oassigned rules *)
   Lemma oassigned_add_obl Gls k :
     oassigned Gls ∗
-    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i) ∨ oblG_discharged k))
+    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i)
+                   ∨ oblG_discharged k))
     ⊢ oassigned ({[k]} ∪ Gls).
   Proof.
     iIntros "(A& H)". rewrite /oassigned -!lock. destruct (decide (k ∈ Gls)).
@@ -617,7 +623,8 @@ Section othread.
     k ∈ Gls →
     oassigned Gls
     ⊢ oassigned (Gls ∖ {[k]}) ∗
-    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i) ∨ oblG_discharged k)).
+    (oblG_elem k ∗ ((∃ i, oblG_owner k i (1/2/2/2/2) ∗ othreadG_owns i k (1/2/2) ∗ othreadG_elem i)
+                   ∨ oblG_discharged k)).
   Proof.
     rewrite /oassigned -!lock. iIntros (INk) "A".
     iPoseProof (big_sepS_delete with "A") as "[$ $]". auto.

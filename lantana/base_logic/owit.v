@@ -1,6 +1,9 @@
-From iris.algebra Require Import gmap_view reservation_map.
-(* From iris.algebra Require Import gmap_view reservation_map dfrac_agree mono_nat. *)
-From iris.bi Require Import cmra.
+(** * Ghost state of witnesses
+
+    The invariant [owit W] holds a credit for every assigned witness of [W] and [owit_inv Ω W]
+    relates witnesses to obligations. Rules for witness credits and witness steps. *)
+
+From iris.algebra Require Import reservation_map.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
@@ -8,7 +11,7 @@ From lantana.algebra Require Export wfocm.
 From lantana.algebra Require Import bcred.
 From lantana.base_logic Require Export witness osat.
 
-(** The ghost state for liveness obls *)
+(** The ghost state for witnesses *)
 Module owitGS.
 
   Class owitGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
@@ -96,7 +99,7 @@ Section owit.
   Local Instance witG_bound_token_id_timeless E : Timeless (witG_bound_token_id E).
   Proof. rewrite /witG_bound_token_id. apply _. Qed.
 
-  (* wlsat *)
+  (* Invariant *)
   Global Instance owit_timeless W : Timeless (owit W).
   Proof. rewrite /owit -lock. apply _. Qed.
 
@@ -240,7 +243,7 @@ Section owit.
     iDestruct "WH1" as "(%& %& $)". iPureIntro. etransitivity; eauto.
   Qed.
 
-  (* witness_step rules: progress, discharge, expire *)
+  (** Witness steps: progress and discharge *)
   Lemma owit_progress_one W k w1 w2 :
     W !! k = Some (witness_assigned w1) →
     witness_step (witness_assigned w1) (witness_assigned w2) →
@@ -361,200 +364,6 @@ Section owit.
   Lemma owit_inv_dom Ω W :
     owit_inv Ω W → dom Ω = dom W.
   Proof. intros. eapply map_Forall2_dom_L; eauto. Qed.
-
-  Lemma owit_inv_cond_step_same_gls C Ω W1 W2 :
-    owit_inv Ω W1 →
-    (W1 ↓ₛ W2 | C) →
-    owit_inv Ω W2 →
-    wits_mon W1 W2.
-  Proof.
-    revert Ω W2. induction W1 using map_ind; intros.
-    { apply map_Forall2_empty_inv_l in H0. subst. done. }
-    rename x into w1, m into W1, W2 into W2', Ω into Ω'.
-    apply map_Forall2_insert_inv_r in H0; auto. destruct H0 as (g& Ω& EQO& LUOi& HO1& MFO).
-    apply map_Forall2_insert_inv_l in H1; auto. destruct H1 as (w2& W2& EQW2& LUWi2& HC& MFW).
-    subst. apply map_Forall2_insert in H2; auto. destruct H2 as (How& MFW2).
-    pose proof (IHW1 _ _ MFO MFW MFW2) as IH.
-    apply map_Forall2_insert; auto. split; auto.
-    clear MFW2 MFW MFO IHW1 IH.
-    destruct HC as [[HC Step] | [HC EQ]].
-    - destruct g, w1, w2; inv Step; inv H0; try done. eapply WFOCM.lt_le; auto.
-    - subst. destruct g, w2; try done.
-  Qed.
-  Lemma owit_inv_one_step_same_gls Ω W1 W2 :
-    owit_inv Ω W1 →
-    W1 ↓₁ W2 →
-    owit_inv Ω W2 →
-    wits_mon W1 W2.
-  Proof.
-    intros. apply wits_one_to_wits_cond in H0. destruct H0. eapply (owit_inv_cond_step_same_gls _ Ω W1 W2); eauto.
-  Qed.
-
-  Lemma owit_inv_alloc_same_gls_dom Ω1 Ω2 W1 W2 :
-    dom Ω1 = dom Ω2 →
-    owit_inv Ω1 W1 →
-    (W1 ↓ₐ W2) →
-    owit_inv Ω2 W2 →
-    False.
-  Proof.
-    intros. destruct H1 as (k& LU& g& HE); subst.
-    apply owit_inv_dom in H0, H2. rewrite -H H0 dom_insert_L in H2.
-    apply not_elem_of_dom in LU. set_solver.
-  Qed.
-
-  Lemma owit_inv_step_same_gls Ω W1 W2 :
-    owit_inv Ω W1 →
-    (W1 ↓ W2) →
-    owit_inv Ω W2 →
-    wits_mon W1 W2.
-  Proof.
-    intros. inv H0.
-    - eapply owit_inv_one_step_same_gls; eauto.
-    - exfalso. eapply (owit_inv_alloc_same_gls_dom Ω Ω W1 W2); eauto.
-  Qed.
-  Lemma owit_inv_rc_step_same_gls Ω W1 W2 :
-    owit_inv Ω W1 →
-    (W1 ↓∘ W2) →
-    owit_inv Ω W2 →
-    wits_mon W1 W2.
-  Proof.
-    intros. inv H0.
-    - done.
-    - eapply owit_inv_step_same_gls; eauto.
-  Qed.
-
-  Lemma owit_inv_alloc_same_wits_dom Ω1 Ω2 W1 W2 :
-    dom W1 = dom W2 →
-    owit_inv Ω1 W1 →
-    (Ω1 ↪ₐ Ω2) →
-    owit_inv Ω2 W2 →
-    False.
-  Proof.
-    intros. destruct H1 as (k& LU& ?& HE); subst.
-    apply owit_inv_dom in H0, H2. rewrite -H -H0 dom_insert_L in H2.
-    apply not_elem_of_dom in LU. set_solver.
-  Qed.
-
-  Lemma owit_inv_progress_owner Ω k a t1 W1 :
-    Ω !! k = Some (obl_assigned a t1) →
-    owit_inv Ω W1 →
-    ∀ a' t2,
-    obl_step (obl_assigned a t1) (obl_assigned a' t2) →
-    ∀ W2,
-    W1 ↓∘ W2 →
-    owit_inv (<[k:=(obl_assigned a' t2)]> Ω) W2 →
-    wits_mon W1 W2.
-  (* Below is not necessarily true - Wits can take refelexive step *)
-    (* ∃ w1 w2, W1 !! k = Some (v, witness_assigned w1) ∧ *)
-    (*          witness_step (v, witness_assigned w1) (v, witness_assigned w2) ∧ *)
-    (*          wits_mon (<[k:=(v, witness_assigned w2)]> W1) W2. *)
-  Proof.
-    intros LUO INV1 a' t2 GStep W2 WSStep INV2.
-    inv GStep; inv H.
-    pose proof INV1 as I1. specialize (I1 k). rewrite LUO in I1. inv I1.
-    destruct y; try done. symmetry in H0.
-    pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
-    destruct y; try done. symmetry in H2.
-    eapply (owit_inv_rc_step_same_gls Ω). 1: eapply INV1. 1: eauto.
-    intros i. specialize (INV2 i). destruct (decide (k = i)).
-    - subst. rewrite lookup_insert_eq H2 in INV2. rewrite LUO H2.
-      inv INV2. econstructor.
-      apply η_lt_proper in LTf. etrans; first eauto. eapply WFOCM.lt_le; eauto.
-    - rewrite lookup_insert_ne in INV2; auto.
-  Qed.
-
-  Lemma owit_inv_discharge Ω k a t W1 :
-    Ω !! k = Some (obl_assigned a t) →
-    owit_inv Ω W1 →
-    obl_step (obl_assigned a t) (obl_discharged) →
-    ∀ W2,
-    W1 ↓∘ W2 →
-    owit_inv (<[k:=(obl_discharged)]> Ω) W2 →
-    (∃ b, W1 !! k = Some (witness_assigned b) ∧ wits_mon (<[k:=(witness_discharged)]> W1) W2).
-  Proof.
-    intros LUO INV1 GStep W2 WSStep INV2.
-    inv GStep; inv H.
-    pose proof INV1 as I1. specialize (I1 k). rewrite LUO in I1. inv I1.
-    destruct y; try done. symmetry in H0.
-    pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
-    destruct y; try done. symmetry in H2.
-    eexists. split; first eauto.
-    inv WSStep. inv H; cycle 1.
-    { eapply (owit_inv_alloc_same_gls_dom Ω (<[k:=(obl_discharged)]> Ω)) in H4; eauto; first done.
-      rewrite dom_insert_L. apply elem_of_dom_2 in LUO. set_solver + LUO. }
-    apply wits_one_to_wits_cond in H4. destruct H4 as (?&H4). assert (x = k).
-    { specialize (H4 k). rewrite H0 H2 in H4. inv H4. destruct H6.
-      - destruct H; done.
-      - destruct H; done. }
-    subst x.
-    intros i. specialize (H4 i). destruct (decide (i = k)).
-    { subst. rewrite H2 lookup_insert_eq. econstructor. done. }
-    rewrite lookup_insert_ne; auto.
-    destruct (Ω !! i) eqn:LUO2.
-    - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
-      pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
-      rewrite LUO2 in I4. inv I4. symmetry in H5, H7.
-      rewrite H5 H7 in H4. inv H4. econstructor.
-      destruct H10 as [[HC WS] | [HC WS]]; cycle 1.
-      { inv WS. destruct o, y0; try done. }
-      inv WS.
-    - pose proof INV1 as I3. specialize (I3 i). rewrite LUO2 in I3. inv I3.
-      symmetry in H.
-      pose proof INV2 as I4. specialize (I4 i). rewrite lookup_insert_ne in I4; auto.
-      rewrite LUO2 in I4. inv I4.
-      symmetry in H5. econstructor.
-  Qed.
-
-  Lemma owit_inv_alloc_assigned Ω k W1 :
-    k ∉ dom Ω →
-    owit_inv Ω W1 →
-    ∀ a t W2,
-    W1 ↓∘ W2 →
-    owit_inv (<[k:=(obl_assigned a t)]> Ω) W2 →
-    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_assigned (η a))]> W1) W2).
-  Proof.
-    intros LUO INV1 a t W2 WSStep INV2.
-    apply not_elem_of_dom in LUO.
-    pose proof INV1 as I1. specialize (I1 k). rewrite LUO in I1. inv I1.
-    symmetry in H.
-    pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
-    rename y into w. destruct w; try done. symmetry in H1.
-    split.
-    { apply not_elem_of_dom. auto. }
-    inv WSStep. inv H0.
-    { apply wits_one_dom in H3. exfalso. apply elem_of_dom_2 in H1. apply not_elem_of_dom in H.
-      rewrite H3 in H. set_solver. }
-    destruct H3 as (?&?&?&?).
-    subst. destruct (decide (k = x)).
-    - subst x. rewrite lookup_insert_eq in H1. inv H1. apply map_Forall2_insert; auto.
-      split; auto. reflexivity.
-    - rewrite lookup_insert_ne in H1; auto. rewrite H in H1. inv H1.
-  Qed.
-
-  Lemma owit_inv_alloc_discharged Ω k W1 :
-    k ∉ dom Ω →
-    owit_inv Ω W1 →
-    ∀ W2,
-    W1 ↓∘ W2 →
-    owit_inv (<[k:=(obl_discharged)]> Ω) W2 →
-    (k ∉ dom W1 ∧ wits_mon (<[k:=(witness_discharged)]> W1) W2).
-  Proof.
-    intros LUO INV1 W2 WSStep INV2.
-    apply not_elem_of_dom in LUO.
-    pose proof INV1 as I1. specialize (I1 k). rewrite LUO in I1. inv I1.
-    symmetry in H.
-    pose proof INV2 as I2. specialize (I2 k). rewrite lookup_insert_eq in I2. inv I2.
-    rename y into w. destruct w; try done. symmetry in H1.
-    split.
-    { apply not_elem_of_dom. auto. }
-    inv WSStep. inv H0.
-    { apply wits_one_dom in H3. exfalso. apply elem_of_dom_2 in H1. apply not_elem_of_dom in H.
-      rewrite H3 in H. set_solver. }
-    destruct H3 as (?&?&?&?).
-    subst. destruct (decide (k = x)).
-    - subst x. rewrite lookup_insert_eq in H1. inv H1. done.
-    - rewrite lookup_insert_ne in H1; auto. rewrite H in H1. inv H1.
-  Qed.
 
 End owit.
 
