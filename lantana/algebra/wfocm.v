@@ -1,3 +1,6 @@
+(** Well-founded ordered commutative monoids ([WFOCM]): an [OCM] with a well-founded strict order
+    [ltR] such that [a < c] iff [a + b <= c] for some positive [b]. *)
+
 From stdpp Require Import base.
 From lantana.algebra Require Export ocm.
 
@@ -66,11 +69,13 @@ Module WFOCM.
       - eapply (lt_le_lt _ y0); eauto. eapply (le_lt_lt _ y); eauto.
     Qed.
 
-    Lemma induction_type : forall P : A -> Type, (forall x : A, (forall y : A, ltR y x -> P y) -> P x) -> forall a : A, P a.
+    Lemma induction_type : forall P : A -> Type,
+        (forall x : A, (forall y : A, ltR y x -> P y) -> P x) -> forall a : A, P a.
     Proof using Type*.
       intros. apply (well_founded_induction_type lt_wf). auto.
     Qed.
-    Lemma induction_set : forall P : A -> Set, (forall x : A, (forall y : A, ltR y x -> P y) -> P x) -> forall a : A, P a.
+    Lemma induction_set : forall P : A -> Set,
+        (forall x : A, (forall y : A, ltR y x -> P y) -> P x) -> forall a : A, P a.
     Proof using Type*.
       intros. apply (well_founded_induction lt_wf). auto.
     Qed.
@@ -95,4 +100,3 @@ Infix "w≤" := WFOCM.leR (at level 70).
 Infix "w+" := WFOCM.addO (at level 70).
 Infix "w<" := WFOCM.ltR (at level 70).
 Notation "'wzero'" := OCM.unit (only parsing).
-(* Notation "'wzero'" := OCM.unit (at level 20). *)

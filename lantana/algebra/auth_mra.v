@@ -1,25 +1,27 @@
+(** The camera [auth_mra R] of authoritative monotone knowledge: [●AM[R] a] owns the current
+    value [a] and [◯AM[R] b] knows that [R b a]. The class [auth_mra_class] collects the
+    properties of [R] for the full set of rules. *)
+
 From iris.algebra Require Export auth.
 From iris.algebra Require Import proofmode_classes mra updates.
 From iris.prelude Require Import options.
+From lantana.ordinal Require Import ordinal.
 
 Section mra_aux.
 
   Context `{SI : sidx} {A} {R : relation A}.
   Implicit Types a b : A.
 
-  (* FIXME: what's wrong here? *)
   Lemma to_mra_op_included_R `{!PreOrder R} a b :
     to_mra (R:=R) a ⋅ to_mra b ≼ to_mra a → R b a.
   Proof.
     intros Hi. apply mra_included in Hi.
     assert (H0 : to_mra (R:=R) a ⋅ to_mra b ⋅ to_mra a ≡ to_mra b ⋅ to_mra a).
     { rewrite comm assoc mra_idemp. rewrite comm. auto. }
-    Set Printing All.
     replace (@ofe_equiv _ (@mraO SI A R)) with (@mra_equiv A R) in H0 by done.
     replace (@cmra_op SI (@mraR SI A R)) with (@mra_op A R) in H0 by done.
     rewrite /ucmra_car /cmra_op in Hi. simpl in Hi.
     rewrite /ucmra_op in Hi. simpl in Hi.
-    Unset Printing All.
     assert (Heq : to_mra (R:=R) a ≡ to_mra b ⋅ to_mra a).
     { etransitivity; [apply Hi | apply H0]. }
     apply mra_included in Heq. apply to_mra_included in Heq. auto.
@@ -150,7 +152,7 @@ End auth_mra.
 
 Global Typeclasses Opaque auth_mra_auth auth_mra_know.
 
-(* Properties needed to use the full set of rules *)
+(** * Properties of [R] needed for the full set of rules *)
 Class auth_mra_class {A : Type} (auth_mra_R : A → A → Prop) (auth_mra_equiv : Equiv A):= {
     #[global] auth_mra_R_PreOrder :: PreOrder auth_mra_R;
     #[global] auth_mra_equiv_Reflexive :: Reflexive (≡@{A});
@@ -167,8 +169,7 @@ Class auth_mra_eq_class {A : Type} (auth_mra_eq_R : A → A → Prop) := {
 Global Instance auth_mra_eq_instance `{AMEC : @auth_mra_eq_class A R} : auth_mra_class R (=@{A}).
 Proof. destruct AMEC. econstructor; eauto. Qed.
 
-(** FIXME: move to a more general directory. *)
-(** Lexicographical ordering *)
+(** * The lexicographic order [lex_R] on pairs, up to an equivalence [EA] on the first component *)
 Variant lex_R {A B} (EA RA : A -> A -> Prop) (RB : B -> B -> Prop) : A * B -> A * B -> Prop :=
   | lex_R_left a0 a1 b0 b1
       (HA : RA a0 a1) (NA : ¬ EA a0 a1)
@@ -240,4 +241,11 @@ Proof.
       * econstructor 2.
         -- etrans; first eauto. etrans; first eauto. symmetry. auto.
         -- eapply auth_mra_Proper1. 3: eauto. all: symmetry; eauto.
+Qed.
+
+(** * The ordinals of [lantana.ordinal] *)
+Global Program Instance ordinal_auth_mra_class : auth_mra_class ord.le ord.eq :=
+  Build_auth_mra_class ord.t _ _ _ _ _ _.
+Next Obligation.
+  repeat intro. split; auto.
 Qed.

@@ -1,5 +1,7 @@
+(** Lists of finite sets: their union [union_list_of_sets] and pairwise disjointness
+    [disjoint_list_of_sets], under list and set operations. *)
+
 From iris.proofmode Require Import proofmode.
-From stdpp Require Import fin_maps.
 
 Definition union_list_of_sets `{!EqDecision E} `{!Countable E} (L : list (gset E)) : gset E :=
   foldr (λ B A, B ∪ A) ∅ L.
@@ -19,8 +21,7 @@ Section list_of_sets.
   Lemma union_list_of_sets_nil : union_list_of_sets ([] : list (gset E)) = ∅.
   Proof using. done. Qed.
 
-  (** Cons amounts to taking the union with the new head.
-      This is the analogue of [union_sets_insert_L]. *)
+  (** Cons amounts to taking the union with the new head. *)
   Lemma union_list_of_sets_cons s L :
     union_list_of_sets (s :: L) = s ∪ union_list_of_sets L.
   Proof using. done. Qed.
@@ -44,8 +45,7 @@ Section list_of_sets.
 
   (** ** Membership characterisation of [union_list_of_sets] *)
 
-  (** [e] is in [union_list_of_sets L] iff some element of [L] contains [e].
-      This is one of the most useful lemmas about [union_list_of_sets]. *)
+  (** [e] is in [union_list_of_sets L] iff some element of [L] contains [e]. *)
   Lemma elem_of_union_list_of_sets L e :
     e ∈ union_list_of_sets L ↔ ∃ j s, L !! j = Some s ∧ e ∈ s.
   Proof using.
@@ -74,16 +74,14 @@ Section list_of_sets.
 
   (** ** [union_list_of_sets] interacts with lookups and sublists *)
 
-  (** Each element of [L] is contained in [union_list_of_sets L].
-      Analogue of [union_sets_lookup_subseteq]. *)
+  (** Each element of [L] is contained in [union_list_of_sets L]. *)
   Lemma union_list_of_sets_lookup_subseteq L j s :
     L !! j = Some s → s ⊆ union_list_of_sets L.
   Proof using.
     intros ? e ?. apply elem_of_union_list_of_sets. eauto.
   Qed.
 
-  (** Deleting an element at index [j] splits off its set.
-      Analogue of [union_sets_delete_L]. *)
+  (** Deleting an element at index [j] splits off its set. *)
   Lemma union_list_of_sets_delete_L L j s :
     L !! j = Some s →
     union_list_of_sets L = s ∪ union_list_of_sets (delete j L).
@@ -171,8 +169,7 @@ Section list_of_sets.
 
   (** ** [disjoint_list_of_sets] under cons *)
 
-  (** Bridge between [Forall (λ s', s ## s') L] and [s ## union_list_of_sets L].
-      Analogue of [map_Forall_disjoint_union_sets]. *)
+  (** Bridge between [Forall (λ s', s ## s') L] and [s ## union_list_of_sets L]. *)
   Lemma Forall_disjoint_union_list_of_sets L s :
     Forall (λ s', s ## s') L ↔ s ## union_list_of_sets L.
   Proof using.
@@ -185,8 +182,7 @@ Section list_of_sets.
   Qed.
 
   (** [disjoint_list_of_sets] under [cons] is equivalent to the head being
-      disjoint from every tail value, plus disjointness of the tail.
-      Analogue of [disjoint_sets_insert]. *)
+      disjoint from every tail value, plus disjointness of the tail. *)
   Lemma disjoint_list_of_sets_cons_iff s L :
     disjoint_list_of_sets (s :: L) ↔
     Forall (λ s', s ## s') L ∧ disjoint_list_of_sets L.
@@ -234,8 +230,7 @@ Section list_of_sets.
   Qed.
 
   (** Each value of a [disjoint_list_of_sets] list is disjoint from the union
-      of the remaining values.  Analogue of
-      [disjoint_sets_lookup_disjoint_union_sets_delete]. *)
+      of the remaining values. *)
   Lemma disjoint_list_of_sets_lookup_disjoint_union_list_of_sets_delete L j s :
     disjoint_list_of_sets L →
     L !! j = Some s → s ## union_list_of_sets (delete j L).
@@ -252,8 +247,7 @@ Section list_of_sets.
 
   (** ** [disjoint_list_of_sets] under append *)
 
-  (** [disjoint_list_of_sets] of an append: necessary direction.
-      Analogue of [disjoint_sets_disj_union_inv]. *)
+  (** [disjoint_list_of_sets] of an append: necessary direction. *)
   Lemma disjoint_list_of_sets_app_inv L1 L2 :
     disjoint_list_of_sets (L1 ++ L2) →
     disjoint_list_of_sets L1 ∧ disjoint_list_of_sets L2 ∧
@@ -272,8 +266,7 @@ Section list_of_sets.
         by apply Forall_disjoint_union_list_of_sets.
   Qed.
 
-  (** [disjoint_list_of_sets] of an append: sufficient direction.
-      Analogue of [disjoint_sets_disj_union]. *)
+  (** [disjoint_list_of_sets] of an append: sufficient direction. *)
   Lemma disjoint_list_of_sets_app L1 L2 :
     disjoint_list_of_sets L1 → disjoint_list_of_sets L2 →
     Forall (λ s, s ## union_list_of_sets L2) L1 →
@@ -323,8 +316,7 @@ Section list_of_sets.
 
   (** Splitting [disjoint_list_of_sets] around an index: equivalent to the
       disjointness of the rest of the list, plus the disjointness of the
-      value at [j] from everything else. Analogue of
-      [disjoint_sets_lookup_iff]. *)
+      value at [j] from everything else. *)
   Lemma disjoint_list_of_sets_lookup_iff L j s :
     L !! j = Some s →
     disjoint_list_of_sets L ↔
@@ -355,7 +347,7 @@ Section list_of_sets.
   (** ** [union_list_of_sets] under set operations on individual values *)
 
   (** Replacing the value at index [j] with [s']: the result is independent of
-      the old value. Analogue of [union_sets_insert_replace]. *)
+      the old value. *)
   Lemma union_list_of_sets_insert_replace L j s s' :
     L !! j = Some s →
     union_list_of_sets (<[j:=s']>L) = s' ∪ union_list_of_sets (delete j L).
@@ -367,8 +359,7 @@ Section list_of_sets.
     set_solver.
   Qed.
 
-  (** Extending the value at [j] by [s']: the new union adds exactly [s'].
-      Analogue of [union_sets_insert_union_L]. *)
+  (** Extending the value at [j] by [s']: the new union adds exactly [s']. *)
   Lemma union_list_of_sets_insert_union_L L j s s' :
     L !! j = Some s →
     union_list_of_sets (<[j:= s ∪ s']>L) = s' ∪ union_list_of_sets L.
@@ -462,8 +453,7 @@ Section list_of_sets.
   Qed.
 
   (** Extending the value at [j] by [s'] preserves [disjoint_list_of_sets]
-      iff [s'] is disjoint from every other value of [L].  Analogue of
-      [disjoint_sets_insert_union_iff]. *)
+      iff [s'] is disjoint from every other value of [L]. *)
   Lemma disjoint_list_of_sets_insert_union_iff L j s s' :
     L !! j = Some s →
     disjoint_list_of_sets (<[j:= s ∪ s']>L) ↔

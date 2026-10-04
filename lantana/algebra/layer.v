@@ -1,25 +1,19 @@
-From Stdlib Require Import Lia.
+(** The layers of Lantana: pairs of an ordinal of [lantana.ordinal] and a natural number, ordered
+    lexicographically. *)
+
 From stdpp Require Import base tactics.
 From lantana.ordinal Require Export ordinal_facts.
 From lantana.algebra Require Export measure.
 
-(** We have three definitions of ordinal.
-1. From transfinite.stepindex Require Import ordinals.
-This one has different definitions and we use it exclusively for step-index, so there should be no problem.
-2. From Ordinal Require Export Ordinal.
-This is the opam library, and we use this for logic's internal definitions, namely fuels and witnesses.
-3. From lantana.ordinal Require Import Ordinal.
-This is a copy of 2. We use this as the layer of measure_rep.
-This causes universe inconsistency, so we have a copy to use as layer.
+(** Lantana uses three libraries of ordinals:
+    1. [transfinite.stepindex.ordinals], only for step-indexing;
+    2. the opam library [Ordinal] ([Ord.t]), for the logic's internal definitions (fuels and
+       witnesses, see [measure_rep]);
+    3. [lantana.ordinal] ([ord.t]), a copy of 2 used for layers: using 2 for both the layers and
+       [measure_rep] causes a universe inconsistency.
+    Ideally, 2 would be universe polymorphic and 3 could be removed. *)
 
-Ideally, we should make the library 2 universe polymorphic and remove 3.
- *)
-
-Section layer.
-
-  Definition layer : Type := prod ord.t nat.
-
-End layer.
+Definition layer : Type := prod ord.t nat.
 
 Global Program Instance layer_layer_class : layer_class layer :=
   Build_layer_class _
@@ -53,7 +47,7 @@ Next Obligation.
       * econstructor 1. rewrite H, H0. auto.
 Qed.
 
-(** Notations and Coercions. *)
+(** Notations. *)
 Export ordinalScope.
 Export arithmeticScope.
 Export hessenbergScope.

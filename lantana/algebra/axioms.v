@@ -1,4 +1,6 @@
-From Stdlib.Logic Require ClassicalFacts.
+(** The classical axioms assumed by Lantana: functional and propositional extensionality,
+    excluded middle, proof irrelevance and choice. *)
+
 From Stdlib.Logic Require Import ProofIrrelevance.
 From Stdlib.Logic Require Import PropExtensionality.
 From Stdlib.Logic Require Import ClassicalChoice.
@@ -17,37 +19,8 @@ Proof.
 Qed.
 
 Definition classic := Classical_Prop.classic.
-Definition inj_pair2 := Classical_Prop.EqdepTheory.inj_pair2.
-
-(* Definition epsilon_on := ChoiceFacts.EpsilonStatement_on. *)
-(* Definition epsilon := Epsilon.epsilon. *)
-(* Lemma epsilon_spec: forall (A : Type) (i : inhabited A) (P : A -> Prop), (exists x : A, P x) -> P (epsilon i P). *)
-(* Proof. *)
-(*   apply Epsilon.epsilon_spec. *)
-(* Qed. *)
-
-Lemma not_ex_all_not_help
-      A (P: A -> Prop)
-      (NOT: ~ (exists a: A, P a))
-  :
-  forall a, ~ P a.
-Proof.
-  intros. eapply Classical_Pred_Type.not_ex_all_not in NOT. eauto.
-Qed.
-
-Ltac nean H := eapply not_ex_all_not_help in H; red in H.
 
 Definition proof_irrelevance := proof_irrelevance.
-(* Definition excluded_middle_informative := excluded_middle_informative. *)
 Definition choice := choice.
-
-(* Lemma dependent_functional_choice (A : Type) (B : A -> Type) : *)
-(*   forall R : forall x : A, B x -> Prop, *)
-(*     (forall x : A, exists y : B x, R x y) -> *)
-(*     (exists f : (forall x : A, B x), forall x : A, R x (f x)). *)
-(* Proof. *)
-(*   eapply ChoiceFacts.non_dep_dep_functional_choice. *)
-(*   clear. exact functional_choice. *)
-(* Qed. *)
 
 Definition propositional_extensionality := propositional_extensionality.

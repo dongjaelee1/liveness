@@ -1,11 +1,12 @@
-From stdpp Require Import base.
+(** Bounded credits over an [OCM]: the persistent [credit_bound a] bounds by [a] the [credit]s
+    in circulation; spending credits lowers the bound.
+    Reference: "Module CounterRA" in Lilo and FOS. *)
+
 From iris.algebra Require Export cmra.
-From iris.algebra Require Import proofmode_classes updates.
+From iris.algebra Require Import updates.
 From iris.prelude Require Import options.
 From lantana.algebra Require Import ocm.
 
-(** Bounded credit. *)
-(** Reference: "Module CounterRA" in Lilo and FOS. *)
 Variant bcred `{OCM.t A leR addO} : Type :=
   BCred : partition.t leR addO → quotient.t leR addO → bcred.
 
@@ -182,7 +183,7 @@ Section bcred.
     apply cmra_discrete_updateP. intros mb. rewrite !bcred_opM. destruct mb; simpl; intros.
     - destruct c as [p q]. rewrite bcred_op in H. rewrite right_id_L left_id_L in H.
       destruct (quotient.from_monoid_exist q); subst.
-      rewrite bcred_valid in H. simpl in H. destruct H as (y&[Ha Hb]&(y0&y1&Hc&Hd&He)). 
+      rewrite bcred_valid in H. simpl in H. destruct H as (y&[Ha Hb]&(y0&y1&Hc&Hd&He)).
       exists (credit_bound x). split.
       + esplit. split; [eauto|]. etransitivity; [|eauto]. etransitivity; [|eauto].
         eapply OCM.add_le_proper; eauto.

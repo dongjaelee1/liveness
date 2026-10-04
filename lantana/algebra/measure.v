@@ -1,3 +1,7 @@
+(** Layers ([layer_class]: a well-founded order up to an equivalence) and measures: a syntax
+    [measure] for ordinals, interpreted at a layer by [measure_rep], where [▽] ([ms_extend]) is
+    [η] of the supremum of all measures at lower layers. *)
+
 From stdpp Require Import base.
 From lantana.algebra Require Import axioms.
 From lantana.algebra Require Export wf_structs ordinal_facts.
@@ -24,7 +28,7 @@ Section measure_rep.
   | ms_expn (s1 s2 : measure)
   | ms_extend.
 
-  (** Interpretaion into Ordinal. *)
+  (** Interpretation into ordinals. *)
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
   Remark measure_rep_rec_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
   Proof using. intros. destruct m. auto. Qed.
@@ -178,7 +182,8 @@ Section measure_rep.
         exists (exist _ a HLa1). simpl. reflexivity.
   Qed.
 
-  Global Instance measure_rep_layer_le_proper μ : Proper ((λ ℓ1 ℓ2, eqL ℓ1 ℓ2 ∨ ltL ℓ1 ℓ2) ==> Ord.le) (λ ℓ, measure_rep ℓ μ).
+  Global Instance measure_rep_layer_le_proper μ :
+    Proper ((λ ℓ1 ℓ2, eqL ℓ1 ℓ2 ∨ ltL ℓ1 ℓ2) ==> Ord.le) (λ ℓ, measure_rep ℓ μ).
   Proof using.
     induction μ; repeat intro.
     - rewrite !measure_rep_embed. reflexivity.
@@ -255,73 +260,3 @@ Infix "⊕" := ms_add : msyn_scope.
 Infix "×" := ms_mult : msyn_scope.
 Infix "↑" := ms_expn : msyn_scope.
 Notation "▽" := (ms_extend) : msyn_scope.
-
-(** Additional definitions and properties. *)
-
-Class Layerless `{!layer_class L} `{!ord_mono_fun_class} (μ : measure) : Prop :=
-  layerless: ∀ (ℓ1 ℓ2 : L), (measure_rep ℓ1 μ == measure_rep ℓ2 μ)%ord.
-
-Section layerless.
-  Context `{!layer_class L} `{!ord_mono_fun_class}.
-
-  Global Instance ms_embed_layerless {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) (a : A) :
-    Layerless (ms_embed wf_ltA a).
-  Proof using. intros ℓ1 ℓ2. rewrite !measure_rep_embed. reflexivity. Qed.
-
-  Global Instance ms_large_layerless : Layerless (ms_large).
-  Proof using. intros ℓ1 ℓ2. rewrite !measure_rep_large. reflexivity. Qed.
-
-  Global Instance ma_add_layerless s1 s2 :
-    Layerless s1 → Layerless s2 → Layerless (ms_add s1 s2).
-  Proof using.
-    intros HL1 HL2 ℓ1 ℓ2. rewrite !measure_rep_add. rewrite (HL1 ℓ1 ℓ2), (HL2 ℓ1 ℓ2). reflexivity.
-  Qed.
-
-  Global Instance ma_mult_layerless s1 s2 :
-    Layerless s1 → Layerless s2 → Layerless (ms_mult s1 s2).
-  Proof using.
-    intros HL1 HL2 ℓ1 ℓ2. rewrite !measure_rep_mult. rewrite (HL1 ℓ1 ℓ2), (HL2 ℓ1 ℓ2). reflexivity.
-  Qed.
-
-  Global Instance ma_expn_layerless s1 s2 :
-    Layerless s1 → Layerless s2 → Layerless (ms_expn s1 s2).
-  Proof using.
-    intros HL1 HL2 ℓ1 ℓ2. rewrite !measure_rep_expn. rewrite (HL1 ℓ1 ℓ2), (HL2 ℓ1 ℓ2). reflexivity.
-  Qed.
-
-End layerless.
-
-Section layer.
-  Context `{!layer_class L} `{!ord_mono_fun_class}.
-
-  Definition layer_leibniz_le : L → L → Prop :=
-    λ l1 l2, l1 = l2 ∨ (ltL l1 l2).
-
-  Global Instance layer_leibniz_le_reflexive : Reflexive layer_leibniz_le.
-  Proof using. repeat intro. left. auto. Qed.
-  Global Instance layer_leibniz_le_transitive : Transitive layer_leibniz_le.
-  Proof using.
-    repeat intro. destruct H0, H1; subst.
-    - reflexivity.
-    - right; auto.
-    - right; auto.
-    - right. etransitivity; eauto.
-  Qed.
-  Global Instance layer_leibniz_le_preorder : PreOrder layer_leibniz_le.
-  Proof using. econstructor; apply _. Qed.
-
-  Global Instance measure_rep_layer_leibniz_le_proper μ : Proper (layer_leibniz_le ==> Ord.le) (λ ℓ, measure_rep ℓ μ).
-  Proof using.
-    induction μ; repeat intro.
-    - rewrite !measure_rep_embed. reflexivity.
-    - rewrite !measure_rep_large. reflexivity.
-    - rewrite !measure_rep_add. rewrite IHμ1, IHμ2; eauto. reflexivity.
-    - rewrite !measure_rep_mult. rewrite IHμ1, IHμ2; eauto. reflexivity.
-    - rewrite !measure_rep_expn. rewrite IHμ1, IHμ2; eauto. reflexivity.
-    - destruct H0.
-      + subst. reflexivity.
-      + etransitivity; last (eapply measure_rep_extend; eauto).
-        eapply η_mono.
-  Qed.
-
-End layer.
