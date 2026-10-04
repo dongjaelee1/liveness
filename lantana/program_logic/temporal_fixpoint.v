@@ -494,9 +494,9 @@ Section recursion.
   (** Allocation: the new invariant is registered while it is allocated open. *)
   Lemma nest_alloc E N Q G :
     ↑N ⊆ E → (⊢ Q ⊨ₜ G) →
-    ▷ Q -∗ |={E}=>g nest N Q G.
+    ▷ Q -∗ |={E}=>m nest N Q G.
   Proof.
-    iIntros (HN HQ) "HQ". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
+    iIntros (HN HQ) "HQ". iApply sfmupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
     iMod (saved_ti_alloc (tps_ti (nest_tps G))) as (γ) "#Hγ".
     iMod (inv_alloc_open N E (Q ∗ nest N Q G)) as "[#Hinv Hclose]"; first done.
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".

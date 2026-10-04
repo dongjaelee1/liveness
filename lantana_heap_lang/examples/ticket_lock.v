@@ -283,7 +283,7 @@ Section proof.
       TicketLock.init #() @ i; E
     l{{{ tl γ, RET tl; thread_expr i C (of_val tl) ∗ £ lc ∗
                        thP_carriers i G ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
-                       (∀ E R, R -∗ |={E}=>g is_fair_lock tl γ R) }}}.
+                       (∀ E R, R -∗ |={E}=>m is_fair_lock tl γ R) }}}.
   Proof.
     iExists 10.
     iIntros (lc ℓ i G E C) "!> %Φ (TE& TG& GF) HΦ".
@@ -452,7 +452,7 @@ Section proof.
       rewrite bool_decide_eq_true_2; last done.
       lwp_pures.
       iModIntro. lwp_finish.
-      iApply sfgupd_fupd_acc.
+      iApply sfmupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
       iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
@@ -567,7 +567,7 @@ Section proof.
       rewrite bool_decide_eq_true_2; last done.
       lwp_pures.
       iModIntro. lwp_finish.
-      iApply sfgupd_fupd_acc.
+      iApply sfmupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
       iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
@@ -678,7 +678,7 @@ Section proof.
       rewrite bool_decide_eq_true_2; last done.
       lwp_pures.
       iModIntro. lwp_finish.
-      iApply sfgupd_fupd_acc.
+      iApply sfmupd_fupd_acc.
       iInv "ITK" as "H".
       iPoseProof (tlc_split_nat 1 with "LC1") as "[LC1 _]". 1: eauto.
       iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
@@ -1095,7 +1095,7 @@ Section proof.
       disjunct of [lock_inv]: the lock invariant is registered under its alive branch. *)
   Lemma is_fair_lock_register_alive E tl γ R :
     ↑N_inv ⊆ E →
-    is_fair_lock tl γ R -∗ γ ↪LOCK_AL□ -∗ |={E}=>g is_fair_lock_alive tl γ R.
+    is_fair_lock tl γ R -∗ γ ↪LOCK_AL□ -∗ |={E}=>m is_fair_lock_alive tl γ R.
   Proof.
     iIntros (HN) "(%next& %curr& %Htl& #I& #K) #AL".
     iMod (alwaysI_register E N_inv _

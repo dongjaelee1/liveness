@@ -81,7 +81,6 @@ lantana/program_logic/history_interp.v
 lantana/program_logic/temporal_registry.v
 lantana/program_logic/temporal_class.v
 lantana/program_logic/sfmupd.v
-lantana/program_logic/sfgupd.v
 lantana/program_logic/model_physical_updates.v
 lantana/program_logic/weakestpre.v
 lantana/program_logic/lifting.v

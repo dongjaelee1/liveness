@@ -672,6 +672,15 @@ Section fgupd.
     Frame p R P Q → Frame p R (|={E1,E2:n,Θ}=>g P) (|={E1,E2:n,Θ}=>g Q).
   Proof. rewrite /Frame=><-. by rewrite fgupd_frame_l. Qed.
 
+  (** A non-discharging update eliminated in a model update. *)
+  Global Instance elim_gupd_fmupd (p : bool) E1 E2 n Θ P Q :
+    ElimModal True p false (|=[n,Θ]=>g P) P (|={E1,E2:n,Θ}=>m Q) (|={E1,E2:n,Θ}=>m Q)%I.
+  Proof.
+    rewrite /ElimModal bi.intuitionistically_if_elim //=.
+    iIntros "_ [HP HPQ]". iPoseProof (gupd_mupd with "HP") as "HP".
+    iMod "HP". by iApply "HPQ".
+  Qed.
+
   Global Instance elim_modal_fgupd_fmupd p E1 E2 E3 n Θ P Q :
     ElimModal True p false (|={E1,E2:n,Θ}=>g P) P (|={E1,E3:n,Θ}=>m Q) (|={E2,E3:n,Θ}=>m Q).
   Proof.

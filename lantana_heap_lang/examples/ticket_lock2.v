@@ -185,7 +185,7 @@ Section proof.
     l{{{ thread_expr i C (TicketLock.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ m) }}}
       TicketLock.init #() @ i
     l{{{ tl γ, RET tl; thread_expr i C (of_val tl) ∗ £ lc ∗ thP_carriers i G ∗ γ ↪LOCK ℓ ∗
-                       (∀ E R, R -∗ |={E}=>g is_fair_lock tl γ R) }}}.
+                       (∀ E R, R -∗ |={E}=>m is_fair_lock tl γ R) }}}.
   Proof.
     iExists 4.
     iIntros (lc ℓ i G C) "!> %Φ (TE& TG& GF) HΦ".

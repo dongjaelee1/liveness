@@ -53,7 +53,7 @@ From lantana.prelude Require Import axioms.
       ([alwaysI] the canonical one, [alwaysI_guar] a given one); recursion through a
       registered structure goes through [alwaysI_guar] (temporal_fixpoint.v, [nest]).
     - Allocating an [alwaysI] or an [untilI] registers it: the allocation rules are model
-      updates ([|={E}=>g]), which read the position of the run. *)
+      updates ([|={E}=>m]), which read the position of the run. *)
 
 (** ** Guarantees *)
 
@@ -523,26 +523,26 @@ Section gupd_read.
     iModIntro. iFrame. iSplit; first done. by iApply gupd_intro.
   Qed.
 
-  (** The same at the level of [sfgupd], with the history and the registry: fancy updates
+  (** The same at the level of [sfmupd], with the history and the registry: fancy updates
       may happen before and after reading the model. *)
-  Lemma sfgupd_read_fupd E (P : iProp Σ) :
+  Lemma sfmupd_read_fupd E (P : iProp Σ) :
     (∀ h n σ Θ κs,
       history_interp h n σ Θ κs -∗ treg_state -∗ |={E,∅}=> ∀ g i Ω W,
         model_interp g i Ω W n (dom Θ) -∗
-        model_interp g i Ω W n (dom Θ) ∗ |={∅,E}=> history_interp h n σ Θ κs ∗ treg_state ∗ P) ⊢ |={E}=>g P.
+        model_interp g i Ω W n (dom Θ) ∗ |={∅,E}=> history_interp h n σ Θ κs ∗ treg_state ∗ P) ⊢ |={E}=>m P.
   Proof.
-    iIntros "H". unfold_sfgupd. iIntros (h n σ Θ κs) "[HI TI]". rewrite /fgupd.
+    iIntros "H". unfold_sfmupd. iIntros (h n σ Θ κs) "[HI TI]". rewrite /fmupd.
     iMod ("H" with "HI TI") as "H". iModIntro.
-    iApply gupd_read. iIntros (g i Ω W) "MI". iDestruct ("H" with "MI") as "($& HP)".
+    iApply gupd_mupd. iApply gupd_read. iIntros (g i Ω W) "MI". iDestruct ("H" with "MI") as "($& HP)".
     iMod "HP" as "(HI& TI& HP)". iModIntro. iFrame.
   Qed.
 
-  Lemma sfgupd_read E (P : iProp Σ) :
+  Lemma sfmupd_read E (P : iProp Σ) :
     (∀ h n σ Θ κs g i Ω W,
       history_interp h n σ Θ κs -∗ treg_state -∗ model_interp g i Ω W n (dom Θ) -∗
-      model_interp g i Ω W n (dom Θ) ∗ |={E}=> history_interp h n σ Θ κs ∗ treg_state ∗ P) ⊢ |={E}=>g P.
+      model_interp g i Ω W n (dom Θ) ∗ |={E}=> history_interp h n σ Θ κs ∗ treg_state ∗ P) ⊢ |={E}=>m P.
   Proof.
-    iIntros "H". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
+    iIntros "H". iApply sfmupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
     iApply fupd_mask_intro; first set_solver. iIntros "close".
     iIntros (g i Ω W) "MI". iDestruct ("H" with "HI TI MI") as "($& HP)".
     iMod "close" as "_". iMod "HP" as "(HI& TI& HP)". iModIntro. iFrame.
@@ -622,9 +622,9 @@ Section always_rules.
       position. *)
   Lemma alwaysI_register_guar E N P G :
     ↑N ⊆ E →
-    inv N P -∗ ▷ (P ⊨ₜ G) -∗ |={E}=>g alwaysI_guar N P G.
+    inv N P -∗ ▷ (P ⊨ₜ G) -∗ |={E}=>m alwaysI_guar N P G.
   Proof.
-    iIntros (HNE) "#Hinv #HG". iApply sfgupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
+    iIntros (HNE) "#Hinv #HG". iApply sfmupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
     iMod (inv_acc with "Hinv") as "[HP Hclose]"; first done.
     iApply fupd_mask_intro; first set_solver. iIntros "close".
     iIntros (g i Ω W) "MI".
@@ -639,7 +639,7 @@ Section always_rules.
   (** The same under a view [V] of the content. *)
   Lemma alwaysI_register E N P V :
     ↑N ⊆ E →
-    inv N P -∗ □ (P -∗ V) -∗ |={E}=>g alwaysI_view N P V.
+    inv N P -∗ □ (P -∗ V) -∗ |={E}=>m alwaysI_view N P V.
   Proof.
     iIntros (HNE) "#Hinv #HPV".
     iApply (alwaysI_register_guar with "Hinv []"); first done.
@@ -648,9 +648,9 @@ Section always_rules.
 
   (** Allocation registers the invariant and records its content at the current position. *)
   Lemma alwaysI_alloc_guar E N P G :
-    ▷ (P ⊨ₜ G) -∗ ▷ P -∗ |={E}=>g alwaysI_guar N P G.
+    ▷ (P ⊨ₜ G) -∗ ▷ P -∗ |={E}=>m alwaysI_guar N P G.
   Proof.
-    iIntros "#HG HP". iApply sfgupd_read. iIntros (h n σ Θ κs g i Ω W) "HI TI MI".
+    iIntros "#HG HP". iApply sfmupd_read. iIntros (h n σ Θ κs g i Ω W) "HI TI MI".
     iPoseProof (temporal_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
     iFrame "MI".
@@ -661,7 +661,7 @@ Section always_rules.
     iModIntro. iFrame "HI TI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG C".
   Qed.
   Lemma alwaysI_alloc E N P :
-    ▷ P -∗ |={E}=>g alwaysI N P.
+    ▷ P -∗ |={E}=>m alwaysI N P.
   Proof.
     iIntros "HP". iApply (alwaysI_alloc_guar with "[] HP").
     iNext. iApply temporal_sem.
@@ -709,13 +709,13 @@ Section until_rules.
   Lemma untilI_alloc E g K (b : bool) ℓ1 ℓ2 μ :
     (ℓ1 <= ℓ2)%ordi →
     crP_obls g ℓ1 K -∗
-    |={E}=>g ∃ k, ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
+    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗
                  oblP_fuel k ℓ2 μ ∗ witP_layer k ℓ2 ∗
-                 ∀ E' N (P Q : iProp Σ), ▷ (if b then Q else P) -∗ |={E'}=>g untilI N k b 1 P Q.
+                 ∀ E' N (P Q : iProp Σ), ▷ (if b then Q else P) -∗ |={E'}=>m untilI N k b 1 P Q.
   Proof.
     iIntros (Ltl) "TG". iMod (obl_alloc_assigned with "TG") as "(%k& $& $& Oa& $& $& ACC)". 1: auto.
     iIntros "!> %E' %N %P %Q HC".
-    iApply sfgupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI TI MI".
+    iApply sfmupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI TI MI".
     iAssert (▷ (tguar (tps_sem P) n ∨ tguar (tps_sem Q) n))%I as "#C".
     { destruct b.
       - iPoseProof (temporal_elim_later with "[] [$HC $HI $MI]") as "#C"; first iApply temporal_sem.
@@ -741,14 +741,14 @@ Section until_rules.
       position (no until is created, so nothing is registered). *)
   Lemma untilI_discharged_alloc E ℓ μ (Q : iProp Σ) :
     Q -∗
-    |={E}=>g Q ∗ ∃ k, oblP_discharged k ∗
+    |={E}=>m Q ∗ ∃ k, oblP_discharged k ∗
                         (∀ E' N (P : iProp Σ), |={E'}=> oblP_inv N k P Q (until_disch k (tps_sem Q))) ∗
                         oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
     iIntros "HQ". iPoseProof (temporal_sem Q) as "#HG2".
-    unfold_sfgupd. rewrite /fgupd. iIntros (?????) "[SI TI]".
+    unfold_sfmupd. rewrite /fmupd. iIntros (?????) "[SI TI]".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    unfold_opreds. iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
+    unfold_opreds. iApply gupd_mupd. iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
     assert (NEW : ∃ k, Ω1 !! k = None).
     { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
     destruct NEW as (k& NEWk).
@@ -784,7 +784,7 @@ Section until_rules.
   Lemma untilI_to_true E N k (P Q : iProp Σ) :
     ↑N ⊆ E →
     untilI N k false 1 P Q ={E,E ∖ ↑N}=∗
-    ▷ (P ∗ ∀ E', |={E'}=>g ((▷ Q) ={E ∖ ↑N,E}=∗ untilI N k true 1 P Q)).
+    ▷ (P ∗ ∀ E', |={E'}=>m ((▷ Q) ={E ∖ ↑N,E}=∗ untilI N k true 1 P Q)).
   Proof.
     rewrite !untilI_unfold. iIntros (HM) "(Oa& #U)". iPoseProof (untilI_pers_inv with "U") as "#Oi".
     iMod (obl_assigned_to_true with "Oi Oa") as "[H ACC]". 1: auto.
@@ -859,7 +859,7 @@ Section until_rules.
     ↑N ⊆ E →
     untilI N k false 1 P Q ={E,E ∖ ↑N}=∗
     ▷ (P ∗
-       ∀ E', |={E'}=>g ((▷ Q) ={E ∖ ↑N}=∗
+       ∀ E', |={E'}=>m ((▷ Q) ={E ∖ ↑N}=∗
                        ∀ g ℓ K, (⌜k ∈ K⌝) → crP_obls g ℓ K -∗
                                 ∀ E'', ▷ (|={E''}=>m |={E ∖ ↑N,E}=> (Q ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k)))).
   Proof.

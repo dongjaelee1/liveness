@@ -67,7 +67,7 @@ Section registry.
 
   (** Allocation, with no request registered yet: a registered invariant. *)
   Lemma registry_alloc E N G :
-    ⊢ |={E}=>g ∃ γm, alwaysI N (registry_inv γm G).
+    ⊢ |={E}=>m ∃ γm, alwaysI N (registry_inv γm G).
   Proof.
     iMod (ghost_map_alloc_empty (K:=nat) (V:=gname)) as (γm) "Ha".
     iMod (alwaysI_alloc E N (registry_inv γm G) with "[Ha]") as "$"; last done.

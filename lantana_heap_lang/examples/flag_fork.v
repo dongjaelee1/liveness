@@ -82,7 +82,7 @@ Section proof.
              "[] [$TE $TG $GF1 $Cg0 Of0 $Ftk]").
     1: set_solver.
     { iIntros (j g2 Φ') "!> (TE& TGj& GFj& Cgj& Ftk) HΦ'".
-      iApply lwp_sfgupd.
+      iApply lwp_sfmupd.
       iApply ("Flag_set_spec" $! 0 with "[$TE $TGj GFj $Cgj $Ftk $is_flag]").
       { iFrame. iPureIntro. set_solver. }
       iIntros "(TE& _& TG& Cg& #Od)".

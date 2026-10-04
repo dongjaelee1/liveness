@@ -386,7 +386,7 @@ Section proof.
 
   Lemma px_init E g :
     crP_obls g 0 ∅
-    -∗ |={E}=>g ∃ ck r rm ci cj n,
+    -∗ |={E}=>m ∃ ck r rm ci cj n,
                 crP_obls g 0 {[ck]} ∗
                 finallyT Nu ck (1/2) (cnt_lb r cj (n + 1) ∗ ∃ k', (n + 1) ↪[rm]□ k') ∗
                 witP_layer ck 0 ∗
