@@ -124,6 +124,17 @@ Local Definition wit_fuels_unseal :
   @wit_fuels = @wit_fuels_def := wit_fuels_aux.(seal_eq).
 Global Arguments wit_fuels {SI Σ _ _}.
 
+(** Fuels for an induction on a well-founded order [ltA], embedded in the measures. *)
+Local Definition embed_fuels_def `{SI : sidx} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
+  {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
+  (a : A) (F : gmap oid (ord.t * measure)) : iProp Σ :=
+  collect_fuels (measure_rep (0 : ord.t, 1) (⟪wf_ltA, a⟫)%M) F.
+Local Definition embed_fuels_aux : seal (@embed_fuels_def). Proof. by eexists. Qed.
+Definition embed_fuels := embed_fuels_aux.(unseal).
+Local Definition embed_fuels_unseal :
+  @embed_fuels = @embed_fuels_def := embed_fuels_aux.(seal_eq).
+Global Arguments embed_fuels {SI Σ _ _ A ltA}.
+
 (** ** Children of a parent *)
 Local Definition parP_kids_def `{SI : sidx} `{@mupdGS SI Σ}
   (p : parent) (K : gset oid) : iProp Σ :=
@@ -864,6 +875,36 @@ Section preds_forest.
     iExists a0. iSplitR; first done. iFrame "Wbk2 B". assert (a0 <= η (measure_rep (ℓ, 1) μ))%ord.
     { etransitivity; last eauto. apply WFOCM.lt_le. auto. }
     iFrame (H1). iApply (collect_fuels_decr with "Fs"). auto.
+  Qed.
+
+  (** ** embed_fuels rules *)
+  Lemma embed_fuels_init {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a :
+    ⊢ embed_fuels wf_ltA a ∅.
+  Proof. rewrite !embed_fuels_unseal /embed_fuels_def /collect_fuels big_sepM_empty. done. Qed.
+
+  Lemma embed_fuels_add_map {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA)
+    a F G l m :
+    embed_fuels wf_ltA a F -∗
+    ([∗ set] g ∈ G, oblP_fuel g l (m × ℵ)%M) ==∗
+    embed_fuels wf_ltA a ((gset_to_gmap (l, m) G) ∪ F).
+  Proof.
+    rewrite !embed_fuels_unseal /embed_fuels_def.
+    revert F. induction G as [|g G Hg IH] using set_ind_L; intros F; iIntros "Gfs Fs".
+    { rewrite gset_to_gmap_empty left_id_L. by iFrame. }
+    rewrite big_sepS_insert; last done. iDestruct "Fs" as "[Fg Fs]".
+    iMod (IH with "Gfs Fs") as "Gfs".
+    rewrite gset_to_gmap_union_singleton -insert_union_l.
+    iApply (collect_fuels_add with "Gfs Fg").
+    rewrite measure_rep_embed measure_rep_large. apply Ord.lt_le, Ord.large_lt_from_wf.
+  Qed.
+
+  Lemma embed_fuels_decr {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a a' F :
+    ltA a' a →
+    embed_fuels wf_ltA a F ==∗
+    embed_fuels wf_ltA a' F ∗ ([∗ map] f ↦ '(l, m) ∈ F, oblP_fuel f l m).
+  Proof.
+    rewrite embed_fuels_unseal /embed_fuels_def.
+    intros LT. apply (collect_fuels_decr). apply measure_rep_embed_lt. auto.
   Qed.
 
 End preds_forest.
