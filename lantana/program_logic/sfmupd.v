@@ -269,92 +269,70 @@ Section sfmupd.
     iIntros "LC H". iApply fupd_sfmupd_elim. iApply (lantana.base_logic.fancy_updates.lc_fupd_add_laterN with "LC"). iNext. auto.
   Qed.
 
-  (** ** Obligation rules *)
+  (** ** Obligation rules
+
+      The obligation rules of [opreds.v] as model updates with the program state. A parent is
+      a thread ([thP_kids i K]) or an obligation ([oblP_kids k K]). *)
   Lemma thread_terminate E i :
-    thP_carriers i ∅ -∗ |={E}=>m thP_done i.
+    thP_kids i ∅ -∗ |={E}=>m thP_done i.
   Proof.
-    unfold_sfmupd. iIntros "Tb %%%%% $". iMod (thread_terminate_mupd with "Tb") as "#Tt". auto.
+    unfold_sfmupd. iIntros "T %%%%% $". iMod (thread_terminate_mupd with "T") as "$". auto.
   Qed.
 
-  Lemma carrier_alloc E i G ℓ μ :
-    thP_carriers i G -∗
-    |={E}=>m ∃ g, (⌜ g ∉ G ⌝) ∗
-                 thP_carriers i ({[g]} ∪ G) ∗ crP_obls g ℓ ∅ ∗ crP_fuel g ℓ μ.
+  (** A new live obligation [k] below [p], without children, at layer [ℓ]. *)
+  Lemma obl_new E p K ℓ μ :
+    parP_below p ℓ -∗
+    parP_kids p K -∗
+    |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
+                 oblP_assigned k 1 ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
-    unfold_sfmupd. iIntros "Tb %%%%% $".
-    iMod (carrier_alloc_mupd with "Tb") as "(%& %& $& $& $)". auto.
+    unfold_sfmupd. iIntros "B Kp %%%%% $".
+    iMod (obl_new_mupd with "B Kp") as "$". auto.
   Qed.
 
-  Lemma carrier_delete E i G g ℓ :
-    g ∈ G →
-    thP_carriers i G -∗
-    crP_obls g ℓ ∅ -∗
-    |={E}=>m thP_carriers i (G ∖ {[g]}).
+  (** A discharged obligation (outside the forest). *)
+  Lemma obl_new_discharged E ℓ :
+    ⊢ |={E}=>m ∃ k, oblP_discharged k ∗ witP_layer k ℓ.
   Proof.
-    unfold_sfmupd. iIntros (Ing) "Tb Gg %%%%% $".
-    iMod (carrier_delete_mupd with "Tb Gg") as "$"; auto.
+    unfold_sfmupd. iIntros "%%%%% $". iMod obl_new_discharged_mupd as "$". auto.
   Qed.
 
-  Lemma obl_alloc_assigned E g K b ℓ1 ℓ2 μ :
-    (ℓ1 <= ℓ2)%ordi →
-    crP_obls g ℓ1 K -∗
-    |={E}=>m ∃ k, (⌜ k ∉ K ⌝) ∗
-                 crP_obls g ℓ1 ({[k]} ∪ K) ∗
-                 oblP_assigned k b (1/2)%Qp ∗
-                 oblP_fuel k ℓ2 μ ∗
-                 witP_layer k ℓ2 ∗
-                 (∀ E N (P Q R : iProp Σ), (▷ (if b then Q else P)) ={E}=∗ oblP_inv N k P Q R).
-  Proof.
-    unfold_sfmupd. iIntros (Ltl) "Tb %%%%% $".
-    iMod (obl_alloc_assigned_mupd with "Tb") as "(%& %& $& $& $& $& $)"; auto.
-  Qed.
-
-  Lemma obl_alloc_discharged E ℓ μ :
-    ⊢ |={E}=>m ∃ k, oblP_discharged k ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                   (∀ E N (P Q R : iProp Σ), (▷ R) ={E}=∗ oblP_inv N k P Q R).
-  Proof.
-    unfold_sfmupd. iIntros "%%%%% $".
-    iMod (obl_alloc_discharged_mupd) as "(%& $& $& $& $)"; auto.
-  Qed.
-
-  Lemma obl_assigned_to_true E N k P Q R :
-    ↑N ⊆ E →
-    oblP_inv N k P Q R -∗
-    |={E,E ∖ ↑N}=> oblP_assigned k false (1/2)%Qp -∗
-                  ((▷ (oblP_assigned k false 1 ∗ P)) ∗
-                   (∀ b, oblP_assigned k b 1 -∗
-                         ∀ E', |={E'}=>m (oblP_assigned k true (1/2)%Qp) ∗
-                                      ((▷ Q) ={E ∖ ↑N,E}=∗ True))).
-  Proof.
-    iIntros (MASK) "#Gv". iMod (obl_assigned_to_true_mupd with "Gv") as "H". 1: auto.
-    iIntros "!> Ga". iPoseProof ("H" with "Ga") as "[$ ACC]". iIntros "% Ga". iPoseProof ("ACC" with "Ga") as "H".
-    unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
-  Qed.
-
-  Lemma obl_offload E g1 g2 K1 K2 ℓ1 ℓ2 ℓ k :
+  (** [k] moves, with its whole subtree, from [p1] to [p2], burning one unit of its fuel at a
+      layer [ℓ] large enough for [p2]. *)
+  Lemma obl_move E p1 p2 K1 K2 k ℓ :
     k ∈ K1 →
-    (ℓ2 <= ℓ)%ordi →
-    crP_obls g1 ℓ1 K1 -∗
-    crP_obls g2 ℓ2 K2 -∗
-    oblP_fuel k ℓ 1 -∗
-    |={E}=>m crP_obls g1 ℓ1 (K1 ∖ {[k]}) ∗ crP_obls g2 ℓ2 (K2 ∪ {[k]}) ∗ ⌜ k ∉ K2 ⌝.
+    parP_below p2 ℓ -∗
+    parP_kids p1 K1 -∗ parP_kids p2 K2 -∗ oblP_fuel k ℓ 1 -∗
+    |={E}=>m ⌜ k ∉ K2 ⌝ ∗ parP_kids p1 (K1 ∖ {[k]}) ∗ parP_kids p2 ({[k]} ∪ K2).
   Proof.
-    iIntros (Ink Ltl) "Gg1 Gg2 Of".
-    unfold_sfmupd. iIntros "%%%%% $".
-    iMod (obl_offload_mupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
+    unfold_sfmupd. iIntros (Hk) "B K1 K2 F %%%%% $".
+    iMod (obl_move_mupd with "B K1 K2 F") as "$"; auto.
   Qed.
 
-  Lemma obl_offload_set E g1 g2 K1 K2 K ℓ1 ℓ2 ℓ :
-    K ⊆ K1 →
-    (ℓ2 <= ℓ)%ordi →
-    crP_obls g1 ℓ1 K1 -∗
-    crP_obls g2 ℓ2 K2 -∗
-    ([∗ set] k ∈ K, oblP_fuel k ℓ 1) -∗
-    |={E}=>m crP_obls g1 ℓ1 (K1 ∖ K) ∗ crP_obls g2 ℓ2 (K2 ∪ K) ∗ ⌜ K2 ## K ⌝.
+  (** [x], a child of [k], moves with its subtree up to the parent [p] of [k], for free. *)
+  Lemma obl_move_up E p K k Kk x :
+    k ∈ K → x ∈ Kk →
+    parP_kids p K -∗ oblP_kids k Kk -∗
+    |={E}=>m ⌜ x ∉ K ⌝ ∗ parP_kids p ({[x]} ∪ K) ∗ oblP_kids k (Kk ∖ {[x]}).
   Proof.
-    iIntros (Ink Ltl) "Gg1 Gg2 Of".
-    unfold_sfmupd. iIntros "%%%%% $".
-    iMod (obl_offload_set_mupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
+    unfold_sfmupd. iIntros (Hk Hx) "Kp Kk %%%%% $".
+    iMod (obl_move_up_mupd with "Kp Kk") as "$"; auto.
+  Qed.
+
+  (** Children only exist below live obligations, and discharged obligations are no
+      children. *)
+  Lemma oblP_kids_discharged_false E k K :
+    oblP_kids k K -∗ oblP_discharged k -∗ |={E}=>m False.
+  Proof.
+    unfold_sfmupd. iIntros "Kk D %%%%% _".
+    iMod (oblP_kids_discharged_false_mupd with "Kk D") as "[]".
+  Qed.
+
+  Lemma parP_kids_discharged E k p K :
+    parP_kids p K -∗ oblP_discharged k -∗ |={E}=>m ⌜ k ∉ K ⌝ ∗ parP_kids p K.
+  Proof.
+    unfold_sfmupd. iIntros "Kp D %%%%% $".
+    iMod (parP_kids_discharged_mupd with "Kp D") as "[$ $]"; auto.
   Qed.
 
   Lemma obl_check_witnesses E (R : oids) :
@@ -364,23 +342,60 @@ Section sfmupd.
     unfold_sfmupd. iIntros "Rs %%%%% $". iMod (obl_check_witnesses_mupd with "Rs") as "H". auto.
   Qed.
 
-
-  (** ** Update rules *)
-  Lemma obl_true_to_discharge E N k P Q R :
-    ↑N ⊆ E →
-    oblP_inv N k P Q R -∗
-    |={E,E ∖ ↑N}=> ∀ g ℓ K q,
-    (⌜k ∈ K⌝) → crP_obls g ℓ K -∗ oblP_assigned k true q -∗
-    ((▷ (crP_obls g ℓ K ∗ oblP_assigned k true q ∗ oblP_assigned k true (1/2) ∗ Q)) ∗
-     (crP_obls g ℓ K -∗
-      oblP_assigned k true 1 -∗
-      ∀ E', |={E'}=>m (crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k) ∗
-                     ((▷ (R)) ={E ∖ ↑N,E}=∗ True))).
+  Lemma obl_check_witness E r ℓ :
+    witP_layer r ℓ -∗ |={E}=>m (witP_cred r Ord.O ∨ oblP_discharged r).
   Proof.
-    iIntros (MASK) "#Gv". iMod (obl_discharge_mupd with "Gv") as "H". 1: auto.
-    iIntros "!> %%%% % TG Ga". iPoseProof ("H" with "[//] TG Ga") as "[$ ACC]". iIntros "TG Ga".
-    iPoseProof ("ACC" with "TG Ga") as "H".
-    unfold_sfmupd. iIntros "% %%%%% $". iMod ("H" $! n (dom Θ)) as "H". iModIntro. done.
+    iIntros "#W". iMod (obl_check_witnesses E {[r]} with "[]") as "H".
+    { rewrite big_sepS_singleton. eauto. }
+    rewrite big_sepS_singleton. by iModIntro.
+  Qed.
+
+  (** A childless obligation [k] below [p] is discharged and leaves the forest. *)
+  Lemma obl_discharge_leaf E p K k :
+    k ∈ K →
+    parP_kids p K -∗ oblP_kids k ∅ -∗ oblP_assigned k 1 -∗
+    |={E}=>m parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k.
+  Proof.
+    unfold_sfmupd. iIntros (Hk) "Kp Kk Ga %%%%% $".
+    iMod (obl_discharge_mupd with "Kp Kk Ga") as "[$ $]"; auto.
+  Qed.
+
+  (** ** Obligations with an invariant *)
+  Lemma obl_alloc_assigned E p K ℓ μ :
+    parP_below p ℓ -∗ parP_kids p K -∗
+    |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
+                 oblP_assigned k (1/2)%Qp ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+                 (∀ E N (P R : iProp Σ), ▷ P ={E}=∗ oblP_inv N k P R).
+  Proof.
+    iIntros "B Kp". iMod (obl_new with "B Kp") as (k) "(%Hk& Kp& Kk& [A1 A2]& F& W)".
+    iModIntro. iExists k. iFrame "Kp Kk A1 F W". iSplit; first done.
+    iIntros (E' N P R) "H". iApply (oblP_inv_alloc_assigned with "A2 H").
+  Qed.
+
+  Lemma obl_alloc_discharged E ℓ :
+    ⊢ |={E}=>m ∃ k, oblP_discharged k ∗ witP_layer k ℓ ∗
+                   (∀ E N (P R : iProp Σ), ▷ R ={E}=∗ oblP_inv N k P R).
+  Proof.
+    iMod (obl_new_discharged E ℓ) as (k) "(#D& W)". iModIntro. iExists k. iFrame "D W".
+    iIntros (E' N P R) "H". iApply (oblP_inv_alloc_discharged with "D H").
+  Qed.
+
+  (** Discharging [k] with the invariant [oblP_inv N k P R]: [P] is taken out, and once [R] is
+      established [k], a childless child of [p], is discharged. *)
+  Lemma obl_discharge_inv E N k P R :
+    ↑N ⊆ E →
+    oblP_inv N k P R -∗
+    |={E,E ∖ ↑N}=> ∀ q, oblP_assigned k q -∗
+    ▷ (oblP_assigned k q ∗ oblP_assigned k (1/2) ∗ P) ∗
+    (∀ p K, ⌜ k ∈ K ⌝ → parP_kids p K -∗ oblP_kids k ∅ -∗ oblP_assigned k 1 -∗ ▷ R -∗
+     ∀ E', |={E'}=>m |={E ∖ ↑N,E}=> parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k).
+  Proof.
+    iIntros (HN) "#I". iMod (oblP_inv_acc_assigned with "I") as "H"; first done.
+    iIntros "!> %q A". iDestruct ("H" with "A") as "[$ ACC]".
+    iIntros (p K Hk) "Kp Kk A HR %E'". iMod (obl_discharge_leaf with "Kp Kk A") as "[$ #D]"; first done.
+    iModIntro. iMod ("ACC" with "[HR]") as "_".
+    { iNext. rewrite oblP_variant_unfold. iRight. iFrame "D HR". }
+    iModIntro. iFrame "D".
   Qed.
 
 End sfmupd.
