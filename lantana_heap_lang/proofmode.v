@@ -133,7 +133,7 @@ Proof. rewrite envs_entails_unseal=> ->. by apply lwp_value. Qed.
 
 Lemma tac_lwp_value `{!heapGS Σ} Δ s i E (Φ : val → iPropI Σ) v :
   envs_entails Δ (|={E}=>m Φ v) → envs_entails Δ (lWP (Val v) @ s; i; E {{ Φ }}).
-Proof. rewrite envs_entails_unseal=> ->. iIntros "H". iApply lwp_value_sfmupd. by iMod "H". Qed.
+Proof. rewrite envs_entails_unseal=> ->. iIntros "H". rewrite lwp_value_sfmupd. by iMod "H". Qed.
 
 (** Simplify the goal if it is [WP] of a value.
   If the postcondition already allows a fupd, do not add a second one.

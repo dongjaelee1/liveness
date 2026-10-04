@@ -305,10 +305,11 @@ Proof. done. Qed.
     the invariant, registered with the reading [G] and a (later-guarded) proof that the
     content guarantees [G], and the record of [G] at its registration position. The proof
     may be an iProp hypothesis available at registration: one that depends on a token
-    ([alwaysI_register] with a view), or a closed one about a recursively defined structure
+    ([alwaysI_register]), or a closed one about a recursively defined structure
     (temporal_fixpoint.v). The common cases: [alwaysI N P] reads as the canonical trace
-    property of [P]; a view [V] of [P] ([alwaysI_view], from [□ (P -∗ V)]) reads as that of
-    [V]. Sealed: the proof mode must not unify two structures through their bodies. *)
+    property of [P]; [alwaysI_as N P V], the invariant [P] seen as a consequence [V] of its
+    content (from [□ (P -∗ V)]), reads as that of [V]. Sealed: the proof mode must not unify
+    two structures through their bodies. *)
 Local Definition alwaysI_guar_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (N : namespace) (P : iProp Σ) (G : tps Λ Σ) : iProp Σ :=
   ∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hG_event r st ∗
@@ -322,12 +323,12 @@ Lemma alwaysI_guar_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N P 
   alwaysI_guar N P G = (∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hG_event r st ∗
                         saved_ti γ (tps_ti G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ ▷ tguar G r)%I.
 Proof. by rewrite alwaysI_guar_unseal. Qed.
-Definition alwaysI_view `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (P V : iProp Σ) : iProp Σ :=
+Definition alwaysI_as `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (P V : iProp Σ) : iProp Σ :=
   alwaysI_guar N P (tps_sem V).
 Definition alwaysI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (P : iProp Σ) : iProp Σ :=
-  alwaysI_view N P P.
+  alwaysI_as N P P.
 (* Opaque for the proof mode: [iNext] must not unfold a structure to strip its inner later. *)
-Global Typeclasses Opaque alwaysI_view alwaysI.
+Global Typeclasses Opaque alwaysI_as alwaysI.
 
 (** The persistent part of an until: its obligation invariant, registered, with the records
     of its contents at its allocation position, where its obligation was assigned. *)
@@ -556,8 +557,8 @@ Section always_rules.
 
   Global Instance alwaysI_guar_persistent N P G : Persistent (alwaysI_guar N P G).
   Proof. rewrite alwaysI_guar_unfold. apply _. Qed.
-  Global Instance alwaysI_view_persistent N P V : Persistent (alwaysI_view N P V).
-  Proof. rewrite /alwaysI_view. apply _. Qed.
+  Global Instance alwaysI_as_persistent N P V : Persistent (alwaysI_as N P V).
+  Proof. rewrite /alwaysI_as. apply _. Qed.
   Global Instance alwaysI_persistent N P : Persistent (alwaysI N P).
   Proof. rewrite /alwaysI. apply _. Qed.
   Global Instance treg_handle_persistent e : Persistent (treg_handle e).
@@ -573,20 +574,20 @@ Section always_rules.
   Proof. rewrite alwaysI_guar_unfold. iIntros "(%&%&%&%& _& _& _& $& _)". Qed.
   Lemma alwaysI_guar_temporal N P G : alwaysI_guar N P G ⊢ ▷ (P ⊨ₜ G).
   Proof. rewrite alwaysI_guar_unfold. iIntros "(%&%&%&%& _& _& _& _& $& _)". Qed.
-  Lemma alwaysI_view_inv N P V : alwaysI_view N P V ⊢ inv N P.
+  Lemma alwaysI_as_inv N P V : alwaysI_as N P V ⊢ inv N P.
   Proof. apply alwaysI_guar_inv. Qed.
   Lemma alwaysI_inv N P : alwaysI N P ⊢ inv N P.
-  Proof. apply alwaysI_view_inv. Qed.
+  Proof. apply alwaysI_as_inv. Qed.
 
   Lemma alwaysI_guar_acc E N P G :
     ↑N ⊆ E → alwaysI_guar N P G ={E,E∖↑N}=∗ ▷ P ∗ (▷ P ={E∖↑N,E}=∗ True).
   Proof. iIntros (?) "#H". iApply inv_acc; first done. by iApply alwaysI_guar_inv. Qed.
-  Lemma alwaysI_view_acc E N P V :
-    ↑N ⊆ E → alwaysI_view N P V ={E,E∖↑N}=∗ ▷ P ∗ (▷ P ={E∖↑N,E}=∗ True).
+  Lemma alwaysI_as_acc E N P V :
+    ↑N ⊆ E → alwaysI_as N P V ={E,E∖↑N}=∗ ▷ P ∗ (▷ P ={E∖↑N,E}=∗ True).
   Proof. apply alwaysI_guar_acc. Qed.
   Lemma alwaysI_acc E N P :
     ↑N ⊆ E → alwaysI N P ={E,E∖↑N}=∗ ▷ P ∗ (▷ P ={E∖↑N,E}=∗ True).
-  Proof. apply alwaysI_view_acc. Qed.
+  Proof. apply alwaysI_as_acc. Qed.
 
   (** Proof mode integration: [iInv] opens these like invariants. *)
   Global Instance into_inv_alwaysI_guar N P G : IntoInv (alwaysI_guar N P G) N := {}.
@@ -598,14 +599,14 @@ Section always_rules.
     rewrite /IntoAcc /accessor bi.exist_unit.
     iIntros (?) "#Hinv _". by iApply alwaysI_guar_acc.
   Qed.
-  Global Instance into_inv_alwaysI_view N P V : IntoInv (alwaysI_view N P V) N := {}.
-  Global Instance into_acc_alwaysI_view N P V E :
-    IntoAcc (X := unit) (alwaysI_view N P V)
+  Global Instance into_inv_alwaysI_as N P V : IntoInv (alwaysI_as N P V) N := {}.
+  Global Instance into_acc_alwaysI_as N P V E :
+    IntoAcc (X := unit) (alwaysI_as N P V)
             (↑N ⊆ E) True (fupd E (E ∖ ↑N)) (fupd (E ∖ ↑N) E)
             (λ _ : (), (▷ P)%I) (λ _ : (), (▷ P)%I) (λ _ : (), None).
   Proof.
     rewrite /IntoAcc /accessor bi.exist_unit.
-    iIntros (?) "#Hinv _". by iApply alwaysI_view_acc.
+    iIntros (?) "#Hinv _". by iApply alwaysI_as_acc.
   Qed.
   Global Instance into_inv_alwaysI N P : IntoInv (alwaysI N P) N := {}.
   Global Instance into_acc_alwaysI N P E :
@@ -636,10 +637,10 @@ Section always_rules.
     { iIntros (st) "_". simpl. iExists P, G. iFrame "Hγ Hinv HG". }
     iModIntro. iFrame "HI TI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG C".
   Qed.
-  (** The same under a view [V] of the content. *)
+  (** The same, read as a consequence [V] of the content. *)
   Lemma alwaysI_register E N P V :
     ↑N ⊆ E →
-    inv N P -∗ □ (P -∗ V) -∗ |={E}=>m alwaysI_view N P V.
+    inv N P -∗ □ (P -∗ V) -∗ |={E}=>m alwaysI_as N P V.
   Proof.
     iIntros (HNE) "#Hinv #HPV".
     iApply (alwaysI_register_guar with "Hinv []"); first done.
@@ -1208,10 +1209,10 @@ Section loops.
       split_and!; [lia|by apply behavior_S|exact FS|done|done].
   Qed.
 
-  Lemma temporal_always_view N P V : ⊢ alwaysI_view N P V ⊨ₜ tps_always (tps_sem V).
+  Lemma temporal_always_as N P V : ⊢ alwaysI_as N P V ⊨ₜ tps_always (tps_sem V).
   Proof. apply temporal_always_guar. Qed.
   Lemma temporal_always N P : ⊢ alwaysI N P ⊨ₜ tps_always (tps_sem P).
-  Proof. apply temporal_always_view. Qed.
+  Proof. apply temporal_always_as. Qed.
 
   (** *** The until loop
 
@@ -1414,14 +1415,14 @@ Section loops.
   Qed.
 
   (** With valid guarantees of the contents. *)
-  Lemma temporal_always_view_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_view N P V ⊨ₜ tps_always G.
+  Lemma temporal_always_as_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_as N P V ⊨ₜ tps_always G.
   Proof.
     intros HG. iApply (temporal_weaken _ (tps_always (tps_sem V))).
     { apply tps_always_mono. by apply tps_sem_le. }
-    iApply temporal_always_view.
+    iApply temporal_always_as.
   Qed.
   Lemma temporal_always_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ tps_always G.
-  Proof. apply temporal_always_view_valid. Qed.
+  Proof. apply temporal_always_as_valid. Qed.
   Lemma temporal_until_valid N k b q P Q G1 G2 :
     (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k b q P Q ⊨ₜ tps_until G1 G2.
   Proof.
@@ -1580,9 +1581,9 @@ Section into_temporal.
   Global Instance into_temporal_alwaysI_guar N P G :
     IntoTemporal (alwaysI_guar N P G) (tps_always G) | 10.
   Proof. apply temporal_always_guar. Qed.
-  Global Instance into_temporal_alwaysI_view N P V G :
-    IntoTemporal V G → IntoTemporal (alwaysI_view N P V) (tps_always G) | 10.
-  Proof. intros H. unfold IntoTemporal in *. by apply temporal_always_view_valid. Qed.
+  Global Instance into_temporal_alwaysI_as N P V G :
+    IntoTemporal V G → IntoTemporal (alwaysI_as N P V) (tps_always G) | 10.
+  Proof. intros H. unfold IntoTemporal in *. by apply temporal_always_as_valid. Qed.
   Global Instance into_temporal_alwaysI N P G :
     IntoTemporal P G → IntoTemporal (alwaysI N P) (tps_always G) | 10.
   Proof. intros H. unfold IntoTemporal in *. by apply temporal_always_valid. Qed.

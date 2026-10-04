@@ -101,16 +101,6 @@ Record ticketlock_γ :=
       ticketlock_γa : gname;
     }.
 
-(** A general guarantee rule (local to this file): an invariant [A ∨ B] whose left disjunct
-    is excluded by a persistent [C] guarantees, together with [C], what [B] guarantees. *)
-Section temporal_excl.
-  Context `{!lantanaGS Λ Σ}.
-
-  (** [main]'s [temporal_inv_or_excl] (ruling out a disjunct of an invariant's content with a
-      persistent fact) is replaced by registering the invariant under a view
-      ([alwaysI_register]); see [is_fair_lock_register_alive]. *)
-
-End temporal_excl.
 
 Section proof.
   Context `{!heapGS Σ, !ticket_lockG Σ}.
@@ -216,7 +206,7 @@ Section proof.
     is_fair_lock tl γ R ∗
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
-      alwaysI_view N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R)
+      alwaysI_as N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R)
         (lock_inv_alive (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) next curr R).
 
   (** The alive lock is the lock. (Use this rather than framing the one against the other:
