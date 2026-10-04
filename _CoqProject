@@ -3,7 +3,7 @@
 -Q lantana lantana
 -Q lantana_heap_lang lantana.heap_lang
 
-# Custom flags (to be kept in sync with the dune file at the root of the repo).
+# Custom flags.
 # We sometimes want to locally override notation, and there is no good way to do that with scopes.
 -arg -w -arg -notation-overridden
 # Cannot use non-canonical projections as it causes massive unification failures
@@ -34,12 +34,10 @@ lantana/ordinal/wf_rel.v
 lantana/ordinal/zorn.v
 lantana/ordinal/ordinal_facts.v
 
+# Rocq-level mathematics and cameras
 lantana/algebra/axioms.v
 lantana/algebra/wf_structs.v
 lantana/algebra/ordinal_facts.v
-
-lantana/program_logic/lwp_notation.v
-
 lantana/algebra/list_of_sets.v
 lantana/algebra/ocm.v
 lantana/algebra/wfocm.v
@@ -52,6 +50,7 @@ lantana/algebra/auth_mra.v
 lantana/algebra/ordinal_ucmra.v
 lantana/algebra/ordinal_existential_properties.v
 
+# The iProp-level model: later credits, fancy updates, invariants, the obligation model
 lantana/base_logic/relational_updates.v
 lantana/base_logic/later_credits.v
 lantana/base_logic/fancy_updates.v
@@ -71,13 +70,15 @@ lantana/base_logic/model_history.v
 lantana/base_logic/mupd.v
 lantana/base_logic/oinv.v
 lantana/base_logic/opreds.v
+lantana/base_logic/model_physical_updates.v
 
+# Languages and the thread-local weakest precondition lwp
+lantana/program_logic/lwp_notation.v
 lantana/program_logic/language.v
 lantana/program_logic/history_interp.v
 lantana/program_logic/temporal_registry.v
 lantana/program_logic/temporal_class.v
 lantana/program_logic/sfmupd.v
-lantana/base_logic/model_physical_updates.v
 lantana/program_logic/obl_forest.v
 lantana/program_logic/obl_forest_instance.v
 lantana/program_logic/weakestpre.v
@@ -86,6 +87,9 @@ lantana/program_logic/ectx_language.v
 lantana/program_logic/ectx_lifting.v
 lantana/program_logic/ectxi_language.v
 lantana/program_logic/atomic.v
+lantana/program_logic/obl_forest_derived.v
+
+# Traces, temporal guarantees and adequacy
 lantana/trace/until_chain.v
 lantana/trace/temporal_property.v
 lantana/trace/adequacy.v
@@ -96,8 +100,8 @@ lantana/trace/guarantee_adequacy.v
 lantana/trace/temporal_saved.v
 lantana/trace/temporal_fixpoint.v
 lantana/trace/fuel_burning_triple.v
-lantana/program_logic/obl_forest_derived.v
 
+# HeapLang
 lantana_heap_lang/locations.v
 lantana_heap_lang/lang.v
 lantana_heap_lang/tactics.v
@@ -110,7 +114,7 @@ lantana_heap_lang/derived_laws.v
 lantana_heap_lang/proofmode.v
 lantana_heap_lang/temporal_laws.v
 
-
+# Case studies
 lantana_heap_lang/examples/step_tactics.v
 lantana_heap_lang/examples/flag.v
 lantana_heap_lang/examples/flag_client.v
