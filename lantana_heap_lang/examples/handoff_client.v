@@ -41,9 +41,9 @@ Section proof.
 
   (** layers: set = 0 → task = 1 → flag obl = 1 → return obl = flag commitment = 2 *)
   Lemma main_spec :
-    ⊢ ∃ μ, ∀ i g kl kc,
-    l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 2 μ ∗
-         crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
+    ⊢ ∃ μ, ∀ i kl kc,
+    l{{{ thread_expr i [] (main #()) ∗ thP_kids i {[kl; kc]} ∗ ([∗ set] g ∈ {[kl; kc]}, oblP_fuel g 2 μ) ∗
+         ⌜kl ≠ kc⌝ ∗ oblP_kids kl ∅ ∗ oblP_kids kc ∅ ∗
          finallyI Nl kl 1 (exits #1@i) ∗
          finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) }}}
       main #() @ i
@@ -54,101 +54,110 @@ Section proof.
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
     iPoseProof (Handoff_send_spec) as (μ_hs) "Handoff_send_spec".
     iPoseProof (Handoff_receive_spec) as (μ_hr) "Handoff_receive_spec".
-    iExists (20 ⊕ μ_fi ⊕ μ_hs ⊕ μ_fw)%M. iIntros (i g kl kc Φ) "!> HP HΦ".
-    iDestruct "HP" as "(TE& TG& GF& Cg& %Hklc& HF& HC)".
-    iPoseProof (crP_fuel_add with "GF") as "[GF GF_m]".
-    iPoseProof (crP_fuel_add with "GF_m") as "[GF_fi GF_m]".
-    iPoseProof (crP_fuel_add with "GF_m") as "[GF_hs GF_fw]".
-    iPoseProof (crP_fuels_init {[g]} with "[GF]") as "GF".
-    { iApply big_sepS_singleton. iFrame. }
+    iExists (20 ⊕ μ_fi ⊕ μ_hs ⊕ μ_fw)%M. iIntros (i kl kc Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& %Hklc& Kkl& Kkc& HF& HC)".
+    iPoseProof (oblP_fuel_add_set with "GF") as "[GF GF_m]".
+    iPoseProof (oblP_fuel_add_set with "GF_m") as "[GF_fi GF_m]".
+    iPoseProof (oblP_fuel_add_set with "GF_m") as "[GF_hs GF_fw]".
+    iPoseProof (oblP_fuels_init with "GF") as "GF".
     rewrite /main /=.
     lwp_pure_lc 100.
     lwp_pures.
     lwp_bind (AllocN _ _).
-    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
     iModIntro. iIntros (ptrb) "[TE ((_& TG& _)& Ptrb& _)]".
     lwp_pures.
     lwp_bind (Fork _).
-    iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro. iApply lwp_fork_step. iModIntro. iFrame "TE TG GF1". iExists ∅. iSplitR; first done.
     iIntros (j) "TE TEj TG _ TGj !> !>".
-    iMod (carrier_alloc _ _ _ 1 μ_hr with "TGj") as "(%& _& TGj& Cgj& GFj)".
+    (* The receiver's inbox, at layer 0. *)
+    iMod (obl_new _ (PThread j) ∅ 0 μ_hr with "[] TGj") as "(%gj& _& TGj& Kgj& Agj& GFj& #Wgj)".
+    { iApply parP_le_thread. }
     rewrite union_empty_r_L.
     iDestruct "Ptrb" as "[Ptrb Ptrb0]".
-    iMod (is_handoff_initialize ⊤ with "Ptrb0 Cgj") as "(%γh& #is_handoff& Gv)".
-    iModIntro. iSplitR "TEj TGj GFj Gv"; cycle 1.
+    iMod (is_handoff_initialize ⊤ ptrb 1 gj with "Ptrb0 Kgj Wgj") as "(%γh& #is_handoff& Gv)".
+    iModIntro. iSplitR "TEj TGj GFj Agj Gv"; cycle 1.
     { iRename "TEj" into "TE". lwp_bind (Handoff.receive _).
       iModIntro.
       iApply lwp_sfmupd.
-      iApply ("Handoff_receive_spec" $! 0 with "[$TE $TGj GFj $Gv $is_handoff]").
+      iApply ("Handoff_receive_spec" $! 0 with "[$TE $TGj GFj $Agj $Gv $is_handoff]").
       { iApply big_sepS_singleton. iFrame. }
       iIntros (?) "(TE& _& TGj)". iMod (thread_terminate with "TGj") as "TGj".
       rewrite /lift_term. iModIntro. by iFrame. }
     iModIntro.
     lwp_pures.
     lwp_bind (Flag.init _).
-    iMod (carrier_alloc _ _ _ 1 (12 ⊕ μ_fi ⊕ μ_hs)%M with "TG") as "(%& %& TG& Cg0& GF0)".
-    iPoseProof (crP_fuel_add with "GF0") as "[GF00 GF0]".
-    iPoseProof (crP_fuel_add with "GF0") as "[GF0_fi GF0]".
-    iMod (crP_fuel_layer_mon _ (0)%ordi with "GF_fi") as "GF_fi".
+    (* A container for the flag's obligation, at the flag's layer: the obligation is handed off. *)
+    iMod (obl_new _ (PThread i) {[kl; kc]} 1 (12 ⊕ μ_fi ⊕ μ_hs)%M with "[] TG")
+      as "(%g0& %Hg0& TG& Kg0& Ag0& GF0& #Wg0)".
+    { iApply parP_le_thread. }
+    iPoseProof (oblP_fuel_add with "GF0") as "[GF00 GF0]".
+    iPoseProof (oblP_fuel_add with "GF0") as "[GF0_fi GF0]".
+    iMod (oblP_fuel_layer_mon_set _ (0)%ordi with "GF_fi") as "GF_fi".
     { apply ordArith.le_from_nat. lia. }
-    iMod (crP_fuel_layer_mon _ (0)%ordi with "GF0_fi") as "GF0_fi".
+    iMod (oblP_fuel_layer_mon _ (0)%ordi with "GF0_fi") as "GF0_fi".
     { apply ordArith.le_from_nat. lia. }
-    iModIntro.    
-    iApply ("Flag_init_spec" $! 0 _ _ _ _ 1 1 with "[$TE $TG GF_fi GF0_fi $Cg0]").
-    { iApply big_sepS_union. 1: set_solver. rewrite !big_sepS_singleton. iFrame. }
-    iIntros "%ptrx % (TE& _& TG& _& Cg0& Of& HU& #is_flag)".
+    iModIntro.
+    iApply ("Flag_init_spec" $! 0 _ _ (PObl g0) ∅ 1 1 with "[$TE $TG GF_fi GF0_fi $Kg0]").
+    { iSplitL "GF_fi GF0_fi".
+      - iApply big_sepS_union. 1: set_solver. rewrite big_sepS_singleton. iFrame.
+      - iApply (parP_le_obl with "Wg0"). done. }
+    iIntros "%ptrx %k (TE& _& TG& %Hk& Kg0& Kk& Of& HU& #is_flag)".
     rewrite union_empty_r_L.
     (* Keep the commitment: the flag exists. *)
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LCc LC]".
-    iMod (finallyI_discharge with "LCc Cg HC []") as "(_& Cg& _)".
+    iMod (finallyI_discharge with "LCc TG Kkc HC []") as "(_& TG& _)".
     { set_solver. }
     { set_solver. }
     { iSplit; [iExists ptrx, k, 1%ordi; iFrame "is_flag"|iExists ptrb, γh, 1%ordi; iFrame "is_handoff"]. }
+    iPoseProof (oblP_fuels_remove_obl kc with "GF") as "GF".
+    iPoseProof (big_sepS_delete _ _ kc with "GF_fw") as "[_ GF_fw]"; first set_solver.
+    iPoseProof (big_sepS_delete _ _ kc with "GF_hs") as "[_ GF_hs]"; first set_solver.
+    replace (({[g0]} ∪ {[kl; kc]}) ∖ {[kc]}) with ({[g0]} ∪ {[kl]} : gset oid) by set_solver.
     replace ({[kl; kc]} ∖ {[kc]}) with ({[kl]} : gset oid) by set_solver.
-    iPoseProof (crP_fuels_add_carrier with "GF00 GF") as "GF".
+    iPoseProof (oblP_fuels_add_obl with "GF00 GF") as "GF".
     lwp_pures.
     lwp_bind (Handoff.send _ _ _).
-    (** Need carrier at layer 1 for Flag.set. *)
     iModIntro.
-    iMod (crP_fuel_layer_mon _ 0 with "GF_hs") as "GF_hs".
+    iMod (oblP_fuel_layer_mon_set _ 0 with "GF_hs") as "GF_hs".
     { apply ordArith.le_from_nat. lia. }
-    iMod (crP_fuel_layer_mon _ 0 with "GF0") as "GF0".
+    iMod (oblP_fuel_layer_mon _ 0 with "GF0") as "GF0".
     { apply ordArith.le_from_nat. lia. }
-    iApply ("Handoff_send_spec" $! 0 _ _ Flag.set #ptrx _ _ {[k]} with "[$TE $TG GF_hs GF0 $Cg0 Of Ptrb HU $is_handoff]").
+    iApply ("Handoff_send_spec" $! 0 _ _ Flag.set #ptrx _ (PObl g0) {[k]} {[k]}
+             with "[$TE $TG GF_hs GF0 $Kg0 Of Ptrb HU Kk $is_handoff]").
     { iSplitL "GF_hs GF0".
       { iApply (big_sepS_union_2 with "[GF0]").
         - iApply big_sepS_singleton. iFrame.
-        - iApply big_sepS_singleton. iFrame. }
+        - iFrame. }
       iSplit.
       { iPureIntro. set_solver. }
       iSplitL "Of".
       { iApply big_sepS_singleton. iFrame. }
-      iFrame "Ptrb". iExists 0. iExists (flag_tk ptrx k).
+      iFrame "Ptrb". iExists 0, (flag_tk ptrx k ∗ oblP_kids k ∅)%I.
       iSplit.
       { iPureIntro. apply ordArith.lt_from_nat. lia. }
-      iFrame "HU". iExists μ_fs. iIntros (?????? ??) "!> (TE& TG& GF& Cg& %INk& HU) HΦ".
-      iApply ("Flag_set_spec" $! lc with "[$TE $TG GF $Cg $HU $is_flag]").
+      iFrame "HU Kk". iExists μ_fs. iIntros (?????? ?) "!> (TE& TG& GF& Cg& %INk& HU& Kk) HΦ".
+      iApply ("Flag_set_spec" $! lc with "[$TE $TG GF $Cg $Kk $HU $is_flag]").
       { iSplit.
         - iFrame.
         - iPureIntro. set_solver. }
       iIntros "(TE& LC& TG& Cg& _)". iApply ("HΦ" with "[$]"). }
-    iIntros "(TE& _& TG& Cg0)".
-    replace ({[k]} ∖ {[k]}) with (∅ : gset ocid) by set_solver.
-    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g1 with "GF") as "GF".
-    replace ({[g1; g]} ∖ {[g1]}) with ({[g]} : gset ocid) by set_solver.
+    iIntros "(TE& _& TG& Kg0)".
+    replace ({[k]} ∖ {[k]}) with (∅ : gset oid) by set_solver.
+    iMod (obl_discharge_leaf with "TG Kg0 Ag0") as "[TG _]"; first set_solver.
+    iPoseProof (oblP_fuels_remove_obl g0 with "GF") as "GF".
+    replace (({[g0]} ∪ {[kl]}) ∖ {[g0]}) with ({[kl]} : gset oid) by set_solver.
     lwp_pures.
     lwp_bind (Flag.wait _).
     iModIntro. iApply ("Flag_wait_spec" $! 0 with "[$TE $TG GF_fw $is_flag]").
-    { iApply big_sepS_singleton. erewrite crP_fuel_layer_eq. 1: iFrame.
-      rewrite -hessenberg.add_from_nat. done. }
+    { iApply oblP_fuel_layer_eq_set. 2: iFrame. by rewrite -hessenberg.add_from_nat. }
     iIntros "(TE& _& TG& #Odk)".
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate_finally with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_terminate_finally with "TE LC TG Kkl HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td".
     (* A bare [done] on this goal takes ~12s. *)
@@ -157,13 +166,13 @@ Section proof.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := main #() ]} →
-    Φ = (λ μ, (∃ g kl kc, finallyI Nl kl 1 (exits #1@i) ∗
-                          finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
-                          (thP_carriers i {[g]} ∗ crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗
-                           crP_fuel g 2 μ))%I) →
+    Φ = (λ μ, (∃ kl kc, finallyI Nl kl 1 (exits #1@i) ∗
+                        finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
+                        (thP_kids i {[kl; kc]} ∗ oblP_kids kl ∅ ∗ oblP_kids kc ∅ ∗ ⌜kl ≠ kc⌝ ∗
+                         ([∗ set] g ∈ {[kl; kc]}, oblP_fuel g 2 μ)))%I) →
     Ψs = ({[i := (λ _ v, ⌜v = #1⌝)%I]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗
-     ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
+     ([∗ set] i ∈ dom Θ, thP_kids i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
                    (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ i; ⊤ {{ lift_term i Ψ }}))).
   Proof using handoffG0.
@@ -171,25 +180,29 @@ Section proof.
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     rewrite !big_sepS_singleton.
     iPoseProof (main_spec) as (μ) "main_spec".
-    iMod (carrier_alloc _ _ _ 2 μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
-    iMod (untilI_alloc _ _ _ 2 2 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
+    iMod (untilI_alloc _ _ _ 2 μ with "[] TGs") as "(%kl1& %Hkl1& TG1& Kkl1& Ofkl1& #Wlkl1& Akl1)".
+    { iApply parP_le_thread. }
     iMod ("Akl1" $! _ Nl True%I (exits #1@i)%I with "[]") as "Ukl1".
     { done. }
-    iMod (untilI_alloc _ _ _ 2 2 0 with "Gg1") as "(%kc& %Hkc& Gg1& Ofkc& #Wlkc& Akc)". 1: done.
+    iMod (untilI_alloc _ _ _ 2 μ with "[] TG1") as "(%kc& %Hkc& TG1& Kkc& Ofkc& #Wlkc& Akc)".
+    { iApply parP_le_thread. }
     iMod ("Akc" $! _ Nc True%I ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ))%I with "[]") as "Ukc".
     { done. }
-    iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Gg1 Gf1 Ofkl1 Ofkc".
+    iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Kkl1 Kkc Ofkl1 Ofkc".
     { subst Φ. rewrite !union_empty_r_L.
       replace ({[kc]} ∪ {[kl1]}) with ({[kl1; kc]} : gset oid) by set_solver.
-      iExists g1, kl1, kc. iFrame "Ukl1 Ukc TG1 Gf1 Gg1". iPureIntro. set_solver. }
-    iClear "Wlkl1 Wlkc". clear dependent g1 kl1 kc.
+      iExists kl1, kc. iFrame "Ukl1 Ukc TG1 Kkl1 Kkc".
+      rewrite (big_sepS_union _ {[kl1]} {[kc]}); last set_solver. rewrite !big_sepS_singleton.
+      iFrame "Ofkl1 Ofkc". iPureIntro. set_solver. }
+    iClear "Wlkl1 Wlkc". clear dependent kl1 kc.
     iIntros "HP". subst Φ.
-    iDestruct "HP" as (g1 kl1 kc) "(HF& HC& TG& Cg& %Hklc& GF)".
+    iDestruct "HP" as (kl1 kc) "(HF& HC& TG& Kkl& Kkc& %Hklc& GF)".
     iEval (rewrite HT big_sepM_singleton) in "TEs".
-    iPoseProof ("main_spec" $! i g1 kl1 kc (λ v, lift_term i (λ _ v, ⌜v = #1⌝)%I v) with "[TEs TG Cg GF HF HC]") as "WP".
+    iPoseProof ("main_spec" $! i kl1 kc (λ v, lift_term i (λ _ v, ⌜v = #1⌝)%I v)
+                 with "[TEs TG Kkl Kkc GF HF HC]") as "WP".
     (* Frame by name, [HF] before [HC]: a bare [iFrame] tries [HC] against [HF]'s conjunct
        first, and that failing unification of two different [finallyI]s takes ~19s. *)
-    { iFrame "TEs TG Cg GF HF HC". done. }
+    { iFrame "TEs TG GF Kkl Kkc HF HC". done. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { done. }
     { done. }
@@ -219,10 +232,11 @@ Section adequacy.
 
   Let Φ_P `{!heapGS Σ} `{!handoffG Σ} : _ → iProp Σ :=
         λ μ,
-          (∃ g kl kc,
+          (∃ kl kc,
               finallyI Nl kl 1 (exits #1@i) ∗
               finallyI Nc kc 1 ((∃ x k ℓ, is_flag x k ℓ) ∗ (∃ b γ ℓ, is_handoff b γ ℓ)) ∗
-              (thP_carriers i {[g]} ∗ crP_obls g 2 {[kl; kc]} ∗ ⌜kl ≠ kc⌝ ∗ crP_fuel g 2 μ))%I.
+              (thP_kids i {[kl; kc]} ∗ oblP_kids kl ∅ ∗ oblP_kids kc ∅ ∗ ⌜kl ≠ kc⌝ ∗
+               ([∗ set] g ∈ {[kl; kc]}, oblP_fuel g 2 μ)))%I.
 
   Let G_main {Σ} : tps heap_lang Σ :=
         (tps_finally (exits #1@i) ∧
