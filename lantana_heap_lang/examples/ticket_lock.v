@@ -827,7 +827,7 @@ Section proof.
     iDestruct "IFL" as "(%&%& %& #INV& #ITK)".
     subst tl.
     (** Exchange token. *)
-    iApply lwpupd_fupd_l. iInv "ITK" as "H".
+    iApply sfmupd_fupd_l. iInv "ITK" as "H".
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%& [TK | (%& GV0& PtrCurr0& #GMEo0& GEku)])".
@@ -957,7 +957,7 @@ Section proof.
     iDestruct "IFL" as "(%&%& %& #INV& #ITK)".
     subst tl.
     (** Exchange token. *)
-    iApply lwpupd_fupd_l. iInv "ITK" as "H".
+    iApply sfmupd_fupd_l. iInv "ITK" as "H".
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%& [TK | (%& GV0& PtrCurr0& #GMEo0& GEku)])".

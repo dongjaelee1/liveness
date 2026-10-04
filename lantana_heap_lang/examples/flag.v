@@ -124,7 +124,7 @@ Section proof.
     rewrite /Flag.init.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc lc.
-    iApply lwpupd_lwp_sfmupd.
+    iApply sfmupd_lwp_sfmupd.
     lwp_bind (AllocN _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.

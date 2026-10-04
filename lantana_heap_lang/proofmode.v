@@ -41,7 +41,7 @@ Tactic Notation "thread_expr_focus" constr(H) open_constr(efoc) :=
 Ltac thread_expr_focus_goal :=
   lazymatch goal with
   | |- envs_entails _ (lwp _ _ _ ?e _) => thread_expr_focus "TE" e
-  | |- envs_entails _ (lwpupd _ _ ?e _) => thread_expr_focus "TE" e
+  | |- envs_entails _ (|={_}=>m (lwp _ _ _ ?e _)) => thread_expr_focus "TE" e
   end.
 
 Lemma tac_lwp_expr_eval `{!heapGS Σ} Δ s i E Φ e e' :
@@ -71,7 +71,7 @@ Lemma tac_lwp_pure `{!heapGS Σ} Δ (s : stuckness) i E
                        (thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                         ALC (£ o ={E',E}=∗ |={E}=>m P)))
            (thread_expr i C (fill K e2) -∗
-            lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
+            (|={E}=>m (lWP (fill K e2) @ s; i; E {{ Φ }})))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
@@ -98,7 +98,7 @@ Lemma tac_lwp_pure_simple `{!heapGS Σ} Δ s i E K e1 e2 φ (n m' : nat) Φ {C} 
          ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r) -∗
          £ (o)%ord -∗
          thread_expr i C (fill K e2) -∗
-         lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))%I →
+         (|={E}=>m (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ? ->.
@@ -120,7 +120,7 @@ Proof.
     iMod (witP_cred_lt with "H") as "[_ H]".
     { apply OrdArith.lt_from_nat. eauto. }
     by iFrame. }
-  iApply lwpupd_fupd_l. iApply rupd_fupd. iMod (tlc_weaken _ o with "LC") as "LC".
+  iApply sfmupd_fupd_l. iApply rupd_fupd. iMod (tlc_weaken _ o with "LC") as "LC".
   { unshelve etransitivity. 1: exact (o × 1)%ord.
     - rewrite Jacobsthal.mult_1_r. done.
     - apply Jacobsthal.le_mult_r, OrdArith.le_from_nat. lia. }
@@ -251,7 +251,7 @@ Tactic Notation "lwp_label" := lwp_pure (Label _ _).
 Lemma tac_lwp_bind_step `{!heapGS Σ} K Δ s i E Φ e f :
   TCEq (to_val e) None →
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (lWP e @ s; i; E {{ v, lwpupd i E (f (Val v)) (lWP f (Val v) @ s; i; E {{ Φ }}) }})%I →
+  envs_entails Δ (lWP e @ s; i; E {{ v, (|={E}=>m (lWP f (Val v) @ s; i; E {{ Φ }})) }})%I →
   envs_entails Δ (lWP fill K e @ s; i; E {{ Φ }})%I.
 Proof. intros He. rewrite envs_entails_unseal=> -> ->. by apply: lwp_bind_step. Qed.
 
@@ -272,9 +272,9 @@ Tactic Notation "lwp_bind_step" open_constr(efoc) :=
 
 Lemma tac_lwp_bind_gen `{!heapGS Σ} K Δ s i E Φ e f :
   f = (λ e, fill K e) → (* as an eta expanded hypothesis so that we can `simpl` it *)
-  envs_entails Δ (lwpupd i E e (lWP e @ s; i; E {{ v, lwpupd i E (f (Val v)) (lWP f (Val v) @ s; i; E {{ Φ }}) }}))%I →
-  envs_entails Δ (lwpupd i E (fill K e) (lWP fill K e @ s; i; E {{ Φ }}))%I.
-Proof. rewrite envs_entails_unseal=> -> ->. by apply: lwp_bind_lwpupd. Qed.
+  envs_entails Δ ((|={E}=>m (lWP e @ s; i; E {{ v, (|={E}=>m (lWP f (Val v) @ s; i; E {{ Φ }})) }})))%I →
+  envs_entails Δ ((|={E}=>m (lWP fill K e @ s; i; E {{ Φ }})))%I.
+Proof. rewrite envs_entails_unseal=> -> ->. by apply: lwp_bind_sfmupd. Qed.
 
 Ltac lwp_bind_gen_core K :=
   lazymatch eval hnf in K with
@@ -285,26 +285,26 @@ Ltac lwp_bind_gen_core K :=
 Tactic Notation "lwp_bind" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
-  | |- envs_entails _ (lwpupd ?i ?E ?e (lwp ?s ?i ?E ?e ?Q)) =>
+  | |- envs_entails _ ((|={?E}=>m (lwp ?s ?i ?E ?e ?Q))) =>
     first [ reshape_expr e ltac:(fun K e' => unify e' efoc; lwp_bind_gen_core K)
           | fail 1 "lwp_bind: cannot find" efoc "in" e ]
-  | _ => fail "lwp_bind: not a 'lwpupd lwp'"
+  | _ => fail "lwp_bind: not a '|={E}=>m lWP'"
   end.
 
-(** Tactics for lwpupd lwp form. *)
+(** Tactics for goals of the form [|={E}=>m lWP e @ s; i; E {{ Φ }}]. *)
 Lemma tac_lwp_expr_eval_upd `{!heapGS Σ} Δ s i E Φ e e' :
   (∀ (e'':=e'), e = e'') →
-  environments.envs_entails Δ (lwpupd i E e' (lWP e' @ s; i; E {{ Φ }}))%I →
-  environments.envs_entails Δ (lwpupd i E e (lWP e @ s; i; E {{ Φ }}))%I.
+  environments.envs_entails Δ ((|={E}=>m (lWP e' @ s; i; E {{ Φ }})))%I →
+  environments.envs_entails Δ ((|={E}=>m (lWP e @ s; i; E {{ Φ }})))%I.
 Proof. by intros ->. Qed.
 
 Tactic Notation "lwp_expr_eval_upd" tactic3(t) :=
   iStartProof;
   lazymatch goal with
-  | |- environments.envs_entails _ (lwpupd ?i ?E ?e (lwp ?s ?i ?E ?e ?Q)) =>
+  | |- environments.envs_entails _ ((|={?E}=>m (lwp ?s ?i ?E ?e ?Q))) =>
       notypeclasses refine (tac_lwp_expr_eval_upd _ _ _ _ _ e _ _ _);
       [let x := fresh in intros x; t; unfold x; notypeclasses refine eq_refl|]
-  | _ => fail "lwp_expr_eval_upd: not a 'lwpupd lwp'"
+  | _ => fail "lwp_expr_eval_upd: not a '|={E}=>m lWP'"
   end.
 Ltac lwp_expr_simpl_upd := lwp_expr_eval_upd simpl.
 

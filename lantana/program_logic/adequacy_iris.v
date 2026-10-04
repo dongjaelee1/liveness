@@ -108,24 +108,20 @@ Section proof2.
       replace (dom (<[i1:=e2]> Θ) ∪ dom efs) with (dom Θ2); cycle 1.
       { subst Θ2. rewrite dom_union_L. auto. }
       remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
-      iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, lwpupd j ⊤ e (match to_val e with
+      iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, (|={⊤}=>m (match to_val e with
                                                           | Some v => lift_term j Q v
                                                           | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
-                                                          end))%I with "[Efs]" as "Efs".
+                                                          end)))%I with "[Efs]" as "Efs".
       { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
         destruct (to_val x) eqn:EQx.
-        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. by iApply lwpupd_trans.
+        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. by iApply sfmupd_trans.
         - iApply "WP". }
-      iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
-      { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
-        apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom.
-        apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+      iDestruct "HI" as "[HI SIa]".
+      iMod (all_interp_sfmupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
       1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2.
       * rewrite lwp_fix_unfold_fix /lwp_pre He2.
-        iMod (all_interp_lwpupd_steps γ2 with "WP HI MI") as "(WP& [[HI TI] SIa]& %g3& %v3& %Ω5& %W5& %& MI)".
-        { subst Θ2. rewrite lookup_union_l.
-          - apply lookup_insert_eq.
-          - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+        iMod (all_interp_sfmupd_steps (fair_sched_fun γ2) with "WP HI MI") as "(WP& [HI TI]& %g3& %v3& %Ω5& %W5& %& MI)".
+        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
         1: eapply LB4.
         destruct H as [LEO3 LB5].
         iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
@@ -162,7 +158,7 @@ Section proof2.
           { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
             apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
           iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
-        iDestruct "HI" as "[[HI TI] SIa]".
+        iDestruct "HI" as "[HI TI]".
         iPoseProof (history_interp_wf with "HI") as "%HistWF".
         iPoseProof ("IH" with "[] [] [] [] [] [] HI TI SIa MI WPs") as "H".
         1: eauto. 1: eauto. 1: eauto.
@@ -243,7 +239,7 @@ Section proof2.
     (∃ Q, Ψs !! i = Some Q ∧ ∀ v, (Q i v ⊢ ⌜Φ i v⌝)) →
     ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
      model_interp g v Ω W n (dom Θ) ∗
-     (|={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ v, lift_term i Ψ v }})))
+     (|={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ NotStuck; i; ⊤ {{ v, lift_term i Ψ v }}))))
     ⊢ |={⊤}=> safety_iris_tiProp i Φ (n, τf).
   Proof.
     iIntros (BEH FS LB HIST POST) "([HI SIa]& MI& WPs)".
@@ -255,20 +251,19 @@ Section proof2.
     remember (map_zip Θ Ψs) as TQ. assert (EQTQ : Θ = fst <$> TQ).
     { subst. rewrite fst_map_zip; auto. intro k. rewrite -!elem_of_dom Dom. auto. }
     iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
-               lwpupd i ⊤ e (match to_val e with
+               (|={⊤}=>m (match to_val e with
                              | Some v => (lift_term i Q) v
                              | None => lwp_fix NotStuck i ⊤ e (lift_term i Q)
-                             end))%I with "[WPs]" as "WPs".
+                             end)))%I with "[WPs]" as "WPs".
     { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
       rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
       simpl. destruct (to_val e) eqn:He.
-      - by iApply lwpupd_trans.
+      - by iApply sfmupd_trans.
       - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
-    iMod (all_interp_lwpupd_steps_gmap γ with "WPs [$HI $SIa] MI") as "(WPs& HI& %&%&%&%& %& MI)".
-    { subst Θ. done. }
+    iMod (all_interp_sfmupd_steps_gmap γ with "WPs HI MI") as "(WPs& HI& %&%&%&%& %& MI)".
     { auto. }
     destruct H as [LEO3 LB3].
-    iPoseProof (lwp_fix_safety_iris_tiProp with "[$HI $MI $WPs]") as "$".
+    iPoseProof (lwp_fix_safety_iris_tiProp with "[$HI $SIa $MI $WPs]") as "$".
     1,2: eauto. all: eauto.
     destruct POST as (?& LUi& POST). assert (is_Some (Θ !! i)).
     { apply elem_of_dom. apply elem_of_dom_2 in LUi. rewrite Dom. auto. }
@@ -295,7 +290,7 @@ Theorem lwp_adequacy_safety_iris (Σ : gFunctors) (Λ : language)
      ⌜(∃ Q, Ψs !! j = Some Q ∧ ∀ v, (Q j v ⊢ ⌜Φ j v⌝))⌝ ∧
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
      (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
-      (|={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ lift_term i Ψ }})))) →
+      (|={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ NotStuck; i; ⊤ {{ lift_term i Ψ }}))))) →
   safety_iris j Φ τ.
 Proof.
   intros τ BEH FS INIT1 INIT2 Hwp.
@@ -320,7 +315,7 @@ Proof.
             ⌜(∃ (Q : thread_id → val Λ → iProp Σ), Ψs !! j = Some Q ∧ ∀ v, (Q j v ⊢ ⌜Φ j v⌝))⌝ ∧
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
-             (|={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ lift_term i Ψ }})))).
+             (|={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ NotStuck; i; ⊤ {{ lift_term i Ψ }}))))).
   { iIntros (Htemp). destruct (Hwp Htemp) as [x Hx]. iExists x. iApply Hx. }
   eapply sat_wand; cycle 1.
   { eapply Hwp'. }

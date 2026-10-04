@@ -146,7 +146,7 @@ Section proof.
       rewrite -hessenberg.add_from_nat. done. }
     iIntros "(TE& _& TG& #Odk)".
     do 2 (iModIntro; lwp_pure_one).
-    iApply lwpupd_lwp_sfmupd.
+    iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
     iMod (thread_expr_terminateT with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
@@ -165,7 +165,7 @@ Section proof.
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
-                   (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+                   (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ i; ⊤ {{ lift_term i Ψ }}))))).
   Proof using handoffG0.
     iIntros (HT HP HQ) "TEs TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".

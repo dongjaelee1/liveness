@@ -98,7 +98,7 @@ Section proof.
     iIntros "[TE ((_& TG& _)& Ptrx)]".
     lwp_pures.
     (* The nested commitment, then termination. *)
-    iApply lwpupd_lwp_sfmupd.
+    iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC2 _]".
     replace ({[kq; kf]} ∖ {[kq]}) with ({[kf]} : gset oid) by set_solver.
     iMod (finallyI_discharge with "LC2 Cg HF Ptrx") as "(Ptrx& Cg& #Odf)".
@@ -121,7 +121,7 @@ Section proof.
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ x ↦ #0 -∗ y ↦ #7 -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
-                   (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+                   (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ i; ⊤ {{ lift_term i Ψ }}))))).
   Proof.
     iIntros (HT HP HQ) "TEs Ptrx Ptry TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".

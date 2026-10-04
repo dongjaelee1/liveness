@@ -1777,25 +1777,23 @@ Section adequacy.
       replace (dom (<[i1:=e2]> Θ) ∪ dom efs) with (dom Θ2); cycle 1.
       { subst Θ2. rewrite dom_union_L. auto. }
       remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
-      iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, lwpupd j ⊤ e (match to_val e with
+      iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, (|={⊤}=>m (match to_val e with
                                                           | Some v => lift_term j Q v
                                                           | None => lwp_fix s j ⊤ e (lift_term j Q)
-                                                          end))%I with "[Efs]" as "Efs".
+                                                          end)))%I with "[Efs]" as "Efs".
       { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
         destruct (to_val x) eqn:EQx.
-        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. iApply lwpupd_trans. iApply "WP".
+        - rewrite lwp_fix_unfold_fix /lwp_pre EQx. iApply sfmupd_trans. iApply "WP".
         - iApply "WP". }
-      iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
-      { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id.
-        apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom.
-        apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+      iDestruct "HI" as "[HIT SIa]".
+      iMod (all_interp_sfmupd_steps_gmap γ2 with "Efs HIT MI") as "(Efs& HIT& %g2& %v2& %Ω4& %W4& %& MI)".
       1: auto. destruct H as [LEO2 LB4].
       assert (EQTQ2 : Θ2 = fst <$> (<[i1:=(e2, Q)]> TQ ∪ TQefs)).
       { subst. rewrite map_fmap_union fmap_insert -map_fmap_compose /compose map_fmap_id. done. }
       assert (TQDisj : <[i1:=(e2, Q)]> TQ ##ₘ TQefs).
       { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
         apply map_disjoint_dom in TDisj. rewrite dom_fmap_L in TDisj. auto. }
-      iDestruct "HI" as "[[HI TI] SIa]".
+      iDestruct "HIT" as "[HI TI]".
       iPoseProof (history_interp_wf with "HI") as "%HistWF".
       assert (HIST' : hist_trace (h ++ [(σ2, Θ2, κs)]) τf).
       { intros n' σ' Θ' κs' H. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
@@ -1806,9 +1804,8 @@ Section adequacy.
           assert (Hh : length h = S n) by lia. rewrite Hh TRn1. eauto. }
       destruct (to_val e2) eqn:He2.
       + rewrite lwp_fix_unfold_fix /lwp_pre He2.
-        iMod (all_interp_lwpupd_steps γ2 with "WP [$HI $TI $SIa] MI") as "(WP& [[HI TI] SIa]& %g3& %v3& %Ω5& %W5& %& MI)".
-        { subst Θ2. rewrite lookup_union_l; first apply lookup_insert_eq.
-          apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
+        iMod (all_interp_sfmupd_steps (fair_sched_fun γ2) with "WP [$HI $TI] MI") as "(WP& [HI TI]& %g3& %v3& %Ω5& %W5& %& MI)".
+        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
         1: eapply LB4. destruct H as [LEO3 LB5].
         iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                    (match to_val e with
@@ -1892,7 +1889,7 @@ Section adequacy.
     ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
       model_interp g v Ω W n (dom Θ) ∗
       (|={⊤}=>m ∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                  (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }}))))
+                  (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }})))))
       ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> tps_ti G (n, τf)).
   Proof.
     iIntros (BEH FS LB HIST) "([HI SIa]& MI& WPs)".
@@ -1910,17 +1907,16 @@ Section adequacy.
     remember (map_zip Θ Ψs) as TQ. assert (EQTQ : Θ = fst <$> TQ).
     { subst. rewrite fst_map_zip; auto. intro k. rewrite -!elem_of_dom Dom. auto. }
     iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
-               lwpupd i ⊤ e (match to_val e with
+               (|={⊤}=>m (match to_val e with
                              | Some v => (lift_term i Q) v
                              | None => lwp_fix s i ⊤ e (lift_term i Q)
-                             end))%I with "[WPs]" as "WPs".
+                             end)))%I with "[WPs]" as "WPs".
     { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
       rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
       simpl. destruct (to_val e) eqn:He.
-      - iApply lwpupd_trans. iApply "H".
+      - iApply sfmupd_trans. iApply "H".
       - rewrite lwp_fix_unfold_fix /lwp_pre He. iFrame. }
-    iMod (all_interp_lwpupd_steps_gmap γ with "WPs [$HI $TI $SIa] MI") as "(WPs& [[HI TI] SIa]& %&%&%&%& %H& MI)".
-    { subst Θ. done. }
+    iMod (all_interp_sfmupd_steps_gmap γ with "WPs [$HI $TI] MI") as "(WPs& [HI TI]& %&%&%&%& %H& MI)".
     { auto. }
     destruct H as [LEO3 LB3].
     (* the check at [n] *)
@@ -1955,7 +1951,7 @@ Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
      (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
       |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                  (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
+                  (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))))) →
   R τ.
 Proof.
   intros HR τ BEH FS INIT1 INIT2 Hwp. apply HR.
@@ -1980,7 +1976,7 @@ Proof.
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
              |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                         (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
+                         (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))))).
   { iIntros (Htemp). destruct (Hwp Htemp) as [x Hx]. iExists x. iApply Hx. }
   eapply sat_wand; cycle 1.
   { eapply Hwp'. }

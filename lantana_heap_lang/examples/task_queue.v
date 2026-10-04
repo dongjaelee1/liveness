@@ -225,7 +225,7 @@ Section proof.
       iPoseProof (crP_fuels_init with "GF") as "GF".
       do 2 lwp_pure_one.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      iApply (lc_sfmupd_add_later with "LC1"). iNext.
       iModIntro. iApply ("IH" with "Qw F_mr TG GF TE").
     - iDestruct "HW" as "%". subst G.
       (** Lob (co-)induction *)
@@ -248,7 +248,7 @@ Section proof.
       iClear "GF' GF''".
       do 1 lwp_pure_one.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      iApply (lc_sfmupd_add_later with "LC1"). iNext.
       iApply ("IH" with "TG TE").
   Qed.
 

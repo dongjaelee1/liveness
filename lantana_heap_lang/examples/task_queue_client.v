@@ -96,7 +96,7 @@ Section proof.
       iModIntro. lwp_pure_lc 100.
       lwp_pures.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      iApply (lc_sfmupd_add_later with "LC1"). iNext.
       lwp_bind (TaskQueue.put_task _ _ _).
       assert (Hn : Z.to_nat n = 1 + Z.to_nat (n - 1)) by lia.
       rewrite (oblP_fuel_eq k _ _ (1 ⊕ (Z.to_nat (n - 1)))%M); cycle 1.
@@ -219,7 +219,7 @@ Section proof.
     iApply ("Flag_wait_spec" $! 0 with "[$TE $TG $GF_fw $is_flag]").
     iIntros "(TE& _& TG& #Od0)".
     do 2 (iModIntro; lwp_pure_one).
-    iApply lwpupd_lwp_sfmupd.
+    iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
     iMod (thread_expr_terminateT with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
@@ -236,7 +236,7 @@ Section proof.
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
-                   (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+                   (Φ μ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ i; ⊤ {{ lift_term i Ψ }}))))).
   Proof using queueG0 ticket_lockG0.
     iIntros (HT HP HQ) "TEs TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".

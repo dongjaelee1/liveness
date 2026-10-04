@@ -25,7 +25,7 @@ Class lantanaGS_no_lc `(HGS : lantanaGS Λ Σ) `{!TemporalInterp Λ Σ} := {
            |={E,E'}=> ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
                           (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                            (|={E',E}=> |={E}=>m P)))
-        (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
+        ((|={E}=>m (lWP e2 @ s; i; E {{ v, Φ v }})))
       ⊢ lWP e1 @ s; i; E {{ Φ }};    
   }.
 
@@ -35,7 +35,7 @@ Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _ _} (n : 
   ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
   (Nat.iter n (λ P, |={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                (|={E',E}=> |={E}=>m P)))
-     (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
+     ((|={E}=>m (lWP e2 @ s; i; E {{ Φ }}))))
   ⊢ (lWP e1 @ s; i; E {{ Φ }}).
 Proof.
   iIntros (Hexec HΦ) "(#Rs& LWP)".
@@ -56,7 +56,7 @@ Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _ _}
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
         (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
                        (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗ (|={E',E}=> |={E}=>m P)))
-           (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
+           ((|={E}=>m (lWP (fill K e2) @ s; i; E {{ Φ }})))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
@@ -271,7 +271,7 @@ Section proof.
       iPoseProof ("IHα" $! _ LTw with "TE TG Gg TUz LC HΦ Cai Wfs'") as "LWP".
       eauto.
     - (** Counter is at least n; fetch next count and use Löb induction *)
-      iApply lwpupd_fupd_l. iInv "Ipx" as "H".
+      iApply sfmupd_fupd_l. iInv "Ipx" as "H".
       iPoseProof (tlc_split_nat 9 1 with "LC") as "[LC LCw]".
       (** TODO: make interface defs and lemmas for tlc *)
       iApply (lantana.base_logic.fancy_updates.lc_fupd_add_later with "LCw"). iNext.
@@ -321,7 +321,6 @@ Section proof.
     iEval (rewrite -/loop).
     iPoseProof (tlc_split_nat 90 10 with "LC") as "[LC LC']".
     (** TODO: better interface for sfmupd-fupd access patterns *)
-    iApply (sfmupd_lwpupd_elim).
     (* The next until is allocated and registered (a model update) before the invariant is
        opened. *)
     iMod (carrier_alloc _ _ _ 0 10 with "TG") as "(%g'& %Ning'& TG& Gg'& Gf')".
@@ -379,7 +378,7 @@ Section proof.
     iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
     replace ({[g'; g]} ∖ {[g]}) with ({[g']} : gset _) by set_solver.
     rewrite union_empty_r_L.
-    iModIntro. iMod "mask" as "_". iIntros "!> !>".
+    iModIntro. iMod "mask" as "_". iIntros "!>".
     iApply ("IH" with "TE HΦ TG Gg' [Unew] Gf' Caj Mn1").
     replace (n + 1 + 1) with (n + 2) by lia. iFrame.
   Qed.
@@ -432,7 +431,7 @@ Section proof.
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ £ (10)%ord -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m (Φ ∗
-              (Φ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+              (Φ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ i; ⊤ {{ lift_term i Ψ }}))))).
   Proof using H.
     iIntros (Hij HT HP HQ) "TEs LC TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".

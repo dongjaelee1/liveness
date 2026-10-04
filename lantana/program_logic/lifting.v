@@ -21,7 +21,7 @@ Section lifting.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
 
-  (* For lwp_step, enable progress and fork, and lwpupd. *)
+  (* For lwp_step, enable progress and fork, and a model update after the step. *)
   Lemma lwp_step_step s i E e1 ν :
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
@@ -37,10 +37,10 @@ Section lifting.
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                      (lwpupd i E e2 (ν e2 efs)))))
+                                      ((|={E}=>m (ν e2 efs))))))
     ⊢ lwp_step s i E e1 ν.
   Proof.
-    iIntros "H". iIntros (??????? ??) "SI".
+    iIntros "H". iApply lwp_step_post_sfmupd. iIntros (??????? ??) "SI".
     iMod ("H" with "[//] [//] SI") as "H". iModIntro.
     iMod "H" as "($& %& GOs& GFs& %& #REs& H)".
     iIntros "!> % % % %Step".
@@ -52,11 +52,7 @@ Section lifting.
     iMod ("H" with "[//] GOs Ws Efs") as "H".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
     iMod "H". iMod "close" as "_". iMod "H" as "[HI H]".
-    unfold_lwpupd. iMod ("H" $! K with "[//] [] HI") as "H".
-    { iPureIntro. rewrite lookup_union_l.
-      - rewrite lookup_insert_eq. auto.
-      - apply fork_thread_ids in Step. apply not_elem_of_dom. apply elem_of_dom_2 in H0. set_solver. }
-    rewrite dom_union_L. by iFrame.
+    iModIntro. by iFrame.
   Qed.
 
   Lemma lwp_lift_step s i E e1 Φ :
@@ -75,9 +71,9 @@ Section lifting.
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                      lwpupd i E e2 ((lWP e2 @ s; i; E {{ Φ }}) ∗
+                                      (|={E}=>m ((lWP e2 @ s; i; E {{ Φ }}) ∗
                                                      ([∗ map] j ↦ ef ∈ efs,
-                                                        lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
+                                                        (|={⊤}=>m (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (He) "H". rewrite lwp_unfold /lwp_pre. rewrite He.
@@ -117,7 +113,7 @@ Section lifting.
           ς i e2 -∗
           thP_carriers i G -∗
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-          ALC (|={E',E}=> lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
+          ALC (|={E',E}=> (|={E}=>m (lWP e2 @ s; i; E {{ Φ }})))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hsafe Hstep HCS) "H".
@@ -169,8 +165,8 @@ Section lifting.
                                       (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       |={E1}=>m
-                                               (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
-                                             [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))
+                                               (from_option (λ v, (|={E1}=>m (Φ v))) False (to_val e2)) ∗
+                                             [∗ map] j ↦ ef ∈ efs, (|={⊤}=>m (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros (He) "H". iApply (lwp_lift_step s i E1 e1). 1: auto.
@@ -201,7 +197,7 @@ Section lifting.
          (ς i e2 -∗
           thP_carriers i G -∗
           ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-          ALC (|={E',E}=> lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
+          ALC (|={E',E}=> (|={E}=>m (lWP e2 @ s; i; E {{ Φ }})))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (? Hpuredet HCS) "H". iApply (lwp_lift_pure_step_no_fork s i E E'); eauto.
@@ -222,7 +218,7 @@ Section lifting.
                    (thP_carriers i G -∗
                     ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                     ALC (£ o ={E',E}=∗ |={E}=>m P)))
-       (ς i e2 -∗ lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
+       (ς i e2 -∗ (|={E}=>m (lWP e2 @ s; i; E {{ Φ }}))))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
     iIntros (Hexec Hφ HCS) "[Hc Hlwp]". specialize (Hexec Hφ). destruct Hexec as [Hn Hexec].
@@ -258,7 +254,7 @@ Section lifting.
     (Nat.iter n (λ P, |={E,E'}=> thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗
                                 (thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                  ALC (£ o ={E',E}=∗ |={E}=>m P)))
-       (ς i e2 -∗ lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
+       (ς i e2 -∗ (|={E}=>m (lWP e2 @ s; i; E {{ Φ }}))))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
     iIntros (Hexec HΦ HCS) "(Hc& #Rs& LWP)".
@@ -279,7 +275,7 @@ Section lifting.
     PureExecSI ς i →
     (ς i e1 ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
      (ς i e2 -∗ thP_carriers i G -∗ ([∗ set] r ∈ R, witP_cred r n ∨ oblP_discharged r) -∗
-      £ (o × n)%ord -∗ lwpupd i E e2 (lWP e2 @ s; i ; E {{ Φ }})))
+      £ (o × n)%ord -∗ (|={E}=>m (lWP e2 @ s; i ; E {{ Φ }}))))
     ⊢ (lWP e1 @ s; i; E {{ Φ }}).
   Proof.
     iIntros (Hexec HΦ HCS) "(Hc& TG& Gfs& #Rs& Hlwp)".

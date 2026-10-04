@@ -32,9 +32,9 @@ Section wp.
                                ALC (|={∅,E:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
                                       (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                      lwpupd i E e2 ((lWP e2 @ s; i; E {{ Φ }}) ∗
+                                      (|={E}=>m ((lWP e2 @ s; i; E {{ Φ }}) ∗
                                                      ([∗ map] j ↦ ef ∈ efs,
-                                                        lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
+                                                        (|={⊤}=>m (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (He) "H". iApply (lwp_lift_step s i E e1 Φ). 1: auto. iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
@@ -83,8 +83,8 @@ Section wp.
                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                      |={E1}=>m
-                                              (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2)) ∗
-                                            [∗ map] j ↦ ef ∈ efs, lwpupd j ⊤ ef (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
+                                              (from_option (λ v, (|={E1}=>m (Φ v))) False (to_val e2)) ∗
+                                            [∗ map] j ↦ ef ∈ efs, (|={⊤}=>m (lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros (He) "H". iApply lwp_lift_atomic_step. 1: auto.
@@ -110,7 +110,7 @@ Section wp.
                                      ⌜efs = ∅⌝ ∗
                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
-                                     (from_option (λ v, lwpupd i E1 e2 (Φ v)) False (to_val e2))))
+                                     (from_option (λ v, (|={E1}=>m (Φ v))) False (to_val e2))))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
     iIntros (He) "H". iApply lwp_lift_atomic_base_step. 1: auto.
@@ -134,7 +134,7 @@ Section wp.
                  (ς i e2 -∗
                   thP_carriers i G -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                  ALC (|={E',E}=> lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
+                  ALC (|={E',E}=> (|={E}=>m (lWP e2 @ s; i; E {{ Φ }})))))
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof using Hinh.
     intros. rewrite -(lwp_lift_pure_det_step_no_fork e1 e2); eauto.

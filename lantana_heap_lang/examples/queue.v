@@ -316,7 +316,7 @@ Section proof.
     lwp_pures.
     iMod (inv_acc with "IQ") as "[qinv IQ_ACC]". 1: set_solver.
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-    iApply (lc_lwpupd_add_later with "LC1"). iNext.
+    iApply (lc_sfmupd_add_later with "LC1"). iNext.
     iDestruct "qinv" as "(%&%& Queue0& Gvar& %Disj& Gq& Fq)".
     iPoseProof (own_valid_2 with "Queue Queue0") as "%".
     apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs0.
@@ -330,7 +330,6 @@ Section proof.
     { rewrite !measure_rep_nat measure_rep_large. apply Ord.lt_le. unshelve etrans. 1: exact ω%ord.
       - apply Ord.omega_upperbound.
       - rewrite Ord.omega_from_peano_lt_set. apply Ord.large_lt_from_wf_set. }
-    iModIntro.
     iMod ("IQ_ACC" with "[Queue0 Gvar Gq Fq FBq]") as "_".
     { iNext. iFrame "Queue0 Gvar". iSplit.
       { iPureIntro. rewrite fmap_app. apply disjoint_list_of_sets_app_disjoint_iff. simpl. split_and !; auto.
@@ -438,7 +437,7 @@ Section proof.
       lwp_bind (TicketLock.release tl).
       iMod (inv_acc with "IQ") as "[qinv IQ_ACC]". 1: set_solver.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      iApply (lc_sfmupd_add_later with "LC1"). iNext.
       iDestruct "qinv" as "(%&%& Queue0& Gvar& %Disj& Gq& Fq)".
       iPoseProof (own_valid_2 with "Queue Queue0") as "%".
       apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs.
@@ -446,7 +445,7 @@ Section proof.
       + iPoseProof (ghost_var_agree with "Gvar HW") as "%". simplify_eq. simpl.
         iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 83 ⊕ mr)%M with "TG") as "(%ng& %Ninng& TG& Gng& Fng)".
         iMod (ghost_var_update_2 (ng) with "Gvar HW") as "[Gvar HW]". 1: by rewrite Qp.div_2.
-        iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Fq Gng]") as "_".
+        iMod ("IQ_ACC" with "[Queue0 Gvar Fq Gng]") as "_".
         { iNext. iFrame. simpl. iFrame. iPureIntro. auto. }
         iPoseProof (crP_fuel_add with "Fng") as "[Fng Fng']".
         iPoseProof (crP_fuel_add with "Fng'") as "[Fng' Fng_mr]".
@@ -470,7 +469,7 @@ Section proof.
         lwp_pures.
         iModIntro. lwp_finish.
         iApply ("HΦ"). iFrame. iModIntro. iPureIntro. set_solver.
-      + iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Fq Gq]") as "_".
+      + iMod ("IQ_ACC" with "[Queue0 Gvar Fq Gq]") as "_".
         { iNext. iFrame. simpl. auto. }
         iModIntro.
         iDestruct "IFL" as "(AL& CF& IFL)".
@@ -505,7 +504,7 @@ Section proof.
       lwp_bind (TicketLock.release tl).
       iMod (inv_acc with "IQ") as "[qinv IQ_ACC]". 1: set_solver.
       iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
-      iApply (lc_lwpupd_add_later with "LC1"). iNext.
+      iApply (lc_sfmupd_add_later with "LC1"). iNext.
       iDestruct "qinv" as "(%&%& Queue0& Gvar& %Disj& Gq& Fq)".
       iPoseProof (own_valid_2 with "Queue Queue0") as "%".
       apply dfrac_agree_op_valid in H. destruct H as [_ ?]. apply leibniz_equiv in H. subst vs.
@@ -540,7 +539,7 @@ Section proof.
         iMod (obl_offload_set with "Gq Gng F") as "(Gq& Gng& %)". 1: set_solver. 1: done.
         replace (union_list_of_sets vs'.*2 ∖ union_list_of_sets vs'.*2) with (∅ : oids) by set_solver.
         rewrite !union_empty_l_L.
-        iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Gng Fq]") as "_".
+        iMod ("IQ_ACC" with "[Queue0 Gvar Gng Fq]") as "_".
         { iNext. iFrame. iPureIntro. auto. }
         iModIntro.
         iPoseProof (crP_fuel_add with "Fg") as "(Fg_Q& Fg)".
@@ -593,7 +592,7 @@ Section proof.
         destruct H0 as (DisjB& Disj').
         replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
         rewrite !union_empty_l_L.
-        iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Gq Fq]") as "_".
+        iMod ("IQ_ACC" with "[Queue0 Gvar Gq Fq]") as "_".
         { iNext. iFrame. iPureIntro. auto. }
         iModIntro.
         iPoseProof (crP_fuel_add with "Fg") as "(Fg_Q& Fg)".

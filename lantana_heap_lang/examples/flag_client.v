@@ -72,7 +72,7 @@ Section proof.
     iIntros "(TE& LC& TG& Gg& #Od)".
     replace ({[k; kl]} ∖ {[k]}) with ({[kl]} : gset _) by set_solver.
     do 2 (iModIntro; lwp_pure_one).
-    iApply lwpupd_lwp_sfmupd.
+    iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
     iMod (thread_expr_terminateT with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
@@ -102,7 +102,7 @@ Section proof.
       rewrite hessenberg.add_O_l. done. }
     iIntros "(TE& LC& TG& #Od)".
     do 2 (iModIntro; lwp_pure_one).
-    iApply lwpupd_lwp_sfmupd.
+    iApply sfmupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
     iMod (thread_expr_terminateT with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
@@ -123,7 +123,7 @@ Section proof.
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ (l ↦ #0) -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ1 μ2, (Φ μ1 μ2 ∗
-                       (Φ μ1 μ2 -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+                       (Φ μ1 μ2 -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, (|={⊤}=>m (lWP e @ i; ⊤ {{ lift_term i Ψ }}))))).
   Proof.
     iIntros (Hij HT HP HQ) "TEs Ptrl TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".

@@ -123,10 +123,10 @@ Section until.
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "HUacc" as "[HΦ HUacc]".
-    iApply lwp_lwpupd.
+    iApply lwp_sfmupd.
     iPoseProof ("H" $! (λ v, |={E ∖ ↑N}=>m |={E ∖ ↑N,E}=> Φ0 v)%I with "[$TG $HP $HΦ]") as "Hwp".
     iApply lwp_mono.
-    { iIntros (?) "H". iApply sfmupd_lwpupd. iApply "H". }
+    { iIntros (?) "H". iApply "H". }
     iApply "Hwp". iIntros (v) "(TG& HQ& HΨ& Cg& %Ink)".
     iMod ("HUacc" with "HΨ") as ">HUacc".
     iPoseProof ("HUacc" with "[//] Cg") as "HUacc".
@@ -153,10 +153,10 @@ Section until.
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "HUacc" as "[HΦ HUacc]".
-    iApply lwp_lwpupd.
+    iApply lwp_sfmupd.
     iPoseProof ("H" $! (λ v, |={E ∖ ↑N}=>m |={E ∖ ↑N,E}=> Φ0 v)%I with "[$TG $HP $HΦ]") as "Hwp".
     iApply lwp_mono.
-    { iIntros (?) "H". iApply sfmupd_lwpupd. iApply "H". }
+    { iIntros (?) "H". iApply "H". }
     iApply "Hwp". iIntros (v) "(TG& %&%&%& HQ& HΨ& Cg& %Ink)".
     iMod ("HUacc" with "HΨ") as ">HUacc".
     iPoseProof ("HUacc" with "[//] Cg") as "HUacc".

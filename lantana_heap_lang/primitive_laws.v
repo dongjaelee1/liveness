@@ -286,7 +286,7 @@ Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ {C} :
                  (thP_carriers i G -∗
                   ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                   ALC (£ o ={E',E}=∗ |={E}=>m P)))
-    (thread_expr i C e2 -∗ lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }})))
+    (thread_expr i C e2 -∗ (|={E}=>m (lWP e2 @ s; i; E {{ v, Φ v }}))))
   ⊢ (lWP e1 @ s; i; E {{ Φ }}).
 Proof.
   intros Hexec Hp. apply (lifting.lwp_pure_step n o s i E E' e1 e2 φ Φ
@@ -303,7 +303,7 @@ Lemma lwp_fork_step s i E E' e Φ {C} :
                    thP_carriers j ∅ -∗
                    ALC (|={E',E}=>
                         |={E}=>m (|={E}=>m Φ (LitV LitUnit)) ∗
-                                (lwpupd j ⊤ e (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }}))))) -∗
+                                ((|={⊤}=>m (lWP e @ s; j; ⊤ {{ lift_term j (λ _ _, True) }})))))) -∗
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step. 1: eauto.
@@ -327,11 +327,7 @@ Proof.
   rewrite big_sepM_singleton. iFrame.
   replace (dom (<[i:=fill K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
   { rewrite dom_union_L dom_insert_lookup_L; eauto. rewrite dom_singleton_L. auto. }
-  iFrame. iModIntro. iSplitR "HE"; cycle 1.
-  { iMod "HE". iDestruct "HE" as "[>H HE]".
-    iModIntro. iSplitL "H"; first by iFrame.
-    iApply (lwpupd_mono with "HE").
-    apply lwp_mono. intros v. by rewrite /lift_term /= right_id. }
+  iFrame. iModIntro.
   iPureIntro. destruct HI. split.
   - rewrite length_app H. simpl. lia.
   - rewrite last_app. simpl. auto.
@@ -386,8 +382,6 @@ Proof.
   iMod "H" as "HE".
   iMod (hG_history_auth_app with "Ha") as "Ha".
   rewrite !map_union_empty. iFrame. iModIntro. iSplit; first done.
-  iSplitR "HE"; cycle 1.
-  { iMod "HE". iModIntro. iFrame. }
   iPureIntro. destruct HI. split.
   - rewrite length_app H. simpl. lia.
   - rewrite last_app. simpl. auto.
