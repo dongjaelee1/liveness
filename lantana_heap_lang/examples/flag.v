@@ -94,7 +94,7 @@ Section proof.
   (** The until and the invariant are registered; the obligation of the flag is a new child
       of the parent [p]. *)
   Lemma is_flag_init E l p K ℓ μ :
-    parP_below p ℓ -∗
+    parP_le p ℓ -∗
     l ↦ #0 -∗
     parP_kids p K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗ oblP_fuel k ℓ μ ∗
@@ -112,7 +112,7 @@ Section proof.
   Lemma Flag_init_spec :
     ⊢ ∃ μ, ∀ lc i G p K ℓ m C,
     l{{{ thread_expr i C (Flag.init #()) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g 0 μ) ∗
-         parP_below p ℓ ∗ parP_kids p K }}}
+         parP_le p ℓ ∗ parP_kids p K }}}
       Flag.init #() @ i
     l{{{ (x : loc) k, RET #x; thread_expr i C (#x) ∗ £ lc ∗ thP_kids i G ∗
                       (⌜k ∉ K⌝) ∗
@@ -201,7 +201,7 @@ Section proof.
     iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
     iModIntro. iIntros (ptrx) "[TE ((_& TG& _)& Ptrx& _)]".
     iMod (is_flag_init _ ptrx _ _ (ℓ) m with "[] Ptrx TG") as "(%k& %Hk& TG& Kk& Of& Ftk& #is_flag)".
-    { iApply parP_below_thread. }
+    { iApply parP_le_thread. }
     iApply ("HΦ" with "[$TE $LC $TG $Kk $Of $Ftk $is_flag]").
     iPureIntro. auto.
   Qed.

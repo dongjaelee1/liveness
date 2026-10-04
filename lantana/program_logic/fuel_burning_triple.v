@@ -154,7 +154,7 @@ Section until.
             e
             Q)
     ⊢ fuel_burning_triple s i E G G
-        (P ∗ parP_below p ℓ ∗ parP_kids p K ∗ Φ)
+        (P ∗ parP_le p ℓ ∗ parP_kids p K ∗ Φ)
         e
         Q.
   Proof.

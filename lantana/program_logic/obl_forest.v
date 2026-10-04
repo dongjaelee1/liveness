@@ -18,7 +18,9 @@
       ([parP_below]); below a thread any layer works.
     - [obl_move_up]: a child of [k] moves up to the parent of [k] for free: it keeps its
       owner, and the fuel the model keeps for it already dominates its new parent.
-    - [obl_new] creates a live obligation below a parent, with the same layer condition.
+    - [obl_new] creates a live obligation below a parent; below an obligation [q] its layer
+      must be at least a witness layer of [q] ([parP_le]): unlike a move, a new obligation may
+      sit at its parent's own layer.
     - [obl_discharge] removes a childless obligation from the forest; its children must have
       moved to another parent before.
 
@@ -161,7 +163,7 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
     parP_kids (PThread i) ∅ -∗ |={E}=>m thP_done i;
   (** A new live obligation [k] below [p], without children, at layer [ℓ]. *)
   obl_new E p K ℓ μ :
-    parent_below witP_layer p ℓ -∗
+    parent_le witP_layer p ℓ -∗
     parP_kids p K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ parP_kids (PObl k) ∅ ∗
                  oblP_assigned k 1 ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ;
@@ -213,6 +215,7 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
 Notation thP_kids i K := (parP_kids (PThread i) K).
 Notation oblP_kids k K := (parP_kids (PObl k) K).
 Notation parP_below p ℓ := (parent_below witP_layer p ℓ).
+Notation parP_le p ℓ := (parent_le witP_layer p ℓ).
 (** Burning one unit of fuel of each obligation of a set. *)
 Notation oblP_fuels K n := ([∗ set] k ∈ K, ∃ ℓ, oblP_fuel k ℓ n)%I.
 (** One witness credit: a step gives one to each live witness ([step_progress]), and each
@@ -354,27 +357,43 @@ Section derived.
     (ℓq < ℓ)%ordi → witP_layer q ℓq -∗ parP_below (PObl q) ℓ.
   Proof. iIntros (Hl) "W". iExists ℓq. by iFrame. Qed.
 
+  Global Instance parent_le_persistent p ℓ : Persistent (parP_le p ℓ).
+  Proof. destruct p; rewrite /parent_le; apply _. Qed.
+
+  Lemma parP_le_thread i ℓ : ⊢ parP_le (PThread i) ℓ.
+  Proof. done. Qed.
+
+  Lemma parP_le_obl q ℓq ℓ :
+    (ℓq <= ℓ)%ordi → witP_layer q ℓq -∗ parP_le (PObl q) ℓ.
+  Proof. iIntros (Hl) "W". iExists ℓq. by iFrame. Qed.
+
+  Lemma parP_below_le p ℓ : parP_below p ℓ -∗ parP_le p ℓ.
+  Proof.
+    destruct p as [i|q]; first by iIntros. iIntros "(%ℓq& %Hl& W)". iExists ℓq. iFrame.
+    iPureIntro. by apply ord.lt_le.
+  Qed.
+
   (** ** Ghost updates in their usual shapes *)
   Lemma obl_new_thread E i K ℓ μ :
     thP_kids i K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ thP_kids i ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
                  oblP_assigned k 1 ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
-    iIntros "T". iPoseProof (parP_below_thread i ℓ) as "B". iApply (obl_new with "B T").
+    iIntros "T". iPoseProof (parP_le_thread i ℓ) as "B". iApply (obl_new with "B T").
   Qed.
 
   Lemma obl_new_obl E q K ℓq ℓ μ :
-    (ℓq < ℓ)%ordi →
+    (ℓq <= ℓ)%ordi →
     witP_layer q ℓq -∗ oblP_kids q K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ oblP_kids q ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
                  oblP_assigned k 1 ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
-    iIntros (Hl) "W C". iPoseProof (parP_below_obl q ℓq ℓ Hl with "W") as "B".
+    iIntros (Hl) "W C". iPoseProof (parP_le_obl q ℓq ℓ Hl with "W") as "B".
     iApply (obl_new with "B C").
   Qed.
 
   Lemma obl_alloc_assigned E p K ℓ μ :
-    parP_below p ℓ -∗ parP_kids p K -∗
+    parP_le p ℓ -∗ parP_kids p K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
                  oblP_assigned k (1/2)%Qp ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                  (∀ E N (P R : iProp Σ), ▷ P ={E}=∗ oblP_inv N k P R).

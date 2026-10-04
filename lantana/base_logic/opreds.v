@@ -154,6 +154,18 @@ Definition parent_below `{SI : sidx} {Σ : gFunctors} (wl : oid → ord.t → iP
   end%I.
 Notation parP_below p ℓ := (parent_below witP_layer p ℓ).
 
+(** A new obligation at layer [ℓ] may be created below [p]: always below a thread; below an
+    obligation [q], [ℓ] must be at least a witness layer of [q]. (A move needs a strictly larger
+    layer, [parent_below]: moving an existing obligation below one of the same layer is
+    unsound.) *)
+Definition parent_le `{SI : sidx} {Σ : gFunctors} (wl : oid → ord.t → iProp Σ)
+    (p : parent) (ℓ : ord.t) : iProp Σ :=
+  match p with
+  | PThread _ => True
+  | PObl q => ∃ ℓq, ⌜ (ℓq <= ℓ)%ordi ⌝ ∗ wl q ℓq
+  end%I.
+Notation parP_le p ℓ := (parent_le witP_layer p ℓ).
+
 Ltac unfold_opreds :=
   try rewrite !wit_fuels_unseal /wit_fuels_def;
   try rewrite /collect_fuels;
@@ -947,6 +959,20 @@ Section rules.
   Qed.
 
   (** ** Thread termination *)
+  (** ** Measures: the bound of a parent at a layer [ℓq ≤ ℓ] is below [μq ⊕ 1] at [ℓ] *)
+  Lemma layer_le_bound ℓq ℓ μq :
+    (ℓq <= ℓ)%ordi → (measure_rep (ℓq, 1) μq < measure_rep (ℓ, 1) (μq ⊕ 1)%M)%ord.
+  Proof.
+    intros Hl.
+    assert (H1 : (measure_rep (ℓq, 1) μq <= measure_rep (ℓ, 1) μq)%ord).
+    { apply measure_rep_layer_le_proper. apply classicOrd.le_eq_or_lt in Hl. destruct Hl as [Hl|Hl].
+      - right. econstructor; auto.
+      - left. econstructor; auto. }
+    eapply Ord.le_lt_lt; first exact H1.
+    rewrite measure_rep_add measure_rep_nat.
+    apply Hessenberg.add_lt_l. rewrite Ord.from_nat_1. apply Ord.S_pos.
+  Qed.
+
   Lemma thread_terminate_mupd n Θ i :
     parP_kids (PThread i) ∅ -∗ |=[n,Θ]=>m thP_done i.
   Proof.
@@ -957,11 +983,13 @@ Section rules.
     iModIntro. by iFrame "S T A F Te Td".
   Qed.
 
-  (** ** A new live obligation below [p] *)
+  (** ** A new live obligation below [p]
+      Below an obligation [q] the new obligation may sit at [q]'s own layer: its model fuel is
+      chosen here, so its piece above [q] is paid by [q]'s fuel bound. *)
   Lemma obl_new_mupd n Θ p K ℓ μ :
     (match p with
      | PThread _ => True
-     | PObl q => ∃ ℓq, ⌜ (ℓq < ℓ)%ordi ⌝ ∗ witP_layer q ℓq
+     | PObl q => ∃ ℓq, ⌜ (ℓq <= ℓ)%ordi ⌝ ∗ witP_layer q ℓq
      end) -∗
     parP_kids p K -∗
     |=[n,Θ]=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ parP_kids (PObl k) ∅ ∗
@@ -970,24 +998,26 @@ Section rules.
     iIntros "Bp Kp". iDestruct (parP_kids_frag with "Kp") as "[Kx Kp]".
     iApply mupd_nd_step. iIntros (????) "(HI& S& T& A& F& W& %GWI)".
     (* The owner of the new obligation, and the bound on the parent's fuel. *)
-    iAssert (⌜ ∃ t, match p with
-                    | PThread j => j = t
-                    | PObl q => obl_owner_of Ω1 q = Some t ∧
-                                (obl_fuel_of Ω1 q < measure_rep (ℓ, 1) (▽)%M)%ord
-                    end ⌝)%I as %[t Hpi].
+    (* The piece of the new obligation above its parent: [ν] at layer [ℓ], above the
+       parent's fuel bound [μq] at layer [ℓq ≤ ℓ]. *)
+    iAssert (⌜ ∃ t ν, match p with
+                      | PThread j => j = t
+                      | PObl q => obl_owner_of Ω1 q = Some t ∧
+                                  (obl_fuel_of Ω1 q < measure_rep (ℓ, 1) ν)%ord
+                      end ⌝)%I as %[t [ν Hpi]].
     { destruct p as [j|q].
-      - iPureIntro. by exists j.
+      - iPureIntro. exists j, (▽)%M. done.
       - iDestruct "Bp" as "(%ℓq& %Hl& Wq)".
         iPoseProof (witP_layer_oblG_bound with "Wq") as "(%μq& Bq)".
         iDestruct (oforest_obl_fuel_bound with "F Kp Bq") as %[Hle (aq& iq& Hq)].
-        iPureIntro. exists iq. split.
+        iPureIntro. exists iq, (μq ⊕ 1)%M. split.
         + by rewrite /obl_owner_of Hq.
-        + eapply Ord.le_lt_lt; first done. by apply layer_dominates. }
+        + eapply Ord.le_lt_lt; first done. by apply layer_le_bound. }
     assert (NEW : ∃ k, Ω1 !! k = None).
     { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
     destruct NEW as (k& Hk).
     iMod (osat_alloc_obl_assigned _ k false
-            (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ▽)%M) t with "S")
+            (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ν)%M) t with "S")
       as "(S& #Gwf& #Ge& Gl& Gf& Go& %OStep)".
     { by apply not_elem_of_dom. }
     iEval (rewrite measure_rep_add) in "Gf". iPoseProof (oblG_fuel_split with "Gf") as "[Gf Gπ]".
@@ -1000,18 +1030,18 @@ Section rules.
     { reflexivity. }
     { destruct p as [j|q]; first done. iExists _. iFrame "Gπ". iPureIntro. apply Hpi. }
     iMod (owit_alloc_witness_assigned _ k
-            (η (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ▽)%M)) with "W") as "(W& #Ww)".
+            (η (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ν)%M)) with "W") as "(W& #Ww)".
     { apply owit_inv_dom in GWI. rewrite -GWI. by apply not_elem_of_dom. }
     iPoseProof (oassigned_add_obl with "[$A $Ge Ok Oo]") as "A".
     { iLeft. iExists t. iFrame "Ok Oo Ei". }
     iMod (model_history_interp_step _ _ n n _
-            (<[k:=obl_assigned (OC:=ord_obl_class) (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ▽)%M) t]> Ω1)
+            (<[k:=obl_assigned (OC:=ord_obl_class) (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ν)%M) t]> Ω1)
            with "HI") as "HI".
     { done. }
     { apply obls_lef_obls_le, obls_ndf_obls_lef. by apply obls_ndf_insert_fresh. }
     iModIntro.
     iExists (<[k:=obl_assigned (OC:=ord_obl_class)
-                    (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ▽)%M) t]> Ω1).
+                    (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ν)%M) t]> Ω1).
     iSplitR.
     { iPureIntro. by apply obls_ndf_insert_fresh. }
     iIntros (W2 [WStep GWI2]) "!>".

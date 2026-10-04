@@ -710,7 +710,7 @@ Section until_rules.
 
   (** Update rules. Allocation of the until registers it (a model update, reading the model). *)
   Lemma untilI_alloc E p K ℓ μ :
-    parP_below p ℓ -∗ parP_kids p K -∗
+    parP_le p ℓ -∗ parP_kids p K -∗
     |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
                  oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                  ∀ E' N (P Q : iProp Σ), ▷ P -∗ |={E'}=>m untilI N k 1 P Q.

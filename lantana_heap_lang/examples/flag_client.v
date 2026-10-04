@@ -132,13 +132,13 @@ Section proof.
     iPoseProof (writer_spec) as (μ1) "writer_spec".
     iPoseProof (reader_spec) as (μ2) "reader_spec".
     iMod (is_flag_init _ _ _ _ 0 μ1 with "[] Ptrl TG1") as "(%k& %Hk& TG1& Kk& Ofk& Uk& #is_flag)".
-    { iApply parP_below_thread. }
+    { iApply parP_le_thread. }
     iMod (untilI_alloc _ _ _ 0 μ1 with "[] TG1") as "(%kl1& %Hkl1& TG1& Kkl1& Ofkl1& #Wlkl1& Akl1)".
-    { iApply parP_below_thread. }
+    { iApply parP_le_thread. }
     iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I with "[]") as "Ukl1".
     { done. }
     iMod (untilI_alloc _ _ _ 1 μ2 with "[] TG2") as "(%kl2& %Hkl2& TG2& Kkl2& Ofkl2& #Wlkl2& Akl2)".
-    { iApply parP_below_thread. }
+    { iApply parP_le_thread. }
     iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I with "[]") as "Ukl2".
     { done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Kk Kkl1 TG2 Kkl2 Ofk Ofkl1 Ofkl2".

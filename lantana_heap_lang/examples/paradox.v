@@ -322,7 +322,7 @@ Section proof.
     (* The next until is allocated and registered (a model update) before the invariant is
        opened. *)
     iMod (untilI_alloc _ _ _ 0 10 with "[] TG") as "(%ck1& %Nin1& TG& Kck1& Of1& #Wlk1& A)".
-    { iApply parP_below_thread. }
+    { iApply parP_le_thread. }
     iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I with "[//]") as "Unew".
     iApply (sfmupd_fupd_acc _ ∅).
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
@@ -390,7 +390,7 @@ Section proof.
     iPoseProof (get_cnt_lb with "CAj") as "#Clj". 1: reflexivity.
     iMod (ghost_map_alloc (∅ : gmap nat oid)) as "(%rm& GM& _)".
     iMod (untilI_alloc _ _ _ 0 10 with "[] TG") as "(%ck& _& TG& Kck& Gf& #Wl& ACC)".
-    { iApply parP_below_thread. }
+    { iApply parP_le_thread. }
     rewrite union_empty_r_L.
     iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I with "[//]") as "HF".
     iMod (ghost_map_insert_persist 0 ck with "GM") as "(GM& #GMe)". 1: done.
@@ -431,7 +431,7 @@ Section proof.
     iPoseProof (px_loop1_spec) as "px_loop1_spec".
     iPoseProof (px_loop2_spec) as "px_loop2_spec".
     iMod (untilI_alloc _ _ _ 1 0 with "[] TG1") as "(%z& _& TG1& _& _& _& ACC)".
-    { iApply parP_below_thread. }
+    { iApply parP_le_thread. }
     iMod ("ACC" $! _ N1 True%I False%I with "[//]") as "HFz".
     rewrite !union_empty_r_L.
     iMod (px_init ⊤ with "TG2") as "(%&%&%&%&%&%& TG2& Kck& Gf& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)".

@@ -279,7 +279,7 @@ Section proof.
         tickets; its fuel pays the steps of the loop. *)
     iMod (untilI_alloc _ _ _ (ℓ ⊕ Z.to_nat (n + 1)%Z)%ordi ((50 ⊕ (50 × ▽)) ⊕ 1)%M with "[] TG")
       as "(%κu& %Ningu0& TG& Kku& OGF& #Wlku& ALLOC)".
-    { iApply parP_below_thread. }
+    { iApply parP_le_thread. }
     iMod ("ALLOC" $! _ N_eventually True%I (curr ↦{#1 / 2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku1]".
     iPoseProof (oblP_fuel_add with "OGF") as "[GF' QGF]".
     iMod (oblP_fuel_extend _ ℓ _ μ with "QGF") as "QGF".

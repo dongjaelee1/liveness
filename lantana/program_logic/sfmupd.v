@@ -281,7 +281,7 @@ Section sfmupd.
 
   (** A new live obligation [k] below [p], without children, at layer [ℓ]. *)
   Lemma obl_new E p K ℓ μ :
-    parP_below p ℓ -∗
+    parP_le p ℓ -∗
     parP_kids p K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
                  oblP_assigned k 1 ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
@@ -358,6 +358,20 @@ Section sfmupd.
   Proof.
     unfold_sfmupd. iIntros (Hk) "Kp Kk Ga %%%%% $".
     iMod (obl_discharge_mupd with "Kp Kk Ga") as "[$ $]"; auto.
+  Qed.
+
+  (** ** Parents *)
+  Lemma parP_le_thread i ℓ : ⊢ parP_le (PThread i) ℓ.
+  Proof. done. Qed.
+
+  Lemma parP_le_obl q ℓq ℓ :
+    (ℓq <= ℓ)%ordi → witP_layer q ℓq -∗ parP_le (PObl q) ℓ.
+  Proof. iIntros (Hl) "W". iExists ℓq. by iFrame. Qed.
+
+  Lemma parP_below_le p ℓ : parP_below p ℓ -∗ parP_le p ℓ.
+  Proof.
+    destruct p as [i|q]; first by iIntros. iIntros "(%ℓq& %Hl& W)". iExists ℓq. iFrame.
+    iPureIntro. by apply ord.lt_le.
   Qed.
 
   (** ** Moving sets of obligations *)
@@ -441,7 +455,7 @@ Section sfmupd.
 
   (** ** Obligations with an invariant *)
   Lemma obl_alloc_assigned E p K ℓ μ :
-    parP_below p ℓ -∗ parP_kids p K -∗
+    parP_le p ℓ -∗ parP_kids p K -∗
     |={E}=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
                  oblP_assigned k (1/2)%Qp ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                  (∀ E N (P R : iProp Σ), ▷ P ={E}=∗ oblP_inv N k P R).
