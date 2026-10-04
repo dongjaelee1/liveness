@@ -547,6 +547,58 @@ Section adequacy.
     iModIntro. iExists Φ_P. iFrame "HP H". iApply Φ_P_temporal.
   Qed.
 
+  (** ** The no-credit rule is unsound *)
+  (** A fair run of the two loops: thread [i] steps at even times and [j] at odd times; every
+      step takes [loop #()] to [loop #()]. *)
+  Lemma loop_prim_step k σ tids :
+    prim_step k (loop #()) σ tids [] (loop #()) σ ∅.
+  Proof. apply ectx_language.base_prim_step. by econstructor. Qed.
+
+  Let ρ0 : cfg heap_lang := (Θ0, Build_state σ0 ∅).
+  Let sched (n : nat) : thread_id := if Nat.even n then i else j.
+  Let loop_run : trace heap_lang := (0, λ n, (ρ0, sched n, [])).
+
+  Lemma loop_run_behavior n : behavior (n, loop_run.2).
+  Proof.
+    revert n. cofix IH. intros n.
+    eapply (behavior_step n _ ρ0 ρ0 (sched n) (sched (S n)) [] []); [done| |done|apply IH].
+    assert (Hk : Θ0 !! sched n = Some (loop #())).
+    { rewrite /Θ0 /sched. destruct (Nat.even n); by simplify_map_eq. }
+    left. eapply (thread_step_atomic (loop #()) _ (loop #()) _ ∅ Θ0); [done|exact Hk|apply loop_prim_step|].
+    rewrite /ρ0 right_id_L insert_id //.
+  Qed.
+
+  Lemma loop_run_fair : fair_scheduling loop_run.
+  Proof.
+    intros m _ k. simpl. rewrite /ρ0 /Θ0.
+    destruct (decide (k = i ∨ k = j)) as [Hk|Hk].
+    - right. split.
+      + exists (loop #()). split; last done. destruct Hk as [->| ->]; by simplify_map_eq.
+      + destruct Hk as [->| ->].
+        * exists (2 * m). simpl. split; first lia. split; last done.
+          rewrite /ts_emb /thread_turn /sched /=. replace (m + (m + 0)) with (2 * m) by lia.
+          rewrite Nat.even_mul. done.
+        * exists (1 + 2 * m). simpl. split; first lia. split; last done.
+          rewrite /ts_emb /thread_turn /sched /=. replace (m + (m + 0)) with (2 * m) by lia.
+          change (match 2 * m with 0 => false | S n' => Nat.even n' end) with (Nat.even (S (2 * m))).
+          rewrite Nat.even_succ Nat.odd_mul. done.
+    - left. left. assert (k ≠ i ∧ k ≠ j) as [Hi Hj] by tauto. by simplify_map_eq.
+  Qed.
+
+  (** Assuming the rule, [loop_paradox] gives "eventually False" on this run. *)
+  Theorem no_lc_absurd :
+    (∀ Λ0 Σ0 (HGS : lantanaGS Λ0 Σ0) (TI : TemporalInterp Λ0 Σ0), @lantanaGS_no_lc _ Λ0 Σ0 HGS TI) →
+    False.
+  Proof.
+    intros LNLC.
+    destruct (loop_paradox LNLC loop_run) as [Hf _].
+    - apply loop_run_behavior.
+    - apply loop_run_fair.
+    - done.
+    - done.
+    - destruct Hf as (m& _& Hm& _). done.
+  Qed.
+
 End adequacy.
 
-(* Print Assumptions flag_client_adequacy. *)
+(* Print Assumptions no_lc_absurd. *)
