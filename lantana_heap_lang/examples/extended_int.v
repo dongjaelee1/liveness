@@ -50,10 +50,10 @@ Section proof.
   Lemma lwp_lt :
     ⊢ ∃ m, ∀ x y i G C,
     l{{{ thread_expr i C (lt (into_val x) (into_val y)) ∗
-         thP_carriers i G ∗ crP_fuels G m }}}
+         thP_kids i G ∗ oblP_fuels G m }}}
       lt (into_val x) (into_val y) @ i
     l{{{ RET #(bool_decide (lt_rel x y));
-         thread_expr i C #(bool_decide (lt_rel x y)) ∗ thP_carriers i G }}}.
+         thread_expr i C #(bool_decide (lt_rel x y)) ∗ thP_kids i G }}}.
   Proof.
     iExists 100. iIntros. iIntros (?) "!# (TE& Htg& Hfuel) HΦ".
 

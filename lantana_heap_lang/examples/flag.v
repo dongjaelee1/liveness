@@ -179,6 +179,75 @@ Section proof.
     iApply ("HΦ" with "[$TE $Q_LC $TG $Gg $Odk]").
   Qed.
 
+  (** The same operations when the flag's obligation is a child of the calling thread itself. *)
+  Lemma Flag_init_thread_spec :
+    ⊢ ∃ μ, ∀ lc i G ℓ m C,
+    l{{{ thread_expr i C (Flag.init #()) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g 0 μ) }}}
+      Flag.init #() @ i
+    l{{{ (x : loc) k, RET #x; thread_expr i C (#x) ∗ £ lc ∗
+                      (⌜k ∉ G⌝) ∗
+                      thP_kids i ({[k]} ∪ G) ∗ oblP_kids k ∅ ∗
+                      oblP_fuel k ℓ m ∗
+                      flag_tk x k ∗ is_flag x k ℓ }}}.
+  Proof.
+    iExists 10. iIntros (lc i G ℓ m C Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF)".
+    rewrite /Flag.init.
+    iPoseProof (oblP_fuels_init with "GF") as "GF".
+    lwp_pure_lc lc.
+    iApply sfmupd_lwp_sfmupd.
+    lwp_bind (AllocN _ _).
+    iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
+    iModIntro. iIntros (ptrx) "[TE ((_& TG& _)& Ptrx& _)]".
+    iMod (is_flag_init _ ptrx _ _ (ℓ) m with "[] Ptrx TG") as "(%k& %Hk& TG& Kk& Of& Ftk& #is_flag)".
+    { iApply parP_below_thread. }
+    iApply ("HΦ" with "[$TE $LC $TG $Kk $Of $Ftk $is_flag]").
+    iPureIntro. auto.
+  Qed.
+
+  Lemma Flag_set_thread_spec :
+    ⊢ ∃ μ, ∀ lc i l G k ℓ C,
+    l{{{ thread_expr i C (Flag.set #(l : loc)) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g 0 μ) ∗
+         ⌜ k ∈ G ⌝ ∗ oblP_kids k ∅ ∗
+         flag_tk l k ∗
+         is_flag l k ℓ }}}
+      Flag.set #l @ i
+    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_kids i (G ∖ {[k]}) ∗ oblP_discharged k }}}.
+  Proof.
+    iExists 10. iIntros (lc i l G k ℓ C Φ) "!> HP HΦ".
+    iDestruct "HP" as "(TE& TG& GF& %Ink& Kk& HU& #is_flag)".
+    iDestruct "is_flag" as "(#Wlk& HA)".
+    rewrite /Flag.set.
+    iPoseProof (oblP_fuels_init with "GF") as "GF".
+    lwp_pure_lc (lc ⊕ 10)%ord.
+    iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
+    lwp_bind (Store _ _).
+    iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
+    iModIntro.
+    iInv "HA" as "inv". iDestruct "inv" as "[inv | inv]"; cycle 1.
+    { iDestruct "inv" as "[>inv _]".
+      iEval (rewrite /flag_tk !untilI_unfold) in "HU". iDestruct "HU" as "[Oak _]".
+      iPoseProof (oblP_assigned_discharged_false with "Oak inv") as "%". done. }
+    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+    iApply (lwp_lc_later with "LC1"). iNext.
+    iCombine "HU inv" as "inv".
+    iMod (untilI_discharge with "inv") as "inv".
+    { apply N_subseteq_1. }
+    iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
+    iApply (lwp_lc_later with "LC1"). iNext.
+    iDestruct "inv" as "[Ptrl ACCinv]".
+    iApply lwp_sfmupd.
+    iApply (lwp_store _ ∅ 0 with "[$TE $Ptrl $TG $GF1]"). 1: done.
+    iIntros "[TE ((_& TG& _)& Ptrl)]".
+    iPoseProof ("ACCinv" $! (PThread i) G Ink with "TG Kk Ptrl") as "ACCinv".
+    iMod ("ACCinv" $! _) as "ACCinv". iMod "ACCinv" as "(Ptrl& TG& #Odk)".
+    iApply fupd_sfmupd. iApply fupd_mask_intro; first solve_ndisj. iIntros "close".
+    iMod "close" as "_". iModIntro. iModIntro. iSplitL "Ptrl".
+    { iNext. iRight. iFrame. eauto. }
+    iApply ("HΦ" with "[$TE $Q_LC $TG $Odk]").
+  Qed.
+
   Lemma Flag_wait_spec :
     ⊢ ∃ μ, ∀ lc i l G k ℓ C,
     l{{{ thread_expr i C (Flag.wait #(l : loc)) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, oblP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
