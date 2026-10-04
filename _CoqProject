@@ -69,7 +69,9 @@ lantana/base_logic/witness.v
 lantana/base_logic/osat.v
 lantana/base_logic/owit.v
 lantana/base_logic/othread.v
-lantana/base_logic/ocarrier.v
+lantana/base_logic/parent.v
+lantana/base_logic/model_rel.v
+lantana/base_logic/oforest.v
 lantana/base_logic/model_interp.v
 lantana/base_logic/mupd.v
 lantana/base_logic/oinv.v
