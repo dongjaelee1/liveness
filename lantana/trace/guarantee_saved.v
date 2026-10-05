@@ -1,14 +1,14 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import saved_prop ghost_map.
-From lantana.trace Require Export temporal_guarantee.
+From lantana.trace Require Export guarantee_infer.
 
 (** * Temporal formulas in ghost state
 
     Temporal formulas are iProps and their guarantees are persistent iProps, so both can be
     stored in ghost state with the usual Iris constructions. A saved proposition names a
     temporal formula; storing its guarantee next to it makes the pair self-certifying.
-    Recursion through a registered structure is in temporal_fixpoint.v ([nest]). *)
+    Recursion through a registered structure is in guarantee_rec.v ([nest]). *)
 
 Section saved.
   Context `{!lantanaGS Λ Σ, !savedPropG Σ}.
@@ -76,4 +76,3 @@ Section request_registry.
   Qed.
 
 End request_registry.
-

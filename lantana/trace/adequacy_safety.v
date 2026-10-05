@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.trace Require Import adequacy temporal_guarantee.
+From lantana.trace Require Import adequacy_step guarantee_infer.
 From lantana.base_logic Require Import satisfiable.
 
 (** * Adequacy of [lWP] for Iris-style safety
@@ -346,4 +346,3 @@ Proof.
   { intros n' σ' Θ' κs' Hlu. rewrite lookup_cons in Hlu. destruct n'; last done. inv Hlu. rewrite INIT2. eauto. }
   eauto.
 Qed.
-

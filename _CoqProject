@@ -89,16 +89,21 @@ lantana/program_logic/atomic.v
 lantana/program_logic/obl_forest_derived.v
 
 # Traces, temporal guarantees and adequacy
+lantana/trace/trace_pred.v
+lantana/trace/trace_step_indexed.v
+lantana/trace/trace_prop.v
+lantana/trace/trace_fixpoint.v
+lantana/trace/guarantee.v
+lantana/trace/guarantee_struct.v
+lantana/trace/guarantee_run.v
+lantana/trace/guarantee_infer.v
+lantana/trace/guarantee_rec.v
+lantana/trace/guarantee_saved.v
 lantana/trace/until_chain.v
-lantana/trace/temporal_property.v
-lantana/trace/adequacy.v
-lantana/trace/adequacy_iris.v
-lantana/trace/temporal_tps.v
-lantana/trace/temporal_guarantee.v
-lantana/trace/guarantee_adequacy.v
-lantana/trace/temporal_saved.v
-lantana/trace/temporal_fixpoint.v
 lantana/trace/fuel_burning_triple.v
+lantana/trace/adequacy_step.v
+lantana/trace/adequacy_temporal.v
+lantana/trace/adequacy_safety.v
 
 # HeapLang
 lantana_heap_lang/locations.v

@@ -1,5 +1,5 @@
 From iris.proofmode Require Import proofmode.
-From lantana.trace Require Export temporal_guarantee.
+From lantana.trace Require Export guarantee_infer.
 
 (** * Fuel-burning triples
 

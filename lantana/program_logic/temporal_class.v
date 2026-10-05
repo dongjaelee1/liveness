@@ -9,7 +9,7 @@ From lantana.program_logic Require Export temporal_registry.
     registry of trace-visible structures. [TemporalInterp] is the interpretation of the
     temporal layer: a resource that the program logic threads together with the history
     interpretation ([history_tinterp]), without knowing its content. The temporal layer
-    (temporal_guarantee.v) fixes it to the state of the registry; until then it is a
+    (guarantee_struct.v) fixes it to the state of the registry; until then it is a
     parameter, so the program logic stays independent of the temporal layer. *)
 
 Class temporalGpreS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
@@ -36,7 +36,7 @@ Global Instance subG_temporalΣ `{SI : sidx} {Λ} {Σ} : subG (temporalΣ Λ) Σ
 Proof. solve_inG. Qed.
 
 (** The interpretation of the temporal layer. Its only instance is the registry state
-    (temporal_guarantee.v, [treg_temporal_interp]); it is keyed by the ghost state so that
+    (guarantee_struct.v, [treg_temporal_interp]); it is keyed by the ghost state so that
     there is one interpretation per instance of the logic. *)
 Class TemporalInterp `{SI : sidx} (Λ : language) (Σ : gFunctors)
   `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} := temporal_interp : iProp Σ.

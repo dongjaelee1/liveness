@@ -1,5 +1,5 @@
 From iris.prelude Require Import options.
-From lantana.trace Require Export temporal_guarantee.
+From lantana.trace Require Export guarantee_infer.
 From iris.algebra Require Import mono_list.
 From lantana.algebra Require Import axioms. (* func_ext *)
 

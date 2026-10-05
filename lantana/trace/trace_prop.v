@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.trace Require Export adequacy.
+From lantana.trace Require Export trace_step_indexed.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
 
@@ -8,7 +8,7 @@ From lantana.base_logic Require Import satisfiable.
 
     A trace property [G : tps Λ Σ] has two readings: [tps_ti G], a step-indexed trace
     predicate, which is what the program logic establishes, and [tps_tr G], a trace
-    predicate ([trProp], temporal_property.v); [tps_good] says that satisfiability of the
+    predicate ([trProp], trace_pred.v); [tps_good] says that satisfiability of the
     first implies the second. The connectives build both readings at once; [G ⊑ G']
     ([tps_le]) compares in-logic readings. Implication reads its antecedent at the level of
     traces; complete and instant properties are those whose antecedents the logic can
@@ -37,29 +37,6 @@ Bind Scope tps_scope with tps.
 (** [G ⊑ G']: the step-indexed part of [G] implies that of [G']. *)
 Definition tps_le {Λ Σ} (G G' : tps Λ Σ) : Prop :=
   ∀ (H : temporalGS Λ Σ) τ, @tps_ti _ _ G H τ ⊢ @tps_ti _ _ G' H τ.
-
-Lemma ti_until_tr_until_gen `{!temporalGS Λ Σ} F (I1 I2 : tiProp Λ Σ) (R1 R2 : trProp Λ) :
-  (∀ τ, iProp_sat_lc_at_frame F ⊤ (I1 τ) → R1 τ) →
-  (∀ τ, iProp_sat_lc_at_frame F ⊤ (I2 τ) → R2 τ) →
-  ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_exist Ord.t (λ a, ti_until Ord.lt a I1 I2) τ) →
-       tr_until R1 R2 τ.
-Proof.
-  intros IH1 IH2 τ H. unfold tr_until. destruct τ as (n&τf).
-  unfold ti_exist in H. apply sat_exists in H. destruct H as [x H].
-  revert n τf H. induction x as [a IHa] using (well_founded_ind Ord.lt_well_founded). intros.
-  rewrite ti_until_unfold /ti_until_pre in H.
-  apply sat_fupd, sat_later, sat_fupd, sat_fupd, sat_ALC, sat_fupd in H. apply sat_or in H. destruct H as [H|H].
-  { apply IH2 in H. exists n. split_and !; eauto. intros. lia. }
-  apply iProp_sat_lc_at_frame_and in H. destruct H as [HP H].
-  apply sat_exists in H. destruct H as [b H].
-  apply iProp_sat_lc_at_frame_and in H. destruct H as [Hlt H]. apply sat_elim in Hlt.
-  specialize (IHa _ Hlt _ _ H). simpl in IHa. destruct IHa as (m'& Hm'& Htr& Hp).
-  destruct Hm' as [|m Hm'].
-  { exists (S n). split_and !; eauto. intros l [Hl1 Hl2]. inversion Hl1; subst; eauto. apply Hp. lia. }
-  exists (S m). split_and !; eauto.
-  { lia. }
-  intros l [Hl1 Hl2]. inversion Hl1; subst; eauto. apply Hp. lia.
-Qed.
 
 Section tps_connectives.
   Context {Λ : language} {Σ : gFunctors}.
@@ -201,31 +178,10 @@ Section tps_connectives.
 
   (** In-logic monotonicity of always and until: the implication between the readings is
       an iProp hypothesis, available one step later. *)
-  Lemma ti_always_mono_i `{!temporalGS Λ Σ} (P1 P1' P2 : tiProp Λ Σ) :
-    ▷ □ (∀ τ, P1 τ -∗ P1' τ) -∗ ∀ τ, ti_always P1 P2 τ -∗ ti_always P1' P2 τ.
-  Proof.
-    iIntros "#W". iLöb as "IH". iIntros (τ) "H". rewrite !ti_always_unfold /ti_always_pre.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
-    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
-    iSplit; first (iDestruct "H" as "[H _]"; by iApply "W").
-    iSplit; first by iDestruct "H" as "[_ [$ _]]".
-    iDestruct "H" as "[_ [_ H]]". by iApply "IH".
-  Qed.
   Lemma tps_always_mono_i `{!temporalGS Λ Σ} (G G' : tps Λ Σ) :
     ▷ □ (∀ τ, tps_ti G τ -∗ tps_ti G' τ) -∗
     ∀ τ, tps_ti (tps_always G) τ -∗ tps_ti (tps_always G') τ.
   Proof. iIntros "#W" (τ). cbn. by iApply (ti_always_mono_i with "W"). Qed.
-  Lemma ti_until_mono_i `{!temporalGS Λ Σ} (P1 P2 P1' P2' : tiProp Λ Σ) :
-    ▷ □ (∀ τ, P1 τ -∗ P1' τ) -∗ ▷ □ (∀ τ, P2 τ -∗ P2' τ) -∗
-    ∀ (a : Ord.t) τ, ti_until Ord.lt a P1 P2 τ -∗ ti_until Ord.lt a P1' P2' τ.
-  Proof.
-    iIntros "#W1 #W2". iLöb as "IH". iIntros (a τ) "H". rewrite !ti_until_unfold /ti_until_pre.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
-    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. iDestruct "H" as "[H|H]".
-    - iLeft. by iApply "W2".
-    - iRight. iSplit; first (iDestruct "H" as "[H _]"; by iApply "W1").
-      iDestruct "H" as "[_ (%a'& %Hlt& H)]". iExists a'. iSplit; first done. by iApply "IH".
-  Qed.
   Lemma tps_until_mono_i `{!temporalGS Λ Σ} (G1 G2 G1' G2' : tps Λ Σ) :
     ▷ □ (∀ τ, tps_ti G1 τ -∗ tps_ti G1' τ) -∗ ▷ □ (∀ τ, tps_ti G2 τ -∗ tps_ti G2' τ) -∗
     ∀ τ, tps_ti (tps_until G1 G2) τ -∗ tps_ti (tps_until G1' G2') τ.
@@ -397,4 +353,3 @@ Section complete.
 End complete.
 Global Hint Mode TpsComplete - - ! : typeclass_instances.
 Global Hint Mode TpsInstant - - ! : typeclass_instances.
-

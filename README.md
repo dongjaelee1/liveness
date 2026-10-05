@@ -56,7 +56,7 @@ Each directory imports only from the directories listed before it:
 | `lantana/algebra/` | Rocq-level mathematics: ordinals and well-founded structures, ordered commutative monoids, measures and layers, and the cameras used by the logic |
 | `lantana/base_logic/` | the `iProp`-level model of Lantana: transfinite later credits, fancy updates and invariants, and the obligation model (obligations and witnesses, their ghost state, the obligation forest, model updates `mupd`, and the predicates of §3–§5 in `base_logic/opreds.v`) |
 | `lantana/program_logic/` | languages and the thread-local weakest precondition `lwp`: its definition, lifting lemmas, the model update `sfmupd` usable inside `lwp` proofs, and the obligation-forest interface |
-| `lantana/trace/` | traces and temporal properties, temporal guarantees `P ⊨ₜ G` (always, until, finally), and the adequacy theorems |
+| `lantana/trace/` | trace predicates and semantic trace properties (`trace_*.v`), temporal guarantees `P ⊨ₜ G` with the registered structures always, until, finally (`guarantee_*.v`), and the adequacy theorems (`adequacy_*.v`) |
 | `lantana_heap_lang/` | HeapLang for Lantana, its proof mode, and the case studies in `examples/` |
 
 ## Correspondence between the paper and the Rocq development
@@ -103,7 +103,7 @@ carrier-set superscripts.
   `untilI` and `finallyI` are ordinary `iProp`s, and a persistent *guarantee* `P ⊨ₜ G` states
   that whenever `P` holds, the rest of the execution satisfies the semantic trace property
   `G` (`tps`). Guarantees are inferred by `IntoTemporal` instances, and adequacy concludes the
-  trace reading `tps_tr G` (`trace/temporal_guarantee.v`).
+  trace reading `tps_tr G` (`trace/guarantee.v`; inference in `trace/guarantee_infer.v`).
 
 Naming conventions: `oblP_*` are obligation predicates, `witP_*` witness predicates,
 `thP_*` per-thread predicates, `parP_*` predicates on parents (`thP_kids i K` and
@@ -119,14 +119,14 @@ predicates.
 | carrier superscripts / `carriers_i G` (Thm 1) | no carriers: `thP_kids i G`, the children of thread `i` in the obligation forest; every initial thread starts with `thP_kids i ∅` | `base_logic/opreds.v` |
 | `Fuel^ℓ_G μ` | no carrier fuel: `oblP_fuel k ℓ μ` of each child `k` of the thread; a set is `[∗ set] k ∈ G, oblP_fuel k ℓ μ` (cf. `oblP_fuels`) | `base_logic/opreds.v` |
 | `obls^ℓ_g K` | replaced by `parP_kids p K` (children `K` of a thread, `thP_kids i K`, or of an obligation, `oblP_kids k K`); below an obligation the layer bound is its witness layer (`parP_below` / `parP_le`) | `base_logic/opreds.v` |
-| `Φ until^k_q Ψ` | `untilI N k q P Q` (an `iProp`; `N` is the namespace of the obligation invariant `oblP_inv` of `k`; variant `untilI_guar` with given readings, e.g. for recursion, `renew` in `trace/temporal_fixpoint.v`); guarantee `temporal_until` | `trace/temporal_guarantee.v` |
-| `finally^k Φ` | `finallyI N k q Q` (`untilI N k q True Q`) | `trace/temporal_guarantee.v` |
+| `Φ until^k_q Ψ` | `untilI N k q P Q` (an `iProp`; `N` is the namespace of the obligation invariant `oblP_inv` of `k`; variant `untilI_guar` with given readings, e.g. for recursion, `renew` in `trace/guarantee_rec.v`); guarantee `temporal_until` | `trace/guarantee_struct.v`, `trace/guarantee_run.v` |
+| `finally^k Φ` | `finallyI N k q Q` (`untilI N k q True Q`) | `trace/guarantee_struct.v` |
 | `obl∎ k` (discharged) | `oblP_discharged k` | `base_logic/opreds.v` |
 | `tr$^ℓ_k m` (transfer credit) | `oblP_fuel k ℓ m` (the obligation's own fuel, now the only kind of fuel) | `base_logic/opreds.v` |
 | `wit^ℓ k` (witness) | `witP_layer k ℓ` | `base_logic/opreds.v` |
 | `wit€ k` (witness credit, §4.1) | `witP_cred k a` (`a` an ordinal amount; a step gives `witP_cred k Ord.one`) | `base_logic/opreds.v` |
 | `∎ i` (thread finished, Thm 1) | `thP_done i` | `base_logic/opreds.v` |
-| `always I` | `alwaysI N I` (a registered invariant; variants `alwaysI_as`, `alwaysI_guar`); guarantee `temporal_always` | `trace/temporal_guarantee.v`, `base_logic/invariants.v` |
+| `always I` | `alwaysI N I` (a registered invariant; variants `alwaysI_as`, `alwaysI_guar`); guarantee `temporal_always` | `trace/guarantee_struct.v`, `trace/guarantee_run.v`, `base_logic/invariants.v` |
 | `£ α` (transfinite later credits) | later-credit predicate `£ α` and `tlc_*` lemmas | `base_logic/later_credits.v` |
 | `Measure` (with extension measure `∇`, §3.2) | inductive `measure`; `∇` is the constructor `ms_extend`; interpretation into ordinals via `measure_rep_rec` | `algebra/measure.v` |
 | layers `ℓ` (ordinals) | `layer`, a notation for `ord.t` from the Ordinal library (we use two Ordinal libraries to sidestep universe inconsistency); its order is the instance `layer_layer_class` of `layer_class` | `algebra/measure.v`, `algebra/layer.v` |
@@ -140,21 +140,21 @@ predicates.
 | FORK* | `lwp_fork` (with the lower-level `lwp_fork_step`; the children `K ⊆ G` given to the new thread move with one unit of fuel each) | `lantana_heap_lang/primitive_laws.v` |
 | EXIT | the value case of `lwp` (`lwp_value`); `thread_terminate` turns `thP_kids i ∅` into `thP_done i`, which forked threads owe in their postcondition (`lift_term`) | `program_logic/weakestpre.v`, `program_logic/sfmupd.v` |
 | FINALLY-EXIT* | `thread_expr_terminate_finally` | `lantana_heap_lang/temporal_laws.v` |
-| FINALLY-ALLOC* | `untilI_alloc` with left formula `True` (`finallyI`) | `trace/temporal_guarantee.v` |
+| FINALLY-ALLOC* | `untilI_alloc` with left formula `True` (`finallyI`) | `trace/guarantee_struct.v` |
 | BIND | `lwp_bind` | `program_logic/weakestpre.v` |
 | FRAME, UPD-ELIM | `lwp_strong_mono`, `fupd_lwp` / `lwp_fupd` / `sfmupd_lwp` / `lwp_sfmupd` | `program_logic/weakestpre.v` |
 | CARRIER-ALLOC | no carriers: `obl_new` creates an obligation below a parent (a thread or an obligation), and an obligation can itself be a parent | `program_logic/sfmupd.v` |
 | CARRIER-DELETE | no carriers: a childless obligation is discharged by `obl_discharge_leaf`; its children can first move up to its parent for free (`obl_move_up`; both: `obl_discharge_lift_kids`) | `program_logic/sfmupd.v` |
 | FUELS-ADD / FUELS-UNION / FUELS-EMPTY | `oblP_fuel_add*`, `oblP_fuels_add_obls` / `oblP_fuels_remove_obls`; FUELS-EMPTY is the empty big-op | `base_logic/opreds.v` |
 | FUELS-LAYER | `oblP_fuel_extend` (and `oblP_fuel_extend_set`) | `base_logic/opreds.v` |
-| ALWAYS-ALLOC / ALWAYS-ACC | `alwaysI_alloc` / `alwaysI_acc` (`iInv` also opens `alwaysI`); guarantee `temporal_always` | `trace/temporal_guarantee.v`, `base_logic/invariants.v` |
+| ALWAYS-ALLOC / ALWAYS-ACC | `alwaysI_alloc` / `alwaysI_acc` (`iInv` also opens `alwaysI`); guarantee `temporal_always` | `trace/guarantee_struct.v`, `trace/guarantee_run.v`, `base_logic/invariants.v` |
 | LÖB | Löb induction of Transfinite Iris (`iLöb`) | (Transfinite Iris) |
 | LC-SPEND | `tlc_later`, `tlc_later_strong` | `base_logic/later_credits.v` |
-| UNTIL-ALLOC | `untilI_alloc`; triple-level `fuel_burning_triple_until_alloc` | `trace/temporal_guarantee.v`, `trace/fuel_burning_triple.v` |
-| UNTIL-ACC | `untilI_acc` | `trace/temporal_guarantee.v` |
-| UNTIL-DISCHARGE | `untilI_discharge`; triple-level `fuel_burning_triple_until_discharge` | `trace/temporal_guarantee.v`, `trace/fuel_burning_triple.v` |
-| UNTIL-DONE-FALSE | `untilI_discharged_false` | `trace/temporal_guarantee.v` |
-| UNTIL-SPLIT | `untilI_frac_split`, `untilI_frac_add` | `trace/temporal_guarantee.v` |
+| UNTIL-ALLOC | `untilI_alloc`; triple-level `fuel_burning_triple_until_alloc` | `trace/guarantee_struct.v`, `trace/fuel_burning_triple.v` |
+| UNTIL-ACC | `untilI_acc` | `trace/guarantee_struct.v` |
+| UNTIL-DISCHARGE | `untilI_discharge`; triple-level `fuel_burning_triple_until_discharge` | `trace/guarantee_struct.v`, `trace/fuel_burning_triple.v` |
+| UNTIL-DONE-FALSE | `untilI_discharged_false` | `trace/guarantee_struct.v` |
+| UNTIL-SPLIT | `untilI_frac_split`, `untilI_frac_add` | `trace/guarantee_struct.v` |
 | WIT-IND | `fuel_burning_triple_wit_ind`; underlying `wit_layer_ind` | `trace/fuel_burning_triple.v`, `base_logic/opreds.v` |
 | OBLS-OFFLOAD | `obl_move` (an obligation moves with its subtree to another parent, burning one unit of its own fuel at a layer above the new parent's witness layer, `parP_below`), set versions `obl_move_set_gen` / `obl_move_thread_set` / `obl_move_obl_set` | `program_logic/sfmupd.v` |
 
@@ -163,10 +163,10 @@ predicates.
 | Paper | Rocq | File (under `lantana/`) |
 |---|---|---|
 | `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `cfg`, `thread_pool`, `thread_step` / `thread_done`, `trace`, `behavior_cfg` / `behavior_tp` (please ignore `κ : list (observation Λ)`, which is never used) | `program_logic/language.v` |
-| temporal properties `Φ, Ψ` and `⟦·⟧_t` | semantic trace properties `tps`, trace reading `tps_tr` (and step-indexed reading `tps_ti`); `Always` = `tps_always`, `Until` = `tps_until`, `Finally` = `tps_finally`; meta-level trace predicates `tr_always` / `tr_until` / `tr_eventually` | `trace/temporal_tps.v`, `trace/temporal_property.v` |
-| `Fair` (fair scheduling) | `fair_scheduling` | `trace/temporal_property.v` |
-| logical assertions `φ` and `⟦·⟧_l` | no syntax: temporal formulas are `iProp`s; guarantee `P ⊨ₜ G` (`temporal P G`), inferred by `IntoTemporal` | `trace/temporal_guarantee.v` |
-| `lift` | `tps_sem P`, the canonical trace property guaranteed by `P` (`temporal_sem`); `tsem P`, the one inferred by `IntoTemporal` | `trace/temporal_guarantee.v` |
+| temporal properties `Φ, Ψ` and `⟦·⟧_t` | semantic trace properties `tps`, trace reading `tps_tr` (and step-indexed reading `tps_ti`); `Always` = `tps_always`, `Until` = `tps_until`, `Finally` = `tps_finally`; meta-level trace predicates `tr_always` / `tr_until` / `tr_eventually` | `trace/trace_prop.v`, `trace/trace_pred.v` |
+| `Fair` (fair scheduling) | `fair_scheduling` | `trace/trace_pred.v` |
+| logical assertions `φ` and `⟦·⟧_l` | no syntax: temporal formulas are `iProp`s; guarantee `P ⊨ₜ G` (`temporal P G`), inferred by `IntoTemporal` | `trace/guarantee.v`, `trace/guarantee_infer.v` (`IntoTemporal`) |
+| `lift` | `tps_sem P`, the canonical trace property guaranteed by `P` (`temporal_sem`); `tsem P`, the one inferred by `IntoTemporal` | `trace/guarantee.v` (`tps_sem`), `trace/guarantee_infer.v` (`tsem`) |
 | `Label s e`, `ChooseNat`, atomic property `label_i "s" v` | `Label`, `ChooseNat` (`lantana_heap_lang/lang.v`); atomic properties are state predicates `pred_pointsto` / `pred_expr` (`lantana_heap_lang/lang.v`), owned as `l ↦ v` / `thread_expr i C e` (`exits v @ i`, `lantana_heap_lang/primitive_laws.v`), guaranteeing `tps_atomic` (`lantana_heap_lang/temporal_laws.v`) | — |
 | `lwp` | `lwp`, notation `lWP e @ s; i; E {{ Φ }}` | `program_logic/weakestpre.v`, `program_logic/lwp_notation.v` |
 | obligation state `Ω`, witness state `W` | `obls` (`gmap oid obl`), `witnesses` (`gmap oid witness`); the forest is kept by `oforest` | `base_logic/obligation.v`, `base_logic/witness.v`, `base_logic/oforest.v` |
@@ -174,7 +174,7 @@ predicates.
 | model update modality | `mupd` / `fmupd`; the `lwp`-facing form is `sfmupd`, and the step modalities are `mprog` / `mphys` | `base_logic/mupd.v`, `program_logic/sfmupd.v`, `base_logic/model_physical_updates.v` |
 | fair-scheduler invariant `H` | `owit_inv` | `base_logic/owit.v` |
 | state interpretation `S` | `state_interp` (heap-lang instance) and `history_interp` (wrapper for adequacy proof) | `lantana_heap_lang/primitive_laws.v`, `program_logic/history_interp.v` |
-| **Theorem 1 (Adequacy)** | `lwp_adequacy_temporal` (from a guarantee `P ⊨ₜ G` of the initial resources, any trace predicate implied by `tps_tr G`); Iris-style safety variant `lwp_adequacy_safety_iris` | `trace/guarantee_adequacy.v`, `trace/adequacy_iris.v` |
+| **Theorem 1 (Adequacy)** | `lwp_adequacy_temporal` (from a guarantee `P ⊨ₜ G` of the initial resources, any trace predicate implied by `tps_tr G`); Iris-style safety variant `lwp_adequacy_safety_iris` | `trace/adequacy_temporal.v`, `trace/adequacy_safety.v` |
 
 ### Case studies (§2 to §7)
 

@@ -1,12 +1,12 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.trace Require Export temporal_guarantee.
+From lantana.trace Require Export adequacy_step guarantee_infer.
 From lantana.base_logic Require Import satisfiable.
 
 (** * Adequacy of [lWP] for temporal guarantees
 
     Lantana's weakest precondition is a running system with the one-step property
-    ([sys_step], temporal_guarantee.v): at a position, the registry is checked, then a thread
+    ([sys_step], guarantee.v): at a position, the registry is checked, then a thread
     takes a step. Hence, if the initial resources guarantee [G], every fair run of the program
     satisfies the trace property [tps_tr G] ([lwp_adequacy_temporal]). *)
 Section adequacy.

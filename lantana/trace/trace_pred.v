@@ -6,7 +6,7 @@ From lantana.algebra Require Import axioms.
 
     Properties of executions ([trProp]), with the LTL connectives, their fixpoints, fair
     scheduling and Iris-style safety. The program logic's trace properties ([tps],
-    temporal_tps.v) have these as their trace readings. *)
+    trace_prop.v) have these as their trace readings. *)
 
 (** ** Predicates on a trace state and on a trace *)
 Definition tsProp (Λ : language) := trace_state Λ → Prop.
