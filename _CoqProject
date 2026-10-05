@@ -117,11 +117,14 @@ lantana_heap_lang/temporal_laws.v
 # Case studies
 lantana_heap_lang/examples/step_tactics.v
 lantana_heap_lang/examples/flag.v
+lantana_heap_lang/examples/flag_stable.v
 lantana_heap_lang/examples/flag_client.v
+lantana_heap_lang/examples/flag_stable_client.v
 lantana_heap_lang/examples/flag_fork.v
 lantana_heap_lang/examples/nondet.v
 lantana_heap_lang/examples/handoff.v
 lantana_heap_lang/examples/handoff_client.v
+lantana_heap_lang/examples/handoff_flag_stable_client.v
 lantana_heap_lang/examples/paradox.v
 lantana_heap_lang/examples/nonstrict_move.v
 lantana_heap_lang/examples/ticket_lock.v
@@ -130,5 +133,6 @@ lantana_heap_lang/examples/ticket_lock2_client.v
 lantana_heap_lang/examples/queue.v
 lantana_heap_lang/examples/task_queue.v
 lantana_heap_lang/examples/task_queue_client.v
+lantana_heap_lang/examples/task_queue_flag_stable_client.v
 lantana_heap_lang/examples/cert_discharge.v
 lantana_heap_lang/examples/extended_int.v
