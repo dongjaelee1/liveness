@@ -14,18 +14,12 @@ Import uPred.
 
 Class lantanaGS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
   LantanaG {
-      (** Ghost states for temporal properties. *)
       #[global] lantana_temporalGS :: temporalGS Λ Σ;
 
-      (** The state (and history) interpretation is an invariant that should hold in
-          between each step of reduction.
-          Here [state] is the global state, [thread_ids] is the allocated thread ids,
-          and [list (observation Λ)] are the remaining observations. *)
+      (** The state interpretation, which holds between steps. *)
       #[global] lantana_state_interp_class :: state_interp_class Λ Σ;
 
-      (** A fixed postcondition for any forked-off thread. For most languages, e.g.
-          heap_lang, this will simply be [True]. However, it is useful if one wants to
-          keep track of resources precisely, as in e.g. Iron. *)
+      (** The postcondition of every forked thread ([True] for heap_lang). *)
       fork_post : thread_id → val Λ → iProp Σ;
     }.
 
@@ -41,8 +35,7 @@ Definition lwp_step `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}
   (∀ K h n σ1 Θ κ κs,
      (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
      (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
-      (* Model update before the step. It may discharge an until: the adequacy proof
-         handles this through the records of guarantee.v ([tguar]). *)
+      (* Model update before the step (it may discharge an until; see [tguar]). *)
       |=[n,dom Θ]=>m
       (⌜if s is NotStuck then reducible i e1 σ1 (dom Θ) else True⌝) ∗
       ∀ e2 σ2 (efs : thread_pool Λ), (⌜ prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
@@ -96,7 +89,6 @@ Section lwp_step.
     iApply ("Hf" with "[//] [//] [$HI $HA]").
   Qed.
 
-  (** An m-update after the step can be absorbed into the step. *)
   Lemma lwp_step_post_sfmupd s i E e ν :
     lwp_step s i E e ν ⊣⊢ lwp_step s i E e (λ e' efs, |={E}=>m ν e' efs).
   Proof.
@@ -114,7 +106,6 @@ Section lwp_step.
 
 End lwp_step.
 
-(** Wrapper for the termination condition for soundness. *)
 Definition lift_term `{SI : sidx} `{!lantanaGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) :
   val Λ → iProp Σ :=
   λ v, (thP_done i ∗ Φ i v)%I.
@@ -645,10 +636,8 @@ Section proofmode_classes.
     iModIntro. by iApply ("H" with "P").
   Qed.
 
-  (** Error message instance for non-mask-changing view shifts.
-  Also uses a slightly different error: we cannot apply [fupd_mask_subseteq]
-  if [e] is not atomic, so we tell the user to first add a leading [fupd]
-  and then change the mask of that. *)
+  (** Error message for non-mask-changing view shifts: for a non-atomic [e], first add a
+      leading [fupd], then change its mask. *)
   Global Instance elim_modal_fupd_lwp_wrong_mask p s i E1 E2 e P Φ :
     ElimModal
       (pm_error "Goal and eliminated modality must have the same mask.

@@ -5,10 +5,9 @@ From lantana.base_logic Require Import satisfiable.
 
 (** * Adequacy of [lWP] for temporal guarantees
 
-    Lantana's weakest precondition is a running system with the one-step property
-    ([sys_step], guarantee.v): at a position, the registry is checked, then a thread
-    takes a step. Hence, if the initial resources guarantee [G], every fair run of the program
-    satisfies the trace property [tps_tr G] ([lwp_adequacy_temporal]). *)
+    [lWP] is a running system with the one-step property ([sys_step_lwp]). Hence, if the
+    initial resources guarantee [G], every fair run satisfies [tps_tr G]
+    ([lwp_adequacy_temporal]). *)
 Section adequacy.
   Context `{!lantanaGS Λ Σ}.
 
@@ -232,9 +231,8 @@ Section adequacy.
 
   (** ** The one-step property for [lWP]
 
-      Lantana's system: the auxiliary state interpretation, the registry state and the
-      running threads. A step: the check (mark the registry, certify every entry), then
-      [run_step]. *)
+      The system: the auxiliary state interpretation, the registry state and the running
+      threads. A step: the check, then [run_step]. *)
   Definition sys_lwp (s : stuckness) : nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ :=
     λ _ σ Θ κs, (state_interp_aux σ Θ κs ∗ treg_state ∗ ∃ TQ, ⌜Θ = fst <$> TQ⌝ ∗ threads_run s TQ)%I.
 

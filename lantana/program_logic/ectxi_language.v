@@ -1,30 +1,12 @@
-(** An axiomatization of languages based on evaluation context items, including
-    a proof that these are instances of general ectx-based languages. *)
+(** Languages based on evaluation context items ([ectxiLanguage]), as instances of
+    [ectxLanguage]. *)
 From iris.prelude Require Export prelude.
 From lantana.program_logic Require Import language ectx_language.
 From iris.prelude Require Import options.
 
-(** TAKE CARE: When you define an [ectxiLanguage] canonical structure for your
-language, you need to also define a corresponding [language] and [ectxLanguage]
-canonical structure for canonical structure inference to work properly. You
-should use the coercion [EctxLanguageOfEctxi] and [LanguageOfEctx] for that, and
-not [ectxi_lang] and [ectxi_lang_ectx], otherwise the canonical projections will
-not point to the right terms.
-
-A full concrete example of setting up your language can be found in [heap_lang].
-Below you can find the relevant parts:
-
-  Module heap_lang.
-    (* Your language definition *)
-
-    Lemma heap_lang_mixin : EctxiLanguageMixin of_val to_val fill_item base_step.
-    Proof. (* ... *) Qed.
-  End heap_lang.
-
-  Canonical Structure heap_ectxi_lang := EctxiLanguage heap_lang.heap_lang_mixin.
-  Canonical Structure heap_ectx_lang := EctxLanguageOfEctxi heap_ectxi_lang.
-  Canonical Structure heap_lang := LanguageOfEctx heap_ectx_lang.
-*)
+(** TAKE CARE: an [ectxiLanguage] canonical structure needs matching [ectxLanguage] and
+    [language] canonical structures, built with [EctxLanguageOfEctxi] and [LanguageOfEctx]
+    (not [ectxi_lang] and [ectxi_lang_ectx]), as in heap_lang. *)
 
 Section ectxi_language_mixin.
   Context {expr val ectx_item state observation state_pred : Type}.
@@ -43,19 +25,12 @@ Section ectxi_language_mixin.
       base_step i e1 σ1 τ κ e2 σ2 efs → τ ## dom efs;
 
     mixin_fill_item_val Ki e : is_Some (to_val (fill_item Ki e)) → is_Some (to_val e);
-    (** [fill_item] is always injective on the expression for a fixed
-        context. *)
     mixin_fill_item_inj Ki : Inj (=) (=) (fill_item Ki);
-    (** [fill_item] with (potentially different) non-value expressions is
-        injective on the context. *)
     mixin_fill_item_no_val_inj Ki1 Ki2 e1 e2 :
       to_val e1 = None → to_val e2 = None →
       fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2;
 
-    (** If [fill_item Ki e] takes a base step, then [e] is a value (unlike for
-        [ectx_language], an empty context is impossible here).  In other words,
-        if [e] is not a value then wrapping it in a context does not add new
-        base redex positions. *)
+    (** Unlike in [ectx_language], the context cannot be empty: [e] is a value. *)
     mixin_base_ctx_step_val i Ki e σ1 τ κ e2 σ2 efs :
       base_step i (fill_item Ki e) σ1 τ κ e2 σ2 efs → is_Some (to_val e);
   }.
@@ -95,7 +70,6 @@ Section ectxi_language.
   Implicit Types (e : expr Λ) (Ki : ectx_item Λ).
   Notation ectx := (list (ectx_item Λ)).
 
-  (* Only project stuff out of the mixin that is not also in ectxLanguage *)
   Global Instance fill_item_inj Ki : Inj (=) (=) (fill_item Ki).
   Proof. apply ectxi_language_mixin. Qed.
   Lemma fill_item_val Ki e : is_Some (to_val (fill_item Ki e)) → is_Some (to_val e).
@@ -163,8 +137,8 @@ Section ectxi_language.
   Global Instance ectxi_lang_ctx_item Ki : @LanguageCtx ectxi_lang [Ki].
   Proof. apply _. Qed.
 
-  (** The same reducible expression determines its surrounding context.
-      This uses context decomposition, not determinism of the step. *)
+  (** A reducible expression determines its context (by decomposition, not by
+      determinism of the step). *)
   Lemma fill_ctx_step_inj (K1 K2 : ectx) e i σ τ κ e' σ' efs :
     language.prim_step i e σ τ κ e' σ' efs →
     fill K1 e = fill K2 e → K1 = K2.

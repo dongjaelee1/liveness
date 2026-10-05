@@ -15,8 +15,7 @@ Section fixpoint_guarantees.
     tps_le H (F H) → P ⊨ₜ H ⊢ P ⊨ₜ tps_nu F.
   Proof. intros HH. by apply temporal_weaken, tps_nu_coind. Qed.
 
-  (** A formula guarantees [ν F] if it guarantees [F] of its canonical trace property; this
-      is how guarded-recursive formulas get fixpoint guarantees. *)
+  (** How guarded-recursive formulas get fixpoint guarantees. *)
   Lemma temporal_nu_sem (F : tps Λ Σ → tps Λ Σ) `{!TpsMono F} P :
     (⊢ P ⊨ₜ F (tps_sem P)) → ⊢ P ⊨ₜ tps_nu F.
   Proof.
@@ -38,14 +37,10 @@ End fixpoint_guarantees.
 
 (** ** A recursive structure: invariants nested forever
 
-    A registered structure is contractive in its content ([alwaysI_guar_contractive]), so
-    structures can be defined by guarded recursion. The reading stored with [nest] is
-    [G ∧ ν X. □(G ∧ X)], and the proof that its content guarantees it is closed
-    ([nest_content_temporal]): no Löb hypothesis is needed, the recursion is in the
-    structure, not in the proof. Allocation ([nest_alloc]) is the two-phase allocation of a
-    self-referential invariant: the invariant is allocated open and registered, the record
-    of its content at the current position is obtained by Löb induction (the content holds
-    the structure, whose own record is later-guarded), then the invariant is closed. *)
+    [nest] is defined by guarded recursion through [alwaysI_guar], with the reading
+    [G ∧ ν X. □(G ∧ X)]. The guarantee of its content is a closed proof: the recursion is in
+    the structure, not in the proof. Allocation opens the new invariant, registers it, and
+    gets the record of its content by Löb induction. *)
 Section nest.
   Context `{!lantanaGS Λ Σ}.
 
@@ -81,11 +76,9 @@ Section nest.
     iApply temporal_always_guar.
   Qed.
 
-  (** The content's guarantee, a closed proof. *)
   Lemma nest_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ nest N Q G) ⊨ₜ nest_tps G.
   Proof. intros HQ. iApply temporal_sep; [iApply HQ|iApply nest_temporal]. Qed.
 
-  (** Allocation: the new invariant is registered while it is allocated open. *)
   Lemma nest_alloc E N Q G :
     ↑N ⊆ E → (⊢ Q ⊨ₜ G) →
     ▷ Q -∗ |={E}=>m nest N Q G.
@@ -125,19 +118,11 @@ End nest.
 
 (** ** A recursive until: a commitment that renews itself
 
-    An until with given readings is contractive in its right formula
-    ([untilI_guar_contractive_r]), so structures can be defined by guarded recursion through
-    the right side of an until. [renew N Q G] is a finally of [Q] together with the next
-    link, again a [renew]; the reading stored for the right formula is [G ∧ ν X. ◇(G ∧ X)],
-    and the proof that the right formula guarantees it is closed ([renew_content_temporal]).
-    The left formula is [True], so the obligation invariant does not mention the structure
-    and allocation needs no Löb induction ([renew_alloc]). A thread renews the commitment by
-    allocating the next link and discharging the current one with it ([renew_discharge]).
-
-    On traces [ν X. ◇(G ∧ X)] is just [◇G] ([tps_nu_renew_tr]): the eventuality is not
-    strict, and a link may be discharged at the position of the link it renews, so the
-    reading says nothing about later positions. [G] infinitely often, [□◇G], is the
-    guarantee of an always over a finally ([always_finally_temporal]). *)
+    [renew N Q G], by guarded recursion through the right side of an until: a finally of [Q]
+    and the next link, read as [G ∧ ν X. ◇(G ∧ X)]. The left formula is [True], so allocation
+    needs no Löb induction. A thread renews by allocating the next link and discharging the
+    current one with it. On traces the reading is just [◇G] (the eventuality is not strict);
+    [□◇G] is the guarantee of an always over a finally ([always_finally_temporal]). *)
 Section renew.
   Context `{!lantanaGS Λ Σ}.
   Implicit Types G : tps Λ Σ.
@@ -177,7 +162,6 @@ Section renew.
     iApply temporal_exist_ghost. iIntros (k). iApply temporal_until_guar.
   Qed.
 
-  (** The guarantee of the right formula, a closed proof. *)
   Lemma renew_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ renew N Q G) ⊨ₜ renew_tps G.
   Proof. intros HQ. iApply temporal_sep; [iApply HQ|iApply renew_temporal]. Qed.
 

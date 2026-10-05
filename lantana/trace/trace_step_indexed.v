@@ -7,10 +7,9 @@ From lantana.base_logic Require Import satisfiable.
 
 (** * Step-indexed trace predicates and the ordinal step index
 
-    The in-logic readings of trace properties (trace_prop.v) are built from these: [ti_always]
-    and [ti_until] are guarded fixpoints, the until with a decreasing measure. They are
-    generic in the step index; [ordSI] then fixes it to the ordinals, at which satisfiability
-    of [ti_always] and [ti_until] gives [tr_always] and [tr_until]. *)
+    [ti_always] and [ti_until] (with a decreasing measure) are guarded fixpoints, generic in
+    the step index. At the ordinals ([ordSI]) their satisfiability gives [tr_always] and
+    [tr_until]. *)
 Notation tiProp Λ Σ := (trace Λ → iProp Σ).
 
 Definition ti_atomic `{SI : sidx} {Λ} {Σ} (π : state_pred Λ) : tiProp Λ Σ :=
@@ -25,8 +24,7 @@ Definition ti_and `{SI : sidx} {Λ} {Σ} : tiProp Λ Σ → tiProp Λ Σ → tiP
 Definition ti_or `{SI : sidx} {Λ} {Σ} : tiProp Λ Σ → tiProp Λ Σ → tiProp Λ Σ :=
   λ P Q, (λ τ, (P τ) ∨ (Q τ))%I.
 
-(** The antecedent is a trace property proper: the step-indexed reading of an implication
-    assumes the antecedent at the level of traces. *)
+(** The antecedent is a trace property: it is assumed at the level of traces. *)
 Definition ti_impl `{SI : sidx} {Λ} {Σ} : trProp Λ → tiProp Λ Σ → tiProp Λ Σ :=
   λ P Q, (λ τ, ⌜P τ⌝ → (Q τ))%I.
 
@@ -36,13 +34,12 @@ Definition ti_forall `{SI : sidx} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ �
 Definition ti_exist `{SI : sidx} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ Σ) → tiProp Λ Σ :=
   λ A P, (λ τ, ∃ (a : A), (P a τ))%I.
 
-(** 'Always' is a co-inductive fixpoint. *)
 Definition ti_always_pre `{SI : sidx} `{!temporalGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
-  (** Deferred shape: the first fancy update with the later is the check at [τ] (the
-      adequacy reads and certifies invariants there), the second with the credits is the
-      step; both formulas at [τ] are established after the step, from the certificates. *)
+  (** Deferred shape: the first update (with the later) is the check at [τ], where the
+      adequacy certifies the invariants; the second (with the credits) is the step. The
+      formulas at [τ] are established after the step, from the certificates. *)
   λ P1 P2 τ, (|={E,∅}=> ▷ |={∅,E}=> |={E,∅}=> ALC (|={∅,E}=>
                ((P1 τ) ∧ (P2 τ) ∧ ti_always P1 P2 (trace_next τ))))%I.
 
@@ -63,13 +60,12 @@ Lemma ti_always_unfold `{SI : sidx} `{!temporalGS Λ Σ} (P1 P2 : tiProp Λ Σ) 
   ti_always P1 P2 τ ⊣⊢ ti_always_pre ⊤ (ti_always) P1 P2 τ.
 Proof. rewrite ti_always_unseal. apply (fixpoint_unfold (ti_always_pre ⊤)). Qed.
 
-(** 'Until' is an inductive fixpoint, decreasing argument of Type A. *)
 Definition ti_until_pre `{SI : sidx} `{!temporalGS Λ Σ} E
   {A : Type} (ltA : A → A → Prop)
   (ti_until : A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
-  (** Deferred shape, as for always: the decision about [τ] is made after the step, and
-      the measure for the continuation is chosen then. *)
+  (** Deferred shape, as for always: [τ] and the measure of the continuation are decided
+      after the step. *)
   λ a P Q τ,
     (|={E,∅}=> ▷ |={∅,E}=> |={E,∅}=> ALC (|={∅,E}=>
        ((Q τ) ∨ ((P τ) ∧ ∃ a', (⌜ltA a' a⌝) ∧ ti_until a' P Q (trace_next τ)))))%I.
@@ -180,8 +176,7 @@ Qed.
 Section ti_mono.
   Context {Λ : language} {Σ : gFunctors}.
 
-  (** In-logic monotonicity of always and until: the implication between the readings is
-      an iProp hypothesis, available one step later. *)
+  (** The implication between the readings is an iProp hypothesis, available one step later. *)
   Lemma ti_always_mono_i `{!temporalGS Λ Σ} (P1 P1' P2 : tiProp Λ Σ) :
     ▷ □ (∀ τ, P1 τ -∗ P1' τ) -∗ ∀ τ, ti_always P1 P2 τ -∗ ti_always P1' P2 τ.
   Proof.

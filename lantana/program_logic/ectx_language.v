@@ -1,13 +1,10 @@
-(** An axiomatization of evaluation-context based languages, including a proof
-    that this gives rise to a "language" in the Iris sense. *)
+(** Languages based on evaluation contexts ([ectxLanguage]) and the [language] each gives. *)
 From iris.prelude Require Export prelude.
 From lantana.program_logic Require Import language.
 From iris.prelude Require Import options.
 
-(** TAKE CARE: When you define an [ectxLanguage] canonical structure for your
-language, you need to also define a corresponding [language] canonical
-structure. Use the coercion [LanguageOfEctx] as defined in the bottom of this
-file for doing that. *)
+(** TAKE CARE: an [ectxLanguage] canonical structure needs a matching [language] canonical
+    structure, built with [LanguageOfEctx] (end of this file). *)
 
 Section ectx_language_mixin.
   Context {expr val ectx state observation state_pred : Type}.
@@ -33,23 +30,15 @@ Section ectx_language_mixin.
     mixin_fill_inj K : Inj (=) (=) (fill K);
     mixin_fill_val K e : is_Some (to_val (fill K e)) → is_Some (to_val e);
 
-    (** Given a base redex [e1_redex] somewhere in a term, and another
-        decomposition of the same term into [fill K' e1'] such that [e1'] is not
-        a value, then the base redex context is [e1']'s context [K'] filled with
-        another context [K''].  In particular, this implies [e1 = fill K''
-        e1_redex] by [fill_inj], i.e., [e1]' contains the base redex.)
-
-        This implies there can be only one base redex, see
-        [base_redex_unique]. *)
+    (** A base redex in [fill K' e1'], with [e1'] not a value, lies inside [e1']. Hence
+        there is at most one base redex ([base_redex_unique]). *)
     mixin_step_by_val i K' K_redex e1' e1_redex σ1 Θ κ e2 σ2 efs :
       fill K' e1' = fill K_redex e1_redex →
       to_val e1' = None →
       base_step i e1_redex σ1 Θ κ e2 σ2 efs →
       ∃ K'', K_redex = comp_ectx K' K'';
 
-    (** If [fill K e] takes a base step, then either [e] is a value or [K] is
-        the empty evaluation context. In other words, if [e] is not a value
-        wrapping it in a context does not add new base redex positions. *)
+    (** Wrapping a non-value in a context adds no base redex positions. *)
     mixin_base_ctx_step_val i K e σ1 Θ κ e2 σ2 efs :
       base_step i (fill K e) σ1 Θ κ e2 σ2 efs → is_Some (to_val e) ∨ K = empty_ectx;
   }.
@@ -95,7 +84,6 @@ Section ectx_language.
   Implicit Types e : expr Λ.
   Implicit Types K : ectx Λ.
 
-  (* Only project stuff out of the mixin that is not also in language *)
   Lemma val_base_stuck i e1 σ1 Θ κ e2 σ2 efs : base_step i e1 σ1 Θ κ e2 σ2 efs → to_val e1 = None.
   Proof. apply ectx_language_mixin. Qed.
   Lemma fork_thread_ids i e1 σ1 Θ κ e2 σ2 efs : base_step i e1 σ1 Θ κ e2 σ2 efs → Θ ## dom efs.
@@ -127,8 +115,7 @@ Section ectx_language.
   Definition base_stuck i (e : expr Λ) (σ : state Λ) Θ :=
     to_val e = None ∧ base_irreducible i e σ Θ.
 
-  (* All non-value redexes are at the root.  In other words, all sub-redexes are
-     values. *)
+  (* All non-value redexes are at the root. *)
   Definition sub_redexes_are_values (e : expr Λ) :=
     ∀ K e', e = fill K e' → to_val e' = None → K = empty_ectx.
 
@@ -178,11 +165,8 @@ Section ectx_language.
   Lemma not_base_reducible i e σ Θ : ¬base_reducible i e σ Θ ↔ base_irreducible i e σ Θ.
   Proof. unfold base_reducible, base_irreducible. naive_solver. Qed.
 
-  (** The decomposition into base redex and context is unique.
-
-      In all sensible instances, [comp_ectx K' empty_ectx] will be the same as
-      [K'], so the conclusion is [K = K' ∧ e = e'], but we do not require a law
-      to actually prove that so we cannot use that fact here. *)
+  (** The decomposition into base redex and context is unique; no law equates
+      [comp_ectx K' empty_ectx] with [K']. *)
   Lemma base_redex_unique K K' i e e' σ Θ :
     fill K e = fill K' e' →
     base_reducible i e σ Θ →
@@ -290,7 +274,6 @@ Section ectx_language.
     by simplify_eq; rewrite fill_empty.
   Qed.
 
-  (* Every evaluation context is a context. *)
   Global Instance ectx_lang_ctx K : @LanguageCtx ectx_lang K.
   Proof.
     split; simpl.
@@ -318,11 +301,7 @@ Section ectx_language.
     - intros i σ1 κ Θ e2' σ2 efs ?%base_reducible_prim_step; eauto using base_reducible_no_obs_reducible.
   Qed.
 
-  (** This is not an instance because HeapLang's [wp_pure] tactic already takes
-      care of handling the evaluation context.  So the instance is redundant.
-      If you are defining your own language and your [wp_pure] works
-      differently, you might want to specialize this lemma to your language and
-      register that as an instance. *)
+  (** Not an instance: HeapLang's [wp_pure] handles evaluation contexts itself. *)
   Lemma pure_exec_fill K φ n e1 e2 :
     PureExec φ n e1 e2 →
     PureExec φ n (fill K e1) (fill K e2).
@@ -333,13 +312,8 @@ Global Arguments ectx_lang : clear implicits.
 Global Arguments Ectx_step {Λ i e1 σ1 Θ κ e2 σ2 efs}.
 Coercion ectx_lang : ectxLanguage >-> language.
 
-(* This definition makes sure that the fields of the [language] record do not
-refer to the projections of the [ectxLanguage] record but to the actual fields
-of the [ectxLanguage] record. This is crucial for canonical structure search to
-work.
-
-Note that this trick no longer works when we switch to canonical projections
-because then the pattern match [let '...] will be desugared into projections. *)
+(* The [let '...] match makes the fields of the [language] record the fields of [Λ], not
+   projections of it, as canonical structure search needs. *)
 Definition LanguageOfEctx (Λ : ectxLanguage) : language :=
   let '@EctxLanguage E V C St K Π of_val to_val empty comp fill base sat mix := Λ in
   @Language E V St K Π C of_val to_val _ sat fill empty comp

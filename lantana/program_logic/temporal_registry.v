@@ -7,18 +7,10 @@ From lantana.program_logic Require Export history_interp.
 
 (** * The temporal registry
 
-    Every structure whose content is trace-visible (an [alwaysI] invariant or an [untilI])
-    is registered here, so that the adequacy proof can find it at every check and certify
-    its content at that position. The registry is an append-only list of entries tagged
-    with the history position at which they were registered; the adequacy appends a marker
-    at every check. Positions are non-decreasing along the list, which lets a record about
-    position [n] tell whether an item it mentions was registered before the check at [n]
-    (then the check certified it) or during step [n] (then the item's own allocation
-    certificate is for [n]).
-
-    Trace properties of contents are identified across the registry by saved predicates on
-    traces ([saved_ti]); the agreement they give is up to a later, which the step-indexed
-    readings of always and until absorb. *)
+    An append-only list of the trace-visible structures ([alwaysI], [untilI]), each tagged
+    with its registration position, and of a marker per check of the adequacy. Positions are
+    non-decreasing, so a record about position [n] can tell whether an item was registered
+    before the check at [n] (then the check certified it) or during step [n]. *)
 
 Inductive rentry :=
   | RMark
@@ -152,7 +144,6 @@ Section registry.
     - left. by eapply prefix_lookup_Some.
   Qed.
 
-  (** Appending an entry whose position dominates the list. *)
   Lemma reg_auth_append l p e :
     (∀ pe, pe ∈ l → pe.1 ≤ p) →
     reg_auth l ==∗ reg_auth (l ++ [(p, e)]) ∗ reg_idx (length l) p e.
@@ -174,7 +165,7 @@ Section registry.
   Proof. rewrite /saved_ti. apply _. Qed.
   Lemma saved_ti_alloc f : ⊢ |==> ∃ γ, saved_ti γ f.
   Proof. by apply saved_pred_alloc. Qed.
-  (** Agreement of the predicates (in [trace Λ -d> iPropO Σ]). *)
+  (** Agreement up to a later, which the step-indexed readings absorb. *)
   Lemma saved_ti_agree_fun γ (f g : trace Λ -d> iPropO Σ) : saved_ti γ f -∗ saved_ti γ g -∗ ▷ (f ≡ g).
   Proof.
     iIntros "H1 H2". rewrite /saved_ti /saved_pred_own.
@@ -185,7 +176,6 @@ Section registry.
 
 End registry.
 
-(** Allocation of the registry ghost state. *)
 Lemma treg_alloc `{SI : sidx} {Λ Σ} `{!tregGpreS Λ Σ} : ⊢ |==> ∃ _ : tregGS Λ Σ, reg_auth [].
 Proof.
   iMod (own_alloc (●ML ([] : list (leibnizO (nat * rentry))))) as (γ) "H"; first apply mono_list_auth_valid.
@@ -194,11 +184,9 @@ Qed.
 
 (** ** The registry state
 
-    The list, and for every entry a history event at its registration position (which
-    bounds the position by the current history index) and the entry's handle, whose
-    meaning [Hd] is supplied by the temporal layer. The state is part of the interpretation
-    that the program logic threads between steps (temporal_class.v), so registering is a
-    plain ghost update. *)
+    The list, and for each entry a history event at its position and its handle [Hd] (given
+    by the temporal layer). The program logic threads this state, so registering is a plain
+    ghost update. *)
 Section registry_state.
   Context `{SI : sidx} `{!invGS Σ} `{!state_interp_class Λ Σ}
     `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS Λ Σ}.
@@ -212,7 +200,6 @@ Section registry_state.
   Lemma treg_st_init Hd : reg_auth [] ⊢ treg_st Hd.
   Proof. iIntros "Ha". iExists []. iFrame. by rewrite /treg_entries big_sepL_nil. Qed.
 
-  (** Every registered position is bounded by the current history index. *)
   Lemma treg_entries_bound Hd l h n σ Θ κs :
     treg_entries Hd l -∗ history_interp h n σ Θ κs -∗ ⌜∀ pe, pe ∈ l → pe.1 ≤ n⌝.
   Proof.
@@ -223,7 +210,6 @@ Section registry_state.
     apply lookup_lt_Some in Hh. lia.
   Qed.
 
-  (** Register an entry at the current position. *)
   Lemma treg_st_register Hd e h n σ Θ κs :
     treg_st Hd -∗ (∀ st, hG_event n st -∗ Hd e) -∗
     history_interp h n σ Θ κs ==∗ history_interp h n σ Θ κs ∗ treg_st Hd ∗ ∃ j, reg_idx j n e.

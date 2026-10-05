@@ -1,11 +1,7 @@
 (** * Lifting lemmas of [lWP] from the obligation-forest interface
 
-    The obligation-related lifting lemmas of [lWP] ([lifting.v], [ectx_lifting.v]) are
-    re-derived here for an arbitrary instance of [oblf.obl_forest_interface]: the statements
-    are those of [lifting.v] and [ectx_lifting.v] with the predicates of the class, and the
-    proofs only use the rules of the class (mostly [step_progress], [step_fork] and
-    [obl_check_witness]). For the instance [obl_forest_lantana] they are the lemmas of
-    [lifting.v] and [ectx_lifting.v]. *)
+    The obligation-related lemmas of lifting.v and ectx_lifting.v, for any instance of
+    [oblf.obl_forest_interface], proved from the rules of the class only. *)
 
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export obl_forest lifting ectx_lifting.
@@ -24,7 +20,6 @@ Section lifting.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
 
-  (* For lwp_step, enable progress and fork, and a model update after the step. *)
   Lemma lwp_step_step s i E e1 ν :
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →

@@ -1,7 +1,6 @@
-(** * The forest model is an instance of the obligation-forest interface
+(** * The instance [obl_forest_lantana] of the obligation-forest interface
 
-    [obl_forest_lantana] instantiates [oblf.obl_forest_interface] with the predicates of
-    [opreds.v]; the updates are the model-update rules of [sfmupd.v] and the steps those of
+    The predicates of [opreds.v], the model updates of sfmupd.v and the steps of
     [model_physical_updates.v]. *)
 
 From iris.proofmode Require Import base proofmode classes.

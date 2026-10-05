@@ -1,8 +1,6 @@
-(** Logically atomic triples for [lWP] ([atomic_lwp], via telescopes), their notations and
-    generic lemmas, as in Iris' [program_logic/atomic.v]:
+(** Logically atomic triples for [lWP], as in Iris' [program_logic/atomic.v]:
       <<{ ∀∀ x, α }>> e @ i; E <<{ ∃∃ y, β | z, RET v; POST }>>
-    [x] is bound in everything after it, [y] in [β], [v] and [POST], [z] in [v] and [POST].
-    [∀∀], [∃∃] and [POST] may be omitted, except that binders [z] require all of them. *)
+    [∀∀], [∃∃] and [POST] may be omitted only without the RET binders [z]. *)
 
 From iris.proofmode Require Import proofmode classes.
 From iris.bi.lib Require Export atomic.
@@ -10,15 +8,11 @@ From lantana.base_logic Require Import invariants.
 From lantana.program_logic Require Export weakestpre.
 From iris.prelude Require Import options.
 
-(* This hard-codes the inner mask to be empty, because we have yet to find an
-example where we want it to be anything else.
-
-For the non-atomic post-condition, we use an [option PROP], combined with a
-[-∗?]. This is to avoid introducing spurious [True -∗] into proofs that do not
-need a non-atomic post-condition (which is most of them). *)
+(* The inner mask is empty. The non-atomic postcondition is an [option] used with [-∗?], so
+   that proofs without one see no spurious [True -∗]. *)
 Definition atomic_lwp `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} {TA TB TP : tele}
   (i : thread_id)
-  (e : expr Λ) (* expression *)
+  (e : expr Λ)
   (E : coPset) (* *implementation* mask *)
   (α : TA → iProp Σ) (* atomic pre-condition *)
   (β : TA → TB → iProp Σ) (* atomic post-condition *)
@@ -26,16 +20,12 @@ Definition atomic_lwp `{SI : sidx} `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ} 
   (f : TA → TB → TP → val Λ) (* Turn the return data into the return value *)
   : iProp Σ :=
     ∀ (Φ : val Λ → iProp Σ),
-            (* The (outer) user mask is what is left after the implementation
-            opened its things. *)
+            (* The outer (user) mask is what the implementation leaves. *)
             atomic_update (⊤∖E) ∅ α β (λ.. x y, ∀.. z, POST x y z -∗? Φ (f x y z)) -∗
             lWP e @ i {{ Φ }}.
 
-(** We avoid '<<{'/'}>>' since those can also reasonably be infix operators
-(and in fact Autosubst uses the latter). *)
 Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' z1 .. zn , 'RET' v ; POST '}>>'" :=
-(* The way to read the [tele_app foo] here is that they convert the n-ary
-function [foo] into a unary function taking a telescope as the argument. *)
+(* [tele_app f] turns the n-ary function [f] into a unary function on a telescope. *)
   (atomic_lwp (TA:=TeleS (λ x1, .. (TeleS (λ xn, TeleO)) .. ))
              (TB:=TeleS (λ y1, .. (TeleS (λ yn, TeleO)) .. ))
              (TP:=TeleS (λ z1, .. (TeleS (λ zn, TeleO)) .. ))
@@ -60,16 +50,6 @@ function [foo] into a unary function taking a telescope as the argument. *)
   (at level 20, i, E, β, α, v, POST at level 200, x1 binder, xn binder, y1 binder, yn binder, z1 binder, zn binder,
    format "'[hv' '<<{'  '[' ∀∀  x1  ..  xn ,  '/' α  ']' '}>>'  '/  ' e  @  i ;  E  '/' '<<{'  '[' ∃∃  y1  ..  yn ,  '/' β  '|'  '/' z1  ..  zn ,  RET  v ;  '/' POST  ']' '}>>' ']'")
   : bi_scope.
-
-(* There are overall 16 of possible variants of this notation:
-- with and without ∀∀ binders
-- with and without ∃∃ binders
-- with and without RET binders
-- with and without POST
-
-However we don't support the case where RET binders are present but anything
-else is missing. Below we declare the 8 notations that involve no RET binders.
-*)
 
 (* No RET binders *)
 Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' 'RET' v ; POST '}>>'" :=
@@ -229,7 +209,6 @@ Section lemmas.
   Notation iProp := (iProp Σ).
   Implicit Types (α : TA → iProp) (β : TA → TB → iProp) (POST : TA → TB → TP → option iProp) (f : TA → TB → TP → val Λ).
 
-  (* Atomic triples imply sequential triples. *)
   Lemma atomic_lwp_seq i e E α β POST f :
     atomic_lwp i e E α β POST f -∗
     ∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ lWP e @ i {{ Φ }}.
@@ -241,7 +220,6 @@ Section lemmas.
     rewrite ->!tele_app_bind. iIntros (z) "Hpost HΦ". iApply ("HΦ" with "Hβ Hpost").
   Qed.
 
-  (* Sequential (fix) triples with the empty mask for a physically atomic [e] are atomic. *)
   Lemma atomic_seq_lwp_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} :
     (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ (lwp NotStuck i ∅ e Φ)) -∗
     atomic_lwp i e E α β POST f.
@@ -252,8 +230,6 @@ Section lemmas.
     rewrite ->!tele_app_bind. iApply "HΦ". done.
   Qed.
 
-  (** Sequential triples with a persistent precondition and no initial quantifier
-  are atomic. *)
   Lemma persistent_seq_lwp_atomic i e E (α : [tele] → iProp) (β : [tele] → TB → iProp)
       (POST : [tele] → TB → TP → option iProp) (f : [tele] → TB → TP → val Λ)
       {HP : Persistent (α [tele_arg])} :
@@ -276,8 +252,7 @@ Section lemmas.
     iApply atomic_update_mask_weaken; last done. set_solver.
   Qed.
 
-  (** We can open invariants around atomic triples.
-      (Just for demonstration purposes; we always use [iInv] in proofs.) *)
+  (** For demonstration only: proofs open invariants with [iInv]. *)
   Lemma atomic_lwp_inv i e E α β POST f N I :
     ↑N ⊆ E →
     atomic_lwp i e (E ∖ ↑N) (λ.. x, ▷ I ∗ α x) (λ.. x y, ▷ I ∗ β x y) POST f -∗

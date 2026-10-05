@@ -79,9 +79,8 @@ Section certification.
       iMod ("IH" with "Hl' HI MI") as "($& $& #Cs)". iModIntro. iFrame "C Cs".
   Qed.
 
-  (** The check at position [n]: the marker is appended to the registry and every entry is
-      certified. The lower bound of the marked registry and the certificates form the
-      bundle for [n]. *)
+  (** The check at [n] appends the marker; the marked registry's lower bound and the
+      certificates of its entries form the bundle for [n]. *)
   Lemma treg_mark n l h σ Θ κs :
     reg_auth l -∗ treg_entries treg_handle l -∗ history_interp h n σ Θ κs ==∗
     history_interp h n σ Θ κs ∗ reg_auth (l ++ [(n, RMark)]) ∗
@@ -104,8 +103,7 @@ Section certification.
     iFrame "Hlb". iSplit; first done. iFrame "Cs".
   Qed.
 
-  (** The check as a whole: from the registry state and the interpretations at [n], the
-      bundle for [n] and the state back. *)
+  (** The check as a whole: the bundle for [n], and the registry state back. *)
   Lemma treg_check n h σ Θ κs g v Ω W :
     treg_state -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
     treg_state ∗ history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ ∃ l, bundle l n.
@@ -121,9 +119,8 @@ End certification.
 
 (** ** Reading the registered structures off a run
 
-    For any system satisfying the one-step property: the always of a registered invariant and
-    the until of a registered obligation invariant. The loops take the certificate of the
-    structure they read from the bundle of each position. *)
+    For any system with the one-step property. Each loop takes the certificate of its
+    structure from the bundle of each position. *)
 Section loops.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Local Notation sysT := (nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ).
@@ -175,9 +172,8 @@ Section loops.
   Qed.
 
   (** One iteration of a loop, in the shape of the step-indexed readings: the check gives
-      the bundle, from which the certificate [C] of the structure being read is taken; the
-      shape's later strips its later; the step gives the system at [S n], the facts about
-      the step and [c] later credits to the continuation. *)
+      the bundle and the certificate [C], whose later the shape's later strips; the step gives
+      the system at [S n], the facts about the step and [c] later credits. *)
   Lemma sys_step_iter (Sys : sysT) (c : nat) h n σ Θ κs g v Ω W τf γ (C Φ : iProp Σ) :
     sys_step Sys -∗
     ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗

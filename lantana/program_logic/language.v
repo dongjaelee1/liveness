@@ -17,11 +17,8 @@ Section language_mixin.
   Context {expr val state observation state_pred : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
-  (** We annotate the reduction relation with observations [κ], which we will
-     use in the definition of weakest preconditions to predict future
-     observations and assert correctness of the predictions. *)
-  (** thread_ids is a state that tracks occupied thread_ids,
-     and gmap thread_id expr are forked threads. *)
+  (** A step of thread [i] with observations [κ]; [thread_ids] are the occupied thread ids,
+      the [gmap] holds the forked threads. *)
   Context (prim_step : thread_id → expr → state → thread_ids → list observation →
                        expr → state → gmap thread_id expr → Prop).
   Context (state_sat : state → gmap thread_id expr → state_pred → Prop).
@@ -35,9 +32,8 @@ Section language_mixin.
   }.
 End language_mixin.
 
-(** A language chooses its context representation. Only application of the
-    identity and composition is prescribed; contexts need not be injective,
-    and a language may provide only the identity context. *)
+(** A language chooses its context representation: only the identity and composition are
+    prescribed, and contexts need not be injective. *)
 Record LanguageCtxMixin {C E : Type}
     (apply_ctx : C → E → E) (id_ctx : C) (comp_ctx : C → C → C) : Prop := {
   mixin_ctx_id e : apply_ctx id_ctx e = e;
@@ -148,7 +144,6 @@ Section language.
 
   Definition reducible i (e : expr Λ) (σ : state Λ) Θ :=
     ∃ κ e' σ' efs, prim_step i e σ Θ κ e' σ' efs.
-  (** Reducible without observations, as for pure steps. *)
   Definition reducible_no_obs i (e : expr Λ) (σ : state Λ) Θ :=
     ∃ e' σ' efs, prim_step i e σ Θ [] e' σ' efs.
   Definition irreducible i (e : expr Λ) (σ : state Λ) Θ :=
@@ -158,31 +153,19 @@ Section language.
   Definition not_stuck i (e : expr Λ) (σ : state Λ) Θ :=
     is_Some (to_val e) ∨ reducible i e σ Θ.
 
-  (* [Atomic WeaklyAtomic]: This (weak) form of atomicity is enough to open
-     invariants when WP ensures safety, i.e., programs never can get stuck.  We
-     have an example in lambdaRust of an expression that is atomic in this
-     sense, but not in the stronger sense defined below, and we have to be able
-     to open invariants around that expression.  See `CasStuckS` in
-     [lambdaRust](https://gitlab.mpi-sws.org/FP/LambdaRust-coq/blob/master/theories/lang/lang.v).
-
-     [Atomic StronglyAtomic]: To open invariants with a WP that does not ensure
-     safety, we need a stronger form of atomicity.  With the above definition,
-     in case `e` reduces to a stuck non-value, there is no proof that the
-     invariants have been established again. *)
+  (* [WeaklyAtomic] suffices to open invariants when WP ensures safety (as in Iris);
+     otherwise [StronglyAtomic] is needed, as a step to a stuck non-value would not
+     re-establish them. *)
   Class Atomic (a : atomicity) (e : expr Λ) : Prop :=
     atomic i σ Θ e' κ σ' efs :
       prim_step i e σ Θ κ e' σ' efs →
       if a is WeaklyAtomic then irreducible i e' σ' (Θ ∪ (dom efs)) else is_Some (to_val e').
 
-  (** An atomic thread step.
-   We formalize an execution of a program as the infinite sequence of program states,
-   where the last state for a terminating program is repeated infinitely.
-   Note that if a thread spawns, it never deallocates. *)
+  (** A step of thread [i]. Forked threads are added to the pool and never removed. *)
   Inductive thread_step (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
   | thread_step_atomic e1 σ1 e2 σ2 efs Θ :
     ρ1 = (Θ, σ1) →
     Θ !! i = Some e1 →
-    (* atomic execution *)
     prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs →
     ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
     thread_step i ρ1 κ ρ2.
@@ -248,7 +231,6 @@ Section language.
     stuck i e σ Θ → stuck i (K e) σ Θ.
   Proof. rewrite -!not_not_stuck. eauto using not_stuck_fill_inv. Qed.
 
-  (** Generalized pure_step that can condition on the state *)
   Record pure_step (e1 e2 : expr Λ) := {
     pure_step_safe i σ1 Θ : reducible_no_obs i e1 σ1 Θ;
     pure_step_det i σ1 κ Θ e2' σ2 efs :
@@ -279,19 +261,17 @@ Section language.
     rtc (pure_step) e1 e2 → rtc (pure_step) (K e1) (K e2).
   Proof. eauto using rtc_congruence, pure_step_ctx. Qed.
 
-  (* We do not make this an instance because it is awfully general. *)
+  (* Not an instance: too general. *)
   Lemma pure_exec_ctx K `{!@LanguageCtx Λ K} φ n e1 e2 :
     PureExec φ n e1 e2 →
     PureExec φ n (K e1) (K e2).
   Proof. rewrite /PureExec. intros. destruct (H0 H1). split; eauto using pure_step_nsteps_ctx. Qed.
 
-  (* This is a family of frequent assumptions for PureExec *)
   Class IntoVal (e : expr Λ) (v : val Λ) :=
     into_val : of_val v = e.
 
   Class AsVal (e : expr Λ) := as_val : ∃ v, of_val v = e.
-  (* There is no instance [IntoVal → AsVal] as often one can solve [AsVal] more
-  efficiently since no witness has to be computed. *)
+  (* No instance [IntoVal → AsVal]: [AsVal] is often solved faster, without a witness. *)
   Global Instance as_vals_of_val vs : TCForall AsVal (of_val <$> vs).
   Proof.
     apply TCForall_Forall, Forall_fmap, Forall_true=> v.

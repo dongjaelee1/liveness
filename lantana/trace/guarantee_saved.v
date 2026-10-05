@@ -5,10 +5,8 @@ From lantana.trace Require Export guarantee_infer.
 
 (** * Temporal formulas in ghost state
 
-    Temporal formulas are iProps and their guarantees are persistent iProps, so both can be
-    stored in ghost state with the usual Iris constructions. A saved proposition names a
-    temporal formula; storing its guarantee next to it makes the pair self-certifying.
-    Recursion through a registered structure is in guarantee_rec.v ([nest]). *)
+    A saved proposition names a temporal formula; stored with its guarantee, the pair is
+    self-certifying. Also a registry of temporal formulas chosen at runtime. *)
 
 Section saved.
   Context `{!lantanaGS Λ Σ, !savedPropG Σ}.
@@ -27,7 +25,6 @@ Section saved.
     iModIntro. iExists γ. by iFrame "#".
   Qed.
 
-  (** Everybody holding the name agrees on the formula. *)
   Lemma saved_temporal_agree γ P Q G G' :
     saved_temporal γ P G -∗ saved_temporal γ Q G' -∗ ▷ (P ≡ Q).
   Proof. iIntros "[HP _] [HQ _]". iApply (saved_prop_agree with "HP HQ"). Qed.

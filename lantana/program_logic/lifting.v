@@ -1,5 +1,4 @@
-(** The "lifting lemmas" in this file serve to lift the rules of the operational
-semantics to the program logic. *)
+(** Lifting lemmas: the rules of the operational semantics as rules of [lWP]. *)
 
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export weakestpre.
@@ -20,7 +19,7 @@ Section lifting.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
 
-  (* For lwp_step, enable progress and fork, and a model update after the step. *)
+  (* [lwp_step] with the progress and fork updates applied, and a model update after it. *)
   Lemma lwp_step_step s i E e1 ν :
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →

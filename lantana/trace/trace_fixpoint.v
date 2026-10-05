@@ -7,32 +7,11 @@ From lantana.algebra Require Import ordinal_existential_properties axioms.
 
 (** * Least and greatest fixpoints of trace properties
 
-    The body of a fixpoint is any [F : tps Λ Σ → tps Λ Σ] that is monotone for both readings
-    ([TpsMono]); no syntax is involved.
+    For a body [F] monotone in both readings ([TpsMono]): [tps_nu F], the union of the
+    post-fixpoints of [F], and [tps_mu F], the union of ordinal approximants
+    [μ_α := F (∃ β < α, μ_β)]. Always and until are such fixpoints. *)
 
-    - [tps_nu F]: the in-logic reading is the union of all post-fixpoints of [F] (for [⊑]);
-      the trace reading is the greatest fixpoint of the trace functor
-      [R ↦ tps_tr (F (tps_trp R))]. Soundness: the set of traces at which the in-logic
-      reading is satisfiable is a post-fixpoint of the trace functor (coinduction).
-    - [tps_mu F]: approximants [μ_α := F (∃ β < α, μ_β)] by well-founded recursion on
-      ordinals, and [μ := ∃ α, μ_α]. Each approximant is a trace property, so soundness is
-      free; the trace reading is the least fixpoint of the trace functor (the ranks of its
-      traces are bounded by one ordinal). The ordinal is the measure that a least fixpoint
-      needs in a step-indexed logic: without it (an impredicative least fixpoint for [⊑]) a
-      guarded body has a unique fixpoint, so [μ] would coincide with [ν].
-    - In the logic, [μ] is below every pre-fixpoint and [μ ⊑ F μ]; the fold [F μ ⊑ μ] holds
-      for continuous bodies ([TpsCont]) but not for guarded ones: a pre-fixpoint of a
-      guarded body is valid by Löb induction, so it holds on every trace
-      ([tps_guarded_prefix_tr]), while the least fixpoint of traces can be empty
-      ([tps_mu_unfold_r_guarded]). Introducing [μ] for a guarded body takes a ranking
-      ([tps_mu_rank]; for guarantees [temporal_mu_rank], guarantee_rec.v).
-
-    The in-logic step [tps_later] and next position [tps_next] are the two halves of the
-    step built into [tps_always] and [tps_until]; with them, [tps_always G] is
-    [ν X. ⊳(G ∧ ○X)] and [tps_until G1 G2] is [μ X. ⊳(G2 ∨ (G1 ∧ ○X))]. *)
-
-(* As under the guarantees (guarantee_infer.v): the proof mode does not unfold the
-   connectives, which are records. *)
+(* The proof mode must not unfold the connectives, which are records. *)
 #[local] Typeclasses Opaque tps_pure tps_atomic tps_and tps_or tps_impl tps_forall tps_exist
   tps_always tps_until tps_state.
 
@@ -190,10 +169,9 @@ End mono_instances.
 
 (** ** Continuous bodies
 
-    [F] commutes, in the logic, with the union of an increasing chain indexed by ordinals.
-    Bodies with no modality in front of the recursive occurrence are continuous; guarded
-    bodies are not: the step index ranges beyond the ordinals of [Ord.t], so [▷ ∃ α, X α]
-    does not give [∃ α, ▷ X α]. *)
+    [F] commutes, in the logic, with unions of increasing chains indexed by ordinals. Guarded
+    bodies are not continuous: the step index ranges beyond [Ord.t], so [▷ ∃ α, X α] does
+    not give [∃ α, ▷ X α]. *)
 Class TpsCont {Λ Σ} (F : tps Λ Σ → tps Λ Σ) : Prop :=
   tps_cont (X : Ord.t → tps Λ Σ) :
     (∀ α β, Ord.le α β → tps_le (X α) (X β)) →
@@ -289,7 +267,10 @@ Section nu.
 
 End nu.
 
-(** ** Least fixpoints, with ordinal approximants *)
+(** ** Least fixpoints, with ordinal approximants
+
+    The ordinal is the measure a least fixpoint needs in a step-indexed logic: without it, a
+    guarded body has a unique fixpoint, and [μ] would be [ν]. *)
 Section mu.
   Context {Λ : language} {Σ : gFunctors}.
   Implicit Types G X : tps Λ Σ.
@@ -366,7 +347,6 @@ Section mu.
     apply (tps_exist_ub (λ b : {β | Ord.lt β (Ord.S α)}, tps_mu_approx (proj1_sig b)) (α ↾ Ord.S_lt α)).
   Qed.
 
-  (** The trace reading implies the least fixpoint of the trace functor. *)
   Lemma tps_mu_tr τ `{!TpsMono F} : tps_tr tps_mu τ → tr_lfp (λ R, tps_tr (F (tps_trp R))) τ.
   Proof.
     assert (Hm : tr_mono (λ R, tps_tr (F (tps_trp R)))).
@@ -376,9 +356,8 @@ Section mu.
     eapply tps_mono_tr; last exact Hα. intros τ' [[β Hβ] H']. by apply (IH β).
   Qed.
 
-  (** The trace reading is a pre-fixpoint of the trace functor: choose a rank for each trace
-      in it; their join bounds them (the join over traces puts the types of [language] below
-      the index types of [Ord.t]). *)
+  (** The trace reading is a pre-fixpoint of the trace functor: the join of the ranks of its
+      traces bounds them all. *)
   Lemma tps_mu_tr_pre `{!TpsMono F} τ :
     tps_tr (F (tps_trp (tps_tr tps_mu))) τ → tps_tr tps_mu τ.
   Proof.
@@ -391,7 +370,6 @@ Section mu.
     exists (f τ' ↾ Ord.le_lt_lt (Ord.join_upperbound f τ') (Ord.S_lt _)). simpl. by apply Hf.
   Qed.
 
-  (** The least fixpoint of the trace functor implies the trace reading. *)
   Lemma tps_mu_tr_lfp `{!TpsMono F} τ : tr_lfp (λ R, tps_tr (F (tps_trp R))) τ → tps_tr tps_mu τ.
   Proof. intros H. apply H. intros τ'. apply tps_mu_tr_pre. Qed.
 
@@ -566,10 +544,8 @@ End ltl.
 (** ** No fold for a guarded body
 
     A pre-fixpoint (for [⊑]) of the guarded body [X ↦ ⊳ ⊚ ○'X] is valid by Löb induction,
-    hence, once the logic has a model, true on every trace; but the least fixpoint of that
-    body on traces is empty ([G1 𝒰 G2] with [G2] false). So [F (μ F) ⊑ μ F] fails for it, and
-    no least fixpoint whose trace reading is the least fixpoint of traces has the fold for
-    guarded bodies. The same holds for [G1 𝒰 G2], which is [μ (F_until G1 G2)] in [⊑]. *)
+    hence true on every trace, while the least fixpoint of that body on traces is empty. So
+    [F (μ F) ⊑ μ F] fails for it, and likewise for [G1 𝒰 G2]. *)
 Section no_fold.
   Context {Λ : language} {Σ : gFunctors}.
 

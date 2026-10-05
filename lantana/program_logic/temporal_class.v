@@ -5,12 +5,9 @@ From lantana.program_logic Require Export temporal_registry.
 
 (** * Ghost state of the temporal layer
 
-    [temporalGS] bundles the ghost state of the obligation model, of the history and of the
-    registry of trace-visible structures. [TemporalInterp] is the interpretation of the
-    temporal layer: a resource that the program logic threads together with the history
-    interpretation ([history_tinterp]), without knowing its content. The temporal layer
-    (guarantee_struct.v) fixes it to the state of the registry; until then it is a
-    parameter, so the program logic stays independent of the temporal layer. *)
+    [temporalGS]: the ghost state of the obligation model, the history and the registry.
+    [TemporalInterp]: the interpretation of the temporal layer, a parameter that the program
+    logic threads without knowing its content; guarantee_struct.v fixes it to the registry. *)
 
 Class temporalGpreS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
   TemporalGpreS {
@@ -35,14 +32,11 @@ Definition temporalΣ `{SI : sidx} (Λ : language) : gFunctors :=
 Global Instance subG_temporalΣ `{SI : sidx} {Λ} {Σ} : subG (temporalΣ Λ) Σ → temporalGpreS Λ Σ.
 Proof. solve_inG. Qed.
 
-(** The interpretation of the temporal layer. Its only instance is the registry state
-    (guarantee_struct.v, [treg_temporal_interp]); it is keyed by the ghost state so that
-    there is one interpretation per instance of the logic. *)
+(** Keyed by the ghost state: one interpretation per instance of the logic. *)
 Class TemporalInterp `{SI : sidx} (Λ : language) (Σ : gFunctors)
   `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} := temporal_interp : iProp Σ.
 Global Hint Mode TemporalInterp - - - - - : typeclass_instances.
 
-(** The history interpretation together with the interpretation of the temporal layer:
-    what the program logic threads between steps and through its model updates. An
-    abbreviation, so that proofs see the pair. *)
+(** What the program logic threads between steps and through model updates; a notation, so
+    that proofs see the pair. *)
 Notation history_tinterp h n σ Θ κs := (history_interp h n σ Θ κs ∗ temporal_interp)%I.

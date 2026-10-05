@@ -6,19 +6,13 @@ From lantana.base_logic Require Import satisfiable.
 
 (** * Semantic trace properties
 
-    A trace property [G : tps Λ Σ] has two readings: [tps_ti G], a step-indexed trace
-    predicate, which is what the program logic establishes, and [tps_tr G], a trace
-    predicate ([trProp], trace_pred.v); [tps_good] says that satisfiability of the
-    first implies the second. The connectives build both readings at once; [G ⊑ G']
-    ([tps_le]) compares in-logic readings. Implication reads its antecedent at the level of
-    traces; complete and instant properties are those whose antecedents the logic can
-    introduce and eliminate. *)
+    Trace properties ([tps]) with an in-logic and a trace reading, their connectives, state
+    atoms, and complete and instant properties. *)
 
 (** ** Semantic trace properties *)
 
-(** [tps_ti] is the trace predicate that the running system establishes inside the logic
-    (step-indexed, with ordinal measures for eventualities); [tps_good] says that its
-    satisfiability implies [tps_tr], the trace property proper. *)
+(** [tps_ti]: the step-indexed reading, which the running system establishes in the logic;
+    [tps_good]: its satisfiability implies the trace reading [tps_tr]. *)
 Record tps {Λ : language} {Σ : gFunctors} := Tps {
   tps_ti : ∀ `{!temporalGS Λ Σ}, trace Λ → iProp Σ;
   tps_tr : trace Λ → Prop;
@@ -71,9 +65,8 @@ Section tps_connectives.
     - right. by eapply tps_good.
   Qed.
 
-  (** Implication, with any trace property as antecedent. Both readings assume the
-      antecedent at the level of traces, so agreement needs nothing about it (in contrast
-      to an induction on syntax, which would need the antecedent's agreement backwards). *)
+  (** Implication, with any trace property as antecedent: both readings assume it at the
+      level of traces. *)
   Program Definition tps_impl (A G : tps Λ Σ) : tps Λ Σ :=
     {| tps_ti _ := ti_impl (tps_tr A) (tps_ti G); tps_tr := tr_impl (tps_tr A) (tps_tr G) |}.
   Next Obligation.
@@ -81,7 +74,7 @@ Section tps_connectives.
     iIntros "_". by iPureIntro.
   Qed.
 
-  (** Universal quantification over any type: [sat] commutes with [∀]. *)
+  (** Over any type: [sat] commutes with [∀]. *)
   Program Definition tps_forall {X : Type} (G : X → tps Λ Σ) : tps Λ Σ :=
     {| tps_ti _ := ti_forall X (λ x, tps_ti (G x)); tps_tr := tr_forall X (λ x, tps_tr (G x)) |}.
   Next Obligation.
@@ -176,8 +169,6 @@ Section tps_connectives.
       iDestruct "H" as "[_ (%a''& %Hlt& H)]". iExists a''. iSplit; first done. by iApply "IH".
   Qed.
 
-  (** In-logic monotonicity of always and until: the implication between the readings is
-      an iProp hypothesis, available one step later. *)
   Lemma tps_always_mono_i `{!temporalGS Λ Σ} (G G' : tps Λ Σ) :
     ▷ □ (∀ τ, tps_ti G τ -∗ tps_ti G' τ) -∗
     ∀ τ, tps_ti (tps_always G) τ -∗ tps_ti (tps_always G') τ.
@@ -217,11 +208,10 @@ End state_atoms.
 
 (** ** Complete and instant trace properties
 
-    An implication [A → G] assumes [A] at the level of traces. Inside the logic that
-    assumption can be used when [A] is complete (its real reading gives its in-logic reading):
-    then [A → G] is introduced from [A ∧ H ⊑ G]. It can be eliminated when [A] is instant (its
-    in-logic reading gives its real reading). Everything built from pure facts and state atoms
-    is complete, including always and until; the non-temporal part is also instant. *)
+    An implication [A → G] assumes [A] at the level of traces. In the logic it is introduced
+    from [A ∧ H ⊑ G] when [A] is complete (its trace reading gives its in-logic reading), and
+    eliminated when [A] is instant (the converse). Pure facts, state atoms, always and until
+    are complete; the non-temporal ones are also instant. *)
 Section complete.
   Context {Λ : language} {Σ : gFunctors}.
   Implicit Types G A : tps Λ Σ.

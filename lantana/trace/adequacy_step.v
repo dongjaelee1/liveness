@@ -7,9 +7,8 @@ From lantana.base_logic Require Import satisfiable.
 
 (** * One step of [lWP]: obligations, witnesses, the fairness counter
 
-    The facts about one step of [lWP] that the adequacy theorems (adequacy_temporal.v,
-    adequacy_safety.v) use. They are generic in the interpretation of the temporal layer
-    ([TemporalInterp]): this file does not import the guarantees, which fix it. *)
+    The facts about one step of [lWP] used by both adequacy theorems, generic in
+    [TemporalInterp]. *)
 
 Section lwp_step.
   Context `{!lantanaGS Λ Σ} `{!TemporalInterp Λ Σ}.

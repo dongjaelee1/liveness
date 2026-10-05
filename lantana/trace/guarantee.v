@@ -6,53 +6,20 @@ From transfinite.stepindex Require Import ordinals.
 
 (** * Temporal guarantees [P ⊨ₜ G]: records, the one-step property, rules for connectives
 
-    Temporal formulas are ordinary iProps. What makes an iProp [P] temporal is a separate,
-    persistent iProp [P ⊨ₜ G] stating that, whenever [P] holds, the rest of the execution
-    satisfies the trace property [G] (trace_prop.v). Quantifiers are iProp's own (over any
-    type, e.g. over iProp), temporal formulas can be stored in invariants and saved
-    propositions, and program proofs never leave iProp. Adequacy concludes [tps_tr G], and
-    hence any trace predicate it implies.
+    Temporal formulas are ordinary iProps; [P ⊨ₜ G] is a persistent iProp saying that whenever
+    [P] holds, the rest of the execution satisfies the trace property [G]. Adequacy concludes
+    [tps_tr G].
 
-    Records and certificates. [P ⊨ₜ G] turns [P] at a position [n] of the run into a record
-    [tguar G n]: a persistent wand that yields the step-indexed reading of [G] at [n] once
-    the run has made the step from [n] to [S n]. A record may be written by a thread in the
-    pre-step model update of step [n] (e.g. by discharging an until), so it can only be
-    eliminated afterwards, against the system at [S n] and a bundle of certificates for [n]:
-    every trace-visible structure ([alwaysI], [untilI]) is registered (temporal_registry.v)
-    and, at every position, the content of each registered item is certified as a
-    later-guarded record. The step-indexed readings of always and until (trace_step_indexed.v) decide
-    a position only after the step from it, so that a pre-step discharge at [n] is read off
-    the obligation invariant at [S n].
+    At position [n], [P ⊨ₜ G] turns [P] into a record [tguar G n], which gives the reading of
+    [G] at [n] once the step from [n] is made. A record may be written in the pre-step update
+    of step [n] (e.g. by discharging an until), so it is eliminated after the step, against
+    the bundle of certificates for [n]: each registered structure (temporal_registry.v) has
+    its content certified at every position. A record holds for any running system with the
+    one-step property [sys_step]; [lWP] is one (adequacy_temporal.v).
 
-    The running system is abstract in a record: a record is valid for any system that
-    satisfies the one-step property [sys_step] (certify the registry, then step fairly, giving
-    the bundle of the position, the interpretations after the step and later credits). The
-    temporal layer therefore does not depend on the weakest precondition; Lantana's [lWP]
-    is one system with the step property ([sys_step_lwp], adequacy_temporal.v), and the
-    state of the registry is the interpretation of the temporal layer that the program logic
-    threads ([TemporalInterp], temporal_class.v). Registration is a plain model update.
-
-    Contents: guarantees and records ([tguar]), the canonical trace property of an iProp
-    ([tps_sem]), and the rules for the connectives. The registry and the registered
-    structures [alwaysI] and [untilI], with their rules, are in guarantee_struct.v; the
-    loops that read them off a run in guarantee_run.v; inference of guarantees
-    ([IntoTemporal]) in guarantee_infer.v. The adequacy for [lWP] is in adequacy_temporal.v.
-
-    Limitations, by design:
-    - A quantifier can be trace-visible ([tps_exist]) only over types with the existential
-      property of the step index (nat, Z, loc, gname, ...): over larger types (iProp, tps) no
-      sound adequacy could read the witness off the trace. Over those, existentials are ghost
-      ([temporal_exist_ghost]): the guarantee of the body must not depend on the witness.
-    - The trace property [G] of the adequacy is fixed at the meta level; dynamically created
-      names reach it through trace-visible existentials, typically under a [finally]
-      allocated at time 0 (see lantana_heap_lang/examples/flag_fork.v).
-    - The step-indexed readings are specific to [ordSI].
-    - A registered structure stores the readings of its contents when it is registered
-      ([alwaysI] and [untilI] the canonical ones, [alwaysI_guar] and [untilI_guar] given
-      ones); recursion through a registered structure goes through [alwaysI_guar] or
-      [untilI_guar] (guarantee_rec.v, [nest] and [renew]).
-    - Allocating an [alwaysI] or an [untilI] registers it: the allocation rules are model
-      updates ([|={E}=>m]), which read the position of the run. *)
+    An existential is trace-visible ([tps_exist]) only over small types (nat, Z, loc, gname,
+    ...), otherwise ghost ([temporal_exist_ghost]). The trace property of the adequacy is
+    fixed at the meta level: dynamic names reach it through trace-visible existentials. *)
 
 (** ** Guarantees *)
 
@@ -76,10 +43,9 @@ Section guarantee.
   (** A running system: a resource indexed by the position and the configuration. *)
   Local Notation sysT := (nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ).
 
-  (** The certificate of a registered item at position [n]: a later-guarded record of its
-      content at [n] ([tg f n] is the record for the step-indexed reading [f]). For an until,
-      either the records of its left and right formulas (one of them holds at [n]) or, if it
-      was discharged at [n' ≤ n], the record of its right formula at [n']. *)
+  (** The certificate of a registered item at [n]: a later-guarded record of its content at
+      [n]. For an until, the record of its left or right formula at [n], or, if it was
+      discharged at [n' ≤ n], the record of its right formula at [n']. *)
   Definition cert_pre (tg : tgT) (n : nat) (e : rentry) : iProp Σ :=
     match e with
     | RMark => True
@@ -95,11 +61,9 @@ Section guarantee.
   Definition bundle_pre (tg : tgT) (l : list (nat * rentry)) (n : nat) : iProp Σ :=
     reg_lb l ∗ ⌜last l = Some (n, RMark)⌝ ∗ [∗ list] pe ∈ l, cert_pre tg n pe.2.
 
-  (** The one-step property of a system [Sys]: from a consistent system at [n], the bundle for
-      [n] (the check), then, after the step, the system at [S n] with the facts about the
-      step and later credits for the continuation. The modalities are those of the
-      step-indexed readings (trace_step_indexed.v): the check is the first fancy update with the later,
-      the step the second with the credits. *)
+  (** The one-step property of [Sys]: from a consistent system at [n], the bundle for [n]
+      (the check), then after the step the system at [S n], the facts about the step and
+      later credits. The modalities are those of [ti_always] and [ti_until]. *)
   Definition sys_step_pre (tg : tgT) (Sys : sysT) : iProp Σ :=
     □ ∀ (c : nat) h n σ Θ κs g v Ω W τf γ,
       ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
@@ -219,7 +183,6 @@ Section guarantee.
       tps_ti G (n, τf)) ⊢ tguar G n.
   Proof. apply tguar_ti_intro. Qed.
 
-  (** Eliminating a record: against the bundle of its position and the system after the step. *)
   Lemma tguar_elim G (Sys : sysT) l h n g v Ω W τf γ σ Θ κs :
     tguar G n -∗
     sys_step Sys -∗
@@ -229,19 +192,18 @@ Section guarantee.
     tps_ti G (n, τf).
   Proof. apply tguar_ti_elim. Qed.
 
-  (** Producing a record from a guarantee and the content at the current position. *)
   Lemma temporal_elim P G h n σ Θ κs m i Ω W :
     temporal P G -∗
     history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ P -∗ tguar G n.
   Proof. iIntros "#HG H". by iApply "HG". Qed.
 
-  (** The same from a later-guarded content: a later-guarded record (the certificates). *)
+  (** For the certificates: a later-guarded content gives a later-guarded record. *)
   Lemma temporal_elim_later P G h n σ Θ κs m i Ω W :
     temporal P G -∗
     ▷ P ∗ history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) -∗ ▷ tguar G n.
   Proof. iIntros "#HG (HP& HI& MI)". iNext. iApply ("HG" with "[$HI $MI $HP]"). Qed.
 
-  (** The same from a later-guarded guarantee, as stored with a registered structure. *)
+  (** The same with a later-guarded guarantee, as stored with a registered structure. *)
   Lemma temporal_elim_later_guar P G h n σ Θ κs m i Ω W :
     ▷ temporal P G -∗
     ▷ P ∗ history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) -∗ ▷ tguar G n.
@@ -266,8 +228,7 @@ End guarantee.
 Notation "P ⊨ₜ G" := (temporal P%I G%S) (at level 70, format "P  ⊨ₜ  G") : bi_scope.
 
 (** The canonical trace property of an iProp: the meet of all trace properties that it
-    validly guarantees. Every iProp guarantees it ([temporal_sem]), and it implies each of
-    them ([tps_sem_le]). The registered structures store it for their contents, so temporal
+    validly guarantees. The registered structures store it for their contents, so temporal
     formulas carry no trace-property annotations. *)
 Definition tps_sem `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (Q : iProp Σ) : tps Λ Σ :=
   tps_forall (λ G : {G : tps Λ Σ | ⊢ Q ⊨ₜ G}, proj1_sig G).
@@ -410,9 +371,8 @@ Section rules.
     iIntros "#HG !>" (?????????) "(HI& MI& #HP)". iApply (temporal_elim with "HG"). iFrame "HI MI HP".
   Qed.
 
-  (** A persistent token excluding a branch of a disjunction: the guarantee of the other
-      branch is a guarantee of the whole. With [alwaysI_register_guar], this exports a
-      stronger reading of an invariant once the token is at hand. *)
+  (** A persistent token [C] excluding [A]: a guarantee of [B] is one of [A ∨ B]. With
+      [alwaysI_register_guar], this gives a stronger reading of an invariant. *)
   Lemma temporal_or_excl (A B C : iProp Σ) G `{!Persistent C} :
     (C ∗ A ⊢ False) → C -∗ B ⊨ₜ G -∗ (A ∨ B) ⊨ₜ G.
   Proof.
@@ -446,7 +406,7 @@ Section impl_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   (** A guarantee extends to an implication whose complete antecedent, together with it,
-      entails the consequent. With a pure antecedent this is [temporal_impl] weakened. *)
+      entails the consequent. *)
   Lemma temporal_impl_intro P A H G `{!TpsComplete A} :
     tps_le (tps_and A H) G → P ⊨ₜ H ⊢ P ⊨ₜ tps_impl A G.
   Proof. intros HG. by apply temporal_weaken, tps_impl_intro. Qed.

@@ -5,10 +5,9 @@ From lantana.base_logic Require Import satisfiable.
 
 (** * Adequacy of [lWP] for Iris-style safety
 
-    A program verified with [lWP] (at [NotStuck]) is safe on every fair run: no thread gets
-    stuck and the thread [j] satisfies its postcondition once it terminates ([safety_iris]).
-    The proof reads the always of the step-indexed reading off the run directly, without
-    temporal guarantees. *)
+    On every fair run of a program verified with [lWP] at [NotStuck], no thread gets stuck
+    and thread [j] satisfies its postcondition once it terminates ([safety_iris]). The proof
+    reads [ti_always] off the run directly, without guarantees. *)
 
 Local Definition safety_iris_tiProp `{!temporalGS Λ Σ} i Φ : tiProp Λ Σ :=
   ti_always (ti_pure True) (λ τ, (⌜ (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R τ ⌝)%I).

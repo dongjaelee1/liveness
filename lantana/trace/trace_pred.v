@@ -4,9 +4,8 @@ From lantana.algebra Require Import axioms.
 
 (** * Trace predicates
 
-    Properties of executions ([trProp]), with the LTL connectives, their fixpoints, fair
-    scheduling and Iris-style safety. The program logic's trace properties ([tps],
-    trace_prop.v) have these as their trace readings. *)
+    Properties of executions ([trProp]): the LTL connectives, their fixpoints, fair
+    scheduling and Iris-style safety. *)
 
 (** ** Predicates on a trace state and on a trace *)
 Definition tsProp (Λ : language) := trace_state Λ → Prop.
@@ -52,7 +51,6 @@ Proof.
   intros. unfold ts_emb. destruct τ as (n& τf). simpl. eauto.
 Qed.
 
-(** Unfolds the trace connectives. *)
 Ltac unfold_trProp :=
   unfold tr_until, tr_always, tr_exist, tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_atomic.
 
@@ -202,7 +200,7 @@ Section fair_sched_cnt.
   Definition beh_fscnt (τ : trace Λ) (γ : fscnt) : Prop :=
     ∀ (i : thread_id), beh_fscnt_th τ i (γ i).
 
-  (** We use choice here. *)
+  (** Uses choice. *)
   Lemma fair_scheduling_fscnt (τ : trace Λ) :
     fair_scheduling τ → ∃ (γ : fscnt), beh_fscnt τ γ.
   Proof.
@@ -277,7 +275,7 @@ Section fair_sched_cnt.
   Definition fscnt_next_rel (τ : trace Λ) (γ1 γ2 : fscnt) : Prop :=
     ∀ i, fscnt_next_rel_th τ i (γ1 i) (γ2 i).
 
-  (** We again use choice here. *)
+  (** Uses choice. *)
   Lemma exists_fscnt_next (τ : trace Λ) (γ : fscnt) :
     beh_fscnt τ γ →
     ∃ γ', beh_fscnt (trace_next τ) γ' ∧ fscnt_next_rel τ γ γ'.

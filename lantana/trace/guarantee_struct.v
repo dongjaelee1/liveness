@@ -4,10 +4,10 @@ From iris.prelude Require Import options.
 From lantana.trace Require Export guarantee.
 From transfinite.stepindex Require Import ordinals.
 
-(** * The registry state and the registered structures, with their rules
+(** * The registry state and the registered structures [alwaysI], [untilI], with their rules
 
-    From here on, the interpretation of the temporal layer ([TemporalInterp],
-    temporal_class.v) is the registry state ([treg_temporal_interp]). *)
+    Here the interpretation of the temporal layer becomes the registry state
+    ([treg_temporal_interp]). *)
 
 (** Once discharged, the obligation invariant of an until keeps the record of its right
     formula at the discharge event. *)
@@ -16,10 +16,8 @@ Notation until_disch k G2 :=
 
 (** ** The registry and the registered structures
 
-    The registry state holds, for every registered item, its handle: the saved
-    step-indexed readings of its contents and its invariant, which a run opens at every
-    position to certify the content. The state is the interpretation of the temporal layer
-    ([TemporalInterp]), threaded by the program logic with the history interpretation. *)
+    The handle of a registered item: the saved readings of its contents and its invariant,
+    which a run opens at every position to certify the content. *)
 Definition treg_handle `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (e : rentry) : iProp Σ :=
   match e with
   | RMark => True
@@ -34,15 +32,11 @@ Global Instance treg_temporal_interp `{!temporalGS Λ Σ} `{!state_interp_class 
 Lemma temporal_interp_treg `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : temporal_interp = treg_state.
 Proof. done. Qed.
 
-(** An invariant whose content is trace-visible through a guarantee [G] of its content [P]:
-    the invariant, registered with the reading [G] and a (later-guarded) proof that the
-    content guarantees [G], and the record of [G] at its registration position. The proof
-    may be an iProp hypothesis available at registration: one that depends on a token
-    ([alwaysI_register]), or a closed one about a recursively defined structure
-    (guarantee_rec.v). The common cases: [alwaysI N P] reads as the canonical trace
-    property of [P]; [alwaysI_as N P V], the invariant [P] seen as a consequence [V] of its
-    content (from [□ (P -∗ V)]), reads as that of [V]. Sealed: the proof mode must not unify
-    two structures through their bodies. *)
+(** An invariant [P] made trace-visible through a guarantee [G] of its content: registered
+    with [G] and a later-guarded proof of [P ⊨ₜ G] (which may be a hypothesis at
+    registration), and the record of [G] at its registration. [alwaysI N P] reads as
+    [tps_sem P], [alwaysI_as N P V] as [tps_sem V]. Sealed: the proof mode must not unify two
+    structures through their bodies. *)
 Local Definition alwaysI_guar_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (N : namespace) (P : iProp Σ) (G : tps Λ Σ) : iProp Σ :=
   ∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hG_event r st ∗
@@ -63,11 +57,9 @@ Definition alwaysI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namesp
 (* Opaque for the proof mode: [iNext] must not unfold a structure to strip its inner later. *)
 Global Typeclasses Opaque alwaysI_as alwaysI.
 
-(** The persistent part of an until with readings [G1], [G2] of its left and right formulas
-    [P], [Q]: its obligation invariant, registered with the readings and (later-guarded)
-    proofs that the formulas guarantee them, and the record of [G1] at its allocation
-    position, where its obligation was assigned. Once the obligation is discharged, the
-    invariant keeps the record of [G2] at the discharge. *)
+(** The persistent part of [P] until [Q], read as [G1] until [G2]: its registered obligation
+    invariant, later-guarded proofs of [P ⊨ₜ G1] and [Q ⊨ₜ G2], and the record of [G1] at
+    its allocation. *)
 Definition untilI_guar_pers `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (N : namespace) (k : positive) (P Q : iProp Σ) (G1 G2 : tps Λ Σ) : iProp Σ :=
   ∃ j r γP γQ st v Ω fu o,
@@ -82,10 +74,8 @@ Definition untilI_pers `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   untilI_guar_pers N k P Q (tps_sem P) (tps_sem Q).
 Global Typeclasses Opaque untilI_pers.
 
-(** [P] until [Q] using namespace [N] and obligation [k], read as [G1] until [G2]: the token
-    of the assigned obligation with the persistent part. As for [alwaysI_guar], the proofs
-    that the formulas guarantee their readings may be iProp hypotheses at allocation, e.g.
-    closed proofs about a recursively defined structure (guarantee_rec.v, [renew]). *)
+(** [P] until [Q] with namespace [N] and obligation [k], read as [G1] until [G2]: the token
+    of the assigned obligation and the persistent part. *)
 Local Definition untilI_guar_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   N k (q : Qp) (P Q : iProp Σ) (G1 G2 : tps Λ Σ) : iProp Σ :=
   oblP_assigned k (q/2)%Qp ∗ untilI_guar_pers N k P Q G1 G2.
@@ -121,8 +111,8 @@ Definition finallyI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (q : Q
 
 (** ** Reading the model under a model update
 
-    Allocation of a registered structure reads the history and the model (to produce the
-    record of the content at the current position) and updates the registry state. *)
+    Allocation reads the history and the model, to record the content at the current
+    position, and updates the registry state. *)
 Section mupd_read.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
@@ -139,8 +129,7 @@ Section mupd_read.
     iModIntro. iFrame. iSplit; first done. by iApply mupd_intro.
   Qed.
 
-  (** The same at the level of [sfmupd], with the history and the registry: fancy updates
-      may happen before and after reading the model. *)
+  (** The same for [sfmupd], with fancy updates before and after reading the model. *)
   Lemma sfmupd_read_fupd E (P : iProp Σ) :
     (∀ h n σ Θ κs,
       history_interp h n σ Θ κs -∗ treg_state -∗ |={E,∅}=> ∀ g i Ω W,
@@ -179,9 +168,7 @@ Section always_rules.
   Global Instance treg_handle_persistent e : Persistent (treg_handle e).
   Proof. destruct e; apply _. Qed.
 
-  (** The structure is contractive in its content, which occurs only in the invariant and
-      in the stored guarantee: structures can be defined by guarded recursion
-      (guarantee_rec.v). *)
+  (** Contractive in the content: structures can be defined by guarded recursion. *)
   Global Instance alwaysI_guar_contractive N G : Contractive (λ P, alwaysI_guar N P G).
   Proof. rewrite alwaysI_guar_unseal /alwaysI_guar_def. solve_contractive. Qed.
 
@@ -233,9 +220,7 @@ Section always_rules.
     iIntros (?) "#Hinv _". by iApply alwaysI_acc.
   Qed.
 
-  (** Registering an existing invariant with a guarantee of its content (an iProp
-      hypothesis, later-guarded): a model update that records the content at the current
-      position. *)
+  (** Registering an existing invariant, with a later-guarded guarantee of its content. *)
   Lemma alwaysI_register_guar E N P G :
     ↑N ⊆ E →
     inv N P -∗ ▷ (P ⊨ₜ G) -∗ |={E}=>m alwaysI_guar N P G.
@@ -262,7 +247,6 @@ Section always_rules.
     iNext. iApply (temporal_mono with "HPV"). iApply temporal_sem.
   Qed.
 
-  (** Allocation registers the invariant and records its content at the current position. *)
   Lemma alwaysI_alloc_guar E N P G :
     ▷ (P ⊨ₜ G) -∗ ▷ P -∗ |={E}=>m alwaysI_guar N P G.
   Proof.
@@ -299,9 +283,8 @@ Section until_rules.
   Local Instance oblP_inv_contractive_l n N k :
     Proper (dist_later n ==> (=) ==> dist n) (oblP_inv (Σ:=Σ) N k).
   Proof. intros P P' HP R ? <-. by apply oblP_inv_contractive_1. Qed.
-  (** The structure is contractive in its formulas, which occur only in the invariant and in
-      the stored guarantees: structures can be defined by guarded recursion through either
-      side (guarantee_rec.v). *)
+  (** Contractive in both formulas: structures can be defined by guarded recursion through
+      either side. *)
   Global Instance untilI_guar_contractive_l N k q Q G1 G2 :
     Contractive (λ P, untilI_guar N k q P Q G1 G2).
   Proof. rewrite untilI_guar_unseal /untilI_guar_def /untilI_guar_pers. solve_contractive. Qed.
@@ -361,9 +344,8 @@ Section until_rules.
   Global Instance untilI_as_fractional N k q P Q : AsFractional (untilI N k q P Q) (λ q, untilI N k q P Q) q.
   Proof. split; [auto|apply _]. Qed.
 
-  (** Update rules. Allocation of the until registers it (a model update, reading the model)
-      with the readings of its formulas and later-guarded proofs that the formulas guarantee
-      them; the record of the left formula at the current position is produced from it. *)
+  (** Update rules. Allocation registers the until, with later-guarded guarantees of its
+      formulas, and records the left formula at the current position. *)
   Lemma untilI_guar_alloc E p K ℓ μ :
     parP_le p ℓ -∗ parP_kids p K -∗
     |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
@@ -402,8 +384,8 @@ Section until_rules.
     iApply ("ACC" with "[] [] HP"); iNext; iApply temporal_sem.
   Qed.
 
-  (** An already discharged obligation invariant, with the record of a guarantee [G] of [Q]
-      at the current position (no until is created, so nothing is registered). *)
+  (** An already discharged obligation invariant, with the record of [G] at the current
+      position; nothing is registered. *)
   Lemma untilI_discharged_alloc_guar E ℓ μ (Q : iProp Σ) G :
     Q ⊨ₜ G -∗ Q -∗
     |={E}=>m Q ∗ ∃ k, oblP_discharged k ∗
@@ -455,9 +437,8 @@ Section until_rules.
                         oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof. iIntros "HQ". iApply (untilI_discharged_alloc_guar with "[] HQ"). iApply temporal_sem. Qed.
 
-  (** Discharge: [P] is taken out of the until; once [Q] holds, the obligation [k] (a
-      childless child of [p]) is discharged, and the record of [G2] at the discharge position
-      (from [Q] and its stored guarantee) is left in the invariant. *)
+  (** Discharge: [P] is taken out; once [Q] holds, [k] (a childless child of [p]) is
+      discharged and the record of [G2] at the discharge is left in the invariant. *)
   Lemma untilI_guar_discharge E N k (P Q : iProp Σ) G1 G2 :
     ↑N ⊆ E →
     untilI_guar N k 1 P Q G1 G2 ={E,E ∖ ↑N}=∗
@@ -520,8 +501,7 @@ Section until_rules.
     ▷ (P ∗ (▷ P ={E ∖ ↑N,E}=∗ untilI N k q P Q)).
   Proof. rewrite untilI_guar_canonical. apply untilI_guar_acc. Qed.
 
-  (** Discharge with the right formula at hand, using a later credit (the left formula is
-      dropped). *)
+  (** Discharge with the right formula at hand, using a later credit. *)
   Lemma untilI_guar_discharge_lc E N k p K P Q G1 G2 :
     ↑N ⊆ E → k ∈ K →
     £ (2 : Ord.t) -∗ parP_kids p K -∗ oblP_kids k ∅ -∗ untilI_guar N k 1 P Q G1 G2 -∗ Q -∗

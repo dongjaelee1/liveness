@@ -4,34 +4,24 @@ From iris.prelude Require Import options.
 From lantana.trace Require Export guarantee_run.
 From transfinite.stepindex Require Import ordinals.
 
-(** * Inferring guarantees; examples
-
-    From [IntoTemporal] on, [temporal] and the connectives of trace properties are opaque
-    for the proof mode. *)
+(** * Inferring guarantees ([IntoTemporal]); examples *)
 
 (** ** Inferring guarantees
 
-    Every iProp guarantees its canonical trace property [tps_sem], but that mentions the
-    ghost-state instances; an adequacy needs one that does not. [IntoTemporal P G] computes
-    such a [G] from the shape of [P]; any iProp at all guarantees [tps_true], which is the
-    fallback for leaves without an instance. Formulas contain no inferred trace properties
-    (the registered structures store [tps_sem]), so the search runs only when a guarantee is
-    wanted, in one of two modes:
-    - inference ([G] unknown: [tsem P], [tps_of P]), deterministic. For an existential the
-      strongest guarantee of the body is inferred; if it does not depend on the witness the
-      quantifier is a ghost one, otherwise it is trace-visible (types with the existential
-      property) or the existential is dropped ([tps_true]);
-    - checking against a given [G] ([into_temporal P G]), where an existential is
-      trace-visible exactly when [G] is a [tps_exist] over the same type. *)
+    [tps_sem P] mentions the ghost-state instances; an adequacy needs a trace property that
+    does not. [IntoTemporal P G] computes one from the shape of [P], with fallback [tps_true].
+    Two modes:
+    - inference ([G] unknown: [tsem P], [tps_of P]): an existential is ghost if the guarantee
+      of its body does not depend on the witness, else trace-visible (small types) or dropped;
+    - checking against a given [G]: an existential is trace-visible exactly when [G] is a
+      [tps_exist] over the same type. *)
 Class IntoTemporal `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (P : iProp Σ) (G : tps Λ Σ) :=
   into_temporal : ⊢ P ⊨ₜ G.
 Global Arguments into_temporal {_ _ _ _} _ _ {_}.
 Global Hint Mode IntoTemporal - - - - ! - : typeclass_instances.
-(* The search compares guarantees by their formula and trace property: unfolding [temporal]
-   when an instance does not match makes the failure very slow. *)
+(* Opaque: unfolding [temporal] when an instance does not match makes the search very slow. *)
 Global Typeclasses Opaque temporal.
-(* Likewise for the connectives, which are records ([tps_true] and [tps_finally] stay
-   abbreviations). User definitions of trace properties are still unfolded. *)
+(* Likewise for the connectives, which are records. *)
 Global Typeclasses Opaque tps_pure tps_atomic tps_and tps_or tps_impl tps_forall tps_exist
   tps_always tps_until tps_state.
 
@@ -221,18 +211,16 @@ Section examples.
     iApply temporal_certified.
   Qed.
 
-  (** A temporal antecedent used inside the logic: assuming that the run eventually reaches
-      [π], the in-logic reading of that eventuality (with its measure) is available by
-      completeness, here to strengthen a guarantee. *)
+  (** A temporal antecedent used in the logic: by completeness, the in-logic reading of
+      "eventually [π]" strengthens a guarantee. *)
   Local Lemma ex_impl_temporal P π G :
     P ⊨ₜ G ⊢ P ⊨ₜ tps_impl (tps_finally (tps_atomic π)) (tps_and (tps_finally (tps_atomic π)) G).
   Proof.
     apply (temporal_impl_intro _ _ _ _ (tps_le_refl _)).
   Qed.
 
-  (** The rule one might hope for, an iProp implication guaranteeing the implication of the
-      guarantees, is unsound: it guarantees a trace property that no trace has. (The
-      antecedent's resources are not determined by the trace.) *)
+  (** Unsound: an iProp implication guaranteeing the implication of the guarantees (the
+      antecedent's resources are not determined by the trace). *)
   Local Lemma naive_impl_rule_unsound :
     (∀ (P1 P2 : iProp Σ) G1 G2, (⊢ P1 ⊨ₜ G1) → (⊢ P2 ⊨ₜ G2) → ⊢ (P1 → P2) ⊨ₜ tps_impl G1 G2) →
     ⊢ True ⊨ₜ tps_impl tps_true (tps_pure False).

@@ -1,12 +1,8 @@
 (** * The obligation-forest interface
 
-    [oblf.obl_forest_interface] gives the obligation predicates and rules of a logic in which
-    the live obligations form a forest: a parent is a thread or an obligation, and every live
-    obligation is a child of exactly one parent ([parP_kids p K]).
-    The rules are model updates [|={E}=>m] (sfmupd.v) and the step modalities of
-    [model_physical_updates.v]. Derived rules follow the class. The instance is
-    [obl_forest_lantana] (obl_forest_instance.v); obl_forest_derived.v re-derives the
-    obligation-related lifting lemmas of [lWP] from the class. *)
+    [oblf.obl_forest_interface]: obligation predicates and rules in which every live obligation
+    is a child of one parent, a thread or an obligation ([parP_kids p K]), and derived rules.
+    Its instance is in obl_forest_instance.v. *)
 
 From iris.proofmode Require Import base proofmode classes.
 From iris.bi.lib Require Import fractional.
@@ -20,36 +16,20 @@ Module oblf.
 
 (** * The class
 
-    The model behind the rules is the forest invariant of [oforest.v] (part of
-    [model_interp]). The obligation model [Ω] and the witnesses [W] are those of
-    Lantana; the forest is a parent map in a ghost invariant. The owner of an obligation in
-    [Ω] is the thread at the root of its tree. Every obligation [d] whose parent is an
-    obligation [c] has a fuel piece [π d] stored in the invariant with [π d > fuel c] (the
-    model fuel of [c]), and [fuel c < fuel d]. Hence fuel strictly increases downwards and
-    the parent map has no cycles. A children predicate [parP_kids p K] holds a share of the
-    assignment of each obligation of [K] (and of [p] for an obligation), so it excludes
-    their discharge without the invariant.
-    - Step of thread [i]: the unit burnt for each child of [i] makes its fuel decrease; every
-      other obligation [d] owned by [i] splits its piece into [fuel c] and a unit, which [d]
-      burns. After the step [fuel' c < fuel c], so [fuel c] is the new piece of [d]. Every
-      obligation owned by [i] makes progress.
-    - [obl_move] of [k] to [q]: [fuel q] is bounded by the witness layer of [q], so the
-      [▽]-part of the unit (at a higher layer) dominates it and becomes the new [π k]. If [q]
-      has the owner of [k], nothing else changes. Otherwise the other part of the unit makes
-      the fuel of [k] decrease, which pays the owner change of [k], and by the same cascade as
-      in a step the whole subtree of [k] changes owner in the same round.
-    - [obl_discharge]: [k] has no children; its piece [π k] is dropped. *)
+    In the model ([oforest.v]), an obligation owned by thread [i] is in the tree of [i], and
+    below an obligation [c] a child stores a piece of fuel above the fuel of [c]. A step of [i]
+    burns a unit of each child of [i]; deeper obligations of [i] burn a unit split off their
+    piece. A move pays a unit at a layer that dominates the new parent; if the owner changes,
+    the subtree changes owner in the same round. *)
 Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   `{!ord_mono_fun_class} `{!TemporalInterp Λ Σ} := {
   (** ** Predicates *)
   (** The children of parent [p] are [K]. For a thread, the thread is also running; for an
       obligation, it exists exactly while the obligation is live and in the forest. *)
   parP_kids : parent → oids → iProp Σ;
-  (** Thread [i] has terminated. *)
   thP_done : positive → iProp Σ;
   (** Obligation [k] is live; [q] is a fraction. *)
   oblP_assigned : oid → Qp → iProp Σ;
-  (** Obligation [k] is discharged. *)
   oblP_discharged : oid → iProp Σ;
   (** Fuel [μ] of obligation [k] at layer [ℓ]. *)
   oblP_fuel : oid → layer → measure → iProp Σ;
@@ -83,12 +63,10 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
   (** ** Logical rules *)
   oblP_assigned_discharged_false k q :
     oblP_assigned k q -∗ oblP_discharged k -∗ False;
-  (** Only live obligations have a children predicate (a discharged obligation has no
-      children) ... *)
+  (** A discharged obligation has no children predicate ... *)
   oblP_kids_discharged_false k K :
     parP_kids (PObl k) K -∗ oblP_discharged k -∗ False;
-  (** ... and only live obligations are children (a discharged obligation is not in the
-      forest). *)
+  (** ... and is nobody's child. *)
   parP_kids_discharged k p K :
     parP_kids p K -∗ oblP_discharged k -∗ ⌜ k ∉ K ⌝;
 
@@ -141,9 +119,8 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
   (** ** Model updates that keep every obligation live *)
   thread_terminate E i :
     parP_kids (PThread i) ∅ -∗ |={E}=>m thP_done i;
-  (** A new live obligation [k] below [p], without children, at layer [ℓ]. Below an
-      obligation [q], [ℓ] is at least a witness layer of [q]: unlike a move, a new obligation
-      may sit at its parent's own layer. *)
+  (** A new obligation [k] below [p], at layer [ℓ]. Below an obligation [q], [ℓ] is at least
+      a witness layer of [q] (a move needs a strictly larger layer). *)
   obl_new E p K ℓ μ :
     parent_le witP_layer p ℓ -∗
     parP_kids p K -∗
@@ -152,9 +129,8 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
   (** A discharged obligation (outside the forest). *)
   obl_new_discharged E ℓ :
     ⊢ |={E}=>m ∃ k, oblP_discharged k ∗ witP_layer k ℓ;
-  (** [k] moves, with its whole subtree, from parent [p1] to parent [p2], burning one unit
-      of its fuel at a layer [ℓ] large enough for [p2]: any layer below a thread, a layer above
-      a witness layer of [q] below an obligation [q]. *)
+  (** [k] moves with its subtree from [p1] to [p2], burning a unit at a layer [ℓ]: any layer
+      below a thread, a layer above a witness layer of [q] below an obligation [q]. *)
   obl_move E p1 p2 K1 K2 k ℓ :
     k ∈ K1 →
     parent_below witP_layer p2 ℓ -∗
@@ -170,8 +146,7 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
     witP_layer r ℓ -∗ |={E}=>m (witP_cred r Ord.O ∨ oblP_discharged r);
 
   (** ** Discharge *)
-  (** A childless obligation [k] below [p] is discharged and leaves the forest (its children
-      must have moved to another parent before). *)
+  (** A childless obligation [k] below [p] is discharged and leaves the forest. *)
   obl_discharge E p K k :
     k ∈ K →
     parP_kids p K -∗ parP_kids (PObl k) ∅ -∗ oblP_assigned k 1 -∗
@@ -201,7 +176,6 @@ Notation thP_kids i K := (parP_kids (PThread i) K).
 Notation oblP_kids k K := (parP_kids (PObl k) K).
 Notation parP_below p ℓ := (parent_below witP_layer p ℓ).
 Notation parP_le p ℓ := (parent_le witP_layer p ℓ).
-(** Burning one unit of fuel of each obligation of a set. *)
 Notation oblP_fuels K n := ([∗ set] k ∈ K, ∃ ℓ, oblP_fuel k ℓ n)%I.
 (** One witness credit: a step gives one to each live witness ([step_progress]), and each
     round of the witness induction consumes one ([wit_fuels_decr]). *)
@@ -770,7 +744,6 @@ Section fuel.
     rewrite Hessenberg.add_comm (ord_S_add a0). reflexivity.
   Qed.
 
-  (** Useful pattern for burning fuels when taking a step *)
   Lemma oblP_fuel_add_nat m1 m2 n k ℓ :
     (n = m1 + m2)%nat →
     oblP_fuel k ℓ n ⊣⊢ (oblP_fuel k ℓ m1 ∗ oblP_fuel k ℓ m2)%I.

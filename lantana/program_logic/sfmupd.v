@@ -1,6 +1,6 @@
-(** The model update of the program logic, [|={E1,E2}=>m P] ([sfmupd]): a fancy model update
-    that keeps the history interpretation ([history_tinterp]). Its proof-mode instances, and
-    the obligation rules of [opreds.v] stated as such updates. *)
+(** The model update [|={E1,E2}=>m P] ([sfmupd]): a fancy model update that keeps the history
+    interpretation. Its proof-mode instances, and the obligation rules of [opreds.v] as such
+    updates. *)
 
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
@@ -55,7 +55,6 @@ Section sfmupd.
     iIntros "H". unfold_sfmupd. iIntros (?????) "SI". by iMod ("H" with "SI") as "[$ >$]".
   Qed.
 
-  (** Change to a larger mask. *)
   Lemma sfmupd_mask_mono E1 E2 P :
     E1 ⊆ E2 →
     (|={E1}=>m P) ⊢ |={E2}=>m P.
@@ -65,7 +64,6 @@ Section sfmupd.
     iMod ("H" with "SI") as "H". by iMod "close".
   Qed.
 
-  (** We can combine two obligation updates into one. *)
   Lemma sfmupd_bind E1 E2 E3 P Q :
     (P -∗ |={E2,E3}=>m Q) ⊢ (|={E1,E2}=>m P) -∗ (|={E1,E3}=>m Q).
   Proof.
@@ -277,17 +275,13 @@ Section sfmupd.
     iApply (lantana.base_logic.fancy_updates.lc_fupd_add_laterN with "LC"). iNext. auto.
   Qed.
 
-  (** ** Obligation rules
-
-      The obligation rules of [opreds.v] as model updates with the program state. A parent is
-      a thread ([thP_kids i K]) or an obligation ([oblP_kids k K]). *)
+  (** ** Obligation rules (described with the interface, obl_forest.v) *)
   Lemma thread_terminate E i :
     thP_kids i ∅ -∗ |={E}=>m thP_done i.
   Proof.
     unfold_sfmupd. iIntros "T %%%%% $". iMod (thread_terminate_mupd with "T") as "$". auto.
   Qed.
 
-  (** A new live obligation [k] below [p], without children, at layer [ℓ]. *)
   Lemma obl_new E p K ℓ μ :
     parP_le p ℓ -∗
     parP_kids p K -∗
@@ -298,15 +292,12 @@ Section sfmupd.
     iMod (obl_new_mupd with "B Kp") as "$". auto.
   Qed.
 
-  (** A discharged obligation (outside the forest). *)
   Lemma obl_new_discharged E ℓ :
     ⊢ |={E}=>m ∃ k, oblP_discharged k ∗ witP_layer k ℓ.
   Proof.
     unfold_sfmupd. iIntros "%%%%% $". iMod obl_new_discharged_mupd as "$". auto.
   Qed.
 
-  (** [k] moves, with its whole subtree, from [p1] to [p2], burning one unit of its fuel at a
-      layer [ℓ] large enough for [p2]. *)
   Lemma obl_move E p1 p2 K1 K2 k ℓ :
     k ∈ K1 →
     parP_below p2 ℓ -∗
@@ -317,7 +308,6 @@ Section sfmupd.
     iMod (obl_move_mupd with "B K1 K2 F") as "$"; auto.
   Qed.
 
-  (** [x], a child of [k], moves with its subtree up to the parent [p] of [k], for free. *)
   Lemma obl_move_up E p K k Kk x :
     k ∈ K → x ∈ Kk →
     parP_kids p K -∗ oblP_kids k Kk -∗
@@ -342,7 +332,6 @@ Section sfmupd.
     rewrite big_sepS_singleton. by iModIntro.
   Qed.
 
-  (** A childless obligation [k] below [p] is discharged and leaves the forest. *)
   Lemma obl_discharge_leaf E p K k :
     k ∈ K →
     parP_kids p K -∗ oblP_kids k ∅ -∗ oblP_assigned k 1 -∗
@@ -374,7 +363,6 @@ Section sfmupd.
     (ℓq < ℓ)%ordi → witP_layer q ℓq -∗ parP_below (PObl q) ℓ.
   Proof. iIntros (Hl) "W". iExists ℓq. by iFrame. Qed.
 
-  (** Moving a set [X] of children of [p1] to [p2], one unit each, each at its own layer. *)
   Lemma obl_move_set_gen E p1 p2 K1 K2 X :
     X ⊆ K1 →
     parP_kids p1 K1 -∗ parP_kids p2 K2 -∗
@@ -391,8 +379,6 @@ Section sfmupd.
     iModIntro. iFrame. iPureIntro. set_solver.
   Qed.
 
-  (** Moving a set [X] of children of [p1] below the thread [j]: one unit each, at any
-      layer. *)
   Lemma obl_move_thread_set E p1 j K1 K2 X :
     X ⊆ K1 →
     parP_kids p1 K1 -∗ thP_kids j K2 -∗ ([∗ set] k ∈ X, ∃ ℓ, oblP_fuel k ℓ 1) -∗
@@ -403,8 +389,6 @@ Section sfmupd.
     iApply parP_below_thread.
   Qed.
 
-  (** Moving a set [X] of children of [p1] below the obligation [q]: one unit each, each at
-      a layer above the witness layer [ℓq] of [q]. *)
   Lemma obl_move_obl_set E p1 q K1 K2 X ℓq :
     X ⊆ K1 →
     witP_layer q ℓq -∗ parP_kids p1 K1 -∗ oblP_kids q K2 -∗
@@ -416,7 +400,6 @@ Section sfmupd.
     by iApply (parP_below_obl q ℓq ℓ Hl).
   Qed.
 
-  (** Moving a set [X] of children of [k] up to the parent [p] of [k], for free. *)
   Lemma obl_move_up_set E p K k Kk X :
     k ∈ K → X ⊆ Kk →
     parP_kids p K -∗ oblP_kids k Kk -∗
@@ -431,7 +414,6 @@ Section sfmupd.
     iModIntro. iFrame. iPureIntro. set_solver.
   Qed.
 
-  (** Discharging [k] after moving its children up to its parent [p] (for free). *)
   Lemma obl_discharge_lift_kids E p K k Kk :
     k ∈ K →
     parP_kids p K -∗ oblP_kids k Kk -∗ oblP_assigned k 1 -∗
@@ -465,8 +447,6 @@ Section sfmupd.
     iIntros (E' N P R) "H". iApply (oblP_inv_alloc_discharged with "D H").
   Qed.
 
-  (** Discharging [k] with the invariant [oblP_inv N k P R]: [P] is taken out, and once [R] is
-      established [k], a childless child of [p], is discharged. *)
   Lemma obl_discharge_inv E N k P R :
     ↑N ⊆ E →
     oblP_inv N k P R -∗

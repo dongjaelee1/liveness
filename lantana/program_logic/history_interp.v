@@ -7,7 +7,6 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From lantana.program_logic Require Export language.
 
-(** The ghost state for history. *)
 Module histGS.
 
   Class histGpreS `{SI : sidx} (Σ : gFunctors) (St : Type) : Set :=
@@ -32,8 +31,7 @@ End histGS.
 Import histGS.
 
 (** User interface *)
-(* Make the instances local to this file. We cannot use #[local] in the code *)
-(* above, as that would make the instances local to the module. *)
+(* Local to this file, as in osat.v. *)
 Local Existing Instances hist_inG histGpreS_hist.
 
 Local Definition hG_history_auth_def `{SI : sidx} `{@histGS SI Σ St}
@@ -99,12 +97,10 @@ Section history_ghost.
 
 End history_ghost.
 
-(** State interpretation and predicates defined by the language,
-    with the thread ids to connect to the obligation model. *)
+(** The state interpretation and the state predicates of a language. *)
 Class state_interp_class `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
   { state_interp : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
-    (** Auxiliary data about the state.
-        For example, we might want to hold some of state_pred_interp inside the lwp. *)
+    (** Auxiliary data about the state, e.g. part of [state_pred_interp] kept in the lwp. *)
     state_interp_aux : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
     state_pred_interp : state_pred Λ → iProp Σ;
     state_interp_wf : (∀ σ Θ κs π,
@@ -203,8 +199,7 @@ Section hist.
 
 End hist.
 
-(* Allocation of a history interpretation;
-   state_interp_class is user given, and we want it to come later. *)
+(* The user gives the [state_interp_class] after the allocation. *)
 Lemma history_interp_init `{SI : sidx}
   `{HIST : !histGpreS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   σ Θ κs :

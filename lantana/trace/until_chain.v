@@ -114,8 +114,7 @@ Module uchainGS.
 End uchainGS.
 Import uchainGS.
 
-(* The instances are local to this file ([#[local]] in the module would make them local
-   to the module). *)
+(* Local to this file, as in osat.v. *)
 Local Existing Instances uchain_inG uchainGpreS_log.
 
 Local Definition uchain_auth_def `{SI : sidx} `{@uchainGS SI Σ}
@@ -139,8 +138,7 @@ Global Arguments uchain_pin {SI Σ _}.
 
 (** ** Chains
 
-    A chain of untils: [P] until [Q], or until the next link, whose ordinal is smaller.
-    Defined by well-founded recursion on the ordinal, so it is a plain iProp. *)
+    Defined by well-founded recursion on the ordinal, so a chain is a plain iProp. *)
 Fixpoint untilI_chain_rec `{!lantanaGS Λ Σ}
   (N : namespace) k (o : Ord.t) (P Q : iProp Σ) (ACC : Acc Ord.lt o) {struct ACC} : iProp Σ :=
   untilI N k (1/2) P
