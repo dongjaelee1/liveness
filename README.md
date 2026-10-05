@@ -203,4 +203,8 @@ an obligation of the same layer would be unsound (`nonstrict_move_absurd`);
 `ticket_lock2.v` / `ticket_lock2_client.v` give a starvation-free ticket lock
 (`fair_lock_starvation_free`, `ticket_lock_client_adequacy`); `cert_discharge.v` tests a
 discharge in the pre-step model update with nested temporal formulas
-(`cert_discharge_adequacy`).
+(`cert_discharge_adequacy`). `flag_stable.v` (with `flag_stable_client.v`,
+`handoff_flag_stable_client.v`, `task_queue_flag_stable_client.v`) is a flag whose set value
+lives in a nested `alwaysI`, so it stays set (`flag_tps_stays`); `ticket_lock_mono.v` exports
+that `next` never decreases, so a lock that cannot be deleted is starvation free
+(`alive_fair_lock_starvation_free`).
