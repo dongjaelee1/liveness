@@ -171,9 +171,9 @@ Definition until_chain_log `{!lantanaGS Λ Σ} `{!uchainGS Σ}
   (N : namespace) (P Q R : iProp Σ) : iProp Σ :=
   locked
     (∃ (l : list (oid * Ord.t)) k o,
-        ⌜ ∃ m, (o <= measure_rep (ord.O, 1) m)%ord ⌝ ∗
+        ⌜ ∃ m, (o <= measure_rep ord.O m)%ord ⌝ ∗
                (uchain_auth (1/2) (l ++ [(k, o)])) ∗
-               ([∗ list] ko ∈ l, (oblP_discharged ko.1) ∗ ⌜ ∃ m, (ko.2 <= measure_rep (ord.O, 1) m)%ord ⌝) ∗
+               ([∗ list] ko ∈ l, (oblP_discharged ko.1) ∗ ⌜ ∃ m, (ko.2 <= measure_rep ord.O m)%ord ⌝) ∗
                (untilI_chain N k o P Q ∨
                   ((uchain_auth (1/2) (l ++ [(k, o)]) ∗ oblP_discharged k) ∗ R))
     )%I.

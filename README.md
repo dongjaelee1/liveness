@@ -129,7 +129,7 @@ predicates.
 | `always I` | `alwaysI N I` (a registered invariant; variants `alwaysI_as`, `alwaysI_guar`); guarantee `temporal_always` | `trace/temporal_guarantee.v`, `base_logic/invariants.v` |
 | `£ α` (transfinite later credits) | later-credit predicate `£ α` and `tlc_*` lemmas | `base_logic/later_credits.v` |
 | `Measure` (with extension measure `∇`, §3.2) | inductive `measure`; `∇` is the constructor `ms_extend`; interpretation into ordinals via `measure_rep_rec` | `algebra/measure.v` |
-| layers `ℓ` (ordinals) | `layer_class` (instance `layer_layer_class`), over `ord.t` from the Ordinal library (we use two Ordinal libraries to sidestep universe inconsistency) | `algebra/measure.v`, `algebra/layer.v` |
+| layers `ℓ` (ordinals) | `layer`, a notation for `ord.t` from the Ordinal library (we use two Ordinal libraries to sidestep universe inconsistency); its order is the instance `layer_layer_class` of `layer_class` | `algebra/measure.v`, `algebra/layer.v` |
 
 ### Rules (Figs. 3–6, §5)
 

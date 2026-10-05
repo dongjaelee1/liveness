@@ -19,11 +19,11 @@ Section instance.
   (** ** Fuel and credits *)
   Lemma oblP_fuel_proper_lantana k ℓ1 ℓ2 μ1 μ2 :
     (ℓ1 == ℓ2)%ordi →
-    (measure_rep (ℓ1, 1) μ1 == measure_rep (ℓ2, 1) μ2)%ord →
+    (measure_rep ℓ1 μ1 == measure_rep ℓ2 μ2)%ord →
     oblP_fuel k ℓ1 μ1 ⊣⊢ oblP_fuel k ℓ2 μ2.
   Proof.
     intros Hℓ Hμ. rewrite (oblP_fuel_layer_eq k ℓ1 ℓ2 μ1 Hℓ) (oblP_fuel_eq k ℓ2 μ1 μ2); first done.
-    etrans; last exact Hμ. symmetry. apply measure_rep_layer_eq. split; auto.
+    etrans; last exact Hμ. symmetry. by apply measure_rep_layer_eq.
   Qed.
 
   Lemma oblP_fuel_extend_lantana k ℓ1 ℓ2 μ :
