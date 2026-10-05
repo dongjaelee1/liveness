@@ -327,22 +327,6 @@ Section sfmupd.
     iMod (obl_move_up_mupd with "Kp Kk") as "$"; auto.
   Qed.
 
-  (** Children only exist below live obligations, and discharged obligations are no
-      children. *)
-  Lemma oblP_kids_discharged_false E k K :
-    oblP_kids k K -∗ oblP_discharged k -∗ |={E}=>m False.
-  Proof.
-    unfold_sfmupd. iIntros "Kk D %%%%% _".
-    iMod (oblP_kids_discharged_false_mupd with "Kk D") as "[]".
-  Qed.
-
-  Lemma parP_kids_discharged E k p K :
-    parP_kids p K -∗ oblP_discharged k -∗ |={E}=>m ⌜ k ∉ K ⌝ ∗ parP_kids p K.
-  Proof.
-    unfold_sfmupd. iIntros "Kp D %%%%% $".
-    iMod (parP_kids_discharged_mupd with "Kp D") as "[$ $]"; auto.
-  Qed.
-
   Lemma obl_check_witnesses E (R : oids) :
     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
     |={E}=>m ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_discharged r).

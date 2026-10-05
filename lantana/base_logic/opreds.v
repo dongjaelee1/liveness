@@ -8,7 +8,12 @@
 
     The rules below are model updates [|=[n,Θ]=>m]; the non-discharging ones are proved
     through [mupd_nd_step]. An obligation invariant [oblP_inv N k P R] holds [P] while [k] is
-    live and [R] once it is discharged. *)
+    live and [R] once it is discharged.
+
+    The assignment of a live obligation [k] is split four ways: a quarter in [osat], a half
+    for the user ([oblP_assigned k 1]), and an eighth each in the children predicate of [k]
+    and in that of its parent. Hence a children predicate excludes [oblP_discharged] for [k]
+    and for each of its children, without the forest invariant. *)
 
 From iris.proofmode Require Import base proofmode classes.
 From iris.bi.lib Require Import fractional.
@@ -22,7 +27,7 @@ Local Definition oblP_id `{SI : sidx} `{@mupdGS SI Σ} k : iProp Σ :=
 
 Local Definition oblP_assigned_def `{SI : sidx} `{@mupdGS SI Σ}
   k q : iProp Σ :=
-  oblP_id k ∗ oblG_assigned k false (q/2 + q/2/2)%Qp.
+  oblP_id k ∗ oblG_assigned k false (q/2)%Qp.
 Local Definition oblP_assigned_aux : seal (@oblP_assigned_def). Proof. by eexists. Qed.
 Definition oblP_assigned := oblP_assigned_aux.(unseal).
 Local Definition oblP_assigned_unseal :
@@ -65,7 +70,7 @@ Global Arguments oblP_variant {SI Σ _}.
 
 Local Definition oblP_inv_def `{SI : sidx} `{@mupdGS SI Σ}
   N k (P R : iProp Σ) : iProp Σ :=
-  oblP_id k ∗ oblG_inv N k ((1/2)/2 + (1/2)/2/2)%Qp P False R.
+  oblP_id k ∗ oblG_inv N k ((1/2)/2)%Qp P False R.
 Local Definition oblP_inv_aux : seal (@oblP_inv_def). Proof. by eexists. Qed.
 Definition oblP_inv := oblP_inv_aux.(unseal).
 Local Definition oblP_inv_unseal :
@@ -133,12 +138,18 @@ Local Definition embed_fuels_unseal :
 Global Arguments embed_fuels {SI Σ _ _ A ltA}.
 
 (** ** Children of a parent *)
+(** The share of the assignment of [k] held by a children predicate. *)
+Local Definition oblP_share `{SI : sidx} `{@mupdGS SI Σ} k : iProp Σ :=
+  oblP_id k ∗ oblG_assigned k false (1/2/2/2)%Qp.
+
+(** The children predicate of [p] holds the share of each child; that of an obligation [k]
+    also holds a share of [k] itself. *)
 Local Definition parP_kids_def `{SI : sidx} `{@mupdGS SI Σ}
   (p : parent) (K : gset oid) : iProp Σ :=
-  match p with
-  | PThread i => othreadG_elem i ∗ othreadG_exec i (1/2)%Qp ∗ oforestG_kids (PThread i) K
-  | PObl k => oforestG_kids (PObl k) K
-  end.
+  (match p with
+   | PThread i => othreadG_elem i ∗ othreadG_exec i (1/2)%Qp
+   | PObl k => oblP_share k
+   end) ∗ oforestG_kids p K ∗ [∗ set] x ∈ K, oblP_share x.
 Local Definition parP_kids_aux : seal (@parP_kids_def). Proof. by eexists. Qed.
 Definition parP_kids := parP_kids_aux.(unseal).
 Local Definition parP_kids_unseal :
@@ -188,6 +199,7 @@ Ltac unfold_opreds :=
   try rewrite /oblP_fuel_val;
   try rewrite !oblP_discharged_unseal /oblP_discharged_def;
   try rewrite !oblP_assigned_unseal /oblP_assigned_def;
+  try rewrite /oblP_share;
   try rewrite /oblP_id.
 
 Ltac unfold_oblP_fuel :=
@@ -260,12 +272,10 @@ Section pred_rules.
 
   Global Instance oblP_assigned_fractional k : Fractional (oblP_assigned k).
   Proof.
-    rewrite !oblP_assigned_unseal /oblP_assigned_def. intros p q. iSplit.
-    - iIntros "(#$& [Gv1 Gv2])". rewrite !Qp.div_add_distr.
-      iDestruct "Gv1" as "[Gv1 Gv1']". iDestruct "Gv2" as "[Gv2 Gv2']".
-      iCombine "Gv1 Gv2" as "$". iCombine "Gv1' Gv2'" as "$".
-    - iIntros "((#$& [Gv1 Gv2])& _& [Gv3 Gv4])". rewrite !Qp.div_add_distr.
-      iCombine "Gv1 Gv3" as "Gv1". iSplitL "Gv1"; iFrame. iSplitR "Gv4"; iFrame.
+    rewrite !oblP_assigned_unseal /oblP_assigned_def. intros p q.
+    rewrite Qp.div_add_distr. iSplit.
+    - iIntros "(#$& [$ $])".
+    - iIntros "((#$& G1)& _& G2)". iCombine "G1 G2" as "$".
   Qed.
   Global Instance oblP_assigned_as_fractional k q : AsFractional (oblP_assigned k q) (oblP_assigned k) q.
   Proof. split; [auto|apply _]. Qed.
@@ -935,17 +945,32 @@ Section mupd_rules.
     parP_kids p K ⊣⊢
     (match p with
      | PThread i => othreadG_elem i ∗ othreadG_exec i (1/2)%Qp
-     | PObl _ => True
-     end) ∗ oforestG_kids p K.
+     | PObl k => oblG_elem k ∗ oblG_assigned k false (1/2/2/2)%Qp
+     end) ∗ oforestG_kids p K ∗
+    ([∗ set] x ∈ K, oblG_elem x ∗ oblG_assigned x false (1/2/2/2)%Qp).
+  Proof. by unfold_opreds. Qed.
+
+  (** A children predicate excludes [oblP_discharged] of its obligation and of its children,
+      by the shares of their assignments it holds. *)
+  Lemma oblP_kids_discharged_false k K :
+    oblP_kids k K -∗ oblP_discharged k -∗ False.
   Proof.
-    unfold_opreds. destruct p.
-    - by rewrite assoc.
-    - by rewrite left_id.
+    rewrite parP_kids_frag. unfold_opreds. iIntros "((_& Ga)& _) (_& Gd)".
+    iApply (oblG_assigned_discharged_false with "[$Ga $Gd]").
+  Qed.
+
+  Lemma parP_kids_discharged k p K :
+    parP_kids p K -∗ oblP_discharged k -∗ ⌜ k ∉ K ⌝.
+  Proof.
+    rewrite parP_kids_frag. unfold_opreds. iIntros "(_& _& Ks) (_& Gd)".
+    destruct (decide (k ∈ K)) as [Hk|]; last done.
+    iDestruct (big_sepS_elem_of with "Ks") as "(_& Ga)"; first done.
+    iDestruct (oblG_assigned_discharged_false with "[$Ga $Gd]") as %[].
   Qed.
 
   (** ** Unfolding the predicates (for the model-level proofs) *)
   Lemma oblP_assigned_unfold k q :
-    oblP_assigned k q ⊣⊢ oblG_elem k ∗ oblG_assigned k false (q/2 + q/2/2)%Qp.
+    oblP_assigned k q ⊣⊢ oblG_elem k ∗ oblG_assigned k false (q/2)%Qp.
   Proof. by unfold_opreds. Qed.
   Lemma oblP_discharged_unfold k : oblP_discharged k ⊣⊢ oblG_elem k ∗ oblG_discharged k.
   Proof. by unfold_opreds. Qed.
@@ -1003,7 +1028,7 @@ Section mupd_rules.
     parP_kids (PThread i) ∅ -∗ |=[n,Θ]=>m thP_done i.
   Proof.
     rewrite parP_kids_frag. unfold_opreds.
-    iIntros "((#Te& Tx)& Kd)". iApply mupd_ghost_round. iIntros (Ω) "(S& T& A& F)".
+    iIntros "((#Te& Tx)& Kd& _)". iApply mupd_ghost_round. iIntros (Ω) "(S& T& A& F)".
     iPoseProof (othread_elem with "[$T $Te]") as "%Ini".
     iMod (oforest_exec_to_done with "[$T $F $Tx $Kd]") as "(T& F& #Td)"; first done.
     iModIntro. by iFrame "S T A F Te Td".
@@ -1021,7 +1046,7 @@ Section mupd_rules.
     |=[n,Θ]=>m ∃ k, ⌜ k ∉ K ⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ parP_kids (PObl k) ∅ ∗
                    oblP_assigned k 1 ∗ oblP_fuel k ℓ μ ∗ witP_layer k ℓ.
   Proof.
-    iIntros "Bp Kp". iDestruct (parP_kids_frag with "Kp") as "[Kx Kp]".
+    iIntros "Bp Kp". iDestruct (parP_kids_frag with "Kp") as "(Kx& Kp& Ks)".
     iApply mupd_nd_step. iIntros (????) "(HI& S& T& A& F& W& %GWI)".
     (* The owner of the new obligation, and the bound on the parent's fuel. *)
     (* The piece of the new obligation above its parent: [ν] at layer [ℓ], above the
@@ -1046,6 +1071,9 @@ Section mupd_rules.
             (measure_rep (ℓ, 1) ((((1 ⊕ ▽) × μ) ⊕ ▽) ⊕ ν)%M) t with "S")
       as "(S& #Gwf& #Ge& Gl& Gf& Go& %OStep)".
     { by apply not_elem_of_dom. }
+    (* The user's half and the two shares of the children predicates. *)
+    iDestruct "Gl" as "[Gl Gs]". iEval (rewrite -(Qp.div_2 (1/2/2))) in "Gs".
+    iDestruct "Gs" as "[Gs1 Gs2]".
     iEval (rewrite measure_rep_add) in "Gf". iPoseProof (oblG_fuel_split with "Gf") as "[Gf Gπ]".
     iEval (rewrite measure_rep_add) in "Gf". iPoseProof (oblG_fuel_split with "Gf") as "[Gu _]".
     iMod (oforest_alloc_obl _ _ p K k _ t _ with "[$S $T $F $Kp $Ge $Go $Gwf Gπ]")
@@ -1078,10 +1106,10 @@ Section mupd_rules.
     rewrite /model_interp. iFrame "HI S T F W". iSplitL "A".
     { rewrite dom_insert_L. by iFrame. }
     iModIntro. iExists k. iSplitR; first done.
-    iSplitL "Kx Kp".
-    { iApply parP_kids_frag. iFrame. }
-    iSplitL "Kk".
-    { iApply parP_kids_frag. by iFrame. }
+    iSplitL "Kx Kp Ks Gs1".
+    { iApply parP_kids_frag. iFrame "Kx Kp". rewrite big_sepS_insert //. iFrame "Ge Gs1 Ks". }
+    iSplitL "Kk Gs2".
+    { iApply parP_kids_frag. rewrite big_sepS_empty. iFrame "Ge Gs2 Kk". }
     unfold_opreds. iFrame "Ge Gl Gu". iSplit.
     - iExists _. iFrame "Ww".
     - iExists _. iFrame "Gwf".
@@ -1121,31 +1149,6 @@ Section mupd_rules.
     - iExists _. iFrame "Gwf".
   Qed.
 
-  (** ** Liveness of children *)
-  Lemma oblP_kids_discharged_false_mupd n Θ k K :
-    parP_kids (PObl k) K -∗ oblP_discharged k -∗ |=[n,Θ]=>m False.
-  Proof.
-    rewrite parP_kids_frag. iIntros "[_ Kk]". unfold_opreds. iIntros "(#Ge& #Gu)".
-    iApply mupd_ghost_round. iIntros (Ω) "(S& T& A& F)".
-    iDestruct (oforest_kids_live with "F Kk") as %[_ Hl].
-    destruct (Hl k eq_refl) as (a& t& Hka).
-    iPoseProof (osat_lookup_discharged with "[$S $Ge $Gu]") as "%Hd".
-    by rewrite Hka in Hd.
-  Qed.
-
-  Lemma parP_kids_discharged_mupd n Θ k p K :
-    parP_kids p K -∗ oblP_discharged k -∗ |=[n,Θ]=>m ⌜ k ∉ K ⌝ ∗ parP_kids p K.
-  Proof.
-    iIntros "Kp Gd". iApply mupd_ghost_round. iIntros (Ω) "(S& T& A& F)".
-    iAssert (⌜ k ∉ K ⌝)%I as %Hk.
-    { iDestruct (parP_kids_frag with "Kp") as "[_ Kf]".
-      iDestruct (oforest_kids_live with "F Kf") as %[Hl _].
-      destruct (decide (k ∈ K)) as [Hin|]; last done. destruct (Hl k Hin) as (a& t& Hka).
-      unfold_opreds. iDestruct "Gd" as "(#Ge& #Gu)".
-      iPoseProof (osat_lookup_discharged with "[$S $Ge $Gu]") as "%Hd". by rewrite Hka in Hd. }
-    iModIntro. by iFrame.
-  Qed.
-
   (** ** Moving an obligation with its subtree *)
   (** [k] moves from [p1] to [p2], burning one unit at a layer [ℓ] that dominates [p2]. The
       unit splits into a part that [k] burns when it changes owner, and a part that is the
@@ -1160,8 +1163,10 @@ Section mupd_rules.
     |=[n,Θ]=>m ⌜ k ∉ K2 ⌝ ∗ parP_kids p1 (K1 ∖ {[k]}) ∗ parP_kids p2 ({[k]} ∪ K2).
   Proof.
     iIntros (Hk) "Bp K1 K2 Fk".
-    iDestruct (parP_kids_frag with "K1") as "[Kx1 K1]".
-    iDestruct (parP_kids_frag with "K2") as "[Kx2 K2]".
+    iDestruct (parP_kids_frag with "K1") as "(Kx1& K1& Ks1)".
+    iDestruct (parP_kids_frag with "K2") as "(Kx2& K2& Ks2)".
+    (* The share of [k] moves from [p1] to [p2]. *)
+    iDestruct (big_sepS_delete _ _ k with "Ks1") as "[Sk Ks1]"; first done.
     iDestruct (oblP_fuel_unfold with "Fk") as "[#Ek Fk]".
     set (u := measure_rep (ℓ, 1) 1%M). set (π := measure_rep (ℓ, 1) (▽)%M).
     assert (Hu : (Ord.O < u)%ord).
@@ -1201,7 +1206,8 @@ Section mupd_rules.
       { destruct p2; [done|iFrame]. }
       iModIntro. iExists Ω. iFrame "S T A F". iSplit.
       { iPureIntro. split; [apply obls_ndf_refl|done]. }
-      iSplit; first done. iSplitL "Kx1 K1"; iApply parP_kids_frag; iFrame.
+      iSplit; first done. iSplitL "Kx1 K1 Ks1"; iApply parP_kids_frag; first by iFrame.
+      iFrame "Kx2 K2". rewrite big_sepS_insert //. iFrame.
     - (* Owner change: the whole subtree of [k] moves to [j]. *)
       iMod (oforest_move_cross _ _ p1 p2 K1 K2 k t j u π with "[$S $T $A $F $K1 $K2 $Fu Fπ]")
         as "(%Ω'& (%Hndf& %Hdom& %HkK2)& S& T& A& F& K1& K2)".
@@ -1212,7 +1218,8 @@ Section mupd_rules.
       { done. }
       { destruct p2; [done|iFrame]. }
       iModIntro. iExists Ω'. iFrame "S T A F". iSplit; first done.
-      iSplit; first done. iSplitL "Kx1 K1"; iApply parP_kids_frag; iFrame.
+      iSplit; first done. iSplitL "Kx1 K1 Ks1"; iApply parP_kids_frag; first by iFrame.
+      iFrame "Kx2 K2". rewrite big_sepS_insert //. iFrame.
   Qed.
 
   (** [x], a child of [k], moves up to the parent [p] of [k]: a ghost round without model
@@ -1223,13 +1230,16 @@ Section mupd_rules.
     |=[n,Θ]=>m ⌜ x ∉ K ⌝ ∗ parP_kids p ({[x]} ∪ K) ∗ parP_kids (PObl k) (Kk ∖ {[x]}).
   Proof.
     iIntros (Hk Hx) "Kp Kk".
-    iDestruct (parP_kids_frag with "Kp") as "[Kx Kp]".
-    iDestruct (parP_kids_frag with "Kk") as "[_ Kk]".
+    iDestruct (parP_kids_frag with "Kp") as "(Kx& Kp& Ks)".
+    iDestruct (parP_kids_frag with "Kk") as "(Kxk& Kk& Ksk)".
+    (* The share of [x] moves from [k] to [p]. *)
+    iDestruct (big_sepS_delete _ _ x with "Ksk") as "[Sx Ksk]"; first done.
     iApply mupd_ghost_round. iIntros (Ω) "(S& T& A& F)".
     iMod (oforest_move_up _ _ p K k Kk x with "[$F $Kp $Kk]") as "(%HxK& F& Kp& Kk)";
       [done|done|].
     iModIntro. iFrame "S T A F". iSplit; first done.
-    iSplitL "Kx Kp"; iApply parP_kids_frag; by iFrame.
+    iSplitL "Kx Kp Ks Sx"; iApply parP_kids_frag; last by iFrame.
+    iFrame "Kx Kp". rewrite big_sepS_insert //. iFrame.
   Qed.
 
   (** ** Checking witnesses *)
@@ -1297,9 +1307,12 @@ Section mupd_rules.
     |=[n,Θ]=>m parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k.
   Proof.
     iIntros (Hk) "Kp Kk Ga".
-    iDestruct (parP_kids_frag with "Kp") as "[Kx Kp]".
-    iDestruct (parP_kids_frag with "Kk") as "[_ Kk]".
+    iDestruct (parP_kids_frag with "Kp") as "(Kx& Kp& Ks)".
+    iDestruct (parP_kids_frag with "Kk") as "((_& Gs1)& Kk& _)".
     iDestruct (oblP_assigned_unfold with "Ga") as "(#Ge& Gl)".
+    (* The user's half and the shares of both children predicates. *)
+    iDestruct (big_sepS_delete _ _ k with "Ks") as "[(_& Gs2) Ks]"; first done.
+    iCombine "Gs1 Gs2" as "Gs". iCombine "Gl Gs" as "Gl".
     iApply mupd_unfold. iRight. iIntros (????) "(HI& S& T& A& F& W& %GWI)".
     iPoseProof (osat_lookup_assigned with "[$S $Ge $Gl]") as "%LUO1l".
     destruct LUO1l as (a& t& LUO1l).
@@ -1335,7 +1348,7 @@ Section mupd_rules.
       replace ({[k]} ∪ dom Ω1 ∖ {[k]}) with (({[k]} ∪ dom Ω1)).
       { iFrame. eauto. }
       apply elem_of_dom_2 in LUO1l. rewrite -union_difference_L; set_solver. }
-    iIntros "!> !>". iSplitL "Kx Kp".
+    iIntros "!> !>". iSplitL "Kx Kp Ks".
     { iApply parP_kids_frag. iFrame. }
     iApply oblP_discharged_unfold. iFrame "Ge Gu".
   Qed.
@@ -1356,7 +1369,7 @@ Section mupd_rules.
     iMod (oforest_alloc_threads _ π with "[$F $TGs]") as "[$ Ks]"; first done.
     iModIntro. iPoseProof (big_sepS_sep with "[$Efs $Ks]") as "Efs".
     iApply (big_sepS_impl with "Efs"). iIntros "!> %j _ [E K]".
-    iApply parP_kids_frag. iFrame.
+    iApply parP_kids_frag. rewrite big_sepS_empty. iFrame.
   Qed.
 
   (** ** Invariants of obligations *)

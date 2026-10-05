@@ -26,7 +26,9 @@ Module oblf.
     [Ω] is the thread at the root of its tree. Every obligation [d] whose parent is an
     obligation [c] has a fuel piece [π d] stored in the invariant with [π d > fuel c] (the
     model fuel of [c]), and [fuel c < fuel d]. Hence fuel strictly increases downwards and
-    the parent map has no cycles.
+    the parent map has no cycles. A children predicate [parP_kids p K] holds a share of the
+    assignment of each obligation of [K] (and of [p] for an obligation), so it excludes
+    their discharge without the invariant.
     - Step of thread [i]: the unit burnt for each child of [i] makes its fuel decrease; every
       other obligation [d] owned by [i] splits its piece into [fuel c] and a unit, which [d]
       burns. After the step [fuel' c < fuel c], so [fuel c] is the new piece of [d]. Every
@@ -83,13 +85,15 @@ Class obl_forest_interface `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_cla
     oblP_assigned k q -∗ oblP_discharged k -∗ False;
   (** Only live obligations have a children predicate (a discharged obligation has no
       children) ... *)
-  oblP_kids_discharged_false E k K :
-    parP_kids (PObl k) K -∗ oblP_discharged k -∗ |={E}=>m False;
+  oblP_kids_discharged_false k K :
+    parP_kids (PObl k) K -∗ oblP_discharged k -∗ False;
   (** ... and only live obligations are children (a discharged obligation is not in the
-      forest). Both facts are read off the forest invariant, hence the ghost update. *)
-  parP_kids_discharged E k p K :
-    parP_kids p K -∗ oblP_discharged k -∗ |={E}=>m ⌜ k ∉ K ⌝ ∗ parP_kids p K;
+      forest). *)
+  parP_kids_discharged k p K :
+    parP_kids p K -∗ oblP_discharged k -∗ ⌜ k ∉ K ⌝;
 
+  (** FIXME: Simplify `layer` to `ord.t` (it's `ord.t * nat` now),
+      and use `layer` instead of `ord.t` in the rule interface.  *)
   oblP_fuel_proper k ℓ1 ℓ2 μ1 μ2 :
     (ℓ1 == ℓ2)%ordi →
     (measure_rep (ℓ1, 1) μ1 == measure_rep (ℓ2, 1) μ2)%ord →

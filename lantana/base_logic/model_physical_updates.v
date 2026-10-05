@@ -82,7 +82,7 @@ Section mprog.
      ={∅}=∗ P) -∗
     @={n,Θ,i}=↓ P.
   Proof.
-    iIntros "Kt Fs #REs H". iDestruct (parP_kids_frag with "Kt") as "[(#Oe& Ox) Kt]".
+    iIntros "Kt Fs #REs H". iDestruct (parP_kids_frag with "Kt") as "((#Oe& Ox)& Kt& Ks)".
     iIntros "%%%% (MH& S& O& A& F& W& %GWI1)".
     iAssert ([∗ set] k ∈ K, ∃ c, ⌜ (Ord.O < c)%ord ⌝ ∗ oblG_fuel k c)%I with "[Fs]" as "Fs".
     { iApply (big_sepS_impl with "Fs"). iIntros "!> %k _ (%ℓ& Fk)".
@@ -173,8 +173,8 @@ Section mprog.
       - iDestruct "H" as "(%&%& Wc)". iLeft. iApply (witG_witness_mon with "Wc").
         apply Ord.S_supremum. eauto. }
     iCombine "REs Rs" as "Rs". iPoseProof (big_sepS_sep with "Rs") as "Rs".
-    iMod ("H" with "[Ox Kt] [Rs]") as "H".
-    { iApply parP_kids_frag. iFrame "Oe Ox Kt". }
+    iMod ("H" with "[Ox Kt Ks] [Rs]") as "H".
+    { iApply parP_kids_frag. iFrame "Oe Ox Kt Ks". }
     { iApply (big_sepS_impl with "Rs"). iIntros "!> %r _ ((%ℓ& Wl)& Wr)".
       iDestruct (witP_layer_unfold with "Wl") as "[(%& #Ge& _) _]".
       iDestruct "Wr" as "[Ww | Gf]".
@@ -276,7 +276,7 @@ Section mphys.
     iMod ("H" with "[Efs Ks]") as "H".
     { iPoseProof (big_sepS_sep with "[$Efs $Ks]") as "Efs".
       iApply (big_sepS_impl with "Efs"). iIntros "!> %j _ [E K]".
-      iApply parP_kids_frag. iFrame. }
+      iApply parP_kids_frag. rewrite big_sepS_empty. iFrame. }
     iModIntro. rewrite /model_interp. iFrame. done.
   Qed.
 

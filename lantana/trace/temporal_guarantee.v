@@ -1640,7 +1640,7 @@ Global Hint Extern 100 (@IntoTemporal ?Λ ?Σ ?Ht ?Hs ?P ?G) =>
   first [evar_headed G | unify G (@tps_true Λ Σ)];
   notypeclasses refine (into_temporal_default P) : typeclass_instances.
 
-(** ** Examples and sanity checks *)
+(** ** Examples and unit checks *)
 Section examples.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
