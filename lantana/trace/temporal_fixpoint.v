@@ -525,3 +525,116 @@ Section nest.
   Qed.
 
 End nest.
+
+(** ** A recursive until: a commitment that renews itself
+
+    An until with given readings is contractive in its right formula
+    ([untilI_guar_contractive_r]), so structures can be defined by guarded recursion through
+    the right side of an until. [renew N Q G] is a finally of [Q] together with the next
+    link, again a [renew]; the reading stored for the right formula is [G ∧ ν X. ◇(G ∧ X)],
+    and the proof that the right formula guarantees it is closed ([renew_content_temporal]).
+    The left formula is [True], so the obligation invariant does not mention the structure
+    and allocation needs no Löb induction ([renew_alloc]). A thread renews the commitment by
+    allocating the next link and discharging the current one with it ([renew_discharge]).
+
+    On traces [ν X. ◇(G ∧ X)] is just [◇G] ([tps_nu_renew_tr]): the eventuality is not
+    strict, and a link may be discharged at the position of the link it renews, so the
+    reading says nothing about later positions. [G] infinitely often, [□◇G], is the
+    guarantee of an always over a finally ([always_finally_temporal]). *)
+Section renew.
+  Context `{!lantanaGS Λ Σ}.
+  Implicit Types G : tps Λ Σ.
+
+  Definition F_renew (G : tps Λ Σ) : tps Λ Σ → tps Λ Σ := λ X, tps_finally (tps_and G X).
+  Global Instance F_renew_mono G : TpsMono (F_renew G).
+  Proof.
+    apply (tps_mono_until (λ _, tps_true) (λ X, tps_and G X)); first apply tps_mono_const.
+    apply (tps_mono_and (λ _, G) (λ X, X)); [apply tps_mono_const|apply tps_mono_id].
+  Qed.
+
+  (** The reading of the right formula of a link. *)
+  Definition renew_tps G : tps Λ Σ := tps_and G (tps_nu (F_renew G)).
+
+  Definition renew_pre N (Q : iProp Σ) G (X : iPropO Σ) : iPropO Σ :=
+    (∃ k, untilI_guar N k 1 True (Q ∗ X) tps_true (renew_tps G))%I.
+  Local Instance renew_pre_contractive N Q G : Contractive (renew_pre N Q G).
+  Proof.
+    intros n X X' HX. rewrite /renew_pre. f_equiv=> k. apply untilI_guar_contractive_r.
+    eapply (ne_dist_later (λ Y : iPropO Σ, (Q ∗ Y)%I)); [solve_proper|exact HX].
+  Qed.
+  Definition renew N Q G : iProp Σ := fixpoint (renew_pre N Q G).
+  Lemma renew_unfold N Q G :
+    renew N Q G ≡ (∃ k, untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G))%I.
+  Proof. apply (fixpoint_unfold (renew_pre N Q G)). Qed.
+
+  Lemma renew_intro N Q G k :
+    untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G) ⊢ renew N Q G.
+  Proof. iIntros "H". iEval (rewrite renew_unfold). by iExists k. Qed.
+
+  Lemma renew_temporal N Q G : ⊢ renew N Q G ⊨ₜ tps_nu (F_renew G).
+  Proof.
+    iApply (temporal_weaken _ (F_renew G (tps_nu (F_renew G)))).
+    { apply (tps_nu_unfold_r (F_renew G)). }
+    iApply (temporal_mono (∃ k, untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G)) with "[]").
+    { iIntros "!> H". by iEval (rewrite renew_unfold) in "H". }
+    iApply temporal_exist_ghost. iIntros (k). iApply temporal_until_guar.
+  Qed.
+
+  (** The guarantee of the right formula, a closed proof. *)
+  Lemma renew_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ renew N Q G) ⊨ₜ renew_tps G.
+  Proof. intros HQ. iApply temporal_sep; [iApply HQ|iApply renew_temporal]. Qed.
+
+  (** Allocation of a link, with a fresh obligation [k] below [p]. *)
+  Lemma renew_alloc E N Q G p K ℓ μ :
+    (⊢ Q ⊨ₜ G) →
+    parP_le p ℓ -∗ parP_kids p K -∗
+    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
+                 oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+                 untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G).
+  Proof.
+    iIntros (HQ) "B Kp". iMod (untilI_guar_alloc with "B Kp") as "(%k& %Hk& Kp& Kk& F& W& ACC)".
+    iMod ("ACC" $! E N True%I (Q ∗ renew N Q G)%I tps_true (renew_tps G) with "[] [] [//]") as "U".
+    { iNext. iApply temporal_true. }
+    { iNext. iApply (renew_content_temporal _ _ _ HQ). }
+    iModIntro. iExists k. iSplitR; first done. iFrame.
+  Qed.
+
+  (** Renewal: the link [k] is discharged with [Q] and the next link at hand. *)
+  Lemma renew_discharge E N Q G k p K :
+    ↑N ⊆ E → k ∈ K →
+    £ (2 : Ord.t) -∗ parP_kids p K -∗ oblP_kids k ∅ -∗
+    untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G) -∗ Q -∗ renew N Q G -∗
+    |={E}=>m Q ∗ renew N Q G ∗ parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k.
+  Proof.
+    iIntros (HN Hk) "LC Kp Kk U HQ R".
+    iMod (untilI_guar_discharge_lc with "LC Kp Kk U [$HQ $R]") as "([$ $]& $& $)"; done.
+  Qed.
+
+  (** On traces, [ν X. ◇(G ∧ X)] is [◇G]. *)
+  Lemma tps_nu_renew_tr G τ : tps_tr (tps_nu (F_renew G)) τ ↔ tps_tr (tps_finally G) τ.
+  Proof.
+    rewrite tps_nu_tr. destruct τ as [n τf]. rewrite /=. split.
+    - intros (R & HR & Hτ). destruct (HR _ Hτ) as (m & Hm & [HG _] & _).
+      exists m. split_and!; [done|done|by intros].
+    - intros (m & Hm & HG & _).
+      exists (λ τ', ∃ m', τ'.1 ≤ m' ∧ tps_tr G (m', τ'.2)). split; last by exists m.
+      intros [n' τf'] (m' & Hm' & HG'). exists m'. split_and!; [done| |by intros].
+      split; first done. by exists m'.
+  Qed.
+
+  (** [G] infinitely often: always a live finally, renewed in an invariant. *)
+  Lemma tps_always_finally_tr G n τf :
+    tps_tr (tps_always (tps_finally G)) (n, τf) ↔ ∀ m, n ≤ m → ∃ l, m ≤ l ∧ tps_tr G (l, τf).
+  Proof.
+    rewrite /=. split.
+    - intros H m Hm. destruct (H m Hm) as (l & ? & ? & _). eauto.
+    - intros H m Hm. destruct (H m Hm) as (l & ? & ?). exists l. split_and!; [done|done|by intros].
+  Qed.
+  Lemma always_finally_temporal N N' q (Q : iProp Σ) :
+    ⊢ alwaysI N (∃ k, finallyI N' k q Q) ⊨ₜ tps_always (tps_finally (tps_sem Q)).
+  Proof.
+    iApply temporal_always_valid. iApply temporal_exist_ghost. iIntros (k).
+    iApply temporal_until_valid; [apply temporal_true|apply temporal_sem].
+  Qed.
+
+End renew.

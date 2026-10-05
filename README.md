@@ -119,7 +119,7 @@ predicates.
 | carrier superscripts / `carriers_i G` (Thm 1) | no carriers: `thP_kids i G`, the children of thread `i` in the obligation forest; every initial thread starts with `thP_kids i ∅` | `base_logic/opreds.v` |
 | `Fuel^ℓ_G μ` | no carrier fuel: `oblP_fuel k ℓ μ` of each child `k` of the thread; a set is `[∗ set] k ∈ G, oblP_fuel k ℓ μ` (cf. `oblP_fuels`) | `base_logic/opreds.v` |
 | `obls^ℓ_g K` | replaced by `parP_kids p K` (children `K` of a thread, `thP_kids i K`, or of an obligation, `oblP_kids k K`); below an obligation the layer bound is its witness layer (`parP_below` / `parP_le`) | `base_logic/opreds.v` |
-| `Φ until^k_q Ψ` | `untilI N k q P Q` (an `iProp`; `N` is the namespace of the obligation invariant `oblP_inv` of `k`); guarantee `temporal_until` | `trace/temporal_guarantee.v` |
+| `Φ until^k_q Ψ` | `untilI N k q P Q` (an `iProp`; `N` is the namespace of the obligation invariant `oblP_inv` of `k`; variant `untilI_guar` with given readings, e.g. for recursion, `renew` in `trace/temporal_fixpoint.v`); guarantee `temporal_until` | `trace/temporal_guarantee.v` |
 | `finally^k Φ` | `finallyI N k q Q` (`untilI N k q True Q`) | `trace/temporal_guarantee.v` |
 | `obl∎ k` (discharged) | `oblP_discharged k` | `base_logic/opreds.v` |
 | `tr$^ℓ_k m` (transfer credit) | `oblP_fuel k ℓ m` (the obligation's own fuel, now the only kind of fuel) | `base_logic/opreds.v` |
