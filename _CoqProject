@@ -128,6 +128,7 @@ lantana_heap_lang/examples/handoff_flag_stable_client.v
 lantana_heap_lang/examples/paradox.v
 lantana_heap_lang/examples/nonstrict_move.v
 lantana_heap_lang/examples/ticket_lock.v
+lantana_heap_lang/examples/ticket_lock_mono.v
 lantana_heap_lang/examples/ticket_lock2.v
 lantana_heap_lang/examples/ticket_lock2_client.v
 lantana_heap_lang/examples/queue.v
