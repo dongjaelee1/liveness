@@ -25,6 +25,15 @@ Section laws.
   Proof. exact (temporal_atomic (pred_expr i C e)). Qed.
   (* TODO: [IntoTemporal] instances for the invariant heap ([l ↦_I v]). *)
 
+  (** A freed location ([freed], primitive_laws.v) stays freed in the state. *)
+  Definition freed_tps (l : loc) : tps heap_lang Σ := tps_state (λ σ _, heap σ !! l = Some None).
+
+  Lemma freed_temporal (l : loc) q : ⊢ freed l q ⊨ₜ freed_tps l.
+  Proof.
+    apply temporal_state. intros σ Θ κs. iIntros "[(H& _) F]".
+    iApply (gen_heap_valid with "H F").
+  Qed.
+
   (** Discharge at the actual final value, using credits from earlier steps: the thread's
       only child is the obligation of the finally. *)
   Lemma thread_expr_terminate_finally i E v k N :

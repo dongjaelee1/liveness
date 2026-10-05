@@ -408,6 +408,18 @@ Proof. rewrite pointsto_unseal. apply pointsto_persist. Qed.
 Lemma pointsto_unpersist l v : l ↦□ v ==∗ ∃ q, l ↦{#q} v.
 Proof. rewrite pointsto_unseal. apply pointsto_unpersist. Qed.
 
+(** The points-to of a freed location, which [lwp_free_freed] keeps. *)
+Definition freed (l : loc) (q : Qp) : iProp Σ := gen_heap.pointsto l (DfracOwn q) (None : option val).
+
+Lemma freed_split (l : loc) q1 q2 : freed l (q1 + q2) ⊣⊢ freed l q1 ∗ freed l q2.
+Proof. rewrite /freed -gen_heap.pointsto_fractional. done. Qed.
+
+Lemma freed_pointsto_false (l : loc) q dq v : freed l q -∗ l ↦{dq} v -∗ False.
+Proof.
+  rewrite pointsto_unseal /pointsto_def /freed.
+  iIntros "H1 H2". by iDestruct (gen_heap.pointsto_agree with "H1 H2") as %?.
+Qed.
+
 Global Instance frame_pointsto p l v q1 q2 q :
   FrameFractionalQp q1 q2 q →
   Frame p (l ↦{#q1} v) (l ↦{#q2} v) (l ↦{#q} v) | 5.
@@ -554,6 +566,34 @@ Lemma lwp_free G R o s i E l v {C} :
     Free (Val $ LitV $ LitLoc l) @ s; i; E
   l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_kids i G ∗
        ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) }}}.
+Proof.
+  iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
+  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
+  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
+  iSplit; first by eauto with base_step.
+  iFrame "Tb Gfs Rs".
+  iIntros (v2 σ2 efs Hstep).
+  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
+  { exact HT. } { by apply base_prim_step. }
+  subst C. inv_base_step.
+  iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
+  rewrite !map_union_empty.
+  iMod (hG_history_auth_app with "Ha") as "Ha".
+  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
+  iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
+  iModIntro. iSplit; first done. iFrame. iSplitR.
+  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
+  iModIntro. iApply "HΦ". iFrame.
+Qed.
+
+(** [lwp_free], keeping the points-to of the freed location. *)
+Lemma lwp_free_freed G R o s i E (l : loc) v {C} :
+  l{{{ thread_expr i C (Free #l) ∗ (thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+       ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ l ↦ v }}}
+    Free (Val $ LitV $ LitLoc l) @ s; i; E
+  l{{{ RET LitV LitUnit; thread_expr i C (#()) ∗ (£ o ∗ thP_kids i G ∗
+       ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ freed l 1 }}}.
 Proof.
   iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
