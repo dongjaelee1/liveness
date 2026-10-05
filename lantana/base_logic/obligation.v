@@ -7,12 +7,10 @@
 From iris.proofmode Require Import proofmode.
 From lantana.algebra Require Export wfocm.
 
-(** The fuel of obligations is a well-founded ordered commutative monoid. *)
 Class obl_class := {
     obl_fuel : Type;
     #[global] obl_fuel_wfocm :: WFOCM.pack obl_fuel;
   }.
-(** We assume that the thread id is positive *)
 Definition obl_owner := positive.
 
 Variant obl `{OC : obl_class} : Type :=
@@ -77,7 +75,6 @@ Definition obl_cond_owner `{OC : obl_class} (i : obl_owner) : obl_cond :=
 Global Instance obl_cond_owner_dec `{OC : obl_class} : ∀ i k g, Decision (obl_cond_owner i k g).
 Proof using. intros. rewrite /obl_cond_owner. destruct g; solve_decision. Qed.
 
-(** Conditional step *)
 Definition obls_cond_step `{OC : obl_class} (C : obl_cond) : obls → obls → Prop :=
   obls_cond_rel C obl_step.
 Notation "A ↪ₛ B | C" := (obls_cond_step C A B) (at level 20, format "A  ↪ₛ  B  |  C").
@@ -152,7 +149,6 @@ Section obls_rels.
     obls_cond_rel C2 R Ω1 Ω2.
   Proof using. intros. eapply obls_cond_rel_iff_lookup; eauto. Qed.
 
-  (** [obl_keep] and [obls_keep] are equivalences *)
   Global Instance obl_keep_reflexive : Reflexive obl_keep.
   Proof using.
     repeat intro. destruct x; simpl in *; subst; try done.

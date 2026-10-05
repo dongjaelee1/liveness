@@ -47,13 +47,11 @@ Definition wit_rel_preserves_cond `{OC : obl_class} (C : wit_cond) (R : witness 
   Prop :=
   ∀ k w1 w2, C k w1 → R w1 w2 → C k w2.
 
-(** The assigned witnesses. *)
 Definition wit_cond_assigned `{OC : obl_class} : wit_cond :=
   λ _ w, match w with | witness_assigned _ => True | _ => False end.
 Global Instance wit_cond_assigned_dec `{OC : obl_class} : ∀ k w, Decision (wit_cond_assigned k w).
 Proof using. intros. rewrite /wit_cond_assigned. destruct w; solve_decision. Qed.
 
-(** Conditional step *)
 Definition wits_cond_step `{OC : obl_class} (C : wit_cond) : witnesses → witnesses → Prop :=
   wits_cond_rel C witness_step.
 Notation "A ↓ₛ B | C" := (wits_cond_step C A B) (at level 20, format "A  ↓ₛ  B  |  C").
@@ -133,7 +131,6 @@ Section witnesses.
     wits_cond_rel C2 R W1 W2.
   Proof using. intros. eapply wits_cond_rel_iff_lookup; eauto. Qed.
 
-  (** [witness_keep] and [wits_keep] are preorders *)
   Global Instance witness_keep_transitive : Transitive witness_keep.
   Proof using.
     repeat intro. destruct x, y, z; inv H; inv H0. all: econstructor.
@@ -154,7 +151,6 @@ Section witnesses.
     repeat intro. destruct (x !! i) eqn:Hx; try done.
   Qed.
 
-  (** [wits_mon] is a preorder; progress does not increase witnesses *)
   Global Instance wits_mon_transitive : Transitive wits_mon.
   Proof using.
     repeat intro. specialize (H i). specialize (H0 i).

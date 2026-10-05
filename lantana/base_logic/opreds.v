@@ -1,14 +1,8 @@
 (** * Obligation predicates and their rules
 
-    Obligations form a forest ([oforest.v]): a parent is a thread or an obligation, and
-    every live obligation is a child of exactly one parent ([parP_kids p K]: the children of
-    [p] are [K]). A step of a thread burns one unit of fuel of each of its children; the
-    model keeps the fuel of every obligation above the fuel of its parent, so all other
-    obligations below the thread burn a unit automatically.
-
-    The rules below are model updates [|=[n,Θ]=>m]; the non-discharging ones are proved
-    through [mupd_nd_step]. An obligation invariant [oblP_inv N k P R] holds [P] while [k] is
-    live and [R] once it is discharged.
+    Obligations form a forest ([oforest.v]); [parP_kids p K]: the children of the parent [p]
+    (a thread or an obligation) are [K]. A step of a thread burns one unit of fuel of each of
+    its children; the other obligations below the thread burn a unit automatically.
 
     The assignment of a live obligation [k] is split four ways: a quarter in [osat], a half
     for the user ([oblP_assigned k 1]), and an eighth each in the children predicate of [k]
@@ -20,8 +14,8 @@ From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.base_logic Require Export oinv mupd.
 
-(** All Local Definitions are only for internal uses and users should not need them. *)
-(** ** Obl predicates. *)
+(** Local definitions are internal. *)
+(** ** Obligation predicates *)
 Local Definition oblP_id `{SI : sidx} `{@mupdGS SI Σ} k : iProp Σ :=
   oblG_elem k.
 
@@ -56,9 +50,8 @@ Local Definition oblP_fuel_unseal :
   @oblP_fuel = @oblP_fuel_def := oblP_fuel_aux.(seal_eq).
 Global Arguments oblP_fuel {SI Σ _ _}.
 
-(** The two states of an obligation invariant: [P] while the obligation is live, [R] once it
-    is discharged. (The ghost protocol of [oinv.v] has a third, intermediate state; it is not
-    used: its content is [False].) *)
+(** The states of an obligation invariant: [P] while the obligation is live, [R] once it is
+    discharged. The third state of [oinv.v] is unused ([False]). *)
 Local Definition oblP_variant_def `{SI : sidx} `{@mupdGS SI Σ}
   k (P R : iProp Σ) : iProp Σ :=
   ((oblP_assigned k (1/2)%Qp ∗ P) ∨ (oblP_discharged k ∗ R))%I.
@@ -142,8 +135,6 @@ Global Arguments embed_fuels {SI Σ _ _ A ltA}.
 Local Definition oblP_share `{SI : sidx} `{@mupdGS SI Σ} k : iProp Σ :=
   oblP_id k ∗ oblG_assigned k false (1/2/2/2)%Qp.
 
-(** The children predicate of [p] holds the share of each child; that of an obligation [k]
-    also holds a share of [k] itself. *)
 Local Definition parP_kids_def `{SI : sidx} `{@mupdGS SI Σ}
   (p : parent) (K : gset oid) : iProp Σ :=
   (match p with
@@ -156,7 +147,6 @@ Local Definition parP_kids_unseal :
   @parP_kids = @parP_kids_def := parP_kids_aux.(seal_eq).
 Global Arguments parP_kids {SI Σ _}.
 
-(** Children of a thread and of an obligation. *)
 Notation thP_kids i K := (parP_kids (PThread i) K).
 Notation oblP_kids k K := (parP_kids (PObl k) K).
 (** [n] units of fuel of each obligation of a set, at any layers. *)
@@ -174,9 +164,8 @@ Definition parent_below `{SI : sidx} {Σ : gFunctors} (wl : oid → layer → iP
 Notation parP_below p ℓ := (parent_below witP_layer p ℓ).
 
 (** A new obligation at layer [ℓ] may be created below [p]: always below a thread; below an
-    obligation [q], [ℓ] must be at least a witness layer of [q]. (A move needs a strictly larger
-    layer, [parent_below]: moving an existing obligation below one of the same layer is
-    unsound.) *)
+    obligation [q], [ℓ] must be at least a witness layer of [q]. A move needs a strictly larger
+    layer ([parent_below]): moving an obligation below one of the same layer is unsound. *)
 Definition parent_le `{SI : sidx} {Σ : gFunctors} (wl : oid → layer → iProp Σ)
     (p : parent) (ℓ : layer) : iProp Σ :=
   match p with
@@ -912,7 +901,6 @@ Section mupd_rules.
     apply Hessenberg.add_lt_l. rewrite Ord.from_nat_1. apply Ord.S_pos.
   Qed.
 
-  (** The bound of a parent at a layer [ℓq ≤ ℓ] is below [μq ⊕ 1] at [ℓ]. *)
   Lemma layer_le_bound ℓq ℓ μq :
     (ℓq <= ℓ)%ordi → (measure_rep ℓq μq < measure_rep ℓ (μq ⊕ 1)%M)%ord.
   Proof.
@@ -932,8 +920,6 @@ Section mupd_rules.
     ([∗ set] x ∈ K, oblG_elem x ∗ oblG_assigned x false (1/2/2/2)%Qp).
   Proof. by unfold_opreds. Qed.
 
-  (** A children predicate excludes [oblP_discharged] of its obligation and of its children,
-      by the shares of their assignments it holds. *)
   Lemma oblP_kids_discharged_false k K :
     oblP_kids k K -∗ oblP_discharged k -∗ False.
   Proof.
@@ -1030,9 +1016,8 @@ Section mupd_rules.
   Proof.
     iIntros "Bp Kp". iDestruct (parP_kids_frag with "Kp") as "(Kx& Kp& Ks)".
     iApply mupd_nd_step. iIntros (????) "(HI& S& T& A& F& W& %GWI)".
-    (* The owner of the new obligation, and the bound on the parent's fuel. *)
-    (* The piece of the new obligation above its parent: [ν] at layer [ℓ], above the
-       parent's fuel bound [μq] at layer [ℓq ≤ ℓ]. *)
+    (* The owner [t] of the new obligation, and its piece [ν] at layer [ℓ] above the parent's
+       fuel bound [μq] at layer [ℓq ≤ ℓ]. *)
     iAssert (⌜ ∃ t ν, match p with
                       | PThread j => j = t
                       | PObl q => obl_owner_of Ω1 q = Some t ∧

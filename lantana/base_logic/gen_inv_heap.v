@@ -187,8 +187,7 @@ Section inv_heap.
     iMod (inv_acc_timeless _ inv_heapN with "Hinv") as "[HP Hclose]"; first done.
     iDestruct "HP" as (h) "[H● HsepM]".
     destruct (h !! l) as [v'| ] eqn: Hlookup.
-    - (* auth map contains l --> contradiction *)
-      iDestruct (big_sepM_lookup with "HsepM") as "[_ Hl']"; first done.
+    - iDestruct (big_sepM_lookup with "HsepM") as "[_ Hl']"; first done.
       by iCombine "Hl Hl'" gives %[??].
     - iMod (own_update with "H●") as "[H● H◯]".
       { apply lookup_to_inv_heap_None in Hlookup.
@@ -210,9 +209,8 @@ Section inv_heap.
     split; [apply: ucmra_unit_least|done].
   Qed.
 
-  (** An accessor to make use of [inv_pointsto_own].
-    This opens the invariant *before* consuming [inv_pointsto_own] so that you can use
-    this before opening an atomic update that provides [inv_pointsto_own]!. *)
+  (** Opens the invariant before consuming [inv_pointsto_own], so that it can be used before
+      opening an atomic update that provides [inv_pointsto_own]. *)
   Lemma inv_pointsto_own_acc_strong E :
     ↑inv_heapN ⊆ E →
     inv_heap_inv L V ={E, E ∖ ↑inv_heapN}=∗ ∀ l v I, l ↦_I v -∗

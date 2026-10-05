@@ -16,8 +16,8 @@ Class invGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
       #[local] invGpreS_lc :: tlcGpreS Σ;
     }.
 
-(* [invGS_lc] and [invGS_wsat] are global so that the lemmas about credits (which require
-[tlcGS]) and the lemmas in [invariants.v] (which require [wsatGS]) apply under [invGS]. *)
+(* Global, so that the credit lemmas (under [tlcGS]) and the lemmas of [invariants.v] (under
+   [wsatGS]) apply under [invGS]. *)
 Class invGS `{SI : sidx} (Σ : gFunctors) : Set := InvG {
   #[global] invGS_wsat :: wsatGS Σ;
   #[global] invGS_lc :: tlcGS Σ;
@@ -30,7 +30,6 @@ Definition invΣ `{SI : sidx} : gFunctors :=
 Global Instance subG_invΣ `{SI : sidx} {Σ} : subG invΣ Σ → invGpreS Σ.
 Proof. solve_inG. Qed.
 
-(* Allocation of invGS. *)
 Lemma invGS_alloc `{SI : sidx} `{!invGpreS Σ} :
   ⊢ |==> ∃ _ : invGS Σ, (∃ x : Ord.t, rupd_pred x) ∗ wsat ∗ ownE ⊤.
 Proof.
@@ -73,7 +72,6 @@ Global Instance uPred_bi_fupd `{SI : sidx} `{!invGS Σ} : BiFUpd (uPredI (iResUR
 Global Instance uPred_bi_bupd_fupd `{SI : sidx} `{!invGS Σ} : BiBUpdFUpd (uPredI (iResUR Σ)).
 Proof. rewrite /BiBUpdFUpd uPred_fupd_unseal. by iIntros (E P) ">? [$ $] !> !>". Qed.
 
-(** A relational update is a fancy update. *)
 Lemma rupd_fupd `{SI : sidx} {Σ : gFunctors} `{!invGS Σ} P E:
   (|==>r P) -∗ |={E}=> P.
 Proof.
@@ -83,10 +81,7 @@ Qed.
 
 (** * Later credits at fancy updates *)
 
-(** [lc_fupd_elim_later] allows to eliminate a later from a hypothesis at an update.
-  This is typically used as [iMod (lc_fupd_elim_later with "Hcredit HP") as "HP".],
-  where ["Hcredit"] is a credit available in the context and ["HP"] is the
-  assumption from which a later should be stripped. *)
+(** Typical use: [iMod (lc_fupd_elim_later with "Hcredit HP") as "HP"]. *)
 Lemma lc_fupd_elim_later_ord `{SI : sidx} `{!invGS Σ} E P :
    £ 1%ord -∗ (▷ P) -∗ |={E}=> P.
 Proof.
@@ -100,10 +95,7 @@ Lemma lc_fupd_elim_later `{SI : sidx} `{!invGS Σ} E P :
    £n 1 -∗ (▷ P) -∗ |={E}=> P.
 Proof. rewrite tlc_one_nat. apply lc_fupd_elim_later_ord. Qed.
 
-(** If the goal is a fancy update, this lemma can be used to make a later appear
-  in front of it in exchange for a later credit.
-  This is typically used as [iApply (lc_fupd_add_later with "Hcredit")],
-  where ["Hcredit"] is a credit available in the context. *)
+(** Typical use on a fancy-update goal: [iApply (lc_fupd_add_later with "Hcredit")]. *)
 Lemma lc_fupd_add_later_ord `{SI : sidx} `{!invGS Σ} E1 E2 P :
   £ 1%ord -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
 Proof.
@@ -115,7 +107,6 @@ Lemma lc_fupd_add_later `{SI : sidx} `{!invGS Σ} E1 E2 P :
   £n 1 -∗ (▷ |={E1, E2}=> P) -∗ |={E1, E2}=> P.
 Proof. rewrite tlc_one_nat. apply lc_fupd_add_later_ord. Qed.
 
-(** Similar to above, but here we are adding [n] laters. *)
 Lemma lc_fupd_add_laterN `{SI : sidx} `{!invGS Σ} E1 E2 P n :
   £ (Ord.from_nat n) -∗ (▷^n |={E1, E2}=> P) -∗ |={E1, E2}=> P.
 Proof.

@@ -1,14 +1,10 @@
 (** * Round relations of the obligation model
 
-    A round of a model update ([mupd]) may change several obligations at once (moving a
-    subtree to another thread changes the owner of all its nodes). The rounds therefore use
-    pointwise relations instead of single model steps:
-    - [obls_ndf]: every obligation stays the same or makes progress (strictly less fuel,
-      possibly a new owner); new obligations may be added (non-discharging rounds,
-      [mupd_nd_step]);
-    - [obls_lef]: the same, and obligations may also be discharged (every round of [mupd]);
-    - [wits_ndf] / [wits_lef]: witnesses do not increase (and may be discharged for [lef]).
-    [obls_lef] implies the coarse relation [obls_le] seen by adequacy. *)
+    A round of [mupd] may change several obligations at once (moving a subtree changes the
+    owner of all its nodes), so rounds use pointwise relations: [obls_ndf] (every obligation
+    stays or makes progress; new ones may be added), [obls_lef] (also discharges), and
+    [wits_ndf] / [wits_lef] (witnesses do not increase). [obls_lef] implies the order
+    [obls_le] seen by adequacy. *)
 
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -90,8 +86,6 @@ End rels.
 Section owit_rels.
   Context `{!ord_mono_fun_class}.
 
-  (** A witness round compatible with a non-discharging obligation round does not discharge
-      witnesses. *)
   Lemma wits_lef_wits_ndf Ω1 Ω2 W1 W2 :
     owit_inv Ω1 W1 → obls_ndf Ω1 Ω2 → wits_lef W1 W2 → owit_inv Ω2 W2 → wits_ndf W1 W2.
   Proof.
@@ -114,7 +108,6 @@ Section owit_rels.
     - apply owit_inv_dom in I1, I2. by rewrite -I1 -I2.
   Qed.
 
-  (** Adding a fresh obligation is a non-discharging round. *)
   Lemma obls_ndf_insert_fresh (Ω : obls) k g : Ω !! k = None → obls_ndf Ω (<[k:=g]> Ω).
   Proof.
     intros Hk x g1 Hx. exists g1. split; last by left.
@@ -197,7 +190,6 @@ Section witness_choice.
   Definition owit_inv_lb_mon (γ : obl_owner → obl_fuel → obl_fuel) : Prop :=
     (∀ a b i j, (a w< b) → (γ i a w< γ j b)) ∧ (∀ i a, γ i a w≤ η a).
 
-  (** Choosing a map pointwise. *)
   Lemma map_Forall2_choice {A B : Type} (Ω2 : gmap oid A) (P : oid → A → B → Prop) :
     (∀ k a, Ω2 !! k = Some a → ∃ b, P k a b) → ∃ W2 : gmap oid B, map_Forall2 P Ω2 W2.
   Proof.

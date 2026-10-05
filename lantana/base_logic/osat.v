@@ -56,7 +56,6 @@ Module osatGS.
         osatGpreS_bound : inG Σ (gmap_viewR oid (agreeR (Ord.t)));
         osatGpreS_state : inG Σ (reservation_mapUR (mono_natUR));
         osatGpreS_fuel : inG Σ (reservation_mapUR bankUR);
-        (* Keep track of the current owner of each obl, if an owner exists *)
         osatGpreS_owner : inG Σ (reservation_mapUR (dfrac_agreeR (leibnizO obl_owner)));
       }.
 
@@ -82,9 +81,8 @@ Module osatGS.
 End osatGS.
 Import osatGS.
 
-(** User interface *)
-(* Make the instances local to this file. We cannot use #[local] in the code *)
-(* above, as that would make the instances local to the module. *)
+(* Local to this file: [#[local]] in the module above would make them local to the module
+   only. *)
 Local Existing Instances osat_inG
   osatGpreS_bound osatGpreS_state osatGpreS_fuel osatGpreS_owner.
 
@@ -172,7 +170,6 @@ Definition osat `{SI : sidx} `{!osatGS Σ} `{!ord_mono_fun_class}
             (∃ t, oblG_owner k t (1)%Qp)
       end))%I.
 
-(** Properties *)
 Section osat.
   Context `{SI : sidx} `{!osatGS Σ} `{OMF : !ord_mono_fun_class}.
 
@@ -939,7 +936,6 @@ Section osat.
 
 End osat.
 
-(* Allocation of an initial obl protocol. *)
 Lemma osat_alloc `{SI : sidx} `{!osatGpreS Σ} `{!ord_mono_fun_class} :
   ⊢ |==> ∃ _ : osatGS Σ, osat ∅.
 Proof.

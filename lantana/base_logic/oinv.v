@@ -20,12 +20,10 @@ Definition oblG_inv `{SI : sidx} `{!osatGS.osatGS Σ} `{!invGS Σ}
   (N : namespace) (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
   inv N (oblG_variant k q P Q R).
 
-(** Properties *)
 Section oinv.
   Context `{SI : sidx} `{!osatGS.osatGS Σ} `{!invGS Σ} `{OMF : !ord_mono_fun_class}.
 
   (** Instances *)
-  (* Variant *)
   Global Instance oblG_inv_contractive_1 N k q Q R : Contractive (λ P, oblG_inv N k q P Q R).
   Proof. rewrite /oblG_inv /oblG_variant. solve_contractive. Qed.
   Global Instance oblG_inv_contractive_2 N k q P R : Contractive (λ Q, oblG_inv N k q P Q R).

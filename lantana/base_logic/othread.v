@@ -14,7 +14,6 @@ From lantana.base_logic Require Export osat.
 (** The ghost state for thread obls *)
 Module othreadGS.
 
-  (* Assumes thread ids are positive *)
   Class othreadGpreS `{SI : sidx} (Σ : gFunctors) : Set :=
     OthreadGpreS {
         othreadGpreS_owns : inG Σ (reservation_mapUR (gmap_viewR oid (unitUR)));
@@ -45,9 +44,6 @@ Module othreadGS.
 End othreadGS.
 Import othreadGS.
 
-(** User interface *)
-(* Make the instances local to this file. We cannot use #[local] in the code *)
-(* above, as that would make the instances local to the module. *)
 Local Existing Instances othread_inG othreadGpreS_owns othreadGpreS_obls othreadGpreS_exec othreadGpreS_elem.
 
 (* Owns: thread currently has this obl *)
@@ -63,7 +59,7 @@ Local Definition othreadG_owns_auth_obls `{SI : sidx} `{!othreadGS Σ}
   i (TObls : gmap oid unit) : iProp Σ :=
   (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (TObls)))).
 
-(* Obls: live obls assigned to this thread, also fix to empty when thread terminates *)
+(* Obls: the live obligations of the thread; empty once it terminates. *)
 Definition othreadG_obls `{SI : sidx} `{!othreadGS Σ} (i : positive) (G : oids) : iProp Σ :=
   own obls_name (gmap_view_frag i (DfracOwn 1) (G)).
 Global Typeclasses Opaque othreadG_obls.
@@ -696,7 +692,6 @@ Section othread.
 
 End othread.
 
-(* Allocation of initial invariant. *)
 Lemma othread_alloc `{SI : sidx} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGpreS Σ} :
   ⊢ |==> ∃ _ : othreadGS Σ, othread ∅ ∗ oassigned ∅.

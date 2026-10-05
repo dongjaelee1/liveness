@@ -5,8 +5,7 @@ From stdpp Require Import base.
 From lantana.algebra Require Import axioms.
 From Stdlib Require Import Program.
 
-(** Ordered commutative monoids, based on the order [leR].
-    Reference: "Module OCM" in Lilo and FOS. *)
+(** Reference: "Module OCM" in Lilo and FOS. *)
 Module OCM.
   Class t {car : Type} (leR : car -> car -> Prop) (addO : car -> car -> car) := {
       unit : car;

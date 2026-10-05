@@ -8,7 +8,7 @@ From iris.prelude Require Import options.
 From lantana.algebra Require Import ocm.
 
 Variant bank `{OCM.t A leR addO} : Type :=
-  | BankCash (s : quotient.t leR addO) (* cash [s] *)
+  | BankCash (s : quotient.t leR addO)
   | BankDebt (e : quotient.t leR addO) (s : quotient.t leR addO) (q : Qp) (* debt bound [e], cash [s], fraction [q] *)
 .
 
@@ -262,7 +262,6 @@ Section bank.
     rewrite quotient.from_monoid_add in Hz2. apply quotient.from_monoid_le; auto.
   Qed.
 
-  (** More properties. *)
   Lemma cash_add a0 a1 : cash a0 ⋅ cash a1 = cash (a0 ⊕ a1).
   Proof. rewrite /cash bank_op_cash quotient.from_monoid_add. auto. Qed.
 

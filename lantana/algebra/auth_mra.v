@@ -78,7 +78,7 @@ Section auth_mra.
     IsOp (to_mra (R:=R) a) (to_mra a1) (to_mra a2) → IsOp' (◯AM[R] a) (◯AM[R] a1) (◯AM[R] a2).
   Proof. rewrite /IsOp' /IsOp /auth_mra_know=> -> //. Qed.
 
-  (** rephrasing of [auth_mra_know_op] useful for weakening a fragment to a previous knowledge *)
+  (** Weakens a fragment to an earlier knowledge [a']. *)
   Lemma auth_mra_know_op_R_l `{!Transitive R} a a' :
     R a' a →
     ◯AM[R] a ≡ ◯AM[R] a' ⋅ ◯AM[R] a.

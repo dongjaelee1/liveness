@@ -10,7 +10,6 @@ From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Import fancy_updates.
 Import uPred.
 
-(* we create a notion of satisfiability which includes invariant masks *)
 Class SatisfiableAtFupd `{SI : sidx} {Σ : gFunctors} `{!invGS Σ} (sat_at : coPset → iProp Σ → Prop) := {
   sat_fupd E1 E2 P: sat_at E1 (|={E1, E2}=> P)%I → sat_at E2 P
 }.

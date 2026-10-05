@@ -38,10 +38,7 @@ Section tc_well_founded.
 
 End tc_well_founded.
 
-(** Relational updates are defined parametrically over:
-  - a type [X],
-  - a well-founded relation [rupd_rel : X → X → Prop],
-  - a predicate [rupd_pred : X → iProp] for the total credit supply. *)
+(** [rupd_pred x]: the total credit supply is [x]. *)
 
 Class rupdG `{SI : sidx} (Σ : gFunctors) (X : Type) :=
   RelG {
@@ -50,19 +47,9 @@ Class rupdG `{SI : sidx} (Σ : gFunctors) (X : Type) :=
       rupd_rel_wf : well_founded rupd_rel;
     }.
 
-(**
-   The definition of [rupd_pre] is the heart of the relational update.
-   It is parameterized over recursive occurences of the update modality. Whenever we
-   do a relational update, we get to assume the total credit supply (here
-   [rupd_pred]). Next, we get to update the ghost state [|==>], and then we can
-   choose between finishing the update or the recursive case. In the recursive
-   case, we have to decrease the credit supply (here with [tc rupd_rel x' x])
-   and then we can prove the relational update again underneath a later. Proving
-   the relational update underneath a later is what allows us to eliminate other
-   laters in our context.
-
-   We define the actual relational update [rupd] as the fixpoint of [rupd_pre].
-*)
+(** Given the credit supply [x], update the ghost state, then either finish, or decrease the
+    supply ([tc rupd_rel x' x]) and continue under a later. Continuing under a later is what
+    eliminates the laters of the context. [rupd] is the fixpoint of [rupd_pre]. *)
 
 Definition rupd_pre `{SI : sidx} {Σ : gFunctors} {X} `{!rupdG Σ X} (rupd : iPropO Σ -d> iPropO Σ) :
   iProp Σ -d> iPropO Σ :=
@@ -90,8 +77,8 @@ Proof.
   by rewrite rupd_eq /rupd_def {1}(fixpoint_unfold rupd_pre P) {1}/rupd_pre.
 Qed.
 
-(** The rules of the later-elimination update from the paper, for the general relational
-   update. The rules of later credits are derived from them in [later_credits.v]. *)
+(** The rules of the paper's later-elimination update; [later_credits.v] derives the rules of
+    later credits from them. *)
 Section rupd_lemmas.
   Context `{SI : sidx} {Σ : gFunctors} {X} `{rG : !rupdG Σ X}.
   Implicit Types (P Q : iProp Σ).
@@ -106,14 +93,12 @@ Section rupd_lemmas.
       eapply SIdx.lt_le_incl; auto.
   Qed.
 
-  (** A standard update can be turned into a relational update. *)
   Lemma bupd_rupd P : (|==> P) ⊢ (|==>r P).
   Proof.
     rewrite rupd_unfold; iIntros "Hupd" (x) "Hpr".
     iMod "Hupd" as "P". iModIntro. iLeft. by iFrame.
   Qed.
 
-  (** We can always introduce a relational update. *)
   Lemma rupd_intro P : P ⊢ |==>r P.
   Proof.
     rewrite rupd_unfold.
@@ -121,15 +106,13 @@ Section rupd_lemmas.
     iLeft; by iFrame.
   Qed.
 
-  (** We can combine two relational updates into one. *)
   Lemma rupd_bind P Q :
     (P -∗ |==>r Q) ⊢ (|==>r P) -∗ (|==>r Q).
   Proof.
     iLöb as "IH". iIntros "PQ".
     rewrite {2}(rupd_unfold P) {4}(rupd_unfold Q).
     iIntros  "Hupd" (x) "Hpr". iMod ("Hupd" with "Hpr") as "[Hupd|Hupd]".
-    - (* base case for the update around P *)
-      iDestruct "Hupd" as "[Hpr Hupd]".
+    - iDestruct "Hupd" as "[Hpr Hupd]".
       iSpecialize ("PQ" with "Hupd").
       rewrite {3}(rupd_unfold Q).
       iMod ("PQ" with "Hpr") as "[Hupd|Hupd]".
@@ -141,9 +124,7 @@ Section rupd_lemmas.
       iExists _; iFrame. iNext. by iApply ("IH" with "PQ Hupd").
   Qed.
 
-  (** This lemma will allow us to spend one credit for a later elimination.
-     Since the relational update is defined parametrically over the type X
-     and the credit supply, the "spending of a credit" is generalized here. *)
+  (** The general form of spending a credit for a later elimination. *)
   Lemma rupd_step P :
     (∀ x, rupd_pred x -∗ |==> ∃ y, ⌜tc rupd_rel y x⌝ ∗ rupd_pred y ∗ ▷ |==>r P) ⊢ |==>r P.
   Proof.
@@ -222,9 +203,8 @@ Section rupd_lemmas.
     by rewrite -rupd_intro -or_intro_l.
   Qed.
 
-  (* A safety check that relational updates can replace basic updates *)
-  (* We do not use this to build an instance, because it would conflict
-     with the basic updates. Instead, we shadow the proofmode lemmas below. *)
+  (* Relational updates satisfy the laws of basic updates. Not an instance, which would
+     conflict with the basic updates: the proof mode instances below shadow them instead. *)
   Lemma bi_bupd_mixin_rupd : BiBUpdMixin (iPropI Σ) rupd.
   Proof.
     split.
@@ -235,8 +215,7 @@ Section rupd_lemmas.
     - apply rupd_frame_r.
   Qed.
 
-  (* The following instances make the Iris Proof Mode aware of the later
-     elimination update. They are derived from the simpler rules above. *)
+  (* Proof mode instances, derived from the rules above. *)
   Global Instance elim_bupd_rupd (p : bool) P Q :
     ElimModal True p false (|==> P) P (|==>r Q) (|==>r Q)%I.
   Proof.
@@ -326,9 +305,9 @@ End rupd_lemmas.
 
 (** * Eliminating relational updates in adequacy proofs
 
-  If [|==>r P] is satisfiable, then so is [P]; e.g., to access the postcondition of a weakest
-  precondition. Getting rid of [|==>r] lifts the existential quantifier over the credit supply
-  out of the logic, which relies on the existential property of Transfinite Iris. *)
+  If [|==>r P] is satisfiable, then so is [P]. This lifts the existential quantifier over the
+  credit supply out of the logic, which relies on the existential property of Transfinite
+  Iris. *)
 
 Class SatisfiableRUpd `{SI : sidx} {X : Type} {Σ : gFunctors} `{!rupdG Σ X} (sat : iProp Σ → Prop) := {
     sat_rupd P : sat (|==>r P) → sat P

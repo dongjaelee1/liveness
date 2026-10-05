@@ -23,17 +23,11 @@ Class mupdGpreS `{SI : sidx} (Σ : gFunctors) :=
 
 Class mupdGS `{SI : sidx} (Σ : gFunctors) :=
   MupdG {
-      (** Invariants. *)
       #[global] mupd_invGS :: invGS Σ;
-      (** Obls. *)
       #[global] mupd_osatGS :: osatGS.osatGS Σ;
-      (** Obls assigned to threads. *)
       #[global] mupd_othreadGS :: othreadGS.othreadGS Σ;
-      (** Obligation forest. *)
       #[global] mupd_oforestGS :: oforestGS.oforestGS Σ;
-      (** Witnesses. *)
       #[global] mupd_owitGS :: owitGS.owitGS Σ;
-      (** Model history. *)
       #[global] mupd_mhistGS :: mhistGS.mhistGS Σ;
     }.
 Global Opaque mupd_invGS mupd_osatGS mupd_othreadGS mupd_oforestGS mupd_owitGS mupd_mhistGS.
@@ -49,7 +43,7 @@ Definition model_interp `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}
   (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗
    oforest Ω Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
 
-(** ** Modality for updating obls. *)
+(** ** The model update *)
 Definition mupd_pre `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (mupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
@@ -82,7 +76,6 @@ Proof.
     do 21 (f_equiv || done).
 Qed.
 
-(* take the least fixpoint of the above definition *)
 Local Definition mupd_def `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ : iProp Σ → iProp Σ :=
   λ P, ((bi_least_fixpoint (mupd_pre n Θ)) P)%I.
 Local Definition mupd_aux : seal (@mupd_def). by eexists. Qed.
@@ -135,15 +128,12 @@ Section mupd.
     iIntros "!>" (?) "[$ _]".
   Qed.
 
-  (** An empty fancy update can be turned into an obl update. *)
   Lemma fupd_mupd n Θ P : (|={∅}=> P) ⊢ (|=[n,Θ]=>m P).
   Proof. rewrite mupd_unfold. iIntros "Hupd". iLeft. done. Qed.
 
-  (** We can always introduce a obl update. *)
   Lemma mupd_intro n Θ P : P ⊢ |=[n,Θ]=>m P.
   Proof. rewrite mupd_unfold. iIntros "HP". iLeft. iModIntro. done. Qed.
 
-  (** We can always eliminate an empty fancy update. *)
   Lemma fupd_mupd_elim n Θ P :
     (|={∅}=> |=[n,Θ]=>m P) ⊢ |=[n,Θ]=>m P.
   Proof.
@@ -157,7 +147,6 @@ Section mupd.
     iPoseProof (owit_mon _ _ H with "N") as "$". iFrame. done.
   Qed.
 
-  (** We can combine two obl updates into one. *)
   Lemma mupd_bind n Θ P Q :
     (P -∗ |=[n,Θ]=>m Q) ⊢ (|=[n,Θ]=>m P) -∗ (|=[n,Θ]=>m Q).
   Proof.
@@ -365,10 +354,8 @@ Section mupd.
 
   (** ** Non-discharging rounds
 
-      A model update may take a non-discharging round of the obligations ([obls_ndf Ω1 Ω2]:
-      every obligation stays or makes progress, possibly changing owner, and new ones may
-      appear), along which the witnesses do not increase ([wits_ndf]). The obligation rules
-      (opreds.v) are proved through [mupd_nd_step]. *)
+      A round along [obls_ndf] and [wits_ndf]. The obligation rules of [opreds.v] are proved
+      through [mupd_nd_step]. *)
   Lemma mupd_nd_step n Θ P :
     (∀ h i Ω1 W1,
        model_interp h i Ω1 W1 n Θ ={∅}=∗
@@ -388,7 +375,6 @@ Section mupd.
 
 End mupd.
 
-(* Wrapper to use fupd. *)
 Definition fmupd `{SI : sidx} `{!mupdGS Σ} `{!ord_mono_fun_class} E1 E2 n Θ : iPropO Σ -d> iPropO Σ :=
   (λ P, |={E1,∅}=> |=[n,Θ]=>m |={∅,E2}=> P)%I.
 Notation "'|={' E1 , E2 : n , Θ '}=>m' P" := (fmupd E1 E2 n Θ P)
@@ -448,7 +434,6 @@ Section fmupd.
     iIntros "Fupd". iMod "H". iMod "Fupd" as "_". done.
   Qed.
 
-  (** Change to a larger mask. *)
   Lemma fmupd_mask_mono E1 E2 n Θ P :
     E1 ⊆ E2 →
     (|={E1:n,Θ}=>m P) ⊢ |={E2:n,Θ}=>m P.
@@ -459,7 +444,6 @@ Section fmupd.
     iModIntro. iMod "H" as "$". eauto.
   Qed.
 
-  (** We can combine two obl updates into one. *)
   Lemma fmupd_bind E1 E2 E3 n Θ P Q :
     (P -∗ |={E2,E3:n,Θ}=>m Q) ⊢ (|={E1,E2:n,Θ}=>m P) -∗ (|={E1,E3:n,Θ}=>m Q).
   Proof.
@@ -645,7 +629,6 @@ Section fmupd.
 
 End fmupd.
 
-(* Allocation of model_interp. *)
 Lemma model_interp_alloc `{SI : sidx} `{!ord_mono_fun_class} `{!mupdGpreS Σ}
   (n : nat) :
   ⊢ |==> ∃ _ : mupdGS Σ, (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗

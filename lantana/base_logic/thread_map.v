@@ -9,7 +9,6 @@ From iris.prelude Require Import options.
 
 Local Notation thread_map P V := (gmap P V).
 
-(** The CMRA we need. *)
 Class thread_mapGpreS `{SI: sidx} (P V : Type) (Σ : gFunctors) `{Countable P} := {
   #[local] thread_map_GpreS_inG :: ghost_mapG Σ P V
 }.

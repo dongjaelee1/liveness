@@ -35,9 +35,6 @@ Module owitGS.
 End owitGS.
 Import owitGS.
 
-(** User interface *)
-(* Make the instances local to this file. We cannot use #[local] in the code *)
-(* above, as that would make the instances local to the module. *)
 Local Existing Instances owit_inG owitGpreS_witness.
 
 (* Witness: manage credits for an obl's witness progress *)
@@ -83,7 +80,6 @@ Definition owit_inv `{!ord_mono_fun_class}
                  end
     ) Ω W.
 
-(** Properties *)
 Section owit.
   Context `{SI : sidx} `{OSAT : !osatGS.osatGS Σ} `{!owitGS Σ} `{OMF : !ord_mono_fun_class}.
 
@@ -367,7 +363,6 @@ Section owit.
 
 End owit.
 
-(* Allocation of the initial witness protocol. *)
 Lemma owit_alloc `{SI : sidx} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!owitGpreS Σ} :
   ⊢ |==> ∃ _ : owitGS Σ, owit ∅.

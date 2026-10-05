@@ -36,9 +36,6 @@ Module mhistGS.
 End mhistGS.
 Import mhistGS.
 
-(** User interface *)
-(* Make the instances local to this file. We cannot use #[local] in the code *)
-(* above, as that would make the instances local to the module. *)
 Local Existing Instances mhist_inG mhistGpreS_hist.
 
 Definition event_le `{OC : obl_class} : (nat * obls) → (nat * obls) → Prop :=
@@ -303,7 +300,6 @@ Section history_interp.
 
 End history_interp.
 
-(* Allocation of a history interpretation. *)
 Lemma model_history_interp_init `{SI : sidx} `{OC : obl_class} `{!mhistGpreS Σ} n Ω :
   ⊢ |==> ∃ _ : mhistGS Σ, model_history_interp [(n, Ω)] 0 n Ω.
 Proof.

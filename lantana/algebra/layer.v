@@ -4,13 +4,9 @@ From stdpp Require Import base tactics.
 From lantana.ordinal Require Export ordinal_facts.
 From lantana.algebra Require Export measure.
 
-(** Lantana uses three libraries of ordinals:
-    1. [transfinite.stepindex.ordinals], only for step-indexing;
-    2. the opam library [Ordinal] ([Ord.t]), for the logic's internal definitions (fuels and
-       witnesses, see [measure_rep]);
-    3. [lantana.ordinal] ([ord.t]), a copy of 2 used for layers: using 2 for both the layers and
-       [measure_rep] causes a universe inconsistency.
-    Ideally, 2 would be universe polymorphic and 3 could be removed. *)
+(** [ord.t] is a copy of [Ord.t] of the [Ordinal] library (used by [measure_rep]): using [Ord.t]
+    for the layers too causes a universe inconsistency. A universe-polymorphic [Ordinal] would
+    make the copy unnecessary. *)
 
 Notation layer := ord.t.
 
@@ -24,7 +20,6 @@ Export hessenbergScope.
 
 Notation "'ℵ'" := (ord.large) : ordinal_scope.
 
-(** A measure grows with its layer. *)
 Lemma measure_rep_layer_le `{!ord_mono_fun_class} (ℓ1 ℓ2 : layer) μ :
   (ℓ1 <= ℓ2)%ordi → (measure_rep ℓ1 μ <= measure_rep ℓ2 μ)%ord.
 Proof.

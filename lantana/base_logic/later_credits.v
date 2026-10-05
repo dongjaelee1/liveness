@@ -12,7 +12,6 @@ From lantana.base_logic Require Export relational_updates.
 
 Section existential_inj.
 
-  (** The existential property is preserved by injections. *)
   Lemma type_inj_existential@{i j} (X : Type@{i}) (Y : Type@{j}) (SI : sidx) (f : X → Y) :
     TypeExistentialProperty Y SI →
     Inj eq eq f →
@@ -31,10 +30,9 @@ Section existential_inj.
 
 End existential_inj.
 
-(** The generic theory is stated for the abstraction [auth_rupd]: a discrete camera [A] (the
-   credits, used under the authoritative camera) with a well-founded relation [auth_rupd_rel], a
-   successor operation [auth_rupd_next], and compatibility properties. It is instantiated with
-   ordinals at the end of this file. *)
+(** The generic theory is stated for [auth_rupd]: a discrete camera of credits with a
+    well-founded relation [auth_rupd_rel] and a successor [auth_rupd_next]. It is instantiated
+    with ordinals at the end of this file. *)
 
 Class auth_rupd `{SI : sidx} (A : ucmra) := {
     auth_rupd_discrete :: CmraDiscrete A;
@@ -64,12 +62,9 @@ Definition auth_rupdΣ `{SI : sidx} (A : ucmra): gFunctors :=
 Global Instance subG_auth_rupdΣ `{SI : sidx} {Σ : gFunctors} {A : ucmra} : subG (auth_rupdΣ A) Σ → auth_rupd_GpreS Σ A.
 Proof. solve_inG. Qed.
 
-(** In the following section, we prove the properties of later credits for an instance of
-   [auth_rupd]. *)
 Section auth_rupd.
   Context `{SI : sidx} (Σ : gFunctors) (X : ucmra) `{!auth_rupd X}.
 
-  (** We instantiate the relational updates with the relation from [auth_rupd]. *)
   Global Instance auth_rupdGS_instance `{!auth_rupdGS Σ X} : rupdG Σ X :=
     {|
       rupd_pred := λ x, own auth_rupd_name (● x);
@@ -77,15 +72,12 @@ Section auth_rupd.
       rupd_rel_wf := auth_rupd_rel_wf;
     |}.
 
-  (** the connective for the total supply of credits *)
+  (** The total supply of credits. *)
   Definition rupdA `{!auth_rupdGS Σ X} (a : X) : iProp Σ := own auth_rupd_name (● a).
-  (** the connective for the later credits *)
+  (** Later credits. *)
   Definition rupdF `{!auth_rupdGS Σ X} (a : X) : iProp Σ := own auth_rupd_name (◯ a).
 
-  (** We prove a generic lemma about updating the ghost state of [auth_rupd] in Iris.
-     It effectively says that if we are willing to decrease our later credits (the [b]s),
-     then we can also decrease the total supply of later credits (the [a]s).
-   *)
+  (** Decreasing the credits [b] also decreases the total supply [a]. *)
   Lemma auth_rupd_rel_update `{!auth_rupdGS Σ X} (a b b' : X) :
     ✓ a → b ≼ a → auth_rupd_rel b' b → ∃ a', (a, b) ~l~> (a', b') ∧ auth_rupd_rel a' a.
   Proof.
@@ -107,11 +99,7 @@ Section auth_rupd.
     - eapply Hstep.
   Qed.
 
-  (** We lift the generic ghost state update lemma to Iris propositions. The
-     generic version says that if we can decrease [a] later credits to [a'] later
-     credits (e.g., by going from 1 to 0 credits), then we are allowed to
-     eliminate a later modality (because it appears in front of our goal).
-     *)
+  (** Decreasing the credits from [a] to [a'] eliminates a later in front of the goal. *)
   Lemma auth_rupd_step `{!auth_rupdGS Σ X} (a a' : X) P :
     auth_rupd_rel a' a →
     rupdF a ∗ (rupdF a' -∗ ▷ |==>r P) ⊢ |==>r P.
@@ -129,9 +117,6 @@ Section auth_rupd.
     iFrame. iPureIntro. by apply tc_once.
   Qed.
 
-  (** A corollary of the definition of relational updates
-     is that we can always weaken the number of credits,
-     meaning we can drop some if we want to.  *)
   Lemma auth_rupd_weaken `{!auth_rupdGS Σ X} (a a' : X):
     rc auth_rupd_rel a' a → (rupdF a ⊢ |==>r rupdF a').
   Proof.
@@ -140,8 +125,7 @@ Section auth_rupd.
     iFrame. iIntros "Hf". iNext. by iApply rupd_intro.
   Qed.
 
-  (** We can split and combine credits as we see fit. For ordinals, [⋅] is the Hessenberg
-     sum. *)
+  (** For ordinals, [⋅] is the Hessenberg sum. *)
   Lemma rupdF_split `{!auth_rupdGS Σ X} x y :
     rupdF (x ⋅ y) ⊣⊢ rupdF x ∗ rupdF y.
   Proof.
@@ -154,17 +138,13 @@ Section auth_rupd.
     intros He. rewrite /rupdF. rewrite He. done.
   Qed.
 
-  (** In Transfinite Iris, we define a modality for allocating new later credits.
-     We use this modality in the definition of the weakest precondition. It is
-     essentially just an existential quantifier over the additional number of
-     later credits that we would like to allocate for the rest of the proof.
-  *)
+  (** [ALC P]: allocates any number of new credits for the proof of [P] (used in the weakest
+      precondition). *)
   Section allocation.
     Context `{!auth_rupdGS Σ X}.
 
     Definition ALC P := (∃ x : X, rupdF x -∗ |==>r P)%I.
 
-    (* some laws for the allocation modality *)
     Lemma ALC_later P : ALC P ⊣⊢ ALC (▷ P).
     Proof.
       rewrite /ALC; apply bi.equiv_entails; split.
@@ -327,21 +307,8 @@ Section auth_rupd.
 
   End allocation.
 
-  (** Later credits admit an induction principle that is similar to Löb
-       induction. Löb induction means (▷ P ⊢ P) implies ⊢ P. In other words, we
-       can assume our goal underneath a later. The corresponding principle for
-       later credits is:
-          (£1 -∗ P) ⊢ P implies ⊢ P
-     It means that if we are willing to spend one credit, then we can get access
-     to our goal.
-
-     Since later credits can only be spent at specific places (e.g., updates
-     |==>r and weakest preconditions), the principle only applies to certain
-     kinds of propositions P. We call them the CreditExchange propositions P
-     below.
-  *)
-
-  (* credits induction *)
+  (** Credit induction, the analogue of Löb induction: [(£1 -∗ P) ⊢ P] implies [⊢ P]. It holds
+      for the [CreditExchange] propositions, those that can trade a credit for a later. *)
   Class CreditExchange `{!auth_rupdGS Σ X} (P : iProp Σ) := {
       credit_to_later:
       rupdF (auth_rupd_next ε) ∗ ▷ P ⊢ P
@@ -410,14 +377,9 @@ End auth_rupd.
 Global Arguments rupdF {SI Σ X _} a.
 Global Arguments rupdA {SI Σ X _} a.
 
-(** The notation for later credits that we use in the rest of this development.
-
-    Remark: this overrides upstream Iris's notation ['£' n] (reserved at level 1 in
-    [iris.bi.notation], used by [iris.bi.later_credits] for its natural-number credits
-    [lc]). The two notations coexist and the most recently imported one wins, so a file
-    that imports Iris or Transfinite Iris modules after Lantana's may need to re-import
-    [lantana.base_logic.later_credits] last. Getting this wrong fails to type-check
-    (Lantana provides no [LaterCredits] instance for upstream's [lc]). *)
+(** This overrides Iris's notation ['£' n] for its credits [lc]: the most recently imported
+    notation wins, so a file importing Iris modules after Lantana's may need to import
+    [lantana.base_logic.later_credits] last. *)
 Notation "£ a" := (rupdF a).
 Notation "●£ a" := (rupdA a) (at level 60).
 
@@ -439,7 +401,6 @@ Proof.
   - rewrite -{2}Heq; eapply auth_rupd_next_step.
 Qed.
 
-(* Initial allocation *)
 Lemma auth_rupd_alloc `{SI : sidx} {Σ : gFunctors} M `{!auth_rupd M} `{!auth_rupd_GpreS Σ M} k :
   ⊢ |==> ∃ _ : auth_rupdGS Σ M, (●£ k ∗ £ k).
 Proof.
@@ -450,8 +411,6 @@ Proof.
 Qed.
 
 (** ** Transfinite later credits *)
-(** We instantiate the generic definition from above with ordinals to obtain transfinite
-    later credits [£ (α : Ord.t)]. *)
 Notation tlcGS Σ := (auth_rupdGS Σ OrdUR).
 Notation tlcGpreS Σ := (auth_rupd_GpreS Σ OrdUR).
 Notation tlcΣ := (auth_rupdΣ OrdUR).
@@ -479,7 +438,6 @@ Section transfinite_lc.
   Lemma ord_valid_trivial (a : OrdR) : ✓ a.
   Proof. done. Qed.
 
-  (* we define an auth rupd instance for ordinals *)
   Global Instance ord_auth_rupd : auth_rupd (OrdUR) :=
     {|
       auth_rupd_discrete := _;

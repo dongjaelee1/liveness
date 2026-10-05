@@ -1,17 +1,11 @@
 (** * Ghost state of obligation forests
 
-    The invariant [oforest Ω Θ] is the fifth conjunct of [model_interp]. Every live obligation
-    of [Ω] is a node of the forest and has a parent: a thread or another obligation ([Par]).
-    The children of each parent are kept in a ghost map ([Kids]) whose fragments are the
-    children predicates of the logic.
-
-    - The owner of an obligation (in [Ω]) is the owner of its parent; children of a thread are
-      owned by that thread.
-    - An obligation [x] whose parent is an obligation [c] stores a piece of its own fuel that
-      is strictly larger than the (model) fuel of [c]. Hence, when [c] makes progress, [x] can
-      split one unit off this piece and still be larger than the new fuel of [c]: the children
-      of an obligation burn fuel together with it, without any user resource.
-    - The fuel of every obligation stays below its initial fuel ([oblG_bound]). *)
+    The invariant [oforest Ω Θ], part of [model_interp]: every live obligation of [Ω] is a node
+    with a parent, a thread or an obligation ([Par]). The children of each parent are kept in a
+    ghost map ([Kids]); its fragments are one part of the children predicates [parP_kids]
+    ([opreds.v]). An obligation has the owner of its parent. Below an obligation [c], a node
+    stores a piece of its fuel above the fuel of [c], so it can split off a unit whenever [c]
+    makes progress: children burn fuel with their parent, without user resources. *)
 
 From iris.algebra Require Import reservation_map.
 From iris.proofmode Require Import proofmode.
@@ -430,7 +424,6 @@ Section forest_pure.
   Qed.
 
   (** ** Subtrees *)
-  (** [p] is an obligation of [X]. *)
   Definition par_in (X : gset oid) (p : parent) : Prop :=
     match p with PObl c => c ∈ X | PThread _ => False end.
   Global Instance par_in_dec X p : Decision (par_in X p).
@@ -536,7 +529,6 @@ Section forest_pure.
     destruct (Hgen _ Hx) as [->|(c& Hc& Hin)]; [by left|right]. eauto.
   Qed.
 
-  (** All nodes of the subtree of a node [k] are nodes with the owner of [k]. *)
   Lemma subtree_owner Ω Θ Par Kids k x :
     forest_wf Ω Θ Par Kids → k ∈ dom Par → x ∈ subtree Par k →
     x ∈ dom Par ∧ obl_owner_of Ω x = obl_owner_of Ω k.
@@ -910,7 +902,6 @@ Section oforest.
     by rewrite obl_fuel_of_insert_ne.
   Qed.
 
-  (** A fuel piece of a live obligation is below its model fuel. *)
   Lemma osat_fuel_le Ω x a :
     osat Ω -∗ oblG_fuel x a -∗ ⌜ ∀ f t, Ω !! x = Some (obl_assigned f t) → (a <= f)%ord ⌝.
   Proof.
@@ -923,7 +914,6 @@ Section oforest.
     etrans; first exact Hle. done.
   Qed.
 
-  (** Children and obligation parents are live. *)
   Lemma oforest_kids_live Ω Θ p K :
     oforest Ω Θ -∗ oforestG_kids p K -∗
     ⌜ (∀ x, x ∈ K → ∃ a t, Ω !! x = Some (obl_assigned a t)) ∧
@@ -936,7 +926,6 @@ Section oforest.
     - intros q ->. apply (fwf_par_live _ _ _ _ WF). apply (fwf_kids_dom _ _ _ _ WF (PObl q)). eauto.
   Qed.
 
-  (** The fuel of an obligation parent is below any fuel bound of it. *)
   Lemma oforest_obl_fuel_bound Ω Θ q K β :
     oforest Ω Θ -∗ oforestG_kids (PObl q) K -∗ oblG_bound q β -∗
     ⌜ (obl_fuel_of Ω q <= β)%ord ∧ ∃ a t, Ω !! q = Some (obl_assigned a t) ⌝.
@@ -991,10 +980,9 @@ Section oforest.
     by rewrite obl_fuel_of_insert_ne.
   Qed.
 
-  (** A step of thread [i]: the children of [i] spend the units given by the user; every
-      other node owned by [i] splits one unit off its stored piece, keeping exactly the fuel
-      its parent had. After the step of the model, which lowers the fuel of every obligation
-      owned by [i], the invariant holds again. *)
+  (** A step of thread [i]: its children spend the units given by the user; every other node of
+      [i] splits a unit off its piece, keeping exactly the fuel its parent had. Once the model
+      step lowers the fuel of [i]'s obligations, the invariant holds again. *)
   Lemma oforest_step Ω Θ i K :
     i ∈ Θ →
     oforest Ω Θ ∗ oforestG_kids (PThread i) K ∗
@@ -1484,7 +1472,6 @@ Section oforest.
 
 End oforest.
 
-(** Allocation of an empty forest. *)
 Lemma oforest_alloc `{SI : sidx} {Σ}
   `{!@osatGS.osatGS _ Σ} `{!othreadGS.othreadGS Σ} `{!oforestGpreS Σ} :
   ⊢ |==> ∃ _ : oforestGS Σ, oforest ∅ ∅.
