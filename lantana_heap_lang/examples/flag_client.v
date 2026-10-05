@@ -34,7 +34,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i k kl,
     l{{{ thread_expr i [] (writer #()) ∗ thP_kids i {[k; kl]} ∗ ([∗ set] g ∈ {[k; kl]}, oblP_fuel g 0 μ) ∗
          ⌜k ≠ kl⌝ ∗ oblP_kids k ∅ ∗ oblP_kids kl ∅ ∗
-         (* Start with the other half of the until ownership for the pointsto. *)
+         (* The other half of the until ownership for the pointsto. *)
          flag_tk l k ∗
          finallyI Nl kl 1 (exits #()@i) ∗
          is_flag l k 0 }}}
@@ -178,8 +178,7 @@ Section adequacy.
                thP_kids j {[kl2]} ∗ oblP_kids kl2 ∅ ∗
                ([∗ set] g ∈ {[k; kl1]}, oblP_fuel g 0 μ1) ∗ oblP_fuel kl2 1 μ2))%I.
 
-  (** What they guarantee: the pure and ghost parts guarantee nothing, and the quantified
-      names do not show. *)
+  (** What they guarantee: nothing for the pure and ghost parts; the names do not show. *)
   Let G_client {Σ} : tps heap_lang Σ :=
         (tps_true ∧ flag_tps l ∧ tps_until (l ↦ #0) (l ↦ #1) ∧
          tps_finally (exits #()@i) ∧ tps_finally (exits #1@j) ∧ tps_true)%S.

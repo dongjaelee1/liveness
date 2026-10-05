@@ -8,58 +8,8 @@ From iris.prelude Require Import options.
     (forked threads get fresh ids), with labels [Label t e], nondeterministic [ChooseNat], and
     the state predicates ([state_pred]) that atomic temporal formulas observe.
 
-Noteworthy design choices:
-
-- This is a right-to-left evaluated language, like CakeML and OCaml.  The reason
-  for this is that it makes curried functions usable: Given a WP for [f a b], we
-  know that any effects [f] might have to not matter until after *both* [a] and
-  [b] are evaluated.  With left-to-right evaluation, that triple is basically
-  useless unless the user let-expands [b].
-
-- Even after deallocating a location, the heap remembers that these locations
-  were previously allocated and makes sure they do not get reused. This is
-  necessary to ensure soundness of the [meta] feature provided by [gen_heap].
-  Also, unlike in languages like C, allocated and deallocated "blocks" do not
-  have to match up: you can allocate a large array of locations and then
-  deallocate a hole out of it in the middle.
-
-- For prophecy variables, we annotate the reduction steps with an "observation"
-  and tweak adequacy such that WP knows all future observations. There is
-  another possible choice: Use non-deterministic choice when creating a prophecy
-  variable ([NewProph]), and when resolving it ([Resolve]) make the
-  program diverge unless the variable matches. That, however, requires an
-  erasure proof that this endless loop does not make specifications useless.
-
-The expression [Resolve e p v] attaches a prophecy resolution (for prophecy
-variable [p] to value [v]) to the top-level base-reduction step of [e]. The
-prophecy resolution happens simultaneously with the base-step being taken.
-Furthermore, it is required that the base-step produces a value (otherwise
-the [Resolve] is stuck), and this value is also attached to the resolution.
-A prophecy variable is thus resolved to a pair containing (1) the result
-value of the wrapped expression (called [e] above), and (2) the value that
-was attached by the [Resolve] (called [v] above). This allows, for example,
-to distinguish a resolution originating from a successful [CmpXchg] from one
-originating from a failing [CmpXchg]. For example:
- - [Resolve (CmpXchg #l #n #(n+1)) #p v] will behave as [CmpXchg #l #n #(n+1)],
-   which means step to a value-boole pair [(n', b)] while updating the heap, but
-   in the meantime the prophecy variable [p] will be resolved to [(n', b), v)].
- - [Resolve (! #l) #p v] will behave as [! #l], that is return the value
-   [w] pointed to by [l] on the heap (assuming it was allocated properly),
-   but it will additionally resolve [p] to the pair [(w,v)].
-
-Note that the sub-expressions of [Resolve e p v] (i.e., [e], [p] and [v])
-are reduced as usual, from right to left. However, the evaluation of [e]
-is restricted so that the base-step to which the resolution is attached
-cannot be taken by the context. For example:
- - [Resolve (CmpXchg #l #n (#n + #1)) #p v] will first be reduced (with by a
-   context-step) to [Resolve (CmpXchg #l #n #(n+1) #p v], and then behave as
-   described above.
- - However, [Resolve ((λ: "n", CmpXchg #l "n" ("n" + #1)) #n) #p v] is stuck.
-   Indeed, it can only be evaluated using a base-step (it is a β-redex),
-   but the process does not yield a value.
-
-The mechanism described above supports nesting [Resolve] expressions to
-attach several prophecy resolutions to a base-redex. *)
+    As in Iris: evaluation is right-to-left, so that specs of curried calls [f a b] are
+    usable; freed locations are never reused. *)
 
 Delimit Scope expr_scope with E.
 Delimit Scope val_scope with V.
@@ -69,20 +19,15 @@ Module heap_lang.
 (** Expressions and vals. *)
 Definition proph_id := positive.
 
-(** We have a notion of "poison" as a variant of unit that may not be compared
-with anything. This is useful for erasure proofs: if we erased things to unit,
-[<erased> == unit] would evaluate to true after erasure, changing program
-behavior. So we erase to the poison value instead, making sure that no legal
-comparisons could be affected. *)
+(** [LitPoison]: a unit that compares with nothing, the target of erasure (erasing to unit
+    would make [<erased> == unit] true). *)
 Inductive base_lit : Set :=
   | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitPoison
   | LitLoc (l : loc) | LitProphecy (p: proph_id).
 Inductive un_op : Set :=
   | NegOp | MinusUnOp.
 Inductive bin_op : Set :=
-  (** We use "quot" and "rem" instead of "div" and "mod" to
-      better match the behavior of 'real' languages:
-      e.g., in Rust, -30/-4 == 7. ("div" would return 8.) *)
+  (** "quot" and "rem" as in Rust ([-30/-4 = 7]), not "div" and "mod". *)
   | PlusOp | MinusOp | MultOp | QuotOp | RemOp (* Arithmetic *)
   | AndOp | OrOp | XorOp (* Bitwise *)
   | ShiftLOp | ShiftROp (* Shifts *)
@@ -135,11 +80,8 @@ with val :=
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-(** An observation associates a prophecy variable (identifier) to a pair of
-values. The first value is the one that was returned by the (atomic) operation
-during which the prophecy resolution happened (typically, a boolean when the
-wrapped operation is a CmpXchg). The second value is the one that the prophecy
-variable was actually resolved to. *)
+(** An observation: a prophecy and the pair of the value returned by the resolving atomic
+    operation and the value it is resolved to. *)
 Definition observation : Set := proph_id * (val * val).
 
 Notation of_val := Val (only parsing).
@@ -150,35 +92,11 @@ Definition to_val (e : expr) : option val :=
   | _ => None
   end.
 
-(** We assume the following encoding of values to 64-bit words: The least 3
-significant bits of every word are a "tag", and we have 61 bits of payload,
-which is enough if all pointers are 8-byte-aligned (common on 64bit
-architectures). The tags have the following meaning:
-
-0: Payload is the data for a LitV (LitInt _).
-1: Payload is the data for a InjLV (LitV (LitInt _)).
-2: Payload is the data for a InjRV (LitV (LitInt _)).
-3: Payload is the data for a LitV (LitLoc _).
-4: Payload is the data for a InjLV (LitV (LitLoc _)).
-5: Payload is the data for a InjRV (LitV (LitLoc _)).
-6: Payload is one of the following finitely many values, which 61 bits are more
-   than enough to encode:
-   LitV LitUnit, InjLV (LitV LitUnit), InjRV (LitV LitUnit),
-   LitV LitPoison, InjLV (LitV LitPoison), InjRV (LitV LitPoison),
-   LitV (LitBool _), InjLV (LitV (LitBool _)), InjRV (LitV (LitBool _)).
-7: Value is boxed, i.e., payload is a pointer to some read-only memory area on
-   the heap which stores whether this is a RecV, PairV, InjLV or InjRV and the
-   relevant data for those cases. However, the boxed representation is never
-   used if any of the above representations could be used.
-
-Ignoring (as usual) the fact that we have to fit the infinite Z/loc into 61
-bits, this means every value is machine-word-sized and can hence be atomically
-read and written.  Also notice that the sets of boxed and unboxed values are
-disjoint. *)
+(** Values are assumed word-sized: the unboxed ones below, and boxed ones (a pointer to
+    read-only memory); the two sets are disjoint. *)
 Definition lit_is_unboxed (l: base_lit) : Prop :=
   match l with
-  (** Disallow comparing (erased) prophecies with (erased) prophecies, by
-  considering them boxed. *)
+  (** Prophecies and poison count as boxed, so that two of them cannot be compared. *)
   | LitProphecy _ | LitPoison => False
   | LitInt _ | LitBool _  | LitLoc _ | LitUnit => True
   end.
@@ -195,10 +113,8 @@ Proof. destruct l; simpl; exact (decide _). Defined.
 Global Instance val_is_unboxed_dec v : Decision (val_is_unboxed v).
 Proof. destruct v as [ | | | [] | [] ]; simpl; exact (decide _). Defined.
 
-(** We just compare the word-sized representation of two values, without looking
-into boxed data.  This works out fine if at least one of the to-be-compared
-values is unboxed (exploiting the fact that an unboxed and a boxed value can
-never be equal because these are disjoint sets). *)
+(** Comparison compares the words, without looking into boxed data: sound when one of the
+    two values is unboxed. *)
 Definition vals_compare_safe (vl v1 : val) : Prop :=
   val_is_unboxed vl ∨ val_is_unboxed v1.
 Global Arguments vals_compare_safe !_ !_ /.
@@ -420,12 +336,9 @@ Canonical Structure locO `{SI : sidx} := leibnizO loc.
 Canonical Structure valO `{SI : sidx} := leibnizO val.
 Canonical Structure exprO `{SI : sidx} := leibnizO expr.
 
-(** Evaluation contexts *)
-(** Note that [ResolveLCtx] is not by itself an evaluation context item: we do
-not reduce directly under Resolve's first argument. We only reduce things nested
-further down. Once no nested contexts exist any more, the expression must take
-exactly one more step to a value, and Resolve then (atomically) also uses that
-value for prophecy resolution.  *)
+(** Evaluation contexts. [ResolveLCtx] is not an item by itself: in [Resolve e p v], only
+    the nested contexts of [e] are reduced; then the base step of [e] to a value also
+    resolves [p] to the pair of that value and [v], atomically. *)
 Inductive ectx_item :=
   | AppLCtx (v2 : val)
   | AppRCtx (e1 : expr)
@@ -458,13 +371,6 @@ Inductive ectx_item :=
   | ResolveRCtx (e0 : expr) (e1 : expr)
   | LabelCtx (t : string)
 .
-
-(** Contextual closure will only reduce [e] in [Resolve e (Val _) (Val _)] if
-the local context of [e] is non-empty. As a consequence, the first argument of
-[Resolve] is not completely evaluated (down to a value) by contextual closure:
-no base steps (i.e., surface reductions) are taken. This means that contextual
-closure will reduce [Resolve (CmpXchg #l #n (#n + #1)) #p #v] into [Resolve
-(CmpXchg #l #n #(n+1)) #p #v], but it cannot context-step any further. *)
 
 Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
   match Ki with
@@ -500,8 +406,8 @@ Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
   | LabelCtx t => Label t e
   end.
 
-(** State predicates retain the exact caller context. The fold below is
-    definitionally the evaluation-context language's [fill]. *)
+(** [pred_expr i C e]: thread [i] runs [e] in the context [C]. The fold below is
+    definitionally [fill]. *)
 Variant state_pred : Type :=
   | pred_pointsto (l : loc) (dq : dfrac) (v : val)
   | pred_expr (i : thread_id) (C : list ectx_item) (e : expr).
@@ -831,11 +737,8 @@ Canonical Structure heap_lang := LanguageOfEctx heap_ectx_lang.
 (* Prefer heap_lang names over ectx_language names. *)
 Export heap_lang.
 
-(** The following lemma is not provable using the axioms of [ectxi_language].
-The proof requires a case analysis over context items ([destruct i] on the
-last line), which in all cases yields a non-value. To prove this lemma for
-[ectxi_language] in general, we would require that a term of the form
-[fill_item i e] is never a value. *)
+(** Specific to heap_lang: the proof needs that [fill_item Ki e] is never a value, which
+    [ectxi_language] does not state. *)
 Lemma to_val_fill_some K e v : to_val (fill K e) = Some v → K = [] ∧ e = Val v.
 Proof.
   intro H. destruct K as [|Ki K]; first by apply of_to_val in H. exfalso.
@@ -856,8 +759,6 @@ Proof.
   apply to_val_fill_some in H3 as [-> ->]. subst e. done.
 Qed.
 
-(** If [e1] makes a base step to a value under some state [σ1] then any base
- step from [e1] under any other state [σ1'] must necessarily be to a value. *)
 Lemma base_step_to_val i e1 σ1 Θ κ e2 σ2 efs i' σ1' Θ' κ' e2' σ2' efs' :
   base_step i e1 σ1 Θ κ e2 σ2 efs →
   base_step i' e1 σ1' Θ' κ' e2' σ2' efs' → is_Some (to_val e2) → is_Some (to_val e2').

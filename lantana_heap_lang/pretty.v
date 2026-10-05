@@ -24,8 +24,7 @@ Global Instance pretty_binder : Pretty binder :=
        | BAnon => "<>"
        end.
 
-(** Note that this instance does not print function bodies and is thus not
-injective (unlike most `pretty` instances). *)
+(** Function bodies are not printed, so this instance is not injective. *)
 Global Instance pretty_val : Pretty val :=
   fix go v :=
     match v with

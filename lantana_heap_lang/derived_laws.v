@@ -4,11 +4,8 @@ From lantana.heap_lang Require Export primitive_laws.
 From lantana.heap_lang Require Import notation.
 From iris.prelude Require Import options.
 
-(** Derived laws, not using the lifting lemmas: the [array] connective and the lWP rules for
-    allocating and accessing arrays. *)
-
-(** The [array] connective is a version of [pointsto] that works
-with lists of values. *)
+(** The [array] connective ([pointsto] for a list of values) and the lWP rules for arrays,
+    derived without the lifting lemmas. *)
 
 Definition array `{!heapGS Σ} (l : loc) (dq : dfrac) (vs : list val) : iProp Σ :=
   [∗ list] i ↦ v ∈ vs, (l +ₗ i) ↦{dq} v.
@@ -16,9 +13,8 @@ Definition array `{!heapGS Σ} (l : loc) (dq : dfrac) (vs : list val) : iProp Σ
 Notation "l ↦∗ dq vs" := (array l dq vs)
   (at level 20, dq custom dfrac  at level 1, format "l  ↦∗ dq  vs") : bi_scope.
 
-(** We have [FromSep] and [IntoSep] instances to split the fraction (via the
-[AsFractional] instance below), but not for splitting the list, as that would
-lead to overlapping instances. *)
+(** The fraction splits (via [AsFractional]); the list does not, as that would give
+    overlapping instances. *)
 
 Section array_laws.
 Context `{!heapGS Σ}.

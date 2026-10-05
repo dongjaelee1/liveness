@@ -6,8 +6,7 @@ From lantana.heap_lang.examples Require Import step_tactics.
 
 (** * A flag: [set] writes [1] and [wait] spins until it reads [1]
 
-    The cell is "[0] until [1]" (an until on the flag's obligation), so [wait] terminates;
-    [flag_tps] is the flag's trace guarantee. *)
+    The cell is "[0] until [1]" (an until on the flag's obligation), so [wait] terminates. *)
 
 Module Flag.
 
@@ -47,7 +46,6 @@ Section proof.
   Definition flag_tk (l : loc) k : iProp Σ :=
     untilI Np k (1/2) (l ↦ #0) (l ↦ #1).
 
-  (** The trace properties guaranteed by the flag. *)
   Definition flag_tps (l : loc) : tps heap_lang Σ :=
     (tps_true ∧ tps_always (tps_until (l ↦ #0) (l ↦ #1) ∨ (tps_true ∧ l ↦ #1)))%S.
 
@@ -57,9 +55,8 @@ Section proof.
   Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ tps_until (l ↦ #0) (l ↦ #1).
   Proof. apply (into_temporal _ _). Qed.
 
-  (** A response property: whenever the flag holds 0, it eventually holds 1. The
-      condition "the flag holds 0 now" is a fact about the current state; the proof uses it
-      to rule out the invariant's other branch (the cell cannot hold 0 and 1 at once). *)
+  (** Whenever the flag holds 0, it eventually holds 1. The antecedent rules out the
+      invariant's other branch (the cell cannot hold 0 and 1 at once). *)
   Definition flag_response_tps (l : loc) : tps heap_lang Σ :=
     tps_always (l ↦ #0 → tps_finally (l ↦ #1))%S.
 
@@ -307,7 +304,6 @@ Section trace.
   (** The flag at the level of traces: [0] until [1], and [1] from then on. *)
   Definition is_flag_tr (l : loc) : trProp heap_lang :=
     tr_always (tr_until (l ↦ #0) (l ↦ #1) ∨ (l ↦ #1))%R.
-  (** The guaranteed trace property implies [is_flag_tr]. *)
   Lemma flag_tps_impl {Σ : gFunctors} l :
     ∀ τ, tps_tr (flag_tps (Σ:=Σ) l) τ → is_flag_tr l τ.
   Proof.
@@ -317,10 +313,8 @@ Section trace.
     - destruct H0. right. eauto.
   Qed.
 
-  (** What the guarantee does not say: "once the flag is 1, it stays 1". The run in which
-      the flag holds 0, 1, 0, 1, 1, ... satisfies the flag's guarantee, yet goes back from 1
-      to 0. (The program never does that, but its invariant only describes each state, not
-      the history; a proof of "stays 1" needs an invariant that says so.) *)
+  (** The guarantee does not say that the flag stays [1]: the run 0, 1, 0, 1, 1, ...
+      satisfies it. The invariant describes each state, not the history (see flag_stable.v). *)
   Definition flag_run (l : loc) : nat → trace_state heap_lang :=
     λ n, ((∅, {| heap := {[l := Some (if decide (n = 0 ∨ n = 2) then #0 else #1)]};
                  used_proph_id := ∅ |}), 1%positive, []).

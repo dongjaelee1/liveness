@@ -6,7 +6,7 @@ From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_map.
 From iris.proofmode Require Import rocq_tactics.
-(* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
+(* Re-imported so that Lantana's [£] shadows upstream Iris' ['£' n]. *)
 From lantana.base_logic Require Import later_credits.
 
 (** * The no-credit rule is unsound
@@ -77,8 +77,7 @@ Tactic Notation "lwp_pure_no_lc" open_constr(efoc) :=
                                unify e' efoc;
                                eapply (tac_lwp_pure_no_lc _ _ _ _ K e');
                                [tc_solve                       (* PureExec *)
-                               |try solve_vals_compare_safe    (* The pure condition for PureExec --
-         handles trivial goals, including [vals_compare_safe] *)
+                               |try solve_vals_compare_safe    (* its pure condition *)
                                |idtac (* new goal *)
                             ])
         || fail "lwp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
@@ -95,7 +94,6 @@ Tactic Notation "lwp_rec_no_lc" :=
 
 Tactic Notation "lwp_lam_no_lc" := lwp_rec_no_lc.
 
-(** The program. *)
 Definition loop : val :=
   rec: "loop" <> :=
     "loop" #().
@@ -218,7 +216,7 @@ Section proof.
   Global Instance px_persistent r i j k : Persistent (px r i j k).
   Proof. rewrite /px. apply _. Qed.
 
-  (** Receives later credits via px_inv *)
+  (** Later credits come from [px_inv]. *)
   Lemma px_loop1_spec :
     ⊢ ∀ i z r rm ci cj C,
     l{{{ thread_expr i C (loop #()) ∗ thP_kids i ({[z]}) ∗
@@ -243,9 +241,7 @@ Section proof.
     iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
     iIntros "Wfs".
     iEval (rewrite /loop).
-    (* This particular step returns to exactly the same expression, so TE
-       stays unchanged. The conditional no-credit rule above is not extended
-       with a new generic expression-transport assumption. *)
+    (* The step returns to the same expression, so [TE] is unchanged. *)
     lwp_lam_no_lc. simpl. iExists ⊤, ({[ck]}). iSplitR.
     { rewrite big_sepS_singleton. auto. }
     iIntros "!> Wcs !> !>".

@@ -5,18 +5,11 @@ Import heap_lang.
 (** Tactics on heap_lang's operational semantics: [reshape_expr], [inv_base_step], and the
     [base_step] hint database. *)
 
-(** The tactic [reshape_expr e tac] decomposes the expression [e] into an
-evaluation context [K] and a subexpression [e']. It calls the tactic [tac K e']
-for each possible decomposition until [tac] succeeds. *)
+(** [reshape_expr e tac] calls [tac K e'] for each decomposition [e = fill K e'] until [tac]
+    succeeds. *)
 Ltac reshape_expr e tac :=
-  (* Note that the current context is spread into a list of fully-constructed
-     items [K], and a list of pairs of values [vs] (prophecy identifier and
-     resolution value) that is only non-empty if a [ResolveLCtx] item (maybe
-     having several levels) is in the process of being constructed. Note that
-     a fully-constructed item is inserted into [K] by calling [add_item], and
-     that is only the case when a non-[ResolveLCtx] item is built. When [vs]
-     is non-empty, [add_item] also wraps the item under several [ResolveLCtx]
-     constructors: one for each pair in [vs]. *)
+  (* [K]: the finished items; [vs]: the (prophecy, value) pairs of the [ResolveLCtx] items
+     under construction. [add_item] wraps a finished item in one [ResolveLCtx] per pair. *)
   let rec go K vs e :=
     match e with
     | _                               => lazymatch vs with [] => tac K e | _ => fail end
@@ -59,18 +52,14 @@ Ltac reshape_expr e tac :=
   in
   go (@nil ectx_item) (@nil (val * val)) e.
 
-(** The tactic [inv_base_step] performs inversion on hypotheses of the shape
-[base_step]. The tactic will discharge head-reductions starting from values, and
-simplifies hypothesis related to conversions from and to values, and finite map
-operations. This tactic is slightly ad-hoc and tuned for proving our lifting
-lemmas. *)
+(** [inv_base_step] inverts [base_step] hypotheses, discharges base steps from values, and
+    simplifies value conversions and map operations. Tuned for the lifting lemmas. *)
 Ltac inv_base_step :=
   repeat match goal with
-  | _ => progress simplify_map_eq/= (* simplify memory stuff *)
+  | _ => progress simplify_map_eq/=
   | H : to_val _ = Some _ |- _ => apply of_to_val in H
   | H : base_step _ ?e _ _ _ _ _ _ |- _ =>
-     try (is_var e; fail 1); (* inversion yields many goals if [e] is a variable
-     and should thus better be avoided. *)
+     try (is_var e; fail 1); (* inverting on a variable [e] gives many goals *)
      inversion H; subst; clear H
   end.
 
@@ -78,7 +67,7 @@ Create HintDb base_step.
 Global Hint Extern 0 (base_reducible _ _ _ _) => eexists _, _, _, _; simpl : base_step.
 Global Hint Extern 0 (base_reducible_no_obs _ _ _ _) => eexists _, _, _; simpl : base_step.
 
-(* [simpl apply] is too stupid, so we need extern hints here. *)
+(* Extern hints, since [simple apply] fails on these goals. *)
 Global Hint Extern 1 (base_step _ _ _ _ _ _ _ _) => econstructor : base_step.
 Global Hint Extern 0 (base_step _ (CmpXchg _ _ _) _ _ _ _ _ _) => eapply CmpXchgS : base_step.
 Global Hint Extern 0 (base_step _ (AllocN _ _) _ _ _ _ _ _) => apply alloc_fresh : base_step.

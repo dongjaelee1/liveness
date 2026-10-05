@@ -192,8 +192,8 @@ Section proof.
     iEval (rewrite HT big_sepM_singleton) in "TEs".
     iPoseProof ("main_spec" $! i kl1 kc (λ v, lift_term i (λ _ v, ⌜v = #1⌝)%I v)
                  with "[TEs TG Kkl Kkc GF HF HC]") as "WP".
-    (* Frame by name, [HF] before [HC]: a bare [iFrame] tries [HC] against [HF]'s conjunct
-       first, and that failing unification of two different [finallyI]s takes ~19s. *)
+    (* Frame by name, [HF] first: a bare [iFrame] tries a failing unification of the two
+       [finallyI]s that takes ~19s. *)
     { iFrame "TEs TG GF Kkl Kkc HF HC". done. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { done. }

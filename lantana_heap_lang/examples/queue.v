@@ -18,7 +18,6 @@ Module Queue.
     Transfinite Iris (https://gitlab.mpi-sws.org/iris/transfinite/-/blob/master/theories/examples/termination/eventloop.v)
    *)
 
-  (** Use a ticket lock. *)
   Definition init : val :=
     λ: <>,
       let: "node" := ref NONE in
@@ -43,7 +42,6 @@ Module Queue.
       let: "h" := !"hptr" in
       match: !"h" with
         NONE =>
-          (* Empty queue. *)
           TicketLock.release "lock";;
           NONE
       | SOME "node" =>
@@ -80,7 +78,6 @@ Record queue_γ :=
       queue_γd : gname;
     }.
 
-(** The ghost-state instances, local to this file. *)
 (* FIXME: the ticket lock's [tlock_config_inG] has to be made an instance here as well. *)
 Local Existing Instances queue_inG queueGpreS_queue queueGpreS_data_inG tlock_config_inG.
 
@@ -610,11 +607,9 @@ Section proof.
   Qed.
 
   (** ** Temporal guarantees *)
-  (** The queue has no trace content beyond its lock's: [queue_inv] is ghost state, and the
-      lock resource [queue_lock] is the [R] of the lock, to which the lock's guarantee gives
-      [tps_true]. Since [is_queue] keeps [γ ↪LOCK_AL□], its lock cannot be deleted, so the
-      queue guarantees what a lock that cannot be deleted guarantees
-      ([is_fair_lock_alive_temporal]). *)
+  (** The queue guarantees what its lock does: [queue_inv] is ghost state, [queue_lock] is the
+      lock's [R] (guaranteeing [tps_true]), and [γ ↪LOCK_AL□] keeps the lock from being
+      deleted ([is_fair_lock_alive_temporal]). *)
   Definition queue_tps (ql : val) : tps heap_lang Σ :=
     (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧ alive_fair_lock_tps tl)%S.
 

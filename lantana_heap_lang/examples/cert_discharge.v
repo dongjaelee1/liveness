@@ -6,9 +6,9 @@ From lantana.heap_lang.examples Require Import step_tactics.
 
 (** * Test: a discharge in the pre-step modality, with nested structures
 
-    The thread commits to [◇ (x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ ◇ (x ↦ #2))] and discharges it in
-    the pre-step modality of [x <- #2], a step that destroys [x ↦ #1]. The certificate-based
-    adequacy records the readings of the nested always and until at the discharge position. *)
+    The commitment [◇ (x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ ◇ (x ↦ #2))] is discharged in the
+    pre-step modality of [x <- #2], which destroys [x ↦ #1]; adequacy records the nested
+    always and until at the discharge position. *)
 
 Module CertDischarge.
 
@@ -32,7 +32,6 @@ Section proof.
   Definition cd_Q (x y : loc) kf : iProp Σ :=
     x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ finallyI Nf kf 1 (x ↦ #2).
 
-  (** What it guarantees, inferred. *)
   Lemma cd_Q_temporal x y kf :
     ⊢ cd_Q x y kf ⊨ₜ (x ↦ #1 ∧ tps_always (y ↦ #7) ∧ tps_finally (x ↦ #2))%S.
   Proof. apply (into_temporal _ _). Qed.
@@ -156,8 +155,7 @@ Section adequacy.
               (thP_kids i {[kq; kf]} ∗ oblP_kids kq ∅ ∗ oblP_kids kf ∅ ∗ ⌜kq ≠ kf⌝ ∗
                ([∗ set] g ∈ {[kq; kf]}, oblP_fuel g 0 μ)))%I.
 
-  (** What they guarantee: the nested structures of the first commitment show in its
-      right formula. *)
+  (** What they guarantee; the first commitment's right formula keeps its nested structures. *)
   Let G_main {Σ} : tps heap_lang Σ :=
         (tps_finally (x ↦ #1 ∧ tps_always (y ↦ #7) ∧ tps_finally (x ↦ #2)) ∧
          tps_finally (x ↦ #2) ∧ x ↦ #0 ∧ y ↦ #7 ∧ tps_true)%S.

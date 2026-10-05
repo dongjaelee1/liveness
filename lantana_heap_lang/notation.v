@@ -3,7 +3,6 @@ From iris.prelude Require Import options.
 
 (** Notations and coercions for writing heap_lang programs. *)
 
-(** Coercions to make programs easier to type. *)
 Coercion LitInt : Z >-> base_lit.
 Coercion LitBool : bool >-> base_lit.
 Coercion LitLoc : loc >-> base_lit.
@@ -14,7 +13,7 @@ Coercion App : expr >-> Funclass.
 Coercion Val : val >-> expr.
 Coercion Var : string >-> expr.
 
-(** Define some derived forms. *)
+(** Derived forms. *)
 Notation Lam x e := (Rec BAnon x e) (only parsing).
 Notation Let x e1 e2 := (App (Lam x e2) e1) (only parsing).
 Notation Seq e1 e2 := (Let BAnon e1 e2) (only parsing).
@@ -23,44 +22,21 @@ Notation LetCtx x e2 := (AppRCtx (LamV x e2)) (only parsing).
 Notation SeqCtx e2 := (LetCtx BAnon e2) (only parsing).
 Notation Match e0 x1 e1 x2 e2 := (Case e0 (Lam x1 e1) (Lam x2 e2)) (only parsing).
 Notation Alloc e := (AllocN (Val $ LitV $ LitInt 1) e) (only parsing).
-(** Compare-and-set (CAS) returns just a boolean indicating success or failure. *)
+(** Compare-and-set returns only the success boolean. *)
 Notation CAS l e1 e2 := (Snd (CmpXchg l e1 e2)) (only parsing).
 
-(* Skip should be atomic, we sometimes open invariants around
-   it. Hence, we need to explicitly use LamV instead of e.g., Seq. *)
+(* [Skip] is atomic (invariants are opened around it), hence [LamV] rather than [Seq]. *)
 Notation Skip := (App (Val $ LamV BAnon (Val $ LitV LitUnit)) (Val $ LitV LitUnit)).
 
-(* No scope for the values, does not conflict and scope is often not inferred
-properly. *)
+(* No scope for the values: none conflicts, and the scope is often not inferred. *)
 Notation "# l" := (LitV l%Z%V%stdpp) (at level 8, format "# l").
 
-(** Syntax inspired by Coq/Ocaml. Constructions with higher precedence come
-    first. *)
+(** Constructions with higher precedence come first. *)
 Notation "( e1 , e2 , .. , en )" := (Pair .. (Pair e1 e2) .. en) : expr_scope.
 Notation "( e1 , e2 , .. , en )" := (PairV .. (PairV e1 e2) .. en) : val_scope.
 
-(*
-Using the '[hv' ']' printing box, we make sure that when the notation for match
-does not fit on a single line, line breaks will be inserted for *each* breaking
-point '/'. Note that after each breaking point /, one can put n spaces (for
-example '/  '). That way, when the breaking point is turned into a line break,
-indentation of n spaces will appear after the line break. As such, when the
-match does not fit on one line, it will print it like:
-
-  match: e0 with
-    InjL x1 => e1
-  | InjR x2 => e2
-  end
-
-Moreover, if the branches do not fit on a single line, it will be printed as:
-
-  match: e0 with
-    InjL x1 =>
-    lots of stuff bla bla bla bla bla bla bla bla
-  | InjR x2 =>
-    even more stuff bla bla bla bla bla bla bla bla
-  end
-*)
+(* A match that does not fit on a line breaks at every '/' (the '[hv' box); '/  ' indents
+   the next line by two spaces. *)
 Notation "'match:' e0 'with' 'InjL' x1 => e1 | 'InjR' x2 => e2 'end'" :=
   (Match e0 x1%binder e1 x2%binder e2)
   (e0, x1, e1, x2, e2 at level 200,
@@ -93,8 +69,6 @@ Notation "~ e" := (UnOp NegOp e%E) (at level 75, right associativity) : expr_sco
 (* The unicode ← is already part of the notation "_ ← _; _" for bind. *)
 Notation "e1 <- e2" := (Store e1%E e2%E) (at level 80) : expr_scope.
 
-(* The breaking point '/  ' makes sure that the body of the rec is indented
-by two spaces in case the whole rec does not fit on a single line. *)
 Notation "'rec:' f x := e" := (Rec f%binder x%binder e%E)
   (at level 200, f at level 1, x at level 1, e at level 200,
    format "'[' 'rec:'  f  x  :=  '/  ' e ']'") : expr_scope.
@@ -104,10 +78,8 @@ Notation "'rec:' f x := e" := (RecV f%binder x%binder e%E)
 Notation "'if:' e1 'then' e2 'else' e3" := (If e1%E e2%E e3%E)
   (at level 200, e1, e2, e3 at level 200) : expr_scope.
 
-(** Derived notions, in order of declaration. The notations for let and seq
-are stated explicitly instead of relying on the Notations Let and Seq as
-defined above. This is needed because App is now a coercion, and these
-notations are otherwise not pretty printed back accordingly. *)
+(** Derived notions. let and seq are stated explicitly, not via [Let] and [Seq], so that
+    they print back ([App] is a coercion). *)
 Notation "'rec:' f x y .. z := e" := (Rec f%binder x%binder (Lam y%binder .. (Lam z%binder e%E) ..))
   (at level 200, f, x, y, z at level 1, e at level 200,
    format "'[' 'rec:'  f  x  y  ..  z  :=  '/  ' e ']'") : expr_scope.
@@ -115,8 +87,6 @@ Notation "'rec:' f x y .. z := e" := (RecV f%binder x%binder (Lam y%binder .. (L
   (at level 200, f, x, y, z at level 1, e at level 200,
    format "'[' 'rec:'  f  x  y  ..  z  :=  '/  ' e ']'") : val_scope.
 
-(* The breaking point '/  ' makes sure that the body of the λ: is indented
-by two spaces in case the whole λ: does not fit on a single line. *)
 Notation "λ: x , e" := (Lam x%binder e%E)
   (at level 200, x at level 1, e at level 200,
    format "'[' 'λ:'  x ,  '/  ' e ']'") : expr_scope.

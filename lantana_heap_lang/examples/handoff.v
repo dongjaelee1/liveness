@@ -4,7 +4,7 @@ From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_var.
 From lantana.heap_lang.examples Require Import step_tactics.
-(* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
+(* Re-imported so that Lantana's [£] shadows upstream Iris' ['£' n]. *)
 From lantana.base_logic Require Import later_credits.
 
 (** * A handoff cell: [send] puts a task [f a] into the cell, and [receive] waits for a task
@@ -12,11 +12,9 @@ From lantana.base_logic Require Import later_credits.
 
 Module Handoff.
 
-  (** Put the task [f a] into the buffer [b]. *)
   Definition send : val :=
     λ: "b" "f" "a", "b" <- SOME ("f", "a").
 
-  (** Spin until the buffer [b] holds a task, then run it. *)
   Definition receive : val :=
     rec: "loop" "b" :=
       match: !"b" with
@@ -165,7 +163,7 @@ Section proof.
       Handoff.receive #b @ i
     l{{{ v, RET v; thread_expr i C (of_val v) ∗ £ lc ∗ thP_kids i ∅ }}}.
   Proof.
-    (** For internal steps; a task brings its own fuel *)
+    (* For internal steps; a task brings its own fuel. *)
     iExists 10. iIntros (lc i b g γ ℓ C Φ) "!> HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Ag& Gv& #handoff_inv)".
     rewrite /Handoff.receive.
@@ -177,7 +175,6 @@ Section proof.
     lwp_bind (Load _).
     iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    (** Cases. *)
     rewrite /is_handoff.
     iInv "handoff_inv" as "inv".
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.

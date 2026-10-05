@@ -21,13 +21,11 @@ Module TaskQueue.
           (Fst "fa") (Snd "fa")
       end.
 
-  (** The worker: an infinite loop of [run_task]. *)
   Definition worker : val :=
     rec: "loop" "q" :=
       run_task "q";;
       "loop" "q".
 
-  (** Initialize a queue and fork one worker thread. *)
   Definition init : val :=
     λ: <>,
       let: "q" := Queue.init #() in
@@ -40,7 +38,6 @@ Section proof.
   Context `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ}.
 
   (** ** Definitions *)
-  (** The invariant *)
   Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) : iProp Σ :=
     is_queue ql γ ℓ (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I.
 
@@ -65,7 +62,6 @@ Section proof.
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     lwp_pures.
-    (** Queue enqueue *)
     lwp_bind (Queue.enqueue _ _).
     iModIntro. iApply ("Queue_enqueue_spec" $! 0 with "[$TE $TG $F_Queue_enqueue $Gg $OF TASK $IQ]").
     { by iFrame. }
@@ -270,9 +266,9 @@ Section proof.
   Qed.
 
   (** ** Temporal guarantees *)
-  (** A task queue has no trace content beyond its queue's: the tasks it stores ([is_task])
-      are Hoare triples with ghost resources, which guarantee [tps_true]. (That every task is
-      eventually run is expressed by obligations, not at the level of traces.) *)
+  (** A task queue guarantees what its queue does: the tasks ([is_task]) are Hoare triples
+      with ghost resources, guaranteeing [tps_true]. That every task runs is expressed by
+      obligations. *)
   Definition task_queue_tps (ql : val) : tps heap_lang Σ := queue_tps ql.
 
   Lemma is_task_queue_temporal ql γ ℓ : ⊢ is_task_queue ql γ ℓ ⊨ₜ task_queue_tps ql.

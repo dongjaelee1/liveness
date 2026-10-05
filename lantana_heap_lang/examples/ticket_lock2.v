@@ -5,7 +5,7 @@ From lantana.heap_lang Require Import notation proofmode.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_map.
 From lantana.heap_lang.examples Require Import step_tactics.
-(* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
+(* Re-imported so that Lantana's [£] shadows upstream Iris' ['£' n]. *)
 From lantana.base_logic Require Import later_credits.
 
 (** * A starvation-free ticket lock
@@ -70,8 +70,6 @@ Section proof.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
   (** ** Definitions *)
-  (** The trace properties these definitions guarantee are inferred below
-      ([is_fair_lock_temporal], [lock_token_temporal]); see also section [trace]. *)
 
   Local Definition lock_inv γt γa γc (next curr : loc) (R : iProp Σ) : iProp Σ :=
     ∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
@@ -210,19 +208,14 @@ Section proof.
       apply hessenberg.lt_add_r. rewrite ord.omega_from_peano_lt_set. apply ord.large_lt_from_wf_set. }
     iPoseProof (oblP_fuel_add_set with "Fs") as "[GF Fsloop]".
     iPoseProof (oblP_fuels_init with "GF") as "GF".
-    (* argument *)
     lwp_lam. simpl.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC TE".
-    (* get fst and snd of the argument *)
     iDestruct "IFL" as "(%&%& %& #INV)". subst tl.
-    (* fst *)
     lwp_pures.
-    (* FAA *)
     iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
     lwp_bind (FAA _ _).
-    (* Atomic step of FAA, *)
+    (* The atomic FAA, in the invariant; a model update follows the step. *)
     iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]". 1: set_solver.
-    (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -334,9 +327,8 @@ Section proof.
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
     lwp_bind (Load _).
-    (* Atomic step of Load, *)
+    (* The atomic load, in the invariant; a model update follows the step. *)
     iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]". 1: set_solver.
-    (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_nat 1 97 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -443,10 +435,9 @@ Section proof.
     iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
     (* Update curr and unlock κl. *)
     iDestruct "IFL" as "(%&%& %& #INV)". symmetry in H. inv H.
-    (* Atomic step of Store, *)
+    (* The atomic store, in the invariant; a model update follows the step. *)
     iModIntro.
     iMod (alwaysI_acc with "INV") as "[H ACCinv]". 1: set_solver.
-    (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -519,9 +510,8 @@ Section proof.
   Qed.
 
   (** ** Temporal guarantees *)
-  (** The trace property guaranteed by [lock_inv], as inferred by [IntoTemporal]: it mirrors
-      [lock_inv], with [tps_true] for ghost state and [R]. The pending tickets
-      [c + 1 ≤ t ≤ n] carry [finally curr ↦ t]. *)
+  (** The guarantee of [lock_inv], as inferred: [tps_true] for ghost state and [R]; the
+      pending tickets [c + 1 ≤ t ≤ n] carry [finally curr ↦ t]. *)
   Definition lock_inv_tps (next curr : loc) : tps heap_lang Σ :=
     (∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
        next ↦ #n ∧ curr ↦{#1/2} #c ∧ (tps_true ∧ tps_true) ∧
@@ -535,7 +525,6 @@ Section proof.
        (⌜c = n⌝ ∧ curr ↦{#1/2} #c ∧ tps_true ∨
         ⌜(c < n)%Z⌝ ∧ (tps_true ∧ curr ↦{#1/2} #c ∧ tps_true ∨ tps_true)))%S.
 
-  (** The trace property guaranteed by [is_fair_lock]. *)
   Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_tps next curr))%S.
 
@@ -547,9 +536,8 @@ Section proof.
     IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
   Proof. apply is_fair_lock_temporal. Qed.
 
-  (** Starvation freedom as a guarantee, with a state fact as antecedent: whenever [n]
-      tickets are out and ticket [c] is served, every pending ticket [t] is eventually
-      served. The logic uses the antecedent to pick the right ticket of [lock_inv_tps]. *)
+  (** Starvation freedom as a guarantee: whenever [n] tickets are out and ticket [c] is
+      served, every pending ticket is eventually served. The antecedent picks the ticket. *)
   Definition starvation_free_tps (next curr : loc) : tps heap_lang Σ :=
     tps_always (∀ n c t : Z,
       (next ↦ #n ∧ curr ↦{#1/2} #c ∧ ⌜(c < t ≤ n)%Z⌝) →
@@ -581,7 +569,7 @@ Section proof.
     apply lock_inv_tps_starvation_free_le.
   Qed.
 
-  (** The trace property guaranteed by a lock token: the holder releases the lock. *)
+  (** The guarantee of a lock token: the holder releases the lock. *)
   Definition lock_token_tps (tl : val) : tps heap_lang Σ :=
     (∃ (next curr : loc) (u : Z), ⌜tl = (#next, #curr)%V⌝ ∧ curr ↦{#1/2} #u ∧ tps_true ∧
        tps_finally (curr ↦{#1/2} #(u + 1) ∧ tps_true))%S.
@@ -602,10 +590,8 @@ Section trace.
   Definition tr_pointsto (l : loc) (v : val) : trProp heap_lang :=
     tr_atomic (pred_pointsto l (DfracOwn 1) v).
 
-  (** Starvation freedom of the ticket lock [(next, curr)]: at any time, if [n] tickets have
-      been handed out ([next ↦ n]) and ticket [c] is being served ([curr ↦ c]), then every
-      [t] with [c < t ≤ n] will eventually be served. In particular the holder of ticket
-      [n - 1] eventually releases the lock ([curr ↦ n]). *)
+  (** Starvation freedom of the ticket lock [(next, curr)]: whenever [next ↦ n] and
+      [curr ↦ c], every ticket [t] with [c < t ≤ n] is eventually served. *)
   Definition starvation_free (next curr : loc) : trProp heap_lang :=
     tr_always (λ τ, ∀ n c t : Z,
       tr_pointsto next #n τ → tr_pointsto curr #c τ → (c < t ≤ n)%Z →
@@ -626,7 +612,6 @@ Section trace.
     intros. done.
   Qed.
 
-  (** A fair lock is starvation free. *)
   Lemma fair_lock_starvation_free {Σ} tl τ :
     tps_tr (fair_lock_tps (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ starvation_free next curr τ.
@@ -635,7 +620,6 @@ Section trace.
     by eapply (lock_inv_tps_starvation_free (Σ:=Σ)).
   Qed.
 
-  (** The guarantee [starvation_free_tps] means [starvation_free]. *)
   Lemma starvation_free_tps_tr {Σ} next curr τ :
     tps_tr (starvation_free_tps (Σ:=Σ) next curr) τ → starvation_free next curr τ.
   Proof.

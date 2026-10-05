@@ -5,10 +5,9 @@ From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Export ticket_lock2.
 From lantana.heap_lang.examples Require Import step_tactics.
 
-(** A client that creates a ticket lock at runtime, acquires and releases it. Its adequacy
-    theorem exports, besides termination, the starvation freedom of that lock, which comes
-    from the lock library's guarantee ([is_fair_lock_temporal]) through a commitment
-    obligation. *)
+(** * A client that creates a ticket lock, acquires and releases it. Besides termination, its
+    adequacy theorem exports the starvation freedom of the lock, from the lock's guarantee
+    ([is_fair_lock_temporal]) through a commitment obligation. *)
 Module TicketLockClient.
 
   Definition main : val :=

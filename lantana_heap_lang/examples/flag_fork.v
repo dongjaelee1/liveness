@@ -11,7 +11,6 @@ Module FlagFork.
 
   Definition main : val :=
     λ: <>,
-      (* Allocate a flag [x], fork a thread that sets it, and wait for it. *)
       let: "x" := Flag.init #() in
       Fork (Flag.set "x");;
       Flag.wait "x";;

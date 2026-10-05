@@ -61,7 +61,7 @@ Section proof.
     l{{{ RET #(); thread_expr i C #() ∗ £ lc ∗ thP_kids i G ∗ parP_kids p (K ∖ {[k]}) }}}.
   Proof.
     unfold decr_reentrant.
-    (** Lob to bootstrap the spec *)
+    (* Löb induction *)
     iLöb as "TASK".
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
     iPoseProof (TaskQueue_put_task_spec) as (μ_tp) "TaskQueue_put_task_spec".

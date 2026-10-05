@@ -3,10 +3,8 @@ From lantana.trace Require Export guarantee_infer.
 From lantana.heap_lang Require Export primitive_laws.
 From iris.prelude Require Import options.
 
-(** * Temporal guarantees for heap_lang
-
-    Atoms: points-to facts and thread expressions guarantee the corresponding state
-    predicates. *)
+(** * Temporal guarantees for heap_lang: points-to facts and thread expressions guarantee
+    the corresponding state predicates. *)
 
 Notation "l ↦ dq v" := (tps_atomic (pred_pointsto l dq v))
   (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tps_scope.
@@ -25,7 +23,7 @@ Section laws.
   Proof. exact (temporal_atomic (pred_expr i C e)). Qed.
   (* TODO: [IntoTemporal] instances for the invariant heap ([l ↦_I v]). *)
 
-  (** A freed location ([freed], primitive_laws.v) stays freed in the state. *)
+  (** A freed location stays freed. *)
   Definition freed_tps (l : loc) : tps heap_lang Σ := tps_state (λ σ _, heap σ !! l = Some None).
 
   Lemma freed_temporal (l : loc) q : ⊢ freed l q ⊨ₜ freed_tps l.
@@ -34,8 +32,7 @@ Section laws.
     iApply (gen_heap_valid with "H F").
   Qed.
 
-  (** Discharge at the actual final value, using credits from earlier steps: the thread's
-      only child is the obligation of the finally. *)
+  (** Discharging a [finally] on the thread's final value, with credits from earlier steps. *)
   Lemma thread_expr_terminate_finally i E v k N :
     ↑N ⊆ E →
     thread_expr i [] (of_val v) -∗ £ (2 : Ord.t) -∗

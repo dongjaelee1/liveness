@@ -7,19 +7,16 @@ From iris.algebra.lib Require Import dfrac_agree.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map mono_Z.
 From lantana.heap_lang.examples Require Import step_tactics.
 From lantana.heap_lang.examples Require ticket_lock.
-(* Re-activate Lantana's [£] (upstream Iris also declares ['£' n] at the same level). *)
+(* Re-imported so that Lantana's [£] shadows upstream Iris' ['£' n]. *)
 From lantana.base_logic Require Import later_credits.
 
 (** * The ticket lock of ticket_lock.v, whose guarantee records that [next] never decreases
 
-    The same code and specs. The lock invariant holds half of [next]'s points-to and the other
-    half is in the mono cell, an invariant registered once for every value [v] that [next]
-    reaches, with the reading "[next ≥ v], or [next] freed": [delete] frees [next]
-    ([lwp_free_freed]) and leaves half of its freed points-to in the cell. A lock that cannot
-    be deleted has [next ↦ n] at every position, so [next] never decreases, and the lock is
-    starvation free with no hypothesis about [next] ([alive_fair_lock_starvation_free]). *)
+    The same code and specs. Half of [next]'s points-to is in the mono cell, an invariant
+    registered for every value [v] that [next] reaches, with the reading "[next ≥ v], or
+    [next] freed". So a lock that cannot be deleted is starvation free with no hypothesis
+    about [next] ([alive_fair_lock_starvation_free]). *)
 
-(** The code is that of ticket_lock.v. *)
 Module TicketLock := ticket_lock.TicketLock.
 
 (** The CMRA we need: that of ticket_lock.v and the lower bounds of [next]. *)
@@ -78,8 +75,6 @@ Section proof.
   Qed.
 
   (** ** Definitions *)
-  (** The trace properties these definitions guarantee are inferred below
-      ([is_fair_lock_temporal]); see also section [trace]. *)
 
   Definition own_fair_lock_alive (γ : ticketlock_γ) (dq : dfrac) :=
     own (ticketlock_γa γ) (to_dfrac_agree dq tt).
@@ -96,18 +91,12 @@ Section proof.
       (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_CF dq  l") : bi_scope.
 
   (** *** The mono cell
-      An invariant with half of [next]'s points-to (half of its freed points-to once the lock
-      is deleted) and the authority over the lower bounds of [next]. It is registered again
-      each time [next] reaches a value [v], with the reading [next_ge_tps next v]: the proof
-      that the content guarantees this reading is given at registration, from the lower
-      bound [γm ↪◯MZ v] at hand ([mono_inv_temporal]).
-
-      A chain of always-invariants, one per value, each pointing to the next, would not do:
-      at a position, the guarantee of [link v] would rest on that of [link (v+1)], available
-      only one step of the logic later (its certificate is later-guarded, and the in-logic
-      reading of [□ G] starts with [⊳ ⊚]). The chain grows without bound, so the reading would
-      have to absorb any number of steps at one position; such a reading is valid by Löb
-      induction, hence true on every trace (cf. [tps_guarded_prefix_tr]). *)
+      An invariant with half of [next]'s points-to ([delete] leaves half of its freed
+      points-to) and the authority over the lower bounds of [next]. It is registered again
+      each time [next] reaches a value [v], with the reading [next_ge_tps next v], justified
+      by the lower bound [γm ↪◯MZ v] ([mono_inv_temporal]). A chain of invariants, one per
+      value, would not do: each link's reading would rest on the next one's, available only
+      one step of the logic later (its certificate is later-guarded). *)
   Local Definition mono_inv γm (next : loc) : iProp Σ :=
     ∃ w : Z, γm ↪●MZ w ∗ (next ↦{#1/2} #w ∨ freed next (1/2)).
 
@@ -159,8 +148,7 @@ Section proof.
               ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
               finallyI N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)).
 
-  (** The alive branch of the lock invariant, as a notation (so that proofs about the
-      invariant's content are unchanged). *)
+  (** The alive branch of the lock invariant; a notation, so that proofs see its content. *)
   Local Notation lock_inv_alive γt γo γc γm next curr R :=
     ((∃ (n c : Z)
          (tickets : gmap Z (option (oid * ord.t * measure)))
@@ -214,8 +202,7 @@ Section proof.
       alwaysI_as N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) (ticketlock_γm γ) next curr R)
         (lock_inv_alive (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γm γ) next curr R).
 
-  (** The alive lock is the lock. (Use this rather than framing the one against the other:
-      unifying the two definitions' bodies does not terminate in reasonable time.) *)
+  (** Use this rather than framing: unifying the two definitions' bodies takes too long. *)
   Lemma is_fair_lock_alive_is_fair_lock tl γ R : is_fair_lock_alive tl γ R ⊢ is_fair_lock tl γ R.
   Proof. iIntros "[$ _]". Qed.
 
@@ -258,14 +245,6 @@ Section proof.
     1: exact ord.eq. 2,3,4,5: apply ordinal_auth_mra_class.
     eauto.
   Qed.
-
-  (** ** The shape of the specs
-      A modular spec with liveness should hide implementation details (number of steps,
-      internal data), be robust against implementation changes (in particular, of the fuel),
-      and have the same format across libraries. [oblP_fuel g 1 1] suits trivially terminating
-      functions, [ord.large] more complex ones (cf. Hartogs numbers). A function that
-      terminates without witness induction has layer 0 and an [∃ μ] in front of its spec, as
-      [TicketLock_init_spec]. *)
 
   (** ** Program proofs *)
   (** TODO: LAT-style specs, for a better interaction with user invariants. *)
@@ -350,19 +329,14 @@ Section proof.
     iPoseProof (oblP_fuel_add_set with "Fs") as "[GF Fsloop]".
     iPoseProof (oblP_fuels_init with "GF") as "GF".
     rewrite /TicketLock.acquire.
-    (* argument *)
     lwp_pure_lc 100.
-    (* get fst and snd of the argument *)
     iDestruct "IFL" as "(%&%& %& #INV& #ITK)". subst tl.
-    (* fst *)
     lwp_pures.
-    (* FAA *)
     lwp_bind (FAA _ _).
     iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]".
-    (* Atomic step of FAA, *)
+    (* The atomic FAA, in the invariant; a model update follows the step. *)
     iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
-    (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -455,7 +429,6 @@ Section proof.
       (* Execute loop body. *)
       lwp_pures.
       lwp_bind (Load _).
-      (* Atomic step of Load, *)
       iModIntro.
       iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]". 1: eauto.
       iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $PtrCurr0]"). 1: done.
@@ -577,7 +550,6 @@ Section proof.
       (* Execute loop body. *)
       lwp_pures.
       lwp_bind (Load _).
-      (* Atomic step of Load, *)
       iModIntro.
       iPoseProof (oblP_fuels_add 1 with "GF") as "[GF1 GF]". 1: eauto.
       iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $PtrCurr0]"). 1: done.
@@ -652,10 +624,9 @@ Section proof.
     (* Execute loop body. *)
     lwp_pure_one.
     lwp_bind (Load _).
-    (* Atomic step of Load, *)
+    (* The atomic load, in the invariant; a model update follows the step. *)
     iModIntro. iMod (alwaysI_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
-    (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -876,11 +847,10 @@ Section proof.
     iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $PtrCurr0]"). 1: done.
     iIntros "[TE ((_& TG& _)& PtrCurr0)]".
     lwp_pures.
-    (* Atomic step of Store, *)
+    (* The atomic store, in the invariant; a model update follows the step. *)
     iModIntro.
     iMod (alwaysI_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
-    (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -1005,12 +975,11 @@ Section proof.
     iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $PtrCurr0]"). 1: done.
     iIntros "[TE ((_& TG& _)& PtrCurr0)]".
     lwp_pures.
-    (* Atomic step of Store, *)
+    (* The atomic store, in the invariant; a model update follows the step. *)
     lwp_bind (Store _ _).
     iModIntro.
     iMod (alwaysI_acc with "INV") as "[H ACCinv]".
     { apply N_inv_subseteq. auto. }
-    (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
@@ -1049,7 +1018,7 @@ Section proof.
     iApply fupd_mask_intro; first solve_ndisj. iIntros "close". iModIntro. iMod "close" as "_".
     iDestruct "H" as "(PtrCurr0& HR)".
     iPoseProof (oblP_fuels_remove_obl κ with "GF") as "GF".
-    (** Return full CF to the invariant. *)
+    (* The lock is deleted: the full alive token goes to the invariant. *)
     iModIntro. iMod ("ACCinv" with "[AL]") as "_".
     { iNext. iLeft. iFrame. }
     iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]". iCombine "PtrCurr1 PtrCurr PtrCurr0" as "PtrCurr".
@@ -1085,12 +1054,8 @@ Section proof.
   Qed.
 
   (** ** Temporal guarantees *)
-  (** The trace property guaranteed by the right disjunct of [lock_inv] (the lock is alive),
-      as inferred by [IntoTemporal]: [tps_true] for ghost state, [R] and the ghost facts
-      about the ticket maps (whose quantifiers are therefore ghost). If a ticket is pending
-      ([c < n]), the until allocated on behalf of the next owner carries
-      [finally curr ↦ c + 1]. The registration of the mono cell for [n] carries
-      [□ next_ge_tps next n]. *)
+  (** The guarantee of the alive branch of [lock_inv], as inferred: as in ticket_lock.v, and
+      the mono cell's registration for [n] carries [□ next_ge_tps next n]. *)
   Definition lock_inv_alive_tps (next curr : loc) : tps heap_lang Σ :=
     (∃ n c : Z,
        next ↦{#(1/2)} #n ∧ tps_always (next_ge_tps next n) ∧
@@ -1103,22 +1068,20 @@ Section proof.
            ((tps_true ∧ tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true) ∧
              tps_true ∧ tps_true ∧ tps_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true) ∨ tps_true))))%S.
 
-  (** The trace property guaranteed by [lock_inv]. Its left disjunct (the lock has been
-      deleted) is ghost state, so this property alone says nothing about the trace. *)
+  (** The guarantee of [lock_inv]: its left disjunct (deleted lock) is ghost state, so it
+      says nothing about the trace. *)
   Definition lock_inv_tps (next curr : loc) : tps heap_lang Σ :=
     (tps_true ∨ lock_inv_alive_tps next curr)%S.
 
-  (** The trace property guaranteed by [lock_token_inv]: either nobody holds the lock (ghost
-      state), or its holder will increment [curr]. As it stands, it says nothing about the
-      trace either (the left disjunct). *)
+  (** The guarantee of [lock_token_inv]: nobody holds the lock (ghost state), or its holder
+      will increment [curr]. *)
   Definition lock_token_inv_tps (curr : loc) : tps heap_lang Σ :=
     (∃ c : Z, tps_true ∨
        tps_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true ∧
        tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true))%S.
 
-  (** The trace property guaranteed by [is_fair_lock]. Since the lock can be deleted
-      ([TicketLock_delete_spec]), it is vacuous at the level of traces; see
-      [is_fair_lock_alive_temporal] for a lock that cannot be deleted. *)
+  (** The guarantee of [is_fair_lock], vacuous on traces since the lock can be deleted; see
+      [is_fair_lock_alive_temporal]. *)
   Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
        tps_always (lock_inv_tps next curr) ∧ tps_always (lock_token_inv_tps curr))%S.
@@ -1131,7 +1094,7 @@ Section proof.
     IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
   Proof. apply is_fair_lock_temporal. Qed.
 
-  (** The trace property guaranteed by a lock that cannot be deleted. *)
+  (** The guarantee of a lock that cannot be deleted. *)
   Definition alive_fair_lock_tps (tl : val) : tps heap_lang Σ :=
     (fair_lock_tps tl ∧
      ∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_alive_tps next curr))%S.
@@ -1166,9 +1129,7 @@ Section proof.
 
 End proof.
 
-(** ** Progress of the lock, at the level of traces
-    The notions of ticket_lock.v: release progress, [next] never decreases, starvation
-    freedom. *)
+(** ** Progress of the lock, at the level of traces (the notions of ticket_lock.v) *)
 Section trace.
   Local Notation tr_pointsto := ticket_lock.tr_pointsto.
 
@@ -1186,9 +1147,9 @@ Section trace.
     intros. done.
   Qed.
 
-  (** [next] never decreases: at every position the alive branch has [next ↦ n] and the
-      registration of the mono cell for [n], which gives [next ≥ n] or [next] freed from then
-      on; [next] is not freed, since the alive branch has [next ↦ n'] at every position. *)
+  (** [next] never decreases: at each position, the mono cell's registration for the current
+      [n] gives [next ≥ n] or [next] freed from then on, and the alive branch keeps [next]
+      allocated. *)
   Lemma lock_inv_alive_tps_next_monotone {Σ} next curr τ :
     tps_tr (tps_always (lock_inv_alive_tps (Σ:=Σ) next curr)) τ → ticket_lock.next_monotone next τ.
   Proof.
@@ -1204,7 +1165,6 @@ Section trace.
       destruct (τf m') as [[[Θ σ] ?] ?]. simpl in *. by rewrite Hn1 in Hfr.
   Qed.
 
-  (** A lock that cannot be deleted makes release progress, and [next] never decreases. *)
   Lemma alive_fair_lock_release_progress {Σ} tl τ :
     tps_tr (alive_fair_lock_tps (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ ticket_lock.release_progress next curr τ.
@@ -1221,8 +1181,7 @@ Section trace.
     by eapply (lock_inv_alive_tps_next_monotone (Σ:=Σ)).
   Qed.
 
-  (** Hence a lock that cannot be deleted is starvation free, with no hypothesis about
-      [next] (compare [ticket_lock.release_progress_starvation_free]). *)
+  (** Hence a lock that cannot be deleted is starvation free, with no hypothesis about [next]. *)
   Lemma alive_fair_lock_starvation_free {Σ} tl τ :
     tps_tr (alive_fair_lock_tps (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ ticket_lock.starvation_free next curr τ.

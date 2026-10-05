@@ -46,10 +46,7 @@ Proof.
     1: exact inhabitant.
 Qed.
 
-(** Since we use an [option val] instance of [gen_heap], we need to add a
-[Some]. We also seal the definition to avoid confusion between the version from
-[gen_heap], and our version with [Some]. That also helps for scopes and
-coercions. *)
+(** The [gen_heap] points-to of [Some v], sealed to keep it apart from [gen_heap]'s. *)
 Local Definition pointsto_def `{heap_stateGS Σ}
     (l : loc) (dq : dfrac) (v : val) : iProp Σ :=
   pointsto l dq (Some v).
@@ -67,8 +64,7 @@ Definition thread_expr `{heap_stateGS Σ}
     (i : thread_id) (C : list ectx_item) (e : expr) : iProp Σ :=
   thread i true (fill C e) 1.
 
-(** Thread [i] has reached final value [v] at the empty context, not merely
-    returned from a function within a larger thread expression. *)
+(** Thread [i]'s whole expression is the value [v] (empty context). *)
 Notation "'exits' v @ i" := (thread_expr i [] (of_val v))%I
   (at level 20, v, i at level 1, format "exits  v @ i") : bi_scope.
 Notation "l ↦ dq v" := (tr_atomic (pred_pointsto l dq v))
@@ -76,9 +72,6 @@ Notation "l ↦ dq v" := (tr_atomic (pred_pointsto l dq v))
 Notation "'exits' v @ i" := (tr_atomic (pred_expr i [] (of_val v)))
   (at level 20, v, i at level 1, format "exits  v @ i") : tr_scope.
 
-(** The terminal atom means actual value reachability, with no hidden context.
-    This equivalence is purely semantic; clients establish its left-hand side
-    under the behavior and fair-scheduling premises of adequacy. *)
 Lemma exits_finally_iff (τ : trace heap_lang) i v :
   tr_eventually (exits v@i)%R τ ↔
   ∃ n, τ.1 ≤ n ∧ (τ.2 n).1.1.1 !! i = Some (of_val v).
@@ -132,7 +125,7 @@ Proof.
   - iPoseProof (thread_expr_read with "TI SP") as "%". eauto.
 Qed.
 
-(** We don't want this to be an instance, which can break iMod. *)
+(** Not an instance: that can break [iMod]. *)
 Definition heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ :=
   Build_state_interp_class _ _ _ state_interp state_interp_aux state_pred_interp state_interp_wf.
 
@@ -150,9 +143,7 @@ Global Instance heapGS_lantanaGS `{!heapGS Σ} : lantanaGS heap_lang Σ := {
   }.
 
 (** * The invariant heap *)
-(** [gen_inv_heap]: Similar to pointsto,
-except that these are higher-order notations so to
-make setoid rewriting in the predicate [I] work we need actual definitions here. *)
+(** Definitions rather than notations, so that setoid rewriting in [I] works. *)
 Section inv_heap.
   Context `{!heapGS Σ}.
   Definition inv_pointsto_own (l : loc) (v : val) (I : val → Prop) : iProp Σ :=
@@ -211,7 +202,7 @@ Proof.
   rewrite dom_insert_lookup_L; last eauto. by iFrame.
 Qed.
 
-(** Pure steps transport the client's single expression fragment. *)
+(** Pure steps of [e] in the context [C] update [thread_expr i C e]. *)
 Global Instance thread_expr_pure_exec_si C i :
   PureExecSI (λ i e, thread_expr i C e) i.
 Proof.
@@ -351,8 +342,7 @@ Qed.
 
 (** ** Heap *)
 
-(** We need to adjust the [gen_heap] and [gen_inv_heap] lemmas because of our
-value type being [option val] (and sealing). *)
+(** The [gen_heap] and [gen_inv_heap] lemmas, for [option val] and the sealing. *)
 
 Global Instance pointsto_timeless l dq v : Timeless (l ↦{dq} v).
 Proof. rewrite pointsto_unseal. apply _. Qed.
@@ -481,7 +471,7 @@ Proof.
   iIntros "!>". iExists (v). iFrame "%∗".
 Qed.
 
-(** The rules for [allocN] stated with the [array] connective are in derived_laws.v. *)
+(** The [allocN] rules with [array] are in derived_laws.v. *)
 Lemma heap_array_to_seq_meta l vs (n : nat) :
   length vs = n →
   ([∗ map] l' ↦ _ ∈ heap_array l vs, meta_token l' ⊤) -∗
@@ -807,8 +797,7 @@ Proof.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
-(* In the following, strong atomicity is required due to the fact that [e] must
-be able to make a base step for [Resolve e _ _] not to be (base) stuck. *)
+(* Strong atomicity: [e] must take a base step for [Resolve e _ _] not to be stuck. *)
 
 Lemma resolve_reducible i e σ D (p : proph_id) v :
   Atomic StronglyAtomic e → reducible i e σ D →
@@ -849,7 +838,6 @@ Proof.
       apply to_val_fill_some in Hfillvt as [-> ->]. inv_base_step.
 Qed.
 
-(** FIXME: no [lwp_resolve] yet: composing with [ResolveLCtx] seems to need an empty
-    context item, which [ectxi_language] does not allow. *)
+(** FIXME: no [lwp_resolve] yet: it seems to need an empty context item ([ectxi_language]). *)
 
 End lifting.

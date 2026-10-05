@@ -10,8 +10,7 @@ From iris.prelude Require Import options.
 
 (** * Focusing the thread expression *)
 
-(** Focus and unfocus the linear expression token without changing its
-    filled expression. Context items are innermost first. *)
+(** Moving context items between [C] and [e]; context items are innermost first. *)
 Lemma thread_expr_focus_eq `{!heapGS Σ} i C D e e' :
   e = fill D e' →
   thread_expr i C e ⊢ thread_expr i (D ++ C) e'.
@@ -73,10 +72,8 @@ Lemma tac_lwp_value `{!heapGS Σ} Δ s i E (Φ : val → iPropI Σ) v :
   envs_entails Δ (|={E}=>m Φ v) → envs_entails Δ (lWP (Val v) @ s; i; E {{ Φ }}).
 Proof. rewrite envs_entails_unseal=> ->. iIntros "H". rewrite lwp_value_sfmupd. by iMod "H". Qed.
 
-(** Simplify the goal if it is [lWP] of a value.
-  If the postcondition already allows a fupd (or is an [lWP]), do not add a model update.
-  But otherwise, *do* add one. This ensures that all the lemmas applied
-  here are bidirectional, so we never will make a goal unprovable. *)
+(** [lWP] of a value: add a model update unless the postcondition allows a fupd or is an
+    [lWP], so that every lemma applied is bidirectional. *)
 Ltac lwp_value_head :=
   lazymatch goal with
   | |- envs_entails _ (lwp ?s ?i ?E (Val _) (λ _, fupd ?E _ _)) =>
@@ -140,18 +137,11 @@ Proof.
 Qed.
 
 Ltac solve_vals_compare_safe :=
-  (* The first branch is for when we have [vals_compare_safe] in the context.
-     The other two branches are for when either one of the branches reduces to
-     [True] or we have it in the context. *)
+  (* [vals_compare_safe] or one of its disjuncts, in the context or trivial *)
   fast_done || (left; fast_done) || (right; fast_done).
 
-(** The argument [efoc] can be used to specify the construct that should be
-reduced. For example, you can write [lwp_pure (If _ _ _)], which will search
-for an [If _ _ _] in the expression, and reduce it.
-
-The use of [open_constr] in this tactic is essential. It will convert all holes
-(i.e. [_]s) into evars, that later get unified when an occurrence is found
-(see [unify e' efoc] in the code below). *)
+(** [lwp_pure efoc] reduces a redex matching [efoc], e.g. [lwp_pure (If _ _ _)];
+    [open_constr] turns the holes of [efoc] into evars. *)
 Tactic Notation "lwp_pure" open_constr(efoc) :=
   iStartProof;
   lazymatch goal with
@@ -162,10 +152,9 @@ Tactic Notation "lwp_pure" open_constr(efoc) :=
       unify e' efoc;
       eapply (tac_lwp_pure_simple _ _ _ _ K e');
       [tc_solve                       (* PureExec *)
-      |try solve_vals_compare_safe    (* The pure condition for PureExec --
-         handles trivial goals, including [vals_compare_safe] *)
-      |try lia (* must take at least one step *)
-      |iFrame "TE" (* reserve the pre-step token *)
+      |try solve_vals_compare_safe    (* its pure condition *)
+      |try lia (* at least one step *)
+      |iFrame "TE"
       ])
     || fail "lwp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
   | _ => fail "lwp_pure: not a 'lwp'"
@@ -173,13 +162,8 @@ Tactic Notation "lwp_pure" open_constr(efoc) :=
 Tactic Notation "lwp_pure" :=
   lwp_pure _.
 
-(** Unlike [lwp_pure], the tactics [lwp_rec] and [lwp_lam] should also reduce
-lambdas/recs that are hidden behind a definition, i.e. they should use
-[AsRecV_recv] as a proper instance instead of a [Hint Extern].
-
-We achieve this by putting [AsRecV_recv] in the current environment so that it
-can be used as an instance by the typeclass resolution system. We then perform
-the reduction, and finally we clear this new hypothesis. *)
+(** [lwp_rec] also reduces recs hidden behind definitions: [AsRecV_recv] is put in the
+    context as an instance (see class_instances.v). *)
 Tactic Notation "lwp_rec" :=
   let H := fresh in
   assert (H := AsRecV_recv);

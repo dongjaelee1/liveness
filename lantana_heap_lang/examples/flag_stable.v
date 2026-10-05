@@ -6,9 +6,8 @@ From lantana.heap_lang.examples Require Import step_tactics.
 
 (** * A flag that stays set: the flag of flag.v, with the set flag in a nested [alwaysI]
 
-    The cell is "[0] until always [1]": the right formula of the until is the invariant
-    [alwaysI Nv (l ↦ #1)], allocated by [set] after its store. The flag's trace guarantee
-    [flag_tps] then also says that once the flag holds [1], it holds [1] forever. *)
+    The cell is "[0] until always [1]", the right formula being the invariant
+    [alwaysI Nv (l ↦ #1)] that [set] allocates after its store. *)
 
 Module Flag.
 
@@ -49,7 +48,6 @@ Section proof.
   Definition flag_tk (l : loc) k : iProp Σ :=
     untilI Np k (1/2) (l ↦ #0) (alwaysI Nv (l ↦ #1)).
 
-  (** The trace properties guaranteed by the flag. *)
   Definition flag_tps (l : loc) : tps heap_lang Σ :=
     (tps_true ∧ tps_always (tps_until (l ↦ #0) (tps_always (l ↦ #1)) ∨
                             (tps_true ∧ tps_always (l ↦ #1))))%S.
@@ -71,9 +69,8 @@ Section proof.
     iModIntro. by iLeft.
   Qed.
 
-  (** A response property: whenever the flag holds 0, it eventually holds 1 forever. Unlike
-      in flag.v, the condition is not needed: in both branches of the invariant the flag
-      eventually stays [1]. *)
+  (** Whenever the flag holds 0, it eventually holds 1 forever. Unlike in flag.v, the
+      antecedent is not needed. *)
   Definition flag_response_tps (l : loc) : tps heap_lang Σ :=
     tps_always (l ↦ #0 → tps_finally (tps_always (l ↦ #1)))%S.
 
@@ -327,7 +324,6 @@ Section trace.
   (** The flag at the level of traces: [0] until [1] forever, or [1] forever. *)
   Definition is_flag_tr (l : loc) : trProp heap_lang :=
     tr_always (tr_until (l ↦ #0) (tr_always (l ↦ #1)) ∨ tr_always (l ↦ #1))%R.
-  (** The guaranteed trace property implies [is_flag_tr]. *)
   Lemma flag_tps_impl {Σ : gFunctors} l :
     ∀ τ, tps_tr (flag_tps (Σ:=Σ) l) τ → is_flag_tr l τ.
   Proof.
@@ -337,8 +333,7 @@ Section trace.
     - right. done.
   Qed.
 
-  (** What the guarantee says, unlike the one of flag.v: once the flag is [1], it stays [1].
-      In the until, the flag cannot hold [0] where it holds [1]. *)
+  (** Unlike in flag.v, the guarantee says that once the flag is [1], it stays [1]. *)
   Definition flag_stays_tr (l : loc) : trProp heap_lang :=
     tr_always (l ↦ #1 → tr_always (l ↦ #1))%R.
 
@@ -355,9 +350,7 @@ Section trace.
   Lemma flag_tps_stays {Σ : gFunctors} l τ : tps_tr (flag_tps (Σ:=Σ) l) τ → flag_stays_tr l τ.
   Proof. intros H. by apply is_flag_tr_stays, (flag_tps_impl (Σ:=Σ)). Qed.
 
-  (** The run of flag.v in which the flag holds 0, 1, 0, 1, 1, ...: it satisfies the guarantee
-      of flag.v ([flag_run_satisfies_guarantee] there), but not this one, as it goes back from
-      1 to 0. *)
+  (** The run 0, 1, 0, 1, 1, ... satisfies the guarantee of flag.v, but not this one. *)
   Definition flag_run (l : loc) : nat → trace_state heap_lang :=
     λ n, ((∅, {| heap := {[l := Some (if decide (n = 0 ∨ n = 2) then #0 else #1)]};
                  used_proph_id := ∅ |}), 1%positive, []).

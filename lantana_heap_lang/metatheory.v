@@ -5,15 +5,13 @@ From iris.prelude Require Import options.
 (** Metatheory of heap_lang (closedness, parallel substitution), not needed for verifying
     programs. *)
 
-(* Adding a binder to a set of identifiers. *)
 Local Definition set_binder_insert (x : binder) (X : stringset) : stringset :=
   match x with
   | BAnon => X
   | BNamed f => {[f]} ∪ X
   end.
 
-(* Check if expression [e] is closed w.r.t. the set [X] of variable names,
-   and that all the values in [e] are closed *)
+(* [e] is closed under the variables [X], and so are the values in [e]. *)
 Fixpoint is_closed_expr (X : stringset) (e : expr) : bool :=
   match e with
   | Val v => is_closed_val v
@@ -65,7 +63,6 @@ Fixpoint subst_map (vs : gmap string val) (e : expr) : expr :=
   | ChooseNat => ChooseNat
   end.
 
-(* Properties *)
 Local Instance set_unfold_elem_of_insert_binder x y X Q :
   SetUnfoldElemOf y X Q →
   SetUnfoldElemOf y (set_binder_insert x X) (Q ∨ BNamed y = x).
@@ -168,7 +165,6 @@ Proof.
     intros [? ?]; apply elem_of_map_to_list.
 Qed.
 
-(* The stepping relation preserves closedness *)
 Lemma base_step_is_closed i e1 σ1 Θ obs e2 σ2 es :
   is_closed_expr ∅ e1 →
   map_Forall (λ _ v, from_option is_closed_val true v) σ1.(heap) →

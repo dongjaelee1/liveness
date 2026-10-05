@@ -25,7 +25,7 @@ Section atomic.
   Proof. solve_atomic. Qed.
   Global Instance injr_atomic s v : Atomic s (InjR (Val v)).
   Proof. solve_atomic. Qed.
-  (** The instance below is a more general version of [Skip] *)
+  (** Generalizes [Skip]. *)
   Global Instance beta_atomic s f x v1 v2 : Atomic s (App (RecV f x (Val v1)) (Val v2)).
   Proof. destruct f, x; solve_atomic. Qed.
   Global Instance unop_atomic s op v : Atomic s (UnOp op (Val v)).
@@ -88,20 +88,9 @@ Section atomic.
 End atomic.
 
 (** * Instances of the [PureExec] class *)
-(** The behavior of the various [lwp_] tactics with regard to lambda differs in
-the following way:
-
-- [lwp_pure] does *not* reduce lambdas/recs that are hidden behind a definition.
-- [lwp_rec] and [lwp_lam] reduce lambdas/recs that are hidden behind a definition.
-
-To realize this behavior, we define the class [AsRecV v f x erec], which takes a
-value [v] as its input, and turns it into a [RecV f x erec] via the instance
-[AsRecV_recv : AsRecV (RecV f x e) f x e]. We register this instance via
-[Hint Extern] so that it is only used if [v] is syntactically a lambda/rec, and
-not if [v] contains a lambda/rec that is hidden behind a definition.
-
-To make sure that [lwp_rec] and [lwp_lam] do reduce lambdas/recs that are hidden
-behind a definition, we activate [AsRecV_recv] by hand in these tactics. *)
+(** [AsRecV v f x erec] turns [v] into [RecV f x erec]. Its instance [AsRecV_recv] is a
+    [Hint Extern], used only when [v] is syntactically a rec, so [lwp_pure] does not reduce
+    recs hidden behind definitions; [lwp_rec] and [lwp_lam] activate it by hand. *)
 Class AsRecV (v : val) (f x : binder) (erec : expr) :=
   as_recv : v = RecV f x erec.
 Global Hint Mode AsRecV ! - - - : typeclass_instances.

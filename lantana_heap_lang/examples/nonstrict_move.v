@@ -5,11 +5,9 @@ From iris.prelude Require Import options.
 
 (** * A move below an obligation of the same layer is unsound
 
-    Assume the non-strict variant of [obl_move] (the new parent's layer may equal the payment
-    layer). Then a looping thread keeps an obligation alive forever: each iteration creates a
-    fresh root at layer 0, moves the old root below it (paying the old root's last unit at the
-    new root's own layer), and pays the step with the new root. Adequacy then gives
-    "eventually False" for the obligation's until. *)
+    With the non-strict [obl_move] (the new parent's layer may equal the payment layer), each
+    iteration of a loop moves the old root below a fresh root at layer 0, paying its last unit
+    at layer 0, and pays the step with the new root. Adequacy then gives "eventually False". *)
 
 Class obl_move_nonstrict `(HGS : lantanaGS Λ Σ) `{!TemporalInterp Λ Σ} := {
     obl_move_le E p1 q K1 K2 k (ℓ ℓq : ord.t) :

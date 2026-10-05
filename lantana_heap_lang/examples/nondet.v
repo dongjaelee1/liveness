@@ -12,20 +12,15 @@ Module Nondet.
   Definition nest : val :=
     rec: "fn" "x" "n" :=
       if: "n" ≤ #0%Z
-      (* if true, set the flag and return *)
       then Flag.set "x"
       else
-        (* fork and recursively pass the flag y to a thread *)
         let: "y" := Flag.init #() in
         Fork ("fn" "y" ("n" - #1%Z));;
-        (* and wait on y *)
         Flag.wait "y";;
-        (* finally set x and return *)
         Flag.set "x".
 
   Definition nondet : val :=
     λ: <>,
-      (* alloc a flag x, nondeterministically choose a nat, and fork a nest thread and wait *)
       let: "n" := ChooseNat in
       let: "x" := Flag.init #() in
       Fork (nest "x" "n");;
@@ -50,8 +45,7 @@ Section proof.
     l{{{ RET #(); thread_expr i C #() ∗ £ lc ∗ thP_kids i (G ∖ {[k]}) ∗ oblP_discharged k }}}.
   Proof.
     unfold Nondet.nest.
-    (** Löb to bootstrap the spec; can do induction on n too *)
-    (* Existential μ is okay, because the layer n will drop *)
+    (* Löb induction (or induction on [n]); the [∃ μ] is fine since the layer [n] drops. *)
     iLöb as "NEST".
     iPoseProof (Flag_init_thread_spec) as (μ_fi) "Flag_init_spec".
     iPoseProof (Flag_set_thread_spec) as (μ_fs) "Flag_set_spec".
