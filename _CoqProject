@@ -78,7 +78,6 @@ lantana/program_logic/language.v
 lantana/program_logic/history_interp.v
 lantana/program_logic/temporal_registry.v
 lantana/program_logic/temporal_class.v
-lantana/program_logic/sfmupd.v
 lantana/program_logic/obl_forest.v
 lantana/program_logic/obl_forest_rules.v
 lantana/program_logic/obl_forest_instance.v

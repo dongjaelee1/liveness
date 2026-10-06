@@ -268,7 +268,6 @@ Section lifting.
       { by rewrite Jacobsthal.mult_O_r. }
       iMod (obl_check_witnesses with "Rs") as "Ws".
       iApply ("IH" with "Hc TG [Ws] Hz").
-      unfold_opreds.
       rewrite Ord.from_nat_O. done. }
     iIntros "(#Rs& TG& Gfs& IH)". simpl.
     iAssert (([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ n) ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1))%I

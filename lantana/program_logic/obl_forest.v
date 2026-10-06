@@ -13,6 +13,27 @@ From lantana.program_logic Require Export temporal_class.
 From lantana.base_logic Require Export model_physical_updates.
 Import uPred.
 
+(** * Parents *)
+(** One unit of fuel at layer [ℓ] is enough to hang below [p]: always below a thread; below an
+    obligation [q], [ℓ] must be above a witness layer of [q] (given by [wl], instantiated with
+    [witP_layer]). *)
+Definition parent_below `{SI : sidx} {Σ : gFunctors} (wl : oid → layer → iProp Σ)
+    (p : parent) (ℓ : layer) : iProp Σ :=
+  match p with
+  | PThread _ => True
+  | PObl q => ∃ ℓq, ⌜ (ℓq < ℓ)%ordi ⌝ ∗ wl q ℓq
+  end%I.
+
+(** A new obligation at layer [ℓ] may be created below [p]: always below a thread; below an
+    obligation [q], [ℓ] must be at least a witness layer of [q]. A move needs a strictly larger
+    layer ([parent_below]): moving an obligation below one of the same layer is unsound. *)
+Definition parent_le `{SI : sidx} {Σ : gFunctors} (wl : oid → layer → iProp Σ)
+    (p : parent) (ℓ : layer) : iProp Σ :=
+  match p with
+  | PThread _ => True
+  | PObl q => ∃ ℓq, ⌜ (ℓq <= ℓ)%ordi ⌝ ∗ wl q ℓq
+  end%I.
+
 Module oblf.
 
 (** * The class
@@ -211,3 +232,4 @@ Notation witP_cred1 r := (witP_cred r Ord.one).
 Notation witP_cred0 r := (witP_cred r Ord.O).
 
 End oblf.
+Export oblf.

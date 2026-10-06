@@ -8,8 +8,7 @@ From lantana.program_logic Require Export language.
 From iris.bi.lib Require Export fixpoint_mono.
 From lantana.program_logic Require Export lwp_notation.
 From iris.prelude Require Import options.
-From lantana.program_logic Require Export temporal_class sfmupd.
-From lantana.base_logic Require Export model_physical_updates.
+From lantana.program_logic Require Export obl_forest_instance.
 Import uPred.
 
 Class lantanaGS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=

@@ -372,7 +372,7 @@ Proof.
   iModIntro. iFrame "R W WOE". rewrite (right_id ε).
   iMod "H" as "(%Hsic& %fork_post& %Ψs& SI& SIa& WPs)".
   iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& A& G& MI)".
-  iMod (thP_kids_alloc_threads _ (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
+  iMod (thP_kids_alloc_threads (temporalGS0:=Htemp) _ (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
   iPoseProof (treg_st_init (treg_handle (temporalGS0:=Htemp)) with "TR") as "TI".
   iPoseProof ("WPs" with "LC Ths") as "WPs". rewrite union_empty_l_L.

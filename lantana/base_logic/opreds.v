@@ -14,26 +14,6 @@ From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.base_logic Require Export oinv mupd model_physical_updates.
 
-(** One unit of fuel at layer [ℓ] is enough to hang below [p]: always below a thread; below an
-    obligation [q], [ℓ] must be above a witness layer of [q] (given by [wl], instantiated with
-    [witP_layer]). *)
-Definition parent_below `{SI : sidx} {Σ : gFunctors} (wl : oid → layer → iProp Σ)
-    (p : parent) (ℓ : layer) : iProp Σ :=
-  match p with
-  | PThread _ => True
-  | PObl q => ∃ ℓq, ⌜ (ℓq < ℓ)%ordi ⌝ ∗ wl q ℓq
-  end%I.
-
-(** A new obligation at layer [ℓ] may be created below [p]: always below a thread; below an
-    obligation [q], [ℓ] must be at least a witness layer of [q]. A move needs a strictly larger
-    layer ([parent_below]): moving an obligation below one of the same layer is unsound. *)
-Definition parent_le `{SI : sidx} {Σ : gFunctors} (wl : oid → layer → iProp Σ)
-    (p : parent) (ℓ : layer) : iProp Σ :=
-  match p with
-  | PThread _ => True
-  | PObl q => ∃ ℓq, ⌜ (ℓq <= ℓ)%ordi ⌝ ∗ wl q ℓq
-  end%I.
-
 (** * The model of the obligation predicates (the implementation of obl_forest.v) *)
 Module omodel.
 
@@ -174,10 +154,6 @@ Notation thP_kids i K := (parP_kids (PThread i) K).
 Notation oblP_kids k K := (parP_kids (PObl k) K).
 (** [n] units of fuel of each obligation of a set, at any layers. *)
 Notation oblP_fuels K n := ([∗ set] k ∈ K, ∃ ℓ, oblP_fuel k ℓ n)%I.
-
-Notation parP_below p ℓ := (parent_below witP_layer p ℓ).
-
-Notation parP_le p ℓ := (parent_le witP_layer p ℓ).
 
 Ltac unfold_opreds :=
   try rewrite !wit_fuels_unseal /wit_fuels_def;

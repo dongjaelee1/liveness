@@ -9,7 +9,6 @@ From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export obl_forest.
 Import uPred.
-Import oblf.
 
 (** * The model update *)
 Section modality.
