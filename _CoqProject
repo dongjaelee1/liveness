@@ -80,6 +80,7 @@ lantana/program_logic/temporal_registry.v
 lantana/program_logic/temporal_class.v
 lantana/program_logic/sfmupd.v
 lantana/program_logic/obl_forest.v
+lantana/program_logic/obl_forest_rules.v
 lantana/program_logic/obl_forest_instance.v
 lantana/program_logic/weakestpre.v
 lantana/program_logic/lifting.v
@@ -87,7 +88,6 @@ lantana/program_logic/ectx_language.v
 lantana/program_logic/ectx_lifting.v
 lantana/program_logic/ectxi_language.v
 lantana/program_logic/atomic.v
-lantana/program_logic/obl_forest_derived.v
 
 # Traces, temporal guarantees and adequacy
 lantana/trace/trace_pred.v

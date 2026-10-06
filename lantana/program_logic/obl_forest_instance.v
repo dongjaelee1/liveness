@@ -6,10 +6,10 @@
 From iris.proofmode Require Import base proofmode classes.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export obl_forest.
+From lantana.program_logic Require Import sfmupd.
 
 Section instance.
   Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
-  Context `{!TemporalInterp Λ Σ}.
 
   (** ** Structural properties *)
   Lemma thP_done_timeless_lantana i : Timeless (thP_done i).
@@ -65,6 +65,11 @@ Section instance.
     oblf.witP_cred := witP_cred;
     oblf.wit_fuels := wit_fuels;
 
+    oblf.sfmupd TI := @sfmupd.sfmupd _ _ _ _ _ _ TI;
+    oblf.sfmupd_ne TI := sfmupd.sfmupd_ne;
+    oblf.fupd_sfmupd TI := sfmupd.fupd_sfmupd;
+    oblf.sfmupd_bind TI := sfmupd.sfmupd_bind;
+
     oblf.parP_kids_timeless := parP_kids_timeless;
     oblf.thP_done_timeless := thP_done_timeless_lantana;
     oblf.thP_done_persistent := thP_done_persistent;
@@ -102,14 +107,14 @@ Section instance.
     oblf.wit_fuels_add := wit_fuels_add;
     oblf.wit_fuels_decr := wit_fuels_decr;
 
-    oblf.thread_terminate := thread_terminate;
-    oblf.obl_new := obl_new;
-    oblf.obl_new_discharged := obl_new_discharged;
-    oblf.obl_move := obl_move;
-    oblf.obl_move_up := obl_move_up;
-    oblf.obl_check_witness := obl_check_witness;
+    oblf.thread_terminate TI := sfmupd.thread_terminate;
+    oblf.obl_new TI := sfmupd.obl_new;
+    oblf.obl_new_discharged TI := sfmupd.obl_new_discharged;
+    oblf.obl_move TI := sfmupd.obl_move;
+    oblf.obl_move_up TI := sfmupd.obl_move_up;
+    oblf.obl_check_witness TI := sfmupd.obl_check_witness;
 
-    oblf.obl_discharge := obl_discharge_leaf;
+    oblf.obl_discharge_leaf TI := sfmupd.obl_discharge_leaf;
 
     oblf.step_progress := mprog_step_kids;
     oblf.step_fork := step_fork_lantana;
