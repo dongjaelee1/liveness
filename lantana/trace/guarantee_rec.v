@@ -173,8 +173,8 @@ Section renew.
                  oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
                  untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G).
   Proof.
-    iIntros (HQ) "B Kp". iMod (untilI_guar_alloc with "B Kp") as "(%k& %Hk& Kp& Kk& F& W& ACC)".
-    iMod ("ACC" $! E N True%I (Q ∗ renew N Q G)%I tps_true (renew_tps G) with "[] [] [//]") as "U".
+    iIntros (HQ) "B Kp". iMod (untilI_alloc with "B Kp") as "(%k& %Hk& Kp& Kk& F& W& Oa)".
+    iMod (untilI_guar_init E N True%I (Q ∗ renew N Q G)%I tps_true (renew_tps G) with "Oa [] [] [//]") as "U".
     { iNext. iApply temporal_true. }
     { iNext. iApply (renew_content_temporal _ _ _ HQ). }
     iModIntro. iExists k. iSplitR; first done. iFrame.

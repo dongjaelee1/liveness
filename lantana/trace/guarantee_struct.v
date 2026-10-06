@@ -109,34 +109,25 @@ Proof. by rewrite untilI_guar_canonical untilI_guar_unfold. Qed.
 Definition finallyI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (q : Qp) (Q : iProp Σ) : iProp Σ :=
   untilI N k q True Q.
 
-(** The persistent part of a discharged until, read with right formula [G2]: its
-    registration, whose obligation invariant is in the discharged state from the allocation
-    on, with the record of [G2] there, and a later-guarded proof of [Q ⊨ₜ G2]. *)
-Definition untilI_done_pers `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
-  (N : namespace) (k : positive) (Q : iProp Σ) (G2 : tps Λ Σ) : iProp Σ :=
-  ∃ j r γP γQ,
-    reg_idx j r (RUntil N k γP γQ) ∗ saved_ti γQ (tps_ti G2) ∗
-    oblP_inv N k False (until_disch k G2) ∗ ▷ (Q ⊨ₜ G2) ∗ oblP_discharged k.
-Global Typeclasses Opaque untilI_done_pers.
-
-(** An until fulfilled at its allocation: its right formula [Q] and the persistent part.
-    Wherever it is held, [Q] holds, so it is read as [G1] until [G2] for any [G1]. A
-    persistent part alone guarantees no until: a persistent resource holds at every later
-    position. Sealed, like [untilI_guar]. *)
+(** A done until, fulfilled at its allocation: its right formula [Q], the discharged
+    obligation [k], and a later-guarded proof of [Q ⊨ₜ G2]. Wherever it is held, [Q] holds,
+    so it is read as [G1] until [G2] for any [G1]; nothing is registered. A persistent part
+    alone would guarantee no until: a persistent resource holds at every later position.
+    Sealed, like [untilI_guar]. *)
 Local Definition untilI_done_guar_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
-  N k (Q : iProp Σ) (G2 : tps Λ Σ) : iProp Σ :=
-  Q ∗ untilI_done_pers N k Q G2.
+  k (Q : iProp Σ) (G2 : tps Λ Σ) : iProp Σ :=
+  Q ∗ oblP_discharged k ∗ ▷ (Q ⊨ₜ G2).
 Local Definition untilI_done_guar_aux : seal (@untilI_done_guar_def). Proof. by eexists. Qed.
 Definition untilI_done_guar := untilI_done_guar_aux.(unseal).
-Global Arguments untilI_done_guar {Λ Σ _ _} N k Q G2.
+Global Arguments untilI_done_guar {Λ Σ _ _} k Q G2.
 Local Lemma untilI_done_guar_unseal : @untilI_done_guar = @untilI_done_guar_def.
 Proof. rewrite -untilI_done_guar_aux.(seal_eq) //. Qed.
-Lemma untilI_done_guar_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k Q G2 :
-  untilI_done_guar N k Q G2 = (Q ∗ untilI_done_pers N k Q G2)%I.
+Lemma untilI_done_guar_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} k Q G2 :
+  untilI_done_guar k Q G2 = (Q ∗ oblP_discharged k ∗ ▷ (Q ⊨ₜ G2))%I.
 Proof. by rewrite untilI_done_guar_unseal. Qed.
 (** With the canonical reading. *)
-Definition untilI_done `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (Q : iProp Σ) : iProp Σ :=
-  untilI_done_guar N k Q (tps_sem Q).
+Definition untilI_done `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} k (Q : iProp Σ) : iProp Σ :=
+  untilI_done_guar k Q (tps_sem Q).
 Global Typeclasses Opaque untilI_done.
 
 (** ** Reading the model under a model update
@@ -308,13 +299,11 @@ Section until_rules.
   Proof. rewrite /untilI_guar_pers. apply _. Qed.
   Global Instance untilI_pers_persistent N k P Q : Persistent (untilI_pers N k P Q).
   Proof. rewrite /untilI_pers. apply _. Qed.
-  Global Instance untilI_done_pers_persistent N k Q G2 : Persistent (untilI_done_pers N k Q G2).
-  Proof. rewrite /untilI_done_pers. apply _. Qed.
-  (** A discharged until is persistent if its right formula is. *)
-  Global Instance untilI_done_guar_persistent N k Q G2 :
-    Persistent Q → Persistent (untilI_done_guar N k Q G2).
+  (** A done until is persistent if its right formula is. *)
+  Global Instance untilI_done_guar_persistent k Q G2 :
+    Persistent Q → Persistent (untilI_done_guar k Q G2).
   Proof. rewrite untilI_done_guar_unfold. apply _. Qed.
-  Global Instance untilI_done_persistent N k Q : Persistent Q → Persistent (untilI_done N k Q).
+  Global Instance untilI_done_persistent k Q : Persistent Q → Persistent (untilI_done k Q).
   Proof. rewrite /untilI_done. apply _. Qed.
 
   (* The contractiveness of the obligation invariant, in the form [f_contractive] uses. *)
@@ -382,17 +371,29 @@ Section until_rules.
   Global Instance untilI_as_fractional N k q P Q : AsFractional (untilI N k q P Q) (λ q, untilI N k q P Q) q.
   Proof. split; [auto|apply _]. Qed.
 
-  (** Update rules. Allocation registers the until, with later-guarded guarantees of its
-      formulas, and records the left formula at the current position. *)
-  Lemma untilI_guar_alloc E p K ℓ μ :
+  (** ** Allocation
+
+      A new until starts as a fresh obligation [k] with its assignment token. On the token,
+      a strong until is allocated with its left formula [P] ([untilI_guar_init]), or a done
+      until with its right formula [Q], which discharges [k] at once
+      ([untilI_done_guar_init]). Both guarantee the until ([temporal_until_guar],
+      [temporal_until_done_guar]). *)
+  Lemma untilI_alloc E p K ℓ μ :
     parP_le p ℓ -∗ parP_kids p K -∗
     |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
-                 oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                 ∀ E' N (P Q : iProp Σ) G1 G2,
-                   ▷ (P ⊨ₜ G1) -∗ ▷ (Q ⊨ₜ G2) -∗ ▷ P -∗ |={E'}=>m untilI_guar N k 1 P Q G1 G2.
+                 oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗ oblP_assigned k 1.
   Proof.
-    iIntros "B Kp". iMod (obl_alloc_assigned with "B Kp") as "(%k& $& $& $& Oa& $& $& ACC)".
-    iIntros "!> %E' %N %P %Q %G1 %G2 #HG1 #HG2 HC".
+    iIntros "B Kp". iMod (obl_new with "B Kp") as (k) "(%Hk& Kp& Kk& Oa& F& W)".
+    iModIntro. iExists k. by iFrame "Kp Kk Oa F W".
+  Qed.
+
+  (** A strong until registers, with later-guarded guarantees of its formulas, and records
+      the left formula at the current position. *)
+  Lemma untilI_guar_init E N (P Q : iProp Σ) G1 G2 k :
+    oblP_assigned k 1 -∗ ▷ (P ⊨ₜ G1) -∗ ▷ (Q ⊨ₜ G2) -∗ ▷ P -∗
+    |={E}=>m untilI_guar N k 1 P Q G1 G2.
+  Proof.
+    iIntros "[Oa Oa'] #HG1 #HG2 HC".
     iApply sfmupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI TI MI".
     iPoseProof (temporal_elim_later_guar P G1 with "HG1 [$HC $HI $MI]") as "#C".
     iDestruct "MI" as "(MHI& S& MI)". iEval (unfold_opreds) in "Oa". iDestruct "Oa" as "(#OE& Oa)".
@@ -400,7 +401,7 @@ Section until_rules.
     iPoseProof (model_history_interp_event_obl_now with "MHI") as "#EA". 1: eauto.
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
     iFrame "MHI S MI".
-    iMod ("ACC" $! E' N P (until_disch k G2) with "HC") as "#OI".
+    iMod (oblP_inv_alloc_assigned E N k P (until_disch k G2) with "Oa' HC") as "#OI".
     iMod (saved_ti_alloc (tps_ti G1)) as (γP) "#HγP".
     iMod (saved_ti_alloc (tps_ti G2)) as (γQ) "#HγQ".
     iMod (treg_st_register treg_handle (RUntil N k γP γQ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
@@ -410,58 +411,67 @@ Section until_rules.
     iExists j, n, γP, γQ, _, i, Ω, fu, o. iFrame "Hj HE HγP HγQ OI HG1 HG2 EA C".
   Qed.
 
-  Lemma untilI_alloc E p K ℓ μ :
-    parP_le p ℓ -∗ parP_kids p K -∗
-    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
-                 oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                 ∀ E' N (P Q : iProp Σ), ▷ P -∗ |={E'}=>m untilI N k 1 P Q.
+  Lemma untilI_init E N (P Q : iProp Σ) k :
+    oblP_assigned k 1 -∗ ▷ P -∗ |={E}=>m untilI N k 1 P Q.
   Proof.
-    iIntros "B Kp". iMod (untilI_guar_alloc with "B Kp") as "(%k& %Hk& Kp& Kk& F& W& ACC)".
-    iModIntro. iExists k. iFrame "Kp Kk F W". iSplitR; first done.
-    iIntros (E' N P Q) "HP". rewrite untilI_guar_canonical.
-    iApply ("ACC" with "[] [] HP"); iNext; iApply temporal_sem.
+    iIntros "Oa HP". rewrite untilI_guar_canonical.
+    iApply (untilI_guar_init with "Oa [] [] HP"); iNext; iApply temporal_sem.
   Qed.
 
-  (** Allocation of a discharged until, with its right formula at hand: a fresh obligation
-      is discharged at once, and the until is registered with the record of [G2] at the
-      current position, where the until is fulfilled. *)
-  Lemma untilI_discharged_alloc_guar E N ℓ (Q : iProp Σ) G2 :
-    ▷ (Q ⊨ₜ G2) -∗ Q -∗ |={E}=>m ∃ k, untilI_done_guar N k Q G2 ∗ witP_layer k ℓ.
+  (** A done until: [k], a childless child of [p], is discharged at once with [Q] at
+      hand. *)
+  Lemma untilI_done_guar_init E (Q : iProp Σ) G2 p K k :
+    k ∈ K →
+    oblP_assigned k 1 -∗ parP_kids p K -∗ oblP_kids k ∅ -∗ ▷ (Q ⊨ₜ G2) -∗ Q -∗
+    |={E}=>m untilI_done_guar k Q G2 ∗ parP_kids p (K ∖ {[k]}).
   Proof.
-    iIntros "#HG2 HQ". iMod (obl_alloc_discharged E ℓ) as (k) "(#D& #Wl& ACC)".
-    iDestruct (oblP_discharged_unfold with "D") as "[#Oe #Od]".
-    iApply sfmupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI TI MI".
-    iPoseProof (temporal_elim_later_guar Q G2 with "HG2 [$HQ $HI $MI]") as "#C".
-    iDestruct "MI" as "(MHI& S& MI)".
-    iDestruct (osat_lookup_discharged with "[$S $Oe $Od]") as %Hkd.
-    iPoseProof (model_history_interp_event_obl_now with "MHI") as "#EF"; first exact Hkd.
-    iFrame "MHI S MI".
-    iMod ("ACC" $! E N False%I (until_disch k G2) with "[]") as "#OI".
-    { iNext. iExists n, i, Ω. iFrame "EF C". }
-    iMod (saved_ti_alloc (tps_ti tps_true)) as (γP) "#HγP".
-    iMod (saved_ti_alloc (tps_ti G2)) as (γQ) "#HγQ".
-    iMod (treg_st_register treg_handle (RUntil N k γP γQ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
-    { iIntros (st) "_". simpl. iExists False%I, tps_true, G2. iFrame "HγP HγQ OI".
-      iNext. iApply temporal_true. }
-    iModIntro. iFrame "HI TI". iExists k. iFrame "Wl".
-    rewrite untilI_done_guar_unfold /untilI_done_pers. iFrame "HQ".
-    iExists j, n, γP, γQ. iFrame "Hj HγQ OI HG2 D".
+    iIntros (Hk) "Oa Kp Kk #HG2 HQ".
+    iMod (obl_discharge_leaf with "Kp Kk Oa") as "[$ #D]"; first done.
+    iModIntro. rewrite untilI_done_guar_unfold. iFrame "HQ D HG2".
   Qed.
-  Lemma untilI_discharged_alloc E N ℓ (Q : iProp Σ) :
-    Q -∗ |={E}=>m ∃ k, untilI_done N k Q ∗ witP_layer k ℓ.
+  Lemma untilI_done_init E (Q : iProp Σ) p K k :
+    k ∈ K →
+    oblP_assigned k 1 -∗ parP_kids p K -∗ oblP_kids k ∅ -∗ Q -∗
+    |={E}=>m untilI_done k Q ∗ parP_kids p (K ∖ {[k]}).
   Proof.
-    iIntros "HQ". rewrite /untilI_done. iApply (untilI_discharged_alloc_guar with "[] HQ").
-    iNext. iApply temporal_sem.
+    iIntros (Hk) "Oa Kp Kk HQ". rewrite /untilI_done.
+    iApply (untilI_done_guar_init with "Oa Kp Kk [] HQ"); first done. iNext. iApply temporal_sem.
+  Qed.
+  (** The same, with the children as [untilI_alloc] returns them. *)
+  Lemma untilI_done_init' E (Q : iProp Σ) p K k :
+    k ∉ K →
+    oblP_assigned k 1 -∗ parP_kids p ({[k]} ∪ K) -∗ oblP_kids k ∅ -∗ Q -∗
+    |={E}=>m untilI_done k Q ∗ parP_kids p K.
+  Proof.
+    iIntros (Hk) "Oa Kp Kk HQ".
+    iMod (untilI_done_init with "Oa Kp Kk HQ") as "[$ Kp]"; first set_solver.
+    assert (({[k]} ∪ K) ∖ {[k]} = K) as -> by set_solver. done.
   Qed.
 
-  (** The right formula and the discharged obligation of a discharged until. *)
-  Lemma untilI_done_guar_elim N k Q G2 : untilI_done_guar N k Q G2 ⊢ Q ∗ oblP_discharged k.
-  Proof.
-    rewrite untilI_done_guar_unfold /untilI_done_pers.
-    iIntros "($& %&%&%&%& _& _& _& _& $)".
-  Qed.
-  Lemma untilI_done_elim N k Q : untilI_done N k Q ⊢ Q ∗ oblP_discharged k.
+  (** The right formula and the discharged obligation of a done until. *)
+  Lemma untilI_done_guar_elim k Q G2 : untilI_done_guar k Q G2 ⊢ Q ∗ oblP_discharged k.
+  Proof. rewrite untilI_done_guar_unfold. iIntros "($& $& _)". Qed.
+  Lemma untilI_done_elim k Q : untilI_done k Q ⊢ Q ∗ oblP_discharged k.
   Proof. apply untilI_done_guar_elim. Qed.
+
+  (** A done until guarantees the until of any left reading, from its right formula: no
+      run is needed. *)
+  Lemma temporal_until_done_guar k Q G1 G2 : ⊢ untilI_done_guar k Q G2 ⊨ₜ tps_until G1 G2.
+  Proof.
+    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_done_guar_unfold.
+    iDestruct "U" as "(HQ& _& #HG2)".
+    iApply (temporal_elim Q with "[] [$HI $MI $HQ]"). by iApply temporal_until_now.
+  Qed.
+  Lemma temporal_until_done k Q G1 : ⊢ untilI_done k Q ⊨ₜ tps_until G1 (tps_sem Q).
+  Proof. apply temporal_until_done_guar. Qed.
+  Lemma temporal_finally_done k Q : ⊢ untilI_done k Q ⊨ₜ tps_finally (tps_sem Q).
+  Proof. apply temporal_until_done. Qed.
+  Lemma temporal_until_done_valid k Q G1 G2 : (⊢ Q ⊨ₜ G2) → ⊢ untilI_done k Q ⊨ₜ tps_until G1 G2.
+  Proof.
+    intros HG2. iApply (temporal_weaken _ (tps_until G1 (tps_sem Q))).
+    { apply tps_until_mono; [apply tps_le_refl|by apply tps_sem_le]. }
+    iApply temporal_until_done.
+  Qed.
 
   (** Discharge: [P] is taken out; once [Q] holds, [k] (a childless child of [p]) is
       discharged and the record of [G2] at the discharge is left in the invariant. *)

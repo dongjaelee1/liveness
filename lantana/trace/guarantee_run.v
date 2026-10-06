@@ -440,24 +440,4 @@ Section loops.
     iApply temporal_until.
   Qed.
 
-  (** A discharged until guarantees the until of any left reading: its right formula holds
-      wherever it is held. The run is not needed (the registry certifies its entry in the
-      discharged form, [cert_of_handle]). *)
-  Lemma temporal_until_done_guar N k Q G1 G2 : ⊢ untilI_done_guar N k Q G2 ⊨ₜ tps_until G1 G2.
-  Proof.
-    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_done_guar_unfold /untilI_done_pers.
-    iDestruct "U" as "(HQ& %j& %r& %γP& %γQ& _& _& _& #HG2& _)".
-    iApply (temporal_elim Q with "[] [$HI $MI $HQ]"). by iApply temporal_until_now.
-  Qed.
-  Lemma temporal_until_done N k Q G1 : ⊢ untilI_done N k Q ⊨ₜ tps_until G1 (tps_sem Q).
-  Proof. apply temporal_until_done_guar. Qed.
-  Lemma temporal_finally_done N k Q : ⊢ untilI_done N k Q ⊨ₜ tps_finally (tps_sem Q).
-  Proof. apply temporal_until_done. Qed.
-  Lemma temporal_until_done_valid N k Q G1 G2 : (⊢ Q ⊨ₜ G2) → ⊢ untilI_done N k Q ⊨ₜ tps_until G1 G2.
-  Proof.
-    intros HG2. iApply (temporal_weaken _ (tps_until G1 (tps_sem Q))).
-    { apply tps_until_mono; [apply tps_le_refl|by apply tps_sem_le]. }
-    iApply temporal_until_done.
-  Qed.
-
 End loops.

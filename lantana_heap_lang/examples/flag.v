@@ -91,7 +91,7 @@ Section proof.
   Proof.
     iIntros "B Ptr Kp". rewrite /is_flag /flag_tk /flag_inv.
     iMod (untilI_alloc _ _ _ ℓ μ with "B Kp") as "(%& $& $& $& $& $& H)".
-    iMod ("H" $! _ Np (l ↦ #0)%I (l ↦ #1)%I with "[Ptr]") as "H".
+    iMod (untilI_init _ Np (l ↦ #0)%I (l ↦ #1)%I with "H [Ptr]") as "H".
     { iNext. iFrame. }
     iDestruct "H" as "[H1 H2]".
     iMod (alwaysI_alloc E Na _ with "[H1]") as "$"; last by iFrame.

@@ -120,7 +120,7 @@ predicates.
 | carrier superscripts / `carriers_i G` (Thm 1) | no carriers: `thP_kids i G`, the children of thread `i` in the obligation forest; every initial thread starts with `thP_kids i ∅` | `program_logic/obl_forest.v` |
 | `Fuel^ℓ_G μ` | no carrier fuel: `oblP_fuel k ℓ μ` of each child `k` of the thread; a set is `[∗ set] k ∈ G, oblP_fuel k ℓ μ` (cf. `oblP_fuels`) | `program_logic/obl_forest.v` |
 | `obls^ℓ_g K` | replaced by `parP_kids p K` (children `K` of a thread, `thP_kids i K`, or of an obligation, `oblP_kids k K`); below an obligation the layer bound is its witness layer (`parP_below` / `parP_le`) | `program_logic/obl_forest.v` |
-| `Φ until^k_q Ψ` | `untilI N k q P Q` (an `iProp`; `N` is the namespace of the obligation invariant `oblP_inv` of `k`; variant `untilI_guar` with given readings, e.g. for recursion, `renew` in `trace/guarantee_rec.v`); guarantee `temporal_until` | `trace/guarantee_struct.v`, `trace/guarantee_run.v` |
+| `Φ until^k_q Ψ` | `untilI N k q P Q` (an `iProp`; `N` is the namespace of the obligation invariant `oblP_inv` of `k`; variant `untilI_guar` with given readings, e.g. for recursion, `renew` in `trace/guarantee_rec.v`); guarantee `temporal_until`. An until fulfilled at its allocation is the done until `untilI_done k Q` (`untilI_done_init`, guarantee `temporal_until_done`) | `trace/guarantee_struct.v`, `trace/guarantee_run.v` |
 | `finally^k Φ` | `finallyI N k q Q` (`untilI N k q True Q`) | `trace/guarantee_struct.v` |
 | `obl∎ k` (discharged) | `oblP_discharged k` | `program_logic/obl_forest.v` |
 | `tr$^ℓ_k m` (transfer credit) | `oblP_fuel k ℓ m` (the obligation's own fuel, now the only kind of fuel) | `program_logic/obl_forest.v` |
@@ -141,7 +141,7 @@ predicates.
 | FORK* | `lwp_fork` (with the lower-level `lwp_fork_step`; the children `K ⊆ G` given to the new thread move with one unit of fuel each) | `lantana_heap_lang/primitive_laws.v` |
 | EXIT | the value case of `lwp` (`lwp_value`); `thread_terminate` turns `thP_kids i ∅` into `thP_done i`, which forked threads owe in their postcondition (`lift_term`) | `program_logic/weakestpre.v`, `program_logic/obl_forest.v` |
 | FINALLY-EXIT* | `thread_expr_terminate_finally` | `lantana_heap_lang/temporal_laws.v` |
-| FINALLY-ALLOC* | `untilI_alloc` with left formula `True` (`finallyI`) | `trace/guarantee_struct.v` |
+| FINALLY-ALLOC* | `untilI_alloc`, then `untilI_init` with left formula `True` (`finallyI`) | `trace/guarantee_struct.v` |
 | BIND | `lwp_bind` | `program_logic/weakestpre.v` |
 | FRAME, UPD-ELIM | `lwp_strong_mono`, `fupd_lwp` / `lwp_fupd` / `sfmupd_lwp` / `lwp_sfmupd` | `program_logic/weakestpre.v` |
 | CARRIER-ALLOC | no carriers: `obl_new` creates an obligation below a parent (a thread or an obligation), and an obligation can itself be a parent | `program_logic/obl_forest.v` |
@@ -151,7 +151,7 @@ predicates.
 | ALWAYS-ALLOC / ALWAYS-ACC | `alwaysI_alloc` / `alwaysI_acc` (`iInv` also opens `alwaysI`); guarantee `temporal_always` | `trace/guarantee_struct.v`, `trace/guarantee_run.v`, `base_logic/invariants.v` |
 | LÖB | Löb induction of Transfinite Iris (`iLöb`) | (Transfinite Iris) |
 | LC-SPEND | `tlc_later`, `tlc_later_strong` | `base_logic/later_credits.v` |
-| UNTIL-ALLOC | `untilI_alloc`; triple-level `fuel_burning_triple_until_alloc` | `trace/guarantee_struct.v`, `trace/fuel_burning_triple.v` |
+| UNTIL-ALLOC | `untilI_alloc`, then `untilI_init`; triple-level `fuel_burning_triple_until_alloc` | `trace/guarantee_struct.v`, `trace/fuel_burning_triple.v` |
 | UNTIL-ACC | `untilI_acc` | `trace/guarantee_struct.v` |
 | UNTIL-DISCHARGE | `untilI_discharge`; triple-level `fuel_burning_triple_until_discharge` | `trace/guarantee_struct.v`, `trace/fuel_burning_triple.v` |
 | UNTIL-DONE-FALSE | `untilI_discharged_false` | `trace/guarantee_struct.v` |

@@ -106,11 +106,11 @@ Section proof.
     iPoseProof (main_spec) as (μ) "main_spec".
     iMod (untilI_alloc _ _ _ 0 μ with "[] TGs") as "(%kf& %Hkf& TG1& Kkf& Ofkf& #Wlkf& Akf)".
     { iApply parP_le_thread. }
-    iMod ("Akf" $! _ Nf True%I (x ↦ #2)%I with "[]") as "Ukf".
+    iMod (untilI_init _ Nf True%I (x ↦ #2)%I with "Akf []") as "Ukf".
     { done. }
     iMod (untilI_alloc _ _ _ 0 μ with "[] TG1") as "(%kq& %Hkq& TG1& Kkq& Ofkq& #Wlkq& Akq)".
     { iApply parP_le_thread. }
-    iMod ("Akq" $! _ Nq True%I (cd_Q x y kf) with "[]") as "Ukq".
+    iMod (untilI_init _ Nq True%I (cd_Q x y kf) with "Akq []") as "Ukq".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukq Ukf Ptrx Ptry TG1 Kkq Kkf Ofkq Ofkf".
     { subst Φ. rewrite !union_empty_r_L.

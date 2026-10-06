@@ -111,11 +111,11 @@ Section proof.
     iPoseProof (TicketLockClient_main_spec) as (μ) "main_spec".
     iMod (untilI_alloc _ _ _ ℵ%ordi μ with "[] TGs") as "(%kr& %Hkr& TG1& Kkr& Ofkr& #Wlkr& Akr)".
     { iApply parP_le_thread. }
-    iMod ("Akr" $! _ Nr True%I (exits #42@i)%I with "[]") as "Ukr".
+    iMod (untilI_init _ Nr True%I (exits #42@i)%I with "Akr []") as "Ukr".
     { done. }
     iMod (untilI_alloc _ _ _ ℵ%ordi μ with "[] TG1") as "(%kc& %Hkc& TG1& Kkc& Ofkc& #Wlkc& Akc)".
     { iApply parP_le_thread. }
-    iMod ("Akc" $! _ Nc True%I (∃ tl γ, is_fair_lock tl γ True)%I with "[]") as "Ukc".
+    iMod (untilI_init _ Nc True%I (∃ tl γ, is_fair_lock tl γ True)%I with "Akc []") as "Ukc".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukr Ukc TG1 Kkr Kkc Ofkr Ofkc".
     { subst Φ. rewrite !union_empty_r_L.

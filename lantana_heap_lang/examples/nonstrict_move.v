@@ -113,7 +113,7 @@ Section adequacy.
     iEval (rewrite dom_singleton_L big_sepS_singleton) in "TGs".
     iMod (untilI_alloc _ _ _ 0 1 with "[] TGs") as "(%x& _& TG& _& Fx& _& Ax)".
     { iApply parP_le_thread. }
-    iMod ("Ax" $! _ N True%I False%I with "[//]") as "Ux".
+    iMod (untilI_init _ N True%I False%I with "Ax [//]") as "Ux".
     rewrite union_empty_r_L.
     iModIntro. iExists (Φ_P (heapGS0:=HHeapGS)).
     iSplitR; first iApply Φ_P_temporal.
