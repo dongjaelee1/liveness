@@ -2,6 +2,7 @@ From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From lantana.base_logic Require Export opreds.
 From lantana.program_logic Require Export temporal_registry.
+Export omodel.
 
 (** * Ghost state of the temporal layer
 

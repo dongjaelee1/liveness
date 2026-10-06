@@ -69,8 +69,8 @@ lantana/base_logic/oforest.v
 lantana/base_logic/model_history.v
 lantana/base_logic/mupd.v
 lantana/base_logic/oinv.v
-lantana/base_logic/opreds.v
 lantana/base_logic/model_physical_updates.v
+lantana/base_logic/opreds.v
 
 # Languages and the thread-local weakest precondition lwp
 lantana/program_logic/lwp_notation.v
