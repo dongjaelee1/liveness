@@ -156,7 +156,7 @@ Section triples.
     iIntros "H % (TG& HP) POST".
     iDestruct "HP" as "(HP& B& Kp& HΦ)".
     iMod (untilI_alloc _ _ _ ℓ μ with "B Kp") as "(%& %& Kp& Kk& Of& #Wl& Acc)".
-    iMod (untilI_init _ N Φ Ψ with "Acc HΦ") as "HU".
+    iMod ("Acc" $! _ N Φ Ψ with "HΦ") as "HU".
     iPoseProof ("H" with "[$TG $HP $Kp $Kk $HU $Wl $Of]") as "WP". 1: auto.
     iApply ("WP" with "POST").
   Qed.

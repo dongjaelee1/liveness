@@ -373,19 +373,12 @@ Section until_rules.
 
   (** ** Allocation
 
-      A new until starts as a fresh obligation [k] with its assignment token. On the token,
-      a strong until is allocated with its left formula [P] ([untilI_guar_init]), or a done
-      until with its right formula [Q], which discharges [k] at once
-      ([untilI_done_guar_init]). Both guarantee the until ([temporal_until_guar],
-      [temporal_until_done_guar]). *)
-  Lemma untilI_alloc E p K ℓ μ :
-    parP_le p ℓ -∗ parP_kids p K -∗
-    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
-                 oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗ oblP_assigned k 1.
-  Proof.
-    iIntros "B Kp". iMod (obl_new with "B Kp") as (k) "(%Hk& Kp& Kk& Oa& F& W)".
-    iModIntro. iExists k. by iFrame "Kp Kk Oa F W".
-  Qed.
+      A strong until is allocated on a fresh obligation [k] ([obl_new], which gives its
+      assignment token) with its left formula [P] ([untilI_guar_init]); [untilI_guar_alloc]
+      does both, with the formulas chosen once [k] is known. A done until comes from
+      discharging a strong until ([untilI_guar_discharge_done]), or from a fresh obligation
+      with [Q] at hand ([untilI_done_guar_init]). Both guarantee the until
+      ([temporal_until_guar], [temporal_until_done_guar]). *)
 
   (** A strong until registers, with later-guarded guarantees of its formulas, and records
       the left formula at the current position. *)
@@ -410,7 +403,6 @@ Section until_rules.
     { iEval (unfold_opreds). iFrame "OE Oa". }
     iExists j, n, γP, γQ, _, i, Ω, fu, o. iFrame "Hj HE HγP HγQ OI HG1 HG2 EA C".
   Qed.
-
   Lemma untilI_init E N (P Q : iProp Σ) k :
     oblP_assigned k 1 -∗ ▷ P -∗ |={E}=>m untilI N k 1 P Q.
   Proof.
@@ -418,8 +410,32 @@ Section until_rules.
     iApply (untilI_guar_init with "Oa [] [] HP"); iNext; iApply temporal_sem.
   Qed.
 
-  (** A done until: [k], a childless child of [p], is discharged at once with [Q] at
-      hand. *)
+  (** The obligation and the strong until at once: [k] is a new child of [p], and the
+      formulas are chosen once [k] is known. *)
+  Lemma untilI_guar_alloc E p K ℓ μ :
+    parP_le p ℓ -∗ parP_kids p K -∗
+    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
+                 oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+                 ∀ E' N (P Q : iProp Σ) G1 G2,
+                   ▷ (P ⊨ₜ G1) -∗ ▷ (Q ⊨ₜ G2) -∗ ▷ P -∗ |={E'}=>m untilI_guar N k 1 P Q G1 G2.
+  Proof.
+    iIntros "B Kp". iMod (obl_new with "B Kp") as (k) "(%Hk& Kp& Kk& Oa& F& W)".
+    iModIntro. iExists k. iFrame "Kp Kk F W". iSplitR; first done.
+    iIntros (E' N P Q G1 G2) "HG1 HG2 HP". iApply (untilI_guar_init with "Oa HG1 HG2 HP").
+  Qed.
+  Lemma untilI_alloc E p K ℓ μ :
+    parP_le p ℓ -∗ parP_kids p K -∗
+    |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
+                 oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
+                 ∀ E' N (P Q : iProp Σ), ▷ P -∗ |={E'}=>m untilI N k 1 P Q.
+  Proof.
+    iIntros "B Kp". iMod (obl_new with "B Kp") as (k) "(%Hk& Kp& Kk& Oa& F& W)".
+    iModIntro. iExists k. iFrame "Kp Kk F W". iSplitR; first done.
+    iIntros (E' N P Q) "HP". iApply (untilI_init with "Oa HP").
+  Qed.
+
+  (** A done until from a fresh obligation: [k], a childless child of [p], is discharged at
+      once with [Q] at hand. *)
   Lemma untilI_done_guar_init E (Q : iProp Σ) G2 p K k :
     k ∈ K →
     oblP_assigned k 1 -∗ parP_kids p K -∗ oblP_kids k ∅ -∗ ▷ (Q ⊨ₜ G2) -∗ Q -∗
@@ -437,7 +453,7 @@ Section until_rules.
     iIntros (Hk) "Oa Kp Kk HQ". rewrite /untilI_done.
     iApply (untilI_done_guar_init with "Oa Kp Kk [] HQ"); first done. iNext. iApply temporal_sem.
   Qed.
-  (** The same, with the children as [untilI_alloc] returns them. *)
+  (** The same, with the children as [obl_new] returns them. *)
   Lemma untilI_done_init' E (Q : iProp Σ) p K k :
     k ∉ K →
     oblP_assigned k 1 -∗ parP_kids p ({[k]} ∪ K) -∗ oblP_kids k ∅ -∗ Q -∗
@@ -474,12 +490,13 @@ Section until_rules.
   Qed.
 
   (** Discharge: [P] is taken out; once [Q] holds, [k] (a childless child of [p]) is
-      discharged and the record of [G2] at the discharge is left in the invariant. *)
-  Lemma untilI_guar_discharge E N k (P Q : iProp Σ) G1 G2 :
+      discharged, the record of [G2] at the discharge is left in the invariant, and the
+      until becomes a done until. *)
+  Lemma untilI_guar_discharge_done E N k (P Q : iProp Σ) G1 G2 :
     ↑N ⊆ E →
     untilI_guar N k 1 P Q G1 G2 ={E,E ∖ ↑N}=∗
     ▷ (P ∗ ∀ p K, ⌜k ∈ K⌝ → parP_kids p K -∗ oblP_kids k ∅ -∗ Q -∗
-         ∀ E', |={E'}=>m |={E ∖ ↑N,E}=> (Q ∗ parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k)).
+         ∀ E', |={E'}=>m |={E ∖ ↑N,E}=> (untilI_done_guar k Q G2 ∗ parP_kids p (K ∖ {[k]}))).
   Proof.
     rewrite untilI_guar_unfold. iIntros (HN) "(Oa& #U)".
     iPoseProof (untilI_guar_pers_inv with "U") as "#OI".
@@ -499,7 +516,28 @@ Section until_rules.
       iFrame "MHI S MI". iModIntro. iFrame "HI TI HQ". iExists n, i, Ω. iFrame "EF TQ". }
     iModIntro. iMod ("ACC" with "[]") as "_".
     { iNext. rewrite oblP_variant_unfold. iRight. iFrame "D R". }
-    iModIntro. iFrame "HQ D".
+    iModIntro. rewrite untilI_done_guar_unfold. iFrame "HQ D HG2".
+  Qed.
+  Lemma untilI_discharge_done E N k (P Q : iProp Σ) :
+    ↑N ⊆ E →
+    untilI N k 1 P Q ={E,E ∖ ↑N}=∗
+    ▷ (P ∗ ∀ p K, ⌜k ∈ K⌝ → parP_kids p K -∗ oblP_kids k ∅ -∗ Q -∗
+         ∀ E', |={E'}=>m |={E ∖ ↑N,E}=> (untilI_done k Q ∗ parP_kids p (K ∖ {[k]}))).
+  Proof. rewrite untilI_guar_canonical /untilI_done. apply untilI_guar_discharge_done. Qed.
+
+  (** The same, with the done until taken apart: the usual case. *)
+  Lemma untilI_guar_discharge E N k (P Q : iProp Σ) G1 G2 :
+    ↑N ⊆ E →
+    untilI_guar N k 1 P Q G1 G2 ={E,E ∖ ↑N}=∗
+    ▷ (P ∗ ∀ p K, ⌜k ∈ K⌝ → parP_kids p K -∗ oblP_kids k ∅ -∗ Q -∗
+         ∀ E', |={E'}=>m |={E ∖ ↑N,E}=> (Q ∗ parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k)).
+  Proof.
+    iIntros (HN) "U". iMod (untilI_guar_discharge_done with "U") as "H"; first done.
+    iModIntro. iNext. iDestruct "H" as "[$ H]".
+    iIntros (p K Hk) "Kp Kk HQ %E'".
+    iPoseProof ("H" $! p K Hk with "Kp Kk HQ") as "H".
+    iMod ("H" $! E') as "H". iModIntro. iMod "H" as "[D $]".
+    iModIntro. iApply (untilI_done_guar_elim with "D").
   Qed.
   Lemma untilI_discharge E N k (P Q : iProp Σ) :
     ↑N ⊆ E →

@@ -305,7 +305,7 @@ Section proof.
        opened. *)
     iMod (untilI_alloc _ _ _ 0 10 with "[] TG") as "(%ck1& %Nin1& TG& Kck1& Of1& #Wlk1& A)".
     { iApply parP_le_thread. }
-    iMod (untilI_init _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I with "A [//]") as "Unew".
+    iMod ("A" $! _ Nu True%I (cnt_lb r cj (n + 2) ∗ ∃ k' : oid, (n + 2) ↪[rm]□ k')%I with "[//]") as "Unew".
     iApply (sfmupd_fupd_acc _ ∅).
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
     iPoseProof (tlc_split_nat 89 1 with "LC") as "[LC LC1]".
@@ -372,7 +372,7 @@ Section proof.
     iMod (untilI_alloc _ _ _ 0 10 with "[] TG") as "(%ck& _& TG& Kck& Gf& #Wl& ACC)".
     { iApply parP_le_thread. }
     rewrite union_empty_r_L.
-    iMod (untilI_init _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I with "ACC [//]") as "HF".
+    iMod ("ACC" $! _ Nu True%I (cnt_lb r cj (0 + 1) ∗ ∃ k', (0 + 1) ↪[rm]□ k')%I with "[//]") as "HF".
     iMod (ghost_map_insert_persist 0 ck with "GM") as "(GM& #GMe)". 1: done.
     iExists ck, r, rm, ci, cj, 0.
     iDestruct "HF" as "[HF HF0]". iDestruct "CAj" as "[CAj CAj0]".
@@ -412,7 +412,7 @@ Section proof.
     iPoseProof (px_loop2_spec) as "px_loop2_spec".
     iMod (untilI_alloc _ _ _ 1 0 with "[] TG1") as "(%z& _& TG1& _& _& _& ACC)".
     { iApply parP_le_thread. }
-    iMod (untilI_init _ N1 True%I False%I with "ACC [//]") as "HFz".
+    iMod ("ACC" $! _ N1 True%I False%I with "[//]") as "HFz".
     rewrite !union_empty_r_L.
     iMod (px_init ⊤ with "TG2") as "(%&%&%&%&%&%& TG2& Kck& Gf& HFck& #Wl& #px& CAi& CAj& #Clj& #GMe)".
     iModIntro. iSplitR "TEs".

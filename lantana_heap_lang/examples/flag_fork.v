@@ -117,11 +117,11 @@ Section proof.
     iPoseProof (FlagFork_main_spec) as (μ) "main_spec".
     iMod (untilI_alloc _ _ _ 1 μ with "[] TGs") as "(%kl1& %Hkl1& TG1& Kkl1& Ofkl1& #Wlkl1& Akl1)".
     { iApply parP_le_thread. }
-    iMod (untilI_init _ Nr True%I (exits #42@i)%I with "Akl1 []") as "Ukl1".
+    iMod ("Akl1" $! _ Nr True%I (exits #42@i)%I with "[]") as "Ukl1".
     { done. }
     iMod (untilI_alloc _ _ _ 1 μ with "[] TG1") as "(%kc& %Hkc& TG1& Kkc& Ofkc& #Wlkc& Akc)".
     { iApply parP_le_thread. }
-    iMod (untilI_init _ Nc True%I (∃ x k ℓ, is_flag x k ℓ)%I with "Akc []") as "Ukc".
+    iMod ("Akc" $! _ Nc True%I (∃ x k ℓ, is_flag x k ℓ)%I with "[]") as "Ukc".
     { done. }
     iModIntro. iExists μ. iSplitL "Ukl1 Ukc TG1 Kkl1 Kkc Ofkl1 Ofkc".
     { subst Φ. rewrite !union_empty_r_L.

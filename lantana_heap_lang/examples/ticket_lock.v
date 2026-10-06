@@ -335,7 +335,7 @@ Section proof.
       iMod (untilI_alloc _ _ _ ℓ m with "[] Gg")
         as "(%κu& %LUku& Gg& Kk& OGF& #Wlku& ALLOC)".
       { iApply (parP_le_obl with "Wgu"). reflexivity. }
-      iMod (untilI_init _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%I with "ALLOC [//]") as "[GUku GUku0]".
+      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(n + 1) ∗ R)%I with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
       iMod (ghost_map_update (None) with "GMAt GMEt") as "[GMAt GMEt]".
       iMod (ghost_map_elem_persist with "GMEt") as "#GMEt".
@@ -867,7 +867,7 @@ Section proof.
       iMod (untilI_alloc _ _ _ ℓ0 μ with "[] Gg1")
         as "(%κu1& %LUku1& Gg1& Kku1& OGF1& #Wlku1& ALLOC)".
       { iApply (parP_le_obl with "Wg1"). reflexivity. }
-      iMod (untilI_init _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%I with "ALLOC [//]") as "[GUku GUku0]".
+      iMod ("ALLOC" $! _ N_ev True%I (curr ↦{#1/2 + 1/2/2} #(c + 2) ∗ R)%I with "[//]") as "[GUku GUku0]".
       rewrite union_empty_r_L.
       iMod (ghost_map_update (Some κu1) with "GMAo GMEo1") as "[GMAo GMEo1]".
       iMod (ghost_map_elem_persist with "GMEo1") as "#GMEo1".

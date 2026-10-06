@@ -121,11 +121,11 @@ Section proof.
     { iApply parP_le_thread. }
     iMod (untilI_alloc _ _ _ 0 μ1 with "[] TG1") as "(%kl1& %Hkl1& TG1& Kkl1& Ofkl1& #Wlkl1& Akl1)".
     { iApply parP_le_thread. }
-    iMod (untilI_init _ Nl True%I (exits #()@i)%I with "Akl1 []") as "Ukl1".
+    iMod ("Akl1" $! _ Nl True%I (exits #()@i)%I with "[]") as "Ukl1".
     { done. }
     iMod (untilI_alloc _ _ _ 1 μ2 with "[] TG2") as "(%kl2& %Hkl2& TG2& Kkl2& Ofkl2& #Wlkl2& Akl2)".
     { iApply parP_le_thread. }
-    iMod (untilI_init _ Nl True%I (exits #1@j)%I with "Akl2 []") as "Ukl2".
+    iMod ("Akl2" $! _ Nl True%I (exits #1@j)%I with "[]") as "Ukl2".
     { done. }
     iModIntro. iExists μ1, μ2. iSplitL "Uk Ukl1 Ukl2 TG1 Kk Kkl1 TG2 Kkl2 Ofk Ofkl1 Ofkl2".
     { subst Φ.

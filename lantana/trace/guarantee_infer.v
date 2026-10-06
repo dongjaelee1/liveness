@@ -222,11 +222,25 @@ Section examples.
     |={E}=>m parP_kids p K ∗
       ∃ P : iProp Σ, (P ⊨ₜ tps_until G1 (tps_atomic π)) ∗ P ∗ (P -∗ state_pred_interp π).
   Proof.
-    iIntros "B Kp Hπ". iMod (untilI_alloc E p K ℓ μ with "B Kp") as "(%k& %Hk& Kp& Kk& _& _& Oa)".
+    iIntros "B Kp Hπ". iMod (obl_new E p K ℓ μ with "B Kp") as (k) "(%Hk& Kp& Kk& Oa& _& _)".
     iMod (untilI_done_init' with "Oa Kp Kk Hπ") as "[U $]"; first done.
     iModIntro. iExists (untilI_done k (state_pred_interp π)). iFrame "U". iSplit.
     - iApply (into_temporal _ _).
     - iIntros "U". by iDestruct (untilI_done_elim with "U") as "[$ _]".
+  Qed.
+
+  (** A strong until, once discharged, is a done until with the same guarantee. *)
+  Local Lemma ex_until_discharged E N k p K π (P : iProp Σ) :
+    ↑N ⊆ E → k ∈ K →
+    £n 1 -∗ untilI N k 1 P (state_pred_interp π) -∗ parP_kids p K -∗ oblP_kids k ∅ -∗
+    state_pred_interp π -∗
+    |={E}=>m ∃ U : iProp Σ, (U ⊨ₜ tps_until (tps_sem P) (tps_atomic π)) ∗ U ∗ parP_kids p (K ∖ {[k]}).
+  Proof.
+    iIntros (HN Hk) "LC U Kp Kk Hπ". iMod (untilI_discharge_done with "U") as "U"; first done.
+    iApply (lc_sfmupd_add_later with "LC"). iNext. iDestruct "U" as "[_ U]".
+    iPoseProof ("U" $! p K Hk with "Kp Kk Hπ") as "U".
+    iMod ("U" $! (E ∖ ↑N)) as "U". iMod "U" as "[U $]". iModIntro.
+    iExists (untilI_done k (state_pred_interp π)). iFrame "U". iApply (into_temporal _ _).
   Qed.
 
   (** Its inferred trace property is the finally of its right formula. *)
