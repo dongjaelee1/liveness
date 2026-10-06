@@ -115,47 +115,6 @@ End model_update.
 Section instance.
   Context `{SI : sidx} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}.
 
-  (** The fields not proved as such in the model. *)
-  Local Lemma thP_done_timeless_model i : Timeless (omodel.thP_done i).
-  Proof. omodel.unfold_opreds. apply _. Qed.
-
-  Local Lemma oblP_fuel_proper_model k ℓ1 ℓ2 μ1 μ2 :
-    (ℓ1 == ℓ2)%ordi →
-    (measure_rep ℓ1 μ1 == measure_rep ℓ2 μ2)%ord →
-    omodel.oblP_fuel k ℓ1 μ1 ⊣⊢ omodel.oblP_fuel k ℓ2 μ2.
-  Proof.
-    intros Hℓ Hμ.
-    rewrite (omodel.oblP_fuel_layer_eq k ℓ1 ℓ2 μ1 Hℓ) (omodel.oblP_fuel_eq k ℓ2 μ1 μ2); first done.
-    etrans; last exact Hμ. symmetry. by apply measure_rep_layer_eq.
-  Qed.
-
-  Local Lemma oblP_fuel_extend_model k ℓ1 ℓ2 μ :
-    (ℓ1 < ℓ2)%ordi →
-    omodel.oblP_fuel k ℓ2 1 ==∗ omodel.oblP_fuel k ℓ1 μ.
-  Proof. iIntros (?) "F". by iApply omodel.oblP_fuel_extend. Qed.
-
-  Local Lemma witP_cred_proper_model k a0 a1 :
-    (a0 == a1)%ord → omodel.witP_cred k a0 ⊣⊢ omodel.witP_cred k a1.
-  Proof. intros Ha. by rewrite (omodel.witP_cred_eq k a0 a1 Ha). Qed.
-
-  Local Lemma oblP_inv_acc_model E N k P R :
-    ↑N ⊆ E →
-    omodel.oblP_inv N k P R ={E,E ∖ ↑N}=∗
-    (▷ ((omodel.oblP_assigned k (1/2) ∗ P) ∨ (omodel.oblP_discharged k ∗ R))) ∗
-    (▷ ((omodel.oblP_assigned k (1/2) ∗ P) ∨ (omodel.oblP_discharged k ∗ R)) ={E ∖ ↑N,E}=∗ True).
-  Proof.
-    iIntros (HN) "I". iMod (omodel.oblP_inv_acc with "I") as "[$ ACC]"; first done.
-    iIntros "!> V". iApply "ACC". iNext. by iApply omodel.oblP_variant_unfold.
-  Qed.
-
-  Local Lemma step_fork_model n1 n2 Θ1 Θ2 π P :
-    n1 ≤ n2 →
-    Θ2 = Θ1 ∪ π →
-    Θ1 ## π →
-    (([∗ set] j ∈ π, omodel.parP_kids (PThread j) ∅) ={∅}=∗ P) -∗
-    @={n1,n2,Θ1,Θ2}=> P.
-  Proof. iIntros (???) "H". iApply omodel.mphys_step; [done..|]. by iModIntro. Qed.
-
   Global Instance obl_forest_lantana : oblf.obl_forest_interface := {|
     oblf.parP_kids := omodel.parP_kids;
     oblf.thP_done := omodel.thP_done;
@@ -173,7 +132,7 @@ Section instance.
     oblf.sfmupd_bind TI := sfmupd_model_bind;
 
     oblf.parP_kids_timeless := omodel.parP_kids_timeless;
-    oblf.thP_done_timeless := thP_done_timeless_model;
+    oblf.thP_done_timeless := omodel.thP_done_timeless;
     oblf.thP_done_persistent := omodel.thP_done_persistent;
     oblf.oblP_assigned_timeless := omodel.oblP_assigned_timeless;
     oblf.oblP_assigned_fractional := omodel.oblP_assigned_fractional;
@@ -192,17 +151,17 @@ Section instance.
     oblf.oblP_assigned_discharged_false := omodel.oblP_assigned_discharged_false;
     oblf.oblP_kids_discharged_false := omodel.oblP_kids_discharged_false;
     oblf.parP_kids_discharged := omodel.parP_kids_discharged;
-    oblf.oblP_fuel_proper := oblP_fuel_proper_model;
+    oblf.oblP_fuel_proper := omodel.oblP_fuel_proper;
     oblf.oblP_fuel_mon_gen := omodel.oblP_fuel_mon_gen;
     oblf.oblP_fuel_add := omodel.oblP_fuel_add;
-    oblf.oblP_fuel_extend := oblP_fuel_extend_model;
-    oblf.witP_cred_proper := witP_cred_proper_model;
+    oblf.oblP_fuel_extend := omodel.oblP_fuel_extend;
+    oblf.witP_cred_proper := omodel.witP_cred_proper;
     oblf.witP_cred_mon := omodel.witP_cred_mon;
     oblf.witP_cred_split := omodel.witP_cred_split;
 
     oblf.oblP_inv_alloc_assigned := omodel.oblP_inv_alloc_assigned;
     oblf.oblP_inv_alloc_discharged := omodel.oblP_inv_alloc_discharged;
-    oblf.oblP_inv_acc := oblP_inv_acc_model;
+    oblf.oblP_inv_acc := omodel.oblP_inv_acc;
 
     oblf.wit_fuels_init := omodel.wit_fuels_init;
     oblf.wit_fuels_witP_layer := omodel.wit_fuels_witP_layer;
@@ -218,7 +177,7 @@ Section instance.
     oblf.obl_discharge_leaf TI := obl_discharge_leaf_model;
 
     oblf.step_progress := omodel.mprog_step_kids;
-    oblf.step_fork := step_fork_model;
+    oblf.step_fork := omodel.mphys_step_kids;
   |}.
 End instance.
 
