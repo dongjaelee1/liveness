@@ -65,7 +65,7 @@ Section proof.
     iModIntro.
     iApply sfmupd_lwp.
     iMod (alwaysI_alloc _ Na (y ↦ #7)%I with "[Ptry]") as "#HA"; first by iFrame.
-    iPoseProof (tlc_split_nat 2 98 with "LC") as "[LC2 LC]".
+    iPoseProof (tlc_split_nat 1 99 with "LC") as "[LC2 LC]".
     iMod (finallyI_discharge with "LC2 TG Kkq HQ [Ptrx HF]") as "(HQ& TG& #Odq)".
     1: solve_ndisj. 1: set_solver.
     { rewrite /cd_Q. iFrame "Ptrx HF HA". }
@@ -79,7 +79,7 @@ Section proof.
     lwp_pures.
     (* The nested commitment, then termination. *)
     iApply sfmupd_lwp_sfmupd.
-    iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC2 _]".
+    iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC2 _]".
     iMod (finallyI_discharge with "LC2 TG Kkf HF Ptrx") as "(Ptrx& TG& #Odf)".
     1: solve_ndisj. 1: set_solver.
     replace ({[kf]} ∖ {[kf]}) with (∅ : gset oid) by set_solver.

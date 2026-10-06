@@ -57,7 +57,7 @@ Section proof.
     replace ({[k; kl]} ∖ {[k]}) with ({[kl]} : gset _) by set_solver.
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
-    iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
+    iPoseProof (tlc_split_nat 1 9 with "LC") as "[LC _]".
     iMod (thread_expr_terminate_finally with "TE LC TG Kkl HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
@@ -87,7 +87,7 @@ Section proof.
     iIntros "(TE& LC& TG& #Od)".
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
-    iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
+    iPoseProof (tlc_split_nat 1 9 with "LC") as "[LC _]".
     iMod (thread_expr_terminate_finally with "TE LC TG Kkl HE") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".

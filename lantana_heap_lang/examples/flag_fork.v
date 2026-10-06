@@ -53,7 +53,7 @@ Section proof.
     iApply ("Flag_init_spec" $! 0 _ _ 0 (9 ⊕ (1 ⊕ μ_fs))%M with "[$TE $TG $GF_fi]").
     iIntros "%x %k (TE& _& %Hk& TG& Kk& Of0& Ftk& #is_flag)".
     (* Keep the commitment: the flag exists. *)
-    iPoseProof (tlc_split_nat 2 98 with "LC") as "[LCc LC]".
+    iPoseProof (tlc_split_nat 1 99 with "LC") as "[LCc LC]".
     iMod (finallyI_discharge with "LCc TG Kkc HC [is_flag]") as "(_& TG& _)".
     { set_solver. }
     { set_solver. }
@@ -93,7 +93,7 @@ Section proof.
     iIntros "(TE& _& TG& #Od0)".
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
-    iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
+    iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC _]".
     iMod (thread_expr_terminate_finally with "TE LC TG Kkr HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.

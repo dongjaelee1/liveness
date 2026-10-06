@@ -123,6 +123,13 @@ Section into_temporal.
   Global Instance into_temporal_untilI N k q P Q G1 G2 :
     IntoTemporal P G1 → IntoTemporal Q G2 → IntoTemporal (untilI N k q P Q) (tps_until G1 G2) | 10.
   Proof. intros H1 H2. unfold IntoTemporal in *. by apply temporal_until_valid. Qed.
+  (** A discharged until, against a target until with any left formula. *)
+  Global Instance into_temporal_untilI_done_guar N k Q G1 G2 :
+    IntoTemporal (untilI_done_guar N k Q G2) (tps_until G1 G2) | 10.
+  Proof. apply temporal_until_done_guar. Qed.
+  Global Instance into_temporal_untilI_done N k Q G1 G2 :
+    IntoTemporal Q G2 → IntoTemporal (untilI_done N k Q) (tps_until G1 G2) | 10.
+  Proof. intros H. unfold IntoTemporal in *. by apply temporal_until_done_valid. Qed.
   Global Instance into_temporal_state_pred π : IntoTemporal (state_pred_interp π) (tps_atomic π) | 10.
   Proof. apply temporal_atomic. Qed.
 
@@ -155,6 +162,13 @@ Global Hint Extern 0 (IntoTemporalExist _ ?G) =>
 Global Hint Extern 0 (IntoTemporalExist _ ?G) =>
   assert_fails (evar_headed G);
   notypeclasses refine (into_temporal_exist_check _ _ _) : typeclass_instances.
+
+(* A discharged until has no left formula: with an unknown target, it is inferred as a
+   finally. *)
+Global Hint Extern 0 (IntoTemporal (untilI_done_guar _ _ _ _) ?G) =>
+  evar_headed G; notypeclasses refine (into_temporal_untilI_done_guar _ _ _ tps_true _) : typeclass_instances.
+Global Hint Extern 0 (IntoTemporal (untilI_done _ _ _) ?G) =>
+  evar_headed G; notypeclasses refine (into_temporal_untilI_done _ _ _ tps_true _ _) : typeclass_instances.
 
 (* The fallback, for an unknown target or [tps_true], and only once the formula and the
    ghost-state instances contain no evars (resolution is retried once they are solved). *)
@@ -200,6 +214,27 @@ Section examples.
   Local Lemma ex_tps_of_eq N1 N2 k :
     ex_tps_of N1 N2 k = (tps_always tps_true ∧ tps_until (tps_pure True) tps_true)%S.
   Proof. done. Qed.
+
+  (** A discharged until, allocated with its right formula at hand, exports the until of any
+      left formula in the form the adequacy takes: a formula, its guarantee, and the
+      formula back. *)
+  Local Lemma ex_until_done_export E (N : namespace) π (G1 : tps Λ Σ) :
+    state_pred_interp π -∗
+    |={E}=>m ∃ P : iProp Σ, (P ⊨ₜ tps_until G1 (tps_atomic π)) ∗ P ∗ (P -∗ state_pred_interp π).
+  Proof.
+    iIntros "Hπ". iMod (untilI_discharged_alloc E N 0 with "Hπ") as (k) "[U _]".
+    iModIntro. iExists (untilI_done N k (state_pred_interp π)). iFrame "U". iSplit.
+    - iApply (into_temporal _ _).
+    - iIntros "U". by iDestruct (untilI_done_elim with "U") as "[$ _]".
+  Qed.
+
+  (** Its inferred trace property is the finally of its right formula. *)
+  Local Definition ex_tps_of_done N k π : tps Λ Σ :=
+    ltac:(tps_of (untilI_done N k (state_pred_interp π))).
+  Local Lemma ex_tps_of_done_eq N k π : ex_tps_of_done N k π = tps_finally (tps_atomic π).
+  Proof. done. Qed.
+  Local Lemma ex_finally_done N k π : ⊢ untilI_done N k (state_pred_interp π) ⊨ₜ tps_finally (tps_atomic π).
+  Proof. apply (into_temporal _ _). Qed.
 
   (** A higher-order specification quantifies over the content together with its guarantee
       (the guarantee of the content of an [alwaysI] must be valid, not a hypothesis). *)

@@ -183,7 +183,7 @@ Section renew.
   (** Renewal: the link [k] is discharged with [Q] and the next link at hand. *)
   Lemma renew_discharge E N Q G k p K :
     ↑N ⊆ E → k ∈ K →
-    £ (2 : Ord.t) -∗ parP_kids p K -∗ oblP_kids k ∅ -∗
+    £n 1 -∗ parP_kids p K -∗ oblP_kids k ∅ -∗
     untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G) -∗ Q -∗ renew N Q G -∗
     |={E}=>m Q ∗ renew N Q G ∗ parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k.
   Proof.

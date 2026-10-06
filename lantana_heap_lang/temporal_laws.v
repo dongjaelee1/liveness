@@ -35,7 +35,7 @@ Section laws.
   (** Discharging a [finally] on the thread's final value, with credits from earlier steps. *)
   Lemma thread_expr_terminate_finally i E v k N :
     ↑N ⊆ E →
-    thread_expr i [] (of_val v) -∗ £ (2 : Ord.t) -∗
+    thread_expr i [] (of_val v) -∗ £n 1 -∗
     thP_kids i {[k]} -∗ oblP_kids k ∅ -∗
     finallyI N k 1 (thread_expr i [] (of_val v)) -∗ |={E}=>m
     thread_expr i [] (of_val v) ∗ thP_done i.

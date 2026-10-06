@@ -165,7 +165,7 @@ Section proof.
     iIntros "%ptrx %k (TE& _& TG& _& Cg0& Kk& Of0& Ftk& #is_flag)".
     rewrite union_empty_r_L.
     (* Keep the commitment: the flag exists. *)
-    iPoseProof (tlc_split_nat 2 98 with "LC") as "[LCc LC]".
+    iPoseProof (tlc_split_nat 1 99 with "LC") as "[LCc LC]".
     iMod (finallyI_discharge with "LCc TG Kkc HC []") as "(_& TG& _)".
     { set_solver. }
     { set_solver. }
@@ -217,7 +217,7 @@ Section proof.
     iIntros "(TE& _& TG& #Od0)".
     do 2 (iModIntro; lwp_pure_one).
     iApply sfmupd_lwp_sfmupd.
-    iPoseProof (tlc_split_nat 2 96 with "LC") as "[LC _]".
+    iPoseProof (tlc_split_nat 1 98 with "LC") as "[LC _]".
     iMod (thread_expr_terminate_finally with "TE LC TG Kkl HF") as "[TE #Td]"; first set_solver.
     iModIntro. lwp_finish.
     iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.

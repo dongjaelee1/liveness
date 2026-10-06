@@ -307,6 +307,19 @@ Section rules.
       by iApply (tguar_elim with "T2 ST [//] B W").
   Qed.
 
+  (** The right formula fulfils an until at once; the later of the guarantee is stripped
+      by the step of the until. *)
+  Lemma temporal_until_now P G1 G2 : ▷ (P ⊨ₜ G2) -∗ P ⊨ₜ tps_until G1 G2.
+  Proof.
+    iIntros "#HG !>" (h n σ Θ κs m i Ω W) "(HI& MI& HP)".
+    iPoseProof (temporal_elim_later_guar P G2 with "HG [$HP $HI $MI]") as "#T".
+    iApply tguar_intro. iIntros "!>" (????????????) "#ST %H #B W".
+    rewrite /= /ti_exist. iExists Ord.O. rewrite ti_until_unfold /ti_until_pre.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
+    iApply fupd_mask_intro; first set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_".
+    iModIntro. iLeft. by iApply (tguar_elim with "T ST [//] B W").
+  Qed.
+
   Lemma temporal_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (⌜φ⌝ → G).
   Proof.
     iIntros "#HG !>" (?????????) "(HI& MI& HP)".
