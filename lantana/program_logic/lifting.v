@@ -86,17 +86,52 @@ Section lifting.
     iMod "H" as "[$ H]". iModIntro. iMod "H" as "[H Efs]". iFrame. auto.
   Qed.
 
+  (** [lwp_lift_step] over the state interpretation: the history and the interpretation of
+      the temporal layer are threaded, and no model update is taken around the step. *)
+  Lemma lwp_lift_step_si s i E e1 Φ :
+    to_val e1 = None →
+    (∀ K σ1 Θ κ κs,
+       (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
+       (state_interp σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
+       (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
+       ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
+            ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
+                 (∀ e2 σ2 efs, (⌜prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs⌝) ={∅}=∗
+                               thP_kids i G -∗
+                               ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+                               ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
+                               ALC (|={∅,E}=>
+                                      (state_interp σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                                       state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
+                                      (|={E}=>m ((lWP e2 @ s; i; E {{ Φ }}) ∗
+                                                     ([∗ map] j ↦ ef ∈ efs,
+                                                        lWP ef @ s; j; ⊤ {{ lift_term j fork_post }}))))))
+    ⊢ lWP e1 @ s; i; E {{ Φ }}.
+  Proof.
+    iIntros (He) "H". iApply lwp_lift_step; first done.
+    iIntros (K h n σ1 Θ κ κs HK HΘ) "[[(%Hh& Ha& SI) TI] SIa]".
+    iMod ("H" $! K with "[//] [//] [$SI $SIa]") as "H". iModIntro. iModIntro.
+    iDestruct "H" as "($& %G& $& $& %R& $& H)".
+    iIntros (e2 σ2 efs Hstep). iMod ("H" with "[//]") as "H". iIntros "!> TG Ws Efs".
+    iApply (ALC_wand with "[Ha TI] (H TG Ws Efs)"). iIntros "H".
+    iApply fupd_fmupd. iMod "H" as "[[SI SIa] H]".
+    iMod (hG_history_auth_app _ [(σ2, (<[i:=K e2]> Θ ∪ efs), κs)] with "Ha") as "Ha".
+    iModIntro. iFrame. iPureIntro. destruct Hh as [Hl Hlast].
+    rewrite length_app last_app Hl. simpl. split; [lia|done].
+  Qed.
+
   Local Hint Resolve reducible_no_obs_reducible : core.
 
   Lemma lwp_lift_stuck i E Φ e :
     to_val e = None →
-    (∀ K h n σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →
-                    (history_tinterp h n σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗
-                    ⌜ stuck i e σ (dom Θ) ⌝)
+    (∀ K σ κ Θ, ⌜LanguageCtx K⌝ → ⌜Θ !! i = Some (K e)⌝ →
+                (state_interp σ Θ κ ∗ state_interp_aux σ Θ κ) ={E,∅}=∗
+                ⌜ stuck i e σ (dom Θ) ⌝)
     ⊢ lWP e @ i; E ?{{ Φ }}.
   Proof.
     rewrite lwp_unfold /lwp_pre /lwp_step =>->.
-    iIntros "H" (K h n σ Θ κ κs ??) "Hσ". iMod ("H" $! K with "[//] [//] Hσ") as "[% %Hirr]".
+    iIntros "H" (K h n σ Θ κ κs ??) "[[(_& _& SI) _] SIa]".
+    iMod ("H" $! K with "[//] [//] [$SI $SIa]") as "[% %Hirr]".
     iModIntro. iSplitR; first done.
     iModIntro. iIntros (e2 σ2 efs ?). by case: (Hirr κ e2 σ2 efs).
   Qed.
@@ -118,11 +153,11 @@ Section lifting.
     ⊢ lWP e1 @ s; i; E {{ Φ }}.
   Proof.
     iIntros (Hsafe Hstep HCS) "H".
-    iApply lwp_lift_step.
+    iApply lwp_lift_step_si.
     { specialize (Hsafe inhabitant inhabitant). destruct s; eauto using reducible_not_val. }
-    iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ".
+    iIntros (K σ1 Θ κ κs HK HΘ) "[SI SIa]".
     iMod "H" as "(Hc& (%& Tb& Gfs& %& #Rs& H))".
-    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iModIntro. iSplit.
+    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iSplit.
     { iPureIntro. split.
       - specialize (Hsafe σ1 ∅). destruct s; eauto using reducible_not_val.
       - destruct s; auto. }
@@ -130,10 +165,7 @@ Section lifting.
     iIntros (e2 σ2 efs ?).
     destruct (Hstep κ σ1 (dom Θ) e2 σ2 efs) as (-> & <- & ->); auto.
     rewrite !map_union_empty. rewrite app_nil_l.
-    iDestruct "Hσ" as "[[HI TI] SIa]".
-    iPoseProof (history_interp_step _ _ _ σ2 _ (<[i:=K e2]> Θ) with "HI") as "(SI& ACC)".
     iMod (pure_exec_si (ς:=ς) _ _ _ _ _ _ HK HΘ H with "[$Hc $SI $SIa]") as "(Hc& SI& SIa)".
-    iMod ("ACC" with "[$SI]") as "HI". iFrame "HI TI".
     iIntros "!> Tb Wcs Efs". iMod ("H" with "[//] Hc Tb Wcs") as "H".
     iMod "Hclose" as "_". iMod "H". iModIntro. rewrite big_sepM_empty. iFrame.
     iMod "H". iModIntro. by iFrame.
@@ -146,15 +178,14 @@ Section lifting.
     iIntros (Hstuck) "_". iApply lwp_lift_stuck.
     - destruct(to_val e) as [v|] eqn:He; last done.
       rewrite -He. by case (Hstuck inhabitant ∅).
-    - iIntros (?????? ??) "_". iApply fupd_mask_intro; auto with set_solver.
+    - iIntros (???? ??) "_". iApply fupd_mask_intro; auto with set_solver.
   Qed.
 
   Lemma lwp_lift_atomic_step {s i E1 E2 Φ} e1 :
     to_val e1 = None →
-    (∀ K h n σ1 Θ κ κs,
+    (∀ K σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
-       (history_tinterp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
-       |=[n,dom Θ]=>m
+       (state_interp σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E1,E2}=∗
        (⌜ to_val e1 = None ∧ if s is NotStuck then reducible i e1 σ1 (dom Θ) else True ⌝) ∗
        ∃ G, thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
             ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -162,20 +193,18 @@ Section lifting.
                                thP_kids i G -∗
                                ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
                                ([∗ set] j ∈ dom efs, thP_kids j ∅) -∗
-                               ALC (|={E2,E1:S n,dom (<[i:=K e2]> Θ) ∪ dom efs}=>m
-                                      (history_tinterp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)])
-                                                       (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
+                               ALC (|={E2,E1}=>
+                                      (state_interp σ2 ((<[i:=K e2]>Θ) ∪ efs) κs ∗
                                        state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                                       |={E1}=>m
                                                (from_option (λ v, (|={E1}=>m (Φ v))) False (to_val e2)) ∗
                                              [∗ map] j ↦ ef ∈ efs, lWP ef @ s; j; ⊤ {{ lift_term j fork_post }})))
     ⊢ lWP e1 @ s; i; E1 {{ Φ }}.
   Proof.
-    iIntros (He) "H". iApply (lwp_lift_step s i E1 e1). 1: auto.
-    iIntros (K h n σ1 Θ κ κs HK HΘ) "Hσ1".
-    iMod ("H" $! K with "[//] [//] Hσ1") as "H".
+    iIntros (He) "H". iApply (lwp_lift_step_si s i E1 e1). 1: auto.
+    iIntros (K σ1 Θ κ κs HK HΘ) "Hσ1".
+    iMod ("H" $! K with "[//] [//] Hσ1") as "(%& H)".
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose".
-    iMod "H" as "(%& H)". iModIntro.
     iSplit; first auto.
     iDestruct "H" as "(%& Tb& Gfs& %& #Rs& H)".
     iExists _. iFrame "Tb Gfs". iExists _. iFrame "Rs".

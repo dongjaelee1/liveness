@@ -245,11 +245,11 @@ Lemma lwp_fork_step s i E E' e Φ {C} :
   lWP Fork e @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "I".
+  iIntros (K σ1 Θ κ κs HK HT) "I".
   iMod "H" as "(TE& %&$&$& %&$& H)".
-  iModIntro. iModIntro. iSplit; first eauto with base_step.
+  iModIntro. iSplit; first eauto with base_step.
   iIntros (v2 σ2 efs Hstep).
-  iDestruct "I" as "[[(%HI& Ha& (Ih& It& Ip)) TI] Ia]".
+  iDestruct "I" as "[(Ih& It& Ip) Ia]".
   iPoseProof (thread_expr_ctx with "It TE") as "%HC".
   { exact HT. } { by apply base_prim_step. }
   subst C. inv_base_step.
@@ -261,14 +261,8 @@ Proof.
   iMod ("H" $! j with "TE Tj Tb Wcs [Efs]") as "H".
   { rewrite dom_singleton_L big_sepS_singleton. eauto. }
   iMod "H" as "HE".
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   rewrite big_sepM_singleton. iFrame.
-  replace (dom (<[i:=fill K #()]> Θ ∪ {[j := e]})) with (dom Θ ∪ {[j]}); cycle 1.
-  { rewrite dom_union_L dom_insert_lookup_L; eauto. rewrite dom_singleton_L. auto. }
-  iFrame. iModIntro.
-  iPureIntro. destruct HI. split.
-  - rewrite length_app H. simpl. lia.
-  - rewrite last_app. simpl. auto.
+  rewrite dom_union_L dom_insert_lookup_L; last eauto. rewrite dom_singleton_L. by iFrame.
 Qed.
 
 (** The forked thread [j] takes the children [K] of the forking thread, each paying one
@@ -304,26 +298,22 @@ Lemma lwp_choosenat_step o s i E E' Φ {C} :
   lWP ChooseNat @ s; i; E {{ Φ }}.
 Proof.
   iIntros "H". iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "I".
+  iIntros (K σ1 Θ κ κs HK HT) "I".
   iMod "H" as "(TE& %&$&$& %&$& H)".
-  iModIntro. iModIntro. iSplit; first eauto with base_step.
+  iModIntro. iSplit; first eauto with base_step.
   Unshelve. 2: exact 0.
   iIntros (v2 σ2 efs Hstep).
-  iDestruct "I" as "[[(%HI& Ha& (Ih& It& Ip)) TI] Ia]".
+  iDestruct "I" as "[(Ih& It& Ip) Ia]".
   iPoseProof (thread_expr_ctx with "It TE") as "%HC".
   { exact HT. } { by apply base_prim_step. }
   subst C. inv_base_step.
-  iMod (thread_expr_update _ _ _ _ #n0 with "It TE") as "[It TE]".
-  iIntros "!> Tb Wcs". iPoseProof ("H" $! n0 with "TE Tb Wcs") as "H".
+  iMod (thread_expr_update _ _ _ _ #n with "It TE") as "[It TE]".
+  iIntros "!> Tb Wcs". iPoseProof ("H" $! n with "TE Tb Wcs") as "H".
   iDestruct "H" as "(%& H)". iExists (o ⊕ x)%ord. iIntros "LC".
   iPoseProof (tlc_split with "LC") as "[LC LC2]".
   iMod ("H" with "LC2") as "H". iModIntro. iPoseProof ("H" with "LC") as "H".
   iMod "H" as "HE".
-  iMod (hG_history_auth_app with "Ha") as "Ha".
-  rewrite !map_union_empty. iFrame. iModIntro. iSplit; first done.
-  iPureIntro. destruct HI. split.
-  - rewrite length_app H. simpl. lia.
-  - rewrite last_app. simpl. auto.
+  rewrite !map_union_empty. iFrame. by iModIntro.
 Qed.
 
 Lemma lwp_choosenat G R o s i E {C} :
@@ -516,7 +506,7 @@ Lemma lwp_allocN_seq G R o s i E v n {C} :
 Proof.
   iIntros (Hn Φ) "[TE (Tb& Gfs& Rs)] HP".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h ? σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs & Ht & Hk) TI] Ia] !> !>". iSplit.
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs & Ht & Hk) Ia] !>". iSplit.
   { iPureIntro. split; first done. destruct n; auto with lia base_step. }
   iFrame "Tb Gfs Rs". iIntros (v2 σ2 efs Hstep).
   iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
@@ -526,11 +516,9 @@ Proof.
     as "(Hs & Hl & Hm)".
   { apply heap_array_map_disjoint. rewrite length_replicate Z2Nat.id; auto with lia. }
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iFrame "Ha Hs Ht Hk TI". iModIntro. iSplitR; first done. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H. split; auto. lia. }
+  iFrame "Hs Ht Hk". iModIntro. iSplitR; first done.
   iModIntro. iApply "HP". iFrame.
   iApply big_sepL_sep. iSplitL "Hl".
   - by iApply heap_array_to_seq_pointsto.
@@ -559,7 +547,7 @@ Lemma lwp_free G R o s i E l v {C} :
 Proof.
   iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -569,11 +557,9 @@ Proof.
   subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
@@ -587,7 +573,7 @@ Lemma lwp_free_freed G R o s i E (l : loc) v {C} :
 Proof.
   iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -597,11 +583,9 @@ Proof.
   subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
@@ -614,7 +598,7 @@ Lemma lwp_load G R o s i E l dq v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -623,11 +607,9 @@ Proof.
   { exact HT. } { by apply base_prim_step. }
   subst C. inv_base_step.
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
@@ -640,7 +622,7 @@ Lemma lwp_store G R o s i E l v' v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -650,11 +632,9 @@ Proof.
   subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
@@ -667,7 +647,7 @@ Lemma lwp_xchg G R o s i E l v' v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -677,11 +657,9 @@ Proof.
   subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
@@ -695,7 +673,7 @@ Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 {C} :
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -705,11 +683,9 @@ Proof.
   subst C. inv_base_step.
   rewrite bool_decide_false //.
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H2. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
@@ -723,7 +699,7 @@ Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' {C} :
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -734,11 +710,9 @@ Proof.
   rewrite bool_decide_true //.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
@@ -751,7 +725,7 @@ Lemma lwp_faa G R o s i E l (i1 i2 : Z) {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -761,11 +735,9 @@ Proof.
   subst C. inv_base_step.
   iMod (gen_heap_update with "Hs Hl") as "[$ Hl]".
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
@@ -779,7 +751,7 @@ Lemma lwp_new_proph G R o s i E {C} :
 Proof.
   iIntros (Φ) "[TE (Tb& Gfs& Rs)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[[(%Hw& Ha& Hs& Ht& Hk) TI] Ia] !> !>".
+  iIntros (K σ1 Θ κ κs HK HT) "[(Hs& Ht& Hk) Ia] !>".
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
   iIntros (v2 σ2 efs Hstep).
@@ -789,11 +761,9 @@ Proof.
   rename select proph_id into p.
   iMod (proph_map_new_proph p with "Hk") as "[Hk Hp]"; first done.
   rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
+  iModIntro. iSplit; first done. iFrame.
   iModIntro. iApply "HΦ". iFrame.
 Qed.
 
