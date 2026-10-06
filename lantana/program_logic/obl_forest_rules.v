@@ -17,9 +17,6 @@ Section modality.
   Context `{!TemporalInterp Λ Σ}.
   Implicit Types P Q R : iProp Σ.
 
-  Global Instance sfmupd_proper E1 E2 : Proper ((≡) ==> (≡)) (sfmupd E1 E2).
-  Proof. intros P P' ?. apply equiv_dist=>n. apply sfmupd_ne. apply equiv_dist. done. Qed.
-
   Lemma sfmupd_intro E P : P ⊢ |={E}=>m P.
   Proof. rewrite -fupd_sfmupd. apply fupd_intro. Qed.
 
@@ -59,7 +56,7 @@ Section modality.
   Proof. intros P Q PQ. by apply sfmupd_mono. Qed.
   Global Instance sfmupd_flip_ent_proper E1 E2 : Proper (flip (⊢) ==> flip (⊢)) (sfmupd E1 E2).
   Proof. intros P Q PQ; by apply sfmupd_mono. Qed.
-  Global Instance sfmupd_equiv_proper E1 E2 : Proper ((≡) ==> (≡)) (sfmupd E1 E2) := ne_proper _.
+  Global Instance sfmupd_proper E1 E2 : Proper ((≡) ==> (≡)) (sfmupd E1 E2) := ne_proper _.
 
   Lemma sfmupd_fupd_l E1 E2 P :
     (|={E1,E2}=> |={E2}=>m P) ⊢ (|={E1,E2}=>m P).

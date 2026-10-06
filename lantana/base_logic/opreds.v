@@ -1,4 +1,8 @@
-(** * Obligation predicates and their rules
+(** * The model of the obligation predicates
+
+    [Module omodel]: the obligation predicates as ghost state, their rules, the model updates
+    of the forest ([*_mupd]) and the physical steps; the implementation of the obligation-forest
+    interface (program_logic/obl_forest.v), used only by obl_forest_instance.v.
 
     Obligations form a forest ([oforest.v]); [parP_kids p K]: the children of the parent [p]
     (a thread or an obligation) are [K]. A step of a thread burns one unit of fuel of each of
