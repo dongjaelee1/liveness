@@ -218,6 +218,17 @@ Notation "'|={' E1 , E2 '}=>m' P" := (sfmupd E1 E2 P)
   (at level 20, P at level 200, format "|={ E1 , E2 }=>m  P").
 Notation "'|={' E '}=>m' P" := (sfmupd E E P)
   (at level 20, P at level 200, format "|={ E }=>m  P").
+(** The wand forms, as Iris' [P ={E1,E2}=∗ Q] and [P ={E}=∗ Q] for fancy updates. *)
+Reserved Notation "P ={ E1 , E2 }=∗m Q"
+  (at level 99, E1,E2 at level 50, Q at level 200,
+   format "'[' P  ={ E1 , E2 }=∗m  '/' '[' Q ']' ']'").
+Reserved Notation "P ={ E }=∗m Q"
+  (at level 99, E at level 50, Q at level 200,
+   format "'[' P  ={ E }=∗m  '/' '[' Q ']' ']'").
+Notation "P ={ E1 , E2 }=∗m Q" := (P -∗ |={E1,E2}=>m Q)%I : bi_scope.
+Notation "P ={ E1 , E2 }=∗m Q" := (P -∗ |={E1,E2}=>m Q) : stdpp_scope.
+Notation "P ={ E }=∗m Q" := (P -∗ |={E}=>m Q)%I : bi_scope.
+Notation "P ={ E }=∗m Q" := (P -∗ |={E}=>m Q) : stdpp_scope.
 
 Notation thP_kids i K := (parP_kids (PThread i) K).
 Notation oblP_kids k K := (parP_kids (PObl k) K).
