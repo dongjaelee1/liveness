@@ -1,6 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From lantana.algebra Require Import auth_mra.
 From lantana.base_logic Require Export invariants.
+From lantana.base_logic Require Import lex_fuels.
 From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
@@ -321,7 +322,7 @@ Section proof.
          oblP_fuel κu ℓ m ∗
          γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ }}}.
   Proof.
-    iExists (100 ⊕ (((50 ⊕ (50 × ▽)) × ℵ) ⊕ (50 × ▽)))%M.
+    iExists (100 ⊕ lex_budget 50)%M.
     iIntros (lc m i G tl γ dq1 dq2 ℓ R E MASK C) "!> % (TE& TG& Fs& AL& CF& #IFL) HΦ".
     iPoseProof (crP_fuel_add_set with "Fs") as "[GF Fsloop]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
@@ -576,23 +577,20 @@ Section proof.
     clear dependent tickets n obls. clear Hmy n0. rename c into prev.
     iAssert (⌜(ℓ0 <= ℓ)%ordi⌝)%I as "%Hcf".
     { iCombine "CF CFl0" gives %?. apply auth_mra_both_dfrac_valid in H. 2: apply _. by destruct H. }
-    iPoseProof (crP_fuel_add_set with "Fsloop") as "[Fsloop1 Fsloop]".
-    (** Nest 1: Embed induction. *)
+    (** One lexicographic induction (lex_fuels_ind): the variant is the ticket
+        distance [ν]; within a fixed [ν] we wait on the current holder's
+        obligation [κ] by witness induction. The combined budget is
+        [lex_budget 50]; the body only picks which component progressed. *)
     remember (Z.to_nat (my - prev)%Z) as ν.
-    iPoseProof (embed_fuels_init (lt_wf) ν) as "EFs0".
-    iMod (embed_fuels_add_map with "EFs0 Fsloop1") as "EFs". rewrite map_union_empty.
-    iClear "EFs0". iRevert (κ ℓ0 Hcf gu Ningu prev Hc LTmy Heqν) "CFl0 Wl0 Q_Gf GMEt0 TG GF GMEo0 EFs TE".
-    iInduction ν as [ν IHν] using (well_founded_induction lt_wf).
-    iIntros (κ ℓ0 Hcf gu Ningu prev Hc LTmy Heqν) "#CFl0 #Wl0 Q_Gf GMEt0 TG GF #GMEo0 EFs TE".
-    (** Nest 2: Witness induction. *)
-    iPoseProof (wit_fuels_init with "Wl0") as "(%& WFs0)".
-    iMod (wit_fuels_add_map with "WFs0 Fsloop") as "WFs".
+    assert (LTℓ0 : (ℓ0 < (ℓ ⊕ 1))%ordi).
     { eapply ord.le_lt_lt. 1: eauto. apply hessenberg.add_lt_l.
       rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
-    rewrite map_union_empty.
-    iClear "WFs0". iRevert (gu Ningu) "Q_Gf GMEt0 TG GF WFs TE".
-    iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
-    iIntros (gu Ningu) "Q_Gf GMEt0 TG GF WFs TE".
+    iMod (lex_fuels_init lt_wf ν κ ℓ0 G (ℓ ⊕ 1)%ordi 50 LTℓ0 with "Wl0 Fsloop") as "LF".
+    iRevert (Hcf gu Ningu prev Hc LTmy Heqν) "AL CF HΦ LC CFl0 Q_Gf GMEt0 TG GF GMEo0 TE".
+    iLexInduction lt_wf ν κ ℓ0 LTℓ0 "[$LF]".
+    iClear "Wl0". clear dependent ν κ ℓ0.
+    iIntros "!> %ν %κ %ℓ0 %LTℓ0 #Wl0 IH !> %Hcf %gu %Ningu %prev %Hc %LTmy %Heqν".
+    iIntros "AL CF HΦ LC #CFl0 Q_Gf GMEt0 TG GF #GMEo0 TE".
     (* Execute loop body. *)
     lwp_pure_one.
     lwp_bind (Load _).
@@ -615,7 +613,7 @@ Section proof.
     (* Two cases: it's my turn, or not. *)
     destruct (decide (my = c)).
     { (* My turn *)
-      iClear "CFl CFl0 Wl0 IHν GMEo0 IHα EFs WFs LC' Wc". clear dependent κ prev. subst c.
+      iClear "CFl CFl0 Wl0 IH GMEo0 LC' Wc". clear dependent κ prev. subst c.
       iPoseProof (ghost_map_lookup with "GMAt GMEt0") as "%LUt".
       assert (Boundmy : (my + 1 ≤ n)%Z).
       { apply elem_of_dom_2 in LUt. apply Domt in LUt. lia. }
@@ -703,21 +701,22 @@ Section proof.
         rewrite bool_decide_eq_false_2; cycle 1.
         { intro. inv H. }
         iModIntro. lwp_pure_one.
-        iMod (wit_fuels_decr with "WFs Wc") as "(%& %LTα& WFs& Fs')".
+        (* The holder made progress: the inner component. *)
+        iDestruct "IH" as "[IH _]".
+        iMod ("IH" with "Wc") as "[Fs' IH]".
         iClear "GF LC".
         iAssert (crP_fuels ({[gu]} ∪ G) 47)%I with "[Loop_Gf Fs']" as "Fs".
         { iApply big_sepS_union. 1: set_solver. iSplitL "Loop_Gf".
           - iApply crP_fuels_init. iApply big_sepS_singleton. iFrame.
-          - iPoseProof (big_sepM_gset_to_gmap with "Fs'") as "H".
-            iPoseProof (crP_fuel_eq_set _ _ _ (47 ⊕ 3)%M with "H") as "H".
+          - iPoseProof (crP_fuel_eq_set _ _ _ (47 ⊕ 3)%M with "Fs'") as "H".
             { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat.
               replace 50 with (47 + 3) by lia. done. }
             iPoseProof (crP_fuel_add_set _ _ 47 with "H") as "[H _]".
             iApply crP_fuels_init. iFrame. }
-        iApply ("IHα" $! α0 LTα with "AL CF HΦ LC' EFs [//] Q_Gf GMEt0 TG Fs WFs TE").
+        iApply ("IH" with "[//] [//] [//] [//] [//] AL CF HΦ LC' CFl0 Q_Gf GMEt0 TG Fs GMEo0 TE").
       - iPoseProof (ghost_map_lookup with "GMAo GMEo0") as "%LUp".
         iAssert (⌜(prev < c)%Z⌝)%I as "%Hpc".
-        { iClear "IHν IHα". destruct (decide (prev = c)).
+        { iClear "IH". destruct (decide (prev = c)).
           { subst c. iDestruct "Hc" as "[(%& _) | Hc]".
             { subst n. lia. }
             iDestruct "Hc" as "(%& %&%& _& _& #GMEo1& HE& _)".
@@ -755,19 +754,21 @@ Section proof.
         rewrite bool_decide_eq_false_2; cycle 1.
         { intro. inv H. }
         iModIntro. lwp_pure_one.
-        assert (LTn : (Z.to_nat (my - c)%Z) < Z.to_nat (my - prev)) by lia.
-        iMod (embed_fuels_decr _ _ (Z.to_nat (my - c)%Z) with "EFs") as "(EFs& Fs')". 1: auto.
-        iClear "GF LC IHα".
-        iPoseProof (big_sepM_gset_to_gmap with "Fs'") as "Fs'".
-        iPoseProof (crP_fuel_add_set with "Fs'") as "[Fs0 Fs1]".
+        iAssert (⌜(ℓ1 <= ℓ)%ordi⌝)%I as "%Hcf1".
+        { iCombine "CF CFl1" gives %?. apply auth_mra_both_dfrac_valid in H1.
+          2: apply _. by destruct H1. }
+        (* A new holder: the ticket distance dropped, the outer component. *)
+        iDestruct "IH" as "[_ IH]".
+        iMod ("IH" $! (Z.to_nat (my - c)%Z) _ ℓ1 with "[] [] Wl1") as "[Fs0 IH]".
+        { iPureIntro. lia. }
+        { iPureIntro. eapply ord.le_lt_lt. 1: eauto. apply hessenberg.add_lt_l.
+          rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
+        iClear "GF LC".
         iAssert (crP_fuels ({[gu]} ∪ G) 47)%I with "[Loop_Gf Fs0]" as "Fs".
         { iPoseProof (crP_fuels_init with "Fs0") as "Fs0".
           iPoseProof (crP_fuels_add 47 with "Fs0") as "[Fs0 _]".
           iApply (crP_fuels_add_carrier with "Loop_Gf Fs0"). }
-        iAssert (⌜(ℓ1 <= ℓ)%ordi⌝)%I as "%Hcf1".
-        { iCombine "CF CFl1" gives %?. apply auth_mra_both_dfrac_valid in H1.
-          2: apply _. by destruct H1. }
-        iApply ("IHν" $! _ LTn with "AL CF HΦ LC' Fs1 [//] [//] [] [] [//] CFl1 Wl1 Q_Gf GMEt0 TG Fs GMEo1 EFs TE").
+        iApply ("IH" with "[//] [//] [] [] [//] AL CF HΦ LC' CFl1 Q_Gf GMEt0 TG Fs GMEo1 TE").
         { iPureIntro. lia. }
         { iPureIntro. lia. }
     }
