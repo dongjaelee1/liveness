@@ -55,9 +55,8 @@ Section laws.
     intros σ Θ [H1 H2]. rewrite /pointsto_sat in H1. rewrite /freed_sat in H2. by simplify_eq.
   Qed.
 
-  (** Implications are exported on traces ([temporal_cast]): the inferred guarantee of a
-      case split on the value of [l] implies "[l ↦ v0] now → [G0]", by the rules of
-      trace_prop_rules.v and the atom rule above. *)
+  (** An implication exported on traces ([temporal_cast]): the inferred guarantee of a case
+      split on the value of [l] implies "[l ↦ v0] now → [G0]", by the rules. *)
   Lemma ex_impl_pointsto l v0 v1 (P0 P1 : iProp Σ) G0 `{!IntoTemporal P0 G0} :
     v0 ≠ v1 →
     tr_sem ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊆ ((l ↦ v0) → itrProp_external G0)%R.

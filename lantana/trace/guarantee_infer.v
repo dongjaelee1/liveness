@@ -181,11 +181,8 @@ Global Hint Extern 100 (@IntoTemporal ?Λ ?Σ ?Ht ?Hs ?P ?G) =>
 
 (** ** The trace reading of a guarantee
 
-    [itrProp_sem P] reads on traces as any property that [P] validly guarantees; with
-    [IntoTemporal] this gives a trace reading of properties that mention [itrProp_sem] (the
-    readings of the registered structures). [IntoTrace P R]: [P] guarantees the trace
-    property [R] ([tr_sem P ⊆ R]), by inferring a guarantee and reading it on traces: the
-    form that adequacy takes. *)
+    [ItrPropExt] reads [itrProp_sem P] through [IntoTemporal]. [IntoTrace P R]: [P]
+    guarantees the trace property [R] ([tr_sem P ⊆ R]), the form adequacy takes. *)
 Section into_trace.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
@@ -306,8 +303,8 @@ Section examples.
     (□ ⌜True⌝ ∧ ◇ ⌜True⌝)%R.
   Proof. done. Qed.
 
-  (** An implication, exported on traces: the inferred guarantee of a case split, read on
-      traces, implies it (compare [temporal_impl]). *)
+  (** An implication exported on traces: the inferred guarantee of a case split implies it
+      (compare [temporal_impl]). *)
   Local Lemma ex_impl_cast (φ : Prop) (P Q : iProp Σ) G H `{!IntoTemporal P G} `{!IntoTemporal Q H} :
     tr_sem ((⌜φ⌝ ∗ P) ∨ (⌜¬φ⌝ ∗ Q)) ⊆ (⌜φ⌝ → itrProp_external G)%R.
   Proof.

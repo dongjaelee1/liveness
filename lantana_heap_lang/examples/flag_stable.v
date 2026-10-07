@@ -58,9 +58,9 @@ Section proof.
   Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ itrProp_until (l ↦ #0) (itrProp_always (l ↦ #1)).
   Proof. apply (into_temporal _ _). Qed.
 
-  (** Whenever the flag holds 0, it eventually holds 1 forever: a consequence of the flag's
-      guarantee on traces (the until gives the finally; an always holds now), guaranteed
-      along with it by the cast. Unlike in flag.v, the antecedent is not needed. *)
+  (** Whenever the flag holds 0, it eventually holds 1 forever: from the flag's guarantee on
+      traces (the until gives the finally; an always holds now). Unlike in flag.v, the
+      antecedent is not needed. *)
   Definition flag_response (l : loc) : trProp heap_lang := (□ ((l ↦ #0) → ◇ □ (l ↦ #1)))%R.
 
   Lemma flag_response_ext l : itrProp_external (flag_itrProp l) ⊆ flag_response l.

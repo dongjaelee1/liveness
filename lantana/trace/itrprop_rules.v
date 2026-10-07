@@ -5,25 +5,25 @@ From transfinite.stepindex Require Import ordinals.
 
 (** * Rules for internalized trace properties ([itrProp])
 
-    The interface of internalized trace properties, the properties that guarantees
-    [P ⊨ₜ G] (guarantee.v) are about. An [itrProp] is read twice (itrprop.v): its internal
-    reading is what a run establishes, its external reading ([itrProp_external G], a
-    [trProp]) is what adequacy concludes. Each reading has its entailment:
+    The interface for the properties that guarantees [P ⊨ₜ G] are about (guarantee.v). An
+    [itrProp] is read twice (itrprop.v): the internal reading is what a run establishes, the
+    external reading ([itrProp_external G], a [trProp]) is what adequacy concludes. Each
+    reading has its entailment:
 
-    - [G ⊑ H] compares internal readings. It transports guarantees ([temporal_weaken]) and
-      the connectives are monotone in it (the rules below). It is sound for external
-      readings of complete properties ([itrProp_le_sound]) but, as the internal readings are
-      deferred by a later, too weak for temporal reasoning: not even [□ ⊥ ⊑ ⊥] holds
+    - [G ⊑ H] compares internal readings. It transports guarantees ([temporal_weaken]), and
+      the connectives are monotone in it. It is sound for the external readings of complete
+      properties ([itrProp_le_sound]) but, the internal readings being deferred by a later,
+      too weak for temporal reasoning: not even [□ ⊥ ⊑ ⊥] holds
       ([itrProp_always_elim_not_le]). Use it for the structure of a property only.
-    - [itrProp_external G ⊆ R] compares external readings, on traces, with the rules of
-      trace_prop_rules.v, where every law of LTL holds. [ItrPropExt G R] computes the external
-      reading of [G] from its shape. The cast [itrProp_cast G R pf] keeps the internal reading
-      of [G] and takes [R] as its external one, so [G ⊑ itrProp_cast G R pf]: every
-      trace-level consequence of a property is guaranteed along with it ([temporal_cast]).
+    - [itrProp_external G ⊆ R] compares external readings on traces, with the rules of
+      trace_prop_rules.v, where every law of LTL holds. [ItrPropExt G R] computes the
+      external reading of [G] from its shape. The cast [itrProp_cast G R pf] keeps the
+      internal reading of [G] with [R] as its external reading, so
+      [G ⊑ itrProp_cast G R pf]: every trace-level consequence of a property is guaranteed
+      along with it ([temporal_cast]).
 
-    The connectives (itrprop.v, scope [%ITR]): [⌜φ⌝], [G ∧ H], [G ∨ H], [G → H] (the
-    antecedent read on the trace), [∀ x, G], [∃ x, G] (small types), [itrProp_state φ],
-    [□ G], [◇ G], [G Uₜ H]. *)
+    Connectives (itrprop.v, scope [%ITR]): [⌜φ⌝], [∧], [∨], [→] (the antecedent read on the
+    trace), [∀], [∃] (small types), [itrProp_state φ], [□ G], [◇ G], [G Uₜ H]. *)
 
 Global Instance itrProp_le_preorder {Λ Σ} : PreOrder (⊑@{itrProp Λ Σ}).
 Proof. split; [intros ?; apply itrProp_le_refl|intros ???; apply itrProp_le_trans]. Qed.
@@ -137,25 +137,7 @@ Section itrProp_impl_rules.
 
 End itrProp_impl_rules.
 
-(** ** Trace readings: the two entailments, and casts
-
-    A property is read twice. Its in-logic reading [itrProp_internal] is what a run establishes: a
-    guarantee [P ⊨ₜ G] (guarantee.v) turns [P], at a position, into the in-logic reading of
-    [G] there. Its trace reading [itrProp_external] is what adequacy concludes.
-
-    Accordingly, two entailments:
-    - [G ⊑ H] ([itrProp_le]) compares in-logic readings. It transports guarantees
-      ([temporal_weaken]), and the connectives are monotone in it. It is sound for trace
-      readings ([itrProp_le_sound]), but it is as weak as the readings are deferred: the
-      in-logic readings of [□] and [𝒰] start with a later, so not even [□ ⊥ ⊑ ⊥] holds
-      ([itrProp_always_elim_not_le]). It is the entailment of the structure of a property.
-    - [itrProp_external G ⊆ R] compares trace readings, on traces (trace_prop.v), where every law of
-      LTL holds. It is the entailment of the meaning of a property. The cast
-      [itrProp_cast G R pf] keeps the in-logic reading of [G] and takes [R] as its trace
-      reading, so [G ⊑ itrProp_cast G R pf]: every trace-level consequence of a property is
-      guaranteed along with it ([temporal_cast]).
-
-    [ItrPropExt G R] computes a trace reading of [G] from its shape, as a trace predicate. *)
+(** ** Casts and external readings *)
 Section readings.
   Context {Λ : language} {Σ : gFunctors}.
   Implicit Types G H : itrProp Λ Σ.

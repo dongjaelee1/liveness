@@ -6,17 +6,16 @@ From lantana.base_logic Require Import satisfiable.
 
 (** * Internalized trace properties
 
-    An [itrProp] is a trace property ([trProp], its external reading) together with its
+    An [itrProp] is a trace property ([trProp], its external reading) with its
     internalization in the logic ([trIProp], its internal reading), adequate for it: if the
-    internal reading is satisfiable, the external one holds. The connectives, state atoms,
-    complete and instant properties, and the two entailments between properties: in the
-    logic ([G ⊑ H]), for the structure of a property, and on traces ([itrProp_external G ⊆ R]),
-    for its meaning (see "Trace readings" below). *)
+    internal reading is satisfiable, the external one holds. This file defines the
+    connectives, the state atoms, complete and instant properties and the model; the rules
+    are in itrprop_rules.v. *)
 
-(** ** Internalized trace properties *)
+(** ** Definition *)
 
-(** [itrProp_internal]: the step-indexed reading, which the running system establishes in the
-    logic; [itrProp_adeq]: its satisfiability implies the external reading [itrProp_external]. *)
+(** [itrProp_internal]: the step-indexed reading, which the run establishes;
+    [itrProp_adeq]: its satisfiability implies the external reading. *)
 Record itrProp {Λ : language} {Σ : gFunctors} := ItrProp {
   itrProp_internal : ∀ `{!temporalGS Λ Σ}, trace Λ → iProp Σ;
   itrProp_external : trProp Λ;
@@ -32,7 +31,7 @@ Declare Scope itrProp_scope.
 Delimit Scope itrProp_scope with ITR.
 Bind Scope itrProp_scope with itrProp.
 
-(** [G ⊑ G']: the step-indexed part of [G] implies that of [G']. *)
+(** In-logic entailment [G ⊑ G']: the internal reading of [G] implies that of [G']. *)
 Definition itrProp_le {Λ Σ} (G G' : itrProp Λ Σ) : Prop :=
   ∀ (H : temporalGS Λ Σ) τ, @itrProp_internal _ _ G H τ ⊢ @itrProp_internal _ _ G' H τ.
 
@@ -135,7 +134,6 @@ Notation "□ G" := (itrProp_always G) (at level 20, right associativity) : itrP
 Notation "◇ G" := (itrProp_finally G) (at level 20, right associativity) : itrProp_scope.
 Notation "G 'Uₜ' H" := (itrProp_until G H) (at level 60, right associativity) : itrProp_scope.
 
-(** In-logic entailment is the canonical order of properties. *)
 Global Instance itrProp_sqsubseteq {Λ Σ} : SqSubsetEq (itrProp Λ Σ) := itrProp_le.
 
 (** ** Semantic state atoms
@@ -155,12 +153,11 @@ Section state_atoms.
 
 End state_atoms.
 
-(** ** Complete and instant trace properties
+(** ** Complete and instant properties
 
-    An implication [A → G] assumes [A] at the level of traces. In the logic it is introduced
-    from [A ∧ H ⊑ G] when [A] is complete (its trace reading gives its in-logic reading), and
-    eliminated when [A] is instant (the converse). Pure facts, state atoms, always and until
-    are complete; the non-temporal ones are also instant. *)
+    Complete: the trace reading gives the in-logic reading; instant: the converse. Pure
+    facts, state atoms, always and until are complete; the non-temporal ones are also
+    instant. They move an antecedent between the two readings (itrprop_rules.v). *)
 Section complete.
   Context {Λ : language} {Σ : gFunctors}.
   Implicit Types G A : itrProp Λ Σ.
@@ -276,9 +273,9 @@ Global Hint Mode ItrPropInstant - - ! : typeclass_instances.
 
 (** ** The model
 
-    Under the assumptions of the adequacy theorem (adequacy_temporal.v), the logic has a
-    model: a property valid in the logic holds on the trace. Hence in-logic entailment is
-    sound for the trace readings of complete properties, and it is not complete for them. *)
+    Under the assumptions of the adequacy theorem (adequacy_temporal.v), a property valid in
+    the logic holds on the trace. Hence in-logic entailment is sound for the trace readings
+    of complete properties, and not complete for them. *)
 Section model.
   Context {Λ : language} {Σ : gFunctors}.
   Implicit Types G H : itrProp Λ Σ.

@@ -4,16 +4,13 @@ From lantana.algebra Require Import axioms.
 
 (** * Rules for trace properties ([trProp])
 
-    The interface of trace properties, the external reading of what a program guarantees:
-    entailment [R ⊆ S] (the validity of the implication [R → S], [tr_le_impl]) with the
-    rules of the connectives and of the state atoms, the laws of LTL, and the fixpoint rules.
-    Trace properties are ordinary predicates on traces (trace_prop.v), so every valid rule is
-    provable from the definitions, classically; [tr_unfold] is the escape hatch when a rule
-    is missing.
+    The interface for the external reading of what a program guarantees: entailment
+    [R ⊆ S] with the rules of the connectives and the state atoms, the laws of LTL and the
+    fixpoint rules. Trace properties are predicates on traces (trace_prop.v), so every valid
+    rule is provable from the definitions, classically; [tr_unfold] is the escape hatch.
 
-    The connectives (trace_prop.v, scope [%R]): [⌜φ⌝], [R ∧ S], [R ∨ S], [R → S], [∀ x, R],
-    [∃ x, R], the state atom [tr_state φ] (a fact about the current state and thread pool),
-    [□ R], [◇ R], [○ R] and [R Uₜ S]. *)
+    Connectives (scope [%R]): [⌜φ⌝], [∧], [∨], [→], [∀], [∃], the state atom [tr_state φ]
+    (a fact about the current state and thread pool), [□ R], [◇ R], [○ R], [R Uₜ S]. *)
 
 Global Instance tr_le_preorder {Λ : language} : PreOrder (⊆@{trProp Λ}).
 Proof. split; [by intros R τ|intros R S T HRS HST τ HR; by apply HST, HRS]. Qed.
@@ -101,7 +98,7 @@ Section tr_rules.
   Lemma tr_exist_mono {Y} (R S : Y → trProp Λ) : (∀ y, R y ⊆ S y) → tr_exist Y R ⊆ tr_exist Y S.
   Proof. intros H τ [y Hy]. exists y. by apply H. Qed.
 
-  (** State atoms: facts about the current configuration combine, and are decided by it. *)
+  (** State atoms combine, and are decided by the current configuration. *)
   Lemma tr_state_mono (φ ψ : state Λ → thread_pool Λ → Prop) :
     (∀ σ Θ, φ σ Θ → ψ σ Θ) → tr_state φ ⊆ tr_state ψ.
   Proof. intros H [n τf]. tr_unfold. destruct (τf n) as (((Θ&σ)&?)&?). apply H. Qed.

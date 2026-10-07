@@ -4,8 +4,8 @@ From lantana.algebra Require Import axioms.
 
 (** * Trace predicates
 
-    Properties of executions ([trProp]): the LTL connectives, their fixpoints, fair
-    scheduling and Iris-style safety. *)
+    Properties of executions ([trProp]): the LTL connectives, entailment [⊆], fixpoints,
+    fair scheduling and Iris-style safety. The rules are in trace_prop_rules.v. *)
 
 (** ** Predicates on a trace state and on a trace *)
 Definition tsProp (Λ : language) := trace_state Λ → Prop.
@@ -83,13 +83,10 @@ Notation "◇ P" := (tr_eventually P) (at level 20, right associativity) : tr_sc
 Notation "○ P" := (tr_next P) (at level 20, right associativity) : tr_scope.
 Notation "P 'Uₜ' Q" := (tr_until P Q) (at level 60, right associativity) : tr_scope.
 
-(** ** Trace entailment [R ⊆ S]
-
-    The rules are in trace_prop_rules.v. *)
+(** ** Trace entailment [R ⊆ S]: the validity of [R → S] ([⊆] is LTL's [⊨], [→] its
+    connective). *)
 Definition tr_le {Λ : language} (R S : trProp Λ) : Prop := ∀ τ, R τ → S τ.
 Global Instance tr_subseteq {Λ : language} : SubsetEq (trProp Λ) := tr_le.
-(** Entailment is the validity of the implication: [⊆] is the meta-level [⊨] of LTL, [→] the
-    connective. *)
 Lemma tr_le_impl {Λ : language} (R S : trProp Λ) : R ⊆ S ↔ ∀ τ, (R → S)%R τ.
 Proof. done. Qed.
 

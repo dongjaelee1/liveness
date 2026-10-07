@@ -247,8 +247,8 @@ Section rules.
     iIntros (Hle) "#HG !>". iIntros (?????????) "H". iApply tguar_mono; first done. by iApply "HG".
   Qed.
 
-  (** Every trace-level consequence [R] of [G] is guaranteed along with [G], as the cast of
-      [G] to [R]: the general way to export what a guarantee implies. *)
+  (** A trace-level consequence [R] of [G] is guaranteed as the cast of [G] to [R]: the way
+      to export what a guarantee implies. *)
   Lemma temporal_cast P G R (pf : itrProp_external G ⊆ R) : P ⊨ₜ G ⊢ P ⊨ₜ itrProp_cast G R pf.
   Proof. apply temporal_weaken, itrProp_cast_le. Qed.
 
@@ -335,17 +335,15 @@ Section rules.
   Lemma itrProp_sem_ext Q G τ : (⊢ Q ⊨ₜ G) → itrProp_external (itrProp_sem Q) τ → itrProp_external G τ.
   Proof. intros HG H. apply (H (exist (λ G, ⊢ Q ⊨ₜ G) G HG)). Qed.
 
-  (** [itrProp_sem Q] is the greatest lower bound of the properties [Q] validly guarantees: the
-      rules for guarantees are complete, up to in-logic entailment, through it. *)
+  (** [itrProp_sem Q] is the greatest lower bound of what [Q] validly guarantees: through it,
+      the rules are complete up to in-logic entailment. *)
   Lemma temporal_sem_complete Q G : (⊢ Q ⊨ₜ G) ↔ itrProp_sem Q ⊑ G.
   Proof.
     split; first apply itrProp_sem_le. intros Hle.
     iApply (temporal_weaken _ _ _ Hle). iApply temporal_sem.
   Qed.
 
-  (** Its trace reading: the strongest trace property [Q] validly guarantees. [Q] guarantees
-      a trace property [R] iff it validly guarantees some [G] whose trace reading implies
-      [R]. *)
+  (** Its trace reading: the strongest trace property [Q] validly guarantees. *)
   Definition tr_sem Q : trProp Λ := itrProp_external (itrProp_sem Q).
   Lemma tr_sem_le Q R : tr_sem Q ⊆ R ↔ ∃ G, (⊢ Q ⊨ₜ G) ∧ itrProp_external G ⊆ R.
   Proof.
@@ -429,15 +427,13 @@ End state_rules.
 
 (** ** Implications
 
-    The antecedent [A] of [A → G] is read on the trace ([itrProp_impl]), so [A → G] is [¬A ∨ G]
-    ([itrProp_impl_or_not]). An implication is a statement about traces, and the general way
-    to export one is the cast ([temporal_cast]): from [P ⊨ₜ H] and
-    [itrProp_external A ∧ itrProp_external H ⊆ R] on traces, where every law of LTL is available, [P]
-    guarantees [itrProp_external A → R]. The rules below stay in the logic and produce the connective
-    [itrProp_impl] itself: from a complete antecedent ([temporal_impl_intro]), by weakening
-    ([temporal_impl_weaken]), and for a pure antecedent of an iProp implication
-    ([temporal_impl]). An iProp antecedent that the context does not provide cannot be used:
-    see [naive_impl_rule_unsound] in guarantee_infer.v. *)
+    The antecedent of [A → G] is read on the trace ([itrProp_impl]), so [A → G] is [¬A ∨ G]
+    ([itrProp_impl_or_not]), a statement about traces: the general way to export one is the
+    cast of a guarantee ([temporal_cast]) after trace-level reasoning. The rules below stay
+    in the logic and produce [itrProp_impl] itself: from a complete antecedent
+    ([temporal_impl_intro]), by weakening ([temporal_impl_weaken]), and for a pure antecedent
+    of an iProp implication ([temporal_impl]). An iProp antecedent that the context does not
+    provide cannot be used ([naive_impl_rule_unsound], guarantee_infer.v). *)
 Section impl_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
