@@ -156,20 +156,20 @@ Section tr_laws.
 
   (** Until: the least fixpoint of [S ∨ (R ∧ ○ -)] ([tr_until_now], [tr_until_step],
       [tr_until_ind]), monotone, and stronger than finally. *)
-  Lemma tr_until_now R S : S ⊆ tr_until R S.
+  Lemma tr_until_now R S : S ⊆ (R Uₜ S)%R.
   Proof. intros [n τf]. tr_unfold. intros H. exists n. split_and!; [lia|done|lia]. Qed.
-  Lemma tr_until_step R S : (R ∧ ○ tr_until R S)%R ⊆ tr_until R S.
+  Lemma tr_until_step R S : (R ∧ ○ (R Uₜ S))%R ⊆ (R Uₜ S)%R.
   Proof.
     intros [n τf]. tr_unfold. intros [HR (m & Hm & HS & HRs)]. exists m. split_and!; [lia|done|].
     intros l Hl. destruct (decide (l = n)) as [->|]; [done|apply HRs; lia].
   Qed.
-  Lemma tr_until_unfold R S : tr_until R S ⊆ (S ∨ (R ∧ ○ tr_until R S))%R.
+  Lemma tr_until_unfold R S : (R Uₜ S)%R ⊆ (S ∨ (R ∧ ○ (R Uₜ S)))%R.
   Proof.
     intros [n τf]. tr_unfold. intros (m & Hm & HS & HRs).
     destruct (decide (m = n)) as [->|]; first by left.
     right. split; first (apply HRs; lia). exists m. split_and!; [lia|done|]. intros l Hl. apply HRs. lia.
   Qed.
-  Lemma tr_until_ind R S X : S ⊆ X → (R ∧ ○ X)%R ⊆ X → tr_until R S ⊆ X.
+  Lemma tr_until_ind R S X : S ⊆ X → (R ∧ ○ X)%R ⊆ X → (R Uₜ S)%R ⊆ X.
   Proof.
     intros HS HR [n τf]. tr_unfold. intros (m & Hm & HSm & HRs).
     assert (∀ d n', n' + d = m → (∀ l, n' ≤ l < m → R (l, τf)) → X (n', τf)) as Hd.
@@ -179,12 +179,12 @@ Section tr_laws.
         change (X (Datatypes.S n', τf)). apply IH; first lia. intros l Hl. apply HRs'. lia. }
     apply (Hd (m - n) n); [lia|exact HRs].
   Qed.
-  Lemma tr_until_mono R R' S S' : R ⊆ R' → S ⊆ S' → tr_until R S ⊆ tr_until R' S'.
+  Lemma tr_until_mono R R' S S' : R ⊆ R' → S ⊆ S' → (R Uₜ S)%R ⊆ (R' Uₜ S')%R.
   Proof.
     intros HR HS [n τf]. tr_unfold. intros (m & Hm & HSm & HRs). exists m. split_and!; [lia|by apply HS|].
     intros l Hl. apply HR, HRs. lia.
   Qed.
-  Lemma tr_until_finally R S : tr_until R S ⊆ (◇ S)%R.
+  Lemma tr_until_finally R S : (R Uₜ S)%R ⊆ (◇ S)%R.
   Proof. apply tr_until_mono; [by intros ?|done]. Qed.
 
   (** Finally. *)

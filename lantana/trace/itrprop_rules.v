@@ -185,7 +185,7 @@ Section readings.
   Global Instance itrProp_ext_finally G R : ItrPropExt G R → ItrPropExt (itrProp_finally G) (◇ R)%R | 9.
   Proof. intros HG. by apply tr_finally_mono. Qed.
   Global Instance itrProp_ext_until G1 G2 R1 R2 :
-    ItrPropExt G1 R1 → ItrPropExt G2 R2 → ItrPropExt (itrProp_until G1 G2) (tr_until R1 R2) | 10.
+    ItrPropExt G1 R1 → ItrPropExt G2 R2 → ItrPropExt (G1 Uₜ G2)%ITR (R1 Uₜ R2)%R | 10.
   Proof. intros H1 H2. by apply tr_until_mono. Qed.
   Global Instance itrProp_ext_cast G R pf : ItrPropExt (itrProp_cast G R pf) R | 10.
   Proof. by intros τ. Qed.
