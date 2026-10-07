@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.program_logic Require Import adequacy_iris.
 From iris.prelude Require Import options.
 
 From lantana.heap_lang.examples Require Export flag.
@@ -55,7 +56,7 @@ Section proof.
          ⟦finallyP Nl kl 1 (exits #()@i)⟧ₗ ∗
          is_flag l k 0 }}}
       writer #() @ i
-    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
+    l{{{ RET #(); thread_expr i [] #() ∗ lift_term i fork_post #() }}}.
   Proof.
     iPoseProof (Flag_set_spec) as (μ_s) "Flag_set_spec".
     iExists (4 ⊕ μ_s)%M. iIntros (i g k kl Φ) "!> HP HΦ".
@@ -87,7 +88,7 @@ Section proof.
          ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ∗
          is_flag l k 0 }}}
       reader #() @ i
-    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
+    l{{{ RET #1; thread_expr i [] #1 ∗ lift_term i fork_post #1 }}}.
   Proof.
     iPoseProof (Flag_wait_spec) as (μ_w) "Flag_wait_spec".
     iExists (10 ⊕ μ_w)%M. iIntros (i g k kl Φ) "!> HP HΦ".
@@ -121,7 +122,7 @@ Section proof.
                       ⟨thP_carriers i {[g1]} ∗ crP_obls g1 0 {[k; kl1]} ∗
                        thP_carriers j {[g2]} ∗ crP_obls g2 1 ({[kl2]}) ∗
                        crP_fuel g1 0 μ1 ∗ crP_fuel g2 1 μ2⟩)%F) →
-    Ψs = ({[i := fork_post; j := fork_post]}) →
+    Ψs = ({[i := (λ _ v, ⌜v = #()⌝)%I; j := (λ _ v, ⌜v = #1⌝)%I]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ (l ↦ #0) -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
      |={⊤}=>m ∃ μ1 μ2, (⟦Φ μ1 μ2⟧ₗ ∗
@@ -163,16 +164,16 @@ Section proof.
     iEval (rewrite HT big_sepM_insert; last by rewrite lookup_singleton_ne) in "TEs".
     iDestruct "TEs" as "[TEi TEs]".
     iEval (rewrite big_sepM_singleton) in "TEs". iRename "TEs" into "TEj".
-    iPoseProof ("writer_spec" $! i g1 k kl1 (λ v, lift_term i fork_post v) with "[TEi Uk Ukl1 TG1 Gg1 Gf1]") as "WP1".
+    iPoseProof ("writer_spec" $! i g1 k kl1 (λ v, lift_term i (λ _ v, ⌜v = #()⌝)%I v) with "[TEi Uk Ukl1 TG1 Gg1 Gf1]") as "WP1".
     { iFrame. iSplit; eauto. }
-    iPoseProof ("reader_spec" $! j g2 k kl2 (λ v, lift_term j fork_post v) with "[TEj Ukl2 TG2 Gg2 Gf2]") as "WP2".
+    iPoseProof ("reader_spec" $! j g2 k kl2 (λ v, lift_term j (λ _ v, ⌜v = #1⌝)%I v) with "[TEj Ukl2 TG2 Gg2 Gf2]") as "WP2".
     { iFrame. eauto. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { rewrite lookup_insert_ne; auto. }
     { rewrite lookup_insert_ne; auto. }
     iSplitL "WP1".
-    { iApply "WP1". iModIntro. iIntros (?) "[_ $]". }
-    rewrite big_sepM2_singleton. iApply "WP2". iModIntro. iIntros (?) "[_ $]".
+    { iApply "WP1". iModIntro. rewrite /lift_term. by iIntros "(_& $& _)". }
+    rewrite big_sepM2_singleton. iApply "WP2". iModIntro. rewrite /lift_term. by iIntros "(_& $& _)".
   Qed.
 
 End proof.
@@ -237,7 +238,7 @@ Section adequacy.
 
   Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
-        {[i := fork_post; j := fork_post]}.
+        {[i := (λ _ v, ⌜v = #()⌝)%I; j := (λ _ v, ⌜v = #1⌝)%I]}.
 
   Theorem flag_client_adequacy :
     ∀ (τ : trace heap_lang),
@@ -278,6 +279,55 @@ Section adequacy.
     iModIntro. iExists (Φ_tf m1 m2). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
+  Qed.
+
+  (** Safety: in every fair run, the scheduled thread is never stuck, and once the writer
+      (resp. the reader) has returned, its value is [#()] (resp. [#1]). *)
+  Theorem flag_client_safety_adequacy :
+    ∀ (τ : trace heap_lang),
+    run τ →
+    fair_scheduling τ →
+    (τ.1 = 0) →
+    (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+    safety_iris i (λ _ v, v = #()) τ ∧ safety_iris j (λ _ v, v = #1) τ.
+  Proof.
+    intros τ Run FS Init1 Init2.
+    cut (∀ k (Φk : thread_id → val → Prop),
+           (∃ Q : thread_id → val → iProp Σ, (@Ψs Σ) !! k = Some Q ∧ ∀ v, (Q k v ⊢ ⌜Φk k v⌝)) →
+           safety_iris k Φk τ).
+    { intros Hsafe. split; apply Hsafe; eexists; split.
+      - by rewrite lookup_insert_eq.
+      - intros v. iIntros "%Hv". by iPureIntro.
+      - rewrite lookup_insert_ne; [by rewrite lookup_singleton_eq|]. by subst i j.
+      - intros v. iIntros "%Hv". by iPureIntro. }
+    intros k Φk POST.
+    eapply (lwp_adequacy_safety_iris Σ heap_lang (Build_state σ0 ∅) Θ0 i [] k).
+    1,2,3,4: eauto.
+    iIntros (?). exists 0%ord.
+    iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
+    iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
+    iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
+    iMod (inv_heap_init loc (option val) (⊤ : coPset)) as "(%Hinv_heap& >HHI)".
+    set (Hheap_stateGS := @HeapStateGS Σ Hheap Hinv_heap Hproph Hthread).
+    set (HHeapGS := @HeapGS Σ Htemporal Hheap_stateGS).
+    set (HlantanaGS := @heapGS_lantanaGS Σ HHeapGS).
+    iExists (lantana_state_interp_class), (@fork_post Σ), (@Ψs Σ).
+    iModIntro. iSplit; first done.
+    iSplitL "HI TI PI".
+    { by iFrame. }
+    iSplitR; first done.
+    iIntros "LC TGs".
+    iMod (flag_client_pre Θ0 i j with "[Tis] [Ptrs] [TGs]") as "H".
+    { subst i j. lia. }
+    { done. }
+    { reflexivity. }
+    { reflexivity. }
+    { rewrite /thread_expr /=. iFrame. }
+    { subst σ0. rewrite big_sepM_singleton.
+      by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
+    { iFrame. }
+    iDestruct "H" as (m1 m2) "(HP& H)".
+    iApply ("H" with "HP").
   Qed.
 
 End adequacy.

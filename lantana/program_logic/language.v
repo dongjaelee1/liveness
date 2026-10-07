@@ -428,6 +428,34 @@ CoInductive behavior {Λ : language} : trace Λ → Prop :=
   behavior (S n, τf) →
   behavior (n, τf).
 
+(** A run is like a behavior, except that a scheduled stuck thread stutters. Every
+    configuration has a successor for every scheduled thread, so stuck executions are runs.
+    We use runs to state safety (see [adequacy_iris.v]). *)
+Inductive thread_stuck {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
+| thread_stuck_intro e1 σ1 Θ :
+  ρ1 = (Θ, σ1) →
+  Θ !! i = Some e1 →
+  stuck i e1 σ1 (dom Θ) →
+  κ = [] →
+  ρ2 = ρ1 →
+  thread_stuck i ρ1 κ ρ2.
+
+CoInductive run {Λ : language} : trace Λ → Prop :=
+| run_step n τf ρ1 ρ2 i1 i2 κ κs :
+  τf n = (ρ1, i1, (κ ++ κs)) →
+  (thread_step i1 ρ1 κ ρ2 ∨ thread_done i1 ρ1 κ ρ2 ∨ thread_stuck i1 ρ1 κ ρ2) →
+  τf (S n) = (ρ2, i2, κs) →
+  run (S n, τf) →
+  run (n, τf).
+
+Lemma behavior_run {Λ : language} (τ : trace Λ) : behavior τ → run τ.
+Proof.
+  destruct τ as [n τf]. revert n. cofix CIH. intros n BEH.
+  inversion BEH as [? ? ρ1 ρ2 i1 i2 κ κs Hτ Hstep Hτ' BEH']; subst.
+  eapply run_step; [done| |done|by apply CIH].
+  destruct Hstep; auto.
+Qed.
+
 Definition behavior_cfg {Λ : language} (ρ : cfg Λ) (τ : trace Λ) : Prop :=
   ∃ i κs, (τ.2 0) = (ρ, i, κs) ∧ behavior τ.
 Definition behavior_tp {Λ : language} (Θ : thread_pool Λ) (τ : trace Λ) : Prop :=

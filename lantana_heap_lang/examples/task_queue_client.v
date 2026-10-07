@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.program_logic Require Import adequacy_iris.
 From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Export flag task_queue.
 
@@ -340,6 +341,47 @@ Section adequacy.
     iModIntro. iExists (Φ_tf μ). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
+    (* TODO: FIXME? *)
+    Unshelve. apply QueueG. apply _.
+  Qed.
+
+  (** Safety: in every fair run, the scheduled thread is never stuck, and once [main]
+      has returned, its value is [#1]. *)
+  Theorem task_queue_client_safety_adequacy :
+    ∀ (τ : trace heap_lang),
+    run τ →
+    fair_scheduling τ →
+    (τ.1 = 0) →
+    (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+    safety_iris i (λ _ v, v = #1) τ.
+  Proof.
+    intros τ Run FS Init1 Init2.
+    eapply (lwp_adequacy_safety_iris Σ heap_lang (Build_state σ0 ∅) Θ0 i [] i).
+    1,2,3,4: eauto.
+    iIntros (?). exists 0%ord.
+    iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
+    iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
+    iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
+    iMod (inv_heap_init loc (option val) (⊤ : coPset)) as "(%Hinv_heap& >HHI)".
+    set (Hheap_stateGS := @HeapStateGS Σ Hheap Hinv_heap Hproph Hthread).
+    set (HHeapGS := @HeapGS Σ Htemporal Hheap_stateGS).
+    set (HlantanaGS := @heapGS_lantanaGS Σ HHeapGS).
+    iExists (lantana_state_interp_class), (@fork_post Σ), (@Ψs Σ).
+    iModIntro. iSplit.
+    { iPureIntro. eexists. split; first apply lookup_singleton_eq.
+      intros v. iIntros "%Hv". by iPureIntro. }
+    iSplitL "HI TI PI".
+    { by iFrame. }
+    iSplitR; first done.
+    iIntros "LC TGs".
+    iMod (main_pre Θ0 i with "[Tis] [TGs]") as "H".
+    { done. }
+    { reflexivity. }
+    { reflexivity. }
+    { rewrite /thread_expr /=. iFrame. }
+    { iFrame. }
+    iDestruct "H" as (μ) "(HP& H)".
+    iApply ("H" with "HP").
     (* TODO: FIXME? *)
     Unshelve. apply QueueG. apply _.
   Qed.

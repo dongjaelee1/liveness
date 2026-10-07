@@ -34,7 +34,7 @@ Section proof2.
   Lemma lwp_fix_safety_iris_tiProp
     h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs
     g v Ω1 Ω2 W τf γ (i : thread_id) (Φ : thread_id → val Λ → Prop) :
-    behavior (n, τf) →
+    run (n, τf) →
     beh_fscnt (n, τf) γ →
     obls_le Ω1 Ω2 →
     owit_inv_lb (fair_sched_fun γ) Ω2 W →
@@ -56,6 +56,13 @@ Section proof2.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
     iMod "close" as "_". iModIntro.
     iSplit. 1: done.
+    (** The postcondition of thread [i] holds now if [i] is a value; this does not consume [WPs]. *)
+    iAssert (⌜∀ e v, Θ !! i = Some e → to_val e = Some v → Φ i v⌝)%I as "%TV".
+    { iIntros (e w LUe Hw). destruct POST as (e'& Q& LUTQ& POSTQ).
+      assert (e' = e) as ->.
+      { subst Θ. rewrite lookup_fmap LUTQ /= in LUe. by injection LUe. }
+      iPoseProof (big_sepM_lookup with "WPs") as "WP"; first exact LUTQ.
+      simpl. rewrite Hw. iDestruct "WP" as "[_ HQ]". by iApply POSTQ. }
     (** Fetch the scheduled thread and take a step. *)
     inversion BEH. clear BEH. subst n0 τf0.
     iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
@@ -65,7 +72,7 @@ Section proof2.
     { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
       iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
     iPoseProof (history_interp_lookup with "HI") as "%Hlu".
-    destruct H2 as [TStep | TDone].
+    destruct H2 as [TStep | [TDone | TStuck]].
     + iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
       inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
       assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
@@ -94,9 +101,9 @@ Section proof2.
       { iPureIntro. split; auto. }
       rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro.
       iSplit.
-      { iPureIntro. rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split; eauto.
+      { iPureIntro. rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split.
         - eexists. split; eauto. rewrite He1. auto.
-        - destruct (decide (i = i1)); auto. subst i1. eexists. split; eauto. rewrite He1. auto. }
+        - exact TV. }
       iMod "WP". simpl.
       iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g'& %v'& %Ω3& %W3& %& MI)".
       2: eapply LB2.
@@ -194,47 +201,40 @@ Section proof2.
       iDestruct "MI" as "[MHI MI]". iMod (model_history_interp_step _ _ _ (S n) with "MHI") as "MHI".
       1: lia. 1: reflexivity.
       iPoseProof (history_interp_wf with "HI") as "%HistWF".
-      destruct (decide (i = i1)).
-      * subst i. assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
-        { subst Θ. rewrite lookup_fmap_Some in H0. destruct H0 as (?&?&?). destruct x. subst. eauto. }
-        destruct LUTQi1 as (Q& LUTQi1). destruct POST as (?&?& POSTLU& POST). rewrite LUTQi1 in POSTLU.
-        inversion POSTLU; clear POSTLU. subst x x0.
-        iPoseProof (POST v1 with "[WPs]") as "%POSTval".
-        { iPoseProof (big_sepM_delete _ _ _ _ LUTQi1 with "WPs") as "[WP WPs]".
-          rewrite He1. iDestruct "WP" as "[_ $]". }
-        iPoseProof ("IH" with "[] [] [] [] [] [] HI SIa [$MHI $MI] WPs") as "H".
-        1: eauto. 1: eauto. 1: eauto.
-        { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
-          - inv H. eapply HIST in LUh. eauto.
-          - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
-            inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
-            destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
-            rewrite H2 TRn1. eauto. }
-        1: eauto. 1: eauto.
-        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iSplit.
-        { iPureIntro. rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split; eauto.
-          - eexists. split; eauto. rewrite He1. auto.
-          - rewrite decide_True; auto. eexists. split; eauto. rewrite He1. auto. }
-        iModIntro. iMod "close" as "_". iModIntro. iFrame.
-      * iPoseProof ("IH" with "[] [] [] [] [] [] HI SIa [$MHI $MI] WPs") as "H".
-        1: eauto. 1: eauto. 1: eauto.
-        { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
-          - inv H. eapply HIST in LUh. eauto.
-          - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
-            inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
-            destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
-            rewrite H2 TRn1. eauto. }
-        1: eauto. 1: eauto.
-        iApply fupd_mask_intro. 1: set_solver. iIntros "close". iSplit.
-        { iPureIntro. rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split; eauto.
-          - eexists. split; eauto. rewrite He1. auto.
-          - rewrite decide_False; auto. }
-        iModIntro. iMod "close" as "_". iModIntro. iFrame.
+      iPoseProof ("IH" with "[] [] [] [] [] [] HI SIa [$MHI $MI] WPs") as "H".
+      1: eauto. 1: eauto. 1: eauto.
+      { iPureIntro. intros. rewrite lookup_app in H. destruct (h !! n') eqn:LUh.
+        - inv H. eapply HIST in LUh. eauto.
+        - rewrite lookup_cons in H. destruct (n' - length h) eqn:Hn'; last done.
+          inv H. apply lookup_ge_None in LUh. assert (n' = length h) by lia. subst n'.
+          destruct HistWF. rewrite length_app in H. simpl in H. assert (length h = S n) by lia.
+          rewrite H2 TRn1. eauto. }
+      1: eauto. 1: eauto.
+      iApply fupd_mask_intro. 1: set_solver. iIntros "close". iSplit.
+      { iPureIntro. rewrite /tr_and /ts_emb /not_stuck /if_term_val. simpl. rewrite !TRn. split.
+        - eexists. split; eauto. rewrite He1. auto.
+        - exact TV. }
+      iModIntro. iMod "close" as "_". iModIntro. iFrame.
+    + (** The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
+      destruct TStuck as [e1 σ1 Θ1 [= <- <-] LUTi1 [He1 Irr] -> ->].
+      assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
+      { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
+      destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_lookup _ _ _ _ LUTQi1 with "WPs") as "WP".
+      rewrite He1.
+      iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
+      iSpecialize ("WP" $! ctx_id h n σ Θ [] κs). iEval (rewrite !ctx_id_apply) in "WP".
+      iMod ("WP" with "[] [//] [$HI $SIa]") as "WP".
+      { iPureIntro. apply _. }
+      iMod (model_interp_gupd_steps with "WP MI") as "(WP& %& %& %& %& %& MI)".
+      2: eapply LB.
+      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      iDestruct "WP" as "[%NStuck _]". exfalso.
+      destruct NStuck as (?&?&?&?& PStep). by eapply Irr.
   Qed.
 
   Lemma lwp_safety_iris_tiProp h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
     (i : thread_id) (Φ : thread_id → val Λ → Prop) :
-    behavior (n, τf) →
+    run (n, τf) →
     beh_fscnt (n, τf) γ →
     owit_inv_lb (fair_sched_fun γ) Ω W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
@@ -275,11 +275,14 @@ Section proof2.
 
 End proof2.
 
+(** Iris-style safety (cf. Iris's [adequate]): in every fair run from the initial configuration,
+    the scheduled thread is never stuck, and once thread [j] is a value [v], [Φ j v] holds.
+    Runs include executions that get stuck (see [run]), so this is not implied by the hypotheses. *)
 Theorem lwp_adequacy_safety_iris (Σ : gFunctors) (Λ : language)
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   σ Θ i κs j (Φ : thread_id → val Λ → Prop) :
   ∀ (τ : trace Λ),
-  behavior τ →
+  run τ →
   fair_scheduling τ →
   (τ.1 = 0) →
   (τ.2 0 = (Θ, σ, i, κs)) →

@@ -350,7 +350,9 @@ Section fair_sched_cnt.
 
 End fair_sched_cnt.
 
-(** ** Define not_stuck & if_term_val (= Iris safety) as a property of a trace. *)
+(** ** Iris-style safety as a property of a trace (cf. Iris's [adequate]):
+    the scheduled thread is not stuck, and once thread [i] is a value [v], [Φ i v] holds.
+    Stated over runs (see [run] in [language.v]), where a stuck thread can be scheduled. *)
 Definition not_stuck {Λ : language} : tsProp Λ :=
   λ ξ, let '((Θ, σ), i, _) := ξ in
        ∃ e, Θ !! i = Some e ∧
@@ -360,14 +362,8 @@ Definition not_stuck {Λ : language} : tsProp Λ :=
             end.
 
 Definition if_term_val {Λ : language} (i : thread_id) (Φ : thread_id → val Λ → Prop) : tsProp Λ :=
-  λ ξ, let '((Θ, _), j, _) := ξ in
-       if (decide (i = j))
-       then ∃ e, Θ !! j = Some e ∧
-                 match (to_val e) with
-                 | Some v => Φ i v
-                 | None => True
-                 end
-       else True.
+  λ ξ, let '((Θ, _), _, _) := ξ in
+       ∀ e v, Θ !! i = Some e → to_val e = Some v → Φ i v.
 
 Definition safety_iris {Λ : language} (i : thread_id) (Φ : thread_id → val Λ → Prop) : trProp Λ :=
   tr_always (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R.
