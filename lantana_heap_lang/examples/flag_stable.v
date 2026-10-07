@@ -48,14 +48,14 @@ Section proof.
   Definition flag_tk (l : loc) k : iProp Σ :=
     untilI Np k (1/2) (l ↦ #0) (alwaysI Nv (l ↦ #1)).
 
-  Definition flag_itProp (l : loc) : itProp heap_lang Σ :=
-    (itProp_true ∧ itProp_always (itProp_until (l ↦ #0) (itProp_always (l ↦ #1)) ∨
-                            (itProp_true ∧ itProp_always (l ↦ #1))))%IT.
+  Definition flag_itrProp (l : loc) : itrProp heap_lang Σ :=
+    (itrProp_true ∧ itrProp_always (itrProp_until (l ↦ #0) (itrProp_always (l ↦ #1)) ∨
+                            (itrProp_true ∧ itrProp_always (l ↦ #1))))%ITR.
 
-  Lemma is_flag_temporal l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_itProp l.
+  Lemma is_flag_temporal l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_itrProp l.
   Proof. apply (into_temporal _ _). Qed.
 
-  Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ itProp_until (l ↦ #0) (itProp_always (l ↦ #1)).
+  Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ itrProp_until (l ↦ #0) (itrProp_always (l ↦ #1)).
   Proof. apply (into_temporal _ _). Qed.
 
   (** Whenever the flag holds 0, it eventually holds 1 forever: a consequence of the flag's
@@ -63,9 +63,9 @@ Section proof.
       along with it by the cast. Unlike in flag.v, the antecedent is not needed. *)
   Definition flag_response (l : loc) : trProp heap_lang := (□ ((l ↦ #0) → ◇ □ (l ↦ #1)))%R.
 
-  Lemma flag_response_ext l : itProp_external (flag_itProp l) ⊆ flag_response l.
+  Lemma flag_response_ext l : itrProp_external (flag_itrProp l) ⊆ flag_response l.
   Proof.
-    rewrite /flag_itProp. etrans; first apply (itProp_ext_of _ _).
+    rewrite /flag_itrProp. etrans; first apply (itrProp_ext_of _ _).
     etrans; first apply tr_and_elim_r. apply tr_always_mono, tr_or_elim; apply tr_impl_intro;
       (etrans; first apply tr_and_elim_l).
     - apply tr_until_finally.
@@ -73,7 +73,7 @@ Section proof.
   Qed.
 
   Lemma is_flag_response l k ℓ :
-    ⊢ is_flag l k ℓ ⊨ₜ itProp_cast (flag_itProp l) (flag_response l) (flag_response_ext l).
+    ⊢ is_flag l k ℓ ⊨ₜ itrProp_cast (flag_itrProp l) (flag_response l) (flag_response_ext l).
   Proof. iApply temporal_cast. iApply is_flag_temporal. Qed.
 
   (** The main proofs. *)
@@ -313,9 +313,9 @@ Section trace.
   (** The flag at the level of traces: [0] until [1] forever, or [1] forever. *)
   Definition is_flag_tr (l : loc) : trProp heap_lang :=
     tr_always (tr_until (l ↦ #0) (tr_always (l ↦ #1)) ∨ tr_always (l ↦ #1))%R.
-  Lemma flag_itProp_impl {Σ : gFunctors} l : itProp_external (flag_itProp (Σ:=Σ) l) ⊆ is_flag_tr l.
+  Lemma flag_itrProp_impl {Σ : gFunctors} l : itrProp_external (flag_itrProp (Σ:=Σ) l) ⊆ is_flag_tr l.
   Proof.
-    rewrite /flag_itProp. etrans; first apply (itProp_ext_of _ _).
+    rewrite /flag_itrProp. etrans; first apply (itrProp_ext_of _ _).
     etrans; first apply tr_and_elim_r. apply tr_always_mono, tr_or_mono; [reflexivity|apply tr_and_elim_r].
   Qed.
 
@@ -332,8 +332,8 @@ Section trace.
     etrans; first apply tr_pointsto_agree. apply tr_pure_elim. intros Heq. by simplify_eq.
   Qed.
 
-  Lemma flag_itProp_stays {Σ : gFunctors} l : itProp_external (flag_itProp (Σ:=Σ) l) ⊆ flag_stays_tr l.
-  Proof. etrans; [apply flag_itProp_impl|apply is_flag_tr_stays]. Qed.
+  Lemma flag_itrProp_stays {Σ : gFunctors} l : itrProp_external (flag_itrProp (Σ:=Σ) l) ⊆ flag_stays_tr l.
+  Proof. etrans; [apply flag_itrProp_impl|apply is_flag_tr_stays]. Qed.
 
   (** The run 0, 1, 0, 1, 1, ... satisfies the guarantee of flag.v, but not this one. *)
   Definition flag_run (l : loc) : nat → trace_state heap_lang :=
@@ -357,7 +357,7 @@ Section trace.
     specialize (H H1 2 ltac:(lia)). apply flag_run_at in H. case_decide; [done|lia].
   Qed.
 
-  Lemma flag_run_violates_guarantee {Σ : gFunctors} l : ¬ itProp_external (flag_itProp (Σ:=Σ) l) (0, flag_run l).
-  Proof. intros H. by eapply flag_run_goes_back, flag_itProp_stays. Qed.
+  Lemma flag_run_violates_guarantee {Σ : gFunctors} l : ¬ itrProp_external (flag_itrProp (Σ:=Σ) l) (0, flag_run l).
+  Proof. intros H. by eapply flag_run_goes_back, flag_itrProp_stays. Qed.
 
 End trace.

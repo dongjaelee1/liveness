@@ -103,20 +103,20 @@ carrier-set superscripts.
 * *Temporal formulas are iProps.* There is no syntax of temporal formulas: `alwaysI`,
   `untilI` and `finallyI` are ordinary `iProp`s, and a persistent *guarantee* `P ⊨ₜ G` states
   that whenever `P` holds, the rest of the execution satisfies the semantic trace property
-  `G` (`itProp`). Guarantees are inferred by `IntoTemporal` instances, and adequacy concludes the
-  trace reading `itProp_external G` (`trace/guarantee.v`; inference in `trace/guarantee_infer.v`).
-* *Two entailments of trace properties.* A `itProp` has an in-logic reading, which the run
+  `G` (`itrProp`). Guarantees are inferred by `IntoTemporal` instances, and adequacy concludes the
+  trace reading `itrProp_external G` (`trace/guarantee.v`; inference in `trace/guarantee_infer.v`).
+* *Two entailments of trace properties.* A `itrProp` has an in-logic reading, which the run
   establishes, and a trace reading, which adequacy concludes. In-logic entailment `G ⊑ H`
-  (`itProp_le`, rules in `trace/itprop_rules.v`) transports guarantees (`temporal_weaken`) and is what the connectives are
-  monotone in, but it is too weak for temporal reasoning (`itProp_always_elim_not_le`). Trace
-  entailment `itProp_external G ⊆ R` is LTL on traces (rules in `trace/trace_prop_rules.v`), and the cast
-  `itProp_cast G R pf` transports it along a guarantee (`temporal_cast`). `IntoTrace P R`
+  (`itrProp_le`, rules in `trace/itrprop_rules.v`) transports guarantees (`temporal_weaken`) and is what the connectives are
+  monotone in, but it is too weak for temporal reasoning (`itrProp_always_elim_not_le`). Trace
+  entailment `itrProp_external G ⊆ R` is LTL on traces (rules in `trace/trace_prop_rules.v`), and the cast
+  `itrProp_cast G R pf` transports it along a guarantee (`temporal_cast`). `IntoTrace P R`
   infers the trace property that `P` guarantees (`trace/guarantee_infer.v`).
 
 Naming conventions: `oblP_*` are obligation predicates, `witP_*` witness predicates,
 `thP_*` per-thread predicates, `parP_*` predicates on parents (`thP_kids i K` and
 `oblP_kids k K` are `parP_kids` at a thread and at an obligation), `alwaysI`/`untilI`/`finallyI`
-temporal formulas (iProps), `itProp_*` internalized trace properties (a `trProp`, the external reading, with its `trIProp`, the internal reading, and adequacy), and `tr_*` meta-level trace
+temporal formulas (iProps), `itrProp_*` internalized trace properties (a `trProp`, the external reading, with its `trIProp`, the internal reading, and adequacy), and `tr_*` meta-level trace
 predicates.
 
 ### Predicates (Fig. 1, §3–§5)
@@ -171,18 +171,18 @@ predicates.
 | Paper | Rocq | File (under `lantana/`) |
 |---|---|---|
 | `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `cfg`, `thread_pool`, `thread_step` / `thread_done`, `trace`, `behavior_cfg` / `behavior_tp` (please ignore `κ : list (observation Λ)`, which is never used) | `program_logic/language.v` |
-| temporal properties `Φ, Ψ` and `⟦·⟧_t` | semantic trace properties `itProp`, trace reading `itProp_external` (and step-indexed reading `itProp_internal`); `Always` = `itProp_always`, `Until` = `itProp_until`, `Finally` = `itProp_finally`; meta-level trace predicates `tr_always` / `tr_until` / `tr_eventually` | `trace/itprop.v`, `trace/trace_prop.v` (rules: `trace/itprop_rules.v`, `trace/trace_prop_rules.v`) |
+| temporal properties `Φ, Ψ` and `⟦·⟧_t` | semantic trace properties `itrProp`, trace reading `itrProp_external` (and step-indexed reading `itrProp_internal`); `Always` = `itrProp_always`, `Until` = `itrProp_until`, `Finally` = `itrProp_finally`; meta-level trace predicates `tr_always` / `tr_until` / `tr_eventually` | `trace/itrprop.v`, `trace/trace_prop.v` (rules: `trace/itrprop_rules.v`, `trace/trace_prop_rules.v`) |
 | `Fair` (fair scheduling) | `fair_scheduling` | `trace/trace_prop.v` |
 | logical assertions `φ` and `⟦·⟧_l` | no syntax: temporal formulas are `iProp`s; guarantee `P ⊨ₜ G` (`temporal P G`), inferred by `IntoTemporal` | `trace/guarantee.v`, `trace/guarantee_infer.v` (`IntoTemporal`) |
-| `lift` | `itProp_sem P`, the canonical trace property guaranteed by `P` (`temporal_sem`); `itsem P`, the one inferred by `IntoTemporal` | `trace/guarantee.v` (`itProp_sem`), `trace/guarantee_infer.v` (`itsem`) |
-| `Label s e`, `ChooseNat`, atomic property `label_i "s" v` | `Label`, `ChooseNat` (`lantana_heap_lang/lang.v`); atomic properties are state predicates `pointsto_sat` / `thread_expr_sat` (`lantana_heap_lang/lang.v`), read as `itProp_state`; the assertions `l ↦ v` / `thread_expr i C e` (`exits v @ i`) determine them through the state interpretation (`StateFact` instances, `lantana_heap_lang/temporal_laws.v`), so they guarantee them (`temporal_state_fact`, `trace/guarantee.v`) | — |
+| `lift` | `itrProp_sem P`, the canonical trace property guaranteed by `P` (`temporal_sem`); `itrsem P`, the one inferred by `IntoTemporal` | `trace/guarantee.v` (`itrProp_sem`), `trace/guarantee_infer.v` (`itrsem`) |
+| `Label s e`, `ChooseNat`, atomic property `label_i "s" v` | `Label`, `ChooseNat` (`lantana_heap_lang/lang.v`); atomic properties are state predicates `pointsto_sat` / `thread_expr_sat` (`lantana_heap_lang/lang.v`), read as `itrProp_state`; the assertions `l ↦ v` / `thread_expr i C e` (`exits v @ i`) determine them through the state interpretation (`StateFact` instances, `lantana_heap_lang/temporal_laws.v`), so they guarantee them (`temporal_state_fact`, `trace/guarantee.v`) | — |
 | `lwp` | `lwp`, notation `lWP e @ s; i; E {{ Φ }}` | `program_logic/weakestpre.v`, `program_logic/lwp_notation.v` |
 | obligation state `Ω`, witness state `W` | `obls` (`gmap oid obl`), `witnesses` (`gmap oid witness`); the forest is kept by `oforest` | `base_logic/obligation.v`, `base_logic/witness.v`, `base_logic/oforest.v` |
 | model interpretation `M` | `model_interp` (including the forest invariant `oforest` and the model history `model_history_interp`) | `base_logic/mupd.v`, `base_logic/model_history.v` |
 | model update modality | `mupd` / `fmupd`; the `lwp`-facing form is the class field `sfmupd` (`|={E}=>m`), defined at the instance from `fmupd`, and the step modalities are `mprog` / `mphys` | `base_logic/mupd.v`, `program_logic/obl_forest.v`, `program_logic/obl_forest_instance.v`, `base_logic/model_physical_updates.v` |
 | fair-scheduler invariant `H` | `owit_inv` | `base_logic/owit.v` |
 | state interpretation `S` | `state_interp` (heap-lang instance) and `history_interp` (wrapper for adequacy proof) | `lantana_heap_lang/primitive_laws.v`, `program_logic/history_interp.v` |
-| **Theorem 1 (Adequacy)** | `lwp_adequacy_temporal` (from a guarantee `P ⊨ₜ G` of the initial resources, any trace predicate implied by `itProp_external G`); Iris-style safety variant `lwp_adequacy_safety_iris` | `trace/adequacy_temporal.v`, `trace/adequacy_safety.v` |
+| **Theorem 1 (Adequacy)** | `lwp_adequacy_temporal` (from a guarantee `P ⊨ₜ G` of the initial resources, any trace predicate implied by `itrProp_external G`); Iris-style safety variant `lwp_adequacy_safety_iris` | `trace/adequacy_temporal.v`, `trace/adequacy_safety.v` |
 
 ### Case studies (§2 to §7)
 
@@ -190,7 +190,7 @@ All in `lantana_heap_lang/examples/`.
 
 | Paper | Rocq | File |
 |---|---|---|
-| Flag module: `init`/`set`/`wait`; `isFlag`; `FlagObl`; SPEC-INIT/SPEC-SET/SPEC-WAIT | `init`/`set`/`wait`; `is_flag` (guarantee `is_flag_temporal`, trace property `flag_itProp`); `flag_tk`; `Flag_init_spec` / `Flag_set_spec` / `Flag_wait_spec` | `flag.v` |
+| Flag module: `init`/`set`/`wait`; `isFlag`; `FlagObl`; SPEC-INIT/SPEC-SET/SPEC-WAIT | `init`/`set`/`wait`; `is_flag` (guarantee `is_flag_temporal`, trace property `flag_itrProp`); `flag_tk`; `Flag_init_spec` / `Flag_set_spec` / `Flag_wait_spec` | `flag.v` |
 | `main` (§2) and its trace property | `main`, `FlagFork_main_spec`, end-to-end `main_adequacy` | `flag_fork.v` |
 | `nest` / `nondet` (§4.3); SPEC-NEST/SPEC-NONDET | `nest` / `nondet`; `Nondet_nest_spec` / `Nondet_nondet_spec` | `nondet.v` |
 | Handoff: `send`/`receive`; `HandoffBuf`; `isHandoff`; `TaskSpec`; SPEC-SEND/SPEC-RECEIVE | `send`/`receive`; `handoff_inv`; `is_handoff`; `is_task`; `Handoff_send_spec` / `Handoff_receive_spec` | `handoff.v` |
@@ -213,6 +213,6 @@ an obligation of the same layer would be unsound (`nonstrict_move_absurd`);
 discharge in the pre-step model update with nested temporal formulas
 (`cert_discharge_adequacy`). `flag_stable.v` (with `flag_stable_client.v`,
 `handoff_flag_stable_client.v`, `task_queue_flag_stable_client.v`) is a flag whose set value
-lives in a nested `alwaysI`, so it stays set (`flag_itProp_stays`); `ticket_lock_mono.v` exports
+lives in a nested `alwaysI`, so it stays set (`flag_itrProp_stays`); `ticket_lock_mono.v` exports
 that `next` never decreases, so a lock that cannot be deleted is starvation free
 (`alive_fair_lock_starvation_free`).

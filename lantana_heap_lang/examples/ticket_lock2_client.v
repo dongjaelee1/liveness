@@ -163,14 +163,14 @@ Section adequacy.
               (thP_kids i {[kr; kc]} ∗ oblP_kids kr ∅ ∗ oblP_kids kc ∅ ∗ ⌜kr ≠ kc⌝ ∗
                ([∗ set] g ∈ {[kr; kc]}, oblP_fuel g ℵ%ordi μ)))%I.
 
-  Let G_main {Σ} : itProp heap_lang Σ :=
-        (itProp_finally (exits #42@i) ∧ itProp_finally (itProp_exist (λ tl : val, fair_lock_itProp tl)) ∧
-         itProp_true)%IT.
+  Let G_main {Σ} : itrProp heap_lang Σ :=
+        (itrProp_finally (exits #42@i) ∧ itrProp_finally (itrProp_exist (λ tl : val, fair_lock_itrProp tl)) ∧
+         itrProp_true)%ITR.
 
   Lemma Φ_P_temporal `{!heapGS Σ, !ticket_lockG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_main_impl {Σ} τ : itProp_external (G_main (Σ:=Σ)) τ → client_spec τ.
+  Remark G_main_impl {Σ} τ : itrProp_external (G_main (Σ:=Σ)) τ → client_spec τ.
   Proof.
     intros (Hr& Hf& _). split; first exact Hr.
     destruct τ as [n τf]. destruct Hf as (m& Hm& [tl Htl]& Hb).

@@ -179,17 +179,17 @@ Section adequacy.
                ([∗ set] g ∈ {[k; kl1]}, oblP_fuel g 0 μ1) ∗ oblP_fuel kl2 1 μ2))%I.
 
   (** What they guarantee: nothing for the pure and ghost parts; the names do not show. *)
-  Let G_client {Σ} : itProp heap_lang Σ :=
-        (itProp_true ∧ flag_itProp l ∧ itProp_until (l ↦ #0) (l ↦ #1) ∧
-         itProp_finally (exits #()@i) ∧ itProp_finally (exits #1@j) ∧ itProp_true)%IT.
+  Let G_client {Σ} : itrProp heap_lang Σ :=
+        (itrProp_true ∧ flag_itrProp l ∧ itrProp_until (l ↦ #0) (l ↦ #1) ∧
+         itrProp_finally (exits #()@i) ∧ itrProp_finally (exits #1@j) ∧ itrProp_true)%ITR.
 
   Lemma Φ_P_temporal `{!heapGS Σ} m1 m2 : ⊢ Φ_P m1 m2 ⊨ₜ G_client.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_client_impl {Σ} τ : itProp_external (G_client (Σ:=Σ)) τ → R_main τ.
+  Remark G_client_impl {Σ} τ : itrProp_external (G_client (Σ:=Σ)) τ → R_main τ.
   Proof.
     intros (_& Hflag& Hu& Hf1& Hf2& _).
-    split; [exact (flag_itProp_impl l τ Hflag)|]. split; [exact Hu|]. split; [exact Hf1|exact Hf2].
+    split; [exact (flag_itrProp_impl l τ Hflag)|]. split; [exact Hu|]. split; [exact Hf1|exact Hf2].
   Qed.
 
   Let Σ : gFunctors :=

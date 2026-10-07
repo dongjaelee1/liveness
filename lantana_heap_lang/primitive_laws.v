@@ -737,7 +737,7 @@ Lemma lwp_new_proph G R o s i E {C} :
   l{{{ thread_expr i C (NewProph) ∗ thP_kids i G ∗ ([∗ set] g ∈ G, ∃ ℓ, oblP_fuel g ℓ 1) ∗
        ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
     NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); thread_expr i C (Val (LitV (LitProphecy p))) ∗ (£ o ∗ thP_kids i G ∗
+  l{{{ pvs p, RET (LitV (LitrProphecy p)); thread_expr i C (Val (LitV (LitrProphecy p))) ∗ (£ o ∗ thP_kids i G ∗
        ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
 Proof.
   iIntros (Φ) "[TE (Tb& Gfs& Rs)] HΦ".
@@ -762,7 +762,7 @@ Qed.
 
 Lemma resolve_reducible i e σ D (p : proph_id) v :
   Atomic StronglyAtomic e → reducible i e σ D →
-  reducible i (Resolve e (Val (LitV (LitProphecy p))) (Val v)) σ D.
+  reducible i (Resolve e (Val (LitV (LitrProphecy p))) (Val v)) σ D.
 Proof.
   intros A (κ & e' & σ' & efs & H).
   exists (κ ++ [(p, (default v (to_val e'), v))]), e', σ', efs.

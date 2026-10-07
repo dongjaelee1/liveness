@@ -92,8 +92,8 @@ lantana/program_logic/atomic.v
 lantana/trace/trace_prop.v
 lantana/trace/trace_prop_rules.v
 lantana/trace/trace_step_indexed.v
-lantana/trace/itprop.v
-lantana/trace/itprop_rules.v
+lantana/trace/itrprop.v
+lantana/trace/itrprop_rules.v
 lantana/trace/trace_fixpoint.v
 lantana/trace/guarantee.v
 lantana/trace/guarantee_struct.v

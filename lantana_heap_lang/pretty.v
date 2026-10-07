@@ -15,7 +15,7 @@ Global Instance pretty_base_lit : Pretty base_lit :=
        | LitUnit => "()"
        | LitPoison => "<poison>"
        | LitLoc l => "(loc " +:+ pretty l +:+ ")"
-       | LitProphecy i => "(prophecy " +:+ pretty i +:+ ")"
+       | LitrProphecy i => "(prophecy " +:+ pretty i +:+ ")"
        end.
 
 Global Instance pretty_binder : Pretty binder :=

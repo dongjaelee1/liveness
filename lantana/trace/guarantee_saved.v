@@ -10,7 +10,7 @@ From lantana.trace Require Export guarantee_infer.
 
 Section saved.
   Context `{!lantanaGS Λ Σ, !savedPropG Σ}.
-  Implicit Types G : itProp Λ Σ.
+  Implicit Types G : itrProp Λ Σ.
 
   (** [γ] names the temporal formula [P], which guarantees [G]. *)
   Definition saved_temporal (γ : gname) (P : iProp Σ) G : iProp Σ :=
@@ -50,7 +50,7 @@ End saved.
     guarantees, at all times, the trace property of every registered request. *)
 Section request_registry.
   Context `{!lantanaGS Λ Σ, !savedPropG Σ, !ghost_mapG Σ nat gname}.
-  Implicit Types G : nat → itProp Λ Σ.
+  Implicit Types G : nat → itrProp Λ Σ.
 
   Definition registry_inv γm G : iProp Σ :=
     ∃ m : gmap nat gname, ghost_map_auth_frac γm 1 m ∗
@@ -59,8 +59,8 @@ Section request_registry.
   (** Inferred: the requests' names are ghost (they do not show), the map is trace-visible. *)
   Lemma registry_temporal N γm G :
     ⊢ alwaysI N (registry_inv γm G) ⊨ₜ
-      itProp_always (itProp_exist (λ m : gmap nat gname,
-        itProp_true ∧ itProp_forall (λ r, itProp_forall (λ γr, itProp_impl ⌜m !! r = Some γr⌝ (G r))))).
+      itrProp_always (itrProp_exist (λ m : gmap nat gname,
+        itrProp_true ∧ itrProp_forall (λ r, itrProp_forall (λ γr, itrProp_impl ⌜m !! r = Some γr⌝ (G r))))).
   Proof. apply (into_temporal _ _). Qed.
 
   (** Allocation, with no request registered yet: a registered invariant. *)

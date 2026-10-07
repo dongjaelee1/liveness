@@ -6,7 +6,7 @@ From iris.prelude Require Import options.
 Coercion LitInt : Z >-> base_lit.
 Coercion LitBool : bool >-> base_lit.
 Coercion LitLoc : loc >-> base_lit.
-Coercion LitProphecy : proph_id >-> base_lit.
+Coercion LitrProphecy : proph_id >-> base_lit.
 
 Coercion App : expr >-> Funclass.
 

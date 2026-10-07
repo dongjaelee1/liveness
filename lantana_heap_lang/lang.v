@@ -23,7 +23,7 @@ Definition proph_id := positive.
     would make [<erased> == unit] true). *)
 Inductive base_lit : Set :=
   | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitPoison
-  | LitLoc (l : loc) | LitProphecy (p: proph_id).
+  | LitLoc (l : loc) | LitrProphecy (p: proph_id).
 Inductive un_op : Set :=
   | NegOp | MinusUnOp.
 Inductive bin_op : Set :=
@@ -97,7 +97,7 @@ Definition to_val (e : expr) : option val :=
 Definition lit_is_unboxed (l: base_lit) : Prop :=
   match l with
   (** Prophecies and poison count as boxed, so that two of them cannot be compared. *)
-  | LitProphecy _ | LitPoison => False
+  | LitrProphecy _ | LitPoison => False
   | LitInt _ | LitBool _  | LitLoc _ | LitUnit => True
   end.
 Definition val_is_unboxed (v : val) : Prop :=
@@ -209,14 +209,14 @@ Proof.
   | LitUnit => (inr (inl false), None)
   | LitPoison => (inr (inl true), None)
   | LitLoc l => (inr (inr l), None)
-  | LitProphecy p => (inr (inl false), Some p)
+  | LitrProphecy p => (inr (inl false), Some p)
   end) (λ l, match l with
   | (inl (inl n), None) => LitInt n
   | (inl (inr b), None) => LitBool b
   | (inr (inl false), None) => LitUnit
   | (inr (inl true), None) => LitPoison
   | (inr (inr l), None) => LitLoc l
-  | (_, Some p) => LitProphecy p
+  | (_, Some p) => LitrProphecy p
   end) _); by intros [].
 Qed.
 Global Instance un_op_finite : Countable un_op.
@@ -653,11 +653,11 @@ Inductive base_step (i : thread_id) :
      p ∉ σ.(used_proph_id) →
      base_step i NewProph σ Θ
                []
-               (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ)
+               (Val $ LitV $ LitrProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ)
                ∅
   | ResolveS p v e σ Θ w σ' κs ts :
      base_step i e σ Θ κs (Val v) σ' ts →
-     base_step i (Resolve e (Val $ LitV $ LitProphecy p) (Val w)) σ Θ
+     base_step i (Resolve e (Val $ LitV $ LitrProphecy p) (Val w)) σ Θ
                (κs ++ [(p, (v, w))]) (Val v) σ' ts
   | LabelS t v σ Θ :
     base_step i (Label t (Val v)) σ Θ
@@ -706,7 +706,7 @@ Qed.
 
 Lemma new_proph_id_fresh i σ Θ :
   let p := fresh σ.(used_proph_id) in
-  base_step i NewProph σ Θ [] (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ) ∅.
+  base_step i NewProph σ Θ [] (Val $ LitV $ LitrProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ) ∅.
 Proof. constructor; auto. apply is_fresh. Qed.
 
 Lemma new_thread_id_fresh i e σ Θ :

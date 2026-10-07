@@ -608,12 +608,12 @@ Section proof.
 
   (** ** Temporal guarantees *)
   (** The queue guarantees what its lock does: [queue_inv] is ghost state, [queue_lock] is the
-      lock's [R] (guaranteeing [itProp_true]), and [γ ↪LOCK_AL□] keeps the lock from being
+      lock's [R] (guaranteeing [itrProp_true]), and [γ ↪LOCK_AL□] keeps the lock from being
       deleted ([is_fair_lock_alive_temporal]). *)
-  Definition queue_itProp (ql : val) : itProp heap_lang Σ :=
-    (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧ alive_fair_lock_itProp tl)%IT.
+  Definition queue_itrProp (ql : val) : itrProp heap_lang Σ :=
+    (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧ alive_fair_lock_itrProp tl)%ITR.
 
-  Lemma is_queue_temporal ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_itProp ql.
+  Lemma is_queue_temporal ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_itrProp ql.
   Proof.
     iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I with "[]").
@@ -623,10 +623,10 @@ Section proof.
   Qed.
 
   Global Instance is_queue_into_temporal ql γ ℓ φ :
-    IntoTemporal (is_queue ql γ ℓ φ) (queue_itProp ql) | 0.
+    IntoTemporal (is_queue ql γ ℓ φ) (queue_itrProp ql) | 0.
   Proof. apply is_queue_temporal. Qed.
 
-  Lemma is_queue_init_temporal ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_itProp ql.
+  Lemma is_queue_init_temporal ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_itrProp ql.
   Proof.
     iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I with "[]").
@@ -643,7 +643,7 @@ Section trace.
   (** The queue's lock makes release progress ([release_progress]): every [enqueue] or
       [dequeue] that takes the lock eventually releases it. *)
   Lemma queue_release_progress {Σ} ql τ :
-    itProp_external (queue_itProp (Σ:=Σ) ql) τ →
+    itrProp_external (queue_itrProp (Σ:=Σ) ql) τ →
     ∃ lhptr ltptr next curr : loc,
       ql = (#lhptr, #ltptr, (#next, #curr))%V ∧ release_progress next curr τ.
   Proof.

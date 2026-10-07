@@ -465,13 +465,13 @@ Section adequacy.
   (** The trace property guaranteed by the final resources, as inferred. *)
   Section G_main.
     Context `{!heapGS Σ} `{!mcntsG Σ}.
-    Definition G_main : itProp heap_lang Σ := ltac:(itProp_of Φ_P).
+    Definition G_main : itrProp heap_lang Σ := ltac:(itrProp_of Φ_P).
   End G_main.
 
   Lemma Φ_P_temporal `{!heapGS Σ} `{!mcntsG Σ} : ⊢ Φ_P ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_main_impl {Σ} τ : itProp_external (G_main (Σ:=Σ)) τ → R_main τ.
+  Remark G_main_impl {Σ} τ : itrProp_external (G_main (Σ:=Σ)) τ → R_main τ.
   Proof.
     destruct τ as [n τf]. intros (Hf& (m& Hm& _& Hb)& _). split; first exact Hf.
     exists m. split_and!; [done|done|]. intros. done.

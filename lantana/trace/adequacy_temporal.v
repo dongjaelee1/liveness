@@ -6,7 +6,7 @@ From lantana.base_logic Require Import satisfiable.
 (** * Adequacy of [lWP] for temporal guarantees
 
     [lWP] is a running system with the one-step property ([sys_step_lwp]). Hence, if the
-    initial resources guarantee [G], every fair run satisfies [itProp_external G]
+    initial resources guarantee [G], every fair run satisfies [itrProp_external G]
     ([lwp_adequacy_temporal]). *)
 Section adequacy.
   Context `{!lantanaGS Λ Σ}.
@@ -254,7 +254,7 @@ Section adequacy.
   (** The program logic from position [n]: check, step, and eliminate the record of the
       initial formula. *)
   Lemma lwp_ti_logic_temporal s h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
-    (G : itProp Λ Σ) :
+    (G : itrProp Λ Σ) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
     owit_inv_lb (fair_sched_fun γ) Ω W →
@@ -263,7 +263,7 @@ Section adequacy.
       model_interp g v Ω W n (dom Θ) ∗
       (|={⊤}=>m ∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
                   (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }})))
-      ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> itProp_internal G (n, τf)).
+      ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> itrProp_internal G (n, τf)).
   Proof.
     iIntros (BEH FS LB HIST) "([HI SIa]& MI& WPs)".
     iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((%P& #HG& HP& WPs)& [HI TI]& %&%&%&%& %H& MI)".
@@ -307,8 +307,8 @@ End adequacy.
 (** The program logic establishes [G]; anything implied by its trace property holds. *)
 Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS.tregGpreS Λ Σ}
-  s σ Θ i κs (G : itProp Λ Σ) (R : trProp Λ) :
-  (∀ τ, itProp_external G τ → R τ) →
+  s σ Θ i κs (G : itrProp Λ Σ) (R : trProp Λ) :
+  (∀ τ, itrProp_external G τ → R τ) →
   ∀ (τ : trace Λ),
   behavior τ →
   fair_scheduling τ →
@@ -333,12 +333,12 @@ Proof.
                 let _ : temporalGS Λ Σ := TemporalG Hmupd Hhist Htreg in
                 (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
                 wsat.wsat ∗ wsat.ownE ⊤ ∗
-                |={⊤,∅}=> ALC (|={∅,⊤}=> itProp_internal G τ))) as Hsat; cycle 1.
+                |={⊤,∅}=> ALC (|={∅,⊤}=> itrProp_internal G τ))) as Hsat; cycle 1.
   { apply sat_bupd, sat_exists in Hsat. destruct Hsat as (Hmupd& Hsat).
     apply sat_exists in Hsat. destruct Hsat as (Hhist& Hsat).
     apply sat_exists in Hsat. destruct Hsat as (Htreg& Hsat).
     set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
-    apply (itProp_adeq G (temporalGS0:=Htemp) emp).
+    apply (itrProp_adeq G (temporalGS0:=Htemp) emp).
     apply (sat_fupd ∅), sat_ALC, (sat_fupd ⊤).
     unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
     eapply sat_mono. 2: eapply Hsat. simpl. iIntros "($& $& $& $)". }
