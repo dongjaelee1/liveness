@@ -14,14 +14,13 @@ Canonical Structure thread_idO `{SI : sidx} := leibnizO thread_id.
 Notation thread_ids := (gset thread_id).
 
 Section language_mixin.
-  Context {expr val state observation state_pred : Type}.
+  Context {expr val state observation : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
   (** A step of thread [i] with observations [κ]; [thread_ids] are the occupied thread ids,
       the [gmap] holds the forked threads. *)
   Context (prim_step : thread_id → expr → state → thread_ids → list observation →
                        expr → state → gmap thread_id expr → Prop).
-  Context (state_sat : state → gmap thread_id expr → state_pred → Prop).
 
   Record LanguageMixin := {
     mixin_to_of_val v : to_val (of_val v) = Some v;
@@ -47,13 +46,11 @@ Structure language :=
       val : Type;
       state : Type;
       observation : Type;
-      state_pred : Type;
       ctx : Type;
       of_val : val → expr;
       to_val : expr → option val;
       prim_step : thread_id → expr → state → thread_ids → list observation →
                   expr → state → gmap thread_id expr → Prop;
-      state_sat : state → gmap thread_id expr → state_pred → Prop;
       ctx_apply : ctx → expr → expr;
       ctx_id : ctx;
       ctx_comp : ctx → ctx → ctx;
@@ -64,11 +61,10 @@ Structure language :=
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments Language {_ _ _ _ _ _ _ _ _ _ _ _ _} _ _.
+Global Arguments Language {_ _ _ _ _ _ _ _ _ _ _} _ _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
 Global Arguments prim_step {_} _ _ _ _ _ _ _ _.
-Global Arguments state_sat {_} _ _ _.
 Global Arguments ctx_apply {_} _ _.
 Global Arguments ctx_id {_}.
 Global Arguments ctx_comp {_} _ _.

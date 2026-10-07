@@ -42,14 +42,6 @@ Section tprop_connectives.
 
   Definition tprop_true : tprop Λ Σ := tprop_pure True.
 
-  Program Definition tprop_atomic (π : state_pred Λ) : tprop Λ Σ :=
-    {| tprop_ti _ := ti_atomic π; tprop_tr := tr_atomic π |}.
-  Next Obligation.
-    intros π ? F [n τf] H. unfold ti_atomic in H. simpl in H.
-    unfold tr_atomic, ts_emb, ts_atomic. simpl. destruct (τf n) as (((Θ&σ)&?)&?).
-    by apply sat_elim in H.
-  Qed.
-
   Program Definition tprop_and G1 G2 : tprop Λ Σ :=
     {| tprop_ti _ := ti_and (tprop_ti G1) (tprop_ti G2); tprop_tr := tr_and (tprop_tr G1) (tprop_tr G2) |}.
   Next Obligation.
@@ -240,9 +232,10 @@ Section state_atoms.
 
   Program Definition tprop_state (φ : state Λ → thread_pool Λ → Prop) : tprop Λ Σ :=
     {| tprop_ti _ τ := (let '((Θ, σ), _, _) := τ.2 τ.1 in ⌜φ σ Θ⌝)%I;
-       tprop_tr τ := let '((Θ, σ), _, _) := τ.2 τ.1 in φ σ Θ |}.
+       tprop_tr := tr_state φ |}.
   Next Obligation.
-    intros φ ? F [n τf] H. simpl in *. destruct (τf n) as (((Θ&σ)&?)&?). by apply sat_elim in H.
+    intros φ ? F [n τf] H. rewrite /tr_state /ts_emb /ts_state /trace_now. simpl in *.
+    destruct (τf n) as (((Θ&σ)&?)&?). by apply sat_elim in H.
   Qed.
 
 End state_atoms.
@@ -279,11 +272,6 @@ Section complete.
   (** Completeness. *)
   Global Instance tprop_complete_pure φ : TpropComplete (tprop_pure φ).
   Proof. intros ? τ H. rewrite /= /ti_pure. by iPureIntro. Qed.
-  Global Instance tprop_complete_atomic π : TpropComplete (tprop_atomic π).
-  Proof.
-    intros ? [n τf]. rewrite /= /ti_atomic /tr_atomic /ts_emb /ts_atomic /trace_now /=.
-    destruct (τf n) as (((Θ&σ)&?)&?). intros Hπ. iPureIntro. exact Hπ.
-  Qed.
   Global Instance tprop_complete_and G1 G2 : TpropComplete G1 → TpropComplete G2 → TpropComplete (tprop_and G1 G2).
   Proof. intros H1 H2 ? τ [??]. rewrite /= /ti_and. iSplit; [by iApply H1|by iApply H2]. Qed.
   Global Instance tprop_complete_or G1 G2 : TpropComplete G1 → TpropComplete G2 → TpropComplete (tprop_or G1 G2).
@@ -334,11 +322,6 @@ Section complete.
   (** Instantness. *)
   Global Instance tprop_instant_pure φ : TpropInstant (tprop_pure φ).
   Proof. intros ? τ. rewrite /= /ti_pure. by iIntros "%". Qed.
-  Global Instance tprop_instant_atomic π : TpropInstant (tprop_atomic π).
-  Proof.
-    intros ? [n τf]. rewrite /= /ti_atomic /tr_atomic /ts_emb /ts_atomic /trace_now /=.
-    destruct (τf n) as (((Θ&σ)&?)&?). by iIntros "%".
-  Qed.
   Global Instance tprop_instant_and G1 G2 : TpropInstant G1 → TpropInstant G2 → TpropInstant (tprop_and G1 G2).
   Proof.
     intros H1 H2 ? τ. rewrite /= /ti_and. iIntros "H".
@@ -376,10 +359,14 @@ Section complete.
 
   Global Instance tprop_complete_state φ : TpropComplete (tprop_state φ).
   Proof.
-    intros ? [n τf]. rewrite /=. destruct (τf n) as (((Θ&σ)&?)&?). intros Hφ. by iPureIntro.
+    intros ? [n τf]. rewrite /= /tr_state /ts_emb /ts_state /trace_now /=.
+    destruct (τf n) as (((Θ&σ)&?)&?). intros Hφ. by iPureIntro.
   Qed.
   Global Instance tprop_instant_state φ : TpropInstant (tprop_state φ).
-  Proof. intros ? [n τf]. rewrite /=. destruct (τf n) as (((Θ&σ)&?)&?). by iIntros "%". Qed.
+  Proof.
+    intros ? [n τf]. rewrite /= /tr_state /ts_emb /ts_state /trace_now /=.
+    destruct (τf n) as (((Θ&σ)&?)&?). by iIntros "%".
+  Qed.
 
 End complete.
 Global Hint Mode TpropComplete - - ! : typeclass_instances.
@@ -420,13 +407,7 @@ Section decided.
   Proof. done. Qed.
   Global Instance tprop_decided_state φ : TpropDecided (tprop_state φ) (hist_now φ).
   Proof.
-    intros n τf. rewrite /hist_now trace_hist_last /=. destruct (τf n) as (((Θ&σ)&?)&κs).
-    split; [intros; by eexists _, _, _|by intros (?&?&?&[= <- <- <-]&?)].
-  Qed.
-  Global Instance tprop_decided_atomic π :
-    TpropDecided (tprop_atomic π) (hist_now (λ σ Θ, state_sat σ Θ π)).
-  Proof.
-    intros n τf. rewrite /hist_now trace_hist_last /= /tr_atomic /ts_emb /ts_atomic /trace_now /=.
+    intros n τf. rewrite /hist_now trace_hist_last /= /tr_state /ts_emb /ts_state /trace_now /=.
     destruct (τf n) as (((Θ&σ)&?)&κs).
     split; [intros; by eexists _, _, _|by intros (?&?&?&[= <- <- <-]&?)].
   Qed.

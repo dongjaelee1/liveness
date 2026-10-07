@@ -10,16 +10,17 @@ From lantana.algebra Require Import axioms.
 (** ** Predicates on a trace state and on a trace *)
 Definition tsProp (Λ : language) := trace_state Λ → Prop.
 
-Definition ts_atomic {Λ : language} (π : state_pred Λ) : tsProp Λ :=
-  λ ξ, let '((Θ, σ), _, _) := ξ in state_sat σ Θ π.
+(** A predicate on the configuration (state and thread pool) of a trace state. *)
+Definition ts_state {Λ : language} (φ : state Λ → thread_pool Λ → Prop) : tsProp Λ :=
+  λ ξ, let '((Θ, σ), _, _) := ξ in φ σ Θ.
 
 Definition trProp (Λ : language) : Type := trace Λ → Prop.
 
 Definition ts_emb {Λ : language} : tsProp Λ → trProp Λ :=
   λ P τ, P (trace_now τ).
 
-Definition tr_atomic {Λ : language} (π : state_pred Λ) : trProp Λ :=
-  ts_emb (ts_atomic π).
+Definition tr_state {Λ : language} (φ : state Λ → thread_pool Λ → Prop) : trProp Λ :=
+  ts_emb (ts_state φ).
 
 Definition tr_pure {Λ : language} (P : Prop) : trProp Λ :=
   λ _, P.
@@ -52,7 +53,7 @@ Proof.
 Qed.
 
 Ltac unfold_trProp :=
-  unfold tr_until, tr_always, tr_exist, tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_atomic.
+  unfold tr_until, tr_always, tr_exist, tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_state.
 
 (** ** Notations *)
 

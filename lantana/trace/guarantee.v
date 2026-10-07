@@ -262,20 +262,6 @@ Section rules.
     iIntros "!>" (?????????) "(_& _& %Hφ)". iApply tguar_intro. iIntros "!>" (????????????) "_ _ _ _". done.
   Qed.
 
-  Lemma temporal_atomic π : ⊢ state_pred_interp π ⊨ₜ tprop_atomic π.
-  Proof.
-    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& _& TL)".
-    rewrite /history_interp. iDestruct "HI" as "(HI1& HI2& SI)".
-    iPoseProof (state_interp_wf with "[$SI $TL]") as "%".
-    iPoseProof (history_interp_event_pred_now with "[HI1 HI2 SI]") as "#TF". 1: done.
-    { rewrite /history_interp. iFrame. }
-    iApply tguar_intro.
-    iIntros "!>" (Sys l h' g v2 Ω2 W' τf γ σ' Θ' κs') "_ %Hf _ (HI'& MI& Sys)".
-    destruct Hf as (BEH& FS& LB& HIST).
-    simpl. unfold ti_atomic. iPoseProof (event_pred_history_interp_lookup with "[$HI' $TF]") as "%H'".
-    destruct H' as [H' ?]. simpl. apply HIST in H'. destruct H' as [? H']. rewrite H'. auto.
-  Qed.
-
   Lemma temporal_and P Q G1 G2 : P ⊨ₜ G1 -∗ Q ⊨ₜ G2 -∗ (P ∧ Q) ⊨ₜ (G1 ∧ G2).
   Proof.
     iIntros "#HG1 #HG2 !>" (?????????) "(HI& MI& HPQ)".
@@ -386,8 +372,17 @@ Section rules.
 
 End rules.
 
+(** ** State atoms
+
+    The atoms of temporal properties are facts about the current state: an iProp [P]
+    determines [φ] when the state interpretation and [P] entail [φ] ([StateFact]), and then
+    [P] guarantees [tprop_state φ] ([temporal_state_fact]). A language provides the facts of
+    its assertions, e.g. [l ↦ v] for heap_lang (temporal_laws.v). *)
 Section state_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+
+  Class StateFact (P : iProp Σ) (φ : state Λ → thread_pool Λ → Prop) : Prop :=
+    state_fact σ Θ κs : state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝.
 
   Lemma temporal_state (φ : state Λ → thread_pool Λ → Prop) (P : iProp Σ) :
     (∀ σ Θ κs, state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝) → ⊢ P ⊨ₜ tprop_state φ.
@@ -402,6 +397,9 @@ Section state_rules.
     iPoseProof (history_interp_hG_event_lookup with "[$HI' $HE]") as "%Hh".
     apply HIST in Hh as [? Hτ]. simpl. rewrite Hτ. done.
   Qed.
+
+  Lemma temporal_state_fact P φ `{!StateFact P φ} : ⊢ P ⊨ₜ tprop_state φ.
+  Proof. apply temporal_state, state_fact. Qed.
 
 End state_rules.
 

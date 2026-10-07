@@ -343,7 +343,7 @@ Section trace.
     intros H m Hm H1. destruct (H m Hm) as [(m'& Hm'& H2& H0)|H2]; last done.
     destruct (decide (m' = m)) as [->|Hne]; first done.
     exfalso. specialize (H0 m ltac:(lia)). revert H0 H1.
-    unfold ts_emb, ts_atomic, trace_now. simpl.
+    unfold ts_emb, ts_state, pointsto_sat, trace_now. simpl.
     destruct (τf m) as [[[??] ?] ?]. simpl. intros -> ?. by simplify_eq.
   Qed.
 
@@ -356,10 +356,10 @@ Section trace.
                  used_proph_id := ∅ |}), 1%positive, []).
 
   Lemma flag_run_at l m v :
-    tr_atomic (pred_pointsto l (DfracOwn 1) v) (m, flag_run l) ↔
+    tr_state (pointsto_sat l (DfracOwn 1) v) (m, flag_run l) ↔
     v = (if decide (m = 0 ∨ m = 2) then #0 else #1).
   Proof.
-    rewrite /tr_atomic /ts_emb /ts_atomic /trace_now /flag_run /= lookup_insert_eq.
+    rewrite /tr_state /ts_emb /ts_state /pointsto_sat /trace_now /flag_run /= lookup_insert_eq.
     split; [by intros [= ->]|by intros ->].
   Qed.
 
@@ -367,7 +367,7 @@ Section trace.
   Proof.
     intros H. unfold flag_stays_tr, tr_always, tr_impl in H. cbv beta iota in H.
     specialize (H 1 ltac:(lia)).
-    assert (H1 : tr_atomic (pred_pointsto l (DfracOwn 1) #1) (1, flag_run l)).
+    assert (H1 : tr_state (pointsto_sat l (DfracOwn 1) #1) (1, flag_run l)).
     { apply flag_run_at. case_decide; [lia|done]. }
     specialize (H H1 2 ltac:(lia)). apply flag_run_at in H. case_decide; [done|lia].
   Qed.

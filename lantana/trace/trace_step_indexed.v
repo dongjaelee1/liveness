@@ -12,9 +12,6 @@ From lantana.base_logic Require Import satisfiable.
     [tr_until]. *)
 Notation tiProp Λ Σ := (trace Λ → iProp Σ).
 
-Definition ti_atomic `{SI : sidx} {Λ} {Σ} (π : state_pred Λ) : tiProp Λ Σ :=
-  λ τ, let '((Θ, σ), _, _) := (τ.2 τ.1) in ⌜state_sat σ Θ π⌝%I.
-
 Definition ti_pure `{SI : sidx} {Λ} {Σ} (P : Prop) : tiProp Λ Σ :=
   λ _, ⌜P⌝%I.
 

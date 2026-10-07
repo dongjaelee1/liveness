@@ -122,14 +122,13 @@ Section history_ghost.
 
 End history_ghost.
 
-(** The state interpretation and the state predicates of a language. *)
+(** The state interpretation of a language. Facts about the state that assertions
+    determine through it are the atoms of trace properties ([StateFact] in
+    trace/guarantee.v). *)
 Class state_interp_class `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
   { state_interp : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
-    (** Auxiliary data about the state, e.g. part of [state_pred_interp] kept in the lwp. *)
+    (** Auxiliary data about the state, kept in the lWP. *)
     state_interp_aux : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
-    state_pred_interp : state_pred Λ → iProp Σ;
-    state_interp_wf : (∀ σ Θ κs π,
-                         (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ π ⌝);
   }.
 
 Definition history_interp `{SI : sidx} `{@state_interp_class SI Λ Σ}
@@ -139,25 +138,10 @@ Definition history_interp `{SI : sidx} `{@state_interp_class SI Λ Σ}
   (⌜ length h = (S n) ∧ last h = Some ((σ, Θ), κs) ⌝ ∗ hG_history_auth h ∗ state_interp σ Θ κs)%I.
 Global Instance: Params (@history_interp) 5 := {}.
 
-Local Definition event_pred_def `{SI : sidx} `{@state_interp_class SI Λ Σ}
-  `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
-  (n : nat) σ Θ κs (π : state_pred Λ) : iProp Σ :=
-  (hG_event n (σ, Θ, κs) ∗ ⌜ state_sat σ Θ π ⌝)%I.
-Local Definition event_pred_aux : seal (@event_pred_def). Proof. by eexists. Qed.
-Definition event_pred := event_pred_aux.(unseal).
-Local Definition event_pred_unseal :
-  @event_pred = @event_pred_def := event_pred_aux.(seal_eq).
-Global Arguments event_pred {SI Λ Σ _ _}.
-
 (** Properties *)
 Section hist.
   Context `{SI : sidx} `{SIC : @state_interp_class SI Λ Σ}.
   Context `{HIST : @histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}.
-
-  Global Instance event_pred_persistent n σ Θ κs π : Persistent (event_pred n σ Θ κs π).
-  Proof. rewrite event_pred_unseal /event_pred_def. apply _. Qed.
-  Global Instance event_pred_timeless n σ Θ κs π : Timeless (event_pred n σ Θ κs π).
-  Proof. rewrite event_pred_unseal /event_pred_def. apply _. Qed.
 
   Lemma history_interp_wf h n σ Θ κs :
     history_interp h n σ Θ κs ⊢ ⌜ length h = (S n) ∧ last h = Some (σ, Θ, κs) ⌝.
@@ -179,32 +163,6 @@ Section hist.
     rewrite /history_interp. iIntros "(%& Ha& $)". iIntros "SI".
     iMod (hG_history_auth_app _ [(σ2, Θ2, κs2)] with "Ha") as "Ha". iFrame. iPureIntro.
     destruct H. rewrite length_app H last_app. simpl. split; auto. lia.
-  Qed.
-
-  Lemma history_interp_event_pred_any n σ Θ κs π h n' σ' Θ' κs' :
-    (h !! n = Some (σ, Θ, κs)) →
-    (state_sat σ Θ π) →
-    history_interp h n' σ' Θ' κs' ⊢ event_pred n σ Θ κs π.
-  Proof.
-    rewrite /history_interp event_pred_unseal /event_pred_def.
-    iIntros (LU Sat) "(%& Ha& SI)". destruct H. iPoseProof (hG_history_event _ _ _ LU with "Ha") as "#He".
-    iFrame "He". auto.
-  Qed.
-
-  Lemma history_interp_event_pred_now π h n σ Θ κs :
-    (state_sat σ Θ π) →
-    history_interp h n σ Θ κs ⊢ event_pred n σ Θ κs π.
-  Proof.
-    iIntros (Sat) "HI". iPoseProof (history_interp_lookup with "HI") as "%".
-    iApply (history_interp_event_pred_any with "HI"); eauto.
-  Qed.
-
-  Lemma event_pred_history_interp_lookup n σ Θ κs π h n' σ' Θ' κs' :
-    history_interp h n' σ' Θ' κs' ∗ event_pred n σ Θ κs π ⊢
-    ⌜ h !! n = Some (σ, Θ, κs) ∧ state_sat σ Θ π ⌝.
-  Proof.
-    rewrite /history_interp event_pred_unseal /event_pred_def. iIntros "((%& Ha& SI)& (#He& %))".
-    destruct H. iPoseProof (hG_event_history_lookup with "[$Ha $He]") as "%". eauto.
   Qed.
 
   Lemma history_interp_hG_event_now h n σ Θ κs :

@@ -547,8 +547,8 @@ Section proof.
     tprop_le (tprop_always (lock_inv_tprop next curr)) (starvation_free_tprop next curr).
   Proof.
     apply tprop_always_mono. intros ? [k τf].
-    rewrite /= /ti_exist /ti_forall /ti_and /ti_or /ti_impl /ti_pure /ti_atomic.
-    rewrite /tr_and /tr_atomic /tr_pure /ts_emb /ts_atomic /trace_now /=.
+    rewrite /= /ti_exist /ti_forall /ti_and /ti_or /ti_impl /ti_pure.
+    rewrite /tr_and /tr_state /tr_pure /ts_emb /ts_state /pointsto_sat /trace_now /=.
     destruct (τf k) as (((Θ&σ)&i0)&κs0).
     iIntros "(%n' & %c' & %tickets & %acks & %Hn' & %Hc' & _ & %Hdom & %Hcn & %Hdomt & Htk & _)".
     iIntros (n c t (Hn & Hc & Ht)). rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
@@ -588,7 +588,7 @@ Section trace.
 
   (** [l ↦ v] in the current state of the trace. *)
   Definition tr_pointsto (l : loc) (v : val) : trProp heap_lang :=
-    tr_atomic (pred_pointsto l (DfracOwn 1) v).
+    tr_state (pointsto_sat l (DfracOwn 1) v).
 
   (** Starvation freedom of the ticket lock [(next, curr)]: whenever [next ↦ n] and
       [curr ↦ c], every ticket [t] with [c < t ≤ n] is eventually served. *)
@@ -602,7 +602,7 @@ Section trace.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n c t Hn Hc Ht.
     destruct (Hal m Hm) as (n' & c' & tickets & acks & Hn' & Hc' & _ & _ & Hb & Hdom & Htk & _).
-    simpl in *. unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic, tr_pure in *. simpl in *.
+    simpl in *. unfold tr_pointsto, tr_state, ts_emb, ts_state, pointsto_sat, tr_pure in *. simpl in *.
     destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *.
     rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
     assert (is_Some (tickets !! t)) as [κ Hκ].
@@ -624,12 +624,12 @@ Section trace.
     tprop_tr (starvation_free_tprop (Σ:=Σ) next curr) τ → starvation_free next curr τ.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n c t Hn Hc Ht.
-    unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic, trace_now in *. simpl in *.
+    unfold tr_pointsto, tr_state, ts_emb, ts_state, pointsto_sat, trace_now in *. simpl in *.
     destruct (Hal m Hm n c t) as (m' & Hm' & [Hcur _] & _).
-    { rewrite /tr_and /tr_atomic /tr_pure /ts_emb /ts_atomic /trace_now /=.
+    { rewrite /tr_and /tr_state /tr_pure /ts_emb /ts_state /pointsto_sat /trace_now /=.
       destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *. split_and!; [done|done|lia|lia]. }
     exists m'. split_and!; [done| |done]. revert Hcur.
-    rewrite /tr_atomic /ts_emb /ts_atomic /trace_now /=. destruct (τf m') as [[[Θ σ] ?] ?]. done.
+    rewrite /tr_state /ts_emb /ts_state /pointsto_sat /trace_now /=. destruct (τf m') as [[[Θ σ] ?] ?]. done.
   Qed.
 
   (** The holder of a lock token (serving ticket [u]) eventually releases the lock. *)

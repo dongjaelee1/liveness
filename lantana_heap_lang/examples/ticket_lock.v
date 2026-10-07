@@ -1073,7 +1073,7 @@ Section trace.
 
   (** [l ↦ v] in the current state of the trace. *)
   Definition tr_pointsto (l : loc) (v : val) : trProp heap_lang :=
-    tr_atomic (pred_pointsto l (DfracOwn 1) v).
+    tr_state (pointsto_sat l (DfracOwn 1) v).
 
   (** Release progress of the ticket lock [(next, curr)]: whenever a ticket is taken but not
       served out ([curr ↦ c], [next ↦ n], [c < n]), [curr] is eventually incremented. So
@@ -1088,7 +1088,7 @@ Section trace.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n c Hn Hc Hlt.
     destruct (Hal m Hm) as (n' & c' & Hn' & Hc' & _ & _ & _ & Hb & _ & _ & Hcase).
-    simpl in *. unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic, tr_pure in *. simpl in *.
+    simpl in *. unfold tr_pointsto, tr_state, ts_emb, ts_state, pointsto_sat, tr_pure in *. simpl in *.
     destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *.
     rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
     destruct Hcase as [[? _] | [_ (_ & _ & _ & Hfin & _)]]; [lia|].

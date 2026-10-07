@@ -9,13 +9,12 @@ From iris.prelude Require Import options.
     (not [ectxi_lang] and [ectxi_lang_ectx]), as in heap_lang. *)
 
 Section ectxi_language_mixin.
-  Context {expr val ectx_item state observation state_pred : Type}.
+  Context {expr val ectx_item state observation : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
   Context (fill_item : ectx_item → expr → expr).
   Context (base_step : thread_id → expr → state → thread_ids → list observation →
                        expr → state → gmap thread_id expr → Prop).
-  Context (state_sat : state → gmap thread_id expr → state_pred → Prop).
 
   Record EctxiLanguageMixin := {
     mixin_to_of_val v : to_val (of_val v) = Some v;
@@ -42,14 +41,12 @@ Structure ectxiLanguage := EctxiLanguage {
   ectx_item : Type;
   state : Type;
   observation : Type;
-  state_pred : Type;
 
   of_val : val → expr;
   to_val : expr → option val;
   fill_item : ectx_item → expr → expr;
   base_step : thread_id → expr → state → thread_ids → list observation →
               expr → state → gmap thread_id expr → Prop;
-  state_sat : state → gmap thread_id expr → state_pred → Prop;
 
   ectxi_language_mixin :
     EctxiLanguageMixin of_val to_val fill_item base_step
@@ -58,12 +55,11 @@ Structure ectxiLanguage := EctxiLanguage {
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments EctxiLanguage {_ _ _ _ _ _ _ _ _ _ _} _.
+Global Arguments EctxiLanguage {_ _ _ _ _ _ _ _ _} _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
 Global Arguments fill_item {_} _ _.
 Global Arguments base_step {_} _ _ _ _ _ _ _ _.
-Global Arguments state_sat {_} _ _ _.
 
 Section ectxi_language.
   Context {Λ : ectxiLanguage}.
@@ -120,7 +116,7 @@ Section ectxi_language.
       intros ?%base_ctx_step_val; eauto using fill_val.
   Qed.
 
-  Canonical Structure ectxi_lang_ectx := EctxLanguage (state_sat:=state_sat) ectxi_lang_ectx_mixin.
+  Canonical Structure ectxi_lang_ectx := EctxLanguage ectxi_lang_ectx_mixin.
   Canonical Structure ectxi_lang := LanguageOfEctx ectxi_lang_ectx.
 
   Lemma fill_not_val K e : to_val e = None → to_val (fill K e) = None.
@@ -160,8 +156,8 @@ Coercion ectxi_lang_ectx : ectxiLanguage >-> ectxLanguage.
 Coercion ectxi_lang : ectxiLanguage >-> language.
 
 Definition EctxLanguageOfEctxi (Λ : ectxiLanguage) : ectxLanguage :=
-  let '@EctxiLanguage E V C St K Π of_val to_val fill base sat mix := Λ in
-  @EctxLanguage E V (list C) St K Π of_val to_val _ _ _ _ sat
-    (@ectxi_lang_ectx_mixin (@EctxiLanguage E V C St K Π of_val to_val fill base sat mix)).
+  let '@EctxiLanguage E V C St K of_val to_val fill base mix := Λ in
+  @EctxLanguage E V (list C) St K of_val to_val _ _ _ _
+    (@ectxi_lang_ectx_mixin (@EctxiLanguage E V C St K of_val to_val fill base mix)).
 
 Global Arguments EctxLanguageOfEctxi : simpl never.

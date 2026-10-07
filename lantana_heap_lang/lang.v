@@ -6,7 +6,7 @@ From iris.prelude Require Import options.
 
 (** heap_lang for Lantana: Iris' heap_lang where a step knows its thread id and the ids in use
     (forked threads get fresh ids), with labels [Label t e], nondeterministic [ChooseNat], and
-    the state predicates ([state_pred]) that atomic temporal formulas observe.
+    the state predicates that the atoms of temporal properties observe.
 
     As in Iris: evaluation is right-to-left, so that specs of curried calls [f a b] are
     usable; freed locations are never reused. *)
@@ -406,17 +406,14 @@ Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
   | LabelCtx t => Label t e
   end.
 
-(** [pred_expr i C e]: thread [i] runs [e] in the context [C]. The fold below is
-    definitionally [fill]. *)
-Variant state_pred : Type :=
-  | pred_pointsto (l : loc) (dq : dfrac) (v : val)
-  | pred_expr (i : thread_id) (C : list ectx_item) (e : expr).
-
-Definition state_sat : state → gmap thread_id expr → state_pred → Prop :=
-  λ σ Θ π, match π with
-           | pred_pointsto l dq v => heap σ !! l = Some (Some v)
-           | pred_expr i C e => Θ !! i = Some (foldl (flip fill_item) e C)
-           end.
+(** State predicates, the atoms of temporal properties: [l] holds [v] (the fraction [dq]
+    of the points-to plays no role), and thread [i] runs [e] in the context [C] (the fold is
+    definitionally [fill]). *)
+Definition pointsto_sat (l : loc) (dq : dfrac) (v : val) : state → gmap thread_id expr → Prop :=
+  λ σ _, heap σ !! l = Some (Some v).
+Definition thread_expr_sat (i : thread_id) (C : list ectx_item) (e : expr) :
+    state → gmap thread_id expr → Prop :=
+  λ _ Θ, Θ !! i = Some (foldl (flip fill_item) e C).
 
 (** Substitution *)
 Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
@@ -730,7 +727,7 @@ End heap_lang.
 
 (** Language *)
 Canonical Structure heap_ectxi_lang :=
-  EctxiLanguage (state_sat:=heap_lang.state_sat) heap_lang.heap_lang_mixin.
+  EctxiLanguage heap_lang.heap_lang_mixin.
 Canonical Structure heap_ectx_lang := EctxLanguageOfEctxi heap_ectxi_lang.
 Canonical Structure heap_lang := LanguageOfEctx heap_ectx_lang.
 

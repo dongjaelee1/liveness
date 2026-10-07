@@ -7,7 +7,7 @@ From iris.prelude Require Import options.
     structure, built with [LanguageOfEctx] (end of this file). *)
 
 Section ectx_language_mixin.
-  Context {expr val ectx state observation state_pred : Type}.
+  Context {expr val ectx state observation : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
   Context (empty_ectx : ectx).
@@ -15,7 +15,6 @@ Section ectx_language_mixin.
   Context (fill : ectx → expr → expr).
   Context (base_step : thread_id → expr → state → thread_ids → list observation →
                        expr → state → gmap thread_id expr → Prop).
-  Context (state_sat : state → gmap thread_id expr → state_pred → Prop).
 
   Record EctxLanguageMixin := {
     mixin_to_of_val v : to_val (of_val v) = Some v;
@@ -50,7 +49,6 @@ Structure ectxLanguage := EctxLanguage {
   ectx : Type;
   state : Type;
   observation : Type;
-  state_pred : Type;
 
   of_val : val → expr;
   to_val : expr → option val;
@@ -59,7 +57,6 @@ Structure ectxLanguage := EctxLanguage {
   fill : ectx → expr → expr;
   base_step : thread_id → expr → state → thread_ids → list observation →
               expr → state → gmap thread_id expr → Prop;
-  state_sat : state → gmap thread_id expr → state_pred → Prop;
 
   ectx_language_mixin :
     EctxLanguageMixin of_val to_val empty_ectx comp_ectx fill base_step
@@ -68,14 +65,13 @@ Structure ectxLanguage := EctxLanguage {
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-Global Arguments EctxLanguage {_ _ _ _ _ _ _ _ _ _ _ _ _} _.
+Global Arguments EctxLanguage {_ _ _ _ _ _ _ _ _ _ _} _.
 Global Arguments of_val {_} _.
 Global Arguments to_val {_} _.
 Global Arguments empty_ectx {_}.
 Global Arguments comp_ectx {_} _ _.
 Global Arguments fill {_} _ _.
 Global Arguments base_step {_} _ _ _ _ _ _ _ _.
-Global Arguments state_sat {_} _ _ _.
 
 (* From an ectx_language, we can construct a language. *)
 Section ectx_language.
@@ -148,7 +144,7 @@ Section ectx_language.
   Qed.
 
   Canonical Structure ectx_lang : language :=
-    Language (state_sat:=state_sat) ectx_lang_mixin ectx_lang_ctx_mixin.
+    Language ectx_lang_mixin ectx_lang_ctx_mixin.
 
   Definition base_atomic (a : atomicity) (e : expr Λ) : Prop :=
     ∀ i σ Θ κ e' σ' efs,
@@ -315,9 +311,9 @@ Coercion ectx_lang : ectxLanguage >-> language.
 (* The [let '...] match makes the fields of the [language] record the fields of [Λ], not
    projections of it, as canonical structure search needs. *)
 Definition LanguageOfEctx (Λ : ectxLanguage) : language :=
-  let '@EctxLanguage E V C St K Π of_val to_val empty comp fill base sat mix := Λ in
-  @Language E V St K Π C of_val to_val _ sat fill empty comp
-    (@ectx_lang_mixin (@EctxLanguage E V C St K Π of_val to_val empty comp fill base sat mix))
-    (@ectx_lang_ctx_mixin (@EctxLanguage E V C St K Π of_val to_val empty comp fill base sat mix)).
+  let '@EctxLanguage E V C St K of_val to_val empty comp fill base mix := Λ in
+  @Language E V St K C of_val to_val _ fill empty comp
+    (@ectx_lang_mixin (@EctxLanguage E V C St K of_val to_val empty comp fill base mix))
+    (@ectx_lang_ctx_mixin (@EctxLanguage E V C St K of_val to_val empty comp fill base mix)).
 
 Global Arguments LanguageOfEctx : simpl never.

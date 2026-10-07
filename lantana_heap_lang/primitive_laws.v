@@ -67,9 +67,9 @@ Definition thread_expr `{heap_stateGS Σ}
 (** Thread [i]'s whole expression is the value [v] (empty context). *)
 Notation "'exits' v @ i" := (thread_expr i [] (of_val v))%I
   (at level 20, v, i at level 1, format "exits  v @ i") : bi_scope.
-Notation "l ↦ dq v" := (tr_atomic (pred_pointsto l dq v))
+Notation "l ↦ dq v" := (tr_state (pointsto_sat l dq v))
   (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tr_scope.
-Notation "'exits' v @ i" := (tr_atomic (pred_expr i [] (of_val v)))
+Notation "'exits' v @ i" := (tr_state (thread_expr_sat i [] (of_val v)))
   (at level 20, v, i at level 1, format "exits  v @ i") : tr_scope.
 
 Lemma exits_finally_iff (τ : trace heap_lang) i v :
@@ -78,7 +78,7 @@ Lemma exits_finally_iff (τ : trace heap_lang) i v :
 Proof.
   destruct τ as [m τf].
   change ((∃ n, m ≤ n ∧
-    (let '((Θ, σ), _, _) := τf n in state_sat σ Θ (pred_expr i [] (of_val v))) ∧
+    (let '((Θ, σ), _, _) := τf n in thread_expr_sat i [] (of_val v) σ Θ) ∧
     (∀ l, m ≤ l < n → True)) ↔
     ∃ n, m ≤ n ∧ (τf n).1.1.1 !! i = Some (of_val v)).
   split.
@@ -99,15 +99,6 @@ Definition state_interp_aux `{!heap_stateGS Σ}
     (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   True%I.
 
-(** The state predicates as assertions. *)
-Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
-  match π with
-  | pred_pointsto l dq v =>
-      pointsto l dq v
-  | pred_expr i C e =>
-      thread_expr i C e
-  end.
-
 Lemma thread_expr_read `{!heap_stateGS Σ} :
   ∀ (Θ : thread_pool heap_lang) i C e,
   thread_map_interp (dom Θ) Θ -∗ thread_expr i C e -∗ ⌜Θ !! i = Some (fill C e)⌝.
@@ -116,18 +107,21 @@ Proof.
   iPoseProof (thread_map_thread_read with "TI Ti") as "%". eauto.
 Qed.
 
-Lemma state_interp_wf `{!heap_stateGS Σ} :
-  ∀ (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) (π : state_pred),
-  state_interp σ Θ κs ∗ state_pred_interp π ⊢ ⌜state_sat σ Θ π⌝.
+(** The facts about the state that a points-to and a thread expression determine
+    (temporal_laws.v makes them [StateFact]s). *)
+Lemma pointsto_state_interp `{!heap_stateGS Σ} σ Θ κs l dq v :
+  state_interp σ Θ κs ∗ pointsto l dq v ⊢ ⌜pointsto_sat l dq v σ Θ⌝.
 Proof.
-  iIntros (????) "[(HI& TI& PI) SP]". destruct π; simpl.
-  - rewrite pointsto_unseal /pointsto_def. iPoseProof (gen_heap_valid with "HI SP") as "%". eauto.
-  - iPoseProof (thread_expr_read with "TI SP") as "%". eauto.
+  iIntros "[(HI& _& _) Hl]". rewrite pointsto_unseal /pointsto_def.
+  iPoseProof (gen_heap_valid with "HI Hl") as "%". eauto.
 Qed.
+Lemma thread_expr_state_interp `{!heap_stateGS Σ} σ Θ κs i C e :
+  state_interp σ Θ κs ∗ thread_expr i C e ⊢ ⌜thread_expr_sat i C e σ Θ⌝.
+Proof. iIntros "[(_& TI& _) Ti]". iPoseProof (thread_expr_read with "TI Ti") as "%". eauto. Qed.
 
 (** Not an instance: that can break [iMod]. *)
 Definition heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ :=
-  Build_state_interp_class _ _ _ state_interp state_interp_aux state_pred_interp state_interp_wf.
+  Build_state_interp_class _ _ _ state_interp state_interp_aux.
 
 (** * The program-logic instance *)
 Class heapGS Σ :=
@@ -343,9 +337,6 @@ Global Instance pointsto_as_fractional l q v :
 Proof. rewrite pointsto_unseal. apply _. Qed.
 Global Instance pointsto_persistent l v : Persistent (l ↦□ v).
 Proof. rewrite pointsto_unseal. apply _. Qed.
-
-Global Instance state_pred_interp_timesless π : Timeless (state_pred_interp π).
-Proof. destruct π; simpl; apply _. Qed.
 
 Global Instance pointsto_combine_sep_gives l dq1 dq2 v1 v2 :
   CombineSepGives (l ↦{dq1} v1) (l ↦{dq2} v2) ⌜✓ (dq1 ⋅ dq2) ∧ v1 = v2⌝.

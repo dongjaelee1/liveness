@@ -68,8 +68,8 @@ Section proof.
     rewrite /tprop_le in Hu. intros ? τ. cbn [tprop_ti tprop_or tprop_and tprop_impl].
     unfold ti_or, ti_and, ti_impl. iIntros "[H|[_ H1]] %H0".
     - by iApply Hu.
-    - iDestruct (tprop_instant_atomic with "H1") as %H1. exfalso. destruct τ as [n τf].
-      revert H0 H1. cbn [tprop_tr tprop_atomic]. unfold tr_atomic, ts_emb, ts_atomic, trace_now. simpl.
+    - iDestruct (tprop_instant_state with "H1") as %H1. exfalso. destruct τ as [n τf].
+      revert H0 H1. cbn [tprop_tr tprop_state]. unfold tr_state, ts_emb, ts_state, pointsto_sat, trace_now. simpl.
       destruct (τf n) as [[[??] ?] ?]. simpl. intros -> ?. by simplify_eq.
   Qed.
 
@@ -320,16 +320,16 @@ Section trace.
                  used_proph_id := ∅ |}), 1%positive, []).
 
   Lemma flag_run_at l m v :
-    tr_atomic (pred_pointsto l (DfracOwn 1) v) (m, flag_run l) ↔
+    tr_state (pointsto_sat l (DfracOwn 1) v) (m, flag_run l) ↔
     v = (if decide (m = 0 ∨ m = 2) then #0 else #1).
   Proof.
-    rewrite /tr_atomic /ts_emb /ts_atomic /trace_now /flag_run /= lookup_insert_eq.
+    rewrite /tr_state /ts_emb /ts_state /pointsto_sat /trace_now /flag_run /= lookup_insert_eq.
     split; [by intros [= ->]|by intros ->].
   Qed.
 
   Lemma flag_run_satisfies_guarantee {Σ : gFunctors} l : tprop_tr (flag_tprop (Σ:=Σ) l) (0, flag_run l).
   Proof.
-    split; first done. intros m _. cbn [tprop_tr tprop_or tprop_and tprop_until tprop_atomic tprop_pure].
+    split; first done. intros m _. cbn [tprop_tr tprop_or tprop_and tprop_until tprop_state tprop_pure].
     rewrite /tprop_true. cbn [tprop_tr tprop_pure]. unfold tr_or, tr_and, tr_pure, tr_until. cbv beta iota.
     destruct (decide (m = 0 ∨ m = 2)) as [Hm|Hm].
     - left. exists (S m). split_and!; [lia| |].
@@ -338,11 +338,11 @@ Section trace.
     - right. split; first done. apply flag_run_at. by rewrite decide_False.
   Qed.
 
-  Lemma flag_run_goes_back l : ¬ tr_always (λ τ, tr_atomic (pred_pointsto l (DfracOwn 1) #1) τ →
-      tr_always (tr_atomic (pred_pointsto l (DfracOwn 1) #1)) τ) (0, flag_run l).
+  Lemma flag_run_goes_back l : ¬ tr_always (λ τ, tr_state (pointsto_sat l (DfracOwn 1) #1) τ →
+      tr_always (tr_state (pointsto_sat l (DfracOwn 1) #1)) τ) (0, flag_run l).
   Proof.
     intros H. unfold tr_always in H. cbv beta iota in H. specialize (H 1 ltac:(lia)).
-    assert (H1 : tr_atomic (pred_pointsto l (DfracOwn 1) #1) (1, flag_run l)).
+    assert (H1 : tr_state (pointsto_sat l (DfracOwn 1) #1) (1, flag_run l)).
     { apply flag_run_at. case_decide; [lia|done]. }
     specialize (H H1 2 ltac:(lia)). apply flag_run_at in H. case_decide; [done|lia].
   Qed.

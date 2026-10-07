@@ -3,34 +3,36 @@ From lantana.trace Require Export guarantee_infer.
 From lantana.heap_lang Require Export primitive_laws.
 From iris.prelude Require Import options.
 
-(** * Temporal guarantees for heap_lang: points-to facts and thread expressions guarantee
-    the corresponding state predicates. *)
+(** * Temporal guarantees for heap_lang: the atoms are the state predicates of lang.v, the
+    points-to facts and thread expressions determine them ([StateFact]), and so guarantee
+    them ([IntoTemporal] by [into_temporal_state_fact]). *)
 
-Notation "l ↦ dq v" := (tprop_atomic (pred_pointsto l dq v))
+Notation "l ↦ dq v" := (tprop_state (pointsto_sat l dq v))
   (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tprop_scope.
-Notation "'exits' v @ i" := (tprop_atomic (pred_expr i [] (of_val v)))
+Notation "'exits' v @ i" := (tprop_state (thread_expr_sat i [] (of_val v)))
   (at level 20, v, i at level 1, format "exits  v @ i") : tprop_scope.
 
 Section laws.
   Context `{!heapGS Σ}.
 
-  Global Instance into_temporal_pointsto l dq v :
-    IntoTemporal (l ↦{dq} v) (tprop_atomic (pred_pointsto l dq v)) | 10.
-  Proof. exact (temporal_atomic (pred_pointsto l dq v)). Qed.
-
-  Global Instance into_temporal_thread_expr i C e :
-    IntoTemporal (thread_expr i C e) (tprop_atomic (pred_expr i C e)) | 10.
-  Proof. exact (temporal_atomic (pred_expr i C e)). Qed.
-  (* TODO: [IntoTemporal] instances for the invariant heap ([l ↦_I v]). *)
+  Global Instance pointsto_state_fact l dq v : StateFact (l ↦{dq} v) (pointsto_sat l dq v).
+  Proof. intros σ Θ κs. apply pointsto_state_interp. Qed.
+  Global Instance thread_expr_state_fact i C e :
+    StateFact (thread_expr i C e) (thread_expr_sat i C e).
+  Proof. intros σ Θ κs. apply thread_expr_state_interp. Qed.
+  (* TODO: [StateFact] instances for the invariant heap ([l ↦_I v]). *)
 
   (** A freed location stays freed. *)
   Definition freed_tprop (l : loc) : tprop heap_lang Σ := tprop_state (λ σ _, heap σ !! l = Some None).
+  Global Instance freed_state_fact l q : StateFact (freed l q) (λ σ _, heap σ !! l = Some None).
+  Proof. intros σ Θ κs. iIntros "[(H& _) F]". iApply (gen_heap_valid with "H F"). Qed.
 
   Lemma freed_temporal (l : loc) q : ⊢ freed l q ⊨ₜ freed_tprop l.
-  Proof.
-    apply temporal_state. intros σ Θ κs. iIntros "[(H& _) F]".
-    iApply (gen_heap_valid with "H F").
-  Qed.
+  Proof. apply temporal_state_fact, _. Qed.
+
+  (** The guarantee of an atom is inferred from its state fact. *)
+  Local Lemma ex_pointsto_temporal l dq v : ⊢ l ↦{dq} v ⊨ₜ (l ↦{dq} v).
+  Proof. apply (into_temporal _ _). Qed.
 
   (** An implication with a state antecedent, from a case split on the state: the value of
       [l] decides the disjunct. The antecedent [l ↦ v0] is read on the trace. *)
@@ -38,14 +40,10 @@ Section laws.
     v0 ≠ v1 →
     P0 ⊨ₜ G0 -∗ ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊨ₜ ((l ↦ v0) → G0).
   Proof.
-    iIntros (Hv) "#HG".
-    iApply (temporal_weaken _ (tprop_impl (tprop_state (λ σ _, heap σ !! l = Some (Some v0))) G0)).
-    { apply tprop_impl_mono; [|apply tprop_le_refl]. intros [n τf].
-      rewrite /= /tr_atomic /ts_emb /ts_atomic /trace_now /=. by destruct (τf n) as (((?&?)&?)&?). }
-    iApply (temporal_impl_state _ _ P0 with "HG").
+    iIntros (Hv) "#HG". iApply (temporal_impl_state _ _ P0 with "HG").
     iIntros "!>" (σ Θ κs Hl) "[SI [[_ HP]|[Hl1 _]]]"; first by iFrame.
-    iDestruct (state_interp_wf σ Θ κs (pred_pointsto l (DfracOwn 1) v1) with "[$SI $Hl1]") as %H1.
-    simpl in H1. rewrite Hl in H1. by simplify_eq.
+    iDestruct (pointsto_state_interp σ Θ κs l (DfracOwn 1) v1 with "[$SI $Hl1]") as %H1.
+    rewrite /pointsto_sat in Hl H1. rewrite Hl in H1. by simplify_eq.
   Qed.
 
   (** Discharging a [finally] on the thread's final value, with credits from earlier steps. *)

@@ -22,7 +22,7 @@ Global Hint Mode IntoTemporal - - - - ! - : typeclass_instances.
 (* Opaque: unfolding [temporal] when an instance does not match makes the search very slow. *)
 Global Typeclasses Opaque temporal.
 (* Likewise for the connectives, which are records. *)
-Global Typeclasses Opaque tprop_pure tprop_atomic tprop_and tprop_or tprop_impl tprop_forall tprop_exist
+Global Typeclasses Opaque tprop_pure tprop_and tprop_or tprop_impl tprop_forall tprop_exist
   tprop_always tprop_until tprop_state.
 
 (** How an existential over a family of guarantees is guaranteed, when inferring. *)
@@ -130,8 +130,10 @@ Section into_temporal.
   Global Instance into_temporal_untilI_done k Q G1 G2 :
     IntoTemporal Q G2 → IntoTemporal (untilI_done k Q) (tprop_until G1 G2) | 10.
   Proof. intros H. unfold IntoTemporal in *. by apply temporal_until_done_valid. Qed.
-  Global Instance into_temporal_state_pred π : IntoTemporal (state_pred_interp π) (tprop_atomic π) | 10.
-  Proof. apply temporal_atomic. Qed.
+  (** A state fact guarantees its state atom. *)
+  Global Instance into_temporal_state_fact P φ :
+    StateFact P φ → IntoTemporal P (tprop_state φ) | 10.
+  Proof. intros HP. exact (temporal_state_fact P φ). Qed.
 
   Global Instance into_temporal_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ)
     (G : K → A → tprop Λ Σ) :
@@ -217,38 +219,40 @@ Section examples.
   (** A done until, allocated with its right formula at hand, exports the until of any left
       formula in the form the adequacy takes: a formula, its guarantee, and the formula
       back. *)
-  Local Lemma ex_until_done_export E p K ℓ (μ : measure) π (G1 : tprop Λ Σ) :
-    parP_le p ℓ -∗ parP_kids p K -∗ state_pred_interp π -∗
+  Local Lemma ex_until_done_export E p K ℓ (μ : measure) (Q : iProp Σ) φ `{!StateFact Q φ}
+      (G1 : tprop Λ Σ) :
+    parP_le p ℓ -∗ parP_kids p K -∗ Q -∗
     |={E}=>m parP_kids p K ∗
-      ∃ P : iProp Σ, (P ⊨ₜ tprop_until G1 (tprop_atomic π)) ∗ P ∗ (P -∗ state_pred_interp π).
+      ∃ P : iProp Σ, (P ⊨ₜ tprop_until G1 (tprop_state φ)) ∗ P ∗ (P -∗ Q).
   Proof.
     iIntros "B Kp Hπ". iMod (obl_new E p K ℓ μ with "B Kp") as (k) "(%Hk& Kp& Kk& Oa& _& _)".
     iMod (untilI_done_init' with "Oa Kp Kk Hπ") as "[U $]"; first done.
-    iModIntro. iExists (untilI_done k (state_pred_interp π)). iFrame "U". iSplit.
+    iModIntro. iExists (untilI_done k Q). iFrame "U". iSplit.
     - iApply (into_temporal _ _).
     - iIntros "U". by iDestruct (untilI_done_elim with "U") as "[$ _]".
   Qed.
 
   (** A strong until, once discharged, is a done until with the same guarantee. *)
-  Local Lemma ex_until_discharged E N k p K π (P : iProp Σ) :
+  Local Lemma ex_until_discharged E N k p K (Q : iProp Σ) φ `{!StateFact Q φ} (P : iProp Σ) :
     ↑N ⊆ E → k ∈ K →
-    £n 1 -∗ untilI N k 1 P (state_pred_interp π) -∗ parP_kids p K -∗ oblP_kids k ∅ -∗
-    state_pred_interp π -∗
-    |={E}=>m ∃ U : iProp Σ, (U ⊨ₜ tprop_until (tprop_sem P) (tprop_atomic π)) ∗ U ∗ parP_kids p (K ∖ {[k]}).
+    £n 1 -∗ untilI N k 1 P Q -∗ parP_kids p K -∗ oblP_kids k ∅ -∗ Q -∗
+    |={E}=>m ∃ U : iProp Σ, (U ⊨ₜ tprop_until (tprop_sem P) (tprop_state φ)) ∗ U ∗ parP_kids p (K ∖ {[k]}).
   Proof.
     iIntros (HN Hk) "LC U Kp Kk Hπ". iMod (untilI_discharge_done with "U") as "U"; first done.
     iApply (lc_sfmupd_add_later with "LC"). iNext. iDestruct "U" as "[_ U]".
     iPoseProof ("U" $! p K Hk with "Kp Kk Hπ") as "U".
     iMod ("U" $! (E ∖ ↑N)) as "U". iMod "U" as "[U $]". iModIntro.
-    iExists (untilI_done k (state_pred_interp π)). iFrame "U". iApply (into_temporal _ _).
+    iExists (untilI_done k Q). iFrame "U". iApply (into_temporal _ _).
   Qed.
 
   (** Its inferred trace property is the finally of its right formula. *)
-  Local Definition ex_tprop_of_done k π : tprop Λ Σ :=
-    ltac:(tprop_of (untilI_done k (state_pred_interp π))).
-  Local Lemma ex_tprop_of_done_eq k π : ex_tprop_of_done k π = tprop_finally (tprop_atomic π).
+  Local Definition ex_tprop_of_done k (Q : iProp Σ) φ `{!StateFact Q φ} : tprop Λ Σ :=
+    ltac:(tprop_of (untilI_done k Q)).
+  Local Lemma ex_tprop_of_done_eq k (Q : iProp Σ) φ `{!StateFact Q φ} :
+    ex_tprop_of_done k Q φ = tprop_finally (tprop_state φ).
   Proof. done. Qed.
-  Local Lemma ex_finally_done k π : ⊢ untilI_done k (state_pred_interp π) ⊨ₜ tprop_finally (tprop_atomic π).
+  Local Lemma ex_finally_done k (Q : iProp Σ) φ `{!StateFact Q φ} :
+    ⊢ untilI_done k Q ⊨ₜ tprop_finally (tprop_state φ).
   Proof. apply (into_temporal _ _). Qed.
 
   (** A higher-order specification quantifies over the content together with its guarantee
@@ -262,9 +266,9 @@ Section examples.
   Qed.
 
   (** A temporal antecedent used in the logic: by completeness, the in-logic reading of
-      "eventually [π]" strengthens a guarantee. *)
-  Local Lemma ex_impl_temporal P π G :
-    P ⊨ₜ G ⊢ P ⊨ₜ tprop_impl (tprop_finally (tprop_atomic π)) (tprop_and (tprop_finally (tprop_atomic π)) G).
+      "eventually [φ]" strengthens a guarantee. *)
+  Local Lemma ex_impl_temporal P φ G :
+    P ⊨ₜ G ⊢ P ⊨ₜ tprop_impl (tprop_finally (tprop_state φ)) (tprop_and (tprop_finally (tprop_state φ)) G).
   Proof.
     apply (temporal_impl_intro _ _ _ _ (tprop_le_refl _)).
   Qed.

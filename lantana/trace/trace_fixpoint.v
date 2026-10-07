@@ -12,7 +12,7 @@ From lantana.algebra Require Import ordinal_existential_properties axioms.
     [μ_α := F (∃ β < α, μ_β)]. Always and until are such fixpoints. *)
 
 (* The proof mode must not unfold the connectives, which are records. *)
-#[local] Typeclasses Opaque tprop_pure tprop_atomic tprop_and tprop_or tprop_impl tprop_forall tprop_exist
+#[local] Typeclasses Opaque tprop_pure tprop_and tprop_or tprop_impl tprop_forall tprop_exist
   tprop_always tprop_until tprop_state.
 
 (** ** Trace predicates, the in-logic step, and the next position *)

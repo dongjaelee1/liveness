@@ -117,9 +117,9 @@ Section proof.
       iDestruct (mono_Z_auth_lb_own_valid with "A Lb") as %[_ ?]. iLeft. iExists w. by iFrame. }
     iApply temporal_or; last iApply freed_temporal.
     iApply temporal_exist. iIntros (w). iApply temporal_sep; first iApply temporal_pure.
-    iApply (temporal_weaken _ (tprop_atomic (pred_pointsto next (DfracOwn (1/2)) #w))).
+    iApply (temporal_weaken _ (tprop_state (pointsto_sat next (DfracOwn (1/2)) #w))).
     { intros ? τ. done. }
-    iApply (temporal_atomic (pred_pointsto next (DfracOwn (1/2)) #w)).
+    iApply (temporal_state_fact (next ↦{#1/2} #w)).
   Qed.
 
   (** Allocation of the cell, with its first registration. *)
@@ -1139,7 +1139,7 @@ Section trace.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n c Hn Hc Hlt.
     destruct (Hal m Hm) as (n' & c' & Hn' & _ & Hc' & _ & _ & _ & Hb & _ & _ & Hcase).
-    simpl in *. unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic, tr_pure in *. simpl in *.
+    simpl in *. unfold tr_pointsto, tr_state, ts_emb, ts_state, pointsto_sat, tr_pure in *. simpl in *.
     destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *.
     rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
     destruct Hcase as [[? _] | [_ (_ & _ & _ & Hfin & _)]]; [lia|].
@@ -1158,10 +1158,10 @@ Section trace.
     destruct (Hal m' ltac:(simpl in *; lia)) as (n1 & c1 & Hn1 & _).
     destruct (Hge m' Hm') as [(w & Hw & Hnw) | Hfr].
     - assert (n = n0) as ->.
-      { simpl in *. unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic in *. simpl in *.
+      { simpl in *. unfold tr_pointsto, tr_state, ts_emb, ts_state, pointsto_sat in *. simpl in *.
         destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *. rewrite Hn in Hn0. by simplify_eq. }
       exists w. split; [exact Hnw|done].
-    - exfalso. simpl in *. unfold tr_atomic, ts_emb, ts_atomic in *. simpl in *.
+    - exfalso. simpl in *. unfold tr_state, ts_emb, ts_state, pointsto_sat in *. simpl in *.
       destruct (τf m') as [[[Θ σ] ?] ?]. simpl in *. by rewrite Hn1 in Hfr.
   Qed.
 

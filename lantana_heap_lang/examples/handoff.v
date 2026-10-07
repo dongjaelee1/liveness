@@ -242,7 +242,7 @@ Section trace.
 
   (** The cell [b] holds [v] in the current state of the trace (any fraction). *)
   Definition tr_cell (b : loc) (v : val) : trProp heap_lang :=
-    λ τ, ∃ dq, tr_atomic (pred_pointsto b dq v) τ.
+    λ τ, ∃ dq, tr_state (pointsto_sat b dq v) τ.
 
   (** At all times the cell is empty or holds a task. *)
   Definition handoff_tr (b : loc) : trProp heap_lang :=
