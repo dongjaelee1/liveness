@@ -7,7 +7,9 @@ From lantana.base_logic Require Import satisfiable.
 (** * Semantic trace properties
 
     Trace properties ([tprop]) with an in-logic and a trace reading, their connectives, state
-    atoms, and complete and instant properties. *)
+    atoms, complete and instant properties, and the two entailments between properties: in
+    the logic ([G ⊑ H]), for the structure of a property, and on traces ([tprop_tr G ⊆ R]),
+    for its meaning (see "Trace readings" below). *)
 
 (** ** Semantic trace properties *)
 
@@ -15,7 +17,7 @@ From lantana.base_logic Require Import satisfiable.
     [tprop_good]: its satisfiability implies the trace reading [tprop_tr]. *)
 Record tprop {Λ : language} {Σ : gFunctors} := Tprop {
   tprop_ti : ∀ `{!temporalGS Λ Σ}, trace Λ → iProp Σ;
-  tprop_tr : trace Λ → Prop;
+  tprop_tr : trProp Λ;
   tprop_good : ∀ `{!temporalGS Λ Σ} (F : iProp Σ) (τ : trace Λ),
     iProp_sat_lc_at_frame F ⊤ (tprop_ti τ) → tprop_tr τ;
 }.
@@ -222,6 +224,13 @@ Infix "∨" := tprop_or : tprop_scope.
 Infix "→" := tprop_impl : tprop_scope.
 Notation "∀ x .. y , G" := (tprop_forall (λ x, .. (tprop_forall (λ y, G%T)) ..)) : tprop_scope.
 Notation "∃ x .. y , G" := (tprop_exist (λ x, .. (tprop_exist (λ y, G%T)) ..)) : tprop_scope.
+Notation "□ G" := (tprop_always G) (at level 20, right associativity) : tprop_scope.
+Notation "◇ G" := (tprop_finally G) (at level 20, right associativity) : tprop_scope.
+
+(** In-logic entailment is the canonical order of properties. *)
+Global Instance tprop_sqsubseteq {Λ Σ} : SqSubsetEq (tprop Λ Σ) := tprop_le.
+Global Instance tprop_le_preorder {Λ Σ} : PreOrder (⊑@{tprop Λ Σ}).
+Proof. split; [intros ?; apply tprop_le_refl|intros ???; apply tprop_le_trans]. Qed.
 
 (** ** Semantic state atoms
 
@@ -372,81 +381,130 @@ End complete.
 Global Hint Mode TpropComplete - - ! : typeclass_instances.
 Global Hint Mode TpropInstant - - ! : typeclass_instances.
 
-(** ** Decided antecedents
+(** ** Trace readings: the two entailments, and casts
 
-    [TpropDecided A ψ]: at any position, [A] holds iff the configurations up to it (as the
-    history records them, [trace_hist]) satisfy [ψ]. Such antecedents are decided when a
-    guarantee is taken, so an implication with them is exported by a case split
-    ([temporal_impl_decided] in guarantee.v). Pure facts and state atoms are decided, and
-    decided properties are closed under [∧], [∨], [→], [∀] and [∃]. The temporal operators
-    are not: their truth depends on the states to come ([tprop_finally_not_decided]); as
-    antecedents they are used on traces ([tprop_impl_intro], with complete antecedents). *)
+    A property is read twice. Its in-logic reading [tprop_ti] is what a run establishes: a
+    guarantee [P ⊨ₜ G] (guarantee.v) turns [P], at a position, into the in-logic reading of
+    [G] there. Its trace reading [tprop_tr] is what adequacy concludes.
 
-(** The configurations of a trace up to position [n], in the order of the history. *)
-Definition trace_hist {Λ : language} (n : nat) (τf : nat → trace_state Λ) :
-    list (state Λ * thread_pool Λ * list (observation Λ)) :=
-  (λ m, let '((Θ, σ), _, κs) := τf m in (σ, Θ, κs)) <$> seq 0 (S n).
+    Accordingly, two entailments:
+    - [G ⊑ H] ([tprop_le]) compares in-logic readings. It transports guarantees
+      ([temporal_weaken]), and the connectives are monotone in it. It is sound for trace
+      readings ([tprop_le_sound]), but it is as weak as the readings are deferred: the
+      in-logic readings of [□] and [𝒰] start with a later, so not even [□ ⊥ ⊑ ⊥] holds
+      ([tprop_always_elim_not_le]). It is the entailment of the structure of a property.
+    - [tprop_tr G ⊆ R] compares trace readings, on traces (trace_pred.v), where every law of
+      LTL holds. It is the entailment of the meaning of a property. The cast
+      [tprop_cast G R pf] keeps the in-logic reading of [G] and takes [R] as its trace
+      reading, so [G ⊑ tprop_cast G R pf]: every trace-level consequence of a property is
+      guaranteed along with it ([temporal_cast]).
 
-Lemma trace_hist_last {Λ : language} n (τf : nat → trace_state Λ) :
-  last (trace_hist n τf) = Some (let '((Θ, σ), _, κs) := τf n in (σ, Θ, κs)).
-Proof. by rewrite /trace_hist seq_S fmap_app last_snoc. Qed.
-
-Section decided.
+    [TpropTr G R] computes a trace reading of [G] from its shape, as a trace predicate. *)
+Section readings.
   Context {Λ : language} {Σ : gFunctors}.
-  Implicit Types A : tprop Λ Σ.
-  Local Notation hist := (list (state Λ * thread_pool Λ * list (observation Λ))).
+  Implicit Types G H : tprop Λ Σ.
+  Implicit Types R : trProp Λ.
 
-  Class TpropDecided A (ψ : hist → Prop) : Prop :=
-    tprop_decided : ∀ n τf, tprop_tr A (n, τf) ↔ ψ (trace_hist n τf).
+  Program Definition tprop_cast G R (pf : tprop_tr G ⊆ R) : tprop Λ Σ :=
+    {| tprop_ti _ := tprop_ti G; tprop_tr := R |}.
+  Next Obligation. intros G R pf ? F τ Hs. apply pf. by eapply tprop_good. Qed.
 
-  (** [φ] holds of the current (last) configuration of a history. *)
-  Definition hist_now (φ : state Λ → thread_pool Λ → Prop) : hist → Prop :=
-    λ h, ∃ σ Θ κs, last h = Some (σ, Θ, κs) ∧ φ σ Θ.
-
-  Global Instance tprop_decided_pure φ : TpropDecided (tprop_pure φ) (λ _, φ).
+  Lemma tprop_cast_le G R pf : G ⊑ tprop_cast G R pf.
+  Proof. intros ??. done. Qed.
+  Lemma tprop_le_cast G R pf : tprop_cast G R pf ⊑ G.
+  Proof. intros ??. done. Qed.
+  Lemma tprop_cast_tr G R pf : tprop_tr (tprop_cast G R pf) = R.
   Proof. done. Qed.
-  Global Instance tprop_decided_state φ : TpropDecided (tprop_state φ) (hist_now φ).
+  Lemma tprop_cast_complete G R pf `{!TpropComplete G} :
+    R ⊆ tprop_tr G → TpropComplete (tprop_cast G R pf).
+  Proof. intros HR ? τ Hτ. change (⊢ tprop_ti G τ). apply tprop_complete. by apply HR. Qed.
+
+  (** [TpropTr G R]: [R] is a trace reading of [G]. The instances follow the connectives;
+      the fallback is the reading itself. *)
+  Class TpropTr G R : Prop := tprop_tr_of : tprop_tr G ⊆ R.
+
+  Global Instance tprop_tr_pure φ : TpropTr (tprop_pure φ) (tr_pure φ) | 10.
+  Proof. by intros τ. Qed.
+  Global Instance tprop_tr_state φ : TpropTr (tprop_state φ) (tr_state φ) | 10.
+  Proof. by intros τ. Qed.
+  Global Instance tprop_tr_and G1 G2 R1 R2 :
+    TpropTr G1 R1 → TpropTr G2 R2 → TpropTr (tprop_and G1 G2) (R1 ∧ R2)%R | 10.
+  Proof. intros H1 H2 τ [??]. split; auto. Qed.
+  Global Instance tprop_tr_or G1 G2 R1 R2 :
+    TpropTr G1 R1 → TpropTr G2 R2 → TpropTr (tprop_or G1 G2) (R1 ∨ R2)%R | 10.
+  Proof. intros H1 H2 τ [?|?]; [left|right]; auto. Qed.
+  Global Instance tprop_tr_impl A G R :
+    TpropTr G R → TpropTr (tprop_impl A G) (tprop_tr A → R)%R | 10.
+  Proof. intros HG τ HAG HA. by apply HG, HAG. Qed.
+  Global Instance tprop_tr_forall {X} (G : X → tprop Λ Σ) (R : X → trProp Λ) :
+    (∀ x, TpropTr (G x) (R x)) → TpropTr (tprop_forall G) (tr_forall X R) | 10.
+  Proof. intros HG τ H x. by apply HG. Qed.
+  Global Instance tprop_tr_exist {X} `{!TypeExistentialProperty X ordI} (G : X → tprop Λ Σ) (R : X → trProp Λ) :
+    (∀ x, TpropTr (G x) (R x)) → TpropTr (tprop_exist G) (tr_exist X R) | 10.
+  Proof. intros HG τ [x H]. exists x. by apply HG. Qed.
+  Global Instance tprop_tr_always G R : TpropTr G R → TpropTr (tprop_always G) (□ R)%R | 10.
+  Proof. intros HG. by apply tr_always_mono. Qed.
+  Global Instance tprop_tr_finally G R : TpropTr G R → TpropTr (tprop_finally G) (◇ R)%R | 9.
+  Proof. intros HG. by apply tr_finally_mono. Qed.
+  Global Instance tprop_tr_until G1 G2 R1 R2 :
+    TpropTr G1 R1 → TpropTr G2 R2 → TpropTr (tprop_until G1 G2) (tr_until R1 R2) | 10.
+  Proof. intros H1 H2. by apply tr_until_mono. Qed.
+  Global Instance tprop_tr_cast G R pf : TpropTr (tprop_cast G R pf) R | 10.
+  Proof. by intros τ. Qed.
+  Global Instance tprop_tr_default G : TpropTr G (tprop_tr G) | 100.
+  Proof. by intros τ. Qed.
+
+End readings.
+Global Hint Mode TpropTr - - ! - : typeclass_instances.
+
+(** ** The model
+
+    Under the assumptions of the adequacy theorem (adequacy_temporal.v), the logic has a
+    model: a property valid in the logic holds on the trace. Hence in-logic entailment is
+    sound for the trace readings of complete properties, and it is not complete for them. *)
+Section model.
+  Context {Λ : language} {Σ : gFunctors}.
+  Implicit Types G H : tprop Λ Σ.
+  Local Notation histGpreS := (histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))).
+
+  Lemma tprop_valid_tr `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G τ :
+    (∀ Ht : temporalGS Λ Σ, ⊢ tprop_ti G τ) → tprop_tr G τ.
   Proof.
-    intros n τf. rewrite /hist_now trace_hist_last /= /tr_state /ts_emb /ts_state /trace_now /=.
-    destruct (τf n) as (((Θ&σ)&?)&κs).
-    split; [intros; by eexists _, _, _|by intros (?&?&?&[= <- <- <-]&?)].
-  Qed.
-  Global Instance tprop_decided_and A1 A2 ψ1 ψ2 :
-    TpropDecided A1 ψ1 → TpropDecided A2 ψ2 → TpropDecided (tprop_and A1 A2) (λ h, ψ1 h ∧ ψ2 h).
-  Proof. intros H1 H2 n τf. specialize (H1 n τf). specialize (H2 n τf). rewrite /= /tr_and. tauto. Qed.
-  Global Instance tprop_decided_or A1 A2 ψ1 ψ2 :
-    TpropDecided A1 ψ1 → TpropDecided A2 ψ2 → TpropDecided (tprop_or A1 A2) (λ h, ψ1 h ∨ ψ2 h).
-  Proof. intros H1 H2 n τf. specialize (H1 n τf). specialize (H2 n τf). rewrite /= /tr_or. tauto. Qed.
-  Global Instance tprop_decided_impl A1 A2 ψ1 ψ2 :
-    TpropDecided A1 ψ1 → TpropDecided A2 ψ2 → TpropDecided (tprop_impl A1 A2) (λ h, ψ1 h → ψ2 h).
-  Proof. intros H1 H2 n τf. specialize (H1 n τf). specialize (H2 n τf). rewrite /= /tr_impl. tauto. Qed.
-  Global Instance tprop_decided_forall {X} (A : X → tprop Λ Σ) (ψ : X → hist → Prop) :
-    (∀ x, TpropDecided (A x) (ψ x)) → TpropDecided (tprop_forall A) (λ h, ∀ x, ψ x h).
-  Proof.
-    intros H n τf. rewrite /= /tr_forall. split; intros Hx x; apply (H x n τf), Hx.
-  Qed.
-  Global Instance tprop_decided_exist {X} `{!TypeExistentialProperty X ordI}
-      (A : X → tprop Λ Σ) (ψ : X → hist → Prop) :
-    (∀ x, TpropDecided (A x) (ψ x)) → TpropDecided (tprop_exist A) (λ h, ∃ x, ψ x h).
-  Proof.
-    intros H n τf. rewrite /= /tr_exist. split; intros [x Hx]; exists x; by apply (H x n τf).
+    intros HG. destruct (τ.2 τ.1) as [[[Θ σ] i] κs].
+    assert (iProp_sat (|==> ∃ (Hmupd : mupdGS Σ)
+                (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ)))
+                (Htreg : tregGS.tregGS Λ Σ),
+              (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗ wsat.wsat ∗ wsat.ownE ⊤))
+      as Hsat.
+    { eapply sat_mono; last apply iProp_sat_intro. iIntros "_".
+      iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& _)".
+      iMod (history_interp_init (Λ:=Λ) σ Θ κs) as (Hhist) "_".
+      iMod (treg_alloc (Λ:=Λ)) as (Htreg) "_".
+      iModIntro. iExists Hmupd, Hhist, Htreg. iFrame. }
+    apply sat_bupd, sat_exists in Hsat as [Hmupd Hsat].
+    apply sat_exists in Hsat as [Hhist Hsat]. apply sat_exists in Hsat as [Htreg Hsat].
+    set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
+    apply (tprop_good G (temporalGS0:=Htemp) emp).
+    unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
+    eapply sat_mono; last exact Hsat. iIntros "($& $& $)". iApply (HG Htemp).
   Qed.
 
-  (** A finally is not decided: with a state [σ0, Θ0] outside [φ] and a state [σ1, Θ1] in
-      it, two traces with the same configuration at [0] differ on [◇φ] at [0]. *)
-  Lemma tprop_finally_not_decided (φ : state Λ → thread_pool Λ → Prop) σ0 Θ0 σ1 Θ1
-      (i : thread_id) (κs : list (observation Λ)) (ψ : hist → Prop) :
-    ¬ φ σ0 Θ0 → φ σ1 Θ1 → ¬ TpropDecided (tprop_finally (tprop_state φ)) ψ.
+  (** Soundness: for a complete [G], in-logic entailment implies trace inclusion. *)
+  Lemma tprop_le_sound `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G G' `{!TpropComplete G} :
+    G ⊑ G' → tprop_tr G ⊆ tprop_tr G'.
   Proof.
-    intros H0 H1 Hd.
-    set (τ1 := λ m : nat, match m with 0 => ((Θ0, σ0), i, κs) | _ => ((Θ1, σ1), i, κs) end).
-    set (τ2 := λ _ : nat, ((Θ0, σ0), i, κs) : trace_state Λ).
-    assert (Hh : trace_hist 0 τ1 = trace_hist 0 τ2) by done.
-    assert (HF : tprop_tr (Σ:=Σ) (tprop_finally (tprop_state φ)) (0, τ1)).
-    { exists 1. split_and!; [lia|done|]. intros l Hl. done. }
-    apply Hd in HF. rewrite Hh in HF. apply Hd in HF.
-    destruct HF as (m & _ & Hm & _). by apply H0.
+    intros Hle τ HG. apply tprop_valid_tr. intros Ht. rewrite -(Hle Ht τ). by apply tprop_complete.
   Qed.
 
-End decided.
-Global Hint Mode TpropDecided - - ! - : typeclass_instances.
+  (** Incompleteness: [□ ⊥ ⊆ ⊥] holds on traces, but [□ ⊥ ⊑ ⊥] does not hold in the logic
+      (the reading of [□ ⊥] starts with a later, so it is proved by Löb induction). *)
+  Lemma tprop_always_elim_not_le `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} (τ : trace Λ) :
+    ¬ ((□ ⌜False⌝)%T ⊑ (⌜False⌝ : tprop Λ Σ)%T).
+  Proof.
+    intros Hle. apply (tprop_valid_tr (tprop_pure False) τ). intros Ht.
+    iLöb as "IH". iPoseProof (Hle Ht τ with "[IH]") as "%HF"; last done.
+    rewrite /= ti_always_unfold /ti_always_pre.
+    iApply fupd_mask_intro; first set_solver. iIntros "_". iNext. done.
+  Qed.
+
+End model.

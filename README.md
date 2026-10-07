@@ -105,6 +105,13 @@ carrier-set superscripts.
   that whenever `P` holds, the rest of the execution satisfies the semantic trace property
   `G` (`tprop`). Guarantees are inferred by `IntoTemporal` instances, and adequacy concludes the
   trace reading `tprop_tr G` (`trace/guarantee.v`; inference in `trace/guarantee_infer.v`).
+* *Two entailments of trace properties.* A `tprop` has an in-logic reading, which the run
+  establishes, and a trace reading, which adequacy concludes. In-logic entailment `G ⊑ H`
+  (`tprop_le`) transports guarantees (`temporal_weaken`) and is what the connectives are
+  monotone in, but it is too weak for temporal reasoning (`tprop_always_elim_not_le`). Trace
+  entailment `tprop_tr G ⊆ R` is LTL on traces (`trace/trace_pred.v`), and the cast
+  `tprop_cast G R pf` transports it along a guarantee (`temporal_cast`). `IntoTrace P R`
+  infers the trace property that `P` guarantees (`trace/guarantee_infer.v`).
 
 Naming conventions: `oblP_*` are obligation predicates, `witP_*` witness predicates,
 `thP_*` per-thread predicates, `parP_*` predicates on parents (`thP_kids i K` and

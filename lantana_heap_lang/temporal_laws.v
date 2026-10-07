@@ -34,17 +34,27 @@ Section laws.
   Local Lemma ex_pointsto_temporal l dq v : ⊢ l ↦{dq} v ⊨ₜ (l ↦{dq} v).
   Proof. apply (into_temporal _ _). Qed.
 
-  (** An implication with a state antecedent, from a case split on the state: the value of
-      [l] decides the disjunct. The antecedent [l ↦ v0] is read on the trace. *)
-  Lemma temporal_impl_pointsto_example l v0 v1 (P0 P1 : iProp Σ) G0 :
+  (** Implications are exported on traces ([temporal_cast]): the inferred guarantee of a
+      case split on the value of [l], read on traces, implies "[l ↦ v0] now → [G0]". *)
+  Lemma ex_impl_pointsto l v0 v1 (P0 P1 : iProp Σ) G0 `{!IntoTemporal P0 G0} :
     v0 ≠ v1 →
-    P0 ⊨ₜ G0 -∗ ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊨ₜ ((l ↦ v0) → G0).
+    tr_sem ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊆ ((l ↦ v0) → tprop_tr G0)%R.
   Proof.
-    iIntros (Hv) "#HG". iApply (temporal_impl_state _ _ P0 with "HG").
-    iIntros "!>" (σ Θ κs Hl) "[SI [[_ HP]|[Hl1 _]]]"; first by iFrame.
-    iDestruct (pointsto_state_interp σ Θ κs l (DfracOwn 1) v1 with "[$SI $Hl1]") as %H1.
-    rewrite /pointsto_sat in Hl H1. rewrite Hl in H1. by simplify_eq.
+    intros Hv. etrans; first apply (into_trace _ _).
+    intros [n τf]. tr_unfold. destruct (τf n) as (((Θ&σ)&?)&?).
+    intros [[H0 HG]|[H1 _]] H0'; first done. exfalso. rewrite /pointsto_sat in H0' H1. simplify_eq.
   Qed.
+
+  (** Inference is compositional, hence incomplete: [l ↦ v ∗ l ↦ v] is inconsistent, so it
+      guarantees [⊥] ([temporal_mono]), while its inferred guarantee is satisfiable. *)
+  Lemma ex_sep_bot l v : ⊢ (l ↦ v ∗ l ↦ v) ⊨ₜ ⌜False⌝.
+  Proof.
+    iApply (temporal_mono ⌜False⌝%I); last iApply temporal_pure.
+    iIntros "!> [H1 H2]". by iDestruct (pointsto_ne with "H1 H2") as %?.
+  Qed.
+  Local Lemma ex_sep_inferred l v :
+    (ltac:(tr_of (l ↦ v ∗ l ↦ v)%I) : trProp heap_lang) = ((l ↦ v) ∧ (l ↦ v))%R.
+  Proof. done. Qed.
 
   (** Discharging a [finally] on the thread's final value, with credits from earlier steps. *)
   Lemma thread_expr_terminate_finally i E v k N :

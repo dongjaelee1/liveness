@@ -179,6 +179,33 @@ Global Hint Extern 100 (@IntoTemporal ?Λ ?Σ ?Ht ?Hs ?P ?G) =>
   first [evar_headed G | unify G (@tprop_true Λ Σ)];
   notypeclasses refine (into_temporal_default P) : typeclass_instances.
 
+(** ** The trace reading of a guarantee
+
+    [tprop_sem P] reads on traces as any property that [P] validly guarantees; with
+    [IntoTemporal] this gives a trace reading of properties that mention [tprop_sem] (the
+    readings of the registered structures). [IntoTrace P R]: [P] guarantees the trace
+    property [R] ([tr_sem P ⊆ R]), by inferring a guarantee and reading it on traces: the
+    form that adequacy takes. *)
+Section into_trace.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
+
+  Global Instance tprop_tr_sem P G R : IntoTemporal P G → TpropTr G R → TpropTr (tprop_sem P) R | 10.
+  Proof. intros HG HR τ Hτ. apply HR. exact (tprop_sem_tr P G τ HG Hτ). Qed.
+
+  Class IntoTrace (P : iProp Σ) (R : trProp Λ) : Prop := into_trace : tr_sem P ⊆ R.
+
+  Global Instance into_trace_of P G R : IntoTemporal P G → TpropTr G R → IntoTrace P R | 10.
+  Proof. intros HG HR. apply tr_sem_le. by exists G. Qed.
+End into_trace.
+Global Arguments into_trace {_ _ _ _} _ _ {_}.
+Global Hint Mode IntoTrace - - - - ! - : typeclass_instances.
+
+(** The trace property inferred for [P]: [Definition R : trProp Λ := ltac:(tr_of P).] *)
+Definition trsem `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
+  (P : iProp Σ) {R : trProp Λ} `{!IntoTrace P R} : trProp Λ := R.
+Global Arguments trsem {_ _ _ _} _ {_ _}.
+Ltac tr_of P := let R := eval cbv [trsem] in (trsem P%I) in exact R.
+
 (** ** Examples and unit checks *)
 Section examples.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
@@ -273,11 +300,20 @@ Section examples.
     apply (temporal_impl_intro _ _ _ _ (tprop_le_refl _)).
   Qed.
 
-  (** Decided antecedents compose: the decider of a compound antecedent is inferred. *)
-  Local Lemma ex_decided (φ : Prop) (ψ : state Λ → thread_pool Λ → Prop) :
-    TpropDecided (Σ:=Σ) (tprop_or (tprop_pure φ) (tprop_impl (tprop_state ψ) (tprop_pure False)))
-      (λ h, φ ∨ (hist_now ψ h → False)).
-  Proof. apply _. Qed.
+  (** The inferred trace property of an iProp, as a trace predicate. *)
+  Local Lemma ex_tr_of N1 N2 k :
+    (ltac:(tr_of ((∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k 1 Ψ)%I)) : trProp Λ) =
+    (□ ⌜True⌝ ∧ ◇ ⌜True⌝)%R.
+  Proof. done. Qed.
+
+  (** An implication, exported on traces: the inferred guarantee of a case split, read on
+      traces, implies it (compare [temporal_impl]). *)
+  Local Lemma ex_impl_cast (φ : Prop) (P Q : iProp Σ) G H `{!IntoTemporal P G} `{!IntoTemporal Q H} :
+    tr_sem ((⌜φ⌝ ∗ P) ∨ (⌜¬φ⌝ ∗ Q)) ⊆ (⌜φ⌝ → tprop_tr G)%R.
+  Proof.
+    etrans; first apply (into_trace _ _). tr_unfold.
+    intros τ [[Hφ HG]|[Hnφ _]] H'; [done|contradiction].
+  Qed.
 
   (** Unsound: an iProp implication guaranteeing the implication of the guarantees (the
       antecedent's resources are not determined by the trace). *)

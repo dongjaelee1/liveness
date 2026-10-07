@@ -242,10 +242,15 @@ Section rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Implicit Types G : tprop Λ Σ.
 
-  Lemma temporal_weaken P G G' : tprop_le G G' → P ⊨ₜ G ⊢ P ⊨ₜ G'.
+  Lemma temporal_weaken P G G' : G ⊑ G' → P ⊨ₜ G ⊢ P ⊨ₜ G'.
   Proof.
     iIntros (Hle) "#HG !>". iIntros (?????????) "H". iApply tguar_mono; first done. by iApply "HG".
   Qed.
+
+  (** Every trace-level consequence [R] of [G] is guaranteed along with [G], as the cast of
+      [G] to [R]: the general way to export what a guarantee implies. *)
+  Lemma temporal_cast P G R (pf : tprop_tr G ⊆ R) : P ⊨ₜ G ⊢ P ⊨ₜ tprop_cast G R pf.
+  Proof. apply temporal_weaken, tprop_cast_le. Qed.
 
   Lemma temporal_mono P Q G : □ (Q -∗ P) -∗ P ⊨ₜ G -∗ Q ⊨ₜ G.
   Proof.
@@ -330,6 +335,25 @@ Section rules.
   Lemma tprop_sem_tr Q G τ : (⊢ Q ⊨ₜ G) → tprop_tr (tprop_sem Q) τ → tprop_tr G τ.
   Proof. intros HG H. apply (H (exist (λ G, ⊢ Q ⊨ₜ G) G HG)). Qed.
 
+  (** [tprop_sem Q] is the greatest lower bound of the properties [Q] validly guarantees: the
+      rules for guarantees are complete, up to in-logic entailment, through it. *)
+  Lemma temporal_sem_complete Q G : (⊢ Q ⊨ₜ G) ↔ tprop_sem Q ⊑ G.
+  Proof.
+    split; first apply tprop_sem_le. intros Hle.
+    iApply (temporal_weaken _ _ _ Hle). iApply temporal_sem.
+  Qed.
+
+  (** Its trace reading: the strongest trace property [Q] validly guarantees. [Q] guarantees
+      a trace property [R] iff it validly guarantees some [G] whose trace reading implies
+      [R]. *)
+  Definition tr_sem Q : trProp Λ := tprop_tr (tprop_sem Q).
+  Lemma tr_sem_le Q R : tr_sem Q ⊆ R ↔ ∃ G, (⊢ Q ⊨ₜ G) ∧ tprop_tr G ⊆ R.
+  Proof.
+    split.
+    - intros HR. exists (tprop_sem Q). split; [apply temporal_sem|done].
+    - intros (G & HG & HR) τ Hτ. apply HR. by eapply tprop_sem_tr.
+  Qed.
+
   (** Trace-visible existential quantification, over small types. *)
   Lemma temporal_exist {X : Type} `{!TypeExistentialProperty X ordI} (P : X → iProp Σ) (G : X → tprop Λ Σ) :
     (∀ x, P x ⊨ₜ G x) -∗ (∃ x, P x) ⊨ₜ tprop_exist G.
@@ -405,100 +429,32 @@ End state_rules.
 
 (** ** Implications
 
-    The antecedent [A] of [A → G] is read on the trace ([tprop_impl]), so the implication is
-    [¬A ∨ G] ([tprop_impl_or_not]). A guarantee is taken at a position [n], from the history
-    and the model at [n], before the rest of the trace is known. So an iProp [R] guarantees
-    [A → G] in two ways: by trace-level reasoning on a guarantee of [R]
-    ([temporal_impl_intro], [temporal_impl_weaken], and [temporal_weaken] with
-    [tprop_impl_or_not]), or by a case split of [R] at [n] whose other cases are refuted by
-    the history so far ([temporal_impl_hist]). An antecedent that the history does not
-    decide (e.g. one about the future), or an iProp antecedent that the context does not
-    provide, cannot be used: see [naive_impl_rule_unsound] in guarantee_infer.v. The
-    antecedents decided by the history are the class [TpropDecided] (trace_prop.v): pure facts,
-    state atoms, and their combinations by [∧], [∨], [→], [∀], [∃]
-    ([temporal_impl_decided], [temporal_impl_state], [temporal_impl]). Temporal antecedents
-    ([□], [𝒰], [◇]) are not decided; they go through [temporal_impl_intro]. *)
+    The antecedent [A] of [A → G] is read on the trace ([tprop_impl]), so [A → G] is [¬A ∨ G]
+    ([tprop_impl_or_not]). An implication is a statement about traces, and the general way
+    to export one is the cast ([temporal_cast]): from [P ⊨ₜ H] and
+    [tprop_tr A ∧ tprop_tr H ⊆ R] on traces, where every law of LTL is available, [P]
+    guarantees [tprop_tr A → R]. The rules below stay in the logic and produce the connective
+    [tprop_impl] itself: from a complete antecedent ([temporal_impl_intro]), by weakening
+    ([temporal_impl_weaken]), and for a pure antecedent of an iProp implication
+    ([temporal_impl]). An iProp antecedent that the context does not provide cannot be used:
+    see [naive_impl_rule_unsound] in guarantee_infer.v. *)
 Section impl_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
-  (** A guarantee extends to an implication whose complete antecedent, together with it,
-      entails the consequent. *)
   Lemma temporal_impl_intro P A H G `{!TpropComplete A} :
-    tprop_le (tprop_and A H) G → P ⊨ₜ H ⊢ P ⊨ₜ tprop_impl A G.
+    (A ∧ H)%T ⊑ G → P ⊨ₜ H ⊢ P ⊨ₜ (A → G).
   Proof. intros HG. by apply temporal_weaken, tprop_impl_intro. Qed.
 
-  Lemma temporal_impl_weaken P A G : P ⊨ₜ G ⊢ P ⊨ₜ tprop_impl A G.
+  Lemma temporal_impl_weaken P A G : P ⊨ₜ G ⊢ P ⊨ₜ (A → G).
   Proof. apply temporal_weaken, tprop_impl_intro_le. Qed.
 
-  (** The general rule: at every position, [R] gives [P] (keeping the history and the
-      model), which guarantees the implication, or every trace with the history so far
-      falsifies [A] there. *)
-  Lemma temporal_impl_hist R P A G :
-    P ⊨ₜ tprop_impl A G -∗
-    □ (∀ h n σ Θ κs m i Ω W,
-         history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ R -∗
-         (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ P) ∨
-         ⌜∀ τf, hist_trace h τf → ¬ tprop_tr A (n, τf)⌝) -∗
-    R ⊨ₜ tprop_impl A G.
-  Proof.
-    iIntros "#HG #HD !>" (h n σ Θ κs m i Ω W) "(HI& MI& HR)".
-    iPoseProof (history_interp_lb with "HI") as "#Hlb".
-    iDestruct ("HD" with "[$HI $MI $HR]") as "[(HI& MI& HP)|%Hno]".
-    - iApply (temporal_elim with "HG [$HI $MI $HP]").
-    - iApply tguar_intro. iIntros "!>" (Sys l h' g v2 Ω2 W' τf γ σ' Θ' κs') "_ %Hf _ (HI'& _)".
-      destruct Hf as (_& _& _& HIST).
-      iDestruct (history_interp_lb_prefix with "[$HI' $Hlb]") as %Hpre.
-      rewrite /= /ti_impl. iIntros (HA). exfalso. apply (Hno τf); last done.
-      intros n' σ'' Θ'' κs'' Hn'. apply HIST. by eapply prefix_lookup_Some.
-  Qed.
-
-  (** The history at [n] lists the configurations of the trace up to [n]. *)
-  Lemma hist_trace_trace_hist h n (τf : nat → trace_state Λ) :
-    length h = S n → hist_trace h τf → trace_hist n τf = h.
-  Proof.
-    intros Hlen HIST. apply list_eq. intros m. rewrite /trace_hist list_lookup_fmap.
-    destruct (decide (m < S n)) as [Hm|Hm].
-    - rewrite lookup_seq_lt //=.
-      destruct (h !! m) as [[[σ Θ] κs]|] eqn:Hhm; last (apply lookup_ge_None in Hhm; lia).
-      destruct (HIST _ _ _ _ Hhm) as [i' ->]. done.
-    - rewrite lookup_seq_ge; last lia. symmetry. apply lookup_ge_None. lia.
-  Qed.
-
-  (** A decided antecedent: [R] gives [P] wherever the history satisfies the decider [ψ]. *)
-  Lemma temporal_impl_decided A ψ `{!TpropDecided A ψ} R P G :
-    P ⊨ₜ G -∗
-    □ (∀ h n σ Θ κs m i Ω W, ⌜ψ h⌝ -∗
-         history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ R -∗
-         history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ P) -∗
-    R ⊨ₜ tprop_impl A G.
-  Proof.
-    iIntros "#HG #HR". iApply (temporal_impl_hist with "[]"); first by iApply temporal_impl_weaken.
-    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& R)".
-    iDestruct (history_interp_wf with "HI") as %[Hlen _].
-    destruct (Classical_Prop.classic (ψ h)) as [Hψ|Hψ].
-    - iLeft. iApply ("HR" with "[//] [$HI $MI $R]").
-    - iRight. iPureIntro. intros τf HIST HA. apply Hψ.
-      rewrite -(hist_trace_trace_hist h n τf) //. by apply (tprop_decided (A:=A) n τf).
-  Qed.
-
-  (** A state antecedent: [R] gives [P] whenever the current state satisfies [φ]. *)
-  Lemma temporal_impl_state (φ : state Λ → thread_pool Λ → Prop) R P G :
-    P ⊨ₜ G -∗
-    □ (∀ σ Θ κs, ⌜φ σ Θ⌝ -∗ state_interp σ Θ κs ∗ R -∗ state_interp σ Θ κs ∗ P) -∗
-    R ⊨ₜ tprop_impl (tprop_state φ) G.
-  Proof.
-    iIntros "#HG #HR". iApply (temporal_impl_decided with "HG").
-    iIntros "!>" (h n σ Θ κs m i Ω W (σ'&Θ'&κs'&Hl&Hφ)) "(HI& $& R)".
-    rewrite /history_interp. iDestruct "HI" as "(%Hh& Ha& SI)".
-    assert (Hlast := proj2 Hh). rewrite Hlast in Hl. simplify_eq.
-    iDestruct ("HR" with "[//] [$SI $R]") as "[SI $]". by iFrame.
-  Qed.
-
-  (** A pure antecedent. *)
+  (** A pure antecedent is decided outside the logic. *)
   Lemma temporal_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (⌜φ⌝ → G).
   Proof.
-    iIntros "#HG". iApply (temporal_impl_decided with "HG").
-    iIntros "!>" (h n σ Θ κs m i Ω W Hφ) "($& $& HP)". by iApply "HP".
+    iIntros "#HG". destruct (Classical_Prop.classic φ) as [Hφ|Hφ].
+    - iApply temporal_impl_weaken. iApply (temporal_mono with "[] HG"). iIntros "!> HP". by iApply "HP".
+    - iApply (temporal_weaken _ tprop_true); last iApply temporal_true.
+      intros ??. rewrite /= /ti_impl. by iIntros "_ %".
   Qed.
 
 End impl_rules.

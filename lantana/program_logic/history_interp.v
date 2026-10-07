@@ -53,16 +53,6 @@ Local Definition hG_event_unseal :
   @hG_event = @hG_event_def := hG_event_aux.(seal_eq).
 Global Arguments hG_event {SI Σ St _}.
 
-(** A persistent lower bound of the history: every later history extends [h]. *)
-Local Definition hG_history_lb_def `{SI : sidx} `{@histGS SI Σ St}
-  (h : list St) : iProp Σ :=
-  (own hist_name (◯ML (h : list (leibnizO _))))%I.
-Local Definition hG_history_lb_aux : seal (@hG_history_lb_def). Proof. by eexists. Qed.
-Definition hG_history_lb := hG_history_lb_aux.(unseal).
-Local Definition hG_history_lb_unseal :
-  @hG_history_lb = @hG_history_lb_def := hG_history_lb_aux.(seal_eq).
-Global Arguments hG_history_lb {SI Σ St _}.
-
 (** Properties *)
 Section history_ghost.
   Context `{SI : sidx} `{HIST : !histGS Σ St}.
@@ -74,21 +64,6 @@ Section history_ghost.
   Proof. rewrite hG_event_unseal /hG_event_def. apply _. Qed.
   Global Instance hG_event_timeless n e : Timeless (hG_event n e).
   Proof. rewrite hG_event_unseal /hG_event_def. apply _. Qed.
-
-  Global Instance hG_history_lb_persistent h : Persistent (hG_history_lb h).
-  Proof. rewrite hG_history_lb_unseal /hG_history_lb_def. apply _. Qed.
-
-  Lemma hG_history_lb_get h : hG_history_auth h ⊢ hG_history_lb h.
-  Proof.
-    rewrite hG_history_auth_unseal /hG_history_auth_def hG_history_lb_unseal /hG_history_lb_def.
-    iIntros "H". rewrite mono_list_auth_lb_op. iDestruct "H" as "[_ $]".
-  Qed.
-
-  Lemma hG_history_lb_prefix h h' : hG_history_auth h' ∗ hG_history_lb h ⊢ ⌜h `prefix_of` h'⌝.
-  Proof.
-    rewrite hG_history_auth_unseal /hG_history_auth_def hG_history_lb_unseal /hG_history_lb_def.
-    iIntros "[H E]". iCombine "H E" gives %V. iPureIntro. by apply mono_list_both_valid_L in V.
-  Qed.
 
   Lemma hG_history_auth_app h1 h2 :
     hG_history_auth h1 ⊢ |==> hG_history_auth (h1 ++ h2).
@@ -178,15 +153,6 @@ Section hist.
   Proof.
     rewrite /history_interp.
     iIntros "[(%& Ha& SI) #HE]". destruct H. iPoseProof (hG_event_history_lookup with "[$]") as "%". auto.
-  Qed.
-
-  Lemma history_interp_lb h n σ Θ κs : history_interp h n σ Θ κs ⊢ hG_history_lb h.
-  Proof. rewrite /history_interp. iIntros "(_& Ha& _)". by iApply hG_history_lb_get. Qed.
-
-  Lemma history_interp_lb_prefix h n σ Θ κs h0 :
-    history_interp h n σ Θ κs ∗ hG_history_lb h0 ⊢ ⌜h0 `prefix_of` h⌝.
-  Proof.
-    rewrite /history_interp. iIntros "[(_& Ha& _) Hlb]". iApply (hG_history_lb_prefix with "[$Ha $Hlb]").
   Qed.
 
 End hist.
