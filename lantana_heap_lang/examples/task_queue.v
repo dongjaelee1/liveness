@@ -267,15 +267,15 @@ Section proof.
 
   (** ** Temporal guarantees *)
   (** A task queue guarantees what its queue does: the tasks ([is_task]) are Hoare triples
-      with ghost resources, guaranteeing [tprop_true]. That every task runs is expressed by
+      with ghost resources, guaranteeing [itProp_true]. That every task runs is expressed by
       obligations. *)
-  Definition task_queue_tprop (ql : val) : tprop heap_lang Σ := queue_tprop ql.
+  Definition task_queue_itProp (ql : val) : itProp heap_lang Σ := queue_itProp ql.
 
-  Lemma is_task_queue_temporal ql γ ℓ : ⊢ is_task_queue ql γ ℓ ⊨ₜ task_queue_tprop ql.
-  Proof. rewrite /is_task_queue /task_queue_tprop. apply (into_temporal _ _). Qed.
+  Lemma is_task_queue_temporal ql γ ℓ : ⊢ is_task_queue ql γ ℓ ⊨ₜ task_queue_itProp ql.
+  Proof. rewrite /is_task_queue /task_queue_itProp. apply (into_temporal _ _). Qed.
 
   Global Instance is_task_queue_into_temporal ql γ ℓ :
-    IntoTemporal (is_task_queue ql γ ℓ) (task_queue_tprop ql) | 0.
+    IntoTemporal (is_task_queue ql γ ℓ) (task_queue_itProp ql) | 0.
   Proof. apply is_task_queue_temporal. Qed.
 
 End proof.
@@ -285,7 +285,7 @@ Section trace.
 
   (** Every [put_task] or [run_task] that takes the queue's lock eventually releases it. *)
   Lemma task_queue_release_progress {Σ} ql τ :
-    tprop_tr (task_queue_tprop (Σ:=Σ) ql) τ →
+    itProp_external (task_queue_itProp (Σ:=Σ) ql) τ →
     ∃ lhptr ltptr next curr : loc,
       ql = (#lhptr, #ltptr, (#next, #curr))%V ∧ release_progress next curr τ.
   Proof. apply queue_release_progress. Qed.

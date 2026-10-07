@@ -298,19 +298,19 @@ Section adequacy.
               (thP_kids i {[kl; kc]} ∗ oblP_kids kl ∅ ∗ oblP_kids kc ∅ ∗ ⌜kl ≠ kc⌝ ∗
                ([∗ set] g ∈ {[kl; kc]}, oblP_fuel g (ℓq ⊕ 3)%ordi μ)))%I.
 
-  Let G_main {Σ} : tprop heap_lang Σ :=
-        (tprop_finally (exits #1@i) ∧
-         tprop_finally (tprop_exist (λ x : loc, flag_tprop x) ∧ tprop_exist (λ ql : val, task_queue_tprop ql)) ∧
-         tprop_true)%T.
+  Let G_main {Σ} : itProp heap_lang Σ :=
+        (itProp_finally (exits #1@i) ∧
+         itProp_finally (itProp_exist (λ x : loc, flag_itProp x) ∧ itProp_exist (λ ql : val, task_queue_itProp ql)) ∧
+         itProp_true)%IT.
 
   Lemma Φ_P_temporal `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_main_impl {Σ} τ : tprop_tr (G_main (Σ:=Σ)) τ → R_main τ ∧ R_queue τ.
+  Remark G_main_impl {Σ} τ : itProp_external (G_main (Σ:=Σ)) τ → R_main τ ∧ R_queue τ.
   Proof.
     intros (Hr& Hf& _). destruct τ as [n τf]. destruct Hf as (m& Hm& [[x Hx] [ql Hq]]& Hb).
     split; [split; first exact Hr|].
-    - exists m. split_and!; [done| |done]. exists x. exact (flag_tprop_impl x (m, τf) Hx).
+    - exists m. split_and!; [done| |done]. exists x. exact (flag_itProp_impl x (m, τf) Hx).
     - exists m. split_and!; [done| |done].
       destruct (task_queue_release_progress ql (m, τf) Hq) as (lhptr & ltptr & next & curr & _ & Hrp).
       by exists lhptr, ltptr, next, curr.

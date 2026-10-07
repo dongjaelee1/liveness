@@ -89,9 +89,9 @@ lantana/program_logic/ectxi_language.v
 lantana/program_logic/atomic.v
 
 # Traces, temporal guarantees and adequacy
-lantana/trace/trace_pred.v
-lantana/trace/trace_step_indexed.v
 lantana/trace/trace_prop.v
+lantana/trace/trace_step_indexed.v
+lantana/trace/itprop.v
 lantana/trace/trace_fixpoint.v
 lantana/trace/guarantee.v
 lantana/trace/guarantee_struct.v

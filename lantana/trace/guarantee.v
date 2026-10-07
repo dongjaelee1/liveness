@@ -1,14 +1,14 @@
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From lantana.trace Require Export trace_prop.
+From lantana.trace Require Export itprop.
 From transfinite.stepindex Require Import ordinals.
 
 (** * Temporal guarantees [P ⊨ₜ G]: records, the one-step property, rules for connectives
 
     Temporal formulas are ordinary iProps; [P ⊨ₜ G] is a persistent iProp saying that whenever
     [P] holds, the rest of the execution satisfies the trace property [G]. Adequacy concludes
-    [tprop_tr G].
+    [itProp_external G].
 
     At position [n], [P ⊨ₜ G] turns [P] into a record [tguar G n], which gives the reading of
     [G] at [n] once the step from [n] is made. A record may be written in the pre-step update
@@ -17,7 +17,7 @@ From transfinite.stepindex Require Import ordinals.
     its content certified at every position. A record holds for any running system with the
     one-step property [sys_step]; [lWP] is one (adequacy_temporal.v).
 
-    An existential is trace-visible ([tprop_exist]) only over small types (nat, Z, loc, gname,
+    An existential is trace-visible ([itProp_exist]) only over small types (nat, Z, loc, gname,
     ...), otherwise ghost ([temporal_exist_ghost]). The trace property of the adequacy is
     fixed at the meta level: dynamic names reach it through trace-visible existentials. *)
 
@@ -25,7 +25,7 @@ From transfinite.stepindex Require Import ordinals.
 
 Section guarantee.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
-  Implicit Types G : tprop Λ Σ.
+  Implicit Types G : itProp Λ Σ.
   Implicit Types P Q : iProp Σ.
 
   (** The history [h] is the one of the trace [τf]. *)
@@ -131,7 +131,7 @@ Section guarantee.
   Proof. iIntros "Heq H". iApply (internal_eq_rewrite f g (λ f, tguar_ti f n) with "Heq H"). Qed.
 
   (** Records of a trace property, the bundle, the certificates and the step property. *)
-  Definition tguar G n : iProp Σ := tguar_ti (tprop_ti G) n.
+  Definition tguar G n : iProp Σ := tguar_ti (itProp_internal G) n.
   Definition bundle l n : iProp Σ := bundle_pre tguar_ti l n.
   Definition cert n e : iProp Σ := cert_pre tguar_ti n e.
   Definition sys_step (Sys : sysT) : iProp Σ := sys_step_pre tguar_ti Sys.
@@ -180,7 +180,7 @@ Section guarantee.
       ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
       bundle l n -∗
       history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
-      tprop_ti G (n, τf)) ⊢ tguar G n.
+      itProp_internal G (n, τf)) ⊢ tguar G n.
   Proof. apply tguar_ti_intro. Qed.
 
   Lemma tguar_elim G (Sys : sysT) l h n g v Ω W τf γ σ Θ κs :
@@ -189,7 +189,7 @@ Section guarantee.
     ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
     bundle l n -∗
     history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
-    tprop_ti G (n, τf).
+    itProp_internal G (n, τf).
   Proof. apply tguar_ti_elim. Qed.
 
   Lemma temporal_elim P G h n σ Θ κs m i Ω W :
@@ -217,7 +217,7 @@ Section guarantee.
   Global Instance temporal_proper_ne n : Proper (dist n ==> (=) ==> dist n) temporal.
   Proof. intros P P' HP G ? <-. by apply temporal_ne. Qed.
 
-  Lemma tguar_mono G G' n : tprop_le G G' → tguar G n ⊢ tguar G' n.
+  Lemma tguar_mono G G' n : itProp_le G G' → tguar G n ⊢ tguar G' n.
   Proof.
     iIntros (Hle) "#HG". iApply tguar_intro. iIntros "!>" (????????????) "#ST %H #B W".
     iApply Hle. by iApply (tguar_elim with "HG ST [//] B W").
@@ -225,22 +225,22 @@ Section guarantee.
 
 End guarantee.
 
-Notation "P ⊨ₜ G" := (temporal P%I G%T) (at level 70, format "P  ⊨ₜ  G") : bi_scope.
+Notation "P ⊨ₜ G" := (temporal P%I G%IT) (at level 70, format "P  ⊨ₜ  G") : bi_scope.
 
 (** The canonical trace property of an iProp: the meet of all trace properties that it
     validly guarantees. The registered structures store it for their contents, so temporal
     formulas carry no trace-property annotations. *)
-Definition tprop_sem `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (Q : iProp Σ) : tprop Λ Σ :=
-  tprop_forall (λ G : {G : tprop Λ Σ | ⊢ Q ⊨ₜ G}, proj1_sig G).
-(* Opaque for the proof mode: unification must not compare two [tprop_sem] through their
+Definition itProp_sem `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (Q : iProp Σ) : itProp Λ Σ :=
+  itProp_forall (λ G : {G : itProp Λ Σ | ⊢ Q ⊨ₜ G}, proj1_sig G).
+(* Opaque for the proof mode: unification must not compare two [itProp_sem] through their
    bodies (the index type is a proposition about the argument). *)
-Global Typeclasses Opaque tprop_sem.
+Global Typeclasses Opaque itProp_sem.
 
 (** ** Rules *)
 
 Section rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
-  Implicit Types G : tprop Λ Σ.
+  Implicit Types G : itProp Λ Σ.
 
   Lemma temporal_weaken P G G' : G ⊑ G' → P ⊨ₜ G ⊢ P ⊨ₜ G'.
   Proof.
@@ -249,20 +249,20 @@ Section rules.
 
   (** Every trace-level consequence [R] of [G] is guaranteed along with [G], as the cast of
       [G] to [R]: the general way to export what a guarantee implies. *)
-  Lemma temporal_cast P G R (pf : tprop_tr G ⊆ R) : P ⊨ₜ G ⊢ P ⊨ₜ tprop_cast G R pf.
-  Proof. apply temporal_weaken, tprop_cast_le. Qed.
+  Lemma temporal_cast P G R (pf : itProp_external G ⊆ R) : P ⊨ₜ G ⊢ P ⊨ₜ itProp_cast G R pf.
+  Proof. apply temporal_weaken, itProp_cast_le. Qed.
 
   Lemma temporal_mono P Q G : □ (Q -∗ P) -∗ P ⊨ₜ G -∗ Q ⊨ₜ G.
   Proof.
     iIntros "#HQP #HG !>". iIntros (?????????) "(HI& MI& HQ)". iApply "HG". iFrame. by iApply "HQP".
   Qed.
 
-  Lemma temporal_true P : ⊢ P ⊨ₜ tprop_true.
+  Lemma temporal_true P : ⊢ P ⊨ₜ itProp_true.
   Proof.
     iIntros "!>" (?????????) "_". iApply tguar_intro. iIntros "!>" (????????????) "_ _ _ _". done.
   Qed.
 
-  Lemma temporal_pure (φ : Prop) : ⊢ ⌜φ⌝ ⊨ₜ tprop_pure φ.
+  Lemma temporal_pure (φ : Prop) : ⊢ ⌜φ⌝ ⊨ₜ itProp_pure φ.
   Proof.
     iIntros "!>" (?????????) "(_& _& %Hφ)". iApply tguar_intro. iIntros "!>" (????????????) "_ _ _ _". done.
   Qed.
@@ -300,7 +300,7 @@ Section rules.
 
   (** The right formula fulfils an until at once; the later of the guarantee is stripped
       by the step of the until. *)
-  Lemma temporal_until_now P G1 G2 : ▷ (P ⊨ₜ G2) -∗ P ⊨ₜ tprop_until G1 G2.
+  Lemma temporal_until_now P G1 G2 : ▷ (P ⊨ₜ G2) -∗ P ⊨ₜ itProp_until G1 G2.
   Proof.
     iIntros "#HG !>" (h n σ Θ κs m i Ω W) "(HI& MI& HP)".
     iPoseProof (temporal_elim_later_guar P G2 with "HG [$HP $HI $MI]") as "#T".
@@ -312,8 +312,8 @@ Section rules.
   Qed.
 
   (** Universal quantification over any type. *)
-  Lemma temporal_forall {X : Type} (P : X → iProp Σ) (G : X → tprop Λ Σ) :
-    (∀ x, P x ⊨ₜ G x) -∗ (∀ x, P x) ⊨ₜ tprop_forall G.
+  Lemma temporal_forall {X : Type} (P : X → iProp Σ) (G : X → itProp Λ Σ) :
+    (∀ x, P x ⊨ₜ G x) -∗ (∀ x, P x) ⊨ₜ itProp_forall G.
   Proof.
     iIntros "#HG !>" (?????????) "(HI& MI& HP)".
     iAssert (∀ x, tguar (G x) _)%I with "[-]" as "#T".
@@ -322,41 +322,41 @@ Section rules.
     by iApply (tguar_elim with "T ST [//] B W").
   Qed.
 
-  Lemma temporal_sem Q : ⊢ Q ⊨ₜ tprop_sem Q.
+  Lemma temporal_sem Q : ⊢ Q ⊨ₜ itProp_sem Q.
   Proof.
-    iApply (temporal_mono (∀ _ : {G : tprop Λ Σ | ⊢ Q ⊨ₜ G}, Q)%I with "[]").
+    iApply (temporal_mono (∀ _ : {G : itProp Λ Σ | ⊢ Q ⊨ₜ G}, Q)%I with "[]").
     { iIntros "!> HQ" (?). done. }
     iApply temporal_forall. iIntros ([G HG]). iApply HG.
   Qed.
-  Lemma tprop_sem_le Q G : (⊢ Q ⊨ₜ G) → tprop_le (tprop_sem Q) G.
+  Lemma itProp_sem_le Q G : (⊢ Q ⊨ₜ G) → itProp_le (itProp_sem Q) G.
   Proof.
     intros HG ??. rewrite /= /ti_forall. iIntros "H". iApply ("H" $! (exist (λ G, ⊢ Q ⊨ₜ G) G HG)).
   Qed.
-  Lemma tprop_sem_tr Q G τ : (⊢ Q ⊨ₜ G) → tprop_tr (tprop_sem Q) τ → tprop_tr G τ.
+  Lemma itProp_sem_ext Q G τ : (⊢ Q ⊨ₜ G) → itProp_external (itProp_sem Q) τ → itProp_external G τ.
   Proof. intros HG H. apply (H (exist (λ G, ⊢ Q ⊨ₜ G) G HG)). Qed.
 
-  (** [tprop_sem Q] is the greatest lower bound of the properties [Q] validly guarantees: the
+  (** [itProp_sem Q] is the greatest lower bound of the properties [Q] validly guarantees: the
       rules for guarantees are complete, up to in-logic entailment, through it. *)
-  Lemma temporal_sem_complete Q G : (⊢ Q ⊨ₜ G) ↔ tprop_sem Q ⊑ G.
+  Lemma temporal_sem_complete Q G : (⊢ Q ⊨ₜ G) ↔ itProp_sem Q ⊑ G.
   Proof.
-    split; first apply tprop_sem_le. intros Hle.
+    split; first apply itProp_sem_le. intros Hle.
     iApply (temporal_weaken _ _ _ Hle). iApply temporal_sem.
   Qed.
 
   (** Its trace reading: the strongest trace property [Q] validly guarantees. [Q] guarantees
       a trace property [R] iff it validly guarantees some [G] whose trace reading implies
       [R]. *)
-  Definition tr_sem Q : trProp Λ := tprop_tr (tprop_sem Q).
-  Lemma tr_sem_le Q R : tr_sem Q ⊆ R ↔ ∃ G, (⊢ Q ⊨ₜ G) ∧ tprop_tr G ⊆ R.
+  Definition tr_sem Q : trProp Λ := itProp_external (itProp_sem Q).
+  Lemma tr_sem_le Q R : tr_sem Q ⊆ R ↔ ∃ G, (⊢ Q ⊨ₜ G) ∧ itProp_external G ⊆ R.
   Proof.
     split.
-    - intros HR. exists (tprop_sem Q). split; [apply temporal_sem|done].
-    - intros (G & HG & HR) τ Hτ. apply HR. by eapply tprop_sem_tr.
+    - intros HR. exists (itProp_sem Q). split; [apply temporal_sem|done].
+    - intros (G & HG & HR) τ Hτ. apply HR. by eapply itProp_sem_ext.
   Qed.
 
   (** Trace-visible existential quantification, over small types. *)
-  Lemma temporal_exist {X : Type} `{!TypeExistentialProperty X ordI} (P : X → iProp Σ) (G : X → tprop Λ Σ) :
-    (∀ x, P x ⊨ₜ G x) -∗ (∃ x, P x) ⊨ₜ tprop_exist G.
+  Lemma temporal_exist {X : Type} `{!TypeExistentialProperty X ordI} (P : X → iProp Σ) (G : X → itProp Λ Σ) :
+    (∀ x, P x ⊨ₜ G x) -∗ (∃ x, P x) ⊨ₜ itProp_exist G.
   Proof.
     iIntros "#HG !>" (?????????) "(HI& MI& [%x HP])".
     iPoseProof (temporal_elim with "HG [$HI $MI $HP]") as "#T".
@@ -400,7 +400,7 @@ End rules.
 
     The atoms of temporal properties are facts about the current state: an iProp [P]
     determines [φ] when the state interpretation and [P] entail [φ] ([StateFact]), and then
-    [P] guarantees [tprop_state φ] ([temporal_state_fact]). A language provides the facts of
+    [P] guarantees [itProp_state φ] ([temporal_state_fact]). A language provides the facts of
     its assertions, e.g. [l ↦ v] for heap_lang (temporal_laws.v). *)
 Section state_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
@@ -409,7 +409,7 @@ Section state_rules.
     state_fact σ Θ κs : state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝.
 
   Lemma temporal_state (φ : state Λ → thread_pool Λ → Prop) (P : iProp Σ) :
-    (∀ σ Θ κs, state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝) → ⊢ P ⊨ₜ tprop_state φ.
+    (∀ σ Θ κs, state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝) → ⊢ P ⊨ₜ itProp_state φ.
   Proof.
     iIntros (Hφ). iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& _& HP)".
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
@@ -422,38 +422,38 @@ Section state_rules.
     apply HIST in Hh as [? Hτ]. simpl. rewrite Hτ. done.
   Qed.
 
-  Lemma temporal_state_fact P φ `{!StateFact P φ} : ⊢ P ⊨ₜ tprop_state φ.
+  Lemma temporal_state_fact P φ `{!StateFact P φ} : ⊢ P ⊨ₜ itProp_state φ.
   Proof. apply temporal_state, state_fact. Qed.
 
 End state_rules.
 
 (** ** Implications
 
-    The antecedent [A] of [A → G] is read on the trace ([tprop_impl]), so [A → G] is [¬A ∨ G]
-    ([tprop_impl_or_not]). An implication is a statement about traces, and the general way
+    The antecedent [A] of [A → G] is read on the trace ([itProp_impl]), so [A → G] is [¬A ∨ G]
+    ([itProp_impl_or_not]). An implication is a statement about traces, and the general way
     to export one is the cast ([temporal_cast]): from [P ⊨ₜ H] and
-    [tprop_tr A ∧ tprop_tr H ⊆ R] on traces, where every law of LTL is available, [P]
-    guarantees [tprop_tr A → R]. The rules below stay in the logic and produce the connective
-    [tprop_impl] itself: from a complete antecedent ([temporal_impl_intro]), by weakening
+    [itProp_external A ∧ itProp_external H ⊆ R] on traces, where every law of LTL is available, [P]
+    guarantees [itProp_external A → R]. The rules below stay in the logic and produce the connective
+    [itProp_impl] itself: from a complete antecedent ([temporal_impl_intro]), by weakening
     ([temporal_impl_weaken]), and for a pure antecedent of an iProp implication
     ([temporal_impl]). An iProp antecedent that the context does not provide cannot be used:
     see [naive_impl_rule_unsound] in guarantee_infer.v. *)
 Section impl_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
-  Lemma temporal_impl_intro P A H G `{!TpropComplete A} :
-    (A ∧ H)%T ⊑ G → P ⊨ₜ H ⊢ P ⊨ₜ (A → G).
-  Proof. intros HG. by apply temporal_weaken, tprop_impl_intro. Qed.
+  Lemma temporal_impl_intro P A H G `{!ItPropComplete A} :
+    (A ∧ H)%IT ⊑ G → P ⊨ₜ H ⊢ P ⊨ₜ (A → G).
+  Proof. intros HG. by apply temporal_weaken, itProp_impl_intro. Qed.
 
   Lemma temporal_impl_weaken P A G : P ⊨ₜ G ⊢ P ⊨ₜ (A → G).
-  Proof. apply temporal_weaken, tprop_impl_intro_le. Qed.
+  Proof. apply temporal_weaken, itProp_impl_intro_le. Qed.
 
   (** A pure antecedent is decided outside the logic. *)
   Lemma temporal_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (⌜φ⌝ → G).
   Proof.
     iIntros "#HG". destruct (Classical_Prop.classic φ) as [Hφ|Hφ].
     - iApply temporal_impl_weaken. iApply (temporal_mono with "[] HG"). iIntros "!> HP". by iApply "HP".
-    - iApply (temporal_weaken _ tprop_true); last iApply temporal_true.
+    - iApply (temporal_weaken _ itProp_true); last iApply temporal_true.
       intros ??. rewrite /= /ti_impl. by iIntros "_ %".
   Qed.
 
@@ -463,27 +463,27 @@ End impl_rules.
 Section big_op_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
-  Lemma temporal_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ) (G : K → A → tprop Λ Σ) :
+  Lemma temporal_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ) (G : K → A → itProp Λ Σ) :
     (∀ k x, Φ k x ⊨ₜ G k x) -∗
-    ([∗ map] k ↦ x ∈ m, Φ k x) ⊨ₜ tprop_forall (λ k, tprop_forall (λ x, tprop_impl ⌜m !! k = Some x⌝ (G k x))).
+    ([∗ map] k ↦ x ∈ m, Φ k x) ⊨ₜ itProp_forall (λ k, itProp_forall (λ x, itProp_impl ⌜m !! k = Some x⌝ (G k x))).
   Proof.
     iIntros "#HG". iApply (temporal_mono (∀ k x, ⌜m !! k = Some x⌝ → Φ k x)%I with "[]").
     { iIntros "!> H" (k x Hk). by iApply (big_sepM_lookup with "H"). }
     iApply temporal_forall. iIntros (k). iApply temporal_forall. iIntros (x). iApply temporal_impl. iApply "HG".
   Qed.
 
-  Lemma temporal_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → tprop Λ Σ) :
+  Lemma temporal_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → itProp Λ Σ) :
     (∀ k x, Φ k x ⊨ₜ G k x) -∗
-    ([∗ list] k ↦ x ∈ l, Φ k x) ⊨ₜ tprop_forall (λ k, tprop_forall (λ x, tprop_impl ⌜l !! k = Some x⌝ (G k x))).
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊨ₜ itProp_forall (λ k, itProp_forall (λ x, itProp_impl ⌜l !! k = Some x⌝ (G k x))).
   Proof.
     iIntros "#HG". iApply (temporal_mono (∀ k x, ⌜l !! k = Some x⌝ → Φ k x)%I with "[]").
     { iIntros "!> H" (k x Hk). by iApply (big_sepL_lookup with "H"). }
     iApply temporal_forall. iIntros (k). iApply temporal_forall. iIntros (x). iApply temporal_impl. iApply "HG".
   Qed.
 
-  Lemma temporal_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → tprop Λ Σ) :
+  Lemma temporal_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → itProp Λ Σ) :
     (∀ x, Φ x ⊨ₜ G x) -∗
-    ([∗ set] x ∈ X, Φ x) ⊨ₜ tprop_forall (λ x, tprop_impl ⌜x ∈ X⌝ (G x)).
+    ([∗ set] x ∈ X, Φ x) ⊨ₜ itProp_forall (λ x, itProp_impl ⌜x ∈ X⌝ (G x)).
   Proof.
     iIntros "#HG". iApply (temporal_mono (∀ x, ⌜x ∈ X⌝ → Φ x)%I with "[]").
     { iIntros "!> H" (x Hx). by iApply (big_sepS_elem_of with "H"). }

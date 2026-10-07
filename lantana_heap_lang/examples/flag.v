@@ -46,35 +46,35 @@ Section proof.
   Definition flag_tk (l : loc) k : iProp Σ :=
     untilI Np k (1/2) (l ↦ #0) (l ↦ #1).
 
-  Definition flag_tprop (l : loc) : tprop heap_lang Σ :=
-    (tprop_true ∧ tprop_always (tprop_until (l ↦ #0) (l ↦ #1) ∨ (tprop_true ∧ l ↦ #1)))%T.
+  Definition flag_itProp (l : loc) : itProp heap_lang Σ :=
+    (itProp_true ∧ itProp_always (itProp_until (l ↦ #0) (l ↦ #1) ∨ (itProp_true ∧ l ↦ #1)))%IT.
 
-  Lemma is_flag_temporal l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_tprop l.
+  Lemma is_flag_temporal l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_itProp l.
   Proof. apply (into_temporal _ _). Qed.
 
-  Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ tprop_until (l ↦ #0) (l ↦ #1).
+  Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ itProp_until (l ↦ #0) (l ↦ #1).
   Proof. apply (into_temporal _ _). Qed.
 
   (** Whenever the flag holds 0, it eventually holds 1. The antecedent rules out the
       invariant's other branch (the cell cannot hold 0 and 1 at once). *)
-  Definition flag_response_tprop (l : loc) : tprop heap_lang Σ :=
-    tprop_always (l ↦ #0 → tprop_finally (l ↦ #1))%T.
+  Definition flag_response_itProp (l : loc) : itProp heap_lang Σ :=
+    itProp_always (l ↦ #0 → itProp_finally (l ↦ #1))%IT.
 
-  Lemma flag_tprop_response l : tprop_le (flag_tprop l) (flag_response_tprop l).
+  Lemma flag_itProp_response l : itProp_le (flag_itProp l) (flag_response_itProp l).
   Proof.
-    eapply tprop_le_trans; first apply tprop_and_elim_r. apply tprop_always_mono.
-    assert (Hu := tprop_until_mono (Λ:=heap_lang) (Σ:=Σ) (l ↦ #0)%T (l ↦ #1)%T tprop_true (l ↦ #1)%T
-                    (tprop_le_true _) (tprop_le_refl _)).
-    rewrite /tprop_le in Hu. intros ? τ. cbn [tprop_ti tprop_or tprop_and tprop_impl].
+    eapply itProp_le_trans; first apply itProp_and_elim_r. apply itProp_always_mono.
+    assert (Hu := itProp_until_mono (Λ:=heap_lang) (Σ:=Σ) (l ↦ #0)%IT (l ↦ #1)%IT itProp_true (l ↦ #1)%IT
+                    (itProp_le_true _) (itProp_le_refl _)).
+    rewrite /itProp_le in Hu. intros ? τ. cbn [itProp_internal itProp_or itProp_and itProp_impl].
     unfold ti_or, ti_and, ti_impl. iIntros "[H|[_ H1]] %H0".
     - by iApply Hu.
-    - iDestruct (tprop_instant_state with "H1") as %H1. exfalso. destruct τ as [n τf].
-      revert H0 H1. cbn [tprop_tr tprop_state]. unfold tr_state, ts_emb, ts_state, pointsto_sat, trace_now. simpl.
+    - iDestruct (itProp_instant_state with "H1") as %H1. exfalso. destruct τ as [n τf].
+      revert H0 H1. cbn [itProp_external itProp_state]. unfold tr_state, ts_emb, ts_state, pointsto_sat, trace_now. simpl.
       destruct (τf n) as [[[??] ?] ?]. simpl. intros -> ?. by simplify_eq.
   Qed.
 
-  Lemma is_flag_response l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_response_tprop l.
-  Proof. iApply temporal_weaken; [apply flag_tprop_response|iApply is_flag_temporal]. Qed.
+  Lemma is_flag_response l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_response_itProp l.
+  Proof. iApply temporal_weaken; [apply flag_itProp_response|iApply is_flag_temporal]. Qed.
 
   (** The main proofs. *)
   Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).
@@ -304,8 +304,8 @@ Section trace.
   (** The flag at the level of traces: [0] until [1], and [1] from then on. *)
   Definition is_flag_tr (l : loc) : trProp heap_lang :=
     tr_always (tr_until (l ↦ #0) (l ↦ #1) ∨ (l ↦ #1))%R.
-  Lemma flag_tprop_impl {Σ : gFunctors} l :
-    ∀ τ, tprop_tr (flag_tprop (Σ:=Σ) l) τ → is_flag_tr l τ.
+  Lemma flag_itProp_impl {Σ : gFunctors} l :
+    ∀ τ, itProp_external (flag_itProp (Σ:=Σ) l) τ → is_flag_tr l τ.
   Proof.
     rewrite /is_flag_tr. simpl. unfold_trProp. intros. destruct τ. destruct H. intros. specialize (H0 _ H1).
     destruct H0.
@@ -327,10 +327,10 @@ Section trace.
     split; [by intros [= ->]|by intros ->].
   Qed.
 
-  Lemma flag_run_satisfies_guarantee {Σ : gFunctors} l : tprop_tr (flag_tprop (Σ:=Σ) l) (0, flag_run l).
+  Lemma flag_run_satisfies_guarantee {Σ : gFunctors} l : itProp_external (flag_itProp (Σ:=Σ) l) (0, flag_run l).
   Proof.
-    split; first done. intros m _. cbn [tprop_tr tprop_or tprop_and tprop_until tprop_state tprop_pure].
-    rewrite /tprop_true. cbn [tprop_tr tprop_pure]. unfold tr_or, tr_and, tr_pure, tr_until. cbv beta iota.
+    split; first done. intros m _. cbn [itProp_external itProp_or itProp_and itProp_until itProp_state itProp_pure].
+    rewrite /itProp_true. cbn [itProp_external itProp_pure]. unfold tr_or, tr_and, tr_pure, tr_until. cbv beta iota.
     destruct (decide (m = 0 ∨ m = 2)) as [Hm|Hm].
     - left. exists (S m). split_and!; [lia| |].
       + apply flag_run_at. rewrite decide_False; [done|lia].

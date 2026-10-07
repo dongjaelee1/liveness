@@ -1,510 +1,453 @@
-From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.trace Require Export trace_step_indexed.
-From transfinite.stepindex Require Import ordinals.
-From lantana.base_logic Require Import satisfiable.
+From lantana.program_logic Require Export language.
+From lantana.algebra Require Import axioms.
 
-(** * Semantic trace properties
+(** * Trace predicates
 
-    Trace properties ([tprop]) with an in-logic and a trace reading, their connectives, state
-    atoms, complete and instant properties, and the two entailments between properties: in
-    the logic ([G ⊑ H]), for the structure of a property, and on traces ([tprop_tr G ⊆ R]),
-    for its meaning (see "Trace readings" below). *)
+    Properties of executions ([trProp]): the LTL connectives, their fixpoints, fair
+    scheduling and Iris-style safety. *)
 
-(** ** Semantic trace properties *)
+(** ** Predicates on a trace state and on a trace *)
+Definition tsProp (Λ : language) := trace_state Λ → Prop.
 
-(** [tprop_ti]: the step-indexed reading, which the running system establishes in the logic;
-    [tprop_good]: its satisfiability implies the trace reading [tprop_tr]. *)
-Record tprop {Λ : language} {Σ : gFunctors} := Tprop {
-  tprop_ti : ∀ `{!temporalGS Λ Σ}, trace Λ → iProp Σ;
-  tprop_tr : trProp Λ;
-  tprop_good : ∀ `{!temporalGS Λ Σ} (F : iProp Σ) (τ : trace Λ),
-    iProp_sat_lc_at_frame F ⊤ (tprop_ti τ) → tprop_tr τ;
-}.
-Global Arguments tprop Λ Σ : clear implicits.
-Global Arguments Tprop {Λ Σ}.
-Global Arguments tprop_ti {Λ Σ} _ {_}.
-Global Arguments tprop_tr {Λ Σ}.
+(** A predicate on the configuration (state and thread pool) of a trace state. *)
+Definition ts_state {Λ : language} (φ : state Λ → thread_pool Λ → Prop) : tsProp Λ :=
+  λ ξ, let '((Θ, σ), _, _) := ξ in φ σ Θ.
 
-Declare Scope tprop_scope.
-Delimit Scope tprop_scope with T.
-Bind Scope tprop_scope with tprop.
+Definition trProp (Λ : language) : Type := trace Λ → Prop.
 
-(** [G ⊑ G']: the step-indexed part of [G] implies that of [G']. *)
-Definition tprop_le {Λ Σ} (G G' : tprop Λ Σ) : Prop :=
-  ∀ (H : temporalGS Λ Σ) τ, @tprop_ti _ _ G H τ ⊢ @tprop_ti _ _ G' H τ.
+Definition ts_emb {Λ : language} : tsProp Λ → trProp Λ :=
+  λ P τ, P (trace_now τ).
 
-Section tprop_connectives.
-  Context {Λ : language} {Σ : gFunctors}.
-  Implicit Types G : tprop Λ Σ.
+Definition tr_state {Λ : language} (φ : state Λ → thread_pool Λ → Prop) : trProp Λ :=
+  ts_emb (ts_state φ).
 
-  Program Definition tprop_pure (p : Prop) : tprop Λ Σ :=
-    {| tprop_ti _ := ti_pure p; tprop_tr := tr_pure p |}.
-  Next Obligation. intros p ? F τ H. by apply sat_elim in H. Qed.
+Definition tr_pure {Λ : language} (P : Prop) : trProp Λ :=
+  λ _, P.
 
-  Definition tprop_true : tprop Λ Σ := tprop_pure True.
+Definition tr_and {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
+  λ P Q, (λ τ, (P τ) ∧ (Q τ)).
 
-  Program Definition tprop_and G1 G2 : tprop Λ Σ :=
-    {| tprop_ti _ := ti_and (tprop_ti G1) (tprop_ti G2); tprop_tr := tr_and (tprop_tr G1) (tprop_tr G2) |}.
-  Next Obligation.
-    intros G1 G2 ? F τ H. unfold ti_and in H. apply iProp_sat_lc_at_frame_and in H as [H1 H2].
-    split; [eapply tprop_good, H1|eapply tprop_good, H2].
-  Qed.
+Definition tr_or {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
+  λ P Q, (λ τ, (P τ) ∨ (Q τ)).
 
-  Program Definition tprop_or G1 G2 : tprop Λ Σ :=
-    {| tprop_ti _ := ti_or (tprop_ti G1) (tprop_ti G2); tprop_tr := tr_or (tprop_tr G1) (tprop_tr G2) |}.
-  Next Obligation.
-    intros G1 G2 ? F τ H. unfold ti_or in H. apply sat_or in H as [H|H].
-    - left. by eapply tprop_good.
-    - right. by eapply tprop_good.
-  Qed.
+Definition tr_impl {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
+  λ P Q, (λ τ, P τ → (Q τ)).
 
-  (** Implication, with any trace property as antecedent: both readings assume it at the
-      level of traces. *)
-  Program Definition tprop_impl (A G : tprop Λ Σ) : tprop Λ Σ :=
-    {| tprop_ti _ := ti_impl (tprop_tr A) (tprop_ti G); tprop_tr := tr_impl (tprop_tr A) (tprop_tr G) |}.
-  Next Obligation.
-    intros A G ? F τ H HA. unfold ti_impl in H. eapply tprop_good. eapply sat_impl; [apply H|].
-    iIntros "_". by iPureIntro.
-  Qed.
+Definition tr_forall {Λ : language} : ∀ (A : Type), (A → trProp Λ) → trProp Λ :=
+  λ A P, (λ τ, ∀ (a : A), (P a τ)).
 
-  (** Over any type: [sat] commutes with [∀]. *)
-  Program Definition tprop_forall {X : Type} (G : X → tprop Λ Σ) : tprop Λ Σ :=
-    {| tprop_ti _ := ti_forall X (λ x, tprop_ti (G x)); tprop_tr := tr_forall X (λ x, tprop_tr (G x)) |}.
-  Next Obligation.
-    intros X G ? F τ H x. unfold ti_forall in H. eapply tprop_good. by apply (sat_forall x) in H.
-  Qed.
+Definition tr_exist {Λ : language} : ∀ (A : Type), (A → trProp Λ) → trProp Λ :=
+  λ A P, (λ τ, ∃ (a : A), (P a τ)).
 
-  (** Existential quantification needs the existential property of the step index, so only
-      types smaller than the ordinals of [ordI] qualify (nat, gnames, oids, Ord.t, ...). *)
-  Program Definition tprop_exist {X : Type} `{!TypeExistentialProperty X ordI} (G : X → tprop Λ Σ) : tprop Λ Σ :=
-    {| tprop_ti _ := ti_exist X (λ x, tprop_ti (G x)); tprop_tr := tr_exist X (λ x, tprop_tr (G x)) |}.
-  Next Obligation.
-    intros X ? G ? F τ H. unfold ti_exist in H. apply sat_exists in H as [x H].
-    exists x. by eapply tprop_good.
-  Qed.
+Definition tr_always {Λ : language} : trProp Λ → trProp Λ :=
+  λ P, (λ τ, let '(n, τf) := τ in ∀ m, (n ≤ m) → (P (m, τf))).
 
-  Program Definition tprop_always G : tprop Λ Σ :=
-    {| tprop_ti _ := ti_always (tprop_ti G) (ti_pure True); tprop_tr := tr_always (tprop_tr G) |}.
-  Next Obligation.
-    intros G ? F τ H.
-    cut (tr_always (tprop_tr G ∧ tr_pure True)%R τ).
-    { unfold tr_always. destruct τ. intros Hτ m Hm. by destruct (Hτ m Hm). }
-    eapply (ti_always_tr_always F (tprop_ti G) (ti_pure True) (tprop_tr G) (tr_pure True));
-      [intros; by eapply tprop_good | intros; exact I | exact H].
-  Qed.
+Definition tr_until {Λ : language} : trProp Λ → trProp Λ → trProp Λ :=
+  λ P Q, (λ τ, let '(n, τf) := τ in ∃ m, (n ≤ m) ∧ (Q (m, τf)) ∧ (∀ l, (n ≤ l < m) → (P (l, τf)))).
 
-  Program Definition tprop_until G1 G2 : tprop Λ Σ :=
-    {| tprop_ti _ := ti_exist Ord.t (λ a, ti_until Ord.lt a (tprop_ti G1) (tprop_ti G2));
-       tprop_tr := tr_until (tprop_tr G1) (tprop_tr G2) |}.
-  Next Obligation.
-    intros G1 G2 ? F τ H.
-    eapply (ti_until_tr_until_gen F (tprop_ti G1) (tprop_ti G2) (tprop_tr G1) (tprop_tr G2));
-      [intros; by eapply tprop_good | intros; by eapply tprop_good | exact H].
-  Qed.
+Global Instance ts_emb_decide {Λ : language} (P : tsProp Λ) :
+  (∀ ξ, Decision (P ξ)) → ∀ τ, Decision (ts_emb P τ).
+Proof.
+  intros. unfold ts_emb. destruct τ as (n& τf). simpl. eauto.
+Qed.
 
-  Definition tprop_finally G : tprop Λ Σ := tprop_until tprop_true G.
+Ltac unfold_trProp :=
+  unfold tr_until, tr_always, tr_exist, tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_state.
 
-  Lemma tprop_le_refl G : tprop_le G G.
-  Proof. intros ??. done. Qed.
-  Lemma tprop_le_trans G1 G2 G3 : tprop_le G1 G2 → tprop_le G2 G3 → tprop_le G1 G3.
-  Proof. intros H1 H2 ??. by rewrite H1 H2. Qed.
-  Lemma tprop_le_true G : tprop_le G tprop_true.
-  Proof. intros ??. by iIntros "_". Qed.
-  Lemma tprop_and_elim_l G1 G2 : tprop_le (tprop_and G1 G2) G1.
-  Proof. intros ??. rewrite /= /ti_and. by iIntros "[$ _]". Qed.
-  Lemma tprop_and_elim_r G1 G2 : tprop_le (tprop_and G1 G2) G2.
-  Proof. intros ??. rewrite /= /ti_and. by iIntros "[_ $]". Qed.
+(** ** Notations *)
 
-  Lemma tprop_or_mono G1 G2 G1' G2' :
-    tprop_le G1 G1' → tprop_le G2 G2' → tprop_le (tprop_or G1 G2) (tprop_or G1' G2').
-  Proof. intros H1 H2 ??. rewrite /= /ti_or. by rewrite H1 H2. Qed.
-  Lemma tprop_and_mono G1 G2 G1' G2' :
-    tprop_le G1 G1' → tprop_le G2 G2' → tprop_le (tprop_and G1 G2) (tprop_and G1' G2').
-  Proof. intros H1 H2 ??. rewrite /= /ti_and. by rewrite H1 H2. Qed.
-  (** Antecedents are compared as trace properties. *)
-  Lemma tprop_impl_mono A A' G G' :
-    (∀ τ, tprop_tr A' τ → tprop_tr A τ) → tprop_le G G' → tprop_le (tprop_impl A G) (tprop_impl A' G').
-  Proof. intros HA HG ??. rewrite /= /ti_impl. iIntros "H %H'". iApply HG. iApply "H". eauto. Qed.
-  Lemma tprop_impl_intro_le A G : tprop_le G (tprop_impl A G).
-  Proof. intros ??. rewrite /= /ti_impl. by iIntros "H _". Qed.
-  (** The antecedent is read on the trace, so an implication is the disjunction of its
-      consequent with the negated antecedent. *)
-  Lemma tprop_impl_or_not A G : tprop_le (tprop_impl A G) (tprop_or (tprop_impl A (tprop_pure False)) G).
+Declare Scope tr_scope.
+Delimit Scope tr_scope with R.
+
+Notation "'⌜' p '⌝'" := (tr_pure p) (at level 0, p at level 200) : tr_scope.
+Infix "∧" := (tr_and) : tr_scope.
+Infix "∨" := (tr_or) : tr_scope.
+Infix "→" := (tr_impl) : tr_scope.
+Notation r_forall A := (tr_forall A).
+Notation "∀'" := (r_forall _) (only parsing) : tr_scope.
+Notation "∀ a .. z , P" := (r_forall _ (λ a, .. (r_forall _ (λ z, P%R)) ..)) : tr_scope.
+Notation r_exist A := (tr_exist A).
+Notation "∃'" := (r_exist _) (only parsing) : tr_scope.
+Notation "∃ a .. z , P" := (r_exist _ (λ a, .. (r_exist _ (λ z, P%R)) ..)) : tr_scope.
+
+Definition tr_eventually {Λ : language} : trProp Λ → trProp Λ :=
+  λ Q, tr_until (⌜ True ⌝)%R Q.
+
+(** The next position. *)
+Definition tr_next {Λ : language} : trProp Λ → trProp Λ :=
+  λ P τ, P (trace_next τ).
+
+Notation "□ P" := (tr_always P) (at level 20, right associativity) : tr_scope.
+Notation "◇ P" := (tr_eventually P) (at level 20, right associativity) : tr_scope.
+Notation "○ P" := (tr_next P) (at level 20, right associativity) : tr_scope.
+
+(** ** Trace entailment [R ⊆ S], and the laws of LTL
+
+    Trace predicates are ordinary predicates on traces, so every valid law of LTL is
+    provable from the definitions (classically). The laws below are the ones that proofs
+    about exported properties use; all are entailments, so they compose by
+    [transitivity]. *)
+Definition tr_le {Λ : language} (R S : trProp Λ) : Prop := ∀ τ, R τ → S τ.
+Global Instance tr_subseteq {Λ : language} : SubsetEq (trProp Λ) := tr_le.
+Global Instance tr_le_preorder {Λ : language} : PreOrder (⊆@{trProp Λ}).
+Proof. split; [by intros R τ|intros R S T HRS HST τ HR; by apply HST, HRS]. Qed.
+
+(** Entailment is the validity of the implication: [⊆] is the meta-level [⊨] of LTL, [→] the
+    connective. *)
+Lemma tr_le_impl {Λ : language} (R S : trProp Λ) : R ⊆ S ↔ ∀ τ, (R → S)%R τ.
+Proof. done. Qed.
+
+Ltac tr_unfold :=
+  unfold subseteq, tr_subseteq, tr_le, tr_next, tr_eventually, tr_until, tr_always, tr_exist,
+    tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_state, ts_emb, ts_state, trace_now in *; simpl in *.
+
+Section tr_laws.
+  Context {Λ : language}.
+  Implicit Types R S X : trProp Λ.
+
+  (** Always: reflexive, transitive, monotone, distributes over [∧], and is the greatest
+      fixpoint of [R ∧ ○ -] ([tr_always_coind]). *)
+  Lemma tr_always_elim R : (□ R)%R ⊆ R.
+  Proof. intros [n τf]. tr_unfold. intros H. apply H. lia. Qed.
+  Lemma tr_always_next R : (□ R)%R ⊆ (○ □ R)%R.
+  Proof. intros [n τf]. tr_unfold. intros H m Hm. apply H. lia. Qed.
+  Lemma tr_always_idemp R : (□ R)%R ⊆ (□ □ R)%R.
+  Proof. intros [n τf]. tr_unfold. intros H m Hm m' Hm'. apply H. lia. Qed.
+  Lemma tr_always_mono R S : R ⊆ S → (□ R)%R ⊆ (□ S)%R.
+  Proof. intros HRS [n τf]. tr_unfold. intros H m Hm. apply HRS, H. lia. Qed.
+  Lemma tr_always_and R S : (□ (R ∧ S))%R ⊆ (□ R ∧ □ S)%R.
+  Proof. intros [n τf]. tr_unfold. intros H. split; intros m Hm; by apply H. Qed.
+  Lemma tr_and_always R S : (□ R ∧ □ S)%R ⊆ (□ (R ∧ S))%R.
+  Proof. intros [n τf]. tr_unfold. intros [H1 H2] m Hm. auto. Qed.
+  Lemma tr_always_impl R S : (□ (R → S) ∧ □ R)%R ⊆ (□ S)%R.
+  Proof. intros [n τf]. tr_unfold. intros [H1 H2] m Hm. auto. Qed.
+  Lemma tr_always_coind R X : X ⊆ (R ∧ ○ X)%R → X ⊆ (□ R)%R.
   Proof.
-    intros ? τ. rewrite /= /ti_impl /ti_or /ti_pure. iIntros "H".
-    destruct (Classical_Prop.classic (tprop_tr A τ)) as [HA|HA].
-    - iRight. by iApply "H".
-    - iLeft. by iIntros (?).
+    intros HX [n τf]. tr_unfold. intros Hx m Hm.
+    assert (∀ d n', X (n', τf) → R (n' + d, τf)) as Hd.
+    { induction d as [|d IH]; intros n' Hn'.
+      - rewrite Nat.add_0_r. by apply HX.
+      - destruct (HX (n', τf) Hn') as [_ Hnext]. replace (n' + S d) with (S n' + d) by lia.
+        apply IH. exact Hnext. }
+    replace m with (n + (m - n)) by lia. by apply Hd.
   Qed.
-  Lemma tprop_or_not_impl A G : tprop_le (tprop_or (tprop_impl A (tprop_pure False)) G) (tprop_impl A G).
+
+  (** Until: the least fixpoint of [S ∨ (R ∧ ○ -)] ([tr_until_now], [tr_until_step],
+      [tr_until_ind]), monotone, and stronger than finally. *)
+  Lemma tr_until_now R S : S ⊆ tr_until R S.
+  Proof. intros [n τf]. tr_unfold. intros H. exists n. split_and!; [lia|done|lia]. Qed.
+  Lemma tr_until_step R S : (R ∧ ○ tr_until R S)%R ⊆ tr_until R S.
   Proof.
-    intros ? τ. rewrite /= /ti_impl /ti_or /ti_pure. iIntros "[H|H] %HA"; last done.
-    by iDestruct ("H" $! HA) as %[].
+    intros [n τf]. tr_unfold. intros [HR (m & Hm & HS & HRs)]. exists m. split_and!; [lia|done|].
+    intros l Hl. destruct (decide (l = n)) as [->|]; [done|apply HRs; lia].
   Qed.
-
-  (** Antecedents compose on traces, for any antecedents: a conjunction curries, a
-      disjunction splits, an existential becomes a universal. *)
-  Lemma tprop_impl_curry A1 A2 G :
-    tprop_le (tprop_impl A1 (tprop_impl A2 G)) (tprop_impl (tprop_and A1 A2) G).
-  Proof. intros ? τ. rewrite /= /ti_impl /tr_and. iIntros "H" ([H1 H2]). by iApply "H". Qed.
-  Lemma tprop_impl_uncurry A1 A2 G :
-    tprop_le (tprop_impl (tprop_and A1 A2) G) (tprop_impl A1 (tprop_impl A2 G)).
-  Proof. intros ? τ. rewrite /= /ti_impl /tr_and. iIntros "H" (H1 H2). by iApply "H". Qed.
-  Lemma tprop_impl_or_split A1 A2 G :
-    tprop_le (tprop_and (tprop_impl A1 G) (tprop_impl A2 G)) (tprop_impl (tprop_or A1 A2) G).
+  Lemma tr_until_unfold R S : tr_until R S ⊆ (S ∨ (R ∧ ○ tr_until R S))%R.
   Proof.
-    intros ? τ. rewrite /= /ti_and /ti_impl /tr_or. iIntros "H" ([H1|H2]).
-    - iDestruct "H" as "[H _]". by iApply "H".
-    - iDestruct "H" as "[_ H]". by iApply "H".
+    intros [n τf]. tr_unfold. intros (m & Hm & HS & HRs).
+    destruct (decide (m = n)) as [->|]; first by left.
+    right. split; first (apply HRs; lia). exists m. split_and!; [lia|done|]. intros l Hl. apply HRs. lia.
   Qed.
-  Lemma tprop_impl_or_join A1 A2 G :
-    tprop_le (tprop_impl (tprop_or A1 A2) G) (tprop_and (tprop_impl A1 G) (tprop_impl A2 G)).
+  Lemma tr_until_ind R S X : S ⊆ X → (R ∧ ○ X)%R ⊆ X → tr_until R S ⊆ X.
   Proof.
-    intros ? τ. rewrite /= /ti_and /ti_impl /tr_or. iIntros "H".
-    iSplit; iIntros (?); iApply "H"; iPureIntro; auto.
+    intros HS HR [n τf]. tr_unfold. intros (m & Hm & HSm & HRs).
+    assert (∀ d n', n' + d = m → (∀ l, n' ≤ l < m → R (l, τf)) → X (n', τf)) as Hd.
+    { induction d as [|d IH]; intros n' Hd HRs'.
+      - rewrite Nat.add_0_r in Hd. subst. by apply HS.
+      - apply HR. split; first (apply HRs'; lia).
+        change (X (Datatypes.S n', τf)). apply IH; first lia. intros l Hl. apply HRs'. lia. }
+    apply (Hd (m - n) n); [lia|exact HRs].
   Qed.
-  Lemma tprop_impl_exist {X} `{!TypeExistentialProperty X ordI} (A : X → tprop Λ Σ) G :
-    tprop_le (tprop_forall (λ x, tprop_impl (A x) G)) (tprop_impl (tprop_exist A) G).
+  Lemma tr_until_mono R R' S S' : R ⊆ R' → S ⊆ S' → tr_until R S ⊆ tr_until R' S'.
   Proof.
-    intros ? τ. rewrite /= /ti_forall /ti_impl /tr_exist. iIntros "H" ([x Hx]). by iApply ("H" $! x).
+    intros HR HS [n τf]. tr_unfold. intros (m & Hm & HSm & HRs). exists m. split_and!; [lia|by apply HS|].
+    intros l Hl. apply HR, HRs. lia.
   Qed.
-  Lemma tprop_forall_mono {X} (G G' : X → tprop Λ Σ) :
-    (∀ x, tprop_le (G x) (G' x)) → tprop_le (tprop_forall G) (tprop_forall G').
-  Proof. intros H ??. rewrite /= /ti_forall. iIntros "H %x". iApply H. iApply "H". Qed.
-  Lemma tprop_exist_mono {X} `{!TypeExistentialProperty X ordI} (G G' : X → tprop Λ Σ) :
-    (∀ x, tprop_le (G x) (G' x)) → tprop_le (tprop_exist G) (tprop_exist G').
-  Proof. intros H ??. rewrite /= /ti_exist. iIntros "[%x H]". iExists x. by iApply H. Qed.
+  Lemma tr_until_finally R S : tr_until R S ⊆ (◇ S)%R.
+  Proof. apply tr_until_mono; [by intros ?|done]. Qed.
 
-  Lemma tprop_always_mono G G' : tprop_le G G' → tprop_le (tprop_always G) (tprop_always G').
+  (** Finally. *)
+  Lemma tr_finally_intro S : S ⊆ (◇ S)%R.
+  Proof. apply tr_until_now. Qed.
+  Lemma tr_finally_mono S S' : S ⊆ S' → (◇ S)%R ⊆ (◇ S')%R.
+  Proof. intros HS. by apply tr_until_mono. Qed.
+  Lemma tr_finally_idemp S : (◇ ◇ S)%R ⊆ (◇ S)%R.
   Proof.
-    intros Hle H τ. cbn. iIntros "H".
-    iAssert (∀ τ, ti_always (tprop_ti G) (ti_pure True) τ -∗ ti_always (tprop_ti G') (ti_pure True) τ)%I
-      with "[]" as "Hal"; last by iApply "Hal".
-    iLöb as "IH". iIntros (τ') "H". rewrite !ti_always_unfold /ti_always_pre.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
-    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
-    iSplit; first (iDestruct "H" as "[H _]"; by iApply Hle).
-    iSplit; first by iDestruct "H" as "[_ [$ _]]".
-    iDestruct "H" as "[_ [_ H]]". by iApply "IH".
+    intros [n τf]. tr_unfold. intros (m & Hm & (m' & Hm' & HS & _) & _). exists m'. split_and!; [lia|done|done].
   Qed.
-
-  Lemma tprop_until_mono G1 G2 G1' G2' :
-    tprop_le G1 G1' → tprop_le G2 G2' → tprop_le (tprop_until G1 G2) (tprop_until G1' G2').
+  Lemma tr_finally_or S S' : (◇ (S ∨ S'))%R ⊆ (◇ S ∨ ◇ S')%R.
   Proof.
-    intros H1 H2 H τ. cbn. rewrite /ti_exist. iIntros "[%a H]". iExists a.
-    iAssert (∀ a τ, ti_until Ord.lt a (tprop_ti G1) (tprop_ti G2) τ -∗
-                    ti_until Ord.lt a (tprop_ti G1') (tprop_ti G2') τ)%I with "[]" as "Hu";
-      last by iApply "Hu".
-    iLöb as "IH". iIntros (a' τ') "H". rewrite !ti_until_unfold /ti_until_pre.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
-    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. iDestruct "H" as "[H|H]".
-    - iLeft. by iApply H2.
-    - iRight. iSplit; first (iDestruct "H" as "[H _]"; by iApply H1).
-      iDestruct "H" as "[_ (%a''& %Hlt& H)]". iExists a''. iSplit; first done. by iApply "IH".
+    intros [n τf]. tr_unfold. intros (m & Hm & [HS|HS] & _); [left|right]; exists m; split_and!; done.
   Qed.
-
-  Lemma tprop_always_mono_i `{!temporalGS Λ Σ} (G G' : tprop Λ Σ) :
-    ▷ □ (∀ τ, tprop_ti G τ -∗ tprop_ti G' τ) -∗
-    ∀ τ, tprop_ti (tprop_always G) τ -∗ tprop_ti (tprop_always G') τ.
-  Proof. iIntros "#W" (τ). cbn. by iApply (ti_always_mono_i with "W"). Qed.
-  Lemma tprop_until_mono_i `{!temporalGS Λ Σ} (G1 G2 G1' G2' : tprop Λ Σ) :
-    ▷ □ (∀ τ, tprop_ti G1 τ -∗ tprop_ti G1' τ) -∗ ▷ □ (∀ τ, tprop_ti G2 τ -∗ tprop_ti G2' τ) -∗
-    ∀ τ, tprop_ti (tprop_until G1 G2) τ -∗ tprop_ti (tprop_until G1' G2') τ.
+  Lemma tr_always_finally_resp R S : (□ (R → ◇ S) ∧ ◇ R)%R ⊆ (◇ S)%R.
   Proof.
-    iIntros "#W1 #W2" (τ). cbn. rewrite /ti_exist. iIntros "[%a H]". iExists a.
-    by iApply (ti_until_mono_i with "W1 W2").
+    intros [n τf]. tr_unfold. intros [H (m & Hm & HR & _)].
+    destruct (H m Hm HR) as (m' & Hm' & HS & _). exists m'. split_and!; [lia|done|done].
   Qed.
+  Lemma tr_always_finally_mono R S : R ⊆ S → (□ ◇ R)%R ⊆ (□ ◇ S)%R.
+  Proof. intros HRS. by apply tr_always_mono, tr_finally_mono. Qed.
 
-End tprop_connectives.
-
-Notation "⌜ p ⌝" := (tprop_pure p) : tprop_scope.
-Infix "∧" := tprop_and : tprop_scope.
-Infix "∨" := tprop_or : tprop_scope.
-Infix "→" := tprop_impl : tprop_scope.
-Notation "∀ x .. y , G" := (tprop_forall (λ x, .. (tprop_forall (λ y, G%T)) ..)) : tprop_scope.
-Notation "∃ x .. y , G" := (tprop_exist (λ x, .. (tprop_exist (λ y, G%T)) ..)) : tprop_scope.
-Notation "□ G" := (tprop_always G) (at level 20, right associativity) : tprop_scope.
-Notation "◇ G" := (tprop_finally G) (at level 20, right associativity) : tprop_scope.
-
-(** In-logic entailment is the canonical order of properties. *)
-Global Instance tprop_sqsubseteq {Λ Σ} : SqSubsetEq (tprop Λ Σ) := tprop_le.
-Global Instance tprop_le_preorder {Λ Σ} : PreOrder (⊑@{tprop Λ Σ}).
-Proof. split; [intros ?; apply tprop_le_refl|intros ???; apply tprop_le_trans]. Qed.
-
-(** ** Semantic state atoms
-
-    Any predicate on the current state can be an atom, provided some iProp ensures it
-    through the state interpretation (e.g. negated points-to facts). *)
-Section state_atoms.
-  Context {Λ : language} {Σ : gFunctors}.
-
-  Program Definition tprop_state (φ : state Λ → thread_pool Λ → Prop) : tprop Λ Σ :=
-    {| tprop_ti _ τ := (let '((Θ, σ), _, _) := τ.2 τ.1 in ⌜φ σ Θ⌝)%I;
-       tprop_tr := tr_state φ |}.
-  Next Obligation.
-    intros φ ? F [n τf] H. rewrite /tr_state /ts_emb /ts_state /trace_now. simpl in *.
-    destruct (τf n) as (((Θ&σ)&?)&?). by apply sat_elim in H.
-  Qed.
-
-End state_atoms.
-
-(** ** Complete and instant trace properties
-
-    An implication [A → G] assumes [A] at the level of traces. In the logic it is introduced
-    from [A ∧ H ⊑ G] when [A] is complete (its trace reading gives its in-logic reading), and
-    eliminated when [A] is instant (the converse). Pure facts, state atoms, always and until
-    are complete; the non-temporal ones are also instant. *)
-Section complete.
-  Context {Λ : language} {Σ : gFunctors}.
-  Implicit Types G A : tprop Λ Σ.
-
-  Class TpropComplete G : Prop :=
-    tprop_complete : ∀ (H : temporalGS Λ Σ) τ, tprop_tr G τ → ⊢ @tprop_ti _ _ G H τ.
-  Class TpropInstant G : Prop :=
-    tprop_instant : ∀ (H : temporalGS Λ Σ) τ, @tprop_ti _ _ G H τ ⊢ ⌜tprop_tr G τ⌝.
-
-  Lemma tprop_impl_intro A H G `{HA : !TpropComplete A} :
-    tprop_le (tprop_and A H) G → tprop_le H (tprop_impl A G).
+  (** Duality: [□] and [◇] are each other's negation (classically). *)
+  Lemma tr_not_finally R : (□ (R → ⌜False⌝))%R ⊆ (◇ R → ⌜False⌝)%R.
+  Proof. intros [n τf]. tr_unfold. intros H (m & Hm & HR & _). by apply (H m). Qed.
+  Lemma tr_not_always R : (◇ R → ⌜False⌝)%R ⊆ (□ (R → ⌜False⌝))%R.
+  Proof. intros [n τf]. tr_unfold. intros H m Hm HR. apply H. exists m. split_and!; done. Qed.
+  Lemma tr_not_always_finally R : (□ R → ⌜False⌝)%R ⊆ (◇ (R → ⌜False⌝))%R.
   Proof.
-    intros HG ? τ. rewrite /= /ti_impl. iIntros "H %Hτ". iApply HG.
-    rewrite /= /ti_and. iSplit; last done. by iApply HA.
+    intros [n τf]. tr_unfold. intros H.
+    destruct (Classical_Prop.classic (∃ m, n ≤ m ∧ ¬ R (m, τf))) as [(m & Hm & HR)|Hno].
+    - exists m. split_and!; done.
+    - exfalso. apply H. intros m Hm. destruct (Classical_Prop.classic (R (m, τf))); [done|].
+      exfalso. apply Hno. by exists m.
   Qed.
+End tr_laws.
 
-  Lemma tprop_impl_elim A G `{HA : !TpropInstant A} : tprop_le (tprop_and A (tprop_impl A G)) G.
-  Proof.
-    intros ? τ. rewrite /= /ti_and /ti_impl. iIntros "H".
-    iAssert ⌜tprop_tr A τ⌝%I as %Hτ; first by iApply HA; iDestruct "H" as "[$ _]".
-    iDestruct "H" as "[_ H]". by iApply "H".
-  Qed.
-
-  (** Completeness. *)
-  Global Instance tprop_complete_pure φ : TpropComplete (tprop_pure φ).
-  Proof. intros ? τ H. rewrite /= /ti_pure. by iPureIntro. Qed.
-  Global Instance tprop_complete_and G1 G2 : TpropComplete G1 → TpropComplete G2 → TpropComplete (tprop_and G1 G2).
-  Proof. intros H1 H2 ? τ [??]. rewrite /= /ti_and. iSplit; [by iApply H1|by iApply H2]. Qed.
-  Global Instance tprop_complete_or G1 G2 : TpropComplete G1 → TpropComplete G2 → TpropComplete (tprop_or G1 G2).
-  Proof. intros H1 H2 ? τ [?|?]; rewrite /= /ti_or; [iLeft; by iApply H1|iRight; by iApply H2]. Qed.
-  Global Instance tprop_complete_impl A G : TpropComplete G → TpropComplete (tprop_impl A G).
-  Proof. intros HG ? τ H. rewrite /= /ti_impl. iIntros (HA). iApply HG. by apply H. Qed.
-  Global Instance tprop_complete_forall {X} (G : X → tprop Λ Σ) :
-    (∀ x, TpropComplete (G x)) → TpropComplete (tprop_forall G).
-  Proof. intros HG ? τ H. rewrite /= /ti_forall. iIntros (x). iApply HG. apply H. Qed.
-  Global Instance tprop_complete_exist {X} `{!TypeExistentialProperty X ordI} (G : X → tprop Λ Σ) :
-    (∀ x, TpropComplete (G x)) → TpropComplete (tprop_exist G).
-  Proof. intros HG ? τ [x H]. rewrite /= /ti_exist. iExists x. by iApply HG. Qed.
-
-  Global Instance tprop_complete_always G : TpropComplete G → TpropComplete (tprop_always G).
-  Proof.
-    intros HG ? τ Hτ. rewrite /=.
-    iAssert (□ ∀ τ, ⌜tr_always (tprop_tr G) τ⌝ → ti_always (tprop_ti G) (ti_pure True) τ)%I as "#H";
-      last by iApply "H".
-    iLöb as "IH". iIntros "!>" ([n τf] Hal). rewrite ti_always_unfold /ti_always_pre.
-    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iNext. iMod "Hclose" as "_". iModIntro.
-    iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iApply ALC_intro. iMod "Hclose" as "_".
-    iModIntro. iSplit.
-    { iApply HG. apply (Hal n). lia. }
-    iSplit; first by rewrite /ti_pure.
-    iApply "IH". iPureIntro. intros m Hm. apply Hal. simpl in Hm. lia.
-  Qed.
-
-  Global Instance tprop_complete_until G1 G2 :
-    TpropComplete G1 → TpropComplete G2 → TpropComplete (tprop_until G1 G2).
-  Proof.
-    intros H1 H2 ? [n τf] (m & Hnm & HQ & HP). rewrite /= /ti_exist.
-    (* The measure is the number of steps to the right formula. *)
-    assert (∀ d n', m - n' = d → n' ≤ m → (∀ l, n' ≤ l < m → tprop_tr G1 (l, τf)) →
-              ⊢ ti_until Ord.lt (Ord.from_nat d) (tprop_ti G1) (tprop_ti G2) (n', τf)) as Hu.
-    { induction d as [|d IH]; intros n' Hd Hn' HP'; rewrite ti_until_unfold /ti_until_pre;
-        iApply fupd_mask_intro; try set_solver; iIntros "Hclose"; iNext; iMod "Hclose" as "_"; iModIntro;
-        iApply fupd_mask_intro; try set_solver; iIntros "Hclose"; iApply ALC_intro; iMod "Hclose" as "_"; iModIntro.
-      - assert (m = n') as -> by lia. iLeft. by iApply H2.
-      - iRight. iSplit; first (iApply H1; apply HP'; lia).
-        iExists (Ord.from_nat d). iSplit; first (iPureIntro; rewrite Ord.from_nat_S; apply Ord.S_lt).
-        iApply (IH (S n')); [simpl; lia|simpl; lia|]. intros l Hl. apply HP'. lia. }
-    iExists (Ord.from_nat (m - n)). iApply (Hu _ n eq_refl Hnm). intros l Hl. apply HP. lia.
-  Qed.
-
-  Global Instance tprop_complete_finally G : TpropComplete G → TpropComplete (tprop_finally G).
-  Proof. intros HG. apply tprop_complete_until; [apply tprop_complete_pure|done]. Qed.
-
-  (** Instantness. *)
-  Global Instance tprop_instant_pure φ : TpropInstant (tprop_pure φ).
-  Proof. intros ? τ. rewrite /= /ti_pure. by iIntros "%". Qed.
-  Global Instance tprop_instant_and G1 G2 : TpropInstant G1 → TpropInstant G2 → TpropInstant (tprop_and G1 G2).
-  Proof.
-    intros H1 H2 ? τ. rewrite /= /ti_and. iIntros "H".
-    iAssert ⌜tprop_tr G1 τ⌝%I as %?; first by iApply H1; iDestruct "H" as "[$ _]".
-    iAssert ⌜tprop_tr G2 τ⌝%I as %?; first by iApply H2; iDestruct "H" as "[_ $]".
-    by iPureIntro.
-  Qed.
-  Global Instance tprop_instant_or G1 G2 : TpropInstant G1 → TpropInstant G2 → TpropInstant (tprop_or G1 G2).
-  Proof.
-    intros H1 H2 ? τ. rewrite /= /ti_or. iIntros "[H|H]".
-    - iDestruct (H1 with "H") as %?. iPureIntro. by left.
-    - iDestruct (H2 with "H") as %?. iPureIntro. by right.
-  Qed.
-  Global Instance tprop_instant_impl A G : TpropInstant G → TpropInstant (tprop_impl A G).
-  Proof.
-    intros HG ? τ. rewrite /= /ti_impl. iIntros "H".
-    destruct (Classical_Prop.classic (tprop_tr A τ)) as [HA|HA].
-    - iDestruct (HG with "(H [//])") as %?. iPureIntro. by intros _.
-    - iPureIntro. by intros ?.
-  Qed.
-  Global Instance tprop_instant_forall {X} (G : X → tprop Λ Σ) :
-    (∀ x, TpropInstant (G x)) → TpropInstant (tprop_forall G).
-  Proof.
-    intros HG ? τ. rewrite /= /ti_forall /tr_forall.
-    destruct (Classical_Prop.classic (∀ x, tprop_tr (G x) τ)) as [Hall|Hn]; first by iIntros "_".
-    apply Classical_Pred_Type.not_all_ex_not in Hn as [x Hx].
-    iIntros "H". iSpecialize ("H" $! x). iDestruct (HG with "H") as %?. done.
-  Qed.
-  Global Instance tprop_instant_exist {X} `{!TypeExistentialProperty X ordI} (G : X → tprop Λ Σ) :
-    (∀ x, TpropInstant (G x)) → TpropInstant (tprop_exist G).
-  Proof.
-    intros HG ? τ. rewrite /= /ti_exist. iIntros "[%x H]". iDestruct (HG with "H") as %?.
-    iPureIntro. by exists x.
-  Qed.
-
-  Global Instance tprop_complete_state φ : TpropComplete (tprop_state φ).
-  Proof.
-    intros ? [n τf]. rewrite /= /tr_state /ts_emb /ts_state /trace_now /=.
-    destruct (τf n) as (((Θ&σ)&?)&?). intros Hφ. by iPureIntro.
-  Qed.
-  Global Instance tprop_instant_state φ : TpropInstant (tprop_state φ).
-  Proof.
-    intros ? [n τf]. rewrite /= /tr_state /ts_emb /ts_state /trace_now /=.
-    destruct (τf n) as (((Θ&σ)&?)&?). by iIntros "%".
-  Qed.
-
-End complete.
-Global Hint Mode TpropComplete - - ! : typeclass_instances.
-Global Hint Mode TpropInstant - - ! : typeclass_instances.
-
-(** ** Trace readings: the two entailments, and casts
-
-    A property is read twice. Its in-logic reading [tprop_ti] is what a run establishes: a
-    guarantee [P ⊨ₜ G] (guarantee.v) turns [P], at a position, into the in-logic reading of
-    [G] there. Its trace reading [tprop_tr] is what adequacy concludes.
-
-    Accordingly, two entailments:
-    - [G ⊑ H] ([tprop_le]) compares in-logic readings. It transports guarantees
-      ([temporal_weaken]), and the connectives are monotone in it. It is sound for trace
-      readings ([tprop_le_sound]), but it is as weak as the readings are deferred: the
-      in-logic readings of [□] and [𝒰] start with a later, so not even [□ ⊥ ⊑ ⊥] holds
-      ([tprop_always_elim_not_le]). It is the entailment of the structure of a property.
-    - [tprop_tr G ⊆ R] compares trace readings, on traces (trace_pred.v), where every law of
-      LTL holds. It is the entailment of the meaning of a property. The cast
-      [tprop_cast G R pf] keeps the in-logic reading of [G] and takes [R] as its trace
-      reading, so [G ⊑ tprop_cast G R pf]: every trace-level consequence of a property is
-      guaranteed along with it ([temporal_cast]).
-
-    [TpropTr G R] computes a trace reading of [G] from its shape, as a trace predicate. *)
-Section readings.
-  Context {Λ : language} {Σ : gFunctors}.
-  Implicit Types G H : tprop Λ Σ.
+(** ** Fixpoints of trace predicates *)
+Section tr_fixpoints.
+  Context {Λ : language}.
   Implicit Types R : trProp Λ.
+  Implicit Types Φ : trProp Λ → trProp Λ.
 
-  Program Definition tprop_cast G R (pf : tprop_tr G ⊆ R) : tprop Λ Σ :=
-    {| tprop_ti _ := tprop_ti G; tprop_tr := R |}.
-  Next Obligation. intros G R pf ? F τ Hs. apply pf. by eapply tprop_good. Qed.
+  Definition tr_mono Φ : Prop := ∀ R R', (∀ τ, R τ → R' τ) → ∀ τ, Φ R τ → Φ R' τ.
+  Definition tr_gfp Φ : trProp Λ := λ τ, ∃ R, (∀ τ', R τ' → Φ R τ') ∧ R τ.
+  Definition tr_lfp Φ : trProp Λ := λ τ, ∀ R, (∀ τ', Φ R τ' → R τ') → R τ.
 
-  Lemma tprop_cast_le G R pf : G ⊑ tprop_cast G R pf.
-  Proof. intros ??. done. Qed.
-  Lemma tprop_le_cast G R pf : tprop_cast G R pf ⊑ G.
-  Proof. intros ??. done. Qed.
-  Lemma tprop_cast_tr G R pf : tprop_tr (tprop_cast G R pf) = R.
-  Proof. done. Qed.
-  Lemma tprop_cast_complete G R pf `{!TpropComplete G} :
-    R ⊆ tprop_tr G → TpropComplete (tprop_cast G R pf).
-  Proof. intros HR ? τ Hτ. change (⊢ tprop_ti G τ). apply tprop_complete. by apply HR. Qed.
-
-  (** [TpropTr G R]: [R] is a trace reading of [G]. The instances follow the connectives;
-      the fallback is the reading itself. *)
-  Class TpropTr G R : Prop := tprop_tr_of : tprop_tr G ⊆ R.
-
-  Global Instance tprop_tr_pure φ : TpropTr (tprop_pure φ) (tr_pure φ) | 10.
-  Proof. by intros τ. Qed.
-  Global Instance tprop_tr_state φ : TpropTr (tprop_state φ) (tr_state φ) | 10.
-  Proof. by intros τ. Qed.
-  Global Instance tprop_tr_and G1 G2 R1 R2 :
-    TpropTr G1 R1 → TpropTr G2 R2 → TpropTr (tprop_and G1 G2) (R1 ∧ R2)%R | 10.
-  Proof. intros H1 H2 τ [??]. split; auto. Qed.
-  Global Instance tprop_tr_or G1 G2 R1 R2 :
-    TpropTr G1 R1 → TpropTr G2 R2 → TpropTr (tprop_or G1 G2) (R1 ∨ R2)%R | 10.
-  Proof. intros H1 H2 τ [?|?]; [left|right]; auto. Qed.
-  Global Instance tprop_tr_impl A G R :
-    TpropTr G R → TpropTr (tprop_impl A G) (tprop_tr A → R)%R | 10.
-  Proof. intros HG τ HAG HA. by apply HG, HAG. Qed.
-  Global Instance tprop_tr_forall {X} (G : X → tprop Λ Σ) (R : X → trProp Λ) :
-    (∀ x, TpropTr (G x) (R x)) → TpropTr (tprop_forall G) (tr_forall X R) | 10.
-  Proof. intros HG τ H x. by apply HG. Qed.
-  Global Instance tprop_tr_exist {X} `{!TypeExistentialProperty X ordI} (G : X → tprop Λ Σ) (R : X → trProp Λ) :
-    (∀ x, TpropTr (G x) (R x)) → TpropTr (tprop_exist G) (tr_exist X R) | 10.
-  Proof. intros HG τ [x H]. exists x. by apply HG. Qed.
-  Global Instance tprop_tr_always G R : TpropTr G R → TpropTr (tprop_always G) (□ R)%R | 10.
-  Proof. intros HG. by apply tr_always_mono. Qed.
-  Global Instance tprop_tr_finally G R : TpropTr G R → TpropTr (tprop_finally G) (◇ R)%R | 9.
-  Proof. intros HG. by apply tr_finally_mono. Qed.
-  Global Instance tprop_tr_until G1 G2 R1 R2 :
-    TpropTr G1 R1 → TpropTr G2 R2 → TpropTr (tprop_until G1 G2) (tr_until R1 R2) | 10.
-  Proof. intros H1 H2. by apply tr_until_mono. Qed.
-  Global Instance tprop_tr_cast G R pf : TpropTr (tprop_cast G R pf) R | 10.
-  Proof. by intros τ. Qed.
-  Global Instance tprop_tr_default G : TpropTr G (tprop_tr G) | 100.
-  Proof. by intros τ. Qed.
-
-End readings.
-Global Hint Mode TpropTr - - ! - : typeclass_instances.
-
-(** ** The model
-
-    Under the assumptions of the adequacy theorem (adequacy_temporal.v), the logic has a
-    model: a property valid in the logic holds on the trace. Hence in-logic entailment is
-    sound for the trace readings of complete properties, and it is not complete for them. *)
-Section model.
-  Context {Λ : language} {Σ : gFunctors}.
-  Implicit Types G H : tprop Λ Σ.
-  Local Notation histGpreS := (histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))).
-
-  Lemma tprop_valid_tr `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G τ :
-    (∀ Ht : temporalGS Λ Σ, ⊢ tprop_ti G τ) → tprop_tr G τ.
+  Lemma tr_gfp_coind Φ R : (∀ τ, R τ → Φ R τ) → ∀ τ, R τ → tr_gfp Φ τ.
+  Proof. intros HR τ Hτ. by exists R. Qed.
+  Lemma tr_gfp_unfold_l Φ : tr_mono Φ → ∀ τ, tr_gfp Φ τ → Φ (tr_gfp Φ) τ.
   Proof.
-    intros HG. destruct (τ.2 τ.1) as [[[Θ σ] i] κs].
-    assert (iProp_sat (|==> ∃ (Hmupd : mupdGS Σ)
-                (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ)))
-                (Htreg : tregGS.tregGS Λ Σ),
-              (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗ wsat.wsat ∗ wsat.ownE ⊤))
-      as Hsat.
-    { eapply sat_mono; last apply iProp_sat_intro. iIntros "_".
-      iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& _)".
-      iMod (history_interp_init (Λ:=Λ) σ Θ κs) as (Hhist) "_".
-      iMod (treg_alloc (Λ:=Λ)) as (Htreg) "_".
-      iModIntro. iExists Hmupd, Hhist, Htreg. iFrame. }
-    apply sat_bupd, sat_exists in Hsat as [Hmupd Hsat].
-    apply sat_exists in Hsat as [Hhist Hsat]. apply sat_exists in Hsat as [Htreg Hsat].
-    set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
-    apply (tprop_good G (temporalGS0:=Htemp) emp).
-    unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
-    eapply sat_mono; last exact Hsat. iIntros "($& $& $)". iApply (HG Htemp).
+    intros Hm τ (R & HR & Hτ). eapply Hm; last by apply HR. intros τ' Hτ'. by exists R.
+  Qed.
+  Lemma tr_gfp_unfold_r Φ : tr_mono Φ → ∀ τ, Φ (tr_gfp Φ) τ → tr_gfp Φ τ.
+  Proof.
+    intros Hm τ Hτ. exists (Φ (tr_gfp Φ)). split; last done.
+    intros τ' Hτ'. eapply Hm; [|exact Hτ']. by apply tr_gfp_unfold_l.
   Qed.
 
-  (** Soundness: for a complete [G], in-logic entailment implies trace inclusion. *)
-  Lemma tprop_le_sound `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G G' `{!TpropComplete G} :
-    G ⊑ G' → tprop_tr G ⊆ tprop_tr G'.
+  Lemma tr_lfp_ind Φ R : (∀ τ, Φ R τ → R τ) → ∀ τ, tr_lfp Φ τ → R τ.
+  Proof. intros HR τ H. by apply H. Qed.
+  Lemma tr_lfp_unfold_r Φ : tr_mono Φ → ∀ τ, Φ (tr_lfp Φ) τ → tr_lfp Φ τ.
+  Proof. intros Hm τ Hτ R HR. apply HR. eapply Hm; [|exact Hτ]. intros τ' H'. by apply H'. Qed.
+  Lemma tr_lfp_unfold_l Φ : tr_mono Φ → ∀ τ, tr_lfp Φ τ → Φ (tr_lfp Φ) τ.
   Proof.
-    intros Hle τ HG. apply tprop_valid_tr. intros Ht. rewrite -(Hle Ht τ). by apply tprop_complete.
+    intros Hm τ H. apply H. intros τ' H'. eapply Hm; [|exact H']. intros τ'' H''.
+    by apply tr_lfp_unfold_r.
+  Qed.
+End tr_fixpoints.
+
+(** ** Fair scheduling
+
+    Every thread that is active is eventually scheduled. The fairness counter ([fscnt])
+    bounds, for every thread, the steps of other threads until its next turn. *)
+
+Definition thread_active {Λ : language} (i : thread_id) : tsProp Λ :=
+  λ ξ, let '((Θ, σ), _, _) := ξ in ∃ e, Θ !! i = Some e ∧ to_val e = None.
+
+Definition thread_na {Λ : language} (i : thread_id) : tsProp Λ :=
+  λ ξ, let '((Θ, σ), _, _) := ξ in (Θ !! i = None ∨ ∃ e, Θ !! i = Some e ∧ is_Some (to_val e)).
+
+Definition thread_turn {Λ : language} (i : thread_id) : tsProp Λ :=
+  λ ξ, let '(_, j, _) := ξ in i = j.
+
+Definition fair_scheduling {Λ : language} : trProp Λ :=
+  tr_always (∀ i, (ts_emb (thread_na i)) ∨
+                  ((ts_emb (thread_active i)) ∧ tr_eventually (ts_emb (thread_turn i))))%R.
+
+Section thread_status.
+  Context {Λ : language}.
+  Implicit Type ξ : trace_state Λ.
+  Implicit Type τ : trace Λ.
+
+  Lemma fair_scheduling_next (τ : trace Λ) :
+    fair_scheduling τ → fair_scheduling (trace_next τ).
+  Proof.
+    unfold fair_scheduling, tr_always. destruct τ as (n& τf). simpl. intros.
+    specialize (H m). apply H. lia.
   Qed.
 
-  (** Incompleteness: [□ ⊥ ⊆ ⊥] holds on traces, but [□ ⊥ ⊑ ⊥] does not hold in the logic
-      (the reading of [□ ⊥] starts with a later, so it is proved by Löb induction). *)
-  Lemma tprop_always_elim_not_le `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} (τ : trace Λ) :
-    ¬ ((□ ⌜False⌝)%T ⊑ (⌜False⌝ : tprop Λ Σ)%T).
+  Global Instance thread_na_decide i ξ : Decision (thread_na i ξ).
   Proof.
-    intros Hle. apply (tprop_valid_tr (tprop_pure False) τ). intros Ht.
-    iLöb as "IH". iPoseProof (Hle Ht τ with "[IH]") as "%HF"; last done.
-    rewrite /= ti_always_unfold /ti_always_pre.
-    iApply fupd_mask_intro; first set_solver. iIntros "_". iNext. done.
+    unfold thread_na. destruct ξ as (((Θ& σ)& j)& κs) eqn:Htrn. destruct (Θ !! i) eqn:Hi.
+    - destruct (to_val e) eqn:He.
+      + left. right. eauto.
+      + right. intros F. destruct F; first done. destruct H as (?&?&?). inv H. rewrite He in H0. done.
+    - left. auto.
   Qed.
 
-End model.
+  Global Instance thread_active_decide i ξ : Decision (thread_active i ξ).
+  Proof.
+    unfold thread_active. destruct ξ as (((Θ& σ)& j)& κs) eqn:Htrn. destruct (Θ !! i) eqn:Hi.
+    - destruct (to_val e) eqn:He.
+      + right. intros F. destruct F as (?&?&?). inv H.
+      + left. eauto.
+    - right. intros F. destruct F as (?&?&?). inv H.
+  Qed.
+
+  Lemma thread_active_and_not_false i ξ : thread_na i ξ → thread_active i ξ → False.
+  Proof.
+    unfold thread_na, thread_active. destruct ξ as (((Θ& σ)& j)& κs) eqn:Htrn.
+    intros. destruct (Θ !! i) eqn:LUi.
+    + destruct (to_val e) eqn: EQe.
+      * destruct H; [done |]. destruct H0 as (?&?&?). inv H0.
+      * destruct H; [done |]. destruct H as (?&?&?). inv H. rewrite EQe in H1. done.
+    + destruct H0 as (?&?&?). done.
+  Qed.
+  Lemma ts_emb_thread_active_and_not_false i τ :
+    (ts_emb (thread_na i)) τ → (ts_emb (thread_active i)) τ → False.
+  Proof.
+    destruct τ as (n&τf). unfold ts_emb. simpl. apply thread_active_and_not_false.
+  Qed.
+
+  Lemma thread_active_or_not i ξ : thread_na i ξ ∨ thread_active i ξ.
+  Proof.
+    unfold thread_na, thread_active.
+    destruct ξ as (((Θ& σ)& j)& κs) eqn:Htrn.
+    destruct (Θ !! i) eqn:LUi; eauto.
+    destruct (to_val e) eqn: EQe; eauto.
+  Qed.
+  Lemma ts_emb_thread_active_or_not i τ : (ts_emb (thread_na i)) τ ∨ (ts_emb (thread_active i)) τ.
+  Proof.
+    destruct τ as (n&τf). unfold ts_emb. simpl. apply thread_active_or_not.
+  Qed.
+
+End thread_status.
+
+Section fair_sched_cnt.
+  Context {Λ : language}.
+  Implicit Type ξ : trace_state Λ.
+  Implicit Type τ : trace Λ.
+
+  Definition fscnt : Type := thread_id → nat.
+
+  CoInductive beh_fscnt_th (τ : trace Λ) (i : thread_id) (c : nat) : Prop :=
+  | beh_fscnt_th_step ξ j c' :
+    j = trace_thread τ →
+    ξ = trace_now τ →
+    ((thread_na i ξ) ∨ (thread_active i ξ ∧ (if (decide (i = j)) then True else c' < c))) →
+    beh_fscnt_th (trace_next τ) i c' →
+    beh_fscnt_th τ i c.
+  Definition beh_fscnt (τ : trace Λ) (γ : fscnt) : Prop :=
+    ∀ (i : thread_id), beh_fscnt_th τ i (γ i).
+
+  (** Uses choice. *)
+  Lemma fair_scheduling_fscnt (τ : trace Λ) :
+    fair_scheduling τ → ∃ (γ : fscnt), beh_fscnt τ γ.
+  Proof.
+    intros FS. unfold beh_fscnt. apply choice. intros i. destruct τ as (n&τf).
+    assert (∀ (s : nat),
+              (((ts_emb (thread_na i) (n, τf))) ∨
+               ((ts_emb (thread_active i) (n, τf)) ∧ (ts_emb (thread_turn i) (s + n, τf))))
+              → beh_fscnt_th (n, τf) i s); cycle 1.
+    { destruct (ts_emb_thread_active_or_not i (n, τf)) as [TH | TH].
+      - exists 0. specialize (H 0). apply H. left. auto.
+      - specialize (FS n). unshelve edestruct FS. 1: exact i. 1: lia.
+        { exfalso. eapply (ts_emb_thread_active_and_not_false _ ((n, τf))); eauto. }
+        destruct H0 as [TA TEV]. unfold tr_eventually, tr_until in TEV. destruct TEV as (m& LEm& TTurn& _).
+        remember (m - n) as s. assert (m = s + n) by lia. subst m. clear Heqs LEm.
+        exists s. apply H. right. auto. }
+    revert n FS. cofix CIH; intros. destruct H as [TH | TH].
+    - rename TH into TNA. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
+      destruct (ts_emb_thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
+      + econstructor. 1,2: eauto. 1: auto.
+        unshelve eapply (CIH _ _ 0); auto. apply fair_scheduling_next. auto.
+      + pose proof FS as FSn'. specialize (FSn' (S n)).
+        unshelve edestruct FSn'. 1: exact i. 1: lia.
+        { exfalso. eapply (ts_emb_thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
+        destruct H as [TA TEV]. unfold tr_eventually, tr_until in TEV. destruct TEV as (m& LEm& TTurn& _).
+        remember (m - (S n)) as s'. assert (m = s' + S n) by lia. subst m. clear Heqs' LEm.
+        eapply (beh_fscnt_th_step _ _ _ _ _ s'). 1,2: eauto. 1: auto.
+        eapply CIH.
+        * apply fair_scheduling_next; auto.
+        * right. eauto.
+    - destruct TH as [TA TTurn]. destruct s.
+      (* A case split on [s], not an induction (which may break the guard condition). *)
+      { simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
+        unfold ts_emb, thread_turn in TTurn. simpl in TTurn. rewrite Htrn in TTurn. subst j.
+        destruct (ts_emb_thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
+        - econstructor. 1,2: eauto.
+          { right. split; auto. unfold trace_thread. simpl. rewrite Htrn. rewrite decide_True; eauto. }
+          unshelve eapply (CIH _ _ 0); eauto. eapply fair_scheduling_next; eauto.
+        - pose proof FS as FSn'. specialize (FSn' (S n)).
+          unshelve edestruct FSn'. 1: exact i. 1: lia.
+          { exfalso. eapply (ts_emb_thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
+          destruct H as [TA2 TEV2]. unfold tr_eventually, tr_until in TEV2. destruct TEV2 as (m& LEm& TTurn2& _).
+          remember (m - (S n)) as s. assert (m = s + S n) by lia. subst m. clear Heqs LEm.
+          eapply (beh_fscnt_th_step _ _ _ _ _ s). 1,2: eauto.
+          { right. split; auto. unfold trace_thread. simpl. rewrite Htrn. rewrite decide_True; auto. }
+          apply CIH; auto. apply fair_scheduling_next; auto. }
+      { simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
+        destruct (decide (j = i)).
+        - subst j. destruct (ts_emb_thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
+          + econstructor. 1,2: eauto.
+            { right. split; auto. unfold trace_thread. simpl. rewrite Htrn. rewrite decide_True; auto. }
+            unshelve eapply (CIH _ _ 0); eauto. eapply fair_scheduling_next; eauto.
+          + pose proof FS as FSn'. specialize (FSn' (S n)).
+            unshelve edestruct FSn'. 1: exact i. 1: lia.
+            { exfalso. eapply (ts_emb_thread_active_and_not_false _ (trace_next (n, τf))); eauto. }
+            destruct H as [TA2 TEV2]. unfold tr_eventually, tr_until in TEV2. destruct TEV2 as (m& LEm& TTurn2& _).
+            remember (m - (S n)) as s'. assert (m = s' + S n) by lia. subst m. clear Heqs' LEm.
+            eapply (beh_fscnt_th_step _ _ _ _ _ s'). 1,2: eauto.
+            { right. split; auto. unfold trace_thread. simpl. rewrite Htrn. rewrite decide_True; auto. }
+            apply CIH; auto. apply fair_scheduling_next; auto.
+        - eapply (beh_fscnt_th_step _ _ _ _ _ s). 1,2: eauto.
+          { right. split; auto. unfold trace_thread. simpl. rewrite Htrn. rewrite decide_False; auto. }
+          apply CIH; auto.
+          + apply fair_scheduling_next; auto.
+          + simpl. destruct (ts_emb_thread_active_or_not i (S n, τf)) as [? | TA2]; first auto.
+            right. replace (s + S n) with (S (s + n)) by lia. split; auto. }
+  Qed.
+
+  Definition fscnt_next_rel_th (τ : trace Λ) i (c1 c2 : nat) : Prop :=
+    if (decide (i = trace_thread τ)) then True
+    else if (decide (thread_na i (trace_now τ))) then True
+         else (c2 < c1).
+  Definition fscnt_next_rel (τ : trace Λ) (γ1 γ2 : fscnt) : Prop :=
+    ∀ i, fscnt_next_rel_th τ i (γ1 i) (γ2 i).
+
+  (** Uses choice. *)
+  Lemma exists_fscnt_next (τ : trace Λ) (γ : fscnt) :
+    beh_fscnt τ γ →
+    ∃ γ', beh_fscnt (trace_next τ) γ' ∧ fscnt_next_rel τ γ γ'.
+  Proof.
+    intros Beh. unfold beh_fscnt, fscnt_next_rel.
+    cut (∃ γ', ∀ i, (λ i c, beh_fscnt_th (trace_next τ) i c ∧ fscnt_next_rel_th τ i (γ i) c) i (γ' i)).
+    { intros. destruct H. exists x. split; intros; firstorder. }
+    apply choice. intros i. specialize (Beh i). inv Beh.
+    exists c'. split; auto. unfold fscnt_next_rel_th.
+    destruct τ as (n&τf). unfold trace_thread, trace_now. simpl in *.
+    destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn. simpl.
+    destruct (decide (i = j)); auto. destruct H1.
+    { rewrite decide_True; auto. }
+    destruct H.
+    rewrite /trace_thread /trace_now in H0. simpl in H0. rewrite Htrn in H0. simpl in H0.
+    rewrite decide_False in H0; auto.
+    rewrite decide_False; auto.
+    intros F. eapply thread_active_and_not_false; by eauto.
+  Qed.
+
+End fair_sched_cnt.
+
+(** ** Iris-style safety
+
+    The scheduled thread is not stuck, and a terminated thread [i] satisfies its
+    postcondition. This [not_stuck] (a [tsProp]) shadows [language.not_stuck]. *)
+Definition not_stuck {Λ : language} : tsProp Λ :=
+  λ ξ, let '((Θ, σ), i, _) := ξ in
+       ∃ e, Θ !! i = Some e ∧
+            match to_val e with
+            | Some _ => True
+            | None => reducible i e σ (dom Θ)
+            end.
+
+Definition if_term_val {Λ : language} (i : thread_id) (Φ : thread_id → val Λ → Prop) : tsProp Λ :=
+  λ ξ, let '((Θ, _), j, _) := ξ in
+       if (decide (i = j))
+       then ∃ e, Θ !! j = Some e ∧
+                 match (to_val e) with
+                 | Some v => Φ i v
+                 | None => True
+                 end
+       else True.
+
+Definition safety_iris {Λ : language} (i : thread_id) (Φ : thread_id → val Λ → Prop) : trProp Λ :=
+  tr_always (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R.

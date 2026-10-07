@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export weakestpre.
-From lantana.trace Require Export trace_pred.
+From lantana.trace Require Export trace_prop.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
 
