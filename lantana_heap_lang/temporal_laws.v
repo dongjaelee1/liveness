@@ -32,6 +32,22 @@ Section laws.
     iApply (gen_heap_valid with "H F").
   Qed.
 
+  (** An implication with a state antecedent, from a case split on the state: the value of
+      [l] decides the disjunct. The antecedent [l ↦ v0] is read on the trace. *)
+  Lemma temporal_impl_pointsto_example l v0 v1 (P0 P1 : iProp Σ) G0 :
+    v0 ≠ v1 →
+    P0 ⊨ₜ G0 -∗ ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊨ₜ ((l ↦ v0) → G0).
+  Proof.
+    iIntros (Hv) "#HG".
+    iApply (temporal_weaken _ (tps_impl (tps_state (λ σ _, heap σ !! l = Some (Some v0))) G0)).
+    { apply tps_impl_mono; [|apply tps_le_refl]. intros [n τf].
+      rewrite /= /tr_atomic /ts_emb /ts_atomic /trace_now /=. by destruct (τf n) as (((?&?)&?)&?). }
+    iApply (temporal_impl_state _ _ P0 with "HG").
+    iIntros "!>" (σ Θ κs Hl) "[SI [[_ HP]|[Hl1 _]]]"; first by iFrame.
+    iDestruct (state_interp_wf σ Θ κs (pred_pointsto l (DfracOwn 1) v1) with "[$SI $Hl1]") as %H1.
+    simpl in H1. rewrite Hl in H1. by simplify_eq.
+  Qed.
+
   (** Discharging a [finally] on the thread's final value, with credits from earlier steps. *)
   Lemma thread_expr_terminate_finally i E v k N :
     ↑N ⊆ E →

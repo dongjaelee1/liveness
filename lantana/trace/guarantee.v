@@ -320,16 +320,6 @@ Section rules.
     iModIntro. iLeft. by iApply (tguar_elim with "T ST [//] B W").
   Qed.
 
-  Lemma temporal_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (⌜φ⌝ → G).
-  Proof.
-    iIntros "#HG !>" (?????????) "(HI& MI& HP)".
-    destruct (Classical_Prop.classic φ) as [Hφ|Hφ].
-    - iPoseProof (temporal_elim with "HG [$HI $MI HP]") as "#T"; first by iApply "HP".
-      iApply tguar_intro. iIntros "!>" (????????????) "#ST %H #B W". rewrite /= /ti_impl. iIntros (_).
-      by iApply (tguar_elim with "T ST [//] B W").
-    - iApply tguar_intro. iIntros "!>" (????????????) "_ _ _ _". rewrite /= /ti_impl. by iIntros (?).
-  Qed.
-
   (** Universal quantification over any type. *)
   Lemma temporal_forall {X : Type} (P : X → iProp Σ) (G : X → tps Λ Σ) :
     (∀ x, P x ⊨ₜ G x) -∗ (∀ x, P x) ⊨ₜ tps_forall G.
@@ -415,6 +405,21 @@ Section state_rules.
 
 End state_rules.
 
+(** ** Implications
+
+    The antecedent [A] of [A → G] is read on the trace ([tps_impl]), so the implication is
+    [¬A ∨ G] ([tps_impl_or_not]). A guarantee is taken at a position [n], from the history
+    and the model at [n], before the rest of the trace is known. So an iProp [R] guarantees
+    [A → G] in two ways: by trace-level reasoning on a guarantee of [R]
+    ([temporal_impl_intro], [temporal_impl_weaken], and [temporal_weaken] with
+    [tps_impl_or_not]), or by a case split of [R] at [n] whose other cases are refuted by
+    the history so far ([temporal_impl_hist]). An antecedent that the history does not
+    decide (e.g. one about the future), or an iProp antecedent that the context does not
+    provide, cannot be used: see [naive_impl_rule_unsound] in guarantee_infer.v. The
+    antecedents decided by the history are the class [TpsDecided] (trace_prop.v): pure facts,
+    state atoms, and their combinations by [∧], [∨], [→], [∀], [∃]
+    ([temporal_impl_decided], [temporal_impl_state], [temporal_impl]). Temporal antecedents
+    ([□], [𝒰], [◇]) are not decided; they go through [temporal_impl_intro]. *)
 Section impl_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
@@ -426,6 +431,77 @@ Section impl_rules.
 
   Lemma temporal_impl_weaken P A G : P ⊨ₜ G ⊢ P ⊨ₜ tps_impl A G.
   Proof. apply temporal_weaken, tps_impl_intro_le. Qed.
+
+  (** The general rule: at every position, [R] gives [P] (keeping the history and the
+      model), which guarantees the implication, or every trace with the history so far
+      falsifies [A] there. *)
+  Lemma temporal_impl_hist R P A G :
+    P ⊨ₜ tps_impl A G -∗
+    □ (∀ h n σ Θ κs m i Ω W,
+         history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ R -∗
+         (history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ P) ∨
+         ⌜∀ τf, hist_trace h τf → ¬ tps_tr A (n, τf)⌝) -∗
+    R ⊨ₜ tps_impl A G.
+  Proof.
+    iIntros "#HG #HD !>" (h n σ Θ κs m i Ω W) "(HI& MI& HR)".
+    iPoseProof (history_interp_lb with "HI") as "#Hlb".
+    iDestruct ("HD" with "[$HI $MI $HR]") as "[(HI& MI& HP)|%Hno]".
+    - iApply (temporal_elim with "HG [$HI $MI $HP]").
+    - iApply tguar_intro. iIntros "!>" (Sys l h' g v2 Ω2 W' τf γ σ' Θ' κs') "_ %Hf _ (HI'& _)".
+      destruct Hf as (_& _& _& HIST).
+      iDestruct (history_interp_lb_prefix with "[$HI' $Hlb]") as %Hpre.
+      rewrite /= /ti_impl. iIntros (HA). exfalso. apply (Hno τf); last done.
+      intros n' σ'' Θ'' κs'' Hn'. apply HIST. by eapply prefix_lookup_Some.
+  Qed.
+
+  (** The history at [n] lists the configurations of the trace up to [n]. *)
+  Lemma hist_trace_trace_hist h n (τf : nat → trace_state Λ) :
+    length h = S n → hist_trace h τf → trace_hist n τf = h.
+  Proof.
+    intros Hlen HIST. apply list_eq. intros m. rewrite /trace_hist list_lookup_fmap.
+    destruct (decide (m < S n)) as [Hm|Hm].
+    - rewrite lookup_seq_lt //=.
+      destruct (h !! m) as [[[σ Θ] κs]|] eqn:Hhm; last (apply lookup_ge_None in Hhm; lia).
+      destruct (HIST _ _ _ _ Hhm) as [i' ->]. done.
+    - rewrite lookup_seq_ge; last lia. symmetry. apply lookup_ge_None. lia.
+  Qed.
+
+  (** A decided antecedent: [R] gives [P] wherever the history satisfies the decider [ψ]. *)
+  Lemma temporal_impl_decided A ψ `{!TpsDecided A ψ} R P G :
+    P ⊨ₜ G -∗
+    □ (∀ h n σ Θ κs m i Ω W, ⌜ψ h⌝ -∗
+         history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ R -∗
+         history_interp h n σ Θ κs ∗ model_interp m i Ω W n (dom Θ) ∗ P) -∗
+    R ⊨ₜ tps_impl A G.
+  Proof.
+    iIntros "#HG #HR". iApply (temporal_impl_hist with "[]"); first by iApply temporal_impl_weaken.
+    iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& R)".
+    iDestruct (history_interp_wf with "HI") as %[Hlen _].
+    destruct (Classical_Prop.classic (ψ h)) as [Hψ|Hψ].
+    - iLeft. iApply ("HR" with "[//] [$HI $MI $R]").
+    - iRight. iPureIntro. intros τf HIST HA. apply Hψ.
+      rewrite -(hist_trace_trace_hist h n τf) //. by apply (tps_decided (A:=A) n τf).
+  Qed.
+
+  (** A state antecedent: [R] gives [P] whenever the current state satisfies [φ]. *)
+  Lemma temporal_impl_state (φ : state Λ → thread_pool Λ → Prop) R P G :
+    P ⊨ₜ G -∗
+    □ (∀ σ Θ κs, ⌜φ σ Θ⌝ -∗ state_interp σ Θ κs ∗ R -∗ state_interp σ Θ κs ∗ P) -∗
+    R ⊨ₜ tps_impl (tps_state φ) G.
+  Proof.
+    iIntros "#HG #HR". iApply (temporal_impl_decided with "HG").
+    iIntros "!>" (h n σ Θ κs m i Ω W (σ'&Θ'&κs'&Hl&Hφ)) "(HI& $& R)".
+    rewrite /history_interp. iDestruct "HI" as "(%Hh& Ha& SI)".
+    assert (Hlast := proj2 Hh). rewrite Hlast in Hl. simplify_eq.
+    iDestruct ("HR" with "[//] [$SI $R]") as "[SI $]". by iFrame.
+  Qed.
+
+  (** A pure antecedent. *)
+  Lemma temporal_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (⌜φ⌝ → G).
+  Proof.
+    iIntros "#HG". iApply (temporal_impl_decided with "HG").
+    iIntros "!>" (h n σ Θ κs m i Ω W Hφ) "($& $& HP)". by iApply "HP".
+  Qed.
 
 End impl_rules.
 

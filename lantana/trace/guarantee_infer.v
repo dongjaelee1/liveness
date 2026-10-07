@@ -269,6 +269,12 @@ Section examples.
     apply (temporal_impl_intro _ _ _ _ (tps_le_refl _)).
   Qed.
 
+  (** Decided antecedents compose: the decider of a compound antecedent is inferred. *)
+  Local Lemma ex_decided (φ : Prop) (ψ : state Λ → thread_pool Λ → Prop) :
+    TpsDecided (Σ:=Σ) (tps_or (tps_pure φ) (tps_impl (tps_state ψ) (tps_pure False)))
+      (λ h, φ ∨ (hist_now ψ h → False)).
+  Proof. apply _. Qed.
+
   (** Unsound: an iProp implication guaranteeing the implication of the guarantees (the
       antecedent's resources are not determined by the trace). *)
   Local Lemma naive_impl_rule_unsound :

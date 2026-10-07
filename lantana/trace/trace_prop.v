@@ -134,6 +134,47 @@ Section tps_connectives.
   Proof. intros HA HG ??. rewrite /= /ti_impl. iIntros "H %H'". iApply HG. iApply "H". eauto. Qed.
   Lemma tps_impl_intro_le A G : tps_le G (tps_impl A G).
   Proof. intros ??. rewrite /= /ti_impl. by iIntros "H _". Qed.
+  (** The antecedent is read on the trace, so an implication is the disjunction of its
+      consequent with the negated antecedent. *)
+  Lemma tps_impl_or_not A G : tps_le (tps_impl A G) (tps_or (tps_impl A (tps_pure False)) G).
+  Proof.
+    intros ? τ. rewrite /= /ti_impl /ti_or /ti_pure. iIntros "H".
+    destruct (Classical_Prop.classic (tps_tr A τ)) as [HA|HA].
+    - iRight. by iApply "H".
+    - iLeft. by iIntros (?).
+  Qed.
+  Lemma tps_or_not_impl A G : tps_le (tps_or (tps_impl A (tps_pure False)) G) (tps_impl A G).
+  Proof.
+    intros ? τ. rewrite /= /ti_impl /ti_or /ti_pure. iIntros "[H|H] %HA"; last done.
+    by iDestruct ("H" $! HA) as %[].
+  Qed.
+
+  (** Antecedents compose on traces, for any antecedents: a conjunction curries, a
+      disjunction splits, an existential becomes a universal. *)
+  Lemma tps_impl_curry A1 A2 G :
+    tps_le (tps_impl A1 (tps_impl A2 G)) (tps_impl (tps_and A1 A2) G).
+  Proof. intros ? τ. rewrite /= /ti_impl /tr_and. iIntros "H" ([H1 H2]). by iApply "H". Qed.
+  Lemma tps_impl_uncurry A1 A2 G :
+    tps_le (tps_impl (tps_and A1 A2) G) (tps_impl A1 (tps_impl A2 G)).
+  Proof. intros ? τ. rewrite /= /ti_impl /tr_and. iIntros "H" (H1 H2). by iApply "H". Qed.
+  Lemma tps_impl_or_split A1 A2 G :
+    tps_le (tps_and (tps_impl A1 G) (tps_impl A2 G)) (tps_impl (tps_or A1 A2) G).
+  Proof.
+    intros ? τ. rewrite /= /ti_and /ti_impl /tr_or. iIntros "H" ([H1|H2]).
+    - iDestruct "H" as "[H _]". by iApply "H".
+    - iDestruct "H" as "[_ H]". by iApply "H".
+  Qed.
+  Lemma tps_impl_or_join A1 A2 G :
+    tps_le (tps_impl (tps_or A1 A2) G) (tps_and (tps_impl A1 G) (tps_impl A2 G)).
+  Proof.
+    intros ? τ. rewrite /= /ti_and /ti_impl /tr_or. iIntros "H".
+    iSplit; iIntros (?); iApply "H"; iPureIntro; auto.
+  Qed.
+  Lemma tps_impl_exist {X} `{!TypeExistentialProperty X ordI} (A : X → tps Λ Σ) G :
+    tps_le (tps_forall (λ x, tps_impl (A x) G)) (tps_impl (tps_exist A) G).
+  Proof.
+    intros ? τ. rewrite /= /ti_forall /ti_impl /tr_exist. iIntros "H" ([x Hx]). by iApply ("H" $! x).
+  Qed.
   Lemma tps_forall_mono {X} (G G' : X → tps Λ Σ) :
     (∀ x, tps_le (G x) (G' x)) → tps_le (tps_forall G) (tps_forall G').
   Proof. intros H ??. rewrite /= /ti_forall. iIntros "H %x". iApply H. iApply "H". Qed.
@@ -343,3 +384,88 @@ Section complete.
 End complete.
 Global Hint Mode TpsComplete - - ! : typeclass_instances.
 Global Hint Mode TpsInstant - - ! : typeclass_instances.
+
+(** ** Decided antecedents
+
+    [TpsDecided A ψ]: at any position, [A] holds iff the configurations up to it (as the
+    history records them, [trace_hist]) satisfy [ψ]. Such antecedents are decided when a
+    guarantee is taken, so an implication with them is exported by a case split
+    ([temporal_impl_decided] in guarantee.v). Pure facts and state atoms are decided, and
+    decided properties are closed under [∧], [∨], [→], [∀] and [∃]. The temporal operators
+    are not: their truth depends on the states to come ([tps_finally_not_decided]); as
+    antecedents they are used on traces ([tps_impl_intro], with complete antecedents). *)
+
+(** The configurations of a trace up to position [n], in the order of the history. *)
+Definition trace_hist {Λ : language} (n : nat) (τf : nat → trace_state Λ) :
+    list (state Λ * thread_pool Λ * list (observation Λ)) :=
+  (λ m, let '((Θ, σ), _, κs) := τf m in (σ, Θ, κs)) <$> seq 0 (S n).
+
+Lemma trace_hist_last {Λ : language} n (τf : nat → trace_state Λ) :
+  last (trace_hist n τf) = Some (let '((Θ, σ), _, κs) := τf n in (σ, Θ, κs)).
+Proof. by rewrite /trace_hist seq_S fmap_app last_snoc. Qed.
+
+Section decided.
+  Context {Λ : language} {Σ : gFunctors}.
+  Implicit Types A : tps Λ Σ.
+  Local Notation hist := (list (state Λ * thread_pool Λ * list (observation Λ))).
+
+  Class TpsDecided A (ψ : hist → Prop) : Prop :=
+    tps_decided : ∀ n τf, tps_tr A (n, τf) ↔ ψ (trace_hist n τf).
+
+  (** [φ] holds of the current (last) configuration of a history. *)
+  Definition hist_now (φ : state Λ → thread_pool Λ → Prop) : hist → Prop :=
+    λ h, ∃ σ Θ κs, last h = Some (σ, Θ, κs) ∧ φ σ Θ.
+
+  Global Instance tps_decided_pure φ : TpsDecided (tps_pure φ) (λ _, φ).
+  Proof. done. Qed.
+  Global Instance tps_decided_state φ : TpsDecided (tps_state φ) (hist_now φ).
+  Proof.
+    intros n τf. rewrite /hist_now trace_hist_last /=. destruct (τf n) as (((Θ&σ)&?)&κs).
+    split; [intros; by eexists _, _, _|by intros (?&?&?&[= <- <- <-]&?)].
+  Qed.
+  Global Instance tps_decided_atomic π :
+    TpsDecided (tps_atomic π) (hist_now (λ σ Θ, state_sat σ Θ π)).
+  Proof.
+    intros n τf. rewrite /hist_now trace_hist_last /= /tr_atomic /ts_emb /ts_atomic /trace_now /=.
+    destruct (τf n) as (((Θ&σ)&?)&κs).
+    split; [intros; by eexists _, _, _|by intros (?&?&?&[= <- <- <-]&?)].
+  Qed.
+  Global Instance tps_decided_and A1 A2 ψ1 ψ2 :
+    TpsDecided A1 ψ1 → TpsDecided A2 ψ2 → TpsDecided (tps_and A1 A2) (λ h, ψ1 h ∧ ψ2 h).
+  Proof. intros H1 H2 n τf. specialize (H1 n τf). specialize (H2 n τf). rewrite /= /tr_and. tauto. Qed.
+  Global Instance tps_decided_or A1 A2 ψ1 ψ2 :
+    TpsDecided A1 ψ1 → TpsDecided A2 ψ2 → TpsDecided (tps_or A1 A2) (λ h, ψ1 h ∨ ψ2 h).
+  Proof. intros H1 H2 n τf. specialize (H1 n τf). specialize (H2 n τf). rewrite /= /tr_or. tauto. Qed.
+  Global Instance tps_decided_impl A1 A2 ψ1 ψ2 :
+    TpsDecided A1 ψ1 → TpsDecided A2 ψ2 → TpsDecided (tps_impl A1 A2) (λ h, ψ1 h → ψ2 h).
+  Proof. intros H1 H2 n τf. specialize (H1 n τf). specialize (H2 n τf). rewrite /= /tr_impl. tauto. Qed.
+  Global Instance tps_decided_forall {X} (A : X → tps Λ Σ) (ψ : X → hist → Prop) :
+    (∀ x, TpsDecided (A x) (ψ x)) → TpsDecided (tps_forall A) (λ h, ∀ x, ψ x h).
+  Proof.
+    intros H n τf. rewrite /= /tr_forall. split; intros Hx x; apply (H x n τf), Hx.
+  Qed.
+  Global Instance tps_decided_exist {X} `{!TypeExistentialProperty X ordI}
+      (A : X → tps Λ Σ) (ψ : X → hist → Prop) :
+    (∀ x, TpsDecided (A x) (ψ x)) → TpsDecided (tps_exist A) (λ h, ∃ x, ψ x h).
+  Proof.
+    intros H n τf. rewrite /= /tr_exist. split; intros [x Hx]; exists x; by apply (H x n τf).
+  Qed.
+
+  (** A finally is not decided: with a state [σ0, Θ0] outside [φ] and a state [σ1, Θ1] in
+      it, two traces with the same configuration at [0] differ on [◇φ] at [0]. *)
+  Lemma tps_finally_not_decided (φ : state Λ → thread_pool Λ → Prop) σ0 Θ0 σ1 Θ1
+      (i : thread_id) (κs : list (observation Λ)) (ψ : hist → Prop) :
+    ¬ φ σ0 Θ0 → φ σ1 Θ1 → ¬ TpsDecided (tps_finally (tps_state φ)) ψ.
+  Proof.
+    intros H0 H1 Hd.
+    set (τ1 := λ m : nat, match m with 0 => ((Θ0, σ0), i, κs) | _ => ((Θ1, σ1), i, κs) end).
+    set (τ2 := λ _ : nat, ((Θ0, σ0), i, κs) : trace_state Λ).
+    assert (Hh : trace_hist 0 τ1 = trace_hist 0 τ2) by done.
+    assert (HF : tps_tr (Σ:=Σ) (tps_finally (tps_state φ)) (0, τ1)).
+    { exists 1. split_and!; [lia|done|]. intros l Hl. done. }
+    apply Hd in HF. rewrite Hh in HF. apply Hd in HF.
+    destruct HF as (m & _ & Hm & _). by apply H0.
+  Qed.
+
+End decided.
+Global Hint Mode TpsDecided - - ! - : typeclass_instances.
