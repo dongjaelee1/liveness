@@ -350,6 +350,27 @@ Section proof.
     iApply ("HΦ" with "[$TE $Q_LC $TG $GB]").
   Qed.
 
+  (** The FIFO countdown: dequeuing advances every remaining value one
+      position, freeing exactly one unit of transfer credit per obligation,
+      which is what moving the obligation to the primary's fresh carrier costs. *)
+  Local Lemma queue_credits_shift ℓ (l : list oids) :
+    ([∗ list] n ↦ B ∈ l, [∗ set] b ∈ B, oblP_fuel b ℓ (S (S n))%M) ⊢
+    ([∗ list] n ↦ B ∈ l, [∗ set] b ∈ B, oblP_fuel b ℓ (S n)%M) ∗
+    ([∗ set] b ∈ union_list_of_sets l, oblP_fuel b ℓ 1).
+  Proof.
+    iIntros "Fq".
+    iAssert (([∗ list] n ↦ B ∈ l, [∗ set] b ∈ B, oblP_fuel b ℓ (S n)%M) ∗
+             ([∗ list] n ↦ B ∈ l, [∗ set] b ∈ B, oblP_fuel b ℓ 1))%I with "[Fq]" as "[$ F]".
+    { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %k %B % H".
+      iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
+      { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
+        replace (S (S k)) with (S k + 1) by lia. done. }
+      iApply (oblP_fuel_add_set with "H"). }
+    iInduction l as [ | B l] "IH"; first done.
+    iPoseProof (big_sepL_cons with "F") as "[Fb F]".
+    rewrite union_list_of_sets_cons. iApply (big_sepS_union_2 with "Fb"). by iApply "IH".
+  Qed.
+
   (** TODO: LAT-style spec that enables the client to put crP_obls in some invariant. *)
   Lemma Queue_dequeue_spec :
     ⊢ ∃ μ, ∀ lc m (b : bool) wg i G φ γ ℓ (ql : val) C,
@@ -499,26 +520,13 @@ Section proof.
       + iPoseProof (ghost_var_agree with "Gvar HW") as "%". simplify_eq.
         rewrite !fmap_cons. iPoseProof (big_sepL_cons with "Fq") as "[FB Fq]".
         simpl.
-        iAssert (([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ (S k)) ∗
-                 ([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ 1))%I
-          with "[Fq]" as "[Fq F]".
-        { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %% % H".
-          iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
-          { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
-            replace (S (S k)) with (S k + 1) by lia. done. }
-          iApply (oblP_fuel_add_set with "H"). }
+        iDestruct (queue_credits_shift with "Fq") as "[Fq F]".
         iMod (carrier_alloc_offload _ _ _ _ _ _ _ ℓ _ (μ ⊕ 76 ⊕ mr)%M with "TG Gq FB")
           as "(%g& %Ning& TG& Gq& Gg& Fg)". 1: set_solver. 1: done.
         assert (HDisj : B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
         { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
         destruct HDisj as (DisjB& Disj').
         replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
-        iAssert ([∗ set] b ∈ union_list_of_sets vs'.*2, oblP_fuel b ℓ 1)%I with "[F]" as "F".
-        { iClear "TicketLock_acquire_spec TicketLock_release_spec IQ IFL".
-          remember (vs'.*2) as l. clear dependent vs'. clear DisjB Disj'. iInduction l as [ | ]. 1: done.
-          iPoseProof (big_sepL_cons with "F") as "[Fb F]".
-          iPoseProof ("IHl" with "F") as "F".
-          rewrite union_list_of_sets_cons. iApply (big_sepS_union_2 with "Fb F"). }
         iMod (carrier_alloc_offload _ _ _ _ _ _ _ ℓ _ (μ ⊕ 76 ⊕ mr)%M with "TG Gq F")
           as "(%ng& %Ninng& TG& Gq& Gng& Fng)". 1: set_solver. 1: done.
         iMod (ghost_var_update_2 (ng) with "Gvar HW") as "[Gvar HW]". 1: by rewrite Qp.div_2.
@@ -559,14 +567,7 @@ Section proof.
         { iPureIntro. split_and !; set_solver. }
       + rename g into ng. rewrite !fmap_cons. iPoseProof (big_sepL_cons with "Fq") as "[FB Fq]".
         simpl.
-        iAssert (([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ (S k)) ∗
-                 ([∗ list] k↦y ∈ vs'.*2, [∗ set] b ∈ y, oblP_fuel b ℓ 1))%I
-          with "[Fq]" as "[Fq F]".
-        { iApply big_sepL_sep. iApply (big_sepL_impl with "Fq"). iIntros "!> %% % H".
-          iPoseProof (oblP_fuel_eq_set _ _ _ ((S k) ⊕ 1)%M with "H") as "H".
-          { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
-            replace (S (S k)) with (S k + 1) by lia. done. }
-          iApply (oblP_fuel_add_set with "H"). }
+        iDestruct (queue_credits_shift with "Fq") as "[Fq F]".
         iMod (carrier_alloc_offload _ _ _ _ _ _ _ ℓ _ (μ ⊕ 76 ⊕ mr)%M with "TG Gq FB")
           as "(%g& %Ning& TG& Gq& Gg& Fg)". 1: set_solver. 1: done.
         assert (HDisj : B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
