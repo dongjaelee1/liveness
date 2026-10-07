@@ -229,20 +229,20 @@ Section adequacy.
               (thP_kids i {[kl; kc]} ∗ oblP_kids kl ∅ ∗ oblP_kids kc ∅ ∗ ⌜kl ≠ kc⌝ ∗
                ([∗ set] g ∈ {[kl; kc]}, oblP_fuel g 2 μ)))%I.
 
-  Let G_main {Σ} : tps heap_lang Σ :=
-        (tps_finally (exits #1@i) ∧
-         tps_finally (tps_exist (λ x : loc, flag_tps x) ∧
-                      tps_exist (λ b : loc, tps_always (handoff_inv_tps b))) ∧ tps_true)%S.
+  Let G_main {Σ} : tprop heap_lang Σ :=
+        (tprop_finally (exits #1@i) ∧
+         tprop_finally (tprop_exist (λ x : loc, flag_tprop x) ∧
+                      tprop_exist (λ b : loc, tprop_always (handoff_inv_tprop b))) ∧ tprop_true)%T.
 
   Lemma Φ_P_temporal `{!heapGS Σ} `{!handoffG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → R_main τ ∧ R_handoff τ.
+  Remark G_main_impl {Σ} τ : tprop_tr (G_main (Σ:=Σ)) τ → R_main τ ∧ R_handoff τ.
   Proof.
     intros (Hr& Hf& _). destruct τ as [n τf]. destruct Hf as (m& Hm& [[x Hx] [b Hh]]& Hb).
     split; [split; first exact Hr|].
-    - exists m. split_and!; [done| |done]. exists x. exact (flag_tps_impl x (m, τf) Hx).
-    - exists m. split_and!; [done| |done]. exists b. exact (handoff_inv_tps_tr b (m, τf) Hh).
+    - exists m. split_and!; [done| |done]. exists x. exact (flag_tprop_impl x (m, τf) Hx).
+    - exists m. split_and!; [done| |done]. exists b. exact (handoff_inv_tprop_tr b (m, τf) Hh).
   Qed.
 
   Let Σ : gFunctors :=

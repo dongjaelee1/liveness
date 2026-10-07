@@ -6,27 +6,27 @@ From iris.prelude Require Import options.
 (** * Temporal guarantees for heap_lang: points-to facts and thread expressions guarantee
     the corresponding state predicates. *)
 
-Notation "l ↦ dq v" := (tps_atomic (pred_pointsto l dq v))
-  (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tps_scope.
-Notation "'exits' v @ i" := (tps_atomic (pred_expr i [] (of_val v)))
-  (at level 20, v, i at level 1, format "exits  v @ i") : tps_scope.
+Notation "l ↦ dq v" := (tprop_atomic (pred_pointsto l dq v))
+  (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tprop_scope.
+Notation "'exits' v @ i" := (tprop_atomic (pred_expr i [] (of_val v)))
+  (at level 20, v, i at level 1, format "exits  v @ i") : tprop_scope.
 
 Section laws.
   Context `{!heapGS Σ}.
 
   Global Instance into_temporal_pointsto l dq v :
-    IntoTemporal (l ↦{dq} v) (tps_atomic (pred_pointsto l dq v)) | 10.
+    IntoTemporal (l ↦{dq} v) (tprop_atomic (pred_pointsto l dq v)) | 10.
   Proof. exact (temporal_atomic (pred_pointsto l dq v)). Qed.
 
   Global Instance into_temporal_thread_expr i C e :
-    IntoTemporal (thread_expr i C e) (tps_atomic (pred_expr i C e)) | 10.
+    IntoTemporal (thread_expr i C e) (tprop_atomic (pred_expr i C e)) | 10.
   Proof. exact (temporal_atomic (pred_expr i C e)). Qed.
   (* TODO: [IntoTemporal] instances for the invariant heap ([l ↦_I v]). *)
 
   (** A freed location stays freed. *)
-  Definition freed_tps (l : loc) : tps heap_lang Σ := tps_state (λ σ _, heap σ !! l = Some None).
+  Definition freed_tprop (l : loc) : tprop heap_lang Σ := tprop_state (λ σ _, heap σ !! l = Some None).
 
-  Lemma freed_temporal (l : loc) q : ⊢ freed l q ⊨ₜ freed_tps l.
+  Lemma freed_temporal (l : loc) q : ⊢ freed l q ⊨ₜ freed_tprop l.
   Proof.
     apply temporal_state. intros σ Θ κs. iIntros "[(H& _) F]".
     iApply (gen_heap_valid with "H F").
@@ -39,8 +39,8 @@ Section laws.
     P0 ⊨ₜ G0 -∗ ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊨ₜ ((l ↦ v0) → G0).
   Proof.
     iIntros (Hv) "#HG".
-    iApply (temporal_weaken _ (tps_impl (tps_state (λ σ _, heap σ !! l = Some (Some v0))) G0)).
-    { apply tps_impl_mono; [|apply tps_le_refl]. intros [n τf].
+    iApply (temporal_weaken _ (tprop_impl (tprop_state (λ σ _, heap σ !! l = Some (Some v0))) G0)).
+    { apply tprop_impl_mono; [|apply tprop_le_refl]. intros [n τf].
       rewrite /= /tr_atomic /ts_emb /ts_atomic /trace_now /=. by destruct (τf n) as (((?&?)&?)&?). }
     iApply (temporal_impl_state _ _ P0 with "HG").
     iIntros "!>" (σ Θ κs Hl) "[SI [[_ HP]|[Hl1 _]]]"; first by iFrame.

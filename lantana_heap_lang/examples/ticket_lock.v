@@ -993,50 +993,50 @@ Section proof.
   Qed.
 
   (** ** Temporal guarantees *)
-  (** The guarantee of the alive branch of [lock_inv], as inferred: [tps_true] for ghost
+  (** The guarantee of the alive branch of [lock_inv], as inferred: [tprop_true] for ghost
       state, [R] and the ticket maps. If a ticket is pending ([c < n]), the next owner's until
       carries [finally curr ↦ c + 1]. *)
-  Definition lock_inv_alive_tps (next curr : loc) : tps heap_lang Σ :=
+  Definition lock_inv_alive_tprop (next curr : loc) : tprop heap_lang Σ :=
     (∃ n c : Z,
-       next ↦ #n ∧ curr ↦{#(1/2/2)} #c ∧ tps_true ∧ tps_true ∧ tps_true ∧
-       ⌜(0 ≤ c ≤ n)%Z⌝ ∧ tps_true ∧ tps_true ∧
-       (⌜c = n⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true ∨
+       next ↦ #n ∧ curr ↦{#(1/2/2)} #c ∧ tprop_true ∧ tprop_true ∧ tprop_true ∧
+       ⌜(0 ≤ c ≤ n)%Z⌝ ∧ tprop_true ∧ tprop_true ∧
+       (⌜c = n⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tprop_true ∨
         ⌜(c < n)%Z⌝ ∧
-          (tps_true ∧ tps_true ∧ tps_true ∧
-           tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true) ∧
-           ((tps_true ∧ tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true) ∧
-             tps_true ∧ tps_true ∧ tps_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true) ∨ tps_true))))%S.
+          (tprop_true ∧ tprop_true ∧ tprop_true ∧
+           tprop_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tprop_true) ∧
+           ((tprop_true ∧ tprop_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tprop_true) ∧
+             tprop_true ∧ tprop_true ∧ tprop_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tprop_true) ∨ tprop_true))))%T.
 
   (** The guarantee of [lock_inv]: its left disjunct (deleted lock) is ghost state, so it
       says nothing about the trace. *)
-  Definition lock_inv_tps (next curr : loc) : tps heap_lang Σ :=
-    (tps_true ∨ lock_inv_alive_tps next curr)%S.
+  Definition lock_inv_tprop (next curr : loc) : tprop heap_lang Σ :=
+    (tprop_true ∨ lock_inv_alive_tprop next curr)%T.
 
   (** The guarantee of [lock_token_inv]: nobody holds the lock (ghost state), or its holder
       will increment [curr]. *)
-  Definition lock_token_inv_tps (curr : loc) : tps heap_lang Σ :=
-    (∃ c : Z, tps_true ∨
-       tps_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true ∧
-       tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true))%S.
+  Definition lock_token_inv_tprop (curr : loc) : tprop heap_lang Σ :=
+    (∃ c : Z, tprop_true ∨
+       tprop_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tprop_true ∧
+       tprop_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tprop_true))%T.
 
   (** The guarantee of [is_fair_lock], vacuous on traces since the lock can be deleted; see
       [is_fair_lock_alive_temporal]. *)
-  Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
+  Definition fair_lock_tprop (tl : val) : tprop heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
-       tps_always (lock_inv_tps next curr) ∧ tps_always (lock_token_inv_tps curr))%S.
+       tprop_always (lock_inv_tprop next curr) ∧ tprop_always (lock_token_inv_tprop curr))%T.
 
-  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tps tl.
+  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tprop tl.
   Proof. apply (into_temporal _ _). Qed.
 
   (** Clients see the lock's guarantee, not its invariant. *)
   Global Instance is_fair_lock_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
+    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tprop tl) | 0.
   Proof. apply is_fair_lock_temporal. Qed.
 
   (** The guarantee of a lock that cannot be deleted. *)
-  Definition alive_fair_lock_tps (tl : val) : tps heap_lang Σ :=
-    (fair_lock_tps tl ∧
-     ∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_alive_tps next curr))%S.
+  Definition alive_fair_lock_tprop (tl : val) : tprop heap_lang Σ :=
+    (fair_lock_tprop tl ∧
+     ∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tprop_always (lock_inv_alive_tprop next curr))%T.
 
   (** A persistent [γ ↪LOCK_AL□] (as the queue keeps) rules out deletion, hence the left
       disjunct of [lock_inv]: the lock invariant is registered under its alive branch. *)
@@ -1057,11 +1057,11 @@ Section proof.
   Qed.
 
   Lemma is_fair_lock_alive_temporal tl γ R :
-    ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_tps tl.
+    ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_tprop tl.
   Proof. apply (into_temporal _ _). Qed.
 
   Global Instance is_fair_lock_alive_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock_alive tl γ R) (alive_fair_lock_tps tl) | 0.
+    IntoTemporal (is_fair_lock_alive tl γ R) (alive_fair_lock_tprop tl) | 0.
   Proof. apply is_fair_lock_alive_temporal. Qed.
 
   (** [lock_token] is ghost state: the holder's [finally] lives in [lock_token_inv]. *)
@@ -1083,8 +1083,8 @@ Section trace.
       tr_pointsto next #n τ → tr_pointsto curr #c τ → (c < n)%Z →
       tr_eventually (tr_pointsto curr #(c + 1)) τ).
 
-  Lemma lock_inv_alive_tps_release_progress {Σ} next curr τ :
-    tps_tr (tps_always (lock_inv_alive_tps (Σ:=Σ) next curr)) τ → release_progress next curr τ.
+  Lemma lock_inv_alive_tprop_release_progress {Σ} next curr τ :
+    tprop_tr (tprop_always (lock_inv_alive_tprop (Σ:=Σ) next curr)) τ → release_progress next curr τ.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n c Hn Hc Hlt.
     destruct (Hal m Hm) as (n' & c' & Hn' & Hc' & _ & _ & _ & Hb & _ & _ & Hcase).
@@ -1097,11 +1097,11 @@ Section trace.
   Qed.
 
   Lemma alive_fair_lock_release_progress {Σ} tl τ :
-    tps_tr (alive_fair_lock_tps (Σ:=Σ) tl) τ →
+    tprop_tr (alive_fair_lock_tprop (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ release_progress next curr τ.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
-    by eapply (lock_inv_alive_tps_release_progress (Σ:=Σ)).
+    by eapply (lock_inv_alive_tprop_release_progress (Σ:=Σ)).
   Qed.
 
   (** Only the next ticket carries a [finally] (the releasing thread allocates its

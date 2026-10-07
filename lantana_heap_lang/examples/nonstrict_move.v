@@ -63,13 +63,13 @@ Section adequacy.
 
   Section G_main.
     Context `{!heapGS Σ}.
-    Definition G_main : tps heap_lang Σ := ltac:(tps_of Φ_P).
+    Definition G_main : tprop heap_lang Σ := ltac:(tprop_of Φ_P).
   End G_main.
 
   Lemma Φ_P_temporal `{!heapGS Σ} : ⊢ Φ_P ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
 
-  Remark G_main_false {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → False.
+  Remark G_main_false {Σ} τ : tprop_tr (G_main (Σ:=Σ)) τ → False.
   Proof.
     destruct τ as [n τf]. simpl. intros (Hu& _). destruct Hu as (m& _& HF& _). done.
   Qed.

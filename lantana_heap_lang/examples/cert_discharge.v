@@ -33,7 +33,7 @@ Section proof.
     x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ finallyI Nf kf 1 (x ↦ #2).
 
   Lemma cd_Q_temporal x y kf :
-    ⊢ cd_Q x y kf ⊨ₜ (x ↦ #1 ∧ tps_always (y ↦ #7) ∧ tps_finally (x ↦ #2))%S.
+    ⊢ cd_Q x y kf ⊨ₜ (x ↦ #1 ∧ tprop_always (y ↦ #7) ∧ tprop_finally (x ↦ #2))%T.
   Proof. apply (into_temporal _ _). Qed.
 
   Lemma main_spec :
@@ -156,9 +156,9 @@ Section adequacy.
                ([∗ set] g ∈ {[kq; kf]}, oblP_fuel g 0 μ)))%I.
 
   (** What they guarantee; the first commitment's right formula keeps its nested structures. *)
-  Let G_main {Σ} : tps heap_lang Σ :=
-        (tps_finally (x ↦ #1 ∧ tps_always (y ↦ #7) ∧ tps_finally (x ↦ #2)) ∧
-         tps_finally (x ↦ #2) ∧ x ↦ #0 ∧ y ↦ #7 ∧ tps_true)%S.
+  Let G_main {Σ} : tprop heap_lang Σ :=
+        (tprop_finally (x ↦ #1 ∧ tprop_always (y ↦ #7) ∧ tprop_finally (x ↦ #2)) ∧
+         tprop_finally (x ↦ #2) ∧ x ↦ #0 ∧ y ↦ #7 ∧ tprop_true)%T.
 
   Lemma Φ_P_temporal `{!heapGS Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
   Proof. apply (into_temporal _ _). Qed.
@@ -169,7 +169,7 @@ Section adequacy.
         (tr_eventually (x ↦ #1 ∧ tr_always (y ↦ #7) ∧ tr_eventually (x ↦ #2)) ∧
          tr_eventually (x ↦ #2))%R.
 
-  Remark G_main_impl {Σ} τ : tps_tr (G_main (Σ:=Σ)) τ → R_main τ.
+  Remark G_main_impl {Σ} τ : tprop_tr (G_main (Σ:=Σ)) τ → R_main τ.
   Proof. intros (H1& H2& _). split; [exact H1|exact H2]. Qed.
 
   Let Σ : gFunctors :=

@@ -93,7 +93,7 @@ Section proof.
   (** *** The mono cell
       An invariant with half of [next]'s points-to ([delete] leaves half of its freed
       points-to) and the authority over the lower bounds of [next]. It is registered again
-      each time [next] reaches a value [v], with the reading [next_ge_tps next v], justified
+      each time [next] reaches a value [v], with the reading [next_ge_tprop next v], justified
       by the lower bound [γm ↪◯MZ v] ([mono_inv_temporal]). A chain of invariants, one per
       value, would not do: each link's reading would rest on the next one's, available only
       one step of the logic later (its certificate is later-guarded). *)
@@ -101,15 +101,15 @@ Section proof.
     ∃ w : Z, γm ↪●MZ w ∗ (next ↦{#1/2} #w ∨ freed next (1/2)).
 
   (** [next ≥ v], or [next] has been freed. *)
-  Definition next_ge_tps (next : loc) (v : Z) : tps heap_lang Σ :=
-    ((∃ w : Z, ⌜(v ≤ w)%Z⌝ ∧ next ↦ #w) ∨ freed_tps next)%S.
+  Definition next_ge_tprop (next : loc) (v : Z) : tprop heap_lang Σ :=
+    ((∃ w : Z, ⌜(v ≤ w)%Z⌝ ∧ next ↦ #w) ∨ freed_tprop next)%T.
 
   (** The registration of the mono cell for the value [v]. *)
   Local Definition next_ge γm (next : loc) (v : Z) : iProp Σ :=
-    alwaysI_guar N_mono (mono_inv γm next) (next_ge_tps next v).
+    alwaysI_guar N_mono (mono_inv γm next) (next_ge_tprop next v).
 
   Local Lemma mono_inv_temporal γm next v :
-    γm ↪◯MZ v -∗ mono_inv γm next ⊨ₜ next_ge_tps next v.
+    γm ↪◯MZ v -∗ mono_inv γm next ⊨ₜ next_ge_tprop next v.
   Proof.
     iIntros "#Lb".
     iApply (temporal_mono ((∃ w : Z, ⌜(v ≤ w)%Z⌝ ∗ next ↦{#1/2} #w) ∨ freed next (1/2))%I with "[]").
@@ -117,7 +117,7 @@ Section proof.
       iDestruct (mono_Z_auth_lb_own_valid with "A Lb") as %[_ ?]. iLeft. iExists w. by iFrame. }
     iApply temporal_or; last iApply freed_temporal.
     iApply temporal_exist. iIntros (w). iApply temporal_sep; first iApply temporal_pure.
-    iApply (temporal_weaken _ (tps_atomic (pred_pointsto next (DfracOwn (1/2)) #w))).
+    iApply (temporal_weaken _ (tprop_atomic (pred_pointsto next (DfracOwn (1/2)) #w))).
     { intros ? τ. done. }
     iApply (temporal_atomic (pred_pointsto next (DfracOwn (1/2)) #w)).
   Qed.
@@ -1055,49 +1055,49 @@ Section proof.
 
   (** ** Temporal guarantees *)
   (** The guarantee of the alive branch of [lock_inv], as inferred: as in ticket_lock.v, and
-      the mono cell's registration for [n] carries [□ next_ge_tps next n]. *)
-  Definition lock_inv_alive_tps (next curr : loc) : tps heap_lang Σ :=
+      the mono cell's registration for [n] carries [□ next_ge_tprop next n]. *)
+  Definition lock_inv_alive_tprop (next curr : loc) : tprop heap_lang Σ :=
     (∃ n c : Z,
-       next ↦{#(1/2)} #n ∧ tps_always (next_ge_tps next n) ∧
-       curr ↦{#(1/2/2)} #c ∧ tps_true ∧ tps_true ∧ tps_true ∧
-       ⌜(0 ≤ c ≤ n)%Z⌝ ∧ tps_true ∧ tps_true ∧
-       (⌜c = n⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true ∨
+       next ↦{#(1/2)} #n ∧ tprop_always (next_ge_tprop next n) ∧
+       curr ↦{#(1/2/2)} #c ∧ tprop_true ∧ tprop_true ∧ tprop_true ∧
+       ⌜(0 ≤ c ≤ n)%Z⌝ ∧ tprop_true ∧ tprop_true ∧
+       (⌜c = n⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tprop_true ∨
         ⌜(c < n)%Z⌝ ∧
-          (tps_true ∧ tps_true ∧ tps_true ∧
-           tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true) ∧
-           ((tps_true ∧ tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true) ∧
-             tps_true ∧ tps_true ∧ tps_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true) ∨ tps_true))))%S.
+          (tprop_true ∧ tprop_true ∧ tprop_true ∧
+           tprop_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tprop_true) ∧
+           ((tprop_true ∧ tprop_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tprop_true) ∧
+             tprop_true ∧ tprop_true ∧ tprop_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tprop_true) ∨ tprop_true))))%T.
 
   (** The guarantee of [lock_inv]: its left disjunct (deleted lock) is ghost state, so it
       says nothing about the trace. *)
-  Definition lock_inv_tps (next curr : loc) : tps heap_lang Σ :=
-    (tps_true ∨ lock_inv_alive_tps next curr)%S.
+  Definition lock_inv_tprop (next curr : loc) : tprop heap_lang Σ :=
+    (tprop_true ∨ lock_inv_alive_tprop next curr)%T.
 
   (** The guarantee of [lock_token_inv]: nobody holds the lock (ghost state), or its holder
       will increment [curr]. *)
-  Definition lock_token_inv_tps (curr : loc) : tps heap_lang Σ :=
-    (∃ c : Z, tps_true ∨
-       tps_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tps_true ∧
-       tps_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tps_true))%S.
+  Definition lock_token_inv_tprop (curr : loc) : tprop heap_lang Σ :=
+    (∃ c : Z, tprop_true ∨
+       tprop_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ tprop_true ∧
+       tprop_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ tprop_true))%T.
 
   (** The guarantee of [is_fair_lock], vacuous on traces since the lock can be deleted; see
       [is_fair_lock_alive_temporal]. *)
-  Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
+  Definition fair_lock_tprop (tl : val) : tprop heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
-       tps_always (lock_inv_tps next curr) ∧ tps_always (lock_token_inv_tps curr))%S.
+       tprop_always (lock_inv_tprop next curr) ∧ tprop_always (lock_token_inv_tprop curr))%T.
 
-  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tps tl.
+  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tprop tl.
   Proof. apply (into_temporal _ _). Qed.
 
   (** Clients see the lock's guarantee, not its invariant. *)
   Global Instance is_fair_lock_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
+    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tprop tl) | 0.
   Proof. apply is_fair_lock_temporal. Qed.
 
   (** The guarantee of a lock that cannot be deleted. *)
-  Definition alive_fair_lock_tps (tl : val) : tps heap_lang Σ :=
-    (fair_lock_tps tl ∧
-     ∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_alive_tps next curr))%S.
+  Definition alive_fair_lock_tprop (tl : val) : tprop heap_lang Σ :=
+    (fair_lock_tprop tl ∧
+     ∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tprop_always (lock_inv_alive_tprop next curr))%T.
 
   (** A persistent [γ ↪LOCK_AL□] (as the queue keeps) rules out deletion, hence the left
       disjunct of [lock_inv]: the lock invariant is registered under its alive branch. *)
@@ -1118,11 +1118,11 @@ Section proof.
   Qed.
 
   Lemma is_fair_lock_alive_temporal tl γ R :
-    ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_tps tl.
+    ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_tprop tl.
   Proof. apply (into_temporal _ _). Qed.
 
   Global Instance is_fair_lock_alive_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock_alive tl γ R) (alive_fair_lock_tps tl) | 0.
+    IntoTemporal (is_fair_lock_alive tl γ R) (alive_fair_lock_tprop tl) | 0.
   Proof. apply is_fair_lock_alive_temporal. Qed.
 
   (** [lock_token] is ghost state: the holder's [finally] lives in [lock_token_inv]. *)
@@ -1133,8 +1133,8 @@ End proof.
 Section trace.
   Local Notation tr_pointsto := ticket_lock.tr_pointsto.
 
-  Lemma lock_inv_alive_tps_release_progress {Σ} next curr τ :
-    tps_tr (tps_always (lock_inv_alive_tps (Σ:=Σ) next curr)) τ →
+  Lemma lock_inv_alive_tprop_release_progress {Σ} next curr τ :
+    tprop_tr (tprop_always (lock_inv_alive_tprop (Σ:=Σ) next curr)) τ →
     ticket_lock.release_progress next curr τ.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n c Hn Hc Hlt.
@@ -1150,8 +1150,8 @@ Section trace.
   (** [next] never decreases: at each position, the mono cell's registration for the current
       [n] gives [next ≥ n] or [next] freed from then on, and the alive branch keeps [next]
       allocated. *)
-  Lemma lock_inv_alive_tps_next_monotone {Σ} next curr τ :
-    tps_tr (tps_always (lock_inv_alive_tps (Σ:=Σ) next curr)) τ → ticket_lock.next_monotone next τ.
+  Lemma lock_inv_alive_tprop_next_monotone {Σ} next curr τ :
+    tprop_tr (tprop_always (lock_inv_alive_tprop (Σ:=Σ) next curr)) τ → ticket_lock.next_monotone next τ.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n Hn m' Hm'.
     destruct (Hal m Hm) as (n0 & c0 & Hn0 & Hge & _).
@@ -1166,30 +1166,30 @@ Section trace.
   Qed.
 
   Lemma alive_fair_lock_release_progress {Σ} tl τ :
-    tps_tr (alive_fair_lock_tps (Σ:=Σ) tl) τ →
+    tprop_tr (alive_fair_lock_tprop (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ ticket_lock.release_progress next curr τ.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
-    by eapply (lock_inv_alive_tps_release_progress (Σ:=Σ)).
+    by eapply (lock_inv_alive_tprop_release_progress (Σ:=Σ)).
   Qed.
 
   Lemma alive_fair_lock_next_monotone {Σ} tl τ :
-    tps_tr (alive_fair_lock_tps (Σ:=Σ) tl) τ →
+    tprop_tr (alive_fair_lock_tprop (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ ticket_lock.next_monotone next τ.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
-    by eapply (lock_inv_alive_tps_next_monotone (Σ:=Σ)).
+    by eapply (lock_inv_alive_tprop_next_monotone (Σ:=Σ)).
   Qed.
 
   (** Hence a lock that cannot be deleted is starvation free, with no hypothesis about [next]. *)
   Lemma alive_fair_lock_starvation_free {Σ} tl τ :
-    tps_tr (alive_fair_lock_tps (Σ:=Σ) tl) τ →
+    tprop_tr (alive_fair_lock_tprop (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ ticket_lock.starvation_free next curr τ.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
     apply ticket_lock.release_progress_starvation_free.
-    - by eapply (lock_inv_alive_tps_release_progress (Σ:=Σ)).
-    - by eapply (lock_inv_alive_tps_next_monotone (Σ:=Σ)).
+    - by eapply (lock_inv_alive_tprop_release_progress (Σ:=Σ)).
+    - by eapply (lock_inv_alive_tprop_next_monotone (Σ:=Σ)).
   Qed.
 
 End trace.

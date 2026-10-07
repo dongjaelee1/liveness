@@ -11,27 +11,27 @@ From lantana.algebra Require Import ordinal_existential_properties axioms.
 Section fixpoint_guarantees.
   Context `{!lantanaGS Λ Σ}.
 
-  Lemma temporal_nu_coind (F : tps Λ Σ → tps Λ Σ) `{!TpsMono F} P H :
-    tps_le H (F H) → P ⊨ₜ H ⊢ P ⊨ₜ tps_nu F.
-  Proof. intros HH. by apply temporal_weaken, tps_nu_coind. Qed.
+  Lemma temporal_nu_coind (F : tprop Λ Σ → tprop Λ Σ) `{!TpropMono F} P H :
+    tprop_le H (F H) → P ⊨ₜ H ⊢ P ⊨ₜ tprop_nu F.
+  Proof. intros HH. by apply temporal_weaken, tprop_nu_coind. Qed.
 
   (** How guarded-recursive formulas get fixpoint guarantees. *)
-  Lemma temporal_nu_sem (F : tps Λ Σ → tps Λ Σ) `{!TpsMono F} P :
-    (⊢ P ⊨ₜ F (tps_sem P)) → ⊢ P ⊨ₜ tps_nu F.
+  Lemma temporal_nu_sem (F : tprop Λ Σ → tprop Λ Σ) `{!TpropMono F} P :
+    (⊢ P ⊨ₜ F (tprop_sem P)) → ⊢ P ⊨ₜ tprop_nu F.
   Proof.
     intros HP. iApply temporal_weaken; [|iApply temporal_sem].
-    apply tps_nu_coind. by apply tps_sem_le.
+    apply tprop_nu_coind. by apply tprop_sem_le.
   Qed.
 
-  Lemma temporal_mu_rank (F : tps Λ Σ → tps Λ Σ) `{!TpsMono F} P (H : Ord.t → tps Λ Σ) α :
-    (∀ α, tps_le (H α) (F (tps_exist (λ b : {β : Ord.t | Ord.lt β α}, H (proj1_sig b))))) →
-    P ⊨ₜ H α ⊢ P ⊨ₜ tps_mu F.
-  Proof. intros HH. by apply temporal_weaken, tps_mu_intro. Qed.
+  Lemma temporal_mu_rank (F : tprop Λ Σ → tprop Λ Σ) `{!TpropMono F} P (H : Ord.t → tprop Λ Σ) α :
+    (∀ α, tprop_le (H α) (F (tprop_exist (λ b : {β : Ord.t | Ord.lt β α}, H (proj1_sig b))))) →
+    P ⊨ₜ H α ⊢ P ⊨ₜ tprop_mu F.
+  Proof. intros HH. by apply temporal_weaken, tprop_mu_intro. Qed.
 
   (** Introduction without a ranking, for a continuous body. *)
-  Lemma temporal_mu_fold (F : tps Λ Σ → tps Λ Σ) `{!TpsMono F, !TpsCont F} P :
-    P ⊨ₜ F (tps_mu F) ⊢ P ⊨ₜ tps_mu F.
-  Proof. by apply temporal_weaken, tps_mu_unfold_r. Qed.
+  Lemma temporal_mu_fold (F : tprop Λ Σ → tprop Λ Σ) `{!TpropMono F, !TpropCont F} P :
+    P ⊨ₜ F (tprop_mu F) ⊢ P ⊨ₜ tprop_mu F.
+  Proof. by apply temporal_weaken, tprop_mu_unfold_r. Qed.
 
 End fixpoint_guarantees.
 
@@ -44,39 +44,39 @@ End fixpoint_guarantees.
 Section nest.
   Context `{!lantanaGS Λ Σ}.
 
-  Definition F_nest (G : tps Λ Σ) : tps Λ Σ → tps Λ Σ := λ X, tps_always (tps_and G X).
-  Global Instance F_nest_mono G : TpsMono (F_nest G).
+  Definition F_nest (G : tprop Λ Σ) : tprop Λ Σ → tprop Λ Σ := λ X, tprop_always (tprop_and G X).
+  Global Instance F_nest_mono G : TpropMono (F_nest G).
   Proof.
-    apply (tps_mono_always (λ X, tps_and G X)), (tps_mono_and (λ _, G) (λ X, X)).
-    - apply tps_mono_const.
-    - apply tps_mono_id.
+    apply (tprop_mono_always (λ X, tprop_and G X)), (tprop_mono_and (λ _, G) (λ X, X)).
+    - apply tprop_mono_const.
+    - apply tprop_mono_id.
   Qed.
 
   (** The reading of a nested invariant. *)
-  Definition nest_tps G : tps Λ Σ := tps_and G (tps_nu (F_nest G)).
+  Definition nest_tprop G : tprop Λ Σ := tprop_and G (tprop_nu (F_nest G)).
 
-  Definition nest_pre N (Q : iProp Σ) G (X : iPropO Σ) : iPropO Σ := alwaysI_guar N (Q ∗ X) (nest_tps G).
+  Definition nest_pre N (Q : iProp Σ) G (X : iPropO Σ) : iPropO Σ := alwaysI_guar N (Q ∗ X) (nest_tprop G).
   Local Instance nest_pre_contractive N Q G : Contractive (nest_pre N Q G).
   Proof.
     intros n X X' HX. rewrite /nest_pre. apply alwaysI_guar_contractive.
     eapply (ne_dist_later (λ Y : iPropO Σ, (Q ∗ Y)%I)); [solve_proper|exact HX].
   Qed.
   Definition nest N Q G : iProp Σ := fixpoint (nest_pre N Q G).
-  Lemma nest_unfold N Q G : nest N Q G ≡ alwaysI_guar N (Q ∗ nest N Q G) (nest_tps G).
+  Lemma nest_unfold N Q G : nest N Q G ≡ alwaysI_guar N (Q ∗ nest N Q G) (nest_tprop G).
   Proof. apply (fixpoint_unfold (nest_pre N Q G)). Qed.
   Global Instance nest_persistent N Q G : Persistent (nest N Q G).
   Proof. rewrite /Persistent nest_unfold. apply persistent, _. Qed.
 
-  Lemma nest_temporal N Q G : ⊢ nest N Q G ⊨ₜ tps_nu (F_nest G).
+  Lemma nest_temporal N Q G : ⊢ nest N Q G ⊨ₜ tprop_nu (F_nest G).
   Proof.
-    iApply (temporal_weaken _ (tps_always (nest_tps G))).
-    { apply (tps_nu_unfold_r (F_nest G)). }
-    iApply (temporal_mono (alwaysI_guar N (Q ∗ nest N Q G) (nest_tps G)) with "[]").
+    iApply (temporal_weaken _ (tprop_always (nest_tprop G))).
+    { apply (tprop_nu_unfold_r (F_nest G)). }
+    iApply (temporal_mono (alwaysI_guar N (Q ∗ nest N Q G) (nest_tprop G)) with "[]").
     { iIntros "!> H". by iEval (rewrite nest_unfold) in "H". }
     iApply temporal_always_guar.
   Qed.
 
-  Lemma nest_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ nest N Q G) ⊨ₜ nest_tps G.
+  Lemma nest_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ nest N Q G) ⊨ₜ nest_tprop G.
   Proof. intros HQ. iApply temporal_sep; [iApply HQ|iApply nest_temporal]. Qed.
 
   Lemma nest_alloc E N Q G :
@@ -84,24 +84,24 @@ Section nest.
     ▷ Q -∗ |={E}=>m nest N Q G.
   Proof.
     iIntros (HN HQ) "HQ". iApply sfmupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
-    iMod (saved_ti_alloc (tps_ti (nest_tps G))) as (γ) "#Hγ".
+    iMod (saved_ti_alloc (tprop_ti (nest_tprop G))) as (γ) "#Hγ".
     iMod (inv_alloc_open N E (Q ∗ nest N Q G)) as "[#Hinv Hclose]"; first done.
     iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
     iMod (treg_st_register treg_handle (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
-    { iIntros (st) "_". simpl. iExists (Q ∗ nest N Q G)%I, (nest_tps G). iFrame "Hγ Hinv".
+    { iIntros (st) "_". simpl. iExists (Q ∗ nest N Q G)%I, (nest_tprop G). iFrame "Hγ Hinv".
       iNext. iApply (nest_content_temporal _ _ _ HQ). }
     iApply fupd_mask_intro; first set_solver. iIntros "close".
     iIntros (g i Ω W) "MI".
     (* the record of the content at [n], by Löb: the content holds the structure, whose own
        record is later-guarded *)
     iAssert (□ (▷ Q -∗ history_interp h n σ Θ κs -∗ model_interp g i Ω W n (dom Θ) -∗
-                ▷ tguar (nest_tps G) n))%I with "[]" as "#R".
+                ▷ tguar (nest_tprop G) n))%I with "[]" as "#R".
     { iLöb as "IH". iIntros "!> HQ HI MI".
       iAssert (▷ nest N Q G)%I as "#Hnest".
       { iNext. iEval (rewrite nest_unfold alwaysI_guar_unfold). iExists j, n, γ, _.
         iFrame "Hj HE Hγ Hinv". iSplitR; first (iNext; iApply (nest_content_temporal _ _ _ HQ)).
         iApply ("IH" with "[HQ] HI MI"). by iNext. }
-      iApply (temporal_elim_later_guar (Q ∗ nest N Q G) (nest_tps G) with "[] [$HI $MI HQ]").
+      iApply (temporal_elim_later_guar (Q ∗ nest N Q G) (nest_tprop G) with "[] [$HI $MI HQ]").
       { iNext. iApply (nest_content_temporal _ _ _ HQ). }
       iNext. iFrame "HQ Hnest". }
     iPoseProof ("R" with "HQ HI MI") as "#T".
@@ -125,20 +125,20 @@ End nest.
     [□◇G] is the guarantee of an always over a finally ([always_finally_temporal]). *)
 Section renew.
   Context `{!lantanaGS Λ Σ}.
-  Implicit Types G : tps Λ Σ.
+  Implicit Types G : tprop Λ Σ.
 
-  Definition F_renew (G : tps Λ Σ) : tps Λ Σ → tps Λ Σ := λ X, tps_finally (tps_and G X).
-  Global Instance F_renew_mono G : TpsMono (F_renew G).
+  Definition F_renew (G : tprop Λ Σ) : tprop Λ Σ → tprop Λ Σ := λ X, tprop_finally (tprop_and G X).
+  Global Instance F_renew_mono G : TpropMono (F_renew G).
   Proof.
-    apply (tps_mono_until (λ _, tps_true) (λ X, tps_and G X)); first apply tps_mono_const.
-    apply (tps_mono_and (λ _, G) (λ X, X)); [apply tps_mono_const|apply tps_mono_id].
+    apply (tprop_mono_until (λ _, tprop_true) (λ X, tprop_and G X)); first apply tprop_mono_const.
+    apply (tprop_mono_and (λ _, G) (λ X, X)); [apply tprop_mono_const|apply tprop_mono_id].
   Qed.
 
   (** The reading of the right formula of a link. *)
-  Definition renew_tps G : tps Λ Σ := tps_and G (tps_nu (F_renew G)).
+  Definition renew_tprop G : tprop Λ Σ := tprop_and G (tprop_nu (F_renew G)).
 
   Definition renew_pre N (Q : iProp Σ) G (X : iPropO Σ) : iPropO Σ :=
-    (∃ k, untilI_guar N k 1 True (Q ∗ X) tps_true (renew_tps G))%I.
+    (∃ k, untilI_guar N k 1 True (Q ∗ X) tprop_true (renew_tprop G))%I.
   Local Instance renew_pre_contractive N Q G : Contractive (renew_pre N Q G).
   Proof.
     intros n X X' HX. rewrite /renew_pre. f_equiv=> k. apply untilI_guar_contractive_r.
@@ -146,23 +146,23 @@ Section renew.
   Qed.
   Definition renew N Q G : iProp Σ := fixpoint (renew_pre N Q G).
   Lemma renew_unfold N Q G :
-    renew N Q G ≡ (∃ k, untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G))%I.
+    renew N Q G ≡ (∃ k, untilI_guar N k 1 True (Q ∗ renew N Q G) tprop_true (renew_tprop G))%I.
   Proof. apply (fixpoint_unfold (renew_pre N Q G)). Qed.
 
   Lemma renew_intro N Q G k :
-    untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G) ⊢ renew N Q G.
+    untilI_guar N k 1 True (Q ∗ renew N Q G) tprop_true (renew_tprop G) ⊢ renew N Q G.
   Proof. iIntros "H". iEval (rewrite renew_unfold). by iExists k. Qed.
 
-  Lemma renew_temporal N Q G : ⊢ renew N Q G ⊨ₜ tps_nu (F_renew G).
+  Lemma renew_temporal N Q G : ⊢ renew N Q G ⊨ₜ tprop_nu (F_renew G).
   Proof.
-    iApply (temporal_weaken _ (F_renew G (tps_nu (F_renew G)))).
-    { apply (tps_nu_unfold_r (F_renew G)). }
-    iApply (temporal_mono (∃ k, untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G)) with "[]").
+    iApply (temporal_weaken _ (F_renew G (tprop_nu (F_renew G)))).
+    { apply (tprop_nu_unfold_r (F_renew G)). }
+    iApply (temporal_mono (∃ k, untilI_guar N k 1 True (Q ∗ renew N Q G) tprop_true (renew_tprop G)) with "[]").
     { iIntros "!> H". by iEval (rewrite renew_unfold) in "H". }
     iApply temporal_exist_ghost. iIntros (k). iApply temporal_until_guar.
   Qed.
 
-  Lemma renew_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ renew N Q G) ⊨ₜ renew_tps G.
+  Lemma renew_content_temporal N Q G : (⊢ Q ⊨ₜ G) → ⊢ (Q ∗ renew N Q G) ⊨ₜ renew_tprop G.
   Proof. intros HQ. iApply temporal_sep; [iApply HQ|iApply renew_temporal]. Qed.
 
   (** Allocation of a link, with a fresh obligation [k] below [p]. *)
@@ -171,10 +171,10 @@ Section renew.
     parP_le p ℓ -∗ parP_kids p K -∗
     |={E}=>m ∃ k, ⌜k ∉ K⌝ ∗ parP_kids p ({[k]} ∪ K) ∗ oblP_kids k ∅ ∗
                  oblP_fuel k ℓ μ ∗ witP_layer k ℓ ∗
-                 untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G).
+                 untilI_guar N k 1 True (Q ∗ renew N Q G) tprop_true (renew_tprop G).
   Proof.
     iIntros (HQ) "B Kp". iMod (untilI_guar_alloc with "B Kp") as "(%k& %Hk& Kp& Kk& F& W& ACC)".
-    iMod ("ACC" $! E N True%I (Q ∗ renew N Q G)%I tps_true (renew_tps G) with "[] [] [//]") as "U".
+    iMod ("ACC" $! E N True%I (Q ∗ renew N Q G)%I tprop_true (renew_tprop G) with "[] [] [//]") as "U".
     { iNext. iApply temporal_true. }
     { iNext. iApply (renew_content_temporal _ _ _ HQ). }
     iModIntro. iExists k. iSplitR; first done. iFrame.
@@ -184,7 +184,7 @@ Section renew.
   Lemma renew_discharge E N Q G k p K :
     ↑N ⊆ E → k ∈ K →
     £n 1 -∗ parP_kids p K -∗ oblP_kids k ∅ -∗
-    untilI_guar N k 1 True (Q ∗ renew N Q G) tps_true (renew_tps G) -∗ Q -∗ renew N Q G -∗
+    untilI_guar N k 1 True (Q ∗ renew N Q G) tprop_true (renew_tprop G) -∗ Q -∗ renew N Q G -∗
     |={E}=>m Q ∗ renew N Q G ∗ parP_kids p (K ∖ {[k]}) ∗ oblP_discharged k.
   Proof.
     iIntros (HN Hk) "LC Kp Kk U HQ R".
@@ -192,27 +192,27 @@ Section renew.
   Qed.
 
   (** On traces, [ν X. ◇(G ∧ X)] is [◇G]. *)
-  Lemma tps_nu_renew_tr G τ : tps_tr (tps_nu (F_renew G)) τ ↔ tps_tr (tps_finally G) τ.
+  Lemma tprop_nu_renew_tr G τ : tprop_tr (tprop_nu (F_renew G)) τ ↔ tprop_tr (tprop_finally G) τ.
   Proof.
-    rewrite tps_nu_tr. destruct τ as [n τf]. rewrite /=. split.
+    rewrite tprop_nu_tr. destruct τ as [n τf]. rewrite /=. split.
     - intros (R & HR & Hτ). destruct (HR _ Hτ) as (m & Hm & [HG _] & _).
       exists m. split_and!; [done|done|by intros].
     - intros (m & Hm & HG & _).
-      exists (λ τ', ∃ m', τ'.1 ≤ m' ∧ tps_tr G (m', τ'.2)). split; last by exists m.
+      exists (λ τ', ∃ m', τ'.1 ≤ m' ∧ tprop_tr G (m', τ'.2)). split; last by exists m.
       intros [n' τf'] (m' & Hm' & HG'). exists m'. split_and!; [done| |by intros].
       split; first done. by exists m'.
   Qed.
 
   (** [G] infinitely often: always a live finally, renewed in an invariant. *)
-  Lemma tps_always_finally_tr G n τf :
-    tps_tr (tps_always (tps_finally G)) (n, τf) ↔ ∀ m, n ≤ m → ∃ l, m ≤ l ∧ tps_tr G (l, τf).
+  Lemma tprop_always_finally_tr G n τf :
+    tprop_tr (tprop_always (tprop_finally G)) (n, τf) ↔ ∀ m, n ≤ m → ∃ l, m ≤ l ∧ tprop_tr G (l, τf).
   Proof.
     rewrite /=. split.
     - intros H m Hm. destruct (H m Hm) as (l & ? & ? & _). eauto.
     - intros H m Hm. destruct (H m Hm) as (l & ? & ?). exists l. split_and!; [done|done|by intros].
   Qed.
   Lemma always_finally_temporal N N' q (Q : iProp Σ) :
-    ⊢ alwaysI N (∃ k, finallyI N' k q Q) ⊨ₜ tps_always (tps_finally (tps_sem Q)).
+    ⊢ alwaysI N (∃ k, finallyI N' k q Q) ⊨ₜ tprop_always (tprop_finally (tprop_sem Q)).
   Proof.
     iApply temporal_always_valid. iApply temporal_exist_ghost. iIntros (k).
     iApply temporal_until_valid; [apply temporal_true|apply temporal_sem].

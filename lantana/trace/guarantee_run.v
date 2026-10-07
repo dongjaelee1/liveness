@@ -136,7 +136,7 @@ Section loops.
       position [r]: from the bundle, or, at [r] itself, the allocation record. *)
   Lemma bundle_always_cert l n j r N γ G :
     r ≤ n →
-    bundle l n -∗ reg_idx j r (RAlways N γ) -∗ saved_ti γ (tps_ti G) -∗
+    bundle l n -∗ reg_idx j r (RAlways N γ) -∗ saved_ti γ (tprop_ti G) -∗
     (⌜r = n⌝ -∗ ▷ tguar G n) -∗ ▷ tguar G n.
   Proof.
     iIntros (Hrn) "#B #Hj #Hγ AC". rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
@@ -151,7 +151,7 @@ Section loops.
   Lemma bundle_until_cert l n j r N k γP γQ G1 G2 :
     r ≤ n →
     bundle l n -∗ reg_idx j r (RUntil N k γP γQ) -∗
-    saved_ti γP (tps_ti G1) -∗ saved_ti γQ (tps_ti G2) -∗
+    saved_ti γP (tprop_ti G1) -∗ saved_ti γQ (tprop_ti G2) -∗
     (⌜r = n⌝ -∗ ▷ (tguar G1 n ∨ tguar G2 n)) -∗
     ▷ (tguar G1 n ∨ tguar G2 n) ∨
     ▷ (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ tguar G2 n').
@@ -199,11 +199,11 @@ Section loops.
 
   (** *** The always loop *)
   Lemma always_run (Sys : sysT) N γ G j r :
-    sys_step Sys -∗ reg_idx j r (RAlways N γ) -∗ saved_ti γ (tps_ti G) -∗
+    sys_step Sys -∗ reg_idx j r (RAlways N γ) -∗ saved_ti γ (tprop_ti G) -∗
     ∀ h n σ Θ κs g v Ω W τf γ',
       ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω W ∧ hist_trace h τf⌝ -∗
       history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-      ti_always (tps_ti G) (ti_pure True) (n, τf).
+      ti_always (tprop_ti G) (ti_pure True) (n, τf).
   Proof.
     iIntros "#ST #Hj #Hγ" (h n σ Θ κs g v Ω W τf γ') "%H Sys".
     iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ' H).
@@ -222,7 +222,7 @@ Section loops.
 
   (** The registered structures guarantee the always and the until of their stored
       readings. *)
-  Lemma temporal_always_guar N P G : ⊢ alwaysI_guar N P G ⊨ₜ tps_always G.
+  Lemma temporal_always_guar N P G : ⊢ alwaysI_guar N P G ⊨ₜ tprop_always G.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& #A)". rewrite alwaysI_guar_unfold.
     iDestruct "A" as (j r γ st) "(#Hj& #HE& #Hγ& #Hinv& #HG& #AC)".
@@ -243,9 +243,9 @@ Section loops.
       split_and!; [lia|by apply behavior_S|exact FS|done|done].
   Qed.
 
-  Lemma temporal_always_as N P V : ⊢ alwaysI_as N P V ⊨ₜ tps_always (tps_sem V).
+  Lemma temporal_always_as N P V : ⊢ alwaysI_as N P V ⊨ₜ tprop_always (tprop_sem V).
   Proof. apply temporal_always_guar. Qed.
-  Lemma temporal_always N P : ⊢ alwaysI N P ⊨ₜ tps_always (tps_sem P).
+  Lemma temporal_always N P : ⊢ alwaysI N P ⊨ₜ tprop_always (tprop_sem P).
   Proof. apply temporal_always_as. Qed.
 
   (** *** The until loop
@@ -256,7 +256,7 @@ Section loops.
     sys_step Sys -∗ tguar G2 n -∗
     ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-    ti_until Ord.lt a fP (tps_ti G2) (n, τf).
+    ti_until Ord.lt a fP (tprop_ti G2) (n, τf).
   Proof.
     iIntros "#ST #TQ %H Sys". destruct H as (BEH& FS& LB& HIST).
     rewrite ti_until_unfold /ti_until_pre.
@@ -273,13 +273,13 @@ Section loops.
       of the step, decides the continuation. *)
   Lemma until_run (Sys : sysT) N k γP γQ j r (P : iProp Σ) G1 G2 :
     sys_step Sys -∗ reg_idx j r (RUntil N k γP γQ) -∗
-    saved_ti γP (tps_ti G1) -∗ saved_ti γQ (tps_ti G2) -∗
+    saved_ti γP (tprop_ti G1) -∗ saved_ti γQ (tprop_ti G2) -∗
     oblP_inv N k P (until_disch k G2) -∗
     ∀ h n σ Θ κs g v Ω W τf γ fu o,
       ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
        hist_trace h τf ∧ Ω !! k = Some (obl_assigned fu o)⌝ -∗
       history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-      ti_until Ord.lt (Ord.S (fair_sched_fun γ o fu)) (tps_ti G1) (tps_ti G2) (n, τf).
+      ti_until Ord.lt (Ord.S (fair_sched_fun γ o fu)) (tprop_ti G1) (tprop_ti G2) (n, τf).
   Proof.
     iIntros "#ST #Hj #HγP #HγQ #OI". iIntros (h n σ Θ κs g v Ω W τf γ fu o) "%H Sys".
     iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ fu o H).
@@ -344,7 +344,7 @@ Section loops.
       iModIntro. iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
   Qed.
 
-  Lemma temporal_until_guar N k q P Q G1 G2 : ⊢ untilI_guar N k q P Q G1 G2 ⊨ₜ tps_until G1 G2.
+  Lemma temporal_until_guar N k q P Q G1 G2 : ⊢ untilI_guar N k q P Q G1 G2 ⊨ₜ tprop_until G1 G2.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_guar_unfold /untilI_guar_pers.
     iDestruct "U" as "[Oa #U]".
@@ -420,23 +420,23 @@ Section loops.
       iModIntro. iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
   Qed.
 
-  Lemma temporal_until N k q P Q : ⊢ untilI N k q P Q ⊨ₜ tps_until (tps_sem P) (tps_sem Q).
+  Lemma temporal_until N k q P Q : ⊢ untilI N k q P Q ⊨ₜ tprop_until (tprop_sem P) (tprop_sem Q).
   Proof. rewrite untilI_guar_canonical. apply temporal_until_guar. Qed.
 
   (** With valid guarantees of the contents. *)
-  Lemma temporal_always_as_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_as N P V ⊨ₜ tps_always G.
+  Lemma temporal_always_as_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_as N P V ⊨ₜ tprop_always G.
   Proof.
-    intros HG. iApply (temporal_weaken _ (tps_always (tps_sem V))).
-    { apply tps_always_mono. by apply tps_sem_le. }
+    intros HG. iApply (temporal_weaken _ (tprop_always (tprop_sem V))).
+    { apply tprop_always_mono. by apply tprop_sem_le. }
     iApply temporal_always_as.
   Qed.
-  Lemma temporal_always_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ tps_always G.
+  Lemma temporal_always_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ tprop_always G.
   Proof. apply temporal_always_as_valid. Qed.
   Lemma temporal_until_valid N k q P Q G1 G2 :
-    (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k q P Q ⊨ₜ tps_until G1 G2.
+    (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k q P Q ⊨ₜ tprop_until G1 G2.
   Proof.
-    intros HG1 HG2. iApply (temporal_weaken _ (tps_until (tps_sem P) (tps_sem Q))).
-    { apply tps_until_mono; by apply tps_sem_le. }
+    intros HG1 HG2. iApply (temporal_weaken _ (tprop_until (tprop_sem P) (tprop_sem Q))).
+    { apply tprop_until_mono; by apply tprop_sem_le. }
     iApply temporal_until.
   Qed.
 

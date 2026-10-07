@@ -510,43 +510,43 @@ Section proof.
   Qed.
 
   (** ** Temporal guarantees *)
-  (** The guarantee of [lock_inv], as inferred: [tps_true] for ghost state and [R]; the
+  (** The guarantee of [lock_inv], as inferred: [tprop_true] for ghost state and [R]; the
       pending tickets [c + 1 ≤ t ≤ n] carry [finally curr ↦ t]. *)
-  Definition lock_inv_tps (next curr : loc) : tps heap_lang Σ :=
+  Definition lock_inv_tprop (next curr : loc) : tprop heap_lang Σ :=
     (∃ (n c : Z) (tickets : gmap Z oid) (acks : gmap Z bool),
-       next ↦ #n ∧ curr ↦{#1/2} #c ∧ (tps_true ∧ tps_true) ∧
+       next ↦ #n ∧ curr ↦{#1/2} #c ∧ (tprop_true ∧ tprop_true) ∧
        ⌜dom tickets = dom acks⌝ ∧ ⌜(0 ≤ c ≤ n)%Z⌝ ∧ ⌜∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z⌝ ∧
        (∀ (t : Z) (κ : oid), ⌜tickets !! t = Some κ⌝ →
-          (tps_true ∧ tps_true ∧ tps_true) ∧
-          (⌜(0 ≤ t ≤ c)%Z⌝ ∧ tps_true ∨
-           ⌜(c + 1 ≤ t ≤ n)%Z⌝ ∧ tps_finally (curr ↦{#1/2} #t ∧ tps_true))) ∧
+          (tprop_true ∧ tprop_true ∧ tprop_true) ∧
+          (⌜(0 ≤ t ≤ c)%Z⌝ ∧ tprop_true ∨
+           ⌜(c + 1 ≤ t ≤ n)%Z⌝ ∧ tprop_finally (curr ↦{#1/2} #t ∧ tprop_true))) ∧
        (∀ (t : Z) (a : bool), ⌜acks !! t = Some a⌝ →
-          ⌜(0 ≤ t ≤ c)%Z⌝ ∧ tps_true ∨ ⌜t = (c + 1)%Z⌝ ∨ ⌜(c + 1 < t ≤ n)%Z⌝ ∧ tps_true) ∧
-       (⌜c = n⌝ ∧ curr ↦{#1/2} #c ∧ tps_true ∨
-        ⌜(c < n)%Z⌝ ∧ (tps_true ∧ curr ↦{#1/2} #c ∧ tps_true ∨ tps_true)))%S.
+          ⌜(0 ≤ t ≤ c)%Z⌝ ∧ tprop_true ∨ ⌜t = (c + 1)%Z⌝ ∨ ⌜(c + 1 < t ≤ n)%Z⌝ ∧ tprop_true) ∧
+       (⌜c = n⌝ ∧ curr ↦{#1/2} #c ∧ tprop_true ∨
+        ⌜(c < n)%Z⌝ ∧ (tprop_true ∧ curr ↦{#1/2} #c ∧ tprop_true ∨ tprop_true)))%T.
 
-  Definition fair_lock_tps (tl : val) : tps heap_lang Σ :=
-    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tps_always (lock_inv_tps next curr))%S.
+  Definition fair_lock_tprop (tl : val) : tprop heap_lang Σ :=
+    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ tprop_always (lock_inv_tprop next curr))%T.
 
-  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tps tl.
+  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_tprop tl.
   Proof. apply (into_temporal _ _). Qed.
 
   (** Clients see the lock's guarantee, not its invariant. *)
   Global Instance is_fair_lock_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tps tl) | 0.
+    IntoTemporal (is_fair_lock tl γ R) (fair_lock_tprop tl) | 0.
   Proof. apply is_fair_lock_temporal. Qed.
 
   (** Starvation freedom as a guarantee: whenever [n] tickets are out and ticket [c] is
       served, every pending ticket is eventually served. The antecedent picks the ticket. *)
-  Definition starvation_free_tps (next curr : loc) : tps heap_lang Σ :=
-    tps_always (∀ n c t : Z,
+  Definition starvation_free_tprop (next curr : loc) : tprop heap_lang Σ :=
+    tprop_always (∀ n c t : Z,
       (next ↦ #n ∧ curr ↦{#1/2} #c ∧ ⌜(c < t ≤ n)%Z⌝) →
-      tps_finally (curr ↦{#1/2} #t ∧ tps_true))%S.
+      tprop_finally (curr ↦{#1/2} #t ∧ tprop_true))%T.
 
-  Lemma lock_inv_tps_starvation_free_le next curr :
-    tps_le (tps_always (lock_inv_tps next curr)) (starvation_free_tps next curr).
+  Lemma lock_inv_tprop_starvation_free_le next curr :
+    tprop_le (tprop_always (lock_inv_tprop next curr)) (starvation_free_tprop next curr).
   Proof.
-    apply tps_always_mono. intros ? [k τf].
+    apply tprop_always_mono. intros ? [k τf].
     rewrite /= /ti_exist /ti_forall /ti_and /ti_or /ti_impl /ti_pure /ti_atomic.
     rewrite /tr_and /tr_atomic /tr_pure /ts_emb /ts_atomic /trace_now /=.
     destruct (τf k) as (((Θ&σ)&i0)&κs0).
@@ -558,27 +558,27 @@ Section proof.
   Qed.
 
   (** The trace property of a fair lock, starvation freedom included. *)
-  Definition fair_lock_sf_tps (tl : val) : tps heap_lang Σ :=
-    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ starvation_free_tps next curr)%S.
+  Definition fair_lock_sf_tprop (tl : val) : tprop heap_lang Σ :=
+    (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ starvation_free_tprop next curr)%T.
 
-  Lemma is_fair_lock_starvation_free tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_sf_tps tl.
+  Lemma is_fair_lock_starvation_free tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_sf_tprop tl.
   Proof.
     iApply temporal_weaken; last iApply is_fair_lock_temporal.
-    apply tps_exist_mono => next. apply tps_exist_mono => curr.
-    apply tps_and_mono; [apply tps_le_refl|].
-    apply lock_inv_tps_starvation_free_le.
+    apply tprop_exist_mono => next. apply tprop_exist_mono => curr.
+    apply tprop_and_mono; [apply tprop_le_refl|].
+    apply lock_inv_tprop_starvation_free_le.
   Qed.
 
   (** The guarantee of a lock token: the holder releases the lock. *)
-  Definition lock_token_tps (tl : val) : tps heap_lang Σ :=
-    (∃ (next curr : loc) (u : Z), ⌜tl = (#next, #curr)%V⌝ ∧ curr ↦{#1/2} #u ∧ tps_true ∧
-       tps_finally (curr ↦{#1/2} #(u + 1) ∧ tps_true))%S.
+  Definition lock_token_tprop (tl : val) : tprop heap_lang Σ :=
+    (∃ (next curr : loc) (u : Z), ⌜tl = (#next, #curr)%V⌝ ∧ curr ↦{#1/2} #u ∧ tprop_true ∧
+       tprop_finally (curr ↦{#1/2} #(u + 1) ∧ tprop_true))%T.
 
-  Lemma lock_token_temporal tl γ κu R : ⊢ lock_token tl γ κu R ⊨ₜ lock_token_tps tl.
+  Lemma lock_token_temporal tl γ κu R : ⊢ lock_token tl γ κu R ⊨ₜ lock_token_tprop tl.
   Proof. rewrite lock_token_unseal. apply (into_temporal _ _). Qed.
 
   Global Instance lock_token_into_temporal tl γ κu R :
-    IntoTemporal (lock_token tl γ κu R) (lock_token_tps tl) | 0.
+    IntoTemporal (lock_token tl γ κu R) (lock_token_tprop tl) | 0.
   Proof. apply lock_token_temporal. Qed.
 
 End proof.
@@ -597,8 +597,8 @@ Section trace.
       tr_pointsto next #n τ → tr_pointsto curr #c τ → (c < t ≤ n)%Z →
       tr_eventually (tr_pointsto curr #t) τ).
 
-  Lemma lock_inv_tps_starvation_free {Σ} next curr τ :
-    tps_tr (tps_always (lock_inv_tps (Σ:=Σ) next curr)) τ → starvation_free next curr τ.
+  Lemma lock_inv_tprop_starvation_free {Σ} next curr τ :
+    tprop_tr (tprop_always (lock_inv_tprop (Σ:=Σ) next curr)) τ → starvation_free next curr τ.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n c t Hn Hc Ht.
     destruct (Hal m Hm) as (n' & c' & tickets & acks & Hn' & Hc' & _ & _ & Hb & Hdom & Htk & _).
@@ -613,15 +613,15 @@ Section trace.
   Qed.
 
   Lemma fair_lock_starvation_free {Σ} tl τ :
-    tps_tr (fair_lock_tps (Σ:=Σ) tl) τ →
+    tprop_tr (fair_lock_tprop (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ starvation_free next curr τ.
   Proof.
     intros (next & curr & Htl & Hal). exists next, curr. split; first done.
-    by eapply (lock_inv_tps_starvation_free (Σ:=Σ)).
+    by eapply (lock_inv_tprop_starvation_free (Σ:=Σ)).
   Qed.
 
-  Lemma starvation_free_tps_tr {Σ} next curr τ :
-    tps_tr (starvation_free_tps (Σ:=Σ) next curr) τ → starvation_free next curr τ.
+  Lemma starvation_free_tprop_tr {Σ} next curr τ :
+    tprop_tr (starvation_free_tprop (Σ:=Σ) next curr) τ → starvation_free next curr τ.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm n c t Hn Hc Ht.
     unfold tr_pointsto, tr_atomic, ts_emb, ts_atomic, trace_now in *. simpl in *.
@@ -634,7 +634,7 @@ Section trace.
 
   (** The holder of a lock token (serving ticket [u]) eventually releases the lock. *)
   Lemma lock_token_releases {Σ} tl τ :
-    tps_tr (lock_token_tps (Σ:=Σ) tl) τ →
+    tprop_tr (lock_token_tprop (Σ:=Σ) tl) τ →
     ∃ (next curr : loc) (u : Z), tl = (#next, #curr)%V ∧ tr_pointsto curr #u τ ∧
       tr_eventually (tr_pointsto curr #(u + 1)) τ.
   Proof.

@@ -84,12 +84,12 @@ Section proof.
 
   (** What the handoff exports: the cell always holds [NONE] or a task [SOME (f, a)]; the
       task's resources and the obligations have no trace content. *)
-  Definition handoff_inv_tps (b : loc) : tps heap_lang Σ :=
-    ((b ↦{#1/2} NONEV ∧ tps_true) ∨
-     (∃ f a : val, b ↦ SOMEV (f, a) ∧ tps_true) ∨
-     (∃ f a : val, b ↦ SOMEV (f, a) ∧ tps_true))%S.
+  Definition handoff_inv_tprop (b : loc) : tprop heap_lang Σ :=
+    ((b ↦{#1/2} NONEV ∧ tprop_true) ∨
+     (∃ f a : val, b ↦ SOMEV (f, a) ∧ tprop_true) ∨
+     (∃ f a : val, b ↦ SOMEV (f, a) ∧ tprop_true))%T.
 
-  Lemma is_handoff_temporal b γ ℓ : ⊢ is_handoff b γ ℓ ⊨ₜ tps_always (handoff_inv_tps b).
+  Lemma is_handoff_temporal b γ ℓ : ⊢ is_handoff b γ ℓ ⊨ₜ tprop_always (handoff_inv_tprop b).
   Proof. apply (into_temporal _ _). Qed.
 
   (** The main proofs. *)
@@ -248,8 +248,8 @@ Section trace.
   Definition handoff_tr (b : loc) : trProp heap_lang :=
     tr_always (λ τ, tr_cell b NONEV τ ∨ ∃ f a : val, tr_cell b (SOMEV (f, a)) τ).
 
-  Lemma handoff_inv_tps_tr {Σ} b τ :
-    tps_tr (tps_always (handoff_inv_tps (Σ:=Σ) b)) τ → handoff_tr b τ.
+  Lemma handoff_inv_tprop_tr {Σ} b τ :
+    tprop_tr (tprop_always (handoff_inv_tprop (Σ:=Σ) b)) τ → handoff_tr b τ.
   Proof.
     destruct τ as [k τf]. intros Hal m Hm. destruct (Hal m Hm) as [[Hb _]|[(f & a & Hb & _)|(f & a & Hb & _)]].
     - left. exists (DfracOwn (1/2)). exact Hb.

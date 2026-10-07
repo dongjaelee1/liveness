@@ -48,21 +48,21 @@ Section proof.
   Definition flag_tk (l : loc) k : iProp Σ :=
     untilI Np k (1/2) (l ↦ #0) (alwaysI Nv (l ↦ #1)).
 
-  Definition flag_tps (l : loc) : tps heap_lang Σ :=
-    (tps_true ∧ tps_always (tps_until (l ↦ #0) (tps_always (l ↦ #1)) ∨
-                            (tps_true ∧ tps_always (l ↦ #1))))%S.
+  Definition flag_tprop (l : loc) : tprop heap_lang Σ :=
+    (tprop_true ∧ tprop_always (tprop_until (l ↦ #0) (tprop_always (l ↦ #1)) ∨
+                            (tprop_true ∧ tprop_always (l ↦ #1))))%T.
 
-  Lemma is_flag_temporal l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_tps l.
+  Lemma is_flag_temporal l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_tprop l.
   Proof. apply (into_temporal _ _). Qed.
 
-  Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ tps_until (l ↦ #0) (tps_always (l ↦ #1)).
+  Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ tprop_until (l ↦ #0) (tprop_always (l ↦ #1)).
   Proof. apply (into_temporal _ _). Qed.
 
   (** An always holds eventually: it holds now. *)
-  Local Lemma tps_always_finally (G G1 : tps heap_lang Σ) :
-    tps_le (tps_always G) (tps_until G1 (tps_always G)).
+  Local Lemma tprop_always_finally (G G1 : tprop heap_lang Σ) :
+    tprop_le (tprop_always G) (tprop_until G1 (tprop_always G)).
   Proof.
-    intros ? τ. cbn [tps_ti tps_until tps_always]. rewrite /ti_exist. iIntros "H". iExists Ord.O.
+    intros ? τ. cbn [tprop_ti tprop_until tprop_always]. rewrite /ti_exist. iIntros "H". iExists Ord.O.
     rewrite (ti_until_unfold _ _ _ τ) /ti_until_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iNext. iMod "Hclose" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iApply ALC_intro. iMod "Hclose" as "_".
@@ -71,21 +71,21 @@ Section proof.
 
   (** Whenever the flag holds 0, it eventually holds 1 forever. Unlike in flag.v, the
       antecedent is not needed. *)
-  Definition flag_response_tps (l : loc) : tps heap_lang Σ :=
-    tps_always (l ↦ #0 → tps_finally (tps_always (l ↦ #1)))%S.
+  Definition flag_response_tprop (l : loc) : tprop heap_lang Σ :=
+    tprop_always (l ↦ #0 → tprop_finally (tprop_always (l ↦ #1)))%T.
 
-  Lemma flag_tps_response l : tps_le (flag_tps l) (flag_response_tps l).
+  Lemma flag_tprop_response l : tprop_le (flag_tprop l) (flag_response_tprop l).
   Proof.
-    eapply tps_le_trans; first apply tps_and_elim_r. apply tps_always_mono.
-    eapply tps_le_trans; last apply tps_impl_intro_le.
-    eapply tps_le_trans.
-    { apply tps_or_mono; [apply tps_until_mono; [apply tps_le_true|apply tps_le_refl]|apply tps_and_elim_r]. }
-    intros ? τ. cbn [tps_ti tps_or]. rewrite /ti_or. iIntros "[H|H]"; first done.
-    by iApply tps_always_finally.
+    eapply tprop_le_trans; first apply tprop_and_elim_r. apply tprop_always_mono.
+    eapply tprop_le_trans; last apply tprop_impl_intro_le.
+    eapply tprop_le_trans.
+    { apply tprop_or_mono; [apply tprop_until_mono; [apply tprop_le_true|apply tprop_le_refl]|apply tprop_and_elim_r]. }
+    intros ? τ. cbn [tprop_ti tprop_or]. rewrite /ti_or. iIntros "[H|H]"; first done.
+    by iApply tprop_always_finally.
   Qed.
 
-  Lemma is_flag_response l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_response_tps l.
-  Proof. iApply temporal_weaken; [apply flag_tps_response|iApply is_flag_temporal]. Qed.
+  Lemma is_flag_response l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_response_tprop l.
+  Proof. iApply temporal_weaken; [apply flag_tprop_response|iApply is_flag_temporal]. Qed.
 
   (** The main proofs. *)
   Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).
@@ -324,8 +324,8 @@ Section trace.
   (** The flag at the level of traces: [0] until [1] forever, or [1] forever. *)
   Definition is_flag_tr (l : loc) : trProp heap_lang :=
     tr_always (tr_until (l ↦ #0) (tr_always (l ↦ #1)) ∨ tr_always (l ↦ #1))%R.
-  Lemma flag_tps_impl {Σ : gFunctors} l :
-    ∀ τ, tps_tr (flag_tps (Σ:=Σ) l) τ → is_flag_tr l τ.
+  Lemma flag_tprop_impl {Σ : gFunctors} l :
+    ∀ τ, tprop_tr (flag_tprop (Σ:=Σ) l) τ → is_flag_tr l τ.
   Proof.
     rewrite /is_flag_tr. simpl. unfold_trProp. intros [n τf] [_ H] m Hm. specialize (H m Hm).
     destruct H as [(m'&?&?&?)|[_ H]].
@@ -347,8 +347,8 @@ Section trace.
     destruct (τf m) as [[[??] ?] ?]. simpl. intros -> ?. by simplify_eq.
   Qed.
 
-  Lemma flag_tps_stays {Σ : gFunctors} l τ : tps_tr (flag_tps (Σ:=Σ) l) τ → flag_stays_tr l τ.
-  Proof. intros H. by apply is_flag_tr_stays, (flag_tps_impl (Σ:=Σ)). Qed.
+  Lemma flag_tprop_stays {Σ : gFunctors} l τ : tprop_tr (flag_tprop (Σ:=Σ) l) τ → flag_stays_tr l τ.
+  Proof. intros H. by apply is_flag_tr_stays, (flag_tprop_impl (Σ:=Σ)). Qed.
 
   (** The run 0, 1, 0, 1, 1, ... satisfies the guarantee of flag.v, but not this one. *)
   Definition flag_run (l : loc) : nat → trace_state heap_lang :=
@@ -372,7 +372,7 @@ Section trace.
     specialize (H H1 2 ltac:(lia)). apply flag_run_at in H. case_decide; [done|lia].
   Qed.
 
-  Lemma flag_run_violates_guarantee {Σ : gFunctors} l : ¬ tps_tr (flag_tps (Σ:=Σ) l) (0, flag_run l).
-  Proof. intros H. by eapply flag_run_goes_back, flag_tps_stays. Qed.
+  Lemma flag_run_violates_guarantee {Σ : gFunctors} l : ¬ tprop_tr (flag_tprop (Σ:=Σ) l) (0, flag_run l).
+  Proof. intros H. by eapply flag_run_goes_back, flag_tprop_stays. Qed.
 
 End trace.

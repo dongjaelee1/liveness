@@ -8,60 +8,60 @@ From transfinite.stepindex Require Import ordinals.
 
 (** ** Inferring guarantees
 
-    [tps_sem P] mentions the ghost-state instances; an adequacy needs a trace property that
-    does not. [IntoTemporal P G] computes one from the shape of [P], with fallback [tps_true].
+    [tprop_sem P] mentions the ghost-state instances; an adequacy needs a trace property that
+    does not. [IntoTemporal P G] computes one from the shape of [P], with fallback [tprop_true].
     Two modes:
-    - inference ([G] unknown: [tsem P], [tps_of P]): an existential is ghost if the guarantee
+    - inference ([G] unknown: [tsem P], [tprop_of P]): an existential is ghost if the guarantee
       of its body does not depend on the witness, else trace-visible (small types) or dropped;
     - checking against a given [G]: an existential is trace-visible exactly when [G] is a
-      [tps_exist] over the same type. *)
-Class IntoTemporal `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (P : iProp Σ) (G : tps Λ Σ) :=
+      [tprop_exist] over the same type. *)
+Class IntoTemporal `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (P : iProp Σ) (G : tprop Λ Σ) :=
   into_temporal : ⊢ P ⊨ₜ G.
 Global Arguments into_temporal {_ _ _ _} _ _ {_}.
 Global Hint Mode IntoTemporal - - - - ! - : typeclass_instances.
 (* Opaque: unfolding [temporal] when an instance does not match makes the search very slow. *)
 Global Typeclasses Opaque temporal.
 (* Likewise for the connectives, which are records. *)
-Global Typeclasses Opaque tps_pure tps_atomic tps_and tps_or tps_impl tps_forall tps_exist
-  tps_always tps_until tps_state.
+Global Typeclasses Opaque tprop_pure tprop_atomic tprop_and tprop_or tprop_impl tprop_forall tprop_exist
+  tprop_always tprop_until tprop_state.
 
 (** How an existential over a family of guarantees is guaranteed, when inferring. *)
-Class SimplExist `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (G : X → tps Λ Σ) (G' : tps Λ Σ) :=
+Class SimplExist `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (G : X → tprop Λ Σ) (G' : tprop Λ Σ) :=
   simpl_exist (P : X → iProp Σ) : (∀ x, P x ⊨ₜ G x) ⊢ (∃ x, P x) ⊨ₜ G'.
 Global Hint Mode SimplExist - - - - - ! - : typeclass_instances.
 
 (** Existentials, dispatched on whether the target is known (hints after [into_temporal]).
     Records, so that a failing unification does not unfold them. *)
-Class IntoTemporalExist `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (P : X → iProp Σ) (G : tps Λ Σ) :=
+Class IntoTemporalExist `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (P : X → iProp Σ) (G : tprop Λ Σ) :=
   { into_temporal_exist_body : ⊢ (∃ x, P x) ⊨ₜ G }.
 Global Hint Mode IntoTemporalExist - - - - - ! - : typeclass_instances.
-(** Against a known target: trace-visible if the target is a [tps_exist] (possibly behind
+(** Against a known target: trace-visible if the target is a [tprop_exist] (possibly behind
     definitions), ghost otherwise. *)
-Class IntoTemporalExistCheck `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (P : X → iProp Σ) (G : tps Λ Σ) :=
+Class IntoTemporalExistCheck `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} {X : Type} (P : X → iProp Σ) (G : tprop Λ Σ) :=
   { into_temporal_exist_check_body : ⊢ (∃ x, P x) ⊨ₜ G }.
 Global Hint Mode IntoTemporalExistCheck - - - - - ! ! : typeclass_instances.
 
 (** The trace property inferred for [P]. *)
 Definition tsem `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
-  (P : iProp Σ) {G : tps Λ Σ} `{!IntoTemporal P G} : tps Λ Σ := G.
+  (P : iProp Σ) {G : tprop Λ Σ} `{!IntoTemporal P G} : tprop Λ Σ := G.
 Global Arguments tsem {_ _ _ _} _ {_ _}.
 
 (** The inferred trace property of [P], computed so that it no longer mentions ghost-state
-    instances: [Definition G : tps Λ Σ := ltac:(tps_of P).] in a section with the instances
+    instances: [Definition G : tprop Λ Σ := ltac:(tprop_of P).] in a section with the instances
     yields a [G] that can be used in an adequacy statement. *)
-Ltac tps_of P := let G := eval cbv [tsem] in (tsem P%I) in exact G.
+Ltac tprop_of P := let G := eval cbv [tsem] in (tsem P%I) in exact G.
 
 (** [t] is an evar, possibly applied: the target is unknown. *)
 Ltac evar_headed t := idtac; lazymatch t with ?f _ => evar_headed f | _ => is_evar t end.
 
 Section into_temporal.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
-  Implicit Types G : tps Λ Σ.
+  Implicit Types G : tprop Λ Σ.
 
   (** The fallback, used through the hint below. *)
-  Lemma into_temporal_default P : IntoTemporal P tps_true.
+  Lemma into_temporal_default P : IntoTemporal P tprop_true.
   Proof. apply temporal_true. Qed.
-  Global Instance into_temporal_pure φ : IntoTemporal (⌜φ⌝ : iProp Σ) (tps_pure φ) | 10.
+  Global Instance into_temporal_pure φ : IntoTemporal (⌜φ⌝ : iProp Σ) (tprop_pure φ) | 10.
   Proof. apply temporal_pure. Qed.
   Global Instance into_temporal_sep P Q G1 G2 :
     IntoTemporal P G1 → IntoTemporal Q G2 → IntoTemporal (P ∗ Q) (G1 ∧ G2) | 10.
@@ -75,25 +75,25 @@ Section into_temporal.
 
   Global Instance simpl_exist_ghost {X} G : SimplExist (λ _ : X, G) G | 0.
   Proof. intros P. iIntros "H". by iApply temporal_exist_ghost. Qed.
-  Global Instance simpl_exist_visible {X} `{!TypeExistentialProperty X ordI} (G : X → tps Λ Σ) :
-    SimplExist G (tps_exist G) | 10.
+  Global Instance simpl_exist_visible {X} `{!TypeExistentialProperty X ordI} (G : X → tprop Λ Σ) :
+    SimplExist G (tprop_exist G) | 10.
   Proof. intros P. iIntros "H". by iApply temporal_exist. Qed.
   (* Total, so that inference never backtracks into the body. *)
-  Global Instance simpl_exist_true {X} (G : X → tps Λ Σ) : SimplExist G tps_true | 100.
+  Global Instance simpl_exist_true {X} (G : X → tprop Λ Σ) : SimplExist G tprop_true | 100.
   Proof. intros P. iIntros "_". iApply temporal_true. Qed.
 
   Global Instance into_temporal_exist {X} (P : X → iProp Σ) G :
     IntoTemporalExist P G → IntoTemporal (∃ x, P x) G | 10.
   Proof. by intros []. Qed.
-  Lemma into_temporal_exist_infer {X} (P : X → iProp Σ) (Gx : X → tps Λ Σ) G :
+  Lemma into_temporal_exist_infer {X} (P : X → iProp Σ) (Gx : X → tprop Λ Σ) G :
     (∀ x, IntoTemporal (P x) (Gx x)) → SimplExist Gx G → IntoTemporalExist P G.
   Proof. intros H HS. constructor. unfold IntoTemporal in *. iApply HS. iIntros (x). iApply H. Qed.
   Lemma into_temporal_exist_check {X} (P : X → iProp Σ) G :
     IntoTemporalExistCheck P G → IntoTemporalExist P G.
   Proof. by intros [?]. Qed.
   Global Instance into_temporal_exist_visible_check {X} `{!TypeExistentialProperty X ordI}
-    (P : X → iProp Σ) (G : X → tps Λ Σ) :
-    (∀ x, IntoTemporal (P x) (G x)) → IntoTemporalExistCheck P (tps_exist G) | 0.
+    (P : X → iProp Σ) (G : X → tprop Λ Σ) :
+    (∀ x, IntoTemporal (P x) (G x)) → IntoTemporalExistCheck P (tprop_exist G) | 0.
   Proof. intros H. constructor. unfold IntoTemporal in *. iApply temporal_exist. iIntros (x). iApply H. Qed.
   Global Instance into_temporal_exist_ghost_check {X} (P : X → iProp Σ) G :
     (∀ x, IntoTemporal (P x) G) → IntoTemporalExistCheck P G | 10.
@@ -102,51 +102,51 @@ Section into_temporal.
   Global Instance into_temporal_impl (φ : Prop) P G :
     IntoTemporal P G → IntoTemporal (⌜φ⌝ → P) (⌜φ⌝ → G) | 10.
   Proof. intros H. unfold IntoTemporal in *. iApply temporal_impl. iApply H. Qed.
-  Global Instance into_temporal_forall {X} (P : X → iProp Σ) (G : X → tps Λ Σ) :
-    (∀ x, IntoTemporal (P x) (G x)) → IntoTemporal (∀ x, P x) (tps_forall G) | 10.
+  Global Instance into_temporal_forall {X} (P : X → iProp Σ) (G : X → tprop Λ Σ) :
+    (∀ x, IntoTemporal (P x) (G x)) → IntoTemporal (∀ x, P x) (tprop_forall G) | 10.
   Proof. intros H. unfold IntoTemporal in *. iApply temporal_forall. iIntros (x). iApply H. Qed.
   Global Instance into_temporal_persistently P G :
     IntoTemporal P G → IntoTemporal (□ P) G | 10.
   Proof. intros H. unfold IntoTemporal in *. iApply temporal_persistently. iApply H. Qed.
   Global Instance into_temporal_alwaysI_guar N P G :
-    IntoTemporal (alwaysI_guar N P G) (tps_always G) | 10.
+    IntoTemporal (alwaysI_guar N P G) (tprop_always G) | 10.
   Proof. apply temporal_always_guar. Qed.
   Global Instance into_temporal_alwaysI_as N P V G :
-    IntoTemporal V G → IntoTemporal (alwaysI_as N P V) (tps_always G) | 10.
+    IntoTemporal V G → IntoTemporal (alwaysI_as N P V) (tprop_always G) | 10.
   Proof. intros H. unfold IntoTemporal in *. by apply temporal_always_as_valid. Qed.
   Global Instance into_temporal_alwaysI N P G :
-    IntoTemporal P G → IntoTemporal (alwaysI N P) (tps_always G) | 10.
+    IntoTemporal P G → IntoTemporal (alwaysI N P) (tprop_always G) | 10.
   Proof. intros H. unfold IntoTemporal in *. by apply temporal_always_valid. Qed.
   Global Instance into_temporal_untilI_guar N k q P Q G1 G2 :
-    IntoTemporal (untilI_guar N k q P Q G1 G2) (tps_until G1 G2) | 10.
+    IntoTemporal (untilI_guar N k q P Q G1 G2) (tprop_until G1 G2) | 10.
   Proof. apply temporal_until_guar. Qed.
   Global Instance into_temporal_untilI N k q P Q G1 G2 :
-    IntoTemporal P G1 → IntoTemporal Q G2 → IntoTemporal (untilI N k q P Q) (tps_until G1 G2) | 10.
+    IntoTemporal P G1 → IntoTemporal Q G2 → IntoTemporal (untilI N k q P Q) (tprop_until G1 G2) | 10.
   Proof. intros H1 H2. unfold IntoTemporal in *. by apply temporal_until_valid. Qed.
   (** A done until, against a target until with any left formula. *)
   Global Instance into_temporal_untilI_done_guar k Q G1 G2 :
-    IntoTemporal (untilI_done_guar k Q G2) (tps_until G1 G2) | 10.
+    IntoTemporal (untilI_done_guar k Q G2) (tprop_until G1 G2) | 10.
   Proof. apply temporal_until_done_guar. Qed.
   Global Instance into_temporal_untilI_done k Q G1 G2 :
-    IntoTemporal Q G2 → IntoTemporal (untilI_done k Q) (tps_until G1 G2) | 10.
+    IntoTemporal Q G2 → IntoTemporal (untilI_done k Q) (tprop_until G1 G2) | 10.
   Proof. intros H. unfold IntoTemporal in *. by apply temporal_until_done_valid. Qed.
-  Global Instance into_temporal_state_pred π : IntoTemporal (state_pred_interp π) (tps_atomic π) | 10.
+  Global Instance into_temporal_state_pred π : IntoTemporal (state_pred_interp π) (tprop_atomic π) | 10.
   Proof. apply temporal_atomic. Qed.
 
   Global Instance into_temporal_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ)
-    (G : K → A → tps Λ Σ) :
+    (G : K → A → tprop Λ Σ) :
     (∀ k x, IntoTemporal (Φ k x) (G k x)) →
     IntoTemporal ([∗ map] k ↦ x ∈ m, Φ k x)
-      (tps_forall (λ k, tps_forall (λ x, tps_impl ⌜m !! k = Some x⌝ (G k x)))) | 10.
+      (tprop_forall (λ k, tprop_forall (λ x, tprop_impl ⌜m !! k = Some x⌝ (G k x)))) | 10.
   Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepM. iIntros (k x). iApply HG. Qed.
-  Global Instance into_temporal_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → tps Λ Σ) :
+  Global Instance into_temporal_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → tprop Λ Σ) :
     (∀ k x, IntoTemporal (Φ k x) (G k x)) →
     IntoTemporal ([∗ list] k ↦ x ∈ l, Φ k x)
-      (tps_forall (λ k, tps_forall (λ x, tps_impl ⌜l !! k = Some x⌝ (G k x)))) | 10.
+      (tprop_forall (λ k, tprop_forall (λ x, tprop_impl ⌜l !! k = Some x⌝ (G k x)))) | 10.
   Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepL. iIntros (k x). iApply HG. Qed.
-  Global Instance into_temporal_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → tps Λ Σ) :
+  Global Instance into_temporal_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → tprop Λ Σ) :
     (∀ x, IntoTemporal (Φ x) (G x)) →
-    IntoTemporal ([∗ set] x ∈ X, Φ x) (tps_forall (λ x, tps_impl ⌜x ∈ X⌝ (G x))) | 10.
+    IntoTemporal ([∗ set] x ∈ X, Φ x) (tprop_forall (λ x, tprop_impl ⌜x ∈ X⌝ (G x))) | 10.
   Proof. intros HG. unfold IntoTemporal in *. iApply temporal_big_sepS. iIntros (x). iApply HG. Qed.
 
   Lemma tsem_temporal (Q : iProp Σ) G `{!IntoTemporal Q G} : ⊢ Q ⊨ₜ tsem Q.
@@ -165,16 +165,16 @@ Global Hint Extern 0 (IntoTemporalExist _ ?G) =>
 
 (* A done until has no left formula: with an unknown target, it is inferred as a finally. *)
 Global Hint Extern 0 (IntoTemporal (untilI_done_guar _ _ _) ?G) =>
-  evar_headed G; notypeclasses refine (into_temporal_untilI_done_guar _ _ tps_true _) : typeclass_instances.
+  evar_headed G; notypeclasses refine (into_temporal_untilI_done_guar _ _ tprop_true _) : typeclass_instances.
 Global Hint Extern 0 (IntoTemporal (untilI_done _ _) ?G) =>
-  evar_headed G; notypeclasses refine (into_temporal_untilI_done _ _ tps_true _ _) : typeclass_instances.
+  evar_headed G; notypeclasses refine (into_temporal_untilI_done _ _ tprop_true _ _) : typeclass_instances.
 
-(* The fallback, for an unknown target or [tps_true], and only once the formula and the
+(* The fallback, for an unknown target or [tprop_true], and only once the formula and the
    ghost-state instances contain no evars (resolution is retried once they are solved). *)
 Global Hint Extern 100 (@IntoTemporal ?Λ ?Σ ?Ht ?Hs ?P ?G) =>
   assert_fails (has_evar Λ); assert_fails (has_evar Σ); assert_fails (has_evar Ht); assert_fails (has_evar Hs);
   assert_fails (has_evar P);
-  first [evar_headed G | unify G (@tps_true Λ Σ)];
+  first [evar_headed G | unify G (@tprop_true Λ Σ)];
   notypeclasses refine (into_temporal_default P) : typeclass_instances.
 
 (** ** Examples and unit checks *)
@@ -184,7 +184,7 @@ Section examples.
   (** Ghost quantification over iProp, scoping over two temporal operators. *)
   Local Lemma ex_iprop N1 N2 k :
     ⊢ (∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k 1 Ψ) ⊨ₜ
-      (tps_always tps_true ∧ tps_finally tps_true).
+      (tprop_always tprop_true ∧ tprop_finally tprop_true).
   Proof.
     iApply temporal_exist_ghost. iIntros (Ψ).
     iApply temporal_sep; [iApply temporal_always_valid; apply temporal_true|].
@@ -192,35 +192,35 @@ Section examples.
   Qed.
 
   (** An invariant whose content changes over time, each content carrying its own guarantee. *)
-  Local Lemma ex_dynamic_inv N G : ⊢ alwaysI N (∃ P : iProp Σ, P ∗ P ⊨ₜ G) ⊨ₜ tps_always G.
+  Local Lemma ex_dynamic_inv N G : ⊢ alwaysI N (∃ P : iProp Σ, P ∗ P ⊨ₜ G) ⊨ₜ tprop_always G.
   Proof. iApply temporal_always_valid. iApply temporal_certified. Qed.
 
   (** The same guarantee, inferred. *)
   Local Lemma ex_iprop_inferred N1 N2 k :
     ⊢ (∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k 1 Ψ) ⊨ₜ
-      (tps_always tps_true ∧ tps_until (tps_pure True) tps_true).
+      (tprop_always tprop_true ∧ tprop_until (tprop_pure True) tprop_true).
   Proof. apply (into_temporal _ _). Qed.
 
   (** Trace-visible quantification over a small type is inferred when the guarantee of
       the body depends on the witness. *)
   Local Lemma ex_visible_inferred N (f : nat → Prop) :
-    ⊢ (∃ n : nat, alwaysI N ⌜f n⌝) ⊨ₜ tps_exist (λ n : nat, tps_always (tps_pure (f n))).
+    ⊢ (∃ n : nat, alwaysI N ⌜f n⌝) ⊨ₜ tprop_exist (λ n : nat, tprop_always (tprop_pure (f n))).
   Proof. apply (into_temporal _ _). Qed.
 
   (** The inferred trace property as a closed term. *)
-  Local Definition ex_tps_of N1 N2 k : tps Λ Σ :=
-    ltac:(tps_of ((∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k 1 Ψ)%I)).
-  Local Lemma ex_tps_of_eq N1 N2 k :
-    ex_tps_of N1 N2 k = (tps_always tps_true ∧ tps_until (tps_pure True) tps_true)%S.
+  Local Definition ex_tprop_of N1 N2 k : tprop Λ Σ :=
+    ltac:(tprop_of ((∃ Ψ : iProp Σ, alwaysI N1 Ψ ∗ finallyI N2 k 1 Ψ)%I)).
+  Local Lemma ex_tprop_of_eq N1 N2 k :
+    ex_tprop_of N1 N2 k = (tprop_always tprop_true ∧ tprop_until (tprop_pure True) tprop_true)%T.
   Proof. done. Qed.
 
   (** A done until, allocated with its right formula at hand, exports the until of any left
       formula in the form the adequacy takes: a formula, its guarantee, and the formula
       back. *)
-  Local Lemma ex_until_done_export E p K ℓ (μ : measure) π (G1 : tps Λ Σ) :
+  Local Lemma ex_until_done_export E p K ℓ (μ : measure) π (G1 : tprop Λ Σ) :
     parP_le p ℓ -∗ parP_kids p K -∗ state_pred_interp π -∗
     |={E}=>m parP_kids p K ∗
-      ∃ P : iProp Σ, (P ⊨ₜ tps_until G1 (tps_atomic π)) ∗ P ∗ (P -∗ state_pred_interp π).
+      ∃ P : iProp Σ, (P ⊨ₜ tprop_until G1 (tprop_atomic π)) ∗ P ∗ (P -∗ state_pred_interp π).
   Proof.
     iIntros "B Kp Hπ". iMod (obl_new E p K ℓ μ with "B Kp") as (k) "(%Hk& Kp& Kk& Oa& _& _)".
     iMod (untilI_done_init' with "Oa Kp Kk Hπ") as "[U $]"; first done.
@@ -234,7 +234,7 @@ Section examples.
     ↑N ⊆ E → k ∈ K →
     £n 1 -∗ untilI N k 1 P (state_pred_interp π) -∗ parP_kids p K -∗ oblP_kids k ∅ -∗
     state_pred_interp π -∗
-    |={E}=>m ∃ U : iProp Σ, (U ⊨ₜ tps_until (tps_sem P) (tps_atomic π)) ∗ U ∗ parP_kids p (K ∖ {[k]}).
+    |={E}=>m ∃ U : iProp Σ, (U ⊨ₜ tprop_until (tprop_sem P) (tprop_atomic π)) ∗ U ∗ parP_kids p (K ∖ {[k]}).
   Proof.
     iIntros (HN Hk) "LC U Kp Kk Hπ". iMod (untilI_discharge_done with "U") as "U"; first done.
     iApply (lc_sfmupd_add_later with "LC"). iNext. iDestruct "U" as "[_ U]".
@@ -244,17 +244,17 @@ Section examples.
   Qed.
 
   (** Its inferred trace property is the finally of its right formula. *)
-  Local Definition ex_tps_of_done k π : tps Λ Σ :=
-    ltac:(tps_of (untilI_done k (state_pred_interp π))).
-  Local Lemma ex_tps_of_done_eq k π : ex_tps_of_done k π = tps_finally (tps_atomic π).
+  Local Definition ex_tprop_of_done k π : tprop Λ Σ :=
+    ltac:(tprop_of (untilI_done k (state_pred_interp π))).
+  Local Lemma ex_tprop_of_done_eq k π : ex_tprop_of_done k π = tprop_finally (tprop_atomic π).
   Proof. done. Qed.
-  Local Lemma ex_finally_done k π : ⊢ untilI_done k (state_pred_interp π) ⊨ₜ tps_finally (tps_atomic π).
+  Local Lemma ex_finally_done k π : ⊢ untilI_done k (state_pred_interp π) ⊨ₜ tprop_finally (tprop_atomic π).
   Proof. apply (into_temporal _ _). Qed.
 
   (** A higher-order specification quantifies over the content together with its guarantee
       (the guarantee of the content of an [alwaysI] must be valid, not a hypothesis). *)
   Local Lemma ex_higher_order N G :
-    ⊢ (∃ P : iProp Σ, alwaysI N (P ∗ P ⊨ₜ G)) ⊨ₜ tps_always G.
+    ⊢ (∃ P : iProp Σ, alwaysI N (P ∗ P ⊨ₜ G)) ⊨ₜ tprop_always G.
   Proof.
     iApply temporal_exist_ghost. iIntros (P). iApply temporal_always_valid.
     iApply (temporal_mono (∃ P, P ∗ P ⊨ₜ G)%I with "[]"); first by iIntros "!> H"; iExists P.
@@ -264,22 +264,22 @@ Section examples.
   (** A temporal antecedent used in the logic: by completeness, the in-logic reading of
       "eventually [π]" strengthens a guarantee. *)
   Local Lemma ex_impl_temporal P π G :
-    P ⊨ₜ G ⊢ P ⊨ₜ tps_impl (tps_finally (tps_atomic π)) (tps_and (tps_finally (tps_atomic π)) G).
+    P ⊨ₜ G ⊢ P ⊨ₜ tprop_impl (tprop_finally (tprop_atomic π)) (tprop_and (tprop_finally (tprop_atomic π)) G).
   Proof.
-    apply (temporal_impl_intro _ _ _ _ (tps_le_refl _)).
+    apply (temporal_impl_intro _ _ _ _ (tprop_le_refl _)).
   Qed.
 
   (** Decided antecedents compose: the decider of a compound antecedent is inferred. *)
   Local Lemma ex_decided (φ : Prop) (ψ : state Λ → thread_pool Λ → Prop) :
-    TpsDecided (Σ:=Σ) (tps_or (tps_pure φ) (tps_impl (tps_state ψ) (tps_pure False)))
+    TpropDecided (Σ:=Σ) (tprop_or (tprop_pure φ) (tprop_impl (tprop_state ψ) (tprop_pure False)))
       (λ h, φ ∨ (hist_now ψ h → False)).
   Proof. apply _. Qed.
 
   (** Unsound: an iProp implication guaranteeing the implication of the guarantees (the
       antecedent's resources are not determined by the trace). *)
   Local Lemma naive_impl_rule_unsound :
-    (∀ (P1 P2 : iProp Σ) G1 G2, (⊢ P1 ⊨ₜ G1) → (⊢ P2 ⊨ₜ G2) → ⊢ (P1 → P2) ⊨ₜ tps_impl G1 G2) →
-    ⊢ True ⊨ₜ tps_impl tps_true (tps_pure False).
+    (∀ (P1 P2 : iProp Σ) G1 G2, (⊢ P1 ⊨ₜ G1) → (⊢ P2 ⊨ₜ G2) → ⊢ (P1 → P2) ⊨ₜ tprop_impl G1 G2) →
+    ⊢ True ⊨ₜ tprop_impl tprop_true (tprop_pure False).
   Proof.
     intros Hrule.
     assert (HF : ∀ G, ⊢ (False : iProp Σ) ⊨ₜ G).
@@ -288,7 +288,7 @@ Section examples.
     iApply Hrule; [apply temporal_true|apply HF].
   Qed.
 
-  Local Lemma tps_impl_true_false_empty τ : ¬ tps_tr (tps_impl (Λ:=Λ) (Σ:=Σ) tps_true (tps_pure False)) τ.
+  Local Lemma tprop_impl_true_false_empty τ : ¬ tprop_tr (tprop_impl (Λ:=Λ) (Σ:=Σ) tprop_true (tprop_pure False)) τ.
   Proof. intros H. by apply H. Qed.
 
 End examples.
