@@ -7,7 +7,7 @@ From lantana.base_logic Require Import satisfiable.
 (** * Internalized trace properties
 
     An [itProp] is a trace property ([trProp], its external reading) together with its
-    internalization in the logic ([tiProp], its internal reading), adequate for it: if the
+    internalization in the logic ([trIProp], its internal reading), adequate for it: if the
     internal reading is satisfiable, the external one holds. The connectives, state atoms,
     complete and instant properties, and the two entailments between properties: in the
     logic ([G ⊑ H]), for the structure of a property, and on traces ([itProp_external G ⊆ R]),
@@ -41,22 +41,22 @@ Section itProp_connectives.
   Implicit Types G : itProp Λ Σ.
 
   Program Definition itProp_pure (p : Prop) : itProp Λ Σ :=
-    {| itProp_internal _ := ti_pure p; itProp_external := tr_pure p |}.
+    {| itProp_internal _ := trI_pure p; itProp_external := tr_pure p |}.
   Next Obligation. intros p ? F τ H. by apply sat_elim in H. Qed.
 
   Definition itProp_true : itProp Λ Σ := itProp_pure True.
 
   Program Definition itProp_and G1 G2 : itProp Λ Σ :=
-    {| itProp_internal _ := ti_and (itProp_internal G1) (itProp_internal G2); itProp_external := tr_and (itProp_external G1) (itProp_external G2) |}.
+    {| itProp_internal _ := trI_and (itProp_internal G1) (itProp_internal G2); itProp_external := tr_and (itProp_external G1) (itProp_external G2) |}.
   Next Obligation.
-    intros G1 G2 ? F τ H. unfold ti_and in H. apply iProp_sat_lc_at_frame_and in H as [H1 H2].
+    intros G1 G2 ? F τ H. unfold trI_and in H. apply iProp_sat_lc_at_frame_and in H as [H1 H2].
     split; [eapply itProp_adeq, H1|eapply itProp_adeq, H2].
   Qed.
 
   Program Definition itProp_or G1 G2 : itProp Λ Σ :=
-    {| itProp_internal _ := ti_or (itProp_internal G1) (itProp_internal G2); itProp_external := tr_or (itProp_external G1) (itProp_external G2) |}.
+    {| itProp_internal _ := trI_or (itProp_internal G1) (itProp_internal G2); itProp_external := tr_or (itProp_external G1) (itProp_external G2) |}.
   Next Obligation.
-    intros G1 G2 ? F τ H. unfold ti_or in H. apply sat_or in H as [H|H].
+    intros G1 G2 ? F τ H. unfold trI_or in H. apply sat_or in H as [H|H].
     - left. by eapply itProp_adeq.
     - right. by eapply itProp_adeq.
   Qed.
@@ -64,44 +64,44 @@ Section itProp_connectives.
   (** Implication, with any trace property as antecedent: both readings assume it at the
       level of traces. *)
   Program Definition itProp_impl (A G : itProp Λ Σ) : itProp Λ Σ :=
-    {| itProp_internal _ := ti_impl (itProp_external A) (itProp_internal G); itProp_external := tr_impl (itProp_external A) (itProp_external G) |}.
+    {| itProp_internal _ := trI_impl (itProp_external A) (itProp_internal G); itProp_external := tr_impl (itProp_external A) (itProp_external G) |}.
   Next Obligation.
-    intros A G ? F τ H HA. unfold ti_impl in H. eapply itProp_adeq. eapply sat_impl; [apply H|].
+    intros A G ? F τ H HA. unfold trI_impl in H. eapply itProp_adeq. eapply sat_impl; [apply H|].
     iIntros "_". by iPureIntro.
   Qed.
 
   (** Over any type: [sat] commutes with [∀]. *)
   Program Definition itProp_forall {X : Type} (G : X → itProp Λ Σ) : itProp Λ Σ :=
-    {| itProp_internal _ := ti_forall X (λ x, itProp_internal (G x)); itProp_external := tr_forall X (λ x, itProp_external (G x)) |}.
+    {| itProp_internal _ := trI_forall X (λ x, itProp_internal (G x)); itProp_external := tr_forall X (λ x, itProp_external (G x)) |}.
   Next Obligation.
-    intros X G ? F τ H x. unfold ti_forall in H. eapply itProp_adeq. by apply (sat_forall x) in H.
+    intros X G ? F τ H x. unfold trI_forall in H. eapply itProp_adeq. by apply (sat_forall x) in H.
   Qed.
 
   (** Existential quantification needs the existential property of the step index, so only
       types smaller than the ordinals of [ordI] qualify (nat, gnames, oids, Ord.t, ...). *)
   Program Definition itProp_exist {X : Type} `{!TypeExistentialProperty X ordI} (G : X → itProp Λ Σ) : itProp Λ Σ :=
-    {| itProp_internal _ := ti_exist X (λ x, itProp_internal (G x)); itProp_external := tr_exist X (λ x, itProp_external (G x)) |}.
+    {| itProp_internal _ := trI_exist X (λ x, itProp_internal (G x)); itProp_external := tr_exist X (λ x, itProp_external (G x)) |}.
   Next Obligation.
-    intros X ? G ? F τ H. unfold ti_exist in H. apply sat_exists in H as [x H].
+    intros X ? G ? F τ H. unfold trI_exist in H. apply sat_exists in H as [x H].
     exists x. by eapply itProp_adeq.
   Qed.
 
   Program Definition itProp_always G : itProp Λ Σ :=
-    {| itProp_internal _ := ti_always (itProp_internal G) (ti_pure True); itProp_external := tr_always (itProp_external G) |}.
+    {| itProp_internal _ := trI_always (itProp_internal G) (trI_pure True); itProp_external := tr_always (itProp_external G) |}.
   Next Obligation.
     intros G ? F τ H.
     cut (tr_always (itProp_external G ∧ tr_pure True)%R τ).
     { unfold tr_always. destruct τ. intros Hτ m Hm. by destruct (Hτ m Hm). }
-    eapply (ti_always_tr_always F (itProp_internal G) (ti_pure True) (itProp_external G) (tr_pure True));
+    eapply (trI_always_tr_always F (itProp_internal G) (trI_pure True) (itProp_external G) (tr_pure True));
       [intros; by eapply itProp_adeq | intros; exact I | exact H].
   Qed.
 
   Program Definition itProp_until G1 G2 : itProp Λ Σ :=
-    {| itProp_internal _ := ti_exist Ord.t (λ a, ti_until Ord.lt a (itProp_internal G1) (itProp_internal G2));
+    {| itProp_internal _ := trI_exist Ord.t (λ a, trI_until Ord.lt a (itProp_internal G1) (itProp_internal G2));
        itProp_external := tr_until (itProp_external G1) (itProp_external G2) |}.
   Next Obligation.
     intros G1 G2 ? F τ H.
-    eapply (ti_until_tr_until_gen F (itProp_internal G1) (itProp_internal G2) (itProp_external G1) (itProp_external G2));
+    eapply (trI_until_tr_until_gen F (itProp_internal G1) (itProp_internal G2) (itProp_external G1) (itProp_external G2));
       [intros; by eapply itProp_adeq | intros; by eapply itProp_adeq | exact H].
   Qed.
 
@@ -111,111 +111,16 @@ Section itProp_connectives.
   Proof. intros ??. done. Qed.
   Lemma itProp_le_trans G1 G2 G3 : itProp_le G1 G2 → itProp_le G2 G3 → itProp_le G1 G3.
   Proof. intros H1 H2 ??. by rewrite H1 H2. Qed.
-  Lemma itProp_le_true G : itProp_le G itProp_true.
-  Proof. intros ??. by iIntros "_". Qed.
-  Lemma itProp_and_elim_l G1 G2 : itProp_le (itProp_and G1 G2) G1.
-  Proof. intros ??. rewrite /= /ti_and. by iIntros "[$ _]". Qed.
-  Lemma itProp_and_elim_r G1 G2 : itProp_le (itProp_and G1 G2) G2.
-  Proof. intros ??. rewrite /= /ti_and. by iIntros "[_ $]". Qed.
-
-  Lemma itProp_or_mono G1 G2 G1' G2' :
-    itProp_le G1 G1' → itProp_le G2 G2' → itProp_le (itProp_or G1 G2) (itProp_or G1' G2').
-  Proof. intros H1 H2 ??. rewrite /= /ti_or. by rewrite H1 H2. Qed.
-  Lemma itProp_and_mono G1 G2 G1' G2' :
-    itProp_le G1 G1' → itProp_le G2 G2' → itProp_le (itProp_and G1 G2) (itProp_and G1' G2').
-  Proof. intros H1 H2 ??. rewrite /= /ti_and. by rewrite H1 H2. Qed.
-  (** Antecedents are compared as trace properties. *)
-  Lemma itProp_impl_mono A A' G G' :
-    (∀ τ, itProp_external A' τ → itProp_external A τ) → itProp_le G G' → itProp_le (itProp_impl A G) (itProp_impl A' G').
-  Proof. intros HA HG ??. rewrite /= /ti_impl. iIntros "H %H'". iApply HG. iApply "H". eauto. Qed.
-  Lemma itProp_impl_intro_le A G : itProp_le G (itProp_impl A G).
-  Proof. intros ??. rewrite /= /ti_impl. by iIntros "H _". Qed.
-  (** The antecedent is read on the trace, so an implication is the disjunction of its
-      consequent with the negated antecedent. *)
-  Lemma itProp_impl_or_not A G : itProp_le (itProp_impl A G) (itProp_or (itProp_impl A (itProp_pure False)) G).
-  Proof.
-    intros ? τ. rewrite /= /ti_impl /ti_or /ti_pure. iIntros "H".
-    destruct (Classical_Prop.classic (itProp_external A τ)) as [HA|HA].
-    - iRight. by iApply "H".
-    - iLeft. by iIntros (?).
-  Qed.
-  Lemma itProp_or_not_impl A G : itProp_le (itProp_or (itProp_impl A (itProp_pure False)) G) (itProp_impl A G).
-  Proof.
-    intros ? τ. rewrite /= /ti_impl /ti_or /ti_pure. iIntros "[H|H] %HA"; last done.
-    by iDestruct ("H" $! HA) as %[].
-  Qed.
-
-  (** Antecedents compose on traces, for any antecedents: a conjunction curries, a
-      disjunction splits, an existential becomes a universal. *)
-  Lemma itProp_impl_curry A1 A2 G :
-    itProp_le (itProp_impl A1 (itProp_impl A2 G)) (itProp_impl (itProp_and A1 A2) G).
-  Proof. intros ? τ. rewrite /= /ti_impl /tr_and. iIntros "H" ([H1 H2]). by iApply "H". Qed.
-  Lemma itProp_impl_uncurry A1 A2 G :
-    itProp_le (itProp_impl (itProp_and A1 A2) G) (itProp_impl A1 (itProp_impl A2 G)).
-  Proof. intros ? τ. rewrite /= /ti_impl /tr_and. iIntros "H" (H1 H2). by iApply "H". Qed.
-  Lemma itProp_impl_or_split A1 A2 G :
-    itProp_le (itProp_and (itProp_impl A1 G) (itProp_impl A2 G)) (itProp_impl (itProp_or A1 A2) G).
-  Proof.
-    intros ? τ. rewrite /= /ti_and /ti_impl /tr_or. iIntros "H" ([H1|H2]).
-    - iDestruct "H" as "[H _]". by iApply "H".
-    - iDestruct "H" as "[_ H]". by iApply "H".
-  Qed.
-  Lemma itProp_impl_or_join A1 A2 G :
-    itProp_le (itProp_impl (itProp_or A1 A2) G) (itProp_and (itProp_impl A1 G) (itProp_impl A2 G)).
-  Proof.
-    intros ? τ. rewrite /= /ti_and /ti_impl /tr_or. iIntros "H".
-    iSplit; iIntros (?); iApply "H"; iPureIntro; auto.
-  Qed.
-  Lemma itProp_impl_exist {X} `{!TypeExistentialProperty X ordI} (A : X → itProp Λ Σ) G :
-    itProp_le (itProp_forall (λ x, itProp_impl (A x) G)) (itProp_impl (itProp_exist A) G).
-  Proof.
-    intros ? τ. rewrite /= /ti_forall /ti_impl /tr_exist. iIntros "H" ([x Hx]). by iApply ("H" $! x).
-  Qed.
-  Lemma itProp_forall_mono {X} (G G' : X → itProp Λ Σ) :
-    (∀ x, itProp_le (G x) (G' x)) → itProp_le (itProp_forall G) (itProp_forall G').
-  Proof. intros H ??. rewrite /= /ti_forall. iIntros "H %x". iApply H. iApply "H". Qed.
-  Lemma itProp_exist_mono {X} `{!TypeExistentialProperty X ordI} (G G' : X → itProp Λ Σ) :
-    (∀ x, itProp_le (G x) (G' x)) → itProp_le (itProp_exist G) (itProp_exist G').
-  Proof. intros H ??. rewrite /= /ti_exist. iIntros "[%x H]". iExists x. by iApply H. Qed.
-
-  Lemma itProp_always_mono G G' : itProp_le G G' → itProp_le (itProp_always G) (itProp_always G').
-  Proof.
-    intros Hle H τ. cbn. iIntros "H".
-    iAssert (∀ τ, ti_always (itProp_internal G) (ti_pure True) τ -∗ ti_always (itProp_internal G') (ti_pure True) τ)%I
-      with "[]" as "Hal"; last by iApply "Hal".
-    iLöb as "IH". iIntros (τ') "H". rewrite !ti_always_unfold /ti_always_pre.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
-    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
-    iSplit; first (iDestruct "H" as "[H _]"; by iApply Hle).
-    iSplit; first by iDestruct "H" as "[_ [$ _]]".
-    iDestruct "H" as "[_ [_ H]]". by iApply "IH".
-  Qed.
-
-  Lemma itProp_until_mono G1 G2 G1' G2' :
-    itProp_le G1 G1' → itProp_le G2 G2' → itProp_le (itProp_until G1 G2) (itProp_until G1' G2').
-  Proof.
-    intros H1 H2 H τ. cbn. rewrite /ti_exist. iIntros "[%a H]". iExists a.
-    iAssert (∀ a τ, ti_until Ord.lt a (itProp_internal G1) (itProp_internal G2) τ -∗
-                    ti_until Ord.lt a (itProp_internal G1') (itProp_internal G2') τ)%I with "[]" as "Hu";
-      last by iApply "Hu".
-    iLöb as "IH". iIntros (a' τ') "H". rewrite !ti_until_unfold /ti_until_pre.
-    iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
-    iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro. iDestruct "H" as "[H|H]".
-    - iLeft. by iApply H2.
-    - iRight. iSplit; first (iDestruct "H" as "[H _]"; by iApply H1).
-      iDestruct "H" as "[_ (%a''& %Hlt& H)]". iExists a''. iSplit; first done. by iApply "IH".
-  Qed.
-
   Lemma itProp_always_mono_i `{!temporalGS Λ Σ} (G G' : itProp Λ Σ) :
     ▷ □ (∀ τ, itProp_internal G τ -∗ itProp_internal G' τ) -∗
     ∀ τ, itProp_internal (itProp_always G) τ -∗ itProp_internal (itProp_always G') τ.
-  Proof. iIntros "#W" (τ). cbn. by iApply (ti_always_mono_i with "W"). Qed.
+  Proof. iIntros "#W" (τ). cbn. by iApply (trI_always_mono_i with "W"). Qed.
   Lemma itProp_until_mono_i `{!temporalGS Λ Σ} (G1 G2 G1' G2' : itProp Λ Σ) :
     ▷ □ (∀ τ, itProp_internal G1 τ -∗ itProp_internal G1' τ) -∗ ▷ □ (∀ τ, itProp_internal G2 τ -∗ itProp_internal G2' τ) -∗
     ∀ τ, itProp_internal (itProp_until G1 G2) τ -∗ itProp_internal (itProp_until G1' G2') τ.
   Proof.
-    iIntros "#W1 #W2" (τ). cbn. rewrite /ti_exist. iIntros "[%a H]". iExists a.
-    by iApply (ti_until_mono_i with "W1 W2").
+    iIntros "#W1 #W2" (τ). cbn. rewrite /trI_exist. iIntros "[%a H]". iExists a.
+    by iApply (trI_until_mono_i with "W1 W2").
   Qed.
 
 End itProp_connectives.
@@ -228,11 +133,10 @@ Notation "∀ x .. y , G" := (itProp_forall (λ x, .. (itProp_forall (λ y, G%IT
 Notation "∃ x .. y , G" := (itProp_exist (λ x, .. (itProp_exist (λ y, G%IT)) ..)) : itProp_scope.
 Notation "□ G" := (itProp_always G) (at level 20, right associativity) : itProp_scope.
 Notation "◇ G" := (itProp_finally G) (at level 20, right associativity) : itProp_scope.
+Notation "G 'Uₜ' H" := (itProp_until G H) (at level 60, right associativity) : itProp_scope.
 
 (** In-logic entailment is the canonical order of properties. *)
 Global Instance itProp_sqsubseteq {Λ Σ} : SqSubsetEq (itProp Λ Σ) := itProp_le.
-Global Instance itProp_le_preorder {Λ Σ} : PreOrder (⊑@{itProp Λ Σ}).
-Proof. split; [intros ?; apply itProp_le_refl|intros ???; apply itProp_le_trans]. Qed.
 
 (** ** Semantic state atoms
 
@@ -266,58 +170,44 @@ Section complete.
   Class ItPropInstant G : Prop :=
     itProp_instant : ∀ (H : temporalGS Λ Σ) τ, @itProp_internal _ _ G H τ ⊢ ⌜itProp_external G τ⌝.
 
-  Lemma itProp_impl_intro A H G `{HA : !ItPropComplete A} :
-    itProp_le (itProp_and A H) G → itProp_le H (itProp_impl A G).
-  Proof.
-    intros HG ? τ. rewrite /= /ti_impl. iIntros "H %Hτ". iApply HG.
-    rewrite /= /ti_and. iSplit; last done. by iApply HA.
-  Qed.
-
-  Lemma itProp_impl_elim A G `{HA : !ItPropInstant A} : itProp_le (itProp_and A (itProp_impl A G)) G.
-  Proof.
-    intros ? τ. rewrite /= /ti_and /ti_impl. iIntros "H".
-    iAssert ⌜itProp_external A τ⌝%I as %Hτ; first by iApply HA; iDestruct "H" as "[$ _]".
-    iDestruct "H" as "[_ H]". by iApply "H".
-  Qed.
-
   (** Completeness. *)
   Global Instance itProp_complete_pure φ : ItPropComplete (itProp_pure φ).
-  Proof. intros ? τ H. rewrite /= /ti_pure. by iPureIntro. Qed.
+  Proof. intros ? τ H. rewrite /= /trI_pure. by iPureIntro. Qed.
   Global Instance itProp_complete_and G1 G2 : ItPropComplete G1 → ItPropComplete G2 → ItPropComplete (itProp_and G1 G2).
-  Proof. intros H1 H2 ? τ [??]. rewrite /= /ti_and. iSplit; [by iApply H1|by iApply H2]. Qed.
+  Proof. intros H1 H2 ? τ [??]. rewrite /= /trI_and. iSplit; [by iApply H1|by iApply H2]. Qed.
   Global Instance itProp_complete_or G1 G2 : ItPropComplete G1 → ItPropComplete G2 → ItPropComplete (itProp_or G1 G2).
-  Proof. intros H1 H2 ? τ [?|?]; rewrite /= /ti_or; [iLeft; by iApply H1|iRight; by iApply H2]. Qed.
+  Proof. intros H1 H2 ? τ [?|?]; rewrite /= /trI_or; [iLeft; by iApply H1|iRight; by iApply H2]. Qed.
   Global Instance itProp_complete_impl A G : ItPropComplete G → ItPropComplete (itProp_impl A G).
-  Proof. intros HG ? τ H. rewrite /= /ti_impl. iIntros (HA). iApply HG. by apply H. Qed.
+  Proof. intros HG ? τ H. rewrite /= /trI_impl. iIntros (HA). iApply HG. by apply H. Qed.
   Global Instance itProp_complete_forall {X} (G : X → itProp Λ Σ) :
     (∀ x, ItPropComplete (G x)) → ItPropComplete (itProp_forall G).
-  Proof. intros HG ? τ H. rewrite /= /ti_forall. iIntros (x). iApply HG. apply H. Qed.
+  Proof. intros HG ? τ H. rewrite /= /trI_forall. iIntros (x). iApply HG. apply H. Qed.
   Global Instance itProp_complete_exist {X} `{!TypeExistentialProperty X ordI} (G : X → itProp Λ Σ) :
     (∀ x, ItPropComplete (G x)) → ItPropComplete (itProp_exist G).
-  Proof. intros HG ? τ [x H]. rewrite /= /ti_exist. iExists x. by iApply HG. Qed.
+  Proof. intros HG ? τ [x H]. rewrite /= /trI_exist. iExists x. by iApply HG. Qed.
 
   Global Instance itProp_complete_always G : ItPropComplete G → ItPropComplete (itProp_always G).
   Proof.
     intros HG ? τ Hτ. rewrite /=.
-    iAssert (□ ∀ τ, ⌜tr_always (itProp_external G) τ⌝ → ti_always (itProp_internal G) (ti_pure True) τ)%I as "#H";
+    iAssert (□ ∀ τ, ⌜tr_always (itProp_external G) τ⌝ → trI_always (itProp_internal G) (trI_pure True) τ)%I as "#H";
       last by iApply "H".
-    iLöb as "IH". iIntros "!>" ([n τf] Hal). rewrite ti_always_unfold /ti_always_pre.
+    iLöb as "IH". iIntros "!>" ([n τf] Hal). rewrite trI_always_unfold /trI_always_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iNext. iMod "Hclose" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iApply ALC_intro. iMod "Hclose" as "_".
     iModIntro. iSplit.
     { iApply HG. apply (Hal n). lia. }
-    iSplit; first by rewrite /ti_pure.
+    iSplit; first by rewrite /trI_pure.
     iApply "IH". iPureIntro. intros m Hm. apply Hal. simpl in Hm. lia.
   Qed.
 
   Global Instance itProp_complete_until G1 G2 :
     ItPropComplete G1 → ItPropComplete G2 → ItPropComplete (itProp_until G1 G2).
   Proof.
-    intros H1 H2 ? [n τf] (m & Hnm & HQ & HP). rewrite /= /ti_exist.
+    intros H1 H2 ? [n τf] (m & Hnm & HQ & HP). rewrite /= /trI_exist.
     (* The measure is the number of steps to the right formula. *)
     assert (∀ d n', m - n' = d → n' ≤ m → (∀ l, n' ≤ l < m → itProp_external G1 (l, τf)) →
-              ⊢ ti_until Ord.lt (Ord.from_nat d) (itProp_internal G1) (itProp_internal G2) (n', τf)) as Hu.
-    { induction d as [|d IH]; intros n' Hd Hn' HP'; rewrite ti_until_unfold /ti_until_pre;
+              ⊢ trI_until Ord.lt (Ord.from_nat d) (itProp_internal G1) (itProp_internal G2) (n', τf)) as Hu.
+    { induction d as [|d IH]; intros n' Hd Hn' HP'; rewrite trI_until_unfold /trI_until_pre;
         iApply fupd_mask_intro; try set_solver; iIntros "Hclose"; iNext; iMod "Hclose" as "_"; iModIntro;
         iApply fupd_mask_intro; try set_solver; iIntros "Hclose"; iApply ALC_intro; iMod "Hclose" as "_"; iModIntro.
       - assert (m = n') as -> by lia. iLeft. by iApply H2.
@@ -332,23 +222,23 @@ Section complete.
 
   (** Instantness. *)
   Global Instance itProp_instant_pure φ : ItPropInstant (itProp_pure φ).
-  Proof. intros ? τ. rewrite /= /ti_pure. by iIntros "%". Qed.
+  Proof. intros ? τ. rewrite /= /trI_pure. by iIntros "%". Qed.
   Global Instance itProp_instant_and G1 G2 : ItPropInstant G1 → ItPropInstant G2 → ItPropInstant (itProp_and G1 G2).
   Proof.
-    intros H1 H2 ? τ. rewrite /= /ti_and. iIntros "H".
+    intros H1 H2 ? τ. rewrite /= /trI_and. iIntros "H".
     iAssert ⌜itProp_external G1 τ⌝%I as %?; first by iApply H1; iDestruct "H" as "[$ _]".
     iAssert ⌜itProp_external G2 τ⌝%I as %?; first by iApply H2; iDestruct "H" as "[_ $]".
     by iPureIntro.
   Qed.
   Global Instance itProp_instant_or G1 G2 : ItPropInstant G1 → ItPropInstant G2 → ItPropInstant (itProp_or G1 G2).
   Proof.
-    intros H1 H2 ? τ. rewrite /= /ti_or. iIntros "[H|H]".
+    intros H1 H2 ? τ. rewrite /= /trI_or. iIntros "[H|H]".
     - iDestruct (H1 with "H") as %?. iPureIntro. by left.
     - iDestruct (H2 with "H") as %?. iPureIntro. by right.
   Qed.
   Global Instance itProp_instant_impl A G : ItPropInstant G → ItPropInstant (itProp_impl A G).
   Proof.
-    intros HG ? τ. rewrite /= /ti_impl. iIntros "H".
+    intros HG ? τ. rewrite /= /trI_impl. iIntros "H".
     destruct (Classical_Prop.classic (itProp_external A τ)) as [HA|HA].
     - iDestruct (HG with "(H [//])") as %?. iPureIntro. by intros _.
     - iPureIntro. by intros ?.
@@ -356,7 +246,7 @@ Section complete.
   Global Instance itProp_instant_forall {X} (G : X → itProp Λ Σ) :
     (∀ x, ItPropInstant (G x)) → ItPropInstant (itProp_forall G).
   Proof.
-    intros HG ? τ. rewrite /= /ti_forall /tr_forall.
+    intros HG ? τ. rewrite /= /trI_forall /tr_forall.
     destruct (Classical_Prop.classic (∀ x, itProp_external (G x) τ)) as [Hall|Hn]; first by iIntros "_".
     apply Classical_Pred_Type.not_all_ex_not in Hn as [x Hx].
     iIntros "H". iSpecialize ("H" $! x). iDestruct (HG with "H") as %?. done.
@@ -364,7 +254,7 @@ Section complete.
   Global Instance itProp_instant_exist {X} `{!TypeExistentialProperty X ordI} (G : X → itProp Λ Σ) :
     (∀ x, ItPropInstant (G x)) → ItPropInstant (itProp_exist G).
   Proof.
-    intros HG ? τ. rewrite /= /ti_exist. iIntros "[%x H]". iDestruct (HG with "H") as %?.
+    intros HG ? τ. rewrite /= /trI_exist. iIntros "[%x H]". iDestruct (HG with "H") as %?.
     iPureIntro. by exists x.
   Qed.
 
@@ -383,81 +273,6 @@ End complete.
 Global Hint Mode ItPropComplete - - ! : typeclass_instances.
 Global Hint Mode ItPropInstant - - ! : typeclass_instances.
 
-(** ** Trace readings: the two entailments, and casts
-
-    A property is read twice. Its in-logic reading [itProp_internal] is what a run establishes: a
-    guarantee [P ⊨ₜ G] (guarantee.v) turns [P], at a position, into the in-logic reading of
-    [G] there. Its trace reading [itProp_external] is what adequacy concludes.
-
-    Accordingly, two entailments:
-    - [G ⊑ H] ([itProp_le]) compares in-logic readings. It transports guarantees
-      ([temporal_weaken]), and the connectives are monotone in it. It is sound for trace
-      readings ([itProp_le_sound]), but it is as weak as the readings are deferred: the
-      in-logic readings of [□] and [𝒰] start with a later, so not even [□ ⊥ ⊑ ⊥] holds
-      ([itProp_always_elim_not_le]). It is the entailment of the structure of a property.
-    - [itProp_external G ⊆ R] compares trace readings, on traces (trace_prop.v), where every law of
-      LTL holds. It is the entailment of the meaning of a property. The cast
-      [itProp_cast G R pf] keeps the in-logic reading of [G] and takes [R] as its trace
-      reading, so [G ⊑ itProp_cast G R pf]: every trace-level consequence of a property is
-      guaranteed along with it ([temporal_cast]).
-
-    [ItPropExt G R] computes a trace reading of [G] from its shape, as a trace predicate. *)
-Section readings.
-  Context {Λ : language} {Σ : gFunctors}.
-  Implicit Types G H : itProp Λ Σ.
-  Implicit Types R : trProp Λ.
-
-  Program Definition itProp_cast G R (pf : itProp_external G ⊆ R) : itProp Λ Σ :=
-    {| itProp_internal _ := itProp_internal G; itProp_external := R |}.
-  Next Obligation. intros G R pf ? F τ Hs. apply pf. by eapply itProp_adeq. Qed.
-
-  Lemma itProp_cast_le G R pf : G ⊑ itProp_cast G R pf.
-  Proof. intros ??. done. Qed.
-  Lemma itProp_le_cast G R pf : itProp_cast G R pf ⊑ G.
-  Proof. intros ??. done. Qed.
-  Lemma itProp_cast_ext G R pf : itProp_external (itProp_cast G R pf) = R.
-  Proof. done. Qed.
-  Lemma itProp_cast_complete G R pf `{!ItPropComplete G} :
-    R ⊆ itProp_external G → ItPropComplete (itProp_cast G R pf).
-  Proof. intros HR ? τ Hτ. change (⊢ itProp_internal G τ). apply itProp_complete. by apply HR. Qed.
-
-  (** [ItPropExt G R]: [R] is a trace reading of [G]. The instances follow the connectives;
-      the fallback is the reading itself. *)
-  Class ItPropExt G R : Prop := itProp_ext_of : itProp_external G ⊆ R.
-
-  Global Instance itProp_ext_pure φ : ItPropExt (itProp_pure φ) (tr_pure φ) | 10.
-  Proof. by intros τ. Qed.
-  Global Instance itProp_ext_state φ : ItPropExt (itProp_state φ) (tr_state φ) | 10.
-  Proof. by intros τ. Qed.
-  Global Instance itProp_ext_and G1 G2 R1 R2 :
-    ItPropExt G1 R1 → ItPropExt G2 R2 → ItPropExt (itProp_and G1 G2) (R1 ∧ R2)%R | 10.
-  Proof. intros H1 H2 τ [??]. split; auto. Qed.
-  Global Instance itProp_ext_or G1 G2 R1 R2 :
-    ItPropExt G1 R1 → ItPropExt G2 R2 → ItPropExt (itProp_or G1 G2) (R1 ∨ R2)%R | 10.
-  Proof. intros H1 H2 τ [?|?]; [left|right]; auto. Qed.
-  Global Instance itProp_ext_impl A G R :
-    ItPropExt G R → ItPropExt (itProp_impl A G) (itProp_external A → R)%R | 10.
-  Proof. intros HG τ HAG HA. by apply HG, HAG. Qed.
-  Global Instance itProp_ext_forall {X} (G : X → itProp Λ Σ) (R : X → trProp Λ) :
-    (∀ x, ItPropExt (G x) (R x)) → ItPropExt (itProp_forall G) (tr_forall X R) | 10.
-  Proof. intros HG τ H x. by apply HG. Qed.
-  Global Instance itProp_ext_exist {X} `{!TypeExistentialProperty X ordI} (G : X → itProp Λ Σ) (R : X → trProp Λ) :
-    (∀ x, ItPropExt (G x) (R x)) → ItPropExt (itProp_exist G) (tr_exist X R) | 10.
-  Proof. intros HG τ [x H]. exists x. by apply HG. Qed.
-  Global Instance itProp_ext_always G R : ItPropExt G R → ItPropExt (itProp_always G) (□ R)%R | 10.
-  Proof. intros HG. by apply tr_always_mono. Qed.
-  Global Instance itProp_ext_finally G R : ItPropExt G R → ItPropExt (itProp_finally G) (◇ R)%R | 9.
-  Proof. intros HG. by apply tr_finally_mono. Qed.
-  Global Instance itProp_ext_until G1 G2 R1 R2 :
-    ItPropExt G1 R1 → ItPropExt G2 R2 → ItPropExt (itProp_until G1 G2) (tr_until R1 R2) | 10.
-  Proof. intros H1 H2. by apply tr_until_mono. Qed.
-  Global Instance itProp_ext_cast G R pf : ItPropExt (itProp_cast G R pf) R | 10.
-  Proof. by intros τ. Qed.
-  Global Instance itProp_ext_default G : ItPropExt G (itProp_external G) | 100.
-  Proof. by intros τ. Qed.
-
-End readings.
-Global Hint Mode ItPropExt - - ! - : typeclass_instances.
 
 (** ** The model
 
@@ -505,7 +320,7 @@ Section model.
   Proof.
     intros Hle. apply (itProp_valid_ext (itProp_pure False) τ). intros Ht.
     iLöb as "IH". iPoseProof (Hle Ht τ with "[IH]") as "%HF"; last done.
-    rewrite /= ti_always_unfold /ti_always_pre.
+    rewrite /= trI_always_unfold /trI_always_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "_". iNext. done.
   Qed.
 

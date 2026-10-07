@@ -107,16 +107,16 @@ carrier-set superscripts.
   trace reading `itProp_external G` (`trace/guarantee.v`; inference in `trace/guarantee_infer.v`).
 * *Two entailments of trace properties.* A `itProp` has an in-logic reading, which the run
   establishes, and a trace reading, which adequacy concludes. In-logic entailment `G ⊑ H`
-  (`itProp_le`) transports guarantees (`temporal_weaken`) and is what the connectives are
+  (`itProp_le`, rules in `trace/itprop_rules.v`) transports guarantees (`temporal_weaken`) and is what the connectives are
   monotone in, but it is too weak for temporal reasoning (`itProp_always_elim_not_le`). Trace
-  entailment `itProp_external G ⊆ R` is LTL on traces (`trace/trace_prop.v`), and the cast
+  entailment `itProp_external G ⊆ R` is LTL on traces (rules in `trace/trace_prop_rules.v`), and the cast
   `itProp_cast G R pf` transports it along a guarantee (`temporal_cast`). `IntoTrace P R`
   infers the trace property that `P` guarantees (`trace/guarantee_infer.v`).
 
 Naming conventions: `oblP_*` are obligation predicates, `witP_*` witness predicates,
 `thP_*` per-thread predicates, `parP_*` predicates on parents (`thP_kids i K` and
 `oblP_kids k K` are `parP_kids` at a thread and at an obligation), `alwaysI`/`untilI`/`finallyI`
-temporal formulas (iProps), `itProp_*` internalized trace properties (a `trProp`, the external reading, with its `tiProp`, the internal reading, and adequacy), and `tr_*` meta-level trace
+temporal formulas (iProps), `itProp_*` internalized trace properties (a `trProp`, the external reading, with its `trIProp`, the internal reading, and adequacy), and `tr_*` meta-level trace
 predicates.
 
 ### Predicates (Fig. 1, §3–§5)
@@ -171,7 +171,7 @@ predicates.
 | Paper | Rocq | File (under `lantana/`) |
 |---|---|---|
 | `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `cfg`, `thread_pool`, `thread_step` / `thread_done`, `trace`, `behavior_cfg` / `behavior_tp` (please ignore `κ : list (observation Λ)`, which is never used) | `program_logic/language.v` |
-| temporal properties `Φ, Ψ` and `⟦·⟧_t` | semantic trace properties `itProp`, trace reading `itProp_external` (and step-indexed reading `itProp_internal`); `Always` = `itProp_always`, `Until` = `itProp_until`, `Finally` = `itProp_finally`; meta-level trace predicates `tr_always` / `tr_until` / `tr_eventually` | `trace/itprop.v`, `trace/trace_prop.v` |
+| temporal properties `Φ, Ψ` and `⟦·⟧_t` | semantic trace properties `itProp`, trace reading `itProp_external` (and step-indexed reading `itProp_internal`); `Always` = `itProp_always`, `Until` = `itProp_until`, `Finally` = `itProp_finally`; meta-level trace predicates `tr_always` / `tr_until` / `tr_eventually` | `trace/itprop.v`, `trace/trace_prop.v` (rules: `trace/itprop_rules.v`, `trace/trace_prop_rules.v`) |
 | `Fair` (fair scheduling) | `fair_scheduling` | `trace/trace_prop.v` |
 | logical assertions `φ` and `⟦·⟧_l` | no syntax: temporal formulas are `iProp`s; guarantee `P ⊨ₜ G` (`temporal P G`), inferred by `IntoTemporal` | `trace/guarantee.v`, `trace/guarantee_infer.v` (`IntoTemporal`) |
 | `lift` | `itProp_sem P`, the canonical trace property guaranteed by `P` (`temporal_sem`); `itsem P`, the one inferred by `IntoTemporal` | `trace/guarantee.v` (`itProp_sem`), `trace/guarantee_infer.v` (`itsem`) |

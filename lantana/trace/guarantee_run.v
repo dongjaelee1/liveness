@@ -203,12 +203,12 @@ Section loops.
     ∀ h n σ Θ κs g v Ω W τf γ',
       ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω W ∧ hist_trace h τf⌝ -∗
       history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-      ti_always (itProp_internal G) (ti_pure True) (n, τf).
+      trI_always (itProp_internal G) (trI_pure True) (n, τf).
   Proof.
     iIntros "#ST #Hj #Hγ" (h n σ Θ κs g v Ω W τf γ') "%H Sys".
     iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ' H).
     destruct H as (Hrn& BEH& FS& LB& HIST).
-    rewrite ti_always_unfold /ti_always_pre.
+    rewrite trI_always_unfold /trI_always_pre.
     iApply (sys_step_iter Sys 0 _ _ _ _ _ _ _ _ _ _ _ (tguar G n) with "ST [%] Sys [] []").
     { split_and!; done. }
     { iIntros (l) "#B". iApply (bundle_always_cert with "B Hj Hγ []"); first lia.
@@ -234,7 +234,7 @@ Section loops.
     destruct Hf as (BEH& FS& LB& HIST).
     iDestruct (bundle_always_cert with "B Hj Hγ []") as "#C"; first done.
     { iIntros (->). done. }
-    rewrite /= ti_always_unfold /ti_always_pre.
+    rewrite /= trI_always_unfold /trI_always_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_". iModIntro.
     iSplit; [|iSplit; first done].
@@ -252,14 +252,14 @@ Section loops.
 
       Once the obligation is discharged, the record of the right formula at the current
       position is at hand: step, and decide with it. *)
-  Lemma until_run_discharged (Sys : sysT) (fP : tiProp Λ Σ) G2 a h n σ Θ κs g v Ω W τf γ :
+  Lemma until_run_discharged (Sys : sysT) (fP : trIProp Λ Σ) G2 a h n σ Θ κs g v Ω W τf γ :
     sys_step Sys -∗ tguar G2 n -∗
     ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-    ti_until Ord.lt a fP (itProp_internal G2) (n, τf).
+    trI_until Ord.lt a fP (itProp_internal G2) (n, τf).
   Proof.
     iIntros "#ST #TQ %H Sys". destruct H as (BEH& FS& LB& HIST).
-    rewrite ti_until_unfold /ti_until_pre.
+    rewrite trI_until_unfold /trI_until_pre.
     iApply (sys_step_iter Sys 0 _ _ _ _ _ _ _ _ _ _ _ True%I with "ST [%] Sys [] []").
     { split_and!; done. }
     { by iIntros (l) "_". }
@@ -279,14 +279,14 @@ Section loops.
       ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
        hist_trace h τf ∧ Ω !! k = Some (obl_assigned fu o)⌝ -∗
       history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-      ti_until Ord.lt (Ord.S (fair_sched_fun γ o fu)) (itProp_internal G1) (itProp_internal G2) (n, τf).
+      trI_until Ord.lt (Ord.S (fair_sched_fun γ o fu)) (itProp_internal G1) (itProp_internal G2) (n, τf).
   Proof.
     iIntros "#ST #Hj #HγP #HγQ #OI". iIntros (h n σ Θ κs g v Ω W τf γ fu o) "%H Sys".
     iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ fu o H).
     destruct H as (Hrn& BEH& FS& LB& HIST& Hk).
     iAssert (event_obl v (n, Ω) k (obl_assigned fu o))%I as "#EA".
     { iDestruct "Sys" as "(_& MI& _)". by iApply (model_interp_event_obl with "MI"). }
-    rewrite ti_until_unfold /ti_until_pre.
+    rewrite trI_until_unfold /trI_until_pre.
     iApply (sys_step_iter Sys 1 _ _ _ _ _ _ _ _ _ _ _
               ((tguar G1 n ∨ tguar G2 n) ∨
                (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ tguar G2 n'))%I
@@ -362,8 +362,8 @@ Section loops.
     (* the certificate of this until for [n]: from the bundle, or its allocation records *)
     iDestruct (bundle_until_cert with "B Hj HγP HγQ []") as "#C"; first done.
     { iIntros (->). iNext. by iLeft. }
-    rewrite /= /ti_exist. iExists (Ord.S (Ord.S (fair_sched_ub fu))).
-    rewrite ti_until_unfold /ti_until_pre.
+    rewrite /= /trI_exist. iExists (Ord.S (Ord.S (fair_sched_ub fu))).
+    rewrite trI_until_unfold /trI_until_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "close".
     rewrite (ALC_credits _ _ (Ord.from_nat 1) (|={∅,⊤}=> _)%I). iApply ALC_intro. iIntros "LC".

@@ -81,126 +81,17 @@ Definition tr_next {Λ : language} : trProp Λ → trProp Λ :=
 Notation "□ P" := (tr_always P) (at level 20, right associativity) : tr_scope.
 Notation "◇ P" := (tr_eventually P) (at level 20, right associativity) : tr_scope.
 Notation "○ P" := (tr_next P) (at level 20, right associativity) : tr_scope.
+Notation "P 'Uₜ' Q" := (tr_until P Q) (at level 60, right associativity) : tr_scope.
 
-(** ** Trace entailment [R ⊆ S], and the laws of LTL
+(** ** Trace entailment [R ⊆ S]
 
-    Trace predicates are ordinary predicates on traces, so every valid law of LTL is
-    provable from the definitions (classically). The laws below are the ones that proofs
-    about exported properties use; all are entailments, so they compose by
-    [transitivity]. *)
+    The rules are in trace_prop_rules.v. *)
 Definition tr_le {Λ : language} (R S : trProp Λ) : Prop := ∀ τ, R τ → S τ.
 Global Instance tr_subseteq {Λ : language} : SubsetEq (trProp Λ) := tr_le.
-Global Instance tr_le_preorder {Λ : language} : PreOrder (⊆@{trProp Λ}).
-Proof. split; [by intros R τ|intros R S T HRS HST τ HR; by apply HST, HRS]. Qed.
-
 (** Entailment is the validity of the implication: [⊆] is the meta-level [⊨] of LTL, [→] the
     connective. *)
 Lemma tr_le_impl {Λ : language} (R S : trProp Λ) : R ⊆ S ↔ ∀ τ, (R → S)%R τ.
 Proof. done. Qed.
-
-Ltac tr_unfold :=
-  unfold subseteq, tr_subseteq, tr_le, tr_next, tr_eventually, tr_until, tr_always, tr_exist,
-    tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_state, ts_emb, ts_state, trace_now in *; simpl in *.
-
-Section tr_laws.
-  Context {Λ : language}.
-  Implicit Types R S X : trProp Λ.
-
-  (** Always: reflexive, transitive, monotone, distributes over [∧], and is the greatest
-      fixpoint of [R ∧ ○ -] ([tr_always_coind]). *)
-  Lemma tr_always_elim R : (□ R)%R ⊆ R.
-  Proof. intros [n τf]. tr_unfold. intros H. apply H. lia. Qed.
-  Lemma tr_always_next R : (□ R)%R ⊆ (○ □ R)%R.
-  Proof. intros [n τf]. tr_unfold. intros H m Hm. apply H. lia. Qed.
-  Lemma tr_always_idemp R : (□ R)%R ⊆ (□ □ R)%R.
-  Proof. intros [n τf]. tr_unfold. intros H m Hm m' Hm'. apply H. lia. Qed.
-  Lemma tr_always_mono R S : R ⊆ S → (□ R)%R ⊆ (□ S)%R.
-  Proof. intros HRS [n τf]. tr_unfold. intros H m Hm. apply HRS, H. lia. Qed.
-  Lemma tr_always_and R S : (□ (R ∧ S))%R ⊆ (□ R ∧ □ S)%R.
-  Proof. intros [n τf]. tr_unfold. intros H. split; intros m Hm; by apply H. Qed.
-  Lemma tr_and_always R S : (□ R ∧ □ S)%R ⊆ (□ (R ∧ S))%R.
-  Proof. intros [n τf]. tr_unfold. intros [H1 H2] m Hm. auto. Qed.
-  Lemma tr_always_impl R S : (□ (R → S) ∧ □ R)%R ⊆ (□ S)%R.
-  Proof. intros [n τf]. tr_unfold. intros [H1 H2] m Hm. auto. Qed.
-  Lemma tr_always_coind R X : X ⊆ (R ∧ ○ X)%R → X ⊆ (□ R)%R.
-  Proof.
-    intros HX [n τf]. tr_unfold. intros Hx m Hm.
-    assert (∀ d n', X (n', τf) → R (n' + d, τf)) as Hd.
-    { induction d as [|d IH]; intros n' Hn'.
-      - rewrite Nat.add_0_r. by apply HX.
-      - destruct (HX (n', τf) Hn') as [_ Hnext]. replace (n' + S d) with (S n' + d) by lia.
-        apply IH. exact Hnext. }
-    replace m with (n + (m - n)) by lia. by apply Hd.
-  Qed.
-
-  (** Until: the least fixpoint of [S ∨ (R ∧ ○ -)] ([tr_until_now], [tr_until_step],
-      [tr_until_ind]), monotone, and stronger than finally. *)
-  Lemma tr_until_now R S : S ⊆ tr_until R S.
-  Proof. intros [n τf]. tr_unfold. intros H. exists n. split_and!; [lia|done|lia]. Qed.
-  Lemma tr_until_step R S : (R ∧ ○ tr_until R S)%R ⊆ tr_until R S.
-  Proof.
-    intros [n τf]. tr_unfold. intros [HR (m & Hm & HS & HRs)]. exists m. split_and!; [lia|done|].
-    intros l Hl. destruct (decide (l = n)) as [->|]; [done|apply HRs; lia].
-  Qed.
-  Lemma tr_until_unfold R S : tr_until R S ⊆ (S ∨ (R ∧ ○ tr_until R S))%R.
-  Proof.
-    intros [n τf]. tr_unfold. intros (m & Hm & HS & HRs).
-    destruct (decide (m = n)) as [->|]; first by left.
-    right. split; first (apply HRs; lia). exists m. split_and!; [lia|done|]. intros l Hl. apply HRs. lia.
-  Qed.
-  Lemma tr_until_ind R S X : S ⊆ X → (R ∧ ○ X)%R ⊆ X → tr_until R S ⊆ X.
-  Proof.
-    intros HS HR [n τf]. tr_unfold. intros (m & Hm & HSm & HRs).
-    assert (∀ d n', n' + d = m → (∀ l, n' ≤ l < m → R (l, τf)) → X (n', τf)) as Hd.
-    { induction d as [|d IH]; intros n' Hd HRs'.
-      - rewrite Nat.add_0_r in Hd. subst. by apply HS.
-      - apply HR. split; first (apply HRs'; lia).
-        change (X (Datatypes.S n', τf)). apply IH; first lia. intros l Hl. apply HRs'. lia. }
-    apply (Hd (m - n) n); [lia|exact HRs].
-  Qed.
-  Lemma tr_until_mono R R' S S' : R ⊆ R' → S ⊆ S' → tr_until R S ⊆ tr_until R' S'.
-  Proof.
-    intros HR HS [n τf]. tr_unfold. intros (m & Hm & HSm & HRs). exists m. split_and!; [lia|by apply HS|].
-    intros l Hl. apply HR, HRs. lia.
-  Qed.
-  Lemma tr_until_finally R S : tr_until R S ⊆ (◇ S)%R.
-  Proof. apply tr_until_mono; [by intros ?|done]. Qed.
-
-  (** Finally. *)
-  Lemma tr_finally_intro S : S ⊆ (◇ S)%R.
-  Proof. apply tr_until_now. Qed.
-  Lemma tr_finally_mono S S' : S ⊆ S' → (◇ S)%R ⊆ (◇ S')%R.
-  Proof. intros HS. by apply tr_until_mono. Qed.
-  Lemma tr_finally_idemp S : (◇ ◇ S)%R ⊆ (◇ S)%R.
-  Proof.
-    intros [n τf]. tr_unfold. intros (m & Hm & (m' & Hm' & HS & _) & _). exists m'. split_and!; [lia|done|done].
-  Qed.
-  Lemma tr_finally_or S S' : (◇ (S ∨ S'))%R ⊆ (◇ S ∨ ◇ S')%R.
-  Proof.
-    intros [n τf]. tr_unfold. intros (m & Hm & [HS|HS] & _); [left|right]; exists m; split_and!; done.
-  Qed.
-  Lemma tr_always_finally_resp R S : (□ (R → ◇ S) ∧ ◇ R)%R ⊆ (◇ S)%R.
-  Proof.
-    intros [n τf]. tr_unfold. intros [H (m & Hm & HR & _)].
-    destruct (H m Hm HR) as (m' & Hm' & HS & _). exists m'. split_and!; [lia|done|done].
-  Qed.
-  Lemma tr_always_finally_mono R S : R ⊆ S → (□ ◇ R)%R ⊆ (□ ◇ S)%R.
-  Proof. intros HRS. by apply tr_always_mono, tr_finally_mono. Qed.
-
-  (** Duality: [□] and [◇] are each other's negation (classically). *)
-  Lemma tr_not_finally R : (□ (R → ⌜False⌝))%R ⊆ (◇ R → ⌜False⌝)%R.
-  Proof. intros [n τf]. tr_unfold. intros H (m & Hm & HR & _). by apply (H m). Qed.
-  Lemma tr_not_always R : (◇ R → ⌜False⌝)%R ⊆ (□ (R → ⌜False⌝))%R.
-  Proof. intros [n τf]. tr_unfold. intros H m Hm HR. apply H. exists m. split_and!; done. Qed.
-  Lemma tr_not_always_finally R : (□ R → ⌜False⌝)%R ⊆ (◇ (R → ⌜False⌝))%R.
-  Proof.
-    intros [n τf]. tr_unfold. intros H.
-    destruct (Classical_Prop.classic (∃ m, n ≤ m ∧ ¬ R (m, τf))) as [(m & Hm & HR)|Hno].
-    - exists m. split_and!; done.
-    - exfalso. apply H. intros m Hm. destruct (Classical_Prop.classic (R (m, τf))); [done|].
-      exfalso. apply Hno. by exists m.
-  Qed.
-End tr_laws.
 
 (** ** Fixpoints of trace predicates *)
 Section tr_fixpoints.
@@ -212,27 +103,6 @@ Section tr_fixpoints.
   Definition tr_gfp Φ : trProp Λ := λ τ, ∃ R, (∀ τ', R τ' → Φ R τ') ∧ R τ.
   Definition tr_lfp Φ : trProp Λ := λ τ, ∀ R, (∀ τ', Φ R τ' → R τ') → R τ.
 
-  Lemma tr_gfp_coind Φ R : (∀ τ, R τ → Φ R τ) → ∀ τ, R τ → tr_gfp Φ τ.
-  Proof. intros HR τ Hτ. by exists R. Qed.
-  Lemma tr_gfp_unfold_l Φ : tr_mono Φ → ∀ τ, tr_gfp Φ τ → Φ (tr_gfp Φ) τ.
-  Proof.
-    intros Hm τ (R & HR & Hτ). eapply Hm; last by apply HR. intros τ' Hτ'. by exists R.
-  Qed.
-  Lemma tr_gfp_unfold_r Φ : tr_mono Φ → ∀ τ, Φ (tr_gfp Φ) τ → tr_gfp Φ τ.
-  Proof.
-    intros Hm τ Hτ. exists (Φ (tr_gfp Φ)). split; last done.
-    intros τ' Hτ'. eapply Hm; [|exact Hτ']. by apply tr_gfp_unfold_l.
-  Qed.
-
-  Lemma tr_lfp_ind Φ R : (∀ τ, Φ R τ → R τ) → ∀ τ, tr_lfp Φ τ → R τ.
-  Proof. intros HR τ H. by apply H. Qed.
-  Lemma tr_lfp_unfold_r Φ : tr_mono Φ → ∀ τ, Φ (tr_lfp Φ) τ → tr_lfp Φ τ.
-  Proof. intros Hm τ Hτ R HR. apply HR. eapply Hm; [|exact Hτ]. intros τ' H'. by apply H'. Qed.
-  Lemma tr_lfp_unfold_l Φ : tr_mono Φ → ∀ τ, tr_lfp Φ τ → Φ (tr_lfp Φ) τ.
-  Proof.
-    intros Hm τ H. apply H. intros τ' H'. eapply Hm; [|exact H']. intros τ'' H''.
-    by apply tr_lfp_unfold_r.
-  Qed.
 End tr_fixpoints.
 
 (** ** Fair scheduling

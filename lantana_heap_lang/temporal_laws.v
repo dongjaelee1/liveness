@@ -12,6 +12,10 @@ Notation "l ↦ dq v" := (itProp_state (pointsto_sat l dq v))
 Notation "'exits' v @ i" := (itProp_state (thread_expr_sat i [] (of_val v)))
   (at level 20, v, i at level 1, format "exits  v @ i") : itProp_scope.
 
+(** The state predicate of a freed location, and its trace atom. *)
+Definition freed_sat (l : loc) : state → thread_pool heap_lang → Prop := λ σ _, heap σ !! l = Some None.
+Definition freed_tr (l : loc) : trProp heap_lang := tr_state (freed_sat l).
+
 Section laws.
   Context `{!heapGS Σ}.
 
@@ -23,8 +27,8 @@ Section laws.
   (* TODO: [StateFact] instances for the invariant heap ([l ↦_I v]). *)
 
   (** A freed location stays freed. *)
-  Definition freed_itProp (l : loc) : itProp heap_lang Σ := itProp_state (λ σ _, heap σ !! l = Some None).
-  Global Instance freed_state_fact l q : StateFact (freed l q) (λ σ _, heap σ !! l = Some None).
+  Definition freed_itProp (l : loc) : itProp heap_lang Σ := itProp_state (freed_sat l).
+  Global Instance freed_state_fact l q : StateFact (freed l q) (freed_sat l).
   Proof. intros σ Θ κs. iIntros "[(H& _) F]". iApply (gen_heap_valid with "H F"). Qed.
 
   Lemma freed_temporal (l : loc) q : ⊢ freed l q ⊨ₜ freed_itProp l.
@@ -34,15 +38,35 @@ Section laws.
   Local Lemma ex_pointsto_temporal l dq v : ⊢ l ↦{dq} v ⊨ₜ (l ↦{dq} v).
   Proof. apply (into_temporal _ _). Qed.
 
+  (** ** Rules for the atoms, on traces *)
+
+  (** Two points-to atoms on the same location agree on the value; the fraction plays no
+      role on traces; a location is not both allocated and freed. *)
+  Lemma tr_pointsto_agree l dq1 dq2 v1 v2 : ((l ↦{dq1} v1) ∧ (l ↦{dq2} v2))%R ⊆ (⌜v1 = v2⌝)%R.
+  Proof.
+    etrans; first apply tr_state_and. apply tr_state_pure.
+    intros σ Θ [H1 H2]. rewrite /pointsto_sat in H1 H2. by simplify_eq.
+  Qed.
+  Lemma tr_pointsto_frac l dq dq' v : (l ↦{dq} v)%R ⊆ (l ↦{dq'} v)%R.
+  Proof. by intros τ. Qed.
+  Lemma tr_pointsto_freed l dq v : ((l ↦{dq} v) ∧ freed_tr l)%R ⊆ (⌜False⌝)%R.
+  Proof.
+    etrans; first apply tr_state_and. apply tr_state_pure.
+    intros σ Θ [H1 H2]. rewrite /pointsto_sat in H1. rewrite /freed_sat in H2. by simplify_eq.
+  Qed.
+
   (** Implications are exported on traces ([temporal_cast]): the inferred guarantee of a
-      case split on the value of [l], read on traces, implies "[l ↦ v0] now → [G0]". *)
+      case split on the value of [l] implies "[l ↦ v0] now → [G0]", by the rules of
+      trace_prop_rules.v and the atom rule above. *)
   Lemma ex_impl_pointsto l v0 v1 (P0 P1 : iProp Σ) G0 `{!IntoTemporal P0 G0} :
     v0 ≠ v1 →
     tr_sem ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊆ ((l ↦ v0) → itProp_external G0)%R.
   Proof.
     intros Hv. etrans; first apply (into_trace _ _).
-    intros [n τf]. tr_unfold. destruct (τf n) as (((Θ&σ)&?)&?).
-    intros [[H0 HG]|[H1 _]] H0'; first done. exfalso. rewrite /pointsto_sat in H0' H1. simplify_eq.
+    apply tr_or_elim; apply tr_impl_intro.
+    - etrans; [apply tr_and_elim_l|apply tr_and_elim_r].
+    - etrans; [apply tr_and_mono; [apply tr_and_elim_l|reflexivity]|].
+      etrans; first apply tr_pointsto_agree. apply tr_pure_elim. intros Heq. destruct (Hv (eq_sym Heq)).
   Qed.
 
   (** Inference is compositional, hence incomplete: [l ↦ v ∗ l ↦ v] is inconsistent, so it

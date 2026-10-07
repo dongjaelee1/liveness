@@ -1079,21 +1079,18 @@ Section trace.
       served out ([curr ↦ c], [next ↦ n], [c < n]), [curr] is eventually incremented. So
       every holder of the lock eventually releases it. *)
   Definition release_progress (next curr : loc) : trProp heap_lang :=
-    tr_always (λ τ, ∀ n c : Z,
-      tr_pointsto next #n τ → tr_pointsto curr #c τ → (c < n)%Z →
-      tr_eventually (tr_pointsto curr #(c + 1)) τ).
+    (□ (∀ n c : Z, tr_pointsto next #n → tr_pointsto curr #c → ⌜(c < n)%Z⌝ →
+                   ◇ tr_pointsto curr #(c + 1)))%R.
 
-  Lemma lock_inv_alive_itProp_release_progress {Σ} next curr τ :
-    itProp_external (itProp_always (lock_inv_alive_itProp (Σ:=Σ) next curr)) τ → release_progress next curr τ.
+  Lemma lock_inv_alive_itProp_release_progress {Σ} next curr :
+    itProp_external (itProp_always (lock_inv_alive_itProp (Σ:=Σ) next curr)) ⊆ release_progress next curr.
   Proof.
-    destruct τ as [k τf]. intros Hal m Hm n c Hn Hc Hlt.
-    destruct (Hal m Hm) as (n' & c' & Hn' & Hc' & _ & _ & _ & Hb & _ & _ & Hcase).
-    simpl in *. unfold tr_pointsto, tr_state, ts_emb, ts_state, pointsto_sat, tr_pure in *. simpl in *.
-    destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *.
-    rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
-    destruct Hcase as [[? _] | [_ (_ & _ & _ & Hfin & _)]]; [lia|].
-    destruct Hfin as (m' & Hm' & [Hcur _] & _). exists m'. split_and!; [done|done|].
-    intros. done.
+    rewrite /lock_inv_alive_itProp. etrans; first apply (itProp_ext_of _ _). apply tr_always_mono.
+    intros τ (n' & c' & Hn' & Hc' & _ & _ & _ & Hb%tr_pure_at & _ & _ & Hcase) n c Hn Hc Hlt%tr_pure_at.
+    pose proof (tr_pointsto_agree next _ _ _ _ τ (conj Hn' Hn)) as [= <-].
+    pose proof (tr_pointsto_agree curr _ _ _ _ τ (conj Hc' Hc)) as [= <-].
+    destruct Hcase as [[?%tr_pure_at _] | [_ (_ & _ & _ & Hfin & _)]]; first lia.
+    refine (tr_finally_mono _ _ _ τ Hfin). etrans; [apply tr_and_elim_l|apply tr_pointsto_frac].
   Qed.
 
   Lemma alive_fair_lock_release_progress {Σ} tl τ :
@@ -1101,26 +1098,24 @@ Section trace.
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ release_progress next curr τ.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
-    by eapply (lock_inv_alive_itProp_release_progress (Σ:=Σ)).
+    exact (lock_inv_alive_itProp_release_progress (Σ:=Σ) next curr τ Hal).
   Qed.
 
   (** Only the next ticket carries a [finally] (the releasing thread allocates its
       obligation), so starvation freedom also needs that [next] never decreases: the code
       ensures it, the guarantee does not record it (see ticket_lock_mono.v). *)
   Definition next_monotone (next : loc) : trProp heap_lang :=
-    tr_always (λ τ, ∀ n : Z, tr_pointsto next #n τ →
-      tr_always (λ τ', ∃ n' : Z, tr_pointsto next #n' τ' ∧ (n ≤ n')%Z) τ).
+    (□ (∀ n : Z, tr_pointsto next #n → □ (∃ n' : Z, tr_pointsto next #n' ∧ ⌜(n ≤ n')%Z⌝)))%R.
 
   (** Starvation freedom: every pending ticket [t] ([c < t ≤ n]) is eventually served. *)
   Definition starvation_free (next curr : loc) : trProp heap_lang :=
-    tr_always (λ τ, ∀ n c t : Z,
-      tr_pointsto next #n τ → tr_pointsto curr #c τ → (c < t ≤ n)%Z →
-      tr_eventually (tr_pointsto curr #t) τ).
+    (□ (∀ n c t : Z, tr_pointsto next #n → tr_pointsto curr #c → ⌜(c < t ≤ n)%Z⌝ →
+                     ◇ tr_pointsto curr #t))%R.
 
   Lemma release_progress_starvation_free next curr τ :
     release_progress next curr τ → next_monotone next τ → starvation_free next curr τ.
   Proof.
-    destruct τ as [k τf]. intros Hrp Hmon m Hm n c t Hn Hc Ht.
+    destruct τ as [k τf]. intros Hrp Hmon m Hm n c t Hn Hc Ht%tr_pure_at.
     (* By induction on [t - c0], from any time at which [curr ↦ c0 < t ≤ next]. *)
     cut (∀ d m0 (c0 : Z), Z.to_nat (t - c0) = d → k ≤ m0 → tr_pointsto curr #c0 (m0, τf) →
            (c0 < t)%Z → (∃ n0 : Z, tr_pointsto next #n0 (m0, τf) ∧ (t ≤ n0)%Z) →
@@ -1129,9 +1124,9 @@ Section trace.
         as (m' & Hm' & Ht'). exists m'. split_and!; [done|done|]. intros. done. }
     intros d. induction d as [d IH] using (well_founded_induction lt_wf).
     intros m0 c0 Hd Hm0 Hc0 Hlt (n0 & Hn0 & Htn0).
-    destruct (Hrp m0 Hm0 n0 c0 Hn0 Hc0 ltac:(lia)) as (m1 & Hm1 & Hc1 & _).
+    destruct (Hrp m0 Hm0 n0 c0 Hn0 Hc0 (ltac:(lia) : (c0 < n0)%Z)) as (m1 & Hm1 & Hc1 & _).
     destruct (decide (c0 + 1 = t)%Z) as [<-|Hne]; first by exists m1.
-    destruct (Hmon m0 Hm0 n0 Hn0 m1 Hm1) as (n1 & Hn1 & Hle).
+    destruct (Hmon m0 Hm0 n0 Hn0 m1 Hm1) as (n1 & Hn1 & Hle%tr_pure_at).
     destruct (IH (Z.to_nat (t - (c0 + 1))) ltac:(lia) m1 (c0 + 1)%Z eq_refl ltac:(lia) Hc1 ltac:(lia))
       as (m' & Hm' & Ht'); first (exists n1; split; [done|lia]).
     exists m'. split; [lia|done].

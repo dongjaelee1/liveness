@@ -1133,36 +1133,32 @@ End proof.
 Section trace.
   Local Notation tr_pointsto := ticket_lock.tr_pointsto.
 
-  Lemma lock_inv_alive_itProp_release_progress {Σ} next curr τ :
-    itProp_external (itProp_always (lock_inv_alive_itProp (Σ:=Σ) next curr)) τ →
-    ticket_lock.release_progress next curr τ.
+  Lemma lock_inv_alive_itProp_release_progress {Σ} next curr :
+    itProp_external (itProp_always (lock_inv_alive_itProp (Σ:=Σ) next curr)) ⊆
+    ticket_lock.release_progress next curr.
   Proof.
-    destruct τ as [k τf]. intros Hal m Hm n c Hn Hc Hlt.
-    destruct (Hal m Hm) as (n' & c' & Hn' & _ & Hc' & _ & _ & _ & Hb & _ & _ & Hcase).
-    simpl in *. unfold tr_pointsto, tr_state, ts_emb, ts_state, pointsto_sat, tr_pure in *. simpl in *.
-    destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *.
-    rewrite Hn in Hn'. rewrite Hc in Hc'. simplify_eq.
-    destruct Hcase as [[? _] | [_ (_ & _ & _ & Hfin & _)]]; [lia|].
-    destruct Hfin as (m' & Hm' & [Hcur _] & _). exists m'. split_and!; [done|done|].
-    intros. done.
+    rewrite /lock_inv_alive_itProp. etrans; first apply (itProp_ext_of _ _). apply tr_always_mono.
+    intros τ (n' & c' & Hn' & _ & Hc' & _ & _ & _ & Hb%tr_pure_at & _ & _ & Hcase) n c Hn Hc Hlt%tr_pure_at.
+    pose proof (tr_pointsto_agree next _ _ _ _ τ (conj Hn' Hn)) as [= <-].
+    pose proof (tr_pointsto_agree curr _ _ _ _ τ (conj Hc' Hc)) as [= <-].
+    destruct Hcase as [[?%tr_pure_at _] | [_ (_ & _ & _ & Hfin & _)]]; first lia.
+    refine (tr_finally_mono _ _ _ τ Hfin). etrans; [apply tr_and_elim_l|apply tr_pointsto_frac].
   Qed.
 
   (** [next] never decreases: at each position, the mono cell's registration for the current
       [n] gives [next ≥ n] or [next] freed from then on, and the alive branch keeps [next]
       allocated. *)
-  Lemma lock_inv_alive_itProp_next_monotone {Σ} next curr τ :
-    itProp_external (itProp_always (lock_inv_alive_itProp (Σ:=Σ) next curr)) τ → ticket_lock.next_monotone next τ.
+  Lemma lock_inv_alive_itProp_next_monotone {Σ} next curr :
+    itProp_external (itProp_always (lock_inv_alive_itProp (Σ:=Σ) next curr)) ⊆ ticket_lock.next_monotone next.
   Proof.
-    destruct τ as [k τf]. intros Hal m Hm n Hn m' Hm'.
+    rewrite /lock_inv_alive_itProp. etrans; first apply (itProp_ext_of _ _).
+    intros [k τf] Hal m Hm n Hn m' Hm'.
     destruct (Hal m Hm) as (n0 & c0 & Hn0 & Hge & _).
-    destruct (Hal m' ltac:(simpl in *; lia)) as (n1 & c1 & Hn1 & _).
+    destruct (Hal m' ltac:(lia)) as (n1 & c1 & Hn1 & _).
+    pose proof (tr_pointsto_agree next _ _ _ _ (m, τf) (conj Hn Hn0)) as [= ->].
     destruct (Hge m' Hm') as [(w & Hw & Hnw) | Hfr].
-    - assert (n = n0) as ->.
-      { simpl in *. unfold tr_pointsto, tr_state, ts_emb, ts_state, pointsto_sat in *. simpl in *.
-        destruct (τf m) as [[[Θ σ] ?] ?]. simpl in *. rewrite Hn in Hn0. by simplify_eq. }
-      exists w. split; [exact Hnw|done].
-    - exfalso. simpl in *. unfold tr_state, ts_emb, ts_state, pointsto_sat in *. simpl in *.
-      destruct (τf m') as [[[Θ σ] ?] ?]. simpl in *. by rewrite Hn1 in Hfr.
+    - exists w. split; [exact Hnw|exact Hw].
+    - exfalso. exact (tr_pointsto_freed next _ _ (m', τf) (conj Hn1 Hfr)).
   Qed.
 
   Lemma alive_fair_lock_release_progress {Σ} tl τ :
@@ -1170,7 +1166,7 @@ Section trace.
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ ticket_lock.release_progress next curr τ.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
-    by eapply (lock_inv_alive_itProp_release_progress (Σ:=Σ)).
+    exact (lock_inv_alive_itProp_release_progress (Σ:=Σ) next curr τ Hal).
   Qed.
 
   Lemma alive_fair_lock_next_monotone {Σ} tl τ :
@@ -1178,7 +1174,7 @@ Section trace.
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ ticket_lock.next_monotone next τ.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
-    by eapply (lock_inv_alive_itProp_next_monotone (Σ:=Σ)).
+    exact (lock_inv_alive_itProp_next_monotone (Σ:=Σ) next curr τ Hal).
   Qed.
 
   (** Hence a lock that cannot be deleted is starvation free, with no hypothesis about [next]. *)
@@ -1188,8 +1184,8 @@ Section trace.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
     apply ticket_lock.release_progress_starvation_free.
-    - by eapply (lock_inv_alive_itProp_release_progress (Σ:=Σ)).
-    - by eapply (lock_inv_alive_itProp_next_monotone (Σ:=Σ)).
+    - exact (lock_inv_alive_itProp_release_progress (Σ:=Σ) next curr τ Hal).
+    - exact (lock_inv_alive_itProp_next_monotone (Σ:=Σ) next curr τ Hal).
   Qed.
 
 End trace.

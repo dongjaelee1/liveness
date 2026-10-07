@@ -241,20 +241,29 @@ End proof.
 Section trace.
 
   (** The cell [b] holds [v] in the current state of the trace (any fraction). *)
-  Definition tr_cell (b : loc) (v : val) : trProp heap_lang :=
-    λ τ, ∃ dq, tr_state (pointsto_sat b dq v) τ.
+  Definition tr_cell (b : loc) (v : val) : trProp heap_lang := (∃ dq, b ↦{dq} v)%R.
+
+  Lemma tr_cell_intro b dq v : (b ↦{dq} v)%R ⊆ tr_cell b v.
+  Proof. apply (tr_exist_intro (λ dq, (b ↦{dq} v)%R) dq). Qed.
 
   (** At all times the cell is empty or holds a task. *)
   Definition handoff_tr (b : loc) : trProp heap_lang :=
-    tr_always (λ τ, tr_cell b NONEV τ ∨ ∃ f a : val, tr_cell b (SOMEV (f, a)) τ).
+    (□ (tr_cell b NONEV ∨ ∃ f a : val, tr_cell b (SOMEV (f, a))))%R.
 
-  Lemma handoff_inv_itProp_ext {Σ} b τ :
-    itProp_external (itProp_always (handoff_inv_itProp (Σ:=Σ) b)) τ → handoff_tr b τ.
+  Lemma handoff_inv_itProp_ext {Σ} b :
+    itProp_external (itProp_always (handoff_inv_itProp (Σ:=Σ) b)) ⊆ handoff_tr b.
   Proof.
-    destruct τ as [k τf]. intros Hal m Hm. destruct (Hal m Hm) as [[Hb _]|[(f & a & Hb & _)|(f & a & Hb & _)]].
-    - left. exists (DfracOwn (1/2)). exact Hb.
-    - right. exists f, a, (DfracOwn 1). exact Hb.
-    - right. exists f, a, (DfracOwn 1). exact Hb.
+    rewrite /handoff_inv_itProp. etrans; first apply (itProp_ext_of _ _). apply tr_always_mono.
+    apply tr_or_elim; last apply tr_or_elim.
+    - apply tr_or_intro_l. etrans; [apply tr_and_elim_l|apply tr_cell_intro].
+    - apply tr_or_intro_r. apply tr_exist_elim => f. apply tr_exist_elim => a.
+      etrans; first apply tr_and_elim_l. etrans; first apply tr_cell_intro.
+      etrans; [apply (tr_exist_intro (λ a, tr_cell b (SOMEV (f, a))) a)|
+               apply (tr_exist_intro (λ f, (∃ a : val, tr_cell b (SOMEV (f, a)))%R) f)].
+    - apply tr_or_intro_r. apply tr_exist_elim => f. apply tr_exist_elim => a.
+      etrans; first apply tr_and_elim_l. etrans; first apply tr_cell_intro.
+      etrans; [apply (tr_exist_intro (λ a, tr_cell b (SOMEV (f, a))) a)|
+               apply (tr_exist_intro (λ f, (∃ a : val, tr_cell b (SOMEV (f, a)))%R) f)].
   Qed.
 
 End trace.

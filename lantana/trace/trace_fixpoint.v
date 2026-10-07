@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.trace Require Export itprop.
+From lantana.trace Require Export itprop_rules.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
 From lantana.algebra Require Import ordinal_existential_properties axioms.
@@ -67,10 +67,10 @@ Section connectives.
 
   Lemma itProp_exist_lub {X} `{!TypeExistentialProperty X ordI} (G : X → itProp Λ Σ) G' :
     (∀ x, itProp_le (G x) G') → itProp_le (itProp_exist G) G'.
-  Proof. intros HG ? τ. rewrite /= /ti_exist. iIntros "[%x H]". by iApply HG. Qed.
+  Proof. intros HG ? τ. rewrite /= /trI_exist. iIntros "[%x H]". by iApply HG. Qed.
   Lemma itProp_exist_ub {X} `{!TypeExistentialProperty X ordI} (G : X → itProp Λ Σ) x :
     itProp_le (G x) (itProp_exist G).
-  Proof. intros ? τ. rewrite /= /ti_exist. iIntros "H". by iExists x. Qed.
+  Proof. intros ? τ. rewrite /= /trI_exist. iIntros "H". by iExists x. Qed.
 
 End connectives.
 
@@ -185,11 +185,11 @@ Section cont_instances.
   Global Instance itProp_cont_id : ItPropCont (Λ:=Λ) (Σ:=Σ) (λ X, X).
   Proof. intros X _. apply itProp_le_refl. Qed.
   Global Instance itProp_cont_const G : ItPropCont (Λ:=Λ) (Σ:=Σ) (λ _, G).
-  Proof. intros X _ ? τ. rewrite /= /ti_exist. iIntros "H". by iExists Ord.O. Qed.
+  Proof. intros X _ ? τ. rewrite /= /trI_exist. iIntros "H". by iExists Ord.O. Qed.
   Global Instance itProp_cont_and F1 F2 `{!ItPropMono F1, !ItPropMono F2} :
     ItPropCont F1 → ItPropCont F2 → ItPropCont (λ X, itProp_and (F1 X) (F2 X)).
   Proof.
-    intros H1 H2 X HX ? τ. rewrite /= /ti_and (H1 X HX _ τ) (H2 X HX _ τ) /= /ti_exist.
+    intros H1 H2 X HX ? τ. rewrite /= /trI_and (H1 X HX _ τ) (H2 X HX _ τ) /= /trI_exist.
     rewrite bi.and_exist_r. iIntros "[%α H]". rewrite bi.and_exist_l. iDestruct "H" as (β) "H".
     iExists (Ord.union α β). iSplit.
     - iDestruct "H" as "[H _]". iApply (itProp_mono_le (X α)); [apply HX, Ord.union_l|done].
@@ -198,12 +198,12 @@ Section cont_instances.
   Global Instance itProp_cont_or F1 F2 :
     ItPropCont F1 → ItPropCont F2 → ItPropCont (λ X, itProp_or (F1 X) (F2 X)).
   Proof.
-    intros H1 H2 X HX ? τ. rewrite /= /ti_or (H1 X HX _ τ) (H2 X HX _ τ) /= /ti_exist.
+    intros H1 H2 X HX ? τ. rewrite /= /trI_or (H1 X HX _ τ) (H2 X HX _ τ) /= /trI_exist.
     iIntros "[[%α H]|[%α H]]"; iExists α; [by iLeft|by iRight].
   Qed.
   Global Instance itProp_cont_impl A F : ItPropCont F → ItPropCont (λ X, itProp_impl A (F X)).
   Proof.
-    intros HF X HX ? τ. rewrite /= /ti_impl (HF X HX _ τ) /= /ti_exist. iIntros "H".
+    intros HF X HX ? τ. rewrite /= /trI_impl (HF X HX _ τ) /= /trI_exist. iIntros "H".
     destruct (classic (itProp_external A τ)) as [HA|HA].
     - iDestruct ("H" $! HA) as (α) "H". iExists α. by iIntros "_".
     - iExists Ord.O. by iIntros (?).
@@ -211,11 +211,11 @@ Section cont_instances.
   Global Instance itProp_cont_exist {A} `{!TypeExistentialProperty A ordI} (F : A → itProp Λ Σ → itProp Λ Σ) :
     (∀ a, ItPropCont (F a)) → ItPropCont (λ X, itProp_exist (λ a, F a X)).
   Proof.
-    intros HF X HX ? τ. rewrite /= /ti_exist. iIntros "[%a H]".
-    rewrite (HF a X HX _ τ) /= /ti_exist. iDestruct "H" as (α) "H". iExists α, a. done.
+    intros HF X HX ? τ. rewrite /= /trI_exist. iIntros "[%a H]".
+    rewrite (HF a X HX _ τ) /= /trI_exist. iDestruct "H" as (α) "H". iExists α, a. done.
   Qed.
   Global Instance itProp_cont_shift F : ItPropCont F → ItPropCont (λ X, itProp_shift (F X)).
-  Proof. intros HF X HX ? τ. rewrite /= (HF X HX _ (trace_next τ)) /= /ti_exist. done. Qed.
+  Proof. intros HF X HX ? τ. rewrite /= (HF X HX _ (trace_next τ)) /= /trI_exist. done. Qed.
 
 End cont_instances.
 
@@ -417,7 +417,7 @@ Section ltl.
   (** [□ G] is [ν X. ⊳ ⊚ (G ∧ ○'X)], in both directions. *)
   Lemma itProp_always_le_nu G : itProp_le (itProp_always G) (itProp_nu (F_always G)).
   Proof.
-    apply itProp_nu_coind. intros ? τ. rewrite /F_always /= ti_always_unfold /ti_always_pre /ti_and /ti_pure.
+    apply itProp_nu_coind. intros ? τ. rewrite /F_always /= trI_always_unfold /trI_always_pre /trI_and /trI_pure.
     iIntros "H". iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
     iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
     iSplit; first by iDestruct "H" as "[$ _]". by iDestruct "H" as "[_ [_ $]]".
@@ -428,7 +428,7 @@ Section ltl.
     intros ? τ. rewrite {1}/itProp_internal /=. iIntros "[%X [%HX H]]".
     iRevert (τ) "H". iLöb as "IH". iIntros (τ) "H".
     iPoseProof (HX _ τ with "H") as "H". rewrite /F_always. iSimpl in "H".
-    rewrite ti_always_unfold /ti_always_pre /ti_and /ti_pure.
+    rewrite trI_always_unfold /trI_always_pre /trI_and /trI_pure.
     iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
     iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
     iSplit; first by iDestruct "H" as "[$ _]". iSplit; first done.
@@ -450,9 +450,9 @@ Section ltl.
 
   (** A ranked until. *)
   Program Definition itProp_until_at G1 G2 (a : Ord.t) : itProp Λ Σ :=
-    {| itProp_internal _ := ti_until Ord.lt a (itProp_internal G1) (itProp_internal G2); itProp_external := itProp_external (itProp_until G1 G2) |}.
+    {| itProp_internal _ := trI_until Ord.lt a (itProp_internal G1) (itProp_internal G2); itProp_external := itProp_external (itProp_until G1 G2) |}.
   Next Obligation.
-    intros G1 G2 a ? F τ H. eapply (itProp_adeq (itProp_until G1 G2)). simpl. rewrite /ti_exist.
+    intros G1 G2 a ? F τ H. eapply (itProp_adeq (itProp_until G1 G2)). simpl. rewrite /trI_exist.
     eapply sat_mono; last exact H. iIntros "H". by iExists a.
   Qed.
 
@@ -460,8 +460,8 @@ Section ltl.
   Lemma itProp_until_le_mu G1 G2 : itProp_le (itProp_until G1 G2) (itProp_mu (F_until G1 G2)).
   Proof.
     eapply itProp_le_trans; [|apply itProp_exist_lub; intros a; apply (itProp_mu_intro _ (itProp_until_at G1 G2))].
-    - intros ? τ. rewrite /= /ti_exist. iIntros "[%a H]". by iExists a.
-    - intros α ? τ. rewrite /F_until /= ti_until_unfold /ti_until_pre /ti_or /ti_and /ti_exist.
+    - intros ? τ. rewrite /= /trI_exist. iIntros "[%a H]". by iExists a.
+    - intros α ? τ. rewrite /F_until /= trI_until_unfold /trI_until_pre /trI_or /trI_and /trI_exist.
       iIntros "H". iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
       iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
       iDestruct "H" as "[H|H]"; first by iLeft. iRight.
@@ -485,7 +485,7 @@ Section ltl.
     itProp_le (itProp_mu_approx (F_until G1 G2) α) (itProp_until_at G1 G2 α).
   Proof.
     induction α as [α IH] using (well_founded_ind Ord.lt_well_founded).
-    intros ? τ. rewrite itProp_mu_approx_unfold /F_until /= ti_until_unfold /ti_until_pre /ti_or /ti_and /ti_exist.
+    intros ? τ. rewrite itProp_mu_approx_unfold /F_until /= trI_until_unfold /trI_until_pre /trI_or /trI_and /trI_exist.
     iIntros "H". iMod "H". iModIntro. iNext. iMod "H". iModIntro. iMod "H". iModIntro.
     iApply (ALC_wand with "[] H"). iIntros "H". iMod "H". iModIntro.
     iDestruct "H" as "[H|H]"; first by iLeft. iRight.
@@ -497,7 +497,7 @@ Section ltl.
   Lemma itProp_mu_le_until G1 G2 : itProp_le (itProp_mu (F_until G1 G2)) (itProp_until G1 G2).
   Proof.
     apply itProp_exist_lub. intros α. eapply itProp_le_trans; first apply itProp_mu_approx_le_until.
-    intros ? τ. rewrite /= /ti_exist. iIntros "H". by iExists α.
+    intros ? τ. rewrite /= /trI_exist. iIntros "H". by iExists α.
   Qed.
 
   Lemma itProp_mu_until_ext_iff G1 G2 τ :
@@ -554,7 +554,7 @@ Section no_fold.
   Proof.
     intros HM H. cut (⊢ ∀ τ, @itProp_internal _ _ M H τ)%I.
     { intros HM' τ. iApply HM'. }
-    iLöb as "IH". iIntros (τ). iApply HM. rewrite /F_until /= /ti_or /ti_and /ti_pure.
+    iLöb as "IH". iIntros (τ). iApply HM. rewrite /F_until /= /trI_or /trI_and /trI_pure.
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iNext. iMod "Hclose" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iApply ALC_intro. iMod "Hclose" as "_".
     iModIntro. iRight. iSplit; first done. iApply "IH".

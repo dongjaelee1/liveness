@@ -55,26 +55,23 @@ Section proof.
   Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ itProp_until (l ↦ #0) (l ↦ #1).
   Proof. apply (into_temporal _ _). Qed.
 
-  (** Whenever the flag holds 0, it eventually holds 1. The antecedent rules out the
-      invariant's other branch (the cell cannot hold 0 and 1 at once). *)
-  Definition flag_response_itProp (l : loc) : itProp heap_lang Σ :=
-    itProp_always (l ↦ #0 → itProp_finally (l ↦ #1))%IT.
+  (** Whenever the flag holds 0, it eventually holds 1: a consequence of the flag's guarantee
+      on traces (the until gives the finally; in the other branch the cell holds 1, not 0),
+      guaranteed along with it by the cast. *)
+  Definition flag_response (l : loc) : trProp heap_lang := (□ ((l ↦ #0) → ◇ (l ↦ #1)))%R.
 
-  Lemma flag_itProp_response l : itProp_le (flag_itProp l) (flag_response_itProp l).
+  Lemma flag_response_ext l : itProp_external (flag_itProp l) ⊆ flag_response l.
   Proof.
-    eapply itProp_le_trans; first apply itProp_and_elim_r. apply itProp_always_mono.
-    assert (Hu := itProp_until_mono (Λ:=heap_lang) (Σ:=Σ) (l ↦ #0)%IT (l ↦ #1)%IT itProp_true (l ↦ #1)%IT
-                    (itProp_le_true _) (itProp_le_refl _)).
-    rewrite /itProp_le in Hu. intros ? τ. cbn [itProp_internal itProp_or itProp_and itProp_impl].
-    unfold ti_or, ti_and, ti_impl. iIntros "[H|[_ H1]] %H0".
-    - by iApply Hu.
-    - iDestruct (itProp_instant_state with "H1") as %H1. exfalso. destruct τ as [n τf].
-      revert H0 H1. cbn [itProp_external itProp_state]. unfold tr_state, ts_emb, ts_state, pointsto_sat, trace_now. simpl.
-      destruct (τf n) as [[[??] ?] ?]. simpl. intros -> ?. by simplify_eq.
+    rewrite /flag_itProp. etrans; first apply (itProp_ext_of _ _).
+    etrans; first apply tr_and_elim_r. apply tr_always_mono, tr_or_elim; apply tr_impl_intro.
+    - etrans; [apply tr_and_elim_l|apply tr_until_finally].
+    - etrans; [apply tr_and_mono; [apply tr_and_elim_r|reflexivity]|].
+      etrans; first apply tr_pointsto_agree. apply tr_pure_elim. intros Heq. by simplify_eq.
   Qed.
 
-  Lemma is_flag_response l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_response_itProp l.
-  Proof. iApply temporal_weaken; [apply flag_itProp_response|iApply is_flag_temporal]. Qed.
+  Lemma is_flag_response l k ℓ :
+    ⊢ is_flag l k ℓ ⊨ₜ itProp_cast (flag_itProp l) (flag_response l) (flag_response_ext l).
+  Proof. iApply temporal_cast. iApply is_flag_temporal. Qed.
 
   (** The main proofs. *)
   Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).
@@ -304,13 +301,10 @@ Section trace.
   (** The flag at the level of traces: [0] until [1], and [1] from then on. *)
   Definition is_flag_tr (l : loc) : trProp heap_lang :=
     tr_always (tr_until (l ↦ #0) (l ↦ #1) ∨ (l ↦ #1))%R.
-  Lemma flag_itProp_impl {Σ : gFunctors} l :
-    ∀ τ, itProp_external (flag_itProp (Σ:=Σ) l) τ → is_flag_tr l τ.
+  Lemma flag_itProp_impl {Σ : gFunctors} l : itProp_external (flag_itProp (Σ:=Σ) l) ⊆ is_flag_tr l.
   Proof.
-    rewrite /is_flag_tr. simpl. unfold_trProp. intros. destruct τ. destruct H. intros. specialize (H0 _ H1).
-    destruct H0.
-    - destruct H0 as (?&?&?&?). left. eexists. split_and !; eauto.
-    - destruct H0. right. eauto.
+    rewrite /flag_itProp. etrans; first apply (itProp_ext_of _ _).
+    etrans; first apply tr_and_elim_r. apply tr_always_mono, tr_or_mono; [reflexivity|apply tr_and_elim_r].
   Qed.
 
   (** The guarantee does not say that the flag stays [1]: the run 0, 1, 0, 1, 1, ...

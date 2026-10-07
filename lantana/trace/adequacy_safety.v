@@ -7,10 +7,10 @@ From lantana.base_logic Require Import satisfiable.
 
     On every fair run of a program verified with [lWP] at [NotStuck], no thread gets stuck
     and thread [j] satisfies its postcondition once it terminates ([safety_iris]). The proof
-    reads [ti_always] off the run directly, without guarantees. *)
+    reads [trI_always] off the run directly, without guarantees. *)
 
-Local Definition safety_iris_tiProp `{!temporalGS Λ Σ} i Φ : tiProp Λ Σ :=
-  ti_always (ti_pure True) (λ τ, (⌜ (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R τ ⌝)%I).
+Local Definition safety_iris_tiProp `{!temporalGS Λ Σ} i Φ : trIProp Λ Σ :=
+  trI_always (trI_pure True) (λ τ, (⌜ (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R τ ⌝)%I).
 
 Section safety_trace.
   Context `{!temporalGS Λ Σ}.
@@ -21,7 +21,7 @@ Section safety_trace.
   Proof.
     intros. cut (tr_always (tr_pure True ∧ (ts_emb not_stuck ∧ ts_emb (if_term_val i Φ)))%R τ).
     { unfold safety_iris, tr_always. destruct τ. intros. apply H0 in H1. by destruct H1. }
-    eapply ti_always_tr_always; eauto. 1: done. simpl. intros. apply sat_elim in H0. auto.
+    eapply trI_always_tr_always; eauto. 1: done. simpl. intros. apply sat_elim in H0. auto.
   Qed.
 
 End safety_trace.
@@ -50,7 +50,7 @@ Section safety_lwp.
     clear dependent Ω1. rename Ω2 into Ω.
     iRevert (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ POST) "HI TI SIa MI WPs".
     iLöb as "IH". iIntros (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ POST) "HI TI SIa MI WPs".
-    rewrite /safety_iris_tiProp ti_always_unfold /ti_always_pre.
+    rewrite /safety_iris_tiProp trI_always_unfold /trI_always_pre.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
     iMod "close" as "_". iModIntro.
     (** Fetch the scheduled thread and take a step; the position is decided after it. *)

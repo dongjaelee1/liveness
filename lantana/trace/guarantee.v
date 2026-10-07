@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From lantana.trace Require Export itprop.
+From lantana.trace Require Export itprop_rules.
 From transfinite.stepindex Require Import ordinals.
 
 (** * Temporal guarantees [P ⊨ₜ G]: records, the one-step property, rules for connectives
@@ -63,7 +63,7 @@ Section guarantee.
 
   (** The one-step property of [Sys]: from a consistent system at [n], the bundle for [n]
       (the check), then after the step the system at [S n], the facts about the step and
-      later credits. The modalities are those of [ti_always] and [ti_until]. *)
+      later credits. The modalities are those of [trI_always] and [trI_until]. *)
   Definition sys_step_pre (tg : tgT) (Sys : sysT) : iProp Σ :=
     □ ∀ (c : nat) h n σ Θ κs g v Ω W τf γ,
       ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
@@ -305,7 +305,7 @@ Section rules.
     iIntros "#HG !>" (h n σ Θ κs m i Ω W) "(HI& MI& HP)".
     iPoseProof (temporal_elim_later_guar P G2 with "HG [$HP $HI $MI]") as "#T".
     iApply tguar_intro. iIntros "!>" (????????????) "#ST %H #B W".
-    rewrite /= /ti_exist. iExists Ord.O. rewrite ti_until_unfold /ti_until_pre.
+    rewrite /= /trI_exist. iExists Ord.O. rewrite trI_until_unfold /trI_until_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_".
     iModIntro. iLeft. by iApply (tguar_elim with "T ST [//] B W").
@@ -330,7 +330,7 @@ Section rules.
   Qed.
   Lemma itProp_sem_le Q G : (⊢ Q ⊨ₜ G) → itProp_le (itProp_sem Q) G.
   Proof.
-    intros HG ??. rewrite /= /ti_forall. iIntros "H". iApply ("H" $! (exist (λ G, ⊢ Q ⊨ₜ G) G HG)).
+    intros HG ??. rewrite /= /trI_forall. iIntros "H". iApply ("H" $! (exist (λ G, ⊢ Q ⊨ₜ G) G HG)).
   Qed.
   Lemma itProp_sem_ext Q G τ : (⊢ Q ⊨ₜ G) → itProp_external (itProp_sem Q) τ → itProp_external G τ.
   Proof. intros HG H. apply (H (exist (λ G, ⊢ Q ⊨ₜ G) G HG)). Qed.
@@ -454,7 +454,7 @@ Section impl_rules.
     iIntros "#HG". destruct (Classical_Prop.classic φ) as [Hφ|Hφ].
     - iApply temporal_impl_weaken. iApply (temporal_mono with "[] HG"). iIntros "!> HP". by iApply "HP".
     - iApply (temporal_weaken _ itProp_true); last iApply temporal_true.
-      intros ??. rewrite /= /ti_impl. by iIntros "_ %".
+      intros ??. rewrite /= /trI_impl. by iIntros "_ %".
   Qed.
 
 End impl_rules.
