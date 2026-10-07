@@ -78,9 +78,7 @@ Section proof.
       iApply ("Flag_set_spec" $! 0 with "[$TE $TGj GFj $Cgj $Ftk $is_flag]").
       { iFrame. iPureIntro. set_solver. }
       iIntros "(TE& _& TG& Cg& #Od)".
-      replace ({[k]} ∖ {[k]}) with (∅ : gset oid) by set_solver.
-      iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
-      replace ({[g2]} ∖ {[g2]}) with (∅ : gset ocid) by set_solver.
+      iMod (carrier_delete_eq _ _ _ ∅ with "TG Cg") as "TG". 1-3: set_solver.
       iMod (thread_terminate with "TG") as "#Td".
       iModIntro. rewrite /lift_term. iApply "HΦ'". eauto. }
     { iSplitR; first done.
@@ -89,10 +87,7 @@ Section proof.
         iApply big_sepS_singleton. iFrame.
       - rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. simpl. done. }
     iIntros "[TE ((_& TG& _)& Cg0)]".
-    replace ({[k]} ∖ {[k]}) with (∅ : oids) by set_solver.
-    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g0 with "GF") as "GF".
-    replace ({[g0; g]} ∖ {[g0]}) with ({[g]} : oids) by set_solver.
+    iMod (carrier_delete_fuels _ _ _ {[g]} with "TG Cg0 GF") as "[TG GF]". 1-3: set_solver.
     clear dependent g0.
     lwp_pures.
     lwp_bind (Flag.wait _).

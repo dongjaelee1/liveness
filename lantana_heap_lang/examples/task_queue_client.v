@@ -198,10 +198,7 @@ Section proof.
       iFrame. iFrame "ITQ is_flag". eauto. }
     iClear "decr_reentrant_spec".
     iIntros "(TE& _& TG& Cg0)".
-    replace ({[k]} ∖ {[k]}) with (∅ : oids) by set_solver.
-    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g0 with "GF") as "GF".
-    replace ({[g0; g]} ∖ {[g0]}) with ({[g]} : gset ocid) by set_solver.
+    iMod (carrier_delete_fuels _ _ _ {[g]} with "TG Cg0 GF") as "[TG GF]". 1-3: set_solver.
     lwp_pures.
     lwp_bind (Flag.wait _).
     iModIntro.

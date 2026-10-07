@@ -161,9 +161,8 @@ Section proof.
         iApply lwp_sfmupd.
         iApply ("TASK" $! 0 with "[$TE $TG $F_task $Gg $HP]").
         { iPureIntro. set_solver. }
-        iIntros (?) "(TE& _& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
-        iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
-        replace (({[g; ng]} ∪ G) ∖ {[g]}) with ({[ng]} ∪ G) by set_solver.
+        iIntros (?) "(TE& _& TG& Gg)".
+        iMod (carrier_delete_eq _ _ _ ({[ng]} ∪ G) with "TG Gg") as "TG". 1-3: set_solver.
         iModIntro. iApply "HΦ". iFrame "TE Q_LC". iExists ng. iFrame. iPureIntro. set_solver.
       + iRename "HW" into "TG".
         subst v.
@@ -176,9 +175,8 @@ Section proof.
         iApply lwp_sfmupd.
         iApply ("TASK" $! 0 with "[$TE $TG $F_task $Gg $HP]").
         { iPureIntro. set_solver. }
-        iIntros (?) "(TE& _& TG& Gg)". replace (B ∖ B) with (∅ : oids) by set_solver.
-        iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
-        replace (({[g]} ∪ G) ∖ {[g]}) with G by set_solver.
+        iIntros (?) "(TE& _& TG& Gg)".
+        iMod (carrier_delete_eq _ _ _ G with "TG Gg") as "TG". 1-3: set_solver.
         iModIntro. iApply "HΦ". iFrame.
   Qed.
 
@@ -216,8 +214,7 @@ Section proof.
       iModIntro.
       iApply ("TaskQueue_run_task_spec" $! 100 (102 ⊕ (mr ⊕ 1))%M true with "[$TE $TG $F_mr $F_mr1 $HW $ITQ]").
       iIntros (rv) "(TE& LC& (%& TG& %Ninng& Qw& Gg& Fng))".
-      iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
-      replace ({[ng; g]} ∖ {[g]}) with ({[ng]} : gset ocid) by set_solver.
+      iMod (carrier_delete_eq _ _ _ {[ng]} with "TG Gg") as "TG". 1-3: set_solver.
       iClear "GF".
       iAssert (([∗ set] k ∈ {[ng]}, crP_fuel k ℓ (102 ⊕ (mr ⊕ 1))%M))%I with "[Fng]" as "GF".
       { iApply big_sepS_singleton. iFrame. }

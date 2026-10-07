@@ -121,16 +121,11 @@ Section proof.
         iPoseProof ("NEST" $! 0 with "[$TE $TG $GFj $Cgj $Ftk0 $is_flag0]") as "H".
         { iPureIntro. set_solver. }
         iApply lwp_sfmupd. iApply "H". iIntros "(TE& _& TG& Cg& #Od)".
-        replace ({[k0]} ∖ {[k0]}) with (∅ : gset oid) by set_solver.
-        iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
-        replace ({[g2]} ∖ {[g2]}) with (∅ : gset ocid) by set_solver.
+        iMod (carrier_delete_eq _ _ _ ∅ with "TG Cg") as "TG". 1-3: set_solver.
         iMod (thread_terminate with "TG") as "#Td".
         iModIntro. rewrite /lift_term. iApply "HΦ". eauto. }
       iIntros "(TE& (_& TG& _)& Cg0)".
-      replace ({[k0]} ∖ {[k0]}) with (∅ : oids) by set_solver.
-      iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
-      iPoseProof (crP_fuels_remove_carrier g0 with "GF") as "GF".
-      replace (({[g0]} ∪ G) ∖ {[g0]}) with G by set_solver.
+      iMod (carrier_delete_fuels _ _ _ G with "TG Cg0 GF") as "[TG GF]". 1-3: set_solver.
       lwp_pures.
       lwp_bind (Flag.wait _).
       iModIntro.
@@ -198,16 +193,11 @@ Section proof.
       iApply ("Nondet_nest_spec" $! 0 with "[$TE $TGj $GFj $Cgj $Ftk $is_flag]").
       { iPureIntro. set_solver. }
       iIntros "(TE& _& TG& Cg& #Od)".
-      replace ({[k]} ∖ {[k]}) with (∅ : gset oid) by set_solver.
-      iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
-      replace ({[g2]} ∖ {[g2]}) with (∅ : gset ocid) by set_solver.
+      iMod (carrier_delete_eq _ _ _ ∅ with "TG Cg") as "TG". 1-3: set_solver.
       iMod (thread_terminate with "TG") as "#Td".
       iModIntro. rewrite /lift_term. iApply "HΦ". eauto. }
     iIntros "(TE& (_& TG& _)& Cg0)".
-    replace ({[k]} ∖ {[k]}) with (∅ : oids) by set_solver.
-    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g with "GF") as "GF".
-    replace (({[g]} ∪ G) ∖ {[g]}) with G by set_solver.
+    iMod (carrier_delete_fuels _ _ _ G with "TG Cg0 GF") as "[TG GF]". 1-3: set_solver.
     lwp_pures.
     lwp_bind (Flag.wait _).
     iModIntro.

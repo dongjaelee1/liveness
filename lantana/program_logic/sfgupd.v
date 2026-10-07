@@ -358,6 +358,62 @@ Section sfgupd.
     iMod (obl_offload_set_gupd with "Gg1 Gg2 Of") as "($& $& $)"; auto.
   Qed.
 
+  (** ** Derived carrier-management rules.
+
+      The three rules above are what the logic offers; the proofs of the case
+      studies compose them in a few recurring shapes, each followed by set
+      arithmetic on carrier sets. We package the shapes once, with the set
+      equalities as premises, so a use site discharges them by [set_solver]
+      instead of [replace]. *)
+
+  (** Delete a carrier whose obligation set is empty (up to [set_solver]). *)
+  Lemma carrier_delete_eq E i G G' g ℓ K :
+    g ∈ G → K = ∅ → G' = G ∖ {[g]} →
+    thP_carriers i G -∗ crP_obls g ℓ K -∗ |={E}=>g thP_carriers i G'.
+  Proof. intros ? -> ->. by apply carrier_delete. Qed.
+
+  (** Same, also dropping the carrier from a [crP_fuels] collection. *)
+  Lemma carrier_delete_fuels E i G G' g ℓ K n :
+    g ∈ G → K = ∅ → G' = G ∖ {[g]} →
+    thP_carriers i G -∗ crP_obls g ℓ K -∗ crP_fuels G n -∗
+    |={E}=>g thP_carriers i G' ∗ crP_fuels G' n.
+  Proof.
+    iIntros (? -> ->) "TG Gg GF".
+    iMod (carrier_delete_eq with "TG Gg") as "$"; [done..|].
+    iApply sfgupd_intro. by iApply crP_fuels_remove_carrier.
+  Qed.
+
+  Lemma crP_fuels_remove_carrier_eq g G G' n :
+    G' = G ∖ {[g]} → crP_fuels G n -∗ crP_fuels G' n.
+  Proof. intros ->. apply crP_fuels_remove_carrier. Qed.
+
+  (** Refresh: retire an empty carrier and start a fresh one with a budget of
+      the proof's choice. The cutpoint where a perpetual worker's fuel resets. *)
+  Lemma carrier_renew E i G G' g ℓ K ℓ' μ :
+    g ∈ G → K = ∅ → G' = G ∖ {[g]} →
+    thP_carriers i G -∗ crP_obls g ℓ K -∗
+    |={E}=>g ∃ g', ⌜g' ∉ G'⌝ ∗ thP_carriers i ({[g']} ∪ G') ∗ crP_obls g' ℓ' ∅ ∗ crP_fuel g' ℓ' μ.
+  Proof.
+    iIntros (? -> ->) "TG Gg".
+    iApply (sfgupd_bind with "[] [TG Gg]"); last by iApply (carrier_delete_eq with "TG Gg").
+    iIntros "TG". by iApply carrier_alloc.
+  Qed.
+
+  (** Allocate a fresh carrier and move the obligations [K] off [g1] onto it,
+      spending one unit of transfer credit per obligation. *)
+  Lemma carrier_alloc_offload E i G g1 ℓ1 K1 K ℓ ℓo μ :
+    K ⊆ K1 → (ℓ <= ℓo)%ordi →
+    thP_carriers i G -∗ crP_obls g1 ℓ1 K1 -∗ ([∗ set] k ∈ K, oblP_fuel k ℓo 1) -∗
+    |={E}=>g ∃ g, ⌜g ∉ G⌝ ∗ thP_carriers i ({[g]} ∪ G) ∗
+                 crP_obls g1 ℓ1 (K1 ∖ K) ∗ crP_obls g ℓ K ∗ crP_fuel g ℓ μ.
+  Proof.
+    iIntros (??) "TG Gg1 Of".
+    iApply (sfgupd_bind with "[Gg1 Of] [TG]"); last by iApply (carrier_alloc with "TG").
+    iIntros "(%g& %& TG& Gg& Fg)".
+    iApply (sfgupd_bind with "[TG Fg] [Gg1 Gg Of]"); last by iApply (obl_offload_set with "Gg1 Gg Of").
+    iIntros "(Gg1& Gg& _)". iApply sfgupd_intro. rewrite left_id_L. by iFrame.
+  Qed.
+
   Lemma obl_check_witnesses E (R : oids) :
     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
     |={E}=>g ([∗ set] r ∈ R, (witP_cred r Ord.O) ∨ oblP_discharged r).

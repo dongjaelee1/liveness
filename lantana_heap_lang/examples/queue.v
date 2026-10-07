@@ -345,9 +345,7 @@ Section proof.
     (* FIXME: it would be nice if we don't get this evar *)
     Unshelve. 2: exact 0.
     iIntros "(TE& _& TG& Ggu& _)".
-    replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
-    iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
-    replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
+    iMod (carrier_delete_eq _ _ _ G with "TG Ggu") as "TG". 1-3: set_solver.
     replace (B ∖ B) with (∅ : oids) by set_solver.
     iApply ("HΦ" with "[$TE $Q_LC $TG $GB]").
   Qed.
@@ -453,11 +451,8 @@ Section proof.
         { iPureIntro. set_solver. }
         { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. simpl. iFrame. eauto. }
         iIntros "(TE& _& TG& Ggu& _)".
-        replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
-        iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
-        replace (({[ng]} ∪ ({[gu]} ∪ G)) ∖ {[gu]}) with ({[ng]} ∪ G) by set_solver.
-        iPoseProof (crP_fuels_remove_carrier gu with "GF") as "GF".
-        replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
+        iMod (carrier_delete_eq _ _ _ ({[ng]} ∪ G) with "TG Ggu") as "TG". 1-3: set_solver.
+        iDestruct (crP_fuels_remove_carrier_eq gu _ G with "GF") as "GF"; [set_solver|].
         iPoseProof (crP_fuels_add_carrier with "Fng' GF")as "GF".
         lwp_pures.
         iModIntro. lwp_finish.
@@ -470,10 +465,7 @@ Section proof.
         { iPureIntro. set_solver. }
         { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. simpl. iFrame. eauto. }
         iIntros "(TE& _& TG& Ggu& _)".
-        replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
-        iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
-        iPoseProof (crP_fuels_remove_carrier gu with "GF") as "GF".
-        replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
+        iMod (carrier_delete_fuels _ _ _ G with "TG Ggu GF") as "[TG GF]". 1-3: set_solver.
         lwp_pures.
         iModIntro. lwp_finish.
         iApply ("HΦ"). iFrame. by iModIntro.
@@ -515,23 +507,22 @@ Section proof.
           { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
             replace (S (S k)) with (S k + 1) by lia. done. }
           iApply (oblP_fuel_add_set with "H"). }
-        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 76 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
-        iMod (obl_offload_set with "Gq Gg FB") as "(Gq& Gg& %)". 1: set_solver. 1: done.
-        assert (B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
+        iMod (carrier_alloc_offload _ _ _ _ _ _ _ ℓ _ (μ ⊕ 76 ⊕ mr)%M with "TG Gq FB")
+          as "(%g& %Ning& TG& Gq& Gg& Fg)". 1: set_solver. 1: done.
+        assert (HDisj : B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
         { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
-        destruct H0 as (DisjB& Disj').
+        destruct HDisj as (DisjB& Disj').
         replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
-        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 76 ⊕ mr)%M with "TG") as "(%ng& %Ninng& TG& Gng& Fng)".
-        iMod (ghost_var_update_2 (ng) with "Gvar HW") as "[Gvar HW]". 1: by rewrite Qp.div_2.
         iAssert ([∗ set] b ∈ union_list_of_sets vs'.*2, oblP_fuel b ℓ 1)%I with "[F]" as "F".
         { iClear "TicketLock_acquire_spec TicketLock_release_spec IQ IFL".
           remember (vs'.*2) as l. clear dependent vs'. clear DisjB Disj'. iInduction l as [ | ]. 1: done.
           iPoseProof (big_sepL_cons with "F") as "[Fb F]".
           iPoseProof ("IHl" with "F") as "F".
           rewrite union_list_of_sets_cons. iApply (big_sepS_union_2 with "Fb F"). }
-        iMod (obl_offload_set with "Gq Gng F") as "(Gq& Gng& %)". 1: set_solver. 1: done.
+        iMod (carrier_alloc_offload _ _ _ _ _ _ _ ℓ _ (μ ⊕ 76 ⊕ mr)%M with "TG Gq F")
+          as "(%ng& %Ninng& TG& Gq& Gng& Fng)". 1: set_solver. 1: done.
+        iMod (ghost_var_update_2 (ng) with "Gvar HW") as "[Gvar HW]". 1: by rewrite Qp.div_2.
         replace (union_list_of_sets vs'.*2 ∖ union_list_of_sets vs'.*2) with (∅ : oids) by set_solver.
-        rewrite !union_empty_l_L.
         iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Gng Fq]") as "_".
         { iNext. iFrame. iPureIntro. auto. }
         iModIntro.
@@ -554,12 +545,10 @@ Section proof.
         { iPureIntro. set_solver. }
         { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. eauto. }
         iIntros "(TE& _& TG& Ggu& _)".
-        replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
-        iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
+        iMod (carrier_delete_eq _ _ _ ({[ng]} ∪ ({[g]} ∪ G)) with "TG Ggu") as "TG". 1-3: set_solver.
         iPoseProof (crP_fuels_add_carrier with "Fg GF") as "GF".
         iPoseProof (crP_fuels_add_carrier with "Fng GF") as "GF".
-        iPoseProof (crP_fuels_remove_carrier gu with "GF") as "GF".
-        replace (({[ng]} ∪ ({[g]} ∪ ({[gu]} ∪ G))) ∖ {[gu]}) with (({[ng]} ∪ ({[g]} ∪ G))) by set_solver.
+        iDestruct (crP_fuels_remove_carrier_eq gu _ ({[ng]} ∪ ({[g]} ∪ G)) with "GF") as "GF"; [set_solver|].
         lwp_pures.
         iModIntro. lwp_finish.
         iModIntro. iApply "HΦ". iFrame "TE Q_LC".
@@ -578,13 +567,12 @@ Section proof.
           { rewrite measure_rep_add !measure_rep_nat. rewrite -Hessenberg.add_from_nat.
             replace (S (S k)) with (S k + 1) by lia. done. }
           iApply (oblP_fuel_add_set with "H"). }
-        iMod (carrier_alloc _ _ _ ℓ (μ ⊕ 76 ⊕ mr)%M with "TG") as "(%g& %Ning& TG& Gg& Fg)".
-        iMod (obl_offload_set with "Gq Gg FB") as "(Gq& Gg& %)". 1: set_solver. 1: done.
-        assert (B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
+        iMod (carrier_alloc_offload _ _ _ _ _ _ _ ℓ _ (μ ⊕ 76 ⊕ mr)%M with "TG Gq FB")
+          as "(%g& %Ning& TG& Gq& Gg& Fg)". 1: set_solver. 1: done.
+        assert (HDisj : B ## union_list_of_sets vs'.*2 ∧ disjoint_list_of_sets vs'.*2).
         { rewrite fmap_cons in Disj. apply disjoint_list_of_sets_cons_inv in Disj. auto. }
-        destruct H0 as (DisjB& Disj').
+        destruct HDisj as (DisjB& Disj').
         replace ((B ∪ union_list_of_sets vs'.*2) ∖ B) with (union_list_of_sets vs'.*2) by set_solver.
-        rewrite !union_empty_l_L.
         iModIntro. iMod ("IQ_ACC" with "[Queue0 Gvar Gq Fq]") as "_".
         { iNext. iFrame. iPureIntro. auto. }
         iModIntro.
@@ -600,11 +588,9 @@ Section proof.
         { iPureIntro. set_solver. }
         { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. eauto. }
         iIntros "(TE& _& TG& Ggu& _)".
-        replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
-        iMod (carrier_delete with "TG Ggu") as "TG". 1: set_solver.
+        iMod (carrier_delete_eq _ _ _ ({[g]} ∪ G) with "TG Ggu") as "TG". 1-3: set_solver.
         iPoseProof (crP_fuels_add_carrier with "Fg GF") as "GF".
-        iPoseProof (crP_fuels_remove_carrier gu with "GF") as "GF".
-        replace (({[g]} ∪ ({[gu]} ∪ G)) ∖ {[gu]}) with (({[g]} ∪ G)) by set_solver.
+        iDestruct (crP_fuels_remove_carrier_eq gu _ ({[g]} ∪ G) with "GF") as "GF"; [set_solver|].
         lwp_pures.
         iModIntro. lwp_finish.
         iModIntro. iApply "HΦ". iFrame "TE Q_LC".

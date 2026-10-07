@@ -176,9 +176,8 @@ Section proof.
       iApply (lwp_load _ ∅ 0 with "[$TE $Ptrb $TG $GF1]"). 1: done.
       iIntros "(TE& (_& TG& _)& Ptrb)".
       iCombine "Gv Gv0" gives %H. destruct H as [_ <-]. subst.
-      iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
-      replace ({[g]} ∖ {[g]}) with (∅ : gset ocid) by set_solver.
-      iMod (carrier_alloc _ _ _ ℓ (15 ⊕ 1)%M with "TG") as "(%g'& _& TG& Cg'& Gf)".
+      iMod (carrier_renew _ _ _ ∅ _ _ _ ℓ (15 ⊕ 1)%M with "TG Cg") as "(%g'& _& TG& Cg'& Gf)".
+      1-3: set_solver.
       iMod (ghost_var_update_2 g' with "Gv Gv0") as "(Gv& Gv0)". 1: by rewrite Qp.div_2.
       iClear "F_task GF". clear g.
       rewrite union_empty_r_L.
@@ -205,9 +204,8 @@ Section proof.
       iApply lwp_sfgupd.
       (* iApply lwp_sfmupd. *)
       iApply ("task" $! 0 with "[$TE $TG $F_task $Cg $HP]"). 1: eauto.
-      iIntros (?) "(TE& _& TG& Cg)". replace (K ∖ K) with (∅ : gset ocid) by set_solver.
-      iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.
-      replace ({[g]} ∖ {[g]}) with (∅ : gset ocid) by set_solver.
+      iIntros (?) "(TE& _& TG& Cg)".
+      iMod (carrier_delete_eq _ _ _ ∅ with "TG Cg") as "TG". 1-3: set_solver.
       iApply ("HΦ" with "[$TE $Q_LC $TG]").
     - iDestruct "inv" as "(%&%& _& Gv0)".
       iCombine "Gv Gv0" gives %H. destruct H as [? _]. done.

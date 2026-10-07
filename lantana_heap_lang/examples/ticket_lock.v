@@ -670,9 +670,7 @@ Section proof.
       { lia. }
       iDestruct "H" as "(%&%&%& %& GMEt1& GMEo& _& Gg)".
       iCombine "GMEt1 GMEt0" as "GMEt" gives %?. destruct H0 as [_ H0]. simplify_eq.
-      iMod (carrier_delete with "TG Gg") as "TG". 1: set_solver.
-      iPoseProof (crP_fuels_remove_carrier gu with "GF") as "GF".
-      replace (({[gu]} ∪ G) ∖ {[gu]}) with G by set_solver.
+      iMod (carrier_delete_fuels _ _ _ G with "TG Gg GF") as "[TG GF]". 1-3: set_solver.
       rename gu into gu_prev, LUt into LUt_prev. iClear "Q_Gf". clear Ningu.
       iMod (carrier_alloc _ _ _ (ℓ)%ordi (45 ⊕ 47 ⊕ m)%M with "TG") as "(%gu& %Ningu& TG& Gg& Gf)".
       iPoseProof (crP_fuel_add with "Gf") as "[Gf Q_Gf]".

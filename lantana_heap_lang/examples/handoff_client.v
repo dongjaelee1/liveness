@@ -126,10 +126,7 @@ Section proof.
         - iPureIntro. set_solver. }
       iIntros "(TE& LC& TG& Cg& _)". iApply ("HΦ" with "[$]"). }
     iIntros "(TE& _& TG& Cg0)".
-    replace ({[k]} ∖ {[k]}) with (∅ : gset ocid) by set_solver.
-    iMod (carrier_delete with "TG Cg0") as "TG". 1: set_solver.
-    iPoseProof (crP_fuels_remove_carrier g1 with "GF") as "GF".
-    replace ({[g1; g]} ∖ {[g1]}) with ({[g]} : gset ocid) by set_solver.
+    iMod (carrier_delete_fuels _ _ _ {[g]} with "TG Cg0 GF") as "[TG GF]". 1-3: set_solver.
     lwp_pures.
     lwp_bind (Flag.wait _).
     iModIntro. iApply ("Flag_wait_spec" $! 0 with "[$TE $TG GF_fw $is_flag]").
