@@ -104,6 +104,7 @@ lantana_heap_lang/metatheory.v
 lantana_heap_lang/primitive_laws.v
 lantana_heap_lang/derived_laws.v
 lantana_heap_lang/proofmode.v
+lantana_heap_lang/triple.v
 
 lantana_heap_lang/lib/array.v
 
