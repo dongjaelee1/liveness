@@ -361,6 +361,29 @@ Proof.
     auto.
 Qed.
 
+(** The fork rule with the child's carrier at an explicit depth, so that the
+    child can be handed one unit one depth up for its specification. *)
+Lemma lwp_fork_d ℓ d μ K P G R o s i E e g1 K1 {C} :
+  K ⊆ K1 →
+  (∀ j g2, l{{{ thread_expr j [] e ∗ thP_carriers j {[g2]} ∗ ([∗ set] g ∈ {[g2]}, crP_dfuel g ℓ d μ) ∗ crP_obls g2 ℓ K ∗ P }}}
+             e @ s; j; ⊤ l{{{ v, RET v; lift_term j (λ _ _, True) v }}})%I
+  ⊢
+  l{{{ thread_expr i C (Fork e) ∗ (thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ crP_obls g1 ℓ K1 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) ∗ P }}}
+    Fork e @ s; i; E
+                     l{{{ RET #(); thread_expr i C #() ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ crP_obls g1 ℓ (K1 ∖ K)}}}.
+Proof.
+  iIntros (HK) "#Hfork !> %Φ (TE& (TG& GF& Rs)& Cg& OF& HP) HΦ".
+  iApply lwp_fork_step. iModIntro. iFrame "TE TG GF Rs".
+  iIntros (j) "TE TEj TG Ws TGj". iApply (ALC_credits _ _ o). iIntros "!> LC !>".
+  iMod (carrier_alloc_d _ _ _ ℓ d μ with "TGj") as "(%g2& _& TGj& Cg2& GF2)".
+  iMod (obl_offload_set with "Cg Cg2 OF") as "(Cg& Cg2& _)". 1: set_solver. 1: done.
+  rewrite union_empty_l_L union_empty_r_L. iModIntro. iSplitR "TEj HP TGj GF2 Cg2".
+  - iApply ("HΦ" with "[$TE $LC $TG $Ws $Cg]").
+  - iModIntro. iApply ("Hfork" with "[$TEj $TGj GF2 $Cg2 $HP]").
+    { iApply big_sepS_singleton. iFrame. }
+    auto.
+Qed.
+
 (** Discharge at the actual final value, using credits from earlier steps. *)
 Lemma thread_expr_terminate i E v g ℓ k N :
   ↑N ⊆ E →

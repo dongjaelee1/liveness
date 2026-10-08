@@ -1322,6 +1322,43 @@ Section preds.
       rewrite !measure_rep_mult. by apply Jacobsthal.le_mult_r.
     Qed.
 
+    Lemma crP_dfuel_eq k ℓ d μ1 μ2 :
+      (measure_rep (ℓ, 0, d) μ1 == measure_rep (ℓ, 0, d) μ2) →
+      crP_dfuel k ℓ d μ1 = crP_dfuel k ℓ d μ2.
+    Proof.
+      unfold_crP_dfuel. intros. rewrite !measure_rep_mult.
+      apply crP_fuel_val_eq. rewrite !H. done.
+    Qed.
+    Lemma crP_dfuel_layer_eq k ℓ1 ℓ2 d μ :
+      (ℓ1 == ℓ2)%ordi →
+      crP_dfuel k ℓ1 d μ = crP_dfuel k ℓ2 d μ.
+    Proof.
+      unfold_crP_dfuel. intros. apply crP_fuel_val_eq. apply measure_rep_layer_eq.
+      split; [split; auto | reflexivity].
+    Qed.
+    Lemma crP_dfuel_layer_eq_set K ℓ1 ℓ2 d μ :
+      (ℓ1 == ℓ2)%ordi →
+      ([∗ set] k ∈ K, crP_dfuel k ℓ1 d μ)%I ≡ ([∗ set] k ∈ K, crP_dfuel k ℓ2 d μ)%I.
+    Proof. intros. apply big_opS_proper. intros. erewrite crP_dfuel_layer_eq; eauto. Qed.
+
+    Lemma crP_dfuel_layer_mon k ℓ1 ℓ2 d μ :
+      (ℓ1 <= ℓ2)%ordi →
+      crP_dfuel k ℓ2 d μ ==∗ crP_dfuel k ℓ1 d μ.
+    Proof.
+      unfold_crP_dfuel. iIntros (LE) "H". iApply (crP_fuel_val_mon with "H").
+      apply (measure_rep_layer_le_proper _).
+      apply classicOrd.le_eq_or_lt in LE. destruct LE.
+      - right. econstructor 1. econstructor; auto.
+      - left. split; [econstructor; auto | reflexivity].
+    Qed.
+    Lemma crP_dfuel_layer_mon_set K ℓ1 ℓ2 d μ :
+      (ℓ1 <= ℓ2)%ordi →
+      ([∗ set] k ∈ K, crP_dfuel k ℓ2 d μ) ⊢ |==> ([∗ set] k ∈ K, crP_dfuel k ℓ1 d μ).
+    Proof.
+      iIntros (LE) "H". iApply big_sepS_bupd. iApply (big_sepS_impl with "H").
+      iModIntro. iIntros. by iApply crP_dfuel_layer_mon.
+    Qed.
+
     (** One unit at a strictly higher layer converts to any budget below. *)
     Local Lemma crP_fuel_val_extend k (L1 L2 : layer) μ :
       ltL L1 L2 →

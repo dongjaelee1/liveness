@@ -1,5 +1,5 @@
 From iris.proofmode Require Import proofmode.
-From lantana.base_logic Require Export invariants.
+From lantana.base_logic Require Export invariants depth.
 From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
@@ -231,6 +231,58 @@ Section proof.
       lwp_pures.
       iModIntro. lwp_finish.
       iModIntro. iApply ("HΦ" with "[$]").
+  Qed.
+
+  (** ** Depth-form specifications
+
+      The same specifications with the budget replaced by one unit of carrier
+      fuel one depth up. A client charges a fixed unit per call instead of
+      destructing a measured specification at its setup and summing budgets;
+      the budget is chosen inside the proof, where it belongs. *)
+  Lemma Flag_init_dspec :
+    ⊢ ∀ lc i G g K ℓ m C,
+    l{{{ thread_expr i C (Flag.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_dfuel g 0 1 1) ∗
+         crP_obls g ℓ K }}}
+      Flag.init #() @ i
+    l{{{ (x : loc) k, RET #x; thread_expr i C (#x) ∗ £ lc ∗ thP_carriers i G ∗
+                      (⌜k ∉ K⌝) ∗
+                      crP_obls g ℓ ({[k]} ∪ K) ∗
+                      oblP_fuel k ℓ m ∗
+                      flag_tk x k ∗ is_flag x k ℓ }}}.
+  Proof.
+    iPoseProof (Flag_init_spec) as (μ) "#S".
+    iIntros (lc i G g K ℓ m C Φ) "!> (TE& TG& GF& Cg) HΦ".
+    iMod (crP_dfuel_to_fuel_set _ _ 0 μ with "GF") as "GF".
+    iApply ("S" with "[$TE $TG $GF $Cg] HΦ").
+  Qed.
+
+  Lemma Flag_set_dspec :
+    ⊢ ∀ lc i l G g K k ℓ ℓg C,
+    l{{{ thread_expr i C (Flag.set #(l : loc)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_dfuel g 0 1 1) ∗
+         crP_obls g ℓg K ∗ ⌜ k ∈ K ⌝ ∗
+         flag_tk l k ∗
+         is_flag l k ℓ }}}
+      Flag.set #l @ i
+    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗
+                  crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}}.
+  Proof.
+    iPoseProof (Flag_set_spec) as (μ) "#S".
+    iIntros (lc i l G g K k ℓ ℓg C Φ) "!> (TE& TG& GF& Gg& %Ink& HU& #IF) HΦ".
+    iMod (crP_dfuel_to_fuel_set _ _ 0 μ with "GF") as "GF".
+    iApply ("S" with "[$TE $TG $GF $Gg $HU $IF //] HΦ").
+  Qed.
+
+  Lemma Flag_wait_dspec :
+    ⊢ ∀ lc i l G k ℓ C,
+    l{{{ thread_expr i C (Flag.wait #(l : loc)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_dfuel g (ℓ ⊕ 1)%ordi 1 1) ∗
+         is_flag l k ℓ }}}
+      Flag.wait #l @ i
+    l{{{ RET #1; thread_expr i C (#1) ∗ £ lc ∗ thP_carriers i G ∗ oblP_discharged k }}}.
+  Proof.
+    iPoseProof (Flag_wait_spec) as (μ) "#S".
+    iIntros (lc i l G k ℓ C Φ) "!> (TE& TG& GF& #IF) HΦ".
+    iMod (crP_dfuel_to_fuel_set _ _ 0 μ with "GF") as "GF".
+    iApply ("S" with "[$TE $TG $GF $IF] HΦ").
   Qed.
 
 End proof.
