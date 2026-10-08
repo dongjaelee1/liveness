@@ -3,7 +3,8 @@ From iris.prelude Require Import options.
 From lantana.trace Require Export guarantee_infer itrprop_fixpoint.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
-From lantana.algebra Require Import ordinal_existential_properties axioms.
+From lantana.algebra Require Import ordinal_existential_properties.
+From lantana.prelude Require Import axioms.
 
 (** * Guarantees of fixpoints, recursive structures ([nest], [renew]) *)
 

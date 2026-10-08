@@ -1,7 +1,7 @@
 From iris.prelude Require Import options.
 From lantana.trace Require Export temporal_formula.
 From iris.algebra Require Import mono_list.
-From lantana.algebra Require Import axioms. (* func_ext *)
+From lantana.prelude Require Import axioms. (* func_ext *)
 
 (** * Chains of untils
 

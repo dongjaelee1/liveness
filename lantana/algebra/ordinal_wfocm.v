@@ -1,7 +1,8 @@
 (** The ordinals of the [Ordinal] library with Hessenberg addition form a well-founded ordered
     commutative monoid ([WFOCM]). *)
 
-From lantana.algebra Require Export ordinal_facts wfocm.
+From lantana.prelude Require Export ordinal_facts.
+From lantana.algebra Require Export wfocm.
 
 Global Program Instance ord_OCM : OCM.t Ord.le Hessenberg.add :=
   OCM.Build_t _ _ _ Ord.O _ _ _ _ _ _ _.

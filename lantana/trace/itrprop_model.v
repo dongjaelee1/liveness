@@ -3,7 +3,8 @@ From iris.prelude Require Import options.
 From lantana.trace Require Export itrprop_fixpoint.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
-From lantana.algebra Require Import ordinal_existential_properties axioms.
+From lantana.algebra Require Import ordinal_existential_properties.
+From lantana.prelude Require Import axioms.
 
 (** * The model of internalized trace properties
 

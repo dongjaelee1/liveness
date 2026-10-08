@@ -1,6 +1,6 @@
 From iris.prelude Require Import options.
 From lantana.trace Require Export trace_prop.
-From lantana.algebra Require Import axioms.
+From lantana.prelude Require Import axioms.
 
 (** * Rules for trace properties ([trProp])
 

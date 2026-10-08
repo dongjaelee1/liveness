@@ -1,6 +1,6 @@
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export language.
-From lantana.algebra Require Import axioms.
+From lantana.prelude Require Import axioms.
 
 (** * Trace predicates
 

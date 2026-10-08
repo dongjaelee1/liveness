@@ -34,10 +34,12 @@ lantana/ordinal/wf_rel.v
 lantana/ordinal/zorn.v
 lantana/ordinal/ordinal_facts.v
 
+# prelude: Rocq-generic facts, no Iris
+lantana/prelude/axioms.v
+lantana/prelude/wf_structs.v
+lantana/prelude/ordinal_facts.v
+
 # Rocq-level mathematics and cameras
-lantana/algebra/axioms.v
-lantana/algebra/wf_structs.v
-lantana/algebra/ordinal_facts.v
 lantana/algebra/list_of_sets.v
 lantana/algebra/ocm.v
 lantana/algebra/wfocm.v

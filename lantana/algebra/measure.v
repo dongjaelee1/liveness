@@ -3,8 +3,8 @@
     [η] of the supremum of all measures at lower layers. *)
 
 From stdpp Require Import base.
-From lantana.algebra Require Import axioms.
-From lantana.algebra Require Export ordinal_facts.
+From lantana.prelude Require Import axioms.
+From lantana.prelude Require Export ordinal_facts.
 
 Class layer_class (L : Type) := {
     ltL : L -> L -> Prop;
