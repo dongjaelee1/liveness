@@ -435,17 +435,20 @@ Section ltl.
     iDestruct "H" as "[_ H]". by iApply "IH".
   Qed.
 
-  Lemma itrProp_nu_always_ext G τ : itrProp_external (itrProp_nu (F_always G)) τ ↔ tr_always (itrProp_external G) τ.
+  (** On traces, [ν X. G ∧ ○X] is [□ G]. *)
+  Lemma itrProp_nu_always_ext G : itrProp_external (itrProp_nu (F_always G)) ⊆ (□ itrProp_external G)%R.
   Proof.
-    rewrite itrProp_nu_ext. destruct τ as [n τf]. split.
-    - intros (R & HR & Hτ).
-      assert (Hk : ∀ k, R (n + k, τf)).
-      { intros k. induction k as [|k IHk]; first by rewrite Nat.add_0_r.
-        destruct (HR _ IHk) as [_ Hnext]. by rewrite Nat.add_succ_r. }
-      intros m Hm. replace m with (n + (m - n)) by lia. by destruct (HR _ (Hk (m - n))).
-    - intros Hal. exists (tr_always (itrProp_external G)). split; last done.
-      intros [n' τf'] Hal'. split; first (apply Hal'; lia).
-      intros m Hm. apply Hal'. simpl in Hm. lia.
+    intros [n τf]. rewrite itrProp_nu_ext. intros (R & HR & Hτ).
+    assert (Hk : ∀ k, R (n + k, τf)).
+    { intros k. induction k as [|k IHk]; first by rewrite Nat.add_0_r.
+      destruct (HR _ IHk) as [_ Hnext]. by rewrite Nat.add_succ_r. }
+    intros m Hm. replace m with (n + (m - n)) by lia. by destruct (HR _ (Hk (m - n))).
+  Qed.
+  Lemma itrProp_nu_always_ext' G : (□ itrProp_external G)%R ⊆ itrProp_external (itrProp_nu (F_always G)).
+  Proof.
+    intros [n τf] Hal. rewrite itrProp_nu_ext. exists (tr_always (itrProp_external G)). split; last done.
+    intros [n' τf'] Hal'. split; first (apply Hal'; lia).
+    intros m Hm. apply Hal'. simpl in Hm. lia.
   Qed.
 
   (** A ranked until. *)

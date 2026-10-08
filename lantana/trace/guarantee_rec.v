@@ -191,26 +191,23 @@ Section renew.
     iMod (untilI_guar_discharge_lc with "LC Kp Kk U [$HQ $R]") as "([$ $]& $& $)"; done.
   Qed.
 
-  (** On traces, [ν X. ◇(G ∧ X)] is [◇G]. *)
-  Lemma itrProp_nu_renew_ext G τ : itrProp_external (itrProp_nu (F_renew G)) τ ↔ itrProp_external (itrProp_finally G) τ.
+  (** On traces, [ν X. ◇(G ∧ X)] is [◇ G]: the eventuality is not strict. *)
+  Lemma itrProp_nu_renew_ext G : itrProp_external (itrProp_nu (F_renew G)) ⊆ (◇ itrProp_external G)%R.
   Proof.
-    rewrite itrProp_nu_ext. destruct τ as [n τf]. rewrite /=. split.
-    - intros (R & HR & Hτ). destruct (HR _ Hτ) as (m & Hm & [HG _] & _).
-      exists m. split_and!; [done|done|by intros].
-    - intros (m & Hm & HG & _).
-      exists (λ τ', ∃ m', τ'.1 ≤ m' ∧ itrProp_external G (m', τ'.2)). split; last by exists m.
-      intros [n' τf'] (m' & Hm' & HG'). exists m'. split_and!; [done| |by intros].
-      split; first done. by exists m'.
+    intros [n τf]. rewrite itrProp_nu_ext /=. intros (R & HR & Hτ).
+    destruct (HR _ Hτ) as (m & Hm & [HG _] & _). exists m. split_and!; [done|done|by intros].
+  Qed.
+  Lemma itrProp_nu_renew_ext' G : (◇ itrProp_external G)%R ⊆ itrProp_external (itrProp_nu (F_renew G)).
+  Proof.
+    intros [n τf]. rewrite itrProp_nu_ext /=. intros (m & Hm & HG & _).
+    exists (λ τ', ∃ m', τ'.1 ≤ m' ∧ itrProp_external G (m', τ'.2)). split; last by exists m.
+    intros [n' τf'] (m' & Hm' & HG'). exists m'. split_and!; [done| |by intros].
+    split; first done. by exists m'.
   Qed.
 
-  (** [G] infinitely often: always a live finally, renewed in an invariant. *)
-  Lemma itrProp_always_finally_ext G n τf :
-    itrProp_external (itrProp_always (itrProp_finally G)) (n, τf) ↔ ∀ m, n ≤ m → ∃ l, m ≤ l ∧ itrProp_external G (l, τf).
-  Proof.
-    rewrite /=. split.
-    - intros H m Hm. destruct (H m Hm) as (l & ? & ? & _). eauto.
-    - intros H m Hm. destruct (H m Hm) as (l & ? & ?). exists l. split_and!; [done|done|by intros].
-  Qed.
+  (** [□ ◇ G] reads as [□ ◇] of the reading of [G]: [G] infinitely often. *)
+  Lemma itrProp_always_finally_ext G : itrProp_external (□ ◇ G)%ITR = (□ ◇ itrProp_external G)%R.
+  Proof. done. Qed.
   Lemma always_finally_temporal N N' q (Q : iProp Σ) :
     ⊢ alwaysI N (∃ k, finallyI N' k q Q) ⊨ₜ itrProp_always (itrProp_finally (itrProp_sem Q)).
   Proof.
