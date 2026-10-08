@@ -141,14 +141,15 @@ names the underlying lemmas.
 
 | Paper rule | Rocq (`triple.v`) | Underlying |
 |---|---|---|
-| STEP-PURE, STEP-PURE-LC, STEP-PURE-WIT | `fbtriple_step_pure`, `fbtriple_step_pure_lc`, `fbtriple_step_pure_wit1` (one obligation `k`, as displayed) and `fbtriple_step_pure_wit` (a set `R` of obligations, each reported as `witP_cred r 1 ∨ oblP_discharged r`) | `lwp_pure_step` (`program_logic/lifting.v`, HeapLang instance in `lantana_heap_lang/primitive_laws.v`) |
+| STEP-PURE, STEP-PURE-LC, STEP-PURE-WIT | `fbtriple_step_pure`, `fbtriple_step_pure_lc`, `fbtriple_step_pure_wit1` (one obligation `k`, as displayed) and `fbtriple_step_pure_wit` (a set `R` of obligations, each reported as `witP_cred r 1 ∨ oblP_discharged r`). These step to a value; `fbtriple_pure_step` (not displayed in the paper) takes a pure step to any expression, such as a function call's β-step | `lwp_pure_step` (`program_logic/lifting.v`, HeapLang instance in `lantana_heap_lang/primitive_laws.v`) |
 | STEP-REF / STEP-STORE / STEP-LOAD | `fbtriple_step_ref` / `fbtriple_step_store` / `fbtriple_step_load` | `lwp_alloc` / `lwp_store` / `lwp_load` (`lantana_heap_lang/primitive_laws.v`) |
 | FORK* | `fbtriple_fork1` (as displayed) and `fbtriple_fork` (moves a set `K ⊆ K1` of obligations to the child); the child's premise is a top-level triple for every thread `j` and carrier `g2`, ending with no carriers | `lwp_fork_step` (`lantana_heap_lang/primitive_laws.v`) |
 | EXIT | `fbtriple_exit`; `fbtriple_top_lwp` turns a top-level triple ending with no carriers into the `lwp` that Theorem 1 consumes | value case of `lwp`; `thread_terminate` (`program_logic/sfgupd.v`) |
 | FINALLY-EXIT* | `fbtriple_finally_exit` (the thread's last pure step discharges `finally (exits v@i)`; see above) | `tf_until_discharge`, `carrier_delete`; the case studies use the same reasoning packaged as `thread_expr_exit` (`lantana_heap_lang/primitive_laws.v`) |
 | FINALLY-ALLOC* | `fbtriple_finally_alloc` | `tf_until_alloc` (`program_logic/temporal_logic.v`) |
-| BIND | `fbtriple_bind` (the premise is at context `K ++ C`) | `lwp_bind` (`program_logic/weakestpre.v`) |
-| FRAME | `fbtriple_frame` | `lwp_strong_mono` |
+| BIND | `fbtriple_bind` (the premise is at context `K ++ C`); for the general form, `fbtriple_gen_bind`, whose first postcondition names the intermediate carriers | `lwp_bind` (`program_logic/weakestpre.v`) |
+| FRAME | `fbtriple_frame`; `fbtriple_gen_frame` for the general form | `lwp_strong_mono` |
+| (not displayed) moving precondition resources into the context | `fbtriple_wand_pre`, `fbtriple_gen_wand_pre`: `(R -∗ {P} e {Q}) ⊢ {P ∗ R} e {Q}`, which holds because triples are not persistent | |
 | UPD-ELIM | `fbtriple_upd_elim` (fancy update), `fbtriple_gupd_elim` (ghost update) | `fupd_lwp`, `sfgupd_elim_lwp` (`program_logic/weakestpre.v`) |
 | CARRIER-ALLOC | `fbtriple_carrier_alloc` (same post-carriers in premise and conclusion) | `carrier_alloc` (`program_logic/sfgupd.v`) |
 | CARRIER-DELETE | `fbtriple_carrier_delete` (same post-carriers in premise and conclusion) | `carrier_delete` (`program_logic/sfgupd.v`) |
@@ -160,6 +161,7 @@ names the underlying lemmas.
 | WIT-IND | `fbtriple_wit_ind` (as displayed: a persistent premise, and a non-persistent triple as the induction hypothesis) | `wit_layer_ind` (`base_logic/opreds.v`) |
 | FUELS-ADD / FUELS-UNION / FUELS-EMPTY / FUELS-LAYER | `fuels_add` / `fuels_union` / `fuels_empty` (generalized by `fuels_weaken`) / `fuels_layer` | `crP_fuel_add_set` / big-op union / empty big-op / `crP_fuel_extend_set` (`base_logic/opreds.v`) |
 | FUELS-MONO (fuel can be lowered to a smaller measure) | `fuels_mono` | `crP_fuel_mon_set` (`base_logic/opreds.v`) |
+| (not displayed) layers compared as ordinals | `fuels_layer_eq` (`ℓ1 == ℓ2`, e.g. `0 ⊕ 1` and `1`) | `crP_fuel_layer_eq_set` |
 | UNTIL-DONE-FALSE / UNTIL-SPLIT | `until_done_false` / `until_split` | `tf_until_discharged_false` / `tf_until_fractional` (also `tf_until_frac_split`, `tf_until_frac_add`) |
 | LÖB / LC-SPEND | `lob` / `lc_spend` | Löb induction of Transfinite Iris (`iLöb`) / `lc_fupd_elim_later_ord` (`base_logic/fancy_updates.v`); see also `tlc_later` (`base_logic/later_credits.v`) |
 | persistence facts | `always_persistent`, `persistently_persistent`, `persistent_dup`, `wit_layer_persistent`, `obl_done_persistent` | |
@@ -171,7 +173,7 @@ triple-level step rules state the paper's layer-0 form.
 
 | Paper | Rocq | File (under `lantana/`) |
 |---|---|---|
-| `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `cfg`, `thread_pool`, `thread_step`, `thread_done`, `trace`, `behavior` (please ignore `κ : list (observation Λ)`, which is never used) | `program_logic/language.v` |
+| `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `cfg`, `thread_pool`, `thread_step`, `thread_done`, `trace`, `behavior` (please ignore `κ : list (observation Λ)`, which is never used). A behavior also lets a scheduled stuck thread stutter (`thread_stuck`), so executions that get stuck are behaviors | `program_logic/language.v` |
 | temporal properties `Φ, Ψ` and `⟦·⟧_t` | syntax `tp`, interpretation `tp_trace`; `Always` = `tr_always`, `Until` = `tr_until`, `Finally` = `tr_eventually` | `program_logic/temporal_property.v` |
 | `Fair` (fair scheduling) | `fair_scheduling` | `program_logic/temporal_property.v` |
 | logical assertions `φ` and `⟦·⟧_l` | syntax `tf`, interpretation `⟦·⟧ₗ` | `program_logic/temporal_logic.v` |
@@ -184,8 +186,8 @@ triple-level step rules state the paper's layer-0 form.
 | model update modality | `mupd` / `fmupd`; the `lwp`-facing forms are `sfmupd`, `sfgupd`, and `lwpupd` | `base_logic/mupd.v`, `program_logic/sfmupd.v`, `program_logic/sfgupd.v`, `program_logic/weakestpre.v` |
 | fair-scheduler invariant `H` | `owit_inv` | `base_logic/owit.v` |
 | state interpretation `S` | `state_interp` (heap-lang instance) and `history_interp` (wrapper for adequacy proof) | `lantana_heap_lang/primitive_laws.v`, `program_logic/history_interp.v` |
-| **Theorem 1 (Adequacy)** | `lwp_adequacy` | `program_logic/adequacy.v` |
-| Iris-style safety (cf. Iris's `adequate`) | `lwp_adequacy_safety_iris`: in every fair *run* the scheduled thread is never stuck, and whenever thread `j` is a value `v`, its postcondition holds (`safety_iris`). A `run` is a behavior in which a stuck scheduled thread may also repeat its configuration (`thread_stuck`), so stuck executions are runs; every behavior is a run (`behavior_run`) | `program_logic/adequacy_iris.v`, `program_logic/language.v`, `program_logic/temporal_property.v` |
+| **Theorem 1 (Adequacy)** | `lwp_adequacy`, for `NotStuck` weakest preconditions (a stuck scheduled thread contradicts the reducibility they prove) | `program_logic/adequacy.v` |
+| Iris-style safety (cf. Iris's `adequate`) | `lwp_adequacy_safety_iris`: in every fair behavior the scheduled thread is never stuck, so no stuck transition happens, and whenever thread `j` is a value `v`, its postcondition holds (`safety_iris`). It assumes the same behaviors as `lwp_adequacy` | `program_logic/adequacy_iris.v`, `program_logic/language.v`, `program_logic/temporal_property.v` |
 
 ### Case studies (§2 to §7)
 
@@ -194,7 +196,7 @@ All in `lantana_heap_lang/examples/`.
 | Paper | Rocq | File |
 |---|---|---|
 | Flag module: `init`/`set`/`wait`; `isFlag`; `FlagObl`; SPEC-INIT/SPEC-SET/SPEC-WAIT | `init`/`set`/`wait`; `is_flag` (syntactic form `is_flag_tf`); `flag_tk`; `Flag_init_fbspec` / `Flag_set_fbspec` / `Flag_wait_fbspec` (from `Flag_*_spec`) | `flag.v` |
-| `main` (§2) and its trace property | `main`, `FlagFork_main_fbspec` (texan form `FlagFork_main_spec`), end-to-end `main_adequacy` | `flag_fork.v` |
+| `main` (§2) and its trace property | `main`, `FlagFork_main_fbspec` (texan form `FlagFork_main_spec`), end-to-end `main_adequacy`; `FlagFork_main_fbspec_rules` proves the same specification with the rules of `triple.v` and the flag specifications only, following §2's walkthrough | `flag_fork.v`, `flag_fork_rules.v` |
 | `nest` / `nondet` (§4.3); SPEC-NEST/SPEC-NONDET | `nest` / `nondet`; `Nondet_nest_fbspec` / `Nondet_nondet_fbspec` (from `Nondet_*_spec`) | `nondet.v` |
 | Handoff: `send`/`receive`; `HandoffBuf`; `isHandoff`; `TaskSpec`; SPEC-SEND/SPEC-RECEIVE | `send`/`receive`; `handoff_inv`; `is_handoff`; `is_task` (in the paper's format: `is_task_fbtriple`); `Handoff_send_fbspec` / `Handoff_receive_fbspec` (from `Handoff_*_spec`) | `handoff.v` |
 | `handoffMain` (§5.2); SPEC-HANDOFF-MAIN | `main`, `main_fbspec` (texan form `main_spec`), `handoff_client_adequacy` | `handoff_client.v` |
@@ -209,9 +211,11 @@ instantiations of Theorem 1, deriving the trace-level temporal property of the
 respective client program. The `*_safety_adequacy` theorems
 (`flag_client_safety_adequacy`, `main_safety_adequacy`,
 `handoff_client_safety_adequacy`, `task_queue_client_safety_adequacy`)
-instantiate `lwp_adequacy_safety_iris` for the same programs: in every fair run,
+instantiate `lwp_adequacy_safety_iris` for the same programs: in every fair behavior,
 the scheduled thread is never stuck, and each thread that terminates returns the
-value its specification promises.
+value its specification promises. Since both theorems assume the same behaviors, the
+`*_liveness_safety` corollaries (`main_liveness_safety`, `handoff_client_liveness_safety`,
+`task_queue_client_liveness_safety`, `flag_client_liveness_safety`) state both at once.
 `flag_client.v` uses adequacy to prove a property about a memory location, beyond termination;
 its threads' closed specifications are `writer_fbspec` and `reader_fbspec`.
 `paradox.v` proves the unsoundness counterexample remarked at the end of §6.2.

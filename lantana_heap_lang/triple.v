@@ -193,6 +193,19 @@ Section rules.
     iApply ("H" with "[$TE $TG $HP]"). iIntros (v) "(TE& HQ)". iApply "HΦ". iFrame.
   Qed.
 
+  (** Resources of a precondition can move into the proof context, since a triple is not
+      persistent. The converse follows from [fbtriple_gen_conseq]. *)
+  Lemma fbtriple_gen_wand_pre s i C E G P R e Q :
+    (R -∗ ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄) ⊢ ⦃ P ∗ R ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄.
+  Proof.
+    rewrite /fbtriple_gen. iIntros "H %Φ (TE& TG& HP& HR) HΦ".
+    iApply ("H" with "HR [$TE $TG $HP] HΦ").
+  Qed.
+
+  Lemma fbtriple_wand_pre s i C E G G' P R e Q :
+    (R -∗ ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G') ⊢ ⦃ P ∗ R ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+  Proof. rewrite /fbtriple. apply fbtriple_gen_wand_pre. Qed.
+
   (** UPD-ELIM, for Iris's fancy update and for Lantana's ghost update. *)
   Lemma fbtriple_upd_elim s i C E G G' P e Q :
     ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G' ⊢ ⦃ |={E}=> P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
@@ -411,6 +424,29 @@ Section rules.
     iIntros "%w ($& _)".
   Qed.
 
+  (** A pure step to any expression [e2], not only to a value: the proof continues from [e2],
+      with the step's later credits. STEP-PURE-LC is the case where [e2] is a value. A proof
+      needs this for steps such as a function call's β-reduction. *)
+  Lemma fbtriple_gen_pure_step s i C E G P e1 e2 φ Q (α : Ord.t) :
+    PureExec φ 1 e1 e2 → φ →
+    ⦃ P ∗ £ α ⦄^G e2 @ s; i; C; E ⦃ v, Q v ⦄ -∗
+    ⦃ fuels G 0 1 ∗ P ⦄^G e1 @ s; i; C; E ⦃ v, Q v ⦄.
+  Proof.
+    rewrite /fbtriple_gen. iIntros (Hexec Hφ) "H %Φ (TE& TG& HF& HP) HΦ".
+    iApply (lifting.lwp_pure_step_simple 1 G ∅ α s i E e1 e2 φ Φ
+              (λ i e, thread_expr i C e)); [done|].
+    iFrame "TE TG". iSplitL "HF"; first by iApply fuels_any_layer.
+    iSplitR; first by rewrite big_sepS_empty.
+    iIntros "TE TG _ LC". iModIntro. iApply ("H" with "[$TE $TG $HP LC] HΦ").
+    by iApply tlc_mult_1.
+  Qed.
+
+  Lemma fbtriple_pure_step s i C E G G' P e1 e2 φ Q (α : Ord.t) :
+    PureExec φ 1 e1 e2 → φ →
+    ⦃ P ∗ £ α ⦄^G e2 @ s; i; C; E ⦃ v, Q v ⦄^G' -∗
+    ⦃ fuels G 0 1 ∗ P ⦄^G e1 @ s; i; C; E ⦃ v, Q v ⦄^G'.
+  Proof. rewrite /fbtriple. apply fbtriple_gen_pure_step. Qed.
+
   (** STEP-REF *)
   Lemma fbtriple_step_ref s i C E G v (α : Ord.t) :
     ⊢ ⦃ fuels G 0 1 ⦄^G (ref (Val v)) @ s; i; C; E
@@ -568,6 +604,10 @@ Section logic.
   (** Fuel of some carriers can be dropped; this generalizes FUELS-EMPTY. *)
   Lemma fuels_weaken G G' ℓ μ : G' ⊆ G → fuels G ℓ μ ⊢ fuels G' ℓ μ.
   Proof. iIntros (HG) "H". by iApply (big_sepS_subseteq with "H"). Qed.
+
+  (** Layers are compared as ordinals. *)
+  Lemma fuels_layer_eq G ℓ1 ℓ2 μ : (ℓ1 == ℓ2)%ordi → fuels G ℓ1 μ ⊣⊢ fuels G ℓ2 μ.
+  Proof. apply crP_fuel_layer_eq_set. Qed.
 
   (** FUELS-LAYER *)
   Lemma fuels_layer G ℓ1 ℓ2 μ : (ℓ1 < ℓ2)%ordi → fuels G ℓ2 1 ⊢ |==> fuels G ℓ1 μ.
