@@ -1,5 +1,5 @@
 From iris.proofmode Require Import proofmode.
-From lantana.base_logic Require Export invariants.
+From lantana.base_logic Require Export invariants depth.
 From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
@@ -284,6 +284,19 @@ Section proof.
       iApply ("TaskQueue_worker_spec" $! true with "[$TEj $TGj $Fg $Qw $IQ]").
       { iPureIntro. split; auto. set_solver. }
       iIntros "%". done.
+  Qed.
+
+  (** ** Depth-form specification of [init]. *)
+  Lemma TaskQueue_init_dspec :
+    ⊢ ∀ (lc : Ord.t) i G ℓ C,
+    l{{{ thread_expr i C (TaskQueue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_dfuel g 0 1 1) ∗ ⌜(1 <= ℓ)%ordi⌝ }}}
+      TaskQueue.init #() @ i
+    l{{{ ql γ, RET ql; thread_expr i C (of_val ql) ∗ £ lc ∗ thP_carriers i G ∗ is_task_queue ql γ ℓ }}}.
+  Proof.
+    iPoseProof (TaskQueue_init_spec) as (μ) "#S".
+    iIntros (lc i G ℓ C Φ) "!> (TE& TG& GF& %Hl) HΦ".
+    iMod (crP_dfuel_to_fuel_set _ _ 0 μ with "GF") as "GF".
+    iApply ("S" with "[$TE $TG $GF //] HΦ").
   Qed.
 
 End proof.

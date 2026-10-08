@@ -125,51 +125,72 @@ Section proof.
       iIntros "(TE& _& TG& Gg)". iApply ("HΦ" with "[$TE $Q_LC $TG $Gg]").
   Qed.
 
+  (** The depth form of [decr_reentrant]'s specification, for clients. *)
+  Lemma decr_reentrant_dspec :
+    ⊢ ∀ lc i G g k K γ ℓg (arg : val) C,
+    l{{{ thread_expr i C (decr_reentrant arg) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_dfuel g 1%ordi 1 1) ∗
+         crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗
+         ∃ (ql : val) (x : loc) (n : Z),
+           ⌜arg = (ql, #x, #n)%V⌝ ∗
+           oblP_fuel k (ℓq ⊕ 1)%ordi (Z.to_nat n)%M ∗
+           flag_tk x k ∗
+           is_decr_reentrant arg γ k }}}
+      decr_reentrant arg @ i
+    l{{{ RET #(); thread_expr i C #() ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ {[k]}) }}}.
+  Proof using queueG0 ticket_lockG0.
+    iPoseProof (decr_reentrant_spec) as (μ) "#S".
+    iIntros (lc i G g k K γ ℓg arg C Φ) "!> (TE& TG& GF& Gg& %Hk& HR) HΦ".
+    iMod (crP_dfuel_to_fuel_set _ _ 0 μ with "GF") as "GF".
+    iApply ("S" with "[$TE $TG $GF $Gg $HR //] HΦ").
+  Qed.
+
   Lemma main_spec :
-    ⊢ ∃ μ, ∀ i g kl,
-    l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (ℓq ⊕ 2)%ordi μ) ∗
+    ⊢ ∀ i g kl,
+    l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_dfuel g (ℓq ⊕ 2)%ordi 2 1) ∗
          crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
          ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ }}}
       main #() @ i
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
   Proof using queueG0 ticket_lockG0.
     unfold main.
-    iPoseProof (TaskQueue_init_spec) as (μ_ti) "TaskQueue_init_spec".
-    iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".
-    iPoseProof (decr_reentrant_spec) as (μ_d) "decr_reentrant_spec".
-    iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
-    (* Internal steps, func calls, wait *)
-    iExists (100 ⊕ μ_ti ⊕ μ_fi ⊕ μ_d ⊕ μ_fw)%M. iIntros (i g kl) "!> % (TE& TG& GF& Cg& HF) HΦ".
-    iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
-    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_ti GF_m]".
-    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fi GF_m]".
-    iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_d GF_fw]".
+    iPoseProof (TaskQueue_init_dspec) as "#TaskQueue_init_dspec".
+    iPoseProof (Flag_init_dspec) as "#Flag_init_dspec".
+    iPoseProof (decr_reentrant_dspec) as "#decr_reentrant_dspec".
+    iPoseProof (Flag_wait_dspec) as "#Flag_wait_dspec".
+    iIntros (i g kl) "!> % (TE& TG& GF& Cg& HF) HΦ".
+    (* One unit per call site (task queue init, flag init, decr, wait) and
+       one for the local steps. The budgets of the callees never appear. *)
+    iMod (crP_dfuel_depth_extend_nat_set _ _ 1 ((((1 ⊕ 1) ⊕ 1) ⊕ 1) ⊕ 1)%M with "GF") as "GF".
+    iPoseProof (crP_dfuel_add_set with "GF") as "[GF GF_fw]".
+    iPoseProof (crP_dfuel_add_set with "GF") as "[GF GF_d]".
+    iPoseProof (crP_dfuel_add_set with "GF") as "[GF GF_fi]".
+    iPoseProof (crP_dfuel_add_set with "GF") as "[GF GF_ti]".
+    iMod (crP_dfuel_to_fuel_set _ _ 0 100 with "GF") as "GF".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure_lc 100.
     lwp_pures.
     lwp_bind (TaskQueue.init _).
-    iMod (crP_fuel_layer_mon_set _ (0)%ordi with "GF_ti") as "GF_ti".
-    { apply ord.O_bot. }
-    iModIntro. iApply ("TaskQueue_init_spec" $! 0 _ _ ℓq with "[$TE $TG $GF_ti]").
+    iMod (crP_dfuel_layer_extend_set _ 0 _ 1 _ 1 with "GF_ti") as "GF_ti".
+    { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.lt_from_nat. lia. }
+    iModIntro. iApply ("TaskQueue_init_dspec" $! 0 _ _ ℓq with "[$TE $TG $GF_ti]").
     { iPureIntro. apply ord.lt_le, ℓq_cond. }
-    iClear "TaskQueue_init_spec".
     iIntros (ql qγ) "(TE& _& TG& #ITQ)".
     lwp_pures.
     lwp_bind (Flag.init _).
-    iMod (carrier_alloc _ _ _ (ℓq ⊕ 1)%ordi (μ_fi ⊕ μ_d ⊕ 97)%M with "TG")
+    iMod (carrier_alloc_d _ _ _ (ℓq ⊕ 1)%ordi 1 ((1 ⊕ 1) ⊕ 1)%M with "TG")
       as "(%& %NinG& TG& Cg0& GF0)".
-    iPoseProof (crP_fuel_add with "GF0") as "[F_init0 GF0]".
-    iPoseProof (crP_fuel_add with "GF0") as "[F_d0 GF0]".
-    iMod (crP_fuel_layer_mon_set _ 0 with "GF_fi") as "F_init".
-    { apply ord.O_bot. }
-    iMod (crP_fuel_layer_mon _ 0 with "F_init0") as "F_init0".
-    { apply ord.O_bot. }
+    iPoseProof (crP_dfuel_add with "GF0") as "[GF0 F_d0]".
+    iPoseProof (crP_dfuel_add with "GF0") as "[GF0 F_init0]".
+    iMod (crP_dfuel_to_fuel _ _ 0 97 with "GF0") as "GF0".
+    iMod (crP_dfuel_layer_extend_set _ 0 _ 1 _ 1 with "GF_fi") as "F_init".
+    { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.lt_from_nat. lia. }
+    iMod (crP_dfuel_layer_extend _ 0 _ 1 _ 1 with "F_init0") as "F_init0".
+    { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.lt_from_nat. lia. }
     iModIntro.
-    iApply ("Flag_init_spec" $! 0 _ _ _ _ _ (ℵ)%M with "[$TE $TG F_init F_init0 $Cg0]").
+    iApply ("Flag_init_dspec" $! 0 _ _ _ _ _ (ℵ)%M with "[$TE $TG F_init F_init0 $Cg0]").
     { iApply big_sepS_union. 1: set_solver. rewrite !big_sepS_singleton. iFrame. }
     iIntros "%ptrx %k (TE& _& TG& _& Cg0& Of0& Ftk& #is_flag)".
     rewrite union_empty_r_L.
-    iClear "Flag_init_spec".
     iPoseProof (crP_fuels_add_carrier with "GF0 GF") as "GF".
     lwp_pures.
     lwp_bind (ChooseNat).
@@ -184,27 +205,26 @@ Section proof.
       etrans; first (eapply Ord.lt_le, Ord.omega_upperbound).
       rewrite Ord.omega_from_peano_lt_set.
       eapply Ord.lt_le, Ord.large_lt_from_wf_set. }
-    iMod (crP_fuel_layer_mon_set _ 1 with "GF_d") as "F_d".
+    iMod (crP_dfuel_layer_mon_set _ 1 with "GF_d") as "F_d".
     { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.le_from_nat. lia. }
-    iMod (crP_fuel_layer_mon _ 1 with "F_d0") as "F_d0".
+    iMod (crP_dfuel_layer_mon _ 1 with "F_d0") as "F_d0".
     { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.le_from_nat. lia. }
     iModIntro.
-    iApply ("decr_reentrant_spec" $! 0 with "[$TE $TG F_d F_d0 $Cg0 Of0 $Ftk]").
+    iApply ("decr_reentrant_dspec" $! 0 with "[$TE $TG F_d F_d0 $Cg0 Of0 $Ftk]").
     { iSplitR "Of0".
       { iApply big_sepS_union. 1: set_solver. rewrite !big_sepS_singleton. iFrame. }
       iSplitR.
       { iPureIntro. set_solver. }
       iExists ql, n. iSplitR; first done. replace (Z.to_nat n) with n by lia.
       iFrame. iFrame "ITQ is_flag". eauto. }
-    iClear "decr_reentrant_spec".
     iIntros "(TE& _& TG& Cg0)".
     iMod (carrier_delete_fuels _ _ _ {[g]} with "TG Cg0 GF") as "[TG GF]". 1-3: set_solver.
     lwp_pures.
     lwp_bind (Flag.wait _).
     iModIntro.
-    iMod (crP_fuel_layer_mon_set _ ((ℓq ⊕ 1) ⊕ 1)%ordi with "GF_fw") as "GF_fw".
+    iMod (crP_dfuel_layer_mon_set _ ((ℓq ⊕ 1) ⊕ 1)%ordi with "GF_fw") as "GF_fw".
     { unfold ℓq. rewrite -!hessenberg.add_from_nat. apply ordArith.le_from_nat. lia. }
-    iApply ("Flag_wait_spec" $! 0 with "[$TE $TG $GF_fw $is_flag]").
+    iApply ("Flag_wait_dspec" $! 0 with "[$TE $TG $GF_fw $is_flag]").
     iIntros "(TE& _& TG& #Od0)".
     do 2 (iModIntro; lwp_pure_one).
     iApply lwpupd_lwp_sfmupd.
@@ -216,24 +236,24 @@ Section proof.
 
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := main #() ]} →
-    Φ = (λ μ, (∃ g kl, finallyP Nl kl 1 (exits #1@i) ∗
-                       ⟨thP_carriers i {[g]} ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
-                        crP_fuel g (ℓq ⊕ 2)%ordi μ⟩)%F) →
+    Φ = (∃ g kl, finallyP Nl kl 1 (exits #1@i) ∗
+                 ⟨thP_carriers i {[g]} ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
+                  crP_dfuel g (ℓq ⊕ 2)%ordi 2 1⟩)%F →
     Ψs = ({[i := (λ _ v, ⌜v = #1⌝)%I]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗
      ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
-     |={⊤}=>m ∃ μ, (⟦Φ μ⟧ₗ ∗
-                   (⟦Φ μ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
+     |={⊤}=>m (⟦Φ⟧ₗ ∗
+              (⟦Φ⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   Proof using queueG0 ticket_lockG0.
     iIntros (HT HP HQ) "TEs TGs".
     iEval (rewrite HT !dom_insert_L dom_empty_L union_empty_r_L) in "TGs".
     rewrite !big_sepS_singleton.
-    iPoseProof (main_spec) as (μ) "main_spec".
-    iMod (carrier_alloc _ _ _ (ℓq ⊕ 2)%ordi μ with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
+    iPoseProof (main_spec) as "#main_spec".
+    iMod (carrier_alloc_d _ _ _ (ℓq ⊕ 2)%ordi 2 1 with "TGs") as "(%g1& %Ning1& TG1& Gg1& Gf1)".
     iMod (tf_until_alloc _ _ _ false (ℓq ⊕ 2)%ordi (ℓq ⊕ 2)%ordi 0 with "Gg1") as "(%kl1& %Hkl1& Gg1& Ofkl1& #Wlkl1& Akl1)". 1: done.
     iMod ("Akl1" $! _ Nl (⌜True⌝)%F (exits #1@i)%F with "[]") as "Ukl1".
     { tf_red. done. }
-    iModIntro. iExists μ. iSplitL "Ukl1 TG1 Gg1 Gf1 Ofkl1".
+    iModIntro. iSplitL "Ukl1 TG1 Gg1 Gf1 Ofkl1".
     { subst Φ.
       tf_red. iExists g1. tf_red. iExists kl1. tf_red.
       rewrite !union_empty_r_L. iFrame. }
@@ -279,15 +299,14 @@ Section adequacy.
   Let Nl := nroot.@ "return".
   Let ℓq : ord.t := (1 ⊕ 1)%ordi.
 
-  Let Φ_tf `{!heapGS Σ} : _ → tf Σ :=
-        λ μ,
+  Let Φ_tf `{!heapGS Σ} : tf Σ :=
           (∃ g kl,
               finallyP Nl kl 1 (exits #1@i) ∗
               ⟨thP_carriers i {[g]} ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
-               crP_fuel g (ℓq ⊕ 2)%ordi μ⟩)%F.
+               crP_dfuel g (ℓq ⊕ 2)%ordi 2 1⟩)%F.
 
-  Lemma tf_to_tp_Φ `{!heapGS Σ} m :
-    tf_to_tp (Φ_tf m) = Φ'.
+  Lemma tf_to_tp_Φ `{!heapGS Σ} :
+    tf_to_tp Φ_tf = Φ'.
   Proof. done. Qed.
 
   Let Σ : gFunctors :=
@@ -333,8 +352,8 @@ Section adequacy.
     { reflexivity. }
     { rewrite /thread_expr /=. iFrame. }
     { iFrame. }
-    iDestruct "H" as (μ) "(HP& H)".
-    iModIntro. iExists (Φ_tf μ). iFrame "HP". iSplit.
+    iDestruct "H" as "(HP& H)".
+    iModIntro. iExists Φ_tf. iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
   Qed.

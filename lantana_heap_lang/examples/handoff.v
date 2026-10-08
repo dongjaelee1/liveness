@@ -1,5 +1,5 @@
 From iris.proofmode Require Import proofmode.
-From lantana.base_logic Require Export invariants.
+From lantana.base_logic Require Export invariants depth.
 From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
@@ -209,6 +209,36 @@ Section proof.
       iApply ("HΦ" with "[$TE $Q_LC $TG]").
     - iDestruct "inv" as "(%&%& _& Gv0)".
       iCombine "Gv Gv0" gives %H. destruct H as [? _]. done.
+  Qed.
+
+  (** ** Depth-form specifications (one unit one depth up instead of a budget). *)
+  Lemma Handoff_send_dspec :
+    ⊢ ∀ lc i (b : loc) (f a : val) G g K K' γ ℓ ℓg C,
+    l{{{ thread_expr i C (Handoff.send #b f a) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_dfuel g 0 1 1) ∗
+         crP_obls g ℓg K' ∗ ⌜ K ⊆ K' ⌝ ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ%ordi 1) ∗
+         b ↦{#(1/2)} NONEV ∗
+         is_task ℓ f a K ∗ is_handoff b γ ℓ }}}
+      Handoff.send #b f a @ i
+    l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}}.
+  Proof.
+    iPoseProof (Handoff_send_spec) as (μ) "#S".
+    iIntros (lc i b f a G g K K' γ ℓ ℓg C Φ) "!> (TE& TG& GF& Gg& %HK& OF& Ptr& IT& #IH) HΦ".
+    iMod (crP_dfuel_to_fuel_set _ _ 0 μ with "GF") as "GF".
+    iApply ("S" with "[$TE $TG $GF $Gg $OF $Ptr $IT $IH //] HΦ").
+  Qed.
+
+  Lemma Handoff_receive_dspec :
+    ⊢ ∀ lc i b g γ ℓ C,
+    l{{{ thread_expr i C (Handoff.receive #(b : loc)) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_dfuel g ℓ 1 1) ∗
+         ghost_var_frac (handoff_γd γ) (1/2)%Qp g ∗
+         is_handoff b γ ℓ }}}
+      Handoff.receive #b @ i
+    l{{{ v, RET v; thread_expr i C (of_val v) ∗ £ lc ∗ thP_carriers i ∅ }}}.
+  Proof.
+    iPoseProof (Handoff_receive_spec) as (μ) "#S".
+    iIntros (lc i b g γ ℓ C Φ) "!> (TE& TG& GF& Gv& #IH) HΦ".
+    iMod (crP_dfuel_to_fuel_set _ _ 0 μ with "GF") as "GF".
+    iApply ("S" with "[$TE $TG $GF $Gv $IH] HΦ").
   Qed.
 
 End proof.
