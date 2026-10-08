@@ -290,7 +290,7 @@ Section adequacy.
   Proof.
     intros τ Beh FS Init1 Init2.
     apply Φ_impl.
-    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ').
+    eapply (lwp_adequacy Σ heap_lang (Build_state σ0 ∅) Θ0 i [] Φ').
     1,2,3,4: eauto.
     iIntros (?). exists 0%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
@@ -321,17 +321,17 @@ Section adequacy.
     iFrame.
   Qed.
 
-  (** Safety: in every fair run, the scheduled thread is never stuck, and once the writer
+  (** Safety: in every fair behavior, the scheduled thread is never stuck, and once the writer
       (resp. the reader) has returned, its value is [#()] (resp. [#1]). *)
   Theorem flag_client_safety_adequacy :
     ∀ (τ : trace heap_lang),
-    run τ →
+    behavior τ →
     fair_scheduling τ →
     (τ.1 = 0) →
     (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
     safety_iris i (λ _ v, v = #()) τ ∧ safety_iris j (λ _ v, v = #1) τ.
   Proof.
-    intros τ Run FS Init1 Init2.
+    intros τ Beh FS Init1 Init2.
     cut (∀ k (Φk : thread_id → val → Prop),
            (∃ Q : thread_id → val → iProp Σ, (@Ψs Σ) !! k = Some Q ∧ ∀ v, (Q k v ⊢ ⌜Φk k v⌝)) →
            safety_iris k Φk τ).
@@ -368,6 +368,21 @@ Section adequacy.
     { iFrame. }
     iDestruct "H" as (m1 m2) "(HP& H)".
     iApply ("H" with "HP").
+  Qed.
+
+  (** Liveness and safety together, over the same fair behaviors: the writer returns [#()] and the reader [#1], and no
+      scheduled thread is ever stuck. *)
+  Corollary flag_client_liveness_safety :
+    ∀ (τ : trace heap_lang),
+    behavior τ →
+    fair_scheduling τ →
+    (τ.1 = 0) →
+    (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+    tp_trace Φ τ ∧ (safety_iris i (λ _ v, v = #()) τ ∧ safety_iris j (λ _ v, v = #1) τ).
+  Proof.
+    intros τ Beh FS Init1 Init2. split.
+    - by apply flag_client_adequacy.
+    - by apply flag_client_safety_adequacy.
   Qed.
 
 End adequacy.

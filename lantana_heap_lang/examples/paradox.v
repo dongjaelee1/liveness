@@ -566,7 +566,7 @@ Section adequacy.
   Proof.
     intros LNLC τ Beh FS Init1 Init2.
     apply Φ_impl.
-    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ').
+    eapply (lwp_adequacy Σ heap_lang (Build_state σ0 ∅) Θ0 i [] Φ').
     1,2,3,4: eauto.
     iIntros (?). exists 10%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".

@@ -490,7 +490,7 @@ Section proof2.
     rewrite decide_False in H2; first lia. intros F. eapply thread_active_and_not_false; eauto.
   Qed.
 
-  Lemma lwp_fix_ti_logic s h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs
+  Lemma lwp_fix_ti_logic h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs
     g v1 v2 Ω1 Ω2 W τf γ (Φ : tp) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
@@ -503,7 +503,7 @@ Section proof2.
     (history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v2 Ω2 W n (dom Θ) ∗
     ([∗ map] i ↦ '(e, Q) ∈ TQ, match to_val e with
                                | Some v => (lift_term i Q) v
-                               | None => lwp_fix s i ⊤ e (lift_term i Q)
+                               | None => lwp_fix NotStuck i ⊤ e (lift_term i Q)
                                end) ∗
     tf_intuit n σ Θ κs v1 Ω1 Φ')
     ⊢ ti_logic Ord.lt Φ (n, τf).
@@ -550,7 +550,7 @@ Section proof2.
       { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
         iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
       iPoseProof (history_interp_lookup with "HI") as "%Hlu".
-      destruct H2 as [TStep | TDone].
+      destruct H2 as [TStep | [TDone | TStuck]].
       + iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
         inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
         assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
@@ -591,7 +591,7 @@ Section proof2.
         remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
         iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, lwpupd j ⊤ e (match to_val e with
                                                             | Some v => lift_term j Q v
-                                                            | None => lwp_fix s j ⊤ e (lift_term j Q)
+                                                            | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                                                             end))%I with "[Efs]" as "Efs".
         { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
           destruct (to_val x) eqn:EQx.
@@ -612,7 +612,7 @@ Section proof2.
           iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                      (match to_val e with
                       | Some v => lift_term j Q v
-                      | None => lwp_fix s j ⊤ e (lift_term j Q)
+                      | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                       end))%I with "[WPs WP Efs]" as "WPs".
           { iApply big_sepM_union.
             { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
@@ -632,7 +632,7 @@ Section proof2.
         * iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                      (match to_val e with
                       | Some v => lift_term j Q v
-                      | None => lwp_fix s j ⊤ e (lift_term j Q)
+                      | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                       end))%I with "[WPs WP Efs]" as "WPs".
           { iApply big_sepM_union.
             { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
@@ -676,6 +676,21 @@ Section proof2.
         1: eauto.
         iApply fupd_mask_intro. 1: set_solver. iIntros "close". iSplit. 1: done.
         iModIntro. iMod "close" as "_". iModIntro. iFrame.
+      + (** The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
+        destruct TStuck as [e1 σ1 Θ1 [= <- <-] LUTi1 [He1 Irr] -> ->].
+        assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
+        { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
+        destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_lookup _ _ _ _ LUTQi1 with "WPs") as "WP".
+        rewrite He1.
+        iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
+        iSpecialize ("WP" $! ctx_id h n σ Θ [] κs). iEval (rewrite !ctx_id_apply) in "WP".
+        iMod ("WP" with "[] [//] [$HI $SIa]") as "WP".
+        { iPureIntro. apply _. }
+        iMod (model_interp_gupd_steps with "WP MI") as "(WP& %& %& %& %& %& MI)".
+        2: eapply LB.
+        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+        iDestruct "WP" as "[%NStuck _]". exfalso.
+        destruct NStuck as (?&?&?&?& PStep). by eapply Irr.
     - rewrite /ti_exist. iDestruct "TF" as "[(%&%&#EA) #TF]".
       iPoseProof (event_obl_model_history_interp_lookup with "[MI $EA]") as "%".
       { iDestruct "MI" as "[$ _]". }
@@ -739,7 +754,7 @@ Section proof2.
       { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
         iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
       iPoseProof (history_interp_lookup with "HI") as "%Hlu".
-      destruct H2 as [TStep | TDone].
+      destruct H2 as [TStep | [TDone | TStuck]].
       + iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
         inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
         assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
@@ -828,7 +843,7 @@ Section proof2.
         remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
         iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, lwpupd j ⊤ e (match to_val e with
                                                             | Some v => lift_term j Q v
-                                                            | None => lwp_fix s j ⊤ e (lift_term j Q)
+                                                            | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                                                             end))%I with "[Efs]" as "Efs".
         { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
           destruct (to_val x) eqn:EQx.
@@ -859,7 +874,7 @@ Section proof2.
           iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                      (match to_val e with
                       | Some v => lift_term j Q v
-                      | None => lwp_fix s j ⊤ e (lift_term j Q)
+                      | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                       end))%I with "[WPs WP Efs]" as "WPs".
           { iApply big_sepM_union.
             { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
@@ -920,7 +935,7 @@ Section proof2.
         * iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                      (match to_val e with
                       | Some v => lift_term j Q v
-                      | None => lwp_fix s j ⊤ e (lift_term j Q)
+                      | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                       end))%I with "[WPs WP Efs]" as "WPs".
           { iApply big_sepM_union.
             { subst. apply map_disjoint_dom. rewrite dom_fmap_L dom_insert_lookup_L; eauto.
@@ -1016,16 +1031,31 @@ Section proof2.
             rewrite H2 TRn1. eauto. }
         1: eauto. 1: eauto. 1: done.
         iFrame.
+      + (** The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
+        destruct TStuck as [e1 σ1 Θ1 [= <- <-] LUTi1 [He1 Irr] -> ->].
+        assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
+        { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
+        destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_lookup _ _ _ _ LUTQi1 with "WPs") as "WP".
+        rewrite He1.
+        iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
+        iSpecialize ("WP" $! ctx_id h n σ Θ [] κs). iEval (rewrite !ctx_id_apply) in "WP".
+        iMod ("WP" with "[] [//] [$HI $SIa]") as "WP".
+        { iPureIntro. apply _. }
+        iMod (model_interp_gupd_steps with "WP MI") as "(WP& %& %& %& %& %& MI)".
+        2: eapply LB.
+        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+        iDestruct "WP" as "[%NStuck _]". exfalso.
+        destruct NStuck as (?&?&?&?& PStep). by eapply Irr.
   Qed.
 
-  Lemma lwp_ti_logic s h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ (Φ : tp) :
+  Lemma lwp_ti_logic h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ (Φ : tp) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
     owit_inv_lb (fair_sched_fun γ) Ω W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     ((history_interp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
       model_interp g v Ω W n (dom Θ) ∗
-      (|={⊤}=>m ∃ (Φ' : tf Σ), (⌜ tf_to_tp Φ' = Φ ⌝) ∗ ⟦Φ'⟧ₗ ∗ (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }}))))
+      (|={⊤}=>m ∃ (Φ' : tf Σ), (⌜ tf_to_tp Φ' = Φ ⌝) ∗ ⟦Φ'⟧ₗ ∗ (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ v, lift_term i Ψ v }}))))
       ⊢ |={⊤}=> ti_logic Ord.lt Φ (n, τf).
   Proof.
     iIntros (BEH FS LB HIST) "([HI SIa]& MI& WPs)".
@@ -1045,7 +1075,7 @@ Section proof2.
     iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
                lwpupd i ⊤ e (match to_val e with
                              | Some v => (lift_term i Q) v
-                             | None => lwp_fix s i ⊤ e (lift_term i Q)
+                             | None => lwp_fix NotStuck i ⊤ e (lift_term i Q)
                              end))%I with "[WPs]" as "WPs".
     { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x.
       rewrite lwp_unfold_fix. iEval (rewrite lwp_fix_unfold_fix /lwp_pre) in "H".
@@ -1065,7 +1095,7 @@ End proof2.
 
 Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
-  s σ Θ i κs (Φ : tp) :
+  σ Θ i κs (Φ : tp) :
   ∀ (τ : trace Λ),
   behavior τ →
   fair_scheduling τ →
@@ -1082,7 +1112,7 @@ Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
      (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
       |={⊤}=>m (∃ (Φ' : tf Σ),
                   (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
-                  (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))) →
+                  (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ lift_term i Ψ }}))))) →
   tp_trace Φ τ.
 Proof.
   intros τ BEH FS INIT1 INIT2 Hwp.
@@ -1106,7 +1136,7 @@ Proof.
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (£ c -∗ ([∗ set] i ∈ dom Θ, thP_carriers i ∅) -∗
              |={⊤}=>m (∃ (Φ' : tf Σ), (⌜ tf_to_tp Φ' = Φ ⌝) ∗ (⟦Φ'⟧ₗ) ∗
-                                     (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ s; i; ⊤ {{ lift_term i Ψ }}))))).
+                                     (⟦Φ'⟧ₗ -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lwpupd i ⊤ e (lWP e @ NotStuck; i; ⊤ {{ lift_term i Ψ }}))))).
   { iIntros (Htemp). destruct (Hwp Htemp). iExists x. iApply H0. }
   eapply sat_wand; cycle 1.
   { eapply Hwp'. }

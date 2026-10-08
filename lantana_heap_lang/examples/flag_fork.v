@@ -221,7 +221,7 @@ Section adequacy.
   Proof.
     intros τ Beh FS Init1 Init2.
     apply Φ_impl.
-    eapply (lwp_adequacy Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] Φ').
+    eapply (lwp_adequacy Σ heap_lang (Build_state σ0 ∅) Θ0 i [] Φ').
     1,2,3,4: eauto.
     iIntros (?). exists 0%ord.
     iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
@@ -248,17 +248,17 @@ Section adequacy.
     iFrame.
   Qed.
 
-  (** Safety: in every fair run, the scheduled thread is never stuck, and once [main]
+  (** Safety: in every fair behavior, the scheduled thread is never stuck, and once [main]
       has returned, its value is [#42]. *)
   Theorem main_safety_adequacy :
     ∀ (τ : trace heap_lang),
-    run τ →
+    behavior τ →
     fair_scheduling τ →
     (τ.1 = 0) →
     (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
     safety_iris i (λ _ v, v = #42) τ.
   Proof.
-    intros τ Run FS Init1 Init2.
+    intros τ Beh FS Init1 Init2.
     eapply (lwp_adequacy_safety_iris Σ heap_lang (Build_state σ0 ∅) Θ0 i [] i).
     1,2,3,4: eauto.
     iIntros (?). exists 0%ord.
@@ -285,6 +285,21 @@ Section adequacy.
     { iFrame. }
     iDestruct "H" as (μ) "(HP& H)".
     iApply ("H" with "HP").
+  Qed.
+
+  (** Liveness and safety together, over the same fair behaviors: [main] returns [#42], and no
+      scheduled thread is ever stuck. *)
+  Corollary main_liveness_safety :
+    ∀ (τ : trace heap_lang),
+    behavior τ →
+    fair_scheduling τ →
+    (τ.1 = 0) →
+    (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+    tp_trace Φ τ ∧ (safety_iris i (λ _ v, v = #42) τ).
+  Proof.
+    intros τ Beh FS Init1 Init2. split.
+    - by apply main_adequacy.
+    - by apply main_safety_adequacy.
   Qed.
 
 End adequacy.

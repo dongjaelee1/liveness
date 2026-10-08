@@ -34,7 +34,7 @@ Section proof2.
   Lemma lwp_fix_safety_iris_tiProp
     h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs
     g v Ω1 Ω2 W τf γ (i : thread_id) (Φ : thread_id → val Λ → Prop) :
-    run (n, τf) →
+    behavior (n, τf) →
     beh_fscnt (n, τf) γ →
     obls_le Ω1 Ω2 →
     owit_inv_lb (fair_sched_fun γ) Ω2 W →
@@ -234,7 +234,7 @@ Section proof2.
 
   Lemma lwp_safety_iris_tiProp h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
     (i : thread_id) (Φ : thread_id → val Λ → Prop) :
-    run (n, τf) →
+    behavior (n, τf) →
     beh_fscnt (n, τf) γ →
     owit_inv_lb (fair_sched_fun γ) Ω W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
@@ -275,14 +275,15 @@ Section proof2.
 
 End proof2.
 
-(** Iris-style safety (cf. Iris's [adequate]): in every fair run from the initial configuration,
+(** Iris-style safety (cf. Iris's [adequate]): in every fair behavior from the initial configuration,
     the scheduled thread is never stuck, and once thread [j] is a value [v], [Φ j v] holds.
-    Runs include executions that get stuck (see [run]), so this is not implied by the hypotheses. *)
+    Behaviors include executions that get stuck (see [behavior]), so this is not implied by the
+    hypotheses: the theorem proves that no stuck transition happens. *)
 Theorem lwp_adequacy_safety_iris (Σ : gFunctors) (Λ : language)
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   σ Θ i κs j (Φ : thread_id → val Λ → Prop) :
   ∀ (τ : trace Λ),
-  run τ →
+  behavior τ →
   fair_scheduling τ →
   (τ.1 = 0) →
   (τ.2 0 = (Θ, σ, i, κs)) →

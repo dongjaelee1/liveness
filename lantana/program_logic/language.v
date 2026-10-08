@@ -420,17 +420,8 @@ Inductive thread_done {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list 
   ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
   thread_done i ρ1 κ ρ2.
 
-CoInductive behavior {Λ : language} : trace Λ → Prop :=
-| behavior_step n τf ρ1 ρ2 i1 i2 κ κs :
-  τf n = (ρ1, i1, (κ ++ κs)) →
-  (thread_step i1 ρ1 κ ρ2 ∨ thread_done i1 ρ1 κ ρ2) →
-  τf (S n) = (ρ2, i2, κs) →
-  behavior (S n, τf) →
-  behavior (n, τf).
-
-(** A run is like a behavior, except that a scheduled stuck thread stutters. Every
-    configuration has a successor for every scheduled thread, so stuck executions are runs.
-    We use runs to state safety (see [adequacy_iris.v]). *)
+(** A scheduled thread that is a non-value and cannot step is stuck. The configuration then
+    stutters, as it does for a scheduled value ([thread_done]). *)
 Inductive thread_stuck {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
 | thread_stuck_intro e1 σ1 Θ :
   ρ1 = (Θ, σ1) →
@@ -440,21 +431,17 @@ Inductive thread_stuck {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list
   ρ2 = ρ1 →
   thread_stuck i ρ1 κ ρ2.
 
-CoInductive run {Λ : language} : trace Λ → Prop :=
-| run_step n τf ρ1 ρ2 i1 i2 κ κs :
+(** A behavior is an infinite trace in which the scheduled thread steps, or stutters if it is a
+    value or stuck. Every configuration thus has a successor for every scheduled thread, so
+    executions that get stuck are behaviors too: the adequacy theorems do not exclude them, and
+    the safety theorem ([adequacy_iris.v]) proves that they do not happen. *)
+CoInductive behavior {Λ : language} : trace Λ → Prop :=
+| behavior_step n τf ρ1 ρ2 i1 i2 κ κs :
   τf n = (ρ1, i1, (κ ++ κs)) →
   (thread_step i1 ρ1 κ ρ2 ∨ thread_done i1 ρ1 κ ρ2 ∨ thread_stuck i1 ρ1 κ ρ2) →
   τf (S n) = (ρ2, i2, κs) →
-  run (S n, τf) →
-  run (n, τf).
-
-Lemma behavior_run {Λ : language} (τ : trace Λ) : behavior τ → run τ.
-Proof.
-  destruct τ as [n τf]. revert n. cofix CIH. intros n BEH.
-  inversion BEH as [? ? ρ1 ρ2 i1 i2 κ κs Hτ Hstep Hτ' BEH']; subst.
-  eapply run_step; [done| |done|by apply CIH].
-  destruct Hstep; auto.
-Qed.
+  behavior (S n, τf) →
+  behavior (n, τf).
 
 Definition behavior_cfg {Λ : language} (ρ : cfg Λ) (τ : trace Λ) : Prop :=
   ∃ i κs, (τ.2 0) = (ρ, i, κs) ∧ behavior τ.

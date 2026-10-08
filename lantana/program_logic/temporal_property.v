@@ -352,7 +352,8 @@ End fair_sched_cnt.
 
 (** ** Iris-style safety as a property of a trace (cf. Iris's [adequate]):
     the scheduled thread is not stuck, and once thread [i] is a value [v], [Φ i v] holds.
-    Stated over runs (see [run] in [language.v]), where a stuck thread can be scheduled. *)
+    Behaviors include executions that get stuck (see [behavior] in [language.v]), so a stuck
+    thread can be scheduled. *)
 Definition not_stuck {Λ : language} : tsProp Λ :=
   λ ξ, let '((Θ, σ), i, _) := ξ in
        ∃ e, Θ !! i = Some e ∧
