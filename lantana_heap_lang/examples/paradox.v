@@ -12,49 +12,43 @@ From transfinite.base_logic.lib Require Import ghost_map.
 
 From iris.proofmode Require Import coq_tactics reduction spec_patterns.
 
-(** "pure" steps that are reducible with the thread_exec predicate, without submitting fuels. *)
+(** The fuel-free pure-step rule: one pure step that needs neither fuel nor carriers. Compare
+    [lwp_pure_step] (program_logic/lifting.v), which burns a unit of fuel from every carrier
+    the thread holds. [no_lc_absurd] at the end of this file shows that the rule is unsound. *)
 Class lantanaGS_no_lc `(HGS : lantanaGS Λ Σ) := {
     lwp_pure_step_no_lc :
-    ∀ n s i E E' e1 e2 φ Φ,
-      PureExec φ n e1 e2 →
+    ∀ s i E E' e1 e2 φ Φ,
+      PureExec φ 1 e1 e2 →
       φ →
-      Nat.iter n
-        (λ P,
-           |={E,E'}=> ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                          (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                           (|={E',E}=> |={E}=>m P)))
-        (lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))
-      ⊢ lWP e1 @ s; i; E {{ Φ }};    
+      (|={E,E'}=> ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
+                      (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+                       (|={E',E}=> |={E}=>m lwpupd i E e2 (lWP e2 @ s; i; E {{ v, Φ v }}))))
+      ⊢ lWP e1 @ s; i; E {{ Φ }};
   }.
 
-Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _} (n : nat) R s i E E' e1 e2 φ Φ :
-  PureExec φ n e1 e2 →
+Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _} R s i E E' e1 e2 φ Φ :
+  PureExec φ 1 e1 e2 →
   φ →
   ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-  (Nat.iter n (λ P, |={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                               (|={E',E}=> |={E}=>m P)))
-     (lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }})))
+  (|={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+               (|={E',E}=> |={E}=>m lwpupd i E e2 (lWP e2 @ s; i; E {{ Φ }}))))
   ⊢ (lWP e1 @ s; i; E {{ Φ }}).
 Proof.
   iIntros (Hexec HΦ) "(#Rs& LWP)".
-  iApply (lwp_pure_step_no_lc n _ _ E E'). 1: auto.
-  iStopProof. clear Hexec. pattern n. induction n.
-  { simpl. iIntros "(#Rs& LWP)". auto. }
-  simpl. iIntros "(#Rs& LWP)".
-  iMod "LWP". iFrame "Rs".
-  iIntros "!> Wcs". iMod ("LWP" with "Wcs") as "LWP".
-  iApply IHn. iFrame "Rs". iModIntro. iFrame "LWP".
+  iApply (lwp_pure_step_no_lc _ _ E E'); try done.
+  iMod "LWP". iModIntro. iExists R. iFrame "Rs LWP".
 Qed.
 
 Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _}
-  Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
-  PureExec φ n e1 e2 →
+  Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ (Φ : val → iProp Σ) :
+  PureExec φ 1 e1 e2 →
   φ →
   envs_entails Δ (∃ E' R,
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-        (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
-                       (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗ (|={E',E}=> |={E}=>m P)))
-           (lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
+        (|={E,E'}=>
+           (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+            (|={E',E}=> |={E}=>m
+               lwpupd i E (fill K e2) (lWP (fill K e2) @ s; i; E {{ Φ }})))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
@@ -283,7 +277,7 @@ Section proof.
     iIntros "Wfs".
     iEval (rewrite /loop).
     (* This particular step returns to exactly the same expression, so TE
-       stays unchanged. The conditional no-credit rule above is not extended
+       stays unchanged. The conditional fuel-free rule above is not extended
        with a new generic expression-transport assumption. *)
     lwp_lam_no_lc. simpl. iExists ⊤, ({[ck]}). iSplitR.
     { rewrite big_sepS_singleton. auto. }
@@ -562,7 +556,7 @@ Section adequacy.
         {[i := fork_post; j := fork_post]}.
 
   Theorem loop_paradox :
-    (∀ Λ0 Σ0 (HGS : lantanaGS Λ0 Σ0), @lantanaGS_no_lc _ Λ0 Σ0 HGS) →
+    (∀ Σ0 `{!heapGS Σ0}, @lantanaGS_no_lc _ _ Σ0 _) →
     ∀ (τ : trace heap_lang),
     behavior τ →
     fair_scheduling τ →
@@ -599,6 +593,58 @@ Section adequacy.
     iModIntro. iExists (Φ_tf). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
+  Qed.
+
+  (** ** The fuel-free pure-step rule is unsound *)
+  (** A fair run of the two loops: thread [i] steps at even times and [j] at odd times; every
+      step takes [loop #()] to [loop #()]. *)
+  Lemma loop_prim_step k σ tids :
+    prim_step k (loop #()) σ tids [] (loop #()) σ ∅.
+  Proof. apply ectx_language.base_prim_step. by econstructor. Qed.
+
+  Let ρ0 : cfg heap_lang := (Θ0, Build_state σ0 ∅).
+  Let sched (n : nat) : thread_id := if Nat.even n then i else j.
+  Let loop_run : trace heap_lang := (0, λ n, (ρ0, sched n, [])).
+
+  Lemma loop_run_behavior n : behavior (n, loop_run.2).
+  Proof.
+    revert n. cofix IH. intros n.
+    eapply (behavior_step n _ ρ0 ρ0 (sched n) (sched (S n)) [] []); [done| |done|apply IH].
+    assert (Hk : Θ0 !! sched n = Some (loop #())).
+    { rewrite /Θ0 /sched. destruct (Nat.even n); by simplify_map_eq. }
+    left. eapply (thread_step_atomic (loop #()) _ (loop #()) _ ∅ Θ0); [done|exact Hk|apply loop_prim_step|].
+    rewrite /ρ0 right_id_L insert_id //.
+  Qed.
+
+  Lemma loop_run_fair : fair_scheduling loop_run.
+  Proof.
+    intros m _ k. simpl. rewrite /ρ0 /Θ0.
+    destruct (decide (k = i ∨ k = j)) as [Hk|Hk].
+    - right. split.
+      + exists (loop #()). split; last done. destruct Hk as [->| ->]; by simplify_map_eq.
+      + destruct Hk as [->| ->].
+        * exists (2 * m). simpl. split; first lia. split; last done.
+          rewrite /ts_emb /thread_turn /sched /=. replace (m + (m + 0)) with (2 * m) by lia.
+          rewrite Nat.even_mul. done.
+        * exists (1 + 2 * m). simpl. split; first lia. split; last done.
+          rewrite /ts_emb /thread_turn /sched /=. replace (m + (m + 0)) with (2 * m) by lia.
+          change (match 2 * m with 0 => false | S n' => Nat.even n' end) with (Nat.even (S (2 * m))).
+          rewrite Nat.even_succ Nat.odd_mul. done.
+    - left. left. assert (k ≠ i ∧ k ≠ j) as [Hi Hj] by tauto. by simplify_map_eq.
+  Qed.
+
+  (** Assuming the rule, [loop_paradox] gives "eventually False" on this run. *)
+  Theorem no_lc_absurd :
+    (∀ Σ0 `{!heapGS Σ0}, @lantanaGS_no_lc _ _ Σ0 _) →
+    False.
+  Proof.
+    intros LNLC.
+    destruct (loop_paradox LNLC loop_run) as [Hf _].
+    - apply loop_run_behavior.
+    - apply loop_run_fair.
+    - done.
+    - done.
+    - destruct Hf as (m& _& Hm& _). done.
   Qed.
 
 End adequacy.
