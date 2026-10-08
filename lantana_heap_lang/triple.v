@@ -171,6 +171,28 @@ Section rules.
     iApply ("H" with "[$TE $TG $HP]"). iIntros (v) "(TE& TG& HQ)". iApply "HΦ". iFrame.
   Qed.
 
+  (** BIND for the general form. The first triple's postcondition names the intermediate
+      carriers [G1], from which the continuation starts. [fbtriple_bind] is the case of a fixed
+      [G1]. *)
+  Lemma fbtriple_gen_bind s i C E K G0 P e (R : val → gset ocid → iProp Σ) Q :
+    ⦃ P ⦄^G0 e @ s; i; K ++ C; E ⦃ v, ∃ G1, thP_carriers i G1 ∗ R v G1 ⦄ -∗
+    (∀ v G1, ⦃ R v G1 ⦄^G1 (fill K (of_val v)) @ s; i; C; E ⦃ w, Q w ⦄) -∗
+    ⦃ P ⦄^G0 (fill K e) @ s; i; C; E ⦃ w, Q w ⦄.
+  Proof.
+    rewrite /fbtriple_gen. iIntros "H1 H2 %Φ (TE& TG& HP) HΦ".
+    iEval (rewrite thread_expr_fill) in "TE". iApply (lwp_bind K).
+    iApply ("H1" with "[$TE $TG $HP]"). iIntros (v) "(TE& %G1& TG& HR)".
+    iEval (rewrite -thread_expr_fill) in "TE". iApply ("H2" with "[$TE $TG $HR] HΦ").
+  Qed.
+
+  (** FRAME for the general form. *)
+  Lemma fbtriple_gen_frame s i C E G P R e Q :
+    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄ ⊢ ⦃ P ∗ R ⦄^G e @ s; i; C; E ⦃ v, Q v ∗ R ⦄.
+  Proof.
+    rewrite /fbtriple_gen. iIntros "H %Φ (TE& TG& HP& HR) HΦ".
+    iApply ("H" with "[$TE $TG $HP]"). iIntros (v) "(TE& HQ)". iApply "HΦ". iFrame.
+  Qed.
+
   (** UPD-ELIM, for Iris's fancy update and for Lantana's ghost update. *)
   Lemma fbtriple_upd_elim s i C E G G' P e Q :
     ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G' ⊢ ⦃ |={E}=> P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
