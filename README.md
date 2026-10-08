@@ -52,7 +52,7 @@ Each directory imports only from the directories listed before it:
 
 | Directory | Contents |
 | --- | --- |
-| `lantana/ordinal/` | a copy of the Ordinal library (see Acknowledgements) |
+| `lantana/ordinal/` | a copy of the Ordinal library (see Acknowledgements): layers are its `ord.t`, which must live in a universe below the opam `Ord.t` used by measures (`algebra/layer.v`) |
 | `lantana/prelude/` | Rocq-generic facts with no Iris: the classical axioms (`axioms.v`), facts about ordinals (`ordinal_facts.v`), well-founded structures (`wf_structs.v`) |
 | `lantana/algebra/` | Rocq-level mathematics: ordered commutative monoids, well-founded ones and the ordinals as one, measures and layers, and the cameras used by the logic |
 | `lantana/base_logic/` | the `iProp`-level model of Lantana: transfinite later credits, fancy updates and invariants, and the obligation model (obligations and witnesses, their ghost state, the obligation forest, model updates `mupd`, and `omodel` in `base_logic/opreds.v`, the model of the predicates of §3–§5) |
