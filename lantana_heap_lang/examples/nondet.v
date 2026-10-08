@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import triple.
 From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Export flag.
 
@@ -150,7 +151,7 @@ Section proof.
     ⊢ ∃ μ, ∀ i G C,
     l{{{ thread_expr i C (Nondet.nondet #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ω)%ordi μ) }}}
       Nondet.nondet #() @ i
-    l{{{ v, RET v; thread_expr i C (of_val v) ∗ ⌜v = #1⌝ }}}.
+    l{{{ v, RET v; thread_expr i C (of_val v) ∗ thP_carriers i G ∗ ⌜v = #1⌝ }}}.
   Proof.
     iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
@@ -214,7 +215,35 @@ Section proof.
       apply ord.lt_le, ord.omega_upperbound. }
     iApply ("Flag_wait_spec" $! 0 with "[$TE $TG $GF_fw $is_flag]").
     iIntros "(TE& _& TG& #Od0)".
-    iApply ("HΦ" with "[$TE]"). done.
+    iApply ("HΦ" with "[$TE $TG]"). done.
+  Qed.
+
+  (** * The specifications in the paper's format
+
+      Each is a corollary of the texan specification above. *)
+
+  (** SPEC-NEST *)
+  Corollary Nondet_nest_fbspec :
+    ⊢ □ ∃ μ, ∀ lc i (x : loc) (n : Z) G g K k ℓg C,
+    ⦃ fuels G (Z.to_nat n)%ordi μ ∗ crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗ flag_tk x k ∗
+      is_flag x k (Z.to_nat n) ⦄^G
+      Nondet.nest #x #n @ i; C; ⊤
+    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k ⦄^G.
+  Proof.
+    iPoseProof Nondet_nest_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc i x n G g K k ℓg C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! lc i x n G g K k ℓg C with "Pre"). iIntros "(TE& LC& TG& Post)".
+    iApply "HΦ". by iFrame.
+  Qed.
+
+  (** SPEC-NONDET *)
+  Corollary Nondet_nondet_fbspec :
+    ⊢ □ ∃ μ, ∀ i G C,
+    ⦃ fuels G (ω)%ordi μ ⦄^G Nondet.nondet #() @ i; C; ⊤ ⦃ v, ⌜v = #1⌝ ⦄^G.
+  Proof.
+    iPoseProof Nondet_nondet_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (i G C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! i G C with "Pre"). iIntros (v) "Post". by iApply "HΦ".
   Qed.
 
 End proof.

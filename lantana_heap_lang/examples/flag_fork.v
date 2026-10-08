@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import triple.
 From lantana.program_logic Require Import adequacy_iris.
 From iris.prelude Require Import options.
 
@@ -38,18 +39,19 @@ Section proof.
   Let Nr := nroot.@ "flag_fork_ret".
 
   (** The main proofs. *)
-  Lemma FlagFork_main_spec :
-    ⊢ ∃ μ, ∀ i g kr,
-    l{{{ thread_expr i [] (FlagFork.main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (1)%ordi μ) ∗
-         crP_obls g 1 {[kr]} ∗
-         ⟦finallyP Nr kr 1 (exits #42@i)⟧ₗ }}}
-      FlagFork.main #() @ i
-    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ ⌜v = #42⌝ ∗ lift_term i fork_post v }}}.
+
+  (** The closed specification of [main], in the paper's format: it ends with no carriers. *)
+  Lemma FlagFork_main_fbspec :
+    ⊢ □ ∃ μ, ∀ i g kr,
+    ⦃ fuels {[g]} (1)%ordi μ ∗ crP_obls g 1 {[kr]} ∗ ⟦finallyP Nr kr 1 (exits #42@i)⟧ₗ ⦄^{[g]}
+      FlagFork.main #() @ i; []; ⊤
+    ⦃ v, ⌜v = #42⌝ ⦄^∅.
   Proof.
+    rewrite /fbtriple /fbtriple_gen. iModIntro.
     iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
-    iExists (10 ⊕ μ_fi ⊕ μ_fw)%M. iIntros (i g kr Φ) "!> HP HΦ".
+    iExists (10 ⊕ μ_fi ⊕ μ_fw)%M. iIntros (i g kr Φ) "HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Cg& HF)".
     iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
     iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fi GF_fw]".
@@ -105,9 +107,22 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply lwpupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_exit with "TE LC TG Cg HF") as "[TE TG]"; first set_solver.
     iModIntro. lwp_finish.
-    iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.
+    iApply "HΦ". by iFrame.
+  Qed.
+
+  (** The same specification in the form [FlagFork_pre] uses: the thread has terminated. *)
+  Lemma FlagFork_main_spec :
+    ⊢ ∃ μ, ∀ i g kr,
+    l{{{ thread_expr i [] (FlagFork.main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (1)%ordi μ) ∗
+         crP_obls g 1 {[kr]} ∗
+         ⟦finallyP Nr kr 1 (exits #42@i)⟧ₗ }}}
+      FlagFork.main #() @ i
+    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ ⌜v = #42⌝ ∗ lift_term i fork_post v }}}.
+  Proof.
+    iPoseProof FlagFork_main_fbspec as (μ) "#H". iExists μ. iIntros (i g kr).
+    iApply (fbtriple_top_texan with "H"). iIntros (v) "[Td ->]". rewrite /lift_term. by iFrame.
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :

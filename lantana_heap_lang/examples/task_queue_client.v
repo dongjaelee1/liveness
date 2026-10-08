@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import triple.
 From lantana.program_logic Require Import adequacy_iris.
 From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Export flag task_queue.
@@ -126,21 +127,39 @@ Section proof.
       iIntros "(TE& _& TG& Gg)". iApply ("HΦ" with "[$TE $Q_LC $TG $Gg]").
   Qed.
 
-  Lemma main_spec :
-    ⊢ ∃ μ, ∀ i g kl,
-    l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (ℓq ⊕ 2)%ordi μ) ∗
-         crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
-         ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ }}}
-      main #() @ i
-    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
+  (** SPEC-DECR, in the paper's format: a corollary of the texan specification above. *)
+  Corollary decr_reentrant_fbspec :
+    ⊢ □ ∃ μ, ∀ lc i G g k K γ ℓg (arg : val) C,
+    ⦃ fuels G 1%ordi μ ∗ crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗
+      ∃ (ql : val) (x : loc) (n : Z),
+        ⌜arg = (ql, #x, #n)%V⌝ ∗ oblP_fuel k (ℓq ⊕ 1)%ordi (Z.to_nat n)%M ∗ flag_tk x k ∗
+        is_decr_reentrant arg γ k ⦄^G
+      decr_reentrant arg @ i; C; ⊤
+    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ {[k]}) ⦄^G.
+  Proof.
+    iPoseProof decr_reentrant_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc i G g k K γ ℓg arg C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! lc i G g k K γ ℓg arg C with "Pre"). iIntros "(TE& LC& TG& Post)".
+    iApply "HΦ". by iFrame.
+  Qed.
+
+  (** SPEC-DECR-CLIENTMAIN, the closed specification of [main], in the paper's format: it ends
+      with no carriers. *)
+  Lemma main_fbspec :
+    ⊢ □ ∃ μ, ∀ i g kl,
+    ⦃ fuels {[g]} (ℓq ⊕ 2)%ordi μ ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
+      ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ⦄^{[g]}
+      main #() @ i; []; ⊤
+    ⦃ v, ⌜v = #1⌝ ⦄^∅.
   Proof using queueG0 ticket_lockG0.
+    rewrite /fbtriple /fbtriple_gen. iModIntro.
     unfold main.
     iPoseProof (TaskQueue_init_spec) as (μ_ti) "TaskQueue_init_spec".
     iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".
     iPoseProof (decr_reentrant_spec) as (μ_d) "decr_reentrant_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
     (* Internal steps, func calls, wait *)
-    iExists (100 ⊕ μ_ti ⊕ μ_fi ⊕ μ_d ⊕ μ_fw)%M. iIntros (i g kl) "!> % (TE& TG& GF& Cg& HF) HΦ".
+    iExists (100 ⊕ μ_ti ⊕ μ_fi ⊕ μ_d ⊕ μ_fw)%M. iIntros (i g kl) "% (TE& TG& GF& Cg& HF) HΦ".
     iPoseProof (crP_fuel_add_set with "GF") as "[GF GF_m]".
     iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_ti GF_m]".
     iPoseProof (crP_fuel_add_set with "GF_m") as "[GF_fi GF_m]".
@@ -213,9 +232,22 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply lwpupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_exit with "TE LC TG Cg HF") as "[TE TG]"; first set_solver.
     iModIntro. lwp_finish.
-    iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.
+    iApply "HΦ". by iFrame.
+  Qed.
+
+  (** The same specification in the form [main_pre] uses: the thread has terminated. *)
+  Lemma main_spec :
+    ⊢ ∃ μ, ∀ i g kl,
+    l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ ([∗ set] g ∈ {[g]}, crP_fuel g (ℓq ⊕ 2)%ordi μ) ∗
+         crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
+         ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ }}}
+      main #() @ i
+    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
+  Proof using queueG0 ticket_lockG0.
+    iPoseProof main_fbspec as (μ) "#H". iExists μ. iIntros (i g kl).
+    iApply (fbtriple_top_texan with "H"). iIntros (v) "[Td ->]". rewrite /lift_term. by iFrame.
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :

@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import triple.
 From lantana.program_logic Require Import adequacy_iris.
 From iris.prelude Require Import options.
 
@@ -47,20 +48,20 @@ Section proof.
   Let l := X_loc.
 
   (** The main proofs. *)
-  Lemma writer_spec :
-    ⊢ ∃ μ, ∀ i g k kl,
-    l{{{ thread_expr i [] (writer #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 0 μ ∗
-         crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
-         (* Start with the other half of the until ownership for the pointsto. *)
-         flag_tk l k ∗
-         ⟦finallyP Nl kl 1 (exits #()@i)⟧ₗ ∗
-         is_flag l k 0 }}}
-      writer #() @ i
-    l{{{ RET #(); thread_expr i [] #() ∗ lift_term i fork_post #() }}}.
+  (** The writer's closed specification, in the paper's format: it ends with no carriers. *)
+  Lemma writer_fbspec :
+    ⊢ □ ∃ μ, ∀ i g k kl,
+    ⦃ fuels {[g]} 0 μ ∗ crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
+      (* Start with the other half of the until ownership for the pointsto. *)
+      flag_tk l k ∗ ⟦finallyP Nl kl 1 (exits #()@i)⟧ₗ ∗ is_flag l k 0 ⦄^{[g]}
+      writer #() @ i; []; ⊤
+    ⦃ v, ⌜v = #()⌝ ⦄^∅.
   Proof.
+    rewrite /fbtriple /fbtriple_gen. iModIntro.
     iPoseProof (Flag_set_spec) as (μ_s) "Flag_set_spec".
-    iExists (4 ⊕ μ_s)%M. iIntros (i g k kl Φ) "!> HP HΦ".
+    iExists (4 ⊕ μ_s)%M. iIntros (i g k kl Φ) "HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Gg& %Neqk& HU& HE& #is_flag)".
+    iEval (rewrite big_sepS_singleton) in "GF".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_s]".
     iPoseProof (crP_fuels_init {[g]} with "[GF]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
@@ -76,23 +77,44 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply lwpupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_exit with "TE LC TG Gg HE") as "[TE TG]"; first set_solver.
     iModIntro. lwp_finish.
-    iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
+    iApply "HΦ". by iFrame.
   Qed.
 
-  Lemma reader_spec :
+  (** The same specification in the form [flag_client_pre] uses: the thread has terminated. *)
+  Lemma writer_spec :
     ⊢ ∃ μ, ∀ i g k kl,
-    l{{{ thread_expr i [] (reader #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 1 μ ∗
-         crP_obls g 1 {[kl]} ∗
-         ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ∗
+    l{{{ thread_expr i [] (writer #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 0 μ ∗
+         crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
+         (* Start with the other half of the until ownership for the pointsto. *)
+         flag_tk l k ∗
+         ⟦finallyP Nl kl 1 (exits #()@i)⟧ₗ ∗
          is_flag l k 0 }}}
-      reader #() @ i
-    l{{{ RET #1; thread_expr i [] #1 ∗ lift_term i fork_post #1 }}}.
+      writer #() @ i
+    l{{{ RET #(); thread_expr i [] #() ∗ lift_term i fork_post #() }}}.
   Proof.
+    iPoseProof writer_fbspec as (μ) "#H". iExists μ. rewrite /fbtriple /fbtriple_gen.
+    iIntros (i g k kl Φ) "!> (TE& TG& GF& Pre) HΦ". iApply lwp_sfgupd.
+    iApply ("H" $! i g k kl with "[$TE $TG GF $Pre]").
+    { rewrite big_sepS_singleton. iFrame "GF". }
+    iIntros (v) "(TE& TG& ->)". iMod (thread_terminate with "TG") as "Td". iModIntro.
+    iApply "HΦ". rewrite /lift_term. by iFrame.
+  Qed.
+
+  (** The reader's closed specification, in the paper's format: it ends with no carriers. *)
+  Lemma reader_fbspec :
+    ⊢ □ ∃ μ, ∀ i g k kl,
+    ⦃ fuels {[g]} 1 μ ∗ crP_obls g 1 {[kl]} ∗ ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ∗
+      is_flag l k 0 ⦄^{[g]}
+      reader #() @ i; []; ⊤
+    ⦃ v, ⌜v = #1⌝ ⦄^∅.
+  Proof.
+    rewrite /fbtriple /fbtriple_gen. iModIntro.
     iPoseProof (Flag_wait_spec) as (μ_w) "Flag_wait_spec".
-    iExists (10 ⊕ μ_w)%M. iIntros (i g k kl Φ) "!> HP HΦ".
+    iExists (10 ⊕ μ_w)%M. iIntros (i g k kl Φ) "HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Gg& HE& #is_flag)".
+    iEval (rewrite big_sepS_singleton) in "GF".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_w]".
     iPoseProof (crP_fuels_init {[g]} with "[GF]") as "GF".
     { iApply big_sepS_singleton. iFrame. }
@@ -106,9 +128,27 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply lwpupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 8 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate with "TE LC TG Gg HE") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_exit with "TE LC TG Gg HE") as "[TE TG]"; first set_solver.
     iModIntro. lwp_finish.
-    iApply "HΦ". iFrame "TE". rewrite /lift_term. by iFrame "Td".
+    iApply "HΦ". by iFrame.
+  Qed.
+
+  (** The same specification in the form [flag_client_pre] uses: the thread has terminated. *)
+  Lemma reader_spec :
+    ⊢ ∃ μ, ∀ i g k kl,
+    l{{{ thread_expr i [] (reader #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 1 μ ∗
+         crP_obls g 1 {[kl]} ∗
+         ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ∗
+         is_flag l k 0 }}}
+      reader #() @ i
+    l{{{ RET #1; thread_expr i [] #1 ∗ lift_term i fork_post #1 }}}.
+  Proof.
+    iPoseProof reader_fbspec as (μ) "#H". iExists μ. rewrite /fbtriple /fbtriple_gen.
+    iIntros (i g k kl Φ) "!> (TE& TG& GF& Pre) HΦ". iApply lwp_sfgupd.
+    iApply ("H" $! i g k kl with "[$TE $TG GF $Pre]").
+    { rewrite big_sepS_singleton. iFrame "GF". }
+    iIntros (v) "(TE& TG& ->)". iMod (thread_terminate with "TG") as "Td". iModIntro.
+    iApply "HΦ". rewrite /lift_term. by iFrame.
   Qed.
 
   Lemma flag_client_pre Θ i j Φ Ψs :

@@ -361,13 +361,14 @@ Proof.
     auto.
 Qed.
 
-(** Discharge at the actual final value, using credits from earlier steps. *)
-Lemma thread_expr_terminate i E v g ℓ k N :
+(** Discharge at the actual final value, using credits from earlier steps, and retire the
+    thread's last carrier. The thread then holds no carriers and may exit. *)
+Lemma thread_expr_exit i E v g ℓ k N :
   ↑N ⊆ E →
   thread_expr i [] (of_val v) -∗ £ (2 : Ord.t) -∗
   thP_carriers i {[g]} -∗ crP_obls g ℓ {[k]} -∗
   ⟦finallyP N k 1 (exits v@i)⟧ₗ -∗ |={E}=>m
-  thread_expr i [] (of_val v) ∗ thP_done i.
+  thread_expr i [] (of_val v) ∗ thP_carriers i ∅.
 Proof.
   iIntros (Hmask) "TE LC TG Cg HF".
   iMod (tf_until_discharge with "HF") as "HF"; first set_solver.
@@ -384,7 +385,20 @@ Proof.
   replace ({[k]} ∖ {[k]} : gset _) with (∅ : oids) by set_solver.
   iMod (carrier_delete with "TG Gg") as "TG"; first set_solver.
   replace ({[g]} ∖ {[g]} : gset _) with (∅ : gset ocid) by set_solver.
-  iMod (thread_terminate with "TG") as "$". by iFrame.
+  iModIntro. by iFrame.
+Qed.
+
+(** Discharge at the actual final value, using credits from earlier steps, and terminate. *)
+Lemma thread_expr_terminate i E v g ℓ k N :
+  ↑N ⊆ E →
+  thread_expr i [] (of_val v) -∗ £ (2 : Ord.t) -∗
+  thP_carriers i {[g]} -∗ crP_obls g ℓ {[k]} -∗
+  ⟦finallyP N k 1 (exits v@i)⟧ₗ -∗ |={E}=>m
+  thread_expr i [] (of_val v) ∗ thP_done i.
+Proof.
+  iIntros (Hmask) "TE LC TG Cg HF".
+  iMod (thread_expr_exit with "TE LC TG Cg HF") as "[$ TG]"; first done.
+  by iMod (thread_terminate with "TG") as "$".
 Qed.
 
 (** ChooseNat *)

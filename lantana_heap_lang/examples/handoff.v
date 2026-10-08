@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import triple.
 From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Import ghost_var.
 
@@ -209,6 +210,56 @@ Section proof.
       iApply ("HΦ" with "[$TE $Q_LC $TG]").
     - iDestruct "inv" as "(%&%& _& Gv0)".
       iCombine "Gv Gv0" gives %H. destruct H as [? _]. done.
+  Qed.
+
+  (** * The specifications in the paper's format
+
+      Each is a corollary of the texan specification above. *)
+
+  (** TaskSpec: [is_task] holds a persistent triple for the task. *)
+  Lemma is_task_fbtriple ℓ f a K :
+    is_task ℓ f a K ⊣⊢
+    ∃ ℓt (P : iProp Σ), ⌜(ℓt < ℓ)%ordi⌝ ∧ P ∗
+      ∃ μ, ∀ lc i G g K' ℓg C,
+        □ ⦃ fuels G ℓt μ ∗ crP_obls g ℓg K' ∗ ⌜K ⊆ K'⌝ ∗ P ⦄^G f a @ i; C; ⊤
+          ⦃ _, £ lc ∗ crP_obls g ℓg (K' ∖ K) ⦄^G.
+  Proof.
+    rewrite /is_task /fbtriple /fbtriple_gen. iSplit.
+    - iIntros "(%ℓt& %P& %Hlt& HP& %μ& #H)". iExists ℓt, P. iSplit; first done. iFrame "HP".
+      iExists μ. iIntros (lc i G g K' ℓg C) "!> %Φ Pre HΦ".
+      iApply ("H" $! lc i G g K' ℓg C with "Pre"). iIntros (rv) "(TE& LC& TG& Cg)".
+      iApply "HΦ". iFrame.
+    - iIntros "(%ℓt& %P& %Hlt& HP& %μ& #H)". iExists ℓt, P. iSplit; first done. iFrame "HP".
+      iExists μ. iIntros (lc i G g K' ℓg C Φ) "!> Pre HΦ".
+      iApply ("H" $! lc i G g K' ℓg C with "Pre"). iIntros (rv) "(TE& TG& LC& Cg)".
+      iApply "HΦ". iFrame.
+  Qed.
+
+  (** SPEC-SEND *)
+  Corollary Handoff_send_fbspec :
+    ⊢ □ ∃ μ, ∀ lc i (b : loc) (f a : val) G g K K' γ ℓ ℓg C,
+    ⦃ fuels G 0 μ ∗ crP_obls g ℓg K' ∗ ⌜K ⊆ K'⌝ ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ%ordi 1) ∗
+      b ↦{#(1/2)} NONEV ∗ is_task ℓ f a K ∗ is_handoff b γ ℓ ⦄^G
+      Handoff.send #b f a @ i; C; ⊤
+    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K' ∖ K) ⦄^G.
+  Proof.
+    iPoseProof Handoff_send_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc i b f a G g K K' γ ℓ ℓg C). rewrite /fbtriple /fbtriple_gen.
+    iIntros (Φ) "Pre HΦ". iApply ("H" $! lc i b f a G g K K' γ ℓ ℓg C with "Pre").
+    iIntros "(TE& LC& TG& Post)". iApply "HΦ". by iFrame.
+  Qed.
+
+  (** SPEC-RECEIVE *)
+  Corollary Handoff_receive_fbspec :
+    ⊢ □ ∃ μ, ∀ lc i (b : loc) g γ ℓ C,
+    ⦃ fuels {[g]} ℓ μ ∗ ghost_var (handoff_γd γ) (1/2)%Qp g ∗ is_handoff b γ ℓ ⦄^{[g]}
+      Handoff.receive #b @ i; C; ⊤
+    ⦃ v, £ lc ⦄^∅.
+  Proof.
+    iPoseProof Handoff_receive_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc i b g γ ℓ C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! lc i b g γ ℓ C with "Pre"). iIntros (v) "(TE& LC& TG)".
+    iApply "HΦ". by iFrame.
   Qed.
 
 End proof.

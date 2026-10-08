@@ -51,11 +51,11 @@ The paper presents Lantana through the *fuel-burning triple*
 `lwp` (notation `lWP e @ s; i; E {{ Φ }}`, `lantana/program_logic/weakestpre.v`):
 
 ```
-fbtriple_once s i C E G G' P e Q :=
+fbtriple_gen s i C E G P e Q :=
   ∀ Φ, thread_expr i C e ∗ thP_carriers i G ∗ P -∗
-       (∀ v, thread_expr i C (of_val v) ∗ thP_carriers i G' ∗ Q v -∗ Φ v) -∗
+       (∀ v, thread_expr i C (of_val v) ∗ Q v -∗ Φ v) -∗
        lWP e @ s; i; E {{ Φ }}
-fbtriple s i C E G G' P e Q := □ fbtriple_once s i C E G G' P e Q
+fbtriple s i C E G G' P e Q := fbtriple_gen s i C E G P e (λ v, thP_carriers i G' ∗ Q v)
 ```
 
 with the notation `⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q ⦄^G'`, written
@@ -68,12 +68,27 @@ explicit what the paper leaves implicit:
   which is the paper's carrier-set superscript. Neither appears in `P` or `Q`.
   A top-level triple has `C = []`, and its token for a value `v` is `exits v@i`.
 
-Triples are persistent by definition (`fbtriple_persistent`); `fbtriple_once`
-is the non-persistent core. `fbtriple_texan` shows that a triple is the
+`fbtriple_gen`, written `⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q ⦄` (no final
+superscript), is the general form, whose postcondition states the final carriers
+itself. A specification needs it when the final carrier set depends on variables
+of the postcondition: SPEC-ACQUIRE's new carrier `g_u`, for example. The paper
+writes such a set in the superscript.
+
+As in the paper, a triple is not persistent. A *specification* is a persistent
+triple, `□ ∃ μ, ∀ …, ⦃ P ⦄^G e @ i; C; E ⦃ v, Q ⦄^G'`. `spec_persistent_intro`
+shows that the `□` can be introduced in front of any closed statement.
+`fbtriple_texan` shows that a persistent triple `□ fbtriple …` is the
 texan-style `lwp` triple `l{{{ … }}} e @ s; i; E l{{{ … }}}` with the token and
-the carriers spelled out. The case-study specifications are stated in this
-texan form, with explicit `thread_expr`, `thP_carriers`, `crP_fuel`, and
-`crP_obls` assertions.
+the carriers spelled out.
+
+The case studies prove their specifications in this texan form, with explicit
+`thread_expr`, `thP_carriers`, `crP_fuel`, and `crP_obls` assertions. They
+restate each one in the paper's format as a corollary named `*_fbspec` (see
+"Case studies" below). The closed specifications (`main`, and the flag client's
+`writer` and `reader`) are proved in the paper's format directly, ending with no
+carriers. Their texan form, in which the thread has terminated, follows from
+that (`fbtriple_top_texan`, or the same argument inline), and is the form the
+adequacy proofs use.
 
 Every rule the paper displays for the triple is proved in `triple.v` as an
 `fbtriple_*` lemma, and the paper's logic-level rules are restated there under
@@ -82,11 +97,13 @@ modalities, masks, and later credits that the paper elides. Three rules differ
 from the submitted paper's displays:
 - CARRIER-ALLOC and CARRIER-DELETE: the post-carriers are the same set `G'` in
   the premise and the conclusion.
-- WIT-IND: the induction hypothesis is a one-shot triple (`fbtriple_once`),
-  because it is tied to the remaining witness budget.
 - FINALLY-EXIT*: there is no `Return`. The thread's last step (a pure step to
   the value `v` at the empty context) discharges the exit obligation, whose
   `finally` predicate is `exits v@i`.
+
+WIT-IND is as displayed. Its premise is persistent, since every iteration uses
+it. Its induction hypothesis is an ordinary, non-persistent triple: it can be
+used once, because it carries the remaining witness budget.
 
 Naming conventions: `crP_*` are carrier predicates, `oblP_*` obligation
 predicates, `witP_*` witness predicates, `thP_*` per-thread predicates,
@@ -99,7 +116,8 @@ Files are under `lantana/` unless they start with `lantana_heap_lang/`.
 
 | Paper | Rocq | File |
 |---|---|---|
-| `{P}^G_i e {v. Q v}^G'_E` (fuel-burning triple) | `fbtriple`, notation `⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q ⦄^G'`; non-persistent core `fbtriple_once` | `lantana_heap_lang/triple.v` |
+| `{P}^G_i e {v. Q v}^G'_E` (fuel-burning triple) | `fbtriple`, notation `⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q ⦄^G'`; the general form `fbtriple_gen`, notation `⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q ⦄`, whose `Q` states the final carriers | `lantana_heap_lang/triple.v` |
+| specification `∃ μ. {P}^G e {v. Q}^G'` (`□` and the `∀` omitted) | `□ ∃ μ, ∀ …, ⦃ P ⦄^G e @ i; C; ⊤ ⦃ v, Q ⦄^G'`; `spec_persistent_intro`; `fbtriple_texan` | `lantana_heap_lang/triple.v` |
 | carrier superscripts / `carriers_i G` (Thm 1) | `thP_carriers i G` | `base_logic/opreds.v` |
 | thread `i`'s expression; termination with value `v` | `thread_expr i C e`; `exits v@i` (`thread_expr i [] v`) | `lantana_heap_lang/primitive_laws.v` |
 | `Fuel^ℓ_G μ` | `fuels G ℓ μ := [∗ set] g ∈ G, crP_fuel g ℓ μ`; one carrier: `crP_fuel g ℓ μ` | `lantana_heap_lang/triple.v`, `base_logic/opreds.v` |
@@ -125,9 +143,9 @@ names the underlying lemmas.
 |---|---|---|
 | STEP-PURE, STEP-PURE-LC, STEP-PURE-WIT | `fbtriple_step_pure`, `fbtriple_step_pure_lc`, `fbtriple_step_pure_wit1` (one obligation `k`, as displayed) and `fbtriple_step_pure_wit` (a set `R` of obligations, each reported as `witP_cred r 1 ∨ oblP_discharged r`) | `lwp_pure_step` (`program_logic/lifting.v`, HeapLang instance in `lantana_heap_lang/primitive_laws.v`) |
 | STEP-REF / STEP-STORE / STEP-LOAD | `fbtriple_step_ref` / `fbtriple_step_store` / `fbtriple_step_load` | `lwp_alloc` / `lwp_store` / `lwp_load` (`lantana_heap_lang/primitive_laws.v`) |
-| FORK* | `fbtriple_fork1` (as displayed) and `fbtriple_fork` (moves a set `K ⊆ K1` of obligations to the child); the child's premise is a top-level triple for every thread `j` and carrier `g2`, ending with no carriers | `lwp_fork`, `lwp_fork_step` (`lantana_heap_lang/primitive_laws.v`) |
+| FORK* | `fbtriple_fork1` (as displayed) and `fbtriple_fork` (moves a set `K ⊆ K1` of obligations to the child); the child's premise is a top-level triple for every thread `j` and carrier `g2`, ending with no carriers | `lwp_fork_step` (`lantana_heap_lang/primitive_laws.v`) |
 | EXIT | `fbtriple_exit`; `fbtriple_top_lwp` turns a top-level triple ending with no carriers into the `lwp` that Theorem 1 consumes | value case of `lwp`; `thread_terminate` (`program_logic/sfgupd.v`) |
-| FINALLY-EXIT* | `fbtriple_finally_exit` (the thread's last pure step discharges `finally (exits v@i)`; see above) | `tf_until_discharge`, `carrier_delete`; the case studies use the same reasoning packaged as `thread_expr_terminate` (`lantana_heap_lang/primitive_laws.v`) |
+| FINALLY-EXIT* | `fbtriple_finally_exit` (the thread's last pure step discharges `finally (exits v@i)`; see above) | `tf_until_discharge`, `carrier_delete`; the case studies use the same reasoning packaged as `thread_expr_exit` (`lantana_heap_lang/primitive_laws.v`) |
 | FINALLY-ALLOC* | `fbtriple_finally_alloc` | `tf_until_alloc` (`program_logic/temporal_logic.v`) |
 | BIND | `fbtriple_bind` (the premise is at context `K ++ C`) | `lwp_bind` (`program_logic/weakestpre.v`) |
 | FRAME | `fbtriple_frame` | `lwp_strong_mono` |
@@ -139,7 +157,7 @@ names the underlying lemmas.
 | UNTIL-ALLOC | `fbtriple_until_alloc` | `tf_until_alloc` |
 | UNTIL-ACC | `fbtriple_until_acc` (the access takes a later, paid with `£ 1`) | `tf_until_acc` |
 | UNTIL-DISCHARGE | `fbtriple_until_discharge` (paid with `£ 2`) | `tf_until_discharge` |
-| WIT-IND | `fbtriple_wit_ind` (one-shot induction hypothesis `fbtriple_once`) | `wit_layer_ind` (`base_logic/opreds.v`) |
+| WIT-IND | `fbtriple_wit_ind` (as displayed: a persistent premise, and a non-persistent triple as the induction hypothesis) | `wit_layer_ind` (`base_logic/opreds.v`) |
 | FUELS-ADD / FUELS-UNION / FUELS-EMPTY / FUELS-LAYER | `fuels_add` / `fuels_union` / `fuels_empty` (generalized by `fuels_weaken`) / `fuels_layer` | `crP_fuel_add_set` / big-op union / empty big-op / `crP_fuel_extend_set` (`base_logic/opreds.v`) |
 | FUELS-MONO (fuel can be lowered to a smaller measure) | `fuels_mono` | `crP_fuel_mon_set` (`base_logic/opreds.v`) |
 | UNTIL-DONE-FALSE / UNTIL-SPLIT | `until_done_false` / `until_split` | `tf_until_discharged_false` / `tf_until_fractional` (also `tf_until_frac_split`, `tf_until_frac_add`) |
@@ -175,15 +193,15 @@ All in `lantana_heap_lang/examples/`.
 
 | Paper | Rocq | File |
 |---|---|---|
-| Flag module: `init`/`set`/`wait`; `isFlag`; `FlagObl`; SPEC-INIT/SPEC-SET/SPEC-WAIT | `init`/`set`/`wait`; `is_flag` (syntactic form `is_flag_tf`); `flag_tk`; `Flag_init_spec` / `Flag_set_spec` / `Flag_wait_spec` | `flag.v` |
-| `main` (§2) and its trace property | `main`, `FlagFork_main_spec`, end-to-end `main_adequacy` | `flag_fork.v` |
-| `nest` / `nondet` (§4.3); SPEC-NEST/SPEC-NONDET | `nest` / `nondet`; `Nondet_nest_spec` / `Nondet_nondet_spec` | `nondet.v` |
-| Handoff: `send`/`receive`; `HandoffBuf`; `isHandoff`; `TaskSpec`; SPEC-SEND/SPEC-RECEIVE | `send`/`receive`; `handoff_inv`; `is_handoff`; `is_task`; `Handoff_send_spec` / `Handoff_receive_spec` | `handoff.v` |
-| `handoffMain` (§5.2); SPEC-HANDOFF-MAIN | `main`, `main_spec`, `handoff_client_adequacy` | `handoff_client.v` |
-| Ticket lock (§7.1): `TLInv`; `TLObl`; SPEC-ACQUIRE/SPEC-RELEASE | `is_fair_lock`; `lock_token`; `TicketLock_init_spec` / `TicketLock_acquire_spec` / `TicketLock_release_spec` (the specifications in Rocq are more generalized than ones in the paper) | `ticket_lock.v` |
-| Queue (§7.2): `QInv` (`QData`/`QState`/`QObls`/`QPrimary`); SPEC-ENQUEUE/SPEC-DEQUEUE | `is_queue` (with `queue_worker` for the primary); `Queue_init_spec` / `Queue_enqueue_spec` / `Queue_dequeue_spec` | `queue.v` |
-| Task queue (§7.3): `TQInv`; SPEC-PUT-TASK/SPEC-WORKER | `is_task_queue`; `TaskQueue_init_spec` / `TaskQueue_put_task_spec` / `TaskQueue_run_task_spec` / `TaskQueue_worker_spec` | `task_queue.v` |
-| Reentrant client `decr` / `clientMain` (§7.3); SPEC-DECR/SPEC-DECR-CLIENTMAIN | `decr_reentrant` / `main`; `decr_reentrant_spec` / `main_spec`; `task_queue_client_adequacy` | `task_queue_client.v` |
+| Flag module: `init`/`set`/`wait`; `isFlag`; `FlagObl`; SPEC-INIT/SPEC-SET/SPEC-WAIT | `init`/`set`/`wait`; `is_flag` (syntactic form `is_flag_tf`); `flag_tk`; `Flag_init_fbspec` / `Flag_set_fbspec` / `Flag_wait_fbspec` (from `Flag_*_spec`) | `flag.v` |
+| `main` (§2) and its trace property | `main`, `FlagFork_main_fbspec` (texan form `FlagFork_main_spec`), end-to-end `main_adequacy` | `flag_fork.v` |
+| `nest` / `nondet` (§4.3); SPEC-NEST/SPEC-NONDET | `nest` / `nondet`; `Nondet_nest_fbspec` / `Nondet_nondet_fbspec` (from `Nondet_*_spec`) | `nondet.v` |
+| Handoff: `send`/`receive`; `HandoffBuf`; `isHandoff`; `TaskSpec`; SPEC-SEND/SPEC-RECEIVE | `send`/`receive`; `handoff_inv`; `is_handoff`; `is_task` (in the paper's format: `is_task_fbtriple`); `Handoff_send_fbspec` / `Handoff_receive_fbspec` (from `Handoff_*_spec`) | `handoff.v` |
+| `handoffMain` (§5.2); SPEC-HANDOFF-MAIN | `main`, `main_fbspec` (texan form `main_spec`), `handoff_client_adequacy` | `handoff_client.v` |
+| Ticket lock (§7.1): `TLInv`; `TLObl`; SPEC-ACQUIRE/SPEC-RELEASE | `is_fair_lock`; `lock_token`; `TicketLock_init_fbspec` / `TicketLock_acquire_fbspec` (general form) / `TicketLock_release_fbspec` / `TicketLock_delete_fbspec` (from `TicketLock_*_spec`; the specifications in Rocq are more generalized than ones in the paper) | `ticket_lock.v` |
+| Queue (§7.2): `QInv` (`QData`/`QState`/`QObls`/`QPrimary`); SPEC-ENQUEUE/SPEC-DEQUEUE | `is_queue` (with `queue_worker` for the primary); `Queue_init_fbspec` / `Queue_enqueue_fbspec` / `Queue_dequeue_fbspec` (general form; the paper shows the non-worker, non-empty case) (from `Queue_*_spec`) | `queue.v` |
+| Task queue (§7.3): `TQInv`; SPEC-PUT-TASK/SPEC-WORKER | `is_task_queue`; `TaskQueue_init_fbspec` / `TaskQueue_put_task_fbspec` / `TaskQueue_run_task_fbspec` (general form) / `TaskQueue_worker_fbspec` (from `TaskQueue_*_spec`) | `task_queue.v` |
+| Reentrant client `decr` / `clientMain` (§7.3); SPEC-DECR/SPEC-DECR-CLIENTMAIN | `decr_reentrant` / `main`; `decr_reentrant_fbspec` (from `decr_reentrant_spec`) / `main_fbspec` (texan form `main_spec`); `task_queue_client_adequacy` | `task_queue_client.v` |
 
 The per-example `*_adequacy` theorems (`flag_client_adequacy`, `main_adequacy`,
 `handoff_client_adequacy`, `task_queue_client_adequacy`) are end-to-end
@@ -194,5 +212,6 @@ respective client program. The `*_safety_adequacy` theorems
 instantiate `lwp_adequacy_safety_iris` for the same programs: in every fair run,
 the scheduled thread is never stuck, and each thread that terminates returns the
 value its specification promises.
-`flag_client.v` uses adequacy to prove a property about a memory location, beyond termination.
+`flag_client.v` uses adequacy to prove a property about a memory location, beyond termination;
+its threads' closed specifications are `writer_fbspec` and `reader_fbspec`.
 `paradox.v` proves the unsoundness counterexample remarked at the end of §6.2.

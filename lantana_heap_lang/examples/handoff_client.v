@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import triple.
 From lantana.program_logic Require Import adequacy_iris.
 From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Export flag handoff.
@@ -40,21 +41,23 @@ Section proof.
   (** The main proofs. *)
 
   (** layers: set = 0 → task = 1 → flag obl = 1 → return obl = 2 *)
-  Lemma main_spec :
-    ⊢ ∃ μ, ∀ i g kl,
-    l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 2 μ ∗
-         crP_obls g 2 {[kl]} ∗
-         ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ }}}
-      main #() @ i
-    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
+  (** SPEC-HANDOFF-MAIN, the closed specification of [main], in the paper's format: it ends
+      with no carriers. *)
+  Lemma main_fbspec :
+    ⊢ □ ∃ μ, ∀ i g kl,
+    ⦃ fuels {[g]} 2 μ ∗ crP_obls g 2 {[kl]} ∗ ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ⦄^{[g]}
+      main #() @ i; []; ⊤
+    ⦃ v, ⌜v = #1⌝ ⦄^∅.
   Proof using handoffG0.
+    rewrite /fbtriple /fbtriple_gen. iModIntro.
     iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
     iPoseProof (Flag_wait_spec) as (μ_fw) "Flag_wait_spec".
     iPoseProof (Handoff_send_spec) as (μ_hs) "Handoff_send_spec".
     iPoseProof (Handoff_receive_spec) as (μ_hr) "Handoff_receive_spec".
-    iExists (20 ⊕ μ_fi ⊕ μ_hs ⊕ μ_fw)%M. iIntros (i g kl Φ) "!> HP HΦ".
+    iExists (20 ⊕ μ_fi ⊕ μ_hs ⊕ μ_fw)%M. iIntros (i g kl Φ) "HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Cg& HF)".
+    iEval (rewrite big_sepS_singleton) in "GF".
     iPoseProof (crP_fuel_add with "GF") as "[GF GF_m]".
     iPoseProof (crP_fuel_add with "GF_m") as "[GF_fi GF_m]".
     iPoseProof (crP_fuel_add with "GF_m") as "[GF_hs GF_fw]".
@@ -140,9 +143,26 @@ Section proof.
     do 2 (iModIntro; lwp_pure_one).
     iApply lwpupd_lwp_sfmupd.
     iPoseProof (tlc_split_nat 2 98 with "LC") as "[LC _]".
-    iMod (thread_expr_terminate with "TE LC TG Cg HF") as "[TE #Td]"; first set_solver.
+    iMod (thread_expr_exit with "TE LC TG Cg HF") as "[TE TG]"; first set_solver.
     iModIntro. lwp_finish.
-    iApply "HΦ". iFrame "TE". rewrite /lift_term. iFrame "Td". done.
+    iApply "HΦ". by iFrame.
+  Qed.
+
+  (** The same specification in the form [main_pre] uses: the thread has terminated. *)
+  Lemma main_spec :
+    ⊢ ∃ μ, ∀ i g kl,
+    l{{{ thread_expr i [] (main #()) ∗ thP_carriers i {[g]} ∗ crP_fuel g 2 μ ∗
+         crP_obls g 2 {[kl]} ∗
+         ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ }}}
+      main #() @ i
+    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i (λ _ v, ⌜v = #1⌝) v }}}.
+  Proof using handoffG0.
+    iPoseProof main_fbspec as (μ) "#H". iExists μ. rewrite /fbtriple /fbtriple_gen.
+    iIntros (i g kl Φ) "!> (TE& TG& GF& Pre) HΦ". iApply lwp_sfgupd.
+    iApply ("H" $! i g kl with "[$TE $TG GF $Pre]").
+    { rewrite big_sepS_singleton. iFrame "GF". }
+    iIntros (v) "(TE& TG& ->)". iMod (thread_terminate with "TG") as "Td". iModIntro.
+    iApply "HΦ". rewrite /lift_term. by iFrame.
   Qed.
 
   Lemma main_pre Θ i Φ Ψs :

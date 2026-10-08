@@ -5,6 +5,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import triple.
 From iris.prelude Require Import options.
 From iris.algebra.lib Require Import dfrac_agree.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map.
@@ -1009,6 +1010,66 @@ Section proof.
     iApply (lwp_free _ ∅ 0 with "[$TE $TG $GF1 $PtrCurr]"). 1: done.
     iIntros "(TE& _& TG& _)".
     iApply ("HΦ" with "[$]").
+  Qed.
+
+  (** * The specifications in the paper's format
+
+      Each is a corollary of the texan specification above. *)
+
+  Corollary TicketLock_init_fbspec :
+    ⊢ □ ∃ μ, ∀ lc ℓ i G (E : coPset) C,
+    ⦃ fuels G 0 μ ⦄^G TicketLock.init #() @ i; C; E
+    ⦃ tl, ∃ γ, £ lc ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
+              (∀ E R, ⟦R⟧ₗ ={E}=∗ is_fair_lock tl γ R) ⦄^G.
+  Proof.
+    iPoseProof TicketLock_init_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc ℓ i G E C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! lc ℓ i G E C with "Pre"). iIntros (tl γ) "(TE& LC& TG& Post)".
+    iApply "HΦ". iFrame "TE TG". iExists γ. by iFrame.
+  Qed.
+
+  (** SPEC-ACQUIRE. The final carriers include the new carrier [gu], so the postcondition
+      states them (the general form). *)
+  Corollary TicketLock_acquire_fbspec :
+    ⊢ □ ∃ μ, ∀ lc m i G tl γ dq1 dq2 ℓ R (E : coPset) (MASK : ↑N ⊆ E) C,
+    ⦃ fuels G (ℓ ⊕ 1)%ordi μ ∗ γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ is_fair_lock tl γ R ⦄^G
+      TicketLock.acquire tl @ i; C; E
+    ⦃ v, ∃ gu κu, ⌜v = #()⌝ ∗ £ lc ∗ ⌜gu ∉ G⌝ ∗ thP_carriers i ({[gu]} ∪ G) ∗
+                  crP_obls gu ℓ {[κu]} ∗ fuels {[gu]} ℓ m ∗ oblP_fuel κu ℓ m ∗
+                  γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ ⦄.
+  Proof.
+    iPoseProof TicketLock_acquire_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc m i G tl γ dq1 dq2 ℓ R E MASK C). rewrite /fbtriple_gen.
+    iIntros (Φ) "Pre HΦ". iApply ("H" $! lc m i G tl γ dq1 dq2 ℓ R E MASK C with "Pre").
+    iIntros (gu κu) "(TE& LC& %Hgu& TG& Cg& Fg& Post)". iApply "HΦ". iFrame "TE".
+    iExists gu, κu. rewrite big_sepS_singleton. by iFrame.
+  Qed.
+
+  (** SPEC-RELEASE *)
+  Corollary TicketLock_release_fbspec :
+    ⊢ □ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
+    ⦃ fuels G 0 μ ∗ crP_obls gu ℓu K ∗ ⌜κu ∈ K⌝ ∗ lock_token γ κu ∗ ⟦R⟧ₗ ∗
+      γ ↪LOCK_AL{dq} ∗ is_fair_lock tl γ R ⦄^G
+      TicketLock.release tl @ i; C; E
+    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ γ ↪LOCK_AL{dq} ⦄^G.
+  Proof.
+    iPoseProof TicketLock_release_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc i G tl γ dq R κu gu ℓu K E MASK C). rewrite /fbtriple /fbtriple_gen.
+    iIntros (Φ) "Pre HΦ". iApply ("H" $! lc i G tl γ dq R κu gu ℓu K E MASK C with "Pre").
+    iIntros "(TE& LC& TG& Post)". iApply "HΦ". by iFrame.
+  Qed.
+
+  Corollary TicketLock_delete_fbspec :
+    ⊢ □ ∃ μ, ∀ lc i G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
+    ⦃ fuels G 0 μ ∗ crP_obls gu ℓu K ∗ ⌜κu ∈ K⌝ ∗ lock_token γ κu ∗ ⟦R⟧ₗ ∗
+      γ ↪LOCK_AL ∗ is_fair_lock tl γ R ⦄^G
+      TicketLock.delete tl @ i; C; E
+    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ ⟦R⟧ₗ ⦄^G.
+  Proof.
+    iPoseProof TicketLock_delete_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc i G tl γ R κu gu ℓu K E MASK C). rewrite /fbtriple /fbtriple_gen.
+    iIntros (Φ) "Pre HΦ". iApply ("H" $! lc i G tl γ R κu gu ℓu K E MASK C with "Pre").
+    iIntros "(TE& LC& TG& Post)". iApply "HΦ". by iFrame.
   Qed.
 
 End proof.

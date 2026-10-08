@@ -4,6 +4,7 @@ From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import notation.
 From lantana.heap_lang Require Import proofmode.
+From lantana.heap_lang Require Import triple.
 From iris.prelude Require Import options.
 From iris.algebra Require Import reservation_map dfrac_agree mono_list gset.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map.
@@ -287,6 +288,71 @@ Section proof.
       iApply ("TaskQueue_worker_spec" $! true with "[$TEj $TGj $Fg $Qw $IQ]").
       { iPureIntro. split; auto. set_solver. }
       iIntros "%". done.
+  Qed.
+
+  (** * The specifications in the paper's format
+
+      Each is a corollary of the texan specification above. *)
+
+  (** SPEC-PUT-TASK *)
+  Corollary TaskQueue_put_task_fbspec :
+    ⊢ □ ∃ μ, ∀ lc i G g K B γ ℓ ℓg (ql task_f task_a : val) C,
+    ⦃ fuels G 1%ordi μ ∗ crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗
+      ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
+      is_task ℓ task_f task_a B ∗ is_task_queue ql γ ℓ ⦄^G
+      TaskQueue.put_task ql task_f task_a @ i; C; ⊤
+    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ B) ⦄^G.
+  Proof.
+    iPoseProof TaskQueue_put_task_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc i G g K B γ ℓ ℓg ql task_f task_a C). rewrite /fbtriple /fbtriple_gen.
+    iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! lc i G g K B γ ℓ ℓg ql task_f task_a C with "Pre").
+    iIntros "(TE& LC& TG& Post)". iApply "HΦ". by iFrame.
+  Qed.
+
+  (** [run_task]'s final carriers depend on [b] (whether the caller is the queue's worker), so
+      the postcondition states them (the general form). *)
+  Corollary TaskQueue_run_task_fbspec :
+    ⊢ □ ∃ μ, ∀ lc m (b : bool) wg i G γ ℓ (ql : val) C,
+    ⦃ fuels G (1)%ordi μ ∗ fuels G (ℓ)%ordi 1 ∗ (if b then queue_worker γ wg else True) ∗
+      is_task_queue ql γ ℓ ⦄^G
+      TaskQueue.run_task ql @ i; C; ⊤
+    ⦃ rv, £ lc ∗
+          (if b
+           then (∃ ng, thP_carriers i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
+                       queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
+           else (thP_carriers i G)) ⦄.
+  Proof.
+    iPoseProof TaskQueue_run_task_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc m b wg i G γ ℓ ql C). rewrite /fbtriple_gen. iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! lc m b wg i G γ ℓ ql C with "Pre"). iIntros (rv) "(TE& Post)".
+    iApply "HΦ". iFrame.
+  Qed.
+
+  (** SPEC-WORKER *)
+  Corollary TaskQueue_worker_fbspec :
+    ⊢ □ ∃ μ, ∀ (b : bool) i G γ ℓ (ql : val) C,
+    ⦃ (if b
+       then (∃ g, ⌜G = {[g]} ∧ (1 <= ℓ)%ordi⌝ ∧ (crP_fuel g (ℓ)%ordi μ) ∗ queue_worker γ g)
+       else (⌜G = ∅⌝)) ∗
+      is_task_queue ql γ ℓ ⦄^G
+      TaskQueue.worker ql @ i; C; ⊤
+    ⦃ v, False ⦄^G.
+  Proof.
+    iPoseProof TaskQueue_worker_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (b i G γ ℓ ql C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! b i G γ ℓ ql C with "Pre"). by iIntros "[]".
+  Qed.
+
+  Corollary TaskQueue_init_fbspec :
+    ⊢ □ ∃ μ, ∀ (lc : Ord.t) i G ℓ C,
+    ⦃ fuels G 0 μ ∗ ⌜(1 <= ℓ)%ordi⌝ ⦄^G TaskQueue.init #() @ i; C; ⊤
+    ⦃ ql, ∃ γ, £ lc ∗ is_task_queue ql γ ℓ ⦄^G.
+  Proof.
+    iPoseProof TaskQueue_init_spec as (μ) "#H". iIntros "!>". iExists μ.
+    iIntros (lc i G ℓ C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
+    iApply ("H" $! lc i G ℓ C with "Pre"). iIntros (ql γ) "(TE& LC& TG& Post)".
+    iApply "HΦ". iFrame "TE TG". iExists γ. by iFrame.
   Qed.
 
 End proof.
