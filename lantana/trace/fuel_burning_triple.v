@@ -1,5 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From lantana.trace Require Export guarantee_infer.
+From lantana.program_logic Require Export weakestpre.
 
 (** * Fuel-burning triples
 

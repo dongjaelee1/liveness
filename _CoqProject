@@ -91,13 +91,17 @@ lantana/program_logic/atomic.v
 # Traces, temporal guarantees and adequacy
 lantana/trace/trace_prop.v
 lantana/trace/trace_prop_rules.v
-lantana/trace/trace_step_indexed.v
+lantana/trace/fair_scheduling.v
+lantana/trace/triprop.v
 lantana/trace/itrprop.v
 lantana/trace/itrprop_rules.v
-lantana/trace/trace_fixpoint.v
+lantana/trace/itrprop_fixpoint.v
+lantana/trace/itrprop_model.v
 lantana/trace/guarantee.v
-lantana/trace/guarantee_struct.v
-lantana/trace/guarantee_run.v
+lantana/trace/guarantee_rules.v
+lantana/trace/temporal_formula.v
+lantana/trace/temporal_formula_run.v
+lantana/trace/temporal_formula_rules.v
 lantana/trace/guarantee_infer.v
 lantana/trace/guarantee_rec.v
 lantana/trace/guarantee_saved.v

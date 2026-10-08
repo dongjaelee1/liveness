@@ -9,7 +9,7 @@ From lantana.trace Require Export guarantee_infer.
     self-certifying. Also a registry of temporal formulas chosen at runtime. *)
 
 Section saved.
-  Context `{!lantanaGS Λ Σ, !savedPropG Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!savedPropG Σ}.
   Implicit Types G : itrProp Λ Σ.
 
   (** [γ] names the temporal formula [P], which guarantees [G]. *)
@@ -49,7 +49,7 @@ End saved.
 (** A registry of temporal formulas, one per request, chosen at runtime. Its invariant
     guarantees, at all times, the trace property of every registered request. *)
 Section request_registry.
-  Context `{!lantanaGS Λ Σ, !savedPropG Σ, !ghost_mapG Σ nat gname}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!savedPropG Σ, !ghost_mapG Σ nat gname}.
   Implicit Types G : nat → itrProp Λ Σ.
 
   Definition registry_inv γm G : iProp Σ :=

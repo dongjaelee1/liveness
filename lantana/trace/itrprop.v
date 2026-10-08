@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.trace Require Export trace_step_indexed.
+From lantana.trace Require Export triprop.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
 
@@ -9,8 +9,8 @@ From lantana.base_logic Require Import satisfiable.
     An [itrProp] is a trace property ([trProp], its external reading) with its
     internalization in the logic ([trIProp], its internal reading), adequate for it: if the
     internal reading is satisfiable, the external one holds. This file defines the
-    connectives, the state atoms, complete and instant properties and the model; the rules
-    are in itrprop_rules.v. *)
+    connectives, the state atoms, and complete and instant properties; the rules are in
+    itrprop_rules.v, the model in itrprop_model.v. *)
 
 (** ** Definition *)
 
@@ -269,56 +269,3 @@ Section complete.
 End complete.
 Global Hint Mode ItrPropComplete - - ! : typeclass_instances.
 Global Hint Mode ItrPropInstant - - ! : typeclass_instances.
-
-
-(** ** The model
-
-    Under the assumptions of the adequacy theorem (adequacy_temporal.v), a property valid in
-    the logic holds on the trace. Hence in-logic entailment is sound for the trace readings
-    of complete properties, and not complete for them. *)
-Section model.
-  Context {Λ : language} {Σ : gFunctors}.
-  Implicit Types G H : itrProp Λ Σ.
-  Local Notation histGpreS := (histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))).
-
-  Lemma itrProp_valid_ext `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G τ :
-    (∀ Ht : temporalGS Λ Σ, ⊢ itrProp_internal G τ) → itrProp_external G τ.
-  Proof.
-    intros HG. destruct (τ.2 τ.1) as [[[Θ σ] i] κs].
-    assert (iProp_sat (|==> ∃ (Hmupd : mupdGS Σ)
-                (Hhist : histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ)))
-                (Htreg : tregGS.tregGS Λ Σ),
-              (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗ wsat.wsat ∗ wsat.ownE ⊤))
-      as Hsat.
-    { eapply sat_mono; last apply iProp_sat_intro. iIntros "_".
-      iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& _)".
-      iMod (history_interp_init (Λ:=Λ) σ Θ κs) as (Hhist) "_".
-      iMod (treg_alloc (Λ:=Λ)) as (Htreg) "_".
-      iModIntro. iExists Hmupd, Hhist, Htreg. iFrame. }
-    apply sat_bupd, sat_exists in Hsat as [Hmupd Hsat].
-    apply sat_exists in Hsat as [Hhist Hsat]. apply sat_exists in Hsat as [Htreg Hsat].
-    set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
-    apply (itrProp_adeq G (temporalGS0:=Htemp) emp).
-    unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
-    eapply sat_mono; last exact Hsat. iIntros "($& $& $)". iApply (HG Htemp).
-  Qed.
-
-  (** Soundness: for a complete [G], in-logic entailment implies trace inclusion. *)
-  Lemma itrProp_le_sound `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G G' `{!ItrPropComplete G} :
-    G ⊑ G' → itrProp_external G ⊆ itrProp_external G'.
-  Proof.
-    intros Hle τ HG. apply itrProp_valid_ext. intros Ht. rewrite -(Hle Ht τ). by apply itrProp_complete.
-  Qed.
-
-  (** Incompleteness: [□ ⊥ ⊆ ⊥] holds on traces, but [□ ⊥ ⊑ ⊥] does not hold in the logic
-      (the reading of [□ ⊥] starts with a later, so it is proved by Löb induction). *)
-  Lemma itrProp_always_elim_not_le `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} (τ : trace Λ) :
-    ¬ ((□ ⌜False⌝)%ITR ⊑ (⌜False⌝ : itrProp Λ Σ)%ITR).
-  Proof.
-    intros Hle. apply (itrProp_valid_ext (itrProp_pure False) τ). intros Ht.
-    iLöb as "IH". iPoseProof (Hle Ht τ with "[IH]") as "%HF"; last done.
-    rewrite /= trI_always_unfold /trI_always_pre.
-    iApply fupd_mask_intro; first set_solver. iIntros "_". iNext. done.
-  Qed.
-
-End model.

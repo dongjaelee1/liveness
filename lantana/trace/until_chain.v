@@ -1,5 +1,5 @@
 From iris.prelude Require Import options.
-From lantana.trace Require Export guarantee_infer.
+From lantana.trace Require Export temporal_formula.
 From iris.algebra Require Import mono_list.
 From lantana.algebra Require Import axioms. (* func_ext *)
 
@@ -139,15 +139,15 @@ Global Arguments uchain_pin {SI Σ _}.
 (** ** Chains
 
     Defined by well-founded recursion on the ordinal, so a chain is a plain iProp. *)
-Fixpoint untilI_chain_rec `{!lantanaGS Λ Σ}
+Fixpoint untilI_chain_rec `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (N : namespace) k (o : Ord.t) (P Q : iProp Σ) (ACC : Acc Ord.lt o) {struct ACC} : iProp Σ :=
   untilI N k (1/2) P
     (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), untilI_chain_rec N k' o' P Q (Acc_inv ACC LTo)))%I.
 
-Definition untilI_chain `{!lantanaGS Λ Σ} (N : namespace) k o (P Q : iProp Σ) : iProp Σ :=
+Definition untilI_chain `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) k o (P Q : iProp Σ) : iProp Σ :=
   untilI_chain_rec N k o P Q (Ord.lt_well_founded o).
 
-Lemma untilI_chain_rec_proof_irrelevance `{!lantanaGS Λ Σ} (N : namespace) k o (P Q : iProp Σ) ACC1 ACC2 :
+Lemma untilI_chain_rec_proof_irrelevance `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) k o (P Q : iProp Σ) ACC1 ACC2 :
   untilI_chain_rec N k o P Q ACC1 = untilI_chain_rec N k o P Q ACC2.
 Proof.
   revert k ACC1 ACC2. induction o as [o IH] using (well_founded_ind Ord.lt_well_founded).
@@ -156,7 +156,7 @@ Proof.
   eapply IH. auto.
 Qed.
 
-Lemma untilI_chain_unfold `{!lantanaGS Λ Σ} (N : namespace) k o (P Q : iProp Σ) :
+Lemma untilI_chain_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) k o (P Q : iProp Σ) :
   untilI_chain N k o P Q =
   untilI N k (1/2) P (Q ∨ (∃ k' (o' : Ord.t) (LTo : Ord.lt o' o), untilI_chain N k' o' P Q))%I.
 Proof.
@@ -165,7 +165,7 @@ Proof.
   apply untilI_chain_rec_proof_irrelevance.
 Qed.
 
-Definition until_chain_log `{!lantanaGS Λ Σ} `{!uchainGS Σ}
+Definition until_chain_log `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!uchainGS Σ}
   (N : namespace) (P Q R : iProp Σ) : iProp Σ :=
   locked
     (∃ (l : list (oid * Ord.t)) k o,

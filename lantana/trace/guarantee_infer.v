@@ -1,7 +1,7 @@
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From lantana.trace Require Export guarantee_run.
+From lantana.trace Require Export temporal_formula_rules.
 From transfinite.stepindex Require Import ordinals.
 
 (** * Inferring guarantees ([IntoTemporal]); examples *)

@@ -1,6 +1,6 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.trace Require Export guarantee_infer trace_fixpoint.
+From lantana.trace Require Export guarantee_infer itrprop_fixpoint.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
 From lantana.algebra Require Import ordinal_existential_properties axioms.
@@ -9,7 +9,7 @@ From lantana.algebra Require Import ordinal_existential_properties axioms.
 
 (** ** Guarantees of fixpoints *)
 Section fixpoint_guarantees.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Lemma temporal_nu_coind (F : itrProp Λ Σ → itrProp Λ Σ) `{!ItrPropMono F} P H :
     itrProp_le H (F H) → P ⊨ₜ H ⊢ P ⊨ₜ itrProp_nu F.
@@ -42,7 +42,7 @@ End fixpoint_guarantees.
     the structure, not in the proof. Allocation opens the new invariant, registers it, and
     gets the record of its content by Löb induction. *)
 Section nest.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
   Definition F_nest (G : itrProp Λ Σ) : itrProp Λ Σ → itrProp Λ Σ := λ X, itrProp_always (itrProp_and G X).
   Global Instance F_nest_mono G : ItrPropMono (F_nest G).
@@ -124,7 +124,7 @@ End nest.
     current one with it. On traces the reading is just [◇G] (the eventuality is not strict);
     [□◇G] is the guarantee of an always over a finally ([always_finally_temporal]). *)
 Section renew.
-  Context `{!lantanaGS Λ Σ}.
+  Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
   Implicit Types G : itrProp Λ Σ.
 
   Definition F_renew (G : itrProp Λ Σ) : itrProp Λ Σ → itrProp Λ Σ := λ X, itrProp_finally (itrProp_and G X).

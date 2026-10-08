@@ -7,7 +7,7 @@ From lantana.program_logic Require Export temporal_registry.
 
     [temporalGS]: the ghost state of the obligation model, the history and the registry.
     [TemporalInterp]: the interpretation of the temporal layer, a parameter that the program
-    logic threads without knowing its content; guarantee_struct.v fixes it to the registry. *)
+    logic threads without knowing its content; temporal_formula.v fixes it to the registry. *)
 
 Class temporalGpreS `{SI : sidx} (Λ : language) (Σ : gFunctors) :=
   TemporalGpreS {

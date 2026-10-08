@@ -9,6 +9,32 @@ From lantana.base_logic Require Import satisfiable.
     and thread [j] satisfies its postcondition once it terminates ([safety_iris]). The proof
     reads [trI_always] off the run directly, without guarantees. *)
 
+(** ** Iris-style safety
+
+    The scheduled thread is not stuck, and a terminated thread [i] satisfies its
+    postcondition. This [not_stuck] (a [tsProp]) shadows [language.not_stuck]. *)
+Definition not_stuck {Λ : language} : tsProp Λ :=
+  λ ξ, let '((Θ, σ), i, _) := ξ in
+       ∃ e, Θ !! i = Some e ∧
+            match to_val e with
+            | Some _ => True
+            | None => reducible i e σ (dom Θ)
+            end.
+
+Definition if_term_val {Λ : language} (i : thread_id) (Φ : thread_id → val Λ → Prop) : tsProp Λ :=
+  λ ξ, let '((Θ, _), j, _) := ξ in
+       if (decide (i = j))
+       then ∃ e, Θ !! j = Some e ∧
+                 match (to_val e) with
+                 | Some v => Φ i v
+                 | None => True
+                 end
+       else True.
+
+Definition safety_iris {Λ : language} (i : thread_id) (Φ : thread_id → val Λ → Prop) : trProp Λ :=
+  tr_always (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R.
+
+
 Local Definition safety_iris_tiProp `{!temporalGS Λ Σ} i Φ : trIProp Λ Σ :=
   trI_always (trI_pure True) (λ τ, (⌜ (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R τ ⌝)%I).
 
