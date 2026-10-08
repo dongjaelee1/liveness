@@ -76,6 +76,7 @@ lantana/base_logic/gupd.v
 lantana/base_logic/oinv.v
 lantana/base_logic/opreds.v
 lantana/base_logic/lex_fuels.v
+lantana/base_logic/depth.v
 
 lantana/program_logic/language.v
 lantana/program_logic/history_interp.v

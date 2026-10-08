@@ -209,8 +209,8 @@ Section proof.
       iPoseProof (crP_fuel_add_set with "F_mr") as "[F_mr F_mr1]".
       iMod (crP_fuel_mon_gen_set _ 1%ordi _ mr with "F_mr") as "F_mr". 1: auto.
       { apply measure_rep_layer_le_proper. apply classicOrd.le_eq_or_lt in Hlayer. destruct Hlayer.
-        - right. econstructor 1. auto.
-        - left. split; auto. }
+        - right. econstructor 1. econstructor 1. auto.
+        - left. split; [split; auto | reflexivity]. }
       iModIntro.
       iApply ("TaskQueue_run_task_spec" $! 100 (102 ⊕ (mr ⊕ 1))%M true with "[$TE $TG $F_mr $F_mr1 $HW $ITQ]").
       iIntros (rv) "(TE& LC& (%& TG& %Ninng& Qw& Gg& Fng))".

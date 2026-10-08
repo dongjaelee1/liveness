@@ -286,6 +286,16 @@ Section sfgupd.
     iMod (carrier_alloc_gupd with "Tb") as "(%& %& $& $& $)". auto.
   Qed.
 
+  (** Allocation at an explicit depth. *)
+  Lemma carrier_alloc_d E i G ℓ d μ :
+    thP_carriers i G -∗
+    |={E}=>g ∃ g, (⌜ g ∉ G ⌝) ∗
+                 thP_carriers i ({[g]} ∪ G) ∗ crP_obls g ℓ ∅ ∗ crP_dfuel g ℓ d μ.
+  Proof.
+    unfold_sfgupd. iIntros "Tb %%%%% $".
+    iMod (carrier_alloc_d_gupd with "Tb") as "(%& %& $& $& $)". auto.
+  Qed.
+
   Lemma carrier_delete E i G g ℓ :
     g ∈ G →
     thP_carriers i G -∗
