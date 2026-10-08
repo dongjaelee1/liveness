@@ -82,7 +82,7 @@ Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%P
 
 (** The terminal atom means actual value reachability, with no hidden context.
     This equivalence is purely semantic; clients establish its left-hand side
-    under the behavior and fair-scheduling premises of adequacy. *)
+    with [lwp_adequacy], under its premises that the trace is a fair behavior. *)
 Lemma exits_finally_iff (τ : trace heap_lang) i v :
   tp_trace (tp_finally (exits v@i))%P τ ↔
   ∃ n, τ.1 ≤ n ∧ (τ.2 n).1.1.1 !! i = Some (of_val v).

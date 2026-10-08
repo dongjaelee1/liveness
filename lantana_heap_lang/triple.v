@@ -492,8 +492,14 @@ Section logic.
   Lemma fuels_empty ℓ μ : ⊢ fuels ∅ ℓ μ.
   Proof. by rewrite big_sepS_empty. Qed.
 
-  (** FUELS-MONO, which generalizes FUELS-EMPTY. *)
-  Lemma fuels_mono G G' ℓ μ : G' ⊆ G → fuels G ℓ μ ⊢ fuels G' ℓ μ.
+  (** FUELS-MONO: fuel can be lowered to a smaller measure, compared by its interpretation at
+      layer [ℓ]. *)
+  Lemma fuels_mono G ℓ μ1 μ2 :
+    (measure_rep (ℓ, 0) μ1 <= measure_rep (ℓ, 0) μ2)%ord → fuels G ℓ μ2 ⊢ |==> fuels G ℓ μ1.
+  Proof. apply crP_fuel_mon_set. Qed.
+
+  (** Fuel of some carriers can be dropped; this generalizes FUELS-EMPTY. *)
+  Lemma fuels_weaken G G' ℓ μ : G' ⊆ G → fuels G ℓ μ ⊢ fuels G' ℓ μ.
   Proof. iIntros (HG) "H". by iApply (big_sepS_subseteq with "H"). Qed.
 
   (** FUELS-LAYER *)

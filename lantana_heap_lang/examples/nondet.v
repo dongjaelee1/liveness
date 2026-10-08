@@ -47,8 +47,6 @@ Section proof.
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
-  Let Nl := nroot.@ "label".
-
   (** The main proofs. *)
 
   (** Because the blocking function wait increases the layer by 1, the layer grows with the nested wait calls. *)

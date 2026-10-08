@@ -92,7 +92,6 @@ lantana/program_logic/temporal_logic_lib.v
 lantana/program_logic/temporal_property.v
 lantana/program_logic/adequacy.v
 lantana/program_logic/adequacy_iris.v
-lantana/program_logic/fuel_burning_triple.v
 
 lantana_heap_lang/locations.v
 lantana_heap_lang/lang.v
@@ -116,7 +115,6 @@ lantana_heap_lang/examples/handoff.v
 lantana_heap_lang/examples/handoff_client.v
 lantana_heap_lang/examples/paradox.v
 lantana_heap_lang/examples/ticket_lock.v
-lantana_heap_lang/examples/ticket_lock2.v
 lantana_heap_lang/examples/queue.v
 lantana_heap_lang/examples/task_queue.v
 lantana_heap_lang/examples/task_queue_client.v

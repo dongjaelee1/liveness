@@ -78,9 +78,6 @@ Section atomic.
       + econstructor; try done. simpl. by rewrite fill_app.
   Qed.
 
-  Global Instance label_atomic s t v : Atomic s (Label t (Val v)).
-  Proof. solve_atomic. Qed.
-
   Global Instance choosenat_atomic s : Atomic s (ChooseNat).
   Proof. solve_atomic. Qed.
 End atomic.
@@ -174,10 +171,6 @@ Section pure_exec.
   Proof. solve_pure_exec. Qed.
   Global Instance pure_case_inr v e1 e2 :
     PureExec True 1 (Case (Val $ InjRV v) e1 e2) (App e2 (Val v)).
-  Proof. solve_pure_exec. Qed.
-
-  Global Instance pure_label t v :
-    PureExec True 1 (Label t (of_val v)) (of_val v).
   Proof. solve_pure_exec. Qed.
 
 End pure_exec.

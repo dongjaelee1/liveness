@@ -230,7 +230,6 @@ Tactic Notation "lwp_case" := lwp_pure (Case _ _ _).
 Tactic Notation "lwp_inj" := lwp_pure (InjL _) || lwp_pure (InjR _).
 Tactic Notation "lwp_pair" := lwp_pure (Pair _ _).
 Tactic Notation "lwp_closure" := lwp_pure (Rec _ _ _).
-Tactic Notation "lwp_label" := lwp_pure (Label _ _).
 
 (* Tactic Notation "lwp_if" := lwp_pure (If _ _ _). *)
 (* Tactic Notation "lwp_if_true" := lwp_pure (If (LitV (LitBool true)) _ _). *)
