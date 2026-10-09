@@ -17,7 +17,7 @@ Module Queue.
     Transfinite Iris (https://gitlab.mpi-sws.org/iris/transfinite/-/blob/master/theories/examples/termination/eventloop.v)
    *)
 
-  (** Use a ticket lock. *)
+  (** A linked list with head and tail pointers, protected by a ticket lock. *)
   Definition init : val :=
     λ: <>,
       let: "node" := ref NONE in
@@ -54,8 +54,10 @@ Module Queue.
 
 End Queue.
 
-(** ** A queue's spec with a liveness guarantee: any element can be associated with some obligations. *)
-(** The CMRA we need. *)
+(** ** A queue specification with liveness: each element carries a set of obligations, which
+    pass to the thread that dequeues it. *)
+
+(** Ghost state: the list of elements with their obligations, and the worker's carrier. *)
 Class queueGpreS (Σ : gFunctors) : Set :=
   QueueGpreS {
       queueGpreS_queue : inG Σ (dfrac_agreeR (list (val * oids)));
@@ -80,11 +82,8 @@ Record queue_γ :=
       queue_γd : gname;
     }.
 
-(** User interface *)
-(* Make the instances local to this file. We cannot use #[local] in the code *)
-(* above, as that would make the instances local to the module. *)
-(** FIXME: why do we need this? Is there a more consistent way of doing this?
-           ticket lock inG is also here, doesn't look great. *)
+(* Instances used in this file only: [queueGpreS_queue] is not declared as an instance above,
+   and [tlock_config_inG] is local to [ticket_lock.v]. *)
 Local Existing Instances queue_inG queueGpreS_queue queueGpreS_data_inG tlock_config_inG.
 
 Section proof.
@@ -109,6 +108,8 @@ Section proof.
   Local Definition qG_queue γ (l : list (val * oids)) q : iProp Σ :=
     own γ (to_dfrac_agree (DfracOwn q) l).
 
+  (** The paper's QPrimary: [g] is the carrier of the queue's worker, which holds the obligations
+      of the queued elements. *)
   Definition queue_worker γ (g : ocid) : iProp Σ :=
     ghost_var (queue_γd γ) (1/2)%Qp (g).
 
@@ -118,7 +119,12 @@ Section proof.
     | (v, B) :: vs => (∃ l : loc, lh ↦ SOMEV (v, #l) ∗ φ v B ∗ queue_contents l lt vs φ)
     end%I.
 
-  (* Mostly protects ghost resources + sync using qG_queue *)
+  (** The queue's invariant on the ghost state (the paper's QObls). The worker's carrier [g]
+      holds the obligations of all elements. The obligations of the element at position [n] have
+      [S n] units of their own fuel. Each dequeue moves the remaining elements one position
+      forward, which frees one unit each; a worker's dequeue spends it to move their obligations
+      to its new carrier. The last unit moves an element's obligations to the carrier of the
+      thread that dequeues it. Half of [qG_queue] is here, and half in [queue_lock]. *)
   Local Definition queue_inv (ℓ : ord.t) γq γd : iProp Σ :=
     (∃ (vs : list (val * oids)) (g : ocid),
         qG_queue γq vs (1/2)%Qp ∗
@@ -127,7 +133,8 @@ Section proof.
         crP_obls g ℓ (union_list_of_sets (vs.*2)) ∗
         ([∗ list] n ↦ B ∈ (vs.*2), [∗ set] b ∈ B, oblP_fuel b (ℓ)%ordi (S n)%M))%I.
 
-  (* Mostly protects physical resources + sync using qG_queue *)
+  (** The resource that the lock protects (the paper's QState): the head and tail pointers and
+      the list cells ([queue_contents], the paper's QData), and the other half of [qG_queue]. *)
   Local Definition queue_lock (φ : val → oids → iProp Σ) γq (lhptr ltptr : loc) : iProp Σ :=
     (∃ (lh lt : loc) (vs : list (val * oids)),
         lhptr ↦ #lh ∗
@@ -135,7 +142,8 @@ Section proof.
         qG_queue γq vs (1/2)%Qp ∗
         queue_contents lh lt vs φ)%I.
 
-  (** The invariant *)
+  (** The paper's QInv: [ql] is a queue whose elements satisfy [φ], with obligations at layer
+      [ℓ]. *)
   Definition is_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) (φ : val → oids → iProp Σ) : iProp Σ :=
     ∃ (lhptr ltptr : loc) (tl : val),
       ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
@@ -173,7 +181,6 @@ Section proof.
   Qed.
 
   (** ** Program proofs *)
-  (** FIXME: better notation for triples with this pattern *)
   Lemma Queue_init_spec :
     ⊢ ∃ μ, ∀ lc φ i G C,
     l{{{ thread_expr i C (Queue.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) }}}
@@ -195,7 +202,6 @@ Section proof.
     iModIntro. iIntros (ptr_node) "[TE ((_& TG& _)& Ptr_node& _)]".
     lwp_pures.
     (** Init TicketLock *)
-    (** FIXME: better tactic for function calls *)
     lwp_bind (TicketLock.init #()).
     iMod (own_alloc (to_dfrac_agree (DfracOwn (1/2)) ([] : list (val * oids)) ⋅ to_dfrac_agree (DfracOwn (1/2)) ([] : list (val * oids)))) as (γq) "[HQvs HQvs0]".
     { rewrite -dfrac_agree_op. done. }
@@ -204,12 +210,12 @@ Section proof.
     iIntros (tl γtl) "(TE& _& TG& AL& CF& IFL)".
     iMod (lock_alive_persist with "AL") as "#AL".
     iMod (lock_config_persist with "CF") as "#CF".
-    (** Alloc tl ptr *)
+    (** Alloc tail ptr *)
     lwp_bind (AllocN _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
     iModIntro. iIntros (ltptr) "[TE ((_& TG& _)& Ptr_tl& _)]".
-    (** Alloc hd ptr *)
+    (** Alloc head ptr *)
     lwp_bind (AllocN _ _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_alloc _ ∅ 0 with "[$TE $TG $GF1]"). 1: done.
@@ -238,7 +244,7 @@ Section proof.
     iApply ("ACC" with "Ptr_lt Hφ0 Ptr_l0").
   Qed.
 
-  (** TODO: LAT-style spec that enables the client to put crP_obls in some invariant. *)
+  (** Enqueue [x] with the obligations [B], which move from [g] to the worker's carrier. *)
   Lemma Queue_enqueue_spec :
     ⊢ ∃ μ, ∀ lc i G g K B φ γ ℓ ℓg (ql x : val) C,
     l{{{ thread_expr i C (Queue.enqueue ql x) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
@@ -259,7 +265,6 @@ Section proof.
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
     lwp_pures.
-    (** Need ql *)
     iDestruct "IQ" as "(%&%&%& %Hql& #IQ& #IFL)". simplify_eq.
     lwp_pures.
     (** Acquire lock *)
@@ -271,8 +276,6 @@ Section proof.
     iIntros (gu ku) "(TE& _& %Ningu& TG& Ggu& F_gu& F_ku& _& _& Lock& R)".
     iPoseProof (crP_fuel_add with "F_gu") as "[F_gu F_mr_gu]".
     (* Prepare fuels for the unlock call. *)
-    (* iPoseProof (crP_fuels_init with "F_mr") as "F_mr". *)
-    (* iPoseProof (crP_fuels_add_carrier with "F_mr_gu F_mr") as "F_mr". *)
     iMod (crP_fuel_layer_mon_set _ 0 with "F_mr") as "F_mr".
     { apply ordArith.le_from_nat. lia. }
     iPoseProof (big_sepS_union_2 with "[F_mr_gu] F_mr") as "F_mr".
@@ -343,7 +346,7 @@ Section proof.
     iApply ("TicketLock_release_spec" with "[] [$TE $TG $F_mr $Ggu $Lock $IFL Ptr_lh Ptr_lt Queue QC]").
     { iPureIntro. set_solver. }
     { iSplit. 1: iPureIntro; set_solver. tf_red. iFrame. eauto. }
-    (* FIXME: it would be nice if we don't get this evar *)
+    (* Instantiate the evar that the release specification leaves. *)
     Unshelve. 2: exact 0.
     iIntros "(TE& _& TG& Ggu& _)".
     replace ({[ku]} ∖ {[ku]}) with (∅ : oids) by set_solver.
@@ -353,7 +356,9 @@ Section proof.
     iApply ("HΦ" with "[$TE $Q_LC $TG $GB]").
   Qed.
 
-  (** TODO: LAT-style spec that enables the client to put crP_obls in some invariant. *)
+  (** Dequeue. A dequeued element comes with a new carrier [g] that holds its obligations. If
+      [b], the caller is the worker [wg]: it gets a new worker carrier [ng], and [wg] ends with
+      no obligations. *)
   Lemma Queue_dequeue_spec :
     ⊢ ∃ μ, ∀ lc m (b : bool) wg i G φ γ ℓ (ql : val) C,
     l{{{ thread_expr i C (Queue.dequeue ql) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
@@ -388,7 +393,6 @@ Section proof.
     iPoseProof (crP_fuels_init with "GF") as "GF".
     lwp_pure. simpl.
     iFrame "TG GF". iExists ∅, lc. iSplitR; first eauto. iIntros "TG GF _ Q_LC TE".
-    (** Need ql *)
     iDestruct "IQ" as "(%&%&%& %Hql& #IQ& #IFL)". simplify_eq.
     lwp_pures.
     (** Acquire lock *)
@@ -404,8 +408,6 @@ Section proof.
     { apply ordArith.le_from_nat. lia. }
     iPoseProof (big_sepS_union_2 with "[F_mr_gu] F_mr") as "F_mr".
     { iApply big_sepS_singleton. iFrame. }
-    (* iPoseProof (crP_fuels_init with "F_mr") as "F_mr". *)
-    (* iPoseProof (crP_fuels_add_carrier with "F_mr_gu F_mr")as "F_mr". *)
     rewrite (crP_fuel_eq gu 0 _ (96 ⊕ 4)%M); cycle 1.
     { rewrite measure_rep_add !measure_rep_nat -Hessenberg.add_from_nat. done. }
     iPoseProof (crP_fuel_add with "F_gu") as "[F_gu _]".
@@ -447,7 +449,6 @@ Section proof.
         { apply ord.O_bot. }
         iPoseProof (big_sepS_union_2 with "[Fng_mr] F_mr") as "F_mr".
         { iApply big_sepS_singleton. iFrame. }
-        (* iPoseProof (crP_fuels_add_carrier with "Fng_mr F_mr") as "F_mr". *)
         iModIntro.
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TE $TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC_Ptr_lh]").
@@ -548,8 +549,6 @@ Section proof.
         { apply ord.O_bot. }
         iPoseProof (big_sepS_union_2 with "[Fng_mr] F_mr") as "F_mr".
         { iApply big_sepS_singleton. iFrame. }
-        (* iPoseProof (crP_fuels_add_carrier with "Fg_mr F_mr") as "F_mr". *)
-        (* iPoseProof (crP_fuels_add_carrier with "Fng_mr F_mr") as "F_mr". *)
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TE $TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
         { iPureIntro. set_solver. }
@@ -595,7 +594,6 @@ Section proof.
         { apply ord.O_bot. }
         iPoseProof (big_sepS_union_2 with "[Fg_mr] F_mr") as "F_mr".
         { iApply big_sepS_singleton. iFrame. }
-        (* iPoseProof (crP_fuels_add_carrier with "Fg_mr F_mr") as "F_mr". *)
         iDestruct "IFL" as "(AL& CF& IFL)".
         iApply ("TicketLock_release_spec" $! 0 with "[] [$TE $TG $F_mr $Ggu $IFL $Lock Ptr_lh Ptr_lt Queue QC]").
         { iPureIntro. set_solver. }

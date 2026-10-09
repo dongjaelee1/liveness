@@ -4,21 +4,17 @@ From lantana.base_logic Require Import invariants.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
 
-(** An "invariant" location is a location that has some invariant about its
-value attached to it, and that can never be deallocated explicitly by the
-program.  It provides a persistent witness that will always allow reading the
-location, guaranteeing that the value read will satisfy the invariant.
+(** Adapted from Transfinite Iris's [base_logic/lib/gen_inv_heap.v], using the
+invariants of [invariants.v].
 
-This is useful for data structures like RDCSS that need to read locations long
-after their ownership has been passed back to the client, but do not care *what*
-it is that they are reading in that case. In that extreme case, the invariant
-may just be [True].
+An "invariant" location is a location that has some invariant about its value
+attached to it, and that can never be deallocated explicitly by the program. It
+provides a persistent witness that will always allow reading the location,
+guaranteeing that the value read will satisfy the invariant.
 
-Since invariant locations cannot be deallocated, they only make sense when
-modeling languages with garbage collection.  HeapLang can be used to model
-either language by choosing whether or not to use the [Free] operation.  By
-using a separate assertion [inv_pointsto_own] for "invariant" locations, we can
-keep all the other proofs that do not need it conservative.  *)
+Since invariant locations cannot be deallocated, they only make sense for languages
+with garbage collection. They use the separate assertion [inv_pointsto_own], so
+proofs that do not need them are unaffected. *)
 
 Definition inv_heapN: namespace := nroot .@ "inv_heap".
 Local Notation "l ↦ v" := (pointsto l (DfracOwn 1) v) (at level 20) : bi_scope.
@@ -161,9 +157,9 @@ Section inv_heap.
 
   (** * Typeclass instances *)
 
-  (* FIXME(Coq #6294): needs new unification
-  The uses of [apply:] and [move: ..; rewrite ..] (by lack of [apply: .. in ..])
-  in this file are needed because Coq's default unification algorithm fails. *)
+  (* The uses of [apply:] and [move: ..; rewrite ..] (for lack of [apply: .. in ..])
+  in this file are needed because Rocq's default unification fails here
+  (Coq issue #6294). *)
   Global Instance inv_pointsto_own_proper l v :
     Proper (pointwise_relation _ iff ==> (≡)) (inv_pointsto_own l v).
   Proof.
@@ -224,8 +220,8 @@ Section inv_heap.
   Qed.
 
   (** An accessor to make use of [inv_pointsto_own].
-    This opens the invariant *before* consuming [inv_pointsto_own] so that you can use
-    this before opening an atomic update that provides [inv_pointsto_own]!. *)
+    This opens the invariant *before* consuming [inv_pointsto_own], so that it can be
+    used before opening an atomic update that provides [inv_pointsto_own]. *)
   Lemma inv_pointsto_own_acc_strong E :
     ↑inv_heapN ⊆ E →
     inv_heap_inv L V ={E, E ∖ ↑inv_heapN}=∗ ∀ l v I, l ↦_I v -∗

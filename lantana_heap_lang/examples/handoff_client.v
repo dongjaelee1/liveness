@@ -11,6 +11,8 @@ From lantana.heap_lang.examples Require Export flag handoff.
 
 Section code.
 
+  (** The paper's handoffMain: fork a receiver, send it the task [Flag.set x], and wait on the
+      flag [x]. *)
   Definition main : val :=
     λ: <>,
       let: "b" := ref NONE in
@@ -38,11 +40,9 @@ Section proof.
 
   Let Nl := nroot.@ "return".
 
-  (** The main proofs. *)
-
-  (** layers: set = 0 → task = 1 → flag obl = 1 → return obl = 2 *)
   (** SPEC-HANDOFF-MAIN, the closed specification of [main], in the paper's format: it ends
-      with no carriers. *)
+      with no carriers. The layers: the task [Flag.set] runs at 0; the handoff and the flag's
+      obligation are at 1; [main]'s exit obligation is at 2. *)
   Lemma main_fbspec :
     ⊢ □ ∃ μ, ∀ i g kl,
     ⦃ fuels {[g]} 2 μ ∗ crP_obls g 2 {[kl]} ∗ ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ⦄^{[g]}
@@ -105,7 +105,8 @@ Section proof.
     iPoseProof (crP_fuels_add_carrier with "GF00 GF") as "GF".
     lwp_pures.
     lwp_bind (Handoff.send _ _ _).
-    (** Need carrier at layer 1 for Flag.set. *)
+    (* Send the task [Flag.set x] with the flag's obligation [k]. The task runs at layer 0,
+       below the handoff's layer 1. *)
     iModIntro.
     iMod (crP_fuel_layer_mon _ 0 with "GF_hs") as "GF_hs".
     { apply ordArith.le_from_nat. lia. }
@@ -165,6 +166,8 @@ Section proof.
     iApply "HΦ". rewrite /lift_term. by iFrame.
   Qed.
 
+  (** The setup for [lwp_adequacy] and [lwp_adequacy_safety_iris]: allocate the carrier, the
+      exit obligation and the temporal formula [Φ], and give [main] its weakest precondition. *)
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := main #() ]} →
     Φ = (λ μ, (∃ g kl, finallyP Nl kl 1 (exits #1@i) ∗
@@ -251,6 +254,7 @@ Section adequacy.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := (λ _ v, ⌜v = #1⌝)%I]}.
 
+  (** Liveness: in every fair behavior, [main] terminates with [#1]. *)
   Theorem handoff_client_adequacy :
     ∀ (τ : trace heap_lang),
     behavior τ →
@@ -286,7 +290,7 @@ Section adequacy.
     iModIntro. iExists (Φ_tf μ). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
-    (* TODO: FIXME? *)
+    (* The [handoffG Σ] instance remains as a shelved goal. *)
     Unshelve. apply HandoffG. apply _.
   Qed.
 
@@ -327,7 +331,7 @@ Section adequacy.
     { iFrame. }
     iDestruct "H" as (μ) "(HP& H)".
     iApply ("H" with "HP").
-    (* TODO: FIXME? *)
+    (* The [handoffG Σ] instance remains as a shelved goal. *)
     Unshelve. apply HandoffG. apply _.
   Qed.
 
@@ -347,5 +351,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions handoff_client_adequacy. *)

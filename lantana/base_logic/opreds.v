@@ -6,8 +6,10 @@ From lantana.algebra Require Import ordinal_wfocm.
 From lantana.base_logic Require Export oinv gupd.
 From transfinite.base_logic.lib Require Import ghost_map.
 
-(** All Local Definitions are only for internal uses and users should not need them. *)
-(** ** Obl predicates. *)
+(** The predicates used in Lantana proofs: obligation ([oblP_*]), witness ([witP_*]),
+    carrier ([crP_*]) and thread ([thP_*]) predicates, with their rules. [Local]
+    definitions are internal. *)
+(** ** Obligation predicates *)
 Local Definition oblP_id `{SI : indexT} `{@mupdGS SI Σ} k : iProp Σ :=
   oblG_elem k.
 
@@ -103,7 +105,7 @@ Local Definition crP_fuel_unseal :
   @crP_fuel = @crP_fuel_def := crP_fuel_aux.(seal_eq).
 Global Arguments crP_fuel {SI Σ _ _}.
 
-(** Useful pattern for burning fules when taking a step *)
+(** [n] fuel for each carrier in [G], at any layer. Steps burn fuel in this form. *)
 Global Notation crP_fuels G n := ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ n)%I.
 
 Local Definition crP_obls_def `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
@@ -136,7 +138,8 @@ Local Definition thP_done_unseal :
   @thP_done = @thP_done_def := thP_done_aux.(seal_eq).
 Global Arguments thP_done {SI Σ _}.
 
-(** ** Additional definitions for managing collection of fules for convenient induction *)
+(** ** Collections of carrier fuels, used for induction over a well-founded relation
+    ([embed_fuels]) or over witness credits ([wit_fuels]) *)
 Local Definition collect_fuels `{SI : indexT} `{@mupdGS SI Σ} `{!ord_mono_fun_class}
   α (F : gmap ocid (ord.t * measure)) : iProp Σ :=
   ([∗ map] s ↦ '(l, m) ∈ F, crP_fuel_val s ((measure_rep (l, 0) ((1 ⊕ ▽) × m)%M) × α)%ord).
@@ -628,7 +631,7 @@ Section preds.
       iModIntro. iIntros. by iApply oblP_fuel_lt.
     Qed.
 
-    (** measurable syntax rules. *)
+    (** Rules for the measure constructors. *)
     Lemma oblP_fuel_embed k ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a1 a2 : A) :
       ltA a1 a2 →
       oblP_fuel k ℓ (⟪wf_ltA, a2⟫)%M ⊢ |==> oblP_fuel k ℓ (⟪wf_ltA, a1⟫)%M ∗ oblP_fuel k ℓ 1.
@@ -1136,7 +1139,7 @@ Section preds.
       iModIntro. iIntros. by iApply crP_fuel_lt.
     Qed.
 
-    (** measurable syntax rules. *)
+    (** Rules for the measure constructors. *)
     Lemma crP_fuel_embed k ℓ {A} {ltA} (wf_ltA : well_founded ltA) (a1 a2 : A) :
       ltA a1 a2 →
       crP_fuel k ℓ (⟪wf_ltA, a2⟫)%M ⊢ |==> crP_fuel k ℓ (⟪wf_ltA, a1⟫)%M ∗ crP_fuel k ℓ 1.
@@ -1270,7 +1273,7 @@ Section preds.
       intros. rewrite -big_sepS_bupd. iApply big_sepS_mono. intros. eapply crP_fuel_extend; eauto.
     Qed.
 
-    (** Useful pattern for burning fules when taking a step *)
+    (** Splitting fuel given by natural numbers, and rules for [crP_fuels]. *)
     Lemma crP_fuel_add_nat m1 m2 n k ℓ :
       (n = m1 + m2)%nat →
       crP_fuel k ℓ n ⊣⊢ (crP_fuel k ℓ m1 ∗ crP_fuel k ℓ m2)%I.
@@ -1417,7 +1420,6 @@ Section preds.
 
     Lemma embed_fuels_add {A : Type} {ltA : A → A → Prop} (wf_ltA : well_founded ltA) a F f ℓ μ :
       embed_fuels wf_ltA a F -∗ crP_fuel f ℓ (μ × ℵ)%M ==∗ embed_fuels wf_ltA a (<[f:=(ℓ, μ)]>F).
-      (* embed_fuels wf_ltA a ℓ1 F -∗ crP_fuel f ℓ2 (μ × ⟪wf_ltA, a⟫)%M ==∗ embed_fuels wf_ltA a ℓ1 (<[f:=(ℓ2, μ)]>F). *)
     Proof.
       iIntros "Wfs Gf". rewrite !embed_fuels_unseal /embed_fuels_def.
       iApply (collect_fuels_add with "Wfs Gf").

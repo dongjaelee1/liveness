@@ -83,11 +83,11 @@ Section atomic.
 End atomic.
 
 (** * Instances of the [PureExec] class *)
-(** The behavior of the various [wp_] tactics with regard to lambda differs in
+(** The behavior of the various [lwp_] tactics with regard to lambda differs in
 the following way:
 
-- [wp_pures] does *not* reduce lambdas/recs that are hidden behind a definition.
-- [wp_rec] and [wp_lam] reduce lambdas/recs that are hidden behind a definition.
+- [lwp_pure] does *not* reduce lambdas/recs that are hidden behind a definition.
+- [lwp_rec] and [lwp_lam] reduce lambdas/recs that are hidden behind a definition.
 
 To realize this behavior, we define the class [AsRecV v f x erec], which takes a
 value [v] as its input, and turns it into a [RecV f x erec] via the instance
@@ -95,7 +95,7 @@ value [v] as its input, and turns it into a [RecV f x erec] via the instance
 [Hint Extern] so that it is only used if [v] is syntactically a lambda/rec, and
 not if [v] contains a lambda/rec that is hidden behind a definition.
 
-To make sure that [wp_rec] and [wp_lam] do reduce lambdas/recs that are hidden
+To make sure that [lwp_rec] and [lwp_lam] do reduce lambdas/recs that are hidden
 behind a definition, we activate [AsRecV_recv] by hand in these tactics. *)
 Class AsRecV (v : val) (f x : binder) (erec : expr) :=
   as_recv : v = RecV f x erec.
@@ -111,10 +111,8 @@ Section pure_exec.
     subst; intros ?;
              split; [lia | apply nsteps_once, pure_base_step_pure_step; constructor; [solve_exec_safe | solve_exec_puredet]].
 
-  (** This heap lang tracks termination status of a thread using a state,
-      checking the state on every step.
-      This means every step is pure only with a condition.
-   *)
+  (** Lantana's [PureExec] also requires at least one step ([n > 0]), which
+      [solve_pure_exec] proves with [lia]. *)
 
   Global Instance pure_recc f x (erec : expr) :
     PureExec True 1 (Rec f x erec) (Val $ RecV f x erec).

@@ -17,6 +17,7 @@ Module TaskQueue.
     λ: "q" "f" "a",
       Queue.enqueue "q" ("f", "a").
 
+  (** Run one task from the queue, if there is one. *)
   Definition run_task : val :=
     λ: "q",
       match: Queue.dequeue "q" with
@@ -25,13 +26,13 @@ Module TaskQueue.
           (Fst "fa") (Snd "fa")
       end.
 
-  (** Infinite loop *)
+  (** The worker runs tasks forever. *)
   Definition worker : val :=
     rec: "loop" "q" :=
       run_task "q";;
       "loop" "q".
 
-  (** Initializes a queue and Forks one worker thread *)
+  (** Create a queue and fork its worker. *)
   Definition init : val :=
     λ: <>,
       let: "q" := Queue.init #() in
@@ -55,17 +56,16 @@ Section proof.
   Ltac lwp_pure_lc n := (iModIntro; lwp_pure; post_lwp_lc n).
 
   (** ** Definitions *)
-  (** The invariant *)
+  (** The paper's TQInv: a queue whose elements are tasks [(f, a)], each with [is_task] for its
+      obligations. *)
   Definition is_task_queue (ql : val) (γ : queue_γ) (ℓ : ord.t) : iProp Σ :=
     is_queue ql γ ℓ (λ v B, ∃ f a, ⌜(v = (f, a)%V)⌝ ∗ is_task ℓ f a B)%I.
-    (* is_queue ql γ ℓ (is_task ℓ). *)
 
   (** ** Lemmas *)
   Global Instance is_task_queue_persistent ql γ ℓ : Persistent (is_task_queue ql γ ℓ).
   Proof. rewrite /is_task_queue. apply _. Qed.
 
   (** ** Program proofs *)
-  (** FIXME: better notation for triples with this pattern *)
   Lemma TaskQueue_put_task_spec :
     ⊢ ∃ μ, ∀ lc i G g K B γ ℓ ℓg (ql task_f task_a : val) C,
     l{{{ thread_expr i C (TaskQueue.put_task ql task_f task_a) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
@@ -138,7 +138,6 @@ Section proof.
     - destruct Hcase as (v& Hcase). subst x.
       iDestruct "Hx" as "(%&%& Htask& Gg& Fg& %Ning& HW)".
       iDestruct "Htask" as "(%&%&%& (%&%& %Htask& HP& %mt& TASK))".
-      (* iDestruct "Htask" as "(%&%&%&%& %Htask& HP& %mt& TASK)". *)
       iPoseProof (crP_fuel_add with "Fg") as "[_ Fg]".
       iPoseProof (crP_fuel_add_nat 99 1 with "Fg") as "[Fg' Fg]". 1: lia.
       iPoseProof (crP_fuels_add_carrier with "Fg' GF") as "GF".
@@ -153,7 +152,6 @@ Section proof.
         { iApply big_sepS_singleton. iFrame. }
         replace ({[ng]} ∪ ({[g]} ∪ G)) with ({[g; ng]} ∪ G) by set_solver.
         subst v.
-        (* destruct Htask as (->& Hltask). *)
         lwp_pures.
         lwp_bind (f a).
         iMod (crP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
@@ -168,7 +166,6 @@ Section proof.
         iModIntro. iApply "HΦ". iFrame "TE Q_LC". iExists ng. iFrame. iPureIntro. set_solver.
       + iRename "HW" into "TG".
         subst v.
-        (* destruct Htask as (->& Hltask). *)
         lwp_pures.
         lwp_bind (f a).
         iMod (crP_fuel_extend_set _ ℓt _ mt with "F_task") as "F_task".
@@ -183,6 +180,8 @@ Section proof.
         iModIntro. iApply "HΦ". iFrame.
   Qed.
 
+  (** The worker never returns. If [b], the thread is the queue's worker, with the single
+      carrier [g]; otherwise it holds no carriers. *)
   Lemma TaskQueue_worker_spec :
     ⊢ ∃ μ, ∀ (b : bool) i G γ ℓ (ql : val) C,
     l{{{ thread_expr i C (TaskQueue.worker ql) ∗ thP_carriers i G ∗
@@ -204,7 +203,8 @@ Section proof.
       { iApply big_sepS_singleton. iFrame. }
       iPoseProof (crP_fuel_add_set with "GF") as "[GF F_mr]".
       iPoseProof (crP_fuels_init with "GF") as "GF".
-      (** Lob (co-)induction *)
+      (* Löb induction. The loop needs no termination measure: each iteration gets a fresh
+         worker carrier from [run_task]. *)
       iRevert (g) "Qw F_mr TG GF TE". iLöb as "IH". iIntros (g) "HW F_mr TG GF TE".
       lwp_pure. simpl.
       iFrame "TG GF". iExists ∅, 0. iSplitR; first eauto. iIntros "TG GF _ _ TE".
@@ -229,7 +229,7 @@ Section proof.
       iApply (lc_lwpupd_add_later with "LC1"). iNext.
       iModIntro. iApply ("IH" with "Qw F_mr TG GF TE").
     - iDestruct "HW" as "%". subst G.
-      (** Lob (co-)induction *)
+      (* Löb induction. The thread holds no carriers, so its steps need no fuel. *)
       iRevert "TG TE". iLöb as "IH". iIntros "TG TE".
       iAssert ([∗ set] g ∈ ∅, crP_fuel g 0 100)%I as "GF''". 1: done.
       iPoseProof (crP_fuels_init with "GF''") as "GF'".

@@ -4,7 +4,6 @@ From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
 From lantana.algebra Require Import ordinal_wfocm.
 From lantana.base_logic Require Export owit ocarrier model_interp invariants.
-(* From lantana.base_logic Require Export history_interp invariants. *)
 Import uPred.
 
 Class mupdGpreS `{SI : indexT} (Σ : gFunctors) :=
@@ -21,11 +20,11 @@ Class mupdGS `{SI : indexT} (Σ : gFunctors) :=
   MupdG {
       (** Invariants. *)
       #[global] mupd_invGS :: invGS Σ;
-      (** Obls. *)
+      (** Obligations. *)
       #[global] mupd_osatGS :: osatGS.osatGS Σ;
-      (** Obls assigned to threads. *)
+      (** Obligations of threads. *)
       #[global] mupd_othreadGS :: othreadGS.othreadGS Σ;
-      (** Obl carriers. *)
+      (** Carriers. *)
       #[global] mupd_ocarrierGS :: ocarrierGS.ocarrierGS Σ;
       (** Witnesses. *)
       #[global] mupd_owitGS :: owitGS.owitGS Σ;
@@ -40,11 +39,19 @@ Definition mupdΣ `{SI : indexT} : gFunctors :=
 Global Instance subG_mupdΣ `{SI : indexT} {Σ} : subG mupdΣ Σ → mupdGpreS Σ.
 Proof. solve_inG. Qed.
 
+(** The model interpretation: the model history, the obligation state [Ω], the threads
+    [Θ], their carriers, and the witness state [W], with [owit_inv] relating [Ω] and
+    [W]. *)
 Definition model_interp `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   h i Ω W n Θ : iProp Σ :=
   (model_history_interp h i n Ω ∗ osat Ω ∗ othread Θ ∗ oassigned (dom Ω) ∗ ocarrier Θ ∗ owit W ∗ ⌜ owit_inv Ω W ⌝)%I.
 
-(** ** Modality for updating obls. *)
+(** ** The model update modality *)
+(** [|=[n,Θ]=>m P] is either a fancy update with the empty mask, or: given the model
+    interpretation, the obligation state takes at most one step ([↪∘]); then, for any
+    witness state reached in at most one step ([↓∘]) that keeps [owit_inv], the model
+    interpretation is restored and the update continues. [n] is the current position
+    in the execution, and [Θ] the set of thread ids. *)
 Definition mupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (mupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
@@ -130,11 +137,11 @@ Section mupd.
     iIntros "!>" (?) "[$ _]".
   Qed.
 
-  (** An empty fancy update can be turned into an obl update. *)
+  (** An empty fancy update can be turned into a model update. *)
   Lemma fupd_mupd n Θ P : (|={∅}=> P) ⊢ (|=[n,Θ]=>m P).
   Proof. rewrite mupd_unfold. iIntros "Hupd". iLeft. done. Qed.
 
-  (** We can always introduce a obl update. *)
+  (** We can always introduce a model update. *)
   Lemma mupd_intro n Θ P : P ⊢ |=[n,Θ]=>m P.
   Proof. rewrite mupd_unfold. iIntros "HP". iLeft. iModIntro. done. Qed.
 
@@ -152,7 +159,7 @@ Section mupd.
     iPoseProof (owit_mon _ _ H with "N") as "$". iFrame. done.
   Qed.
 
-  (** We can combine two obl updates into one. *)
+  (** We can combine two model updates into one. *)
   Lemma mupd_bind n Θ P Q :
     (P -∗ |=[n,Θ]=>m Q) ⊢ (|=[n,Θ]=>m P) -∗ (|=[n,Θ]=>m Q).
   Proof.
@@ -343,14 +350,7 @@ Section mupd.
   Qed.
 
   (* The following instances make the Iris Proof Mode aware of the
-     obl update. They are derived from the simpler rules above. *)
-  (* Global Instance elim_fupd_mupd (p : bool) n Θ P Q : *)
-  (*   ElimModal True p false (|={∅}=> P) P (|=[n,Θ]=>m Q) (|=[n,Θ]=>m Q)%I. *)
-  (* Proof. *)
-  (*   rewrite /ElimModal bi.intuitionistically_if_elim //=. *)
-  (*   rewrite fupd_mupd. *)
-  (*   iIntros "_ [HP HPQ]". iApply (mupd_bind with "HPQ HP"). *)
-  (* Qed. *)
+     model update. They are derived from the simpler rules above. *)
 
   Global Instance elim_fupd_mupd (p : bool) E n Θ P Q :
     ElimModal True p false (|={∅,E}=> P) P (|=[n,Θ]=>m Q) (|={E,∅}=> |=[n,Θ]=>m Q)%I.
@@ -439,7 +439,8 @@ Section mupd.
 
 End mupd.
 
-(* Wrapper to use fupd. *)
+(* The model update with invariant masks: a fancy update from [E1] to [∅], a model
+   update, and a fancy update from [∅] to [E2]. *)
 Definition fmupd `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} E1 E2 n Θ : iPropO Σ -d> iPropO Σ :=
   (λ P, |={E1,∅}=> |=[n,Θ]=>m |={∅,E2}=> P)%I.
 Notation "'|={' E1 , E2 : n , Θ '}=>m' P" := (fmupd E1 E2 n Θ P) (at level 99, P at level 200, format "|={ E1 , E2 : n , Θ }=>m  P").
@@ -508,7 +509,7 @@ Section fmupd.
     iModIntro. iMod "H" as "$". eauto.
   Qed.
 
-  (** We can combine two obl updates into one. *)
+  (** We can combine two model updates into one. *)
   Lemma fmupd_bind E1 E2 E3 n Θ P Q :
     (P -∗ |={E2,E3:n,Θ}=>m Q) ⊢ (|={E1,E2:n,Θ}=>m P) -∗ (|={E1,E3:n,Θ}=>m Q).
   Proof.

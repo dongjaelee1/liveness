@@ -5,10 +5,9 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From lantana.algebra Require Import bank.
 From lantana.algebra Require Export ordinal_wfocm ordinal_ucmra.
-(* From lantana.algebra Require Export ordinal_wfocm layer. *)
 From lantana.base_logic Require Export obligation.
 
-(* FIXME: move to somewhere *)
+(** Allocating one key of a reservation map. *)
 Section aux.
   Context `{SI : indexT} {Σ : gFunctors} {A : cmra} {GA : inG Σ A} {GR : inG Σ (reservation_mapR A)}.
 
@@ -42,9 +41,7 @@ End aux.
 Global Instance ord_obl_class : obl_class :=
   Build_obl_class Ord.t ord_wfocm_pack.
 
-(* Canonical Structure layerO `{SI : indexT} := leibnizO layer. *)
-
-(** The ghost state for obls *)
+(** The ghost state for obligations *)
 Module osatGS.
 
   Class osatGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -84,7 +81,7 @@ Import osatGS.
 Local Existing Instances osat_inG
   osatGpreS_bound osatGpreS_state osatGpreS_fuel osatGpreS_owner.
 
-(* Bound: bound of an obl *)
+(* Bound: the fuel bound of an obligation, fixed when it is allocated. *)
 Definition oblG_bound `{SI : indexT} `{!osatGS Σ}
   (k : oid) (β : Ord.t) : iProp Σ :=
   own bound_name (gmap_view_frag k DfracDiscarded (to_agree (β))).
@@ -101,7 +98,8 @@ Local Definition oblG_bound_auth_id `{SI : indexT} `{!osatGS Σ}
   (m : gmap oid Ord.t) : iProp Σ :=
   own bound_name (gmap_view_auth (V:=agreeR (Ord.t)) (DfracOwn 1) (to_agree <$> m)).
 
-(* Caputres P Until Q, need two states: in P and in Q. *)
+(* Assigned: obligation [k] is assigned. The flag [b] records whether its until property
+   [P until Q] is still in [P] ([false]) or already in [Q] ([true]). *)
 Definition oblG_assigned `{SI : indexT} `{!osatGS Σ}
   (k : oid) (b : bool) (q : Qp) : iProp Σ :=
   own state_name (reservation_map_data k (●MN{#q} (Nat.b2n b))).
@@ -118,7 +116,7 @@ Local Definition oblG_state_token_id `{SI : indexT} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own state_name (reservation_map_token (A:=(mono_natUR)) E).
 
-(* Fuel: manage credits for an obl's fuel *)
+(* Fuel: credits of an obligation's fuel, and the supply they are drawn from. *)
 Definition oblG_fuel `{SI : indexT} `{!osatGS Σ}
   (k : oid) (a : obl_fuel) : iProp Σ :=
   own fuel_name (reservation_map_data (A:=bankUR) k (cash a)).
@@ -135,7 +133,7 @@ Local Definition oblG_fuel_token_id `{SI : indexT} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own fuel_name (reservation_map_token (A:=bankUR) E).
 
-(* Owner: tracks the owner thread of an obl *)
+(* Owner: the owner thread of an obligation. *)
 Definition oblG_owner `{SI : indexT} `{!osatGS Σ}
   (k : oid) (t : obl_owner) (q : Qp) : iProp Σ :=
   own owner_name (reservation_map_data k (to_frac_agree q (t : leibnizO obl_owner))).
@@ -146,7 +144,7 @@ Local Definition oblG_owner_token_id `{SI : indexT} `{!osatGS Σ}
   (E : coPset) : iProp Σ :=
   own owner_name (reservation_map_token (A:=dfrac_agreeR (leibnizO obl_owner)) E).
 
-(* Global protocol to manage obls. *)
+(* The global invariant for the obligation state [Ω]. *)
 Definition osat `{SI : indexT} `{!osatGS Σ} `{!ord_mono_fun_class}
   (Ω : obls) : iProp Σ :=
   locked
@@ -241,7 +239,7 @@ Section osat.
   Local Instance oblG_owner_token_id_timeless E : Timeless (oblG_owner_token_id E).
   Proof. rewrite /oblG_owner_token_id. apply _. Qed.
 
-  (* Sat *)
+  (* osat *)
   Global Instance osat_timeless Ω : Timeless (osat Ω).
   Proof. rewrite /osat -lock. apply _. Qed.
 
@@ -722,7 +720,7 @@ Section osat.
     iApply big_sepM_insert; first auto. iFrame. iFrame "Gwf Gl". eauto.
   Qed.
 
-  (** ghost lock step rules: progress, unlock, retire *)
+  (** Obligation steps: progress and discharge. *)
   Lemma osat_progress_one Ω k a t c :
     (Ω !! k = Some (obl_assigned a t)) →
     (Ord.O < c)%ord →
@@ -825,7 +823,7 @@ Section osat.
         { subst. rewrite LUi2. rewrite lookup_insert_eq. econstructor. done. }
         rewrite lookup_insert_ne; auto. done.
     }
-    (* Disjoint gl_conds *)
+    (* Compose the two steps; their conditions are disjoint. *)
     destruct Prog1 as [Prog1 Hkeep1], Prog2 as [Prog2 Hkeep2]. split; last (etrans; eauto).
     eapply obls_cond_rel_split_cond. 4,5: eauto. all: simpl.
     - intros. rewrite dom_insert_L. set_solver.
@@ -929,7 +927,7 @@ Section osat.
 
 End osat.
 
-(* Allocation of an initial obl protocol. *)
+(* Allocation of the initial [osat]. *)
 Lemma osat_alloc `{SI : indexT} `{!osatGpreS Σ} `{!ord_mono_fun_class} :
   ⊢ |==> ∃ _ : osatGS Σ, osat ∅.
 Proof.

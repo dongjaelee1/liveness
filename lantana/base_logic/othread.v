@@ -5,7 +5,7 @@ From iris.prelude Require Import options.
 From lantana.algebra Require Export wfocm.
 From lantana.base_logic Require Export osat.
 
-(** The ghost state for thread obls *)
+(** The ghost state for the obligations of threads *)
 Module othreadGS.
 
   (* Assumes thread ids are positive *)
@@ -44,7 +44,7 @@ Import othreadGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances othread_inG othreadGpreS_owns othreadGpreS_obls othreadGpreS_exec othreadGpreS_elem.
 
-(* Owns: thread currently has this obl *)
+(* Owns: thread [i] currently owns obligation [k]. *)
 Definition othreadG_owns `{SI : indexT} `{!othreadGS Σ} (i : positive) (k : oid) (q : Qp) : iProp Σ :=
   own owns_name (reservation_map_data i (gmap_view_frag k (DfracOwn q) ())).
 Global Typeclasses Opaque othreadG_owns.
@@ -57,7 +57,8 @@ Local Definition othreadG_owns_auth_obls `{SI : indexT} `{!othreadGS Σ}
   i (TObls : gmap oid unit) : iProp Σ :=
   (own owns_name (reservation_map_data i (gmap_view_auth (DfracOwn 1) (TObls)))).
 
-(* Obls: live obls assigned to this thread, also fix to empty when thread terminates *)
+(* Obls: the live obligations of thread [i]. The set is empty once the thread has
+   terminated. *)
 Definition othreadG_obls `{SI : indexT} `{!othreadGS Σ} (i : positive) (G : oids) : iProp Σ :=
   own obls_name (gmap_view_frag i (DfracOwn 1) (G)).
 Global Typeclasses Opaque othreadG_obls.
@@ -86,7 +87,7 @@ Global Instance: Params (@othreadG_done) 3 := {}.
 Local Definition othreadG_exec_token_id `{SI : indexT} `{!othreadGS Σ} TP : iProp Σ :=
   (own exec_name (reservation_map_token (A:=mono_natUR) (⊤ ∖ gset_to_coPset TP))).
 
-(* Elem: keeps the fact that a key is inside a map *)
+(* Elem: thread [i] has been allocated. *)
 Definition othreadG_elem `{SI : indexT} `{!othreadGS Σ} (i : positive) : iProp Σ :=
   own elem_name (gmap_view_frag i DfracDiscarded ()).
 Global Typeclasses Opaque othreadG_elem.
@@ -113,7 +114,8 @@ Definition othread `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
         )
     )%I.
 
-(* Global invariant that relates obligations to the thread pool. *)
+(* Global invariant that relates obligations to threads: each obligation is owned by an
+   allocated thread, or discharged. *)
 Definition oassigned `{SI : indexT} {Σ} `{!@osatGS.osatGS _ Σ} `{!othreadGS Σ}
   (Gls : oids) : iProp Σ :=
   locked

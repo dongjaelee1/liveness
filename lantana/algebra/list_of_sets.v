@@ -1,6 +1,8 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
 
+(** Lists of sets, analogous to the maps of sets in [map_of_sets.v]. [union_list_of_sets L] is the
+    union of the sets in [L]; [disjoint_list_of_sets L] says that they are pairwise disjoint. *)
 Definition union_list_of_sets `{!EqDecision E} `{!Countable E} (L : list (gset E)) : gset E :=
   foldr (λ B A, B ∪ A) ∅ L.
 Definition disjoint_list_of_sets `{!EqDecision E} `{!Countable E} (L : list (gset E)) : Prop :=
@@ -15,7 +17,6 @@ Section list_of_sets.
 
   (** ** Basic properties of [union_list_of_sets] *)
 
-  (** [union_list_of_sets] of the empty list is empty. *)
   Lemma union_list_of_sets_nil : union_list_of_sets ([] : list (gset E)) = ∅.
   Proof using. done. Qed.
 
@@ -25,14 +26,12 @@ Section list_of_sets.
     union_list_of_sets (s :: L) = s ∪ union_list_of_sets L.
   Proof using. done. Qed.
 
-  (** Singleton case. *)
   Lemma union_list_of_sets_singleton s :
     union_list_of_sets [s] = s.
   Proof using.
     rewrite union_list_of_sets_cons union_list_of_sets_nil. set_solver.
   Qed.
 
-  (** [union_list_of_sets] distributes over append. *)
   Lemma union_list_of_sets_app L1 L2 :
     union_list_of_sets (L1 ++ L2) =
     union_list_of_sets L1 ∪ union_list_of_sets L2.
@@ -44,8 +43,7 @@ Section list_of_sets.
 
   (** ** Membership characterisation of [union_list_of_sets] *)
 
-  (** [e] is in [union_list_of_sets L] iff some element of [L] contains [e].
-      This is one of the most useful lemmas about [union_list_of_sets]. *)
+  (** [e] is in [union_list_of_sets L] iff some element of [L] contains [e]. *)
   Lemma elem_of_union_list_of_sets L e :
     e ∈ union_list_of_sets L ↔ ∃ j s, L !! j = Some s ∧ e ∈ s.
   Proof using.
@@ -96,7 +94,6 @@ Section list_of_sets.
     set_solver.
   Qed.
 
-  (** Alternative description: [union_list_of_sets L] is [⋃ L]. *)
   Lemma union_list_of_sets_eq_union_list L :
     union_list_of_sets L = ⋃ L.
   Proof using. done. Qed.
@@ -108,7 +105,6 @@ Section list_of_sets.
     rewrite union_list_of_sets_eq_union_list elem_of_union_list. done.
   Qed.
 
-  (** [union_list_of_sets] is monotone with respect to list element inclusion. *)
   Lemma union_list_of_sets_mono L1 L2 :
     (∀ s, s ∈ L1 → s ∈ L2) →
     union_list_of_sets L1 ⊆ union_list_of_sets L2.
@@ -118,7 +114,6 @@ Section list_of_sets.
     apply elem_of_union_list_of_sets_elem_of. eauto.
   Qed.
 
-  (** [union_list_of_sets] is monotone with respect to sublist. *)
   Lemma union_list_of_sets_sublist L1 L2 :
     L1 `sublist_of` L2 → union_list_of_sets L1 ⊆ union_list_of_sets L2.
   Proof using.
@@ -129,17 +124,14 @@ Section list_of_sets.
 
   (** ** Basic properties of [disjoint_list_of_sets] *)
 
-  (** Recovering the definition: equivalent to a pairwise statement. *)
   Lemma disjoint_list_of_sets_lookup L j1 j2 s1 s2 :
     disjoint_list_of_sets L →
     j1 ≠ j2 → L !! j1 = Some s1 → L !! j2 = Some s2 → s1 ## s2.
   Proof using. intros HD; eauto. Qed.
 
-  (** The empty list trivially has disjoint values. *)
   Lemma disjoint_list_of_sets_nil : disjoint_list_of_sets ([] : list (gset E)).
   Proof using. intros ?????? Hj. by destruct j1. Qed.
 
-  (** A singleton list trivially has disjoint values. *)
   Lemma disjoint_list_of_sets_singleton s :
     disjoint_list_of_sets [s].
   Proof using.
@@ -301,8 +293,8 @@ Section list_of_sets.
     - intros (?&?&?). by apply disjoint_list_of_sets_app.
   Qed.
 
-  (** Variant of [app_iff] using [union_list_of_sets L1] on the left
-      rather than a [Forall] over [L1]. *)
+  (** Variant of [disjoint_list_of_sets_app_iff] with [union_list_of_sets L1] instead of a
+      [Forall] over [L1]. *)
   Lemma disjoint_list_of_sets_app_disjoint_iff L1 L2 :
     disjoint_list_of_sets (L1 ++ L2) ↔
     disjoint_list_of_sets L1 ∧ disjoint_list_of_sets L2 ∧
@@ -474,7 +466,6 @@ Section list_of_sets.
     assert ((<[j:= s ∪ s']>L) !! j = Some (s ∪ s')) as Hi.
     { by apply list_lookup_insert_eq. }
     rewrite (disjoint_list_of_sets_lookup_iff _ _ _ Hi).
-    (* Replace delete j (<[j:=...]>L) with delete j L *)
     assert (delete j (<[j:= s ∪ s']>L) = delete j L) as ->.
     { apply list_eq=>k. destruct (decide (k < j)) as [Hlt2|Hge2].
       - rewrite !list_lookup_delete_lt; auto.
@@ -504,8 +495,8 @@ Section list_of_sets.
     intros Hj HD. by apply (disjoint_list_of_sets_insert_union_iff _ _ _ _ Hj).
   Qed.
 
-  (** Adding a single fresh element [e] to the value at [j]: this preserves
-      [disjoint_list_of_sets] iff [e] is not in any other value of [L]. *)
+  (** Adding an element [e] to the value at [j] preserves [disjoint_list_of_sets] if [e] is in no
+      other value of [L]. *)
   Lemma disjoint_list_of_sets_insert_union_singleton L j s e :
     L !! j = Some s →
     disjoint_list_of_sets L →

@@ -328,7 +328,8 @@ Section rules.
     iMod ("Hclose" with "HΦ") as "HU". iModIntro. iApply "Hpost". iFrame.
   Qed.
 
-  (** UNTIL-DISCHARGE. Discharging takes two laters, paid with later credits. *)
+  (** UNTIL-DISCHARGE. Discharging takes two laters, paid with later credits. [e] must not be
+      a value ([to_val e = None]): the discharge is a model update, which needs a step. *)
   Lemma fbtriple_until_discharge s i C E G G' N k (Φ Ψ : tf Σ) g ℓ K P e Q
       `{!Atomic (stuckness_to_atomicity s) e} :
     TCEq (to_val e) None → ↑N ⊆ E →
@@ -354,9 +355,11 @@ Section rules.
     iApply ("Hpost" with "[$TE $TG $HQ $HΨ $Cg]"). eauto.
   Qed.
 
-  (** WIT-IND, as displayed in the paper. The premise is persistent, since every iteration uses
-      it. The induction hypothesis is an ordinary triple, so it can be used once: it carries
-      the remaining witness budget. *)
+  (** WIT-IND, as displayed in the paper, with its [⇛] in the induction hypothesis read as the
+      fancy wand [={E}=∗]. The premise is persistent, since every iteration uses it. The
+      induction hypothesis can be used once: it carries the remaining witness budget. (The
+      submitted paper says [⇛] is Iris's view shift, which is persistent; read that way, the
+      displayed hypothesis is stronger than the one proved here.) *)
   Lemma fbtriple_wit_ind s i C E G P e Q k ℓ1 ℓ2 μ :
     (ℓ1 < ℓ2)%ordi →
     □ ⦃ P ∗ (witP_cred k 1 ={E}=∗ fuels G ℓ2 μ ∗ ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G) ⦄^G
@@ -595,13 +598,13 @@ Section logic.
   Lemma fuels_empty ℓ μ : ⊢ fuels ∅ ℓ μ.
   Proof. by rewrite big_sepS_empty. Qed.
 
-  (** FUELS-MONO: fuel can be lowered to a smaller measure, compared by its interpretation at
-      layer [ℓ]. *)
+  (** FUELS-MONO (not in the submitted paper, which displays FUELS-EMPTY instead): fuel can be
+      lowered to a smaller measure, compared by its interpretation at layer [ℓ]. *)
   Lemma fuels_mono G ℓ μ1 μ2 :
     (measure_rep (ℓ, 0) μ1 <= measure_rep (ℓ, 0) μ2)%ord → fuels G ℓ μ2 ⊢ |==> fuels G ℓ μ1.
   Proof. apply crP_fuel_mon_set. Qed.
 
-  (** Fuel of some carriers can be dropped; this generalizes FUELS-EMPTY. *)
+  (** Fuel of some carriers can be dropped. *)
   Lemma fuels_weaken G G' ℓ μ : G' ⊆ G → fuels G ℓ μ ⊢ fuels G' ℓ μ.
   Proof. iIntros (HG) "H". by iApply (big_sepS_subseteq with "H"). Qed.
 

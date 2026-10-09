@@ -4,13 +4,14 @@ From lantana.program_logic Require Export language weakestpre.
 From lantana.program_logic Require Export temporal_logic temporal_property.
 
 From transfinite.stepindex Require Import ordinals.
-(* From transfinite.base_logic Require Import satisfiable. *)
 From lantana.base_logic Require Import satisfiable.
 From lantana.algebra Require Import ordinal_existential_properties.
 
 From lantana.prelude Require Import axioms.
 
-(** Lift tf to tp. *)
+(** [tf_to_tp] lifts a logical temporal formula [tf] to a trace property [tp]
+    (the paper's [lift]). Ghost formulas and [emp] become [True], and [∗] becomes
+    [∧]. *)
 Fixpoint tf_to_tp `{SI : indexT} {Π : Type} `{Σ : gFunctors} (Φ : @tf _ Π Σ) : @tp Π :=
   match Φ with
   | tf_emp => tp_true
@@ -51,14 +52,13 @@ Definition ti_forall `{SI : indexT} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ
 Definition ti_exist `{SI : indexT} {Λ} {Σ} : ∀ (A : Type), (A → tiProp Λ Σ) → tiProp Λ Σ :=
   λ A P, (λ τ, ∃ (a : A), (P a τ))%I.
 
-(** 'Always' is a co-inductive fixpoint. *)
-(* We need to use ∧ here for the proof. *)
+(** [ti_always P1 P2]: [P1] and [P2] hold now and at every later point of the
+    trace (a guarded fixpoint). The proof needs [∧] here, not [∗]. *)
 Definition ti_always_pre `{SI : indexT} `{!temporalGS Λ Σ} E
   (ti_always : (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
   (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ :=
   λ P1 P2 τ, (|={E,∅}=> ▷ |={∅,E}=> ((P1 τ) ∧ |={E,∅}=> (P2 τ) ∧ ALC (|={∅,E}=> ti_always P1 P2 (trace_next τ))))%I.
 
-(** FIXME: hacky proof*)
 Local Instance ti_always_pre_contractive `{SI : indexT} `{!temporalGS Λ Σ} E : Contractive (ti_always_pre E).
 Proof.
   rewrite /ti_always_pre. repeat intro. do 6 (f_equiv).
@@ -77,7 +77,8 @@ Lemma ti_always_unfold `{SI : indexT} `{!temporalGS Λ Σ} (P1 P2 : tiProp Λ Σ
   ti_always P1 P2 τ ⊣⊢ ti_always_pre ⊤ (ti_always) P1 P2 τ.
 Proof. rewrite ti_always_unseal. apply (fixpoint_unfold (ti_always_pre ⊤)). Qed.
 
-(** 'Until' is an inductive fixpoint, decreasing argument of Type A. *)
+(** [ti_until ltA a P Q]: [P] holds until [Q] holds. Every step decreases [a] in
+    [ltA], so this is inductive when [ltA] is well-founded. *)
 Definition ti_until_pre `{SI : indexT} `{!temporalGS Λ Σ} E
   {A : Type} (ltA : A → A → Prop)
   (ti_until : A -d> (trace Λ -d> iPropO Σ) -d> (trace Λ -d> iPropO Σ) -d> trace Λ -d> iPropO Σ) :
@@ -90,7 +91,6 @@ Local Instance ti_until_pre_contractive `{SI : indexT} `{!temporalGS Λ Σ} E
   : Contractive (ti_until_pre E ltA).
 Proof.
   rewrite /ti_until_pre. repeat intro. do 9 (f_equiv).
-  (* FIXME: f_equiv not working. *)
   f_contractive. do 1 (f_equiv). eapply dist_ne.
   { eapply H. }
   1,2: reflexivity.
@@ -114,7 +114,7 @@ Lemma ti_until_unfold `{SI : indexT} `{!temporalGS Λ Σ}
   ti_until ltA a P Q τ ⊣⊢ ti_until_pre ⊤ ltA (ti_until ltA) a P Q τ.
 Proof. rewrite ti_until_unseal. apply (fixpoint_unfold (ti_until_pre ⊤ ltA)). Qed.
 
-(** Intermediate interpretation. *)
+(** Interpretation of a trace property [tp] as a [tiProp]. *)
 Fixpoint ti_logic `{SI : indexT} `{!temporalGS Λ Σ}
   {A : Type} (ltA : A → A → Prop)
   (Φ : @tp (state_pred Λ)) : tiProp Λ Σ :=
@@ -131,7 +131,7 @@ Fixpoint ti_logic `{SI : indexT} `{!temporalGS Λ Σ}
       (ti_exist A (λ a, ti_until ltA a (ti_logic ltA P) (ti_logic ltA Q)))
   end.
 
-(** FIXME: move this to a more general location. *)
+(** Satisfiability of a conjunction gives satisfiability of each side. *)
 Section aux.
   Context `{SI : indexT} `{!invGS Σ}.
 
@@ -171,73 +171,10 @@ Proof.
   change (ordinal_ucmra.OrdUR: Type) with Ord.t. apply iProp_sat_exists_instance.
 Qed.
 
-(* Global Instance iProp_sat_lc_at_SatisfiableAtFupd {Σ} `{!invGS Σ} : SatisfiableAtFupd (iProp_sat_lc_at). *)
-(* Proof. *)
-(*   apply sat_at_satisfiable_at_fupd. *)
-(* Qed. *)
-
-(* Global Instance iProp_sat_lc_at_frame_SatisfiableAtFupd {Σ} `{!invGS Σ} (F : iProp Σ) : SatisfiableAtFupd (iProp_sat_lc_at_frame F). *)
-(* Proof. *)
-(*   apply sat_at_frame_satisfiable_at_fupd. *)
-(* Qed. *)
-
-(* Print Universes. *)
-
-(* uPred_primitive.uPred_sat_exists.u0 = temporal_logic.ordSI.u0 *)
-(* tf_depth.u2 < uPred_primitive.uPred_sat_exists.u0 *)
-
-(* ordExistential_instance.u0 < uPred_primitive.uPred_sat_exists.u0 *)
-(* uPred_primitive.uPred_sat_exists.u0 = ordExistential_instance .u1 *)
-(* uPred_primitive.uPred_sat_exists.u0 = ordExistential_instance.u1 *)
-(* ucmra.u0 = cmra.u0 *)
-(* Ord.TYPE.u0 < cmra.u0 *)
-(* obl_class.u0 <= cmra.u0 *)
-(* indexT.u0 <= cmra.u0 *)
-(* ofe.u0 = cmra.u0 *)
-(* universes.Logic = cmra.u0 *)
-
-
-(* Unable to unify "?X" with "ucmra_car ordinal_ucmra.OrdUR" *)
-(* (unable to find a well-typed instantiation for "?X": cannot ensure that "Type@{ucmra.u0}" is a *)
-(* subtype of "Type@{uPred_primitive.uPred_sat_exists.u0}"). *)
-
-(* Global Instance ord_satisfiable_exists {Σ : gFunctors} : SatisfiableExists Ord.t (iProp_sat (Σ:=Σ)). *)
-(* Proof. apply iProp_sat_exists_instance. Qed. *)
-
-
-(* Global Instance iProp_sat_lc_satisfiable_rupd {Σ : gFunctors} `{!invGS Σ} : *)
-(*   SatisfiableRUpd (iProp_sat_lc). *)
-(* Proof. *)
-(*   apply sat_lc_satisfiable_rupd; try apply _. *)
-(*   apply iProp_sat_exists_instance. *)
-
-(*     econstructor. intros.  apply sat_exists in H. *)
-
-(* Unable to unify "?X" with "ucmra_car ordinal_ucmra.OrdUR" *)
-(* (unable to find a well-typed instantiation for "?X": cannot ensure that "Type@{ucmra.u0}" is a *)
-(* subtype of "Type@{uPred_primitive.uPred_sat_exists.u0}"). *)
-
-(* subtype of "Type@{uPred_primitive.uPred_sat_exists .u0}"). *)
-
-
 Section proof1.
   Context `{!temporalGS Λ Σ}.
   Context {A : Type} {ltA : A → A → Prop}.
   Implicit Type F : iProp Σ.
-
-  (* Lemma test1 (Ω1 : obls) i : *)
-  (*   iProp_sat (Σ:=Σ) (∃ Ω2, (⌜(Ω1 ↪ₚ Ω2 | obl_cond_owner i)⌝)) *)
-  (*   → (∃ Ω2, (Ω1 ↪ₚ Ω2 | obl_cond_owner i)). *)
-  (* Proof. *)
-  (*   intros. apply sat_exists in H. destruct H. apply sat_elim in H. eauto. *)
-  (* Qed. *)
-
-  (* Lemma test2 : *)
-  (*   iProp_sat (∃ (o : obl_fuel) k ℓ μ, oblP_fuel k ℓ μ ∗ witP_cred k o) *)
-  (*   → ∃ (o : obl_fuel) k ℓ μ, iProp_sat (oblP_fuel k ℓ μ ∗ witP_cred k o). *)
-  (* Proof. *)
-  (*   intros. do 4 (apply sat_exists in H; destruct H). eauto. *)
-  (* Qed. *)
 
   Lemma ti_always_trace_next F P1 P2 τ :
     iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 τ) →
@@ -264,7 +201,7 @@ Section proof1.
     ∀ τ, iProp_sat_lc_at_frame F ⊤ (ti_always P1 P2 τ) → (tr_always (R1 ∧ R2))%R τ.
   Proof.
     intros IH1 IH2 τ H. unfold tr_always. destruct τ as (n&τf).
-    (** Use classical logic. *)
+    (* Use classical logic. *)
     intro m. pattern m. revert m. apply Classical_Pred_Type.not_ex_not_all.
     intros ?. destruct H0. apply Classical_Prop.imply_to_and in H0. destruct H0.
     apply H1. clear H1.
@@ -332,10 +269,7 @@ Section proof2.
   Local Transparent tf_intuit.
   Context `{!lantanaGS Λ Σ}.
 
-  (* Local Definition D : Type := (prod obl_fuel nat). *)
-  (* Local Definition ltD : D → D → Prop := (prod_lt WFOCM.ltR lt). *)
-  (* Local Definition wf_ltD : well_founded ltD := (prod_lt_well_founded _ _ _ _ WFOCM.lt_wf Nat.lt_wf_0). *)
-
+  (** Every assigned obligation in [Ω] is owned by a thread that is active in [τ]. *)
   Definition obls_thread_active (Ω : obls) (τ : trace Λ) :=
     map_Forall (λ _ o, match o with
                        | obl_assigned _ i => ts_emb (thread_active i) τ
@@ -343,6 +277,9 @@ Section proof2.
                        end
       ) Ω.
 
+  (** Fair scheduling gives the witnesses that the progress update [mprog] asks
+      for: after the scheduled thread [i] makes its obligations progress, there are
+      decreased witnesses [W2] and counters [γ2] for the next trace. *)
   Lemma mprog_exists_step i Ω1 Ω2 W1 (τ : trace Λ) γ1 :
     i = trace_thread τ →
     obls_thread_active Ω1 τ →
@@ -411,7 +348,7 @@ Section proof2.
     - simpl in Stepk. destruct Stepk as [Turn | NoTurn].
       + destruct Turn as [-> Stepk]. simpl in Keepk. destruct o2; last done. clear Keepk.
         inv Stepk; cycle 1. 1: inv H.
-        (* FIXME: type checking fails without OC. *)
+        (* The [OC] argument is needed for type checking. *)
         inv H. simpl in *. exists (witness_assigned (OC:=ord_obl_class) (fair_sched_fun γ2 owner fuel0)).
         split_and !; auto.
         * left. split; auto. econstructor. econstructor. eapply (Ord.lt_le_lt); last eapply LBk.
@@ -490,6 +427,9 @@ Section proof2.
     rewrite decide_False in H2; first lia. intros F. eapply thread_active_and_not_false; eauto.
   Qed.
 
+  (** The core of adequacy: the weakest preconditions of all threads and the
+      persistent record [tf_intuit] of the formula [Φ'] imply the [ti_logic]
+      interpretation of [tf_to_tp Φ'] on the trace. *)
   Lemma lwp_fix_ti_logic h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs
     g v1 v2 Ω1 Ω2 W τf γ (Φ : tp) :
     behavior (n, τf) →
@@ -541,7 +481,7 @@ Section proof2.
       iPoseProof (tf_logic_tf_intuit with "[$HI $MI $HP]") as "#TFP".
       iMod "close" as "_". iMod ("ACC" with "HP") as "_". iModIntro. iSplit.
       { iApply (IHΦ with "[$HI $SIa $MI $WPs $TFP]"); eauto. done. }
-      (** Fetch the scheduled thread and take a step. *)
+      (* Fetch the scheduled thread and take a step. *)
       inversion BEH. clear BEH. subst n0 τf0.
       iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
       rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
@@ -676,7 +616,7 @@ Section proof2.
         1: eauto.
         iApply fupd_mask_intro. 1: set_solver. iIntros "close". iSplit. 1: done.
         iModIntro. iMod "close" as "_". iModIntro. iFrame.
-      + (** The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
+      + (* The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
         destruct TStuck as [e1 σ1 Θ1 [= <- <-] LUTi1 [He1 Irr] -> ->].
         assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
         { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
@@ -727,7 +667,7 @@ Section proof2.
       pose proof LB. specialize (H k). rewrite LUOk in H. inversion H. clear H. destruct y; last done. subst x.
       rename H1 into LUWk, H2 into LEwit. symmetry in LUWk.
       iExists wit. clear LUWk.
-      (** Induction on wit. *)
+      (* Induction on the witness [wit]. *)
       clear b q. iRevert (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ fuel owner LUOk LEwit) "TF HI SIa MI WPs".
       iInduction wit as [w IH] using (well_founded_ind Ord.lt_well_founded).
       iIntros (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ fuel owner LUOk LEwit) "#TF HI SIa MI WPs".
@@ -745,7 +685,7 @@ Section proof2.
       { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
       iModIntro. iRight. iSplit.
       { iApply (IHΦ1 with "[$HI $SIa $MI $WPs $TFP]"); eauto. done. }
-      (** Fetch the scheduled thread and take a step. *)
+      (* Fetch the scheduled thread and take a step. *)
       inversion BEH. clear BEH. subst n0 τf0.
       iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
       rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
@@ -809,9 +749,9 @@ Section proof2.
           iPoseProof (big_sepM_delete _ _ _ _ H1 with "WPs") as "[WP' WPs]". rewrite H0.
           iDestruct "WP'" as "(#Term& HQ)". iPoseProof (othread_assigned_done_false with "[$S $T $A]") as "%"; eauto.
           unfold_opreds. auto. }
-        (** Resume the step. *)
+        (* Resume the step. *)
         rewrite /mphys. iMod ("WP" with "MI") as "[MI WP]". iModIntro.
-        (** Checkpoint Ω2 is asssigend. *)
+        (* Record that [k] is assigned in [Ω2]. *)
         iPoseProof (model_history_interp_event_obl_now with "[MI]") as "#EA".
         1: eapply LUOk2.
         { iDestruct "MI" as "[$ _]". }
@@ -855,22 +795,12 @@ Section proof2.
           apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom.
           apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. }
         1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2.
-        (* iMod (all_interp_lwpupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)". *)
-        (* { subst Θ2 TQefs. rewrite -map_fmap_compose. unfold compose. simpl. rewrite map_fmap_id. *)
-        (*   apply map_union_subseteq_r. apply map_disjoint_insert_l_2; auto. apply not_elem_of_dom. *)
-        (*   apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. } *)
-        (* 1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2. *)
         * rewrite lwp_fix_unfold_fix /lwp_pre He2.
           iDestruct "HI" as "[HI SIa]".
           iMod (all_interp_sfgupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)".
           2: eapply LB4.
           { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
           destruct H as [LEO3 LB5].
-          (* iMod (all_interp_lwpupd_steps with "WP HI MI") as "(WP& HI& %g3& %v3& %Ω5& %W5& %& MI)". *)
-          (* { subst Θ2. rewrite lookup_union_l. *)
-          (*   - apply lookup_insert_eq. *)
-          (*   - apply not_elem_of_dom. apply elem_of_dom_2 in LUTi1. apply map_disjoint_dom in TDisj. set_solver + LUTi1 TDisj. } *)
-          (* 1: eapply LB4. destruct H as [LEO3 LB5]. *)
           iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                      (match to_val e with
                       | Some v => lift_term j Q v
@@ -1031,7 +961,7 @@ Section proof2.
             rewrite H2 TRn1. eauto. }
         1: eauto. 1: eauto. 1: done.
         iFrame.
-      + (** The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
+      + (* The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
         destruct TStuck as [e1 σ1 Θ1 [= <- <-] LUTi1 [He1 Irr] -> ->].
         assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
         { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
@@ -1093,6 +1023,12 @@ Section proof2.
   Local Opaque tf_intuit.
 End proof2.
 
+(** Adequacy, for [NotStuck] weakest preconditions. Suppose one can choose a state
+    interpretation that holds initially and, given later credits [£ c] and empty
+    carrier sets for the initial threads, obtain a formula [Φ'] with
+    [tf_to_tp Φ' = Φ], its interpretation [⟦Φ'⟧ₗ], and from that the weakest
+    preconditions of all initial threads. Then every fair behavior from the initial
+    configuration satisfies [Φ]. *)
 Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   σ Θ i κs (Φ : tp) :
@@ -1105,7 +1041,7 @@ Theorem lwp_adequacy (Σ : gFunctors) (Λ : language)
      ∃ (c : Ord.t),
      ⊢ |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
                 (fork_post : thread_id → val Λ → iProp Σ)
-                (* FIXME: cannot unify pos_countable for some reason *)
+                (* [pos_countable] must be given explicitly for unification. *)
                 (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
      let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
@@ -1161,10 +1097,7 @@ Proof.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
-  (* FIXME: just HI not working. *)
   iApply (lwp_ti_logic with "[$HI $SIa $MHI $S $T $A $G $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
   { intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto. }
 Qed.
-
-(* Print Assumptions lwp_adequacy. *)

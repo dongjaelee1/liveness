@@ -7,7 +7,8 @@ From lantana.base_logic Require Export obligation.
 
 Canonical Structure oblO `{SI : indexT} `{OC : obl_class} := leibnizO obl.
 
-(** The ghost state for model history. *)
+(** The ghost state for the model history: a monotone list of events [(n, Ω)], where
+    [n] is a position in the execution and [Ω] the obligation state at that point. *)
 Module mhistGS.
 
   Class mhistGpreS `{SI : indexT} (Σ : gFunctors) `{OC : obl_class} : Set :=
@@ -43,7 +44,7 @@ Definition model_history_wf `{OC : obl_class} (h : list (nat * obls)) : Prop :=
   ∀ i (e1 e2 : nat * obls),
   (h !! i = Some e1) → (h !! (S i) = Some e2) → event_le e1 e2.
 
-(** Properties of wf. *)
+(** Properties of [model_history_wf]. *)
 Section proof.
   Context `{OC : obl_class}.
 
@@ -221,11 +222,6 @@ Definition event_obl := event_obl_aux.(unseal).
 Local Definition event_obl_unseal :
   @event_obl = @event_obl_def := event_obl_aux.(seal_eq).
 Global Arguments event_obl {SI OC Σ _}.
-
-(* We use this to record that Until was alive at this point of execution. *)
-Definition event_obl_alive `{SI : indexT} `{OC : obl_class} `{@mhistGS SI Σ OC}
-  (i : nat) (e : nat * obls) (k : oid) : iProp Σ :=
-  (∃ o, event_obl i e k o ∧ ⌜ obl_le o obl_discharged ⌝).
 
 (** Properties *)
 Section hist.

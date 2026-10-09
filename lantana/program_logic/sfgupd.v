@@ -4,6 +4,8 @@ From lantana.base_logic Require Export opreds.
 From lantana.program_logic Require Export history_interp.
 Import uPred.
 
+(** [|={E1,E2}=>g P]: a ghost update of the obligation model (no discharges)
+    that keeps the history interpretation. *)
 Local Definition sfgupd_def `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   E1 E2 : iPropO Σ -d> iPropO Σ :=
@@ -257,7 +259,7 @@ Section sfgupd.
     iMod (model_interp_gupd_steps γ with "HP MI") as "(>($& $)& $)"; done.
   Qed.
 
-  (** lc rules *)
+  (** Later credits. *)
   Lemma lc_sfgupd_add_later E1 E2 P :
     £n 1 -∗ ▷ (|={E1,E2}=>g P) -∗ |={E1,E2}=>g P.
   Proof.

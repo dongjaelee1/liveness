@@ -1,30 +1,15 @@
-(** An axiomatization of languages based on evaluation context items, including
-    a proof that these are instances of general ectx-based languages. *)
+(** An axiomatization of languages based on evaluation context items, and the
+    proof that each one is an [ectxLanguage]. Adapted from Iris's
+    [iris/program_logic/ectxi_language.v]. *)
 From iris.prelude Require Export prelude.
 From lantana.program_logic Require Import language ectx_language.
 From iris.prelude Require Import options.
 
-(** TAKE CARE: When you define an [ectxiLanguage] canonical structure for your
-language, you need to also define a corresponding [language] and [ectxLanguage]
-canonical structure for canonical structure inference to work properly. You
-should use the coercion [EctxLanguageOfEctxi] and [LanguageOfEctx] for that, and
-not [ectxi_lang] and [ectxi_lang_ectx], otherwise the canonical projections will
-not point to the right terms.
-
-A full concrete example of setting up your language can be found in [heap_lang].
-Below you can find the relevant parts:
-
-  Module heap_lang.
-    (* Your language definition *)
-
-    Lemma heap_lang_mixin : EctxiLanguageMixin of_val to_val fill_item base_step.
-    Proof. (* ... *) Qed.
-  End heap_lang.
-
-  Canonical Structure heap_ectxi_lang := EctxiLanguage heap_lang.heap_lang_mixin.
-  Canonical Structure heap_ectx_lang := EctxLanguageOfEctxi heap_ectxi_lang.
-  Canonical Structure heap_lang := LanguageOfEctx heap_ectx_lang.
-*)
+(** When you define an [ectxiLanguage] canonical structure, also define the
+[ectxLanguage] and [language] canonical structures, with [EctxLanguageOfEctxi]
+and [LanguageOfEctx] (not [ectxi_lang_ectx] and [ectxi_lang]). Otherwise the
+canonical projections do not point to the right terms. See the end of
+[lantana_heap_lang/lang.v] for an example. *)
 
 Section ectxi_language_mixin.
   Context {expr val ectx_item state observation state_pred : Type}.

@@ -6,7 +6,8 @@ Import uPred.
 
 Local Notation thread_map P V := (gmap P V).
 
-(** The CMRA we need. *)
+(** Ghost state that maps thread ids to values. HeapLang uses it to track the
+    expression of each thread. *)
 Class thread_mapGpreS `{SI: indexT} (P V : Type) (Σ : gFunctors) `{Countable P} := {
   #[local] thread_map_GpreS_inG :: ghost_mapG Σ P V
 }.
@@ -54,7 +55,7 @@ Section thread_map.
   Implicit Types R : thread_map P V.
   Implicit Types Θ : gset P.
 
-  (** General properties of pointsto *)
+  (** Properties of [thread]. *)
   Global Instance thread_timeless p b v q : Timeless (thread p b v q).
   Proof. rewrite thread_unseal /thread_def. apply _. Qed.
   Global Instance thread_false_persistent p v q : Persistent (thread p false v q).

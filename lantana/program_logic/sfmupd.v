@@ -3,6 +3,8 @@ From iris.prelude Require Import options.
 From lantana.program_logic Require Export sfgupd.
 Import uPred.
 
+(** [|={E1,E2}=>m P]: a model update (which can discharge obligations) that keeps
+    the history interpretation. *)
 Local Definition sfmupd_def `{SI : indexT} `{!state_interp_class Λ Σ} `{!ord_mono_fun_class}
   `{!mupdGS Σ} `{!histGS.histGS Σ (state Λ * thread_pool Λ * list (observation Λ))}
   E1 E2 : iPropO Σ -d> iPropO Σ :=
@@ -262,7 +264,7 @@ Section sfmupd.
     iMod (model_interp_mupd_steps γ with "HP MI") as "(>($& $)& $)"; done.
   Qed.
 
-  (** lc rules *)
+  (** Later credits. *)
   Lemma lc_sfmupd_add_later E1 E2 P :
     £n 1 -∗ ▷ (|={E1,E2}=>m P) -∗ |={E1,E2}=>m P.
   Proof.

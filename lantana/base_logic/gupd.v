@@ -6,7 +6,9 @@ From lantana.algebra Require Import ordinal_wfocm.
 From lantana.base_logic Require Export mupd.
 Import uPred.
 
-(** ** Modality for non-discharging (ghost) updates to obls. *)
+(** ** The ghost update modality *)
+(** [|=[n,Θ]=>g P] is like the model update of [mupd.v], but its obligation and
+    witness steps are non-discharging ([↪ₙ∘], [↓ₙ∘]). *)
 Definition gupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
   n Θ (gupd : iPropO Σ -d> iPropO Σ) : iProp Σ -d> iPropO Σ :=
   λ P,
@@ -14,7 +16,6 @@ Definition gupd_pre `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class}
        (∀ h i Ω1 W1,
           (model_interp h i Ω1 W1 n Θ) ={∅}=∗
           ∃ Ω2, (⌜ (Ω1 ↪ₙ∘ Ω2) ⌝) ∗
-                (* ∀ W2, (⌜ (wits_mon W1 W2) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗ *)
                 ∀ W2, (⌜ (W1 ↓ₙ∘ W2) ∧ owit_inv Ω2 W2 ⌝) ={∅}=∗
                       (model_interp (h ++ [(n, Ω2)]) (S i) Ω2 W2 n Θ) ∗ gupd P))%I.
 
@@ -93,11 +94,11 @@ Section gupd.
     iIntros "!>" (?) "[$ _]".
   Qed.
 
-  (** An empty fancy update can be turned into an obl update. *)
+  (** An empty fancy update can be turned into a ghost update. *)
   Lemma fupd_gupd n Θ P : (|={∅}=> P) ⊢ (|=[n,Θ]=>g P).
   Proof. rewrite gupd_unfold. iIntros "Hupd". iLeft. done. Qed.
 
-  (** We can always introduce a obl update. *)
+  (** We can always introduce a ghost update. *)
   Lemma gupd_intro n Θ P : P ⊢ |=[n,Θ]=>g P.
   Proof. rewrite gupd_unfold. iIntros "HP". iLeft. iModIntro. done. Qed.
 
@@ -117,7 +118,7 @@ Section gupd.
     iPoseProof (owit_mon _ _ H with "N") as "$". iFrame. done.
   Qed.
 
-  (** We can combine two obl updates into one. *)
+  (** We can combine two ghost updates into one. *)
   Lemma gupd_bind n Θ P Q :
     (P -∗ |=[n,Θ]=>g Q) ⊢ (|=[n,Θ]=>g P) -∗ (|=[n,Θ]=>g Q).
   Proof.
@@ -157,6 +158,7 @@ Section gupd.
     - econstructor 2. econstructor 2. auto.
   Qed.
 
+  (** A ghost update is a model update. *)
   Lemma gupd_mupd n Θ P :
     (|=[n,Θ]=>g P) ⊢ |=[n,Θ]=>m P.
   Proof.
@@ -316,14 +318,7 @@ Section gupd.
   Qed.
 
   (* The following instances make the Iris Proof Mode aware of the
-     obl update. They are derived from the simpler rules above. *)
-  (* Global Instance elim_fupd_gupd (p : bool) n Θ P Q : *)
-  (*   ElimModal True p false (|={∅}=> P) P (|=[n,Θ]=>g Q) (|=[n,Θ]=>g Q)%I. *)
-  (* Proof. *)
-  (*   rewrite /ElimModal bi.intuitionistically_if_elim //=. *)
-  (*   rewrite fupd_gupd. *)
-  (*   iIntros "_ [HP HPQ]". iApply (gupd_bind with "HPQ HP"). *)
-  (* Qed. *)
+     ghost update. They are derived from the simpler rules above. *)
 
   Global Instance elim_fupd_gupd (p : bool) E n Θ P Q :
     ElimModal True p false (|={∅,E}=> P) P (|=[n,Θ]=>g Q) (|={E,∅}=> |=[n,Θ]=>g Q)%I.
@@ -419,7 +414,8 @@ Section gupd.
 
 End gupd.
 
-(* Wrapper to use fupd. *)
+(* The ghost update with invariant masks: a fancy update from [E1] to [∅], a ghost
+   update, and a fancy update from [∅] to [E2]. *)
 Definition fgupd `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} E1 E2 n Θ : iPropO Σ -d> iPropO Σ :=
   (λ P, |={E1,∅}=> |=[n,Θ]=>g |={∅,E2}=> P)%I.
 Notation "'|={' E1 , E2 : n , Θ '}=>g' P" := (fgupd E1 E2 n Θ P) (at level 99, P at level 200, format "|={ E1 , E2 : n , Θ }=>g  P").
@@ -488,7 +484,7 @@ Section fgupd.
     iModIntro. iMod "H" as "$". eauto.
   Qed.
 
-  (** We can combine two obl updates into one. *)
+  (** We can combine two ghost updates into one. *)
   Lemma fgupd_bind E1 E2 E3 n Θ P Q :
     (P -∗ |={E2,E3:n,Θ}=>g Q) ⊢ (|={E1,E2:n,Θ}=>g P) -∗ (|={E1,E3:n,Θ}=>g Q).
   Proof.

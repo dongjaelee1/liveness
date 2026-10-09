@@ -15,11 +15,9 @@ Section language_mixin.
   Context {expr val state observation state_pred : Type}.
   Context (of_val : val → expr).
   Context (to_val : expr → option val).
-  (** We annotate the reduction relation with observations [κ], which we will
-     use in the definition of weakest preconditions to predict future
-     observations and assert correctness of the predictions. *)
-  (** thread_ids is a state that tracks occupied thread_ids,
-     and gmap thread_id expr are forked threads. *)
+  (** [prim_step i e σ Θ κ e' σ' efs]: thread [i] steps from [e] and [σ] to [e'] and
+     [σ'], with observations [κ]. [Θ] is the set of thread ids in use, and [efs]
+     are the forked threads, which get fresh ids. *)
   Context (prim_step : thread_id → expr → state → thread_ids → list observation →
                        expr → state → gmap thread_id expr → Prop).
   Context (state_sat : state → gmap thread_id expr → state_pred → Prop).
@@ -146,7 +144,6 @@ Section language.
 
   Definition reducible i (e : expr Λ) (σ : state Λ) Θ :=
     ∃ κ e' σ' efs, prim_step i e σ Θ κ e' σ' efs.
-  (* Total WP only permits reductions without observations *)
   Definition reducible_no_obs i (e : expr Λ) (σ : state Λ) Θ :=
     ∃ e' σ' efs, prim_step i e σ Θ [] e' σ' efs.
   Definition irreducible i (e : expr Λ) (σ : state Λ) Θ :=
@@ -156,31 +153,22 @@ Section language.
   Definition not_stuck i (e : expr Λ) (σ : state Λ) Θ :=
     is_Some (to_val e) ∨ reducible i e σ Θ.
 
-  (* [Atomic WeaklyAtomic]: This (weak) form of atomicity is enough to open
-     invariants when WP ensures safety, i.e., programs never can get stuck.  We
-     have an example in lambdaRust of an expression that is atomic in this
-     sense, but not in the stronger sense defined below, and we have to be able
-     to open invariants around that expression.  See `CasStuckS` in
-     [lambdaRust](https://gitlab.mpi-sws.org/FP/LambdaRust-coq/blob/master/theories/lang/lang.v).
-
-     [Atomic StronglyAtomic]: To open invariants with a WP that does not ensure
-     safety, we need a stronger form of atomicity.  With the above definition,
-     in case `e` reduces to a stuck non-value, there is no proof that the
-     invariants have been established again. *)
+  (* As in Iris. [Atomic WeaklyAtomic e]: every step of [e] reaches an irreducible
+     expression. This is enough to open invariants when WP ensures safety.
+     [Atomic StronglyAtomic e]: every step of [e] reaches a value. This is needed
+     when WP does not ensure safety, since [e] could step to a stuck non-value
+     before the invariants are closed again. *)
   Class Atomic (a : atomicity) (e : expr Λ) : Prop :=
     atomic i σ Θ e' κ σ' efs :
       prim_step i e σ Θ κ e' σ' efs →
       if a is WeaklyAtomic then irreducible i e' σ' (Θ ∪ (dom efs)) else is_Some (to_val e').
 
-  (** An atomic thread step.
-   We formalize an execution of a program as the infinite sequence of program states,
-   where the last state for a terminating program is repeated infinitely.
-   Note that if a thread spawns, it never deallocates. *)
+  (** [thread_step i ρ1 κ ρ2]: thread [i] takes one atomic step, with observations
+     [κ]. Forked threads are added to the pool. Threads are never removed from it. *)
   Inductive thread_step (i : thread_id) (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
   | thread_step_atomic e1 σ1 e2 σ2 efs Θ :
     ρ1 = (Θ, σ1) →
     Θ !! i = Some e1 →
-    (* atomic execution *)
     prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs →
     ρ2 = (<[i:=e2]>Θ ∪ efs, σ2) →
     thread_step i ρ1 κ ρ2.
@@ -188,7 +176,6 @@ Section language.
 
   Definition erased_thread_step i (ρ1 ρ2 : cfg Λ) := ∃ κ, thread_step i ρ1 κ ρ2.
 
-  (** TODO: Probably need to define trace and a Coinductive behavior for adequacy *)
   Definition step (ρ1 : cfg Λ) (κ : list (observation Λ)) (ρ2 : cfg Λ) : Prop :=
     ∃ i, thread_step i ρ1 κ ρ2.
   Local Hint Unfold step : core.
@@ -214,7 +201,6 @@ Section language.
     - intros (n & κs & Hsteps). unfold erased_step.
       induction Hsteps; eauto using rtc_refl, rtc_l.
   Qed.
-  (** TODO: and above definitions are maybe not needed *)
 
   Lemma of_to_val_flip v e : of_val v = e → to_val e = Some v.
   Proof. intros <-. by rewrite to_of_val. Qed.
@@ -276,7 +262,8 @@ Section language.
     stuck i e σ Θ → stuck i (K e) σ Θ.
   Proof. rewrite -!not_not_stuck. eauto using not_stuck_fill_inv. Qed.
 
-  (** Generalized pure_step that can condition on the state *)
+  (** [e1] steps purely to [e2]: it can step in every thread and state, and every
+      step goes to [e2] without observations, forks, or changes to the state. *)
   Record pure_step (e1 e2 : expr Λ) := {
     pure_step_safe i σ1 Θ : reducible_no_obs i e1 σ1 Θ;
     pure_step_det i σ1 κ Θ e2' σ2 efs :
@@ -346,14 +333,10 @@ Section language.
     by rewrite to_of_val in Hval.
   Qed.
 
-  (** Let thread pools [t1] and [t3] be such that each thread in [t1] makes
-   (zero or more) pure steps to the corresponding thread in [t3]. Furthermore,
-   let [t2] be a thread pool such that [t1] under state [σ1] makes a (single)
-   step to thread pool [t2] and state [σ2]. In this situation, either the step
-   from [t1] to [t2] corresponds to one of the pure steps between [t1] and [t3],
-   or, there is an [i] such that [i]th thread does not participate in the
-   pure steps between [t1] and [t3] and [t2] corresponds to taking a step in
-   the [i]th thread starting from [t1]. *)
+  (** Suppose each thread of [t1] makes zero or more pure steps to the same thread
+   of [t3], and thread [i] steps from [(t1, σ1)] to [(t2, σ2)]. Then either that step
+   is one of the pure steps, or the thread makes no pure steps between [t1] and
+   [t3] and [t2] is the result of its step. *)
   Lemma erased_thread_step_pure_step_tp i t1 σ1 t2 σ2 t3 :
     erased_thread_step i (t1, σ1) (t2, σ2) →
     pure_steps_tp t1 t3 →
@@ -375,34 +358,17 @@ Section language.
       by eapply map_Forall2_insert.
   Qed.
 
-  (* Lemma erased_step_pure_step_tp t1 σ1 t2 σ2 t3 : *)
-  (*   erased_step (t1, σ1) (t2, σ2) → *)
-  (*   pure_steps_tp t1 t3 → *)
-  (*   (σ1 = σ2 ∧ pure_steps_tp t2 t3) ∨ *)
-  (*   (∃ i e efs e' κ, *)
-  (*     t1 !! i = Some e ∧ t3 !! i = Some e ∧ *)
-  (*     t2 = <[i:=e']>t1 ∪ efs ∧ *)
-  (*     prim_step i e σ1 (dom t1) κ e' σ2 efs). *)
-  (* Proof. *)
-  (*   intros [κ [i [e σ e' σ' efs ths t11 t12 Hi Hstep]]] Hps; simplify_eq/=. *)
-  (*   assert (Hths : ∃ ths', ths = <[i:=e]>ths' ∧ ths' !! i = None). *)
-  (*   { exists (delete i ths). split; [rewrite insert_delete_id | apply lookup_delete_eq]; auto. } *)
-  (*   destruct Hths as (ths'&EQths&Hths'). subst ths. clear Hi. *)
-  (*   apply map_Forall2_insert_inv_l in Hps as (e'' & t31 & -> & Ht31 & Hsteps & Hps); [| done]. *)
-  (*   destruct Hsteps as [e|e1 e2 e3 Hpstep Hprs]. *)
-  (*   - right. exists i, e, efs, e', κ. split_and!. 1,2: by apply lookup_insert_eq. all: done. *)
-  (*   - edestruct Hpstep as (?&?&?&?); first done. destruct H1. simplify_eq. *)
-  (*     left. split; first done. rewrite insert_insert_eq right_id_L. *)
-  (*     by eapply map_Forall2_insert. *)
-  (* Qed. *)
-
 End language.
 
 Global Hint Mode PureExec + - - ! - : typeclass_instances.
 Global Arguments thread_step_atomic {Λ i ρ1 κ ρ2}.
 Notation pure_steps_tp := (map_Forall2 (λ _, rtc (pure_step))).
 
-(** Trace and behavior. *)
+(** ** Traces and behaviors *)
+
+(** A trace is a current position and a function from positions to trace states.
+    A trace state is a configuration, the thread scheduled at that point, and the
+    observations from that point on. *)
 Definition trace_state (Λ : language) : Type := (cfg Λ * thread_id * list (observation Λ)).
 
 Definition trace (Λ : language) : Type :=
@@ -432,9 +398,9 @@ Inductive thread_stuck {Λ : language} (i : thread_id) (ρ1 : cfg Λ) (κ : list
   thread_stuck i ρ1 κ ρ2.
 
 (** A behavior is an infinite trace in which the scheduled thread steps, or stutters if it is a
-    value or stuck. Every configuration thus has a successor for every scheduled thread, so
-    executions that get stuck are behaviors too: the adequacy theorems do not exclude them, and
-    the safety theorem ([adequacy_iris.v]) proves that they do not happen. *)
+    value or stuck. Every configuration thus has a successor for every thread in its pool, so
+    executions that get stuck are behaviors too. The safety theorem [lwp_adequacy_safety_iris]
+    shows that verified programs never take such a stuck step. *)
 CoInductive behavior {Λ : language} : trace Λ → Prop :=
 | behavior_step n τf ρ1 ρ2 i1 i2 κ κs :
   τf n = (ρ1, i1, (κ ++ κs)) →
@@ -448,7 +414,10 @@ Definition behavior_cfg {Λ : language} (ρ : cfg Λ) (τ : trace Λ) : Prop :=
 Definition behavior_tp {Λ : language} (Θ : thread_pool Λ) (τ : trace Λ) : Prop :=
   ∃ σ, behavior_cfg (Θ, σ) τ.
 
-(** We fix a (somewhat general) fair scheduler, only for convenience. *)
+(** Ordinal bounds for fair scheduling, used by the adequacy proofs. Given a
+    fair-scheduling counter [γ] (see [temporal_property.v]), [fair_sched_fun γ i a]
+    is [ω × a ⊕ γ i]. It is strictly monotone in [a] and below [fair_sched_ub a]
+    for all [γ] and [i]. Fixing these functions is a convenience. *)
 Definition fair_sched_ub : Ord.t → Ord.t := (λ a, ((ω × a) ⊕ ω)%ord).
 
 Lemma fair_sched_ub_mono : ∀ o, (o <= fair_sched_ub o)%ord.

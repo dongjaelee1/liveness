@@ -21,7 +21,10 @@ Section lifting.
   Implicit Types P Q : iProp Σ.
   Implicit Types Φ : val Λ → iProp Σ.
 
-  (* For lwp_step, enable progress and fork, and lwpupd. *)
+  (** Proving [lwp_step] from the progress and physical updates of the step
+      ([mprog_step], [mphys_step]): the thread spends fuel of its carriers [G],
+      gets credits for the witnesses [R], and the forked threads start with no
+      carriers. *)
   Lemma lwp_step_step s i E e1 ν :
     (∀ K h n σ1 Θ κ κs,
        (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →

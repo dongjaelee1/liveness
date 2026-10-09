@@ -1,4 +1,6 @@
-(** Another version of the one in transfinite.base_logic.lib; with rupd *)
+(** Satisfiability with invariant masks ([sat_at]). Adapted from Transfinite Iris's
+    [base_logic/lib/satisfiable.v], for the fancy update of [fancy_updates.v], which
+    is built on relational updates. *)
 From transfinite.stepindex Require Export existential_properties.
 From iris.algebra Require Import functions gmap gmap_view gset coPset.
 From transfinite.base_logic Require Import upred.
@@ -8,8 +10,6 @@ From transfinite.base_logic.lib Require Export satisfiable.
 From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Import fancy_updates.
 Import uPred.
-
-(** For the tlc version of fupd *)
 
 (* we create a notion of satisfiability which includes invariant masks *)
 Class SatisfiableAtFupd `{SI : indexT} {Σ : gFunctors} `{!invGS Σ} (sat_at : coPset → iProp Σ → Prop) := {
@@ -23,7 +23,6 @@ Class SatisfiableAt `{SI : indexT} {Σ : gFunctors} `{!invGS Σ} (sat_at : coPse
   #[global] sat_at_fupd :: SatisfiableAtFupd sat_at
 }.
 
-(* Notation SatisfiableAtExists X sat_at := (∀ E, SatisfiableExists X (sat_at E)). *)
 Notation iProp_sat_lc := (sat_lc iProp_sat).
 
 (* there is a canonical satisfiability instance for every notion of satisfiable *)
@@ -63,7 +62,7 @@ End canonical_sat_at.
 
 Notation iProp_sat_lc_at := (sat_at (sat := iProp_sat_lc)).
 
-(* framing preserves SatisfiableAtFUpd *)
+(* framing preserves [SatisfiableAtFupd] and [SatisfiableAt] *)
 Section sat_at_frame.
   Context `{SI : indexT} {Σ : gFunctors} `{!invGS Σ} {sat_at : coPset → iProp Σ → Prop}.
 

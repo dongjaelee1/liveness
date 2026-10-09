@@ -10,36 +10,16 @@ From iris.prelude Require Import options.
 From iris.algebra.lib Require Import dfrac_agree.
 From transfinite.base_logic.lib Require Import ghost_var ghost_map.
 
-(** FIXME: move to more general directory *)
-Section FIXME.
-
-  Global Program Instance ordinal_auth_mra_class : auth_mra_class ord.le ord.eq :=
-    Build_auth_mra_class ord.t _ _ _ _ _ _.
-  Next Obligation.
-    repeat intro. split; auto.
-  Qed.
-
-  Definition dfrac_div (dq : dfrac) (q : Qp) : dfrac :=
-    match dq with
-    | DfracOwn p => DfracOwn (p / q)
-    | DfracDiscarded => DfracDiscarded
-    | DfracBoth p => DfracBoth (p / q)
-    end.
-
-  Lemma dfrac_div_half dq : dq = (dfrac_div dq 2) ⋅ (dfrac_div dq 2).
-  Proof.
-    destruct dq; simpl.
-    - by rewrite dfrac_op_own Qp.div_2.
-    - done.
-    - unfold op. unfold cmra_op. simpl. rewrite Qp.div_2. auto.
-  Qed.
-
-End FIXME.
+(** Ordinals as an [auth_mra_class], for the ghost state of the lock's layer. *)
+Global Program Instance ordinal_auth_mra_class : auth_mra_class ord.le ord.eq :=
+  Build_auth_mra_class ord.t _ _ _ _ _ _.
+Next Obligation.
+  repeat intro. split; auto.
+Qed.
 
 Module TicketLock.
-  (** https://en.wikipedia.org/wiki/Ticket_lock *)
-
-  (* next = next_ticket, curr = now_serving *)
+  (** A ticket lock (https://en.wikipedia.org/wiki/Ticket_lock). The lock is a pair of counters:
+      [next] is the next ticket to hand out, and [curr] the ticket now served. *)
   Definition init : val :=
     λ: <>, (ref #0, ref #0).
 
@@ -61,22 +41,22 @@ Module TicketLock.
     λ: "lnc",
       let: "next" := Fst "lnc" in
       let: "curr" := Snd "lnc" in
-      (* Need to be consistent with the eventual property;
-         must modify the eventual property to remove this line. *)
+      (* The increment discharges the owner's unlock obligation, which promises that [curr]
+         is incremented. *)
       "curr" <- !"curr" + #1;;
       Free "next";;
       Free "curr".
 
 End TicketLock.
 
-(** The CMRA we need. *)
+(** Ghost state: the tickets map (each waiting thread's carrier, layer and fuel), the map of
+    unlock obligations, the lock token, the lock's layer, and the alive token. *)
 Class ticket_lockG Σ :=
   TLockG {
       #[local] tlock_ticketG :: ghost_mapG Σ Z (option (ocid * ord.t * measure));
       #[local] tlock_oblG :: ghost_mapG Σ Z (option oid);
       #[local] tlock_tokenG :: ghost_varG Σ (Z);
       #[local] tlock_config_inG :: inG Σ (auth_mraUR (ord.le));
-      (* FIXME: update ghost_var in param Iris and use that. *)
       #[local] tlock_alive_inG :: inG Σ (dfrac_agreeR unit);
     }.
 
@@ -127,9 +107,8 @@ Section proof.
   Proof. intros. etrans; last eapply H. apply nclose_subseteq. Qed.
 
   (** ** Definitions *)
-  (** We can define the tf counterparts for these definitions
-      if we want to extract top level trace properties of library functions. *)
 
+  (** [γ ↪LOCK_AL dq]: the lock has not been deleted. *)
   Definition own_fair_lock_alive (γ : ticketlock_γ) (dq : dfrac) :=
     own (ticketlock_γa γ) (to_dfrac_agree dq tt).
 
@@ -137,6 +116,8 @@ Section proof.
     (own_fair_lock_alive γ dq)%I
       (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_AL dq") : bi_scope.
 
+  (** [γ ↪LOCK_CF dq ℓ]: the lock's layer is [ℓ]; acquiring the lock creates an unlock
+      obligation at [ℓ]. *)
   Definition own_fair_lock_layer (γ : ticketlock_γ) (ℓ : ord.t) (dq : dfrac) :=
     own (ticketlock_γc γ) (auth_mra_auth ord.le dq ℓ).
 
@@ -144,6 +125,9 @@ Section proof.
     (own_fair_lock_layer γ l dq)%I
       (at level 20, dq custom dfrac at level 1, format "γ  ↪LOCK_CF dq  l") : bi_scope.
 
+  (** The token's invariant. Either the token [γk] is here, or the owner holds half of it, and
+      this invariant holds a share of [curr] and half of the [finallyP] of the owner's unlock
+      obligation [κ]. *)
   Local Definition lock_token_inv γo γk (curr : loc) (R : tf Σ) : iProp Σ :=
     ∃ (c : Z),
       (ghost_var γk 1 (c)) ∨
@@ -152,6 +136,12 @@ Section proof.
               ((c + 1)%Z ↪[γo]□ (Some κ)) ∗
               ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ).
 
+  (** The lock's invariant. Either the lock has been deleted (the alive token is here), or
+      [next] holds [n], [curr] holds [c], and the maps have the keys [0] to [n]: a key up to [c]
+      is a finished thread, whose unlock obligation is discharged; [c + 1] is the current owner;
+      a key above [c + 1] is a waiting thread, with an empty carrier [g]. If [c = n], the lock
+      is free and [R] is here. Otherwise the owner has an unlock obligation [κ], which promises
+      that [curr] reaches [c + 1], with [R]. *)
   Local Definition lock_inv γt γo γc γa (next curr : loc) (R : tf Σ) : iProp Σ :=
     (own γa (to_dfrac_agree (DfracOwn 1) tt)) ∨
       (∃ (n c : Z)
@@ -164,8 +154,8 @@ Section proof.
           (⌜(dom tickets = dom obls)%Z⌝) ∗
           (⌜(0 ≤ c ≤ n)%Z⌝) ∗
           (⌜ ∀ t, t ∈ dom tickets ↔ (0 ≤ t ≤ n)%Z ⌝) ∗
-          (** Finished or waiting threads *)
-          (* We need auth_mra_know to sync what other threads know about the configuration *)
+          (* Each key is a finished, current, or waiting thread. The fragment [◯AM[ord.le] ℓ]
+             records that the lock's layer is at least [ℓ]. *)
           ([∗ set] t ∈ dom tickets,
              ((∃ κ, ⌜(0 ≤ t ≤ c)%Z⌝ ∧
                     t ↪[γt]□ (None : option (ocid * ord.t * measure)) ∗
@@ -178,7 +168,8 @@ Section proof.
                             (own γc (◯AM[ord.le] ℓ)) ∗ crP_obls g ℓ ∅))) ∗
           ((⌜(c = n)⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c%Z ∗ ⟦R⟧ₗ) ∨
              (⌜(c < n)%Z⌝ ∧
-              (* Allocates new obligation on behalf of next owner. *)
+              (* The owner's unlock obligation [κ]. Until the owner sees that it holds the
+                 lock, its carrier [g] (holding [κ]) and [R] stay here. *)
               ∃ ℓ κ, (own γc (◯AM[ord.le] ℓ)) ∗ witP_layer κ ℓ ∗ (c + 1)%Z ↪[γo]□ (Some κ) ∗
                      ⟦finallyP N_ev κ (1/2) (curr ↦{#(1/2 + 1/2/2)} #(c + 1)%Z ∗ R)⟧ₗ ∗
                      ((∃ g μ, (c + 1)%Z ↪[γt]{#1/2} (Some (g, ℓ, μ)) ∗
@@ -188,12 +179,14 @@ Section proof.
                         (* Current owner acquired the lock. *)
                         ((c + 1)%Z ↪[γt]□ (None : option (ocid * ord.t * measure))))))).
 
+  (** [is_fair_lock tl γ R]: [tl] is a ticket lock that protects [R]. *)
   Definition is_fair_lock (tl : val) (γ : ticketlock_γ) (R : tf Σ) : iProp Σ :=
     ∃ (next curr : loc),
       (⌜tl = (#next, #curr)%V⌝) ∧
       inv N_inv (lock_inv (ticketlock_γt γ) (ticketlock_γo γ) (ticketlock_γc γ) (ticketlock_γa γ) next curr R) ∗
       inv N_tk (lock_token_inv (ticketlock_γo γ) (ticketlock_γk γ) curr R).
 
+  (** The paper's TLObl: the lock is held, with the unlock obligation [κu]. *)
   Local Definition lock_token_def (γ : ticketlock_γ) κu : iProp Σ :=
     ∃ (c : Z), ghost_var (ticketlock_γk γ) (1/2) (c) ∗
                ((c + 1)%Z ↪[(ticketlock_γt γ)]□ (None : option (ocid * ord.t * measure))) ∗
@@ -216,7 +209,6 @@ Section proof.
     γ ↪LOCK_CF ℓ1 ==∗ γ ↪LOCK_CF ℓ2.
   Proof.
     iIntros (LE). iIntros "H". iApply (own_update with "H").
-    (* FIXME: typeclass not solved *)
     apply auth_mra_update; auto. apply _.
   Qed.
 
@@ -229,24 +221,12 @@ Section proof.
   Proof.
     iIntros "H1 H2". iCombine "H1 H2" gives %HCF.
     unshelve eapply auth_mra_auth_dfrac_op_valid in HCF.
-    (* FIXME: typeclass not working *)
+    (* The equivalence [ord.eq] and the [auth_mra_class] instances are given by hand. *)
     1: exact ord.eq. 2,3,4,5: apply ordinal_auth_mra_class.
     eauto.
   Qed.
 
-  (** ** Remark: Properties we want from a modular spec with liveness:
-         1. Hide implementation details, e.g., # of lines, internal data structure.
-         2. Robust against implementation changes, especially # of fuels.
-         3. Consistent format for different libraries.
-
-         'crP_fuel g 1 1' is a good abstraction for trivially terminating functions.
-         ord.large is a good abstraction for more complex functions.
-         Ref: https://en.wikipedia.org/wiki/Hartogs_number *)
-  (** ** Remark: Spec we want for a function that trivially terminates (w/o witness induction):
-         "flat layer"=0. A possible format is ∃ μ in front of the spec, as in TicketLock_init_sepc. *)
-
   (** ** Program proofs *)
-  (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_init_spec :
     ⊢ ∃ μ, ∀ lc ℓ i G (E : coPset) C,
     l{{{ thread_expr i C (TicketLock.init #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) }}}
@@ -302,8 +282,10 @@ Section proof.
     iModIntro. rewrite /is_fair_lock. iExists next, curr. iSplitR; first done. eauto.
   Qed.
 
-  (** FIXME: ordi notation levels *)
-  (** TODO: LAT-style spec for better interaction w/ user invariants. *)
+  (** Acquire. The thread gets a new carrier [gu] that holds the unlock obligation [κu]. The
+      waiting loop is proved by two nested inductions: on the number of threads ahead
+      ([embed_fuels]), and, for each owner, on the witness budget of its unlock obligation
+      ([wit_fuels]). *)
   Lemma TicketLock_acquire_spec :
     ⊢ ∃ μ, ∀ lc m i G tl γ dq1 dq2 ℓ R (E : coPset) (MASK : ↑N ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.acquire (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ℓ ⊕ 1)%ordi μ) ∗
@@ -325,11 +307,8 @@ Section proof.
     iPoseProof (crP_fuel_add_set with "Fs") as "[GF Fsloop]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
     rewrite /TicketLock.acquire.
-    (* argument *)
     lwp_pure_lc 100.
-    (* get fst and snd of the argument *)
     iDestruct "IFL" as "(%&%& %& #INV& #ITK)". subst tl.
-    (* fst *)
     lwp_pures.
     (* FAA *)
     lwp_bind (FAA _ _).
@@ -339,7 +318,6 @@ Section proof.
     { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
-    (** FIXME: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]". 1: eauto.
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "[H | H]".
@@ -412,7 +390,7 @@ Section proof.
       (* Execute loop body. *)
       lwp_pures.
       lwp_bind (Load _).
-      (* Atomic step of Load, *)
+      (* Atomic step of Load. *)
       iModIntro.
       iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]". 1: eauto.
       iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $PtrCurr0]"). 1: done.
@@ -522,12 +500,11 @@ Section proof.
       iIntros "!>".
       clear dependent tickets n obls.
       iClear "Fsloop".
-      (* Update fuels. *)
       lwp_pure_one.
       (* Execute loop body. *)
       lwp_pures.
       lwp_bind (Load _).
-      (* Atomic step of Load, *)
+      (* Atomic step of Load. *)
       iModIntro.
       iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]". 1: eauto.
       iApply (lwp_load _ ∅ 0 with "[$TE $TG $GF1 $PtrCurr0]"). 1: done.
@@ -576,14 +553,15 @@ Section proof.
     iAssert (⌜(ℓ0 <= ℓ)%ordi⌝)%I as "%Hcf".
     { iCombine "CF CFl0" gives %?. apply auth_mra_both_dfrac_valid in H. 2: apply _. by destruct H. }
     iPoseProof (crP_fuel_add_set with "Fsloop") as "[Fsloop1 Fsloop]".
-    (** Nest 1: Embed induction. *)
+    (* Outer induction on [ν], the number of threads ahead of mine ([embed_fuels]). *)
     remember (Z.to_nat (my - prev)%Z) as ν.
     iPoseProof (embed_fuels_init (lt_wf) ν) as "EFs0".
     iMod (embed_fuels_add_map with "EFs0 Fsloop1") as "EFs". rewrite map_union_empty.
     iClear "EFs0". iRevert (κ ℓ0 Hcf gu Ningu prev Hc LTmy Heqν) "CFl0 Wl0 Q_Gf GMEt0 TG GF GMEo0 EFs TE".
     iInduction ν as [ν IHν] using (well_founded_induction lt_wf).
     iIntros (κ ℓ0 Hcf gu Ningu prev Hc LTmy Heqν) "#CFl0 #Wl0 Q_Gf GMEt0 TG GF #GMEo0 EFs TE".
-    (** Nest 2: Witness induction. *)
+    (* Inner induction on the witness budget [α] of the current owner's unlock obligation
+       [κ]. *)
     iPoseProof (wit_fuels_init with "Wl0") as "(%& WFs0)".
     iMod (wit_fuels_add_map with "WFs0 Fsloop") as "WFs".
     { eapply ord.le_lt_lt. 1: eauto. apply hessenberg.add_lt_l.
@@ -600,7 +578,6 @@ Section proof.
     { apply N_inv_subseteq. auto. }
     (* and we need a mupd after the step. *)
     iApply lwp_sfmupd.
-    (** TODO: better rules for tlc / later credits. *)
     iPoseProof (tlc_split_nat 1 with "LC") as "[LC1 LC]".
     iApply (lwp_lc_later with "LC1"). iNext.
     iDestruct "H" as "[H | H]".
@@ -660,7 +637,7 @@ Section proof.
       iApply ("HΦ" with "[$TE $TG $Gg $Q_Gf $Ofk $HR $LC $AL $CF GV]"). iSplit. 1: set_solver.
       rewrite lock_token_unseal /lock_token_def. iFrame. eauto. }
     { (* Inductive cases: prev still holding, or new owner. *)
-      (* Must refresh my carrier. *)
+      (* Replace my carrier with a fresh one, with new fuel for the next iteration. *)
       iPoseProof (ghost_map_lookup with "GMAt GMEt0") as "%LUt".
       assert (Boundmy : (my + 1 ≤ n)%Z).
       { apply elem_of_dom_2 in LUt. apply Domt in LUt. lia. }
@@ -772,7 +749,6 @@ Section proof.
     }
   Qed.
 
-  (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_release_spec :
     ⊢ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.release (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
@@ -827,8 +803,8 @@ Section proof.
       apply dfrac_valid_own_r in H. done. }
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". simplify_eq /=.
-    (* FIXME: does not combine the dfrac part. *)
-    (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
+    (* [pointsto_agree] gives only the equality of the values; the store below combines the
+       fractions. *)
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_store _ ∅ lc with "[$TE $TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]".
@@ -843,7 +819,8 @@ Section proof.
     iClear "Hc".
     iPoseProof (ghost_map_elem_agree with "GMEo0 GMEo") as "%". simplify_eq /=. iClear "GMEo0".
     iCombine "GEku HE" as "GEku".
-    (** We need a sfmupd later. *)
+    (* Discharge [κu]: [curr] now holds [c + 1], as its [finallyP] promises. The discharge
+       needs a second model update, hence [sfmupd_trans]. *)
     iApply sfmupd_trans.
     iApply sfmupd_fupd_acc.
     iMod (tf_until_discharge with "GEku") as "H".
@@ -906,7 +883,6 @@ Section proof.
       iApply ("HΦ" with "[$TE $TG $Gg $QLC $AL]").
   Qed.
 
-  (** TODO: LAT-style spec for better interaction w/ user invariants. *)
   Lemma TicketLock_delete_spec :
     ⊢ ∃ μ, ∀ lc i G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
     l{{{ thread_expr i C (TicketLock.delete (tl : val)) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 μ) ∗
@@ -958,8 +934,8 @@ Section proof.
       apply dfrac_valid_own_r in H. done. }
     iDestruct "H" as "(%&%&%&%& PtrNext& PtrCurr& GMAt& GMAo& %EqDom& %Boundc& %Domt& HMt& Hc)".
     iPoseProof (pointsto_agree with "PtrCurr PtrCurr0") as "%". simplify_eq /=.
-    (* FIXME: does not combine the dfrac part. *)
-    (* iCombine "PtrCurr PtrCurr0" as "PtrCurr" gives %?. destruct H as [_ ->]. *)
+    (* [pointsto_agree] gives only the equality of the values; the store below combines the
+       fractions. *)
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iApply (lwp_store _ ∅ lc with "[$TE $TG $GF1 PtrCurr PtrCurr0]").
     { iSplitR; first done. iDestruct "PtrCurr0" as "[PtrCurr1 PtrCurr0]".
@@ -974,7 +950,8 @@ Section proof.
     iClear "Hc".
     iPoseProof (ghost_map_elem_agree with "GMEo0 GMEo") as "%". simplify_eq /=. iClear "GMEo0".
     iCombine "GEku HE" as "GEku".
-    (** We need a sfmupd later. *)
+    (* Discharge [κu]: [curr] now holds [c + 1], as its [finallyP] promises. The discharge
+       needs a second model update, hence [sfmupd_trans]. *)
     iApply sfmupd_trans.
     iApply sfmupd_fupd_acc.
     iMod (tf_until_discharge with "GEku") as "H".
@@ -990,7 +967,7 @@ Section proof.
     iModIntro. iMod ("H" $! _) as "H". iModIntro. iMod "H" as "(H& Gg& #Ofk)".
     iModIntro.
     iEval (tf_red) in "H". iDestruct "H" as "(PtrCurr0& HR)".
-    (** Return full CF to the invariant. *)
+    (* Put the full alive token in the invariant: the lock is now deleted. *)
     iModIntro. iMod ("ACCinv" with "[AL]") as "_".
     { iNext. iLeft. iFrame. }
     rewrite tf_atomic_logic.

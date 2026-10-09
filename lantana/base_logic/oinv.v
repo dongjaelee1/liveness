@@ -7,7 +7,8 @@ From lantana.algebra Require Import bank.
 From lantana.algebra Require Export ordinal_wfocm layer.
 From lantana.base_logic Require Export osat invariants.
 
-(* Each obl has this variant as an invariant: P until (Q and always R). *)
+(* The invariant of obligation [k]: [P] while its flag is [false], [Q] once the flag
+   is [true], and [R] after [k] is discharged. *)
 Definition oblG_variant `{SI : indexT} `{!osatGS.osatGS Σ}
   (k : oid) (q : Qp) (P Q R : iProp Σ) : iProp Σ :=
   (oblG_assigned k false q ∗ P) ∨

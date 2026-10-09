@@ -5,7 +5,7 @@ From iris.prelude Require Import options.
 From transfinite.base_logic.lib Require Export own.
 From lantana.program_logic Require Export language.
 
-(** The ghost state for history. *)
+(** Ghost state for the execution history, the list of configurations so far. *)
 Module histGS.
 
   Class histGpreS `{SI : indexT} (Σ : gFunctors) (St : Type) : Set :=
@@ -96,17 +96,20 @@ Section proof.
 
 End proof.
 
-(** State interpretation and predicates defined by the language,
-    with the thread ids to connect to the obligation model. *)
+(** The state interpretation and the interpretation of atomic state predicates,
+    given by the language instance. [state_interp_wf]: an interpreted predicate
+    holds of the current state. *)
 Class state_interp_class `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
   { state_interp : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
-    (** Auxiliary data about the state.
-        For example, we might want to hold some of state_pred_interp inside the lwp. *)
+    (** Auxiliary state resources, threaded through [lwp] like [state_interp]. For
+        example, they can hold some [state_pred_interp]. *)
     state_interp_aux : state Λ → thread_pool Λ → list (observation Λ) → iProp Σ;
     state_pred_interp : state_pred Λ → iProp Σ;
     state_interp_wf : (∀ σ Θ κs π, (state_interp σ Θ κs ∗ state_pred_interp π) ⊢ ⌜ state_sat σ Θ π ⌝);
   }.
 
+(** [history_interp h n σ Θ κs]: [h] lists the first [n + 1] configurations, the
+    last one is [(σ, Θ, κs)], and the state interpretation holds for it. *)
 Definition history_interp `{SI : indexT} `{@state_interp_class SI Λ Σ}
   `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   (h : list ((state Λ) * (thread_pool Λ) * (list (observation Λ))))
@@ -114,6 +117,8 @@ Definition history_interp `{SI : indexT} `{@state_interp_class SI Λ Σ}
   (⌜ length h = (S n) ∧ last h = Some ((σ, Θ), κs) ⌝ ∗ hG_history_auth h ∗ state_interp σ Θ κs)%I.
 Global Instance: Params (@history_interp) 5 := {}.
 
+(** [event_pred n σ Θ κs π]: the configuration at step [n] was [(σ, Θ, κs)], and
+    it satisfied [π]. *)
 Local Definition event_pred_def `{SI : indexT} `{@state_interp_class SI Λ Σ}
   `{@histGS SI Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   (n : nat) σ Θ κs (π : state_pred Λ) : iProp Σ :=
@@ -198,8 +203,8 @@ Section hist.
 
 End hist.
 
-(* Allocation of a history interpretation;
-   state_interp_class is user given, and we want it to come later. *)
+(** Allocate the history interpretation. The [state_interp_class] is chosen
+    afterwards. *)
 Lemma history_interp_init `{SI : indexT}
   `{HIST : !histGpreS Σ ((state Λ) * (thread_pool Λ) * (list (observation Λ)))}
   σ Θ κs :

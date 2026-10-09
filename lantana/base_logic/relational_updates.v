@@ -39,25 +39,17 @@ Section aux.
 End aux.
 
 
-(** In this file, we define the later elimination update from the paper. The
-   definition that is given here is a generalization of the definition shown in
-   the paper: instead of defining the update just on natural numbers, we define
-   it parametrically over a type and a well-founded relation. The added
-   generality allows us to use the later elimination update both with natural
-   numbers in standard Iris and to use it with ordinal later credits in
-   Transfinite Iris. The more general version is called "relational update"
-   in this file.
-
-   This file exists in both the finite Iris and Transfinite Iris development of
-   later credits. The only interesting difference is that the file for Transfinite
-   Iris, this file, provides more support for proving adequacy when we use relational updates.
-*)
+(** This file defines the later elimination update of the Later Credits paper,
+   generalized from natural numbers to any type with a well-founded relation, so that
+   it works with ordinal later credits in Transfinite Iris. We call the general
+   version the relational update [|==>r]. The end of the file supports adequacy
+   proofs that use relational updates. *)
 
 
-(** Relational updates are defined parametrically over:
+(** Relational updates are parametric in:
   - a type [X],
-  - a well-frounded relation [rupd_rel_wf: X → X → Prop]
-  - a predicate [rupd_pred: X → iProp] *)
+  - a well-founded relation [rupd_rel : X → X → Prop],
+  - a predicate [rupd_pred : X → iProp], the total credit supply. *)
 
 Class rupdG `{SI : indexT} (Σ : gFunctors) (X : Type) :=
   RelG {
@@ -66,19 +58,11 @@ Class rupdG `{SI : indexT} (Σ : gFunctors) (X : Type) :=
       rupd_rel_wf : well_founded rupd_rel;
     }.
 
-(**
-   The definition of [rupd_pre] is the heart of the relational update.
-   It is parameterized over recursive occurences of the update modality. Whenever we
-   do a relational update, we get to assume the total credit supply (here
-   [rupd_pred]). Next, we get to update the ghost state [|==>], and then we can
-   choose between finishing the update or the recursive case. In the recursive
-   case, we have to decrease the credit supply (here with [tc rupd_rel x' x])
-   and then we can prove the relational update again underneath a later. Proving
-   the relational update underneath a later is what allows us to eliminate other
-   laters in our context.
-
-   We define the actual relational update [rupd] as the fixpoint of [rupd_pre].
-*)
+(** [rupd_pre] is the heart of the relational update, and [rupd] is its fixpoint. A
+   relational update receives the total credit supply [rupd_pred x], updates the ghost
+   state ([|==>]), and then either finishes, or decreases the supply
+   ([tc rupd_rel x' x]) and continues with a relational update under a later.
+   Continuing under a later is what lets us eliminate laters in the context. *)
 
 Definition rupd_pre `{SI : indexT} {Σ : gFunctors} {X} `{!rupdG Σ X} (rupd : iPropO Σ -d> iPropO Σ) :
   iProp Σ -d> iPropO Σ :=
@@ -107,10 +91,8 @@ Proof.
 Qed.
 
 
-(** The following section contains the rules for the later elimination update
-   from the paper, but phrased in terms of the more general relational update.
-   The actual rules for finite and transfinite later credits are then derived
-   later on from these rules. *)
+(** Rules of the relational update. The rules for transfinite later credits in
+   [later_credits.v] are derived from them. *)
 Section rupd_lemmas.
   Context `{SI : indexT} {Σ : gFunctors} {X} `{rG : !rupdG Σ X}.
   Implicit Types (P Q : iProp Σ).
@@ -160,9 +142,8 @@ Section rupd_lemmas.
       iExists _; iFrame. iNext. by iApply ("IH" with "PQ Hupd").
   Qed.
 
-  (** This lemma will allow us to spend one credit for a later elimination.
-     Since the relational update is defined parametrically over the type X
-     and the credit supply, the "spending of a credit" is generalized here. *)
+  (** Spending credits to eliminate a later. Spending means decreasing the credit
+     supply along [rupd_rel]. *)
   Lemma rupd_step P :
     (∀ x, rupd_pred x -∗ |==> ∃ y, ⌜tc rupd_rel y x⌝ ∗ rupd_pred y ∗ ▷ |==>r P) ⊢ |==>r P.
   Proof.
@@ -241,9 +222,9 @@ Section rupd_lemmas.
     by rewrite -rupd_intro -or_intro_l.
   Qed.
 
-  (* A safety check that relational updates can replace basic updates *)
-  (* We do not use this to build an instance, because it would conflict
-     with the basic updates. Instead, we shadow the proofmode lemmas below. *)
+  (* A sanity check: relational updates satisfy the laws of basic updates. This is not
+     an instance, since it would conflict with the basic update; the proof mode
+     instances below are used instead. *)
   Lemma bi_bupd_mixin_rupd : BiBUpdMixin (iPropI Σ) rupd.
   Proof.
     split.
@@ -254,8 +235,8 @@ Section rupd_lemmas.
     - apply rupd_frame_r.
   Qed.
 
-  (* The following instances make the Iris Proof Mode aware of the later
-     elimination update. They are derived from the simpler rules above. *)
+  (* The following instances make the Iris Proof Mode aware of the relational
+     update. They are derived from the simpler rules above. *)
   Global Instance elim_bupd_rupd (p : bool) P Q :
     ElimModal True p false (|==> P) P (|==>r Q) (|==>r Q)%I.
   Proof.
@@ -344,18 +325,10 @@ Section rupd_lemmas.
 End rupd_lemmas.
 
 
-(**
-  Below we define some machinery for the adequacy proof of later credits in
-  Transfinite Iris. Intuitively, the goal of this machinery is that if we have
-  proven |==>r P in Iris, then we can get rid of the relational update to access
-  P. That way, we can, for example, access the postcondition of a weakest
-  precondition in the adequacy proof.
-
-  In Transfinite Iris, the adequacy proof for the later elimination update
-  crucially relies on the existential property: As part of getting rid of |==>r,
-  we have to lift the existential quantifier inside of |==>r out of Iris into
-  the meta logic. That's exactly what the existential property allows us to do.
- *)
+(** Support for adequacy proofs: from [|==>r P] we can remove the relational update
+  and access [P], e.g., the postcondition of a weakest precondition. This relies on
+  the existential property of Transfinite Iris, which lifts the existential
+  quantifier inside [|==>r] out of Iris into the meta logic. *)
 
 Class SatisfiableRUpd `{SI : indexT} {X : Type} {Σ : gFunctors} `{!rupdG Σ X} (sat : iProp Σ → Prop) := {
     sat_rupd P : sat (|==>r P) → sat P
@@ -395,7 +368,7 @@ Section rupd_satisfiable.
         etrans; eauto using tc_rtc.
   Qed.
 
-  (* FIXME?: need to fix transfinite.bi.satisfiable.v *)
+  (* Satisfiability framed with some credit supply. *)
   Definition sat_lc := sat_frame (sat:=sat) (∃ x : X, rupd_pred x)%I.
 
   Global Instance sat_lc_satisfiable_rupd : SatisfiableRUpd sat_lc.

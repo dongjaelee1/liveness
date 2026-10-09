@@ -125,7 +125,8 @@ Section ord_from_wf_facts.
 
 End ord_from_wf_facts.
 
-(** Limiting Jacobsthal expn to nat gives useful properties. *)
+(** Ordinal power with a natural-number exponent, by repeated multiplication.
+    It agrees with [o ↑ n] when [o] is positive ([Jacobsthal_expn_nat_spec]). *)
 Fixpoint Jacobsthal_expn_nat (o : Ord.t) (n : nat) : Ord.t :=
   match n with
   | O => Ord.S Ord.O

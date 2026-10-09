@@ -3,7 +3,7 @@
 -Q lantana lantana
 -Q lantana_heap_lang lantana.heap_lang
 
-# Custom flags (to be kept in sync with the dune file at the root of the repo).
+# Custom flags.
 # We sometimes want to locally override notation, and there is no good way to do that with scopes.
 -arg -w -arg -notation-overridden
 # Cannot use non-canonical projections as it causes massive unification failures
@@ -11,7 +11,7 @@
 -arg -w -arg -redundant-canonical-projection
 # Warning seems incorrect, see https://gitlab.mpi-sws.org/iris/stdpp/-/issues/216
 -arg -w -arg -notation-incompatible-prefix
-# We can't do this migration yet until we require Coq 9.0
+# Some files (mostly the Ordinal copy) still use the deprecated [Coq] prefix for the standard library.
 -arg -w -arg -deprecated-from-Coq
 -arg -w -arg -deprecated-dirpath-Coq
 
@@ -42,15 +42,11 @@ lantana/bi/weakestpre.v
 
 lantana/algebra/list_of_sets.v
 lantana/algebra/map_of_sets.v
-lantana/algebra/forest.v
-lantana/algebra/map_of_forests.v
 lantana/algebra/ocm.v
 lantana/algebra/wfocm.v
 lantana/algebra/ordinal_wfocm.v
-lantana/algebra/nat_wfocm.v
 lantana/algebra/measure.v
 lantana/algebra/layer.v
-lantana/algebra/execution.v
 lantana/algebra/bank.v
 lantana/algebra/bcred.v
 lantana/algebra/auth_mra.v
@@ -88,7 +84,6 @@ lantana/program_logic/ectx_lifting.v
 lantana/program_logic/ectxi_language.v
 lantana/program_logic/atomic.v
 lantana/program_logic/temporal_logic.v
-lantana/program_logic/temporal_logic_lib.v
 lantana/program_logic/temporal_property.v
 lantana/program_logic/adequacy.v
 lantana/program_logic/adequacy_iris.v
@@ -98,14 +93,11 @@ lantana_heap_lang/lang.v
 lantana_heap_lang/tactics.v
 lantana_heap_lang/notation.v
 lantana_heap_lang/class_instances.v
-lantana_heap_lang/pretty.v
-lantana_heap_lang/metatheory.v
 lantana_heap_lang/primitive_laws.v
 lantana_heap_lang/derived_laws.v
 lantana_heap_lang/proofmode.v
 lantana_heap_lang/triple.v
 
-lantana_heap_lang/lib/array.v
 
 lantana_heap_lang/examples/flag.v
 lantana_heap_lang/examples/flag_client.v
@@ -118,4 +110,4 @@ lantana_heap_lang/examples/ticket_lock.v
 lantana_heap_lang/examples/queue.v
 lantana_heap_lang/examples/task_queue.v
 lantana_heap_lang/examples/task_queue_client.v
-lantana_heap_lang/examples/extended_int.v
+lantana_heap_lang/examples/assumptions.v

@@ -10,23 +10,22 @@ From lantana.heap_lang.examples Require Export flag.
 
 Module Nondet.
 
+  (** [nest x n] sets the flag [x]. If [n > 0], it first allocates a flag [y], forks
+      [nest y (n - 1)], and waits on [y]. *)
   Definition nest : val :=
     rec: "fn" "x" "n" :=
       if: "n" ≤ #0%Z
-      (* if true, set the flag and return *)
       then Flag.set "x"
       else
-        (* fork and recursively pass the flag y to a thread *)
         let: "y" := Flag.init #() in
         Fork ("fn" "y" ("n" - #1%Z));;
-        (* and wait on y *)
         Flag.wait "y";;
-        (* finally set x and return *)
         Flag.set "x".
 
+  (** [nondet] chooses [n] nondeterministically, allocates a flag [x], forks [nest x n], and
+      waits on [x]. *)
   Definition nondet : val :=
     λ: <>,
-      (* alloc a flag x, nondeterministically choose a nat, and fork a nest thread and wait *)
       let: "n" := ChooseNat in
       let: "x" := Flag.init #() in
       Fork (nest "x" "n");;
@@ -48,9 +47,8 @@ Section proof.
 
   Ltac lwp_pure_lc n := (lwp_pure; post_lwp_lc n).
 
-  (** The main proofs. *)
-
-  (** Because the blocking function wait increases the layer by 1, the layer grows with the nested wait calls. *)
+  (** Each nested [wait] needs fuel one layer above its flag, so [nest x n] needs fuel at
+      layer [n]. *)
   Lemma Nondet_nest_spec :
     ⊢ ∃ μ, ∀ lc i (x : loc) (n : Z) G g K k ℓg C,
     l{{{ thread_expr i C (Nondet.nest #x #n) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (Z.to_nat n)%ordi μ) ∗
@@ -61,8 +59,8 @@ Section proof.
     l{{{ RET #(); thread_expr i C #() ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}}.
   Proof.
     unfold Nondet.nest.
-    (** Löb to bootstrap the spec; can do induction on n too *)
-    (* Existential μ is okay, because the layer n will drop *)
+    (* Löb induction on the whole specification, [∃ μ] included. The recursive call runs in a
+       forked thread, whose new carrier gets the budget that the induction hypothesis names. *)
     iLöb as "NEST".
     iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
@@ -146,7 +144,8 @@ Section proof.
       iIntros "(TE& _& TG& Gg& #Od)". iApply ("HΦ" with "[$]").
   Qed.
 
-  (** nondet always terminates, but because nest's layer depends on nondeterministically chosen n, we need ω for precondition. *)
+  (** [nondet] terminates, but [nest]'s layer depends on the chosen [n], so the precondition
+      needs fuel at layer [ω]. *)
   Lemma Nondet_nondet_spec :
     ⊢ ∃ μ, ∀ i G C,
     l{{{ thread_expr i C (Nondet.nondet #()) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g (ω)%ordi μ) }}}

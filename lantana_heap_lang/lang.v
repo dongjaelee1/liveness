@@ -6,6 +6,11 @@ From lantana.heap_lang Require Export locations.
 From iris.prelude Require Import options.
 
 (** heap_lang.  A fairly simple language used for common Iris examples.
+Adapted from Iris's [heap_lang/lang.v]. In Lantana's version:
+- [base_step] takes the id [i] of the stepping thread and the set [Θ] of
+  thread ids in use, and forked threads get fresh ids;
+- [ChooseNat] picks a natural number nondeterministically;
+- [state_pred] gives the atomic state predicates of the temporal logic.
 
 Noteworthy design choices:
 
@@ -120,8 +125,7 @@ Inductive expr :=
   (* Prophecy *)
   | NewProph
   | Resolve (e0 : expr) (e1 : expr) (e2 : expr) (* wrapped expr, proph, val *)
-  (* Non-determinism *)
-  (* Reference: trillium/fairis *)
+  (* Non-determinism, as in Trillium and Fairis *)
   | ChooseNat
 with val :=
   | LitV (l : base_lit)
@@ -495,8 +499,10 @@ Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
   | ResolveRCtx ex e1 => Resolve ex e1 e
   end.
 
-(** State predicates retain the exact caller context. The fold below is
-    definitionally the evaluation-context language's [fill]. *)
+(** Atomic state predicates, which [state_sat] interprets in a state [σ] and
+thread pool [Θ]: [pred_pointsto l dq v] says that [l] stores [v], and
+[pred_expr i C e] says that thread [i] runs [e] in the evaluation context [C]
+(innermost item first). The fold in [state_sat] is definitionally [fill]. *)
 Variant state_pred : Type :=
   | pred_pointsto (l : loc) (dq : dfrac) (v : val)
   | pred_expr (i : thread_id) (C : list ectx_item) (e : expr).
@@ -819,10 +825,10 @@ Canonical Structure heap_lang := LanguageOfEctx heap_ectx_lang.
 Export heap_lang.
 
 (** The following lemma is not provable using the axioms of [ectxi_language].
-The proof requires a case analysis over context items ([destruct i] on the
-last line), which in all cases yields a non-value. To prove this lemma for
+The proof requires a case analysis over context items ([destruct Ki] in the
+proof), which in all cases yields a non-value. To prove this lemma for
 [ectxi_language] in general, we would require that a term of the form
-[fill_item i e] is never a value. *)
+[fill_item Ki e] is never a value. *)
 Lemma to_val_fill_some K e v : to_val (fill K e) = Some v → K = [] ∧ e = Val v.
 Proof.
   intro H. destruct K as [|Ki K]; first by apply of_to_val in H. exfalso.

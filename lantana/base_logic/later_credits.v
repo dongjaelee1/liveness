@@ -9,8 +9,6 @@ From iris.bi Require Import lib.cmra.
 From iris.proofmode Require Import proofmode.
 From transfinite.base_logic.lib Require Export own.
 From transfinite.stepindex Require Export utils.
-(* From transfinite.stepindex Require Import ordinal_arith. *)
-(* From transfinite.algebra Require Import ordinals. *)
 From lantana.algebra Require Import ordinal_ucmra.
 From lantana.base_logic Require Export relational_updates.
 
@@ -35,22 +33,12 @@ Section aux.
 
 End aux.
 
-(** This file contains the definition of later credits. In the Transfinite Iris
-   developement, this one, the file contains two instantiations of later
-   credits: one with natural numbers and one with ordinals. Both instantiations
-   share some common theory, which can be found at the beginning of this file.
-   After the shared theory, we derive the concrete instantiations.
+(** This file defines later credits. The general theory comes first; at the end, we
+   instantiate it with ordinals to obtain transfinite later credits. *)
 
-   Parts of the general theory and the instantiation with natural numbers are
-   the same for the finite Iris development of later credits.
-  *)
-
-(** To be able to work with ordinals and natural numbers generically for large
-   parts of this file, we fix the abstraction [auth_rupd]. The abstraction
-   bundles a discrete camera A (i.e., one of Iris's resource algebras) together
-   with a well-founded relation [auth_rupd_rel], a successor operation
-   [auth_rupd_next], a number of compatibility properties.
-*)
+(** The general theory is stated for the abstraction [auth_rupd]. It bundles a
+   discrete camera [A] with a well-founded relation [auth_rupd_rel], a successor
+   operation [auth_rupd_next], and compatibility properties. *)
 
 Class auth_rupd `{SI : indexT} (A : ucmra) := {
     auth_rupd_discrete :: CmraDiscrete A;
@@ -80,8 +68,7 @@ Definition auth_rupdΣ `{SI : indexT} (A : ucmra): gFunctors :=
 Global Instance subG_auth_rupdΣ `{SI : indexT} {Σ : gFunctors} {A : ucmra} : subG (auth_rupdΣ A) Σ → auth_rupd_GpreS Σ A.
 Proof. solve_inG. Qed.
 
-(** In the following section, we prove abstractly the properties of finite and
-   transfinite later credits. To do so, we assume an instance of [auth_rupd]. *)
+(** The general theory of later credits, for any instance of [auth_rupd]. *)
 Section auth_rupd.
   Context `{SI : indexT} (Σ : gFunctors) (X : ucmra) `{!auth_rupd X}.
 
@@ -156,9 +143,8 @@ Section auth_rupd.
     iFrame. iIntros "Hf". iNext. by iApply rupd_intro.
   Qed.
 
-  (** We can split and combine credits as we see fit. The [⋅]
-     operation will be instantiated with the right notion of
-     plus for each kind of later credit further below. *)
+  (** Credits can be split and combined. For ordinals, [⋅] is the natural
+     (Hessenberg) sum. *)
   Lemma rupdF_split `{!auth_rupdGS Σ X} x y :
     rupdF (x ⋅ y) ⊣⊢ rupdF x ∗ rupdF y.
   Proof.
@@ -171,11 +157,9 @@ Section auth_rupd.
     intros He. rewrite /rupdF. rewrite He. done.
   Qed.
 
-  (** In Transfinite Iris, we define a modality for allocating new later credits.
-     We use this modality in the definition of the weakest precondition. It is
-     essentially just an existential quantifier over the additional number of
-     later credits that we would like to allocate for the rest of the proof.
-  *)
+  (** The allocation modality [ALC P]: [P] holds once some new later credits have
+     been allocated. It is an existential quantifier over the amount of new credits.
+     The weakest precondition uses it. *)
   Section allocation.
     Context `{!auth_rupdGS Σ X}.
 
@@ -344,21 +328,12 @@ Section auth_rupd.
 
   End allocation.
 
-  (** Later credits admit an induction principle that is similar to Löb
-       induction. Löb induction means (▷ P ⊢ P) implies ⊢ P. In other words, we
-       can assume our goal underneath a later. The corresponding principle for
-       later credits is:
-          (£1 -∗ P) ⊢ P implies ⊢ P
-     It means that if we are willing to spend one credit, then we can get access
-     to our goal.
-
-     Since later credits can only be spent at specific places (e.g., updates
-     |==>r and weakest preconditions), the principle only applies to certain
-     kinds of propositions P. We call them the CreditExchange propositions P
-     below.
-  *)
-
-  (* credits induction *)
+  (** Later credits admit an induction principle similar to Löb induction. Löb
+     induction says that (▷ P ⊢ P) implies ⊢ P. For later credits, it says that
+     (£1 -∗ P) ⊢ P implies ⊢ P: by spending one credit, we get access to the goal.
+     Credits can only be spent at certain places (e.g., updates [|==>r] and weakest
+     preconditions), so the principle only holds for the [CreditExchange]
+     propositions below. *)
   Class CreditExchange `{!auth_rupdGS Σ X} (P : iProp Σ) := {
       credit_to_later:
       rupdF (auth_rupd_next ε) ∗ ▷ P ⊢ P
@@ -423,17 +398,12 @@ Section auth_rupd.
     iFrame. iNext. by iApply "HPQ".
   Qed.
 
-  (* Global Instance fupd_credit_exchange `{!auth_rupdGS Σ X} `{!invG Σ} E1 E2 P : CreditExchange (|={E1, E2}=> P)%I. *)
-  (* Proof. *)
-  (*   rewrite fupd_eq /fupd_def. apply _. *)
-  (* Qed. *)
-
 End auth_rupd.
 
 Global Arguments rupdF {SI Σ X _} a.
 Global Arguments rupdA {SI Σ X _} a.
 
-(** The notation for later credits that we use in the rest of this developemnt. *)
+(** Notation for later credits. *)
 Notation "£ a" := (rupdF a) (at level 60).
 Notation "●£ a" := (rupdA a) (at level 60).
 
@@ -467,8 +437,8 @@ Proof.
 Qed.
 
 (** ** Transfinite Later Credits *)
-(** We now instantiate the generic definition from above with ordinals to *)
-(*    obtain a transfinite version of later credits £ (α: ord). *)
+(** We instantiate the general theory with ordinals to obtain transfinite later
+    credits [£ α]. *)
 Notation tlcGS Σ := (auth_rupdGS Σ OrdUR).
 Notation tlcGpreS Σ := (auth_rupd_GpreS Σ OrdUR).
 Notation tlcΣ := (auth_rupdΣ OrdUR).
@@ -566,7 +536,7 @@ Section transfinite_lc.
     exact (credit_ind Σ OrdUR P).
   Qed.
 
-  (* For natural numbers *)
+  (* Credits for natural numbers, [£n n]. *)
   Lemma tlc_omega (n : nat) :
     £ω ⊢ |==>r £n n.
   Proof. apply tlc_weaken, Ord.lt_le, Ord.omega_upperbound. Qed.
@@ -594,102 +564,3 @@ Section transfinite_lc.
   Proof. rewrite Ord.from_nat_S. apply tlc_succ. Qed.
 
 End transfinite_lc.
-
-(** Use one of two. *)
-(* (** ** Transfinite Later Credits *) *)
-(* (** We now instantiate the generic definition from above with ordinals to *)
-(*    obtain a transfinite version of later credits £ (α: ord). *) *)
-(* Notation tlcGS Σ := (auth_rupdGS Σ ordUR). *)
-(* Notation tlcGpreS Σ := (auth_rupd_GpreS Σ ordUR). *)
-(* Notation tlcΣ := (auth_rupdΣ ordUR). *)
-
-(* (* Notation "'£ω'" := (£ ω%O) (at level 60). *) *)
-(* (* Notation "'£n' a" := (£ (n2o a)) (at level 60). *) *)
-
-(* Section transfinite_lc. *)
-(*   Context `{SI : indexT} `{!tlcGS Σ}. *)
-(*   Local Open Scope O. *)
-
-(*   Lemma ord_auth_step_frame (a a' f : ordR): *)
-(*     a' ≺ a → (a' ⋅ f) ≺ (a ⋅ f). *)
-(*   Proof. *)
-(*     intros Hαβ. *)
-(*     by eapply natural_addition_strict_compat. *)
-(*   Qed. *)
-
-(*   Lemma ord_auth_op_cancel (a f f' : ordR): *)
-(*     a ⋅ f = a ⋅ f' → f = f'. *)
-(*   Proof using SI. *)
-(*     rewrite comm_L [a ⋅ f']comm_L. *)
-(*     by apply natural_addition_cancel. *)
-(*   Qed. *)
-
-(*   Lemma ord_valid_trivial (a: ordR): ✓ a. *)
-(*   Proof. done. Qed. *)
-
-(*   (* we define an auth rupd instance for ordinals *) *)
-(*   Global Instance ord_auth_rupd : auth_rupd (ordUR) := {| *)
-(*     auth_rupd_discrete := _; *)
-(*     auth_rupd_rel := ord_lt; *)
-(*     auth_rupd_next := succ_def; *)
-(*     auth_rupd_rel_wf := wf_ord_lt; *)
-(*     auth_rupd_rel_proper := _; *)
-(*     auth_rupd_rel_frame := ord_auth_step_frame; *)
-(*     auth_rupd_op_cancel := ord_auth_op_cancel; *)
-(*     auth_rupd_next_step := succ_greater; *)
-(*     auth_valid_trivial := ord_valid_trivial *)
-(*   |}. *)
-
-(*   Lemma tlc_split `{!tlcGS Σ} (α β: ord): *)
-(*     £ (α ⊕ β) ⊣⊢ £ α ∗ £ β. *)
-(*   Proof. apply rupdF_split. Qed. *)
-
-(*   Lemma tlc_succ `{!tlcGS Σ} (α: ord): *)
-(*     £ (succ α) ⊣⊢ £ (succ zero) ∗ £ α. *)
-(*   Proof. *)
-(*     by rewrite -tlc_split natural_addition_succ natural_addition_zero_left_id. *)
-(*   Qed. *)
-
-(*   Lemma tlc_later_strong `{!tlcGS Σ} α β P: *)
-(*     β ≺ α → *)
-(*     £ α -∗ (£ β -∗ ▷ |==>r P) -∗ |==>r P. *)
-(*   Proof. *)
-(*     intros Hlt. iIntros "H1 H2". iApply (auth_rupd_step with "[$H1 $H2]"). done. *)
-(*   Qed. *)
-
-(*   Lemma tlc_later `{!tlcGS Σ} P: *)
-(*     £ (succ zero) -∗ (▷ |==>r P) -∗ |==>r P. *)
-(*   Proof. *)
-(*     iIntros "Hf Hupd". iApply (tlc_later_strong (succ zero) zero with "Hf [Hupd]"). *)
-(*     - apply succ_greater. *)
-(*     - by iIntros "_". *)
-(*   Qed. *)
-
-(*   Lemma tlc_laterN `{!tlcGS Σ} P n : *)
-(*     £(Nat.iter n succ_def zero) -∗ (▷^n |==>r P) -∗ |==>r P. *)
-(*   Proof. *)
-(*     iIntros "Hc Hu". iInduction n as [ | n ] "IH"; first done. *)
-(*     simpl. rewrite tlc_succ. iDestruct "Hc" as "[Hc0 Hc]". *)
-(*     iApply (tlc_later with "Hc0"). *)
-(*     iNext. iApply ("IH" with "Hc Hu"). *)
-(*   Qed. *)
-
-(*   Lemma tlc_weaken `{!tlcGS Σ} (α β: ord): *)
-(*     β ⪯ α → (£ α -∗ |==>r £ β). *)
-(*   Proof. *)
-(*     intros Hle. iIntros "H". iApply (auth_rupd_weaken with "H"). done. *)
-(*   Qed. *)
-
-(*   Lemma tlc_zero `{!tlcGS Σ}: ⊢ |==> £ zero. *)
-(*   Proof. *)
-(*     iApply own_unit. *)
-(*   Qed. *)
-
-
-(*   Lemma tlc_loeb `{!tlcGS Σ} P `{!CreditExchange Σ (ordUR) P}: *)
-(*     □ ((£(succ zero) -∗ P) → P) ⊢ P. *)
-(*   Proof. *)
-(*     exact (credit_ind Σ (ordUR) P). *)
-(*   Qed. *)
-
-(* End transfinite_lc. *)

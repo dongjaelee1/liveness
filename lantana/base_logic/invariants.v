@@ -6,7 +6,8 @@ From lantana.base_logic Require Export fancy_updates.
 From iris.prelude Require Import options.
 Import uPred.
 
-(** Semantic Invariants *)
+(** Semantic invariants. Adapted from Transfinite Iris's [base_logic/lib/invariants.v],
+    using the fancy update of [fancy_updates.v]. *)
 Local Definition inv_def `{SI : indexT} `{!invGS Σ} (N : namespace) (P : iProp Σ) : iProp Σ :=
   □ ∀ E, ⌜↑N ⊆ E⌝ → |={E,E ∖ ↑N}=> ▷ P ∗ (▷ P ={E ∖ ↑N,E}=∗ True).
 Local Definition inv_aux : seal (@inv_def). Proof. by eexists. Qed.

@@ -1,8 +1,6 @@
 (** This file extends the HeapLang program logic with some derived laws (not
-using the lifting lemmas) about arrays and prophecies.
-
-For utility functions on arrays (e.g., freeing/copying an array), see
-[heap_lang.lib.array]. *)
+using the lifting lemmas) about arrays. Adapted from Iris's
+[heap_lang/derived_laws.v]; Iris's laws for prophecies are not included. *)
 
 From stdpp Require Import fin_maps.
 From iris.bi Require Import lib.fractional.
@@ -279,49 +277,6 @@ Proof.
   intros. setoid_rewrite vec_to_list_insert. apply lwp_faa_offset.
   by apply vlookup_lookup.
 Qed.
-
-(* (** Derived prophecy laws *) *)
-
-(* (** Lemmas for some particular expression inside the [Resolve]. *) *)
-(* Lemma lwp_resolve_proph G R o s i E (p : proph_id) (pvs : list (val * val)) v : *)
-(*   l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 1) ∗ *)
-(*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs }}} *)
-(*     ResolveProph (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E *)
-(*   l{{{ pvs', RET (LitV LitUnit); (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ⌜pvs = (LitV LitUnit, v)::pvs'⌝ ∗ proph p pvs' }}}. *)
-(* Proof. *)
-(*   iIntros (Φ) "[[Tx T] Hp] HΦ". iApply (lwp_resolve with "Hp Tx"); first done. *)
-(*   iIntros "Tx". iApply lifting.lwp_pure_step; first done. simpl. *)
-(*   iFrame "Tx". iIntros "!>". iDestruct "T" as "($& $& $)". *)
-(*   iIntros "Tx TG Rs". iExists o. iIntros "_ !> LC !>". *)
-(*   iApply lwp_value. iIntros (vs') "HEq Hp". iApply "HΦ". iFrame. *)
-(* Qed. *)
-
-(* Lemma lwp_resolve_cmpxchg_suc G R o s i E l (p : proph_id) (pvs : list (val * val)) (v1 v2 v : val) : *)
-(*   vals_compare_safe v1 v1 → *)
-(*   l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 1) ∗ *)
-(*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs ∗ ▷ l ↦ v1 }}} *)
-(*     Resolve (CmpXchg #l v1 v2) #p v @ s; i; E *)
-(*   l{{{ RET (v1, #true) ; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ∃ pvs', ⌜pvs = ((v1, #true)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦ v2 }}}. *)
-(* Proof. *)
-(*   iIntros (Hcmp Φ) "[[Tx T] [Hp >Hl]] HΦ". *)
-(*   iApply (lwp_resolve with "Hp Tx"); first done. iIntros "Tx". *)
-(*   assert (val_is_unboxed v1) as Hv1; first by destruct Hcmp. *)
-(*   iApply (lwp_cmpxchg_suc with "[$Tx $T $Hl]"); [done..|]. iIntros "[T Hl]". *)
-(*   iIntros (pvs' ->) "Hp". iApply "HΦ". eauto with iFrame. *)
-(* Qed. *)
-
-(* Lemma lwp_resolve_cmpxchg_fail G R o s i E l (p : proph_id) (pvs : list (val * val)) dq (v' v1 v2 v : val) : *)
-(*   v' ≠ v1 → vals_compare_safe v' v1 → *)
-(*   l{{{ (thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 0 1) ∗ *)
-(*         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)) ∗ proph p pvs ∗ ▷ l ↦{dq} v' }}} *)
-(*     Resolve (CmpXchg #l v1 v2) #p v @ s; i; E *)
-(*   l{{{ RET (v', #false) ; (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ ∃ pvs', ⌜pvs = ((v', #false)%V, v)::pvs'⌝ ∗ proph p pvs' ∗ l ↦{dq} v' }}}. *)
-(* Proof. *)
-(*   iIntros (NEq Hcmp Φ) "[[Tx T] [Hp >Hl]] HΦ". *)
-(*   iApply (lwp_resolve with "Hp Tx"); first done. iIntros "Tx". *)
-(*   iApply (lwp_cmpxchg_fail with "[$Tx $T $Hl]"); [done..|]. iIntros "[T Hl]". *)
-(*   iIntros (pvs' ->) "Hp". iApply "HΦ". eauto with iFrame. *)
-(* Qed. *)
 
 End lifting.
 

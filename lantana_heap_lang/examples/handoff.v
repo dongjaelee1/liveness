@@ -10,11 +10,11 @@ From transfinite.base_logic.lib Require Import ghost_var.
 
 Module Handoff.
 
-  (** Put x at buffer b *)
+  (** Put the task [f] with its argument [a] in the buffer [b]. *)
   Definition send : val :=
     λ: "b" "f" "a", "b" <- SOME ("f", "a").
 
-  (** Checks until the buffer b contains SOME x *)
+  (** Poll the buffer [b] until it holds a task, then run it. *)
   Definition receive : val := 
     rec: "loop" "b" :=
       match: !"b" with
@@ -24,7 +24,7 @@ Module Handoff.
 
 End Handoff.
 
-(** The CMRA we need. *)
+(** Ghost state: a ghost variable that holds the receiver's current carrier. *)
 Class handoffGpreS (Σ : gFunctors) : Set :=
   HandoffGpreS {
       #[local] handoffGpreS_data_inG :: ghost_varG Σ (ocid);
@@ -70,6 +70,9 @@ Section proof.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
   (** ** Definitions *)
+
+  (** [is_task ℓ f a K]: running [f a] at some layer below [ℓ] discharges the obligations [K]
+      (the paper's TaskSpec). *)
   Definition is_task (ℓ : ord.t) : val → val → oids → iProp Σ :=
     λ f a K, (∃ ℓt (P : iProp Σ),
                ⌜(ℓt < ℓ)%ordi⌝ ∧
@@ -80,16 +83,20 @@ Section proof.
                 f a @ i
               l{{{ rv, RET rv; thread_expr i C (of_val rv) ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K' ∖ K) }}})%I.
 
+  (** The buffer's invariant (the paper's HandoffBuf). The receiver's carrier [g] is recorded in
+      the ghost variable [γd] (the paper's polling). The buffer is empty and [g] has no
+      obligations; or it holds a task, and [g] holds the task's obligations [K]; or the receiver
+      has taken the task. *)
   Definition handoff_inv (b : loc) γd ℓ : iProp Σ :=
     ∃ g, (b ↦{#(1/2)} NONEV ∗ ghost_var γd (1/2)%Qp g ∗ crP_obls g ℓ ∅) ∨
            (∃ (f a : val) K, b ↦ SOMEV (f, a) ∗ ghost_var γd (1/2)%Qp (g) ∗
                              crP_obls g ℓ K ∗ is_task ℓ f a K) ∨
            (∃ (f a : val), b ↦ SOMEV (f, a) ∗ ghost_var γd (1)%Qp g).
 
+  (** The paper's HInv: [handoff_inv] under [alwaysP]. *)
   Definition is_handoff (b : loc) (γ : handoff_γ) ℓ : iProp Σ :=
     ⟦alwaysP Na (⟨handoff_inv b (handoff_γd γ) ℓ⟩)⟧ₗ.
 
-  (** The main proofs. *)
   Global Instance handoff_inv_persistent b γ ℓ : Persistent (is_handoff b γ ℓ).
   Proof. rewrite /is_handoff. tf_red. apply _. Qed.
 
@@ -151,20 +158,21 @@ Section proof.
       Handoff.receive #b @ i
     l{{{ v, RET v; thread_expr i C (of_val v) ∗ £ lc ∗ thP_carriers i ∅ }}}.
   Proof.
-    (** For internal steps and executing run_task *)
+    (* [10] for the loop's own steps, and [1] that becomes the task's fuel. *)
     iExists (10 ⊕ 1)%M. iIntros (lc i b g γ ℓ C Φ) "!> HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Gv& #handoff_inv)".
     rewrite /Handoff.receive.
     iPoseProof (crP_fuel_add_set with "GF") as "[GF F_task]".
     iPoseProof (crP_fuels_init with "GF") as "GF".
-    (** Lob (co-)induction *)
+    (* Löb induction. While the buffer is empty, the receiver's carrier has no obligations, so
+       each iteration replaces it with a fresh carrier with new fuel. *)
     iRevert (g) "TE TG GF Gv F_task". iLöb as "IH". iIntros (g) "TE TG GF Gv F_task".
     lwp_pure_lc (lc ⊕ 10)%ord.
     iPoseProof (tlc_split with "LC") as "[Q_LC LC]".
     lwp_bind (Load _).
     iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
     iModIntro.
-    (** Cases. *)
+    (* The buffer is empty, holds a task, or has been taken (impossible here). *)
     rewrite /is_handoff. iEval (do 2 tf_red) in "handoff_inv".
     iInv "handoff_inv" as "inv".
     iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
@@ -202,7 +210,6 @@ Section proof.
       iModIntro.
       iMod (crP_fuel_extend_set _ ℓt _ μ with "F_task") as "F_task". 1: eauto.
       iApply lwp_sfgupd.
-      (* iApply lwp_sfmupd. *)
       iApply ("task" $! 0 with "[$TE $TG $F_task $Cg $HP]"). 1: eauto.
       iIntros (?) "(TE& _& TG& Cg)". replace (K ∖ K) with (∅ : gset ocid) by set_solver.
       iMod (carrier_delete with "TG Cg") as "TG". 1: set_solver.

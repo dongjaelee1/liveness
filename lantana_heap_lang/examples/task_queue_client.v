@@ -9,6 +9,8 @@ From lantana.program_logic Require Import adequacy_iris.
 From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Export flag task_queue.
 
+(** The paper's decr: [decr_reentrant (q, x, n)] sets the flag [x] if [n ≤ 0], and otherwise
+    puts itself on the task queue [q] with [n - 1]. *)
 Definition decr_reentrant : val :=
   (rec: "f" "a" :=
      let: "q" := Fst (Fst "a") in
@@ -18,6 +20,8 @@ Definition decr_reentrant : val :=
      then Flag.set "x"
      else TaskQueue.put_task "q" "f" ("q", "x", "n" - #1%Z)).
 
+(** The paper's clientMain: create a task queue and a flag, run [decr_reentrant] with a
+    nondeterministic [n], and wait on the flag. *)
 Definition main : val :=
   λ: <>,
     let: "q" := TaskQueue.init #() in
@@ -43,21 +47,24 @@ Section proof.
 
   Let Nl := nroot.@ "return".
 
-  (** 1 < ℓq (by TaskQueue_put_task_spec, is_task *)
+  (** The task queue's layer. It is above 1, the layer at which the tasks run ([is_task] needs
+      this). *)
   Let ℓq : ord.t := (1 ⊕ 1)%ordi.
   Remark ℓq_cond : (1 < ℓq)%ordi.
   Proof. apply hessenberg.add_lt_l. apply ord.S_lt. Qed.
 
+  (** The persistent part of [decr_reentrant]'s precondition: the flag and the task queue. *)
   Definition is_decr_reentrant (arg : val) γ (k : oid) : iProp Σ :=
     ∃ (ql : val) (x : loc) (n : Z),
       ⌜arg = (ql, #x, #n)%V⌝ ∧
       is_flag x k (ℓq ⊕ 1)%ordi ∗
       is_task_queue ql γ ℓq.
 
-  (** The main proof. *)
   Global Instance is_decr_reentrant_persistent arg γ k : Persistent (is_decr_reentrant arg γ k).
   Proof. rewrite /is_decr_reentrant. apply _. Qed.
 
+  (** The flag's obligation [k] has [n] units of its own fuel: each time [decr_reentrant] puts
+      itself on the queue, together with [k], it spends one. *)
   Lemma decr_reentrant_spec :
     ⊢ ∃ μ, ∀ lc i G g k K γ ℓg (arg : val) C,
     l{{{ thread_expr i C (decr_reentrant arg) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, crP_fuel g 1%ordi μ) ∗
@@ -71,7 +78,8 @@ Section proof.
     l{{{ RET #(); thread_expr i C #() ∗ £ lc ∗ thP_carriers i G ∗ crP_obls g ℓg (K ∖ {[k]}) }}}.
   Proof.
     unfold decr_reentrant.
-    (** Lob to bootstrap the spec *)
+    (* Löb induction on the specification: the task that [decr_reentrant] enqueues is
+       itself. *)
     iLöb as "TASK".
     iPoseProof (Flag_set_spec) as (μ_fs) "Flag_set_spec".
     iPoseProof (TaskQueue_put_task_spec) as (μ_tp) "TaskQueue_put_task_spec".
@@ -112,9 +120,7 @@ Section proof.
         rewrite /is_task_queue. iFrame "is_task_queue".
         rewrite /is_task. iDestruct "TASK" as (mt) "TASK".
         iExists 1%ordi, _. iSplit.
-        (* iExists _, _, 1%ordi, _. iSplit. *)
         { iPureIntro. apply ℓq_cond. }
-        (* { iPureIntro. split; first eauto. apply ℓq_cond. } *)
         iSplitL.
         { iCombine "Of Ftk" as "H". iApply "H". }
         iExists mt. iIntros (???????) "!> % (TE& TG& GF& Gg& %Hsub& OF& Ftk) HΦ".
@@ -250,6 +256,8 @@ Section proof.
     iApply (fbtriple_top_texan with "H"). iIntros (v) "[Td ->]". rewrite /lift_term. by iFrame.
   Qed.
 
+  (** The setup for [lwp_adequacy] and [lwp_adequacy_safety_iris]: allocate the carrier, the
+      exit obligation and the temporal formula [Φ], and give [main] its weakest precondition. *)
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := main #() ]} →
     Φ = (λ μ, (∃ g kl, finallyP Nl kl 1 (exits #1@i) ∗
@@ -338,6 +346,7 @@ Section adequacy.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := (λ _ v, ⌜v = #1⌝)%I]}.
 
+  (** Liveness: in every fair behavior, [main] terminates with [#1]. *)
   Theorem task_queue_client_adequacy :
     ∀ (τ : trace heap_lang),
     behavior τ →
@@ -373,7 +382,7 @@ Section adequacy.
     iModIntro. iExists (Φ_tf μ). iFrame "HP". iSplit.
     { iPureIntro. apply tf_to_tp_Φ. }
     iFrame.
-    (* TODO: FIXME? *)
+    (* The [queueG Σ] instance remains as a shelved goal. *)
     Unshelve. apply QueueG. apply _.
   Qed.
 
@@ -414,7 +423,7 @@ Section adequacy.
     { iFrame. }
     iDestruct "H" as (μ) "(HP& H)".
     iApply ("H" with "HP").
-    (* TODO: FIXME? *)
+    (* The [queueG Σ] instance remains as a shelved goal. *)
     Unshelve. apply QueueG. apply _.
   Qed.
 
@@ -434,5 +443,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions task_queue_client_adequacy. *)

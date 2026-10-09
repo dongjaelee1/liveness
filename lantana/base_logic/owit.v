@@ -1,5 +1,4 @@
 From iris.algebra Require Import gmap_view reservation_map.
-(* From iris.algebra Require Import gmap_view reservation_map dfrac_agree mono_nat. *)
 From iris.bi.lib Require Import cmra.
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
@@ -8,7 +7,7 @@ From lantana.algebra Require Export wfocm.
 From lantana.algebra Require Import bcred.
 From lantana.base_logic Require Export witness osat.
 
-(** The ghost state for liveness obls *)
+(** The ghost state for witnesses *)
 Module owitGS.
 
   Class owitGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
@@ -37,7 +36,7 @@ Import owitGS.
 (* above, as that would make the instances local to the module. *)
 Local Existing Instances owit_inG owitGpreS_witness.
 
-(* Witness: manage credits for an obl's witness progress *)
+(* Witness credits of obligation [k], spent against the bound [witG_bound]. *)
 Definition witG_bound `{SI : indexT} `{!owitGS Σ}
   (k : oid) (ℵ : obl_fuel) : iProp Σ :=
   own witness_name (reservation_map_data (A:=bcredUR) k (credit_bound ℵ)).
@@ -69,7 +68,9 @@ Definition owit `{SI : indexT} {Σ}
         end)
     )%I.
 
-(* Global invariant that relates witnesses to obls *)
+(* Relates witnesses to obligations: an assigned obligation with fuel [a] has an
+   assigned witness [b] with [b ≤ η a], and a discharged obligation has a discharged
+   witness. *)
 Definition owit_inv `{!ord_mono_fun_class}
   (Ω : obls) (W : witnesses) : Prop :=
   map_Forall2 (λ k g w,
@@ -96,7 +97,7 @@ Section owit.
   Local Instance witG_bound_token_id_timeless E : Timeless (witG_bound_token_id E).
   Proof. rewrite /witG_bound_token_id. apply _. Qed.
 
-  (* wlsat *)
+  (* owit *)
   Global Instance owit_timeless W : Timeless (owit W).
   Proof. rewrite /owit -lock. apply _. Qed.
 
@@ -240,7 +241,7 @@ Section owit.
     iDestruct "WH1" as "(%& %& $)". iPureIntro. etransitivity; eauto.
   Qed.
 
-  (* witness_step rules: progress, discharge, expire *)
+  (* Witness steps: progress and discharge. *)
   Lemma owit_progress_one W k w1 w2 :
     W !! k = Some (witness_assigned w1) →
     witness_step (witness_assigned w1) (witness_assigned w2) →
@@ -444,10 +445,6 @@ Section owit.
     W1 ↓∘ W2 →
     owit_inv (<[k:=(obl_assigned a' t2)]> Ω) W2 →
     wits_mon W1 W2.
-  (* Below is not necessarily true - Wits can take refelexive step *)
-    (* ∃ w1 w2, W1 !! k = Some (v, witness_assigned w1) ∧ *)
-    (*          witness_step (v, witness_assigned w1) (v, witness_assigned w2) ∧ *)
-    (*          wits_mon (<[k:=(v, witness_assigned w2)]> W1) W2. *)
   Proof.
     intros LUO INV1 a' t2 GStep W2 WSStep INV2.
     inv GStep; inv H.

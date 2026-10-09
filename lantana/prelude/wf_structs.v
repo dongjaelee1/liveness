@@ -2,12 +2,10 @@ From lantana Require Import axioms.
 From Coq Require Export Relations.Relation_Operators.
 From Coq Require Import RelationClasses Relations.Operators_Properties.
 
-(* Set Implicit Arguments. *)
-
 Lemma well_founded_irrefl A (R : A -> A -> Prop) (WF : well_founded R) : forall x, ~ R x x.
 Proof. intros x HR. specialize (WF x). induction WF; eauto. Qed.
 
-(** clos_trans *)
+(** Transitive closures of well-founded relations. *)
 Lemma clos_trans_well_founded
   A (R : A -> A -> Prop) (WF : well_founded R)
   :
@@ -37,8 +35,9 @@ Proof.
   econstructor 2; eapply clos_trans_tn1_iff; eauto.
 Qed.
 
-(** ord_tree: tree with join. *)
-(* Reference: Coq development of Fair Operational Semantics. *)
+(** [ord_tree A]: well-founded trees that branch over [A]. Any family of trees has
+    an upper bound ([ord_tree_join]). Based on the Coq development of Fair
+    Operational Semantics. *)
 Inductive ord_tree (A : Type) : Type :=
 | ord_tree_base
 | ord_tree_cons (childs : A -> ord_tree A)
@@ -109,7 +108,7 @@ Proof.
   - etransitivity; [eauto|]. econstructor 1. econstructor.
 Qed.
 
-(** succ *)
+(** The successor relation on [nat]. *)
 Variant succ_rel (n : nat) : nat -> Prop := succ_rel_intro : succ_rel n (S n).
 
 Lemma succ_rel_well_founded : well_founded succ_rel.
@@ -130,7 +129,7 @@ Proof.
       * econstructor 2. econstructor. eapply IHn. auto.
 Qed.
 
-(** double *)
+(** Pairs where one component decreases and the other stays the same. *)
 Variant double_rel {A B} (RA : A -> A -> Prop) (RB : B -> B -> Prop)
   : A * B -> A * B -> Prop :=
 | double_rel_left a0 a1 b (LT : RA a0 a1) : double_rel RA RB (a0, b) (a1, b)
@@ -171,7 +170,7 @@ Proof.
   { intros. eapply (H (a, b0)). econstructor 2. auto. }
 Qed.
 
-(** option *)
+(** [option A] with [None] as the top element. *)
 Variant option_lt {A} (R : A -> A -> Prop) : option A -> option A -> Prop :=
   | optoin_lt_top a :
     option_lt R (Some a) None
@@ -187,7 +186,7 @@ Proof.
   intros. inversion H1. eauto.
 Qed.
 
-(** sum *)
+(** [A + B] where every [inl] is below every [inr]. *)
 Variant sum_lt {A B} (RA : A -> A -> Prop) (RB : B -> B -> Prop) : A + B -> A + B -> Prop :=
   | sum_lt_left a0 a1 (LT : RA a0 a1) :
     sum_lt RA RB (inl a0) (inl a1)
@@ -212,7 +211,7 @@ Proof.
   intros. inversion H1; eauto.
 Qed.
 
-(** prod *)
+(** Lexicographic order on pairs. *)
 Variant prod_lt {A B} (RA : A -> A -> Prop) (RB : B -> B -> Prop) : A * B -> A * B -> Prop :=
   | prod_lt_left a0 a1 b0 b1
       (ALT : RA a0 a1)
@@ -256,7 +255,7 @@ Proof.
       * econstructor 1; eauto.
 Qed.
 
-(** prod with equivalence *)
+(** Lexicographic order on pairs, up to an equivalence [EA] on the first component. *)
 Variant prod_eq_lt {A B} (EA RA : A -> A -> Prop) (RB : B -> B -> Prop) : A * B -> A * B -> Prop :=
   | prod_eq_lt_left a0 a1 b0 b1
       (ALT : RA a0 a1)
@@ -334,7 +333,7 @@ Proof.
       * econstructor 1; eauto.
 Qed.
 
-(** option_bot *)
+(** [option A] with [None] as the bottom element. *)
 Variant option_bot_lt {A} (R : A -> A -> Prop) : option A -> option A -> Prop :=
   | optoin_bot_lt_bot a :
     option_bot_lt R None (Some a)

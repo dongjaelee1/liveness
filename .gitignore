@@ -13,7 +13,6 @@
 *.bak
 .coqdeps.d
 .coq-native/
-build-dep/
 vendor/
 Makefile.coq
 .Makefile.coq.d
@@ -32,3 +31,6 @@ _opam
 
 .DS_Store
 */.DS_Store
+
+.vscode
+*/.vscode

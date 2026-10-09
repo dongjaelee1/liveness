@@ -24,7 +24,7 @@ Section measure_rep.
   | ms_expn (s1 s2 : measure)
   | ms_extend.
 
-  (** Interpretaion into Ordinal. *)
+  (** Interpretation into [Ord.t]. *)
   Definition L_sub (u : L) : Type := sig (λ v, ltL v u).
   Remark measure_rep_rec_oblig : ∀ (l : L) (m : L_sub l), ltL (proj1_sig m) l.
   Proof using. intros. destruct m. auto. Qed.

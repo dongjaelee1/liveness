@@ -1,14 +1,16 @@
 From iris.proofmode Require Import proofmode.
 From lantana.base_logic Require Import obligation.
-(* Only to import rc; TODO refactor *)
+(* For [rc]. *)
 From transfinite.stepindex Require Import utils.
 
+(** The witness of an obligation mirrors the obligation: it is assigned, with a
+    measure, or discharged. *)
 Variant witness `{OC : obl_class} : Type :=
   | witness_assigned (wit : obl_fuel)
   | witness_discharged
 .
 
-(* Step relations. *)
+(* Steps of one witness: progress (the measure decreases) and discharge. *)
 Variant witness_progress `{OC : obl_class} : witness → witness → Prop :=
   | witness_progress_intro f1 f2 (LTf : f2 w< f1) :
     witness_progress (witness_assigned f1) (witness_assigned f2).
@@ -31,10 +33,11 @@ Definition witness_keep `{OC : obl_class} : witness → witness → Prop :=
     | _, _ => False
     end.
 
-(** To a map *)
+(** A witness state maps obligation ids to witnesses. *)
 Notation witnesses := (gmap oid witness).
 
-(** For witnesses, take one step at a time. *)
+(** A step of a witness state: one witness steps ([↓₁]), or a new one is allocated
+    ([↓ₐ]). *)
 Definition wits_one `{OC : obl_class} : witnesses → witnesses → Prop :=
   λ W1 W2, ∃ k w1 w2, (W1 !! k = Some w1) ∧ (witness_step w1 w2) ∧ (W2 = <[k:=w2]>W1).
 Infix "↓₁" := (wits_one) (at level 20).
@@ -54,7 +57,7 @@ Notation "A ↓∘ B" := (rc (wits_step) A B) (at level 20, format "A  ↓∘  B
 Notation "A ↓⁺ B" := (tc (wits_step) A B) (at level 20, format "A  ↓⁺  B").
 Notation "A ↓⋆ B" := (rtc (wits_step) A B) (at level 20, format "A  ↓⋆  B").
 
-(** Definitions for non-discharging stpes. *)
+(** Non-discharging steps: like [↓], but no witness is discharged. *)
 Definition wits_one_progress `{OC : obl_class} : witnesses → witnesses → Prop :=
   λ W1 W2, ∃ k w1 w2, (W1 !! k = Some w1) ∧ (witness_progress w1 w2) ∧ (W2 = <[k:=w2]>W1).
 Infix "↓₁ₚ" := (wits_one_progress) (at level 20).
@@ -70,8 +73,8 @@ Notation "A ↓ₙ∘ B" := (rc (wits_nd_step) A B) (at level 20, format "A  ↓
 Notation "A ↓ₙ⁺ B" := (tc (wits_nd_step) A B) (at level 20, format "A  ↓ₙ⁺  B").
 Notation "A ↓ₙ⋆ B" := (rtc (wits_nd_step) A B) (at level 20, format "A  ↓ₙ⋆  B").
 
-(** Definitions for strict progress of witnesses. *)
-(* Only witnesses that satisfy wit_cond makes R *)
+(** Conditional relations: the witnesses that satisfy [C] take an [R] step, and all
+    others stay unchanged. *)
 Definition wit_cond `{OC : obl_class} := (oid → witness → Prop).
 Definition wits_cond_rel `{OC : obl_class} (C : wit_cond) (R : witness → witness → Prop) : witnesses → witnesses → Prop :=
   λ W1 W2, map_Forall2 (λ k w1 w2, (C k w1 ∧ R w1 w2) ∨ ((¬ C k w1) ∧ w1 = w2)) W1 W2.
@@ -90,12 +93,12 @@ Definition wit_cond_assigned `{OC : obl_class} : wit_cond :=
 Global Instance wit_cond_assigned_dec `{OC : obl_class} : ∀ k w, Decision (wit_cond_assigned k w).
 Proof using. intros. rewrite /wit_cond_assigned. destruct w; solve_decision. Qed.
 
-(* Witnesses step relation *)
+(* Conditional step relation *)
 Definition wits_cond_step `{OC : obl_class} (C : wit_cond) : witnesses → witnesses → Prop :=
   wits_cond_rel C witness_step.
 Notation "A ↓ₛ B | C" := (wits_cond_step C A B) (at level 20, format "A  ↓ₛ  B  |  C").
 
-(* Witnesses making strict progresses *)
+(* Strict progress: a conditional step that discharges no witness. *)
 Definition wits_keep `{OC : obl_class} : witnesses → witnesses → Prop :=
   λ W1 W2, map_Forall2 (λ k w1 w2, witness_keep w1 w2) W1 W2.
 
@@ -163,7 +166,7 @@ Section witnesses.
     - rewrite <- IHrtc. eapply wits_cond_rel_dom; eauto.
   Qed.
 
-  (* If C1 and C2 are disjoint, can decompose *)
+  (* A [C1] step followed by a [C2] step, with disjoint conditions, is one [C] step. *)
   Lemma wits_cond_rel_split_cond C C1 C2 R W1 W2 W3 :
     (∀ k g, C k g ↔ (C1 k g ∨ C2 k g)) →
     (∀ k g, (¬ C1 k g) ∨ (¬ C2 k g)) →
@@ -202,7 +205,7 @@ Section witnesses.
     wits_cond_rel C2 R W1 W2.
   Proof using. intros. eapply wits_cond_rel_iff_lookup; eauto. Qed.
 
-  (** For progress *)
+  (** [witness_keep] and [wits_keep] are preorders. *)
   Global Instance witness_keep_transitive : Transitive witness_keep.
   Proof using.
     repeat intro. destruct x, y, z; inv H; inv H0. all: econstructor.
@@ -223,7 +226,7 @@ Section witnesses.
     repeat intro. destruct (x !! i) eqn:Hx; try done.
   Qed.
 
-  (** For mon *)
+  (** [wits_mon] is a preorder. *)
   Global Instance wits_mon_transitive : Transitive wits_mon.
   Proof using.
     repeat intro. specialize (H i). specialize (H0 i).

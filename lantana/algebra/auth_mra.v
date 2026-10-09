@@ -7,7 +7,7 @@ Section mra_aux.
   Context `{SI : indexT} {A} {R : relation A}.
   Implicit Types a b : A.
 
-  (* FIXME: what's wrong here? *)
+  (* The proof unfolds the camera operations of [mraR] by hand, using [Set Printing All]. *)
   Lemma to_mra_op_included_R `{!PreOrder R} a b :
     to_mra (R:=R) a ⋅ to_mra b ≼ to_mra a → R b a.
   Proof.
@@ -76,7 +76,7 @@ Section auth_mra.
     IsOp (to_mra (R:=R) a) (to_mra a1) (to_mra a2) → IsOp' (◯AM[R] a) (◯AM[R] a1) (◯AM[R] a2).
   Proof. rewrite /IsOp' /IsOp /auth_mra_know=> -> //. Qed.
 
-  (** rephrasing of [auth_mra_know_op] useful for weakening a fragment to a previous knowledge *)
+  (** Rephrasing of [auth_mra_know_op], used to weaken a fragment to an earlier one ([R a' a]). *)
   Lemma auth_mra_know_op_R_l `{!Transitive R} a a' :
     R a' a →
     ◯AM[R] a ≡ ◯AM[R] a' ⋅ ◯AM[R] a.
@@ -167,7 +167,6 @@ Class auth_mra_eq_class {A : Type} (auth_mra_eq_R : A → A → Prop) := {
 Global Instance auth_mra_eq_instance `{AMEC : @auth_mra_eq_class A R} : auth_mra_class R (=@{A}).
 Proof. destruct AMEC. econstructor; eauto. Qed.
 
-(** FIXME: move to a more general directory. *)
 (** Lexicographical ordering *)
 Variant lex_R {A B} (EA RA : A -> A -> Prop) (RB : B -> B -> Prop) : A * B -> A * B -> Prop :=
   | lex_R_left a0 a1 b0 b1

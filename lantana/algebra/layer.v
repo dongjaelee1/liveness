@@ -3,17 +3,11 @@ From stdpp Require Import base tactics.
 From lantana.ordinal Require Export ordinal_facts.
 From lantana.algebra Require Export measure.
 
-(** We have three definitions of ordinal.
-1. From transfinite.stepindex Require Import ordinals.
-This one has different definitions and we use it exclusively for step-index, so there should be no problem.
-2. From Ordinal Require Export Ordinal.
-This is the opam library, and we use this for logic's internal definitions, namely fuels and witnesses.
-3. From lantana.ordinal Require Import Ordinal.
-This is a copy of 2. We use this as the layer of measure_rep.
-This causes universe inconsistency, so we have a copy to use as layer.
-
-Ideally, we should make the library 2 universe polymorphic and remove 3.
- *)
+(** The development uses three ordinal libraries:
+    1. [transfinite.stepindex.ordinals], only for step-indices;
+    2. the Ordinal library (opam package [Ordinal]), for the logic's fuels and witnesses;
+    3. its copy in [lantana/ordinal/], for [layer], the layers passed to [measure_rep].
+    The copy avoids a universe inconsistency: library 2 is not universe polymorphic. *)
 
 Section layer.
 

@@ -6,7 +6,8 @@ From stdpp Require Import namespaces.
 From lantana.base_logic Require Import obligation.
 From lantana.program_logic Require Export weakestpre.
 
-(** Syntax for writing temporal formulae; cf., LTL, CTL*. *)
+(** Syntax of logical temporal formulas. They combine LTL-style operators with
+    ghost assertions ([tf_ghost]) and are interpreted in [iProp] by [⟦·⟧ₗ]. *)
 Inductive tf `{SI : indexT} {Π : Type} `{Σ : gFunctors} :=
 | tf_emp
 | tf_atomic (π : Π)
@@ -14,15 +15,16 @@ Inductive tf `{SI : indexT} {Π : Type} `{Σ : gFunctors} :=
 | tf_ghost (p : iProp Σ)
 | tf_and (P Q : tf)
 | tf_or (P Q : tf)
-(** For impl and wnad, we only allow pure Prop in the left side.
-    This makes the wand just an impl, so we omit the wand. *)
+(** The left side of an implication is a pure [Prop]. A wand would then be the same
+    as an implication, so there is none. *)
 | tf_impl (P : Prop) (Q : tf)
-(* | tf_wand (P : Prop) (Q : tf) *)
 | tf_forall (A : Type) (P : A → tf)
 | tf_exist (A : Type) (P : A → tf)
 | tf_sep (P Q : tf)
 | tf_always (N : namespace) (P : tf)
-(** P until Q, using namespace N and oid k. *)
+(** [P] until [Q], with invariant namespace [N] and obligation [k]. The flag [b]
+    becomes [true] once [Q] holds ([tf_until_to_true]). The formula owns the
+    fraction [q/2] of the assignment of [k]; the invariant owns the other half. *)
 | tf_until (N : namespace) (k : oid) (b : bool) (q : Qp) (P Q : tf)
 .
 
@@ -48,10 +50,8 @@ Notation f_exist A := (tf_exist A).
 Notation "∃'" := (f_exist _) (only parsing) : tf_scope.
 Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%F)) ..)) : tf_scope.
 Infix "∗" := (tf_sep) : tf_scope.
-(* Infix "-∗" := (tf_wand) : tf_scope. *)
-(* Notation "□ P" := (tf_pers P%F) : tf_scope. *)
 
-(** Define patterns corresponding to LTL temporal properties. *)
+(** Derived LTL operators. *)
 (* Eventually P *)
 Definition tf_finally `{SI : indexT} {Π} {Σ} N k b q (P : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q ⌜ True ⌝ P)%F.
@@ -60,7 +60,6 @@ Global Arguments tf_finally {SI Π Σ}.
 (* P Weak until Q *)
 Definition tf_weakuntil `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ) : tf Σ :=
   (tf_until N k b q P (Q ∨ tf_always N P))%F.
-(*   (tf_variant N k v ⌜ False ⌝ P (tf_until N k (v + 1) P Q))%F. *)
 Global Arguments tf_weakuntil {SI Π Σ}.
 
 (* P Release Q *)
@@ -73,7 +72,6 @@ Definition tf_strongrelease `{SI : indexT} {Π} {Σ} N k b q (P Q : @tf SI Π Σ
   (tf_until N k b q Q (Q ∗ P))%F.
 Global Arguments tf_strongrelease {SI Π Σ}.
 
-(* FIXME: more to somewhere else. *)
 Section aux.
   Context `{SI : indexT}.
 
@@ -88,6 +86,12 @@ Section aux.
 
 End aux.
 
+(** [tf_logic Φ], written [⟦Φ⟧ₗ]: the interpretation of [Φ] in [iProp]. An
+    [always] is an invariant. An [until] is an assigned obligation [k] with an
+    invariant that holds [P] (then [Q]) until [k] is discharged, and afterwards a
+    record that [Q] held at the discharge.
+    [tf_intuit n σ Θ κs i Ω Φ]: a persistent record that [Φ] held at step [n] of
+    the history (ghost assertions become [True]). *)
 Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (Φ : @tf SI (state_pred Λ) Σ) : iProp Σ :=
   match Φ with
@@ -101,7 +105,6 @@ Fixpoint tf_logic `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ �
   | tf_forall A P => (∀ (a : A), tf_logic (P a))%I
   | tf_exist A P => (∃ (a : A), tf_logic (P a))%I
   | tf_sep P Q => (tf_logic P ∗ tf_logic Q)%I
-  (* | tf_wand P Q => (⌜P⌝ -∗ tf_logic Q)%I *)
   | tf_always N P => (inv N (tf_logic P))%I
   | tf_until N k b q P Q =>
       (oblP_assigned k b (q/2)%Qp ∗
@@ -123,7 +126,6 @@ with tf_intuit `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
        | tf_forall A P => (∀ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
        | tf_exist A P => (∃ (a : A), tf_intuit n σ Θ κs i Ω (P a))%I
        | tf_sep P Q => (tf_intuit n σ Θ κs i Ω P ∗ tf_intuit n σ Θ κs i Ω Q)%I
-       (* | tf_wand P Q => (⌜P⌝ -∗ tf_intuit n σ Θ κs i Ω Q)%I *)
        | tf_always N P => (inv N (tf_logic P))%I
        | tf_until N k b q P Q =>
            ((∃ f o, event_obl i (n, Ω) k (obl_assigned f o)) ∗
@@ -236,12 +238,6 @@ Section reduction.
   Lemma tf_sep_logic P Q :
     ⟦P ∗ Q⟧ₗ = (⟦P⟧ₗ ∗ ⟦Q⟧ₗ)%I.
   Proof. done. Qed.
-  (* Lemma tf_wand_logic P Q : *)
-  (*   ⟦P -∗ Q⟧ₗ = (⟦P⟧ₗ -∗ ⟦Q⟧ₗ)%I. *)
-  (* Proof. done. Qed. *)
-  (* Lemma tf_pers_logic P : *)
-  (*   ⟦□ P⟧ₗ = (□ ⟦P⟧ₗ)%I. *)
-  (* Proof. done. Qed. *)
   Lemma tf_always_logic N P :
     ⟦tf_always N P⟧ₗ = (inv N ⟦P⟧ₗ)%I.
   Proof. done. Qed.
@@ -263,9 +259,11 @@ Ltac tf_red :=
    try rewrite !tf_always_logic
   ).
 
-(* Making this opaque is reasonable only if we have a better reduction tactic than simpl. *)
+(* Unfold these with [tf_red] and the [tf_..._logic] lemmas, not with [simpl]. *)
 Global Opaque tf_logic tf_intuit.
 
+(** The notations used in specifications. [untilP] and [finallyP] set the flag [b]
+    to [false]. *)
 Global Notation alwaysP N P := (tf_always N P%F)%F.
 Global Notation untilP N k q P Q := (tf_until N k false q P%F Q%F)%F.
 Global Notation finallyP N k q Q := (tf_finally N k false q Q%F)%F.
@@ -393,7 +391,7 @@ Section proof.
   Global Instance tf_always_persistent N P : Persistent (⟦tf_always N P⟧ₗ).
   Proof. tf_red. apply _. Qed.
 
-  (** For now, rewrite tf_always_logic and use rules of inv. *)
+  (** For [always], rewrite with [tf_always_logic] and use the invariant rules. *)
 
   (** Until *)
   Lemma tf_until_frac_split N k b q q1 q2 P Q :
@@ -441,11 +439,8 @@ Section proof.
   Proof.
     iIntros "HQ".
     unfold_sfgupd. rewrite /fgupd. iIntros (?????) "SI".
-    (* unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI". *)
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    (* FIXME: proof without unfold everything? *)
     unfold_opreds. iApply gupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
-    (* unfold_opreds. iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)". *)
     assert (NEW : ∃ k, Ω1 !! k = None).
     { exists (fresh (dom Ω1)). apply not_elem_of_dom. apply is_fresh. }
     destruct NEW as (k& NEWk).
@@ -479,7 +474,7 @@ Section proof.
     iFrame "Eo HE HQi".
   Qed.
 
-  (** TODO: Timeless version *)
+  (** Open an [until] whose [P] holds, and set its flag to [true] once [Q] holds. *)
   Lemma tf_until_to_true E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦untilP N k 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
@@ -492,7 +487,7 @@ Section proof.
     iIntros "!> HQ". iMod ("ACC" with "HQ") as "_". iFrame. eauto.
   Qed.
 
-  (** TODO: Timeless version *)
+  (** Discharge the obligation of an [until] whose [Q] holds. *)
   Lemma tf_until_true_to_discharge E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦tf_until N k true 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
@@ -506,7 +501,6 @@ Section proof.
     iNext. iDestruct "H" as "(Oa1& Oa2& HQ)". iCombine "Oa1 Oa2" as "Oa".
     unfold_sfmupd. rewrite /fmupd. iIntros (?????) "SI".
     iApply fupd_mask_intro. 1: set_solver. iIntros "close".
-    (* FIXME: it would be better if we don't need to unfold everything and re-do the proof here... *)
     unfold_opreds. iDestruct "TG" as "(%& #Oe& Gg& Gt& Gw& #Gb& OS)".
     iDestruct "OI" as "(#Ge& Gvar)". iDestruct "Oa" as "(_& Gl)".
     iApply mupd_unfold. iRight. iIntros (????) "(HI& S& O& A& G& W& %GWI)".
@@ -554,6 +548,7 @@ Section proof.
     iModIntro. iFrame.
   Qed.
 
+  (** The two lemmas above combined. *)
   Lemma tf_until_discharge E N k (P Q : tf Σ) :
     ↑N ⊆ E →
     ⟦untilP N k 1 P Q⟧ₗ ={E,E ∖ ↑N}=∗
@@ -594,74 +589,3 @@ Section proof.
   Qed.
 
 End proof.
-
-(* (** Some tests to check universe consistency. *) *)
-
-(* From transfinite.stepindex Require Import ordinals. *)
-(* From transfinite.base_logic Require Import satisfiable. *)
-(* From lantana.algebra Require Import ordinal_existential_properties. *)
-
-(* Global Instance ordSI : indexT := ordI. *)
-
-(* Section test. *)
-(*   Context `{!temporalGS Λ Σ}. *)
-
-(*   (* Print Universes. *) *)
-
-(*   Lemma test (P Q : iProp Σ) : *)
-(*     iProp_sat (∃ (o : ord) (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ (state_pred Λ))) : ord) o⌝ ∗ X)%I → *)
-(*     ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), ⌜ord_lt ((tf_depth (((tf_ghost P) ∗ ∀ N, tf_always N (tf_ghost Q)) : @tf _ _ (state_pred Λ))) : ord) o⌝ ∗ X)%I. *)
-(*   Proof. *)
-(*     intros. apply sat_exists in H. auto. *)
-(*   Qed. *)
-
-(*   (** Fail: tf is inside tf. *) *)
-(*   Fail Lemma test2 (P Q : iProp Σ) : *)
-(*     iProp_sat (∃ (o : Ord.t), ⌜Ord.lt ((tf_depth ((∃ (p : tf), p ∗ ∀ N k (q : tf), tf_always N k (q)) : @tf _ Σ state_pred)) : Ord.t) o⌝)%I → *)
-(*     True. *)
-
-(*   Lemma test3 : *)
-(*     tf_logic (tf_ghost (∃ (P : iProp Σ), ∀ (Q : iProp Σ), P ∗ Q)) *)
-(*     ⊢ (∃ (P : iProp Σ), ∀ (Q : iProp Σ), P ∗ Q). *)
-(*   Proof. simpl. done. Qed. *)
-
-(*   Lemma test4 : *)
-(*     iProp_sat (∃ (o : ord) (X : iProp Σ), *)
-(*           ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ (state_pred Λ))) : ord) o⌝ ∗ *)
-(*           tf_logic (∃ N, tf_always N (tf_ghost X)))%I → *)
-(*     ∃ (o : ord), iProp_sat (∃ (X : iProp Σ), *)
-(*                        ⌜ord_lt ((tf_depth (((tf_ghost (∃ (p : iProp Σ), p)) ∗ ∀ N, tf_ghost (∀ (q : iProp Σ), tf_logic (tf_always N (tf_ghost q)))) : @tf _ Σ (state_pred Λ))) : ord) o⌝ ∗ *)
-(*                        tf_logic (∃ N, tf_always N (tf_ghost X)))%I. *)
-(*   Proof. *)
-(*     intros. apply sat_exists in H. auto. *)
-(*   Qed. *)
-
-(*   (* Print Universes. *) *)
-
-(*   (** Fail: iProp quantification in tf_exist, probably requiring cmra < tf. *) *)
-(*   Fail Lemma test3' : *)
-(*     tf_logic (∃ (P Q : iProp Σ), tf_ghost (P ∗ Q)) ⊢ True. *)
-
-(*   (* Print Universes. *) *)
-(* (* Error: Found type "iProp Σ" where "?A" was expected *) *)
-(* (* (unable to find a well-typed instantiation for "?A": cannot ensure that *) *)
-(* (* "Type@{max(Set+1,indexT.u0,ucmra.u0)}" is a subtype of "Type@{tf.u2}"). *) *)
-
-(* (* Ord.TYPE.u0 < cmra.u0 *) *)
-(*   (* tf.u2 <= Ord.TYPE.u0 *) *)
-
-(*   (** Fail: Probably, tf (tf.u2) ≤ Ord.t (Ord.TYPE.u0) < iProp Σ (cmra.u0), *)
-(*       and this needs cmra.u0 < tf *) *)
-(*   Fail Lemma test5 (P Q : iProp Σ) : *)
-(*     iProp_sat (∃ (o : ord), ⌜ord_lt ((tf_depth ((∃ (p : iProp Σ), (tf_ghost p) ∗ ∀ N k (q : iProp Σ), tf_always N k (tf_ghost q)) : @tf _ Σ state_pred)) : ord) o⌝)%I → *)
-(*     True. *)
-
-(* (* Notation OrdinalExistential := (TypeExistentialProperty Ord.t) *) *)
-(* (* iProp_sat_exists_instance: *) *)
-(* (*   ∀ {SI : indexT} {Σ : gFunctors} {X : Type}, *) *)
-(* (*     TypeExistentialProperty X SI → SatisfiableExists X iProp_sat *) *)
-(* (* sat_exists: *) *)
-(* (*   ∀ {SI : indexT} {PROP : bi} {X : Type} {sat : PROP → Prop}, *) *)
-(* (*     SatisfiableExists X sat → ∀ Φ : X → PROP, sat (∃ x : X, Φ x)%I → ∃ x : X, sat (Φ x) *) *)
-
-(* End test. *)

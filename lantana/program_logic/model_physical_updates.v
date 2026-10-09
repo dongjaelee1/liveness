@@ -3,7 +3,9 @@ From iris.prelude Require Import options.
 From lantana.base_logic Require Export opreds.
 Import uPred.
 
-(* Ensure progress of thread i's obligations and every live witnesses. *)
+(** [mprog n Θ i P], written [@={n,Θ,i}=↓ P]: the progress update of a step of
+    thread [i]. The obligations owned by [i] make progress, and the witnesses of
+    assigned obligations decrease. *)
 Definition mprog `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n Θ i : iPropO Σ -d> iPropO Σ :=
   (λ P,
      ∀ h a Ω1 W1,
@@ -63,7 +65,9 @@ Section mprog.
     iModIntro. iApply ("HPQ" with "HP").
   Qed.
 
-  (** Step rule *)
+  (** Introduction rule: thread [i] spends one unit of fuel of each carrier in [U],
+      and gets a witness credit (or a proof of discharge) for each obligation in
+      [R]. *)
   Lemma mprog_step n Θ i P :
     (|={∅}=> ∃ U, thP_carriers i U ∗ ([∗ set] u ∈ U, ∃ ℓ, crP_fuel u ℓ 1) ∗
                    ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
@@ -168,7 +172,8 @@ Section mprog.
 
 End mprog.
 
-(* Update physical states. *)
+(** [mphys n1 n2 Θ1 Θ2 P], written [@={n1,n2,Θ1,Θ2}=> P]: the physical update of a
+    step, from step [n1] with threads [Θ1] to step [n2] with threads [Θ2]. *)
 Definition mphys `{SI : indexT} `{!mupdGS Σ} `{!ord_mono_fun_class} n1 n2 Θ1 Θ2 : iPropO Σ -d> iPropO Σ :=
   (λ P,
      ∀ h a Ω W,
@@ -224,7 +229,7 @@ Section mphys.
     iModIntro. iApply ("HPQ" with "HP").
   Qed.
 
-  (** Step rule *)
+  (** Introduction rule: the new threads [π] start with empty carrier sets. *)
   Lemma mphys_step n1 n2 Θ1 Θ2 π P :
     n1 ≤ n2 →
     Θ2 = Θ1 ∪ π →

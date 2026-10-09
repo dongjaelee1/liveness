@@ -18,7 +18,7 @@ Module FlagFork.
 
   Definition main : val :=
     λ: <>,
-      (* alloc a flag x and forks a set-thread and wait *)
+      (* Allocate a flag [x], fork a thread that sets it, and wait on it. *)
       let: "x" := Flag.init #() in
       Fork (Flag.set "x");;
       Flag.wait "x";;
@@ -75,7 +75,7 @@ Section derived.
     iApply (fbtriple_conseq with "[] [] H"); [by iIntros "_"|by iIntros (v) "$"].
   Qed.
 
-  (** Call a function at the evaluation context [K] (BIND). *)
+  (** Run the subexpression [e] at the evaluation context [K] with its own triple (BIND). *)
   Lemma fb_call s i C E K G0 G1 G2 P e Q1 (R : val → iProp Σ) :
     ⦃ P ⦄^G0 e @ s; i; K ++ C; E ⦃ v, Q1 v ⦄^G1 -∗ P -∗
     (∀ v, Q1 v -∗ ⦃ True ⦄^G1 fill K (of_val v) @ s; i; C; E ⦃ w, R w ⦄^G2) -∗
@@ -116,6 +116,7 @@ Section derived.
     - by iIntros (w) "_".
   Qed.
 
+  (** [fb_pure] in proof-mode form, for the tactic [fb_pure] below. *)
   Lemma tac_fb_pure Δ s i C E G G' K e1 e2 φ Q :
     PureExec φ 1 e1 e2 → φ →
     envs_entails Δ (fuels G 0 1 ∗ ⦃ True ⦄^G fill K e2 @ s; i; C; E ⦃ v, Q v ⦄^G') →
@@ -159,7 +160,8 @@ Section proof.
   Let Nr := nroot.@ "flag_fork_ret".
 
   (** The closed specification of [main], in the paper's format: it ends with no carriers. The
-      proof follows §2's walkthrough step by step. *)
+      proof follows §2's walkthrough step by step. Its [ge], [gf], [kf] and [kr] are the
+      paper's g_e, g_f, k_f and k_e. *)
   Lemma FlagFork_main_fbspec :
     ⊢ □ ∃ μ, ∀ i g kr,
     ⦃ fuels {[g]} (1)%ordi μ ∗ crP_obls g 1 {[kr]} ∗ ⟦finallyP Nr kr 1 (exits #42@i)⟧ₗ ⦄^{[g]}
@@ -171,7 +173,7 @@ Section proof.
     iDestruct Flag_init_fbspec as (μ_init) "#Hinit".
     iDestruct Flag_set_fbspec as (μ_set) "#Hset".
     iDestruct Flag_wait_fbspec as (μ_wait) "#Hwait".
-    (** [g_e]'s layer-1 budget: one unit for the layer-0 phase, [μ_wait] for [wait], and one
+    (** [ge]'s layer-1 budget: one unit for the layer-0 phase, [μ_wait] for [wait], and one
         unit for the steps after it. *)
     iExists (1 ⊕ (μ_wait ⊕ 1))%M. iIntros (i ge kr).
     iApply fb_intro. iIntros "(F& Ce& HF)".
@@ -187,14 +189,14 @@ Section proof.
     iIntros "F0". iDestruct (fuels_add with "F0") as "[F00 F0]".
     rewrite /FlagFork.main.
     fb_pure "F00".
-    (** CARRIER-ALLOC allocates [g_f] at layer 0 with budget [μ0], and FUELS-UNION merges the
+    (** CARRIER-ALLOC allocates [gf] at layer 0 with budget [μ0], and FUELS-UNION merges the
         two carriers' layer-0 fuel. *)
     iApply (fb_alloc _ _ _ _ _ _ 0 μ0). iIntros (gf Hgf) "Cf Ff".
     iAssert (fuels ({[gf]} ∪ {[ge]}) 0 μ0) with "[F0 Ff]" as "F0".
     { iApply fuels_union. replace ({[gf]} ∖ {[ge]}) with ({[gf]} : gset ocid) by set_solver.
       iFrame. }
     iDestruct (fuels_add with "F0") as "[Fi F0]".
-    (** SPEC-INIT, with [g = g_f] and [m = 1]. *)
+    (** SPEC-INIT, with [g = gf] and [m = 1]. *)
     fb_call (Flag.init _) "[] [Fi Cf]".
     { iApply ("Hinit" $! 0 i ({[gf]} ∪ {[ge]}) gf ∅ 0 1). }
     { iFrame. }
@@ -203,8 +205,8 @@ Section proof.
     (** The let-binding takes two pure steps. *)
     iDestruct (fuels_add with "F0") as "[F1 F0]". fb_pure "F1".
     iDestruct (fuels_add with "F0") as "[F1 F0]". fb_pure "F1".
-    (** FORK*: [k_f] moves to the child, together with [isFlag] and [FlagObl]. The child runs
-        SPEC-SET, then CARRIER-DELETE and EXIT. *)
+    (** FORK*: [kf] moves to the child, together with [flag_tk] and [is_flag] (FlagObl and
+        isFlag). The child runs SPEC-SET, then CARRIER-DELETE and EXIT. *)
     iDestruct (fuels_add with "F0") as "[F1 F0]".
     fb_call (Fork _) "[] [F1 Cf Of Ftk]".
     { iApply (fbtriple_fork1 _ _ _ _ _ gf 0 μ_set kf (flag_tk x kf ∗ is_flag x kf 0)%I _ Ord.O).
@@ -216,7 +218,7 @@ Section proof.
       iApply (fb_delete with "Cs"); first set_solver. rewrite difference_diag_L.
       iApply fb_exit. }
     { iFrame "F1 Cf Of Ftk Hflag". }
-    (** Back on the parent, [g_f] is empty, and CARRIER-DELETE drops it. *)
+    (** Back on the parent, [gf] is empty, and CARRIER-DELETE drops it. *)
     iIntros (w) "(-> & Cf& _)".
     iApply (fb_delete with "Cf"); first set_solver.
     replace (({[gf]} ∪ {[ge]}) ∖ {[gf]}) with ({[ge]} : gset ocid) by set_solver.
@@ -236,8 +238,8 @@ Section proof.
       iModIntro. iExact "F". }
     iIntros "F". iDestruct (fuels_add with "F") as "[F1 F]".
     fb_pure "F1".
-    (** FINALLY-EXIT*: the last step, the β-step to [#42], discharges the exit obligation [k_e]
-        and retires [g_e]. *)
+    (** FINALLY-EXIT*: the last step, the β-step to [#42], discharges the exit obligation [kr]
+        and retires [ge]. *)
     iApply (fb_pre _ _ _ _ _ _
               (fuels {[ge]} 0 1 ∗ crP_obls ge 1 {[kr]} ∗ ⟦finallyP Nr kr 1 (exits #42@i)⟧ₗ)%I
               with "[$F $Ce $HF]").
@@ -260,6 +262,8 @@ Section proof.
     iApply (fbtriple_top_texan with "H"). iIntros (v) "[Td ->]". rewrite /lift_term. by iFrame.
   Qed.
 
+  (** The setup for [lwp_adequacy] and [lwp_adequacy_safety_iris]: allocate the carrier, the
+      exit obligation and the temporal formula [Φ], and give [main] its weakest precondition. *)
   Lemma main_pre Θ i Φ Ψs :
     Θ = {[i := FlagFork.main #() ]} →
     Φ = (λ μ, (∃ g kr, finallyP Nr kr 1 (exits #42@i) ∗
@@ -346,6 +350,7 @@ Section adequacy.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := (λ _ v, ⌜v = #42⌝)%I]}.
 
+  (** Liveness: in every fair behavior, [main] terminates with [#42]. *)
   Theorem main_adequacy :
     ∀ (τ : trace heap_lang),
     behavior τ →
@@ -438,5 +443,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions main_adequacy. *)

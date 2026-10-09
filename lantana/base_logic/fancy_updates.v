@@ -1,10 +1,10 @@
-(** Transfinite later credit version *)
+(** Fancy updates with transfinite later credits. Adapted from Transfinite Iris's
+    [base_logic/lib/fancy_updates.v]; here the fancy update is built on the relational
+    update [|==>r] of [relational_updates.v]. *)
 
 From stdpp Require Export coPset.
 From iris.algebra Require Import gmap auth agree gset coPset.
 From iris.proofmode Require Import proofmode.
-(* From transfinite.stepindex Require Import ordinal_arith. *)
-(* From transfinite.algebra Require Import ordinals. *)
 From transfinite.base_logic.lib Require Export own.
 From transfinite.base_logic.lib Require Import wsat.
 From lantana.algebra Require Import ordinal_ucmra.
@@ -19,9 +19,9 @@ Class invGpreS `{SI : indexT} (Σ : gFunctors) : Set :=
       #[local] invGpreS_lc :: tlcGpreS Σ;
     }.
 
-(* [invGS_lc] needs to be global in order to enable the use of lemmas like
-[lc_split] that require [lcGS], and not [invGS]. [invGS_wsat] also needs to be
-global as the lemmas in [invariants.v] require it. *)
+(* [invGS_lc] is global so that lemmas that need [tlcGS] rather than [invGS], such as
+[tlc_split], can be used. [invGS_wsat] is global because the lemmas in
+[invariants.v] need it. *)
 Class invGS `{SI : indexT} (Σ : gFunctors) : Set := InvG {
   #[global] invGS_wsat :: wsatGS Σ;
   #[global] invGS_lc :: tlcGS Σ;

@@ -5,7 +5,6 @@ From lantana.program_logic Require Export temporal_logic temporal_property.
 From lantana.program_logic Require Export adequacy.
 
 From transfinite.stepindex Require Import ordinals.
-(* From transfinite.base_logic Require Import satisfiable. *)
 From lantana.base_logic Require Import satisfiable.
 From lantana.algebra Require Import ordinal_existential_properties.
 
@@ -56,14 +55,14 @@ Section proof2.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
     iMod "close" as "_". iModIntro.
     iSplit. 1: done.
-    (** The postcondition of thread [i] holds now if [i] is a value; this does not consume [WPs]. *)
+    (* The postcondition of thread [i] holds now if [i] is a value; this does not consume [WPs]. *)
     iAssert (⌜∀ e v, Θ !! i = Some e → to_val e = Some v → Φ i v⌝)%I as "%TV".
     { iIntros (e w LUe Hw). destruct POST as (e'& Q& LUTQ& POSTQ).
       assert (e' = e) as ->.
       { subst Θ. rewrite lookup_fmap LUTQ /= in LUe. by injection LUe. }
       iPoseProof (big_sepM_lookup with "WPs") as "WP"; first exact LUTQ.
       simpl. rewrite Hw. iDestruct "WP" as "[_ HQ]". by iApply POSTQ. }
-    (** Fetch the scheduled thread and take a step. *)
+    (* Fetch the scheduled thread and take a step. *)
     inversion BEH. clear BEH. subst n0 τf0.
     iPoseProof (history_interp_lookup with "HI") as "%LUhn". apply HIST in LUhn. destruct LUhn as (i'&LUhn).
     rewrite H1 in LUhn. inversion LUhn. clear LUhn. subst ρ1 i' κs.
@@ -215,7 +214,7 @@ Section proof2.
         - eexists. split; eauto. rewrite He1. auto.
         - exact TV. }
       iModIntro. iMod "close" as "_". iModIntro. iFrame.
-    + (** The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
+    + (* The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
       destruct TStuck as [e1 σ1 Θ1 [= <- <-] LUTi1 [He1 Irr] -> ->].
       assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
       { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
@@ -291,7 +290,7 @@ Theorem lwp_adequacy_safety_iris (Σ : gFunctors) (Λ : language)
      ∃ (c : Ord.t),
        ⊢ |={⊤}=> ∃ (Hsic : state_interp_class Λ Σ)
                   (fork_post : thread_id → val Λ → iProp Σ)
-                  (* FIXME: cannot unify pos_countable for some reason *)
+                  (* [pos_countable] must be given explicitly for unification. *)
                   (Ψs : gmap thread_id (H:=pos_countable) (thread_id → val Λ → iProp Σ)),
      let _ : lantanaGS Λ Σ := LantanaG Htemporal Hsic fork_post in
      ⌜(∃ Q, Ψs !! j = Some Q ∧ ∀ v, (Q j v ⊢ ⌜Φ j v⌝))⌝ ∧
@@ -346,11 +345,8 @@ Proof.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
-  (* FIXME: just HI not working. *)
   iApply (lwp_safety_iris_tiProp with "[$HI $SIa $MHI $S $T $A $G $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
   { intros. rewrite lookup_cons in H0. destruct n'; last done. inv H0. rewrite INIT2. eauto. }
   eauto.
 Qed.
-
-(* Print Assumptions lwp_adequacy_safety_iris. *)

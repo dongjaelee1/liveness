@@ -10,6 +10,9 @@ From iris.prelude Require Import options.
 
 From lantana.heap_lang.examples Require Export flag.
 
+(** A client of the flag module (not in the paper): [writer] sets the flag at the fixed
+    location [X], and [reader] waits on it. Its adequacy theorem states a property of [X],
+    beyond termination. *)
 Section code.
 
   Definition X_loc : loc := Loc 0.
@@ -47,7 +50,6 @@ Section proof.
 
   Let l := X_loc.
 
-  (** The main proofs. *)
   (** The writer's closed specification, in the paper's format: it ends with no carriers. *)
   Lemma writer_fbspec :
     ⊢ □ ∃ μ, ∀ i g k kl,
@@ -151,6 +153,8 @@ Section proof.
     iApply "HΦ". rewrite /lift_term. by iFrame.
   Qed.
 
+  (** The setup for [lwp_adequacy] and [lwp_adequacy_safety_iris]: allocate the ghost state and
+      the temporal formula [Φ], and give each thread its weakest precondition. *)
   Lemma flag_client_pre Θ i j Φ Ψs :
     i ≠ j →
     Θ = {[i := writer #(); j := reader #() ]} →
@@ -280,6 +284,8 @@ Section adequacy.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := (λ _ v, ⌜v = #()⌝)%I; j := (λ _ v, ⌜v = #1⌝)%I]}.
 
+  (** Liveness: in every fair behavior, the flag invariant [is_flag_tp] holds, [X] holds 0
+      until it holds 1, and the writer and the reader terminate with [#()] and [#1]. *)
   Theorem flag_client_adequacy :
     ∀ (τ : trace heap_lang),
     behavior τ →
@@ -305,7 +311,6 @@ Section adequacy.
     { by iFrame. }
     iSplitR; first done.
     iModIntro. iIntros "LC TGs".
-    (* Set Printing All. *)
     iMod (flag_client_pre Θ0 i j with "[Tis] [Ptrs] [TGs]") as "H".
     { subst i j. lia. }
     { done. }
@@ -370,8 +375,8 @@ Section adequacy.
     iApply ("H" with "HP").
   Qed.
 
-  (** Liveness and safety together, over the same fair behaviors: the writer returns [#()] and the reader [#1], and no
-      scheduled thread is ever stuck. *)
+  (** Liveness and safety together, over the same fair behaviors: the writer returns [#()] and
+      the reader [#1], and no scheduled thread is ever stuck. *)
   Corollary flag_client_liveness_safety :
     ∀ (τ : trace heap_lang),
     behavior τ →
@@ -386,5 +391,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions flag_client_adequacy. *)

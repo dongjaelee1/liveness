@@ -1,6 +1,8 @@
 From iris.proofmode Require Import tactics.
 From stdpp Require Import fin_maps.
 
+(** Maps of sets. [union_sets M] is the union of the values of [M]; [disjoint_sets M] says that
+    they are pairwise disjoint. [filter_sets M ks] (below) keeps the keys in [ks]. *)
 Definition union_sets `{!EqDecision K} `{!Countable K} `{!EqDecision E} `{!Countable E} (M : gmap K (gset E)) : gset E :=
   map_fold (λ _ K A, K ∪ A) (∅ : gset E) M.
 Definition disjoint_sets `{!EqDecision K} `{!Countable K} `{!EqDecision E} `{!Countable E} (M : gmap K (gset E)) : Prop :=
@@ -15,12 +17,10 @@ Section map_of_sets.
 
   (** ** Basic properties of [union_sets] *)
 
-  (** [union_sets] of the empty map is empty. *)
   Lemma union_sets_empty : union_sets (∅ : gmap K (gset E)) = ∅.
   Proof using. by rewrite /union_sets map_fold_empty. Qed.
 
-  (** Inserting at a fresh key amounts to taking the union with the inserted set.
-      This is the analogue of [forest_fold_insert_L] in the tree development. *)
+  (** Inserting at a fresh key amounts to taking the union with the inserted set. *)
   Lemma union_sets_insert_L M k s :
     M !! k = None →
     union_sets (<[k:=s]> M) = s ∪ union_sets M.
@@ -29,7 +29,6 @@ Section map_of_sets.
     intros; set_solver.
   Qed.
 
-  (** Singleton case. *)
   Lemma union_sets_singleton k s :
     union_sets ({[k := s]} : gmap K (gset E)) = s.
   Proof using.
@@ -37,7 +36,7 @@ Section map_of_sets.
     rewrite union_sets_empty. set_solver.
   Qed.
 
-  (** Deleting a present key splits off its set. Analogue of [forest_fold_delete_L]. *)
+  (** Deleting a present key splits off its set. *)
   Lemma union_sets_delete_L M k s :
     M !! k = Some s →
     union_sets M = s ∪ union_sets (delete k M).
@@ -49,8 +48,7 @@ Section map_of_sets.
 
   (** ** Membership characterisation of [union_sets] *)
 
-  (** [e] is in [union_sets M] iff some value of [M] contains [e].
-      This is one of the most useful lemmas about [union_sets]. *)
+  (** [e] is in [union_sets M] iff some value of [M] contains [e]. *)
   Lemma elem_of_union_sets M e :
     e ∈ union_sets M ↔ ∃ k s, M !! k = Some s ∧ e ∈ s.
   Proof using.
@@ -80,14 +78,13 @@ Section map_of_sets.
 
   (** ** [union_sets] interacts with subset and union of maps *)
 
-  (** Each value is contained in [union_sets].  Analogue of [forest_fold_subseteq]. *)
+  (** Each value is contained in [union_sets]. *)
   Lemma union_sets_lookup_subseteq M k s :
     M !! k = Some s → s ⊆ union_sets M.
   Proof using.
     intros ? e ?. apply elem_of_union_sets. eauto.
   Qed.
 
-  (** [union_sets] is monotone with respect to map inclusion. *)
   Lemma union_sets_mono M1 M2 :
     M1 ⊆ M2 → union_sets M1 ⊆ union_sets M2.
   Proof using.
@@ -96,7 +93,6 @@ Section map_of_sets.
     eapply lookup_weaken; eauto.
   Qed.
 
-  (** Alternative description: [union_sets] is the union of the values list. *)
   Lemma union_sets_union_list M :
     union_sets M = ⋃ ((map_to_list M).*2).
   Proof using.
@@ -109,7 +105,6 @@ Section map_of_sets.
       apply elem_of_map_to_list in Hin. eauto.
   Qed.
 
-  (** [union_sets] commutes with disjoint map union. *)
   Lemma union_sets_disj_union_L M1 M2 :
     M1 ##ₘ M2 →
     union_sets (M1 ∪ M2) = union_sets M1 ∪ union_sets M2.
@@ -124,17 +119,14 @@ Section map_of_sets.
 
   (** ** Basic properties of [disjoint_sets] *)
 
-  (** Recovering the definition: equivalent to a pairwise statement. *)
   Lemma disjoint_sets_lookup M k1 k2 s1 s2 :
     disjoint_sets M →
     k1 ≠ k2 → M !! k1 = Some s1 → M !! k2 = Some s2 → s1 ## s2.
   Proof using. intros HD; eauto. Qed.
 
-  (** The empty map trivially has disjoint values. *)
   Lemma disjoint_sets_empty : disjoint_sets (∅ : gmap K (gset E)).
   Proof using. intros ?????? Hk. by rewrite lookup_empty in Hk. Qed.
 
-  (** A singleton trivially has disjoint values. *)
   Lemma disjoint_sets_singleton k s :
     disjoint_sets ({[k := s]} : gmap K (gset E)).
   Proof using.
@@ -173,8 +165,7 @@ Section map_of_sets.
   Qed.
 
   (** [disjoint_sets] under [insert] is equivalent to inserting a set disjoint
-      from every existing value, plus disjointness of the rest.
-      This is the analogue of [forest_trees_disjoint_insert]. *)
+      from every existing value, plus disjointness of the rest. *)
   Lemma disjoint_sets_insert M k s :
     M !! k = None →
     disjoint_sets (<[k:=s]> M) ↔
@@ -246,8 +237,7 @@ Section map_of_sets.
 
   (** ** [disjoint_sets] under disjoint map union *)
 
-  (** [disjoint_sets] of a disjoint union: necessary direction.
-      Analogue of [forest_trees_disjoint_union_inv]. *)
+  (** [disjoint_sets] of a disjoint union: necessary direction. *)
   Lemma disjoint_sets_disj_union_inv M1 M2 :
     M1 ##ₘ M2 →
     disjoint_sets (M1 ∪ M2) →
@@ -269,8 +259,7 @@ Section map_of_sets.
       + rewrite lookup_union_r; auto. eapply map_disjoint_Some_l; eauto.
   Qed.
 
-  (** [disjoint_sets] of a disjoint union: sufficient direction.
-      Analogue of [forest_trees_disjoint_union]. *)
+  (** [disjoint_sets] of a disjoint union: sufficient direction. *)
   Lemma disjoint_sets_disj_union M1 M2 :
     M1 ##ₘ M2 →
     disjoint_sets M1 → disjoint_sets M2 →
@@ -358,7 +347,7 @@ Section map_of_sets.
     f_equal. set_solver.
   Qed.
 
-  (** Singleton-element variants: removing a single element from [s]. *)
+  (** Singleton-element variant: removing a single element from [s]. *)
   Lemma union_sets_insert_difference_singleton_L M k s e :
     disjoint_sets M →
     M !! k = Some s →
@@ -449,9 +438,8 @@ Section map_of_sets.
     intros Hk HD. by apply (disjoint_sets_insert_union_iff _ _ _ _ Hk).
   Qed.
 
-  (** Adding a single fresh element [e] to the value at [k]: this preserves
-      [disjoint_sets] iff [e] is not in any other value of [M].  In
-      particular, it is enough that [e ∉ union_sets M]. *)
+  (** Adding an element [e] to the value at [k] preserves [disjoint_sets] if [e] is in no other
+      value of [M]. *)
   Lemma disjoint_sets_insert_union_singleton M k s e :
     M !! k = Some s →
     disjoint_sets M →
@@ -485,7 +473,7 @@ Section filter_sets.
   Implicit Type k j : K.
   Implicit Type e : E.
 
-  (** ** Lemmas for using [filter_sets] with basic operations, such as insert/delete/elem_of/dom/subseteq. *)
+  (** ** [filter_sets] and basic map operations ([insert], [delete], [∈], [dom], [⊆]) *)
 
   Lemma filter_sets_lookup_Some M ks k s :
     filter_sets M ks !! k = Some s ↔
@@ -674,7 +662,7 @@ Section filter_sets.
         rewrite lookup_delete_ne; auto.
   Qed.
 
-  (** ** Lemmas for using [filter_sets] with advanced operations, union_sets and disjoint_sets. *)
+  (** ** [filter_sets] with [union_sets] and [disjoint_sets] *)
   Lemma union_sets_filter_sets_subseteq M ks :
     union_sets (filter_sets M ks) ⊆ union_sets M.
   Proof using.

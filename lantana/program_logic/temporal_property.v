@@ -2,14 +2,14 @@ From iris.prelude Require Import options.
 From lantana.program_logic Require Export language.
 From lantana.prelude Require Import axioms.
 
-(** ** Syntax for writing temporal formulae; cf., LTL, CTL*. *)
+(** ** Syntax of temporal formulas, in the style of LTL. Atomic propositions have type [Π]. *)
 Inductive tp {Π : Type} :=
 | tp_atomic (π : Π)
 | tp_pure (p : Prop)
 | tp_and (P Q : tp)
 | tp_or (P Q : tp)
-(** For impl and wnad, we only allow pure Prop in the left side.
-    This makes the wand just an impl, so we omit the wand. *)
+(** The left side of an implication is a pure [Prop]. A wand would then be the same
+    as an implication, so there is none. *)
 | tp_impl (P : Prop) (Q : tp)
 | tp_forall (A : Type) (P : A → tp)
 | tp_exist (A : Type) (P : A → tp)
@@ -38,7 +38,7 @@ Notation f_exist A := (tp_exist A).
 Notation "∃'" := (f_exist _) (only parsing) : tp_scope.
 Notation "∃ a .. z , P" := (f_exist _ (λ a, .. (f_exist _ (λ z, P%P)) ..)) : tp_scope.
 
-(** Define patterns corresponding to LTL temporal properties. *)
+(** Derived LTL operators. *)
 (* Eventually P *)
 Definition tp_finally {Π} (P : @tp Π) : tp :=
   (tp_until ⌜ True ⌝ P)%P.
@@ -61,8 +61,8 @@ Global Arguments tp_strongrelease {Π}.
 
 Definition tp_true {Π} : @tp Π := ⌜ True ⌝%P.
 
-(** ** Semantics. *)
-(** trace_state properties *)
+(** ** Semantics *)
+(** Properties of a single trace state. *)
 Definition tsProp (Λ : language) := trace_state Λ → Prop.
 
 Definition ts_and {Λ : language} : tsProp Λ → tsProp Λ → tsProp Λ :=
@@ -115,7 +115,6 @@ Proof.
   intros. unfold ts_emb, ts_and, trace_now, tr_and. auto.
 Qed.
 
-(** TODO: better tactic for solving trProp implications. *)
 Ltac unfold_trProp :=
   unfold tr_until, tr_always, tr_exist, tr_forall, tr_impl, tr_or, tr_and, tr_pure, tr_atomic.
 
@@ -135,7 +134,7 @@ Notation r_exist A := (tr_exist A).
 Notation "∃'" := (r_exist _) (only parsing) : tr_scope.
 Notation "∃ a .. z , P" := (r_exist _ (λ a, .. (r_exist _ (λ z, P%R)) ..)) : tr_scope.
 
-(** ** Interpretation *)
+(** ** Interpretation of formulas as trace properties *)
 Fixpoint tp_trace {Λ : language} (Φ : @tp (state_pred Λ)) : trProp Λ :=
   match Φ with
   | tp_atomic π => tr_atomic π
@@ -153,7 +152,10 @@ Fixpoint tp_trace {Λ : language} (Φ : @tp (state_pred Λ)) : trProp Λ :=
 Definition tr_eventually {Λ : language} : trProp Λ → trProp Λ :=
   λ Q, tr_until (⌜ True ⌝)%R Q.
 
-(** ** Define fair scheduling as a property of a trace. *)
+(** ** Fair scheduling *)
+
+(** A trace is fairly scheduled if, at every point, every thread is either not
+    active (absent or a value) or is scheduled now or later. *)
 
 Definition thread_active {Λ : language} (i : thread_id) : tsProp Λ :=
   λ ξ, let '((Θ, σ), _, _) := ξ in ∃ e, Θ !! i = Some e ∧ to_val e = None.
@@ -230,6 +232,8 @@ Section fair_sched_cnt.
   Implicit Type ξ : trace_state Λ.
   Implicit Type τ : trace Λ.
 
+  (** Fair-scheduling counters. [beh_fscnt_th τ i c]: at every step where thread [i]
+      is active but not scheduled, its counter decreases. *)
   Definition fscnt : Type := thread_id → nat.
 
   CoInductive beh_fscnt_th (τ : trace Λ) (i : thread_id) (c : nat) : Prop :=
@@ -253,7 +257,7 @@ Section fair_sched_cnt.
     destruct (decide (i = trace_thread τ)); auto. eapply Nat.lt_le_trans; eauto.
   Qed.
 
-  (** We use choice here. *)
+  (** Every fair trace has counters. The proof uses the axiom of choice. *)
   Lemma fair_scheduling_fscnt (τ : trace Λ) :
     fair_scheduling τ → ∃ (γ : fscnt), beh_fscnt τ γ.
   Proof.
@@ -283,7 +287,6 @@ Section fair_sched_cnt.
         * apply fair_scheduling_next; auto.
         * right. eauto.
     - destruct TH as [TA TTurn]. destruct s.
-      (* Induction on s breask Guarded check? *)
       { simpl in TTurn. destruct (τf n) as (((Θ& σ)& j)& κs) eqn:Htrn.
         unfold ts_emb, thread_turn in TTurn. simpl in TTurn. rewrite Htrn in TTurn. subst j.
         destruct (ts_emb_thread_active_or_not i (trace_next (n, τf))) as [Next | Next].
@@ -327,7 +330,8 @@ Section fair_sched_cnt.
   Definition fscnt_next_rel (τ : trace Λ) (γ1 γ2 : fscnt) : Prop :=
     ∀ i, fscnt_next_rel_th τ i (γ1 i) (γ2 i).
 
-  (** We again use choice here. *)
+  (** A trace with counters [γ] has counters [γ'] after one step, smaller for the
+      active threads that are not scheduled. The proof uses the axiom of choice. *)
   Lemma exists_fscnt_next (τ : trace Λ) (γ : fscnt) :
     beh_fscnt τ γ →
     ∃ γ', beh_fscnt (trace_next τ) γ' ∧ fscnt_next_rel τ γ γ'.

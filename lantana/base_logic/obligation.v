@@ -1,9 +1,9 @@
 From iris.proofmode Require Import proofmode.
-(* Only to import rc; FIXME : refactor *)
+(* For [rc]. *)
 From transfinite.stepindex Require Import utils.
 From lantana.algebra Require Export wfocm.
 
-(* FIXME : Move to somewhere else *)
+(** Strong normalization is preserved by the transitive closure. *)
 Lemma sn_tc {X} (R : X → X → Prop) (x : X): sn R x ↔ sn (tc R) x.
 Proof.
   split.
@@ -17,14 +17,16 @@ Class obl_class := {
     obl_fuel : Type;
     #[global] obl_fuel_wfocm :: WFOCM.pack obl_fuel;
   }.
-(** We assume that the thread id is positive *)
+(** The owner of an obligation is a thread id. Thread ids are positive. *)
 Definition obl_owner := positive.
 
+(** An obligation is either assigned, with its fuel and owner, or discharged. *)
 Variant obl `{OC : obl_class} : Type :=
   | obl_assigned (fuel : obl_fuel) (owner : obl_owner)
   | obl_discharged.
 
-(* Step relations. *)
+(* Steps of one obligation: progress (the fuel decreases, the owner may change) and
+   discharge. *)
 Variant obl_progress `{OC : obl_class} : obl → obl → Prop :=
   | obl_progress_intro f1 f2 o1 o2 (LTf : f2 w< f1) :
     obl_progress (obl_assigned f1 o1) (obl_assigned f2 o2).
@@ -64,13 +66,14 @@ Definition obl_nd `{OC : obl_class} : obl → obl → Prop :=
     | _, _ => False
     end.
 
-(** To a map *)
+(** An obligation state maps obligation ids to obligations. *)
 Definition oid := positive.
 
 Notation oids := (gset oid).
 Notation obls := (gmap oid obl).
 
-(** For obls, take one step at a time. *)
+(** A step of an obligation state: one obligation steps ([↪₁]), or a new one is
+    allocated ([↪ₐ]). *)
 Definition obls_one `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, ∃ k g1 g2, (Ω1 !! k = Some g1) ∧ (obl_step g1 g2) ∧ (Ω2 = <[k:=g2]>Ω1).
 Infix "↪₁" := (obls_one) (at level 20).
@@ -90,7 +93,7 @@ Notation "A ↪∘ B" := (rc (obls_step) A B) (at level 20, format "A  ↪∘  B
 Notation "A ↪⁺ B" := (tc (obls_step) A B) (at level 20, format "A  ↪⁺  B").
 Notation "A ↪⋆ B" := (rtc (obls_step) A B) (at level 20, format "A  ↪⋆  B").
 
-(** Definitions for non-discharging stpes. *)
+(** Non-discharging steps: like [↪], but no obligation is discharged. *)
 Definition obls_one_progress `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, ∃ k g1 g2, (Ω1 !! k = Some g1) ∧ (obl_progress g1 g2) ∧ (Ω2 = <[k:=g2]>Ω1).
 Infix "↪₁ₚ" := (obls_one_progress) (at level 20).
@@ -106,8 +109,8 @@ Notation "A ↪ₙ∘ B" := (rc (obls_nd_step) A B) (at level 20, format "A  ↪
 Notation "A ↪ₙ⁺ B" := (tc (obls_nd_step) A B) (at level 20, format "A  ↪ₙ⁺  B").
 Notation "A ↪ₙ⋆ B" := (rtc (obls_nd_step) A B) (at level 20, format "A  ↪ₙ⋆  B").
 
-(** Definitions for strict progress of obls. *)
-(* Only ghost locks that satisfy obl_cond makes R *)
+(** Conditional relations: the obligations that satisfy [C] take an [R] step, and all
+    others stay unchanged. *)
 Definition obl_cond `{OC : obl_class} := (oid → obl → Prop).
 Definition obls_cond_rel `{OC : obl_class} (C : obl_cond) (R : obl → obl → Prop) : obls → obls → Prop :=
   λ Ω1 Ω2, map_Forall2 (λ k g1 g2, (C k g1 ∧ R g1 g2) ∨ ((¬ C k g1) ∧ g1 = g2)) Ω1 Ω2.
@@ -131,7 +134,7 @@ Definition obls_cond_step `{OC : obl_class} (C : obl_cond) : obls → obls → P
   obls_cond_rel C obl_step.
 Notation "A ↪ₛ B | C" := (obls_cond_step C A B) (at level 20, format "A  ↪ₛ  B  |  C").
 
-(* Strict progresses *)
+(* Strict progress: a conditional step that discharges no obligation. *)
 Definition obls_keep `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, map_Forall2 (λ k g1 g2, obl_keep g1 g2) Ω1 Ω2.
 
@@ -145,7 +148,7 @@ Definition obls_le `{OC : obl_class} : obls → obls → Prop :=
 Definition obls_nd `{OC : obl_class} : obls → obls → Prop :=
   λ Ω1 Ω2, (dom Ω1 ⊆ dom Ω2) ∧ (∀ k o1 o2, Ω1 !! k = Some o1 → Ω2 !! k = Some o2 → obl_nd o1 o2).
 
-(* Filter out live obligations. *)
+(* Keep only the live (assigned) obligations. *)
 Definition obl_filter_live `{OC : obl_class} : (oid * obl → Prop) :=
   λ x, match x.2 with | obl_assigned _ _ => True | _ => False end.
 Global Instance obl_filter_live_dec `{OC : obl_class} : ∀ (x : oid * obl), Decision (obl_filter_live x).
@@ -206,7 +209,7 @@ Section proofs.
     - rewrite <- IHrtc. eapply obls_cond_rel_dom; eauto.
   Qed.
 
-  (* If C1 and C2 are disjoint, can decompose *)
+  (* A [C1] step followed by a [C2] step, with disjoint conditions, is one [C] step. *)
   Lemma obls_cond_rel_split_cond C C1 C2 R Ω1 Ω2 Ω3 :
     (∀ k g, C k g ↔ (C1 k g ∨ C2 k g)) →
     (∀ k g, (¬ C1 k g) ∨ (¬ C2 k g)) →
@@ -245,7 +248,7 @@ Section proofs.
     obls_cond_rel C2 R Ω1 Ω2.
   Proof using. intros. eapply obls_cond_rel_iff_lookup; eauto. Qed.
 
-  (** For progress *)
+  (** [obl_keep] and [obls_keep] are equivalences. *)
   Global Instance obl_keep_reflexive : Reflexive obl_keep.
   Proof using.
     repeat intro. destruct x; simpl in *; subst; try done.
@@ -281,7 +284,7 @@ Section proofs.
   Global Instance obls_keep_equivalence : Equivalence obls_keep.
   Proof using. econstructor; apply _. Qed.
 
-  (** le relation *)
+  (** Properties of [obl_le] and [obls_le]. *)
   Global Instance obl_le_reflexive : Reflexive obl_le.
   Proof using.
     repeat intro. destruct x; try done. left. done.
@@ -348,7 +351,7 @@ Section proofs.
     - destruct H. inv H0. done.
   Qed.
 
-  (** nd relation *)
+  (** Properties of [obl_nd] and [obls_nd]. *)
   Global Instance obl_nd_reflexive : Reflexive obl_nd.
   Proof using.
     repeat intro. destruct x; try done. left. done.
@@ -420,7 +423,7 @@ Section proofs.
     intros. destruct H. split; auto. intros. apply obl_nd_obl_le; eauto.
   Qed.
 
-  (** Live obls *)
+  (** Properties of [obls_filter_live]. *)
   Lemma obls_filter_live_insert Ω k a o :
     obls_filter_live (<[k:=obl_assigned a o]>Ω) = <[k:=obl_assigned a o]>(obls_filter_live Ω).
   Proof using.

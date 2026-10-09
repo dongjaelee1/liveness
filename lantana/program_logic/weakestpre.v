@@ -1,14 +1,14 @@
 From iris.proofmode Require Import base proofmode classes.
 From lantana.program_logic Require Export language.
-(* FIXME: If we import iris.bi.weakestpre earlier texan triples do not
-   get pretty-printed correctly. *)
+(* [lantana.bi.weakestpre] (which exports [iris.bi.weakestpre]) is imported after
+   [iris.bi.fixpoint]: otherwise Texan triples are not pretty-printed correctly. *)
 From iris.bi Require Export fixpoint.
 From lantana.bi Require Export weakestpre.
 From iris.prelude Require Import options.
 From lantana.program_logic Require Export sfmupd model_physical_updates.
 Import uPred.
 
-(* TODO: move to somewhere else *)
+(** Currying for 5-tuples. *)
 Section curry5.
   Definition curry5 {A B C D E F : Type} (f : A * B * C * D * E → F) (a : A) (b : B) (c : C) (d : D) (e : E) : F :=
     f (a, b, c, d, e).
@@ -59,6 +59,9 @@ Definition temporalΣ `{SI : indexT} (Λ : language) : gFunctors :=
 Global Instance subG_temporalΣ `{SI : indexT} {Λ} {Σ} : subG (temporalΣ Λ) Σ → temporalGpreS Λ Σ.
 Proof. solve_inG. Qed.
 
+(** [lwpupd i E e P]: a model update (which can discharge obligations) for thread
+    [i], whose expression is [K e]. It can use and must restore the history and
+    state interpretations. *)
 Local Definition lwpupd_def `{SI : indexT} `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   i E e : iPropO Σ -d> iPropO Σ :=
   (λ P, ∀ K h n σ Θ κs,
@@ -109,7 +112,7 @@ Section lwpupd.
     iMod "H". iMod "close" as "_". iModIntro. auto.
   Qed.
 
-  (** Expression and context. *)
+  (** An update for [e] is also one for [K e]. *)
   Lemma lwpupd_ctx i E e K P :
     LanguageCtx K →
     (lwpupd i E e P) ⊢ lwpupd i E (K e) P.
@@ -206,7 +209,7 @@ Section lwpupd.
     iDestruct "H" as "[$ H]". auto.
   Qed.
 
-  (** Elim rule. *)
+  (** Eliminating [lwpupd] against the interpretations, as in the adequacy proofs. *)
   Lemma all_interp_lwpupd_steps (γ : thread_id → nat) i E e h n σ Θ κs g v Ω W (P : iProp Σ) :
     (Θ !! i = Some e) →
     (owit_inv_lb (fair_sched_fun γ) Ω W) →
@@ -266,10 +269,8 @@ Class lantanaGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
       (** Ghost states for temporal properties. *)
       #[global] lantana_temporalGS :: temporalGS Λ Σ;
 
-      (** The state (and history) interpretation is an invariant that should hold in
-          between each step of reduction.
-          Here [state] is the global state, [thread_ids] is the allocated thread ids,
-          and [list (observation Λ)] are the remaining observations. *)
+      (** The state interpretation, which holds between steps. It takes the
+          state, the thread pool, and the remaining observations. *)
       #[global] lantana_state_interp_class :: state_interp_class Λ Σ;
 
       (** A fixed postcondition for any forked-off thread. For most languages, e.g.
@@ -281,21 +282,26 @@ Class lantanaGS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
 Global Opaque lantana_temporalGS lantana_state_interp_class.
 Global Arguments LantanaG {SI Λ Σ}.
 
-(** Predicates we take the fixpoint of in order to define the lWP. *)
-(* Ω must make strict progress for every step (to bound step-index) *)
-(* W witnesses progress of obligations; it relies on the fair scheduler for soundness *)
+(** [lwp_step s i E e1 ν]: thread [i], whose expression is [K e1], takes a step.
+    Before the step, obligations can be updated but not discharged; if [s] is
+    [NotStuck], [e1] must be reducible. For every step to [e2] forking [efs], the
+    progress update ([@={n,Θ,i}=↓], [mprog]) makes the obligations of [i] in [Ω]
+    progress, which bounds the step index, and decreases the witnesses [W], which
+    is sound because of fair scheduling. The physical update ([mphys]) moves to the new
+    configuration. Then obligations can be discharged, later credits allocated
+    ([ALC]), and [ν e2 efs] must hold. *)
 Definition lwp_step `{SI : indexT} `{!lantanaGS Λ Σ}
   (s : stuckness) (i : thread_id) (E : coPset) (e1 : expr Λ)
   (ν : expr Λ -d> thread_pool Λ -d> iPropO Σ) : iPropO Σ :=
   (∀ K h n σ1 Θ κ κs,
      (⌜(LanguageCtx K)⌝) → (⌜(Θ !! i = Some (K e1))⌝) →
      (history_interp h n σ1 Θ (κ ++ κs) ∗ state_interp_aux σ1 Θ (κ ++ κs)) ={E,∅}=∗
-      (** ** No discharge allowed for pre-state *)
+      (* No discharge before the step. *)
       |=[n,dom Θ]=>g
       (⌜if s is NotStuck then reducible i e1 σ1 (dom Θ) else True⌝) ∗
       ∀ e2 σ2 (efs : thread_pool Λ), (⌜ prim_step i e1 σ1 (dom Θ) κ e2 σ2 efs ⌝) -∗
       @={n,(dom Θ),i}=↓ (@={n,(S n),(dom Θ),(dom (<[i:=K e2]>Θ) ∪ dom efs)}=>
-      (** ** Discharge allowed for post-state *)
+      (* Discharge allowed after the step. *)
       (ALC (|=[(S n),(dom (<[i:=K e2]>Θ) ∪ dom efs)]=>m |={∅,E}=>
               ((history_interp (h ++ [(σ2, ((<[i:=K e2]>Θ) ∪ efs), κs)]) (S n) σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
                state_interp_aux σ2 ((<[i:=K e2]>Θ) ∪ efs) κs) ∗
@@ -473,14 +479,8 @@ Section proofmode_classes.
       intuitionistically_if_elim lwpupd_frame_r wand_elim_r lwpupd_trans.
   Qed.
 
-  (* This instance makes iMod unstable. *)
-  (* Global Instance elim_lwpupd_lwpupd_ctx (p : bool) i E K e P Q : *)
-  (*   ElimModal (LanguageCtx K) p false (lwpupd i E e P) P (lwpupd i E (K e) Q) (lwpupd i E (K e) Q)%I. *)
-  (* Proof. *)
-  (*   rewrite /ElimModal bi.intuitionistically_if_elim //=. *)
-  (*   iIntros "%HK [HP HPQ]". iPoseProof (lwpupd_ctx _ _ _ K with "HP") as "HP". *)
-  (*   iMod "HP". by iApply "HPQ". *)
-  (* Qed. *)
+  (* [lwpupd_ctx] is not an [ElimModal] instance: such an instance makes [iMod]
+     unstable. *)
 
   Global Instance elim_modal_fupd_lwpupd_acc p i E1 E2 e P Q :
     ElimModal True p false
@@ -500,12 +500,15 @@ Section proofmode_classes.
 
 End proofmode_classes.
 
-(** Wrapper for the termination condition for soundness. *)
+(** [lift_term i Φ]: thread [i] has finished ([thP_done i]) and [Φ i] holds. The
+    adequacy proofs need [thP_done i] in the postcondition of every thread. *)
 Definition lift_term `{SI : indexT} `{!lantanaGS Λ Σ} (i :thread_id) (Φ : thread_id → val Λ → iProp Σ) : val Λ → iProp Σ :=
   λ v, (thP_done i ∗ Φ i v)%I.
 
-(* pre-definition of lwp of which we take a least fixpoint *)
-(* For soundness of Lantana, postcondition of a thread i must include othreadG_term i. *)
+(** The functor whose least fixpoint is [lwp]. A value satisfies the postcondition
+    after a ghost update. A non-value takes an [lwp_step], after which the thread
+    and every forked thread [j] satisfy [lwp] again (with postcondition
+    [lift_term j fork_post] for [j]). *)
 Definition lwp_pre `{SI : indexT} `{!lantanaGS Λ Σ} (s : stuckness)
   (lwp : thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ) :
   thread_id -d> coPset -d> expr Λ -d> (val Λ -d> iPropO Σ) -d> iPropO Σ :=
@@ -547,7 +550,7 @@ Proof.
     do 36 (f_equiv || done). by apply pair_ne.
 Qed.
 
-(* take the least fixpoint of the above definition; we can also just take fixpoint. *)
+(** [lwp] is the least fixpoint of [lwp_pre]. *)
 Definition lwp_fix `{SI : indexT} `{!lantanaGS Λ Σ} : stuckness -> thread_id -> coPset -> expr Λ -> (val Λ -> iProp Σ) -> iProp Σ :=
   λ s i E e Φ, ((bi_least_fixpoint (lwp_pre' s)) (i,E,e,Φ))%I.
 
@@ -771,21 +774,6 @@ Section lwp.
   Lemma lwp_sfgupd s i E e Φ :
     lWP e @ s; i; E {{ v, |={E}=>g Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}.
   Proof. iIntros "H". iApply (lwp_strong_mono_sfgupd s s i E with "H"); auto. Qed.
-
-  (* Not true unless atomic step. *)
-  (* Lemma lwp_sfmupd s i E e Φ : *)
-  (*   lWP e @ s; i; E {{ v, |={E}=>m Φ v }} ⊢ lWP e @ s; i; E {{ Φ }}. *)
-  (* Proof. iIntros "H". iApply (lwp_strong_mono_sfmupd s s i E with "H"); auto. Qed. *)
-  (* Lemma lwp_lwpupd s i E e Φ : *)
-  (*   lWP e @ s; i; E {{ v, ∀ e', lwpupd i E e' (Φ v) }} ⊢ lWP e @ s; i; E {{ Φ }}. *)
-  (* Proof. iIntros "H". iApply (lwp_strong_mono_lwpupd s s i E with "H"); auto. Qed. *)
-
-  (* Lemma sfmupd_lwp s i E e Φ : *)
-  (*   (|={E}=>m lWP e @ s; i; E {{ Φ }}) ⊢ lWP e @ s; i; E {{ Φ }}. *)
-  (* Proof. iIntros "H". iApply sfmupd_elim_lwp. done. Qed. *)
-  (* Lemma lwpupd_lwp s i E e Φ : *)
-  (*   (lwpupd i E e (lWP e @ s; i; E {{ Φ }})) ⊢ lWP e @ s; i; E {{ Φ }}. *)
-  (* Proof. iIntros "H". iApply lwpupd_elim_lwp. done. Qed. *)
 
   Lemma lwp_atomic_sfgupd s i E1 E2 e Φ `{!Atomic (stuckness_to_atomicity s) e} :
     (|={E1,E2}=>g lWP e @ s; i; E2 {{ v, |={E2,E1}=>g Φ v }})
@@ -1032,29 +1020,6 @@ Section lwp.
     iIntros (?) "H". iModIntro. iMod "H". by iFrame.
   Qed.
 
-  (** FIXME: does this hold when we have ∀ K in lwp? Just remove this if this is not used anywhere else. *)
-  (* Lemma lwp_bind_inv K `{!LanguageCtx K} s i E e Φ : *)
-  (*   lWP K e @ s; i; E {{ Φ }} ⊢ lWP e @ s; i; E {{ v, lWP K (of_val v) @ s; i; E {{ Φ }} }}. *)
-  (* Proof. *)
-  (*   iIntros "H". remember (K e) as e' eqn:He'. *)
-  (*   iRevert (e He'). iRevert (i e' E Φ) "H". iApply lwp_ind_strong; first solve_proper. *)
-  (*   iIntros "!#" (i e' E1 Φ) "IH". iIntros (e ->). *)
-  (*   rewrite !lwp_unfold {2}/lwp_pre. *)
-  (*   destruct (to_val e) as [v|] eqn:He. *)
-  (*   { apply of_to_val in He as <-. iModIntro. rewrite !lwp_unfold. *)
-  (*     iApply (lwp_pre_mono with "[] IH"). by iIntros "!#" (i' E e Φ') "[_ ?]". } *)
-  (*   rewrite /lwp_pre fill_not_val; [|done]. *)
-  (*   iIntros (K1 ?????? HK1 LU1) "SI". iMod ("IH" $! (K1 ∘ K) with "[] [//] SI") as "IH". *)
-  (*   iModIntro. iPoseProof "IH" as "(%& IH)". iSplitR. *)
-  (*   { destruct s; eauto using reducible_fill_inv. } *)
-  (*   iIntros (e2 σ2 efs Hstep). iDestruct ("IH" with "[]") as ">IH". *)
-  (*   { eauto using fill_step. } *)
-  (*   iMod "IH" as ">>IH". iModIntro. iMod "IH" as "(SI& IH& Efs)". *)
-  (*   iModIntro. iFrame. iSplitR "Efs". *)
-  (*   - iDestruct "IH" as "[IH _]". by iApply "IH". *)
-  (*   - iApply (big_sepM_impl with "Efs"). iIntros "!> %%% >[_ H]". done. *)
-  (* Qed. *)
-
   (** * Derived rules *)
   Lemma lwp_mono s i E e Φ Ψ : (∀ v, Φ v ⊢ Ψ v) → lWP e @ s; i; E {{ Φ }} ⊢ lWP e @ s; i; E {{ Ψ }}.
   Proof.
@@ -1209,14 +1174,6 @@ Section proofmode_classes.
     iIntros (_) "[P H]". iApply sfgupd_elim_lwp. iMod "P".
     iModIntro. by iApply ("H" with "P").
   Qed.
-
-  (* Global Instance elim_modal_lwpupd_lwp p s i E e P Φ : *)
-  (*   ElimModal True p false (lwpupd i E e P) P (lWP e @ s; i; E {{ Φ }}) (lWP e @ s; i; E {{ Φ }}). *)
-  (* Proof. *)
-  (*   rewrite /ElimModal intuitionistically_if_elim. *)
-  (*   iIntros (_) "[P H]". iApply lwpupd_elim_lwp. iMod "P". *)
-  (*   iModIntro. by iApply ("H" with "P"). *)
-  (* Qed. *)
 
   (** Error message instance for non-mask-changing view shifts.
   Also uses a slightly different error: we cannot apply [fupd_mask_subseteq]

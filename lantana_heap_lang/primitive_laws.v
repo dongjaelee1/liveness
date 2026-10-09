@@ -1,13 +1,16 @@
-(** This file proves the basic laws of the HeapLang program logic by applying
-the Iris lifting lemmas. *)
+(** The basic laws of the HeapLang program logic, proved from the lifting
+lemmas of [lantana.program_logic]. Adapted from Iris's
+[heap_lang/primitive_laws.v]. Besides the heap, the state interpretation tracks
+the thread pool: [thread_expr i C e] owns the expression of thread [i], and each
+rule takes and returns this token. The step rules also take the thread's
+carriers and their fuel, and return later credits and witness credits. *)
 
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From transfinite.base_logic.lib Require Import mono_nat.
 From transfinite.base_logic.lib Require Export gen_heap proph_map.
-(* From transfinite.base_logic.lib Require Export gen_heap proph_map gen_inv_heap. *)
 From lantana.base_logic Require Export thread_map gen_inv_heap.
-(** adequacy fixes step index to ordinals *)
+(** Importing [adequacy] fixes the step-index type to ordinals. *)
 From lantana.program_logic Require Export atomic adequacy.
 From lantana.program_logic Require Import ectx_lifting.
 From lantana.heap_lang Require Export class_instances.
@@ -66,13 +69,15 @@ Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%F
 Notation "l ↦ dq v" := (➢ (pred_pointsto l dq v))%P
                          (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : tp_scope.
 
-(** Exact ownership of a thread's expression in its caller context. *)
+(** The thread-expression token: [thread_expr i C e] is full ownership of the
+expression of thread [i], which is [e] in the evaluation context [C]. *)
 Definition thread_expr `{heap_stateGS Σ}
     (i : thread_id) (C : list ectx_item) (e : expr) : iProp Σ :=
   thread i true (fill C e) 1.
 
-(** Thread [i] has reached final value [v] at the empty context, not merely
-    returned from a function within a larger thread expression. *)
+(** [exits v@i]: the whole expression of thread [i] is the value [v] (the
+context is empty), so the thread has finished, not merely returned from a
+function call. *)
 Notation "'exits' v @ i" := (thread_expr i [] (of_val v))%I
   (at level 20, v, i at level 1, format "exits  v @ i") : bi_scope.
 Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%F
@@ -80,9 +85,9 @@ Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%F
 Notation "'exits' v @ i" := (➢ (pred_expr i [] (of_val v)))%P
   (at level 20, v, i at level 1, format "exits  v @ i") : tp_scope.
 
-(** The terminal atom means actual value reachability, with no hidden context.
-    This equivalence is purely semantic; clients establish its left-hand side
-    with [lwp_adequacy], under its premises that the trace is a fair behavior. *)
+(** A trace satisfies [tp_finally (exits v@i)] iff thread [i] eventually is the
+value [v]. Clients obtain the left-hand side from [lwp_adequacy], for fair
+traces. *)
 Lemma exits_finally_iff (τ : trace heap_lang) i v :
   tp_trace (tp_finally (exits v@i))%P τ ↔
   ∃ n, τ.1 ≤ n ∧ (τ.2 n).1.1.1 !! i = Some (of_val v).
@@ -107,7 +112,7 @@ Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_
 Definition state_interp_aux `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   True%I.
 
-(** State predicate. *)
+(** The resources that interpret the atomic state predicates. *)
 Definition state_pred_interp `{!heap_stateGS Σ} (π : state_pred) : iProp Σ :=
   match π with
   | pred_pointsto l dq v =>
@@ -137,59 +142,11 @@ Qed.
 Definition heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ :=
   Build_state_interp_class _ _ _ state_interp state_interp_aux state_pred_interp state_interp_wf.
 
-(* Global Instance heap_state_interp_class `{!heap_stateGS Σ} : state_interp_class heap_lang Σ := { *)
-(*     state_interp := state_interp; *)
-(*     state_interp_aux := state_interp_aux; *)
-(*     state_pred_interp := state_pred_interp; *)
-(*     state_interp_wf := state_interp_wf; *)
-(*   }. *)
-
 Class heapGS Σ :=
   HeapGS {
       heapGS_temporalGS : temporalGS heap_lang Σ;
-      (* heapGS_mupdGS : mupdGS Σ; *)
-      (* heapGS_histGS : histGS.histGS Σ (state * thread_pool heap_lang * list (observation)); *)
       #[global] heapGS_heap_stateGS :: heap_stateGS Σ;
     }.
-
-(* Definition heapΣ : gFunctors := *)
-(*   #[mupdΣ; *)
-(*     histGS.histΣ (state * thread_pool heap_lang * list (observation)); *)
-(*     heap_stateΣ]. *)
-
-(* Global Instance subG_heapΣ {Σ} : subG heapΣ Σ → heapGS Σ. *)
-(* Proof. *)
-(*   intros. econstructor. *)
-(*   - apply subG_inv in H. destruct H. apply subG_inv in s. destruct s. apply subG_inv in s. destruct s. *)
-(*     econstructor. *)
-(*     + econstructor. *)
-(*       * econstructor. *)
-(*         { eapply subG_wsatΣ. auto. } *)
-(*         all: exact inhabitant. *)
-(*       * econstructor. *)
-(*         { eapply subG_auth_rupdΣ. auto. } *)
-(*         all: exact inhabitant. *)
-(*     + econstructor. *)
-(*       { eapply osatGS.subG_osatΣ. solve_inG. } *)
-(*       all: exact inhabitant. *)
-(*     + econstructor. *)
-(*       { eapply othreadGS.subG_othreadΣ. solve_inG. } *)
-(*       all: exact inhabitant. *)
-(*     + econstructor. *)
-(*       { eapply owitGS.subG_owitΣ. solve_inG. } *)
-(*       all: exact inhabitant. *)
-(*     + econstructor. *)
-(*       { eapply mhistGS.subG_mhistΣ. solve_inG. } *)
-(*       all: exact inhabitant. *)
-(*   - econstructor. *)
-(*     { eapply histGS.subG_histΣ. solve_inG. } *)
-(*     all: exact inhabitant. *)
-(*   - apply subG_heap_stateΣ. solve_inG. *)
-(* Qed. *)
-
-(* (** We don't want this to be an instance, which can break iMod. *) *)
-(* Definition heapGS_temporalGS `{!heapGS Σ} : temporalGS heap_lang Σ := *)
-(*   TemporalG heapGS_mupdGS heapGS_histGS. *)
 
 Global Instance heapGS_lantanaGS `{!heapGS Σ} : lantanaGS heap_lang Σ := {
     lantana_temporalGS := heapGS_temporalGS;
@@ -197,9 +154,9 @@ Global Instance heapGS_lantanaGS `{!heapGS Σ} : lantanaGS heap_lang Σ := {
     fork_post i v := (True)%I;
   }.
 
-(** [gen_inv_heap]: Similar to pointsto,
-except that these are higher-order notations so to
-make setoid rewriting in the predicate [I] work we need actual definitions here. *)
+(** As for [pointsto], we wrap the connectives of [gen_inv_heap]. They are
+definitions, not notations, so that setoid rewriting in the predicate [I]
+works. *)
 Section definitions.
   Context `{!heapGS Σ}.
   Definition inv_pointsto_own (l : loc) (v : val) (I : val → Prop) : iProp Σ :=
@@ -216,8 +173,6 @@ Notation "l '↦_' I □" := (inv_pointsto l I%stdpp%type)
   (at level 20, I at level 9, format "l  '↦_' I  '□'") : bi_scope.
 Notation "l ↦_ I v" := (inv_pointsto_own l v I%stdpp%type)
                          (at level 20, I at level 9, format "l  ↦_ I  v") : bi_scope.
-
-(* TODO: define tf representations for inv_heap *)
 
 Section lifting.
 Context `{!heapGS Σ}.
@@ -259,7 +214,7 @@ Proof.
   rewrite dom_insert_lookup_L; last eauto. by iFrame.
 Qed.
 
-(** Pure steps transport the client's single expression fragment. *)
+(** Pure steps update the [thread_expr] token together with the thread pool. *)
 Global Instance thread_expr_pure_exec_si C i :
   PureExecSI (λ i e, thread_expr i C e) i.
 Proof.
@@ -278,7 +233,7 @@ Proof.
   iIntros "H". iApply H0. iApply (H with "[] H"). iApply IHn.
 Qed.
 
-(** pure steps *)
+(** Pure steps and [Fork] *)
 Lemma lwp_pure_step n o s i E E' e1 e2 φ Φ {C} :
   PureExec φ n e1 e2 →
   φ →
@@ -581,8 +536,8 @@ Proof.
   iIntros "!>". iExists (v). iFrame "%∗".
 Qed.
 
-(** The usable rules for [allocN] stated in terms of the [array] proposition
-are derived in te file [array]. *)
+(** The rules for [allocN] stated with the [array] connective are in
+[derived_laws]. *)
 Lemma heap_array_to_seq_meta l vs (n : nat) :
   length vs = n →
   ([∗ map] l' ↦ _ ∈ heap_array l vs, meta_token l' ⊤) -∗
@@ -904,56 +859,8 @@ Proof.
       apply to_val_fill_some in Hfillvt as [-> ->]. inv_base_step.
 Qed.
 
-(** FIXME: ectxi does not allow empty context, which seems necessary to compose with ResolveLCtx.
-           Can we prove this without changing this constraint? *)
-(* Lemma lwp_resolve s i E e Φ (p : proph_id) v (pvs : list (val * val)) : *)
-(*   Atomic StronglyAtomic e → *)
-(*   to_val e = None → *)
-(*   proph p pvs -∗ *)
-(*   (* (lwp_fix s i E e (λ r, ∀ pvs', ⌜pvs = (r, v)::pvs'⌝ -∗ proph p pvs' -∗ Φ r)) -∗ *) *)
-(*   lWP e @ s; i; E {{ Φ }} -∗ *)
-(*   lWP Resolve e (Val $ LitV $ LitProphecy p) (Val v) @ s; i; E {{ Φ }}. *)
-(* Proof. *)
-(*   (* TODO we should try to use a generic lifting lemma (and avoid [lwp_unfold]) *) *)
-(* (*      here, since this breaks the lWP abstraction. *) *)
-(*   iIntros (A He0) "Hp lWPe". assert (He : to_val (fill_item K e) = None). *)
-(*   { destruct (to_val (fill_item K e)) eqn:CASE; auto. assert (is_Some (to_val (fill_item K e))) by eauto. *)
-(*     apply fill_item_val in H. rewrite He0 in H. done. } *)
-(*   rewrite !lwp_unfold /lwp_pre /= He0. *)
-(*   replace (Resolve (fill_item K e) #p v) with (fill_item (ResolveLCtx K #p v) e); cycle 1. *)
-(*   { done. } *)
-(*   iPoseProof (lwpupd_ctx with "lWPe") as "lWPe". iMod "lWPe". *)
-(*   iModIntro. *)
-(*   iIntros (K' h n σ1 Θ κ κs HK' HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia]". *)
-(*   destruct κ as [|[p' [w' v']] κ' _] using rev_ind. *)
-(*   - iMod ("lWPe" $! (λ e', K' (fill_item (ResolveLCtx K #p v) e')) with "[] [] [$Ha $Hs $Ht $Hk $Ia]") as "lWPe". *)
-(*     { iPureIntro. simpl. eapply language_ctx_compose; eauto. *)
-(*       replace (λ e', Resolve (fill_item K e') #p v) with (fill_item (ResolveLCtx K #p v)); cycle 1. *)
-(*       { done. } *)
-(*       apply _. } *)
-(*     { iPureIntro. simpl in *. apply HT. } *)
-(*     { eauto. } *)
-(*     iModIntro. iDestruct "lWPe" as "(%Hs& lWPe)". iSplit. *)
-(*     { iPureIntro. destruct s; last auto. apply reducible_fill. auto. } *)
-(*     iIntros (e2 σ2 efs step). exfalso. simpl in step. apply step_resolve in step; cycle 1. *)
-(*     { unfold Atomic. simpl. intros. inv H. simpl in *. eapply base_ctx_step_val. eapply H2. *)
-(*     last done. *)
-(*     inv_base_step. match goal with H: ?κs ++ [_] = [] |- _ => by destruct κs end. *)
-(*   - iSpecialize ("lWPe" with "T"). *)
-(*     rewrite -assoc. *)
-(*     iMod ("lWPe" $! Θ σ1 _ _ with "[$Ht $Hσ $Hκ]") as "H". *)
-(*     iModIntro. iMod "H" as "(%Hs& lWPe)". *)
-(*     iModIntro. iSplit. *)
-(*     { iPureIntro. destruct s; [ by apply resolve_reducible | done]. } *)
-(*     iIntros (e2 σ2 efs step). apply step_resolve in step; last done. *)
-(*     inv_base_step; simplify_list_eq. *)
-(*     iMod ("lWPe" $! (Val w') σ2 efs with "[%]") as ">lWPe". *)
-(*     { by eexists [] _ _. } *)
-(*     iMod "lWPe" as ">(($& $& Hκ)& lWPe& Efs)". *)
-(*     iMod (proph_map_resolve_proph p' (w',v') κs with "[$Hκ $Hp]") as (vs' ->) "[$ HPost]". *)
-(*     iModIntro. iFrame. *)
-(*     rewrite !lwp_unfold /lwp_pre /=. *)
-(*     iApply ("lWPe" with "[] HPost"). eauto. *)
-(* Qed. *)
+(** There is no rule for [Resolve] (Iris's [wp_resolve]). A proof here would
+compose the context with [ResolveLCtx], which needs an empty context, and
+[ectxi_language] does not allow one. *)
 
 End lifting.

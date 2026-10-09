@@ -1,43 +1,16 @@
-(** This file declares notation for logically atomic Hoare triples, and some
-generic lemmas about them. To enable the definition of a shared theory applying
-to triples with any number of binders, the triples themselves are defined via telescopes, but as a user
-you need not be concerned with that. You can just use the following notation:
+(** Logically atomic triples for [lwp]. Adapted from Iris's
+[iris/program_logic/atomic.v]. The notation is
 
   <<{ ∀∀ x, atomic_precondition }>>
-    code @ E
-  <<{ ∃∃ y, atomic_postcondition | z, RET return_value; private_postcondition }>>
+    e @ i; E
+  <<{ ∃∃ y, atomic_postcondition | z, RET v; private_postcondition }>>
 
-Here, [x] (which can be any number of binders, including 0) is bound in all of
-the atomic pre- and postcondition and the private (non-atomic) postcondition and
-the return value, [y] (which can be any number of binders, including 0) is bound
-in both postconditions and the return value, and [z] (which can be any number of
-binders, including 0) is bound in the return value and the private
-postcondition.
-
-Note that atomic triples are *not* implicitly persistent, unlike Texan triples.
-If you need a private (non-atomic) precondition, you can use a magic wand:
-
-  private_precondition -∗
-  <<{ ∀∀ x, atomic_precondition }>>
-    code @ E
-  <<{ ∃∃ y, atomic_postcondition
-    | z, RET return_value; private_postcondition }>>
-
-If you don't need a private postcondition, you can leave it away, e.g.:
-
-  <<{ ∀∀ x, atomic_precondition }>>
-    code @ E
-  <<{ ∃∃ y, atomic_postcondition | RET return_value }>>
-
-Note that due to combinatorial explosion and because Coq does not have a
-facility to declare such notation in a compositional way, not *all* variants of
-this notation exist: if you have binders before the [RET] (which is very
-uncommon), you must have a private postcondition (it can be [True]), and you
-must have [∀∀] and [∃∃] binders (they can be [_: ()]).
-
-For an example for how to prove and use logically atomic specifications, see
-[iris_heap_lang/lib/increment.v].
-
+where [i] is the thread and [E] the implementation mask. [x] is bound in the rest
+of the triple, [y] in both postconditions and [v], and [z] in [v] and the private
+postcondition; each can be any number of binders, including none. Unlike Texan
+triples, atomic triples are not persistent. A private precondition is written as
+a wand in front of the triple. The private postcondition can be left out (with
+[| RET v]); with [z] binders it must be present.
 *)
 
 From stdpp Require Import namespaces.
@@ -69,7 +42,7 @@ Definition atomic_lwp `{SI : indexT} `{!lantanaGS Λ Σ} {TA TB TP : tele}
             atomic_update (⊤∖E) ∅ α β (λ.. x y, ∀.. z, POST x y z -∗? Φ (f x y z)) -∗
             lWP e @ i {{ Φ }}.
 
-(** We avoid '<<{'/'}>>' since those can also reasonably be infix operators
+(** We avoid '<<'/'>>' since those can also reasonably be infix operators
 (and in fact Autosubst uses the latter). *)
 Notation "'<<{' ∀∀ x1 .. xn , α '}>>' e @ i ; E '<<{' ∃∃ y1 .. yn , β '|' z1 .. zn , 'RET' v ; POST '}>>'" :=
 (* The way to read the [tele_app foo] here is that they convert the n-ary
@@ -275,11 +248,11 @@ Section lemmas.
     iIntros "Hwp" (Φ x) "Hα HΦ".
     iApply (lwp_frame_wand with "HΦ"). iApply "Hwp".
     iAuIntro. iAaccIntro with "Hα"; first by eauto. iIntros (y) "Hβ !>".
-    (* FIXME: Using ssreflect rewrite does not work, see Coq bug #7773. *)
+    (* [rewrite ->], since ssreflect [rewrite] fails here (Coq bug #7773). *)
     rewrite ->!tele_app_bind. iIntros (z) "Hpost HΦ". iApply ("HΦ" with "Hβ Hpost").
   Qed.
 
-  (* Sequential (fix) triples with the empty mask for a physically atomic [e] are atomic. *)
+  (* Sequential triples with the empty mask for a physically atomic [e] are atomic. *)
   Lemma atomic_seq_lwp_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} :
     (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ (lwp NotStuck i ∅ e Φ)) -∗
     atomic_lwp i e E α β POST f.
@@ -289,16 +262,6 @@ Section lemmas.
     iMod ("Hclose" with "Hβ") as "HΦ".
     rewrite ->!tele_app_bind. iApply "HΦ". done.
   Qed.
-
-  (* Lemma atomic_seq_wp_atomic i e E α β POST f `{!Atomic WeaklyAtomic e} : *)
-  (*   (∀ Φ, ∀.. x, α x -∗ (∀.. y, β x y -∗ ∀.. z, POST x y z -∗? Φ (f x y z)) -∗ lWP e @ i; ∅ {{ Φ }}) -∗ *)
-  (*   atomic_lwp i e E α β POST f. *)
-  (* Proof. *)
-  (*   iIntros "Hwp" (Φ) "AU". iMod "AU" as (x) "[Hα [_ Hclose]]". *)
-  (*   iApply ("Hwp" with "Hα"). iIntros "%y Hβ %z Hpost". *)
-  (*   iMod ("Hclose" with "Hβ") as "HΦ". *)
-  (*   rewrite ->!tele_app_bind. iApply "HΦ". done. *)
-  (* Qed. *)
 
   (** Sequential triples with a persistent precondition and no initial quantifier
   are atomic. *)
@@ -312,7 +275,7 @@ Section lemmas.
     iMod ("HΦ") as "[#Hα [Hclose _]]". iMod ("Hclose" with "Hα") as "HΦ".
     iApply lwp_fupd. iApply ("Hwp" with "Hα"). iIntros "!> %y Hβ %z Hpost".
     iMod ("HΦ") as "[_ [_ Hclose]]". iMod ("Hclose" with "Hβ") as "HΦ".
-    (* FIXME: Using ssreflect rewrite does not work, see Coq bug #7773. *)
+    (* [rewrite ->], since ssreflect [rewrite] fails here (Coq bug #7773). *)
     rewrite ->!tele_app_bind. iApply "HΦ". done.
   Qed.
 

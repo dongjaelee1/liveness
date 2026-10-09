@@ -46,26 +46,32 @@ Section proof.
   Remark N_subseteq_1 : ↑Np ⊆ (⊤ : coPset) ∖ ↑Na.
   Proof. pose proof N_disj_1. set_solver. Qed.
 
+  (** The flag's invariant: [l] holds 0 until it holds 1 (one half of the until; the other half
+      is [flag_tk]), or the obligation [k] is discharged and [l] holds 1. *)
   Definition flag_inv_tf (l : loc) k : tf Σ :=
     ((untilP Np k (1/2) (l ↦ #0) (l ↦ #1)) ∨ (⟨oblP_discharged k⟩ ∗ (l ↦ #1))).
 
+  (** [is_flag] as a temporal formula. *)
   Definition is_flag_tf (l : loc) k ℓ : tf Σ :=
     ⟨witP_layer k ℓ⟩ ∗ alwaysP Na (flag_inv_tf l k).
 
+  (** The paper's isFlag x ℓ k (here [is_flag l k ℓ]): a witness for the obligation [k] at layer
+      [ℓ], and the invariant. *)
   Definition is_flag (l : loc) k ℓ : iProp Σ :=
     (witP_layer k ℓ) ∗ ⟦alwaysP Na (flag_inv_tf l k)⟧ₗ.
 
+  (** The paper's FlagObl: the other half of the until, which [Flag.set] consumes. *)
   Definition flag_tk (l : loc) k : iProp Σ :=
     ⟦untilP Np k (1/2) (l ↦ #0) (l ↦ #1)⟧ₗ.
 
-  (** The main proofs. *)
   Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).
   Proof. rewrite /is_flag. tf_red. apply _. Qed.
 
   Lemma is_flag_tf_red l k ℓ : ⟦is_flag_tf l k ℓ⟧ₗ = is_flag l k ℓ.
   Proof. rewrite /is_flag /is_flag_tf. tf_red. auto. Qed.
 
-  (** until-alloc-flag version **)
+  (** Allocate a flag at [l]: a new obligation [k] on the carrier [g], whose until is split
+      between [flag_tk] and the invariant of [is_flag]. *)
   Lemma is_flag_init E l g K ℓ ℓg μ :
     (ℓg <= ℓ)%ordi →
     l ↦ #0 -∗
@@ -172,12 +178,9 @@ Section proof.
     iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.wait.
     iPoseProof (crP_fuel_add_set with "GF") as "[W_GF GF]".
-    (* Liveness induction *)
-    (* iPoseProof (wit_fuels_init with "Wlk") as "(%& Wf0)". *)
-    (* iMod (wit_fuels_add_map with "Wf0 W_GF") as "Wf". *)
-    (* { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. } *)
-    (* iClear "Wf0". *)
-    (* iInduction α as [α IH] using WFOCM.ind. *)
+    (* Induction on the witness [Wlk] ([wit_layer_ind]): each iteration that reads 0 gets a
+       witness credit for [k], which the induction hypothesis turns into fuel for the next
+       iteration. *)
     iRevert "TE TG HΦ GF". iPoseProof (wit_layer_ind with "[$Wlk $W_GF]") as ">H".
     { apply hessenberg.add_lt_l. rewrite -ord.from_nat_O. apply ordArith.lt_from_nat. lia. }
     2:{ iApply "H". }
@@ -187,7 +190,7 @@ Section proof.
     lwp_bind (Load _).
     iModIntro.
     iInv "HA" as "inv". iDestruct "inv" as "[inv | inv]".
-    - (* Induction case. *)
+    - (* The until still holds: the load reads 0 and the loop repeats. *)
       iPoseProof (tlc_split_one with "LC") as "[LC LC1]". 1: eauto.
       iApply (lwp_lc_later with "LC1"). iNext.
       iMod (tf_until_acc with "inv") as "inv".
@@ -209,18 +212,11 @@ Section proof.
       iModIntro. iModIntro. iSplitL "inv".
       { iFrame. }
       iModIntro; lwp_pure_one.
-      (* rewrite bool_decide_false; cycle 1. *)
-      (* { intro F. simplify_eq /=. } *)
       iModIntro; lwp_pure_one.
       iModIntro; lwp_pure_one.
-      (* rewrite bool_decide_true; cycle 1. *)
-      (* iModIntro; lwp_pure_one. *)
       iModIntro.
       iMod ("IH" with "Wck") as "[GF' IH]". iApply ("IH" with "TE TG HΦ GF'").
-      (* iMod (wit_fuels_decr with "Wf Wck") as "(%& %LTα& Wf'& Fkl')". *)
-      (* iApply ("IH" $! α0 LTα with "TG HΦ [Fkl'] Wf'"). *)
-      (* rewrite map_union_empty. iPoseProof (big_sepM_gset_to_gmap with "Fkl'") as "H". iFrame. *)
-    - (* k is discharged. *)
+    - (* [k] is discharged: the load reads 1 and the loop exits. *)
       iDestruct "inv" as ">(#Odk& Ptrl)".
       iEval (rewrite tf_atomic_logic) in "Ptrl".
       iPoseProof (crP_fuels_add 1 with "GF") as "[GF1 GF]".
@@ -280,11 +276,12 @@ End proof.
 
 Section trace.
 
-  (** Export to trace properties *)
+  (** The flag's invariant as a trace property. *)
   Definition is_flag_tp (l : loc) : tp :=
     (tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (l ↦ #1))))%P.
 
-  (** TODO: weaken the strict equality to semantics equivalence/implication. *)
+  (** The translation of [is_flag_tf] by [tf_to_tp] ([is_flag_tf_to_tp']). It implies
+      [is_flag_tp] ([is_flag_tp_impl]). *)
   Definition is_flag_tp' (l : loc) : tp :=
     (tp_true ∧ tp_always (((tp_until (l ↦ #0) (l ↦ #1)) ∨ (tp_true ∧ (l ↦ #1)))))%P.
 

@@ -1,7 +1,6 @@
 From iris.bi Require Import lib.fractional.
 From iris.algebra Require Import gmap mono_nat.
 From iris.proofmode Require Import proofmode.
-(* From transfinite.base_logic Require Import lib.ghost_map. *)
 From lantana.base_logic Require Export invariants.
 From lantana.program_logic Require Export temporal_logic.
 From lantana.heap_lang Require Export lang.
@@ -69,10 +68,7 @@ Tactic Notation "lwp_pure_no_lc" open_constr(efoc) :=
                                [tc_solve                       (* PureExec *)
                                |try solve_vals_compare_safe    (* The pure condition for PureExec --
          handles trivial goals, including [vals_compare_safe] *)
-                               (* |tc_solve                       (* IntoLaters *) *)
                                |idtac (* new goal *)
-                                  (* |idtac "use lwp_finish to cleanup new lwp"    (* new goal *) *)
-                                  (* |lwp_finish                      (* new goal *) *)
                             ])
         || fail "lwp_pure: cannot find" efoc "in" e "or" efoc "is not a redex"
   | _ => fail "lwp_pure: not a 'lwp'"
@@ -101,12 +97,12 @@ Tactic Notation "lwp_inj_no_lc" := lwp_pure_no_lc (InjL _) || lwp_pure_no_lc (In
 Tactic Notation "lwp_pair_no_lc" := lwp_pure_no_lc (Pair _ _).
 Tactic Notation "lwp_closure_no_lc" := lwp_pure_no_lc (Rec _ _ _).
 
-(** The program. *)
+(** Both threads run [loop], which never terminates. *)
 Definition loop : val := 
   rec: "loop" <> :=
     "loop" #().
 
-(** The CMRA we need. *)
+(** Ghost state: a map of monotone counters, and a map from counter values to obligations. *)
 Class mcntsG Σ :=
   MCounterG {
       #[local] mcnts_inG :: inG Σ (gmapUR positive mono_natUR);
@@ -122,6 +118,8 @@ Proof. solve_inG. Qed.
 Section proof.
   Context `{!heapGS Σ, !mcntsG Σ} `{@lantanaGS_no_lc _ _ Σ _}.
 
+  (** Monotone counters indexed by [i]: [cnt_auth] owns (a fraction of) the value, [cnt_lb] is a
+      lower bound. *)
   Definition cnt_auth (γ : gname) (i : positive) n (q : Qp) : iProp Σ :=
     own γ ({[i := ●MN{#q} n]}).
   Definition cnt_lb (γ : gname) (i : positive) n : iProp Σ :=
@@ -207,6 +205,9 @@ Section proof.
   Let Nu := nroot .@ "paradox_until".
   Let N1 := nroot .@ "paradox_false".
 
+  (** The invariant shared by the two loops. The map [os] sends each value [a] of [j]'s counter
+      to an obligation [k] of [j], which [j] discharges when its counter reaches [a + 1]. Each
+      entry also holds [£ 10] for thread [i], until [i]'s counter reaches [a]. *)
   Definition px_inv_tf r rm i j : tf Σ :=
     (∃ n (os : gmap nat oid),
         ⟨cnt_auth r j n (1/2)%Qp ∗
@@ -247,11 +248,12 @@ Section proof.
     rewrite /px_tf /px. tf_red. f_equiv. apply px_inv_red.
   Qed.
 
-  (** The main proofs. *)
   Global Instance px_persistent r i j k : Persistent (px r i j k).
   Proof. rewrite /px. apply _. Qed.
 
-  (** Receives later credits via px_inv *)
+  (** Thread [i] holds an obligation [z] that it can never discharge (its until ends with
+      [False]), and loops with the fuel-free rule. Each iteration witnesses [j]'s current
+      obligation [ck], and the later credits it needs come from [px_inv]. *)
   Lemma px_loop1_spec :
     ⊢ ∀ i g z r rm ci cj C,
     l{{{ thread_expr i C (loop #()) ∗ thP_carriers i ({[g]}) ∗
@@ -267,31 +269,30 @@ Section proof.
   Proof using Type*.
     iIntros (i g z r rm ci cj C).
     iIntros (Φ) "!> (TE& TG& Gg& TUz& LC& #Ipx& %& Cai& #Cljn& %& #Wckn& #Mn) HΦ".
-    (** Lob induction *)
+    (* Löb induction over the counter value [n]. *)
     iRevert (n ck) "Cljn Wckn Mn Cai". iLöb as "IH".
     iIntros (n ck) "#Cljn #Wckn #Mn Cai".
-    (** Witness induction *)
+    (* Induction on the witness budget [α] of [ck]. *)
     iPoseProof (wit_fuels_init with "Wckn") as "(%& Wfs)".
     iRevert "Wfs".
     iInduction α as [α IHα] using (well_founded_induction Ord.lt_well_founded).
     iIntros "Wfs".
     iEval (rewrite /loop).
-    (* This particular step returns to exactly the same expression, so TE
-       stays unchanged. The conditional fuel-free rule above is not extended
-       with a new generic expression-transport assumption. *)
+    (* The fuel-free rule does not update [thread_expr]. This is fine here: the step returns to
+       the same expression, so [TE] stays valid. *)
     lwp_lam_no_lc. simpl. iExists ⊤, ({[ck]}). iSplitR.
     { rewrite big_sepS_singleton. auto. }
     iIntros "!> Wcs !> !>".
     iEval (rewrite -/loop).
     iEval (rewrite big_sepS_singleton) in "Wcs". iDestruct "Wcs" as "[Wc | #Gdckn]".
-    - (** Witness induction *)
+    - (* A witness credit for [ck]: decrease [α]. *)
       iMod (wit_fuels_decr with "Wfs Wc") as "(%& %LTw& #Wfs'& _)".
       iPoseProof ("IHα" $! _ LTw with "TE TG Gg TUz LC HΦ Cai Wfs'") as "LWP".
       eauto.
-    - (** Counter is at least n; fetch next count and use Löb induction *)
+    - (* [ck] is discharged, so [j]'s counter has reached [n + 1]: take the next entry and its
+         credits, and use the Löb hypothesis. *)
       iApply lwpupd_fupd_l. iInv "Ipx" as "H".
       iPoseProof (tlc_split_nat 9 1 with "LC") as "[LC LCw]".
-      (** TODO: make interface defs and lemmas for tlc *)
       iApply (lc_fupd_add_later with "LCw"). iNext.
       iDestruct "H" as "(%& %& (Ca& GMA)& HM)".
       iPoseProof (ghost_map_lookup with "GMA Mn") as "%LU".
@@ -315,6 +316,9 @@ Section proof.
       iIntros "!> !>". iApply ("IH" with "TE TG Gg TUz LC1 HΦ Cljn1 Wckn1 Mn1 Cai").
   Qed.
 
+  (** Thread [j] loops with ordinary fuel-burning steps. Each iteration discharges its
+      obligation [ck], increments its counter, and moves to a fresh carrier and obligation for
+      the next value, leaving [£ 10] in [px_inv] for thread [i]. *)
   Lemma px_loop2_spec :
     ⊢ ∀ j n r rm ci cj ck C,
     l{{{ thread_expr j C (loop #()) ∗ ∃ g, thP_carriers j {[g]} ∗
@@ -327,7 +331,7 @@ Section proof.
     l{{{ RET #(); thread_expr j C #() ∗ lift_term j fork_post #() }}}.
   Proof using Type*.
     iIntros (j n r rm ci cj ck C) "!> %Φ (TE& %& TG& Gg& Uck& Gf& #Ipx& Caj& #Mn) HΦ".
-    (** Lob induction *)
+    (* Löb induction over the counter value [n]. *)
     iRevert (n g ck) "TG Gg Uck Gf Caj Mn". iLöb as "IH".
     iIntros (n g ck) "TG Gg Uck Gf Caj #Mn".
     iEval (rewrite /loop).
@@ -337,12 +341,10 @@ Section proof.
     iFrame "TG GF". iExists ∅, 100. iSplitR; first eauto. iIntros "TG GF _ LC TE".
     iEval (rewrite -/loop).
     iPoseProof (tlc_split_nat 90 10 with "LC") as "[LC LC']".
-    (** TODO: better interface for sfmupd-fupd access patterns *)
     iApply (sfmupd_lwpupd_elim).
     iApply (sfmupd_fupd_acc _ ∅).
     iMod (inv_acc with "Ipx") as "[H IpxACC]". 1: set_solver.
     iPoseProof (tlc_split_nat 89 1 with "LC") as "[LC LC1]".
-    (** TODO: make interface defs and lemmas for tlc *)
     iApply (lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(%& %& (Ca& GMA)& HM)".
     iAssert (⌜ os !! (n + 1)%nat = None ⌝)%I as "%Nin".
@@ -371,7 +373,6 @@ Section proof.
     { subst N Nu. apply ndot_ne_disjoint. done. }
     iMod (tf_until_discharge with "Uck") as "H". 1: set_solver.
     iPoseProof (tlc_split_nat 88 1 with "LC") as "[LC LC1]".
-    (** TODO: make interface defs and lemmas for tlc *)
     iApply (lc_fupd_add_later with "LC1"). iNext.
     iDestruct "H" as "(_& H)".
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
@@ -381,7 +382,6 @@ Section proof.
     iPoseProof ("H" with "[] Gg") as "H".
     { iPureIntro. set_solver. }
     iPoseProof (tlc_split_nat 87 1 with "LC") as "[LC LC1]".
-    (** TODO: make interface defs and lemmas for tlc *)
     iApply (lc_fupd_add_later with "LC1"). iNext.
     iApply (fupd_mask_intro). 1: set_solver. iIntros "mask".
     iMod ("H" $! _) as "H". iApply fupd_sfmupd_elim. iMod "mask" as "_".
@@ -401,6 +401,7 @@ Section proof.
     replace (n + 1 + 1) with (n + 2) by lia. iFrame.
   Qed.
 
+  (** Allocate the counters and the invariant, with the entry for 0. *)
   Lemma px_init E g :
     crP_obls g 0 ∅
     ⊢ |={E}=>g ∃ ck r rm ci cj n,
@@ -434,6 +435,8 @@ Section proof.
     - iLeft. iFrame.
   Qed.
 
+  (** The setup for [lwp_adequacy]: allocate the ghost state and the temporal formula [Φ], and
+      give each thread its weakest precondition. *)
   Lemma px_loop_pre Θ i j Φ Ψs :
     i ≠ j →
     Θ = {[i := loop #(); j := loop #() ]} →
@@ -555,6 +558,8 @@ Section adequacy.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
         {[i := fork_post; j := fork_post]}.
 
+  (** Assuming the fuel-free rule, adequacy gives "eventually False" for every fair behavior of
+      the two loops. *)
   Theorem loop_paradox :
     (∀ Σ0 `{!heapGS Σ0}, @lantanaGS_no_lc _ _ Σ0 _) →
     ∀ (τ : trace heap_lang),
@@ -581,7 +586,6 @@ Section adequacy.
     { by iFrame. }
     iSplitR; first done.
     iModIntro. iIntros "LC TGs".
-    (* Set Printing All. *)
     iMod (px_loop_pre Θ0 i j with "[Tis] [$LC] [TGs]") as "H".
     { subst i j. lia. }
     { done. }
@@ -648,5 +652,3 @@ Section adequacy.
   Qed.
 
 End adequacy.
-
-(* Print Assumptions flag_client_adequacy. *)
