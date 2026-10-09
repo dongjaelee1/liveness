@@ -196,7 +196,7 @@ All in `lantana_heap_lang/examples/`.
 | Paper | Rocq | File |
 |---|---|---|
 | Flag module: `init`/`set`/`wait`; `isFlag`; `FlagObl`; SPEC-INIT/SPEC-SET/SPEC-WAIT | `init`/`set`/`wait`; `is_flag` (syntactic form `is_flag_tf`); `flag_tk`; `Flag_init_fbspec` / `Flag_set_fbspec` / `Flag_wait_fbspec` (from `Flag_*_spec`) | `flag.v` |
-| `main` (§2) and its trace property | `main`, `FlagFork_main_fbspec` (texan form `FlagFork_main_spec`), end-to-end `main_adequacy`; `FlagFork_main_fbspec_rules` proves the same specification with the rules of `triple.v` and the flag specifications only, following §2's walkthrough | `flag_fork.v`, `flag_fork_rules.v` |
+| `main` (§2) and its trace property | `main`; `FlagFork_main_fbspec`, proved with the rules of `triple.v` and the flag specifications only, following §2's walkthrough (texan form `FlagFork_main_spec`); end-to-end `main_adequacy` | `flag_fork.v` |
 | `nest` / `nondet` (§4.3); SPEC-NEST/SPEC-NONDET | `nest` / `nondet`; `Nondet_nest_fbspec` / `Nondet_nondet_fbspec` (from `Nondet_*_spec`) | `nondet.v` |
 | Handoff: `send`/`receive`; `HandoffBuf`; `isHandoff`; `TaskSpec`; SPEC-SEND/SPEC-RECEIVE | `send`/`receive`; `handoff_inv`; `is_handoff`; `is_task` (in the paper's format: `is_task_fbtriple`); `Handoff_send_fbspec` / `Handoff_receive_fbspec` (from `Handoff_*_spec`) | `handoff.v` |
 | `handoffMain` (§5.2); SPEC-HANDOFF-MAIN | `main`, `main_fbspec` (texan form `main_spec`), `handoff_client_adequacy` | `handoff_client.v` |

@@ -110,7 +110,6 @@ lantana_heap_lang/lib/array.v
 lantana_heap_lang/examples/flag.v
 lantana_heap_lang/examples/flag_client.v
 lantana_heap_lang/examples/flag_fork.v
-lantana_heap_lang/examples/flag_fork_rules.v
 lantana_heap_lang/examples/nondet.v
 lantana_heap_lang/examples/handoff.v
 lantana_heap_lang/examples/handoff_client.v
