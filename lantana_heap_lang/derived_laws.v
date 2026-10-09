@@ -1,6 +1,6 @@
 (** This file extends the HeapLang program logic with some derived laws (not
 using the lifting lemmas) about arrays. Adapted from Iris's
-[heap_lang/derived_laws.v]; Iris's laws for prophecies are not included. *)
+[heap_lang/derived_laws.v]. *)
 
 From stdpp Require Import fin_maps.
 From iris.bi Require Import lib.fractional.

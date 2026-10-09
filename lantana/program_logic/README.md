@@ -29,4 +29,4 @@ In dependency order: each file imports only files above it.
 ## Notes
 
 - `language.v`, `ectx_language.v`, `ectxi_language.v`, `lifting.v`, `ectx_lifting.v` and `atomic.v`, and the structure of `weakestpre.v`, are adapted from Iris's `iris/program_logic/`.
-- The observations `κ : list (observation Λ)` in steps and traces only serve HeapLang's prophecy variables (`NewProph`, `Resolve`), which no example uses.
+- Steps and traces carry observations `κ : list (observation Λ)`, as in Iris, where they serve prophecy variables. HeapLang has no prophecy variables, and its `observation` is the empty type.

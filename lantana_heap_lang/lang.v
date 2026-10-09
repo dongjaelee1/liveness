@@ -10,7 +10,9 @@ Adapted from Iris's [heap_lang/lang.v]. In Lantana's version:
 - [base_step] takes the id [i] of the stepping thread and the set [Θ] of
   thread ids in use, and forked threads get fresh ids;
 - [ChooseNat] picks a natural number nondeterministically;
-- [state_pred] gives the atomic state predicates of the temporal logic.
+- [state_pred] gives the atomic state predicates of the temporal logic;
+- there are no prophecy variables (Iris's [NewProph] and [Resolve]), so steps
+  make no observations.
 
 Noteworthy design choices:
 
@@ -25,45 +27,7 @@ Noteworthy design choices:
   necessary to ensure soundness of the [meta] feature provided by [gen_heap].
   Also, unlike in languages like C, allocated and deallocated "blocks" do not
   have to match up: you can allocate a large array of locations and then
-  deallocate a hole out of it in the middle.
-
-- For prophecy variables, we annotate the reduction steps with an "observation"
-  and tweak adequacy such that WP knows all future observations. There is
-  another possible choice: Use non-deterministic choice when creating a prophecy
-  variable ([NewProph]), and when resolving it ([Resolve]) make the
-  program diverge unless the variable matches. That, however, requires an
-  erasure proof that this endless loop does not make specifications useless.
-
-The expression [Resolve e p v] attaches a prophecy resolution (for prophecy
-variable [p] to value [v]) to the top-level base-reduction step of [e]. The
-prophecy resolution happens simultaneously with the base-step being taken.
-Furthermore, it is required that the base-step produces a value (otherwise
-the [Resolve] is stuck), and this value is also attached to the resolution.
-A prophecy variable is thus resolved to a pair containing (1) the result
-value of the wrapped expression (called [e] above), and (2) the value that
-was attached by the [Resolve] (called [v] above). This allows, for example,
-to distinguish a resolution originating from a successful [CmpXchg] from one
-originating from a failing [CmpXchg]. For example:
- - [Resolve (CmpXchg #l #n #(n+1)) #p v] will behave as [CmpXchg #l #n #(n+1)],
-   which means step to a value-boole pair [(n', b)] while updating the heap, but
-   in the meantime the prophecy variable [p] will be resolved to [(n', b), v)].
- - [Resolve (! #l) #p v] will behave as [! #l], that is return the value
-   [w] pointed to by [l] on the heap (assuming it was allocated properly),
-   but it will additionally resolve [p] to the pair [(w,v)].
-
-Note that the sub-expressions of [Resolve e p v] (i.e., [e], [p] and [v])
-are reduced as usual, from right to left. However, the evaluation of [e]
-is restricted so that the base-step to which the resolution is attached
-cannot be taken by the context. For example:
- - [Resolve (CmpXchg #l #n (#n + #1)) #p v] will first be reduced (with by a
-   context-step) to [Resolve (CmpXchg #l #n #(n+1) #p v], and then behave as
-   described above.
- - However, [Resolve ((λ: "n", CmpXchg #l "n" ("n" + #1)) #n) #p v] is stuck.
-   Indeed, it can only be evaluated using a base-step (it is a β-redex),
-   but the process does not yield a value.
-
-The mechanism described above supports nesting [Resolve] expressions to
-attach several prophecy resolutions to a base-redex. *)
+  deallocate a hole out of it in the middle. *)
 
 Delimit Scope expr_scope with E.
 Delimit Scope val_scope with V.
@@ -71,8 +35,6 @@ Delimit Scope val_scope with V.
 Module heap_lang.
 
 (** Expressions and vals. *)
-Definition proph_id := positive.
-
 (** We have a notion of "poison" as a variant of unit that may not be compared
 with anything. This is useful for erasure proofs: if we erased things to unit,
 [<erased> == unit] would evaluate to true after erasure, changing program
@@ -80,7 +42,7 @@ behavior. So we erase to the poison value instead, making sure that no legal
 comparisons could be affected. *)
 Inductive base_lit : Set :=
   | LitInt (n : Z) | LitBool (b : bool) | LitUnit | LitPoison
-  | LitLoc (l : loc) | LitProphecy (p: proph_id).
+  | LitLoc (l : loc).
 Inductive un_op : Set :=
   | NegOp | MinusUnOp.
 Inductive bin_op : Set :=
@@ -122,9 +84,6 @@ Inductive expr :=
   | FAA (e1 : expr) (e2 : expr) (* Fetch-and-add *)
   (* Concurrency *)
   | Fork (e : expr)
-  (* Prophecy *)
-  | NewProph
-  | Resolve (e0 : expr) (e1 : expr) (e2 : expr) (* wrapped expr, proph, val *)
   (* Non-determinism, as in Trillium and Fairis *)
   | ChooseNat
 with val :=
@@ -137,12 +96,8 @@ with val :=
 Bind Scope expr_scope with expr.
 Bind Scope val_scope with val.
 
-(** An observation associates a prophecy variable (identifier) to a pair of
-values. The first value is the one that was returned by the (atomic) operation
-during which the prophecy resolution happened (typically, a boolean when the
-wrapped operation is a CmpXchg). The second value is the one that the prophecy
-variable was actually resolved to. *)
-Definition observation : Set := proph_id * (val * val).
+(** Without prophecy variables, there is nothing to observe. *)
+Definition observation : Set := Empty_set.
 
 Notation of_val := Val (only parsing).
 
@@ -179,9 +134,7 @@ read and written.  Also notice that the sets of boxed and unboxed values are
 disjoint. *)
 Definition lit_is_unboxed (l: base_lit) : Prop :=
   match l with
-  (** Disallow comparing (erased) prophecies with (erased) prophecies, by
-  considering them boxed. *)
-  | LitProphecy _ | LitPoison => False
+  | LitPoison => False
   | LitInt _ | LitBool _  | LitLoc _ | LitUnit => True
   end.
 Definition val_is_unboxed (v : val) : Prop :=
@@ -210,7 +163,6 @@ Global Arguments vals_compare_safe !_ !_ /.
  *)
 Record state : Type := {
     heap : gmap loc (option val);
-    used_proph_id : gset proph_id;
   }.
 
 (** Equality and other typeclass stuff *)
@@ -266,9 +218,6 @@ Proof.
      | FAA e1 e2, FAA e1' e2' =>
         cast_if_and (decide (e1 = e1')) (decide (e2 = e2'))
      | Fork e, Fork e' => cast_if (decide (e = e'))
-     | NewProph, NewProph => left _
-     | Resolve e0 e1 e2, Resolve e0' e1' e2' =>
-        cast_if_and3 (decide (e0 = e0')) (decide (e1 = e1')) (decide (e2 = e2'))
      | ChooseNat, ChooseNat => left _
      | _, _ => right _
      end
@@ -291,19 +240,17 @@ Proof. solve_decision. Defined.
 Global Instance base_lit_countable : Countable base_lit.
 Proof.
  refine (inj_countable' (λ l, match l with
-  | LitInt n => (inl (inl n), None)
-  | LitBool b => (inl (inr b), None)
-  | LitUnit => (inr (inl false), None)
-  | LitPoison => (inr (inl true), None)
-  | LitLoc l => (inr (inr l), None)
-  | LitProphecy p => (inr (inl false), Some p)
+  | LitInt n => inl (inl n)
+  | LitBool b => inl (inr b)
+  | LitUnit => inr (inl false)
+  | LitPoison => inr (inl true)
+  | LitLoc l => inr (inr l)
   end) (λ l, match l with
-  | (inl (inl n), None) => LitInt n
-  | (inl (inr b), None) => LitBool b
-  | (inr (inl false), None) => LitUnit
-  | (inr (inl true), None) => LitPoison
-  | (inr (inr l), None) => LitLoc l
-  | (_, Some p) => LitProphecy p
+  | inl (inl n) => LitInt n
+  | inl (inr b) => LitBool b
+  | inr (inl false) => LitUnit
+  | inr (inl true) => LitPoison
+  | inr (inr l) => LitLoc l
   end) _); by intros [].
 Qed.
 Global Instance un_op_finite : Countable un_op.
@@ -349,9 +296,7 @@ Proof.
      | CmpXchg e0 e1 e2 => GenNode 17 [go e0; go e1; go e2]
      | Xchg e0 e1 => GenNode 18 [go e0; go e1]
      | FAA e1 e2 => GenNode 19 [go e1; go e2]
-     | NewProph => GenNode 20 []
-     | Resolve e0 e1 e2 => GenNode 21 [go e0; go e1; go e2]
-     | ChooseNat => GenNode 22 []
+     | ChooseNat => GenNode 20 []
      end
    with gov v :=
      match v with
@@ -387,9 +332,7 @@ Proof.
      | GenNode 17 [e0; e1; e2] => CmpXchg (go e0) (go e1) (go e2)
      | GenNode 18 [e0; e1] => Xchg (go e0) (go e1)
      | GenNode 19 [e1; e2] => FAA (go e1) (go e2)
-     | GenNode 20 [] => NewProph
-     | GenNode 21 [e0; e1; e2] => Resolve (go e0) (go e1) (go e2)
-     | GenNode 22 [] => ChooseNat
+     | GenNode 20 [] => ChooseNat
      | _ => Val $ LitV LitUnit (* dummy *)
      end
    with gov v :=
@@ -404,7 +347,7 @@ Proof.
    for go).
  refine (inj_countable' enc dec _).
  refine (fix go (e : expr) {struct e} := _ with gov (v : val) {struct v} := _ for go).
- - destruct e as [v| | | | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
+ - destruct e as [v| | | | | | | | | | | | | | | | | | | | |]; simpl; f_equal;
      [exact (gov v)|done..].
  - destruct v; by f_equal.
 Qed.
@@ -412,7 +355,7 @@ Global Instance val_countable : Countable val.
 Proof. refine (inj_countable of_val to_val _); auto using to_of_val. Qed.
 
 Global Instance state_inhabited : Inhabited state :=
-  populate {| heap := inhabitant; used_proph_id := inhabitant |}.
+  populate {| heap := inhabitant |}.
 Global Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
 Global Instance expr_inhabited : Inhabited expr := populate (Val inhabitant).
 
@@ -422,11 +365,6 @@ Canonical Structure valO `{SI : indexT} := leibnizO val.
 Canonical Structure exprO `{SI : indexT} := leibnizO expr.
 
 (** Evaluation contexts *)
-(** Note that [ResolveLCtx] is not by itself an evaluation context item: we do
-not reduce directly under Resolve's first argument. We only reduce things nested
-further down. Once no nested contexts exist any more, the expression must take
-exactly one more step to a value, and Resolve then (atomically) also uses that
-value for prophecy resolution.  *)
 Inductive ectx_item :=
   | AppLCtx (v2 : val)
   | AppRCtx (e1 : expr)
@@ -453,20 +391,9 @@ Inductive ectx_item :=
   | CmpXchgMCtx (e0 : expr) (v2 : val)
   | CmpXchgRCtx (e0 : expr) (e1 : expr)
   | FaaLCtx (v2 : val)
-  | FaaRCtx (e1 : expr)
-  | ResolveLCtx (ctx : ectx_item) (v1 : val) (v2 : val)
-  | ResolveMCtx (e0 : expr) (v2 : val)
-  | ResolveRCtx (e0 : expr) (e1 : expr)
-.
+  | FaaRCtx (e1 : expr).
 
-(** Contextual closure will only reduce [e] in [Resolve e (Val _) (Val _)] if
-the local context of [e] is non-empty. As a consequence, the first argument of
-[Resolve] is not completely evaluated (down to a value) by contextual closure:
-no base steps (i.e., surface reductions) are taken. This means that contextual
-closure will reduce [Resolve (CmpXchg #l #n (#n + #1)) #p #v] into [Resolve
-(CmpXchg #l #n #(n+1)) #p #v], but it cannot context-step any further. *)
-
-Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
+Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
   match Ki with
   | AppLCtx v2 => App e (of_val v2)
   | AppRCtx e1 => App e1 e
@@ -494,9 +421,6 @@ Fixpoint fill_item (Ki : ectx_item) (e : expr) : expr :=
   | CmpXchgRCtx e0 e1 => CmpXchg e0 e1 e
   | FaaLCtx v2 => FAA e (Val v2)
   | FaaRCtx e1 => FAA e1 e
-  | ResolveLCtx K v1 v2 => Resolve (fill_item K e) (Val v1) (Val v2)
-  | ResolveMCtx ex v2 => Resolve ex e (Val v2)
-  | ResolveRCtx ex e1 => Resolve ex e1 e
   end.
 
 (** Atomic state predicates, which [state_sat] interprets in a state [σ] and
@@ -538,8 +462,6 @@ Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
   | CmpXchg e0 e1 e2 => CmpXchg (subst x v e0) (subst x v e1) (subst x v e2)
   | FAA e1 e2 => FAA (subst x v e1) (subst x v e2)
   | Fork e => Fork (subst x v e)
-  | NewProph => NewProph
-  | Resolve ex e1 e2 => Resolve (subst x v ex) (subst x v e1) (subst x v e2)
   | ChooseNat => ChooseNat
   end.
 
@@ -609,12 +531,8 @@ Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
     end.
 
 Definition state_upd_heap (f: gmap loc (option val) → gmap loc (option val)) (σ: state) : state :=
-  {| heap := f σ.(heap); used_proph_id := σ.(used_proph_id) |}.
+  {| heap := f σ.(heap) |}.
 Global Arguments state_upd_heap _ !_ /.
-
-Definition state_upd_used_proph_id (f: gset proph_id → gset proph_id) (σ: state) : state :=
-  {| heap := σ.(heap); used_proph_id := f σ.(used_proph_id); |}.
-Global Arguments state_upd_used_proph_id _ !_ /.
 
 Fixpoint heap_array (l : loc) (vs : list val) : gmap loc (option val) :=
   match vs with
@@ -662,7 +580,7 @@ Definition state_init_heap (l : loc) (n : Z) (v : val) (σ : state) : state :=
 Lemma state_init_heap_singleton l v σ :
   state_init_heap l 1 v σ = state_upd_heap <[l:=Some v]> σ.
 Proof.
-  destruct σ as [h p]. rewrite /state_init_heap /=. f_equiv.
+  destruct σ as [h]. rewrite /state_init_heap /=. f_equiv.
   rewrite right_id insert_union_singleton_l. done.
 Qed.
 
@@ -745,16 +663,6 @@ Inductive base_step (i : thread_id) : expr → state → thread_ids → list obs
                []
                (Val $ LitV LitUnit) σ
                {[j := e]}
-  | NewProphS σ Θ p :
-     p ∉ σ.(used_proph_id) →
-     base_step i NewProph σ Θ
-               []
-               (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ)
-               ∅
-  | ResolveS p v e σ Θ w σ' κs ts :
-     base_step i e σ Θ κs (Val v) σ' ts →
-     base_step i (Resolve e (Val $ LitV $ LitProphecy p) (Val w)) σ Θ
-               (κs ++ [(p, (v, w))]) (Val v) σ' ts
   | ChooseNatS (n : nat) σ Θ :
     base_step i ChooseNat σ Θ
       []
@@ -795,11 +703,6 @@ Proof.
   by apply Loc.fresh_fresh.
 Qed.
 
-Lemma new_proph_id_fresh i σ Θ :
-  let p := fresh σ.(used_proph_id) in
-  base_step i NewProph σ Θ [] (Val $ LitV $ LitProphecy p) (state_upd_used_proph_id ({[ p ]} ∪.) σ) ∅.
-Proof. constructor; auto. apply is_fresh. Qed.
-
 Lemma new_thread_id_fresh i e σ Θ :
   let j := fresh Θ in
   base_step i (Fork e) σ Θ [] (Val (LitV LitUnit)) (σ) {[j := e]}.
@@ -824,50 +727,9 @@ Canonical Structure heap_lang := LanguageOfEctx heap_ectx_lang.
 (* Prefer heap_lang names over ectx_language names. *)
 Export heap_lang.
 
-(** The following lemma is not provable using the axioms of [ectxi_language].
-The proof requires a case analysis over context items ([destruct Ki] in the
-proof), which in all cases yields a non-value. To prove this lemma for
-[ectxi_language] in general, we would require that a term of the form
-[fill_item Ki e] is never a value. *)
-Lemma to_val_fill_some K e v : to_val (fill K e) = Some v → K = [] ∧ e = Val v.
-Proof.
-  intro H. destruct K as [|Ki K]; first by apply of_to_val in H. exfalso.
-  assert (to_val e ≠ None) as He.
-  { intro A. by rewrite fill_not_val in H. }
-  assert (∃ w, e = Val w) as [w ->].
-  { destruct e; try done; eauto. }
-  assert (to_val (fill (Ki :: K) (Val w)) = None).
-  { destruct Ki; simpl; apply fill_not_val; done. }
-  by simplify_eq.
-Qed.
-
-Lemma prim_step_to_val_is_base_step i e σ1 Θ κs w σ2 efs :
-  prim_step i e σ1 Θ κs (Val w) σ2 efs → base_step i e σ1 Θ κs (Val w) σ2 efs.
-Proof.
-  intro H. destruct H as [K e1 e2 H1 H2].
-  assert (to_val (fill K e2) = Some w) as H3; first by rewrite -H2.
-  apply to_val_fill_some in H3 as [-> ->]. subst e. done.
-Qed.
-
 (** If [e1] makes a base step to a value under some state [σ1] then any base
  step from [e1] under any other state [σ1'] must necessarily be to a value. *)
 Lemma base_step_to_val i e1 σ1 Θ κ e2 σ2 efs i' σ1' Θ' κ' e2' σ2' efs' :
   base_step i e1 σ1 Θ κ e2 σ2 efs →
   base_step i' e1 σ1' Θ' κ' e2' σ2' efs' → is_Some (to_val e2) → is_Some (to_val e2').
 Proof. destruct 1; inversion 1; naive_solver. Qed.
-
-Lemma irreducible_resolve i e v1 v2 σ Θ :
-  irreducible i e σ Θ → irreducible i (Resolve e (Val v1) (Val v2)) σ Θ.
-Proof.
-  intros H κs ? σ' efs [Ks e1' e2' Hfill -> step]. simpl in *.
-  induction Ks as [|K Ks _] using rev_ind; simpl in Hfill.
-  - subst e1'. inversion step. eapply H. by apply base_prim_step.
-  - rewrite fill_app /= in Hfill.
-    destruct K; (inversion Hfill; subst; clear Hfill; try
-      match goal with | H : Val ?v = fill Ks ?e |- _ =>
-        (assert (to_val (fill Ks e) = Some v) as HEq by rewrite -H //);
-        apply to_val_fill_some in HEq; destruct HEq as [-> ->]; inversion step
-      end).
-    eapply (H κs (fill_item _ (foldl (flip fill_item) e2' Ks)) σ' efs).
-    eapply (Ectx_step (Ks ++ [_])); last done; simpl; by rewrite fill_app.
-Qed.

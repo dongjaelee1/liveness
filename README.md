@@ -228,7 +228,7 @@ triple-level step rules state the paper's layer-0 form.
 
 | Paper | Rocq | File (under `lantana/` unless it starts with `lantana_heap_lang/`) |
 |---|---|---|
-| `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `trace_state` (a `cfg`, i.e. a `thread_pool` and a state, with the scheduled thread), `thread_step`, `thread_done`, `trace`, `behavior` (the observations `κ : list (observation Λ)` only serve HeapLang's prophecy variables, which no example uses). Unlike Fig. 6, a behavior also lets a scheduled stuck thread stutter (`thread_stuck`), so executions that get stuck are behaviors too | `program_logic/language.v` |
+| `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `trace_state` (a `cfg`, i.e. a `thread_pool` and a state, with the scheduled thread), `thread_step`, `thread_done`, `trace`, `behavior` (the observations `κ : list (observation Λ)` come from Iris, where they serve prophecy variables; HeapLang has none, so its observations are the empty type). Unlike Fig. 6, a behavior also lets a scheduled stuck thread stutter (`thread_stuck`), so executions that get stuck are behaviors too | `program_logic/language.v` |
 | temporal properties `Φ, Ψ` and `⟦·⟧_t` | syntax `tp`, interpretation `tp_trace`; `Always` = `tr_always`, `Until` = `tr_until`, `Finally` = `tr_eventually` | `program_logic/temporal_property.v` |
 | `Fair` (fair scheduling) | `fair_scheduling`; `inactive`, `active`, `turn` are `thread_na`, `thread_active`, `thread_turn` | `program_logic/temporal_property.v` |
 | logical assertions `φ` and `⟦·⟧_l` | syntax `tf`, interpretation `⟦·⟧ₗ` | `program_logic/temporal_logic.v` |

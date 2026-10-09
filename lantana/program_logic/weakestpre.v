@@ -8,37 +8,6 @@ From iris.prelude Require Import options.
 From lantana.program_logic Require Export sfmupd model_physical_updates.
 Import uPred.
 
-(** Currying for 5-tuples. *)
-Section curry5.
-  Definition curry5 {A B C D E F : Type} (f : A * B * C * D * E → F) (a : A) (b : B) (c : C) (d : D) (e : E) : F :=
-    f (a, b, c, d, e).
-  Definition uncurry5 {A B C D E F : Type} (f : A → B → C → D → E → F) : (A * B * C * D * E) → F :=
-    λ '(a, b, c, d, e), f a b c d e.
-
-  Lemma curry5_uncurry5 : ∀ {A B C D E F : Type} (f : A → B → C → D → E → F), curry5 (uncurry5 f) = f.
-  Proof. done. Qed.
-  Lemma uncurry5_curry5 : ∀ {A B C D E F : Type} (f : A * B * C * D * E → F) (p : A * B * C * D * E), uncurry5 (curry5 f) p = f p.
-  Proof. intros. destruct p as [[[[a b] c] d] e]. done. Qed.
-
-  Global Instance uncurry5_proper' : ∀ {A : Type} {RA : relation A} {B : Type} {RB : relation B} {C : Type} {RC : relation C} {D : Type} {RD : relation D} {E : Type} {RE : relation E} {F : Type} {RF : relation F},
-    Proper
-      ((RA ==> RB ==> RC ==> RD ==> RE ==> RF) ==>
-         prod_relation (prod_relation (prod_relation (prod_relation RA RB) RC) RD) RE ==> RF)
-      (@uncurry5 A B C D E F).
-  Proof.
-    intros. repeat intro.
-    destruct x0 as [[[[a0 b0] c0] d0] e0], y0 as [[[[a1 b1] c1] d1] e1].
-    simpl. destruct H0 as [[[[? ?] ?] ?] ?]. simpl in *. by eapply H.
-  Qed.
-  Global Instance uncurry5_proper : ∀ {A : Type} {H : Equiv A} {B : Type} {H0 : Equiv B} {C : Type} {H1 : Equiv C} {D : Type} {H2 : Equiv D} {E : Type} {H3 : Equiv E} {F : Type} {H4 : Equiv F},
-    Proper ((equiv ==> equiv ==> equiv ==> equiv ==> equiv ==> equiv) ==> equiv ==> equiv) (@uncurry5 A B C D E F).
-  Proof. intros. eapply uncurry5_proper'. Qed.
-
-  Global Instance uncurry5_ne : ∀ {SI : indexT} {A B C D E F : ofe} (n : index),
-    Proper ((dist n ==> dist n ==> dist n ==> dist n ==> dist n ==> dist n) ==> dist n ==> dist n) (@uncurry5 A B C D E F).
-  Proof. intros. apply uncurry5_proper. Qed.
-End curry5.
-
 Class temporalGpreS `{SI : indexT} (Λ : language) (Σ : gFunctors) :=
   TemporalGpreS {
       #[local] temporalGpreS_mupd :: mupdGpreS Σ;

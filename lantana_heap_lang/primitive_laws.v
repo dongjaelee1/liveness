@@ -8,7 +8,7 @@ carriers and their fuel, and return later credits and witness credits. *)
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From transfinite.base_logic.lib Require Import mono_nat.
-From transfinite.base_logic.lib Require Export gen_heap proph_map.
+From transfinite.base_logic.lib Require Export gen_heap.
 From lantana.base_logic Require Export thread_map gen_inv_heap.
 (** Importing [adequacy] fixes the step-index type to ordinals. *)
 From lantana.program_logic Require Export atomic adequacy.
@@ -22,14 +22,12 @@ Class heap_stateGS Σ :=
   HeapStateGS {
       #[global] heap_stateGS_gen_heap_stateGS :: gen_heapGS loc (option val) Σ;
       #[global] heap_stateGS_inv_heap_stateGS :: inv_heapGS loc (option val) Σ;
-      #[global] heap_stateGS_proph_mapGS :: proph_mapGS proph_id (val * val) Σ;
       #[global] heap_stateGS_thread_mapGS :: thread_mapGS thread_id (expr) Σ;
     }.
 
 Definition heap_stateΣ : gFunctors :=
   #[gen_heapΣ loc (option val);
     inv_heapΣ loc (option val);
-    proph_mapΣ proph_id (val * val);
     thread_mapΣ thread_id (expr)].
 
 Global Instance subG_heap_stateΣ {Σ} : subG heap_stateΣ Σ → heap_stateGS Σ.
@@ -40,9 +38,6 @@ Proof.
     1,2: exact inhabitant.
   - econstructor.
     { eapply subG_inv_heapGpreS. solve_inG. }
-    1: exact inhabitant.
-  - econstructor.
-    { eapply subG_proph_mapGpreS. solve_inG. }
     1: exact inhabitant.
   - econstructor.
     { eapply subG_thread_mapGpreS. solve_inG. }
@@ -106,8 +101,7 @@ Qed.
 
 Definition state_interp `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   (gen_heap_interp σ.(heap) ∗
-   thread_map_interp (dom Θ) Θ ∗
-   proph_map_interp κs σ.(used_proph_id))%I.
+   thread_map_interp (dom Θ) Θ)%I.
 
 Definition state_interp_aux `{!heap_stateGS Σ} (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) : iProp Σ :=
   True%I.
@@ -133,7 +127,7 @@ Lemma state_interp_wf `{!heap_stateGS Σ} :
   ∀ (σ : state) (Θ : thread_pool heap_lang) (κs : list observation) (π : state_pred),
   state_interp σ Θ κs ∗ state_pred_interp π ⊢ ⌜state_sat σ Θ π⌝.
 Proof.
-  iIntros (????) "[(HI& TI& PI) SP]". destruct π; simpl.
+  iIntros (????) "[(HI& TI) SP]". destruct π; simpl.
   - rewrite pointsto_unseal /pointsto_def. iPoseProof (gen_heap_valid with "HI SP") as "%". eauto.
   - iPoseProof (thread_expr_read with "TI SP") as "%". eauto.
 Qed.
@@ -218,7 +212,7 @@ Qed.
 Global Instance thread_expr_pure_exec_si C i :
   PureExecSI (λ i e, thread_expr i C e) i.
 Proof.
-  intros D e1 e2 σ Θ κ HD HT HS. iIntros "(TE& (HI& TI& PI)& _)".
+  intros D e1 e2 σ Θ κ HD HT HS. iIntros "(TE& (HI& TI)& _)".
   iPoseProof (thread_expr_ctx with "TI TE") as "%Heq"; [exact HT|exact HS|].
   subst D. iMod (thread_expr_update with "TI TE") as "[TI TE]".
   by iFrame.
@@ -269,7 +263,7 @@ Proof.
   iMod "H" as "(TE& %&$&$& %&$& H)".
   iModIntro. iModIntro. iSplit; first eauto with base_step.
   iIntros (v2 σ2 efs Hstep).
-  iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
+  iDestruct "I" as "[(%HI& Ha& (Ih& It)) Ia]".
   iPoseProof (thread_expr_ctx with "It TE") as "%HC".
   { exact HT. } { by apply base_prim_step. }
   subst C. inv_base_step.
@@ -372,7 +366,7 @@ Proof.
   iModIntro. iModIntro. iSplit; first eauto with base_step.
   Unshelve. 2: exact 0.
   iIntros (v2 σ2 efs Hstep).
-  iDestruct "I" as "[(%HI& Ha& (Ih& It& Ip)) Ia]".
+  iDestruct "I" as "[(%HI& Ha& (Ih& It)) Ia]".
   iPoseProof (thread_expr_ctx with "It TE") as "%HC".
   { exact HT. } { by apply base_prim_step. }
   subst C. inv_base_step.
@@ -583,7 +577,7 @@ Lemma lwp_allocN_seq G R o s i E v n {C} :
 Proof.
   iIntros (Hn Φ) "[TE (Tb& Gfs& Rs)] HP".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h ? σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs & Ht & Hk) Ia] !> !>". iSplit.
+  iIntros (K h ? σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs & Ht) Ia] !> !>". iSplit.
   { iPureIntro. split; first done. destruct n; auto with lia base_step. }
   iFrame "Tb Gfs Rs". iIntros (v2 σ2 efs Hstep).
   iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
@@ -596,7 +590,7 @@ Proof.
   iMod (hG_history_auth_app with "Ha") as "Ha".
   iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
   iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iFrame "Ha Hs Ht Hk". iModIntro. iSplitR; first done. iSplitR.
+  iFrame "Ha Hs Ht". iModIntro. iSplitR; first done. iSplitR.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H. split; auto. lia. }
   iModIntro. iApply "HP". iFrame.
   iApply big_sepL_sep. iSplitL "Hl".
@@ -622,7 +616,7 @@ Lemma lwp_free G R o s i E l v {C} :
 Proof.
   iIntros (Φ) "[TE ((Tb& Gfs& Rs)& Hl)] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -647,7 +641,7 @@ Lemma lwp_load G R o s i E l dq v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -671,7 +665,7 @@ Lemma lwp_store G R o s i E l v' v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -696,7 +690,7 @@ Lemma lwp_xchg G R o s i E l v' v {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -722,7 +716,7 @@ Lemma lwp_cmpxchg_fail G R o s i E l dq v' v1 v2 {C} :
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -748,7 +742,7 @@ Lemma lwp_cmpxchg_suc G R o s i E l v1 v2 v' {C} :
 Proof.
   iIntros (?? Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -774,7 +768,7 @@ Lemma lwp_faa G R o s i E l (i1 i2 : Z) {C} :
 Proof.
   iIntros (Φ) "[TE [(Tb& Gfs& Rs) Hl]] HΦ".
   iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
+  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht) Ia] !> !>".
   rewrite pointsto_unseal. iDestruct (gen_heap_valid with "Hs Hl") as %?.
   iSplit; first by eauto with base_step.
   iFrame "Tb Gfs Rs".
@@ -791,76 +785,5 @@ Proof.
   { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
   iModIntro. iApply "HΦ". iFrame.
 Qed.
-
-Lemma lwp_new_proph G R o s i E {C} :
-  l{{{ thread_expr i C (NewProph) ∗ thP_carriers i G ∗ ([∗ set] g ∈ G, ∃ ℓ, crP_fuel g ℓ 1) ∗ ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ)}}}
-    NewProph @ s; i; E
-  l{{{ pvs p, RET (LitV (LitProphecy p)); thread_expr i C (Val (LitV (LitProphecy p))) ∗ (£ o ∗ thP_carriers i G ∗ ([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r)) ∗ proph p pvs }}}.
-Proof.
-  iIntros (Φ) "[TE (Tb& Gfs& Rs)] HΦ".
-  iApply lwp_lift_atomic_base_step_no_fork. 1: eauto.
-  iIntros (K h n σ1 Θ κ κs HK HT) "[(%Hw& Ha& Hs& Ht& Hk) Ia] !> !>".
-  iSplit; first by eauto with base_step.
-  iFrame "Tb Gfs Rs".
-  iIntros (v2 σ2 efs Hstep).
-  iPoseProof (thread_expr_ctx with "Ht TE") as "%HC".
-  { exact HT. } { by apply base_prim_step. }
-  subst C. inv_base_step.
-  rename select proph_id into p.
-  iMod (proph_map_new_proph p with "Hk") as "[Hk Hp]"; first done.
-  rewrite !map_union_empty.
-  iMod (hG_history_auth_app with "Ha") as "Ha".
-  iMod (thread_expr_update with "Ht TE") as "[Ht TE]".
-  iIntros "!> Tb Wcs". iExists o. iIntros "LC !>".
-  iModIntro. iSplit; first done. iFrame. iSplitR.
-  { iPureIntro. destruct Hw. rewrite length_app last_app. simpl. rewrite H0. split; auto. lia. }
-  iModIntro. iApply "HΦ". iFrame.
-Qed.
-
-(* In the following, strong atomicity is required due to the fact that [e] must
-be able to make a base step for [Resolve e _ _] not to be (base) stuck. *)
-
-Lemma resolve_reducible i e σ D (p : proph_id) v :
-  Atomic StronglyAtomic e → reducible i e σ D →
-  reducible i (Resolve e (Val (LitV (LitProphecy p))) (Val v)) σ D.
-Proof.
-  intros A (κ & e' & σ' & efs & H).
-  exists (κ ++ [(p, (default v (to_val e'), v))]), e', σ', efs.
-  eapply (Ectx_step []); try done.
-  assert (∃ w, Val w = e') as [w <-].
-  { unfold Atomic in A. apply (A i σ D e' κ σ' efs) in H. unfold is_Some in H.
-    destruct H as [w H]. exists w. simpl in H. by apply (of_to_val _ _ H). }
-  simpl. constructor; eauto. by apply prim_step_to_val_is_base_step.
-Qed.
-
-Lemma step_resolve i D e vp vt σ1 κ e2 σ2 efs :
-  Atomic StronglyAtomic e →
-  prim_step i (Resolve e (Val vp) (Val vt)) σ1 D κ e2 σ2 efs →
-  base_step i (Resolve e (Val vp) (Val vt)) σ1 D κ e2 σ2 efs.
-Proof.
-  intros A [Ks e1' e2' Hfill -> step]. simpl in *.
-  induction Ks as [|K Ks _] using rev_ind.
-  + simpl in *. subst. inv_base_step. by constructor.
-  + rewrite fill_app /= in Hfill. destruct K; inversion Hfill; subst; clear Hfill.
-    - rename select ectx_item into Ki.
-      assert (fill_item Ki (fill Ks e1') = fill (Ks ++ [Ki]) e1') as Eq1;
-        first by rewrite fill_app.
-      assert (fill_item Ki (fill Ks e2') = fill (Ks ++ [Ki]) e2') as Eq2;
-        first by rewrite fill_app.
-      rewrite fill_app /=. rewrite Eq1 in A.
-      assert (is_Some (to_val (fill (Ks ++ [Ki]) e2'))) as H.
-      { apply (A i σ1 D _ κ σ2 efs). eapply (Ectx_step (Ks ++ [Ki])); done. }
-      destruct H as [v H]. apply to_val_fill_some in H. by destruct H, Ks.
-    - rename select (of_val vp = _) into Hvp.
-      assert (to_val (fill Ks e1') = Some vp) as Hfillvp by rewrite -Hvp //.
-      apply to_val_fill_some in Hfillvp as [-> ->]. inv_base_step.
-    - rename select (of_val vt = _) into Hvt.
-      assert (to_val (fill Ks e1') = Some vt) as Hfillvt by rewrite -Hvt //.
-      apply to_val_fill_some in Hfillvt as [-> ->]. inv_base_step.
-Qed.
-
-(** There is no rule for [Resolve] (Iris's [wp_resolve]). A proof here would
-compose the context with [ResolveLCtx], which needs an empty context, and
-[ectxi_language] does not allow one. *)
 
 End lifting.
