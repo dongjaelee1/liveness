@@ -616,7 +616,7 @@ Section proof.
 
   Corollary Queue_init_fbspec :
     ⊢ □ ∃ μ, ∀ lc φ i G C,
-    ⦃ fuels G 0 μ ⦄^G Queue.init #() @ i; C; ⊤ ⦃ ql, ∃ γ, £ lc ∗ is_queue_init ql γ φ ⦄^G.
+    fb{{ fuels G 0 μ }}^G Queue.init #() @ i; C; ⊤ fb{{ ql, ∃ γ, £ lc ∗ is_queue_init ql γ φ }}^G.
   Proof.
     iPoseProof Queue_init_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc φ i G C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
@@ -627,10 +627,10 @@ Section proof.
   (** SPEC-ENQUEUE *)
   Corollary Queue_enqueue_fbspec :
     ⊢ □ ∃ μ, ∀ lc i G g K B φ γ ℓ ℓg (ql x : val) C,
-    ⦃ fuels G 1%ordi μ ∗ crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗
-      ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗ φ x B ∗ is_queue ql γ ℓ φ ⦄^G
+    fb{{ fuels G 1%ordi μ ∗ crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗
+      ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗ φ x B ∗ is_queue ql γ ℓ φ }}^G
       Queue.enqueue ql x @ i; C; ⊤
-    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ B) ⦄^G.
+    fb{{ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ B) }}^G.
   Proof.
     iPoseProof Queue_enqueue_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i G g K B φ γ ℓ ℓg ql x C). rewrite /fbtriple /fbtriple_gen.
@@ -643,23 +643,23 @@ Section proof.
       shows the case [b = false], [x = SOMEV v]. *)
   Corollary Queue_dequeue_fbspec :
     ⊢ □ ∃ μ, ∀ lc m (b : bool) wg i G φ γ ℓ (ql : val) C,
-    ⦃ fuels G 1%ordi μ ∗ (if b then queue_worker γ wg else True) ∗ is_queue ql γ ℓ φ ⦄^G
+    fb{{ fuels G 1%ordi μ ∗ (if b then queue_worker γ wg else True) ∗ is_queue ql γ ℓ φ }}^G
       Queue.dequeue ql @ i; C; ⊤
-    ⦃ x, £ lc ∗
-         (match x with
-          | NONEV =>
-              (if b
-               then (∃ ng, thP_carriers i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
-                           queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
-               else (thP_carriers i G))
-          | SOMEV v =>
-              (∃ g B, φ v B ∗ crP_obls g ℓ B ∗ crP_fuel g ℓ m ∗ ⌜g ∉ G⌝ ∗
-                      (if b
-                       then (∃ ng, thP_carriers i ({[g; ng]} ∪ G) ∗ ⌜ng ∉ G ∧ g ≠ ng⌝ ∗
-                                   queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
-                       else (thP_carriers i ({[g]} ∪ G))))
-          | _ => False
-          end) ⦄.
+    fb{{ x, £ lc ∗
+            (match x with
+             | NONEV =>
+                 (if b
+                  then (∃ ng, thP_carriers i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
+                              queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
+                  else (thP_carriers i G))
+             | SOMEV v =>
+                 (∃ g B, φ v B ∗ crP_obls g ℓ B ∗ crP_fuel g ℓ m ∗ ⌜g ∉ G⌝ ∗
+                         (if b
+                          then (∃ ng, thP_carriers i ({[g; ng]} ∪ G) ∗ ⌜ng ∉ G ∧ g ≠ ng⌝ ∗
+                                      queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
+                          else (thP_carriers i ({[g]} ∪ G))))
+             | _ => False
+             end) }}.
   Proof.
     iPoseProof Queue_dequeue_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc m b wg i G φ γ ℓ ql C). rewrite /fbtriple_gen. iIntros (Φ) "Pre HΦ".

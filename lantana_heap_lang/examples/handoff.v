@@ -228,8 +228,8 @@ Section proof.
     is_task ℓ f a K ⊣⊢
     ∃ ℓt (P : iProp Σ), ⌜(ℓt < ℓ)%ordi⌝ ∧ P ∗
       ∃ μ, ∀ lc i G g K' ℓg C,
-        □ ⦃ fuels G ℓt μ ∗ crP_obls g ℓg K' ∗ ⌜K ⊆ K'⌝ ∗ P ⦄^G f a @ i; C; ⊤
-          ⦃ _, £ lc ∗ crP_obls g ℓg (K' ∖ K) ⦄^G.
+        □ fb{{ fuels G ℓt μ ∗ crP_obls g ℓg K' ∗ ⌜K ⊆ K'⌝ ∗ P }}^G f a @ i; C; ⊤
+          fb{{ _, £ lc ∗ crP_obls g ℓg (K' ∖ K) }}^G.
   Proof.
     rewrite /is_task /fbtriple /fbtriple_gen. iSplit.
     - iIntros "(%ℓt& %P& %Hlt& HP& %μ& #H)". iExists ℓt, P. iSplit; first done. iFrame "HP".
@@ -245,10 +245,10 @@ Section proof.
   (** SPEC-SEND *)
   Corollary Handoff_send_fbspec :
     ⊢ □ ∃ μ, ∀ lc i (b : loc) (f a : val) G g K K' γ ℓ ℓg C,
-    ⦃ fuels G 0 μ ∗ crP_obls g ℓg K' ∗ ⌜K ⊆ K'⌝ ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ%ordi 1) ∗
-      b ↦{#(1/2)} NONEV ∗ is_task ℓ f a K ∗ is_handoff b γ ℓ ⦄^G
+    fb{{ fuels G 0 μ ∗ crP_obls g ℓg K' ∗ ⌜K ⊆ K'⌝ ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ%ordi 1) ∗
+      b ↦{#(1/2)} NONEV ∗ is_task ℓ f a K ∗ is_handoff b γ ℓ }}^G
       Handoff.send #b f a @ i; C; ⊤
-    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K' ∖ K) ⦄^G.
+    fb{{ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K' ∖ K) }}^G.
   Proof.
     iPoseProof Handoff_send_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i b f a G g K K' γ ℓ ℓg C). rewrite /fbtriple /fbtriple_gen.
@@ -259,9 +259,9 @@ Section proof.
   (** SPEC-RECEIVE *)
   Corollary Handoff_receive_fbspec :
     ⊢ □ ∃ μ, ∀ lc i (b : loc) g γ ℓ C,
-    ⦃ fuels {[g]} ℓ μ ∗ ghost_var (handoff_γd γ) (1/2)%Qp g ∗ is_handoff b γ ℓ ⦄^{[g]}
+    fb{{ fuels {[g]} ℓ μ ∗ ghost_var (handoff_γd γ) (1/2)%Qp g ∗ is_handoff b γ ℓ }}^{[g]}
       Handoff.receive #b @ i; C; ⊤
-    ⦃ v, £ lc ⦄^∅.
+    fb{{ v, £ lc }}^∅.
   Proof.
     iPoseProof Handoff_receive_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i b g γ ℓ C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".

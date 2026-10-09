@@ -37,7 +37,7 @@ Section derived.
 
   (** Move the precondition into the context ([fbtriple_wand_pre]). *)
   Lemma fb_intro s i C E G G' P e Q :
-    (P -∗ ⦃ True ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G') ⊢ ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    (P -∗ fb{{ True }}^G e @ s; i; C; E fb{{ v, Q v }}^G') ⊢ fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     iIntros "H". iApply (fbtriple_conseq _ _ _ _ _ _ (True ∗ P)%I P e Q Q with "[] [] [H]").
     - by iIntros "$".
@@ -47,7 +47,7 @@ Section derived.
 
   (** Supply a precondition from the context (consequence). *)
   Lemma fb_pre s i C E G G' (R : iProp Σ) e Q :
-    R -∗ ⦃ R ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G' -∗ ⦃ True ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    R -∗ fb{{ R }}^G e @ s; i; C; E fb{{ v, Q v }}^G' -∗ fb{{ True }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     iIntros "HR H". iApply (fbtriple_conseq with "[HR] [] H").
     - iIntros "_". iExact "HR".
@@ -56,8 +56,8 @@ Section derived.
 
   (** Eliminate an update (UPD-ELIM). *)
   Lemma fb_upd s i C E G G' (R : iProp Σ) e Q :
-    (|={E}=> R) -∗ (R -∗ ⦃ True ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G') -∗
-    ⦃ True ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    (|={E}=> R) -∗ (R -∗ fb{{ True }}^G e @ s; i; C; E fb{{ v, Q v }}^G') -∗
+    fb{{ True }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     iIntros "HR H". iApply (fb_pre with "HR"). iApply fbtriple_upd_elim. by iApply fb_intro.
   Qed.
@@ -65,8 +65,8 @@ Section derived.
   (** A pure step in the evaluation context [K] ([fbtriple_pure_step]). *)
   Lemma fb_pure s i C E G G' K e1 e2 φ Q :
     PureExec φ 1 e1 e2 → φ →
-    fuels G 0 1 -∗ ⦃ True ⦄^G fill K e2 @ s; i; C; E ⦃ v, Q v ⦄^G' -∗
-    ⦃ True ⦄^G fill K e1 @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    fuels G 0 1 -∗ fb{{ True }}^G fill K e2 @ s; i; C; E fb{{ v, Q v }}^G' -∗
+    fb{{ True }}^G fill K e1 @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     iIntros (Hexec Hφ) "F H". iApply (fb_pre _ _ _ _ _ _ (fuels G 0 1 ∗ True)%I with "[F]").
     { by iFrame. }
@@ -77,9 +77,9 @@ Section derived.
 
   (** Run the subexpression [e] at the evaluation context [K] with its own triple (BIND). *)
   Lemma fb_call s i C E K G0 G1 G2 P e Q1 (R : val → iProp Σ) :
-    ⦃ P ⦄^G0 e @ s; i; K ++ C; E ⦃ v, Q1 v ⦄^G1 -∗ P -∗
-    (∀ v, Q1 v -∗ ⦃ True ⦄^G1 fill K (of_val v) @ s; i; C; E ⦃ w, R w ⦄^G2) -∗
-    ⦃ True ⦄^G0 fill K e @ s; i; C; E ⦃ w, R w ⦄^G2.
+    fb{{ P }}^G0 e @ s; i; K ++ C; E fb{{ v, Q1 v }}^G1 -∗ P -∗
+    (∀ v, Q1 v -∗ fb{{ True }}^G1 fill K (of_val v) @ s; i; C; E fb{{ w, R w }}^G2) -∗
+    fb{{ True }}^G0 fill K e @ s; i; C; E fb{{ w, R w }}^G2.
   Proof.
     iIntros "H HP Hk". iApply (fb_pre with "HP").
     iApply (fbtriple_bind with "H"). iIntros (v). iApply fb_intro. iApply "Hk".
@@ -88,8 +88,8 @@ Section derived.
   (** CARRIER-ALLOC. *)
   Lemma fb_alloc s i C E G G' ℓ μ e Q :
     (∀ g, ⌜g ∉ G⌝ -∗ crP_obls g ℓ ∅ -∗ fuels {[g]} ℓ μ -∗
-          ⦃ True ⦄^({[g]} ∪ G) e @ s; i; C; E ⦃ v, Q v ⦄^G') -∗
-    ⦃ True ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+          fb{{ True }}^({[g]} ∪ G) e @ s; i; C; E fb{{ v, Q v }}^G') -∗
+    fb{{ True }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     iIntros "H". iApply (fbtriple_carrier_alloc _ _ _ _ _ _ ℓ μ). iIntros (g Hg).
     iApply fb_intro. iIntros "(_& Cg& Fg)". by iApply ("H" with "[//] Cg Fg").
@@ -98,8 +98,8 @@ Section derived.
   (** CARRIER-DELETE. *)
   Lemma fb_delete s i C E G G' g ℓ e Q :
     g ∈ G →
-    crP_obls g ℓ ∅ -∗ ⦃ True ⦄^(G ∖ {[g]}) e @ s; i; C; E ⦃ v, Q v ⦄^G' -∗
-    ⦃ True ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    crP_obls g ℓ ∅ -∗ fb{{ True }}^(G ∖ {[g]}) e @ s; i; C; E fb{{ v, Q v }}^G' -∗
+    fb{{ True }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     iIntros (Hg) "Cg H". iApply (fb_pre _ _ _ _ _ _ (True ∗ crP_obls g ℓ ∅)%I with "[Cg]").
     { by iFrame. }
@@ -108,7 +108,7 @@ Section derived.
 
   (** EXIT, for a thread that ends with no carriers. *)
   Lemma fb_exit s i C E v :
-    ⊢ ⦃ True ⦄^∅ (of_val v) @ s; i; C; E ⦃ _, True ⦄^∅.
+    ⊢ fb{{ True }}^∅ (of_val v) @ s; i; C; E fb{{ _, True }}^∅.
   Proof.
     iApply (fbtriple_conseq _ _ _ _ _ _ True%I True%I (of_val v) (λ w, ⌜w = v⌝)%I
               (λ _, True)%I with "[] [] []"); last iApply fbtriple_exit.
@@ -119,8 +119,8 @@ Section derived.
   (** [fb_pure] in proof-mode form, for the tactic [fb_pure] below. *)
   Lemma tac_fb_pure Δ s i C E G G' K e1 e2 φ Q :
     PureExec φ 1 e1 e2 → φ →
-    envs_entails Δ (fuels G 0 1 ∗ ⦃ True ⦄^G fill K e2 @ s; i; C; E ⦃ v, Q v ⦄^G') →
-    envs_entails Δ (⦃ True ⦄^G fill K e1 @ s; i; C; E ⦃ v, Q v ⦄^G').
+    envs_entails Δ (fuels G 0 1 ∗ fb{{ True }}^G fill K e2 @ s; i; C; E fb{{ v, Q v }}^G') →
+    envs_entails Δ (fb{{ True }}^G fill K e1 @ s; i; C; E fb{{ v, Q v }}^G').
   Proof.
     rewrite envs_entails_unseal => ?? ->. iIntros "[F H]". by iApply (fb_pure with "F H").
   Qed.
@@ -164,9 +164,9 @@ Section proof.
       paper's g_e, g_f, k_f and k_e. *)
   Lemma FlagFork_main_fbspec :
     ⊢ □ ∃ μ, ∀ i g kr,
-    ⦃ fuels {[g]} (1)%ordi μ ∗ crP_obls g 1 {[kr]} ∗ ⟦finallyP Nr kr 1 (exits #42@i)⟧ₗ ⦄^{[g]}
+    fb{{ fuels {[g]} (1)%ordi μ ∗ crP_obls g 1 {[kr]} ∗ ⟦finallyP Nr kr 1 (exits #42@i)⟧ₗ }}^{[g]}
       FlagFork.main #() @ i; []; ⊤
-    ⦃ v, ⌜v = #42⌝ ⦄^∅.
+    fb{{ v, ⌜v = #42⌝ }}^∅.
   Proof.
     iIntros "!>".
     (** The setup destructs the three specifications for their budgets. *)

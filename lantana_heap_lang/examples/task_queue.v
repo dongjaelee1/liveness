@@ -297,11 +297,11 @@ Section proof.
   (** SPEC-PUT-TASK *)
   Corollary TaskQueue_put_task_fbspec :
     ⊢ □ ∃ μ, ∀ lc i G g K B γ ℓ ℓg (ql task_f task_a : val) C,
-    ⦃ fuels G 1%ordi μ ∗ crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗
+    fb{{ fuels G 1%ordi μ ∗ crP_obls g ℓg K ∗ ⌜B ⊆ K⌝ ∗
       ([∗ set] b ∈ B, oblP_fuel b (ℓ ⊕ 1)%ordi 1) ∗
-      is_task ℓ task_f task_a B ∗ is_task_queue ql γ ℓ ⦄^G
+      is_task ℓ task_f task_a B ∗ is_task_queue ql γ ℓ }}^G
       TaskQueue.put_task ql task_f task_a @ i; C; ⊤
-    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ B) ⦄^G.
+    fb{{ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ B) }}^G.
   Proof.
     iPoseProof TaskQueue_put_task_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i G g K B γ ℓ ℓg ql task_f task_a C). rewrite /fbtriple /fbtriple_gen.
@@ -314,14 +314,14 @@ Section proof.
       the postcondition states them (the general form). *)
   Corollary TaskQueue_run_task_fbspec :
     ⊢ □ ∃ μ, ∀ lc m (b : bool) wg i G γ ℓ (ql : val) C,
-    ⦃ fuels G (1)%ordi μ ∗ fuels G (ℓ)%ordi 1 ∗ (if b then queue_worker γ wg else True) ∗
-      is_task_queue ql γ ℓ ⦄^G
+    fb{{ fuels G (1)%ordi μ ∗ fuels G (ℓ)%ordi 1 ∗ (if b then queue_worker γ wg else True) ∗
+      is_task_queue ql γ ℓ }}^G
       TaskQueue.run_task ql @ i; C; ⊤
-    ⦃ rv, £ lc ∗
-          (if b
-           then (∃ ng, thP_carriers i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
-                       queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
-           else (thP_carriers i G)) ⦄.
+    fb{{ rv, £ lc ∗
+             (if b
+              then (∃ ng, thP_carriers i ({[ng]} ∪ G) ∗ ⌜ng ∉ G⌝ ∗
+                          queue_worker γ ng ∗ crP_obls wg ℓ ∅ ∗ crP_fuel ng ℓ m)
+              else (thP_carriers i G)) }}.
   Proof.
     iPoseProof TaskQueue_run_task_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc m b wg i G γ ℓ ql C). rewrite /fbtriple_gen. iIntros (Φ) "Pre HΦ".
@@ -332,12 +332,12 @@ Section proof.
   (** SPEC-WORKER *)
   Corollary TaskQueue_worker_fbspec :
     ⊢ □ ∃ μ, ∀ (b : bool) i G γ ℓ (ql : val) C,
-    ⦃ (if b
-       then (∃ g, ⌜G = {[g]} ∧ (1 <= ℓ)%ordi⌝ ∧ (crP_fuel g (ℓ)%ordi μ) ∗ queue_worker γ g)
-       else (⌜G = ∅⌝)) ∗
-      is_task_queue ql γ ℓ ⦄^G
+    fb{{ (if b
+          then (∃ g, ⌜G = {[g]} ∧ (1 <= ℓ)%ordi⌝ ∧ (crP_fuel g (ℓ)%ordi μ) ∗ queue_worker γ g)
+          else (⌜G = ∅⌝)) ∗
+      is_task_queue ql γ ℓ }}^G
       TaskQueue.worker ql @ i; C; ⊤
-    ⦃ v, False ⦄^G.
+    fb{{ v, False }}^G.
   Proof.
     iPoseProof TaskQueue_worker_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (b i G γ ℓ ql C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
@@ -346,8 +346,8 @@ Section proof.
 
   Corollary TaskQueue_init_fbspec :
     ⊢ □ ∃ μ, ∀ (lc : Ord.t) i G ℓ C,
-    ⦃ fuels G 0 μ ∗ ⌜(1 <= ℓ)%ordi⌝ ⦄^G TaskQueue.init #() @ i; C; ⊤
-    ⦃ ql, ∃ γ, £ lc ∗ is_task_queue ql γ ℓ ⦄^G.
+    fb{{ fuels G 0 μ ∗ ⌜(1 <= ℓ)%ordi⌝ }}^G TaskQueue.init #() @ i; C; ⊤
+    fb{{ ql, ∃ γ, £ lc ∗ is_task_queue ql γ ℓ }}^G.
   Proof.
     iPoseProof TaskQueue_init_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i G ℓ C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".

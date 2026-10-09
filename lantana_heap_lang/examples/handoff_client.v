@@ -45,9 +45,9 @@ Section proof.
       obligation are at 1; [main]'s exit obligation is at 2. *)
   Lemma main_fbspec :
     ⊢ □ ∃ μ, ∀ i g kl,
-    ⦃ fuels {[g]} 2 μ ∗ crP_obls g 2 {[kl]} ∗ ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ⦄^{[g]}
+    fb{{ fuels {[g]} 2 μ ∗ crP_obls g 2 {[kl]} ∗ ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ }}^{[g]}
       main #() @ i; []; ⊤
-    ⦃ v, ⌜v = #1⌝ ⦄^∅.
+    fb{{ v, ⌜v = #1⌝ }}^∅.
   Proof using handoffG0.
     rewrite /fbtriple /fbtriple_gen. iModIntro.
     iPoseProof (Flag_init_spec) as (μ_fi) "Flag_init_spec".

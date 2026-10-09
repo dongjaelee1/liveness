@@ -136,12 +136,12 @@ Section proof.
   (** SPEC-DECR, in the paper's format: a corollary of the texan specification above. *)
   Corollary decr_reentrant_fbspec :
     ⊢ □ ∃ μ, ∀ lc i G g k K γ ℓg (arg : val) C,
-    ⦃ fuels G 1%ordi μ ∗ crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗
+    fb{{ fuels G 1%ordi μ ∗ crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗
       ∃ (ql : val) (x : loc) (n : Z),
-        ⌜arg = (ql, #x, #n)%V⌝ ∗ oblP_fuel k (ℓq ⊕ 1)%ordi (Z.to_nat n)%M ∗ flag_tk x k ∗
-        is_decr_reentrant arg γ k ⦄^G
+           ⌜arg = (ql, #x, #n)%V⌝ ∗ oblP_fuel k (ℓq ⊕ 1)%ordi (Z.to_nat n)%M ∗ flag_tk x k ∗
+           is_decr_reentrant arg γ k }}^G
       decr_reentrant arg @ i; C; ⊤
-    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ {[k]}) ⦄^G.
+    fb{{ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ {[k]}) }}^G.
   Proof.
     iPoseProof decr_reentrant_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i G g k K γ ℓg arg C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
@@ -153,10 +153,10 @@ Section proof.
       with no carriers. *)
   Lemma main_fbspec :
     ⊢ □ ∃ μ, ∀ i g kl,
-    ⦃ fuels {[g]} (ℓq ⊕ 2)%ordi μ ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
-      ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ⦄^{[g]}
+    fb{{ fuels {[g]} (ℓq ⊕ 2)%ordi μ ∗ crP_obls g (ℓq ⊕ 2)%ordi {[kl]} ∗
+      ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ }}^{[g]}
       main #() @ i; []; ⊤
-    ⦃ v, ⌜v = #1⌝ ⦄^∅.
+    fb{{ v, ⌜v = #1⌝ }}^∅.
   Proof using queueG0 ticket_lockG0.
     rewrite /fbtriple /fbtriple_gen. iModIntro.
     unfold main.

@@ -10,7 +10,7 @@ In dependency order: each file imports only files above it.
 
 | File | Imports from this directory | Contents |
 |---|---|---|
-| `language.v` | — | The `language` interface, whose steps `prim_step` have a thread id, the set of ids in use, and forked threads. Thread pools and configurations (`cfg`), thread steps (`thread_step`, `thread_done`, `thread_stuck`), traces, and the coinductive `behavior` (the paper's `Behavior`, plus the stutter `thread_stuck` for a scheduled stuck thread, which the submitted paper's Fig. 6 does not have), plus the ordinal bounds `fair_sched_fun` and `fair_sched_ub` used by the adequacy proofs. |
+| `language.v` | — | The `language` interface, whose steps `prim_step` have a thread id, the set of ids in use, and forked threads. Thread pools and configurations (`cfg`), thread steps (`thread_step`, `thread_done`, `thread_stuck`), traces, and the coinductive `behavior` (the paper's `Behavior`; `thread_stuck` lets a scheduled stuck thread stutter), plus the ordinal bounds `fair_sched_fun` and `fair_sched_ub` used by the adequacy proofs. |
 | `ectx_language.v` | `language.v` | Languages defined by evaluation contexts and base steps (`ectxLanguage`), and their `language` instance. |
 | `ectxi_language.v` | `ectx_language.v`, `language.v` | Languages defined by evaluation-context items (`ectxiLanguage`), and their `ectxLanguage` instance. HeapLang is defined this way. |
 | `history_interp.v` | `language.v` | Ghost state for the execution history (`history_interp`, `event_pred`), and the class `state_interp_class` of state interpretations that a language instance provides (the paper's `S`). |

@@ -237,9 +237,9 @@ Section proof.
   (** SPEC-INIT *)
   Corollary Flag_init_fbspec :
     ⊢ □ ∃ μ, ∀ lc i G g K ℓ m C,
-    ⦃ fuels G 0 μ ∗ crP_obls g ℓ K ⦄^G Flag.init #() @ i; C; ⊤
-    ⦃ v, ∃ (x : loc) k, ⌜v = #x⌝ ∗ £ lc ∗ ⌜k ∉ K⌝ ∗ crP_obls g ℓ ({[k]} ∪ K) ∗
-                       oblP_fuel k ℓ m ∗ flag_tk x k ∗ is_flag x k ℓ ⦄^G.
+    fb{{ fuels G 0 μ ∗ crP_obls g ℓ K }}^G Flag.init #() @ i; C; ⊤
+    fb{{ v, ∃ (x : loc) k, ⌜v = #x⌝ ∗ £ lc ∗ ⌜k ∉ K⌝ ∗ crP_obls g ℓ ({[k]} ∪ K) ∗
+                          oblP_fuel k ℓ m ∗ flag_tk x k ∗ is_flag x k ℓ }}^G.
   Proof.
     iPoseProof Flag_init_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i G g K ℓ m C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
@@ -250,9 +250,9 @@ Section proof.
   (** SPEC-SET *)
   Corollary Flag_set_fbspec :
     ⊢ □ ∃ μ, ∀ lc i (l : loc) G g K k ℓ ℓg C,
-    ⦃ fuels G 0 μ ∗ crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗ flag_tk l k ∗ is_flag l k ℓ ⦄^G
+    fb{{ fuels G 0 μ ∗ crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗ flag_tk l k ∗ is_flag l k ℓ }}^G
       Flag.set #l @ i; C; ⊤
-    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k ⦄^G.
+    fb{{ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}^G.
   Proof.
     iPoseProof Flag_set_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i l G g K k ℓ ℓg C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
@@ -263,8 +263,8 @@ Section proof.
   (** SPEC-WAIT *)
   Corollary Flag_wait_fbspec :
     ⊢ □ ∃ μ, ∀ lc i (l : loc) G k ℓ C,
-    ⦃ fuels G (ℓ ⊕ 1)%ordi μ ∗ is_flag l k ℓ ⦄^G Flag.wait #l @ i; C; ⊤
-    ⦃ v, ⌜v = #1⌝ ∗ £ lc ∗ oblP_discharged k ⦄^G.
+    fb{{ fuels G (ℓ ⊕ 1)%ordi μ ∗ is_flag l k ℓ }}^G Flag.wait #l @ i; C; ⊤
+    fb{{ v, ⌜v = #1⌝ ∗ £ lc ∗ oblP_discharged k }}^G.
   Proof.
     iPoseProof Flag_wait_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i l G k ℓ C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".

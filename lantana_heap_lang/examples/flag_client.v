@@ -53,11 +53,11 @@ Section proof.
   (** The writer's closed specification, in the paper's format: it ends with no carriers. *)
   Lemma writer_fbspec :
     ⊢ □ ∃ μ, ∀ i g k kl,
-    ⦃ fuels {[g]} 0 μ ∗ crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
+    fb{{ fuels {[g]} 0 μ ∗ crP_obls g 0 {[k; kl]} ∗ ⌜k ≠ kl⌝ ∗
       (* Start with the other half of the until ownership for the pointsto. *)
-      flag_tk l k ∗ ⟦finallyP Nl kl 1 (exits #()@i)⟧ₗ ∗ is_flag l k 0 ⦄^{[g]}
+      flag_tk l k ∗ ⟦finallyP Nl kl 1 (exits #()@i)⟧ₗ ∗ is_flag l k 0 }}^{[g]}
       writer #() @ i; []; ⊤
-    ⦃ v, ⌜v = #()⌝ ⦄^∅.
+    fb{{ v, ⌜v = #()⌝ }}^∅.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iModIntro.
     iPoseProof (Flag_set_spec) as (μ_s) "Flag_set_spec".
@@ -107,10 +107,10 @@ Section proof.
   (** The reader's closed specification, in the paper's format: it ends with no carriers. *)
   Lemma reader_fbspec :
     ⊢ □ ∃ μ, ∀ i g k kl,
-    ⦃ fuels {[g]} 1 μ ∗ crP_obls g 1 {[kl]} ∗ ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ∗
-      is_flag l k 0 ⦄^{[g]}
+    fb{{ fuels {[g]} 1 μ ∗ crP_obls g 1 {[kl]} ∗ ⟦finallyP Nl kl 1 (exits #1@i)⟧ₗ ∗
+      is_flag l k 0 }}^{[g]}
       reader #() @ i; []; ⊤
-    ⦃ v, ⌜v = #1⌝ ⦄^∅.
+    fb{{ v, ⌜v = #1⌝ }}^∅.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iModIntro.
     iPoseProof (Flag_wait_spec) as (μ_w) "Flag_wait_spec".

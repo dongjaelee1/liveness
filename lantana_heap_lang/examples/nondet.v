@@ -224,10 +224,10 @@ Section proof.
   (** SPEC-NEST *)
   Corollary Nondet_nest_fbspec :
     ⊢ □ ∃ μ, ∀ lc i (x : loc) (n : Z) G g K k ℓg C,
-    ⦃ fuels G (Z.to_nat n)%ordi μ ∗ crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗ flag_tk x k ∗
-      is_flag x k (Z.to_nat n) ⦄^G
+    fb{{ fuels G (Z.to_nat n)%ordi μ ∗ crP_obls g ℓg K ∗ ⌜k ∈ K⌝ ∗ flag_tk x k ∗
+      is_flag x k (Z.to_nat n) }}^G
       Nondet.nest #x #n @ i; C; ⊤
-    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k ⦄^G.
+    fb{{ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}^G.
   Proof.
     iPoseProof Nondet_nest_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i x n G g K k ℓg C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
@@ -238,7 +238,7 @@ Section proof.
   (** SPEC-NONDET *)
   Corollary Nondet_nondet_fbspec :
     ⊢ □ ∃ μ, ∀ i G C,
-    ⦃ fuels G (ω)%ordi μ ⦄^G Nondet.nondet #() @ i; C; ⊤ ⦃ v, ⌜v = #1⌝ ⦄^G.
+    fb{{ fuels G (ω)%ordi μ }}^G Nondet.nondet #() @ i; C; ⊤ fb{{ v, ⌜v = #1⌝ }}^G.
   Proof.
     iPoseProof Nondet_nondet_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (i G C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".

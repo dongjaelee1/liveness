@@ -995,9 +995,9 @@ Section proof.
 
   Corollary TicketLock_init_fbspec :
     ⊢ □ ∃ μ, ∀ lc ℓ i G (E : coPset) C,
-    ⦃ fuels G 0 μ ⦄^G TicketLock.init #() @ i; C; E
-    ⦃ tl, ∃ γ, £ lc ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
-              (∀ E R, ⟦R⟧ₗ ={E}=∗ is_fair_lock tl γ R) ⦄^G.
+    fb{{ fuels G 0 μ }}^G TicketLock.init #() @ i; C; E
+    fb{{ tl, ∃ γ, £ lc ∗ γ ↪LOCK_AL ∗ γ ↪LOCK_CF ℓ ∗
+                 (∀ E R, ⟦R⟧ₗ ={E}=∗ is_fair_lock tl γ R) }}^G.
   Proof.
     iPoseProof TicketLock_init_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc ℓ i G E C). rewrite /fbtriple /fbtriple_gen. iIntros (Φ) "Pre HΦ".
@@ -1009,11 +1009,11 @@ Section proof.
       states them (the general form). *)
   Corollary TicketLock_acquire_fbspec :
     ⊢ □ ∃ μ, ∀ lc m i G tl γ dq1 dq2 ℓ R (E : coPset) (MASK : ↑N ⊆ E) C,
-    ⦃ fuels G (ℓ ⊕ 1)%ordi μ ∗ γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ is_fair_lock tl γ R ⦄^G
+    fb{{ fuels G (ℓ ⊕ 1)%ordi μ ∗ γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ is_fair_lock tl γ R }}^G
       TicketLock.acquire tl @ i; C; E
-    ⦃ v, ∃ gu κu, ⌜v = #()⌝ ∗ £ lc ∗ ⌜gu ∉ G⌝ ∗ thP_carriers i ({[gu]} ∪ G) ∗
-                  crP_obls gu ℓ {[κu]} ∗ fuels {[gu]} ℓ m ∗ oblP_fuel κu ℓ m ∗
-                  γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ ⦄.
+    fb{{ v, ∃ gu κu, ⌜v = #()⌝ ∗ £ lc ∗ ⌜gu ∉ G⌝ ∗ thP_carriers i ({[gu]} ∪ G) ∗
+                     crP_obls gu ℓ {[κu]} ∗ fuels {[gu]} ℓ m ∗ oblP_fuel κu ℓ m ∗
+                     γ ↪LOCK_AL{dq1} ∗ γ ↪LOCK_CF{dq2} ℓ ∗ lock_token γ κu ∗ ⟦R⟧ₗ }}.
   Proof.
     iPoseProof TicketLock_acquire_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc m i G tl γ dq1 dq2 ℓ R E MASK C). rewrite /fbtriple_gen.
@@ -1025,10 +1025,10 @@ Section proof.
   (** SPEC-RELEASE *)
   Corollary TicketLock_release_fbspec :
     ⊢ □ ∃ μ, ∀ lc i G tl γ dq R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
-    ⦃ fuels G 0 μ ∗ crP_obls gu ℓu K ∗ ⌜κu ∈ K⌝ ∗ lock_token γ κu ∗ ⟦R⟧ₗ ∗
-      γ ↪LOCK_AL{dq} ∗ is_fair_lock tl γ R ⦄^G
+    fb{{ fuels G 0 μ ∗ crP_obls gu ℓu K ∗ ⌜κu ∈ K⌝ ∗ lock_token γ κu ∗ ⟦R⟧ₗ ∗
+      γ ↪LOCK_AL{dq} ∗ is_fair_lock tl γ R }}^G
       TicketLock.release tl @ i; C; E
-    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ γ ↪LOCK_AL{dq} ⦄^G.
+    fb{{ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ γ ↪LOCK_AL{dq} }}^G.
   Proof.
     iPoseProof TicketLock_release_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i G tl γ dq R κu gu ℓu K E MASK C). rewrite /fbtriple /fbtriple_gen.
@@ -1038,10 +1038,10 @@ Section proof.
 
   Corollary TicketLock_delete_fbspec :
     ⊢ □ ∃ μ, ∀ lc i G tl γ R κu gu ℓu K (E : coPset) (MASK : ↑N ⊆ E) C,
-    ⦃ fuels G 0 μ ∗ crP_obls gu ℓu K ∗ ⌜κu ∈ K⌝ ∗ lock_token γ κu ∗ ⟦R⟧ₗ ∗
-      γ ↪LOCK_AL ∗ is_fair_lock tl γ R ⦄^G
+    fb{{ fuels G 0 μ ∗ crP_obls gu ℓu K ∗ ⌜κu ∈ K⌝ ∗ lock_token γ κu ∗ ⟦R⟧ₗ ∗
+      γ ↪LOCK_AL ∗ is_fair_lock tl γ R }}^G
       TicketLock.delete tl @ i; C; E
-    ⦃ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ ⟦R⟧ₗ ⦄^G.
+    fb{{ v, ⌜v = #()⌝ ∗ £ lc ∗ crP_obls gu ℓu (K ∖ {[κu]}) ∗ ⟦R⟧ₗ }}^G.
   Proof.
     iPoseProof TicketLock_delete_spec as (μ) "#H". iIntros "!>". iExists μ.
     iIntros (lc i G tl γ R κu gu ℓu K E MASK C). rewrite /fbtriple /fbtriple_gen.

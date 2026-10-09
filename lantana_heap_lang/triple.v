@@ -9,14 +9,12 @@
       use [C = []], where the token for a value [v] is [exits v@i].
 
     As in the paper, a triple is not persistent. A specification is a persistent triple,
-    [□ ∃ μ, ∀ …, ⦃ P ⦄^G e @ i; C; E ⦃ v, Q ⦄^G'], which is the texan triple of the case
+    [□ ∃ μ, ∀ …, fb{{ P }}^G e @ i; C; E fb{{ v, Q }}^G'], which is the texan triple of the case
     studies ([fbtriple_texan]); the case studies restate their specifications in this form.
     Every triple-based rule displayed in the paper is proved below, named [fbtriple_*] and
     marked with the paper's rule name; the paper elides later modalities, masks, and later
-    credits, which appear here. Where a rule deviates from the submitted paper, its comment says
-    how: CARRIER-ALLOC and CARRIER-DELETE (post-carriers), and FINALLY-EXIT* (the thread's last
-    step instead of [Return]). Logic-level rules (fuels, until, persistence) are restated at
-    the end. *)
+    credits, which appear here. Where a rule generalizes the displayed one, its comment says
+    how. Logic-level rules (fuels, until, persistence) are restated at the end. *)
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From lantana.base_logic Require Export invariants.
@@ -47,25 +45,27 @@ Section definition.
     fbtriple_gen s i C E G P e (λ v, thP_carriers i G' ∗ Q v)%I.
 End definition.
 
-(** [⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q ⦄^G'] is the paper's [{P}^G_i e {v. Q}^G'_E]. The carrier
-    sets [G] and [G'] are parsed at level 9, so compound sets need parentheses. *)
-Notation "'⦃' P '⦄^' G e @ s ; i ; C ; E '⦃' v , Q '⦄^' G'" :=
+(** [fb{{ P }}^G e @ s; i; C; E fb{{ v, Q }}^G'] (fb for fuel-burning) is the paper's
+    [{P}^G_i e {v. Q}^G'_E]. The carrier sets [G] and [G'] are parsed at level 9, so compound
+    sets need parentheses. As in Iris, the closing braces are declared as [} }], so that [}}]
+    does not become a token. *)
+Notation "'fb{{' P } } ^ G e @ s ; i ; C ; E 'fb{{' v , Q } } ^ G'" :=
   (fbtriple s i C E G G' P%I e%E (λ v, Q%I))
   (at level 20, G at level 9, G' at level 9, P, e, Q at level 200, v name,
-   format "'[hv' ⦃  '[' P  ']' ⦄^ G  '/  ' e  '/' @  '[' s ;  '/' i ;  '/' C ;  '/' E  ']' '/' ⦃  '[' v ,  '/' Q  ']' ⦄^ G' ']'") : bi_scope.
-Notation "'⦃' P '⦄^' G e @ i ; C ; E '⦃' v , Q '⦄^' G'" :=
+   format "'[hv' fb{{  '[' P  ']' } } ^ G  '/  ' e  '/' @  '[' s ;  '/' i ;  '/' C ;  '/' E  ']' '/' fb{{  '[' v ,  '/' Q  ']' } } ^ G' ']'") : bi_scope.
+Notation "'fb{{' P } } ^ G e @ i ; C ; E 'fb{{' v , Q } } ^ G'" :=
   (fbtriple NotStuck i C E G G' P%I e%E (λ v, Q%I))
   (at level 20, G at level 9, G' at level 9, P, e, Q at level 200, v name,
-   format "'[hv' ⦃  '[' P  ']' ⦄^ G  '/  ' e  '/' @  '[' i ;  '/' C ;  '/' E  ']' '/' ⦃  '[' v ,  '/' Q  ']' ⦄^ G' ']'") : bi_scope.
-(** [⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q ⦄] is the general form: [Q] states the final carriers. *)
-Notation "'⦃' P '⦄^' G e @ s ; i ; C ; E '⦃' v , Q '⦄'" :=
+   format "'[hv' fb{{  '[' P  ']' } } ^ G  '/  ' e  '/' @  '[' i ;  '/' C ;  '/' E  ']' '/' fb{{  '[' v ,  '/' Q  ']' } } ^ G' ']'") : bi_scope.
+(** [fb{{ P }}^G e @ s; i; C; E fb{{ v, Q }}] is the general form: [Q] states the final carriers. *)
+Notation "'fb{{' P } } ^ G e @ s ; i ; C ; E 'fb{{' v , Q } }" :=
   (fbtriple_gen s i C E G P%I e%E (λ v, Q%I))
   (at level 20, G at level 9, P, e, Q at level 200, v name,
-   format "'[hv' ⦃  '[' P  ']' ⦄^ G  '/  ' e  '/' @  '[' s ;  '/' i ;  '/' C ;  '/' E  ']' '/' ⦃  '[' v ,  '/' Q  ']' ⦄ ']'") : bi_scope.
-Notation "'⦃' P '⦄^' G e @ i ; C ; E '⦃' v , Q '⦄'" :=
+   format "'[hv' fb{{  '[' P  ']' } } ^ G  '/  ' e  '/' @  '[' s ;  '/' i ;  '/' C ;  '/' E  ']' '/' fb{{  '[' v ,  '/' Q  ']' } } ']'") : bi_scope.
+Notation "'fb{{' P } } ^ G e @ i ; C ; E 'fb{{' v , Q } }" :=
   (fbtriple_gen NotStuck i C E G P%I e%E (λ v, Q%I))
   (at level 20, G at level 9, P, e, Q at level 200, v name,
-   format "'[hv' ⦃  '[' P  ']' ⦄^ G  '/  ' e  '/' @  '[' i ;  '/' C ;  '/' E  ']' '/' ⦃  '[' v ,  '/' Q  ']' ⦄ ']'") : bi_scope.
+   format "'[hv' fb{{  '[' P  ']' } } ^ G  '/  ' e  '/' @  '[' i ;  '/' C ;  '/' E  ']' '/' fb{{  '[' v ,  '/' Q  ']' } } ']'") : bi_scope.
 
 Section rules.
   Context `{!heapGS Σ}.
@@ -94,7 +94,7 @@ Section rules.
 
   Lemma fbtriple_gen_conseq s i C E G P P' e Q Q' :
     (P' -∗ P) -∗ (∀ v, Q v -∗ Q' v) -∗
-    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄ -∗ ⦃ P' ⦄^G e @ s; i; C; E ⦃ v, Q' v ⦄.
+    fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }} -∗ fb{{ P' }}^G e @ s; i; C; E fb{{ v, Q' v }}.
   Proof.
     rewrite /fbtriple_gen. iIntros "HP HQ H %Φ (TE& TG& HP') HΦ".
     iApply ("H" with "[$TE $TG HP HP']"); first by iApply "HP".
@@ -103,7 +103,7 @@ Section rules.
 
   Lemma fbtriple_conseq s i C E G G' P P' e Q Q' :
     (P' -∗ P) -∗ (∀ v, Q v -∗ Q' v) -∗
-    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G' -∗ ⦃ P' ⦄^G e @ s; i; C; E ⦃ v, Q' v ⦄^G'.
+    fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G' -∗ fb{{ P' }}^G e @ s; i; C; E fb{{ v, Q' v }}^G'.
   Proof.
     rewrite /fbtriple. iIntros "HP HQ H". iApply (fbtriple_gen_conseq with "HP [HQ] H").
     iIntros (v) "[$ HQv]". by iApply "HQ".
@@ -113,7 +113,7 @@ Section rules.
       clients' adequacy proofs use, where the thread has terminated. *)
   Lemma fbtriple_top_texan s i E G P e Q (R : val → iProp Σ) :
     (∀ v, thP_done i ∗ Q v ⊢ R v) →
-    □ ⦃ P ⦄^G e @ s; i; []; E ⦃ v, Q v ⦄^∅ ⊢
+    □ fb{{ P }}^G e @ s; i; []; E fb{{ v, Q v }}^∅ ⊢
     l{{{ thread_expr i [] e ∗ thP_carriers i G ∗ P }}} e @ s; i; E
     l{{{ v, RET v; thread_expr i [] (of_val v) ∗ R v }}}.
   Proof.
@@ -126,7 +126,7 @@ Section rules.
   (** * Structural rules *)
 
   Lemma fbtriple_value s i C E G v :
-    ⊢ ⦃ True ⦄^G (of_val v) @ s; i; C; E ⦃ w, ⌜w = v⌝ ⦄^G.
+    ⊢ fb{{ True }}^G (of_val v) @ s; i; C; E fb{{ w, ⌜w = v⌝ }}^G.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "%Φ (TE& TG& _) HΦ".
     iApply lwp_value. iApply "HΦ". by iFrame.
@@ -134,14 +134,14 @@ Section rules.
 
   (** EXIT *)
   Lemma fbtriple_exit s i C E v :
-    ⊢ ⦃ True ⦄^∅ (of_val v) @ s; i; C; E ⦃ w, ⌜w = v⌝ ⦄^∅.
+    ⊢ fb{{ True }}^∅ (of_val v) @ s; i; C; E fb{{ w, ⌜w = v⌝ }}^∅.
   Proof. apply fbtriple_value. Qed.
 
   (** A top-level triple, at the empty context and from and to the empty carrier set, gives
       the weakest precondition that adequacy (Theorem 1) consumes: the thread may exit. *)
   Lemma fbtriple_top_lwp s i E P e Q (Ψ : thread_id → val → iProp Σ) :
     (∀ v, Q v ⊢ Ψ i v) →
-    ⦃ P ⦄^∅ e @ s; i; []; E ⦃ v, Q v ⦄^∅ -∗
+    fb{{ P }}^∅ e @ s; i; []; E fb{{ v, Q v }}^∅ -∗
     thread_expr i [] e -∗ thP_carriers i ∅ -∗ P -∗
     lWP e @ s; i; E {{ lift_term i Ψ }}.
   Proof.
@@ -153,9 +153,9 @@ Section rules.
 
   (** BIND. The token for [e] lives in the context [K ++ C]. *)
   Lemma fbtriple_bind s i C E K G0 G1 G2 P e Q1 Q2 :
-    ⦃ P ⦄^G0 e @ s; i; K ++ C; E ⦃ v, Q1 v ⦄^G1 -∗
-    (∀ v, ⦃ Q1 v ⦄^G1 (fill K (of_val v)) @ s; i; C; E ⦃ w, Q2 w ⦄^G2) -∗
-    ⦃ P ⦄^G0 (fill K e) @ s; i; C; E ⦃ w, Q2 w ⦄^G2.
+    fb{{ P }}^G0 e @ s; i; K ++ C; E fb{{ v, Q1 v }}^G1 -∗
+    (∀ v, fb{{ Q1 v }}^G1 (fill K (of_val v)) @ s; i; C; E fb{{ w, Q2 w }}^G2) -∗
+    fb{{ P }}^G0 (fill K e) @ s; i; C; E fb{{ w, Q2 w }}^G2.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "H1 H2 %Φ (TE& TG& HP) HΦ".
     iEval (rewrite thread_expr_fill) in "TE". iApply (lwp_bind K).
@@ -165,7 +165,7 @@ Section rules.
 
   (** FRAME *)
   Lemma fbtriple_frame s i C E G G' P R e Q :
-    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G' ⊢ ⦃ P ∗ R ⦄^G e @ s; i; C; E ⦃ v, Q v ∗ R ⦄^G'.
+    fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G' ⊢ fb{{ P ∗ R }}^G e @ s; i; C; E fb{{ v, Q v ∗ R }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "H %Φ (TE& TG& HP& HR) HΦ".
     iApply ("H" with "[$TE $TG $HP]"). iIntros (v) "(TE& TG& HQ)". iApply "HΦ". iFrame.
@@ -175,9 +175,9 @@ Section rules.
       carriers [G1], from which the continuation starts. [fbtriple_bind] is the case of a fixed
       [G1]. *)
   Lemma fbtriple_gen_bind s i C E K G0 P e (R : val → gset ocid → iProp Σ) Q :
-    ⦃ P ⦄^G0 e @ s; i; K ++ C; E ⦃ v, ∃ G1, thP_carriers i G1 ∗ R v G1 ⦄ -∗
-    (∀ v G1, ⦃ R v G1 ⦄^G1 (fill K (of_val v)) @ s; i; C; E ⦃ w, Q w ⦄) -∗
-    ⦃ P ⦄^G0 (fill K e) @ s; i; C; E ⦃ w, Q w ⦄.
+    fb{{ P }}^G0 e @ s; i; K ++ C; E fb{{ v, ∃ G1, thP_carriers i G1 ∗ R v G1 }} -∗
+    (∀ v G1, fb{{ R v G1 }}^G1 (fill K (of_val v)) @ s; i; C; E fb{{ w, Q w }}) -∗
+    fb{{ P }}^G0 (fill K e) @ s; i; C; E fb{{ w, Q w }}.
   Proof.
     rewrite /fbtriple_gen. iIntros "H1 H2 %Φ (TE& TG& HP) HΦ".
     iEval (rewrite thread_expr_fill) in "TE". iApply (lwp_bind K).
@@ -187,7 +187,7 @@ Section rules.
 
   (** FRAME for the general form. *)
   Lemma fbtriple_gen_frame s i C E G P R e Q :
-    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄ ⊢ ⦃ P ∗ R ⦄^G e @ s; i; C; E ⦃ v, Q v ∗ R ⦄.
+    fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }} ⊢ fb{{ P ∗ R }}^G e @ s; i; C; E fb{{ v, Q v ∗ R }}.
   Proof.
     rewrite /fbtriple_gen. iIntros "H %Φ (TE& TG& HP& HR) HΦ".
     iApply ("H" with "[$TE $TG $HP]"). iIntros (v) "(TE& HQ)". iApply "HΦ". iFrame.
@@ -196,26 +196,26 @@ Section rules.
   (** Resources of a precondition can move into the proof context, since a triple is not
       persistent. The converse follows from [fbtriple_gen_conseq]. *)
   Lemma fbtriple_gen_wand_pre s i C E G P R e Q :
-    (R -∗ ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄) ⊢ ⦃ P ∗ R ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄.
+    (R -∗ fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}) ⊢ fb{{ P ∗ R }}^G e @ s; i; C; E fb{{ v, Q v }}.
   Proof.
     rewrite /fbtriple_gen. iIntros "H %Φ (TE& TG& HP& HR) HΦ".
     iApply ("H" with "HR [$TE $TG $HP] HΦ").
   Qed.
 
   Lemma fbtriple_wand_pre s i C E G G' P R e Q :
-    (R -∗ ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G') ⊢ ⦃ P ∗ R ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    (R -∗ fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G') ⊢ fb{{ P ∗ R }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof. rewrite /fbtriple. apply fbtriple_gen_wand_pre. Qed.
 
   (** UPD-ELIM, for Iris's fancy update and for Lantana's ghost update. *)
   Lemma fbtriple_upd_elim s i C E G G' P e Q :
-    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G' ⊢ ⦃ |={E}=> P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G' ⊢ fb{{ |={E}=> P }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "H %Φ (TE& TG& >HP) HΦ".
     iApply ("H" with "[$TE $TG $HP] HΦ").
   Qed.
 
   Lemma fbtriple_gupd_elim s i C E G G' P e Q :
-    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G' ⊢ ⦃ |={E}=>g P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G' ⊢ fb{{ |={E}=>g P }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "H %Φ (TE& TG& >HP) HΦ".
     iApply ("H" with "[$TE $TG $HP] HΦ").
@@ -223,8 +223,8 @@ Section rules.
 
   (** ALWAYS-ALLOC *)
   Lemma fbtriple_always_alloc s i C E G G' N (I : tf Σ) P e Q :
-    (⟦alwaysP N I⟧ₗ ⊢ ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G') →
-    ⊢ ⦃ P ∗ ▷ ⟦I⟧ₗ ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    (⟦alwaysP N I⟧ₗ ⊢ fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G') →
+    ⊢ fb{{ P ∗ ▷ ⟦I⟧ₗ }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen tf_always_logic. iIntros (H) "%Φ (TE& TG& HP& HI) HΦ".
     iMod (inv_alloc N with "HI") as "#Hinv".
@@ -236,8 +236,8 @@ Section rules.
       `{!Atomic (stuckness_to_atomicity s) e} :
     ↑N ⊆ E →
     ⟦alwaysP N I⟧ₗ -∗
-    ⦃ ▷ ⟦I⟧ₗ ∗ P ⦄^G e @ s; i; C; E ∖ ↑N ⦃ v, ▷ ⟦I⟧ₗ ∗ Q v ⦄^G' -∗
-    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    fb{{ ▷ ⟦I⟧ₗ ∗ P }}^G e @ s; i; C; E ∖ ↑N fb{{ v, ▷ ⟦I⟧ₗ ∗ Q v }}^G' -∗
+    fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen tf_always_logic.
     iIntros (HN) "#Hinv H %Φ (TE& TG& HP) HΦ".
@@ -248,24 +248,22 @@ Section rules.
 
   (** * Carriers and obligations *)
 
-  (** CARRIER-ALLOC. The paper displays the premise's post-carriers as [{g} ∪ G]; they must
-      be the conclusion's [G'], since [g] is bound in the premise. *)
+  (** CARRIER-ALLOC *)
   Lemma fbtriple_carrier_alloc s i C E G G' ℓ μ P e Q :
     (∀ g, ⌜g ∉ G⌝ →
-          ⦃ P ∗ crP_obls g ℓ ∅ ∗ fuels {[g]} ℓ μ ⦄^({[g]} ∪ G) e @ s; i; C; E ⦃ v, Q v ⦄^G') ⊢
-    ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+          fb{{ P ∗ crP_obls g ℓ ∅ ∗ fuels {[g]} ℓ μ }}^({[g]} ∪ G) e @ s; i; C; E fb{{ v, Q v }}^G') ⊢
+    fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "H %Φ (TE& TG& HP) HΦ".
     iMod (carrier_alloc _ _ _ ℓ μ with "TG") as "(%g& %Hg& TG& Cg& Fg)".
     iApply ("H" $! g Hg with "[$TE $TG $HP $Cg Fg] HΦ"). by rewrite big_sepS_singleton.
   Qed.
 
-  (** CARRIER-DELETE. As for CARRIER-ALLOC, the post-carriers are the same in the premise and
-      the conclusion. *)
+  (** CARRIER-DELETE *)
   Lemma fbtriple_carrier_delete s i C E G G' g ℓ P e Q :
     g ∈ G →
-    ⦃ P ⦄^(G ∖ {[g]}) e @ s; i; C; E ⦃ v, Q v ⦄^G' ⊢
-    ⦃ P ∗ crP_obls g ℓ ∅ ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    fb{{ P }}^(G ∖ {[g]}) e @ s; i; C; E fb{{ v, Q v }}^G' ⊢
+    fb{{ P ∗ crP_obls g ℓ ∅ }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (Hg) "H %Φ (TE& TG& HP& Cg) HΦ".
     iMod (carrier_delete with "TG Cg") as "TG"; first done.
@@ -275,10 +273,10 @@ Section rules.
   (** OBLS-OFFLOAD *)
   Lemma fbtriple_obls_offload s i C E G G' g1 g2 K1 K2 K ℓ1 ℓ2 ℓ P e Q :
     K ⊆ K1 → (ℓ2 <= ℓ)%ordi →
-    ⦃ P ∗ crP_obls g1 ℓ1 (K1 ∖ K) ∗ crP_obls g2 ℓ2 (K2 ∪ K) ∗ ⌜K2 ## K⌝ ⦄^G
-      e @ s; i; C; E ⦃ v, Q v ⦄^G' ⊢
-    ⦃ P ∗ crP_obls g1 ℓ1 K1 ∗ crP_obls g2 ℓ2 K2 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) ⦄^G
-      e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    fb{{ P ∗ crP_obls g1 ℓ1 (K1 ∖ K) ∗ crP_obls g2 ℓ2 (K2 ∪ K) ∗ ⌜K2 ## K⌝ }}^G
+      e @ s; i; C; E fb{{ v, Q v }}^G' ⊢
+    fb{{ P ∗ crP_obls g1 ℓ1 K1 ∗ crP_obls g2 ℓ2 K2 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) }}^G
+      e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (HK Hℓ) "H %Φ (TE& TG& HP& C1& C2& OF) HΦ".
     iMod (obl_offload_set with "C1 C2 OF") as "(C1& C2& %Hdisj)"; [done|done|].
@@ -289,9 +287,9 @@ Section rules.
   Lemma fbtriple_until_alloc s i C E G G' g K ℓ1 ℓ2 μ N (Φ Ψ : tf Σ) P e Q :
     (ℓ1 <= ℓ2)%ordi →
     (∀ k, ⌜k ∉ K⌝ →
-          ⦃ P ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗ ⟦untilP N k 1 Φ Ψ⟧ₗ ∗
-            witP_layer k ℓ2 ∗ oblP_fuel k ℓ2 μ ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G') ⊢
-    ⦃ P ∗ crP_obls g ℓ1 K ∗ ▷ ⟦Φ⟧ₗ ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+          fb{{ P ∗ crP_obls g ℓ1 ({[k]} ∪ K) ∗ ⟦untilP N k 1 Φ Ψ⟧ₗ ∗
+            witP_layer k ℓ2 ∗ oblP_fuel k ℓ2 μ }}^G e @ s; i; C; E fb{{ v, Q v }}^G') ⊢
+    fb{{ P ∗ crP_obls g ℓ1 K ∗ ▷ ⟦Φ⟧ₗ }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (Hℓ) "H %Φ' (TE& TG& HP& Cg& HΦ) Hpost".
     iMod (tf_until_alloc _ _ _ false _ ℓ2 μ with "Cg") as "(%k& %Hk& Cg& Of& #Wl& Acc)"; first done.
@@ -302,9 +300,9 @@ Section rules.
   (** FINALLY-ALLOC* *)
   Lemma fbtriple_finally_alloc s i C E G G' g K ℓ N (Ψ : tf Σ) P e Q :
     (∀ k, ⌜k ∉ K⌝ →
-          ⦃ P ∗ crP_obls g ℓ ({[k]} ∪ K) ∗ ⟦finallyP N k 1 Ψ⟧ₗ ⦄^G
-            e @ s; i; C; E ⦃ v, Q v ⦄^G') ⊢
-    ⦃ P ∗ crP_obls g ℓ K ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G'.
+          fb{{ P ∗ crP_obls g ℓ ({[k]} ∪ K) ∗ ⟦finallyP N k 1 Ψ⟧ₗ }}^G
+            e @ s; i; C; E fb{{ v, Q v }}^G') ⊢
+    fb{{ P ∗ crP_obls g ℓ K }}^G e @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "H %Φ' (TE& TG& HP& Cg) Hpost".
     iMod (tf_until_alloc _ _ _ false ℓ ℓ 0 with "Cg") as "(%k& %Hk& Cg& _& _& Acc)"; first done.
@@ -317,9 +315,9 @@ Section rules.
   Lemma fbtriple_until_acc s i C E G G' N k q (Φ Ψ : tf Σ) P e Q
       `{!Atomic (stuckness_to_atomicity s) e} :
     ↑N ⊆ E →
-    ⦃ P ∗ ⟦Φ⟧ₗ ⦄^G e @ s; i; C; E ∖ ↑N ⦃ v, Q v ∗ ▷ ⟦Φ⟧ₗ ⦄^G' ⊢
-    ⦃ P ∗ ⟦untilP N k q Φ Ψ⟧ₗ ∗ £ 1%ord ⦄^G e @ s; i; C; E
-    ⦃ v, Q v ∗ ⟦untilP N k q Φ Ψ⟧ₗ ⦄^G'.
+    fb{{ P ∗ ⟦Φ⟧ₗ }}^G e @ s; i; C; E ∖ ↑N fb{{ v, Q v ∗ ▷ ⟦Φ⟧ₗ }}^G' ⊢
+    fb{{ P ∗ ⟦untilP N k q Φ Ψ⟧ₗ ∗ £ 1%ord }}^G e @ s; i; C; E
+    fb{{ v, Q v ∗ ⟦untilP N k q Φ Ψ⟧ₗ }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (HN) "H %Φ' (TE& TG& HP& HU& LC) Hpost".
     iMod (tf_until_acc with "HU") as "HU"; first done.
@@ -333,9 +331,9 @@ Section rules.
   Lemma fbtriple_until_discharge s i C E G G' N k (Φ Ψ : tf Σ) g ℓ K P e Q
       `{!Atomic (stuckness_to_atomicity s) e} :
     TCEq (to_val e) None → ↑N ⊆ E →
-    ⦃ P ∗ ⟦Φ⟧ₗ ⦄^G e @ s; i; C; E ∖ ↑N ⦃ v, Q v ∗ ⟦Ψ⟧ₗ ∗ crP_obls g ℓ K ∗ ⌜k ∈ K⌝ ⦄^G' ⊢
-    ⦃ P ∗ ⟦untilP N k 1 Φ Ψ⟧ₗ ∗ £ 2 ⦄^G e @ s; i; C; E
-    ⦃ v, Q v ∗ ⟦Ψ⟧ₗ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k ⦄^G'.
+    fb{{ P ∗ ⟦Φ⟧ₗ }}^G e @ s; i; C; E ∖ ↑N fb{{ v, Q v ∗ ⟦Ψ⟧ₗ ∗ crP_obls g ℓ K ∗ ⌜k ∈ K⌝ }}^G' ⊢
+    fb{{ P ∗ ⟦untilP N k 1 Φ Ψ⟧ₗ ∗ £ 2 }}^G e @ s; i; C; E
+    fb{{ v, Q v ∗ ⟦Ψ⟧ₗ ∗ crP_obls g ℓ (K ∖ {[k]}) ∗ oblP_discharged k }}^G'.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (He Hmask) "H %Φ' (TE& TG& HP& HU& LC) Hpost".
     iMod (tf_until_discharge with "HU") as "HUacc"; first done.
@@ -355,17 +353,15 @@ Section rules.
     iApply ("Hpost" with "[$TE $TG $HQ $HΨ $Cg]"). eauto.
   Qed.
 
-  (** WIT-IND, as displayed in the paper, with its [⇛] in the induction hypothesis read as the
-      fancy wand [={E}=∗]. The premise is persistent, since every iteration uses it. The
-      induction hypothesis can be used once: it carries the remaining witness budget. (The
-      submitted paper says [⇛] is Iris's view shift, which is persistent; read that way, the
-      displayed hypothesis is stronger than the one proved here.) *)
+  (** WIT-IND. The [⇛] of the induction hypothesis is the fancy wand [={E}=∗]. The premise is
+      persistent, since every iteration uses it. The induction hypothesis can be used once: it
+      carries the remaining witness budget. *)
   Lemma fbtriple_wit_ind s i C E G P e Q k ℓ1 ℓ2 μ :
     (ℓ1 < ℓ2)%ordi →
-    □ ⦃ P ∗ (witP_cred k 1 ={E}=∗ fuels G ℓ2 μ ∗ ⦃ P ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G) ⦄^G
-        e @ s; i; C; E ⦃ v, Q v ⦄^G -∗
+    □ fb{{ P ∗ (witP_cred k 1 ={E}=∗ fuels G ℓ2 μ ∗ fb{{ P }}^G e @ s; i; C; E fb{{ v, Q v }}^G) }}^G
+        e @ s; i; C; E fb{{ v, Q v }}^G -∗
     witP_layer k ℓ1 -∗
-    ⦃ P ∗ fuels G ℓ2 (μ × ▽)%M ⦄^G e @ s; i; C; E ⦃ v, Q v ⦄^G.
+    fb{{ P ∗ fuels G ℓ2 (μ × ▽)%M }}^G e @ s; i; C; E fb{{ v, Q v }}^G.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (LTl) "#H #Wl %Φ (TE& TG& HP& FS) HΦ".
     iRevert (Φ) "TE TG HP HΦ".
@@ -395,8 +391,8 @@ Section rules.
   Lemma fbtriple_step_pure_wit s i C E G e v φ (R : gset oid) (α : Ord.t) :
     PureExec φ 1 e (of_val v) → φ →
     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
-    ⦃ fuels G 0 1 ⦄^G e @ s; i; C; E
-    ⦃ w, ⌜w = v⌝ ∗ £ α ∗ ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r) ⦄^G.
+    fb{{ fuels G 0 1 }}^G e @ s; i; C; E
+    fb{{ w, ⌜w = v⌝ ∗ £ α ∗ ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r) }}^G.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (Hexec Hφ) "#Rs %Φ (TE& TG& HF) HΦ".
     iApply (lifting.lwp_pure_step_simple 1 G R α s i E e (of_val v) φ Φ
@@ -409,7 +405,7 @@ Section rules.
   (** STEP-PURE-LC *)
   Lemma fbtriple_step_pure_lc s i C E G e v φ (α : Ord.t) :
     PureExec φ 1 e (of_val v) → φ →
-    ⊢ ⦃ fuels G 0 1 ⦄^G e @ s; i; C; E ⦃ w, ⌜w = v⌝ ∗ £ α ⦄^G.
+    ⊢ fb{{ fuels G 0 1 }}^G e @ s; i; C; E fb{{ w, ⌜w = v⌝ ∗ £ α }}^G.
   Proof.
     intros Hexec Hφ. iPoseProof (fbtriple_step_pure_wit s i C E G e v φ ∅ α Hexec Hφ with "[]") as "H".
     { by rewrite big_sepS_empty. }
@@ -420,7 +416,7 @@ Section rules.
   (** STEP-PURE *)
   Lemma fbtriple_step_pure s i C E G e v φ :
     PureExec φ 1 e (of_val v) → φ →
-    ⊢ ⦃ fuels G 0 1 ⦄^G e @ s; i; C; E ⦃ w, ⌜w = v⌝ ⦄^G.
+    ⊢ fb{{ fuels G 0 1 }}^G e @ s; i; C; E fb{{ w, ⌜w = v⌝ }}^G.
   Proof.
     intros Hexec Hφ. iPoseProof (fbtriple_step_pure_lc s i C E G e v φ 0 Hexec Hφ) as "H".
     iApply (fbtriple_conseq with "[] [] H"); first by iIntros "$".
@@ -432,8 +428,8 @@ Section rules.
       needs this for steps such as a function call's β-reduction. *)
   Lemma fbtriple_gen_pure_step s i C E G P e1 e2 φ Q (α : Ord.t) :
     PureExec φ 1 e1 e2 → φ →
-    ⦃ P ∗ £ α ⦄^G e2 @ s; i; C; E ⦃ v, Q v ⦄ -∗
-    ⦃ fuels G 0 1 ∗ P ⦄^G e1 @ s; i; C; E ⦃ v, Q v ⦄.
+    fb{{ P ∗ £ α }}^G e2 @ s; i; C; E fb{{ v, Q v }} -∗
+    fb{{ fuels G 0 1 ∗ P }}^G e1 @ s; i; C; E fb{{ v, Q v }}.
   Proof.
     rewrite /fbtriple_gen. iIntros (Hexec Hφ) "H %Φ (TE& TG& HF& HP) HΦ".
     iApply (lifting.lwp_pure_step_simple 1 G ∅ α s i E e1 e2 φ Φ
@@ -446,14 +442,14 @@ Section rules.
 
   Lemma fbtriple_pure_step s i C E G G' P e1 e2 φ Q (α : Ord.t) :
     PureExec φ 1 e1 e2 → φ →
-    ⦃ P ∗ £ α ⦄^G e2 @ s; i; C; E ⦃ v, Q v ⦄^G' -∗
-    ⦃ fuels G 0 1 ∗ P ⦄^G e1 @ s; i; C; E ⦃ v, Q v ⦄^G'.
+    fb{{ P ∗ £ α }}^G e2 @ s; i; C; E fb{{ v, Q v }}^G' -∗
+    fb{{ fuels G 0 1 ∗ P }}^G e1 @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof. rewrite /fbtriple. apply fbtriple_gen_pure_step. Qed.
 
   (** STEP-REF *)
   Lemma fbtriple_step_ref s i C E G v (α : Ord.t) :
-    ⊢ ⦃ fuels G 0 1 ⦄^G (ref (Val v)) @ s; i; C; E
-      ⦃ w, ∃ l : loc, ⌜w = #l⌝ ∗ l ↦ v ∗ £ α ⦄^G.
+    ⊢ fb{{ fuels G 0 1 }}^G (ref (Val v)) @ s; i; C; E
+      fb{{ w, ∃ l : loc, ⌜w = #l⌝ ∗ l ↦ v ∗ £ α }}^G.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "%Φ (TE& TG& HF) HΦ".
     iApply (lwp_alloc G ∅ α with "[$TE $TG HF]").
@@ -463,8 +459,8 @@ Section rules.
 
   (** STEP-STORE *)
   Lemma fbtriple_step_store s i C E G (l : loc) v w (α : Ord.t) :
-    ⊢ ⦃ l ↦ v ∗ fuels G 0 1 ⦄^G (#l <- Val w) @ s; i; C; E
-      ⦃ r, ⌜r = #()⌝ ∗ l ↦ w ∗ £ α ⦄^G.
+    ⊢ fb{{ l ↦ v ∗ fuels G 0 1 }}^G (#l <- Val w) @ s; i; C; E
+      fb{{ r, ⌜r = #()⌝ ∗ l ↦ w ∗ £ α }}^G.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "%Φ (TE& TG& Hl& HF) HΦ".
     iApply (lwp_store G ∅ α with "[$TE $TG HF $Hl]").
@@ -474,8 +470,8 @@ Section rules.
 
   (** STEP-LOAD *)
   Lemma fbtriple_step_load s i C E G (l : loc) dq v (α : Ord.t) :
-    ⊢ ⦃ l ↦{dq} v ∗ fuels G 0 1 ⦄^G (! #l) @ s; i; C; E
-      ⦃ w, ⌜w = v⌝ ∗ l ↦{dq} v ∗ £ α ⦄^G.
+    ⊢ fb{{ l ↦{dq} v ∗ fuels G 0 1 }}^G (! #l) @ s; i; C; E
+      fb{{ w, ⌜w = v⌝ ∗ l ↦{dq} v ∗ £ α }}^G.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros "%Φ (TE& TG& Hl& HF) HΦ".
     iApply (lwp_load G ∅ α with "[$TE $TG HF $Hl]").
@@ -487,10 +483,10 @@ Section rules.
       and must end with no carriers. The paper shows the instance [K = K1 = {k}]. *)
   Lemma fbtriple_fork s i C E G g1 ℓ μ K K1 P e (α : Ord.t) :
     K ⊆ K1 →
-    (∀ j g2, ⦃ fuels {[g2]} ℓ μ ∗ crP_obls g2 ℓ K ∗ P ⦄^{[g2]} e @ s; j; []; ⊤ ⦃ _, True ⦄^∅) -∗
-    ⦃ fuels G 0 1 ∗ crP_obls g1 ℓ K1 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) ∗ P ⦄^G
+    (∀ j g2, fb{{ fuels {[g2]} ℓ μ ∗ crP_obls g2 ℓ K ∗ P }}^{[g2]} e @ s; j; []; ⊤ fb{{ _, True }}^∅) -∗
+    fb{{ fuels G 0 1 ∗ crP_obls g1 ℓ K1 ∗ ([∗ set] k ∈ K, oblP_fuel k ℓ 1) ∗ P }}^G
       (Fork e) @ s; i; C; E
-    ⦃ w, ⌜w = #()⌝ ∗ crP_obls g1 ℓ (K1 ∖ K) ∗ £ α ⦄^G.
+    fb{{ w, ⌜w = #()⌝ ∗ crP_obls g1 ℓ (K1 ∖ K) ∗ £ α }}^G.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (HK) "Hc %Φ (TE& TG& HF& Cg& OF& HP) HΦ".
     iApply lwp_fork_step. iModIntro. iFrame "TE TG". iSplitL "HF"; first by iApply fuels_any_layer.
@@ -510,8 +506,8 @@ Section rules.
   Lemma fbtriple_step_pure_wit1 s i C E G e v φ k ℓk (α : Ord.t) :
     PureExec φ 1 e (of_val v) → φ →
     witP_layer k ℓk -∗
-    ⦃ fuels G 0 1 ⦄^G e @ s; i; C; E
-    ⦃ w, ⌜w = v⌝ ∗ £ α ∗ (witP_cred k 1 ∨ oblP_discharged k) ⦄^G.
+    fb{{ fuels G 0 1 }}^G e @ s; i; C; E
+    fb{{ w, ⌜w = v⌝ ∗ £ α ∗ (witP_cred k 1 ∨ oblP_discharged k) }}^G.
   Proof.
     iIntros (Hexec Hφ) "#Wl".
     iPoseProof (fbtriple_step_pure_wit s i C E G e v φ {[k]} α Hexec Hφ with "[]") as "H".
@@ -523,9 +519,9 @@ Section rules.
 
   (** FORK* as displayed: one obligation [k] moves to the child. *)
   Lemma fbtriple_fork1 s i C E G g1 ℓ μ k P e (α : Ord.t) :
-    (∀ j g2, ⦃ fuels {[g2]} ℓ μ ∗ crP_obls g2 ℓ {[k]} ∗ P ⦄^{[g2]} e @ s; j; []; ⊤ ⦃ _, True ⦄^∅) -∗
-    ⦃ fuels G 0 1 ∗ crP_obls g1 ℓ {[k]} ∗ oblP_fuel k ℓ 1 ∗ P ⦄^G (Fork e) @ s; i; C; E
-    ⦃ w, ⌜w = #()⌝ ∗ crP_obls g1 ℓ ∅ ∗ £ α ⦄^G.
+    (∀ j g2, fb{{ fuels {[g2]} ℓ μ ∗ crP_obls g2 ℓ {[k]} ∗ P }}^{[g2]} e @ s; j; []; ⊤ fb{{ _, True }}^∅) -∗
+    fb{{ fuels G 0 1 ∗ crP_obls g1 ℓ {[k]} ∗ oblP_fuel k ℓ 1 ∗ P }}^G (Fork e) @ s; i; C; E
+    fb{{ w, ⌜w = #()⌝ ∗ crP_obls g1 ℓ ∅ ∗ £ α }}^G.
   Proof.
     iIntros "Hc".
     iPoseProof (fbtriple_fork s i C E G g1 ℓ μ {[k]} {[k]} P e α with "Hc") as "H"; first done.
@@ -563,8 +559,8 @@ Section rules.
       and retires the carrier [g]. *)
   Lemma fbtriple_finally_exit s i E g ℓ k N e v φ :
     PureExec φ 1 e (of_val v) → φ → ↑N ⊆ E →
-    ⊢ ⦃ fuels {[g]} 0 1 ∗ crP_obls g ℓ {[k]} ∗ ⟦finallyP N k 1 (exits v@i)⟧ₗ ⦄^{[g]}
-        e @ s; i; []; E ⦃ w, ⌜w = v⌝ ⦄^∅.
+    ⊢ fb{{ fuels {[g]} 0 1 ∗ crP_obls g ℓ {[k]} ∗ ⟦finallyP N k 1 (exits v@i)⟧ₗ }}^{[g]}
+        e @ s; i; []; E fb{{ w, ⌜w = v⌝ }}^∅.
   Proof.
     rewrite /fbtriple /fbtriple_gen. iIntros (Hexec Hφ HN) "%Φ (TE& TG& HF& Cg& Hfin) HΦ".
     iApply (lifting.lwp_pure_step_simple 1 {[g]} ∅ 2 s i E e (of_val v) φ Φ
@@ -594,12 +590,12 @@ Section logic.
   Lemma fuels_union G G' ℓ μ : fuels (G ∪ G') ℓ μ ⊣⊢ fuels (G ∖ G') ℓ μ ∗ fuels G' ℓ μ.
   Proof. rewrite -big_sepS_union; last set_solver. by rewrite difference_union_L. Qed.
 
-  (** FUELS-EMPTY *)
+  (** No carriers need no fuel. *)
   Lemma fuels_empty ℓ μ : ⊢ fuels ∅ ℓ μ.
   Proof. by rewrite big_sepS_empty. Qed.
 
-  (** FUELS-MONO (not in the submitted paper, which displays FUELS-EMPTY instead): fuel can be
-      lowered to a smaller measure, compared by its interpretation at layer [ℓ]. *)
+  (** FUELS-MONO: fuel can be lowered to a smaller measure, compared by its interpretation at
+      layer [ℓ]. *)
   Lemma fuels_mono G ℓ μ1 μ2 :
     (measure_rep (ℓ, 0) μ1 <= measure_rep (ℓ, 0) μ2)%ord → fuels G ℓ μ2 ⊢ |==> fuels G ℓ μ1.
   Proof. apply crP_fuel_mon_set. Qed.
