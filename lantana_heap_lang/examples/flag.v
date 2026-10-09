@@ -94,7 +94,7 @@ Section proof.
                       oblP_fuel k ℓ m ∗
                       flag_tk x k ∗ is_flag x k ℓ }}}.
   Proof.
-    iExists 10. iIntros (lc i G g K ℓ m C Φ) "!> HP HΦ".
+    iExists 2. iIntros (lc i G g K ℓ m C Φ) "!> HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Cg)".
     rewrite /Flag.init.
     iPoseProof (crP_fuels_init with "GF") as "GF".
@@ -121,7 +121,7 @@ Section proof.
     l{{{ RET #(); thread_expr i C (#()) ∗ £ lc ∗ thP_carriers i G ∗
                   crP_obls g ℓg (K ∖ {[k]}) ∗ oblP_discharged k }}}.
   Proof.
-    iExists 10. iIntros (lc i l G g K k ℓ ℓg C Φ) "!> HP HΦ".
+    iExists 2. iIntros (lc i l G g K k ℓ ℓg C Φ) "!> HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& Gg& %Ink& HU& #is_flag)".
     iDestruct "is_flag" as "(#Wlk& HA)". iEval (do 2 tf_red) in "HA".
     rewrite /Flag.set.
