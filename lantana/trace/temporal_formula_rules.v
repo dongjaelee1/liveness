@@ -177,6 +177,15 @@ Section until_rules.
     untilI N k q1 P Q -∗ untilI N k q2 P' Q' -∗ untilI N k q P Q.
   Proof. rewrite !untilI_guar_canonical. apply untilI_guar_frac_add. Qed.
 
+  (** Allocation. A strong until is allocated on a fresh obligation [k] ([obl_new], which
+      gives its assignment token) with its left formula [P] ([untilI_guar_init]);
+      [untilI_guar_alloc] does both, with the formulas chosen once [k] is known. A done until
+      comes from discharging a strong until ([untilI_guar_discharge_done]), or from a fresh
+      obligation with [Q] at hand ([untilI_done_guar_init]). Both guarantee the until
+      ([temporal_until_guar], [temporal_until_done_guar]).
+
+      A strong until registers, with later-guarded guarantees of its formulas, and records
+      the left formula at the current position. *)
   Lemma untilI_guar_init E N (P Q : iProp Σ) G1 G2 k :
     oblP_assigned k 1 -∗ ▷ (P ⊨ₜ G1) -∗ ▷ (Q ⊨ₜ G2) -∗ ▷ P -∗
     |={E}=>m untilI_guar N k 1 P Q G1 G2.

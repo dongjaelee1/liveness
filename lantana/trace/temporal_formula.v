@@ -282,16 +282,4 @@ Section until_struct.
   Global Instance untilI_as_fractional N k q P Q : AsFractional (untilI N k q P Q) (λ q, untilI N k q P Q) q.
   Proof. split; [auto|apply _]. Qed.
 
-  (** ** Allocation
-
-      A strong until is allocated on a fresh obligation [k] ([obl_new], which gives its
-      assignment token) with its left formula [P] ([untilI_guar_init]); [untilI_guar_alloc]
-      does both, with the formulas chosen once [k] is known. A done until comes from
-      discharging a strong until ([untilI_guar_discharge_done]), or from a fresh obligation
-      with [Q] at hand ([untilI_done_guar_init]). Both guarantee the until
-      ([temporal_until_guar], [temporal_until_done_guar]). *)
-
-  (** A strong until registers, with later-guarded guarantees of its formulas, and records
-      the left formula at the current position. *)
-
 End until_struct.
