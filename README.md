@@ -63,30 +63,23 @@ Each directory imports only from the directories listed before it:
 ## Correspondence between the paper and the Rocq development
 
 **The most important difference:** the paper presents Lantana through the
-*fuel-burning triple* `{P}^G e {Q}^G'`, but the Rocq development is mostly
-stated in terms of the thread-local weakest precondition `lwp` (notation
-`lWP e @ s; i; E {{ Φ }}` from `lantana/program_logic/lwp_notation.v`, defined in
-`lantana/program_logic/weakestpre.v`).
-The triple is a thin wrapper defined on top of `lwp` in
-`lantana/trace/fuel_burning_triple.v`:
+*fuel-burning triple* `{P}^G e {Q}^G'`, but the Rocq development is stated in terms of the
+thread-local weakest precondition `lwp` (notation `lWP e @ s; i; E {{ Φ }}` from
+`lantana/program_logic/lwp_notation.v`, defined in `lantana/program_logic/weakestpre.v`).
+A triple of the paper corresponds to a texan-style `lwp` triple in which the superscripts
+become ordinary assertions `thP_kids i G` (the obligations directly below thread `i`, see
+below):
 
 ```
-fuel_burning_triple s i E G G' P e Q :=
-  ∀ Φ, (thP_kids i G ∗ P) -∗ (∀ v, thP_kids i G' ∗ Q v -∗ Φ v) -∗
-       lWP e @ s; i; E {{ Φ }}
+l{{{ thread_expr i C e ∗ thP_kids i G ∗ P }}} e @ i; E
+l{{{ v, RET v; thread_expr i C (of_val v) ∗ thP_kids i G' ∗ Q v }}}
 ```
 
-That is, the paper's carrier-set superscripts `G`/`G'` become ordinary
-assertions `thP_kids i G` (the obligations directly below thread `i`, see below)
-threaded through the pre/postcondition. Rules
-that the paper states for the triple therefore appear in the development
-either as `lwp_*` lemmas, as entailments between the underlying predicates or model
-updates `|={E}=>m` on them (usable at any point of an `lwp` proof, see `sfmupd_lwp` /
-`lwp_sfmupd`), or — for a few key rules — as
-packaged `fuel_burning_triple_*` lemmas. Likewise, the case-study
-specifications are stated as `lwp` (texan-style `l{{{ ... }}}`) triples with
-explicit `thP_kids`/`parP_kids`/`oblP_fuel` assertions rather than
-carrier-set superscripts.
+Rules that the paper states for the triple therefore appear in the development either as
+`lwp_*` lemmas, or as entailments and model updates `|={E}=>m` on the underlying predicates,
+usable at any point of an `lwp` proof (`sfmupd_lwp`, `lwp_sfmupd`). Likewise, the case-study
+specifications are texan-style `lwp` triples with explicit `thP_kids`/`parP_kids`/`oblP_fuel`
+assertions.
 
 **Further differences.** The development has evolved since the paper:
 
@@ -124,7 +117,7 @@ predicates.
 
 | Paper | Rocq | File (under `lantana/`) |
 |---|---|---|
-| `{P}^G_i e {Q}^G'_E` (fuel-burning triple) | `fuel_burning_triple` (and `fuel_burning_triple_persistent` for the `□`-specification format of §3.4) | `trace/fuel_burning_triple.v` |
+| `{P}^G_i e {Q}^G'_E` (fuel-burning triple) | a texan `lwp` triple `l{{{ thread_expr i C e ∗ thP_kids i G ∗ P }}} e @ i; E l{{{ v, RET v; … ∗ thP_kids i G' ∗ Q v }}}` (persistent, as the `□`-specifications of §3.4) | `program_logic/lwp_notation.v`, `program_logic/weakestpre.v` |
 | carrier superscripts / `carriers_i G` (Thm 1) | no carriers: `thP_kids i G`, the children of thread `i` in the obligation forest; every initial thread starts with `thP_kids i ∅` | `program_logic/obl_forest.v` |
 | `Fuel^ℓ_G μ` | no carrier fuel: `oblP_fuel k ℓ μ` of each child `k` of the thread; a set is `[∗ set] k ∈ G, oblP_fuel k ℓ μ` (cf. `oblP_fuels`) | `program_logic/obl_forest.v` |
 | `obls^ℓ_g K` | replaced by `parP_kids p K` (children `K` of a thread, `thP_kids i K`, or of an obligation, `oblP_kids k K`); below an obligation the layer bound is its witness layer (`parP_below` / `parP_le`) | `program_logic/obl_forest.v` |
@@ -159,12 +152,12 @@ predicates.
 | ALWAYS-ALLOC / ALWAYS-ACC | `alwaysI_alloc` / `alwaysI_acc` (`iInv` also opens `alwaysI`); guarantee `temporal_always` | `trace/temporal_formula.v`, `trace/temporal_formula_rules.v`, `base_logic/invariants.v` |
 | LÖB | Löb induction of Transfinite Iris (`iLöb`) | (Transfinite Iris) |
 | LC-SPEND | `tlc_later`, `tlc_later_strong` | `base_logic/later_credits.v` |
-| UNTIL-ALLOC | `untilI_alloc` (or `obl_new`, then `untilI_init`); triple-level `fuel_burning_triple_until_alloc` | `trace/temporal_formula_rules.v`, `trace/fuel_burning_triple.v` |
+| UNTIL-ALLOC | `untilI_alloc` (or `obl_new`, then `untilI_init`) | `trace/temporal_formula_rules.v` |
 | UNTIL-ACC | `untilI_acc` | `trace/temporal_formula_rules.v` |
-| UNTIL-DISCHARGE | `untilI_discharge` (`untilI_discharge_done` gives the done until); triple-level `fuel_burning_triple_until_discharge` | `trace/temporal_formula_rules.v`, `trace/fuel_burning_triple.v` |
+| UNTIL-DISCHARGE | `untilI_discharge`, `finallyI_discharge` (`untilI_discharge_done` gives the done until) | `trace/temporal_formula_rules.v` |
 | UNTIL-DONE-FALSE | `untilI_discharged_false` | `trace/temporal_formula_rules.v` |
 | UNTIL-SPLIT | `untilI_frac_split`, `untilI_frac_add` | `trace/temporal_formula_rules.v` |
-| WIT-IND | `fuel_burning_triple_wit_ind`; underlying `wit_layer_ind` | `trace/fuel_burning_triple.v`, `program_logic/obl_forest_rules.v` |
+| WIT-IND | `wit_layer_ind` | `program_logic/obl_forest_rules.v` |
 | OBLS-OFFLOAD | `obl_move` (an obligation moves with its subtree to another parent, burning one unit of its own fuel at a layer above the new parent's witness layer, `parP_below`), set versions `obl_move_set_gen` / `obl_move_thread_set` / `obl_move_obl_set` | `program_logic/obl_forest.v`, `program_logic/obl_forest_rules.v` |
 
 ### Traces, temporal properties, and adequacy (§6, Fig. 7)

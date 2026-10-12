@@ -108,7 +108,6 @@ lantana/trace/guarantee_infer.v
 lantana/trace/guarantee_rec.v
 lantana/trace/guarantee_saved.v
 lantana/trace/until_chain.v
-lantana/trace/fuel_burning_triple.v
 lantana/trace/adequacy_step.v
 lantana/trace/adequacy_temporal.v
 lantana/trace/adequacy_safety.v

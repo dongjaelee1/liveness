@@ -16,7 +16,7 @@ The files form six groups, in build order. The four core definitions files (`tra
 `itrprop`, `guarantee`, `temporal_formula`) each have a `*_rules.v` with the rules a user
 applies; the other files keep their own rules. `itrprop_model.v` holds what needs an allocated
 instance of the logic (as in adequacy), and `temporal_formula_run.v` the run of any system with
-the one-step property. Only `fuel_burning_triple.v` and `adequacy_*.v` depend on `lWP`.
+the one-step property. Only `adequacy_*.v` depend on `lWP`.
 
 ```
 trProp            trace_prop   trace_prop_rules   fair_scheduling
@@ -27,7 +27,7 @@ P ⊨ₜ G            guarantee   guarantee_rules
    ↓
 alwaysI, untilI   temporal_formula   temporal_formula_run   temporal_formula_rules
    ↓
-derived           guarantee_infer   guarantee_rec   guarantee_saved   until_chain   fuel_burning_triple
+derived           guarantee_infer   guarantee_rec   guarantee_saved   until_chain
    ↓
 adequacy          adequacy_step   adequacy_temporal   adequacy_safety
 ```
@@ -57,7 +57,6 @@ through its imports.
 | `guarantee_rec.v` | Guarantees of fixpoints, and recursive structures through the registry (`nest`, `renew`). | guarantee_infer, itrprop_fixpoint, `base_logic/satisfiable`, `algebra/ordinal_existential_properties`, `prelude/axioms` | temporal_formula_rules, temporal_formula, guarantee_rules, guarantee, itrprop |
 | `guarantee_saved.v` | Temporal formulas in ghost state: a saved proposition with its guarantee (`saved_temporal`), and a ghost map of formulas chosen at run time, kept in one `alwaysI` (`registry_inv`, `registry_temporal`). | guarantee_infer | temporal_formula_rules, temporal_formula, guarantee_rules, itrprop |
 | `until_chain.v` | Chains of untils (`untilI_chain`) whose ordinals decrease, so every chain is finite, with a ghost log of discharged links. | temporal_formula, `prelude/axioms` |  |
-| `fuel_burning_triple.v` | The paper's fuel-burning triple on top of `lWP`, with triple-level rules for witness induction and untils. | guarantee_infer, `program_logic/weakestpre` | temporal_formula_rules, temporal_formula |
 | `adequacy_step.v` | Facts about one `lWP` step used by both adequacy theorems: obligations, witnesses and the fairness counter. | triprop, fair_scheduling, `program_logic/weakestpre`, `base_logic/satisfiable` | trace_prop |
 | `adequacy_temporal.v` | Theorem 1: `lWP` is a running system with the one-step property, so if the initial resources guarantee `G`, every fair run satisfies `itrProp_external G` (`lwp_adequacy_temporal`). | adequacy_step, guarantee_infer, `base_logic/satisfiable` | temporal_formula_run, temporal_formula, guarantee, itrprop, fair_scheduling, trace_prop |
 | `adequacy_safety.v` | Iris-style safety (`not_stuck`, `safety_iris`) on fair runs: the scheduled thread is never stuck, and a chosen thread's postcondition holds when it terminates (`lwp_adequacy_safety_iris`). | adequacy_step, guarantee_infer, `base_logic/satisfiable` | temporal_formula, triprop, fair_scheduling, trace_prop |
