@@ -1,8 +1,8 @@
 # Lantana in Rocq
 
-The Rocq development of *Decoupling Liveness Obligations from Thread-Local Carriers in the Lantana
-Concurrent Separation Logic* (POPL 2027). It mechanizes Lantana on top of Iris and Transfinite
-Iris: the logic, its adequacy theorems, and the case studies.
+The Rocq development of *Decoupling Liveness Obligations from Threads in the Lantana Concurrent
+Separation Logic* (POPL 2027). It mechanizes Lantana on top of Iris and Transfinite Iris: the
+logic, its adequacy theorems, and the case studies.
 
 The development has evolved since the paper. Obligations form a forest instead of living in
 carriers, temporal formulas are `iProp`s with semantic guarantees, and the rules are stated for
