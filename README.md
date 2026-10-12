@@ -197,7 +197,10 @@ All in `lantana_heap_lang/examples/`.
 The per-example `*_adequacy` theorems (`flag_client_adequacy`, `main_adequacy`,
 `handoff_client_adequacy`, `task_queue_client_adequacy`) are end-to-end
 instantiations of Theorem 1 (`lwp_adequacy_temporal`), deriving the trace-level temporal
-property of the respective client program.
+property of the respective client program. Each client also has `*_safety_adequacy`, an
+instantiation of `lwp_adequacy_safety_iris` (the scheduled thread is never stuck, and a
+returned thread has its return value), and `*_liveness_safety`, both over the same fair
+behaviors.
 `flag_client.v` uses adequacy to prove a property about a memory location, beyond termination.
 `paradox.v` proves the unsoundness counterexample remarked at the end of §6.2
 (`no_lc_absurd`): a HeapLang rule for one pure step without fuel would be unsound. Beyond the paper: `nonstrict_move.v` shows that moving an obligation below

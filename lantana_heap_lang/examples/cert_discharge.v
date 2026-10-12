@@ -1,6 +1,7 @@
 From lantana.base_logic Require Export invariants.
 From lantana.heap_lang Require Export temporal_laws lang.
 From lantana.heap_lang Require Import notation proofmode.
+From lantana.trace Require Import adequacy_safety.
 From iris.prelude Require Import options.
 From lantana.heap_lang.examples Require Import step_tactics.
 
@@ -44,7 +45,7 @@ Section proof.
          x ↦ #0 ∗ y ↦ #7 ∗
          finallyI Nq kq 1 (cd_Q x y kf) ∗ finallyI Nf kf 1 (x ↦ #2) }}}
       CertDischarge.main #x #y @ i
-    l{{{ v, RET v; thread_expr i [] (of_val v) ∗ lift_term i fork_post v }}}.
+    l{{{ RET #(); thread_expr i [] #() ∗ lift_term i fork_post #() }}}.
   Proof.
     iExists 10. iIntros (i kq kf x y Φ) "!> HP HΦ".
     iDestruct "HP" as "(TE& TG& GF& %Hkqf& Kkq& Kkf& Ptrx& Ptry& HQ& HF)".
@@ -94,7 +95,7 @@ Section proof.
                         x ↦ #0 ∗ y ↦ #7 ∗
                         (thP_kids i {[kq; kf]} ∗ oblP_kids kq ∅ ∗ oblP_kids kf ∅ ∗ ⌜kq ≠ kf⌝ ∗
                          ([∗ set] g ∈ {[kq; kf]}, oblP_fuel g 0 μ)))%I) →
-    Ψs = ({[i := fork_post]}) →
+    Ψs = ({[i := (λ _ v, ⌜v = #()⌝)%I]}) →
     (([∗ map] i ↦ e ∈ Θ, thread_expr i [] e) -∗ x ↦ #0 -∗ y ↦ #7 -∗
      ([∗ set] i ∈ dom Θ, thP_kids i ∅) -∗
      |={⊤}=>m ∃ μ, (Φ μ ∗
@@ -122,14 +123,14 @@ Section proof.
     iIntros "HP". subst Φ.
     iDestruct "HP" as (kq kf) "(HQ& HF& Ptrx& Ptry& TG& Kkq& Kkf& %Hkqf& GF)".
     iEval (rewrite HT big_sepM_singleton) in "TEs".
-    iPoseProof ("main_spec" $! i kq kf x y (λ v, lift_term i fork_post v)
+    iPoseProof ("main_spec" $! i kq kf x y (λ v, lift_term i (λ _ v, ⌜v = #()⌝)%I v)
                  with "[TEs TG Kkq Kkf GF Ptrx Ptry HQ HF]") as "WP".
     { iFrame "TEs TG Kkq Kkf GF Ptrx Ptry HQ HF". iPureIntro. done. }
     iModIntro. subst Θ Ψs. iApply big_sepM2_insert.
     { done. }
     { done. }
     iSplitL "WP".
-    { iApply "WP". iIntros (?) "[_ $]". }
+    { iApply "WP". rewrite /lift_term. by iIntros "(_& $& _)". }
     by rewrite big_sepM2_empty.
   Qed.
 
@@ -180,7 +181,7 @@ Section adequacy.
 
   Let fork_post {Σ} : thread_id → language.val heap_lang → iProp Σ := λ _ _, (True)%I.
   Let Ψs {Σ} : gmap thread_id (thread_id → language.val heap_lang → iProp Σ) :=
-        {[i := fork_post]}.
+        {[i := (λ _ v, ⌜v = #()⌝)%I]}.
 
   Theorem cert_discharge_adequacy :
     ∀ (τ : trace heap_lang),
@@ -219,6 +220,63 @@ Section adequacy.
     { iFrame. }
     iDestruct "H" as (μ) "(HP& H)".
     iModIntro. iExists (Φ_P μ). iFrame "HP H". iApply Φ_P_temporal.
+  Qed.
+
+  (** Safety: in every fair behavior, the scheduled thread is never stuck, and once [main] has returned,
+      its value is [#()]. *)
+  Theorem cert_discharge_safety_adequacy :
+    ∀ (τ : trace heap_lang),
+    behavior τ →
+    fair_scheduling τ →
+    (τ.1 = 0) →
+    (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+    safety_iris i (λ _ v, v = #()) τ.
+  Proof.
+    intros τ Beh FS Init1 Init2.
+    eapply (lwp_adequacy_safety_iris Σ heap_lang (Build_state σ0 ∅) Θ0 i [] i).
+    1,2,3,4: eauto.
+    iIntros (?). exists (Ord.from_nat 2).
+    iMod (gen_heap_init σ0) as "(%Hheap& HI& Ptrs& _)".
+    iMod (thread_map_init Θ0) as "(%Hthread& TI& Tis)".
+    iMod (proph_map_init ([] : list observation) (∅ : gset proph_id)) as "(%Hproph& PI)".
+    iMod (inv_heap_init loc (option val) (⊤ : coPset)) as "(%Hinv_heap& >HHI)".
+    set (Hheap_stateGS := @HeapStateGS Σ Hheap Hinv_heap Hproph Hthread).
+    set (HHeapGS := @HeapGS Σ Htemporal Hheap_stateGS).
+    set (HlantanaGS := @heapGS_lantanaGS Σ HHeapGS).
+    iExists (lantana_state_interp_class), (@fork_post Σ), (@Ψs Σ).
+    iModIntro. iSplit.
+    { iPureIntro. eexists. split; first apply lookup_singleton_eq.
+      intros v. iIntros "%Hv". by iPureIntro. }
+    iSplitL "HI TI PI".
+    { iDestruct "PI" as "[PI _]". by iFrame. }
+    iSplitR; first done.
+    iIntros "LC TGs".
+    iAssert (x ↦ #0 ∗ y ↦ #7)%I with "[Ptrs]" as "[Ptrx Ptry]".
+    { subst σ0. rewrite big_sepM_insert; last done. rewrite big_sepM_singleton.
+      rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. iFrame. }
+    iMod (main_pre (heapGS0:=HHeapGS) Θ0 i x y (Φ_P (heapGS0:=HHeapGS))
+           with "[Tis] Ptrx Ptry [TGs]") as "H".
+    { done. }
+    { reflexivity. }
+    { reflexivity. }
+    { rewrite /thread_expr /=. iFrame. }
+    { iFrame. }
+    iDestruct "H" as (μ) "(HP& H)".
+    iApply ("H" with "HP").
+  Qed.
+
+  (** Liveness and safety together, over the same fair behaviors: [main] returns [#()], and no scheduled thread is ever stuck. *)
+  Corollary cert_discharge_liveness_safety :
+    ∀ (τ : trace heap_lang),
+    behavior τ →
+    fair_scheduling τ →
+    (τ.1 = 0) →
+    (τ.2 0 = ((Θ0, (Build_state σ0 ∅), i, []))) →
+    (R_main τ) ∧ (safety_iris i (λ _ v, v = #()) τ).
+  Proof.
+    intros τ Beh FS Init1 Init2. split.
+    - by apply cert_discharge_adequacy.
+    - by apply cert_discharge_safety_adequacy.
   Qed.
 
 End adequacy.
