@@ -164,7 +164,7 @@ predicates.
 
 | Paper | Rocq | File (under `lantana/`) |
 |---|---|---|
-| `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `cfg`, `thread_pool`, `thread_step` / `thread_done`, `trace`, `behavior_cfg` / `behavior_tp` (please ignore `κ : list (observation Λ)`, which is never used) | `program_logic/language.v` |
+| `Cfg`, `TPool`, THREAD-STEP/THREAD-DONE, `Trace`, `Behavior` | `cfg`, `thread_pool`, `thread_step` / `thread_done`, `trace`, `behavior_cfg` / `behavior_tp` (please ignore `κ : list (observation Λ)`, which is never used); additionally `thread_stuck`: a stuck scheduled thread stutters, so stuck executions are behaviors too | `program_logic/language.v` |
 | temporal properties `Φ, Ψ` and `⟦·⟧_t` | semantic trace properties `itrProp`, trace reading `itrProp_external` (and step-indexed reading `itrProp_internal`); `Always` = `itrProp_always`, `Until` = `itrProp_until`, `Finally` = `itrProp_finally`; meta-level trace predicates `tr_always` / `tr_until` / `tr_eventually` | `trace/itrprop.v`, `trace/trace_prop.v` (rules: `trace/itrprop_rules.v`, `trace/trace_prop_rules.v`) |
 | `Fair` (fair scheduling) | `fair_scheduling` | `trace/fair_scheduling.v` |
 | logical assertions `φ` and `⟦·⟧_l` | no syntax: temporal formulas are `iProp`s; guarantee `P ⊨ₜ G` (`temporal P G`), inferred by `IntoTemporal` | `trace/guarantee.v`, `trace/guarantee_infer.v` (`IntoTemporal`) |
@@ -176,7 +176,7 @@ predicates.
 | model update modality | `mupd` / `fmupd`; the `lwp`-facing form is the class field `sfmupd` (`|={E}=>m`), defined at the instance from `fmupd`, and the step modalities are `mprog` / `mphys` | `base_logic/mupd.v`, `program_logic/obl_forest.v`, `program_logic/obl_forest_instance.v`, `base_logic/model_physical_updates.v` |
 | fair-scheduler invariant `H` | `owit_inv` | `base_logic/owit.v` |
 | state interpretation `S` | `state_interp` (heap-lang instance) and `history_interp` (wrapper for adequacy proof) | `lantana_heap_lang/primitive_laws.v`, `program_logic/history_interp.v` |
-| **Theorem 1 (Adequacy)** | `lwp_adequacy_temporal` (from a guarantee `P ⊨ₜ G` of the initial resources, any trace predicate implied by `itrProp_external G`); Iris-style safety variant `lwp_adequacy_safety_iris` | `trace/adequacy_temporal.v`, `trace/adequacy_safety.v` |
+| **Theorem 1 (Adequacy)** | `lwp_adequacy_temporal` (from a guarantee `P ⊨ₜ G` of the initial resources, any trace predicate implied by `itrProp_external G`; the weakest preconditions are `NotStuck`, which refutes the stuck behaviors); Iris-style safety `lwp_adequacy_safety_iris` (on the same fair behaviors, the scheduled thread is never stuck, and whenever the chosen thread is a value, its postcondition holds) | `trace/adequacy_temporal.v`, `trace/adequacy_safety.v` |
 
 ### Case studies (§2 to §7)
 
@@ -200,7 +200,7 @@ instantiations of Theorem 1 (`lwp_adequacy_temporal`), deriving the trace-level 
 property of the respective client program.
 `flag_client.v` uses adequacy to prove a property about a memory location, beyond termination.
 `paradox.v` proves the unsoundness counterexample remarked at the end of §6.2
-(`no_lc_absurd`). Beyond the paper: `nonstrict_move.v` shows that moving an obligation below
+(`no_lc_absurd`): a HeapLang rule for one pure step without fuel would be unsound. Beyond the paper: `nonstrict_move.v` shows that moving an obligation below
 an obligation of the same layer would be unsound (`nonstrict_move_absurd`);
 `ticket_lock2.v` / `ticket_lock2_client.v` give a starvation-free ticket lock
 (`fair_lock_starvation_free`, `ticket_lock_client_adequacy`); `cert_discharge.v` tests a

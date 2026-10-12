@@ -200,7 +200,7 @@ Section adequacy.
     client_spec τ.
   Proof.
     intros τ Beh FS Init1 Init2.
-    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main client_spec).
+    eapply (lwp_adequacy_temporal Σ heap_lang (Build_state σ0 ∅) Θ0 i [] G_main client_spec).
     { apply G_main_impl. }
     1,2,3,4: eauto.
     iIntros (?). exists (Ord.from_nat 2).

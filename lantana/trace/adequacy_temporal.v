@@ -6,17 +6,18 @@ From lantana.base_logic Require Import satisfiable.
 (** * Adequacy of [lWP] for temporal guarantees
 
     [lWP] is a running system with the one-step property ([sys_step_lwp]). Hence, if the
-    initial resources guarantee [G], every fair run satisfies [itrProp_external G]
-    ([lwp_adequacy_temporal]). *)
+    initial resources guarantee [G], every fair behavior satisfies [itrProp_external G]
+    ([lwp_adequacy_temporal]). Behaviors include stuck executions; a stuck scheduled thread
+    contradicts the reducibility that [lWP] proves at [NotStuck]. *)
 Section adequacy.
   Context `{!lantanaGS Λ Σ}.
 
   (** The running system: every thread runs its [lwp_fix]. *)
-  Definition threads_run (s : stuckness)
+  Definition threads_run
     (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) : iProp Σ :=
     [∗ map] i ↦ '(e, Q) ∈ TQ, match to_val e with
                               | Some v => (lift_term i Q) v
-                              | None => lwp_fix s i ⊤ e (lift_term i Q)
+                              | None => lwp_fix NotStuck i ⊤ e (lift_term i Q)
                               end.
 
   (** ** The fairness measure drops across a step *)
@@ -87,17 +88,17 @@ Section adequacy.
 
       From a consistent system at [n]: the system at [S n], the facts about the step, and
       later credits for the continuation (which may use fancy updates). *)
-  Lemma run_step (c : nat) s h n σ Θ TQ κs g v Ω W τf γ (Φ : iProp Σ) :
+  Lemma run_step (c : nat) h n σ Θ TQ κs g v Ω W τf γ (Φ : iProp Σ) :
     ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
      hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
-    (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run s TQ -∗
+    (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run TQ -∗
     (∀ σ' Θ' κs' TQ' g' v' Ω' W' γ',
        ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω' W' ∧
         hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ Θ' = fst <$> TQ' ∧
         obls_drop (fair_sched_fun γ) (fair_sched_fun γ') Ω Ω'⌝ -∗
        £n c -∗
        (history_tinterp (h ++ [(σ', Θ', κs')]) (S n) σ' Θ' κs' ∗ state_interp_aux σ' Θ' κs') ∗
-       model_interp g' v' Ω' W' (S n) (dom Θ') ∗ threads_run s TQ' -∗
+       model_interp g' v' Ω' W' (S n) (dom Θ') ∗ threads_run TQ' -∗
        |={⊤}=> Φ) -∗
     |={⊤,∅}=> ALC (|={∅,⊤}=> Φ).
   Proof.
@@ -110,7 +111,7 @@ Section adequacy.
     { subst. iApply big_sepM_fmap. iApply (big_sepM_impl with "WPs").
       iIntros "!> %%% H". destruct x. simpl. destruct (to_val e); auto. iDestruct "H" as "[$ _]". }
     iPoseProof (history_interp_lookup with "HI") as "%Hlu".
-    destruct H2 as [TStep | TDone].
+    destruct H2 as [TStep | [TDone | TStuck]].
     - iPoseProof (get_obls_thread_active with "[$HI $MI $WPs]") as "%OTA". 1,2: eauto.
       inversion TStep. clear TStep. inversion H. clear H. subst Θ0 σ ρ2. rename H1 into PStep, H0 into LUTi1.
       assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
@@ -153,7 +154,7 @@ Section adequacy.
       remember ((λ e, (e, fork_post)) <$> efs : gmap thread_id (expr Λ * (thread_id → val Λ → iProp Σ))) as TQefs.
       iAssert ([∗ map] j ↦ '(e, Q) ∈ TQefs, (|={⊤}=>m (match to_val e with
                                                           | Some v => lift_term j Q v
-                                                          | None => lwp_fix s j ⊤ e (lift_term j Q)
+                                                          | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                                                           end)))%I with "[Efs]" as "Efs".
       { subst TQefs. iApply big_sepM_fmap. iApply (big_sepM_impl with "Efs"). iIntros "!> %%% WP".
         destruct (to_val x) eqn:EQx.
@@ -184,7 +185,7 @@ Section adequacy.
         iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                    (match to_val e with
                     | Some v => lift_term j Q v
-                    | None => lwp_fix s j ⊤ e (lift_term j Q)
+                    | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                     end))%I with "[WPs WP Efs]" as "WPs".
         { iApply big_sepM_union; first done.
           iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
@@ -194,7 +195,7 @@ Section adequacy.
       + iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                    (match to_val e with
                     | Some v => lift_term j Q v
-                    | None => lwp_fix s j ⊤ e (lift_term j Q)
+                    | None => lwp_fix NotStuck j ⊤ e (lift_term j Q)
                     end))%I with "[WPs WP Efs]" as "WPs".
         { iApply big_sepM_union; first done.
           iFrame "Efs". rewrite big_sepM_insert_delete. iFrame. rewrite He2. iFrame. }
@@ -227,16 +228,31 @@ Section adequacy.
       rewrite (ALC_credits _ _ (Ord.from_nat c) (|={∅,⊤}=> Φ)%I). iApply ALC_intro. iIntros "LC". iMod "close" as "_".
       iApply ("K" with "[%] LC [$HI $TI $SIa $MHI $MI $WPs]"). split_and!; eauto.
       eapply obls_drop_na; eauto.
+    - (* The scheduled thread is stuck. This is impossible: its [lwp] proves reducibility. *)
+      destruct TStuck as [e1 σ1 Θ1 [= <- <-] LUTi1 [He1 Irr] -> ->].
+      assert (LUTQi1 : ∃ Q, TQ !! i1 = Some (e1, Q)).
+      { subst Θ. rewrite lookup_fmap_Some in LUTi1. destruct LUTi1 as (?&?&?). destruct x. subst. eauto. }
+      destruct LUTQi1 as (Q& LUTQi1). iPoseProof (big_sepM_lookup _ _ _ _ LUTQi1 with "WPs") as "WP".
+      simpl. rewrite He1.
+      iPoseProof (lwp_fix_unfold_fix with "WP") as "WP". rewrite /lwp_pre He1 /lwp_step.
+      iSpecialize ("WP" $! ctx_id h n σ Θ [] κs). iEval (rewrite !ctx_id_apply) in "WP".
+      iMod ("WP" with "[] [//] [$HI $TI $SIa]") as "WP".
+      { iPureIntro. apply _. }
+      iMod (model_interp_mupd_steps with "WP MI") as "(WP& %& %& %& %& %& MI)".
+      2: eapply LB.
+      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      iDestruct "WP" as "[%NStuck _]". exfalso.
+      destruct NStuck as (?&?&?&?& PStep). by eapply Irr.
   Qed.
 
   (** ** The one-step property for [lWP]
 
       The system: the auxiliary state interpretation, the registry state and the running
       threads. A step: the check, then [run_step]. *)
-  Definition sys_lwp (s : stuckness) : nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ :=
-    λ _ σ Θ κs, (state_interp_aux σ Θ κs ∗ treg_state ∗ ∃ TQ, ⌜Θ = fst <$> TQ⌝ ∗ threads_run s TQ)%I.
+  Definition sys_lwp : nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ :=
+    λ _ σ Θ κs, (state_interp_aux σ Θ κs ∗ treg_state ∗ ∃ TQ, ⌜Θ = fst <$> TQ⌝ ∗ threads_run TQ)%I.
 
-  Lemma sys_step_lwp s : ⊢ sys_step (sys_lwp s).
+  Lemma sys_step_lwp : ⊢ sys_step (sys_lwp).
   Proof.
     rewrite /sys_step /sys_step_pre.
     iIntros "!>" (c h n σ Θ κs g v Ω W τf γ) "%H (HI& MI& SIa& TI& %TQ& %EQTQ& WPs)".
@@ -244,7 +260,7 @@ Section adequacy.
     iMod (treg_check n with "TI HI MI") as "(TI& HI& MI& %l& #B)".
     iApply fupd_mask_intro; first set_solver. iIntros "close". iExists l. iFrame "B".
     iNext. iMod "close" as "_". iModIntro.
-    iApply (run_step c s with "[%] [$HI $TI $SIa $MI $WPs]"); first by split_and!.
+    iApply (run_step c with "[%] [$HI $TI $SIa $MI $WPs]"); first by split_and!.
     iIntros (σ' Θ' κs' TQ' g' v' Ω' W' γ') "%Hstep LC ([[HI TI] SIa]& MI& WPs)".
     destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
     iModIntro. iExists σ', Θ', κs', g', v', Ω', W', γ'. rewrite /sys_lwp.
@@ -253,7 +269,7 @@ Section adequacy.
 
   (** The program logic from position [n]: check, step, and eliminate the record of the
       initial formula. *)
-  Lemma lwp_ti_logic_temporal s h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
+  Lemma lwp_ti_logic_temporal h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
     (G : itrProp Λ Σ) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
@@ -262,7 +278,7 @@ Section adequacy.
     ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
       model_interp g v Ω W n (dom Θ) ∗
       (|={⊤}=>m ∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                  (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ v, lift_term i Ψ v }})))
+                  (P -∗ |={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lWP e @ i; ⊤ {{ v, lift_term i Ψ v }})))
       ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> itrProp_internal G (n, τf)).
   Proof.
     iIntros (BEH FS LB HIST) "([HI SIa]& MI& WPs)".
@@ -282,7 +298,7 @@ Section adequacy.
     iAssert ([∗ map] i↦'(e, Q) ∈ TQ,
                (|={⊤}=>m (match to_val e with
                              | Some v => (lift_term i Q) v
-                             | None => lwp_fix s i ⊤ e (lift_term i Q)
+                             | None => lwp_fix NotStuck i ⊤ e (lift_term i Q)
                              end)))%I with "[WPs]" as "WPs".
     { iApply (big_sepM_impl with "WPs"). iIntros "!> %%% H". destruct x as [e Q]. simpl.
       rewrite lwp_unfold_fix. destruct (to_val e) eqn:He.
@@ -293,10 +309,10 @@ Section adequacy.
     destruct H as [LEO3 LB3].
     (* the check at [n] *)
     iMod (treg_check n with "TI HI MI") as "(TI& HI& MI& %l& #B)".
-    iApply (run_step 0 s with "[%] [$HI $TI $SIa $MI $WPs]"); first by split_and!.
+    iApply (run_step 0 with "[%] [$HI $TI $SIa $MI $WPs]"); first by split_and!.
     iIntros (σ2 Θ2 κs2 TQ2 g2 v2 Ω2 W2 γ2) "%Hstep LC' ([[HI TI] SIa]& MI& WPs)".
     destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
-    iModIntro. iApply (tguar_elim _ (sys_lwp s) with "TF [] [%] B [$HI $MI SIa TI WPs]").
+    iModIntro. iApply (tguar_elim _ (sys_lwp) with "TF [] [%] B [$HI $MI SIa TI WPs]").
     { iApply sys_step_lwp. }
     { split_and!; done. }
     rewrite /sys_lwp. iFrame "SIa TI". iExists TQ2. by iFrame.
@@ -307,7 +323,7 @@ End adequacy.
 (** The program logic establishes [G]; anything implied by its trace property holds. *)
 Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
   `{!mupdGpreS Σ} `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS.tregGpreS Λ Σ}
-  s σ Θ i κs (G : itrProp Λ Σ) (R : trProp Λ) :
+  σ Θ i κs (G : itrProp Λ Σ) (R : trProp Λ) :
   (∀ τ, itrProp_external G τ → R τ) →
   ∀ (τ : trace Λ),
   behavior τ →
@@ -323,7 +339,7 @@ Theorem lwp_adequacy_temporal (Σ : gFunctors) (Λ : language)
      state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
      (£ c -∗ ([∗ set] i ∈ dom Θ, thP_kids i ∅) -∗
       |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                  (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))) →
+                  (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ i; ⊤ {{ lift_term i Ψ }})))) →
   R τ.
 Proof.
   intros HR τ BEH FS INIT1 INIT2 Hwp. apply HR.
@@ -351,7 +367,7 @@ Proof.
             state_interp σ Θ κs ∗ state_interp_aux σ Θ κs ∗
             (£ c -∗ ([∗ set] i ∈ dom Θ, thP_kids i ∅) -∗
              |={⊤}=>m (∃ (P : iProp Σ), (P ⊨ₜ G) ∗ P ∗
-                         (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ s; i; ⊤ {{ lift_term i Ψ }})))).
+                         (P -∗ |={⊤}=>m [∗ map] i ↦ e;Ψ ∈ Θ;Ψs, lWP e @ i; ⊤ {{ lift_term i Ψ }})))).
   { iIntros (Htemp). destruct (Hwp Htemp) as [x Hx]. iExists x. iApply Hx. }
   eapply sat_wand; cycle 1.
   { eapply Hwp'. }

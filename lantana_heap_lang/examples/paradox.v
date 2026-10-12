@@ -11,54 +11,45 @@ From lantana.base_logic Require Import later_credits.
 
 (** * The no-credit rule is unsound
 
-    [lantanaGS_no_lc] assumes a rule for pure steps that pays no fuel. With it, two looping
-    threads prove "eventually False" ([loop_paradox]), and a fair run of the loops refutes the
-    rule ([no_lc_absurd]). *)
+    [lantanaGS_no_lc] assumes, for HeapLang, a rule for one pure step that pays no fuel. With
+    it, two looping threads prove "eventually False" ([loop_paradox]), and a fair run of the
+    loops refutes the rule ([no_lc_absurd]). *)
 
-(** The assumed rule: a pure step that pays no fuel (and gives no later credits), yet yields
+(** The assumed rule: one pure step that pays no fuel (and gives no later credits), yet yields
     a witness credit for each obligation of [R] that is not discharged. *)
 Class lantanaGS_no_lc `(HGS : lantanaGS Λ Σ) `{!TemporalInterp Λ Σ} := {
     lwp_pure_step_no_lc :
-    ∀ n s i E E' e1 e2 φ Φ,
-      PureExec φ n e1 e2 →
+    ∀ s i E E' e1 e2 φ Φ,
+      PureExec φ 1 e1 e2 →
       φ →
-      Nat.iter n
-        (λ P,
-           |={E,E'}=> ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-                          (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                           (|={E',E}=> |={E}=>m P)))
-        ((|={E}=>m (lWP e2 @ s; i; E {{ v, Φ v }})))
+      (|={E,E'}=> ∃ R, ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
+                      (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+                       (|={E',E}=> |={E}=>m lWP e2 @ s; i; E {{ v, Φ v }})))
       ⊢ lWP e1 @ s; i; E {{ Φ }};
   }.
 
-Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _ _} (n : nat) R s i E E' e1 e2 φ Φ :
-  PureExec φ n e1 e2 →
+Lemma lwp_pure_step_no_lc_alt `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _ _} R s i E E' e1 e2 φ Φ :
+  PureExec φ 1 e1 e2 →
   φ →
   ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-  (Nat.iter n (λ P, |={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
-                               (|={E',E}=> |={E}=>m P)))
-     ((|={E}=>m (lWP e2 @ s; i; E {{ Φ }}))))
+  (|={E,E'}=> (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+               (|={E',E}=> |={E}=>m lWP e2 @ s; i; E {{ Φ }})))
   ⊢ (lWP e1 @ s; i; E {{ Φ }}).
 Proof.
   iIntros (Hexec HΦ) "(#Rs& LWP)".
-  iApply (lwp_pure_step_no_lc n _ _ E E'). 1: auto.
-  iStopProof. clear Hexec. pattern n. induction n.
-  { simpl. iIntros "(#Rs& LWP)". auto. }
-  simpl. iIntros "(#Rs& LWP)".
-  iMod "LWP". iFrame "Rs".
-  iIntros "!> Wcs". iMod ("LWP" with "Wcs") as "LWP".
-  iApply IHn. iFrame "Rs". iModIntro. iFrame "LWP".
+  iApply (lwp_pure_step_no_lc _ _ E E'); try done.
+  iMod "LWP". iModIntro. iExists R. iFrame "Rs LWP".
 Qed.
 
 Lemma tac_lwp_pure_no_lc `{!heapGS Σ} `{@lantanaGS_no_lc _ _ Σ _ _}
-  Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ n (Φ : val → iProp Σ) :
-  PureExec φ n e1 e2 →
+  Δ (s : stuckness) i E (K : list (ectxi_language.ectx_item _)) e1 e2 φ (Φ : val → iProp Σ) :
+  PureExec φ 1 e1 e2 →
   φ →
   envs_entails Δ (∃ E' R,
         ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) ∗
-        (Nat.iter n (λ (P : iProp Σ), |={E,E'}=>
-                       (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗ (|={E',E}=> |={E}=>m P)))
-           ((|={E}=>m (lWP (fill K e2) @ s; i; E {{ Φ }})))))%I →
+        (|={E,E'}=>
+           (([∗ set] r ∈ R, witP_cred r Ord.one ∨ oblP_discharged r) -∗
+            (|={E',E}=> |={E}=>m lWP (fill K e2) @ s; i; E {{ Φ }}))))%I →
   envs_entails Δ (lWP (fill K e1) @ s; i; E {{ Φ }})%I.
 Proof.
   rewrite envs_entails_unseal=> ?? ->.
@@ -244,7 +235,7 @@ Section proof.
     (* The step returns to the same expression, so [TE] is unchanged. *)
     lwp_lam_no_lc. simpl. iExists ⊤, ({[ck]}). iSplitR.
     { rewrite big_sepS_singleton. auto. }
-    iIntros "!> Wcs !> !>".
+    iIntros "!> Wcs !>".
     iEval (rewrite -/loop).
     iEval (rewrite big_sepS_singleton) in "Wcs". iDestruct "Wcs" as "[Wc | #Gdckn]".
     - (** Witness induction *)
@@ -490,7 +481,7 @@ Section adequacy.
         {[i := fork_post; j := fork_post]}.
 
   Theorem loop_paradox :
-    (∀ Λ0 Σ0 (HGS : lantanaGS Λ0 Σ0) (TI : TemporalInterp Λ0 Σ0), @lantanaGS_no_lc _ Λ0 Σ0 HGS TI) →
+    (∀ Σ0 (HG : heapGS Σ0), @lantanaGS_no_lc _ heap_lang Σ0 _ _) →
     ∀ (τ : trace heap_lang),
     behavior τ →
     fair_scheduling τ →
@@ -499,7 +490,7 @@ Section adequacy.
     R_main τ.
   Proof.
     intros LNLC τ Beh FS Init1 Init2.
-    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main (R_main)).
+    eapply (lwp_adequacy_temporal Σ heap_lang (Build_state σ0 ∅) Θ0 i [] G_main (R_main)).
     { apply G_main_impl. }
     1,2,3,4: eauto.
     iIntros (?). exists (10 : Ord.t)%ord.
@@ -566,7 +557,7 @@ Section adequacy.
 
   (** Assuming the rule, [loop_paradox] gives "eventually False" on this run. *)
   Theorem no_lc_absurd :
-    (∀ Λ0 Σ0 (HGS : lantanaGS Λ0 Σ0) (TI : TemporalInterp Λ0 Σ0), @lantanaGS_no_lc _ Λ0 Σ0 HGS TI) →
+    (∀ Σ0 (HG : heapGS Σ0), @lantanaGS_no_lc _ heap_lang Σ0 _ _) →
     False.
   Proof.
     intros LNLC.

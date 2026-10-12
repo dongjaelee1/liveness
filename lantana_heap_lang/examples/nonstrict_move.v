@@ -85,7 +85,7 @@ Section adequacy.
         {[i := fork_post]}.
 
   Theorem nonstrict_move_unsound :
-    (∀ Λ0 Σ0 (HGS : lantanaGS Λ0 Σ0) (TI : TemporalInterp Λ0 Σ0), @obl_move_nonstrict _ Λ0 Σ0 HGS TI) →
+    (∀ Σ0 (HG : heapGS Σ0), @obl_move_nonstrict _ heap_lang Σ0 _ _) →
     ∀ (τ : trace heap_lang),
     behavior τ →
     fair_scheduling τ →
@@ -94,7 +94,7 @@ Section adequacy.
     False.
   Proof.
     intros NS τ Beh FS Init1 Init2.
-    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main (λ _, False)).
+    eapply (lwp_adequacy_temporal Σ heap_lang (Build_state σ0 ∅) Θ0 i [] G_main (λ _, False)).
     { apply G_main_false. }
     1,2,3,4: eauto.
     iIntros (?). exists (2 : Ord.t)%ord.
@@ -120,7 +120,7 @@ Section adequacy.
     iSplitL "Ux TG Fx".
     { iExists x. iFrame. }
     iIntros "(%x'& _& TG& Fx)". iModIntro.
-    pose proof (NS heap_lang Σ HlantanaGS _) as HNS.
+    pose proof (NS Σ HHeapGS) as HNS.
     rewrite /Θ0 /Ψs. iApply big_sepM2_singleton.
     iEval (rewrite big_sepM_singleton) in "Tis".
     iApply (loop_spec (heapGS0:=HHeapGS) i x' [] with "[Tis] TG Fx").
@@ -158,7 +158,7 @@ Section adequacy.
   Qed.
 
   Theorem nonstrict_move_absurd :
-    (∀ Λ0 Σ0 (HGS : lantanaGS Λ0 Σ0) (TI : TemporalInterp Λ0 Σ0), @obl_move_nonstrict _ Λ0 Σ0 HGS TI) →
+    (∀ Σ0 (HG : heapGS Σ0), @obl_move_nonstrict _ heap_lang Σ0 _ _) →
     False.
   Proof.
     intros NS. apply (nonstrict_move_unsound NS loop_run).

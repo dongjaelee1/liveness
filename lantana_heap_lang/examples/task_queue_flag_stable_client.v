@@ -339,7 +339,7 @@ Section adequacy.
     R_main τ ∧ R_queue τ.
   Proof.
     intros τ Beh FS Init1 Init2.
-    eapply (lwp_adequacy_temporal Σ heap_lang NotStuck (Build_state σ0 ∅) Θ0 i [] G_main
+    eapply (lwp_adequacy_temporal Σ heap_lang (Build_state σ0 ∅) Θ0 i [] G_main
               (λ τ, R_main τ ∧ R_queue τ)).
     { apply G_main_impl. }
     1,2,3,4: eauto.
