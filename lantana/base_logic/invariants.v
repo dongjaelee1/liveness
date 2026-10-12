@@ -1,5 +1,6 @@
-(** Invariants [inv N P] for the fancy updates of [fancy_updates.v], adapted from Transfinite
-    Iris, with rules for allocating, opening, splitting and changing them. *)
+(** Invariants [inv N P] for the fancy updates of [fancy_updates.v], with rules for allocating,
+    opening, splitting and changing them. Adapted from Transfinite Iris's 
+    [transfinite.base_logic.lib.invariants]. *)
 
 From stdpp Require Export namespaces.
 From iris.proofmode Require Import proofmode.

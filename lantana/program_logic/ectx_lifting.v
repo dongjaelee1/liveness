@@ -1,4 +1,5 @@
-(** Lifting lemmas of [lWP] for ectx-based languages, stated with base steps. *)
+(** Lifting lemmas of [lWP] for ectx-based languages, stated with base steps. Adapted from
+    Iris's [iris.program_logic.ectx_lifting]. *)
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export ectx_language lifting.
 From iris.prelude Require Import options.

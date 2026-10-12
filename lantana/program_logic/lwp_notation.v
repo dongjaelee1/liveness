@@ -1,5 +1,5 @@
 (** Notations for the liveness weakest precondition: the class [Lwp] and the [lWP] and
-    texan-triple notations (as Iris' [bi/weakestpre.v], with a thread id). *)
+    texan-triple notations, with a thread id. Adapted from Iris's [iris.bi.weakestpre]. *)
 
 From stdpp Require Export coPset.
 From iris.bi Require Import interface derived_connectives.

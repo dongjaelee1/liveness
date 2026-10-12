@@ -5,7 +5,7 @@ From lantana.heap_lang Require Import notation.
 From iris.prelude Require Import options.
 
 (** The [array] connective ([pointsto] for a list of values) and the lWP rules for arrays,
-    derived without the lifting lemmas. *)
+    derived without the lifting lemmas. Adapted from Iris's [iris.heap_lang.derived_laws]. *)
 
 Definition array `{!heapGS Σ} (l : loc) (dq : dfrac) (vs : list val) : iProp Σ :=
   [∗ list] i ↦ v ∈ vs, (l +ₗ i) ↦{dq} v.

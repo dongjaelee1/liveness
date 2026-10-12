@@ -1,6 +1,6 @@
 (** Satisfiability with invariant masks ([SatisfiableAt]) for the fancy updates of
-    [fancy_updates.v]: a version of transfinite.base_logic.lib.satisfiable with relational
-    updates. *)
+    [fancy_updates.v], which are built on relational updates. Adapted from Transfinite Iris's 
+    [transfinite.base_logic.lib.satisfiable]. *)
 
 From transfinite.stepindex Require Export existential_properties.
 From transfinite.bi Require Export satisfiable.

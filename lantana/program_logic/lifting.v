@@ -1,6 +1,7 @@
 (** Lifting lemmas: the rules of the operational semantics as rules of [lWP]. Only
     [lwp_step_step] and [lwp_lift_step] see the history and the model updates around a step;
-    the others are stated with the state interpretation and the obligation interface. *)
+    the others are stated with the state interpretation and the obligation interface.
+    Adapted from Iris's [iris.program_logic.lifting]. *)
 
 From iris.proofmode Require Import proofmode.
 From lantana.program_logic Require Export weakestpre.

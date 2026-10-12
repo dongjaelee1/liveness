@@ -12,7 +12,7 @@ From lantana.algebra Require Export ordinal_wfocm.
 
 (** The heap_lang instance of the Lantana program logic: the ghost state ([heapGS]), the
     points-to and thread-expression assertions, and the primitive lWP laws, proved from the
-    lifting lemmas. *)
+    lifting lemmas. Adapted from Iris's [iris.heap_lang.primitive_laws]. *)
 
 (** * Ghost state and assertions *)
 Class heap_stateGS Σ :=

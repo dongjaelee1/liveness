@@ -3,7 +3,7 @@ From lantana.heap_lang Require Export lang.
 From iris.prelude Require Import options.
 
 (** Metatheory of heap_lang (closedness, parallel substitution), not needed for verifying
-    programs. *)
+    programs. Adapted from Iris's [iris.heap_lang.metatheory]. *)
 
 Local Definition set_binder_insert (x : binder) (X : stringset) : stringset :=
   match x with

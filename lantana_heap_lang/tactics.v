@@ -3,7 +3,7 @@ From iris.prelude Require Import options.
 Import heap_lang.
 
 (** Tactics on heap_lang's operational semantics: [reshape_expr], [inv_base_step], and the
-    [base_step] hint database. *)
+    [base_step] hint database. Adapted from Iris's [iris.heap_lang.tactics]. *)
 
 (** [reshape_expr e tac] calls [tac K e'] for each decomposition [e = fill K e'] until [tac]
     succeeds. *)

@@ -1,4 +1,4 @@
-(** Logically atomic triples for [lWP], as in Iris' [program_logic/atomic.v]:
+(** Logically atomic triples for [lWP], adapted from Iris's [iris.program_logic.atomic]:
       <<{ ∀∀ x, α }>> e @ i; E <<{ ∃∃ y, β | z, RET v; POST }>>
     [∀∀], [∃∃] and [POST] may be omitted only without the RET binders [z]. *)
 

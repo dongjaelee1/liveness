@@ -3,7 +3,8 @@ From lantana.heap_lang Require Export lang.
 From lantana.heap_lang Require Import tactics notation.
 From iris.prelude Require Import options.
 
-(** The [IntoVal], [AsVal], [Atomic] and [PureExec] instances of heap_lang. *)
+(** The [IntoVal], [AsVal], [Atomic] and [PureExec] instances of heap_lang. Adapted from
+    Iris's [iris.heap_lang.class_instances]. *)
 
 Global Instance into_val_val v : IntoVal (Val v) v.
 Proof. done. Qed.

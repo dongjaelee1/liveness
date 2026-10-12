@@ -6,7 +6,7 @@ From iris.prelude Require Import options.
 
 (** Proof-mode tactics for lWP on heap_lang: focusing the thread's expression token ["TE"],
     pure steps ([lwp_pure] and the tactics built on it), binding ([lwp_bind]), and values
-    ([lwp_finish]). *)
+    ([lwp_finish]). Adapted from Iris's [iris.heap_lang.proofmode]. *)
 
 (** * Focusing the thread expression *)
 

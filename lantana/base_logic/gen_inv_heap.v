@@ -1,7 +1,8 @@
-(** Invariant locations (Iris' [gen_inv_heap], for the invariants of [invariants.v]): locations
+(** Invariant locations (for the invariants of [invariants.v]): locations
     with an invariant on their value that are never deallocated. [inv_pointsto] is a persistent
     witness that allows reading the location and guarantees that the value satisfies the
-    invariant; [inv_pointsto_own] also owns the location. *)
+    invariant; [inv_pointsto_own] also owns the location. Adapted from Transfinite Iris's 
+    [transfinite.base_logic.lib.gen_inv_heap]. *)
 
 From iris.algebra Require Import excl gmap.
 From transfinite.base_logic.lib Require Import gen_heap.

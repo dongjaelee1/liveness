@@ -1,5 +1,6 @@
 (** Languages with thread ids and forking ([language]): contexts, pure steps, atomicity,
-    traces and behaviors, and the ordinal bound [fair_sched_ub] of the fair scheduler. *)
+    traces and behaviors, and the ordinal bound [fair_sched_ub] of the fair scheduler.
+    Adapted from Iris's [iris.program_logic.language]. *)
 
 From stdpp Require Export gmap.
 From iris.algebra Require Export ofe.

@@ -1,5 +1,6 @@
 (** Fancy updates [|={E1,E2}=> P] on top of the relational update of transfinite later credits
-    (instead of the basic update), and the rules for spending credits at fancy updates. *)
+    (instead of the basic update), and the rules for spending credits at fancy updates.
+    Adapted from Transfinite Iris's [transfinite.base_logic.lib.fancy_updates]. *)
 
 From stdpp Require Export coPset.
 From iris.proofmode Require Import proofmode.

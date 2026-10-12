@@ -1,7 +1,8 @@
 From lantana.heap_lang Require Export lang.
 From iris.prelude Require Import options.
 
-(** Notations and coercions for writing heap_lang programs. *)
+(** Notations and coercions for writing heap_lang programs. Adapted from Iris's 
+    [iris.heap_lang.notation]. *)
 
 Coercion LitInt : Z >-> base_lit.
 Coercion LitBool : bool >-> base_lit.

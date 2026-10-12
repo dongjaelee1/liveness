@@ -3,7 +3,9 @@ From stdpp Require Export pretty.
 From lantana.heap_lang Require Import lang.
 From iris.prelude Require Import options.
 
-(** * Pretty printing for HeapLang values *)
+(** * Pretty printing for HeapLang values
+
+    Adapted from Iris's [iris.heap_lang.pretty]. *)
 
 Global Instance pretty_loc : Pretty loc :=
   λ l, pretty l.(loc_car).

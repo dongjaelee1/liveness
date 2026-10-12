@@ -9,7 +9,9 @@ From iris.prelude Require Import options.
     the state predicates that the atoms of temporal properties observe.
 
     As in Iris: evaluation is right-to-left, so that specs of curried calls [f a b] are
-    usable; freed locations are never reused. *)
+    usable; freed locations are never reused.
+
+    Adapted from Iris's [iris.heap_lang.lang]. *)
 
 Delimit Scope expr_scope with E.
 Delimit Scope val_scope with V.

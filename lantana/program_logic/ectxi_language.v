@@ -1,5 +1,5 @@
 (** Languages based on evaluation context items ([ectxiLanguage]), as instances of
-    [ectxLanguage]. *)
+    [ectxLanguage]. Adapted from Iris's [iris.program_logic.ectxi_language]. *)
 From iris.prelude Require Export prelude.
 From lantana.program_logic Require Import language ectx_language.
 From iris.prelude Require Import options.

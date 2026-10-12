@@ -1,5 +1,6 @@
 (** The liveness weakest precondition [lWP]: the least fixpoint of one step ([lwp_step]) of
-    the program logic, with its structural rules and proof-mode instances. *)
+    the program logic, with its structural rules and proof-mode instances. The structure
+    follows Iris's [iris.program_logic.weakestpre]. *)
 
 From iris.proofmode Require Import base proofmode classes.
 From lantana.program_logic Require Export language.
