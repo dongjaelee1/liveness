@@ -1,7 +1,10 @@
-# `lantana/trace`
+# `lantana/trace/`
 
 What a verified program guarantees about its executions, and the adequacy theorems that turn
-such a guarantee into a fact about every fair run.
+such a guarantee into a fact about every fair behavior.
+
+Builds on `lantana/prelude/`, `lantana/algebra/`, `lantana/base_logic/`, `lantana/program_logic/`.
+Used by `lantana_heap_lang/`, `lantana_heap_lang/examples/`.
 
 Three kinds of properties:
 
@@ -34,7 +37,7 @@ adequacy          adequacy_step   adequacy_temporal   adequacy_safety
 
 ## Files
 
-*Imports* are the direct `Require`s (files of this directory, then other directories); *also
+In dependency order: each file imports only files above it. *Imports* are the direct `Require`s (files of this directory, then other directories); *also
 uses* lists the files of this directory whose definitions the file mentions but reaches only
 through its imports.
 
@@ -63,4 +66,5 @@ through its imports.
 
 Outside this directory, `lantana_heap_lang/primitive_laws.v` imports `triprop`, `adequacy_step`,
 `guarantee_infer` and `adequacy_temporal`, and `lantana_heap_lang/temporal_laws.v` imports
-`guarantee_infer`; everything else reaches the trace layer through them.
+`guarantee_infer`; the clients in `lantana_heap_lang/examples/` import `adequacy_safety` for
+their safety theorems. Everything else reaches the trace layer through these imports.

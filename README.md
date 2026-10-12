@@ -1,4 +1,35 @@
-### Installation
+# Lantana in Rocq
+
+The Rocq development of *Decoupling Liveness Obligations from Thread-Local Carriers in the Lantana
+Concurrent Separation Logic* (POPL 2027). It mechanizes Lantana on top of Iris and Transfinite
+Iris: the logic, its adequacy theorems, and the case studies.
+
+The development has evolved since the paper. Obligations form a forest instead of living in
+carriers, temporal formulas are `iProp`s with semantic guarantees, and the rules are stated for
+the weakest precondition `lWP` rather than for the fuel-burning triple. §3.3 explains the
+differences and gives the Rocq name of each item of the paper.
+
+1. [Claims](#1-claims)
+2. [Getting started](#2-getting-started)
+3. [Evaluating the claims](#3-evaluating-the-claims)
+4. [The development](#4-the-development)
+
+## 1. Claims
+
+| Claim | Paper | Rocq |
+|---|---|---|
+| 1. The logic: Lantana's predicates and the rules the paper displays, as lemmas about the weakest precondition `lWP` and the model update `\|={E}=>m`; the carrier rules become rules of the obligation forest | §1–§5, Figs. 1, 3–6 | `lantana/`, `lantana_heap_lang/` |
+| 2. Adequacy: `lwp_adequacy_temporal` (Theorem 1), and Iris-style safety `lwp_adequacy_safety_iris` | §6 | `lantana/trace/adequacy_temporal.v`, `lantana/trace/adequacy_safety.v` |
+| 3. The case studies, with end-to-end liveness and safety theorems for the client programs | §2, §4.3, §5, §7 | `lantana_heap_lang/examples/` |
+| 4. A pure-step rule that burns no fuel is unsound: `no_lc_absurd` | end of §6.2 | `lantana_heap_lang/examples/paradox.v` |
+| 5. Nothing is admitted, and the results assume only axioms of Rocq's standard library | — | §3.2 |
+
+Building the development (§3.1) checks claims 1–4, and §3.3 gives the Rocq name of each item of
+the paper. §3.2 checks claim 5.
+
+## 2. Getting started
+
+### Requirements and installation
 
 The development depends on the following opam packages:
 
@@ -32,35 +63,55 @@ The development depends on the following opam packages:
 3. Run `make -jN` to build the full development, where `N` is the number of
    threads to use for the build process.
 
-## Acknowledgements
+On an Intel Xeon Gold 6354 (3.0 GHz), `make -j3` from scratch takes about 8 minutes, and the
+largest Rocq process uses about 1.8 GB of memory.
 
-The `ordinal/` directory is a copy of the Ordinal library, available at
-https://github.com/snu-sf/Ordinal (MIT license, `ordinal/LICENSE`).
+### Check
 
-(Transfinite Iris) The mechanization of set-theoretic ordinals and the underlying ZF model construction 
-has been based on Coq code by Dominik Kirst and Gert Smolka, available at: 
+The build must end without errors.
 
-* "Large Model Constructions for Second-Order ZF in Dependent Type Theory"
-  by Dominik Kirst and Gert Smolka, CPP 2018
-  See https://www.ps.uni-saarland.de/Publications/details/KirstSmolka:2017:Large-Model.html.
-* "Formalised Set Theory: Well-Orderings and the Axiom of Choice", Dominik Kirst. 
-  See https://www.ps.uni-saarland.de/~kirst/bachelor.php 
+## 3. Evaluating the claims
 
-## Structure of the development
+### 3.1 Building
 
-Each directory imports only from the directories listed before it:
+`make` checks every proof. To rebuild from scratch, run `make clean` first.
 
-| Directory | Contents |
-| --- | --- |
-| `ordinal/` | a copy of the Ordinal library (see Acknowledgements), logical path `lantana.ordinal`: layers are its `ord.t`, which must live in a universe below the opam `Ord.t` used by measures (`algebra/layer.v`) |
-| `lantana/prelude/` | Rocq-generic facts with no Iris: the classical axioms (`axioms.v`), facts about ordinals (`ordinal_facts.v` for the opam `Ord.t`, `ordinal_copy_facts.v` for the copy's `ord.t`), well-founded structures (`wf_structs.v`) |
-| `lantana/algebra/` | Rocq-level mathematics: ordered commutative monoids, well-founded ones and the ordinals as one, measures and layers, and the cameras used by the logic |
-| `lantana/base_logic/` | the `iProp`-level model of Lantana: transfinite later credits, fancy updates and invariants, and the obligation model (obligations and witnesses, their ghost state, the obligation forest, model updates `mupd`, and `omodel` in `base_logic/opreds.v`, the model of the predicates of §3–§5) |
-| `lantana/program_logic/` | the obligation-forest interface, the core of the logic (predicates, the model update `|={E}=>m` and their rules in `obl_forest.v`, derived rules in `obl_forest_rules.v`, the one instance in `obl_forest_instance.v`); languages and the thread-local weakest precondition `lwp`: its definition and lifting lemmas |
-| `lantana/trace/` | trace properties `trProp` (`trace_prop*.v`, `fair_scheduling.v`), their internalization `itrProp` (`triprop.v`, `itrprop*.v`), temporal guarantees `P ⊨ₜ G` (`guarantee*.v`), the temporal formulas always, until, finally (`temporal_formula*.v`), and the adequacy theorems (`adequacy_*.v`); each `*_rules.v` holds the rules of the definitions in its base file; dependency map in `lantana/trace/README.md` |
-| `lantana_heap_lang/` | HeapLang for Lantana, its proof mode, and the case studies in `examples/` |
+To read a statement, open the files in an editor with Rocq support, at the root of this directory
+(for instance VS Code with VsRocq or coq-lsp). Or, after `make`:
+```
+rocq top -Q ordinal lantana.ordinal -Q lantana lantana -Q lantana_heap_lang lantana.heap_lang
+Require Import lantana.trace.adequacy_temporal.
+Check lwp_adequacy_temporal.
+```
 
-## Correspondence between the paper and the Rocq development
+### 3.2 Axioms and admits
+
+`Print Assumptions` on the adequacy theorems (`lwp_adequacy_temporal`,
+`lwp_adequacy_safety_iris`), the end-to-end theorems of every client (`*_liveness_safety`,
+which contains `*_adequacy` and `*_safety_adequacy`), `no_lc_absurd` and
+`nonstrict_move_absurd` lists these seven axioms of Rocq's standard library:
+
+- `Classical_Prop.classic`
+- `Epsilon.epsilon_statement`
+- `FunctionalExtensionality.functional_extensionality_dep`
+- `ProofIrrelevance.proof_irrelevance`
+- `PropExtensionality.propositional_extensionality`
+- `ClassicalUniqueChoice.dependent_unique_choice`
+- `RelationalChoice.relational_choice`
+
+The case-study specifications (for instance `Flag_set_spec`, `TicketLock_acquire_spec`,
+`TaskQueue_worker_spec`) assume the first five. To check one result, after `make`:
+```
+rocq top -Q ordinal lantana.ordinal -Q lantana lantana -Q lantana_heap_lang lantana.heap_lang
+Require Import lantana.heap_lang.examples.flag_fork.
+Print Assumptions main_liveness_safety.
+```
+
+`grep -rnwE 'admit|Admitted' lantana lantana_heap_lang` finds nothing. On `ordinal/`, the copy of
+the Ordinal library, it finds only commented-out code and an unused tactic (`eadmit` in
+`sflib.v`).
+
+### 3.3 From the paper to Rocq
 
 **The most important difference:** the paper presents Lantana through the
 *fuel-burning triple* `{P}^G e {Q}^G'`, but the Rocq development is stated in terms of the
@@ -113,7 +164,7 @@ Naming conventions: `oblP_*` are obligation predicates, `witP_*` witness predica
 temporal formulas (iProps), `itrProp_*` internalized trace properties (a `trProp`, the external reading, with its `trIProp`, the internal reading, and adequacy), and `tr_*` meta-level trace
 predicates.
 
-### Predicates (Fig. 1, §3–§5)
+#### Predicates (Fig. 1, §3–§5)
 
 | Paper | Rocq | File (under `lantana/`) |
 |---|---|---|
@@ -133,7 +184,7 @@ predicates.
 | `Measure` (with extension measure `∇`, §3.2) | inductive `measure`; `∇` is the constructor `ms_extend`; interpretation into ordinals via `measure_rep_rec` | `algebra/measure.v` |
 | layers `ℓ` (ordinals) | `layer`, a notation for `ord.t` from the Ordinal library (we use two Ordinal libraries to sidestep universe inconsistency); its order is the instance `layer_layer_class` of `layer_class` | `algebra/measure.v`, `algebra/layer.v` |
 
-### Rules (Figs. 3–6, §5)
+#### Rules (Figs. 3–6, §5)
 
 | Paper rule | Rocq | File (under `lantana/` or `lantana_heap_lang/`) |
 |---|---|---|
@@ -160,7 +211,7 @@ predicates.
 | WIT-IND | `wit_layer_ind` | `program_logic/obl_forest_rules.v` |
 | OBLS-OFFLOAD | `obl_move` (an obligation moves with its subtree to another parent, burning one unit of its own fuel at a layer above the new parent's witness layer, `parP_below`), set versions `obl_move_set_gen` / `obl_move_thread_set` / `obl_move_obl_set` | `program_logic/obl_forest.v`, `program_logic/obl_forest_rules.v` |
 
-### Traces, temporal properties, and adequacy (§6, Fig. 7)
+#### Traces, temporal properties, and adequacy (§6, Fig. 7)
 
 | Paper | Rocq | File (under `lantana/`) |
 |---|---|---|
@@ -178,7 +229,7 @@ predicates.
 | state interpretation `S` | `state_interp` (heap-lang instance) and `history_interp` (wrapper for adequacy proof) | `lantana_heap_lang/primitive_laws.v`, `program_logic/history_interp.v` |
 | **Theorem 1 (Adequacy)** | `lwp_adequacy_temporal` (from a guarantee `P ⊨ₜ G` of the initial resources, any trace predicate implied by `itrProp_external G`; the weakest preconditions are `NotStuck`, which refutes the stuck behaviors); Iris-style safety `lwp_adequacy_safety_iris` (on the same fair behaviors, the scheduled thread is never stuck, and whenever the chosen thread is a value, its postcondition holds) | `trace/adequacy_temporal.v`, `trace/adequacy_safety.v` |
 
-### Case studies (§2 to §7)
+#### Case studies (§2 to §7)
 
 All in `lantana_heap_lang/examples/`.
 
@@ -194,22 +245,94 @@ All in `lantana_heap_lang/examples/`.
 | Task queue (§7.3): `TQInv`; SPEC-PUT-TASK/SPEC-WORKER | `is_task_queue`; `TaskQueue_init_spec` / `TaskQueue_put_task_spec` / `TaskQueue_run_task_spec` / `TaskQueue_worker_spec` | `task_queue.v` |
 | Reentrant client `decr` / `clientMain` (§7.3); SPEC-DECR/SPEC-DECR-CLIENTMAIN | `decr_reentrant` / `main`; `decr_reentrant_spec` / `main_spec`; `task_queue_client_adequacy` | `task_queue_client.v` |
 
-The per-example `*_adequacy` theorems (`flag_client_adequacy`, `main_adequacy`,
-`handoff_client_adequacy`, `task_queue_client_adequacy`) are end-to-end
-instantiations of Theorem 1 (`lwp_adequacy_temporal`), deriving the trace-level temporal
-property of the respective client program. Each client also has `*_safety_adequacy`, an
-instantiation of `lwp_adequacy_safety_iris` (the scheduled thread is never stuck, and a
-returned thread has its return value), and `*_liveness_safety`, both over the same fair
-behaviors.
-`flag_client.v` uses adequacy to prove a property about a memory location, beyond termination.
-`paradox.v` proves the unsoundness counterexample remarked at the end of §6.2
-(`no_lc_absurd`): a HeapLang rule for one pure step without fuel would be unsound. Beyond the paper: `nonstrict_move.v` shows that moving an obligation below
-an obligation of the same layer would be unsound (`nonstrict_move_absurd`);
-`ticket_lock2.v` / `ticket_lock2_client.v` give a starvation-free ticket lock
-(`fair_lock_starvation_free`, `ticket_lock_client_adequacy`); `cert_discharge.v` tests a
-discharge in the pre-step model update with nested temporal formulas
-(`cert_discharge_adequacy`). `flag_stable.v` (with `flag_stable_client.v`,
-`handoff_flag_stable_client.v`, `task_queue_flag_stable_client.v`) is a flag whose set value
-lives in a nested `alwaysI`, so it stays set (`flag_itrProp_stays`); `ticket_lock_mono.v` exports
-that `next` never decreases, so a lock that cannot be deleted is starvation free
-(`alive_fair_lock_starvation_free`).
+**End-to-end theorems.** Each client program has three, over all fair behaviors from its initial
+configuration:
+
+- `*_adequacy` instantiates Theorem 1 (`lwp_adequacy_temporal`) and gives a trace property of the
+  program (`main_adequacy`, `flag_client_adequacy`, `handoff_client_adequacy`,
+  `task_queue_client_adequacy`, and for the examples beyond the paper `ticket_lock_client_adequacy`
+  and `cert_discharge_adequacy`). `flag_client.v` proves a property about a memory location,
+  beyond termination.
+- `*_safety_adequacy` instantiates `lwp_adequacy_safety_iris`: the scheduled thread is never
+  stuck, and a returned thread has its return value.
+- `*_liveness_safety` states both.
+
+**Unsound rules.** `paradox.v` proves the unsoundness counterexample remarked at the end of §6.2 (`no_lc_absurd`):
+a HeapLang rule for one pure step without fuel would be unsound.
+
+**Beyond the paper:**
+
+- `nonstrict_move.v` shows that moving an obligation below an obligation of the same layer would
+  be unsound (`nonstrict_move_absurd`).
+- `ticket_lock2.v` / `ticket_lock2_client.v` give a starvation-free ticket lock
+  (`fair_lock_starvation_free`, `ticket_lock_client_adequacy`).
+- `cert_discharge.v` tests a discharge in the pre-step model update with nested temporal formulas
+  (`cert_discharge_adequacy`).
+- `flag_stable.v` (with `flag_stable_client.v`, `handoff_flag_stable_client.v`,
+  `task_queue_flag_stable_client.v`) is a flag whose set value lives in a nested `alwaysI`, so it
+  stays set (`flag_itrProp_stays`).
+- `ticket_lock_mono.v` exports that `next` never decreases, so a lock that cannot be deleted is
+  starvation free (`alive_fair_lock_starvation_free`).
+
+## 4. The development
+
+### Structure
+
+In dependency order: each directory imports only from the directories listed before it, and has
+a README that describes its files.
+
+- [`ordinal/`](ordinal/README.md): a copy of the Ordinal library, used for layers.
+- [`lantana/prelude/`](lantana/prelude/README.md): classical axioms, facts about both copies of the
+  ordinals, well-founded structures.
+- [`lantana/algebra/`](lantana/algebra/README.md): ordered commutative monoids, measures and
+  layers, and the cameras of the logic.
+- [`lantana/base_logic/`](lantana/base_logic/README.md): the `iProp`-level model: transfinite later
+  credits, fancy updates and invariants, and the obligation model (obligations and witnesses,
+  their ghost state, the obligation forest, model updates `mupd`, and `omodel`, the model of the
+  predicates).
+- [`lantana/program_logic/`](lantana/program_logic/README.md): the obligation-forest interface
+  (the predicates, the model update `|={E}=>m` and their rules), languages with thread ids, traces
+  and behaviors, and the weakest precondition `lwp` with its lifting lemmas.
+- [`lantana/trace/`](lantana/trace/README.md): trace properties, their internalization `itrProp`,
+  temporal guarantees `P ⊨ₜ G`, the temporal formulas always, until and finally, and the adequacy
+  theorems; the README has a dependency map.
+- [`lantana_heap_lang/`](lantana_heap_lang/README.md): HeapLang for Lantana, its `lWP` rules and
+  proof mode, and the state atoms of temporal properties.
+- [`lantana_heap_lang/examples/`](lantana_heap_lang/examples/README.md): the case studies.
+
+The logical paths are `lantana.ordinal`, `lantana` and `lantana.heap_lang`.
+
+### Adapted files
+
+`lantana/` and `lantana_heap_lang/` are new. Some files are adapted from earlier work, as their
+headers say:
+
+- HeapLang (apart from `temporal_laws.v` and the examples) from Iris's HeapLang, with thread ids,
+  fresh ids for forked threads, `ChooseNat` and `Label`;
+- the language interface, the lifting lemmas, logically atomic triples and the `lWP` notations
+  (`lantana/program_logic/`) from Iris, and `weakestpre.v` follows the structure of Iris's
+  weakest precondition;
+- fancy updates, invariants, satisfiability and invariant locations (`lantana/base_logic/`) from
+  Transfinite Iris, and the relational updates and later credits from the artifact of
+  *Later Credits* (Spies et al., 2022).
+
+`ordinal/` is a copy of the Ordinal library.
+
+### Acknowledgements
+
+The `ordinal/` directory is a copy of the Ordinal library, available at
+https://github.com/snu-sf/Ordinal (MIT license, `ordinal/LICENSE`).
+
+(Transfinite Iris) The mechanization of set-theoretic ordinals and the underlying ZF model construction 
+has been based on Coq code by Dominik Kirst and Gert Smolka, available at: 
+
+* "Large Model Constructions for Second-Order ZF in Dependent Type Theory"
+  by Dominik Kirst and Gert Smolka, CPP 2018
+  See https://www.ps.uni-saarland.de/Publications/details/KirstSmolka:2017:Large-Model.html.
+* "Formalised Set Theory: Well-Orderings and the Axiom of Choice", Dominik Kirst. 
+  See https://www.ps.uni-saarland.de/~kirst/bachelor.php
+
+### License
+
+BSD-3-Clause (`LICENSE`); the copy of the Ordinal library is under the MIT license
+(`ordinal/LICENSE`).
