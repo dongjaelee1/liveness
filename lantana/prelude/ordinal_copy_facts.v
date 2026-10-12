@@ -1,3 +1,9 @@
+(** Facts about the ordinals [ord.t] of the copy of the Ordinal library in [ordinal/], which
+    are the layers ([algebra/layer.v]): inflationary monotone functions
+    ([ord_mono_fun_class], as [ordinal_facts.v] has for [Ord.t]), suprema of ordinal-valued
+    functions ([limit_fun]), arithmetic with [ω] and Jacobsthal exponentiation, and
+    [ord.from_wf]. *)
+
 From stdpp Require Import base.
 From lantana.ordinal Require Export ordinal hessenberg classical_hessenberg.
 

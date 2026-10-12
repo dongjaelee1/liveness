@@ -34,8 +34,8 @@ The development depends on the following opam packages:
 
 ## Acknowledgements
 
-The `lantana/ordinal/` directory is a copy of the Ordinal library, available at
-https://github.com/snu-sf/Ordinal.
+The `ordinal/` directory is a copy of the Ordinal library, available at
+https://github.com/snu-sf/Ordinal (MIT license, `ordinal/LICENSE`).
 
 (Transfinite Iris) The mechanization of set-theoretic ordinals and the underlying ZF model construction 
 has been based on Coq code by Dominik Kirst and Gert Smolka, available at: 
@@ -52,8 +52,8 @@ Each directory imports only from the directories listed before it:
 
 | Directory | Contents |
 | --- | --- |
-| `lantana/ordinal/` | a copy of the Ordinal library (see Acknowledgements): layers are its `ord.t`, which must live in a universe below the opam `Ord.t` used by measures (`algebra/layer.v`) |
-| `lantana/prelude/` | Rocq-generic facts with no Iris: the classical axioms (`axioms.v`), facts about ordinals (`ordinal_facts.v`), well-founded structures (`wf_structs.v`) |
+| `ordinal/` | a copy of the Ordinal library (see Acknowledgements), logical path `lantana.ordinal`: layers are its `ord.t`, which must live in a universe below the opam `Ord.t` used by measures (`algebra/layer.v`) |
+| `lantana/prelude/` | Rocq-generic facts with no Iris: the classical axioms (`axioms.v`), facts about ordinals (`ordinal_facts.v` for the opam `Ord.t`, `ordinal_copy_facts.v` for the copy's `ord.t`), well-founded structures (`wf_structs.v`) |
 | `lantana/algebra/` | Rocq-level mathematics: ordered commutative monoids, well-founded ones and the ordinals as one, measures and layers, and the cameras used by the logic |
 | `lantana/base_logic/` | the `iProp`-level model of Lantana: transfinite later credits, fancy updates and invariants, and the obligation model (obligations and witnesses, their ghost state, the obligation forest, model updates `mupd`, and `omodel` in `base_logic/opreds.v`, the model of the predicates of §3–§5) |
 | `lantana/program_logic/` | the obligation-forest interface, the core of the logic (predicates, the model update `|={E}=>m` and their rules in `obl_forest.v`, derived rules in `obl_forest_rules.v`, the one instance in `obl_forest_instance.v`); languages and the thread-local weakest precondition `lwp`: its definition and lifting lemmas |

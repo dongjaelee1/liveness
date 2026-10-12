@@ -1,7 +1,7 @@
 (** The layers of Lantana: the ordinals of [lantana.ordinal] with their order. *)
 
 From stdpp Require Import base tactics.
-From lantana.ordinal Require Export ordinal_facts.
+From lantana.prelude Require Export ordinal_copy_facts.
 From lantana.algebra Require Export measure.
 
 (** [ord.t] is a copy of [Ord.t] of the [Ordinal] library (used by [measure_rep]): using [Ord.t]
