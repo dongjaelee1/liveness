@@ -222,7 +222,7 @@ Section rupd_lemmas.
     by rewrite -rupd_intro -or_intro_l.
   Qed.
 
-  (* A sanity check: relational updates satisfy the laws of basic updates. This is not
+  (* A check: relational updates satisfy the laws of basic updates. This is not
      an instance, since it would conflict with the basic update; the proof mode
      instances below are used instead. *)
   Lemma bi_bupd_mixin_rupd : BiBUpdMixin (iPropI Σ) rupd.

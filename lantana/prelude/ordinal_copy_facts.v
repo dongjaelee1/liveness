@@ -1,6 +1,9 @@
 From stdpp Require Import base.
 From lantana.ordinal Require Export ordinal hessenberg classical_hessenberg.
 
+(** The facts of [ordinal_facts.v], for the copy of the Ordinal library in [ordinal/], whose
+    ordinals [ord.t] are the layers ([lantana/algebra/layer.v]). *)
+
 Class ord_mono_fun_class := {
     η : ord.t → ord.t;
     η_mono : ∀ o, (o <= η o)%ordi;
@@ -125,7 +128,8 @@ Section ord_from_wf_facts.
 
 End ord_from_wf_facts.
 
-(** Limiting jacobsthal expn to nat gives useful properties. *)
+(** Ordinal power with a natural-number exponent, by repeated multiplication.
+    It agrees with [o ↑ n] when [o] is positive ([jacobsthal_expn_nat_spec]). *)
 Fixpoint jacobsthal_expn_nat (o : ord.t) (n : nat) : ord.t :=
   match n with
   | O => ord.S ord.O

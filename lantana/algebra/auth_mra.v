@@ -7,19 +7,17 @@ Section mra_aux.
   Context `{SI : indexT} {A} {R : relation A}.
   Implicit Types a b : A.
 
-  (* The proof unfolds the camera operations of [mraR] by hand, using [Set Printing All]. *)
+  (* The proof unfolds the camera operations of [mraR] by hand. *)
   Lemma to_mra_op_included_R `{!PreOrder R} a b :
     to_mra (R:=R) a ⋅ to_mra b ≼ to_mra a → R b a.
   Proof.
     intros Hi. apply mra_included in Hi.
     assert (H0 : to_mra (R:=R) a ⋅ to_mra b ⋅ to_mra a ≡ to_mra b ⋅ to_mra a).
     { rewrite comm assoc mra_idemp. rewrite comm. auto. }
-    Set Printing All.
     replace (@ofe_equiv _ (@mraO SI A R)) with (@mra_equiv A R) in H0 by done.
     replace (@cmra_op SI (@mraR SI A R)) with (@mra_op A R) in H0 by done.
     rewrite /ucmra_car /cmra_op in Hi. simpl in Hi.
     rewrite /ucmra_op in Hi. simpl in Hi.
-    Unset Printing All.
     assert (Heq : to_mra (R:=R) a ≡ to_mra b ⋅ to_mra a).
     { etransitivity; [apply Hi | apply H0]. }
     apply mra_included in Heq. apply to_mra_included in Heq. auto.

@@ -1,12 +1,13 @@
-# `lantana/ordinal/`
+# `ordinal/`
 
-A vendored copy of the Ordinal library (https://github.com/snu-sf/Ordinal, version 0.5.6):
-constructive ordinals `ord.t` with their order, arithmetic, and classical facts. Lantana uses this
-copy only for layers `ℓ : ord.t` (through `algebra/layer.v`), while the fuel and witness amounts use
-the opam-installed copy of the same library (`Ord.t`); using two copies sidesteps a universe
-inconsistency.
+A copy of the Ordinal library (https://github.com/snu-sf/Ordinal, version 0.5.6), distributed
+under the MIT license (`LICENSE`): constructive ordinals `ord.t` with their order, arithmetic, and
+classical facts. The files are in the namespace `lantana.ordinal`. Lantana uses this copy only for
+layers `ℓ : ord.t` (through `lantana/prelude/ordinal_copy_facts.v` and
+`lantana/algebra/layer.v`), while the fuel and witness amounts use the opam-installed copy of the
+same library (`Ord.t`); using two copies sidesteps a universe inconsistency.
 
-Builds on nothing else in Lantana. Used by `lantana/algebra/`.
+Builds on nothing in Lantana. Used by `lantana/prelude/`.
 
 ## Files
 
@@ -25,7 +26,6 @@ In dependency order: each file imports only files above it.
 | `classical_ordinal.v` | `basics.v`, `ordinal.v`, `sflib.v`, `totalness.v`, `wf_rel.v` | Facts that need classical logic and choice (`ClassicalChoice`), in module `classicOrd`: trichotomy and totality of the order, least elements (`meet_exists`), the successor-or-limit case split, zero/successor/limit induction, and more laws of `ord.rec`. |
 | `classical_hessenberg.v` | `arithmetic.v`, `basics.v`, `classical_ordinal.v`, `hessenberg.v`, `ordinal.v`, `sflib.v` | Classical laws of Jacobsthal arithmetic (`classicJacobsthal`): `×` distributes over `⊕` and is associative; for `0 < b`, `b ↑ (o0 + o1) == (b ↑ o0) × (b ↑ o1)` and `b ↑ (o0 * o1) == (b ↑ o0) ↑ o1`. |
 | `fixedpoint.v` | `basics.v`, `classical_ordinal.v`, `ordinal.v`, `sflib.v` | The Bourbaki–Witt fixed-point theorem, by transfinite iteration up to a Hartogs number, and least and greatest fixed points (`mu`, `nu`) of monotone operators on predicates. **Not used by Lantana:** Imported only by `well_ordering.v` and `zorn.v`, which are themselves unused. |
-| `ordinal_facts.v` | `classical_hessenberg.v`, `hessenberg.v`, `ordinal.v` | Not part of the Ordinal library: Lantana's lemmas for this copy, the same as `lantana/prelude/ordinal_facts.v` for the opam copy. Monotone functions on ordinals (`ord_mono_fun_class`), suprema of families (`limit_fun`), small facts about `⊕`, `×`, `↑` and `ω`, and the power with a natural-number exponent `jacobsthal_expn_nat`. Uses stdpp. |
 | `to_set.v` | `basics.v`, `classical_ordinal.v`, `ordinal.v`, `sflib.v`, `wf_rel.v` | The converse of `ord.from_wf_set`: every ordinal is the ordinal of a well-founded relation (`toSet.toSet`), and of a well-founded total order (`toSet.to_total_set`). **Not used by Lantana:** Imported only by `cardinal.v`, which is itself unused. |
 | `well_ordering.v` | `basics.v`, `classical_ordinal.v`, `fixedpoint.v`, `ordinal.v`, `sflib.v` | The well-ordering theorem (every type has a well-founded total order), extension of a well-founded relation to a well-founded total one, and comparability of types by injections. **Not used by Lantana:** Imported only by `cardinal.v`, which is itself unused. |
 | `cardinal.v` | `basics.v`, `classical_ordinal.v`, `ordinal.v`, `sflib.v`, `to_set.v`, `well_ordering.v`, `wf_rel.v` | Cardinals as ordinals: the cardinal of a type (`cardinal.cardinal`), comparison by injections, the next cardinal, and the aleph and beth hierarchies. **Not used by Lantana:** Imported only by `inaccessible.v`, which is itself unused. |
@@ -34,7 +34,7 @@ In dependency order: each file imports only files above it.
 
 ## Notes
 
-- Apart from `ordinal_facts.v`, the files are those of coq-ordinal 0.5.6 (the version `configure`
+- The files are those of coq-ordinal 0.5.6 (the version `configure`
   installs), with renames so that both copies can be loaded together: file names in snake case;
   modules in lower case (`Ord` → `ord`, `OrdArith` → `ordArith`, `Hessenberg` → `hessenberg`,
   `ClassicOrd` → `classicOrd`, …); the notation scope `ord_scope` (`%ord`) → `ordinal_scope`

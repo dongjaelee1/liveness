@@ -6,7 +6,7 @@ interpreted into the ordinals of the Ordinal library; and lemmas about finite ma
 used by the ghost state. `ordinal_existential_properties.v` connects these ordinals to the
 step-indices of Transfinite Iris.
 
-Builds on `lantana/ordinal/`, `lantana/prelude/`. Used by `lantana/base_logic/`, `lantana/program_logic/`, `lantana_heap_lang/`, `lantana_heap_lang/examples/`.
+Builds on `lantana/prelude/`. Used by `lantana/base_logic/`, `lantana/program_logic/`, `lantana_heap_lang/`, `lantana_heap_lang/examples/`.
 
 ## Files
 

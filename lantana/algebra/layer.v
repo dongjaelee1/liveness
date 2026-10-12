@@ -1,12 +1,12 @@
 From Stdlib Require Import Lia.
 From stdpp Require Import base tactics.
-From lantana.ordinal Require Export ordinal_facts.
+From lantana.prelude Require Export ordinal_copy_facts.
 From lantana.algebra Require Export measure.
 
 (** The development uses three ordinal libraries:
     1. [transfinite.stepindex.ordinals], only for step-indices;
     2. the Ordinal library (opam package [Ordinal]), for the logic's fuels and witnesses;
-    3. its copy in [lantana/ordinal/], for [layer], the layers passed to [measure_rep].
+    3. its copy in [ordinal/], for [layer], the layers passed to [measure_rep].
     The copy avoids a universe inconsistency: library 2 is not universe polymorphic. *)
 
 Section layer.
