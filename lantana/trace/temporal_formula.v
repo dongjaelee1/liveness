@@ -8,52 +8,53 @@ From transfinite.stepindex Require Import ordinals.
 (** * The temporal formulas [alwaysI], [untilI], and the registry state
 
     Here the interpretation of the temporal layer becomes the registry state
-    ([treg_temporal_interp]). This file defines the formulas; temporal_formula_run.v
+    ([reg_temporal_interp]). This file defines the formulas; temporal_formula_run.v
     certifies them along a run, and temporal_formula_rules.v has their rules. *)
 
 (** Once discharged, the obligation invariant of an until keeps the record of its right
     formula at the discharge event. *)
-Notation until_disch k G2 :=
-  (∃ n' i' Ω', event_obl i' (n', Ω') k obl_discharged ∗ tguar G2 n')%I (only parsing).
+Notation until_discharged k G2 :=
+  (∃ n' i' Ω', event_obl i' (n', Ω') k obl_discharged ∗ record G2 n')%I (only parsing).
 
 (** ** The registry and the registered structures
 
-    The handle of a registered item: the saved readings of its contents and its invariant,
-    which a run opens at every position to certify the content. *)
-Definition treg_handle `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (e : rentry) : iProp Σ :=
+    The interpretation of a registry entry: the saved readings of its contents, its
+    invariant and the guarantee of its content, which the check opens at every position to
+    certify the content. *)
+Definition reg_entry_interp `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (e : reg_entry) : iProp Σ :=
   match e with
   | RMark => True
-  | RAlways N γ => ∃ (P : iProp Σ) (G : itrProp Λ Σ), saved_ti γ (itrProp_internal G) ∗ inv N P ∗ ▷ (P ⊨ₜ G)
+  | RAlways N γ => ∃ (P : iProp Σ) (G : itrProp Λ Σ), saved_trI γ (itrProp_internal G) ∗ inv N P ∗ ▷ (P ⊨ₜ G)
   | RUntil N k γP γQ =>
-      ∃ (P : iProp Σ) (G1 G2 : itrProp Λ Σ), saved_ti γP (itrProp_internal G1) ∗ saved_ti γQ (itrProp_internal G2) ∗
-        oblP_inv N k P (until_disch k G2) ∗ ▷ (P ⊨ₜ G1)
+      ∃ (P : iProp Σ) (G1 G2 : itrProp Λ Σ), saved_trI γP (itrProp_internal G1) ∗ saved_trI γQ (itrProp_internal G2) ∗
+        oblP_inv N k P (until_discharged k G2) ∗ ▷ (P ⊨ₜ G1)
   end.
-Definition treg_state `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : iProp Σ := treg_st treg_handle.
-Global Instance treg_temporal_interp `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : TemporalInterp Λ Σ :=
-  treg_state.
-Lemma temporal_interp_treg `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : temporal_interp = treg_state.
+Definition reg_state `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : iProp Σ := reg_state_with reg_entry_interp.
+Global Instance reg_temporal_interp `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : TemporalInterp Λ Σ :=
+  reg_state.
+Lemma temporal_interp_reg `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} : temporal_interp = reg_state.
 Proof. done. Qed.
 
 (** An invariant [P] made trace-visible through a guarantee [G] of its content: registered
     with [G] and a later-guarded proof of [P ⊨ₜ G] (which may be a hypothesis at
     registration), and the record of [G] at its registration. [alwaysI N P] reads as
-    [itrProp_sem P], [alwaysI_as N P V] as [itrProp_sem V]. Sealed: the proof mode must not unify two
+    [itrProp_canon P], [alwaysI_as N P V] as [itrProp_canon V]. Sealed: the proof mode must not unify two
     structures through their bodies. *)
 Local Definition alwaysI_guar_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (N : namespace) (P : iProp Σ) (G : itrProp Λ Σ) : iProp Σ :=
-  ∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hG_event r st ∗
-              saved_ti γ (itrProp_internal G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ ▷ tguar G r.
+  ∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hist_event r st ∗
+              saved_trI γ (itrProp_internal G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ ▷ record G r.
 Local Definition alwaysI_guar_aux : seal (@alwaysI_guar_def). Proof. by eexists. Qed.
 Definition alwaysI_guar := alwaysI_guar_aux.(unseal).
 Global Arguments alwaysI_guar {Λ Σ _ _} N P G.
 Local Lemma alwaysI_guar_unseal : @alwaysI_guar = @alwaysI_guar_def.
 Proof. rewrite -alwaysI_guar_aux.(seal_eq) //. Qed.
 Lemma alwaysI_guar_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N P G :
-  alwaysI_guar N P G = (∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hG_event r st ∗
-                        saved_ti γ (itrProp_internal G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ ▷ tguar G r)%I.
+  alwaysI_guar N P G = (∃ j r γ st, reg_idx j r (RAlways N γ) ∗ hist_event r st ∗
+                        saved_trI γ (itrProp_internal G) ∗ inv N P ∗ ▷ (P ⊨ₜ G) ∗ ▷ record G r)%I.
 Proof. by rewrite alwaysI_guar_unseal. Qed.
 Definition alwaysI_as `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (P V : iProp Σ) : iProp Σ :=
-  alwaysI_guar N P (itrProp_sem V).
+  alwaysI_guar N P (itrProp_canon V).
 Definition alwaysI `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (N : namespace) (P : iProp Σ) : iProp Σ :=
   alwaysI_as N P P.
 (* Opaque for the proof mode: [iNext] must not unfold a structure to strip its inner later. *)
@@ -65,15 +66,15 @@ Global Typeclasses Opaque alwaysI_as alwaysI.
 Definition untilI_guar_pers `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (N : namespace) (k : positive) (P Q : iProp Σ) (G1 G2 : itrProp Λ Σ) : iProp Σ :=
   ∃ j r γP γQ st v Ω fu o,
-    reg_idx j r (RUntil N k γP γQ) ∗ hG_event r st ∗
-    saved_ti γP (itrProp_internal G1) ∗ saved_ti γQ (itrProp_internal G2) ∗
-    oblP_inv N k P (until_disch k G2) ∗ ▷ (P ⊨ₜ G1) ∗ ▷ (Q ⊨ₜ G2) ∗
-    event_obl v (r, Ω) k (obl_assigned fu o) ∗ ▷ tguar G1 r.
+    reg_idx j r (RUntil N k γP γQ) ∗ hist_event r st ∗
+    saved_trI γP (itrProp_internal G1) ∗ saved_trI γQ (itrProp_internal G2) ∗
+    oblP_inv N k P (until_discharged k G2) ∗ ▷ (P ⊨ₜ G1) ∗ ▷ (Q ⊨ₜ G2) ∗
+    event_obl v (r, Ω) k (obl_assigned fu o) ∗ ▷ record G1 r.
 Global Typeclasses Opaque untilI_guar_pers.
 (** With the canonical readings. *)
 Definition untilI_pers `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}
   (N : namespace) (k : positive) (P Q : iProp Σ) : iProp Σ :=
-  untilI_guar_pers N k P Q (itrProp_sem P) (itrProp_sem Q).
+  untilI_guar_pers N k P Q (itrProp_canon P) (itrProp_canon Q).
 Global Typeclasses Opaque untilI_pers.
 
 (** [P] until [Q] with namespace [N] and obligation [k], read as [G1] until [G2]: the token
@@ -95,14 +96,14 @@ Proof. by rewrite untilI_guar_unseal. Qed.
 (** [P] until [Q], read with the canonical trace properties of its formulas. Sealed on its
     own, so that unification compares two untils by their formulas only. *)
 Local Definition untilI_def `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k (q : Qp) (P Q : iProp Σ) : iProp Σ :=
-  untilI_guar N k q P Q (itrProp_sem P) (itrProp_sem Q).
+  untilI_guar N k q P Q (itrProp_canon P) (itrProp_canon Q).
 Local Definition untilI_aux : seal (@untilI_def). Proof. by eexists. Qed.
 Definition untilI := untilI_aux.(unseal).
 Global Arguments untilI {Λ Σ _ _} N k q P Q.
 Local Lemma untilI_unseal : @untilI = @untilI_def.
 Proof. rewrite -untilI_aux.(seal_eq) //. Qed.
 Lemma untilI_guar_canonical `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k q P Q :
-  untilI N k q P Q = untilI_guar N k q P Q (itrProp_sem P) (itrProp_sem Q).
+  untilI N k q P Q = untilI_guar N k q P Q (itrProp_canon P) (itrProp_canon Q).
 Proof. by rewrite untilI_unseal. Qed.
 Lemma untilI_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} N k q P Q :
   untilI N k q P Q = (oblP_assigned k (q/2)%Qp ∗ untilI_pers N k P Q)%I.
@@ -129,7 +130,7 @@ Lemma untilI_done_guar_unfold `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} 
 Proof. by rewrite untilI_done_guar_unseal. Qed.
 (** With the canonical reading. *)
 Definition untilI_done `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} k (Q : iProp Σ) : iProp Σ :=
-  untilI_done_guar k Q (itrProp_sem Q).
+  untilI_done_guar k Q (itrProp_canon Q).
 Global Typeclasses Opaque untilI_done.
 
 (** ** Reading the model under a model update
@@ -155,9 +156,9 @@ Section mupd_read.
   (** The same for [sfmupd], with fancy updates before and after reading the model. *)
   Lemma sfmupd_read_fupd E (P : iProp Σ) :
     (∀ h n σ Θ κs,
-      history_interp h n σ Θ κs -∗ treg_state -∗ |={E,∅}=> ∀ g i Ω W,
+      history_interp h n σ Θ κs -∗ reg_state -∗ |={E,∅}=> ∀ g i Ω W,
         model_interp g i Ω W n (dom Θ) -∗
-        model_interp g i Ω W n (dom Θ) ∗ |={∅,E}=> history_interp h n σ Θ κs ∗ treg_state ∗ P) ⊢ |={E}=>m P.
+        model_interp g i Ω W n (dom Θ) ∗ |={∅,E}=> history_interp h n σ Θ κs ∗ reg_state ∗ P) ⊢ |={E}=>m P.
   Proof.
     iIntros "H". unfold_sfmupd. iIntros (h n σ Θ κs) "[HI TI]". rewrite /fmupd.
     iMod ("H" with "HI TI") as "H". iModIntro.
@@ -167,8 +168,8 @@ Section mupd_read.
 
   Lemma sfmupd_read E (P : iProp Σ) :
     (∀ h n σ Θ κs g i Ω W,
-      history_interp h n σ Θ κs -∗ treg_state -∗ model_interp g i Ω W n (dom Θ) -∗
-      model_interp g i Ω W n (dom Θ) ∗ |={E}=> history_interp h n σ Θ κs ∗ treg_state ∗ P) ⊢ |={E}=>m P.
+      history_interp h n σ Θ κs -∗ reg_state -∗ model_interp g i Ω W n (dom Θ) -∗
+      model_interp g i Ω W n (dom Θ) ∗ |={E}=> history_interp h n σ Θ κs ∗ reg_state ∗ P) ⊢ |={E}=>m P.
   Proof.
     iIntros "H". iApply sfmupd_read_fupd. iIntros (h n σ Θ κs) "HI TI".
     iApply fupd_mask_intro; first set_solver. iIntros "close".
@@ -191,7 +192,7 @@ Section always_struct.
   Global Instance alwaysI_persistent N P : Persistent (alwaysI N P).
   Proof. rewrite /alwaysI. apply _. Qed.
 
-  Global Instance treg_handle_persistent e : Persistent (treg_handle e).
+  Global Instance reg_entry_interp_persistent e : Persistent (reg_entry_interp e).
   Proof. destruct e; apply _. Qed.
 
   (** Contractive in the content: structures can be defined by guarded recursion. *)
@@ -202,7 +203,7 @@ Section always_struct.
   Lemma alwaysI_guar_inv N P G : alwaysI_guar N P G ⊢ inv N P.
   Proof. rewrite alwaysI_guar_unfold. iIntros "(%&%&%&%& _& _& _& $& _)". Qed.
 
-  Lemma alwaysI_guar_temporal N P G : alwaysI_guar N P G ⊢ ▷ (P ⊨ₜ G).
+  Lemma alwaysI_guar_guar N P G : alwaysI_guar N P G ⊢ ▷ (P ⊨ₜ G).
   Proof. rewrite alwaysI_guar_unfold. iIntros "(%&%&%&%& _& _& _& _& $& _)". Qed.
 
   Lemma alwaysI_as_inv N P V : alwaysI_as N P V ⊢ inv N P.
@@ -249,19 +250,19 @@ Section until_struct.
   Proof. rewrite untilI_guar_unseal /untilI_guar_def /untilI_guar_pers. solve_contractive. Qed.
 
   Lemma untilI_guar_pers_inv N k P Q G1 G2 :
-    untilI_guar_pers N k P Q G1 G2 ⊢ oblP_inv N k P (until_disch k G2).
+    untilI_guar_pers N k P Q G1 G2 ⊢ oblP_inv N k P (until_discharged k G2).
   Proof. rewrite /untilI_guar_pers. iIntros "(%&%&%&%&%&%&%&%&%& _& _& _& _& $& _)". Qed.
 
-  Lemma untilI_pers_inv N k P Q : untilI_pers N k P Q ⊢ oblP_inv N k P (until_disch k (itrProp_sem Q)).
+  Lemma untilI_pers_inv N k P Q : untilI_pers N k P Q ⊢ oblP_inv N k P (until_discharged k (itrProp_canon Q)).
   Proof. apply untilI_guar_pers_inv. Qed.
 
-  Lemma untilI_guar_pers_temporal N k P Q G1 G2 :
+  Lemma untilI_guar_pers_guar N k P Q G1 G2 :
     untilI_guar_pers N k P Q G1 G2 ⊢ ▷ (P ⊨ₜ G1) ∗ ▷ (Q ⊨ₜ G2).
   Proof. rewrite /untilI_guar_pers. iIntros "(%&%&%&%&%&%&%&%&%& _& _& _& _& _& $& $& _)". Qed.
 
-  Lemma untilI_guar_temporal N k q P Q G1 G2 :
+  Lemma untilI_guar_guar N k q P Q G1 G2 :
     untilI_guar N k q P Q G1 G2 ⊢ ▷ (P ⊨ₜ G1) ∗ ▷ (Q ⊨ₜ G2).
-  Proof. rewrite untilI_guar_unfold. iIntros "[_ U]". by iApply untilI_guar_pers_temporal. Qed.
+  Proof. rewrite untilI_guar_unfold. iIntros "[_ U]". by iApply untilI_guar_pers_guar. Qed.
 
   (** Fractions *)
 

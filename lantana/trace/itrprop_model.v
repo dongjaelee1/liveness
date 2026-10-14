@@ -31,7 +31,7 @@ Section model.
     { eapply sat_mono; last apply iProp_sat_intro. iIntros "_".
       iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& _)".
       iMod (history_interp_init (Λ:=Λ) σ Θ κs) as (Hhist) "_".
-      iMod (treg_alloc (Λ:=Λ)) as (Htreg) "_".
+      iMod (reg_alloc (Λ:=Λ)) as (Htreg) "_".
       iModIntro. iExists Hmupd, Hhist, Htreg. iFrame. }
     apply sat_bupd, sat_exists in Hsat as [Hmupd Hsat].
     apply sat_exists in Hsat as [Hhist Hsat]. apply sat_exists in Hsat as [Htreg Hsat].

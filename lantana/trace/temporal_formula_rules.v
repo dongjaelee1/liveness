@@ -9,8 +9,8 @@ From transfinite.stepindex Require Import ordinals.
     [alwaysI N P] is a registered invariant, read as always [P]. [untilI N k q P Q] is [P]
     until [Q], controlled by the obligation [k]; [finallyI] is an until with left formula
     [True]; [untilI_done k Q] is a discharged until. Allocation, access and discharge are
-    model updates [|={E}=>m] (temporal_formula.v). The guarantees [temporal_always] and
-    [temporal_until] read the formulas on traces (temporal_formula_run.v). *)
+    model updates [|={E}=>m] (temporal_formula.v). The guarantees [guar_alwaysI] and
+    [guar_untilI] read the formulas on traces (temporal_formula_run.v). *)
 
 (** ** Rules for [alwaysI] *)
 Section always_rules.
@@ -73,11 +73,11 @@ Section always_rules.
     iMod (inv_acc with "Hinv") as "[HP Hclose]"; first done.
     iApply fupd_mask_intro; first set_solver. iIntros "close".
     iIntros (g i Ω W) "MI".
-    iPoseProof (temporal_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
-    iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
+    iPoseProof (guar_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
+    iPoseProof (history_interp_hist_event_now with "HI") as "#HE".
     iFrame "MI". iMod "close" as "_". iMod ("Hclose" with "HP") as "_".
-    iMod (saved_ti_alloc (itrProp_internal G)) as (γ) "#Hγ".
-    iMod (treg_st_register treg_handle (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
+    iMod (saved_trI_alloc (itrProp_internal G)) as (γ) "#Hγ".
+    iMod (reg_register reg_entry_interp (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, G. iFrame "Hγ Hinv HG". }
     iModIntro. iFrame "HI TI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG C".
   Qed.
@@ -89,19 +89,19 @@ Section always_rules.
   Proof.
     iIntros (HNE) "#Hinv #HPV".
     iApply (alwaysI_register_guar with "Hinv []"); first done.
-    iNext. iApply (temporal_mono with "HPV"). iApply temporal_sem.
+    iNext. iApply (guar_mono with "HPV"). iApply guar_canon.
   Qed.
 
   Lemma alwaysI_alloc_guar E N P G :
     ▷ (P ⊨ₜ G) -∗ ▷ P -∗ |={E}=>m alwaysI_guar N P G.
   Proof.
     iIntros "#HG HP". iApply sfmupd_read. iIntros (h n σ Θ κs g i Ω W) "HI TI MI".
-    iPoseProof (temporal_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
-    iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
+    iPoseProof (guar_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
+    iPoseProof (history_interp_hist_event_now with "HI") as "#HE".
     iFrame "MI".
-    iMod (saved_ti_alloc (itrProp_internal G)) as (γ) "#Hγ".
+    iMod (saved_trI_alloc (itrProp_internal G)) as (γ) "#Hγ".
     iMod (inv_alloc N _ P with "HP") as "#Hinv".
-    iMod (treg_st_register treg_handle (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
+    iMod (reg_register reg_entry_interp (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, G. iFrame "Hγ Hinv HG". }
     iModIntro. iFrame "HI TI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG C".
   Qed.
@@ -110,17 +110,17 @@ Section always_rules.
     ▷ P -∗ |={E}=>m alwaysI N P.
   Proof.
     iIntros "HP". iApply (alwaysI_alloc_guar with "[] HP").
-    iNext. iApply temporal_sem.
+    iNext. iApply guar_canon.
   Qed.
 
-  Lemma temporal_always_guar N P G : ⊢ alwaysI_guar N P G ⊨ₜ itrProp_always G.
+  Lemma guar_alwaysI_guar N P G : ⊢ alwaysI_guar N P G ⊨ₜ itrProp_always G.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& #A)". rewrite alwaysI_guar_unfold.
     iDestruct "A" as (j r γ st) "(#Hj& #HE& #Hγ& #Hinv& #HG& #AC)".
-    iDestruct (history_interp_hG_event_lookup with "[$HI $HE]") as %Hr.
+    iDestruct (history_interp_hist_event_lookup with "[$HI $HE]") as %Hr.
     iDestruct (history_interp_wf with "HI") as %[Hlen _].
     assert (Hrn : r ≤ n) by (apply lookup_lt_Some in Hr; lia).
-    iApply tguar_intro.
+    iApply record_intro.
     iIntros "!>" (Sys l h' g v' Ω' W' τf γ' σ' Θ' κs') "#ST %Hf #B Sys".
     destruct Hf as (BEH& FS& LB& HIST).
     iDestruct (bundle_always_cert with "B Hj Hγ []") as "#C"; first done.
@@ -129,16 +129,16 @@ Section always_rules.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iApply ALC_intro. iMod "close" as "_". iModIntro.
     iSplit; [|iSplit; first done].
-    - iApply (tguar_elim with "C ST [%] B Sys"). split_and!; done.
+    - iApply (record_elim with "C ST [%] B Sys"). split_and!; done.
     - iApply (always_run with "ST Hj Hγ [%] Sys"). simpl.
       split_and!; [lia|by apply behavior_S|exact FS|done|done].
   Qed.
 
-  Lemma temporal_always_as N P V : ⊢ alwaysI_as N P V ⊨ₜ itrProp_always (itrProp_sem V).
-  Proof. apply temporal_always_guar. Qed.
+  Lemma guar_alwaysI_as N P V : ⊢ alwaysI_as N P V ⊨ₜ itrProp_always (itrProp_canon V).
+  Proof. apply guar_alwaysI_guar. Qed.
 
-  Lemma temporal_always N P : ⊢ alwaysI N P ⊨ₜ itrProp_always (itrProp_sem P).
-  Proof. apply temporal_always_as. Qed.
+  Lemma guar_alwaysI N P : ⊢ alwaysI N P ⊨ₜ itrProp_always (itrProp_canon P).
+  Proof. apply guar_alwaysI_as. Qed.
 
   (** *** The until loop
 
@@ -182,7 +182,7 @@ Section until_rules.
       [untilI_guar_alloc] does both, with the formulas chosen once [k] is known. A done until
       comes from discharging a strong until ([untilI_guar_discharge_done]), or from a fresh
       obligation with [Q] at hand ([untilI_done_guar_init]). Both guarantee the until
-      ([temporal_until_guar], [temporal_until_done_guar]).
+      ([guar_untilI_guar], [guar_untilI_done_guar]).
 
       A strong until registers, with later-guarded guarantees of its formulas, and records
       the left formula at the current position. *)
@@ -192,16 +192,16 @@ Section until_rules.
   Proof.
     iIntros "[Oa Oa'] #HG1 #HG2 HC".
     iApply sfmupd_read. iIntros (h n σ Θ κs gm i Ω W) "HI TI MI".
-    iPoseProof (temporal_elim_later_guar P G1 with "HG1 [$HC $HI $MI]") as "#C".
+    iPoseProof (guar_elim_later_guar P G1 with "HG1 [$HC $HI $MI]") as "#C".
     iDestruct "MI" as "(MHI& S& MI)". iEval (unfold_opreds) in "Oa". iDestruct "Oa" as "(#OE& Oa)".
     iPoseProof (osat_lookup_assigned with "[$S $OE $Oa]") as "%Hk". destruct Hk as (fu& o& Hk).
     iPoseProof (model_history_interp_event_obl_now with "MHI") as "#EA". 1: eauto.
-    iPoseProof (history_interp_hG_event_now with "HI") as "#HE".
+    iPoseProof (history_interp_hist_event_now with "HI") as "#HE".
     iFrame "MHI S MI".
-    iMod (oblP_inv_alloc_assigned E N k P (until_disch k G2) with "Oa' HC") as "#OI".
-    iMod (saved_ti_alloc (itrProp_internal G1)) as (γP) "#HγP".
-    iMod (saved_ti_alloc (itrProp_internal G2)) as (γQ) "#HγQ".
-    iMod (treg_st_register treg_handle (RUntil N k γP γQ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
+    iMod (oblP_inv_alloc_assigned E N k P (until_discharged k G2) with "Oa' HC") as "#OI".
+    iMod (saved_trI_alloc (itrProp_internal G1)) as (γP) "#HγP".
+    iMod (saved_trI_alloc (itrProp_internal G2)) as (γQ) "#HγQ".
+    iMod (reg_register reg_entry_interp (RUntil N k γP γQ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, G1, G2. iFrame "HγP HγQ OI HG1". }
     iModIntro. iFrame "HI TI". rewrite untilI_guar_unfold /untilI_guar_pers. iSplitL "Oa".
     { iEval (unfold_opreds). iFrame "OE Oa". }
@@ -212,7 +212,7 @@ Section until_rules.
     oblP_assigned k 1 -∗ ▷ P -∗ |={E}=>m untilI N k 1 P Q.
   Proof.
     iIntros "Oa HP". rewrite untilI_guar_canonical.
-    iApply (untilI_guar_init with "Oa [] [] HP"); iNext; iApply temporal_sem.
+    iApply (untilI_guar_init with "Oa [] [] HP"); iNext; iApply guar_canon.
   Qed.
 
   (** The obligation and the strong until at once: [k] is a new child of [p], and the
@@ -260,7 +260,7 @@ Section until_rules.
     |={E}=>m untilI_done k Q ∗ parP_kids p (K ∖ {[k]}).
   Proof.
     iIntros (Hk) "Oa Kp Kk HQ". rewrite /untilI_done.
-    iApply (untilI_done_guar_init with "Oa Kp Kk [] HQ"); first done. iNext. iApply temporal_sem.
+    iApply (untilI_done_guar_init with "Oa Kp Kk [] HQ"); first done. iNext. iApply guar_canon.
   Qed.
   (** The same, with the children as [obl_new] returns them. *)
 
@@ -285,24 +285,24 @@ Section until_rules.
   (** A done until guarantees the until of any left reading, from its right formula: no
       run is needed. *)
 
-  Lemma temporal_until_done_guar k Q G1 G2 : ⊢ untilI_done_guar k Q G2 ⊨ₜ itrProp_until G1 G2.
+  Lemma guar_untilI_done_guar k Q G1 G2 : ⊢ untilI_done_guar k Q G2 ⊨ₜ itrProp_until G1 G2.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_done_guar_unfold.
     iDestruct "U" as "(HQ& _& #HG2)".
-    iApply (temporal_elim Q with "[] [$HI $MI $HQ]"). by iApply temporal_until_now.
+    iApply (guar_elim Q with "[] [$HI $MI $HQ]"). by iApply guar_until_now.
   Qed.
 
-  Lemma temporal_until_done k Q G1 : ⊢ untilI_done k Q ⊨ₜ itrProp_until G1 (itrProp_sem Q).
-  Proof. apply temporal_until_done_guar. Qed.
+  Lemma guar_untilI_done k Q G1 : ⊢ untilI_done k Q ⊨ₜ itrProp_until G1 (itrProp_canon Q).
+  Proof. apply guar_untilI_done_guar. Qed.
 
-  Lemma temporal_finally_done k Q : ⊢ untilI_done k Q ⊨ₜ itrProp_finally (itrProp_sem Q).
-  Proof. apply temporal_until_done. Qed.
+  Lemma guar_untilI_done_finally k Q : ⊢ untilI_done k Q ⊨ₜ itrProp_finally (itrProp_canon Q).
+  Proof. apply guar_untilI_done. Qed.
 
-  Lemma temporal_until_done_valid k Q G1 G2 : (⊢ Q ⊨ₜ G2) → ⊢ untilI_done k Q ⊨ₜ itrProp_until G1 G2.
+  Lemma guar_untilI_done_valid k Q G1 G2 : (⊢ Q ⊨ₜ G2) → ⊢ untilI_done k Q ⊨ₜ itrProp_until G1 G2.
   Proof.
-    intros HG2. iApply (temporal_weaken _ (itrProp_until G1 (itrProp_sem Q))).
-    { apply itrProp_until_mono; [apply itrProp_le_refl|by apply itrProp_sem_le]. }
-    iApply temporal_until_done.
+    intros HG2. iApply (guar_weaken _ (itrProp_until G1 (itrProp_canon Q))).
+    { apply itrProp_until_mono; [apply itrProp_le_refl|by apply itrProp_canon_le]. }
+    iApply guar_untilI_done.
   Qed.
 
   (** Discharge: [P] is taken out; once [Q] holds, [k] (a childless child of [p]) is
@@ -317,16 +317,16 @@ Section until_rules.
   Proof.
     rewrite untilI_guar_unfold. iIntros (HN) "(Oa& #U)".
     iPoseProof (untilI_guar_pers_inv with "U") as "#OI".
-    iDestruct (untilI_guar_pers_temporal with "U") as "[_ #HG2]".
+    iDestruct (untilI_guar_pers_guar with "U") as "[_ #HG2]".
     iMod (oblP_inv_acc_assigned with "OI") as "H"; first done.
     iDestruct ("H" with "Oa") as "[H ACC]".
     iModIntro. iNext. iDestruct "H" as "(Oa1& Oa2& $)". iCombine "Oa1 Oa2" as "Oa".
     iIntros (p K Hk) "Kp Kk HQ %E'".
     iMod (obl_discharge_leaf with "Kp Kk Oa") as "[$ #D]"; first done.
     iDestruct (oblP_discharged_unfold with "D") as "[#Oe #Od]".
-    iMod (sfmupd_read _ (Q ∗ until_disch k G2) with "[HQ]") as "[HQ #R]".
+    iMod (sfmupd_read _ (Q ∗ until_discharged k G2) with "[HQ]") as "[HQ #R]".
     { iIntros (h n σ Θ κs g i Ω W) "HI TI MI".
-      iPoseProof (temporal_elim with "HG2 [$HI $MI $HQ]") as "#TQ".
+      iPoseProof (guar_elim with "HG2 [$HI $MI $HQ]") as "#TQ".
       iDestruct "MI" as "(MHI& S& MI)".
       iDestruct (osat_lookup_discharged with "[$S $Oe $Od]") as %Hkd.
       iPoseProof (model_history_interp_event_obl_now with "MHI") as "#EF"; first exact Hkd.
@@ -433,7 +433,7 @@ Section until_rules.
     assert (({[k]} ∪ K) ∖ {[k]} = K) as -> by set_solver. done.
   Qed.
 
-  Lemma temporal_until_guar N k q P Q G1 G2 : ⊢ untilI_guar N k q P Q G1 G2 ⊨ₜ itrProp_until G1 G2.
+  Lemma guar_untilI_guar N k q P Q G1 G2 : ⊢ untilI_guar N k q P Q G1 G2 ⊨ₜ itrProp_until G1 G2.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_guar_unfold /untilI_guar_pers.
     iDestruct "U" as "[Oa #U]".
@@ -442,16 +442,16 @@ Section until_rules.
     { iDestruct "MI" as "(_& S& _)". iEval (unfold_opreds) in "Oa". iDestruct "Oa" as "[#Oe Oa]".
       iDestruct (osat_lookup_assigned with "[$S $Oe $Oa]") as %(?&?&?). eauto. }
     iPoseProof (model_interp_event_obl with "MI") as "#EA"; first exact Hk.
-    iDestruct (history_interp_hG_event_lookup with "[$HI $HE]") as %Hr.
+    iDestruct (history_interp_hist_event_lookup with "[$HI $HE]") as %Hr.
     iDestruct (history_interp_wf with "HI") as %[Hlen _].
     assert (Hrn : r ≤ n) by (apply lookup_lt_Some in Hr; lia).
-    iApply tguar_intro.
+    iApply record_intro.
     iIntros "!>" (Sys l h' g v' Ω' W' τf γ' σ' Θ' κs') "#ST %Hf #B Sys".
     destruct Hf as (BEH& FS& LB& HIST).
     (* the certificate of this until for [n]: from the bundle, or its allocation records *)
     iDestruct (bundle_until_cert with "B Hj HγP HγQ []") as "#C"; first done.
     { iIntros (->). iNext. by iLeft. }
-    rewrite /= /trI_exist. iExists (Ord.S (Ord.S (fair_sched_ub fu))).
+    rewrite /= /trI_exist. iExists (Ord.S (Ord.S (fair_measure_ub fu))).
     rewrite trI_until_unfold /trI_until_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "close". iNext. iMod "close" as "_". iModIntro.
     iApply fupd_mask_intro; first set_solver. iIntros "close".
@@ -472,10 +472,10 @@ Section until_rules.
         iMod ("ACC" with "[Oa' HP']") as "_".
         { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
         iModIntro. iRight. iSplit.
-        { iApply (tguar_elim with "TrecP ST [%] B Sys"). split_and!; done. }
-        iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
-        { iPureIntro. apply Ord.lt_S. eapply Ord.le_lt_lt; first apply fair_sched_fun_ub.
-          eapply Ord.le_lt_lt; [by apply fair_sched_ub_le_proper|apply Ord.S_lt]. }
+        { iApply (record_elim with "TrecP ST [%] B Sys"). split_and!; done. }
+        iExists (Ord.S (fair_measure γ' o' fu')). iSplit.
+        { iPureIntro. apply Ord.lt_S. eapply Ord.le_lt_lt; first apply fair_measure_le_ub.
+          eapply Ord.le_lt_lt; [by apply fair_measure_ub_le_proper|apply Ord.S_lt]. }
         unfold trace_next. simpl.
         iApply (until_run with "ST Hj HγP HγQ OI [%] Sys").
         split_and!; [lia|by apply behavior_S|done|done|done|done].
@@ -490,46 +490,46 @@ Section until_rules.
         iMod ("ACC" with "[Of]") as "_".
         { iNext. iApply oblP_variant_unfold. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
         iModIntro. destruct (decide (n' = n)) as [->|Hne].
-        * iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
+        * iLeft. iApply (record_elim with "TQ' ST [%] B Sys"). split_and!; done.
         * assert (n' = S n) as -> by lia.
           iRight. iSplit.
-          { iApply (tguar_elim with "TrecP ST [%] B Sys"). split_and!; done. }
+          { iApply (record_elim with "TrecP ST [%] B Sys"). split_and!; done. }
           iExists Ord.O. iSplit; first (iPureIntro; apply Ord.S_pos).
           unfold trace_next. simpl.
           iApply (until_run_discharged with "ST TQ' [%] Sys").
           split_and!; [by apply behavior_S|done|done|done].
     - (* [Q] at [n] *)
-      iModIntro. iLeft. iApply (tguar_elim with "TrecQ ST [%] B Sys"). split_and!; done.
+      iModIntro. iLeft. iApply (record_elim with "TrecQ ST [%] B Sys"). split_and!; done.
     - (* discharged before the check: the discharge was at [n] *)
       iAssert (⌜n ≤ n'⌝)%I as %Hn.
       { destruct (le_gt_dec i' i) as [Hle|Hlt].
         - iDestruct (event_obl_compare i' i with "[$EF $EA]") as %(_& _& Hle'); first done. done.
         - iDestruct (event_obl_compare i i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
       assert (n' = n) as -> by lia.
-      iModIntro. iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
+      iModIntro. iLeft. iApply (record_elim with "TQ' ST [%] B Sys"). split_and!; done.
   Qed.
 
-  Lemma temporal_until N k q P Q : ⊢ untilI N k q P Q ⊨ₜ itrProp_until (itrProp_sem P) (itrProp_sem Q).
-  Proof. rewrite untilI_guar_canonical. apply temporal_until_guar. Qed.
+  Lemma guar_untilI N k q P Q : ⊢ untilI N k q P Q ⊨ₜ itrProp_until (itrProp_canon P) (itrProp_canon Q).
+  Proof. rewrite untilI_guar_canonical. apply guar_untilI_guar. Qed.
 
   (** With valid guarantees of the contents. *)
 
-  Lemma temporal_always_as_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_as N P V ⊨ₜ itrProp_always G.
+  Lemma guar_alwaysI_as_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_as N P V ⊨ₜ itrProp_always G.
   Proof.
-    intros HG. iApply (temporal_weaken _ (itrProp_always (itrProp_sem V))).
-    { apply itrProp_always_mono. by apply itrProp_sem_le. }
-    iApply temporal_always_as.
+    intros HG. iApply (guar_weaken _ (itrProp_always (itrProp_canon V))).
+    { apply itrProp_always_mono. by apply itrProp_canon_le. }
+    iApply guar_alwaysI_as.
   Qed.
 
-  Lemma temporal_always_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ itrProp_always G.
-  Proof. apply temporal_always_as_valid. Qed.
+  Lemma guar_alwaysI_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ itrProp_always G.
+  Proof. apply guar_alwaysI_as_valid. Qed.
 
-  Lemma temporal_until_valid N k q P Q G1 G2 :
+  Lemma guar_untilI_valid N k q P Q G1 G2 :
     (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k q P Q ⊨ₜ itrProp_until G1 G2.
   Proof.
-    intros HG1 HG2. iApply (temporal_weaken _ (itrProp_until (itrProp_sem P) (itrProp_sem Q))).
-    { apply itrProp_until_mono; by apply itrProp_sem_le. }
-    iApply temporal_until.
+    intros HG1 HG2. iApply (guar_weaken _ (itrProp_until (itrProp_canon P) (itrProp_canon Q))).
+    { apply itrProp_until_mono; by apply itrProp_canon_le. }
+    iApply guar_untilI.
   Qed.
 
 End until_rules.

@@ -5,7 +5,7 @@ From lantana.trace Require Export temporal_formula.
 From transfinite.stepindex Require Import ordinals.
 
 (** * The run: certification of the temporal formulas, and the loops that read them off a
-    run. Their guarantees ([temporal_always], [temporal_until]) are in
+    run. Their guarantees ([guar_alwaysI], [guar_untilI]) are in
     temporal_formula_rules.v. *)
 
 (** ** Certification
@@ -20,19 +20,19 @@ Section certification.
     ▷ (P ⊨ₜ G1) -∗
     ▷ ((oblP_assigned k (1/2) ∗ P) ∨ (oblP_discharged k ∗ R)) ∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) -∗
-    ▷ (tguar G1 n ∨ tguar G2 n).
+    ▷ (record G1 n ∨ record G2 n).
   Proof.
     iIntros (Hk) "#HG (Var& HI& MI)". iNext. iDestruct "Var" as "[[_ HP]|[Of _]]".
-    - iLeft. iApply (temporal_elim P G1 with "HG [$HI $MI $HP]").
+    - iLeft. iApply (guar_elim P G1 with "HG [$HI $MI $HP]").
     - iDestruct "MI" as "(_& S& _)". iEval (unfold_opreds) in "Of". iDestruct "Of" as "[#Oe #Of]".
       iDestruct (osat_lookup_discharged with "[$S $Oe $Of]") as %H. rewrite Hk in H. done.
   Qed.
 
   Local Lemma until_cert_discharged k (P : iProp Σ) G2 h n σ Θ κs g v Ω W :
     Ω !! k = Some obl_discharged →
-    ▷ ((oblP_assigned k (1/2) ∗ P) ∨ (oblP_discharged k ∗ until_disch k G2)) ∗
+    ▷ ((oblP_assigned k (1/2) ∗ P) ∨ (oblP_discharged k ∗ until_discharged k G2)) ∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) -∗
-    ▷ (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ tguar G2 n').
+    ▷ (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ record G2 n').
   Proof.
     iIntros (Hk) "(Var& HI& MI)". iNext. iDestruct "MI" as "(MHI& S& _)".
     iDestruct "Var" as "[[Oa _]|[_ R]]".
@@ -44,15 +44,15 @@ Section certification.
   Qed.
 
   (** The certificate of one registered item. *)
-  Lemma cert_of_handle n e h σ Θ κs g v Ω W :
-    treg_handle e -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
+  Lemma cert_of_entry n e h σ Θ κs g v Ω W :
+    reg_entry_interp e -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ cert n e.
   Proof.
     iIntros "#Hd HI MI". destruct e; simpl.
     - by iFrame.
     - iDestruct "Hd" as "(%P& %G& #SP& #Hinv& #HG)".
       iMod (inv_acc with "Hinv") as "[HP Hclose]"; first done.
-      iPoseProof (temporal_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
+      iPoseProof (guar_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
       iMod ("Hclose" with "HP") as "_". iModIntro. iFrame "HI MI". iExists _. iFrame "SP C".
     - iDestruct "Hd" as "(%P& %G1& %G2& #SP& #SQ& #OI& #HG)".
       iAssert (⌜∃ o, Ω !! k = Some o⌝)%I as %[o Hk].
@@ -71,30 +71,30 @@ Section certification.
   Qed.
 
   Lemma certify_entries n l h σ Θ κs g v Ω W :
-    treg_entries treg_handle l -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
+    reg_entries reg_entry_interp l -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ [∗ list] pe ∈ l, cert n pe.2.
   Proof.
     iIntros "#Hl HI MI". iInduction l as [|pe l] "IH".
     - iModIntro. iFrame. done.
-    - rewrite /treg_entries !big_sepL_cons. iDestruct "Hl" as "[[_ #Hd] #Hl']".
-      iMod (cert_of_handle with "Hd HI MI") as "(HI& MI& #C)".
+    - rewrite /reg_entries !big_sepL_cons. iDestruct "Hl" as "[[_ #Hd] #Hl']".
+      iMod (cert_of_entry with "Hd HI MI") as "(HI& MI& #C)".
       iMod ("IH" with "Hl' HI MI") as "($& $& #Cs)". iModIntro. iFrame "C Cs".
   Qed.
 
   (** The check at [n] appends the marker; the marked registry's lower bound and the
       certificates of its entries form the bundle for [n]. *)
-  Lemma treg_mark n l h σ Θ κs :
-    reg_auth l -∗ treg_entries treg_handle l -∗ history_interp h n σ Θ κs ==∗
+  Lemma reg_mark n l h σ Θ κs :
+    reg_auth l -∗ reg_entries reg_entry_interp l -∗ history_interp h n σ Θ κs ==∗
     history_interp h n σ Θ κs ∗ reg_auth (l ++ [(n, RMark)]) ∗
-    treg_entries treg_handle (l ++ [(n, RMark)]) ∗ reg_lb (l ++ [(n, RMark)]).
+    reg_entries reg_entry_interp (l ++ [(n, RMark)]) ∗ reg_lb (l ++ [(n, RMark)]).
   Proof.
     iIntros "Ha #Hl HI".
-    iDestruct (treg_entries_bound with "Hl HI") as %Hb.
+    iDestruct (reg_entries_bound with "Hl HI") as %Hb.
     iMod (reg_auth_append l n RMark with "Ha") as "[Ha #Hj]"; first done.
-    iDestruct (history_interp_hG_event_now with "HI") as "#Hnow".
+    iDestruct (history_interp_hist_event_now with "HI") as "#Hnow".
     iDestruct (reg_auth_lb with "Ha") as "#Hlb".
     iModIntro. iFrame "HI Ha Hlb".
-    rewrite /treg_entries big_sepL_app big_sepL_singleton. iFrame "Hl". iSplit; [by iExists _|done].
+    rewrite /reg_entries big_sepL_app big_sepL_singleton. iFrame "Hl". iSplit; [by iExists _|done].
   Qed.
 
   Lemma bundle_intro n l :
@@ -106,12 +106,12 @@ Section certification.
   Qed.
 
   (** The check as a whole: the bundle for [n], and the registry state back. *)
-  Lemma treg_check n h σ Θ κs g v Ω W :
-    treg_state -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
-    treg_state ∗ history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ ∃ l, bundle l n.
+  Lemma reg_check n h σ Θ κs g v Ω W :
+    reg_state -∗ history_interp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={⊤}=∗
+    reg_state ∗ history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ ∃ l, bundle l n.
   Proof.
     iIntros "(%l& Ha& #Hl) HI MI".
-    iMod (treg_mark n l with "Ha Hl HI") as "(HI& Ha& #Hl'& #Hlb)".
+    iMod (reg_mark n l with "Ha Hl HI") as "(HI& Ha& #Hl'& #Hlb)".
     iMod (certify_entries n _ with "Hl' HI MI") as "(HI& MI& #Cs)".
     iPoseProof (bundle_intro n _ with "Hlb Cs") as "#B"; first by rewrite last_snoc.
     iModIntro. iFrame "HI MI B". iExists _. iFrame "Ha Hl'".
@@ -139,14 +139,14 @@ Section loops.
 
   Lemma bundle_always_cert l n j r N γ G :
     r ≤ n →
-    bundle l n -∗ reg_idx j r (RAlways N γ) -∗ saved_ti γ (itrProp_internal G) -∗
-    (⌜r = n⌝ -∗ ▷ tguar G n) -∗ ▷ tguar G n.
+    bundle l n -∗ reg_idx j r (RAlways N γ) -∗ saved_trI γ (itrProp_internal G) -∗
+    (⌜r = n⌝ -∗ ▷ record G n) -∗ ▷ record G n.
   Proof.
     iIntros (Hrn) "#B #Hj #Hγ AC". rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
     iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
     - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. simpl.
-      iDestruct "Cj" as (f) "[#Hf #Cj]". iDestruct (saved_ti_agree_fun with "Hf Hγ") as "#Heq".
-      iNext. rewrite /tguar. iApply (tguar_ti_eq with "Heq Cj").
+      iDestruct "Cj" as (f) "[#Hf #Cj]". iDestruct (saved_trI_agree_fun with "Hf Hγ") as "#Heq".
+      iNext. rewrite /record. iApply (record_trI_eq with "Heq Cj").
     - iApply "AC". iPureIntro. lia.
   Qed.
 
@@ -155,23 +155,23 @@ Section loops.
   Lemma bundle_until_cert l n j r N k γP γQ G1 G2 :
     r ≤ n →
     bundle l n -∗ reg_idx j r (RUntil N k γP γQ) -∗
-    saved_ti γP (itrProp_internal G1) -∗ saved_ti γQ (itrProp_internal G2) -∗
-    (⌜r = n⌝ -∗ ▷ (tguar G1 n ∨ tguar G2 n)) -∗
-    ▷ (tguar G1 n ∨ tguar G2 n) ∨
-    ▷ (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ tguar G2 n').
+    saved_trI γP (itrProp_internal G1) -∗ saved_trI γQ (itrProp_internal G2) -∗
+    (⌜r = n⌝ -∗ ▷ (record G1 n ∨ record G2 n)) -∗
+    ▷ (record G1 n ∨ record G2 n) ∨
+    ▷ (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ record G2 n').
   Proof.
     iIntros (Hrn) "#B #Hj #HγP #HγQ AC". rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
     iDestruct (reg_idx_lb_pos with "Hlb Hj") as %[Hin|Hle]; first done.
     - iDestruct (big_sepL_lookup with "Cs") as "Cj"; first done. iEval (simpl) in "Cj".
       iDestruct "Cj" as (fP fQ) "(#HfP& #HfQ& [Cj|Cj])".
-      + iLeft. iDestruct (saved_ti_agree_fun with "HfP HγP") as "#HeqP".
-        iDestruct (saved_ti_agree_fun with "HfQ HγQ") as "#HeqQ".
-        iNext. rewrite /tguar. iDestruct "Cj" as "[Cj|Cj]".
-        * iLeft. iApply (tguar_ti_eq with "HeqP Cj").
-        * iRight. iApply (tguar_ti_eq with "HeqQ Cj").
-      + iRight. iDestruct (saved_ti_agree_fun with "HfQ HγQ") as "#HeqQ".
+      + iLeft. iDestruct (saved_trI_agree_fun with "HfP HγP") as "#HeqP".
+        iDestruct (saved_trI_agree_fun with "HfQ HγQ") as "#HeqQ".
+        iNext. rewrite /record. iDestruct "Cj" as "[Cj|Cj]".
+        * iLeft. iApply (record_trI_eq with "HeqP Cj").
+        * iRight. iApply (record_trI_eq with "HeqQ Cj").
+      + iRight. iDestruct (saved_trI_agree_fun with "HfQ HγQ") as "#HeqQ".
         iNext. iDestruct "Cj" as (n' i' Ω'') "(%& #EF& Cj)". iExists n', i', Ω''. iFrame "EF".
-        iSplit; first done. rewrite /tguar. iApply (tguar_ti_eq with "HeqQ Cj").
+        iSplit; first done. rewrite /record. iApply (record_trI_eq with "HeqQ Cj").
     - iLeft. iApply "AC". iPureIntro. lia.
   Qed.
 
@@ -181,12 +181,12 @@ Section loops.
 
   Lemma sys_step_iter (Sys : sysT) (c : nat) h n σ Θ κs g v Ω W τf γ (C Φ : iProp Σ) :
     sys_step Sys -∗
-    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
+    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_measure γ) Ω W ∧ hist_trace h τf⌝ -∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
     (∀ l, bundle l n -∗ ▷ C) -∗
     ▷ (∀ l σ' Θ' κs' g' v' Ω' W' γ',
-       ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω' W' ∧
-        hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ obls_drop (fair_sched_fun γ) (fair_sched_fun γ') Ω Ω'⌝ -∗
+       ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_measure γ') Ω' W' ∧
+        hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ obls_drop (fair_measure γ) (fair_measure γ') Ω Ω'⌝ -∗
        bundle l n -∗ C -∗ £n c -∗
        history_interp (h ++ [(σ', Θ', κs')]) (S n) σ' Θ' κs' ∗ model_interp g' v' Ω' W' (S n) (dom Θ') ∗
        Sys (S n) σ' Θ' κs' -∗
@@ -205,9 +205,9 @@ Section loops.
   (** *** The always loop *)
 
   Lemma always_run (Sys : sysT) N γ G j r :
-    sys_step Sys -∗ reg_idx j r (RAlways N γ) -∗ saved_ti γ (itrProp_internal G) -∗
+    sys_step Sys -∗ reg_idx j r (RAlways N γ) -∗ saved_trI γ (itrProp_internal G) -∗
     ∀ h n σ Θ κs g v Ω W τf γ',
-      ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω W ∧ hist_trace h τf⌝ -∗
+      ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ' ∧ owit_inv_lb (fair_measure γ') Ω W ∧ hist_trace h τf⌝ -∗
       history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
       trI_always (itrProp_internal G) (trI_pure True) (n, τf).
   Proof.
@@ -215,14 +215,14 @@ Section loops.
     iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ' H).
     destruct H as (Hrn& BEH& FS& LB& HIST).
     rewrite trI_always_unfold /trI_always_pre.
-    iApply (sys_step_iter Sys 0 _ _ _ _ _ _ _ _ _ _ _ (tguar G n) with "ST [%] Sys [] []").
+    iApply (sys_step_iter Sys 0 _ _ _ _ _ _ _ _ _ _ _ (record G n) with "ST [%] Sys [] []").
     { split_and!; done. }
     { iIntros (l) "#B". iApply (bundle_always_cert with "B Hj Hγ []"); first lia.
       iIntros (?). lia. }
     iIntros "!>" (l σ' Θ' κs' g' v' Ω' W' γ'') "%Hstep #B #C _ Sys".
     destruct Hstep as (BEH'& FS'& LB'& HIST'& DROP).
     iModIntro. iSplit; [|iSplit; first done].
-    - iApply (tguar_elim with "C ST [%] B Sys"). split_and!; done.
+    - iApply (record_elim with "C ST [%] B Sys"). split_and!; done.
     - unfold trace_next. simpl. iApply ("IH" with "[%] Sys"). split_and!; [lia|done..].
   Qed.
 
@@ -230,8 +230,8 @@ Section loops.
       readings. *)
 
   Lemma until_run_discharged (Sys : sysT) (fP : trIProp Λ Σ) G2 a h n σ Θ κs g v Ω W τf γ :
-    sys_step Sys -∗ tguar G2 n -∗
-    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧ hist_trace h τf⌝ -∗
+    sys_step Sys -∗ record G2 n -∗
+    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_measure γ) Ω W ∧ hist_trace h τf⌝ -∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
     trI_until Ord.lt a fP (itrProp_internal G2) (n, τf).
   Proof.
@@ -242,7 +242,7 @@ Section loops.
     { by iIntros (l) "_". }
     iIntros "!>" (l σ' Θ' κs' g' v' Ω' W' γ') "%Hstep #B _ _ Sys".
     destruct Hstep as (BEH'& FS'& LB'& HIST'& DROP).
-    iModIntro. iLeft. iApply (tguar_elim with "TQ ST [%] B Sys"). split_and!; done.
+    iModIntro. iLeft. iApply (record_elim with "TQ ST [%] B Sys"). split_and!; done.
   Qed.
 
   (** While the obligation is assigned, with the measure of its state at the check: the
@@ -251,13 +251,13 @@ Section loops.
 
   Lemma until_run (Sys : sysT) N k γP γQ j r (P : iProp Σ) G1 G2 :
     sys_step Sys -∗ reg_idx j r (RUntil N k γP γQ) -∗
-    saved_ti γP (itrProp_internal G1) -∗ saved_ti γQ (itrProp_internal G2) -∗
-    oblP_inv N k P (until_disch k G2) -∗
+    saved_trI γP (itrProp_internal G1) -∗ saved_trI γQ (itrProp_internal G2) -∗
+    oblP_inv N k P (until_discharged k G2) -∗
     ∀ h n σ Θ κs g v Ω W τf γ fu o,
-      ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
+      ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_measure γ) Ω W ∧
        hist_trace h τf ∧ Ω !! k = Some (obl_assigned fu o)⌝ -∗
       history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-      trI_until Ord.lt (Ord.S (fair_sched_fun γ o fu)) (itrProp_internal G1) (itrProp_internal G2) (n, τf).
+      trI_until Ord.lt (Ord.S (fair_measure γ o fu)) (itrProp_internal G1) (itrProp_internal G2) (n, τf).
   Proof.
     iIntros "#ST #Hj #HγP #HγQ #OI". iIntros (h n σ Θ κs g v Ω W τf γ fu o) "%H Sys".
     iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ fu o H).
@@ -266,8 +266,8 @@ Section loops.
     { iDestruct "Sys" as "(_& MI& _)". by iApply (model_interp_event_obl with "MI"). }
     rewrite trI_until_unfold /trI_until_pre.
     iApply (sys_step_iter Sys 1 _ _ _ _ _ _ _ _ _ _ _
-              ((tguar G1 n ∨ tguar G2 n) ∨
-               (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ tguar G2 n'))%I
+              ((record G1 n ∨ record G2 n) ∨
+               (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ record G2 n'))%I
               with "ST [%] Sys [] []").
     { split_and!; done. }
     { iIntros (l) "#B". iDestruct (bundle_until_cert with "B Hj HγP HγQ []") as "[C|C]"; first lia.
@@ -287,8 +287,8 @@ Section loops.
         iMod ("ACC" with "[Oa' HP']") as "_".
         { iNext. iApply oblP_variant_unfold. iLeft. iFrame. }
         iModIntro. iRight. iSplit.
-        { iApply (tguar_elim with "TrecP ST [%] B Sys"). split_and!; done. }
-        iExists (Ord.S (fair_sched_fun γ' o' fu')). iSplit.
+        { iApply (record_elim with "TrecP ST [%] B Sys"). split_and!; done. }
+        iExists (Ord.S (fair_measure γ' o' fu')). iSplit.
         { iPureIntro. apply Ord.lt_S. eapply DROP; eauto. }
         unfold trace_next. simpl.
         iApply ("IH" with "[%] Sys"). split_and!; [lia|done..].
@@ -304,22 +304,22 @@ Section loops.
         iMod ("ACC" with "[Of]") as "_".
         { iNext. iApply oblP_variant_unfold. iRight. iFrame "Of". iExists n', i', Ω''. iFrame "EF TQ'". }
         iModIntro. destruct (decide (n' = n)) as [->|Hne].
-        * iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
+        * iLeft. iApply (record_elim with "TQ' ST [%] B Sys"). split_and!; done.
         * assert (n' = S n) as -> by lia.
           iRight. iSplit.
-          { iApply (tguar_elim with "TrecP ST [%] B Sys"). split_and!; done. }
+          { iApply (record_elim with "TrecP ST [%] B Sys"). split_and!; done. }
           iExists Ord.O. iSplit; first (iPureIntro; apply Ord.S_pos).
           unfold trace_next. simpl.
           iApply (until_run_discharged with "ST TQ' [%] Sys"). split_and!; [by apply behavior_S|done..].
     - (* [Q] holds at [n] *)
-      iModIntro. iLeft. iApply (tguar_elim with "TrecQ ST [%] B Sys"). split_and!; done.
+      iModIntro. iLeft. iApply (record_elim with "TrecQ ST [%] B Sys"). split_and!; done.
     - (* discharged before the check: the discharge was at [n] *)
       iAssert (⌜n ≤ n'⌝)%I as %Hn.
       { destruct (le_gt_dec i' v) as [Hle|Hlt].
         - iDestruct (event_obl_compare i' v with "[$EF $EA]") as %(_& _& Hle'); first done. done.
         - iDestruct (event_obl_compare v i' with "[$EA $EF]") as %(Hle'& _& _); first lia. done. }
       assert (n' = n) as -> by lia.
-      iModIntro. iLeft. iApply (tguar_elim with "TQ' ST [%] B Sys"). split_and!; done.
+      iModIntro. iLeft. iApply (record_elim with "TQ' ST [%] B Sys"). split_and!; done.
   Qed.
 
 End loops.

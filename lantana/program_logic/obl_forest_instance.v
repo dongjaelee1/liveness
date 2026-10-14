@@ -259,18 +259,18 @@ Section run_sfmupd.
 
   Lemma all_interp_sfmupd_steps_gmap (γ : thread_id → nat) E h n σ Θ κs g v Ω W
     (A : Type) (TQ : gmap thread_id ((expr Λ) * A)) (P : thread_id → (expr Λ) → A → iProp Σ) :
-    (owit_inv_lb (fair_sched_fun γ) Ω W) →
+    (owit_inv_lb (fair_measure γ) Ω W) →
     ([∗ map] i ↦ '(e, a) ∈ TQ, |={E}=>m (P i e a)) -∗
     history_tinterp h n σ Θ κs -∗ model_interp g v Ω W n (dom Θ) ={E}=∗
     (([∗ map] i ↦ '(e, a) ∈ TQ, (P i e a)) ∗ history_tinterp h n σ Θ κs ∗
-     ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_sched_fun γ) Ω' W' ⌝ ∗
+     ∃ g' v' Ω' W', ⌜ obls_le Ω Ω' ∧ owit_inv_lb (fair_measure γ) Ω' W' ⌝ ∗
                     model_interp (g ++ g') (v + v') Ω' W' n (dom Θ)).
   Proof.
     iIntros (LB) "PS HI MI".
     iAssert (|={E}=>m [∗ map] i ↦ '(e, a) ∈ TQ, P i e a)%I with "[PS]" as "PS".
     { iApply big_sepM_sfmupd. iApply (big_sepM_impl with "PS"). iIntros "!>" (k [e a] _) "H". done. }
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "PS HI MI") as "$".
-    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    iMod (all_interp_sfmupd_steps (fair_measure γ) with "PS HI MI") as "$".
+    { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
     { done. }
     done.
   Qed.

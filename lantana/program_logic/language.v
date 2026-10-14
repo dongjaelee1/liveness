@@ -1,5 +1,5 @@
 (** Languages with thread ids and forking ([language]): contexts, pure steps, atomicity,
-    traces and behaviors, and the ordinal bound [fair_sched_ub] of the fair scheduler.
+    traces and behaviors, and the ordinal bound [fair_measure_ub] of the fair scheduler.
     Adapted from Iris's [iris.program_logic.language]. *)
 
 From stdpp Require Export gmap.
@@ -347,9 +347,9 @@ Definition behavior_tp {Λ : language} (Θ : thread_pool Λ) (τ : trace Λ) : P
   ∃ σ, behavior_cfg (Θ, σ) τ.
 
 (** We fix a (somewhat general) fair scheduler, only for convenience. *)
-Definition fair_sched_ub : Ord.t → Ord.t := (λ a, ((ω × a) ⊕ ω)%ord).
+Definition fair_measure_ub : Ord.t → Ord.t := (λ a, ((ω × a) ⊕ ω)%ord).
 
-Lemma fair_sched_ub_mono : ∀ o, (o <= fair_sched_ub o)%ord.
+Lemma fair_measure_ub_mono : ∀ o, (o <= fair_measure_ub o)%ord.
 Proof.
   intros. etrans. 2: apply Hessenberg.add_base_l. etrans.
   { apply (Jacobsthal.mult_1_l o). }
@@ -357,28 +357,28 @@ Proof.
   apply Ord.lt_le, omega_lt_one.
 Qed.
 
-Global Instance fair_sched_ub_lt_proper : Proper (Ord.lt ==> Ord.lt) fair_sched_ub.
+Global Instance fair_measure_ub_lt_proper : Proper (Ord.lt ==> Ord.lt) fair_measure_ub.
 Proof.
   repeat intro. apply Hessenberg.lt_add_l.
   apply Jacobsthal.lt_mult_r; auto. apply omega_lt_zero.
 Qed.
 
-Global Instance fair_sched_ub_le_proper : Proper (Ord.le ==> Ord.le) fair_sched_ub.
+Global Instance fair_measure_ub_le_proper : Proper (Ord.le ==> Ord.le) fair_measure_ub.
 Proof.
   repeat intro. apply Hessenberg.le_add_l.
   apply Jacobsthal.le_mult_r; auto.
 Qed.
 
-Global Instance fair_sched_ub_ord_mono_fun_class : ord_mono_fun_class :=
-  Build_ord_mono_fun_class fair_sched_ub fair_sched_ub_mono _ _.
+Global Instance fair_measure_ub_ord_mono_fun_class : ord_mono_fun_class :=
+  Build_ord_mono_fun_class fair_measure_ub fair_measure_ub_mono _ _.
 
-Definition fair_sched_fun (γ : thread_id → nat) : thread_id → Ord.t → Ord.t :=
+Definition fair_measure (γ : thread_id → nat) : thread_id → Ord.t → Ord.t :=
   (λ i a, ((ω × a) ⊕ Ord.from_nat (γ i))%ord).
 
-Lemma fair_sched_fun_mon_gen (γ1 γ2 : thread_id → nat) :
-  (∀ a b i j, (a < b)%ord → (fair_sched_fun γ1 i a < fair_sched_fun γ2 j b)%ord).
+Lemma fair_measure_mon_gen (γ1 γ2 : thread_id → nat) :
+  (∀ a b i j, (a < b)%ord → (fair_measure γ1 i a < fair_measure γ2 j b)%ord).
 Proof.
-  intros. unfold fair_sched_fun. apply ord_lt_exists_left in H. destruct H as (u& GTu& LEu).
+  intros. unfold fair_measure. apply ord_lt_exists_left in H. destruct H as (u& GTu& LEu).
   unshelve eapply Ord.lt_le_lt. 1: exact ((ω × (a ⊕ u)) ⊕ γ2 j)%ord.
   2:{ apply Hessenberg.le_add_l. apply Jacobsthal.le_mult_r. auto. }
   rewrite ClassicJacobsthal.mult_dist Hessenberg.add_assoc.
@@ -387,15 +387,15 @@ Proof.
   apply Hessenberg.le_add_l, Jacobsthal.le_mult_r. apply Ord.S_supremum. auto.
 Qed.
 
-Lemma fair_sched_fun_mon (γ : thread_id → nat) :
-  (∀ a b i j, (a < b)%ord → (fair_sched_fun γ i a < fair_sched_fun γ j b)%ord).
+Lemma fair_measure_mon (γ : thread_id → nat) :
+  (∀ a b i j, (a < b)%ord → (fair_measure γ i a < fair_measure γ j b)%ord).
 Proof.
-  intros. eapply fair_sched_fun_mon_gen; eauto.
+  intros. eapply fair_measure_mon_gen; eauto.
 Qed.
 
-Lemma fair_sched_fun_ub (γ : thread_id → nat) :
-  (∀ i a, (fair_sched_fun γ i a <= fair_sched_ub a)%ord).
+Lemma fair_measure_le_ub (γ : thread_id → nat) :
+  (∀ i a, (fair_measure γ i a <= fair_measure_ub a)%ord).
 Proof.
-  intros. unfold fair_sched_fun, fair_sched_ub. apply Hessenberg.le_add_r.
+  intros. unfold fair_measure, fair_measure_ub. apply Hessenberg.le_add_r.
   apply Ord.lt_le, Ord.omega_upperbound.
 Qed.

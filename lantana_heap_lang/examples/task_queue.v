@@ -271,12 +271,12 @@ Section proof.
       obligations. *)
   Definition task_queue_itrProp (ql : val) : itrProp heap_lang Σ := queue_itrProp ql.
 
-  Lemma is_task_queue_temporal ql γ ℓ : ⊢ is_task_queue ql γ ℓ ⊨ₜ task_queue_itrProp ql.
-  Proof. rewrite /is_task_queue /task_queue_itrProp. apply (into_temporal _ _). Qed.
+  Lemma guar_is_task_queue ql γ ℓ : ⊢ is_task_queue ql γ ℓ ⊨ₜ task_queue_itrProp ql.
+  Proof. rewrite /is_task_queue /task_queue_itrProp. apply (into_guar _ _). Qed.
 
-  Global Instance is_task_queue_into_temporal ql γ ℓ :
-    IntoTemporal (is_task_queue ql γ ℓ) (task_queue_itrProp ql) | 0.
-  Proof. apply is_task_queue_temporal. Qed.
+  Global Instance into_guar_is_task_queue ql γ ℓ :
+    IntoGuar (is_task_queue ql γ ℓ) (task_queue_itrProp ql) | 0.
+  Proof. apply guar_is_task_queue. Qed.
 
 End proof.
 

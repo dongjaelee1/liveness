@@ -31,15 +31,15 @@ Definition safety_iris {Λ : language} (i : thread_id) (Φ : thread_id → val �
   tr_always (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R.
 
 
-Local Definition safety_iris_tiProp `{!temporalGS Λ Σ} i Φ : trIProp Λ Σ :=
+Local Definition safety_iris_trI `{!temporalGS Λ Σ} i Φ : trIProp Λ Σ :=
   trI_always (trI_pure True) (λ τ, (⌜ (ts_emb (not_stuck) ∧ ts_emb (if_term_val i Φ))%R τ ⌝)%I).
 
 Section safety_trace.
   Context `{!temporalGS Λ Σ}.
   Implicit Type F : iProp Σ.
 
-  Lemma safety_iris_tiProp_trProp F i Φ :
-    ∀ (τ : trace Λ), iProp_sat_lc_at_frame F ⊤ (safety_iris_tiProp i Φ τ) → safety_iris i Φ τ.
+  Lemma safety_iris_trI_trProp F i Φ :
+    ∀ (τ : trace Λ), iProp_sat_lc_at_frame F ⊤ (safety_iris_trI i Φ τ) → safety_iris i Φ τ.
   Proof.
     intros. cut (tr_always (tr_pure True ∧ (ts_emb not_stuck ∧ ts_emb (if_term_val i Φ)))%R τ).
     { unfold safety_iris, tr_always. destruct τ. intros. apply H0 in H1. by destruct H1. }
@@ -51,13 +51,13 @@ End safety_trace.
 Section safety_lwp.
   Context `{!lantanaGS Λ Σ}.
 
-  Lemma lwp_fix_safety_iris_tiProp
+  Lemma lwp_fix_safety_iris_trI
     h n σ Θ (TQ : gmap thread_id ((expr Λ) * (thread_id → val Λ → iProp Σ))) κs
     g v Ω1 Ω2 W τf γ (i : thread_id) (Φ : thread_id → val Λ → Prop) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
     obls_le Ω1 Ω2 →
-    owit_inv_lb (fair_sched_fun γ) Ω2 W →
+    owit_inv_lb (fair_measure γ) Ω2 W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     Θ = fst <$> TQ →
     (∃ e Q, TQ !! i = Some (e, Q) ∧ ∀ v, (Q i v ⊢ ⌜Φ i v⌝)) →
@@ -66,13 +66,13 @@ Section safety_lwp.
                                 | Some v => (lift_term i Q) v
                                 | None => lwp_fix NotStuck i ⊤ e (lift_term i Q)
                                 end))
-    ⊢ safety_iris_tiProp i Φ (n, τf).
+    ⊢ safety_iris_trI i Φ (n, τf).
   Proof.
     iIntros (BEH FS LEO LB HIST EQTQ POST) "([[HI TI] SIa]& MI& WPs)".
     clear dependent Ω1. rename Ω2 into Ω.
     iRevert (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ POST) "HI TI SIa MI WPs".
     iLöb as "IH". iIntros (γ h n σ Θ TQ κs g v Ω W BEH FS LB HIST EQTQ POST) "HI TI SIa MI WPs".
-    rewrite /safety_iris_tiProp trI_always_unfold /trI_always_pre.
+    rewrite /safety_iris_trI trI_always_unfold /trI_always_pre.
     iApply fupd_mask_intro. 1: set_solver. iIntros "close". iNext.
     iMod "close" as "_". iModIntro.
     (** The postcondition of thread [i] holds now if [i] is a value; this keeps [WPs]. *)
@@ -105,7 +105,7 @@ Section safety_lwp.
       iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
       iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
       2: eapply LB.
-      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
       destruct H as [OND LB0].
       iPoseProof (model_interp_owit_inv with "MI") as "%OWinv0".
       iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA0". 1,2: eauto.
@@ -126,7 +126,7 @@ Section safety_lwp.
       iMod "WP". simpl.
       iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g'& %v'& %Ω3& %W3& %& MI)".
       2: eapply LB2.
-      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
       destruct H as [LEO LB3]. iMod "WP" as "(HI& WP& Efs)".
       unfold trace_next in *. simpl in *. assert (TDisj : Θ ##ₘ efs).
       { eapply map_disjoint_dom_2, fork_thread_ids; eauto. }
@@ -146,8 +146,8 @@ Section safety_lwp.
       iMod (all_interp_sfmupd_steps_gmap γ2 with "Efs HI MI") as "(Efs& HI& %g2& %v2& %Ω4& %W4& %& MI)".
       1: auto. destruct H as [LEO2 LB4]. destruct (to_val e2) eqn:He2.
       * rewrite lwp_fix_unfold_fix /lwp_pre He2.
-        iMod (all_interp_sfmupd_steps (fair_sched_fun γ2) with "WP HI MI") as "(WP& [HI TI]& %g3& %v3& %Ω5& %W5& %& MI)".
-        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+        iMod (all_interp_sfmupd_steps (fair_measure γ2) with "WP HI MI") as "(WP& [HI TI]& %g3& %v3& %Ω5& %W5& %& MI)".
+        { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
         1: eapply LB4.
         destruct H as [LEO3 LB5].
         iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
@@ -243,26 +243,26 @@ Section safety_lwp.
       { iPureIntro. apply _. }
       iMod (model_interp_mupd_steps with "WP MI") as "(WP& %& %& %& %& %& MI)".
       2: eapply LB.
-      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
       iDestruct "WP" as "[%NStuck _]". exfalso.
       destruct NStuck as (?&?&?&?& PStep). by eapply Irr.
   Qed.
 
-  Lemma lwp_safety_iris_tiProp h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
+  Lemma lwp_safety_iris_trI h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
     (i : thread_id) (Φ : thread_id → val Λ → Prop) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
-    owit_inv_lb (fair_sched_fun γ) Ω W →
+    owit_inv_lb (fair_measure γ) Ω W →
     (∀ n' σ' Θ' κs', h !! n' = Some (σ', Θ', κs') → (∃ i', τf n' = ((Θ', σ'), i', κs'))) →
     (∃ Q, Ψs !! i = Some Q ∧ ∀ v, (Q i v ⊢ ⌜Φ i v⌝)) →
     ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
      model_interp g v Ω W n (dom Θ) ∗
      (|={⊤}=>m [∗ map] i↦e;Ψ ∈ Θ;Ψs, lWP e @ NotStuck; i; ⊤ {{ v, lift_term i Ψ v }}))
-    ⊢ |={⊤}=> safety_iris_tiProp i Φ (n, τf).
+    ⊢ |={⊤}=> safety_iris_trI i Φ (n, τf).
   Proof.
     iIntros (BEH FS LB HIST POST) "([HI SIa]& MI& WPs)".
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "(WPs& HI& %&%&%&%& %& MI)".
-    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    iMod (all_interp_sfmupd_steps (fair_measure γ) with "WPs HI MI") as "(WPs& HI& %&%&%&%& %& MI)".
+    { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
     1: auto.
     destruct H as [LEO1 LB1].
     iPoseProof (big_sepM2_alt with "WPs") as "[%Dom WPs]".
@@ -280,7 +280,7 @@ Section safety_lwp.
     iMod (all_interp_sfmupd_steps_gmap γ with "WPs HI MI") as "(WPs& HI& %&%&%&%& %& MI)".
     { auto. }
     destruct H as [LEO3 LB3].
-    iPoseProof (lwp_fix_safety_iris_tiProp with "[$HI $SIa $MI $WPs]") as "$".
+    iPoseProof (lwp_fix_safety_iris_trI with "[$HI $SIa $MI $WPs]") as "$".
     1,2: eauto. all: eauto.
     destruct POST as (?& LUi& POST). assert (is_Some (Θ !! i)).
     { apply elem_of_dom. apply elem_of_dom_2 in LUi. rewrite Dom. auto. }
@@ -319,12 +319,12 @@ Proof.
                 let _ : temporalGS Λ Σ := TemporalG Hmupd Hhist Htreg in
                 (∃ x : Ord.t, rupd_pred (rupdG:=auth_rupdGS_instance Σ _) x) ∗
                 wsat.wsat ∗ wsat.ownE ⊤ ∗
-                |={⊤}=> safety_iris_tiProp j Φ τ)) as Hsat; cycle 1.
+                |={⊤}=> safety_iris_trI j Φ τ)) as Hsat; cycle 1.
   { apply sat_bupd, sat_exists in Hsat. destruct Hsat as (Hmupd& Hsat).
     apply sat_exists in Hsat. destruct Hsat as (Hhist& Hsat).
     apply sat_exists in Hsat. destruct Hsat as (Htreg& Hsat).
     set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
-    apply (safety_iris_tiProp_trProp emp). apply (sat_fupd ⊤).
+    apply (safety_iris_trI_trProp emp). apply (sat_fupd ⊤).
     unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
     eapply sat_mono. 2: eapply Hsat. simpl. iIntros "($& $& $& $)". }
   assert (Hwp' : ⊢ ∀ Htemporal : temporalGS Λ Σ,
@@ -345,7 +345,7 @@ Proof.
   iIntros "_ H".
   iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& MI)".
   iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
-  iMod (treg_alloc (Λ:=Λ)) as "(%Htreg& TR)".
+  iMod (reg_alloc (Λ:=Λ)) as "(%Htreg& TR)".
   iExists Hmupd, Hhist, Htreg.
   set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
   iDestruct ("H" $! Htemp) as "(%& H)".
@@ -362,8 +362,8 @@ Proof.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
-  iPoseProof (treg_st_init (treg_handle (temporalGS0:=Htemp)) with "TR") as "TI".
-  iApply (lwp_safety_iris_tiProp (lantanaGS0:=Hlantana) with "[$HI $TI $SIa $MHI $S $T $A $G $MI $WPs]").
+  iPoseProof (reg_state_with_init (reg_entry_interp (temporalGS0:=Htemp)) with "TR") as "TI".
+  iApply (lwp_safety_iris_trI (lantanaGS0:=Hlantana) with "[$HI $TI $SIa $MHI $S $T $A $G $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
   { intros n' σ' Θ' κs' Hlu. rewrite lookup_cons in Hlu. destruct n'; last done. inv Hlu. rewrite INIT2. eauto. }
   eauto.

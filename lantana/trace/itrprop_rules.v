@@ -10,7 +10,7 @@ From transfinite.stepindex Require Import ordinals.
     external reading ([itrProp_external G], a [trProp]) is what adequacy concludes. Each
     reading has its entailment:
 
-    - [G ⊑ H] compares internal readings. It transports guarantees ([temporal_weaken]), and
+    - [G ⊑ H] compares internal readings. It transports guarantees ([guar_weaken]), and
       the connectives are monotone in it. It is sound for the external readings of complete
       properties ([itrProp_le_sound]) but, the internal readings being deferred by a later,
       too weak for temporal reasoning: not even [□ ⊥ ⊑ ⊥] holds
@@ -20,7 +20,7 @@ From transfinite.stepindex Require Import ordinals.
       external reading of [G] from its shape. The cast [itrProp_cast G R pf] keeps the
       internal reading of [G] with [R] as its external reading, so
       [G ⊑ itrProp_cast G R pf]: every trace-level consequence of a property is guaranteed
-      along with it ([temporal_cast]).
+      along with it ([guar_cast]).
 
     Connectives (itrprop.v, scope [%ITR]): [⌜φ⌝], [∧], [∨], [→] (the antecedent read on the
     trace), [∀], [∃] (small types), [itrProp_state φ], [□ G], [◇ G], [G Uₜ H]. *)

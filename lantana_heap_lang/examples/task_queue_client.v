@@ -304,8 +304,8 @@ Section adequacy.
          itrProp_finally (itrProp_exist (λ x : loc, flag_itrProp x) ∧ itrProp_exist (λ ql : val, task_queue_itrProp ql)) ∧
          itrProp_true)%ITR.
 
-  Lemma Φ_P_temporal `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_Φ_P `{!heapGS Σ, !queueG Σ, !ticket_lockG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
+  Proof. apply (into_guar _ _). Qed.
 
   Remark G_main_impl {Σ} τ : itrProp_external (G_main (Σ:=Σ)) τ → R_main τ ∧ R_queue τ.
   Proof.
@@ -364,7 +364,7 @@ Section adequacy.
     { iFrame. }
     iDestruct "H" as (μ) "(HP& H)".
     iModIntro. iExists (Φ_P (heapGS0:=HHeapGS) (queueG0:=QueueG Σ _) μ). iFrame "HP H".
-    iApply Φ_P_temporal.
+    iApply guar_Φ_P.
   Qed.
 
   (** Safety: in every fair behavior, the scheduled thread is never stuck, and once [main] has returned,

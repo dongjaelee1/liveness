@@ -24,14 +24,14 @@ Section lwp_step.
     i = trace_thread τ →
     obls_thread_active Ω1 τ →
     owit_inv Ω1 W1 →
-    owit_inv_lb (fair_sched_fun γ1) Ω1 W1 →
+    owit_inv_lb (fair_measure γ1) Ω1 W1 →
     beh_fscnt τ γ1 →
     (Ω1 ↪ₚ Ω2 | obl_cond_owner i) →
     ∃ W2 γ2, (W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ∧
-             owit_inv_lb (fair_sched_fun γ2) Ω2 W2 ∧ beh_fscnt (trace_next τ) γ2 ∧ fscnt_next_rel τ γ1 γ2.
+             owit_inv_lb (fair_measure γ2) Ω2 W2 ∧ beh_fscnt (trace_next τ) γ2 ∧ fscnt_next_rel τ γ1 γ2.
   Proof.
     intros EQi OTA Inv LB Beh Prog. subst i. destruct (exists_fscnt_next _ _ Beh) as (γ2&Beh2&GNext).
-    cut (∃ W2, (W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ∧ owit_inv_lb (fair_sched_fun γ2) Ω2 W2).
+    cut (∃ W2, (W1 ↓ₚ W2 | wit_cond_assigned) ∧ owit_inv Ω2 W2 ∧ owit_inv_lb (fair_measure γ2) Ω2 W2).
     { intros (?&?&?&?). exists x, γ2. split_and !; auto. }
     revert Ω1 Ω2 τ γ1 γ2 OTA Inv LB Beh Prog Beh2 GNext.
     induction W1 using map_ind; intros Ω1 Ω2 τ γ1 γ2 OTA Inv LB Beh Prog Beh2 GNext.
@@ -44,7 +44,7 @@ Section lwp_step.
     apply map_Forall2_insert_inv_r in Inv; auto. destruct Inv as (o1&Ω1&EQO1&LUO1&Invk&Inv').
     assert (Inv : owit_inv Ω1 W1) by auto. clear Inv'. subst Ω1'.
     apply map_Forall2_insert in LB; auto. destruct LB as (LBk& LB').
-    assert (LB : owit_inv_lb (fair_sched_fun γ1) Ω1 W1) by auto. clear LB'.
+    assert (LB : owit_inv_lb (fair_measure γ1) Ω1 W1) by auto. clear LB'.
     apply map_Forall2_insert_inv_l in Keep; auto. destruct Keep as (o2&Ω2&EQO2&LUO2&Keepk&Keep').
     assert (Keep : obls_keep Ω1 Ω2) by auto. clear Keep'. subst Ω2'.
     apply map_Forall2_insert in Step; auto. destruct Step as (Stepk&Step').
@@ -71,7 +71,7 @@ Section lwp_step.
              end) ∧
             (match o2 with
              | obl_assigned a i => match w' with
-                                  | witness_assigned b => (fair_sched_fun γ2 i a) w≤ b
+                                  | witness_assigned b => (fair_measure γ2 i a) w≤ b
                                   | witness_discharged => False
                                   end
              | obl_discharged => match w' with
@@ -88,21 +88,21 @@ Section lwp_step.
     - simpl in Stepk. destruct Stepk as [Turn | NoTurn].
       + destruct Turn as [-> Stepk]. simpl in Keepk. destruct o2; last done. clear Keepk.
         inv Stepk; cycle 1. 1: inv H.
-        inv H. simpl in *. exists (witness_assigned (OC:=ord_obl_class) (fair_sched_fun γ2 owner fuel0)).
+        inv H. simpl in *. exists (witness_assigned (OC:=ord_obl_class) (fair_measure γ2 owner fuel0)).
         split_and !; auto.
         * left. split; auto. econstructor. econstructor. eapply (Ord.lt_le_lt); last eapply LBk.
-          apply fair_sched_fun_mon_gen. auto.
-        * apply fair_sched_fun_ub.
+          apply fair_measure_mon_gen. auto.
+        * apply fair_measure_le_ub.
         * done.
       + destruct NoTurn as [NoTurn <-]. simpl in Keepk. clear Keepk. simpl in *.
-        exists (witness_assigned (OC:=ord_obl_class) (fair_sched_fun γ2 owner fuel)).
+        exists (witness_assigned (OC:=ord_obl_class) (fair_measure γ2 owner fuel)).
         split_and !; auto.
         * left. split; auto. econstructor. econstructor. eapply (Ord.lt_le_lt); last eapply LBk.
-          unfold fair_sched_fun. apply Hessenberg.lt_add_r. specialize (GNext owner).
+          unfold fair_measure. apply Hessenberg.lt_add_r. specialize (GNext owner).
           unfold fscnt_next_rel_th in GNext. rewrite decide_False in GNext; auto. rewrite decide_False in GNext; auto.
           { apply OrdArith.lt_from_nat; auto. }
           { intros F. eapply thread_active_and_not_false; eauto. }
-        * apply fair_sched_fun_ub.
+        * apply fair_measure_le_ub.
         * done.
     - simpl in Stepk. destruct Stepk as [Turn | NoTurn].
       + destruct Turn as [F Stepk]. done.
@@ -155,9 +155,9 @@ Section lwp_step.
   Lemma owit_inv_lb_step_na_turn τ Ω W γ1 γ2 :
     ts_emb (thread_na (trace_thread τ)) τ →
     obls_thread_active Ω τ →
-    owit_inv_lb (fair_sched_fun γ1) Ω W →
+    owit_inv_lb (fair_measure γ1) Ω W →
     fscnt_next_rel τ γ1 γ2 →
-    owit_inv_lb (fair_sched_fun γ2) Ω W.
+    owit_inv_lb (fair_measure γ2) Ω W.
   Proof.
     intros. intro k. specialize (H0 k). specialize (H1 k). inv H1. 2: econstructor.
     symmetry in H3, H4. specialize (H0 _ H3). simpl in H0. econstructor. destruct x, y; try done.

@@ -1020,18 +1020,18 @@ Section proof.
        itrProp_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ itrProp_true))%ITR.
 
   (** The guarantee of [is_fair_lock], vacuous on traces since the lock can be deleted; see
-      [is_fair_lock_alive_temporal]. *)
+      [guar_is_fair_lock_alive]. *)
   Definition fair_lock_itrProp (tl : val) : itrProp heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
        itrProp_always (lock_inv_itrProp next curr) ∧ itrProp_always (lock_token_inv_itrProp curr))%ITR.
 
-  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_itrProp tl.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_is_fair_lock tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_itrProp tl.
+  Proof. apply (into_guar _ _). Qed.
 
   (** Clients see the lock's guarantee, not its invariant. *)
-  Global Instance is_fair_lock_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock tl γ R) (fair_lock_itrProp tl) | 0.
-  Proof. apply is_fair_lock_temporal. Qed.
+  Global Instance into_guar_is_fair_lock tl γ R :
+    IntoGuar (is_fair_lock tl γ R) (fair_lock_itrProp tl) | 0.
+  Proof. apply guar_is_fair_lock. Qed.
 
   (** The guarantee of a lock that cannot be deleted. *)
   Definition alive_fair_lock_itrProp (tl : val) : itrProp heap_lang Σ :=
@@ -1056,13 +1056,13 @@ Section proof.
     iExists next, curr. iSplit; first done. iFrame "IA".
   Qed.
 
-  Lemma is_fair_lock_alive_temporal tl γ R :
+  Lemma guar_is_fair_lock_alive tl γ R :
     ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_itrProp tl.
-  Proof. apply (into_temporal _ _). Qed.
+  Proof. apply (into_guar _ _). Qed.
 
-  Global Instance is_fair_lock_alive_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock_alive tl γ R) (alive_fair_lock_itrProp tl) | 0.
-  Proof. apply is_fair_lock_alive_temporal. Qed.
+  Global Instance into_guar_is_fair_lock_alive tl γ R :
+    IntoGuar (is_fair_lock_alive tl γ R) (alive_fair_lock_itrProp tl) | 0.
+  Proof. apply guar_is_fair_lock_alive. Qed.
 
   (** [lock_token] is ghost state: the holder's [finally] lives in [lock_token_inv]. *)
 

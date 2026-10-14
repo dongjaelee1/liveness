@@ -8,7 +8,7 @@ From lantana.heap_lang.examples Require Import step_tactics.
 
 (** * A client that creates a ticket lock, acquires and releases it. Besides termination, its
     adequacy theorem exports the starvation freedom of the lock, from the lock's guarantee
-    ([is_fair_lock_temporal]) through a commitment obligation. *)
+    ([guar_is_fair_lock]) through a commitment obligation. *)
 Module TicketLockClient.
 
   Definition main : val :=
@@ -168,8 +168,8 @@ Section adequacy.
         (itrProp_finally (exits #42@i) ∧ itrProp_finally (itrProp_exist (λ tl : val, fair_lock_itrProp tl)) ∧
          itrProp_true)%ITR.
 
-  Lemma Φ_P_temporal `{!heapGS Σ, !ticket_lockG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_Φ_P `{!heapGS Σ, !ticket_lockG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
+  Proof. apply (into_guar _ _). Qed.
 
   Remark G_main_impl {Σ} τ : itrProp_external (G_main (Σ:=Σ)) τ → client_spec τ.
   Proof.
@@ -224,7 +224,7 @@ Section adequacy.
     { rewrite /thread_expr /=. iFrame. }
     { iFrame. }
     iDestruct "H" as (μ) "(HP& H)".
-    iModIntro. iExists (Φ_P μ). iFrame "HP H". iApply Φ_P_temporal.
+    iModIntro. iExists (Φ_P μ). iFrame "HP H". iApply guar_Φ_P.
   Qed.
 
   (** Safety: in every fair behavior, the scheduled thread is never stuck, and once [main] has returned,

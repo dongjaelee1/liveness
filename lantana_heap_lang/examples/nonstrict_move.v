@@ -66,8 +66,8 @@ Section adequacy.
     Definition G_main : itrProp heap_lang Σ := ltac:(itrProp_of Φ_P).
   End G_main.
 
-  Lemma Φ_P_temporal `{!heapGS Σ} : ⊢ Φ_P ⊨ₜ G_main.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_Φ_P `{!heapGS Σ} : ⊢ Φ_P ⊨ₜ G_main.
+  Proof. apply (into_guar _ _). Qed.
 
   Remark G_main_false {Σ} τ : itrProp_external (G_main (Σ:=Σ)) τ → False.
   Proof.
@@ -116,7 +116,7 @@ Section adequacy.
     iMod ("Ax" $! _ N True%I False%I with "[//]") as "Ux".
     rewrite union_empty_r_L.
     iModIntro. iExists (Φ_P (heapGS0:=HHeapGS)).
-    iSplitR; first iApply Φ_P_temporal.
+    iSplitR; first iApply guar_Φ_P.
     iSplitL "Ux TG Fx".
     { iExists x. iFrame. }
     iIntros "(%x'& _& TG& Fx)". iModIntro.

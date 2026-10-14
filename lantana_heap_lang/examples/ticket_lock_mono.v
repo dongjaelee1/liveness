@@ -94,7 +94,7 @@ Section proof.
       An invariant with half of [next]'s points-to ([delete] leaves half of its freed
       points-to) and the authority over the lower bounds of [next]. It is registered again
       each time [next] reaches a value [v], with the reading [next_ge_itrProp next v], justified
-      by the lower bound [γm ↪◯MZ v] ([mono_inv_temporal]). A chain of invariants, one per
+      by the lower bound [γm ↪◯MZ v] ([guar_mono_inv]). A chain of invariants, one per
       value, would not do: each link's reading would rest on the next one's, available only
       one step of the logic later (its certificate is later-guarded). *)
   Local Definition mono_inv γm (next : loc) : iProp Σ :=
@@ -108,18 +108,18 @@ Section proof.
   Local Definition next_ge γm (next : loc) (v : Z) : iProp Σ :=
     alwaysI_guar N_mono (mono_inv γm next) (next_ge_itrProp next v).
 
-  Local Lemma mono_inv_temporal γm next v :
+  Local Lemma guar_mono_inv γm next v :
     γm ↪◯MZ v -∗ mono_inv γm next ⊨ₜ next_ge_itrProp next v.
   Proof.
     iIntros "#Lb".
-    iApply (temporal_mono ((∃ w : Z, ⌜(v ≤ w)%Z⌝ ∗ next ↦{#1/2} #w) ∨ freed next (1/2))%I with "[]").
+    iApply (guar_mono ((∃ w : Z, ⌜(v ≤ w)%Z⌝ ∗ next ↦{#1/2} #w) ∨ freed next (1/2))%I with "[]").
     { iIntros "!> (%w& A& [P|F])"; last by iRight.
       iDestruct (mono_Z_auth_lb_own_valid with "A Lb") as %[_ ?]. iLeft. iExists w. by iFrame. }
-    iApply temporal_or; last iApply freed_temporal.
-    iApply temporal_exist. iIntros (w). iApply temporal_sep; first iApply temporal_pure.
-    iApply (temporal_weaken _ (itrProp_state (pointsto_sat next (DfracOwn (1/2)) #w))).
+    iApply guar_or; last iApply guar_freed.
+    iApply guar_exist. iIntros (w). iApply guar_sep; first iApply guar_pure.
+    iApply (guar_weaken _ (itrProp_state (pointsto_sat next (DfracOwn (1/2)) #w))).
     { intros ? τ. done. }
-    iApply (temporal_state_fact (next ↦{#1/2} #w)).
+    iApply (guar_state_fact (next ↦{#1/2} #w)).
   Qed.
 
   (** Allocation of the cell, with its first registration. *)
@@ -127,7 +127,7 @@ Section proof.
     γm ↪◯MZ v -∗ ▷ mono_inv γm next -∗ |={E}=>m next_ge γm next v.
   Proof.
     iIntros "#Lb HI". iApply (alwaysI_alloc_guar with "[] HI").
-    iNext. by iApply mono_inv_temporal.
+    iNext. by iApply guar_mono_inv.
   Qed.
 
   (** A new registration, with a new lower bound (the invariant is that of an earlier one). *)
@@ -137,7 +137,7 @@ Section proof.
   Proof.
     iIntros (HN) "#NG #Lb". iApply (alwaysI_register_guar with "[] []"); first done.
     - by iApply alwaysI_guar_inv.
-    - iNext. by iApply mono_inv_temporal.
+    - iNext. by iApply guar_mono_inv.
   Qed.
 
   Local Definition lock_token_inv γo γk (curr : loc) (R : iProp Σ) : iProp Σ :=
@@ -1081,18 +1081,18 @@ Section proof.
        itrProp_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ itrProp_true))%ITR.
 
   (** The guarantee of [is_fair_lock], vacuous on traces since the lock can be deleted; see
-      [is_fair_lock_alive_temporal]. *)
+      [guar_is_fair_lock_alive]. *)
   Definition fair_lock_itrProp (tl : val) : itrProp heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
        itrProp_always (lock_inv_itrProp next curr) ∧ itrProp_always (lock_token_inv_itrProp curr))%ITR.
 
-  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_itrProp tl.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_is_fair_lock tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_itrProp tl.
+  Proof. apply (into_guar _ _). Qed.
 
   (** Clients see the lock's guarantee, not its invariant. *)
-  Global Instance is_fair_lock_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock tl γ R) (fair_lock_itrProp tl) | 0.
-  Proof. apply is_fair_lock_temporal. Qed.
+  Global Instance into_guar_is_fair_lock tl γ R :
+    IntoGuar (is_fair_lock tl γ R) (fair_lock_itrProp tl) | 0.
+  Proof. apply guar_is_fair_lock. Qed.
 
   (** The guarantee of a lock that cannot be deleted. *)
   Definition alive_fair_lock_itrProp (tl : val) : itrProp heap_lang Σ :=
@@ -1117,13 +1117,13 @@ Section proof.
     iExists next, curr. iSplit; first done. iFrame "IA".
   Qed.
 
-  Lemma is_fair_lock_alive_temporal tl γ R :
+  Lemma guar_is_fair_lock_alive tl γ R :
     ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_itrProp tl.
-  Proof. apply (into_temporal _ _). Qed.
+  Proof. apply (into_guar _ _). Qed.
 
-  Global Instance is_fair_lock_alive_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock_alive tl γ R) (alive_fair_lock_itrProp tl) | 0.
-  Proof. apply is_fair_lock_alive_temporal. Qed.
+  Global Instance into_guar_is_fair_lock_alive tl γ R :
+    IntoGuar (is_fair_lock_alive tl γ R) (alive_fair_lock_itrProp tl) | 0.
+  Proof. apply guar_is_fair_lock_alive. Qed.
 
   (** [lock_token] is ghost state: the holder's [finally] lives in [lock_token_inv]. *)
 

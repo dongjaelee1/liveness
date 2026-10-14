@@ -528,13 +528,13 @@ Section proof.
   Definition fair_lock_itrProp (tl : val) : itrProp heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ itrProp_always (lock_inv_itrProp next curr))%ITR.
 
-  Lemma is_fair_lock_temporal tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_itrProp tl.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_is_fair_lock tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_itrProp tl.
+  Proof. apply (into_guar _ _). Qed.
 
   (** Clients see the lock's guarantee, not its invariant. *)
-  Global Instance is_fair_lock_into_temporal tl γ R :
-    IntoTemporal (is_fair_lock tl γ R) (fair_lock_itrProp tl) | 0.
-  Proof. apply is_fair_lock_temporal. Qed.
+  Global Instance into_guar_is_fair_lock tl γ R :
+    IntoGuar (is_fair_lock tl γ R) (fair_lock_itrProp tl) | 0.
+  Proof. apply guar_is_fair_lock. Qed.
 
 
   (** The guarantee of a lock token: the holder releases the lock. *)
@@ -542,12 +542,12 @@ Section proof.
     (∃ (next curr : loc) (u : Z), ⌜tl = (#next, #curr)%V⌝ ∧ curr ↦{#1/2} #u ∧ itrProp_true ∧
        itrProp_finally (curr ↦{#1/2} #(u + 1) ∧ itrProp_true))%ITR.
 
-  Lemma lock_token_temporal tl γ κu R : ⊢ lock_token tl γ κu R ⊨ₜ lock_token_itrProp tl.
-  Proof. rewrite lock_token_unseal. apply (into_temporal _ _). Qed.
+  Lemma guar_lock_token tl γ κu R : ⊢ lock_token tl γ κu R ⊨ₜ lock_token_itrProp tl.
+  Proof. rewrite lock_token_unseal. apply (into_guar _ _). Qed.
 
-  Global Instance lock_token_into_temporal tl γ κu R :
-    IntoTemporal (lock_token tl γ κu R) (lock_token_itrProp tl) | 0.
-  Proof. apply lock_token_temporal. Qed.
+  Global Instance into_guar_lock_token tl γ κu R :
+    IntoGuar (lock_token tl γ κu R) (lock_token_itrProp tl) | 0.
+  Proof. apply guar_lock_token. Qed.
 
 End proof.
 
@@ -612,7 +612,7 @@ Section guarantee.
 
   Lemma is_fair_lock_starvation_free tl γ R :
     ⊢ is_fair_lock tl γ R ⊨ₜ itrProp_cast (fair_lock_itrProp tl) (fair_lock_sf tl) (fair_lock_starvation_free tl).
-  Proof. iApply temporal_cast. iApply is_fair_lock_temporal. Qed.
+  Proof. iApply guar_cast. iApply guar_is_fair_lock. Qed.
 End guarantee.
 
 Global Notation "γ ↪LOCK dq l" :=

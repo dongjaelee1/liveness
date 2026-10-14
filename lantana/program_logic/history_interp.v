@@ -1,4 +1,4 @@
-(** The history of configurations as ghost state ([hG_history_auth], [hG_event]), the state
+(** The history of configurations as ghost state ([hG_history_auth], [hist_event]), the state
     interpretation class of a language, and the history interpretation built from both. *)
 
 From iris.algebra Require Import mono_list.
@@ -43,15 +43,15 @@ Local Definition hG_history_auth_unseal :
   @hG_history_auth = @hG_history_auth_def := hG_history_auth_aux.(seal_eq).
 Global Arguments hG_history_auth {SI Σ St _}.
 
-Local Definition hG_event_def `{SI : sidx} `{@histGS SI Σ St}
+Local Definition hist_event_def `{SI : sidx} `{@histGS SI Σ St}
   (n : nat) (e : St) : iProp Σ :=
   (∃ (h : list St), (⌜ length h = (S n) ∧ last h = Some e ⌝) ∧
                      own hist_name (◯ML (h : list (leibnizO _))))%I.
-Local Definition hG_event_aux : seal (@hG_event_def). Proof. by eexists. Qed.
-Definition hG_event := hG_event_aux.(unseal).
-Local Definition hG_event_unseal :
-  @hG_event = @hG_event_def := hG_event_aux.(seal_eq).
-Global Arguments hG_event {SI Σ St _}.
+Local Definition hist_event_aux : seal (@hist_event_def). Proof. by eexists. Qed.
+Definition hist_event := hist_event_aux.(unseal).
+Local Definition hist_event_unseal :
+  @hist_event = @hist_event_def := hist_event_aux.(seal_eq).
+Global Arguments hist_event {SI Σ St _}.
 
 (** Properties *)
 Section history_ghost.
@@ -60,10 +60,10 @@ Section history_ghost.
   Global Instance hG_history_auth_timeless h : Timeless (hG_history_auth h).
   Proof. rewrite hG_history_auth_unseal /hG_history_auth_def. apply _. Qed.
 
-  Global Instance hG_event_persistent n e : Persistent (hG_event n e).
-  Proof. rewrite hG_event_unseal /hG_event_def. apply _. Qed.
-  Global Instance hG_event_timeless n e : Timeless (hG_event n e).
-  Proof. rewrite hG_event_unseal /hG_event_def. apply _. Qed.
+  Global Instance hist_event_persistent n e : Persistent (hist_event n e).
+  Proof. rewrite hist_event_unseal /hist_event_def. apply _. Qed.
+  Global Instance hist_event_timeless n e : Timeless (hist_event n e).
+  Proof. rewrite hist_event_unseal /hist_event_def. apply _. Qed.
 
   Lemma hG_history_auth_app h1 h2 :
     hG_history_auth h1 ⊢ |==> hG_history_auth (h1 ++ h2).
@@ -74,9 +74,9 @@ Section history_ghost.
 
   Lemma hG_history_event h n e :
     (h !! n = Some e) →
-    hG_history_auth h ⊢ hG_event n e.
+    hG_history_auth h ⊢ hist_event n e.
   Proof.
-    rewrite hG_history_auth_unseal /hG_history_auth_def. rewrite hG_event_unseal /hG_event_def.
+    rewrite hG_history_auth_unseal /hG_history_auth_def. rewrite hist_event_unseal /hist_event_def.
     iIntros (LU) "H". apply list_elem_of_split_length in LU. destruct LU as (l1&l2&?&?).
     iExists (l1 ++ [e]). iSplit.
     { iPureIntro. subst. rewrite length_app last_app. simpl. split; auto. lia. }
@@ -86,10 +86,10 @@ Section history_ghost.
     exists l2. subst. rewrite cons_middle app_assoc. auto.
   Qed.
 
-  Lemma hG_event_history_lookup h n e :
-    hG_history_auth h ∗ hG_event n e ⊢ ⌜ h !! n = Some e ⌝.
+  Lemma hist_event_history_lookup h n e :
+    hG_history_auth h ∗ hist_event n e ⊢ ⌜ h !! n = Some e ⌝.
   Proof.
-    rewrite hG_history_auth_unseal /hG_history_auth_def. rewrite hG_event_unseal /hG_event_def.
+    rewrite hG_history_auth_unseal /hG_history_auth_def. rewrite hist_event_unseal /hist_event_def.
     iIntros "(H& (%&%& E))". iCombine "H E" gives %V. apply mono_list_both_valid in V. destruct V.
     apply leibniz_equiv in H0. destruct H. subst. iPureIntro.
     rewrite last_lookup H in H1. simpl in H1. rewrite lookup_app_l; auto. rewrite H. lia.
@@ -140,19 +140,19 @@ Section hist.
     destruct H. rewrite length_app H last_app. simpl. split; auto. lia.
   Qed.
 
-  Lemma history_interp_hG_event_now h n σ Θ κs :
-    history_interp h n σ Θ κs ⊢ hG_event n (σ, Θ, κs).
+  Lemma history_interp_hist_event_now h n σ Θ κs :
+    history_interp h n σ Θ κs ⊢ hist_event n (σ, Θ, κs).
   Proof.
     rewrite /history_interp.
     iIntros "(%& Ha& SI)". destruct H. rewrite last_lookup H in H0. simpl in H0.
     iPoseProof (hG_history_event _ _ _ H0 with "Ha") as "#He". iFrame "He".
   Qed.
 
-  Lemma history_interp_hG_event_lookup h n σ Θ κs m e :
-    history_interp h n σ Θ κs ∗ hG_event m e ⊢ ⌜h !! m = Some e⌝.
+  Lemma history_interp_hist_event_lookup h n σ Θ κs m e :
+    history_interp h n σ Θ κs ∗ hist_event m e ⊢ ⌜h !! m = Some e⌝.
   Proof.
     rewrite /history_interp.
-    iIntros "[(%& Ha& SI) #HE]". destruct H. iPoseProof (hG_event_history_lookup with "[$]") as "%". auto.
+    iIntros "[(%& Ha& SI) #HE]". destruct H. iPoseProof (hist_event_history_lookup with "[$]") as "%". auto.
   Qed.
 
 End hist.

@@ -184,8 +184,8 @@ Section adequacy.
         (itrProp_true ∧ flag_itrProp l ∧ itrProp_until (l ↦ #0) (l ↦ #1) ∧
          itrProp_finally (exits #()@i) ∧ itrProp_finally (exits #1@j) ∧ itrProp_true)%ITR.
 
-  Lemma Φ_P_temporal `{!heapGS Σ} m1 m2 : ⊢ Φ_P m1 m2 ⊨ₜ G_client.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_Φ_P `{!heapGS Σ} m1 m2 : ⊢ Φ_P m1 m2 ⊨ₜ G_client.
+  Proof. apply (into_guar _ _). Qed.
 
   Remark G_client_impl {Σ} τ : itrProp_external (G_client (Σ:=Σ)) τ → R_main τ.
   Proof.
@@ -238,7 +238,7 @@ Section adequacy.
       by rewrite primitive_laws.pointsto_unseal /primitive_laws.pointsto_def. }
     { iFrame. }
     iDestruct "H" as (m1 m2) "(HP& H)".
-    iModIntro. iExists (Φ_P m1 m2). iFrame "HP H". iApply Φ_P_temporal.
+    iModIntro. iExists (Φ_P m1 m2). iFrame "HP H". iApply guar_Φ_P.
   Qed.
 
   (** Safety: in every fair behavior, the scheduled thread is never stuck, and once the writer

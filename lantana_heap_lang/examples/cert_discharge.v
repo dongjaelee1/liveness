@@ -33,9 +33,9 @@ Section proof.
   Definition cd_Q (x y : loc) kf : iProp Σ :=
     x ↦ #1 ∗ alwaysI Na (y ↦ #7) ∗ finallyI Nf kf 1 (x ↦ #2).
 
-  Lemma cd_Q_temporal x y kf :
+  Lemma guar_cd_Q x y kf :
     ⊢ cd_Q x y kf ⊨ₜ (x ↦ #1 ∧ itrProp_always (y ↦ #7) ∧ itrProp_finally (x ↦ #2))%ITR.
-  Proof. apply (into_temporal _ _). Qed.
+  Proof. apply (into_guar _ _). Qed.
 
   Lemma main_spec :
     ⊢ ∃ μ, ∀ i kq kf (x y : loc),
@@ -161,8 +161,8 @@ Section adequacy.
         (itrProp_finally (x ↦ #1 ∧ itrProp_always (y ↦ #7) ∧ itrProp_finally (x ↦ #2)) ∧
          itrProp_finally (x ↦ #2) ∧ x ↦ #0 ∧ y ↦ #7 ∧ itrProp_true)%ITR.
 
-  Lemma Φ_P_temporal `{!heapGS Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_Φ_P `{!heapGS Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
+  Proof. apply (into_guar _ _). Qed.
 
   (** At the level of traces: eventually [x] holds [1] while [y] holds [7] from then on,
       and later [x] holds [2]. *)
@@ -219,7 +219,7 @@ Section adequacy.
     { rewrite /thread_expr /=. iFrame. }
     { iFrame. }
     iDestruct "H" as (μ) "(HP& H)".
-    iModIntro. iExists (Φ_P μ). iFrame "HP H". iApply Φ_P_temporal.
+    iModIntro. iExists (Φ_P μ). iFrame "HP H". iApply guar_Φ_P.
   Qed.
 
   (** Safety: in every fair behavior, the scheduled thread is never stuck, and once [main] has returned,

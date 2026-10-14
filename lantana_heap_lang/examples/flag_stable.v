@@ -52,11 +52,11 @@ Section proof.
     (itrProp_true ∧ itrProp_always (itrProp_until (l ↦ #0) (itrProp_always (l ↦ #1)) ∨
                             (itrProp_true ∧ itrProp_always (l ↦ #1))))%ITR.
 
-  Lemma is_flag_temporal l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_itrProp l.
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_is_flag l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_itrProp l.
+  Proof. apply (into_guar _ _). Qed.
 
-  Lemma flag_tk_temporal l k : ⊢ flag_tk l k ⊨ₜ itrProp_until (l ↦ #0) (itrProp_always (l ↦ #1)).
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_flag_tk l k : ⊢ flag_tk l k ⊨ₜ itrProp_until (l ↦ #0) (itrProp_always (l ↦ #1)).
+  Proof. apply (into_guar _ _). Qed.
 
   (** Whenever the flag holds 0, it eventually holds 1 forever: from the flag's guarantee on
       traces (the until gives the finally; an always holds now). Unlike in flag.v, the
@@ -74,7 +74,7 @@ Section proof.
 
   Lemma is_flag_response l k ℓ :
     ⊢ is_flag l k ℓ ⊨ₜ itrProp_cast (flag_itrProp l) (flag_response l) (flag_response_ext l).
-  Proof. iApply temporal_cast. iApply is_flag_temporal. Qed.
+  Proof. iApply guar_cast. iApply guar_is_flag. Qed.
 
   (** The main proofs. *)
   Global Instance is_flag_persistent l k ℓ : Persistent (is_flag l k ℓ).

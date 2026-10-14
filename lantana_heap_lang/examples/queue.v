@@ -609,30 +609,30 @@ Section proof.
   (** ** Temporal guarantees *)
   (** The queue guarantees what its lock does: [queue_inv] is ghost state, [queue_lock] is the
       lock's [R] (guaranteeing [itrProp_true]), and [γ ↪LOCK_AL□] keeps the lock from being
-      deleted ([is_fair_lock_alive_temporal]). *)
+      deleted ([guar_is_fair_lock_alive]). *)
   Definition queue_itrProp (ql : val) : itrProp heap_lang Σ :=
     (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧ alive_fair_lock_itrProp tl)%ITR.
 
-  Lemma is_queue_temporal ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_itrProp ql.
+  Lemma guar_is_queue ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_itrProp ql.
   Proof.
-    iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
+    iApply (guar_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I with "[]").
     { iIntros "!> (%&%&%& %& _& _& _& #IFL)". iExists _, _, _. iSplit; first done.
       iFrame "#". }
-    iApply (into_temporal _ _).
+    iApply (into_guar _ _).
   Qed.
 
-  Global Instance is_queue_into_temporal ql γ ℓ φ :
-    IntoTemporal (is_queue ql γ ℓ φ) (queue_itrProp ql) | 0.
-  Proof. apply is_queue_temporal. Qed.
+  Global Instance into_guar_is_queue ql γ ℓ φ :
+    IntoGuar (is_queue ql γ ℓ φ) (queue_itrProp ql) | 0.
+  Proof. apply guar_is_queue. Qed.
 
-  Lemma is_queue_init_temporal ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_itrProp ql.
+  Lemma guar_is_queue_init ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_itrProp ql.
   Proof.
-    iApply (temporal_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
+    iApply (guar_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I with "[]").
     { iIntros "!> (%&%&%& %& _& _& _& _& #IFL)". iExists _, _, _. iSplit; first done.
       iFrame "#". }
-    iApply (into_temporal _ _).
+    iApply (into_guar _ _).
   Qed.
 
 End proof.

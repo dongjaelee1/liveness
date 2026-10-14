@@ -89,8 +89,8 @@ Section proof.
      (∃ f a : val, b ↦ SOMEV (f, a) ∧ itrProp_true) ∨
      (∃ f a : val, b ↦ SOMEV (f, a) ∧ itrProp_true))%ITR.
 
-  Lemma is_handoff_temporal b γ ℓ : ⊢ is_handoff b γ ℓ ⊨ₜ itrProp_always (handoff_inv_itrProp b).
-  Proof. apply (into_temporal _ _). Qed.
+  Lemma guar_is_handoff b γ ℓ : ⊢ is_handoff b γ ℓ ⊨ₜ itrProp_always (handoff_inv_itrProp b).
+  Proof. apply (into_guar _ _). Qed.
 
   (** The main proofs. *)
   Global Instance handoff_inv_persistent b γ ℓ : Persistent (is_handoff b γ ℓ).

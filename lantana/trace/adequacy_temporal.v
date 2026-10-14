@@ -23,11 +23,11 @@ Section adequacy.
   (** ** The fairness measure drops across a step *)
   Local Lemma obl_le_measure γ fu o fu' o' :
     obl_le (obl_assigned fu o) (obl_assigned fu' o') →
-    (fair_sched_fun γ o' fu' <= fair_sched_fun γ o fu)%ord.
+    (fair_measure γ o' fu' <= fair_measure γ o fu)%ord.
   Proof.
     intros [[Hle <-]|Hlt].
     - apply Hessenberg.le_add_l, Jacobsthal.le_mult_r. done.
-    - apply Ord.lt_le, fair_sched_fun_mon_gen. done.
+    - apply Ord.lt_le, fair_measure_mon_gen. done.
   Qed.
 
   (** Under [obls_le], an assigned obligation comes from an assigned one. *)
@@ -43,7 +43,7 @@ Section adequacy.
   Lemma obls_drop_step γ γ2 i1 (τ : trace Λ) Ω Ω0 Ω2 Ω' :
     obls_le Ω Ω0 → (Ω0 ↪ₚ Ω2 | obl_cond_owner i1) → obls_le Ω2 Ω' →
     obls_thread_active Ω2 τ → trace_thread τ = i1 → fscnt_next_rel τ γ γ2 →
-    obls_drop (fair_sched_fun γ) (fair_sched_fun γ2) Ω Ω'.
+    obls_drop (fair_measure γ) (fair_measure γ2) Ω Ω'.
   Proof.
     intros LEO0 [StepO _] LEO' OTA Hi FSrel k fu o fu' o' Hk Hk'.
     assert (Hk0 : ∃ x0, Ω0 !! k = Some x0).
@@ -61,7 +61,7 @@ Section adequacy.
     - simpl in HC. subst o0.
       inv Hstep; match goal with H : obl_progress _ _ |- _ => inv H | H : obl_discharge _ _ |- _ => inv H end.
       eapply Ord.le_lt_lt; first exact Hle2. eapply Ord.lt_le_lt; last exact Hle0.
-      apply fair_sched_fun_mon_gen. done.
+      apply fair_measure_mon_gen. done.
     - inv Heq. simpl in HC.
       pose proof (OTA k _ Hk2) as TA. simpl in TA.
       specialize (FSrel o2). unfold fscnt_next_rel_th in FSrel.
@@ -74,7 +74,7 @@ Section adequacy.
   (** A step of a finished thread: it owns nothing, every counter drops. *)
   Lemma obls_drop_na γ γ2 (τ : trace Λ) Ω :
     ts_emb (thread_na (trace_thread τ)) τ → obls_thread_active Ω τ → fscnt_next_rel τ γ γ2 →
-    obls_drop (fair_sched_fun γ) (fair_sched_fun γ2) Ω Ω.
+    obls_drop (fair_measure γ) (fair_measure γ2) Ω Ω.
   Proof.
     intros TNA OTA FSrel k fu o fu' o' Hk Hk'. rewrite Hk in Hk'. inv Hk'.
     pose proof (OTA k _ Hk) as TA. simpl in TA.
@@ -89,13 +89,13 @@ Section adequacy.
       From a consistent system at [n]: the system at [S n], the facts about the step, and
       later credits for the continuation (which may use fancy updates). *)
   Lemma run_step (c : nat) h n σ Θ TQ κs g v Ω W τf γ (Φ : iProp Σ) :
-    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_sched_fun γ) Ω W ∧
+    ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_measure γ) Ω W ∧
      hist_trace h τf ∧ Θ = fst <$> TQ⌝ -∗
     (history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗ model_interp g v Ω W n (dom Θ) ∗ threads_run TQ -∗
     (∀ σ' Θ' κs' TQ' g' v' Ω' W' γ',
-       ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_sched_fun γ') Ω' W' ∧
+       ⌜behavior (S n, τf) ∧ beh_fscnt (S n, τf) γ' ∧ owit_inv_lb (fair_measure γ') Ω' W' ∧
         hist_trace (h ++ [(σ', Θ', κs')]) τf ∧ Θ' = fst <$> TQ' ∧
-        obls_drop (fair_sched_fun γ) (fair_sched_fun γ') Ω Ω'⌝ -∗
+        obls_drop (fair_measure γ) (fair_measure γ') Ω Ω'⌝ -∗
        £n c -∗
        (history_tinterp (h ++ [(σ', Θ', κs')]) (S n) σ' Θ' κs' ∗ state_interp_aux σ' Θ' κs') ∗
        model_interp g' v' Ω' W' (S n) (dom Θ') ∗ threads_run TQ' -∗
@@ -125,7 +125,7 @@ Section adequacy.
       iPoseProof (model_interp_owit_inv with "MI") as "%OWinv".
       iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g0& %v0& %Ω0 & %W0& %& MI)".
       2: eapply LB.
-      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
       destruct H as [LEO0 LB0].
       iPoseProof (model_interp_owit_inv with "MI") as "%OWinv0".
       iPoseProof (get_obls_thread_active_gen with "[$MI $THs]") as "%OTA0". 1,2: eauto.
@@ -144,7 +144,7 @@ Section adequacy.
       rewrite (ALC_credits _ _ (Ord.from_nat c) (|={∅,⊤}=> Φ)%I). iMod "WP". iIntros "LC". simpl.
       iMod (model_interp_mupd_steps with "WP MI") as "(WP& %g'& %v'& %Ω3& %W3& %& MI)".
       2: eapply LB2.
-      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
       destruct H as [LEO LB3]. iMod "WP" as "(HI& WP& Efs)".
       unfold trace_next in *. simpl in *. assert (TDisj : Θ ##ₘ efs).
       { eapply map_disjoint_dom_2, fork_thread_ids; eauto. }
@@ -179,8 +179,8 @@ Section adequacy.
           assert (Hh : length h = S n) by lia. rewrite Hh TRn1. eauto. }
       destruct (to_val e2) eqn:He2.
       + rewrite lwp_fix_unfold_fix /lwp_pre He2.
-        iMod (all_interp_sfmupd_steps (fair_sched_fun γ2) with "WP [$HI $TI] MI") as "(WP& [HI TI]& %g3& %v3& %Ω5& %W5& %& MI)".
-        { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+        iMod (all_interp_sfmupd_steps (fair_measure γ2) with "WP [$HI $TI] MI") as "(WP& [HI TI]& %g3& %v3& %Ω5& %W5& %& MI)".
+        { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
         1: eapply LB4. destruct H as [LEO3 LB5].
         iAssert ([∗ map] j ↦ '(e, Q) ∈ (<[i1:=(e2, Q)]> TQ ∪ TQefs),
                    (match to_val e with
@@ -240,7 +240,7 @@ Section adequacy.
       { iPureIntro. apply _. }
       iMod (model_interp_mupd_steps with "WP MI") as "(WP& %& %& %& %& %& MI)".
       2: eapply LB.
-      { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+      { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
       iDestruct "WP" as "[%NStuck _]". exfalso.
       destruct NStuck as (?&?&?&?& PStep). by eapply Irr.
   Qed.
@@ -250,14 +250,14 @@ Section adequacy.
       The system: the auxiliary state interpretation, the registry state and the running
       threads. A step: the check, then [run_step]. *)
   Definition sys_lwp : nat → state Λ → thread_pool Λ → list (observation Λ) → iProp Σ :=
-    λ _ σ Θ κs, (state_interp_aux σ Θ κs ∗ treg_state ∗ ∃ TQ, ⌜Θ = fst <$> TQ⌝ ∗ threads_run TQ)%I.
+    λ _ σ Θ κs, (state_interp_aux σ Θ κs ∗ reg_state ∗ ∃ TQ, ⌜Θ = fst <$> TQ⌝ ∗ threads_run TQ)%I.
 
   Lemma sys_step_lwp : ⊢ sys_step (sys_lwp).
   Proof.
     rewrite /sys_step /sys_step_pre.
     iIntros "!>" (c h n σ Θ κs g v Ω W τf γ) "%H (HI& MI& SIa& TI& %TQ& %EQTQ& WPs)".
     destruct H as (BEH& FS& LB& HIST).
-    iMod (treg_check n with "TI HI MI") as "(TI& HI& MI& %l& #B)".
+    iMod (reg_check n with "TI HI MI") as "(TI& HI& MI& %l& #B)".
     iApply fupd_mask_intro; first set_solver. iIntros "close". iExists l. iFrame "B".
     iNext. iMod "close" as "_". iModIntro.
     iApply (run_step c with "[%] [$HI $TI $SIa $MI $WPs]"); first by split_and!.
@@ -269,11 +269,11 @@ Section adequacy.
 
   (** The program logic from position [n]: check, step, and eliminate the record of the
       initial formula. *)
-  Lemma lwp_ti_logic_temporal h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
+  Lemma lwp_adequacy_internal h n σ Θ (Ψs : gmap thread_id (thread_id → val Λ → iProp Σ)) κs g v Ω W τf γ
     (G : itrProp Λ Σ) :
     behavior (n, τf) →
     beh_fscnt (n, τf) γ →
-    owit_inv_lb (fair_sched_fun γ) Ω W →
+    owit_inv_lb (fair_measure γ) Ω W →
     hist_trace h τf →
     ((history_tinterp h n σ Θ κs ∗ state_interp_aux σ Θ κs) ∗
       model_interp g v Ω W n (dom Θ) ∗
@@ -282,14 +282,14 @@ Section adequacy.
       ⊢ |={⊤,∅}=> ALC (|={∅,⊤}=> itrProp_internal G (n, τf)).
   Proof.
     iIntros (BEH FS LB HIST) "([HI SIa]& MI& WPs)".
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs HI MI") as "((%P& #HG& HP& WPs)& [HI TI]& %&%&%&%& %H& MI)".
-    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    iMod (all_interp_sfmupd_steps (fair_measure γ) with "WPs HI MI") as "((%P& #HG& HP& WPs)& [HI TI]& %&%&%&%& %H& MI)".
+    { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
     1: auto.
     destruct H as [LEO1 LB1].
-    iPoseProof (temporal_elim with "HG [$HI $MI $HP]") as "#TF".
+    iPoseProof (guar_elim with "HG [$HI $MI $HP]") as "#TF".
     iPoseProof ("WPs" with "HP") as "WPs".
-    iMod (all_interp_sfmupd_steps (fair_sched_fun γ) with "WPs [$HI $TI] MI") as "(WPs& [HI TI]& %&%&%&%& %H& MI)".
-    { split; [apply fair_sched_fun_mon | apply fair_sched_fun_ub]. }
+    iMod (all_interp_sfmupd_steps (fair_measure γ) with "WPs [$HI $TI] MI") as "(WPs& [HI TI]& %&%&%&%& %H& MI)".
+    { split; [apply fair_measure_mon | apply fair_measure_le_ub]. }
     1: auto.
     destruct H as [LEO2 LB2].
     iPoseProof (big_sepM2_alt with "WPs") as "[%Dom WPs]".
@@ -308,11 +308,11 @@ Section adequacy.
     { auto. }
     destruct H as [LEO3 LB3].
     (* the check at [n] *)
-    iMod (treg_check n with "TI HI MI") as "(TI& HI& MI& %l& #B)".
+    iMod (reg_check n with "TI HI MI") as "(TI& HI& MI& %l& #B)".
     iApply (run_step 0 with "[%] [$HI $TI $SIa $MI $WPs]"); first by split_and!.
     iIntros (σ2 Θ2 κs2 TQ2 g2 v2 Ω2 W2 γ2) "%Hstep LC' ([[HI TI] SIa]& MI& WPs)".
     destruct Hstep as (BEH'& FS'& LB'& HIST'& EQTQ'& DROP).
-    iModIntro. iApply (tguar_elim _ (sys_lwp) with "TF [] [%] B [$HI $MI SIa TI WPs]").
+    iModIntro. iApply (record_elim _ (sys_lwp) with "TF [] [%] B [$HI $MI SIa TI WPs]").
     { iApply sys_step_lwp. }
     { split_and!; done. }
     rewrite /sys_lwp. iFrame "SIa TI". iExists TQ2. by iFrame.
@@ -376,7 +376,7 @@ Proof.
   iIntros "_ H".
   iMod (model_interp_alloc 0) as "(%Hmupd& R& W& WOE& MI)".
   iMod (history_interp_init σ Θ κs) as "(%Hhist& HI)".
-  iMod (treg_alloc (Λ:=Λ)) as "(%Htreg& TR)".
+  iMod (reg_alloc (Λ:=Λ)) as "(%Htreg& TR)".
   iExists Hmupd, Hhist, Htreg.
   set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
   iDestruct ("H" $! Htemp) as "(%c& H)".
@@ -390,11 +390,11 @@ Proof.
   iMod ("HI" $! Hsic with "SI") as "HI". iDestruct "MI" as "(MHI& S& T& A& G& MI)".
   iMod (thP_kids_alloc_threads (temporalGS0:=Htemp) _ (dom Θ) with "[$T $G]") as "(T& G& Ths)". 1: set_solver.
   set (Hlantana := LantanaG Htemp Hsic fork_post : lantanaGS Λ Σ).
-  iPoseProof (treg_st_init (treg_handle (temporalGS0:=Htemp)) with "TR") as "TI".
+  iPoseProof (reg_state_with_init (reg_entry_interp (temporalGS0:=Htemp)) with "TR") as "TI".
   iPoseProof ("WPs" with "LC Ths") as "WPs". rewrite union_empty_l_L.
   destruct τ as [n τf]. simpl in INIT1, INIT2. subst n.
   apply fair_scheduling_fscnt in FS. destruct FS as (γ& FS).
-  iApply (lwp_ti_logic_temporal (lantanaGS0:=Hlantana) with "[$HI $TI $SIa $MHI $S $T $A $G $MI $WPs]").
+  iApply (lwp_adequacy_internal (lantanaGS0:=Hlantana) with "[$HI $TI $SIa $MHI $S $T $A $G $MI $WPs]").
   1,2: eauto. 1: apply map_Forall2_empty.
   { intros n' σ' Θ' κs' Hlu. rewrite lookup_cons in Hlu. destruct n'; last done. inv Hlu. rewrite INIT2. eauto. }
 Qed.
