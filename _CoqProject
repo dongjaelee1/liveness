@@ -96,10 +96,10 @@ lantana/trace/trace_prop.v
 lantana/trace/trace_prop_rules.v
 lantana/trace/fair_scheduling.v
 lantana/trace/triprop.v
-lantana/trace/itrprop.v
-lantana/trace/itrprop_rules.v
-lantana/trace/itrprop_fixpoint.v
-lantana/trace/itrprop_model.v
+lantana/trace/trspec.v
+lantana/trace/trspec_rules.v
+lantana/trace/trspec_fixpoint.v
+lantana/trace/trspec_model.v
 lantana/trace/guarantee.v
 lantana/trace/guarantee_rules.v
 lantana/trace/temporal_formula.v

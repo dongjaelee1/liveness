@@ -139,7 +139,7 @@ Section loops.
 
   Lemma bundle_always_cert l n j r N γ G :
     r ≤ n →
-    bundle l n -∗ reg_idx j r (RAlways N γ) -∗ saved_trI γ (itrProp_internal G) -∗
+    bundle l n -∗ reg_idx j r (RAlways N γ) -∗ saved_trI γ (trSpec_internal G) -∗
     (⌜r = n⌝ -∗ ▷ record G n) -∗ ▷ record G n.
   Proof.
     iIntros (Hrn) "#B #Hj #Hγ AC". rewrite /bundle /bundle_pre. iDestruct "B" as "(#Hlb& %Hlast& #Cs)".
@@ -155,7 +155,7 @@ Section loops.
   Lemma bundle_until_cert l n j r N k γP γQ G1 G2 :
     r ≤ n →
     bundle l n -∗ reg_idx j r (RUntil N k γP γQ) -∗
-    saved_trI γP (itrProp_internal G1) -∗ saved_trI γQ (itrProp_internal G2) -∗
+    saved_trI γP (trSpec_internal G1) -∗ saved_trI γQ (trSpec_internal G2) -∗
     (⌜r = n⌝ -∗ ▷ (record G1 n ∨ record G2 n)) -∗
     ▷ (record G1 n ∨ record G2 n) ∨
     ▷ (∃ n' i' Ω', ⌜n' ≤ n⌝ ∗ event_obl i' (n', Ω') k obl_discharged ∗ record G2 n').
@@ -205,11 +205,11 @@ Section loops.
   (** *** The always loop *)
 
   Lemma always_run (Sys : sysT) N γ G j r :
-    sys_step Sys -∗ reg_idx j r (RAlways N γ) -∗ saved_trI γ (itrProp_internal G) -∗
+    sys_step Sys -∗ reg_idx j r (RAlways N γ) -∗ saved_trI γ (trSpec_internal G) -∗
     ∀ h n σ Θ κs g v Ω W τf γ',
       ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ' ∧ owit_inv_lb (fair_measure γ') Ω W ∧ hist_trace h τf⌝ -∗
       history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-      trI_always (itrProp_internal G) (trI_pure True) (n, τf).
+      trI_always (trSpec_internal G) (trI_pure True) (n, τf).
   Proof.
     iIntros "#ST #Hj #Hγ" (h n σ Θ κs g v Ω W τf γ') "%H Sys".
     iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ' H).
@@ -233,7 +233,7 @@ Section loops.
     sys_step Sys -∗ record G2 n -∗
     ⌜behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_measure γ) Ω W ∧ hist_trace h τf⌝ -∗
     history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-    trI_until Ord.lt a fP (itrProp_internal G2) (n, τf).
+    trI_until Ord.lt a fP (trSpec_internal G2) (n, τf).
   Proof.
     iIntros "#ST #TQ %H Sys". destruct H as (BEH& FS& LB& HIST).
     rewrite trI_until_unfold /trI_until_pre.
@@ -251,13 +251,13 @@ Section loops.
 
   Lemma until_run (Sys : sysT) N k γP γQ j r (P : iProp Σ) G1 G2 :
     sys_step Sys -∗ reg_idx j r (RUntil N k γP γQ) -∗
-    saved_trI γP (itrProp_internal G1) -∗ saved_trI γQ (itrProp_internal G2) -∗
+    saved_trI γP (trSpec_internal G1) -∗ saved_trI γQ (trSpec_internal G2) -∗
     oblP_inv N k P (until_discharged k G2) -∗
     ∀ h n σ Θ κs g v Ω W τf γ fu o,
       ⌜r < n ∧ behavior (n, τf) ∧ beh_fscnt (n, τf) γ ∧ owit_inv_lb (fair_measure γ) Ω W ∧
        hist_trace h τf ∧ Ω !! k = Some (obl_assigned fu o)⌝ -∗
       history_interp h n σ Θ κs ∗ model_interp g v Ω W n (dom Θ) ∗ Sys n σ Θ κs -∗
-      trI_until Ord.lt (Ord.S (fair_measure γ o fu)) (itrProp_internal G1) (itrProp_internal G2) (n, τf).
+      trI_until Ord.lt (Ord.S (fair_measure γ o fu)) (trSpec_internal G1) (trSpec_internal G2) (n, τf).
   Proof.
     iIntros "#ST #Hj #HγP #HγQ #OI". iIntros (h n σ Θ κs g v Ω W τf γ fu o) "%H Sys".
     iLöb as "IH" forall (h n σ Θ κs g v Ω W τf γ fu o H).

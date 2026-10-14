@@ -1,26 +1,26 @@
 From iris.proofmode Require Import proofmode.
 From iris.prelude Require Import options.
-From lantana.trace Require Export itrprop_fixpoint.
+From lantana.trace Require Export trspec_fixpoint.
 From transfinite.stepindex Require Import ordinals.
 From lantana.base_logic Require Import satisfiable.
 From lantana.algebra Require Import ordinal_existential_properties.
 From lantana.prelude Require Import axioms.
 
-(** * The model of internalized trace properties
+(** * The model of trace specifications
 
     Under the assumptions of the adequacy theorem (adequacy_temporal.v), a property valid in
-    the logic holds on the trace ([itrProp_valid_ext]). Hence in-logic entailment [⊑] is
+    the logic holds on the trace ([trSpec_valid_ext]). Hence in-logic entailment [⊑] is
     sound for the external readings of complete properties, and not complete for them; and
     a guarded fixpoint body has no fold. *)
 
 (** ** Validity, soundness and incompleteness of [⊑] *)
 Section model.
   Context {Λ : language} {Σ : gFunctors}.
-  Implicit Types G H : itrProp Λ Σ.
+  Implicit Types G H : trSpec Λ Σ.
   Local Notation histGpreS := (histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))).
 
-  Lemma itrProp_valid_ext `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G τ :
-    (∀ Ht : temporalGS Λ Σ, ⊢ itrProp_internal G τ) → itrProp_external G τ.
+  Lemma trSpec_valid_ext `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G τ :
+    (∀ Ht : temporalGS Λ Σ, ⊢ trSpec_internal G τ) → trSpec_external G τ.
   Proof.
     intros HG. destruct (τ.2 τ.1) as [[[Θ σ] i] κs].
     assert (iProp_sat (|==> ∃ (Hmupd : mupdGS Σ)
@@ -36,24 +36,24 @@ Section model.
     apply sat_bupd, sat_exists in Hsat as [Hmupd Hsat].
     apply sat_exists in Hsat as [Hhist Hsat]. apply sat_exists in Hsat as [Htreg Hsat].
     set (Htemp := TemporalG Hmupd Hhist Htreg : temporalGS Λ Σ).
-    apply (itrProp_adeq G (temporalGS0:=Htemp) emp).
+    apply (trSpec_adeq G (temporalGS0:=Htemp) emp).
     unfold iProp_sat_lc_at_frame. apply sat_sat_frame. unfold iProp_sat_lc_at, sat_frame. unfold iProp_sat_lc, sat_frame.
     eapply sat_mono; last exact Hsat. iIntros "($& $& $)". iApply (HG Htemp).
   Qed.
 
   (** Soundness: for a complete [G], in-logic entailment implies trace inclusion. *)
-  Lemma itrProp_le_sound `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G G' `{!ItrPropComplete G} :
-    G ⊑ G' → itrProp_external G ⊆ itrProp_external G'.
+  Lemma trSpec_le_sound `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} G G' `{!TrSpecComplete G} :
+    G ⊑ G' → trSpec_external G ⊆ trSpec_external G'.
   Proof.
-    intros Hle τ HG. apply itrProp_valid_ext. intros Ht. rewrite -(Hle Ht τ). by apply itrProp_complete.
+    intros Hle τ HG. apply trSpec_valid_ext. intros Ht. rewrite -(Hle Ht τ). by apply trSpec_complete.
   Qed.
 
   (** Incompleteness: [□ ⊥ ⊆ ⊥] holds on traces, but [□ ⊥ ⊑ ⊥] does not hold in the logic
       (the reading of [□ ⊥] starts with a later, so it is proved by Löb induction). *)
-  Lemma itrProp_always_elim_not_le `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} (τ : trace Λ) :
-    ¬ ((□ ⌜False⌝)%ITR ⊑ (⌜False⌝ : itrProp Λ Σ)%ITR).
+  Lemma trSpec_always_elim_not_le `{!mupdGpreS Σ} `{!histGpreS} `{!tregGS.tregGpreS Λ Σ} (τ : trace Λ) :
+    ¬ ((□ ⌜False⌝)%SPEC ⊑ (⌜False⌝ : trSpec Λ Σ)%SPEC).
   Proof.
-    intros Hle. apply (itrProp_valid_ext (itrProp_pure False) τ). intros Ht.
+    intros Hle. apply (trSpec_valid_ext (trSpec_pure False) τ). intros Ht.
     iLöb as "IH". iPoseProof (Hle Ht τ with "[IH]") as "%HF"; last done.
     rewrite /= trI_always_unfold /trI_always_pre.
     iApply fupd_mask_intro; first set_solver. iIntros "_". iNext. done.
@@ -69,10 +69,10 @@ End model.
 Section no_fold.
   Context {Λ : language} {Σ : gFunctors}.
 
-  Lemma itrProp_guarded_prefix_valid (M : itrProp Λ Σ) :
-    itrProp_le (F_until itrProp_true (itrProp_pure False) M) M → ∀ (H : temporalGS Λ Σ) τ, ⊢ @itrProp_internal _ _ M H τ.
+  Lemma trSpec_guarded_prefix_valid (M : trSpec Λ Σ) :
+    trSpec_le (F_until trSpec_true (trSpec_pure False) M) M → ∀ (H : temporalGS Λ Σ) τ, ⊢ @trSpec_internal _ _ M H τ.
   Proof.
-    intros HM H. cut (⊢ ∀ τ, @itrProp_internal _ _ M H τ)%I.
+    intros HM H. cut (⊢ ∀ τ, @trSpec_internal _ _ M H τ)%I.
     { intros HM' τ. iApply HM'. }
     iLöb as "IH". iIntros (τ). iApply HM. rewrite /F_until /= /trI_or /trI_and /trI_pure.
     iApply fupd_mask_intro; first set_solver. iIntros "Hclose". iNext. iMod "Hclose" as "_". iModIntro.
@@ -81,21 +81,21 @@ Section no_fold.
   Qed.
 
   (** The model: the instance is allocated as in the adequacy (adequacy_temporal.v). *)
-  Lemma itrProp_guarded_prefix_ext `{!mupdGpreS Σ}
+  Lemma trSpec_guarded_prefix_ext `{!mupdGpreS Σ}
       `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS.tregGpreS Λ Σ}
-      (M : itrProp Λ Σ) τ :
-    itrProp_le (F_until itrProp_true (itrProp_pure False) M) M → itrProp_external M τ.
+      (M : trSpec Λ Σ) τ :
+    trSpec_le (F_until trSpec_true (trSpec_pure False) M) M → trSpec_external M τ.
   Proof.
-    intros HM. apply itrProp_valid_ext. intros Ht. apply (itrProp_guarded_prefix_valid M HM Ht).
+    intros HM. apply trSpec_valid_ext. intros Ht. apply (trSpec_guarded_prefix_valid M HM Ht).
   Qed.
 
-  Lemma itrProp_mu_unfold_r_guarded `{!mupdGpreS Σ}
+  Lemma trSpec_mu_unfold_r_guarded `{!mupdGpreS Σ}
       `{!histGS.histGpreS Σ (state Λ * thread_pool Λ * list (observation Λ))} `{!tregGS.tregGpreS Λ Σ}
       (τ : trace Λ) :
-    ¬ itrProp_le (Λ:=Λ) (Σ:=Σ) (F_until itrProp_true (itrProp_pure False) (itrProp_mu (F_until itrProp_true (itrProp_pure False))))
-             (itrProp_mu (F_until itrProp_true (itrProp_pure False))).
+    ¬ trSpec_le (Λ:=Λ) (Σ:=Σ) (F_until trSpec_true (trSpec_pure False) (trSpec_mu (F_until trSpec_true (trSpec_pure False))))
+             (trSpec_mu (F_until trSpec_true (trSpec_pure False))).
   Proof.
-    intros Hfold. apply (itrProp_guarded_prefix_ext _ τ), itrProp_mu_until_ext in Hfold.
+    intros Hfold. apply (trSpec_guarded_prefix_ext _ τ), trSpec_mu_until_ext in Hfold.
     destruct τ as [n τf]. by destruct Hfold as (m & _ & [] & _).
   Qed.
 

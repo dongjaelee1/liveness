@@ -6,12 +6,11 @@ From lantana.trace Require Export guarantee_infer.
 (** * Temporal formulas in ghost state
 
     A saved proposition names a temporal formula; stored with its guarantee, the pair
-    guarantees that property by itself. Also a ghost map of temporal formulas chosen at
-    run time. *)
+    guarantees that property by itself. Also a ghost map of formulas chosen at run time. *)
 
 Section saved.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!savedPropG Σ}.
-  Implicit Types G : itrProp Λ Σ.
+  Implicit Types G : trSpec Λ Σ.
 
   (** [γ] names the temporal formula [P], which guarantees [G]. *)
   Definition saved_guar (γ : gname) (P : iProp Σ) G : iProp Σ :=
@@ -51,7 +50,7 @@ End saved.
     guarantees, at all times, the trace property of every registered request. *)
 Section request_map.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} `{!savedPropG Σ, !ghost_mapG Σ nat gname}.
-  Implicit Types G : nat → itrProp Λ Σ.
+  Implicit Types G : nat → trSpec Λ Σ.
 
   Definition request_map_inv γm G : iProp Σ :=
     ∃ m : gmap nat gname, ghost_map_auth_frac γm 1 m ∗
@@ -60,8 +59,8 @@ Section request_map.
   (** Inferred: the requests' names are ghost (they do not show), the map is trace-visible. *)
   Lemma guar_request_map N γm G :
     ⊢ alwaysI N (request_map_inv γm G) ⊨ₜ
-      itrProp_always (itrProp_exist (λ m : gmap nat gname,
-        itrProp_true ∧ itrProp_forall (λ r, itrProp_forall (λ γr, itrProp_impl ⌜m !! r = Some γr⌝ (G r))))).
+      trSpec_always (trSpec_exist (λ m : gmap nat gname,
+        trSpec_true ∧ trSpec_forall (λ r, trSpec_forall (λ γr, trSpec_impl ⌜m !! r = Some γr⌝ (G r))))).
   Proof. apply (into_guar _ _). Qed.
 
   (** Allocation, with no request registered yet: a registered invariant. *)

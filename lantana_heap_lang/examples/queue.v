@@ -608,12 +608,12 @@ Section proof.
 
   (** ** Temporal guarantees *)
   (** The queue guarantees what its lock does: [queue_inv] is ghost state, [queue_lock] is the
-      lock's [R] (guaranteeing [itrProp_true]), and [γ ↪LOCK_AL□] keeps the lock from being
+      lock's [R] (guaranteeing [trSpec_true]), and [γ ↪LOCK_AL□] keeps the lock from being
       deleted ([guar_is_fair_lock_alive]). *)
-  Definition queue_itrProp (ql : val) : itrProp heap_lang Σ :=
-    (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧ alive_fair_lock_itrProp tl)%ITR.
+  Definition queue_trSpec (ql : val) : trSpec heap_lang Σ :=
+    (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧ alive_fair_lock_trSpec tl)%SPEC.
 
-  Lemma guar_is_queue ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_itrProp ql.
+  Lemma guar_is_queue ql γ ℓ φ : ⊢ is_queue ql γ ℓ φ ⊨ₜ queue_trSpec ql.
   Proof.
     iApply (guar_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I with "[]").
@@ -623,10 +623,10 @@ Section proof.
   Qed.
 
   Global Instance into_guar_is_queue ql γ ℓ φ :
-    IntoGuar (is_queue ql γ ℓ φ) (queue_itrProp ql) | 0.
+    IntoGuar (is_queue ql γ ℓ φ) (queue_trSpec ql) | 0.
   Proof. apply guar_is_queue. Qed.
 
-  Lemma guar_is_queue_init ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_itrProp ql.
+  Lemma guar_is_queue_init ql γ φ : ⊢ is_queue_init ql γ φ ⊨ₜ queue_trSpec ql.
   Proof.
     iApply (guar_mono (∃ (lhptr ltptr : loc) (tl : val), ⌜ql = (#lhptr, #ltptr, tl)%V⌝ ∧
       is_fair_lock_alive tl (queue_ticketlock_γ γ) (queue_lock φ (queue_γq γ) lhptr ltptr))%I with "[]").
@@ -643,7 +643,7 @@ Section trace.
   (** The queue's lock makes release progress ([release_progress]): every [enqueue] or
       [dequeue] that takes the lock eventually releases it. *)
   Lemma queue_release_progress {Σ} ql τ :
-    itrProp_external (queue_itrProp (Σ:=Σ) ql) τ →
+    trSpec_external (queue_trSpec (Σ:=Σ) ql) τ →
     ∃ lhptr ltptr next curr : loc,
       ql = (#lhptr, #ltptr, (#next, #curr))%V ∧ release_progress next curr τ.
   Proof.

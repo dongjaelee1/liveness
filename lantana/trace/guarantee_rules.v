@@ -7,13 +7,13 @@ From transfinite.stepindex Require Import ordinals.
 
     The interface of [P ⊨ₜ G] (guarantee.v): monotonicity in [P] ([guar_mono]) and in
     [G] ([guar_weaken], [guar_cast]), the rules for the connectives of [P], the
-    canonical property [itrProp_canon P] and its completeness, state atoms ([StateFact]),
+    canonical property [trSpec_canon P] and its completeness, state atoms ([StateFact]),
     implications and big separating conjunctions. The rules for the temporal formulas
     [alwaysI] and [untilI] are in temporal_formula_rules.v. *)
 
 Section rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
-  Implicit Types G : itrProp Λ Σ.
+  Implicit Types G : trSpec Λ Σ.
 
   Lemma guar_weaken P G G' : G ⊑ G' → P ⊨ₜ G ⊢ P ⊨ₜ G'.
   Proof.
@@ -22,20 +22,20 @@ Section rules.
 
   (** A trace-level consequence [R] of [G] is guaranteed as the cast of [G] to [R]: the way
       to export what a guarantee implies. *)
-  Lemma guar_cast P G R (pf : itrProp_external G ⊆ R) : P ⊨ₜ G ⊢ P ⊨ₜ itrProp_cast G R pf.
-  Proof. apply guar_weaken, itrProp_cast_le. Qed.
+  Lemma guar_cast P G R (pf : trSpec_external G ⊆ R) : P ⊨ₜ G ⊢ P ⊨ₜ trSpec_cast G R pf.
+  Proof. apply guar_weaken, trSpec_cast_le. Qed.
 
   Lemma guar_mono P Q G : □ (Q -∗ P) -∗ P ⊨ₜ G -∗ Q ⊨ₜ G.
   Proof.
     iIntros "#HQP #HG !>". iIntros (?????????) "(HI& MI& HQ)". iApply "HG". iFrame. by iApply "HQP".
   Qed.
 
-  Lemma guar_true P : ⊢ P ⊨ₜ itrProp_true.
+  Lemma guar_true P : ⊢ P ⊨ₜ trSpec_true.
   Proof.
     iIntros "!>" (?????????) "_". iApply record_intro. iIntros "!>" (????????????) "_ _ _ _". done.
   Qed.
 
-  Lemma guar_pure (φ : Prop) : ⊢ ⌜φ⌝ ⊨ₜ itrProp_pure φ.
+  Lemma guar_pure (φ : Prop) : ⊢ ⌜φ⌝ ⊨ₜ trSpec_pure φ.
   Proof.
     iIntros "!>" (?????????) "(_& _& %Hφ)". iApply record_intro. iIntros "!>" (????????????) "_ _ _ _". done.
   Qed.
@@ -73,7 +73,7 @@ Section rules.
 
   (** The right formula fulfils an until at once; the later of the guarantee is stripped
       by the step of the until. *)
-  Lemma guar_until_now P G1 G2 : ▷ (P ⊨ₜ G2) -∗ P ⊨ₜ itrProp_until G1 G2.
+  Lemma guar_until_now P G1 G2 : ▷ (P ⊨ₜ G2) -∗ P ⊨ₜ trSpec_until G1 G2.
   Proof.
     iIntros "#HG !>" (h n σ Θ κs m i Ω W) "(HI& MI& HP)".
     iPoseProof (guar_elim_later_guar P G2 with "HG [$HP $HI $MI]") as "#T".
@@ -85,8 +85,8 @@ Section rules.
   Qed.
 
   (** Universal quantification over any type. *)
-  Lemma guar_forall {X : Type} (P : X → iProp Σ) (G : X → itrProp Λ Σ) :
-    (∀ x, P x ⊨ₜ G x) -∗ (∀ x, P x) ⊨ₜ itrProp_forall G.
+  Lemma guar_forall {X : Type} (P : X → iProp Σ) (G : X → trSpec Λ Σ) :
+    (∀ x, P x ⊨ₜ G x) -∗ (∀ x, P x) ⊨ₜ trSpec_forall G.
   Proof.
     iIntros "#HG !>" (?????????) "(HI& MI& HP)".
     iAssert (∀ x, record (G x) _)%I with "[-]" as "#T".
@@ -95,39 +95,39 @@ Section rules.
     by iApply (record_elim with "T ST [//] B W").
   Qed.
 
-  Lemma guar_canon Q : ⊢ Q ⊨ₜ itrProp_canon Q.
+  Lemma guar_canon Q : ⊢ Q ⊨ₜ trSpec_canon Q.
   Proof.
-    iApply (guar_mono (∀ _ : {G : itrProp Λ Σ | ⊢ Q ⊨ₜ G}, Q)%I with "[]").
+    iApply (guar_mono (∀ _ : {G : trSpec Λ Σ | ⊢ Q ⊨ₜ G}, Q)%I with "[]").
     { iIntros "!> HQ" (?). done. }
     iApply guar_forall. iIntros ([G HG]). iApply HG.
   Qed.
-  Lemma itrProp_canon_le Q G : (⊢ Q ⊨ₜ G) → itrProp_le (itrProp_canon Q) G.
+  Lemma trSpec_canon_le Q G : (⊢ Q ⊨ₜ G) → trSpec_le (trSpec_canon Q) G.
   Proof.
     intros HG ??. rewrite /= /trI_forall. iIntros "H". iApply ("H" $! (exist (λ G, ⊢ Q ⊨ₜ G) G HG)).
   Qed.
-  Lemma itrProp_canon_ext Q G τ : (⊢ Q ⊨ₜ G) → itrProp_external (itrProp_canon Q) τ → itrProp_external G τ.
+  Lemma trSpec_canon_ext Q G τ : (⊢ Q ⊨ₜ G) → trSpec_external (trSpec_canon Q) τ → trSpec_external G τ.
   Proof. intros HG H. apply (H (exist (λ G, ⊢ Q ⊨ₜ G) G HG)). Qed.
 
-  (** [itrProp_canon Q] is the greatest lower bound of what [Q] validly guarantees: through it,
+  (** [trSpec_canon Q] is the greatest lower bound of what [Q] validly guarantees: through it,
       the rules are complete up to in-logic entailment. *)
-  Lemma guar_canon_complete Q G : (⊢ Q ⊨ₜ G) ↔ itrProp_canon Q ⊑ G.
+  Lemma guar_canon_complete Q G : (⊢ Q ⊨ₜ G) ↔ trSpec_canon Q ⊑ G.
   Proof.
-    split; first apply itrProp_canon_le. intros Hle.
+    split; first apply trSpec_canon_le. intros Hle.
     iApply (guar_weaken _ _ _ Hle). iApply guar_canon.
   Qed.
 
   (** Its trace reading: the strongest trace property [Q] validly guarantees. *)
-  Definition tr_canon Q : trProp Λ := itrProp_external (itrProp_canon Q).
-  Lemma tr_canon_le Q R : tr_canon Q ⊆ R ↔ ∃ G, (⊢ Q ⊨ₜ G) ∧ itrProp_external G ⊆ R.
+  Definition tr_canon Q : trProp Λ := trSpec_external (trSpec_canon Q).
+  Lemma tr_canon_le Q R : tr_canon Q ⊆ R ↔ ∃ G, (⊢ Q ⊨ₜ G) ∧ trSpec_external G ⊆ R.
   Proof.
     split.
-    - intros HR. exists (itrProp_canon Q). split; [apply guar_canon|done].
-    - intros (G & HG & HR) τ Hτ. apply HR. by eapply itrProp_canon_ext.
+    - intros HR. exists (trSpec_canon Q). split; [apply guar_canon|done].
+    - intros (G & HG & HR) τ Hτ. apply HR. by eapply trSpec_canon_ext.
   Qed.
 
   (** Trace-visible existential quantification, over small types. *)
-  Lemma guar_exist {X : Type} `{!TypeExistentialProperty X ordI} (P : X → iProp Σ) (G : X → itrProp Λ Σ) :
-    (∀ x, P x ⊨ₜ G x) -∗ (∃ x, P x) ⊨ₜ itrProp_exist G.
+  Lemma guar_exist {X : Type} `{!TypeExistentialProperty X ordI} (P : X → iProp Σ) (G : X → trSpec Λ Σ) :
+    (∀ x, P x ⊨ₜ G x) -∗ (∃ x, P x) ⊨ₜ trSpec_exist G.
   Proof.
     iIntros "#HG !>" (?????????) "(HI& MI& [%x HP])".
     iPoseProof (guar_elim with "HG [$HI $MI $HP]") as "#T".
@@ -171,7 +171,7 @@ End rules.
 
     The atoms of temporal properties are facts about the current state: an iProp [P]
     determines [φ] when the state interpretation and [P] entail [φ] ([StateFact]), and then
-    [P] guarantees [itrProp_state φ] ([guar_state_fact]). A language provides the facts of
+    [P] guarantees [trSpec_state φ] ([guar_state_fact]). A language provides the facts of
     its assertions, e.g. [l ↦ v] for heap_lang (temporal_laws.v). *)
 Section state_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
@@ -180,7 +180,7 @@ Section state_rules.
     state_fact σ Θ κs : state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝.
 
   Lemma guar_state (φ : state Λ → thread_pool Λ → Prop) (P : iProp Σ) :
-    (∀ σ Θ κs, state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝) → ⊢ P ⊨ₜ itrProp_state φ.
+    (∀ σ Θ κs, state_interp σ Θ κs ∗ P ⊢ ⌜φ σ Θ⌝) → ⊢ P ⊨ₜ trSpec_state φ.
   Proof.
     iIntros (Hφ). iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& _& HP)".
     iPoseProof (history_interp_hist_event_now with "HI") as "#HE".
@@ -193,36 +193,36 @@ Section state_rules.
     apply HIST in Hh as [? Hτ]. simpl. rewrite Hτ. done.
   Qed.
 
-  Lemma guar_state_fact P φ `{!StateFact P φ} : ⊢ P ⊨ₜ itrProp_state φ.
+  Lemma guar_state_fact P φ `{!StateFact P φ} : ⊢ P ⊨ₜ trSpec_state φ.
   Proof. apply guar_state, state_fact. Qed.
 
 End state_rules.
 
 (** ** Implications
 
-    The antecedent of [A → G] is read on the trace ([itrProp_impl]), so [A → G] is [¬A ∨ G]
-    ([itrProp_impl_or_not]), a statement about traces: the general way to export one is the
+    The antecedent of [A → G] is read on the trace ([trSpec_impl]), so [A → G] is [¬A ∨ G]
+    ([trSpec_impl_or_not]), a statement about traces: the general way to export one is the
     cast of a guarantee ([guar_cast]) after trace-level reasoning. The rules below stay
-    in the logic and produce [itrProp_impl] itself: from a complete antecedent
+    in the logic and produce [trSpec_impl] itself: from a complete antecedent
     ([guar_impl_intro]), by weakening ([guar_impl_weaken]), and for a pure antecedent
     of an iProp implication ([guar_impl]). An iProp antecedent that the context does not
     provide cannot be used ([naive_impl_rule_unsound], guarantee_infer.v). *)
 Section impl_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
-  Lemma guar_impl_intro P A H G `{!ItrPropComplete A} :
-    (A ∧ H)%ITR ⊑ G → P ⊨ₜ H ⊢ P ⊨ₜ (A → G).
-  Proof. intros HG. by apply guar_weaken, itrProp_impl_intro. Qed.
+  Lemma guar_impl_intro P A H G `{!TrSpecComplete A} :
+    (A ∧ H)%SPEC ⊑ G → P ⊨ₜ H ⊢ P ⊨ₜ (A → G).
+  Proof. intros HG. by apply guar_weaken, trSpec_impl_intro. Qed.
 
   Lemma guar_impl_weaken P A G : P ⊨ₜ G ⊢ P ⊨ₜ (A → G).
-  Proof. apply guar_weaken, itrProp_impl_intro_le. Qed.
+  Proof. apply guar_weaken, trSpec_impl_intro_le. Qed.
 
   (** A pure antecedent is decided outside the logic. *)
   Lemma guar_impl (φ : Prop) P G : P ⊨ₜ G -∗ (⌜φ⌝ → P) ⊨ₜ (⌜φ⌝ → G).
   Proof.
     iIntros "#HG". destruct (Classical_Prop.classic φ) as [Hφ|Hφ].
     - iApply guar_impl_weaken. iApply (guar_mono with "[] HG"). iIntros "!> HP". by iApply "HP".
-    - iApply (guar_weaken _ itrProp_true); last iApply guar_true.
+    - iApply (guar_weaken _ trSpec_true); last iApply guar_true.
       intros ??. rewrite /= /trI_impl. by iIntros "_ %".
   Qed.
 
@@ -232,27 +232,27 @@ End impl_rules.
 Section big_op_rules.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
 
-  Lemma guar_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ) (G : K → A → itrProp Λ Σ) :
+  Lemma guar_big_sepM `{Countable K} {A} (m : gmap K A) (Φ : K → A → iProp Σ) (G : K → A → trSpec Λ Σ) :
     (∀ k x, Φ k x ⊨ₜ G k x) -∗
-    ([∗ map] k ↦ x ∈ m, Φ k x) ⊨ₜ itrProp_forall (λ k, itrProp_forall (λ x, itrProp_impl ⌜m !! k = Some x⌝ (G k x))).
+    ([∗ map] k ↦ x ∈ m, Φ k x) ⊨ₜ trSpec_forall (λ k, trSpec_forall (λ x, trSpec_impl ⌜m !! k = Some x⌝ (G k x))).
   Proof.
     iIntros "#HG". iApply (guar_mono (∀ k x, ⌜m !! k = Some x⌝ → Φ k x)%I with "[]").
     { iIntros "!> H" (k x Hk). by iApply (big_sepM_lookup with "H"). }
     iApply guar_forall. iIntros (k). iApply guar_forall. iIntros (x). iApply guar_impl. iApply "HG".
   Qed.
 
-  Lemma guar_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → itrProp Λ Σ) :
+  Lemma guar_big_sepL {A} (l : list A) (Φ : nat → A → iProp Σ) (G : nat → A → trSpec Λ Σ) :
     (∀ k x, Φ k x ⊨ₜ G k x) -∗
-    ([∗ list] k ↦ x ∈ l, Φ k x) ⊨ₜ itrProp_forall (λ k, itrProp_forall (λ x, itrProp_impl ⌜l !! k = Some x⌝ (G k x))).
+    ([∗ list] k ↦ x ∈ l, Φ k x) ⊨ₜ trSpec_forall (λ k, trSpec_forall (λ x, trSpec_impl ⌜l !! k = Some x⌝ (G k x))).
   Proof.
     iIntros "#HG". iApply (guar_mono (∀ k x, ⌜l !! k = Some x⌝ → Φ k x)%I with "[]").
     { iIntros "!> H" (k x Hk). by iApply (big_sepL_lookup with "H"). }
     iApply guar_forall. iIntros (k). iApply guar_forall. iIntros (x). iApply guar_impl. iApply "HG".
   Qed.
 
-  Lemma guar_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → itrProp Λ Σ) :
+  Lemma guar_big_sepS `{Countable A} (X : gset A) (Φ : A → iProp Σ) (G : A → trSpec Λ Σ) :
     (∀ x, Φ x ⊨ₜ G x) -∗
-    ([∗ set] x ∈ X, Φ x) ⊨ₜ itrProp_forall (λ x, itrProp_impl ⌜x ∈ X⌝ (G x)).
+    ([∗ set] x ∈ X, Φ x) ⊨ₜ trSpec_forall (λ x, trSpec_impl ⌜x ∈ X⌝ (G x)).
   Proof.
     iIntros "#HG". iApply (guar_mono (∀ x, ⌜x ∈ X⌝ → Φ x)%I with "[]").
     { iIntros "!> H" (x Hx). by iApply (big_sepS_elem_of with "H"). }

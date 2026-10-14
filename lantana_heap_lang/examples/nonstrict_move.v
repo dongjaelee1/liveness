@@ -63,13 +63,13 @@ Section adequacy.
 
   Section G_main.
     Context `{!heapGS Σ}.
-    Definition G_main : itrProp heap_lang Σ := ltac:(itrProp_of Φ_P).
+    Definition G_main : trSpec heap_lang Σ := ltac:(trSpec_of Φ_P).
   End G_main.
 
   Lemma guar_Φ_P `{!heapGS Σ} : ⊢ Φ_P ⊨ₜ G_main.
   Proof. apply (into_guar _ _). Qed.
 
-  Remark G_main_false {Σ} τ : itrProp_external (G_main (Σ:=Σ)) τ → False.
+  Remark G_main_false {Σ} τ : trSpec_external (G_main (Σ:=Σ)) τ → False.
   Proof.
     destruct τ as [n τf]. simpl. intros (Hu& _). destruct Hu as (m& _& HF& _). done.
   Qed.

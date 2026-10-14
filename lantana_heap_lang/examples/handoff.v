@@ -84,12 +84,12 @@ Section proof.
 
   (** What the handoff exports: the cell always holds [NONE] or a task [SOME (f, a)]; the
       task's resources and the obligations have no trace content. *)
-  Definition handoff_inv_itrProp (b : loc) : itrProp heap_lang Σ :=
-    ((b ↦{#1/2} NONEV ∧ itrProp_true) ∨
-     (∃ f a : val, b ↦ SOMEV (f, a) ∧ itrProp_true) ∨
-     (∃ f a : val, b ↦ SOMEV (f, a) ∧ itrProp_true))%ITR.
+  Definition handoff_inv_trSpec (b : loc) : trSpec heap_lang Σ :=
+    ((b ↦{#1/2} NONEV ∧ trSpec_true) ∨
+     (∃ f a : val, b ↦ SOMEV (f, a) ∧ trSpec_true) ∨
+     (∃ f a : val, b ↦ SOMEV (f, a) ∧ trSpec_true))%SPEC.
 
-  Lemma guar_is_handoff b γ ℓ : ⊢ is_handoff b γ ℓ ⊨ₜ itrProp_always (handoff_inv_itrProp b).
+  Lemma guar_is_handoff b γ ℓ : ⊢ is_handoff b γ ℓ ⊨ₜ trSpec_always (handoff_inv_trSpec b).
   Proof. apply (into_guar _ _). Qed.
 
   (** The main proofs. *)
@@ -250,10 +250,10 @@ Section trace.
   Definition handoff_tr (b : loc) : trProp heap_lang :=
     (□ (tr_cell b NONEV ∨ ∃ f a : val, tr_cell b (SOMEV (f, a))))%R.
 
-  Lemma handoff_inv_itrProp_ext {Σ} b :
-    itrProp_external (itrProp_always (handoff_inv_itrProp (Σ:=Σ) b)) ⊆ handoff_tr b.
+  Lemma handoff_inv_trSpec_ext {Σ} b :
+    trSpec_external (trSpec_always (handoff_inv_trSpec (Σ:=Σ) b)) ⊆ handoff_tr b.
   Proof.
-    rewrite /handoff_inv_itrProp. etrans; first apply (itrProp_ext_of _ _). apply tr_always_mono.
+    rewrite /handoff_inv_trSpec. etrans; first apply (trSpec_ext_of _ _). apply tr_always_mono.
     apply tr_or_elim; last apply tr_or_elim.
     - apply tr_or_intro_l. etrans; [apply tr_and_elim_l|apply tr_cell_intro].
     - apply tr_or_intro_r. apply tr_exist_elim => f. apply tr_exist_elim => a.

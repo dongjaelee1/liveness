@@ -993,50 +993,50 @@ Section proof.
   Qed.
 
   (** ** Temporal guarantees *)
-  (** The guarantee of the alive branch of [lock_inv], as inferred: [itrProp_true] for ghost
+  (** The guarantee of the alive branch of [lock_inv], as inferred: [trSpec_true] for ghost
       state, [R] and the ticket maps. If a ticket is pending ([c < n]), the next owner's until
       carries [finally curr ↦ c + 1]. *)
-  Definition lock_inv_alive_itrProp (next curr : loc) : itrProp heap_lang Σ :=
+  Definition lock_inv_alive_trSpec (next curr : loc) : trSpec heap_lang Σ :=
     (∃ n c : Z,
-       next ↦ #n ∧ curr ↦{#(1/2/2)} #c ∧ itrProp_true ∧ itrProp_true ∧ itrProp_true ∧
-       ⌜(0 ≤ c ≤ n)%Z⌝ ∧ itrProp_true ∧ itrProp_true ∧
-       (⌜c = n⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ itrProp_true ∨
+       next ↦ #n ∧ curr ↦{#(1/2/2)} #c ∧ trSpec_true ∧ trSpec_true ∧ trSpec_true ∧
+       ⌜(0 ≤ c ≤ n)%Z⌝ ∧ trSpec_true ∧ trSpec_true ∧
+       (⌜c = n⌝ ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ trSpec_true ∨
         ⌜(c < n)%Z⌝ ∧
-          (itrProp_true ∧ itrProp_true ∧ itrProp_true ∧
-           itrProp_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ itrProp_true) ∧
-           ((itrProp_true ∧ itrProp_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ itrProp_true) ∧
-             itrProp_true ∧ itrProp_true ∧ itrProp_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ itrProp_true) ∨ itrProp_true))))%ITR.
+          (trSpec_true ∧ trSpec_true ∧ trSpec_true ∧
+           trSpec_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ trSpec_true) ∧
+           ((trSpec_true ∧ trSpec_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ trSpec_true) ∧
+             trSpec_true ∧ trSpec_true ∧ trSpec_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ trSpec_true) ∨ trSpec_true))))%SPEC.
 
   (** The guarantee of [lock_inv]: its left disjunct (deleted lock) is ghost state, so it
       says nothing about the trace. *)
-  Definition lock_inv_itrProp (next curr : loc) : itrProp heap_lang Σ :=
-    (itrProp_true ∨ lock_inv_alive_itrProp next curr)%ITR.
+  Definition lock_inv_trSpec (next curr : loc) : trSpec heap_lang Σ :=
+    (trSpec_true ∨ lock_inv_alive_trSpec next curr)%SPEC.
 
   (** The guarantee of [lock_token_inv]: nobody holds the lock (ghost state), or its holder
       will increment [curr]. *)
-  Definition lock_token_inv_itrProp (curr : loc) : itrProp heap_lang Σ :=
-    (∃ c : Z, itrProp_true ∨
-       itrProp_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ itrProp_true ∧
-       itrProp_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ itrProp_true))%ITR.
+  Definition lock_token_inv_trSpec (curr : loc) : trSpec heap_lang Σ :=
+    (∃ c : Z, trSpec_true ∨
+       trSpec_true ∧ curr ↦{#(1/2 + 1/2/2)} #c ∧ trSpec_true ∧
+       trSpec_finally (curr ↦{#(1/2 + 1/2/2)} #(c + 1) ∧ trSpec_true))%SPEC.
 
   (** The guarantee of [is_fair_lock], vacuous on traces since the lock can be deleted; see
       [guar_is_fair_lock_alive]. *)
-  Definition fair_lock_itrProp (tl : val) : itrProp heap_lang Σ :=
+  Definition fair_lock_trSpec (tl : val) : trSpec heap_lang Σ :=
     (∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧
-       itrProp_always (lock_inv_itrProp next curr) ∧ itrProp_always (lock_token_inv_itrProp curr))%ITR.
+       trSpec_always (lock_inv_trSpec next curr) ∧ trSpec_always (lock_token_inv_trSpec curr))%SPEC.
 
-  Lemma guar_is_fair_lock tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_itrProp tl.
+  Lemma guar_is_fair_lock tl γ R : ⊢ is_fair_lock tl γ R ⊨ₜ fair_lock_trSpec tl.
   Proof. apply (into_guar _ _). Qed.
 
   (** Clients see the lock's guarantee, not its invariant. *)
   Global Instance into_guar_is_fair_lock tl γ R :
-    IntoGuar (is_fair_lock tl γ R) (fair_lock_itrProp tl) | 0.
+    IntoGuar (is_fair_lock tl γ R) (fair_lock_trSpec tl) | 0.
   Proof. apply guar_is_fair_lock. Qed.
 
   (** The guarantee of a lock that cannot be deleted. *)
-  Definition alive_fair_lock_itrProp (tl : val) : itrProp heap_lang Σ :=
-    (fair_lock_itrProp tl ∧
-     ∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ itrProp_always (lock_inv_alive_itrProp next curr))%ITR.
+  Definition alive_fair_lock_trSpec (tl : val) : trSpec heap_lang Σ :=
+    (fair_lock_trSpec tl ∧
+     ∃ next curr : loc, ⌜tl = (#next, #curr)%V⌝ ∧ trSpec_always (lock_inv_alive_trSpec next curr))%SPEC.
 
   (** A persistent [γ ↪LOCK_AL□] (as the queue keeps) rules out deletion, hence the left
       disjunct of [lock_inv]: the lock invariant is registered under its alive branch. *)
@@ -1057,11 +1057,11 @@ Section proof.
   Qed.
 
   Lemma guar_is_fair_lock_alive tl γ R :
-    ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_itrProp tl.
+    ⊢ is_fair_lock_alive tl γ R ⊨ₜ alive_fair_lock_trSpec tl.
   Proof. apply (into_guar _ _). Qed.
 
   Global Instance into_guar_is_fair_lock_alive tl γ R :
-    IntoGuar (is_fair_lock_alive tl γ R) (alive_fair_lock_itrProp tl) | 0.
+    IntoGuar (is_fair_lock_alive tl γ R) (alive_fair_lock_trSpec tl) | 0.
   Proof. apply guar_is_fair_lock_alive. Qed.
 
   (** [lock_token] is ghost state: the holder's [finally] lives in [lock_token_inv]. *)
@@ -1082,10 +1082,10 @@ Section trace.
     (□ (∀ n c : Z, tr_pointsto next #n → tr_pointsto curr #c → ⌜(c < n)%Z⌝ →
                    ◇ tr_pointsto curr #(c + 1)))%R.
 
-  Lemma lock_inv_alive_itrProp_release_progress {Σ} next curr :
-    itrProp_external (itrProp_always (lock_inv_alive_itrProp (Σ:=Σ) next curr)) ⊆ release_progress next curr.
+  Lemma lock_inv_alive_trSpec_release_progress {Σ} next curr :
+    trSpec_external (trSpec_always (lock_inv_alive_trSpec (Σ:=Σ) next curr)) ⊆ release_progress next curr.
   Proof.
-    rewrite /lock_inv_alive_itrProp. etrans; first apply (itrProp_ext_of _ _). apply tr_always_mono.
+    rewrite /lock_inv_alive_trSpec. etrans; first apply (trSpec_ext_of _ _). apply tr_always_mono.
     intros τ (n' & c' & Hn' & Hc' & _ & _ & _ & Hb%tr_pure_at & _ & _ & Hcase) n c Hn Hc Hlt%tr_pure_at.
     pose proof (tr_pointsto_agree next _ _ _ _ τ (conj Hn' Hn)) as [= <-].
     pose proof (tr_pointsto_agree curr _ _ _ _ τ (conj Hc' Hc)) as [= <-].
@@ -1094,11 +1094,11 @@ Section trace.
   Qed.
 
   Lemma alive_fair_lock_release_progress {Σ} tl τ :
-    itrProp_external (alive_fair_lock_itrProp (Σ:=Σ) tl) τ →
+    trSpec_external (alive_fair_lock_trSpec (Σ:=Σ) tl) τ →
     ∃ next curr : loc, tl = (#next, #curr)%V ∧ release_progress next curr τ.
   Proof.
     intros (_ & next & curr & Htl & Hal). exists next, curr. split; first done.
-    exact (lock_inv_alive_itrProp_release_progress (Σ:=Σ) next curr τ Hal).
+    exact (lock_inv_alive_trSpec_release_progress (Σ:=Σ) next curr τ Hal).
   Qed.
 
   (** Only the next ticket carries a [finally] (the releasing thread allocates its

@@ -25,7 +25,7 @@ In dependency order: each file imports only files above it.
 | `bcred.v` | `ocm.v` | The bounded-credit camera over an OCM, used for witness credits: the persistent `credit_bound a` bounds by `a` the `credit`s in circulation, with splitting (`credit_split`) and spending (`credit_spend`), which lowers the bound. |
 | `auth_mra.v` | — | `auth_mra R`: the authoritative camera over Iris's monotone resource algebra for a relation `R`, with fractional authority `●AM[R] a` and lower-bound knowledge `◯AM[R] b` (`R b a`); the class `auth_mra_class` of relations with the full set of rules, the lexicographic order `lex_R`, and the instance `ordinal_auth_mra_class` for the copy's `ord.t`. Used by the ticket-lock examples. |
 | `ordinal_ucmra.v` | — | `OrdUR`: the opam ordinals `Ord.t` with the Hessenberg sum as a discrete unital camera, used for transfinite later credits, and cancellation of the Hessenberg sum (`Hessenberg_add_cancel`). |
-| `ordinal_existential_properties.v` | — | The existential property of Transfinite Iris for the type `Ord.t` at the ordinal step-index type `ordI` (an existential over `Ord.t` commutes with step-indexing), used by `lantana/trace/` (`itrprop_fixpoint.v`, `itrprop_model.v`, `guarantee_rec.v`). |
+| `ordinal_existential_properties.v` | — | The existential property of Transfinite Iris for the type `Ord.t` at the ordinal step-index type `ordI` (an existential over `Ord.t` commutes with step-indexing), used by `lantana/trace/` (`trspec_fixpoint.v`, `trspec_model.v`, `guarantee_rec.v`). |
 
 ## Notes
 

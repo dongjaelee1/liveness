@@ -267,15 +267,15 @@ Section proof.
 
   (** ** Temporal guarantees *)
   (** A task queue guarantees what its queue does: the tasks ([is_task]) are Hoare triples
-      with ghost resources, guaranteeing [itrProp_true]. That every task runs is expressed by
+      with ghost resources, guaranteeing [trSpec_true]. That every task runs is expressed by
       obligations. *)
-  Definition task_queue_itrProp (ql : val) : itrProp heap_lang Σ := queue_itrProp ql.
+  Definition task_queue_trSpec (ql : val) : trSpec heap_lang Σ := queue_trSpec ql.
 
-  Lemma guar_is_task_queue ql γ ℓ : ⊢ is_task_queue ql γ ℓ ⊨ₜ task_queue_itrProp ql.
-  Proof. rewrite /is_task_queue /task_queue_itrProp. apply (into_guar _ _). Qed.
+  Lemma guar_is_task_queue ql γ ℓ : ⊢ is_task_queue ql γ ℓ ⊨ₜ task_queue_trSpec ql.
+  Proof. rewrite /is_task_queue /task_queue_trSpec. apply (into_guar _ _). Qed.
 
   Global Instance into_guar_is_task_queue ql γ ℓ :
-    IntoGuar (is_task_queue ql γ ℓ) (task_queue_itrProp ql) | 0.
+    IntoGuar (is_task_queue ql γ ℓ) (task_queue_trSpec ql) | 0.
   Proof. apply guar_is_task_queue. Qed.
 
 End proof.
@@ -285,7 +285,7 @@ Section trace.
 
   (** Every [put_task] or [run_task] that takes the queue's lock eventually releases it. *)
   Lemma task_queue_release_progress {Σ} ql τ :
-    itrProp_external (task_queue_itrProp (Σ:=Σ) ql) τ →
+    trSpec_external (task_queue_trSpec (Σ:=Σ) ql) τ →
     ∃ lhptr ltptr next curr : loc,
       ql = (#lhptr, #ltptr, (#next, #curr))%V ∧ release_progress next curr τ.
   Proof. apply queue_release_progress. Qed.

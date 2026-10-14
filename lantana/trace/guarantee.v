@@ -1,14 +1,14 @@
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From iris.prelude Require Import options.
-From lantana.trace Require Export itrprop_model fair_scheduling.
+From lantana.trace Require Export trspec_model fair_scheduling.
 From transfinite.stepindex Require Import ordinals.
 
 (** * Temporal guarantees [P ⊨ₜ G]: records, certificates and the one-step property
 
     Temporal formulas are ordinary iProps; [P ⊨ₜ G] is a persistent iProp saying that whenever
     [P] holds, the rest of the execution satisfies the trace property [G]. Adequacy concludes
-    [itrProp_external G].
+    [trSpec_external G].
 
     At position [n], [P ⊨ₜ G] turns [P] into a record [record G n], which gives the reading of
     [G] at [n] once the step from [n] is made. A record may be written in the pre-step update
@@ -17,7 +17,7 @@ From transfinite.stepindex Require Import ordinals.
     its content certified at every position. A record holds for any running system with the
     one-step property [sys_step]; [lWP] is one (adequacy_temporal.v).
 
-    An existential is trace-visible ([itrProp_exist]) only over small types (nat, Z, loc, gname,
+    An existential is trace-visible ([trSpec_exist]) only over small types (nat, Z, loc, gname,
     ...), otherwise ghost ([guar_exist_ghost]). The trace property of the adequacy is
     fixed at the meta level: dynamic names reach it through trace-visible existentials.
 
@@ -27,7 +27,7 @@ From transfinite.stepindex Require Import ordinals.
 
 Section guarantee.
   Context `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ}.
-  Implicit Types G : itrProp Λ Σ.
+  Implicit Types G : trSpec Λ Σ.
   Implicit Types P Q : iProp Σ.
 
   (** The history [h] is the one of the trace [τf]. *)
@@ -133,7 +133,7 @@ Section guarantee.
   Proof. iIntros "Heq H". iApply (internal_eq_rewrite f g (λ f, record_trI f n) with "Heq H"). Qed.
 
   (** Records of a trace property, the bundle, the certificates and the step property. *)
-  Definition record G n : iProp Σ := record_trI (itrProp_internal G) n.
+  Definition record G n : iProp Σ := record_trI (trSpec_internal G) n.
   Definition bundle l n : iProp Σ := bundle_pre record_trI l n.
   Definition cert n e : iProp Σ := cert_pre record_trI n e.
   Definition sys_step (Sys : sysT) : iProp Σ := sys_step_pre record_trI Sys.
@@ -182,7 +182,7 @@ Section guarantee.
       ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_measure γ) Ω W ∧ hist_trace h τf⌝ -∗
       bundle l n -∗
       history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
-      itrProp_internal G (n, τf)) ⊢ record G n.
+      trSpec_internal G (n, τf)) ⊢ record G n.
   Proof. apply record_trI_intro. Qed.
 
   Lemma record_elim G (Sys : sysT) l h n g v Ω W τf γ σ Θ κs :
@@ -191,7 +191,7 @@ Section guarantee.
     ⌜behavior (n, τf) ∧ beh_fscnt (S n, τf) γ ∧ owit_inv_lb (fair_measure γ) Ω W ∧ hist_trace h τf⌝ -∗
     bundle l n -∗
     history_interp h (S n) σ Θ κs ∗ model_interp g v Ω W (S n) (dom Θ) ∗ Sys (S n) σ Θ κs -∗
-    itrProp_internal G (n, τf).
+    trSpec_internal G (n, τf).
   Proof. apply record_trI_elim. Qed.
 
   Lemma guar_elim P G h n σ Θ κs m i Ω W :
@@ -219,7 +219,7 @@ Section guarantee.
   Global Instance guar_proper_ne n : Proper (dist n ==> (=) ==> dist n) guar.
   Proof. intros P P' HP G ? <-. by apply guar_ne. Qed.
 
-  Lemma record_mono G G' n : itrProp_le G G' → record G n ⊢ record G' n.
+  Lemma record_mono G G' n : trSpec_le G G' → record G n ⊢ record G' n.
   Proof.
     iIntros (Hle) "#HG". iApply record_intro. iIntros "!>" (????????????) "#ST %H #B W".
     iApply Hle. by iApply (record_elim with "HG ST [//] B W").
@@ -227,13 +227,13 @@ Section guarantee.
 
 End guarantee.
 
-Notation "P ⊨ₜ G" := (guar P%I G%ITR) (at level 70, format "P  ⊨ₜ  G") : bi_scope.
+Notation "P ⊨ₜ G" := (guar P%I G%SPEC) (at level 70, format "P  ⊨ₜ  G") : bi_scope.
 
 (** The canonical trace property of an iProp: the meet of all trace properties that it
     validly guarantees. The registered structures store it for their contents, so temporal
     formulas carry no trace-property annotations. *)
-Definition itrProp_canon `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (Q : iProp Σ) : itrProp Λ Σ :=
-  itrProp_forall (λ G : {G : itrProp Λ Σ | ⊢ Q ⊨ₜ G}, proj1_sig G).
-(* Opaque for the proof mode: unification must not compare two [itrProp_canon] through their
+Definition trSpec_canon `{!temporalGS Λ Σ} `{!state_interp_class Λ Σ} (Q : iProp Σ) : trSpec Λ Σ :=
+  trSpec_forall (λ G : {G : trSpec Λ Σ | ⊢ Q ⊨ₜ G}, proj1_sig G).
+(* Opaque for the proof mode: unification must not compare two [trSpec_canon] through their
    bodies (the index type is a proposition about the argument). *)
-Global Typeclasses Opaque itrProp_canon.
+Global Typeclasses Opaque trSpec_canon.

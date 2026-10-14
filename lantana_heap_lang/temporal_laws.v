@@ -7,10 +7,10 @@ From iris.prelude Require Import options.
     points-to facts and thread expressions determine them ([StateFact]), and so guarantee
     them ([IntoGuar] by [into_guar_state_fact]). *)
 
-Notation "l ↦ dq v" := (itrProp_state (pointsto_sat l dq v))
-  (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : itrProp_scope.
-Notation "'exits' v @ i" := (itrProp_state (thread_expr_sat i [] (of_val v)))
-  (at level 20, v, i at level 1, format "exits  v @ i") : itrProp_scope.
+Notation "l ↦ dq v" := (trSpec_state (pointsto_sat l dq v))
+  (at level 20, dq custom dfrac at level 1, format "l  ↦ dq  v") : trSpec_scope.
+Notation "'exits' v @ i" := (trSpec_state (thread_expr_sat i [] (of_val v)))
+  (at level 20, v, i at level 1, format "exits  v @ i") : trSpec_scope.
 
 (** The state predicate of a freed location, and its trace atom. *)
 Definition freed_sat (l : loc) : state → thread_pool heap_lang → Prop := λ σ _, heap σ !! l = Some None.
@@ -27,11 +27,11 @@ Section laws.
   (* TODO: [StateFact] instances for the invariant heap ([l ↦_I v]). *)
 
   (** A freed location stays freed. *)
-  Definition freed_itrProp (l : loc) : itrProp heap_lang Σ := itrProp_state (freed_sat l).
+  Definition freed_trSpec (l : loc) : trSpec heap_lang Σ := trSpec_state (freed_sat l).
   Global Instance freed_state_fact l q : StateFact (freed l q) (freed_sat l).
   Proof. intros σ Θ κs. iIntros "[(H& _) F]". iApply (gen_heap_valid with "H F"). Qed.
 
-  Lemma guar_freed (l : loc) q : ⊢ freed l q ⊨ₜ freed_itrProp l.
+  Lemma guar_freed (l : loc) q : ⊢ freed l q ⊨ₜ freed_trSpec l.
   Proof. apply guar_state_fact, _. Qed.
 
   (** The guarantee of an atom is inferred from its state fact. *)
@@ -59,7 +59,7 @@ Section laws.
       split on the value of [l] implies "[l ↦ v0] now → [G0]", by the rules. *)
   Lemma ex_impl_pointsto l v0 v1 (P0 P1 : iProp Σ) G0 `{!IntoGuar P0 G0} :
     v0 ≠ v1 →
-    tr_canon ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊆ ((l ↦ v0) → itrProp_external G0)%R.
+    tr_canon ((l ↦ v0 ∗ P0) ∨ (l ↦ v1 ∗ P1)) ⊆ ((l ↦ v0) → trSpec_external G0)%R.
   Proof.
     intros Hv. etrans; first apply (into_trace _ _).
     apply tr_or_elim; apply tr_impl_intro.

@@ -231,20 +231,20 @@ Section adequacy.
               (thP_kids i {[kl; kc]} ∗ oblP_kids kl ∅ ∗ oblP_kids kc ∅ ∗ ⌜kl ≠ kc⌝ ∗
                ([∗ set] g ∈ {[kl; kc]}, oblP_fuel g 2 μ)))%I.
 
-  Let G_main {Σ} : itrProp heap_lang Σ :=
-        (itrProp_finally (exits #1@i) ∧
-         itrProp_finally (itrProp_exist (λ x : loc, flag_itrProp x) ∧
-                      itrProp_exist (λ b : loc, itrProp_always (handoff_inv_itrProp b))) ∧ itrProp_true)%ITR.
+  Let G_main {Σ} : trSpec heap_lang Σ :=
+        (trSpec_finally (exits #1@i) ∧
+         trSpec_finally (trSpec_exist (λ x : loc, flag_trSpec x) ∧
+                      trSpec_exist (λ b : loc, trSpec_always (handoff_inv_trSpec b))) ∧ trSpec_true)%SPEC.
 
   Lemma guar_Φ_P `{!heapGS Σ} `{!handoffG Σ} m : ⊢ Φ_P m ⊨ₜ G_main.
   Proof. apply (into_guar _ _). Qed.
 
-  Remark G_main_impl {Σ} τ : itrProp_external (G_main (Σ:=Σ)) τ → R_main τ ∧ R_handoff τ.
+  Remark G_main_impl {Σ} τ : trSpec_external (G_main (Σ:=Σ)) τ → R_main τ ∧ R_handoff τ.
   Proof.
     intros (Hr& Hf& _). destruct τ as [n τf]. destruct Hf as (m& Hm& [[x Hx] [b Hh]]& Hb).
     split; [split; first exact Hr|].
-    - exists m. split_and!; [done| |done]. exists x. exact (flag_itrProp_impl x (m, τf) Hx).
-    - exists m. split_and!; [done| |done]. exists b. exact (handoff_inv_itrProp_ext b (m, τf) Hh).
+    - exists m. split_and!; [done| |done]. exists x. exact (flag_trSpec_impl x (m, τf) Hx).
+    - exists m. split_and!; [done| |done]. exists b. exact (handoff_inv_trSpec_ext b (m, τf) Hh).
   Qed.
 
   Let Σ : gFunctors :=

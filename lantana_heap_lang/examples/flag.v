@@ -46,22 +46,22 @@ Section proof.
   Definition flag_tk (l : loc) k : iProp Σ :=
     untilI Np k (1/2) (l ↦ #0) (l ↦ #1).
 
-  Definition flag_itrProp (l : loc) : itrProp heap_lang Σ :=
-    (itrProp_true ∧ itrProp_always (itrProp_until (l ↦ #0) (l ↦ #1) ∨ (itrProp_true ∧ l ↦ #1)))%ITR.
+  Definition flag_trSpec (l : loc) : trSpec heap_lang Σ :=
+    (trSpec_true ∧ trSpec_always (trSpec_until (l ↦ #0) (l ↦ #1) ∨ (trSpec_true ∧ l ↦ #1)))%SPEC.
 
-  Lemma guar_is_flag l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_itrProp l.
+  Lemma guar_is_flag l k ℓ : ⊢ is_flag l k ℓ ⊨ₜ flag_trSpec l.
   Proof. apply (into_guar _ _). Qed.
 
-  Lemma guar_flag_tk l k : ⊢ flag_tk l k ⊨ₜ itrProp_until (l ↦ #0) (l ↦ #1).
+  Lemma guar_flag_tk l k : ⊢ flag_tk l k ⊨ₜ trSpec_until (l ↦ #0) (l ↦ #1).
   Proof. apply (into_guar _ _). Qed.
 
   (** Whenever the flag holds 0, it eventually holds 1: from the flag's guarantee on traces
       (the until gives the finally; in the other branch the cell holds 1, not 0). *)
   Definition flag_response (l : loc) : trProp heap_lang := (□ ((l ↦ #0) → ◇ (l ↦ #1)))%R.
 
-  Lemma flag_response_ext l : itrProp_external (flag_itrProp l) ⊆ flag_response l.
+  Lemma flag_response_ext l : trSpec_external (flag_trSpec l) ⊆ flag_response l.
   Proof.
-    rewrite /flag_itrProp. etrans; first apply (itrProp_ext_of _ _).
+    rewrite /flag_trSpec. etrans; first apply (trSpec_ext_of _ _).
     etrans; first apply tr_and_elim_r. apply tr_always_mono, tr_or_elim; apply tr_impl_intro.
     - etrans; [apply tr_and_elim_l|apply tr_until_finally].
     - etrans; [apply tr_and_mono; [apply tr_and_elim_r|reflexivity]|].
@@ -69,7 +69,7 @@ Section proof.
   Qed.
 
   Lemma is_flag_response l k ℓ :
-    ⊢ is_flag l k ℓ ⊨ₜ itrProp_cast (flag_itrProp l) (flag_response l) (flag_response_ext l).
+    ⊢ is_flag l k ℓ ⊨ₜ trSpec_cast (flag_trSpec l) (flag_response l) (flag_response_ext l).
   Proof. iApply guar_cast. iApply guar_is_flag. Qed.
 
   (** The main proofs. *)
@@ -300,9 +300,9 @@ Section trace.
   (** The flag at the level of traces: [0] until [1], and [1] from then on. *)
   Definition is_flag_tr (l : loc) : trProp heap_lang :=
     tr_always (tr_until (l ↦ #0) (l ↦ #1) ∨ (l ↦ #1))%R.
-  Lemma flag_itrProp_impl {Σ : gFunctors} l : itrProp_external (flag_itrProp (Σ:=Σ) l) ⊆ is_flag_tr l.
+  Lemma flag_trSpec_impl {Σ : gFunctors} l : trSpec_external (flag_trSpec (Σ:=Σ) l) ⊆ is_flag_tr l.
   Proof.
-    rewrite /flag_itrProp. etrans; first apply (itrProp_ext_of _ _).
+    rewrite /flag_trSpec. etrans; first apply (trSpec_ext_of _ _).
     etrans; first apply tr_and_elim_r. apply tr_always_mono, tr_or_mono; [reflexivity|apply tr_and_elim_r].
   Qed.
 
@@ -320,10 +320,10 @@ Section trace.
     split; [by intros [= ->]|by intros ->].
   Qed.
 
-  Lemma flag_run_satisfies_guarantee {Σ : gFunctors} l : itrProp_external (flag_itrProp (Σ:=Σ) l) (0, flag_run l).
+  Lemma flag_run_satisfies_guarantee {Σ : gFunctors} l : trSpec_external (flag_trSpec (Σ:=Σ) l) (0, flag_run l).
   Proof.
-    split; first done. intros m _. cbn [itrProp_external itrProp_or itrProp_and itrProp_until itrProp_state itrProp_pure].
-    rewrite /itrProp_true. cbn [itrProp_external itrProp_pure]. unfold tr_or, tr_and, tr_pure, tr_until. cbv beta iota.
+    split; first done. intros m _. cbn [trSpec_external trSpec_or trSpec_and trSpec_until trSpec_state trSpec_pure].
+    rewrite /trSpec_true. cbn [trSpec_external trSpec_pure]. unfold tr_or, tr_and, tr_pure, tr_until. cbv beta iota.
     destruct (decide (m = 0 ∨ m = 2)) as [Hm|Hm].
     - left. exists (S m). split_and!; [lia| |].
       + apply flag_run_at. rewrite decide_False; [done|lia].

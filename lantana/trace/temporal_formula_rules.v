@@ -76,7 +76,7 @@ Section always_rules.
     iPoseProof (guar_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
     iPoseProof (history_interp_hist_event_now with "HI") as "#HE".
     iFrame "MI". iMod "close" as "_". iMod ("Hclose" with "HP") as "_".
-    iMod (saved_trI_alloc (itrProp_internal G)) as (γ) "#Hγ".
+    iMod (saved_trI_alloc (trSpec_internal G)) as (γ) "#Hγ".
     iMod (reg_register reg_entry_interp (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, G. iFrame "Hγ Hinv HG". }
     iModIntro. iFrame "HI TI". rewrite alwaysI_guar_unfold. iExists j, n, γ, _. iFrame "Hj HE Hγ Hinv HG C".
@@ -99,7 +99,7 @@ Section always_rules.
     iPoseProof (guar_elim_later_guar P G with "HG [$HP $HI $MI]") as "#C".
     iPoseProof (history_interp_hist_event_now with "HI") as "#HE".
     iFrame "MI".
-    iMod (saved_trI_alloc (itrProp_internal G)) as (γ) "#Hγ".
+    iMod (saved_trI_alloc (trSpec_internal G)) as (γ) "#Hγ".
     iMod (inv_alloc N _ P with "HP") as "#Hinv".
     iMod (reg_register reg_entry_interp (RAlways N γ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, G. iFrame "Hγ Hinv HG". }
@@ -113,7 +113,7 @@ Section always_rules.
     iNext. iApply guar_canon.
   Qed.
 
-  Lemma guar_alwaysI_guar N P G : ⊢ alwaysI_guar N P G ⊨ₜ itrProp_always G.
+  Lemma guar_alwaysI_guar N P G : ⊢ alwaysI_guar N P G ⊨ₜ trSpec_always G.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& #A)". rewrite alwaysI_guar_unfold.
     iDestruct "A" as (j r γ st) "(#Hj& #HE& #Hγ& #Hinv& #HG& #AC)".
@@ -134,10 +134,10 @@ Section always_rules.
       split_and!; [lia|by apply behavior_S|exact FS|done|done].
   Qed.
 
-  Lemma guar_alwaysI_as N P V : ⊢ alwaysI_as N P V ⊨ₜ itrProp_always (itrProp_canon V).
+  Lemma guar_alwaysI_as N P V : ⊢ alwaysI_as N P V ⊨ₜ trSpec_always (trSpec_canon V).
   Proof. apply guar_alwaysI_guar. Qed.
 
-  Lemma guar_alwaysI N P : ⊢ alwaysI N P ⊨ₜ itrProp_always (itrProp_canon P).
+  Lemma guar_alwaysI N P : ⊢ alwaysI N P ⊨ₜ trSpec_always (trSpec_canon P).
   Proof. apply guar_alwaysI_as. Qed.
 
   (** *** The until loop
@@ -199,8 +199,8 @@ Section until_rules.
     iPoseProof (history_interp_hist_event_now with "HI") as "#HE".
     iFrame "MHI S MI".
     iMod (oblP_inv_alloc_assigned E N k P (until_discharged k G2) with "Oa' HC") as "#OI".
-    iMod (saved_trI_alloc (itrProp_internal G1)) as (γP) "#HγP".
-    iMod (saved_trI_alloc (itrProp_internal G2)) as (γQ) "#HγQ".
+    iMod (saved_trI_alloc (trSpec_internal G1)) as (γP) "#HγP".
+    iMod (saved_trI_alloc (trSpec_internal G2)) as (γQ) "#HγQ".
     iMod (reg_register reg_entry_interp (RUntil N k γP γQ) with "TI [] HI") as "(HI& TI& (%j& #Hj))".
     { iIntros (st) "_". simpl. iExists P, G1, G2. iFrame "HγP HγQ OI HG1". }
     iModIntro. iFrame "HI TI". rewrite untilI_guar_unfold /untilI_guar_pers. iSplitL "Oa".
@@ -285,23 +285,23 @@ Section until_rules.
   (** A done until guarantees the until of any left reading, from its right formula: no
       run is needed. *)
 
-  Lemma guar_untilI_done_guar k Q G1 G2 : ⊢ untilI_done_guar k Q G2 ⊨ₜ itrProp_until G1 G2.
+  Lemma guar_untilI_done_guar k Q G1 G2 : ⊢ untilI_done_guar k Q G2 ⊨ₜ trSpec_until G1 G2.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_done_guar_unfold.
     iDestruct "U" as "(HQ& _& #HG2)".
     iApply (guar_elim Q with "[] [$HI $MI $HQ]"). by iApply guar_until_now.
   Qed.
 
-  Lemma guar_untilI_done k Q G1 : ⊢ untilI_done k Q ⊨ₜ itrProp_until G1 (itrProp_canon Q).
+  Lemma guar_untilI_done k Q G1 : ⊢ untilI_done k Q ⊨ₜ trSpec_until G1 (trSpec_canon Q).
   Proof. apply guar_untilI_done_guar. Qed.
 
-  Lemma guar_untilI_done_finally k Q : ⊢ untilI_done k Q ⊨ₜ itrProp_finally (itrProp_canon Q).
+  Lemma guar_untilI_done_finally k Q : ⊢ untilI_done k Q ⊨ₜ trSpec_finally (trSpec_canon Q).
   Proof. apply guar_untilI_done. Qed.
 
-  Lemma guar_untilI_done_valid k Q G1 G2 : (⊢ Q ⊨ₜ G2) → ⊢ untilI_done k Q ⊨ₜ itrProp_until G1 G2.
+  Lemma guar_untilI_done_valid k Q G1 G2 : (⊢ Q ⊨ₜ G2) → ⊢ untilI_done k Q ⊨ₜ trSpec_until G1 G2.
   Proof.
-    intros HG2. iApply (guar_weaken _ (itrProp_until G1 (itrProp_canon Q))).
-    { apply itrProp_until_mono; [apply itrProp_le_refl|by apply itrProp_canon_le]. }
+    intros HG2. iApply (guar_weaken _ (trSpec_until G1 (trSpec_canon Q))).
+    { apply trSpec_until_mono; [apply trSpec_le_refl|by apply trSpec_canon_le]. }
     iApply guar_untilI_done.
   Qed.
 
@@ -433,7 +433,7 @@ Section until_rules.
     assert (({[k]} ∪ K) ∖ {[k]} = K) as -> by set_solver. done.
   Qed.
 
-  Lemma guar_untilI_guar N k q P Q G1 G2 : ⊢ untilI_guar N k q P Q G1 G2 ⊨ₜ itrProp_until G1 G2.
+  Lemma guar_untilI_guar N k q P Q G1 G2 : ⊢ untilI_guar N k q P Q G1 G2 ⊨ₜ trSpec_until G1 G2.
   Proof.
     iIntros "!>" (h n σ Θ κs m i Ω W) "(HI& MI& U)". rewrite untilI_guar_unfold /untilI_guar_pers.
     iDestruct "U" as "[Oa #U]".
@@ -509,26 +509,26 @@ Section until_rules.
       iModIntro. iLeft. iApply (record_elim with "TQ' ST [%] B Sys"). split_and!; done.
   Qed.
 
-  Lemma guar_untilI N k q P Q : ⊢ untilI N k q P Q ⊨ₜ itrProp_until (itrProp_canon P) (itrProp_canon Q).
+  Lemma guar_untilI N k q P Q : ⊢ untilI N k q P Q ⊨ₜ trSpec_until (trSpec_canon P) (trSpec_canon Q).
   Proof. rewrite untilI_guar_canonical. apply guar_untilI_guar. Qed.
 
   (** With valid guarantees of the contents. *)
 
-  Lemma guar_alwaysI_as_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_as N P V ⊨ₜ itrProp_always G.
+  Lemma guar_alwaysI_as_valid N P V G : (⊢ V ⊨ₜ G) → ⊢ alwaysI_as N P V ⊨ₜ trSpec_always G.
   Proof.
-    intros HG. iApply (guar_weaken _ (itrProp_always (itrProp_canon V))).
-    { apply itrProp_always_mono. by apply itrProp_canon_le. }
+    intros HG. iApply (guar_weaken _ (trSpec_always (trSpec_canon V))).
+    { apply trSpec_always_mono. by apply trSpec_canon_le. }
     iApply guar_alwaysI_as.
   Qed.
 
-  Lemma guar_alwaysI_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ itrProp_always G.
+  Lemma guar_alwaysI_valid N P G : (⊢ P ⊨ₜ G) → ⊢ alwaysI N P ⊨ₜ trSpec_always G.
   Proof. apply guar_alwaysI_as_valid. Qed.
 
   Lemma guar_untilI_valid N k q P Q G1 G2 :
-    (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k q P Q ⊨ₜ itrProp_until G1 G2.
+    (⊢ P ⊨ₜ G1) → (⊢ Q ⊨ₜ G2) → ⊢ untilI N k q P Q ⊨ₜ trSpec_until G1 G2.
   Proof.
-    intros HG1 HG2. iApply (guar_weaken _ (itrProp_until (itrProp_canon P) (itrProp_canon Q))).
-    { apply itrProp_until_mono; by apply itrProp_canon_le. }
+    intros HG1 HG2. iApply (guar_weaken _ (trSpec_until (trSpec_canon P) (trSpec_canon Q))).
+    { apply trSpec_until_mono; by apply trSpec_canon_le. }
     iApply guar_untilI.
   Qed.
 
