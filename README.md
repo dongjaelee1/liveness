@@ -88,8 +88,9 @@ twelve client theorems and `no_lc_absurd` assume these seven axioms of Rocq's st
 - `ClassicalUniqueChoice.dependent_unique_choice`
 - `RelationalChoice.relational_choice`
 
-The rules of `triple.v` and the case-study specifications assume the first five. An admitted proof
-would appear in this output.
+The rules of `triple.v` and the case-study specifications assume the first five, and the three
+lemmas of `lantana/program_logic/equivalences.v` (§3.3) assume none. An admitted proof would
+appear in this output.
 
 `grep -rnwE 'admit|Admitted' lantana lantana_heap_lang` finds only the word "admit" in a comment
 (`lantana/base_logic/later_credits.v`). On `ordinal/`, the copy of the Ordinal library, it finds
@@ -146,9 +147,13 @@ logical temporal formulas, `tp`/`tr_` trace properties.
 
 Notes:
 - `N` is an invariant namespace, which the paper omits.
-- In `measure`, `▽` is `ms_extend`, and `+`, `×`, `μ1^μ2` are `⊕`, `×`, `↑`. There is no `ω`:
-  `ms_embed` embeds any well-founded relation (`ms_nat n` is `n`), and `ms_large` is a large
-  ordinal `ℵ`.
+- In `measure`, `▽` is `ms_extend`, and `+`, `×`, `μ1^μ2` are `⊕`, `×`, `↑`. There is no `ω`
+  constructor: `ms_embed` embeds any well-founded relation (`ms_nat n` is `n`), and `ms_large`,
+  written `ℵ`, is `Ord.large`, the least ordinal above the ordinals of all well-founded relations
+  on small types. So `ℵ` is not ℵ₀: ω < ℵ (`omega_lt_large` in `program_logic/equivalences.v`),
+  and `ℵ` is above every embedded measure (`measure_rep_large_lt`). It has the role of the
+  paper's ω, a budget above every natural number: `task_queue_client.v` takes `ℵ` transfer
+  credits before `ChooseNat` returns `n`, and then lowers them to `n` (`oblP_fuel_mon`).
 - Layers are ordinals of the copy of the Ordinal library in `ordinal/`. Measures are interpreted
   at internal layers `ord.t × nat`, where the paper's `ℓ` is `(ℓ, 0)`.
 
@@ -178,6 +183,11 @@ Notes:
 - The Rocq rules state the later credits and masks that the paper elides; for example, UNTIL-ACC
   takes `£ 1` and UNTIL-DISCHARGE `£ 2`. `fuels_mono` is an update. In WIT-IND, the induction
   hypothesis's `⇛` is `={E}=∗`, used once.
+- ALWAYS-ALLOC and ALWAYS-ACC take a logical formula `I : tf` and use its interpretation
+  `⟦I⟧ₗ`, since adequacy reads the syntax of `always I`. They cover the paper's rules for an
+  arbitrary assertion `P : iProp`: `tf_ghost` (notation `⟨P⟩`) embeds `P` with `⟦⟨P⟩⟧ₗ = P`
+  (`tf_ghost_logic`), and `⟦alwaysP N I⟧ₗ = inv N ⟦I⟧ₗ` (`tf_always_logic`). The same holds for
+  the formulas of the until rules.
 - More general versions: `fbtriple_step_pure_wit` (a set of obligations), `fbtriple_fork` (moves a
   set of obligations to the child), `fbtriple_pure_step` (a pure step to any expression, such as a
   β-step), and `fbtriple_gen_bind`, `fbtriple_gen_frame` for the general form.
@@ -205,8 +215,34 @@ Notes:
 | Iris-style safety | `lwp_adequacy_safety_iris` | `program_logic/adequacy_iris.v` |
 
 Notes:
-- `lwp_adequacy` is Theorem 1 in general form: it starts a thread pool `Θ`, grants initial later
-  credits `£ c`, and its weakest preconditions are `NotStuck`.
+- `lwp_adequacy` is Theorem 1 in general form. Its premise differs from the paper's in these
+  ways:
+  - It starts a thread pool `Θ` with postconditions `Ψs`, where the paper has one thread;
+    `lift_term i Ψ` is the paper's postcondition `ψ v ∗ ■ i`.
+  - It grants initial later credits `£ c`, and its weakest preconditions are `NotStuck`.
+  - It asks for `state_interp_aux σ Θ κs` next to the state interpretation (the paper's `S`).
+    This is a field of `state_interp_class` for state resources beyond `state_interp`, and the
+    user of the theorem chooses the class (`∃ Hsic`). HeapLang's is `True`
+    (`lantana_heap_lang/primitive_laws.v`), so the clients discharge it trivially, and their
+    end-to-end theorems (e.g. `main_adequacy`) have no Iris premises left.
+  - It asks for `lwpupd i ⊤ e (lWP e …)` where the paper has `lwp`. `lwpupd i E e P`
+    (`weakestpre.v`) is the model update `|={E}=>m` for thread `i`, which may also use, and must
+    restore, the history and state interpretations. Since `lwpupd_intro : P ⊢ lwpupd i E e P`
+    and `sfmupd_lwpupd : (|={E}=>m P) ⊢ lwpupd i E e P`, this premise asks for less than the
+    paper's, so the theorem is stronger.
+  - Trace states carry Iris's observations `κs`, which the paper omits (HeapLang has none).
+- `thread_done_intro` has the shape of `thread_step_atomic`, and its side conditions leave the
+  configuration unchanged, as THREAD-DONE says: `thread_done_iff`
+  (`program_logic/equivalences.v`) proves
+  `thread_done i ρ1 κ ρ2 ↔ ∃ v, ρ1.1 !! i = Some (of_val v) ∧ κ = [] ∧ ρ2 = ρ1`.
+- `behavior` is coinductive, where the paper's `Behavior` quantifies over the later positions of
+  the trace: `behavior_iff` (same file) proves
+  `behavior (n, ζ) ↔ ∀ m, n ≤ m → trans (ζ m) (ζ (S m))`, where `trans` is one transition by
+  THREAD-STEP, THREAD-DONE or THREAD-STUCK.
+- `tf` has the constructors of `tp` (the temporal properties of Fig. 6) and three more: `tf_emp`,
+  `tf_sep` (`∗`) and `tf_ghost` (`⟨p⟩`). `tf_always` also takes a namespace, and `tf_until` a
+  namespace, the obligation, its fraction, and a flag that records whether the right-hand side
+  holds.
 - In THREAD-STUCK, a stuck scheduled thread stutters, so stuck executions are behaviors too.
 - `lwp_adequacy_safety_iris` holds for the same fair behaviors: the scheduled thread is never
   stuck, and whenever a thread is a value, its postcondition holds.

@@ -5,7 +5,7 @@
     [FunctionalExtensionality.functional_extensionality_dep],
     [ProofIrrelevance.proof_irrelevance], [PropExtensionality.propositional_extensionality],
     [ClassicalUniqueChoice.dependent_unique_choice] and [RelationalChoice.relational_choice]. *)
-From lantana.program_logic Require adequacy adequacy_iris.
+From lantana.program_logic Require adequacy adequacy_iris equivalences.
 From lantana.heap_lang Require triple.
 From lantana.heap_lang.examples Require flag nondet handoff ticket_lock queue task_queue.
 From lantana.heap_lang.examples Require flag_fork handoff_client task_queue_client flag_client.
@@ -31,6 +31,11 @@ Print Assumptions flag_client.flag_client_liveness_safety.
 
 (** * The paradox: a fuel-free pure-step rule is unsound *)
 Print Assumptions paradox.no_lc_absurd.
+
+(** * The correspondences with the paper's presentation ([equivalences.v]): no axioms *)
+Print Assumptions equivalences.omega_lt_large.
+Print Assumptions equivalences.thread_done_iff.
+Print Assumptions equivalences.behavior_iff.
 
 (** * The rules of the fuel-burning triple ([triple.v]), all at once *)
 Definition triple_rules :=
