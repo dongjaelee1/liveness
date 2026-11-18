@@ -4,8 +4,7 @@ The Rocq development of *Decoupling Liveness Obligations from Threads in the Lan
 Separation Logic* (POPL 2027). It mechanizes Lantana on top of Transfinite Iris: the logic and its
 fuel-burning triple, the adequacy theorem, and the case studies.
 
-Rule names and notation follow the revised paper. Section and figure numbers refer to the
-submitted version.
+Rule names, notation, and section and figure numbers follow the final version of the paper.
 
 1. [Claims](#1-claims)
 2. [Getting started](#2-getting-started)
@@ -19,8 +18,8 @@ submitted version.
 | 1. The logic: Lantana's predicates and the fuel-burning triple, with every rule the paper displays proved as a lemma | §1–§5, Figs. 1, 3–5 | `lantana/`, `lantana_heap_lang/triple.v` |
 | 2. Adequacy: `lwp_adequacy` (Theorem 1), and Iris-style safety `lwp_adequacy_safety_iris` | §6 | `lantana/program_logic/adequacy.v`, `adequacy_iris.v` |
 | 3. The case studies, with end-to-end theorems for the client programs | §2, §4.3, §5, §7 | `lantana_heap_lang/examples/` |
-| 4. A pure-step rule that burns no fuel is unsound: `no_lc_absurd` | end of §6.2 | `lantana_heap_lang/examples/paradox.v` |
-| 5. Nothing is admitted, and the results assume only seven standard axioms, among them Hilbert's epsilon | §6.2 | `lantana_heap_lang/examples/assumptions.v` |
+| 4. A pure-step rule that burns no fuel is unsound: `no_lc_absurd` | end of §6.3 | `lantana_heap_lang/examples/paradox.v` |
+| 5. Nothing is admitted, and the results assume only seven standard axioms, among them Hilbert's epsilon | §6.3, Data Availability Statement | `lantana_heap_lang/examples/assumptions.v` |
 
 Building the development (§3.1) checks claims 1–4, and §3.3 gives the Rocq name of each item of
 the paper. §3.2 checks claim 5.
@@ -136,7 +135,7 @@ logical temporal formulas, `tp`/`tr_` trace properties.
 | `obls^ℓ_g K` | `crP_obls g ℓ K` | `base_logic/opreds.v` |
 | `obl_■ k` | `oblP_discharged k` | `base_logic/opreds.v` |
 | `tr$^ℓ_k m` | `oblP_fuel k ℓ m` | `base_logic/opreds.v` |
-| `wit^ℓ k`, `wit€ k` | `witP_layer k ℓ`, `witP_cred k a` | `base_logic/opreds.v` |
+| `wit^ℓ k`, `wit$ k` | `witP_layer k ℓ`, `witP_cred k a` | `base_logic/opreds.v` |
 | `■ i` | `thP_done i` | `base_logic/opreds.v` |
 | `Φ until^k_q Ψ` | `untilP N k q Φ Ψ` | `program_logic/temporal_logic.v` |
 | `finally^k Φ` | `finallyP N k q Φ` | `program_logic/temporal_logic.v` |
@@ -155,7 +154,10 @@ Notes:
   paper's ω, a budget above every natural number: `task_queue_client.v` takes `ℵ` transfer
   credits before `ChooseNat` returns `n`, and then lowers them to `n` (`oblP_fuel_mon`).
 - Layers are ordinals of the copy of the Ordinal library in `ordinal/`. Measures are interpreted
-  at internal layers `ord.t × nat`, where the paper's `ℓ` is `(ℓ, 0)`.
+  at internal layers `ord.t × nat`: for the paper's layer `ℓ`, carrier fuel is at `(ℓ, 0)`, and
+  transfer credits and witness bounds are at `(ℓ, 1)`.
+- Carriers, obligations and thread identifiers are `positive`, where the paper has natural
+  numbers.
 
 #### Rules (§2, Figs. 3–5, §5)
 
@@ -163,10 +165,10 @@ All in `lantana_heap_lang/triple.v`.
 
 | Paper rule | Rocq |
 |---|---|
-| STEP-PURE, STEP-PURE-LC, STEP-PURE-WIT | `fbtriple_step_pure`, `fbtriple_step_pure_lc`, `fbtriple_step_pure_wit1` |
+| STEP-PURE, STEP-PURE-LC, STEP-PURE-WIT | `fbtriple_pure_step_nolc`, `fbtriple_pure_step`, `fbtriple_pure_step_wit1` |
 | STEP-REF, STEP-STORE, STEP-LOAD | `fbtriple_step_ref`, `fbtriple_step_store`, `fbtriple_step_load` |
 | FORK\* | `fbtriple_fork1` |
-| EXIT | `fbtriple_exit`, and `fbtriple_top_lwp` for Theorem 1 |
+| VALUE | `fbtriple_value`; at the empty carrier set, `fbtriple_exit`, and `fbtriple_top_lwp` for Theorem 1 |
 | FINALLY-EXIT\*, FINALLY-ALLOC\* | `fbtriple_finally_exit`, `fbtriple_finally_alloc` |
 | BIND, FRAME | `fbtriple_bind`, `fbtriple_frame` |
 | UPD-ELIM | `fbtriple_upd_elim` (fancy update), `fbtriple_gupd_elim` (ghost update) |
@@ -188,12 +190,19 @@ Notes:
   arbitrary assertion `P : iProp`: `tf_ghost` (notation `⟨P⟩`) embeds `P` with `⟦⟨P⟩⟧ₗ = P`
   (`tf_ghost_logic`), and `⟦alwaysP N I⟧ₗ = inv N ⟦I⟧ₗ` (`tf_always_logic`). The same holds for
   the formulas of the until rules.
-- More general versions: `fbtriple_step_pure_wit` (a set of obligations), `fbtriple_fork` (moves a
-  set of obligations to the child), `fbtriple_pure_step` (a pure step to any expression, such as a
-  β-step), and `fbtriple_gen_bind`, `fbtriple_gen_frame` for the general form.
+- The pure-step rules continue from any expression, such as the body after a β-step. Their value
+  forms are triples for a step to a value: `fbtriple_step_pure`, `fbtriple_step_pure_lc`,
+  `fbtriple_step_pure_wit1`.
+- More general versions: `fbtriple_pure_step_wit` and `fbtriple_step_pure_wit` (a set of
+  obligations), `fbtriple_fork` (moves a set of obligations to the child), and
+  `fbtriple_gen_bind`, `fbtriple_gen_frame`, `fbtriple_gen_pure_step`,
+  `fbtriple_gen_pure_step_wit` for the general form.
 - Rules the paper does not display: `fbtriple_wand_pre` (`(R -∗ {P} e {Q}) ⊢ {P ∗ R} e {Q}`),
   `fuels_weaken` and `fuels_empty`, and `fuels_layer_eq` (layers compared as ordinals). The proof
-  of `main` uses `fbtriple_wand_pre` and `fuels_layer_eq`.
+  of `main` uses `fbtriple_wand_pre`, `fbtriple_conseq`, `fuels_weaken` and `fuels_layer_eq`.
+- The witness variants of the other step rules (§4.1) are stated for `lWP` only, with a set `R`
+  of witnessed obligations: `lwp_load`, `lwp_store`, `lwp_alloc`, … in
+  `lantana_heap_lang/primitive_laws.v`. The proof of `wait` uses `lwp_load` (`flag.v`).
 
 #### Traces and adequacy (§6, Fig. 6)
 
@@ -203,7 +212,7 @@ Notes:
 | THREAD-STEP, THREAD-DONE, THREAD-STUCK | `thread_step`, `thread_done`, `thread_stuck` | `program_logic/language.v` |
 | temporal properties, `⟦·⟧_t`: Always, Until, Finally | `tp`, `tp_trace`: `tr_always`, `tr_until`, `tr_eventually` | `program_logic/temporal_property.v` |
 | `Fair`: inactive, active, turn | `fair_scheduling`: `thread_na`, `thread_active`, `thread_turn` | `program_logic/temporal_property.v` |
-| logical assertions, `⟦·⟧_l` | `tf`, `⟦·⟧ₗ` | `program_logic/temporal_logic.v` |
+| logical formulas, `⟦·⟧_l` | `tf`, `⟦·⟧ₗ` | `program_logic/temporal_logic.v` |
 | `lift` | `tf_to_tp` | `program_logic/adequacy.v` |
 | `x ↦ v`, `thread_i e`, `exit_i v` | `pred_pointsto`, `pred_expr i [] e`, `exits v@i` | `lantana_heap_lang/lang.v`, `lantana_heap_lang/primitive_laws.v` |
 | `lwp` | `lwp`, notation `lWP e @ s; i; E {{ Φ }}` | `program_logic/weakestpre.v` |
@@ -256,13 +265,13 @@ All in `lantana_heap_lang/examples/`.
 | Flag: `isFlag`, `FlagObl`, SPEC-INIT, SPEC-SET, SPEC-WAIT | `is_flag`, `flag_tk`, `Flag_init_fbspec`, `Flag_set_fbspec`, `Flag_wait_fbspec` | `flag.v` |
 | `main` (§2) | `FlagFork_main_fbspec`, `main_adequacy` | `flag_fork.v` |
 | SPEC-NEST, SPEC-NONDET (§4.3) | `Nondet_nest_fbspec`, `Nondet_nondet_fbspec` | `nondet.v` |
-| Handoff (§5): `HandoffBuf`, `HInv`, `TaskSpec`, SPEC-SEND, SPEC-RECEIVE | `handoff_inv`, `is_handoff`, `is_task`, `Handoff_send_fbspec`, `Handoff_receive_fbspec` | `handoff.v` |
+| Handoff (§5): `HandoffBuf`, `HInv`, `polling`, `TaskSpec`, SPEC-SEND, SPEC-RECEIVE | `handoff_inv`, `is_handoff`, `ghost_var (handoff_γd γ)`, `is_task`, `Handoff_send_fbspec`, `Handoff_receive_fbspec` | `handoff.v` |
 | SPEC-HANDOFF-MAIN (§5.2) | `main_fbspec`, `handoff_client_adequacy` | `handoff_client.v` |
-| Ticket lock (§7.1): `TLInv`, `TLObl`, SPEC-ACQUIRE, SPEC-RELEASE | `lock_token`, `TicketLock_acquire_fbspec`, `TicketLock_release_fbspec` | `ticket_lock.v` |
+| Ticket lock (§7.1): `TLInv`, `TLObl`, SPEC-ACQUIRE, SPEC-RELEASE | `is_fair_lock` with its tokens (note below), `lock_token`, `TicketLock_acquire_fbspec`, `TicketLock_release_fbspec` | `ticket_lock.v` |
 | Queue (§7.2): `QInv`, SPEC-ENQUEUE, SPEC-DEQUEUE | `is_queue`, `Queue_enqueue_fbspec`, `Queue_dequeue_fbspec` | `queue.v` |
 | Task queue (§7.3): `TQInv`, SPEC-PUT-TASK, SPEC-WORKER | `is_task_queue`, `TaskQueue_put_task_fbspec`, `TaskQueue_worker_fbspec` | `task_queue.v` |
 | Reentrant client (§7.3): SPEC-DECR, SPEC-DECR-CLIENTMAIN | `decr_reentrant_fbspec`, `main_fbspec`, `task_queue_client_adequacy` | `task_queue_client.v` |
-| The paradox (end of §6.2) | `no_lc_absurd` | `paradox.v` |
+| The paradox (end of §6.3) | `no_lc_absurd` | `paradox.v` |
 
 Notes:
 - `is_flag x k ℓ` takes its arguments in another order than `isFlag`.
@@ -272,6 +281,10 @@ Notes:
   covers the worker and the empty queue; the paper shows the other case.
 - SPEC-ACQUIRE, SPEC-DEQUEUE and `TaskQueue_run_task_fbspec` use the general form. The ticket lock,
   the queue and the task queue also have `init` specifications, and the ticket lock a `delete` one.
+- The modules' `*_spec` lemmas are proved with the `lWP` rules that the triple rules restate.
+  For example, where the paper names WIT-IND, `wait` uses `wit_layer_ind`, and the ticket lock's
+  waiting loop uses the `wit_fuels` lemmas (`base_logic/opreds.v`). `FlagFork_main_fbspec` uses
+  the rules of `triple.v` only.
 - Each client has three end-to-end theorems: `*_adequacy` (Theorem 1), `*_safety_adequacy`
   (safety) and `*_liveness_safety` (both). The clients are `main` in `flag_fork.v`,
   `handoff_client.v`, `task_queue_client.v`, and `flag_client.v`, which proves a property of a

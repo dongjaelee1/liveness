@@ -14,7 +14,10 @@
     Every triple-based rule displayed in the paper is proved below, named [fbtriple_*] and
     marked with the paper's rule name; the paper elides later modalities, masks, and later
     credits, which appear here. Where a rule generalizes the displayed one, its comment says
-    how. Logic-level rules (fuels, until, persistence) are restated at the end. *)
+    how. The paper displays the pure-step rules (STEP-PURE, STEP-PURE-LC, STEP-PURE-WIT) for a
+    step to any expression, with the rest of the proof as a premise ([fbtriple_pure_step*]);
+    their value forms, which are triples without a premise, are [fbtriple_step_pure*].
+    Logic-level rules (fuels, until, persistence) are restated at the end. *)
 From iris.proofmode Require Import proofmode.
 From iris.bi.lib Require Import fractional.
 From lantana.base_logic Require Export invariants.
@@ -125,6 +128,7 @@ Section rules.
 
   (** * Structural rules *)
 
+  (** VALUE *)
   Lemma fbtriple_value s i C E G v :
     ⊢ fb{{ True }}^G (of_val v) @ s; i; C; E fb{{ w, ⌜w = v⌝ }}^G.
   Proof.
@@ -132,7 +136,7 @@ Section rules.
     iApply lwp_value. iApply "HΦ". by iFrame.
   Qed.
 
-  (** EXIT *)
+  (** VALUE at the empty carrier set, with which a thread ends. *)
   Lemma fbtriple_exit s i C E v :
     ⊢ fb{{ True }}^∅ (of_val v) @ s; i; C; E fb{{ w, ⌜w = v⌝ }}^∅.
   Proof. apply fbtriple_value. Qed.
@@ -386,8 +390,8 @@ Section rules.
   Local Lemma tlc_mult_1 (α : Ord.t) : £ (α × 1)%ord ⊢ £ α.
   Proof. iIntros "LC". iApply (tlc_equiv with "LC"). by rewrite Jacobsthal.mult_1_r. Qed.
 
-  (** STEP-PURE-WIT, for a set [R] of witnessed obligations (the paper shows [R = {k}]). Every
-      step gives later credits [£ α] of the proof's choice. *)
+  (** The value form of STEP-PURE-WIT, for a set [R] of witnessed obligations: a pure step to a
+      value, as a triple. Every step gives later credits [£ α] of the proof's choice. *)
   Lemma fbtriple_step_pure_wit s i C E G e v φ (R : gset oid) (α : Ord.t) :
     PureExec φ 1 e (of_val v) → φ →
     ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
@@ -402,7 +406,7 @@ Section rules.
     iSplit; first done. by iApply tlc_mult_1.
   Qed.
 
-  (** STEP-PURE-LC *)
+  (** The value form of STEP-PURE-LC. *)
   Lemma fbtriple_step_pure_lc s i C E G e v φ (α : Ord.t) :
     PureExec φ 1 e (of_val v) → φ →
     ⊢ fb{{ fuels G 0 1 }}^G e @ s; i; C; E fb{{ w, ⌜w = v⌝ ∗ £ α }}^G.
@@ -413,7 +417,7 @@ Section rules.
     iIntros "%w ($& $& _)".
   Qed.
 
-  (** STEP-PURE *)
+  (** The value form of STEP-PURE. *)
   Lemma fbtriple_step_pure s i C E G e v φ :
     PureExec φ 1 e (of_val v) → φ →
     ⊢ fb{{ fuels G 0 1 }}^G e @ s; i; C; E fb{{ w, ⌜w = v⌝ }}^G.
@@ -423,9 +427,9 @@ Section rules.
     iIntros "%w ($& _)".
   Qed.
 
-  (** A pure step to any expression [e2], not only to a value: the proof continues from [e2],
-      with the step's later credits. STEP-PURE-LC is the case where [e2] is a value. A proof
-      needs this for steps such as a function call's β-reduction. *)
+  (** STEP-PURE-LC, as displayed: a pure step to any expression [e2], a value or not (such as
+      a function call's β-reduction). The proof continues from [e2], with the step's later
+      credits. This is the general form; [fbtriple_pure_step] below is the displayed rule. *)
   Lemma fbtriple_gen_pure_step s i C E G P e1 e2 φ Q (α : Ord.t) :
     PureExec φ 1 e1 e2 → φ →
     fb{{ P ∗ £ α }}^G e2 @ s; i; C; E fb{{ v, Q v }} -∗
@@ -445,6 +449,56 @@ Section rules.
     fb{{ P ∗ £ α }}^G e2 @ s; i; C; E fb{{ v, Q v }}^G' -∗
     fb{{ fuels G 0 1 ∗ P }}^G e1 @ s; i; C; E fb{{ v, Q v }}^G'.
   Proof. rewrite /fbtriple. apply fbtriple_gen_pure_step. Qed.
+
+  (** STEP-PURE, as displayed: STEP-PURE-LC whose premise does not use the later credits. *)
+  Lemma fbtriple_pure_step_nolc s i C E G G' P e1 e2 φ Q :
+    PureExec φ 1 e1 e2 → φ →
+    fb{{ P }}^G e2 @ s; i; C; E fb{{ v, Q v }}^G' -∗
+    fb{{ fuels G 0 1 ∗ P }}^G e1 @ s; i; C; E fb{{ v, Q v }}^G'.
+  Proof.
+    iIntros (Hexec Hφ) "H". iApply (fbtriple_pure_step _ _ _ _ _ _ _ _ _ _ _ Ord.O Hexec Hφ).
+    iApply (fbtriple_conseq with "[] [] H"); [by iIntros "[$ _]"|by iIntros (v) "$"].
+  Qed.
+
+  (** STEP-PURE-WIT for a set [R] of witnessed obligations: a pure step to any expression [e2]
+      that also reports the status of each [r ∈ R], a witness credit or the proof that [r] is
+      discharged. This is the general form. *)
+  Lemma fbtriple_gen_pure_step_wit s i C E G P e1 e2 φ Q (R : gset oid) (α : Ord.t) :
+    PureExec φ 1 e1 e2 → φ →
+    ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
+    fb{{ P ∗ £ α ∗ ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r) }}^G
+      e2 @ s; i; C; E fb{{ v, Q v }} -∗
+    fb{{ fuels G 0 1 ∗ P }}^G e1 @ s; i; C; E fb{{ v, Q v }}.
+  Proof.
+    rewrite /fbtriple_gen. iIntros (Hexec Hφ) "#Rs H %Φ (TE& TG& HF& HP) HΦ".
+    iApply (lifting.lwp_pure_step_simple 1 G R α s i E e1 e2 φ Φ
+              (λ i e, thread_expr i C e)); [done|].
+    iFrame "TE TG Rs". iSplitL "HF"; first by iApply fuels_any_layer.
+    iIntros "TE TG Ws LC". iModIntro. iApply ("H" with "[$TE $TG $HP $Ws LC] HΦ").
+    by iApply tlc_mult_1.
+  Qed.
+
+  Lemma fbtriple_pure_step_wit s i C E G G' P e1 e2 φ Q (R : gset oid) (α : Ord.t) :
+    PureExec φ 1 e1 e2 → φ →
+    ([∗ set] r ∈ R, ∃ ℓ, witP_layer r ℓ) -∗
+    fb{{ P ∗ £ α ∗ ([∗ set] r ∈ R, witP_cred r 1 ∨ oblP_discharged r) }}^G
+      e2 @ s; i; C; E fb{{ v, Q v }}^G' -∗
+    fb{{ fuels G 0 1 ∗ P }}^G e1 @ s; i; C; E fb{{ v, Q v }}^G'.
+  Proof. rewrite /fbtriple. apply fbtriple_gen_pure_step_wit. Qed.
+
+  (** STEP-PURE-WIT, as displayed: one witnessed obligation [k]. *)
+  Lemma fbtriple_pure_step_wit1 s i C E G G' P e1 e2 φ Q k (α : Ord.t) :
+    PureExec φ 1 e1 e2 → φ →
+    (∃ ℓk, witP_layer k ℓk) -∗
+    fb{{ P ∗ £ α ∗ (witP_cred k 1 ∨ oblP_discharged k) }}^G e2 @ s; i; C; E fb{{ v, Q v }}^G' -∗
+    fb{{ fuels G 0 1 ∗ P }}^G e1 @ s; i; C; E fb{{ v, Q v }}^G'.
+  Proof.
+    iIntros (Hexec Hφ) "#Wl H".
+    iApply (fbtriple_pure_step_wit _ _ _ _ _ _ _ _ _ _ _ {[k]} α Hexec Hφ with "[]").
+    { by rewrite big_sepS_singleton. }
+    iApply (fbtriple_conseq with "[] [] H"); last by iIntros (v) "$".
+    iIntros "($& $& Ws)". by rewrite big_sepS_singleton.
+  Qed.
 
   (** STEP-REF *)
   Lemma fbtriple_step_ref s i C E G v (α : Ord.t) :
@@ -502,7 +556,7 @@ Section rules.
       rewrite /lift_term. by iFrame.
   Qed.
 
-  (** STEP-PURE-WIT as displayed, for one witnessed obligation [k]. *)
+  (** The value form of STEP-PURE-WIT for one witnessed obligation [k]. *)
   Lemma fbtriple_step_pure_wit1 s i C E G e v φ k ℓk (α : Ord.t) :
     PureExec φ 1 e (of_val v) → φ →
     witP_layer k ℓk -∗

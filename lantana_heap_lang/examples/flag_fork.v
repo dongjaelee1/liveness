@@ -106,7 +106,7 @@ Section derived.
     by iApply (fbtriple_carrier_delete _ _ _ _ _ _ g ℓ True%I _ _ Hg with "H").
   Qed.
 
-  (** EXIT, for a thread that ends with no carriers. *)
+  (** VALUE, for a thread that ends with no carriers. *)
   Lemma fb_exit s i C E v :
     ⊢ fb{{ True }}^∅ (of_val v) @ s; i; C; E fb{{ _, True }}^∅.
   Proof.
@@ -206,7 +206,7 @@ Section proof.
     iDestruct (fuels_add with "F0") as "[F1 F0]". fb_pure "F1".
     iDestruct (fuels_add with "F0") as "[F1 F0]". fb_pure "F1".
     (** FORK*: [kf] moves to the child, together with [flag_tk] and [is_flag] (FlagObl and
-        isFlag). The child runs SPEC-SET, then CARRIER-DELETE and EXIT. *)
+        isFlag). The child runs SPEC-SET, then CARRIER-DELETE and VALUE. *)
     iDestruct (fuels_add with "F0") as "[F1 F0]".
     fb_call (Fork _) "[] [F1 Cf Of Ftk]".
     { iApply (fbtriple_fork1 _ _ _ _ _ gf 0 μ_set kf (flag_tk x kf ∗ is_flag x kf 0)%I _ Ord.O).
