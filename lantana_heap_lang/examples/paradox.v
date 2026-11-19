@@ -13,7 +13,10 @@ From iris.proofmode Require Import coq_tactics reduction spec_patterns.
 
 (** The fuel-free pure-step rule: one pure step that needs neither fuel nor carriers. Compare
     [lwp_pure_step] (program_logic/lifting.v), which burns a unit of fuel from every carrier
-    the thread holds. [no_lc_absurd] at the end of this file shows that the rule is unsound. *)
+    the thread holds. Like that rule, it grants a witness credit (or the discharge) for each
+    obligation in [R]. [no_lc_absurd] at the end of this file shows that the rule is unsound.
+    The proof uses the witness credits ([px_loop1_spec]), so it does not cover a fuel-free rule
+    without them. *)
 Class lantanaGS_no_lc `(HGS : lantanaGS Λ Σ) := {
     lwp_pure_step_no_lc :
     ∀ s i E E' e1 e2 φ Φ,

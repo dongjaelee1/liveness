@@ -29,7 +29,7 @@ Print Assumptions flag_client.flag_client_adequacy.
 Print Assumptions flag_client.flag_client_safety_adequacy.
 Print Assumptions flag_client.flag_client_liveness_safety.
 
-(** * The paradox: a fuel-free pure-step rule is unsound *)
+(** * The paradox: a fuel-free pure-step rule that grants witness credits is unsound *)
 Print Assumptions paradox.no_lc_absurd.
 
 (** * The correspondences with the paper's presentation ([equivalences.v]): no axioms *)

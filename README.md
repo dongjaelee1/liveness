@@ -18,7 +18,7 @@ Rule names, notation, and section and figure numbers follow the final version of
 | 1. The logic: Lantana's predicates and the fuel-burning triple, with every rule the paper displays proved as a lemma | §1–§5, Figs. 1, 3–5 | `lantana/`, `lantana_heap_lang/triple.v` |
 | 2. Adequacy: `lwp_adequacy` (Theorem 1), and Iris-style safety `lwp_adequacy_safety_iris` | §6 | `lantana/program_logic/adequacy.v`, `adequacy_iris.v` |
 | 3. The case studies, with end-to-end theorems for the client programs | §2, §4.3, §5, §7 | `lantana_heap_lang/examples/` |
-| 4. A pure-step rule that burns no fuel is unsound: `no_lc_absurd` | end of §6.3 | `lantana_heap_lang/examples/paradox.v` |
+| 4. A pure-step rule that burns no fuel but still grants witness credits is unsound: `no_lc_absurd` | end of §6.3 | `lantana_heap_lang/examples/paradox.v` |
 | 5. Nothing is admitted, and the results assume only seven standard axioms, among them Hilbert's epsilon | §6.3, Data Availability Statement | `lantana_heap_lang/examples/assumptions.v` |
 
 Building the development (§3.1) checks claims 1–4, and §3.3 gives the Rocq name of each item of
@@ -30,6 +30,7 @@ the paper. §3.2 checks claim 5.
 
 - opam 2.1 or later, on Linux or macOS (on Windows, use WSL), with network access.
   We tested with opam 2.1.5, OCaml 5.2.1 and Rocq 9.0.0 on Linux (x86-64).
+- `git`, `unzip`, `make` and a C compiler, which opam and `./configure` use.
 - 8 GB of memory. With `-j6`, the build used at most 3.6 GB.
 - Time, on an Intel Xeon Gold 6354 (3.0 GHz): `./configure` takes about 5 minutes plus the time
   opam takes to build Rocq, and `make -j6` about 10 minutes.
@@ -120,7 +121,8 @@ fbtriple s i C E G G' P e Q := fbtriple_gen s i C E G P e (λ v, thP_carriers i 
 - `fbtriple_gen` (no final superscript) lets the postcondition state the final carriers, when
   they depend on its variables (e.g. SPEC-ACQUIRE).
 - A triple is not persistent; a specification is `□ ∃ μ, ∀ …, fb{{ P }}^G e @ i; C; ⊤ fb{{ v, Q }}^G'`.
-- The case studies prove texan-style `*_spec` lemmas and restate them in this form as `*_fbspec`.
+- The modules prove texan-style `*_spec` lemmas and restate them in this form as `*_fbspec`;
+  the clients' closed specifications are proved as `*_fbspec` first.
 
 Name prefixes: `crP_` carriers, `oblP_` obligations, `witP_` witnesses, `thP_` threads, `tf_`
 logical temporal formulas, `tp`/`tr_` trace properties.
@@ -289,8 +291,10 @@ Notes:
   (safety) and `*_liveness_safety` (both). The clients are `main` in `flag_fork.v`,
   `handoff_client.v`, `task_queue_client.v`, and `flag_client.v`, which proves a property of a
   memory location.
-- `no_lc_absurd` derives `False` from a fuel-free pure-step rule (`lantanaGS_no_lc`), through
-  `loop_paradox` and a concrete fair run `loop_run` of two looping threads.
+- `no_lc_absurd` derives `False` from a pure-step rule that burns no fuel but, like the
+  fuel-burning rule, grants witness credits (`lantanaGS_no_lc`), through `loop_paradox` and a
+  concrete fair run `loop_run` of two looping threads. The proof uses the witness credits, so it
+  does not cover a fuel-free rule without them.
 
 ## 4. The development
 
