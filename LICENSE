@@ -5,7 +5,9 @@ distributed under the terms of the 3-clause BSD license
 
 The files in ordinal/ are a copy of the Ordinal library, distributed under the
 terms of the MIT license in ordinal/LICENSE. The bundled zip files are
-distributed under the licenses of their projects (the 3-clause BSD license).
+distributed under the licenses of their projects: see the license files in
+stdpp.zip and iris-parametric-index.zip, and the opam file in
+transfinite-parametric-index.zip.
 
 Copyright: Lantana developers and contributors
 

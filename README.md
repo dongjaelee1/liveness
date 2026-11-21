@@ -15,7 +15,7 @@ Rule names, notation, and section and figure numbers follow the final version of
 
 | Claim | Paper | Rocq |
 |---|---|---|
-| 1. The logic: Lantana's predicates and the fuel-burning triple, with every rule the paper displays proved as a lemma | §1–§5, Figs. 1, 3–5 | `lantana/`, `lantana_heap_lang/triple.v` |
+| 1. The logic: Lantana's predicates and the fuel-burning triple, with every rule the paper displays proved as a lemma | §2–§5, Figs. 1, 3–5 | `lantana/`, `lantana_heap_lang/triple.v` |
 | 2. Adequacy: `lwp_adequacy` (Theorem 1), and Iris-style safety `lwp_adequacy_safety_iris` | §6 | `lantana/program_logic/adequacy.v`, `adequacy_iris.v` |
 | 3. The case studies, with end-to-end theorems for the client programs | §2, §4.3, §5, §7 | `lantana_heap_lang/examples/` |
 | 4. A pure-step rule that burns no fuel but still grants witness credits is unsound: `no_lc_absurd` | end of §6.3 | `lantana_heap_lang/examples/paradox.v` |
@@ -98,7 +98,7 @@ only commented-out code and an unused tactic.
 
 ### 3.3 From the paper to Rocq
 
-Paths are under `lantana/`, unless they start with `lantana_heap_lang/`.
+Paths are under `lantana/`, unless they start with `lantana_heap_lang/` or `ordinal/`.
 
 #### The fuel-burning triple
 
@@ -115,9 +115,10 @@ fbtriple s i C E G G' P e Q := fbtriple_gen s i C E G P e (λ v, thP_carriers i 
 
 - Notation: `fb{{ P }}^G e @ i; C; E fb{{ v, Q }}^G'`, or with `@ s; i; C; E` for a stuckness `s`
   other than `NotStuck`.
-- It makes explicit what the paper leaves implicit: the mask `E`, and the context `C` around `e`
-  in thread `i`'s expression. The triple carries the thread token `thread_expr i C e` and the
-  carriers `thP_carriers i G`, so neither appears in `P` or `Q`.
+- It states the thread `i` and the mask `E`, which the paper's rules elide, and the context `C`
+  around `e` in thread `i`'s expression, which the paper leaves implicit. The triple carries the
+  thread token `thread_expr i C e` and the carriers `thP_carriers i G`, so neither appears in `P`
+  or `Q`.
 - `fbtriple_gen` (no final superscript) lets the postcondition state the final carriers, when
   they depend on its variables (e.g. SPEC-ACQUIRE).
 - A triple is not persistent; a specification is `□ ∃ μ, ∀ …, fb{{ P }}^G e @ i; C; ⊤ fb{{ v, Q }}^G'`.
@@ -144,7 +145,7 @@ logical temporal formulas, `tp`/`tr_` trace properties.
 | `always I` | `alwaysP N I` | `program_logic/temporal_logic.v` |
 | `£ α` | later credits, `tlc_*` lemmas | `base_logic/later_credits.v` |
 | `Measure` | `measure` | `algebra/measure.v` |
-| layers `ℓ` | `ord.t` | `algebra/layer.v` |
+| layers `ℓ` | `ord.t` | `ordinal/ordinal.v`; notations in `algebra/layer.v` |
 
 Notes:
 - `N` is an invariant namespace, which the paper omits.
@@ -199,9 +200,10 @@ Notes:
   obligations), `fbtriple_fork` (moves a set of obligations to the child), and
   `fbtriple_gen_bind`, `fbtriple_gen_frame`, `fbtriple_gen_pure_step`,
   `fbtriple_gen_pure_step_wit` for the general form.
-- Rules the paper does not display: `fbtriple_wand_pre` (`(R -∗ {P} e {Q}) ⊢ {P ∗ R} e {Q}`),
-  `fuels_weaken` and `fuels_empty`, and `fuels_layer_eq` (layers compared as ordinals). The proof
-  of `main` uses `fbtriple_wand_pre`, `fbtriple_conseq`, `fuels_weaken` and `fuels_layer_eq`.
+- Rules the paper does not display: `fbtriple_conseq` (the rule of consequence),
+  `fbtriple_wand_pre` (`(R -∗ {P} e {Q}) ⊢ {P ∗ R} e {Q}`), `fuels_weaken` and `fuels_empty`, and
+  `fuels_layer_eq` (layers compared as ordinals). The proof of `main` uses `fbtriple_wand_pre`,
+  `fbtriple_conseq`, `fuels_weaken` and `fuels_layer_eq`.
 - The witness variants of the other step rules (§4.1) are stated for `lWP` only, with a set `R`
   of witnessed obligations: `lwp_load`, `lwp_store`, `lwp_alloc`, … in
   `lantana_heap_lang/primitive_laws.v`. The proof of `wait` uses `lwp_load` (`flag.v`).
@@ -217,7 +219,7 @@ Notes:
 | logical formulas, `⟦·⟧_l` | `tf`, `⟦·⟧ₗ` | `program_logic/temporal_logic.v` |
 | `lift` | `tf_to_tp` | `program_logic/adequacy.v` |
 | `x ↦ v`, `thread_i e`, `exit_i v` | `pred_pointsto`, `pred_expr i [] e`, `exits v@i` | `lantana_heap_lang/lang.v`, `lantana_heap_lang/primitive_laws.v` |
-| `lwp` | `lwp`, notation `lWP e @ s; i; E {{ Φ }}` | `program_logic/weakestpre.v` |
+| `lwp` | `lwp`, notation `lWP e @ s; i; E {{ Φ }}` | `program_logic/weakestpre.v`; class and notation in `bi/weakestpre.v` |
 | `Ω`, `W` | `obls`, `witnesses` | `base_logic/obligation.v`, `base_logic/witness.v` |
 | `M`, model update | `model_interp`, `mupd` | `base_logic/mupd.v` |
 | `H` | `owit_inv` | `base_logic/owit.v` |
@@ -243,7 +245,7 @@ Notes:
     paper's, so the theorem is stronger.
   - Trace states carry Iris's observations `κs`, which the paper omits (HeapLang has none).
 - `thread_done_intro` has the shape of `thread_step_atomic`, and its side conditions leave the
-  configuration unchanged, as THREAD-DONE says: `thread_done_iff`
+  thread pool and the state unchanged, as THREAD-DONE says: `thread_done_iff`
   (`program_logic/equivalences.v`) proves
   `thread_done i ρ1 κ ρ2 ↔ ∃ v, ρ1.1 !! i = Some (of_val v) ∧ κ = [] ∧ ρ2 = ρ1`.
 - `behavior` is coinductive, where the paper's `Behavior` quantifies over the later positions of
@@ -287,6 +289,10 @@ Notes:
   For example, where the paper names WIT-IND, `wait` uses `wit_layer_ind`, and the ticket lock's
   waiting loop uses the `wit_fuels` lemmas (`base_logic/opreds.v`). `FlagFork_main_fbspec` uses
   the rules of `triple.v` only.
+- `handoff_client.v` and `task_queue.v` fork their worker with `lwp_fork_step`
+  (`lantana_heap_lang/primitive_laws.v`), not with FORK\*: the parent allocates the worker's
+  carrier and keeps its obligations predicate for the shared invariant (`is_handoff`, `is_queue`),
+  where FORK\* gives that predicate to the child.
 - Each client has three end-to-end theorems: `*_adequacy` (Theorem 1), `*_safety_adequacy`
   (safety) and `*_liveness_safety` (both). The clients are `main` in `flag_fork.v`,
   `handoff_client.v`, `task_queue_client.v`, and `flag_client.v`, which proves a property of a
@@ -319,16 +325,18 @@ The logical paths are `lantana.ordinal`, `lantana` and `lantana.heap_lang`.
 ### What is new
 
 `lantana/` and `lantana_heap_lang/` are new. Some files are adapted from earlier work, as their
-headers say:
+headers or the directory READMEs say:
 - HeapLang (apart from `triple.v` and the examples) from Iris's HeapLang, with thread ids and
   `ChooseNat`, and without prophecy variables;
-- the language interface, lifting lemmas and atomic triples (`lantana/program_logic/`) and the
-  weakest-precondition interface (`lantana/bi/`) from Iris;
-- fancy updates, invariants and satisfiability (`lantana/base_logic/`) from Transfinite Iris, and
+- the language interface, lifting lemmas, atomic triples and the structure of `weakestpre.v`
+  (`lantana/program_logic/`), and the weakest-precondition interface (`lantana/bi/`), from Iris;
+- fancy updates, invariants, `gen_inv_heap.v` and satisfiability (`lantana/base_logic/`) from
+  Transfinite Iris, and
   the relational updates and later credits from the artifact of *Later Credits* (Spies et al.,
   2022);
 - `ord_tree` (`lantana/prelude/wf_structs.v`) from the Coq development of Fair Operational
-  Semantics.
+  Semantics (FOS); `ocm.v`, `bank.v` and `bcred.v` (`lantana/algebra/`) follow modules of the Lilo
+  and FOS developments.
 
 `ordinal/` is a copy of the Ordinal library, and the zip files are std++, parametric Iris and
 Transfinite Iris.

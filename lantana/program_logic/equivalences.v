@@ -5,8 +5,8 @@
     - [omega_lt_large]: the paper's grammar of measures has ω, where [measure] has [ms_large]
       (written [ℵ]), which is interpreted as [Ord.large]. They are different ordinals, with
       ω below ℵ.
-    - [thread_done_iff]: THREAD-DONE (Figure 6) leaves the configuration unchanged, where
-      [thread_done_intro] has the shape of [thread_step_atomic], with side conditions.
+    - [thread_done_iff]: THREAD-DONE (Figure 6) leaves the thread pool and the state unchanged,
+      where [thread_done_intro] has the shape of [thread_step_atomic], with side conditions.
     - [behavior_iff]: the paper's [Behavior] quantifies over all later positions of the trace,
       where [behavior] is coinductive.
 
@@ -27,7 +27,8 @@ Qed.
 Section equivalences.
   Context {Λ : language}.
 
-  (** THREAD-DONE as in the paper: a scheduled value leaves the configuration unchanged. *)
+  (** THREAD-DONE as in the paper: a scheduled value leaves the thread pool and the state
+      unchanged. *)
   Lemma thread_done_iff i (ρ1 ρ2 : cfg Λ) κ :
     thread_done i ρ1 κ ρ2 ↔
     ∃ v, ρ1.1 !! i = Some (of_val v) ∧ κ = [] ∧ ρ2 = ρ1.

@@ -39,7 +39,9 @@ In dependency order: each file imports only files above it.
   modules in lower case (`Ord` → `ord`, `OrdArith` → `ordArith`, `Hessenberg` → `hessenberg`,
   `ClassicOrd` → `classicOrd`, …); the notation scope `ord_scope` (`%ord`) → `ordinal_scope`
   (`%ordi`); sflib's internal names and hint database → `sflibord`; and `ToSet.to_set` → `toSet.toSet`.
-  The proofs are unchanged.
+  Three more changes: the notations are in exported modules (`ordinalScope`, `arithmeticScope`,
+  `hessenbergScope`), the four comparison notations have an explicit level, and the hint database
+  is created without `discriminated`. The proofs are unchanged.
 - So in Lantana, `ord.t` and `%ordi` refer to this copy, and `Ord.t` and `%ord` to the opam copy.
 - The seven files marked "Not used by Lantana" are kept so that the copy stays complete. They
   are still built (they are listed in `_CoqProject`).

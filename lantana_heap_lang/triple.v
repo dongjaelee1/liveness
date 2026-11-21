@@ -1,8 +1,8 @@
 (** The fuel-burning triple of the paper and its rules.
 
     The paper writes [{P}^G_i e {v. Q v}^G'_E]. Here the triple is defined at the HeapLang
-    level, with the parts the paper leaves implicit made explicit:
-    - the stuckness [s] and the invariant mask [E];
+    level, and states what the paper leaves implicit or elides in its rules:
+    - the stuckness [s], and in every rule the thread [i] and the invariant mask [E];
     - the evaluation context [C] around [e] in thread [i]'s expression. The triple carries
       the thread-expression token [thread_expr i C e] along with the carrier predicate
       [thP_carriers i G], so that neither appears in [P] or [Q]. Top-level (closed) triples
@@ -10,7 +10,8 @@
 
     As in the paper, a triple is not persistent. A specification is a persistent triple,
     [□ ∃ μ, ∀ …, fb{{ P }}^G e @ i; C; E fb{{ v, Q }}^G'], which is the texan triple of the case
-    studies ([fbtriple_texan]); the case studies restate their specifications in this form.
+    studies ([fbtriple_texan]); the modules restate their specifications in this form, and the
+    clients prove theirs in it directly.
     Every triple-based rule displayed in the paper is proved below, named [fbtriple_*] and
     marked with the paper's rule name; the paper elides later modalities, masks, and later
     credits, which appear here. Where a rule generalizes the displayed one, its comment says
@@ -427,9 +428,9 @@ Section rules.
     iIntros "%w ($& _)".
   Qed.
 
-  (** STEP-PURE-LC, as displayed: a pure step to any expression [e2], a value or not (such as
-      a function call's β-reduction). The proof continues from [e2], with the step's later
-      credits. This is the general form; [fbtriple_pure_step] below is the displayed rule. *)
+  (** The general form of STEP-PURE-LC: a pure step to any expression [e2], a value or not
+      (such as a function call's β-reduction). The proof continues from [e2], with the step's
+      later credits. *)
   Lemma fbtriple_gen_pure_step s i C E G P e1 e2 φ Q (α : Ord.t) :
     PureExec φ 1 e1 e2 → φ →
     fb{{ P ∗ £ α }}^G e2 @ s; i; C; E fb{{ v, Q v }} -∗
@@ -444,6 +445,7 @@ Section rules.
     by iApply tlc_mult_1.
   Qed.
 
+  (** STEP-PURE-LC, as displayed. *)
   Lemma fbtriple_pure_step s i C E G G' P e1 e2 φ Q (α : Ord.t) :
     PureExec φ 1 e1 e2 → φ →
     fb{{ P ∗ £ α }}^G e2 @ s; i; C; E fb{{ v, Q v }}^G' -∗
