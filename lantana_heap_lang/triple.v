@@ -143,7 +143,7 @@ Section rules.
   Proof. apply fbtriple_value. Qed.
 
   (** A top-level triple, at the empty context and from and to the empty carrier set, gives
-      the weakest precondition that adequacy (Theorem 1) consumes: the thread may exit. *)
+      the weakest precondition that adequacy (Theorem 6.1) consumes: the thread may exit. *)
   Lemma fbtriple_top_lwp s i E P e Q (Ψ : thread_id → val → iProp Σ) :
     (∀ v, Q v ⊢ Ψ i v) →
     fb{{ P }}^∅ e @ s; i; []; E fb{{ v, Q v }}^∅ -∗

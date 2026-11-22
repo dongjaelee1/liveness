@@ -16,7 +16,7 @@ Rule names, notation, and section and figure numbers follow the final version of
 | Claim | Paper | Rocq |
 |---|---|---|
 | 1. The logic: Lantana's predicates and the fuel-burning triple, with every rule the paper displays proved as a lemma | §2–§5, Figs. 1, 3–5 | `lantana/`, `lantana_heap_lang/triple.v` |
-| 2. Adequacy: `lwp_adequacy` (Theorem 1), and Iris-style safety `lwp_adequacy_safety_iris` | §6 | `lantana/program_logic/adequacy.v`, `adequacy_iris.v` |
+| 2. Adequacy: `lwp_adequacy` (Theorem 6.1), and Iris-style safety `lwp_adequacy_safety_iris` | §6 | `lantana/program_logic/adequacy.v`, `adequacy_iris.v` |
 | 3. The case studies, with end-to-end theorems for the client programs | §2, §4.3, §5, §7 | `lantana_heap_lang/examples/` |
 | 4. A pure-step rule that burns no fuel but still grants witness credits is unsound: `no_lc_absurd` | end of §6.3 | `lantana_heap_lang/examples/paradox.v` |
 | 5. Nothing is admitted, and the results assume only seven standard axioms, among them Hilbert's epsilon | §6.3, Data Availability Statement | `lantana_heap_lang/examples/assumptions.v` |
@@ -171,7 +171,7 @@ All in `lantana_heap_lang/triple.v`.
 | STEP-PURE, STEP-PURE-LC, STEP-PURE-WIT | `fbtriple_pure_step_nolc`, `fbtriple_pure_step`, `fbtriple_pure_step_wit1` |
 | STEP-REF, STEP-STORE, STEP-LOAD | `fbtriple_step_ref`, `fbtriple_step_store`, `fbtriple_step_load` |
 | FORK\* | `fbtriple_fork1` |
-| VALUE | `fbtriple_value`; at the empty carrier set, `fbtriple_exit`, and `fbtriple_top_lwp` for Theorem 1 |
+| VALUE | `fbtriple_value`; at the empty carrier set, `fbtriple_exit`, and `fbtriple_top_lwp` for Theorem 6.1 |
 | FINALLY-EXIT\*, FINALLY-ALLOC\* | `fbtriple_finally_exit`, `fbtriple_finally_alloc` |
 | BIND, FRAME | `fbtriple_bind`, `fbtriple_frame` |
 | UPD-ELIM | `fbtriple_upd_elim` (fancy update), `fbtriple_gupd_elim` (ghost update) |
@@ -224,11 +224,11 @@ Notes:
 | `M`, model update | `model_interp`, `mupd` | `base_logic/mupd.v` |
 | `H` | `owit_inv` | `base_logic/owit.v` |
 | `S` | `state_interp` | `lantana_heap_lang/primitive_laws.v` |
-| **Theorem 1** | `lwp_adequacy` | `program_logic/adequacy.v` |
+| **Theorem 6.1** | `lwp_adequacy` | `program_logic/adequacy.v` |
 | Iris-style safety | `lwp_adequacy_safety_iris` | `program_logic/adequacy_iris.v` |
 
 Notes:
-- `lwp_adequacy` is Theorem 1 in general form. Its premise differs from the paper's in these
+- `lwp_adequacy` is Theorem 6.1 in general form. Its premise differs from the paper's in these
   ways:
   - It starts a thread pool `Θ` with postconditions `Ψs`, where the paper has one thread;
     `lift_term i Ψ` is the paper's postcondition `ψ v ∗ ■ i`.
@@ -293,7 +293,7 @@ Notes:
   (`lantana_heap_lang/primitive_laws.v`), not with FORK\*: the parent allocates the worker's
   carrier and keeps its obligations predicate for the shared invariant (`is_handoff`, `is_queue`),
   where FORK\* gives that predicate to the child.
-- Each client has three end-to-end theorems: `*_adequacy` (Theorem 1), `*_safety_adequacy`
+- Each client has three end-to-end theorems: `*_adequacy` (Theorem 6.1), `*_safety_adequacy`
   (safety) and `*_liveness_safety` (both). The clients are `main` in `flag_fork.v`,
   `handoff_client.v`, `task_queue_client.v`, and `flag_client.v`, which proves a property of a
   memory location.

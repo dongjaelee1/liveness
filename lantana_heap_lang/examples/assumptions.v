@@ -11,7 +11,7 @@ From lantana.heap_lang.examples Require flag nondet handoff ticket_lock queue ta
 From lantana.heap_lang.examples Require flag_fork handoff_client task_queue_client flag_client.
 From lantana.heap_lang.examples Require paradox.
 
-(** * Adequacy (Theorem 1) and Iris-style safety *)
+(** * Adequacy (Theorem 6.1) and Iris-style safety *)
 Print Assumptions adequacy.lwp_adequacy.
 Print Assumptions adequacy_iris.lwp_adequacy_safety_iris.
 
