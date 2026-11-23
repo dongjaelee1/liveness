@@ -1,8 +1,9 @@
 # Lantana in Rocq
 
 The Rocq development of *Decoupling Liveness Obligations from Threads in the Lantana Concurrent
-Separation Logic* (POPL 2027). It mechanizes Lantana on top of Transfinite Iris: the logic and its
-fuel-burning triple, the adequacy theorem, and the case studies.
+Separation Logic* (POPL 2027; Proc. ACM Program. Lang. 11, POPL, Article 79,
+[doi:10.1145/3871781](https://doi.org/10.1145/3871781)). It mechanizes Lantana on top of
+Transfinite Iris: the logic and its fuel-burning triple, the adequacy theorem, and the case studies.
 
 Rule names, notation, and section and figure numbers follow the final version of the paper.
 
